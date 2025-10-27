@@ -15,7 +15,7 @@
   config-info(
     title: [ASE, EFM3D & EVL: Datasets, Models & Tools for NBV],
     subtitle: [Towards Relative Reconstruction Metrics for Next-Best-View],
-    authors: ([*Jan Duchscherer*]),
+    authors: [*Jan Duchscherer*],
     extra: [VCML Seminar WS24/25],
     footer: [
       #grid(
@@ -32,7 +32,7 @@
     handout: false,
   ),
   config-colors(
-      primary: rgb("fc5555"),
+    primary: rgb("fc5555"),
   ),
 )
 
@@ -53,62 +53,72 @@
 
 // ASE overview slide
 #slide(title: [ASE Dataset Overview])[
- #grid(columns: (1fr, 1fr), gutter: 1.5cm,
-   [#text(size: 16pt)[
-  *Dataset Content*
-  - 100,000 unique multi-room interior scenes
-  - \~2-min egocentric trajectories per scene
-  - Populated with ~8,000 3D objects
-  - Aria camera & lens characteristics
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 1.5cm,
+    [#text(size: 16pt)[
+      *Dataset Content*
+      - 100,000 unique multi-room interior scenes
+      - \~2-min egocentric trajectories per scene
+      - Populated with ~8,000 3D objects
+      - Aria camera & lens characteristics
 
-  *Ground Truth Annotations*
-  - 6DoF trajectories
-  - RGB-D frames
-  - 2D panoptic segmentation
-  - Semi-dense SLAM PC w/ visibility info
-  - 3D floor plan (SceneScript SSL format)
-  - _GT meshes_ as `.ply` files
+      *Ground Truth Annotations*
+      - 6DoF trajectories
+      - RGB-D frames
+      - 2D panoptic segmentation
+      - Semi-dense SLAM PC w/ visibility info
+      - 3D floor plan (SceneScript SSL format)
+      - _GT meshes_ as `.ply` files
 
-  *Key Resources*
-  - Project Aria Tools for data access
-  - #link("https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset")[ASE documentation] @ProjectAria-ASE-2025 @SceneScript-avetisyan2024
-  ]],
+      *Key Resources*
+      - #link("https://github.com/facebookresearch/projectaria_tools")[Project Aria Tools] for data access
+      - #link(
+          "https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset",
+        )[ASE documentation] @ProjectAria-ASE-2025 @SceneScript-avetisyan2024
+    ]],
     [
-    #v(1em)
-    #figure([#image(fig_path + "scene-script/ase_primitives.jpg", width: 90%)
-    #v(0.5em)
-    #image(fig_path + "efm3d/gt_mesh.jpg", width: 90%)], caption: [@SceneScript-avetisyan2024])
-    ]
+      #v(1em)
+      #figure(
+        [#image(fig_path + "scene-script/ase_primitives.jpg", width: 90%)
+          #v(0.5em)
+          #image(fig_path + "efm3d/gt_mesh.jpg", width: 90%)],
+        caption: [@SceneScript-avetisyan2024],
+      )
+    ],
   )
 ]
 
 // ASE Dataset Structure
 #slide(title: [ASE Dataset Structure])[
   #text(size: 10pt)[
-  ```
-  scene_id/
-  ├── ase_scene_language.txt          # Ground truth scene layout in SSL format
-  ├── object_instances_to_classes.json # Mapping from instance IDs to semantic classes
-  ├── trajectory.csv                   # 6DoF camera poses along the egocentric path
-  ├── semidense_points.csv.gz          # Semi-dense 3D point cloud from MPS SLAM
-  ├── semidense_observations.csv.gz    # Point observations (which images see which points)
-  ├── rgb/                             # RGB image frames
-  │   ├── 000000.png
-  │   └── ...
-  ├── depth/                           # Ground truth depth maps
-  │   ├── 000000.png
-  │   └── ...
-  └── instances/                       # Instance segmentation masks
-      ├── 000000.png
-      └── ...
-  ```
+    ```
+    scene_id/
+    ├── ase_scene_language.txt          # Ground truth scene layout in SSL format
+    ├── object_instances_to_classes.json # Mapping from instance IDs to semantic classes
+    ├── trajectory.csv                   # 6DoF camera poses along the egocentric path
+    ├── semidense_points.csv.gz          # Semi-dense 3D point cloud from MPS SLAM
+    ├── semidense_observations.csv.gz    # Point observations (which images see which points)
+    ├── rgb/                             # RGB image frames
+    │   ├── 000000.png
+    │   └── ...
+    ├── depth/                           # Ground truth depth maps
+    │   ├── 000000.png
+    │   └── ...
+    └── instances/                       # Instance segmentation masks
+        ├── 000000.png
+        └── ...
+    ```
   ]
 ]
 
 // EFM3D Section
 #section-slide(title: [EFM3D Benchmark], subtitle: [3D Egocentric Foundation Model: \ Egocentric Voxel Lifting (EVL)
-    #figure(muchpdf(read(fig_path + "efm3d/EFM3D_teaser_v1.pdf", encoding: none), width: 27cm), caption: [@EFM3D-straub2024])
-  ])
+  #figure(
+    muchpdf(read(fig_path + "efm3d/EFM3D_teaser_v1.pdf", encoding: none), width: 27cm),
+    caption: [@EFM3D-straub2024],
+  )
+])
 
 #slide(title: [EFM3D & EVL])[
   *EFM3D Tasks*
@@ -132,20 +142,21 @@
   subtitle: [
     Streamlined ML Workflows for Aria Datasets
     #figure(image(fig_path + "atek/overview.png", width: 20cm), caption: [@ATEK-Repo])
-])//[
-  // #align(center)[
-  //   #text(size: 14pt)[
+  ],
+)//[
+// #align(center)[
+//   #text(size: 14pt)[
 
 
-  //     #v(2em)
+//     #v(2em)
 
-  //     #grid(columns: (1fr, 1fr, 1fr), gutter: 2em,
-  //       [*Data Store*\ PyTorch\ WebDataset],
-  //       [*Evaluation*\ Mesh Metrics\ Benchmarks],
-  //       [*Training*\ Pre-processed\ Splits]
-  //     )
-  //   ]
-  // ]
+//     #grid(columns: (1fr, 1fr, 1fr), gutter: 2em,
+//       [*Data Store*\ PyTorch\ WebDataset],
+//       [*Evaluation*\ Mesh Metrics\ Benchmarks],
+//       [*Training*\ Pre-processed\ Splits]
+//     )
+//   ]
+// ]
 // ]
 
 #slide(title: [ATEK Toolkit])[
@@ -153,15 +164,17 @@
   - Pre-processed for various tasks $->$ ready for PyTorch training
   - Local download or cloud streaming
   - Eval metrics (accuracy, completeness, F-score) $->$ adaptation for RRI
-  - Integration w\/ Meta's MPS and
+  - Integration w\/ Meta's MPS
   - Various example notebooks
 
   *Provided Models*
-  - _Cube R-CNN_ @omni3d-cubercnn-brazil2023 for OBBs, _EFM_ @EFM3D-straub2024 for OBBs & surface reconstruction
+  - _Cube R-CNN_ @omni3d-cubercnn-brazil2023 for OBBs, _EVL_ @EFM3D-straub2024 for OBBs & surface reconstruction
 
   *Resources*
-  - #link("https://github.com/facebookresearch/ATEK")[ATEK GitHub] @ATEK-about-2025
-  - #link("https://www.youtube.com/watch?v=m6oFLfYUpoM&t=7242s")[ECCV 2024 Tutorial: Egocentric Research with Project Aria]
+  - #link("https://github.com/facebookresearch/ATEK")[ATEK GitHub]
+  - #link(
+      "https://www.youtube.com/watch?v=m6oFLfYUpoM&t=7242s",
+    )[ECCV 2024 Tutorial: Egocentric Research with Project Aria]
 ]
 
 // VIN-NBV Overview
@@ -176,7 +189,9 @@
 
   For a candidate view $q$, RRI quantifies expected improvement:
 
-  $ "RRI"(q) = ("CD"(cal(P)_"base", cal(P)_"GT") - "CD"(cal(P)_("base" union q), cal(P)_"GT")) / ("CD"(cal(P)_"base", cal(P)_"GT")) $
+  $
+    "RRI"(q) = ("CD"(cal(P)_"base", cal(P)_"GT") - "CD"(cal(P)_("base" union q), cal(P)_"GT")) / ("CD"(cal(P)_"base", cal(P)_"GT"))
+  $
 
   - Range: $[0, 1]$ where higher = better view
   - Normalized by current error → scale-independent
@@ -188,8 +203,9 @@
 
   $ hat("RRI")(q) = "VIN"_theta (cal(P)_"base", C_"base", C_q) $
 
-  - Input: Partial point cloud + camera poses
-  - Features: Surface normals, visibility counts, depth, coverage
+  - Input: RGB sequence, partial point cloud + camera poses
+  - Features: Surface normals, visibility counts, depth
+  - Main Idea: Project features to candidate view $q$, compute fitness score for each candidate
   - Output: RRI ranking via ordinal classification
 ]
 
