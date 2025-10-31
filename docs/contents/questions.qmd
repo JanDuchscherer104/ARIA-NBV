@@ -41,6 +41,7 @@ This section documents key research questions that guide our investigation into 
 - Can we compute something like a reconstruction completeness score per entity to guide NBV selection?
 - Can RRI be expressed both per entity and per scene to improve NBV selection?
 - Can the NBV selection be conditioned on the std. per-pose RRI as well as the reconstruction score per entity of interest?
+- **Multi‑modal data:** How does integrating other modalities (encoded bboxes, object semantics like segmentation maps) alongside the PC / RGB-D embeddings improve NBV policy performance?
 
 **Hypothesis**: Entity-aware NBV allows task-specific prioritization and should outperform allow the model to pay attention to the objects of interest and hence improve the reconstruction quality for those. This is especially useful in human-in-the-loop scenarios, allowing the user to spcify "I want this table scanned well". This should allow to leverage pre-trained semantic and geometric understanding; Entity-level representations come with rich priors about typical shapes.
 
@@ -103,3 +104,9 @@ $$
 - May predict colliding poses (need explicit constraints)
 
 ---
+
+## LLM Integration for NBV
+
+- **LLM integration:** How can language models translate coverage maps and semantic annotations into natural language explanations or high‑level navigation strategies to allow for an easier human machine (NBV-agent) interaction?  Could state of the art VLAs like Gemini be employed to get OBBs for entity level representations of the scene?
+  - Might this also allow high‑level planning and getting qualitative feedback on the current reconstruction status?
+  - Could the LLMs high-level planning capabilities be used to guide the NBV policy towards task-relevant areas?
