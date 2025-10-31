@@ -18,8 +18,5 @@ format: html
 
 - non-gt point clouds are sparse! How to sample a PC from the candidate view that can be compared to the pre-existing semi-dense SLAM PC that is provided in the ASE dataset?
 
-
-
-
 # Action Items
 

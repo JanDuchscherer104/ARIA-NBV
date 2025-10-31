@@ -14,43 +14,29 @@ bibliography: references.bib
 
 Next-Best-View (NBV) planning addresses the fundamental challenge of autonomous viewpoint selection in active 3D reconstruction. Traditional approaches rely on hand-crafted geometric heuristics that optimize for surface coverage but fail to account for reconstruction quality, leading to suboptimal scanning strategies in complex indoor environments.
 
-This project develops a foundation model-enhanced NBV system that leverages pre-trained egocentric models to predict **Relative Reconstruction Improvement (RRI)** for candidate viewpoints. We replace VIN-NBV's custom CNN backbone with EFM3D/EVL, a pre-trained egocentric foundation model that provides 3D voxel lifting, semantic scene understanding, and multi-modal processing capabilities. This integration enables better generalization to complex multi-room scenes compared to coverage-based methods.
+This project develops a foundation model-enhanced NBV system that integrates VIN-NBV's quality-driven approach with EFM3D/EVL's pre-trained egocentric foundation model. We leverage EVL's 3D voxel lifting, semantic scene understanding, and multi-modal processing to predict **Relative Reconstruction Improvement (RRI)** for candidate viewpoints, directly optimizing reconstruction quality rather than coverage-based heuristics.
 
-Our approach uses the Aria Synthetic Environments (ASE) dataset, containing 100,000 synthetic indoor scenes with ground truth meshes, to train an RRI prediction network. The system combines EVL's pre-trained 3D spatial reasoning with a lightweight prediction head that estimates reconstruction quality improvement from candidate views. **We use RRI as the fitness measure to express the quality of any candidate viewpoint**, directly optimizing for reconstruction improvement rather than geometric coverage proxies.
+Our approach uses the Aria Synthetic Environments (ASE) dataset—100,000 synthetic indoor scenes with ground truth meshes and visibility metadata. We freeze EVL's volumetric encoder to capture scene state, then learn a lightweight prediction head that estimates reconstruction quality improvement from candidate views, using **RRI as the fitness measure** to directly optimize for Chamfer distance reduction.
 
-**Key innovations**: (1) integration of pre-trained foundation models for improved scene understanding, (2) entity-aware RRI computation enabling semantic prioritization, and (3) evaluation on large-scale synthetic indoor scenes. The work establishes a foundation for human-in-the-loop reconstruction systems where users can specify semantic importance weights for different scene entities.
+**Key innovations**: (1) EVL backbone provides rich 3D spatial priors through voxel occupancy, centerness, and semantic channels, (2) ASE's visibility metadata enables efficient RRI computation without expensive ray-casting, (3) SceneScript integration allows entity-aware reconstruction tracking at architectural and object levels, and (4) systematic evaluation on 100K synthetic scenes with ground truth meshes. This establishes a foundation for task-driven NBV where reconstruction priorities can be weighted by semantic importance.
 
-To ground the approach in rich spatial priors we adopt EFM3D’s Egocentric Voxel Lifting (EVL) foundation backbone [@EFM3D-straub2024]. EVL is trained on 100K Aria Synthetic Environments (ASE) sequences with high-fidelity 3D annotations and evaluates on real-world ADT and AEO recordings for surface regression and oriented bounding box detection, respectively. The model fuses multi-stream egocentric video, semi-dense SLAM points, and calibrated camera poses into a gravity-aligned voxel feature grid that captures occupancy, semantics, and object geometry.
+EVL [@EFM3D-straub2024] fuses multi-stream egocentric video, semi-dense SLAM points, and calibrated camera poses into gravity-aligned voxel features that capture occupancy, semantics, and object geometry.
 
-Our system freezes EVL to encode the current reconstruction state, then learns a lightweight head that predicts RRI for candidate viewpoints. Oracle supervision is provided by ray-casting GT meshes to simulate candidate observations, producing accuracy/completeness statistics and RRI targets. The long-term goal is an interactive AR workflow where users can steer NBV through entity-aware weighting, backed by foundation model features that generalize across indoor scenes.
+Oracle supervision combines ray-casting GT meshes with ASE's pre-computed visibility data to efficiently generate RRI targets. The long-term goal is interactive AR workflows where users can steer NBV through entity-aware weighting, backed by foundation model features that generalize across indoor scenes.
 
-# Project Overview
+# Documentation Overview
 
-This documentation organizes the NBV research project into several key components:
+- **Literature**: VIN-NBV, GenNBV, EFM3D/EVL, SceneScript.
+- **Metrics**: RRI, Chamfer distance, F-score; ATEK evaluation.
+- **Data**: ASE structure, GT meshes, egocentric modalities.
+- **Status**: Questions, roadmap, known issues.
 
-## Core Components
-- **[Literature Review](contents/literature/)**: Survey of NBV methods, foundation models, and related work
-- **[Metrics & Evaluation](contents/metrics/)**: RRI formulation, Chamfer distance, and evaluation protocols  
-- **[Dataset Documentation](contents/ase_dataset.qmd)**: ASE dataset structure and ground truth specifications
-- **[Technical Resources](contents/resources.qmd)**: External tools, APIs, and implementation guides
-
-## External Tools
-- **[ATEK](external/ATEK/)**: Meta's AR/VR toolkit for pose estimation and scene understanding
-- **[EFM3D](external/efm3d/)**: Egocentric foundation model with EVL backbone
-- **[Project Aria Tools](external/projectaria_tools/)**: Data processing and visualization utilities
-- **[SceneScript](external/scenescript/)**: Synthetic scene generation and manipulation
-
-## Implementation Status  
-- **[Questions & Ideas](contents/questions.qmd)**: Research directions and technical considerations
-- **[TODOs & Roadmap](contents/roadmap.qmd)**: Development timeline and priority tasks
-- **[Known Issues](contents/todos.qmd)**: Current limitations and debugging notes
-
-Navigate through these sections to understand the theoretical foundations, implementation details, and current development status of the foundation model-enhanced NBV system.
-
-# Project Vision
+# Project Vision and Goals
 
 - Directly optimize reconstruction quality rather than surrogate coverage metrics, following RRI-based policies pioneered by VIN-NBV [@VIN-NBV-frahm2025].
-- Train a lightweight RRI predictor that introspects the current reconstruction and a candidate pose via imitation learning on oracle RRIs.
+- Develop an oracle RRI computation pipeline using ASE visibility data and GT meshes.
+- Develop computational tools to efficiently simulate candidate viewpoints and their expected observations.
+- Train a lightweight RRI predictor that introspects the current reconstruction and a candidate pose via imitation learning on oracle RRIs. This model will leverage EVL's rich 3D feature representations as a frozen backbone.
 - Leverage EVL’s 3D foundation features—voxel occupancy, centerness, semantic channels, and OBB priors—as state embeddings for NBV decision making [@EFM3D-straub2024].
 - Extend towards human-in-the-loop AR guidance, where entity-aware RRI weighting delivers task-specific view suggestions.
 
@@ -62,13 +48,14 @@ Manual 3D reconstruction of large-scale environments is **time-consuming and err
 
 **Next-Best-View (NBV)** planning automates viewpoint selection by predicting optimal camera poses that maximize reconstruction quality improvement.
 
+
 ## Evolution of Approaches
 
 ### Classical Methods: Geometric Heuristics
-Early NBV methods used hand-crafted metrics:
-- **Volumetric uncertainty**: Target unexplored voxels
-- **Information gain**: Maximize entropy reduction
-- **Surface coverage**: Minimize reconstruction error [@VIN-NBV-frahm2025]
+Hand-crafted criteria include:
+- **Volumetric uncertainty** (unseen voxels) [@Connolly1985]
+- **Information gain** (entropy reduction) [@Denzler2002]
+- **Surface coverage** (reconstruction error) [@Scott2003]
 
 **Limitations**: Don't generalize to complex scenes, no semantic understanding.
 
@@ -93,49 +80,13 @@ $$\text{RRI}(v) = \frac{\text{Quality}(R_{t+1}) - \text{Quality}(R_t)}{\text{Qua
 
 # Relative Reconstruction Improvement (RRI)
 
-## RRI Metric Definition
+## RRI Metric
 
-The RRI metric, introduced by VIN-NBV, quantifies the expected reconstruction quality gain from capturing a new viewpoint:
+We score a candidate pose $\mathbf{q}$ by the relative reduction in Chamfer distance (CD):
 
-$$\text{RRI}(\mathbf{q}) = \frac{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}}) - \text{CD}(\mathcal{P}_{t \cup \mathbf{q}}, \mathcal{M}_{\text{GT}})}{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}})}$$
+$$\text{RRI}(\mathbf{q}) = \frac{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}}) - \text{CD}(\mathcal{P}_{t \cup \mathbf{q}}, \mathcal{M}_{\text{GT}})}{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}})}.$$
 
-Where:
-- $\mathbf{q} \in SE(3)$: Candidate viewpoint (6DoF pose with roll typically fixed to 0°)
-- $\mathcal{P}_t$: Current reconstruction point cloud from first $t$ views
-- $\mathcal{P}_{t \cup \mathbf{q}}$: Updated reconstruction after capturing from viewpoint $\mathbf{q}$
-- $\mathcal{M}_{\text{GT}}$: Ground truth mesh (available only during training)
-- $\text{CD}(\cdot, \cdot)$: Chamfer distance (bidirectional surface similarity metric)
-
-**Properties**:
-- Range: [0, 1] where higher values indicate better viewpoints
-- Normalized by current error → scale/object-independent
-- Requires ground truth only during training
-- Directly correlates with reconstruction quality improvement
-
-## NBV Task Formulation using RRI
-
-Given the current reconstruction state and a set of candidate viewpoints, the NBV task is formulated as:
-
-**Input**:
-- Current partial reconstruction $\mathcal{P}_t$ from $t$ captured views
-- Set of candidate viewpoints $\mathcal{Q} = \{\mathbf{q}_1, \mathbf{q}_2, ..., \mathbf{q}_n\}$
-- Current camera trajectory $\mathcal{T}_t = \{\mathbf{c}_1, \mathbf{c}_2, ..., \mathbf{c}_t\}$
-
-**Objective**: Find the next-best viewpoint that maximizes reconstruction improvement:
-
-$$\mathbf{q}^* = \underset{\mathbf{q} \in \mathcal{Q}}{\text{argmax}} \; \text{RRI}(\mathbf{q} \mid \mathcal{P}_t, \mathcal{T}_t)$$
-
-**Sequential Planning**: For planning a sequence of $k$ views, the optimal camera trajectory $\boldsymbol{\tau}^*_{t+k} = \{\mathbf{q}_1, \mathbf{q}_2, ..., \mathbf{q}_k\}$ is:
-
-$$\boldsymbol{\tau}^*_{t+k} = \underset{\boldsymbol{\tau}_{t+k}}{\text{argmax}} \sum_{i=1}^{k} \text{RRI}(\mathbf{q}_i \mid \mathcal{P}_{t+i-1}, \boldsymbol{\tau}_{t+i-1})$$
-
-Subject to:
-- **Collision constraints**: $\mathbf{q} \notin \mathcal{O}_{\text{occupied}}$ (candidate poses must be in free space)
-- **Kinematic constraints**: $\|\text{pos}(\mathbf{q}_i) - \text{pos}(\mathbf{q}_{i-1})\| \leq d_{\max}$ (reachability limits)
-- **Field-of-view constraints**: $\mathcal{V}(\mathbf{q}) \cap \mathcal{S} \neq \emptyset$ (scene entities $\mathcal{S}$ must be visible from frustum $\mathcal{V}(\mathbf{q})$)
-- **Resource constraints**: Total trajectory length, time, or number of views within budget
-
-This formulation directly optimizes reconstruction quality rather than coverage proxies, making it fundamentally different from classical geometric NBV approaches.
+Properties: bounded in [0,1], scale-agnostic (normalized by current error), GT required only for supervision, and strongly tied to reconstruction quality. Planning selects $\arg\max_\mathbf{q}\,\text{RRI}(\mathbf{q})$ under free-space, reachability, and FoV constraints.
 
 # EFM3D Benchmark & EVL Backbone
 
@@ -147,30 +98,28 @@ This formulation directly optimizes reconstruction quality rather than coverage 
 
 ## EVL Architecture
 
-- **3D voxel lifting**: Frozen DinoV2.5 features from multi-stream egocentric snippets are bilinearly lifted into gravity-aligned voxel grids (4 m³ crops with task-dependent resolution).
-- **Multi-modal fusion**: Inputs include RGB and SLAM fisheye cameras, semi-dense points, and derived point/free-space masks that are aggregated across time.
-- **Outputs**: EVL predicts voxel occupancy logits, centerness, 7-DoF OBB regressions, and semantic class scores. Post-processing fuses predictions via tracking, NMS, and TSDF occupancy accumulation.
-- **Training specifics**: OBB head trained on 526K ASE snippets, surface head on 54K snippets, both optimized with Adam and task-specific loss weightings.
-- **Limitations**: Inference currently operates on fixed 4 m³ frustums, assumes static scenes with accurate calibration, and degrades on distant or highly dynamic content—considerations for NBV deployment.
+- Frozen DinoV2.5 features lifted into gravity-aligned voxel volumes (≈4 m³ crops).
+- Multi-stream inputs (RGB, SLAM fisheye) + semi-dense points → occupancy and freespace masks.
+- Heads for occupancy, centerness, 7-DoF OBBs, and semantics; fused over time via tracking and TSDF/occupancy integration.
+- Limitations: fixed frustum range, static-scene assumption, sensitivity to calibration.
 
 # Integration Strategy
 
-## Foundation Model Integration Strategy
+## Foundation Model Integration
 
-Our approach integrates EVL’s pre-trained volumetric representation with VIN-style introspection:
+EVL’s volumetric encoder + VIN-style introspection:
 
-**Architecture**:
+**Data flow**:
 ```
 Current Reconstruction → EVL Encoder → Voxel Features (256³)
 Candidate View → Feature Projection → View Features
 Concat(Scene, View) → MLP Head → RRI Prediction
 ```
 
-**Integration Strategy**:
-1. Use EVL's `voxel/feat` tensor and occupancy logits as the scene state encoder.
-2. Project the candidate view frustum into the voxel grid to accumulate visible features, depth statistics, and free-space overlap.
-3. Concatenate scene context, candidate embeddings, pose metadata, and uncertainty cues before passing them to a small MLP trained with CORAL ordinal loss on binned RRIs.
-4. Enforce collision constraints by discarding candidates that intersect high-occupancy voxels or detected OBBs.
+1. Use EVL `voxel/feat` and occupancy logits as the scene state.
+2. Project the candidate frustum to pool visible features and freespace ratios.
+3. Concatenate scene/view embeddings with pose metadata; train a small MLP with CORAL ordinal loss on binned RRIs.
+4. Reject candidates intersecting high-occupancy voxels or detected OBBs.
 
 ## Feature Design Considerations
 
@@ -178,65 +127,48 @@ Concat(Scene, View) → MLP Head → RRI Prediction
 - RRI predictions are normalized per scene segment to stabilize training; z-score normalization or ordinal binning mitigates the dynamic range of Chamfer-distance improvements.
 - Batch ray-casting against GT meshes supplies synthetic point clouds for candidate poses, ensuring the predictor sees consistent voxelized evidence.
 
-## Training and Inference Loop
+## Training and Inference
 
-- **Oracle**: A ray-casting pipeline renders candidate viewpoints from GT meshes, merges them with the current partial reconstruction, and computes RRI using shared voxel down-sampling to keep Chamfer distances comparable.
-- **Inference**: An initial greedy strategy samples candidate poses around the scene boundary, scores them with the trained predictor, and selects the highest RRI. Future work will explore continuous pose prediction akin to GenNBV [@GenNBV-chen2024].
+- **Oracle**: Ray-cast GT meshes to simulate candidates; fuse and compute RRI with voxel-aligned down-sampling.
+- **Policy**: Greedy selection among sampled candidates by predicted RRI; later extend to continuous actions [@GenNBV-chen2024].
 
 # Roadmap
 
-## Seminar Focus (Phases 1–3)
+## Roadmap
 
-- **Phase 1 – Foundation & Familiarisation**: Study NBV literature; audit ASE, SceneScript, Project Aria Tools, ATEK, and EFM3D to scope oracle requirements.
-- **Phase 2 – Oracle RRI Computation**: Implement GT-backed RRI using mesh ray-casting, voxel-aligned down-sampling, and ATEK’s accuracy/completeness metrics.
-- **Phase 3 – RRI Prediction Network**: Freeze EVL/SceneScript encoders, design candidate featurisation (pose metadata, projected coverage, EVL uncertainty), and train a lightweight MLP head with CORAL loss on oracle labels.
+- Phase 1: Foundations (literature, ASE/SceneScript/ATEK/EFM3D audit).
+- Phase 2: RRI Oracle (GT ray-casting, voxelized metrics via ATEK).
+- Phase 3: VIN+EVL Head (frozen EVL, CORAL-trained predictor).
+- Phase 4: Entity-aware RRI (semantic weighting via EVL/SceneScript).
+- Phase 5: View synthesis for supervision gaps.
+- Phase 6: Continuous-action NBV (GenNBV-style policy).
+- Phase 7–9: Fine-tuning, HITL interfaces, real-world deployment.
 
-## Thesis Extensions (Phases 4–9)
+## Evaluation & Oracle
 
-- **Phase 4 – Entity-aware RRI**: Derive per-entity improvements via EVL semantics or SceneScript, enabling task-weighted prioritisation.
-- **Phase 5 – View Synthesis Integration**: Investigate NeRF or Gaussian splats to hallucinate observations when meshes are unavailable.
-- **Phase 6 – Learning-based NBV Policy**: Move beyond sampled candidates to continuous pose regression, blending GenNBV-style policies with RRI supervision.
-- **Phase 7 – Backbone Fine-tuning**: Adapt EVL or SceneScript to target hardware (Aria glasses, Quest 3, iPhone LiDAR) while maintaining streaming efficiency.
-- **Phase 8 – Human-in-the-loop NBV**: Prototype AR interfaces for entity selection, low-latency RRI updates, and view guidance overlays.
-- **Phase 9 – Real-world Deployment**: Evaluate against coverage, RL, and oracle baselines under sensor noise, pose drift, and dynamic scenes.
+- Chamfer-based RRI in [0,1]; accuracy+completeness decomposition.
+- Precision/Recall/F-score at e.g. 5 cm via ATEK.
+- Consistent voxel down-sampling for comparability.
+- GT-mesh ray-casting to simulate candidate observations.
 
-# Evaluation Metrics & Oracle Pipeline
+## Open Issues
 
-- **Chamfer-distance-based RRI**: Measures relative improvement (0–1 range) after adding a candidate view; normalised by current reconstruction error.
-- **Accuracy & Completeness**: Chamfer distance decomposed into prediction-to-GT accuracy and GT-to-prediction completeness to detect over/under reconstruction.
-- **Precision/Recall/F-score**: Thresholded surface evaluation (e.g., 5 cm) using ATEK’s `evaluate_single_mesh_pair()`.
-- **Voxel Down-sampling**: Consistent voxel grids for partial and updated reconstructions ensure fair metric comparisons.
-- **Ray-casting Oracle**: Candidate views simulated by rendering depth from GT meshes, fusing with semi-dense SLAM clouds, and recomputing metrics before and after integration.
-
-# Open Issues & Research Questions
-
-- **Single trajectory constraint**: ASE provides one egocentric path per scene—candidate poses must be synthesised via ray-casting rather than queried from data.
-- **Sparse observations**: SLAM clouds are semi-dense; integrating synthetic depth with EVL occupancy requires careful weighting to avoid free-space bias.
-- **Action space design**: Decide when to transition from greedy sampled candidates to continuous pose policies without sacrificing stability.
-- **RRI normalisation**: Investigate per-stage normalisation, ordinal binning, and curriculum schedules that handle the shrinking error budget during reconstruction.
-- **Computational efficiency**: Batch ray-casting, caching GT samples, and streaming EVL features are essential for scaling candidate evaluation.
-- **Robust deployment**: Address EVL’s assumptions about static scenes and short-range frustums when targeting dynamic or outdoor environments.
+- Single-trajectory constraint in ASE → simulate novel views.
+- Semi-dense clouds vs freespace bias → careful fusion.
+- Greedy vs continuous actions → stability vs optimality.
+- Normalization schedules for shrinking error budgets.
+- Efficiency: batched ray-casting, caching, streaming EVL.
+- Robustness: fixed frustum, dynamics, calibration.
 
 # Project Resources & Navigation
 
-## Technical Documentation
-```
-contents/
-├── literature/
-│   ├── vin_nbv.qmd           # VIN-NBV: RRI-based NBV planning
-│   ├── efm3d.qmd             # EFM3D/EVL: Egocentric foundation models
-│   ├── gen_nbv.qmd           # GenNBV: Continuous action spaces
-│   └── scene_script.qmd      # SceneScript: Structured scene language
-├── metrics/
-│   ├── surface_metrics.qmd   # Chamfer distance, F-score, completeness
-│   ├── rri_computation.qmd   # Oracle RRI implementation
-│   ├── atek_implementation.qmd # ATEK evaluation utilities
-│   └── efm3d_implementation.qmd # EVL integration details
-├── ase_dataset.qmd           # ASE dataset structure and GT meshes
-├── roadmap.qmd               # Extended timeline and milestones
-├── questions.qmd             # Research questions and hypotheses
-└── glossary.qmd              # Abbreviations and technical terms
-```
+## Navigation
+
+- Literature: `contents/literature/` (VIN-NBV, GenNBV, EFM3D, SceneScript)
+- Metrics: `contents/metrics/` (surface metrics, ATEK, RRI oracle)
+- Data: `contents/ase_dataset.qmd`
+- Resources: `contents/resources.qmd`
+- Project state: `contents/questions.qmd`, `contents/roadmap.qmd`, `contents/todos.qmd`, `contents/glossary.qmd`
 
 ## Key Papers & Repositories
 - **VIN-NBV** [@VIN-NBV-frahm2025] – Learning-based RRI prediction.

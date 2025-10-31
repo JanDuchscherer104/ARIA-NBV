@@ -1,0 +1,21 @@
+# Literature Review
+
+This section contains detailed reviews of key papers and methods related to Next-Best-View planning and foundation models.
+
+## Key Papers
+
+### Next-Best-View Planning
+- **[VIN-NBV](vin_nbv.qmd)**: Learning-based RRI prediction for quality-driven view planning
+- **[GenNBV](gen_nbv.qmd)**: Continuous action spaces and reinforcement learning approaches
+
+### Foundation Models & Scene Understanding  
+- **[EFM3D/EVL](efm3d.qmd)**: Egocentric foundation models for 3D perception and voxel lifting
+- **[SceneScript](scene_script.qmd)**: Structured scene language for semantic scene manipulation
+
+## Research Context
+
+These literature reviews form the theoretical foundation for integrating pre-trained egocentric models with quality-driven NBV planning. The combination of VIN-NBV's RRI optimization with EFM3D's foundation model capabilities enables better generalization to complex indoor environments compared to traditional coverage-based approaches.
+
+## Navigation
+
+Return to [main documentation](../../index.qmd) or explore specific [metrics and evaluation](../metrics/index.qmd) approaches.

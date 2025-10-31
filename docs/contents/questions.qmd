@@ -20,6 +20,16 @@ This section documents key research questions that guide our investigation into 
 
 ---
 
+## 2. RRI prediction Model Architectures
+
+- Should we explicity project features into the frame of the candidate view, or rather use learnable fourier features or other positional encodigns?
+- Maybe initialize weights such that they correspond to the projection operation, but then allow finetuning? This is certainly a TODO for the master thesis.
+- What Input and Output formulations could work best for the RRI prediction model? There are many features from the EFM pipeline that could be useful:
+  - Occupancy probabilities, centerness scores, visibility scores for known points in the semi-dense SLAM point cloud...
+
+---
+
+
 ## 2. EFMs as NBV Backbone
 
 **Q2.1**: Can EFMs like EVL serve as effective encoders for NBV planning?

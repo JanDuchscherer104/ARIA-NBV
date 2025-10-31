@@ -22,6 +22,9 @@ format: html
 **GT** - Ground Truth
 : Reference data or annotations that represent the true or expected values, used for training and evaluation.
 
+**Frustum**
+: The three-dimensional region obtained by slicing a pyramid or cone with two parallel planes and discarding the outer caps. In computer graphics a *viewing frustum* encodes the camera’s visible volume: the near and far clipping planes bound the depth range, while the lateral planes are shaped by field-of-view and aspect ratio, producing a truncated pyramid that defines which objects project onto the image sensor [@Frustum-Wikipedia-2025].
+
 **MPS** - Machine Perception Services
 : A suite of derived data processing services provided by Meta for Project Aria data, including SLAM, eye gaze tracking, hand tracking, and more.
 
