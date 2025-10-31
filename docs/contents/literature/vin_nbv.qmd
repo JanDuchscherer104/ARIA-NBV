@@ -1,0 +1,183 @@
+## VIN-NBV: A View Introspection Network for Next-Best-View Selection
+
+VIN-NBV@VIN-NBV-frahm2025 presents a learning-based approach to NBV that directly optimizes for **reconstruction quality** rather than coverage. The key innovation is the View Introspection Network (VIN), which predicts the **Relative Reconstruction Improvement (RRI)** of candidate viewpoints without actually capturing new images.
+
+### Key Contributions
+
+1. **Reconstruction Quality Optimization**: First NBV method to directly maximize reconstruction quality (measured via Chamfer Distance) rather than coverage
+2. **View Introspection Network (VIN)**: Lightweight NN that predicts RRI of candidate views from current reconstruction state
+3. **Imitation Learning Approach**: Trained using pre-computed ground truth RRI values
+4. **Greedy Sequential Policy**: Simple sampling-based strategy that selects best view given n randomly sampled candidates
+5. **Performance**: 30% improvement over coverage-based baseline, 40% improvement over RL methods (GenNBV, ScanRL)
+
+![VIN-NBV Architecture](../../figures/VIN_arch.png){#fig-vin-arch width=80%}
+
+### Problem Formulation and RRI Metric
+
+**Input**: Initial base images $I_{base} = \{I_1, ..., I_k\}$ with camera parameters $C_{base}$ and depth maps $D_{base}$
+
+**Objective**: Find next best views $C_{nbv} = \{q_1, ..., q_m\} \subseteq \{c | c \in SE(3) \land c_{\phi} = 0\} ^ m$ that maximize reconstruction quality:
+
+$$
+C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
+$$
+
+
+**Relative Reconstruction Improvement (RRI)**:
+
+For a query view $q$, RRI quantifies reconstruction improvement:
+
+$$
+\mathcal{RRI}(q) = \frac{CD(\mathcal{P}_{base}, \mathcal{P}_{GT}) - CD(\mathcal{P}_{base \cup q}, \mathcal{P}_{GT})}{CD(\mathcal{P}_{base}, \mathcal{P}_{GT})}
+$$
+
+**Properties**:
+
+- Range: $[0, 1]$ where higher is better
+- Normalized by current error $ \rightarrow $ scale/object-independent ??
+- Requires ground truth only during training
+- $CD(\mathcal{P}, \mathcal{P}_{GT})$ is Chamfer Distance between reconstruction $\mathcal{P}$ and ground truth $\mathcal{P}_{GT}$.
+- Candidate poses are sampled randomly around the latest pose; roll is fixed to 0°, such that the cameras optical axis is parallel to the ground plane.
+
+### VIN Architecture
+
+**Three-Stage Pipeline**:
+
+1. **Scene Reconstruction**:
+
+   - Backproject RGB-D images to 3D point cloud $\mathcal{P}_{base}$
+   - Voxel downsample for efficiency
+
+2. **3D-Aware Featurization**:
+
+   - **Surface Normals**: Variance indicates geometric complexity (high variance = complex surfaces needing more views)
+   - **Visibility Count**: Tracks how many base views observe each point (low count = potentially informative)
+   - **Depth Values**: Distance information for surface consistency
+   - **Coverage Feature $F_{empty}$**: Empty pixel mask when projecting $\mathcal{P}_{base}$ to query view
+
+4. **RRI Prediction**:
+
+   - **Convolutional Encoder**: 4 layers, hidden dimension 256
+   - Processes featurized point cloud projected to query view
+   - **Ranking MLP**: 3 layers, hidden dimension 256
+   - **Output**: CORAL layer for ordinal classification (15 bins)
+
+**Network Signature**:
+$$
+\widehat{\mathcal{RRI}}(q) = \text{VIN}_\theta(\mathcal{P}_{base}, C_{base}, C_q)
+$$
+
+### VIN-NBV Policy (Algorithm)
+
+**Greedy Sequential Strategy**:
+
+```
+1. Start with k=2 base views (first random, second closest to first)
+2. Repeat until termination criterion:
+   a. Reconstruct R_base from current captures
+   b. Sample n query views around reconstruction
+   c. For each query q:
+      - Featurize reconstruction
+      - Predict RRI(q) using VIN
+   d. Select q* = argmax RRI(q)
+   e. Move to q*, capture image, update base views
+3. Return final reconstruction R_final
+```
+
+### Training Methodology
+
+**Dataset**:
+
+- **Train**: Modified subset of Houses3K
+- **Test**: House category from OmniObject3D (generalization test)
+- 120 rendered views per object
+
+**Ground Truth RRI Computation**:
+
+1. For each training scene, sample query views
+2. Explicitly reconstruct scene with query view added
+3. Compute actual RRI using Chamfer Distance
+4. Normalize via z-scores within capture stage groups
+5. Soft-clip with tanh, bin into 15 ordinal classes
+
+**Training Details**:
+
+- **Loss**: CORAL loss for ordinal classification
+- **Optimizer**: AdamW with learning rate 1e-3
+- **Scheduler**: Cosine annealing
+- **Epochs**: 60
+- **Hardware**: 4× A6000 GPUs, ~24 hours
+- **Batching**: By object (one point cloud per batch projected to all candidate views)
+
+
+**Key Features**:
+
+- **Flexible Constraints**: Can limit by number of captures, time, or distance
+- **Collision-Free**: Sampling strategy can avoid obstacles
+- **No Prior Knowledge**: Works without scene CAD models or preliminary scans
+- **Generalizable**: Trained on houses, tested on unseen categories (dinosaurs, trucks, animals)
+
+### Experimental Results
+
+**Limited Acquisitions (20 captures)**:
+
+- VIN-NBV: **0.20 cm** Chamfer Distance (houses)
+- GenNBV: **0.33 cm** (39% worse)
+- ScanRL: **0.37 cm** (41% worse)
+- Coverage baseline (Cov-NBV): **~30% worse** than VIN-NBV
+
+**Coverage vs Quality**:
+
+- Cov-NBV baseline uses same greedy strategy but scores views by empty pixel count:
+  $$Cov(q) = W \times H - \sum_{u,v} \mathbb{1}(C_q(\mathcal{P}_{base})_{u,v})$$
+- VIN-NBV achieves largest gains in early capture stages
+- Late stages: both converge (coverage becomes more important)
+
+**Ablation - Coverage Feature $F_{empty}$**:
+
+- Removing $F_{empty}$ hurts performance in later stages
+- Early stages: RRI dominates
+- Late stages: Coverage information becomes helpful
+
+**Generalization** (unseen categories):
+
+- Dinosaurs: Slightly behind GenNBV
+- Toy animals: **Significantly outperforms** both baselines
+- Toy trucks: **Significantly outperforms** both baselines
+
+### Comparison to Our NBV Research
+
+**Similarities**:
+
+- Both use Chamfer Distance for reconstruction quality
+- Both require pre-computed ground truth for training
+- Both focus on maximizing reconstruction improvement
+
+**Key Differences**:
+
+- **VIN-NBV**: Single objects, imitation learning, greedy sampling
+- **Our Approach**: Multi-entity scenes, entity-aware RRI, SceneScript integration
+- **VIN-NBV**: Coverage-agnostic (though includes $F_{empty}$ feature)
+- **Our Approach**: Hybrid visibility + Chamfer Distance, pre-computed occlusions from ASE
+
+**Lessons for Our Work**:
+
+1. ✅ Direct quality optimization (RRI) beats coverage by ~30%
+2. ✅ Imitation learning is simpler and more effective than RL
+3. ✅ 3D-aware featurization (normals, visibility) is crucial
+4. ✅ Coverage information still helps in later stages
+5. ⚠️ Greedy strategy works well but leaves ~20% gap to oracle
+
+**Integration Strategy**:
+
+- Adopt VIN's RRI formulation for entity-level metrics
+- Use ASE visibility data instead of VIN's visibility count
+- Extend to per-entity RRI: $\mathcal{RRI}_e$ for each entity $e$
+- Weighted combination: $\mathcal{RRI}_{total} = \sum_e w_e \cdot \mathcal{RRI}_e$
+
+### Limitations
+
+- **Ground truth depth**: Uses noise-free depth maps (not realistic)
+- **Real-world validation**: Not evaluated on real sensor data
+- **Single objects**: Not designed for multi-room scenes
+- **Gap to oracle**: ~20% performance gap in early stages indicates room for improvement

@@ -3,7 +3,7 @@ title: "Semantic Next-Best-View Planning"
 subtitle: "Active 3D Reconstruction with Human-Machine Collaboration"
 author: "Jan Duchscherer"
 format: html
-bibliography: ../_shared/references.bib
+bibliography: references.bib
 ---
 
 # Project Overview
@@ -12,15 +12,15 @@ bibliography: ../_shared/references.bib
 
 Manual 3D reconstruction of large-scale environments is **time-consuming and error-prone**. Professional teams can spend days scanning building-scale scenes with drones, and even experts frequently overlook regions that require multiple rescans [@GenNBV-chen2024].
 
-**Next-Best-View (NBV)** planning aims to automate this process by intelligently selecting camera viewpoints that maximize information gain, but existing approaches face significant limitations:
+**Next-Best-View (NBV)** planning aims to automate the process by predicting optimal camera viewpoints that maximize information gain, but existing approaches face significant limitations:
 
-- **Classical NBV methods** rely on hand-crafted heuristics and restricted action spaces, limiting generalization
-- **Learning-based NBV policies** focus on single-object reconstruction, not complex multi-room and -entity scenes
-- **Coverage-based metrics** optimize geometric completeness without considering semantic importance
+- **Classical NBV methods** rely on hand-crafted heuristics and restricted action spaces, limiting generalization to complex geometries and are infeasible to capture entire scenes.
+- **Coverage-based metrics** optimize geometric completeness without considering semantic importances @GenNBV-chen2024.
+- **Learning-based NBV policies** focus on single-object reconstruction, not complex multi-room and -entity scenes where semantic understanding is crucial. While there are existing approaches that directly optimize for reconstruction quality [@VIN-NBV-frahm2025], they do not leverage pre-trained models to improve their generalization capabilities and performances.
 
 ## Research Vision
 
-This project explores **semantic, entity-aware NBV planning** for large-scale indoor scene reconstruction. By leveraging SceneScript's structured scene representations [@SceneScript-avetisyan2024], we aim to:
+This project explores **semantic, entity-aware NBV planning** for indoor scene reconstruction. By leveraging EFMs (Egocentric Foundation Models) like EVL @EFM3D-straub2024 that consider a rich set of egocentric modalities and are pre-trained on large-scale (synthetic) datasets, we aim to:
 
 1. **Compute Relative Reconstruction Improvement (RRI) at the entity level** — per wall, door, furniture piece
 2. **Enable human-in-the-loop guidance** where users can select entities requiring high-fidelity reconstruction

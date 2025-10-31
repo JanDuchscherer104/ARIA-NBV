@@ -1,0 +1,48 @@
+# Reconstruction Quality Metrics & RRI Computation
+
+This section provides a comprehensive overview of reconstruction quality metrics and how to compute the Relative Reconstruction Improvement (RRI) score for Next-Best-View planning.
+
+## Overview
+
+The evaluation of 3D reconstruction quality relies on comparing predicted reconstructions against ground truth meshes. Both **ATEK** and **EFM3D** provide implementations for computing these metrics using:
+
+- **[Trimesh](https://github.com/mikedh/trimesh)**: For mesh loading and surface sampling
+- **PyTorch**: For efficient distance computations
+- **Point-to-mesh distance functions**: Core geometric primitives
+
+## Contents
+
+This section is organized into the following topics:
+
+1. **[Surface Reconstruction Metrics](surface_metrics.qmd)** - Core metrics: Accuracy, Completeness, Chamfer Distance, Precision/Recall
+2. **[ATEK Implementation](atek_implementation.qmd)** - Detailed breakdown of ATEK's mesh evaluation functions
+3. **[EFM3D Implementation](efm3d_implementation.qmd)** - EFM3D utilities for point clouds, rays, and voxels
+4. **[RRI Computation](rri_computation.qmd)** - Complete pipeline for computing RRI oracle with ASE dataset
+
+## Quick Reference: Key Functions
+
+### From ATEK
+
+| Function | Purpose | Location |
+|----------|---------|----------|
+| [`evaluate_single_mesh_pair()`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_metrics.py#L32) | Complete mesh evaluation pipeline | `surface_reconstruction_metrics.py` |
+| [`compute_pts_to_mesh_dist()`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_utils.py#L97) | Point-to-mesh distance computation | `surface_reconstruction_utils.py` |
+| [`point_to_closest_tri_dist()`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_utils.py#L45) | Point-to-triangle projection + distance | `surface_reconstruction_utils.py` |
+
+### From EFM3D
+
+| Function | Purpose | Location |
+|----------|---------|----------|
+| [`eval_mesh_to_mesh()`](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/mesh_utils.py#L118) | Mesh evaluation with visualizations | `utils/mesh_utils.py` |
+| [`dist_im_to_point_cloud_im()`](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/depth.py#L20) | Depth → point cloud conversion | `utils/depth.py` |
+| [`ray_obb_intersection()`](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/ray.py#L90) | Ray-box intersection for sampling | `utils/ray.py` |
+| [`sample_depths_in_grid()`](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/ray.py#L196) | Sample depths along rays in voxel grid | `utils/ray.py` |
+| [`pointcloud_to_occupancy_snippet()`](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/pointcloud.py#L182) | Point cloud → occupancy grid with free space | `utils/pointcloud.py` |
+| [`pointcloud_to_voxel_counts()`](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/pointcloud.py#L380) | Point cloud → voxel density grid | `utils/pointcloud.py` |
+
+## References
+
+- **ATEK**: [GitHub - ATEK Surface Reconstruction Metrics](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/)
+- **EFM3D**: [GitHub - EFM3D Utils](https://github.com/facebookresearch/efm3d/tree/main/efm3d/utils)
+- **VIN-NBV**: Frahm et al., "View Introspection Network for Next-Best-View Selection", 2025
+- **Trimesh**: [trimesh documentation](https://trimsh.org/)

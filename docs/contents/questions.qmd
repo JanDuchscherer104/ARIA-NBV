@@ -1,0 +1,105 @@
+---
+title: "Research Questions"
+format: html
+bibliography: ../references.bib
+---
+
+# Research Questions
+
+This section documents key research questions that guide our investigation into semantic Next-Best-View planning.
+
+
+## 1. RRI Computation Strategies
+
+**1.1**: Which oracle RRI formulation is most predictive of actual reconstruction improvement?
+
+- How can we effectively compute the RRI for candidate views in the ASE dataset given its limitations?
+- Which metrics should be used to quantify the similarity between point clouds?
+- What metrics might be more suitable than Chamfer Distance for this task?
+- How can we sample point clouds from candidate views that are comparable to the existing semi-dense SLAM point clouds in ASE such that we can compute the RRI in a meaningful way?
+
+---
+
+## 2. EFMs as NBV Backbone
+
+**Q2.1**: Can EFMs like EVL serve as effective encoders for NBV planning?
+
+**Rationale**: EFMs provide semantic understanding that presentmethods lack. This should enable better generalization to complex scenes. Egocentric platforms like Aria glasses or even an iPhone with LiDAR offer rich multi-modal data tha can be leveraged to obtain a better scene representation.
+
+**Q2.2**:
+
+- How do we efficiently handle streaming point cloud updates using an EFM backbone?
+- How can we incrementally update the scene representation as new observations arrive?
+- How can we re-use previously computed features to avoid redundant computations?
+
+---
+
+## 3. Entity-Aware NBV
+
+**Q3.1**:
+
+- Can we compute something like a reconstruction completeness score per entity to guide NBV selection?
+- Can RRI be expressed both per entity and per scene to improve NBV selection?
+- Can the NBV selection be conditioned on the std. per-pose RRI as well as the reconstruction score per entity of interest?
+
+**Hypothesis**: Entity-aware NBV allows task-specific prioritization and should outperform allow the model to pay attention to the objects of interest and hence improve the reconstruction quality for those. This is especially useful in human-in-the-loop scenarios, allowing the user to spcify "I want this table scanned well". This should allow to leverage pre-trained semantic and geometric understanding; Entity-level representations come with rich priors about typical shapes.
+
+
+**Proposed Formulation**:
+
+$$
+\text{Fitness}_{\text{total}}(c, \mathcal{E}) = \sum_{e \in \mathcal{E}} w_e \cdot \text{RRI}_e(c) + \lambda \cdot \text{RRI}_{\text{scene}}(c)
+$$
+
+- $\text{RRI}_e$: Reconstruction score for entity $e$
+- $w_e$: Importance weight (user-specified or uncertainty-based)
+
+
+---
+
+## 4. Continuous vs. Discrete Action Spaces
+
+**Q4.1**: Should NBV prediction output discrete view selection or continuous pose regression?
+
+- How can we combine the benefits of both approaches? i.e. by sampling a batch of candidate views from a continous distribution whose parameters are regressed, followed by discrete selection among these candidates.
+- How can we ensure collision-free views in a continuous action space? Usage of free space
+
+### VIN-NBV: Classification Over Discrete Candidates
+
+**Approach:**
+
+- Sample $N$ random candidate poses (e.g., $N=100$)
+- Compute RRI for each
+- Select argmax
+
+**Why they did this:**
+
+- Avoids regression difficulties (multi-modal distributions)
+- Easier to train (classification > regression for complex distributions)
+- Guarantees collision-free poses (if sampled carefully)
+
+**Limitations:**
+
+- Requires many samples for good coverage
+- May miss optimal view between samples
+- No smooth trajectory planning
+
+### GenNBV: Continuous 5-DoF Regression
+
+**Approach:**
+
+- Predict $(x, y, z, \theta, \phi)$ directly via regression
+- Use RL (PPO) to handle multi-modal distributions
+
+**Advantages:**
+
+- Smooth, continuous trajectories
+- Theoretically optimal (not limited by sampling)
+- Suitable for real-time robotics
+
+**Challenges:**
+
+- Harder to train (regression on multi-modal targets)
+- May predict colliding poses (need explicit constraints)
+
+---

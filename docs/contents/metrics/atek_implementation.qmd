@@ -1,0 +1,200 @@
+# ATEK Implementation Details
+
+ATEK provides production-ready mesh evaluation functions for computing reconstruction quality metrics. This document details the implementation and usage.
+
+## `evaluate_single_mesh_pair()`
+
+**Source**: [`atek/evaluation/surface_reconstruction/surface_reconstruction_metrics.py`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_metrics.py#L32)
+
+**Purpose**: Complete evaluation pipeline that computes all reconstruction quality metrics between a predicted mesh and ground truth mesh.
+
+### Workflow
+
+1. **Load meshes**: Uses `trimesh.load()` to load both predicted and GT meshes
+2. **(Optional) Gravity correction**: For ADT datasets, aligns gravity direction via [`correct_adt_mesh_gravity()`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_utils.py#L27)
+3. **(Optional) Height slicing**: Cuts meshes at specified height using plane slicing
+4. **Sample surfaces**: Uniformly samples `sample_num` points from both meshes using `trimesh.sample.sample_surface()`
+   - Seeds RNG for reproducibility
+   - Poisson disk sampling ensures uniform distribution
+5. **Compute bidirectional distances**: Calls `compute_pts_to_mesh_dist()` twice (see below for details)
+6. **Calculate metrics**: Computes accuracy, completeness, precision@5cm, recall@5cm, F-score@5cm
+
+### Parameters
+
+- `pred_mesh_filename`: Path to predicted mesh (`.ply`, `.obj`, etc.)
+- `gt_mesh_filename`: Path to ground truth mesh
+- `sample_num`: Number of points to sample (default: 10,000)
+- `step`: Batch size for distance computation (default: 50,000 triangles)
+- `threshold`: Distance threshold in meters for precision/recall (default: 0.05m)
+- `correct_mesh_gravity`: Whether to align ADT mesh gravity (default: False)
+- `cut_height`: Optional Z-height to slice meshes (default: None)
+- `rnd_seed`: Random seed for reproducibility (default: 42)
+
+### Returns
+
+- `metrics`: Dictionary with 5 metrics (see below)
+- `accuracy`: Per-point accuracy array (N,) - distances from predicted points to GT
+- `completeness`: Per-point completeness array (M,) - distances from GT points to prediction
+
+## Understanding Accuracy vs. Completeness
+
+The function computes **two separate distance measurements** by switching the roles of source and target:
+
+### Accuracy (Prediction → GT)
+
+```python
+# Step 1: Sample points FROM predicted mesh
+pred_pts, _ = trimesh.sample.sample_surface(pred_mesh, sample_num, seed=rnd_seed)
+
+# Step 2: Compute distances TO ground truth mesh
+accuracy = compute_pts_to_mesh_dist(pred_pts, gt_faces, gt_vertices, step)
+```
+
+**Interpretation**:
+
+- Measures how close predicted surface is to ground truth
+- High accuracy = low error = predicted points lie close to GT surface
+- Detects **over-reconstruction** (extra geometry in prediction)
+- Formula: $\text{Accuracy} = \frac{1}{|\mathcal{P}|} \sum_{\mathbf{p} \in \mathcal{P}} \min_{\mathbf{q} \in \mathcal{M}_{\text{GT}}} \|\mathbf{p} - \mathbf{q}\|_2$
+
+### Completeness (GT → Prediction)
+
+```python
+# Step 1: Sample points FROM ground truth mesh
+gt_pts, _ = trimesh.sample.sample_surface(gt_mesh, sample_num, seed=rnd_seed)
+
+# Step 2: Compute distances TO predicted mesh
+completeness = compute_pts_to_mesh_dist(gt_pts, pred_faces, pred_vertices, step)
+```
+
+**Interpretation**:
+
+- Measures how well prediction covers ground truth surface
+- High completeness = low error = GT points have nearby predicted points
+- Detects **under-reconstruction** (missing geometry in prediction)
+- Formula: $\text{Completeness} = \frac{1}{|\mathcal{M}_{\text{GT}}|} \sum_{\mathbf{q} \in \mathcal{M}_{\text{GT}}} \min_{\mathbf{p} \in \mathcal{P}} \|\mathbf{p} - \mathbf{q}\|_2$
+
+**Key Difference**: Same algorithm ([`compute_pts_to_mesh_dist`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_utils.py#L97)), **but source and target are swapped**.
+
+## Output Metrics Dictionary
+
+```python
+metrics = {
+    "Accuracy_mean_meters": np.mean(accuracy),        # Mean distance pred→GT
+    "Completeness_mean_meters": np.mean(completeness), # Mean distance GT→pred
+    "prec@0.05": precision_perc5,                      # % pred points < 5cm from GT
+    "recal@0.05": recall_perc5,                        # % GT points < 5cm from pred
+    "fscore@0.05": fscore_perc5,                       # Harmonic mean of prec & recall
+}
+```
+
+### Precision & Recall Computation
+
+```python
+# Precision: fraction of predicted points that are "correct" (within threshold)
+precision_perc5 = np.mean((accuracy < 0.05).astype("float"))
+
+# Recall: fraction of GT points that are "recovered" (within threshold)
+recall_perc5 = np.mean((completeness < 0.05).astype("float"))
+
+# F-score: harmonic mean balancing precision and recall
+fscore_perc5 = 2 * precision_perc5 * recall_perc5 / (precision_perc5 + recall_perc5)
+```
+
+## Why Both Directions Matter
+
+**Chamfer Distance** combines both:
+$$
+\text{CD}(\mathcal{P}, \mathcal{M}_{\text{GT}}) = \text{Accuracy} + \text{Completeness}
+$$
+
+This bidirectional metric is crucial because:
+
+- **Accuracy alone** doesn't penalize missing geometry
+- **Completeness alone** doesn't penalize extra/noisy geometry
+- **Together** they provide complete picture of reconstruction quality
+
+**For RRI computation**, we need CD to quantify improvement:
+$$
+\text{RRI}(\mathbf{q}) = \frac{\text{CD}_{\text{before}} - \text{CD}_{\text{after}}}{\text{CD}_{\text{before}}}
+$$
+
+## `compute_pts_to_mesh_dist()`
+
+**Source**: [`atek/evaluation/surface_reconstruction/surface_reconstruction_utils.py`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_utils.py#L97)
+
+**Purpose**: Compute minimum distance from points to mesh triangles.
+
+### Algorithm
+
+1. Iterate through mesh faces in batches (for memory efficiency)
+2. For each point, compute:
+   - Distance to triangle plane (if point projects inside triangle)
+   - Distance to closest vertex (fallback)
+3. Use geometric projection test to determine if point projects onto triangle
+4. Return minimum distance across all triangles
+
+## Key Sub-Functions
+
+### `point_to_closest_tri_dist()`
+
+**Source**: [`surface_reconstruction_utils.py`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_utils.py#L45)
+
+Computes point-to-triangle distances using barycentric coordinate projection.
+
+#### Mathematical Details
+
+For each triangle defined by vertices $\mathbf{v}_0, \mathbf{v}_1, \mathbf{v}_2$:
+
+**1. Barycentric Coordinates**:
+$$
+\mathbf{u} = \mathbf{v}_1 - \mathbf{v}_0, \quad \mathbf{v} = \mathbf{v}_2 - \mathbf{v}_0, \quad \mathbf{w} = \mathbf{p} - \mathbf{v}_0
+$$
+
+$$
+\mathbf{n} = \mathbf{u} \times \mathbf{v}, \quad n^2 = \mathbf{n} \cdot \mathbf{n}
+$$
+
+**2. Projection Test** (check if point projects inside triangle):
+$$
+\gamma = \frac{(\mathbf{u} \times \mathbf{w}) \cdot \mathbf{n}}{n^2}, \quad
+\beta = \frac{(\mathbf{w} \times \mathbf{v}) \cdot \mathbf{n}}{n^2}, \quad
+\alpha = 1 - \gamma - \beta
+$$
+
+Valid if: $0 \leq \alpha, \beta, \gamma \leq 1$
+
+**3. Distance to Plane**:
+$$
+d = \left|\frac{\mathbf{n} \cdot \mathbf{w}}{\|\mathbf{n}\|}\right|
+$$
+
+**4. Fallback**: If point doesn't project onto triangle, set distance to large value (1e6)
+
+### `point_to_closest_vertex_dist()`
+
+**Source**: [`surface_reconstruction_utils.py`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_utils.py#L24)
+
+Fallback method that computes Euclidean distance to nearest triangle vertex:
+
+$$
+d_{\text{vertex}}(\mathbf{p}) = \min_{i \in \{0,1,2\}} \|\mathbf{p} - \mathbf{v}_i\|_2
+$$
+
+## Usage Example
+
+```python
+from atek.evaluation.surface_reconstruction.surface_reconstruction_metrics import evaluate_single_mesh_pair
+
+metrics, accuracy, completeness = evaluate_single_mesh_pair(
+    pred_mesh_filename="path/to/predicted.ply",
+    gt_mesh_filename="path/to/ground_truth.ply",
+    sample_num=10000,
+    step=50000,
+    rnd_seed=42
+)
+
+print(f"Accuracy: {metrics['Accuracy_mean_meters']:.4f}m")
+print(f"Completeness: {metrics['Completeness_mean_meters']:.4f}m")
+print(f"F-score@5cm: {metrics['fscore@0.05']:.2%}")
+```

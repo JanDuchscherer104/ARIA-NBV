@@ -1,0 +1,98 @@
+# Surface Reconstruction Metrics
+
+This document describes the fundamental metrics used to evaluate 3D reconstruction quality by comparing predicted reconstructions against ground truth meshes.
+
+## Key Metrics
+
+### 1. Accuracy (Prediction → Ground Truth)
+
+Measures how close predicted points are to the ground truth surface.
+
+$$
+\text{Accuracy} = \frac{1}{|\mathcal{P}|} \sum_{\mathbf{p} \in \mathcal{P}} \min_{\mathbf{q} \in \mathcal{M}_{\text{GT}}} \|\mathbf{p} - \mathbf{q}\|_2
+$$
+
+**Components**:
+
+- $\mathcal{P}$: Sampled points from predicted mesh/reconstruction
+- $\mathcal{M}_{\text{GT}}$: Sampled points from ground truth mesh
+- Lower values indicate better reconstruction accuracy
+
+**Interpretation**:
+
+- Measures how close predicted surface is to ground truth
+- High accuracy (low error) = predicted points lie close to GT surface
+- Detects **over-reconstruction** (extra geometry/noise in prediction)
+- Doesn't penalize missing geometry
+
+### 2. Completeness (Ground Truth → Prediction)
+
+Measures how well the prediction covers the ground truth surface.
+
+$$
+\text{Completeness} = \frac{1}{|\mathcal{M}_{\text{GT}}|} \sum_{\mathbf{q} \in \mathcal{M}_{\text{GT}}} \min_{\mathbf{p} \in \mathcal{P}} \|\mathbf{p} - \mathbf{q}\|_2
+$$
+
+**Interpretation**:
+
+- Measures how well prediction covers ground truth surface
+- High completeness (low error) = GT points have nearby predicted points
+- Detects **under-reconstruction** (missing geometry/holes in prediction)
+- Doesn't penalize extra geometry
+
+**Key Insight**: Accuracy and Completeness use the **same distance algorithm** with **source and target swapped**.
+
+### 3. Chamfer Distance (Bidirectional)
+
+Combines both accuracy and completeness into a single symmetric metric:
+
+$$
+\text{CD}(\mathcal{P}, \mathcal{M}_{\text{GT}}) = \text{Accuracy} + \text{Completeness}
+$$
+
+**Why bidirectional matters**:
+
+- **Accuracy alone** doesn't penalize missing geometry
+- **Completeness alone** doesn't penalize extra/noisy geometry
+- **Together** they provide complete picture of reconstruction quality
+
+This symmetric metric captures both over-reconstruction (accuracy) and under-reconstruction (completeness).
+
+### 4. Precision, Recall & F-score
+
+Binary classification metrics at threshold $\tau$ (typically 5cm):
+
+**Precision** - Fraction of predicted points that are "correct":
+$$
+\text{Precision}_\tau = \frac{|\{\mathbf{p} \in \mathcal{P} : \min_{\mathbf{q} \in \mathcal{M}_{\text{GT}}} \|\mathbf{p} - \mathbf{q}\| < \tau\}|}{|\mathcal{P}|}
+$$
+
+**Recall** - Fraction of GT points that are "recovered":
+$$
+\text{Recall}_\tau = \frac{|\{\mathbf{q} \in \mathcal{M}_{\text{GT}}: \min_{\mathbf{p} \in \mathcal{P}} \|\mathbf{p} - \mathbf{q}\| < \tau\}|}{|\mathcal{M}_{\text{GT}}|}
+$$
+
+**F-score** - Harmonic mean balancing precision and recall:
+$$
+\text{F-score}_\tau = \frac{2 \cdot \text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}
+$$
+
+## Example Scenarios
+
+Understanding how metrics behave in different reconstruction scenarios:
+
+| Scenario | Accuracy | Completeness | Interpretation |
+|----------|----------|--------------|----------------|
+| Perfect reconstruction | Low ✅ | Low ✅ | Ideal case |
+| Missing geometry (holes) | Low ✅ | High ❌ | Under-reconstruction |
+| Extra geometry (noise) | High ❌ | Low ✅ | Over-reconstruction |
+| Misaligned reconstruction | High ❌ | High ❌ | Wrong pose/scale |
+
+## Computation Methods
+
+Both ATEK and EFM3D provide implementations:
+
+- **ATEK**: [`evaluate_single_mesh_pair()`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_metrics.py) - Production-ready evaluation
+- **EFM3D**: [`eval_mesh_to_mesh()`](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/mesh_utils.py) - Includes visualization utilities
+
+See [ATEK Implementation](atek_implementation.qmd) for detailed breakdown.

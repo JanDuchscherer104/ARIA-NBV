@@ -1,0 +1,332 @@
+---
+title: "Resources & Tools"
+format: html
+---
+
+# Resources & Tools
+
+This section provides an overview of the libraries, tools, and documentation used in this project - all of which stem from the Project Aria ecosystem.
+
+## Project Aria
+- [Project Aria Dataset Explorer](https://explorer.projectaria.com/)
+- [Project Aria Docs](https://facebookresearch.github.io/projectaria_tools/docs/intro)
+  - [ASE Docs](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)
+
+
+## Aria Training and Evaluation Toolkit (ATEK)
+
+**The primary toolkit for ML training and evaluation on Aria datasets.** ATEK provides a complete pipeline from raw VRS data to PyTorch-ready datasets, standardized evaluation metrics, and pre-trained model support.
+
+- **GitHub**: [facebookresearch/ATEK](https://github.com/facebookresearch/ATEK)
+- [ATEK Documentation](https://github.com/facebookresearch/ATEK/tree/main/docs)
+- [Google Colab Demo](https://colab.research.google.com/github/facebookresearch/ATEK/blob/main/examples/ATEK_CoLab_Notebook.ipynb)
+- [Example Notebooks](https://github.com/facebookresearch/ATEK/tree/main/examples)
+  - Demo 1: Data Preprocessing
+  - Demo 2: Data Store & Inference
+  - Demo 3: Model Training
+  - Demo 4: SAM2 Integration
+
+Follow the [EFM3D Installation Instructions](https://github.com/facebookresearch/efm3d/blob/main/INSTALL.md), which already includes ATEK as a dependency.
+
+### Repository Structure
+```
+external/ATEK
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
+├── atek
+│   ├── __init__.py
+│   ├── __pycache__
+│   ├── configs
+│   │   └── __init__.py
+│   ├── data_download
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   └── atek_data_store_download.py
+│   ├── data_loaders
+│   │   ├── __init__.py
+│   │   ├── atek_raw_dataloader_as_cubercnn.py
+│   │   ├── atek_wds_dataloader.py
+│   │   ├── cubercnn_model_adaptor.py
+│   │   ├── sam2_model_adaptor.py
+│   │   └── test
+│   │       ├── __init__.py
+│   │       └── atek_wds_dataloader_test.py
+│   ├── data_preprocess
+│   │   ├── __init__.py
+│   │   ├── atek_data_sample.py
+│   │   ├── atek_wds_writer.py
+│   │   ├── genera_atek_preprocessor_factory.py
+│   │   ├── general_atek_preprocessor.py
+│   │   ├── processors
+│   │   │   ├── __init__.py
+│   │   │   ├── aria_camera_processor.py
+│   │   │   ├── depth_image_processor.py
+│   │   │   ├── efm_gt_processor.py
+│   │   │   ├── mps_online_calib_processor.py
+│   │   │   ├── mps_semidense_processor.py
+│   │   │   ├── mps_traj_processor.py
+│   │   │   ├── obb2_gt_processor.py
+│   │   │   └── obb3_gt_processor.py
+│   │   ├── sample_builders
+│   │   │   ├── __init__.py
+│   │   │   ├── atek_data_paths_provider.py
+│   │   │   ├── efm_sample_builder.py
+│   │   │   └── obb_sample_builder.py
+│   │   ├── subsampling_lib
+│   │   │   ├── __init__.py
+│   │   │   └── temporal_subsampler.py
+│   │   ├── test
+│   │   │   ├── __init__.py
+│   │   │   ├── aria_camera_processor_test.py
+│   │   │   ├── atek_data_sample_test.py
+│   │   │   ├── depth_image_processor_test.py
+│   │   │   ├── file_io_utils_test.py
+│   │   │   ├── mps_processor_test.py
+│   │   │   ├── obb2_gt_processor_test.py
+│   │   │   ├── obb3_gt_processor_test.py
+│   │   │   ├── obb_sample_builder_test.py
+│   │   │   └── test_data
+│   │   └── util
+│   │       └── __init__.py
+│   ├── evaluation
+│   │   ├── __init__.py
+│   │   ├── static_object_detection
+│   │   │   ├── __init__.py
+│   │   │   ├── eval_obb3.py
+│   │   │   ├── eval_obb3_metrics_utils.py
+│   │   │   ├── obb3_csv_io.py
+│   │   │   └── static_object_detection_metrics.py
+│   │   └── surface_reconstruction
+│   │       ├── __init__.py
+│   │       ├── surface_reconstruction_metrics.py
+│   │       └── surface_reconstruction_utils.py
+│   ├── util
+│   │   ├── __init__.py
+│   │   ├── atek_constants.py
+│   │   ├── camera_calib_utils.py
+│   │   ├── file_io_utils.py
+│   │   ├── tensor_utils.py
+│   │   └── viz_utils.py
+│   └── viz
+│       ├── __init__.py
+│       ├── atek_visualizer.py
+│       └── cubercnn_visualizer.py
+├── atek.egg-info
+├── data
+│   └── atek_data_store_confs
+├── docs
+│   ├── ATEK_Data_Store.md
+│   ├── Install.md
+│   ├── ML_task_object_detection.md
+│   ├── ML_task_surface_recon.md
+│   ├── ModelAdaptors.md
+│   ├── data_loading_and_inference.md
+│   ├── evaluation.md
+│   ├── example_cubercnn_customization.md
+│   ├── example_demos.md
+│   ├── example_sam2_customization.md
+│   ├── example_training.md
+│   ├── images
+│   ├── preprocessing.md
+│   └── preprocessing_configurations.md
+├── envs
+├── examples
+│   └── data
+├── readme.md
+├── setup.py
+├── setup_for_pywheel.py
+└── tools
+    ├── ase_mesh_downloader.py
+    ├── atek_wds_data_downloader.py
+    ├── benchmarking_static_object_detection.py
+    ├── benchmarking_surface_reconstruction.py
+    ├── infer_cubercnn.py
+    └── train_cubercnn.py
+```
+
+**Quick Start - Download Pre-processed ASE:**
+
+```bash
+# 1. Get download URLs from https://www.projectaria.com/datasets/ase/
+#    Click "Access The Dataset" → Download JSON file
+
+# cd into NBV repo root
+# 2. Download data using ATEK downloader
+python3 external/ATEK/tools/atek_wds_data_downloader.py \
+  --config-name efm \
+  --input-json-path .data/aria_download_urls/AriaSyntheticEnvironment_ATEK_download_urls.json \
+  --output-folder-path .data/ase_atek \
+  --max-num-sequences 2 \
+  --download-wds-to-local
+```
+
+**Quick Start - Load ASE Data in PyTorch:**
+```python
+# 3. Load data in PyTorch
+from atek.data_loaders import create_native_atek_dataloader
+from atek.util.file_io_utils import load_yaml_and_extract_tar_list
+
+urls = load_yaml_and_extract_tar_list("./data/ase_wds/local_train_tars.yaml")
+dataloader = create_native_atek_dataloader(
+    urls=urls,
+    batch_size=4,
+    num_workers=4,
+    shuffle_flag=True
+)
+
+for batch in dataloader:
+    # batch contains: images, camera_calibs, trajectory, 3D bbox annotations, etc.
+    pass
+```
+
+## EFM3D
+
+- [EDM3D GitHub](https://github.com/facebookresearch/efm3d)
+
+### Repository Structure
+```
+external/efm3d
+├── INSTALL.md
+├── README.md
+├── assets
+├── benchmark.md
+├── ckpt
+│   └── README.md
+├── data
+│   ├── README.md
+│   ├── dataverse_url_parser.py
+│   └── download_ase_mesh.py
+├── efm3d
+│   ├── __init__.py
+│   ├── aria
+│   │   ├── __init__.py
+│   │   ├── aria_constants.py
+│   │   ├── camera.py
+│   │   ├── obb.py
+│   │   ├── pose.py
+│   │   ├── projection_utils.py
+│   │   └── tensor_wrapper.py
+│   ├── config
+│   │   └── taxonomy
+│   ├── dataset
+│   │   ├── atek_vrs_dataset.py
+│   │   ├── atek_wds_dataset.py
+│   │   ├── augmentation.py
+│   │   ├── efm_model_adaptor.py
+│   │   ├── vrs_dataset.py
+│   │   └── wds_dataset.py
+│   ├── inference
+│   │   ├── __init__.py
+│   │   ├── eval.py
+│   │   ├── fuse.py
+│   │   ├── model.py
+│   │   ├── pipeline.py
+│   │   ├── track.py
+│   │   └── viz.py
+│   ├── model
+│   │   ├── __init__.py
+│   │   ├── cnn.py
+│   │   ├── dinov2_utils.py
+│   │   ├── dpt.py
+│   │   ├── evl.py
+│   │   ├── evl_train.py
+│   │   ├── image_tokenizer.py
+│   │   ├── lifter.py
+│   │   └── video_backbone.py
+│   ├── thirdparty
+│   │   ├── __init__.py
+│   │   └── mmdetection3d
+│   │       ├── __init__.py
+│   │       ├── cuda
+│   │       │   └── setup.py
+│   │       └── iou3d.py
+│   └── utils
+│       ├── __init__.py
+│       ├── common.py
+│       ├── depth.py
+│       ├── detection_utils.py
+│       ├── evl_loss.py
+│       ├── file_utils.py
+│       ├── gravity.py
+│       ├── image.py
+│       ├── image_sampling.py
+│       ├── marching_cubes.py
+│       ├── mesh_utils.py
+│       ├── obb_csv_writer.py
+│       ├── obb_io.py
+│       ├── obb_matchers.py
+│       ├── obb_metrics.py
+│       ├── obb_trackers.py
+│       ├── obb_utils.py
+│       ├── pointcloud.py
+│       ├── ray.py
+│       ├── reconstruction.py
+│       ├── render.py
+│       ├── rescale.py
+│       ├── viz.py
+│       ├── voxel.py
+│       └── voxel_sampling.py
+├── eval.py
+├── infer.py
+└── train.py
+```
+
+---
+
+## Project Aria Tools
+
+Project Aria Tools provides Python and C++ APIs for working with raw Aria data (VRS format) and MPS outputs. **Use this for data exploration and custom preprocessing; use ATEK for ML training.**
+
+- **GitHub**: [facebookresearch/projectaria_tools](https://github.com/facebookresearch/projectaria_tools)
+- **Documentation**: [https://facebookresearch.github.io/projectaria_tools](https://facebookresearch.github.io/projectaria_tools/docs/data_utilities)
+
+**Key Features:**
+
+- VRS data provider for accessing sensor streams
+- Device calibration and projection utilities
+- MPS (Machine Perception Services) data loaders
+- Visualization tools (Rerun-based)
+- ASE, ADT, and AEA dataset utilities
+
+---
+
+## SceneScript
+
+SceneScript is the structured language model for scene reconstruction used to train on ASE.
+
+- **GitHub**: [facebookresearch/scenescript](https://github.com/facebookresearch/scenescript)
+- **Paper**: [@SceneScript-avetisyan2024]
+
+**Repository Structure:**
+
+### Repository Structure
+```
+external/scenescript/
+├── src/
+│   ├── data/
+│   │   ├── geometries/
+│   │   │   ├── base_entity.py    # Base class for scene primitives
+│   │   │   ├── wall.py           # Wall representation
+│   │   │   ├── door.py           # Door representation
+│   │   │   ├── window.py         # Window representation
+│   │   │   └── bbox.py           # Bounding box utilities
+│   │   ├── language_sequence.py  # SSL tokenization
+│   │   └── point_cloud.py        # Point cloud utilities
+│   └── networks/
+│       ├── encoder.py            # Sparse 3D ResNet encoder
+│       ├── decoder.py            # Autoregressive transformer
+│       └── scenescript_model.py  # Full model pipeline
+├── inference.ipynb               # Demo notebook
+└── environment.yaml              # Conda environment
+```
+
+**Key Classes:**
+
+- `BaseEntity`: Abstract base for scene primitives
+- `Wall`, `Door`, `Window`: Geometric entities with SSL serialization
+- `LanguageSequence`: SSL tokenizer and parser
+- `SceneScriptModel`: End-to-end encoder-decoder
+
+---
+
+

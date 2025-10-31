@@ -26,12 +26,10 @@ format:
     link-external-newwindow: true
     fig-cap-location: bottom
     tbl-cap-location: top
-    # resource-path:
-    #   - ../_shared/figures/
     lightbox: true           # built-in lightbox for images (Quarto ≥1.4)
 
 # Citations site-wide
-bibliography: ../_shared/references.bib   # single source of truth
+bibliography: references.bib   # single source of truth
 csl: ieee.csl                             # choose a style now or later
 link-citations: true                      # clickable in-text cites
 
@@ -44,16 +42,6 @@ website:
     search: true
     left:
       - text: Home
-        file: index.qmd
-      - text: Literature
-        file: contents/literature.qmd
-      - text: ASE Dataset
-        file: contents/ase_dataset.qmd
-      - text: Ideas
-        file: contents/ideas.qmd
-      - text: Roadmap
-        file: contents/roadmap.qmd
-    right:
       - icon: github
         menu:
           - text: "View Source"
@@ -68,21 +56,36 @@ website:
       - section: "Overview"
         contents:
           - index.qmd
-      - section: "Background"
+      - section: "Literature"
         contents:
-          - contents/literature.qmd
-          - contents/ase_dataset.qmd
+          - contents/literature/vin_nbv.qmd
+          - contents/literature/gen_nbv.qmd
+          - contents/literature/scene_script.qmd
+          - contents/literature/efm3d.qmd
           - contents/glossary.qmd
-      - section: "Research"
+      - section: "Project State"
         contents:
-          - contents/ideas.qmd
-          - contents/roadmap.qmd
-          - contents/issues.qmd
           - contents/questions.qmd
+          - contents/roadmap.qmd
+          - contents/todos.qmd
       - section: "Resources"
         contents:
+          - contents/ase_dataset.qmd
+          - section: "Metrics"
+            contents:
+              - contents/metrics/index.qmd
+              - contents/metrics/surface_metrics.qmd
+              - contents/metrics/atek_implementation.qmd
+              - contents/metrics/efm3d_implementation.qmd
+              - contents/metrics/rri_computation.qmd
           - contents/resources.qmd
-          - contents/todos.qmd
+      - section: "Presentations"
+        contents:
+          - text: "Typst Slides 1"
+            file: typst/slides/slides_1.pdf
+          - text: "Typst Slides 2"
+            file: typst/slides/slides_2.pdf
+
   page-footer:
     left: ""
     right: "Built with Quarto"

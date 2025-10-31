@@ -19,10 +19,7 @@
 
     grid(
       columns: (self.page.margin.left, 1fr, auto, 0.5cm),
-      block(),
-      heading(level: 1, outlined: outlined, hdr),
-      move(dy: -0.31cm, self.store.logo),
-      block(),
+      block(), heading(level: 1, outlined: outlined, hdr), move(dy: -0.31cm, self.store.logo), block(),
     )
   }
 
@@ -48,15 +45,11 @@
     )
 
     if self.store.progress-bar {
-      place(bottom + left, float: true,
-        move(dy: 1.05cm,
-          components.progress-bar(
-            height: 3pt,
-            self.colors.primary,
-            white,
-          )
-        )
-      )
+      place(bottom + left, float: true, move(dy: 1.05cm, components.progress-bar(
+        height: 3pt,
+        self.colors.primary,
+        white,
+      )))
     }
   }
 
@@ -70,7 +63,7 @@
       self.store.default-alignment
     } else {
       alignment
-    }
+    },
   )
 
   touying-slide(self: self, ..args)
@@ -83,7 +76,7 @@
   spacing: 0.78em,
   color: none,
   color-body: none,
-  body
+  body,
 ) = [
   #import "@preview/tableau-icons:0.331.0": *
   #touying-fn-wrapper((self: none) => [
@@ -97,7 +90,7 @@
         sep-thickness: 0pt,
       ),
       frame: (
-        radius: 8pt,  // Rounded corners!
+        radius: 8pt, // Rounded corners!
         thickness: 0pt,
         border-color: if color == none { self.colors.primary } else { color },
         title-color: if color == none { self.colors.primary } else { color },
@@ -110,7 +103,7 @@
         align(horizon)[#strong(title)]
       } else {
         align(horizon)[
-    #draw-icon(icon, height: 1.2em, baseline: 20%, fill: white) #h(0.2cm) #strong[#title]
+          #draw-icon(icon, height: 1.2em, baseline: 20%, fill: white) #h(0.2cm) #strong[#title]
         ]
       },
       body,

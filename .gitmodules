@@ -7,3 +7,6 @@
 [submodule "external/ATEK"]
 	path = external/ATEK
 	url = git@github.com:facebookresearch/ATEK.git
+[submodule "external/efm3d"]
+	path = external/efm3d
+	url = https://github.com/facebookresearch/efm3d

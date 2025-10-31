@@ -1,0 +1,348 @@
+# Computing RRI with Ground Truth Meshes
+
+This document describes the complete pipeline for computing the Relative Reconstruction Improvement (RRI) oracle using the ASE dataset and ground truth meshes.
+
+## RRI Definition
+
+For Next-Best-View planning, the **Relative Reconstruction Improvement (RRI)** quantifies the expected reconstruction quality gain from capturing a new view:
+
+$$
+\text{RRI}(\mathbf{q}) = \frac{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}}) - \text{CD}(\mathcal{P}_{t \cup \mathbf{q}}, \mathcal{M}_{\text{GT}})}{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}})}
+$$
+
+### Components
+
+**Where**:
+
+- $\mathbf{q}$: Candidate viewpoint (5DoF: position + yaw, pitch)
+- $\mathcal{P}_t$: Current reconstruction from first $t$ views
+- $\mathcal{P}_{t \cup \mathbf{q}}$: Updated reconstruction after capturing from $\mathbf{q}$
+- $\mathcal{M}_{\text{GT}}$: Ground truth mesh (from ASE `.ply` files)
+
+**Properties**:
+
+- Range: $[0, 1]$ where higher = more improvement
+- Normalized by current error → scale-independent
+- Requires GT only during training
+
+## RRI Oracle Pipeline for ASE Dataset
+
+### Step 1: Load Ground Truth Mesh
+
+```python
+import trimesh
+
+gt_mesh = trimesh.load("scene_id/gt_mesh.ply")
+```
+
+### Step 2: Construct Current Reconstruction $\mathcal{P}_t$
+
+Choose one of two approaches based on available data:
+
+#### Option A: Dense Point Cloud from Depth Maps
+
+```python
+from efm3d.utils.depth import dist_im_to_point_cloud_im
+import torch
+
+P_t = []
+# For each captured view i in [1, ..., t]
+for depth_map, camera, pose in views:
+    # Convert depth to point cloud in camera frame
+    pc_camera, valid = dist_im_to_point_cloud_im(depth_map, camera)
+
+    # Transform to world coordinates
+    pc_world = pose.transform(pc_camera[valid])
+    P_t.append(pc_world)
+
+# Merge all views
+P_t = torch.cat(P_t, dim=0)  # Concatenate
+```
+
+#### Option B: Semi-Dense SLAM Point Cloud
+
+```python
+import pandas as pd
+import numpy as np
+
+# Use ASE's pre-computed semi-dense SLAM points
+df = pd.read_csv("scene_id/semidense_points.csv.gz")
+P_t = torch.from_numpy(df[['px', 'py', 'pz']].values).float()
+```
+
+### Step 3: Simulate Observation from Candidate View $\mathbf{q}$
+
+Two approaches to simulate what would be visible from candidate viewpoint:
+
+#### Option 3A: Ray-Casting to GT Mesh (Recommended)
+
+```python
+from efm3d.aria.camera import pixel_grid
+from efm3d.utils.ray import ray_grid
+
+# Generate ray grid for candidate camera
+pixel_coords = pixel_grid(candidate_camera)
+rays_camera, valid = ray_grid(candidate_camera)
+
+# Transform rays to world space
+rays_world = q_pose.transform_rays(rays_camera)
+
+# Intersect with GT mesh (using trimesh)
+locations, index_ray, index_tri = gt_mesh.ray.intersects_location(
+    ray_origins=rays_world[..., :3].reshape(-1, 3),
+    ray_directions=rays_world[..., 3:].reshape(-1, 3)
+)
+
+P_q = torch.from_numpy(locations).float()  # Points visible from q
+```
+
+#### Option 3B: Render Depth from GT Mesh
+
+```python
+# Alternative: Use rendering to generate depth map
+# (Requires pyrender or similar)
+depth_q = render_depth(gt_mesh, q_pose, candidate_camera)
+pc_q, valid = dist_im_to_point_cloud_im(depth_q, candidate_camera)
+P_q = q_pose.transform(pc_q[valid])
+```
+
+### Step 4: Merge Reconstructions
+
+```python
+from efm3d.utils.pointcloud import collapse_pointcloud_time
+
+# Combine current and new observations
+P_t_union_q = torch.cat([P_t, P_q], dim=0)
+
+# Remove NaNs and duplicates
+P_t_union_q = collapse_pointcloud_time(P_t_union_q.unsqueeze(0).unsqueeze(0))
+
+# Voxel downsample for consistent density (using Open3D)
+import open3d as o3d
+
+def voxel_downsample(points, voxel_size=0.01):
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points.cpu().numpy())
+    pcd_down = pcd.voxel_down_sample(voxel_size=voxel_size)
+    return torch.from_numpy(np.asarray(pcd_down.points)).float()
+
+P_t = voxel_downsample(P_t, voxel_size=0.01)
+P_t_union_q = voxel_downsample(P_t_union_q, voxel_size=0.01)
+```
+
+### Step 5: Compute Chamfer Distances
+
+```python
+from atek.evaluation.surface_reconstruction.surface_reconstruction_utils import compute_pts_to_mesh_dist
+import numpy as np
+
+# Sample points from GT mesh
+M_GT_sampled, _ = trimesh.sample.sample_surface(gt_mesh, count=10000, seed=42)
+M_GT = torch.from_numpy(M_GT_sampled.view(np.ndarray)).float()
+
+# Convert mesh to tensors
+gt_vertices = torch.from_numpy(gt_mesh.vertices.view(np.ndarray)).float()
+gt_faces = torch.from_numpy(gt_mesh.faces.view(np.ndarray)).long()
+
+# Compute accuracy (P_t → M_GT)
+accuracy_before = compute_pts_to_mesh_dist(P_t, gt_faces, gt_vertices, step=50000)
+accuracy_after = compute_pts_to_mesh_dist(P_t_union_q, gt_faces, gt_vertices, step=50000)
+
+# Compute completeness (M_GT → P_t) - requires converting PC to mesh or using KNN
+# For simplicity, we can use a symmetric distance metric
+from scipy.spatial import cKDTree
+
+def compute_completeness_pc(gt_points, pred_points):
+    """Compute completeness using KNN (GT → Prediction)"""
+    tree = cKDTree(pred_points.cpu().numpy())
+    distances, _ = tree.query(gt_points.cpu().numpy(), k=1)
+    return distances
+
+completeness_before = compute_completeness_pc(M_GT, P_t)
+completeness_after = compute_completeness_pc(M_GT, P_t_union_q)
+
+# Compute Chamfer Distance
+cd_before = np.mean(accuracy_before) + np.mean(completeness_before)
+cd_after = np.mean(accuracy_after) + np.mean(completeness_after)
+
+# Compute RRI
+rri = (cd_before - cd_after) / cd_before
+print(f"RRI: {rri:.4f}")
+```
+
+## Complete RRI Oracle Function
+
+Here's a complete, reusable function:
+
+```python
+def compute_rri_oracle(
+    P_t: torch.Tensor,
+    candidate_pose,
+    candidate_camera,
+    gt_mesh: trimesh.Trimesh,
+    voxel_size: float = 0.01,
+    sample_num: int = 10000,
+    step: int = 50000,
+    seed: int = 42
+) -> float:
+    """
+    Compute RRI oracle for a candidate viewpoint.
+
+    Args:
+        P_t: Current reconstruction point cloud (N, 3)
+        candidate_pose: Candidate camera pose
+        candidate_camera: Candidate camera parameters
+        gt_mesh: Ground truth mesh
+        voxel_size: Voxel size for downsampling
+        sample_num: Number of points to sample from GT mesh
+        step: Batch size for distance computation
+        seed: Random seed
+
+    Returns:
+        rri: Relative Reconstruction Improvement [0, 1]
+    """
+    # Step 1: Simulate observation from candidate view
+    rays_camera, valid = ray_grid(candidate_camera)
+    rays_world = candidate_pose.transform_rays(rays_camera)
+
+    locations, _, _ = gt_mesh.ray.intersects_location(
+        ray_origins=rays_world[..., :3].reshape(-1, 3).cpu().numpy(),
+        ray_directions=rays_world[..., 3:].reshape(-1, 3).cpu().numpy()
+    )
+    P_q = torch.from_numpy(locations).float()
+
+    # Step 2: Merge and downsample
+    P_t_union_q = torch.cat([P_t, P_q], dim=0)
+    P_t_ds = voxel_downsample(P_t, voxel_size)
+    P_t_union_q_ds = voxel_downsample(P_t_union_q, voxel_size)
+
+    # Step 3: Sample GT mesh
+    M_GT_sampled, _ = trimesh.sample.sample_surface(gt_mesh, sample_num, seed=seed)
+    M_GT = torch.from_numpy(M_GT_sampled.view(np.ndarray)).float()
+
+    # Step 4: Compute CD before
+    gt_vertices = torch.from_numpy(gt_mesh.vertices.view(np.ndarray)).float()
+    gt_faces = torch.from_numpy(gt_mesh.faces.view(np.ndarray)).long()
+
+    acc_before = compute_pts_to_mesh_dist(P_t_ds, gt_faces, gt_vertices, step)
+    comp_before = compute_completeness_pc(M_GT, P_t_ds)
+    cd_before = np.mean(acc_before) + np.mean(comp_before)
+
+    # Step 5: Compute CD after
+    acc_after = compute_pts_to_mesh_dist(P_t_union_q_ds, gt_faces, gt_vertices, step)
+    comp_after = compute_completeness_pc(M_GT, P_t_union_q_ds)
+    cd_after = np.mean(acc_after) + np.mean(comp_after)
+
+    # Step 6: Compute RRI
+    rri = (cd_before - cd_after) / cd_before if cd_before > 0 else 0.0
+
+    return rri
+```
+
+## Important Considerations
+
+### Point Cloud Density
+
+**Issue**: CD depends on point cloud density
+- Different view counts → different point densities → incomparable CD values
+
+**Solution**: Use consistent voxel downsampling
+```python
+# Always downsample to same voxel size (e.g., 1cm)
+P_t = voxel_downsample(P_t, voxel_size=0.01)
+P_t_union_q = voxel_downsample(P_t_union_q, voxel_size=0.01)
+```
+
+**Alternative**: Normalize by point count or use mesh-to-mesh CD after surface reconstruction
+
+### Visibility Information
+
+ASE provides `semidense_observations.csv.gz` mapping points to observing frames:
+
+```python
+# Load visibility data
+obs_df = pd.read_csv("scene_id/semidense_observations.csv.gz")
+
+# Identify newly visible points from candidate view
+# (This requires computing which points would be visible from q)
+```
+
+**Benefits**:
+- More accurate than full ray-casting
+- Faster computation
+- Accounts for occlusions
+
+### Entity-Wise RRI
+
+For scene-level reconstruction with semantic understanding:
+
+```python
+def compute_entity_wise_rri(
+    P_t: torch.Tensor,
+    candidate_pose,
+    candidate_camera,
+    gt_mesh: trimesh.Trimesh,
+    instance_labels: torch.Tensor,
+    entity_classes: list
+) -> dict:
+    """
+    Compute RRI separately for each entity class.
+
+    Returns:
+        rri_dict: {"chair": 0.234, "table": 0.456, ...}
+    """
+    rri_dict = {}
+
+    for entity_class in entity_classes:
+        # Segment GT mesh by semantic class
+        M_GT_entity = segment_mesh_by_class(gt_mesh, entity_class)
+
+        # Filter reconstruction points by entity
+        mask = instance_labels == entity_class
+        P_t_entity = P_t[mask]
+
+        # Compute entity-specific RRI
+        rri_entity = compute_rri_oracle(
+            P_t_entity, candidate_pose, candidate_camera, M_GT_entity
+        )
+        rri_dict[entity_class] = rri_entity
+
+    return rri_dict
+```
+
+**Benefits**:
+- Prioritize under-reconstructed object categories
+- Combine with semantic embeddings for multi-task learning
+- Align with task-driven exploration objectives
+
+### Computational Efficiency
+
+For large-scale RRI computation over many candidate views:
+
+1. **Batch ray-casting**: Compute intersections for multiple candidates in parallel
+2. **Cache GT samples**: Reuse sampled GT points across candidates
+3. **Coarse-to-fine**: Pre-filter candidates using faster heuristics before full RRI
+4. **GPU acceleration**: Move distance computations to GPU
+
+```python
+# Batch computation for multiple candidates
+def compute_rri_batch(
+    P_t: torch.Tensor,
+    candidate_poses: list,
+    candidate_camera,
+    gt_mesh: trimesh.Trimesh
+) -> np.ndarray:
+    """Compute RRI for multiple candidates in batch."""
+    rris = []
+    for pose in candidate_poses:
+        rri = compute_rri_oracle(P_t, pose, candidate_camera, gt_mesh)
+        rris.append(rri)
+    return np.array(rris)
+```
+
+## References
+
+- **VIN-NBV**: Frahm et al., "View Introspection Network for Next-Best-View Selection", 2025
+- **ASE Dataset**: [Aria Synthetic Environments](../ase_dataset.qmd)
+- **ATEK Implementation**: [ATEK Metrics](atek_implementation.qmd)
+- **EFM3D Implementation**: [EFM3D Utilities](efm3d_implementation.qmd)

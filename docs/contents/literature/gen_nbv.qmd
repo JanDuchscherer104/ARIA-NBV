@@ -1,0 +1,31 @@
+## GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction
+
+
+GenNBV@GenNBV-chen2024 addresses the generalization challenge in NBV planning through reinforcement learning and a continuous 5D action space.
+
+### Key Contributions
+
+- **Continuous Action Space**: 5-DOF pose prediction (3D position + 2D orientation) allows smooth, collision-free trajectories
+- **Multi-Source State Embedding**: Combines geometric features, semantic information, and action history
+- **Cross-Dataset Generalization**: Achieves 98.26% and 97.12% coverage on unseen building datasets
+- **Reinforcement Learning**: Trained in Isaac Gym simulator using PPO algorithm
+
+### Architecture Components
+
+1. **Geometric Encoder**: Processes partial point clouds to extract shape features
+2. **Semantic Encoder**: Encodes object categories and semantic labels
+3. **Action History Encoder**: Maintains context of recent viewpoints
+4. **Policy Network**: Predicts continuous viewpoint parameters
+
+### Limitations
+
+- **Coverage-Based Objective**: Optimizes for geometric coverage rather than reconstruction quality
+- **Limited Semantic Reasoning**: Treats all surfaces equally without task-specific prioritization
+
+### Relevance to Our Work
+
+GenNBV demonstrates the value of:
+
+- **Continuous action spaces** rather than random sampling with subsequent fitness-based selection
+- **Structured state representations** combining multiple modalities
+- **Learning-based policies** that generalize across scenes

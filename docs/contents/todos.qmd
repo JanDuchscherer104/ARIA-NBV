@@ -1,0 +1,25 @@
+---
+title: "Action Items & TODOs"
+format: html
+---
+
+# Issues & Questions
+
+## ASE: Single Trajectory Per Scene
+
+- Each ASE scene provides only one pre-recorded egocentric trajectory. We cannot query arbitrary novel viewpoints.
+    - EFM3D introduces GT meshes for 100 validation scenes. We can use these to compute oracle RRI for candidate views. Use the mesh predicted by EFM3D as pseudo-GT for other scenes.
+
+- depth maps in ASE data set are ground-truth!
+
+- Should NBV prediction output discrete selection (VIN-NBV) or continuous pose (GenNBV)?
+  - Start with randomly sampled candidate views for which the RRI is computed. Action space is then the selection among these candidates.
+  - Future work: learn to generate continuous poses directly, whose fitness can than be quantified using the RRI predictor; here we can also consider the free space voxels that are used in EFM3D to avoid collisions.
+
+- non-gt point clouds are sparse! How to sample a PC from the candidate view that can be compared to the pre-existing semi-dense SLAM PC that is provided in the ASE dataset?
+
+
+
+
+# Action Items
+
