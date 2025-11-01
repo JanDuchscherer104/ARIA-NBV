@@ -1,7 +1,6 @@
-# docs/quarto/_quarto.yml
 project:
   type: website
-  output-dir: _site
+  output-dir: .
   resources:
     - figures/
 
