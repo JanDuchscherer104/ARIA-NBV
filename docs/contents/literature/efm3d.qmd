@@ -1,4 +1,4 @@
-## EFM3D & EVL
+## EFM3D & EVL {#efm3d}
 
 ### Overview
 - **Porposed Method**: **EVL** was designed as a base-line _3D egocentric foundation model_ that leverages strong priors from various egocentric modalities and inherits foundational capabilities from any (frozen) 2D backbone.
