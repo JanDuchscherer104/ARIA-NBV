@@ -1,0 +1,12 @@
+[submodule "external/scenescript"]
+	path = external/scenescript
+	url = git@github.com:facebookresearch/scenescript.git
+[submodule "external/projectaria_tools"]
+	path = external/projectaria_tools
+	url = git@github.com:facebookresearch/projectaria_tools.git
+[submodule "external/ATEK"]
+	path = external/ATEK
+	url = git@github.com:facebookresearch/ATEK.git
+[submodule "external/efm3d"]
+	path = external/efm3d
+	url = https://github.com/facebookresearch/efm3d
