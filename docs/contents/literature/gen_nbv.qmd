@@ -1,4 +1,4 @@
-## GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction
+## GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction {#gen-nbv}
 
 
 GenNBV@GenNBV-chen2024 addresses the generalization challenge in NBV planning through reinforcement learning and a continuous 5D action space.

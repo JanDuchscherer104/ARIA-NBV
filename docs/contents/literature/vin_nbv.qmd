@@ -1,4 +1,4 @@
-## VIN-NBV: A View Introspection Network for Next-Best-View Selection
+## VIN-NBV: A View Introspection Network for Next-Best-View Selection {#vin-nbv}
 
 VIN-NBV@VIN-NBV-frahm2025 presents a learning-based approach to NBV that directly optimizes for **reconstruction quality** rather than coverage. The key innovation is the View Introspection Network (VIN), which predicts the **Relative Reconstruction Improvement (RRI)** of candidate viewpoints without actually capturing new images.
 
