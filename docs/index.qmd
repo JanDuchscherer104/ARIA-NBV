@@ -36,6 +36,41 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - Entity-aware reconstruction tracking through EVL's OBB detection capabilities.
 - Extend towards human-in-the-loop AR guidance, where entity-aware RRI weighting delivers task-specific view suggestions.
 
+# Important Resources
+
+- see [Resources & Tools](contents/resources.qmd) for libraries, tools, docs and datasets used in this project
+
+## Papers
+
+### Core NBV Methods
+
+- **[VIN-NBV: A View Introspection Network for Next-Best-View Selection](https://arxiv.org/abs/2505.06219)** [@VIN-NBV-frahm2025] - Direct RRI optimization approach
+- **[GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction](https://arxiv.org/abs/2402.16174)** [@GenNBV-chen2024] - RL-based coverage optimization
+
+### Project Aria Ecosystem
+
+- **[EFM3D: A Benchmark for Measuring Progress Towards 3D Egocentric Foundation Models](https://arxiv.org/abs/2406.10224)** [@EFM3D-straub2024] - EVL backbone and benchmarks
+- **[SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model](https://arxiv.org/abs/2403.13064)** [@SceneScript-avetisyan2024] - Structured scene representation
+- **[Project Aria: A New Tool for Egocentric Multi-Modal AI Research](https://arxiv.org/abs/2308.13561)** [@projectaria-engel2023] - ASE dataset foundation
+- **[Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling](https://arxiv.org/abs/2503.11806)** [@HITL-SceneScript-xie2025] - Interactive scene editing
+
+## Resources, Tools, Docs and Datasets
+
+### Project Aria Ecosystem
+
+- **[Project Aria Homepage](https://www.projectaria.com/)** - Main portal for datasets and tools
+- **[Project Aria Documentation](https://facebookresearch.github.io/projectaria_tools/docs/intro)** - APIs and utilities
+- **[ASE Dataset Documentation](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)** - 100K synthetic scenes
+- **[Project Aria Dataset Explorer](https://explorer.projectaria.com/)** - Interactive data browser
+
+### Development Tools
+
+- **[ATEK GitHub Repository](https://github.com/facebookresearch/ATEK)** - ML training and evaluation toolkit
+- **[ATEK Documentation](https://facebookresearch.github.io/projectaria_tools/docs/ATEK/about_ATEK)** - Complete setup and usage guide
+- **[EFM3D GitHub Repository](https://github.com/facebookresearch/efm3d)** - Foundation model implementation
+- **[SceneScript GitHub Repository](https://github.com/facebookresearch/scenescript)** - Structured scene language
+- **[Project Aria Tools GitHub](https://github.com/facebookresearch/projectaria_tools)** - Core data processing utilities
+
 # NBV Background
 
 ## Classical Methods: Geometric Heuristics
@@ -165,8 +200,13 @@ Subject to:
 - **[EFM3D Implementation](contents/metrics/efm3d_implementation.qmd)**: Point cloud and voxel utilities
 - **[RRI Computation](contents/metrics/rri_computation.qmd)**: Complete oracle implementation
 
+## Project Slides
+
+- [Presentation 01](/docs/typst/slides/slides_1.pdf), [typst-src](/docs/typst/slides/slides_1.typ)
+- [Presentation 02](/docs/typst/slides/slides_2.pdf), [typst-src](/docs/typst/slides/slides_2.typ)
 
 # External Code & Notebooks
+
 ```
 external/
 ├── ATEK/                    # Aria toolkit for data processing
