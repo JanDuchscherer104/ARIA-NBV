@@ -1,6 +1,6 @@
 ## GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction {#gen-nbv}
 
-@GenNBV-chen2024 introduce GenNBV, an end-to-end reinforcement-learning policy that plans in a continuous five-degree-of-freedom view space and generalizes from synthetic training scenes to novel buildings.
+@GenNBV-chen2024 introduce GenNBV, an end-to-end reinforcement-learning policy that plans in a continuous five-degree-of-freedom view space.
 
 **Links**: [Project Page](https://gennbv.tech/), [GitHub](https://github.com/zjwzcx/GenNBV)
 
@@ -50,7 +50,7 @@ Coverage is measured by thresholding $F_t^G$ to count occupied voxels $\tilde N_
 $$
 \text{CR}_t = \frac{\tilde N_t}{N^*}\cdot 100\%.
 $$
-The primary reward is the temporal gain in coverage, similar to TD(0) rewards:
+The primary reward is the temporal gain in coverage, similar to TD(0):
 $$
 r^{\text{CR}}_{t+1} = \text{CR}_{t+1} - \text{CR}_t,
 $$

@@ -6,8 +6,9 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="author" content="OpenAI ChatGPT, Deep Research &amp; GPT-5">
 
-<title>semi-dense-pc – Semantic NBV Planning</title>
+<title>Semi-Dense Point Clouds – Semantic NBV Planning</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -55,7 +56,27 @@ div.sourceCode
 @media screen {
 pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
-</style>
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
 
 
 <script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
@@ -107,6 +128,35 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   }
 }</script>
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 </head>
 
@@ -292,17 +342,52 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">Home</span>
-    </span>
+    <a class="nav-link active" href="../../contents/todos.html" aria-current="page"> 
+<span class="menu-text">TODOs</span></a>
   </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-project-state" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Project State</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-project-state">    
+        <li>
+    <a class="dropdown-item" href="../../contents/roadmap.html">
+ <span class="dropdown-text">Roadmap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/research_questions.qmd">
+ <span class="dropdown-text">Research Questions</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-ressources" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Ressources</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-ressources">    
+        <li>
+    <a class="dropdown-item" href="../../contents/resources.html">
+ <span class="dropdown-text">Resources (External Links, Repos, Docs, etc.)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/ase_dataset.html">
+ <span class="dropdown-text">ASE Dataset</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/glossary.html">
+ <span class="dropdown-text">Glossary</span></a>
+  </li>  
+    </ul>
+  </li>
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-bi-github" role="link" data-bs-toggle="dropdown" aria-expanded="false">
       <i class="bi bi-github" role="img">
 </i> 
  <span class="menu-text"></span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-bi-github">    
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="nav-menu-bi-github">    
         <li>
     <a class="dropdown-item" href="https://github.com/JanDuchscherer104/NBV">
  <span class="dropdown-text">View Source</span></a>
@@ -325,7 +410,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Theory &amp; Implementations</li><li class="breadcrumb-item"><a href="../../contents/theory/semi-dense-pc.html">Theory</a></li><li class="breadcrumb-item"><a href="../../contents/theory/semi-dense-pc.html">Semi-Dense Point Clouds</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
       <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
@@ -352,29 +437,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
- <span class="menu-text">Overview</span></a>
+ <span class="menu-text">Literature</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
       <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Next-Best-View Planning with Foundation Models</span></a>
-  </div>
-</li>
-      </ul>
-  </li>
-        <li class="sidebar-item sidebar-item-section">
-      <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
- <span class="menu-text">Literature</span></a>
-          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
-            <i class="bi bi-chevron-right ms-2"></i>
-          </a> 
-      </div>
-      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../../contents/literature/vin_nbv.html" class="sidebar-item-text sidebar-link">
@@ -399,23 +467,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="menu-text">EFM3D &amp; EVL</span></a>
   </div>
 </li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../contents/glossary.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Glossary</span></a>
-  </div>
-</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
  <span class="menu-text">Project State</span></a>
-          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
-      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../../contents/questions.html" class="sidebar-item-text sidebar-link">
@@ -438,28 +500,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
- <span class="menu-text">Resources</span></a>
-          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Theory &amp; Implementations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
-      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../contents/ase_dataset.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Aria Synthetic Environments (ASE) Dataset</span></a>
-  </div>
-</li>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false">
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="false">
  <span class="menu-text">Metrics</span></a>
-          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false" aria-label="Toggle section">
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="false" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
-      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth2 ">  
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth2 ">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../../contents/metrics/index.html" class="sidebar-item-text sidebar-link">
@@ -492,12 +548,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
       </ul>
   </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Theory</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth2 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../contents/resources.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Resources &amp; Tools</span></a>
+  <a href="../../contents/theory/semi-dense-pc.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Semi-Dense Point Clouds</span></a>
   </div>
 </li>
+      </ul>
+  </li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
@@ -533,31 +600,123 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#semi-dense-pc" id="toc-semi-dense-pc" class="nav-link active" data-scroll-target="#semi-dense-pc"><span class="header-section-number">1</span> Semi-Dense Point Cloud</a></li>
-  <li><a href="#what-are-semi-dense-points" id="toc-what-are-semi-dense-points" class="nav-link" data-scroll-target="#what-are-semi-dense-points"><span class="header-section-number">2</span> What are semi-dense points?</a></li>
+  <li><a href="#what-are-semi-dense-points" id="toc-what-are-semi-dense-points" class="nav-link active" data-scroll-target="#what-are-semi-dense-points"><span class="header-section-number">1</span> What are semi-dense points?</a>
+  <ul class="collapse">
+  <li><a href="#inverse-distance-parameterization" id="toc-inverse-distance-parameterization" class="nav-link" data-scroll-target="#inverse-distance-parameterization"><span class="header-section-number">1.1</span> Inverse-Distance parameterization</a></li>
+  <li><a href="#multi-view-constraints-visibility" id="toc-multi-view-constraints-visibility" class="nav-link" data-scroll-target="#multi-view-constraints-visibility"><span class="header-section-number">1.2</span> Multi-view constraints &amp; visibility</a></li>
+  <li><a href="#what-the-aria-files-mean" id="toc-what-the-aria-files-mean" class="nav-link" data-scroll-target="#what-the-aria-files-mean"><span class="header-section-number">1.3</span> What the Aria files mean</a></li>
+  <li><a href="#evlefm3d-context-for-nbv" id="toc-evlefm3d-context-for-nbv" class="nav-link" data-scroll-target="#evlefm3d-context-for-nbv"><span class="header-section-number">1.4</span> EVL/EFM3D context (for NBV)</a></li>
+  <li><a href="#practical-guidance" id="toc-practical-guidance" class="nav-link" data-scroll-target="#practical-guidance"><span class="header-section-number">1.5</span> Practical guidance</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><h1 class="title display-7"></h1></header><div class="quarto-title-block"><div class="quarto-title-tools-only"><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">Theory &amp; Implementations</li><li class="breadcrumb-item"><a href="../../contents/theory/semi-dense-pc.html">Theory</a></li><li class="breadcrumb-item"><a href="../../contents/theory/semi-dense-pc.html">Semi-Dense Point Clouds</a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">Semi-Dense Point Clouds</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
 
 
 
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>OpenAI ChatGPT, Deep Research &amp; GPT-5 </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
 
 
-<section id="semi-dense-pc" class="level2" data-number="1">
-<h2 data-number="1" class="anchored" data-anchor-id="semi-dense-pc"><span class="header-section-number">1</span> Semi-Dense Point Cloud</h2>
+</header>
+
+
+<section id="what-are-semi-dense-points" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="what-are-semi-dense-points"><span class="header-section-number">1</span> What are semi-dense points?</h2>
+<p><a href="https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_pointcloud"><strong>Direct Quote as per Project Aria Docs</strong></a>: Semi-dense points are the 3D points associated with tracks from our semi-dense tracking pipeline. Semi-dense tracks are continually created in pixel locations of input frames that lie in regions of high image gradient, and are then successively tracked in the following frames. Each track is associated with a 3D point, parameterized as an inverse distance along a ray originating from the track’s first initial observation, as well as its uncertainty in inverse distance and distance. These points are transformed from their original camera coordinate spaces to the same coordinate frame associated with the closed loop trajectory of the sequence.</p>
+<p><strong>Idea.</strong> Semi-dense SLAM reconstructs 3D only at <strong>high-gradient</strong> pixels, tracking them across frames and estimating one 3D point per <strong>temporal track</strong> (multi-frame 2D correspondences) <span class="citation" data-cites="Engel2014LSD"><a href="#ref-Engel2014LSD" role="doc-biblioref">[1]</a></span>. Points are stored in the <strong>world frame</strong> of the closed-loop trajectory.</p>
+<section id="inverse-distance-parameterization" class="level3" data-number="1.1">
+<h3 data-number="1.1" class="anchored" data-anchor-id="inverse-distance-parameterization"><span class="header-section-number">1.1</span> Inverse-Distance parameterization</h3>
+<p>For the first (anchor) observation of a track at pixel <span class="math inline">\((u_0,v_0)\)</span> with intrinsics <span class="math inline">\(K\)</span>: <span class="math display">\[
+\hat{\mathbf r}_0=\frac{K^{-1}[u_0,v_0,1]^\top}{\lVert K^{-1}[u_0,v_0,1]^\top\rVert},\qquad
+X_{c_0}(\rho)=\frac{1}{\rho}\,\hat{\mathbf r}_0,\qquad
+X_{w} = T_{w\leftarrow c_0}\,X_{c_0}(\rho).
+\]</span> Using <strong>inverse distance</strong> <span class="math inline">\(\rho=1/d\)</span> stabilizes optimization and handles far points gracefully <span class="citation" data-cites="Engel2014LSD HartleyZisserman"><a href="#ref-Engel2014LSD" role="doc-biblioref">[1]</a>, <a href="#ref-HartleyZisserman" role="doc-biblioref">[2]</a></span>.</p>
+<section id="symbol-definitions-notation" class="level4" data-number="1.1.1">
+<h4 data-number="1.1.1" class="anchored" data-anchor-id="symbol-definitions-notation"><span class="header-section-number">1.1.1</span> Symbol definitions (notation)</h4>
+<ul>
+<li><span class="math inline">\(K \in \mathbb R^{3\times 3}\)</span>: camera intrinsics with <span class="math inline">\(f_x,f_y,c_x,c_y\)</span>.</li>
+<li><span class="math inline">\([u_0,v_0]\)</span>: pixel coordinates (in pixels) of the anchor observation.</li>
+<li><span class="math inline">\(\hat{\mathbf r}_0\)</span>: unit back-projection ray in the anchor camera frame; the hat denotes normalization to unit length.</li>
+<li><span class="math inline">\(\rho=1/d\)</span>: inverse distance (m<span class="math inline">\(^{-1}\)</span>); <span class="math inline">\(d\)</span> is metric distance along <span class="math inline">\(\hat{\mathbf r}_0\)</span>.</li>
+<li><span class="math inline">\(X_{c_0}(\rho) \in \mathbb R^3\)</span>: 3D point in the anchor camera frame at inverse distance <span class="math inline">\(\rho\)</span>.</li>
+<li><span class="math inline">\(T_{w\leftarrow c_0} = (R_{w\leftarrow c_0}, t_{w\leftarrow c_0}) \in \mathrm{SE}(3)\)</span>: rigid transform mapping anchor camera coordinates to world.</li>
+<li><span class="math inline">\(X_w \in \mathbb R^3\)</span>: the same 3D point expressed in the world (closed-loop) frame.</li>
+<li><span class="math inline">\(\sigma_\rho,\sigma_d\)</span>: standard deviations of inverse distance and distance, respectively. All 3D points are column vectors; <span class="math inline">\(\propto\)</span> indicates equality up to a non-zero scale (homogeneous projection).</li>
+</ul>
+<p><strong>Uncertainty.</strong></p>
+<p>Each point’s depth <span class="math inline">\(d\)</span> is treated probabilistically. Typically the system represents <span class="math inline">\(\rho ~ \mathcal N(\mu_\rho,\sigma_\rho^2)\)</span> with a Gaussian <span class="math inline">\(\mathcal{N}(\mu_\rho, \sigma_\rho^2)\)</span>, reflecting measurement noise and triangulation uncertainty. From this, the distance <span class="math inline">\(d=1/\rho\)</span> has (approximate) standard deviation</p>
+<p><span class="math display">\[
+\sigma_d \;\approx\; \frac{\sigma_\rho}{\rho^2},
+\]</span></p>
+<p>so the published fields <code>inv_dist_std</code> and <code>dist_std</code> are simply <span class="math inline">\(\sigma_\rho\)</span> and <span class="math inline">\(\sigma_d\)</span> respectively. Large <span class="math inline">\(\sigma_\rho\)</span> means the depth is poorly constrained (e.g.&nbsp;from small parallax or noise), while small <span class="math inline">\(\sigma_\rho\)</span> means a confident estimate. In practice, one often filters the semi-dense cloud by uncertainty: for example, only keeping points with <span class="math inline">\(\sigma_\rho\)</span> below a threshold (or equivalently <span class="math inline">\(\sigma_d\)</span> small). Note that a “semi‐dense reconstruction” typically shows only points with small inverse-depth uncertainty. In other words, high-uncertainty tracks are often discarded or downweighted, since they contribute geometric outliers.</p>
 </section>
-<section id="what-are-semi-dense-points" class="level2" data-number="2">
-<h2 data-number="2" class="anchored" data-anchor-id="what-are-semi-dense-points"><span class="header-section-number">2</span> What are semi-dense points?</h2>
-<p>Semi-dense points are the 3D points associated with tracks from our semi-dense tracking pipeline. Semi-dense tracks are continually created in pixel locations of input frames that lie in regions of high image gradient, and are then successively tracked in the following frames. Each track is associated with a 3D point, parameterized as an inverse distance along a ray originating from the track’s first initial observation, as well as its uncertainty in inverse distance and distance. These points are transformed from their original camera coordinate spaces to the same coordinate frame associated with the closed loop trajectory of the sequence.</p>
+</section>
+<section id="multi-view-constraints-visibility" class="level3" data-number="1.2">
+<h3 data-number="1.2" class="anchored" data-anchor-id="multi-view-constraints-visibility"><span class="header-section-number">1.2</span> Multi-view constraints &amp; visibility</h3>
+<p>Given world point <span class="math inline">\(X_w\)</span> and camera <span class="math inline">\(j\)</span> with pose <span class="math inline">\((R_j,t_j)\)</span>: <span class="math display">\[
+X_j = T_{j\leftarrow w} X_w,\qquad
+\begin{bmatrix}u\\ v\\ 1\end{bmatrix} \propto K\,X_j,\quad
+u = f_x X_{j,x}/X_{j,z}+c_x,\; v = f_y X_{j,y}/X_{j,z}+c_y.
+\]</span> Per-frame 2D observations <span class="math inline">\((u,v)\)</span> form the <strong>track</strong>; BA/direct methods minimize reprojection/photometric error over all visible frames <span class="citation" data-cites="HartleyZisserman"><a href="#ref-HartleyZisserman" role="doc-biblioref">[2]</a></span>.</p>
+</section>
+<section id="what-the-aria-files-mean" class="level3" data-number="1.3">
+<h3 data-number="1.3" class="anchored" data-anchor-id="what-the-aria-files-mean"><span class="header-section-number">1.3</span> What the Aria files mean</h3>
+<ul>
+<li><p><strong><code>semidense_points.csv.gz</code></strong> (world frame): <code>uid</code>, <code>graph_uid</code>, <code>p{x,y,z}_world</code>, <code>inv_dist_std</code>, <code>dist_std</code>. <span class="math inline">\(\rightarrow\)</span> One row <strong>per 3D landmark</strong> (from a track) in the closed-loop world frame.</p></li>
+<li><p><strong><code>semidense_observations.csv.gz</code></strong> (image frame): <code>uid</code>, <code>frame_tracking_timestamp_us</code>, <code>camera_serial</code>, <code>u</code>, <code>v</code>. <span class="math inline">\(\rightarrow\)</span> All <strong>2D sightings</strong> of each landmark; this is the <strong>visibility set</strong>.</p>
+<p>Importantly, visibility refers to the subset of frames in which a given point is actually seen (i.e.&nbsp;projects into the image bounds and is not occluded). The observations file encodes this – each line lists a frame timestamp and camera for which <span class="math inline">\((u,v)\)</span> was recorded. A longer track (more observations) generally means the point had more parallax and a more reliable depth estimate. Conversely, if a point appears in only two frames with small baseline, its depth will be very uncertain (large σ). By examining the 2D tracks, one can reconstruct the camera trajectory and scene geometry: this is the classical structure-from-motion problem. In summary, semi-dense visibility information is simply the collection of 2D measurements <span class="math inline">\((u,v)\)</span> for each world point in all frames it was tracked, establishing the 3D–2D correspondences that underpin the SLAM solution.</p></li>
+</ul>
+</section>
+<section id="evlefm3d-context-for-nbv" class="level3" data-number="1.4">
+<h3 data-number="1.4" class="anchored" data-anchor-id="evlefm3d-context-for-nbv"><span class="header-section-number">1.4</span> EVL/EFM3D context (for NBV)</h3>
+<p>EVL lifts 2D features to a <strong>gravity-aligned voxel volume</strong> and concatenates <strong>point</strong> and <strong>freespace</strong> masks derived from semi-dense tracks to guide 3D heads (occupancy/OBB) <span class="citation" data-cites="EFM3D-straub2024"><a href="#ref-EFM3D-straub2024" role="doc-biblioref">[3, Sec. 4]</a></span>. - <strong>Point mask</strong>: voxels containing semi-dense surface points. - <strong>Freespace mask</strong>: voxels along camera<span class="math inline">\(\rightarrow\)</span>surface rays (evidence of empty space).</p>
+</section>
+<section id="practical-guidance" class="level3" data-number="1.5">
+<h3 data-number="1.5" class="anchored" data-anchor-id="practical-guidance"><span class="header-section-number">1.5</span> Practical guidance</h3>
+<ul>
+<li>Keep points with small <code>inv_dist_std</code> / <code>dist_std</code>; down-weight or drop large-uncertainty landmarks.</li>
+<li>Longer tracks (more parallax) <span class="math inline">\(\implies\)</span> smaller <span class="math inline">\(\sigma_\rho\)</span>. Small baselines/low texture <span class="math inline">\(\implies\)</span> large <span class="math inline">\(\sigma_\rho\)</span>.</li>
+<li>Use observation lists to reconstruct per-point <strong>visibility</strong> and to validate projections against intrinsics/extrinsics.</li>
+</ul>
 
 
 <!-- -->
 
+
+</section>
 </section>
 
-</main> <!-- /main -->
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body" data-entry-spacing="0" role="list">
+<div id="ref-Engel2014LSD" class="csl-entry" role="listitem">
+<div class="csl-left-margin">[1] </div><div class="csl-right-inline">J. Engel, T. Schöps, and D. Cremers, <span>“<span>LSD-SLAM</span>: Large-scale direct monocular SLAM,”</span> in <em>Computer vision – ECCV 2014</em>, in Lecture notes in computer science, vol. 8690. Cham: Springer, 2014, pp. 834–849. doi: <a href="https://doi.org/10.1007/978-3-319-10605-2_54">10.1007/978-3-319-10605-2_54</a>.</div>
+</div>
+<div id="ref-HartleyZisserman" class="csl-entry" role="listitem">
+<div class="csl-left-margin">[2] </div><div class="csl-right-inline">R. I. Hartley and A. Zisserman, <em>Multiple view geometry in computer vision</em>, Second. Cambridge: Cambridge University Press, 2004. Available: <a href="https://www.robots.ox.ac.uk/~vgg/hzbook/index.html">https://www.robots.ox.ac.uk/~vgg/hzbook/index.html</a></div>
+</div>
+<div id="ref-EFM3D-straub2024" class="csl-entry" role="listitem">
+<div class="csl-left-margin">[3] </div><div class="csl-right-inline">J. Straub, D. DeTone, T. Shen, N. Yang, C. Sweeney, and R. Newcombe, <span>“EFM3D: A benchmark for measuring progress towards 3D egocentric foundation models.”</span> 2024. Available: <a href="https://arxiv.org/abs/2406.10224">https://arxiv.org/abs/2406.10224</a></div>
+</div>
+</div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     // Ensure there is a toggle, if there isn't float one in the top right
@@ -1027,11 +1186,83 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     }
   });
   </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">## Semi-Dense Point Cloud {#semi-dense-pc}</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">## What are semi-dense points?</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>Semi-dense points are the 3D points associated with tracks from our semi-dense tracking pipeline. Semi-dense tracks are continually created in pixel locations of input frames that lie in regions of high image gradient, and are then successively tracked in the following frames. Each track is associated with a 3D point, parameterized as an inverse distance along a ray originating from the track's first initial observation, as well as its uncertainty in inverse distance and distance. These points are transformed from their original camera coordinate spaces to the same coordinate frame associated with the closed loop trajectory of the sequence.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Semi-Dense Point Clouds"</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> html</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="an">bibliography:</span><span class="co"> ../../references.bib</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="an">author:</span><span class="co"> "OpenAI ChatGPT, Deep Research &amp; GPT-5"</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">## What are semi-dense points?</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co">[</span><span class="ot">**Direct Quote as per Project Aria Docs**</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_pointcloud)</span>: Semi-dense points are the 3D points associated with tracks from our semi-dense tracking pipeline. Semi-dense tracks are continually created in pixel locations of input frames that lie in regions of high image gradient, and are then successively tracked in the following frames. Each track is associated with a 3D point, parameterized as an inverse distance along a ray originating from the track's first initial observation, as well as its uncertainty in inverse distance and distance. These points are transformed from their original camera coordinate spaces to the same coordinate frame associated with the closed loop trajectory of the sequence.</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>**Idea.** Semi-dense SLAM reconstructs 3D only at **high-gradient** pixels, tracking them across frames and estimating one 3D point per **temporal track** (multi-frame 2D correspondences) [@Engel2014LSD]. Points are stored in the **world frame** of the closed-loop trajectory.</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="fu">### Inverse-Distance parameterization</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>For the first (anchor) observation of a track at pixel $(u_0,v_0)$ with intrinsics $K$:</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>\hat{\mathbf r}_0=\frac{K^{-1}<span class="co">[</span><span class="ot">u_0,v_0,1</span><span class="co">]</span>^\top}{\lVert K^{-1}<span class="co">[</span><span class="ot">u_0,v_0,1</span><span class="co">]</span>^\top\rVert},\qquad</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>X_{c_0}(\rho)=\frac{1}{\rho}\,\hat{\mathbf r}_0,\qquad</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>X_{w} = T_{w\leftarrow c_0}\,X_{c_0}(\rho).</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>Using **inverse distance** $\rho=1/d$ stabilizes optimization and handles far points gracefully <span class="co">[</span><span class="ot">@Engel2014LSD; @HartleyZisserman</span><span class="co">]</span>.</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="fu">#### Symbol definitions (notation)</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$K \in \mathbb R^{3\times 3}$: camera intrinsics with $f_x,f_y,c_x,c_y$.</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$<span class="co">[</span><span class="ot">u_0,v_0</span><span class="co">]</span>$: pixel coordinates (in pixels) of the anchor observation.</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\hat{\mathbf r}_0$: unit back-projection ray in the anchor camera frame; the hat denotes normalization to unit length.</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\rho=1/d$: inverse distance (m$^{-1}$); $d$ is metric distance along $\hat{\mathbf r}_0$.</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$X_{c_0}(\rho) \in \mathbb R^3$: 3D point in the anchor camera frame at inverse distance $\rho$.</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$T_{w\leftarrow c_0} = (R_{w\leftarrow c_0}, t_{w\leftarrow c_0}) \in \mathrm{SE}(3)$: rigid transform mapping anchor camera coordinates to world.</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$X_w \in \mathbb R^3$: the same 3D point expressed in the world (closed-loop) frame.</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\sigma_\rho,\sigma_d$: standard deviations of inverse distance and distance, respectively.</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>All 3D points are column vectors; $\propto$ indicates equality up to a non-zero scale (homogeneous projection).</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>**Uncertainty.**</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>Each point’s depth $d$ is treated probabilistically. Typically the system represents $\rho ~ \mathcal N(\mu_\rho,\sigma_\rho^2)$ with a Gaussian $\mathcal{N}(\mu_\rho, \sigma_\rho^2)$, reflecting measurement noise and triangulation uncertainty. From this, the distance $d=1/\rho$ has (approximate) standard deviation</span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>\sigma_d \;\approx\; \frac{\sigma_\rho}{\rho^2},</span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>so the published fields <span class="in">`inv_dist_std`</span> and <span class="in">`dist_std`</span> are simply $\sigma_\rho$ and $\sigma_d$ respectively. Large $\sigma_\rho$ means the depth is poorly constrained (e.g. from small parallax or noise), while small $\sigma_\rho$ means a confident estimate. In practice, one often filters the semi-dense cloud by uncertainty: for example, only keeping points with $\sigma_\rho$ below a threshold (or equivalently $\sigma_d$ small). Note that a “semi‐dense reconstruction” typically shows only points with small inverse-depth uncertainty.</span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>In other words, high-uncertainty tracks are often discarded or downweighted, since they contribute geometric outliers.</span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a><span class="fu">### Multi-view constraints &amp; visibility</span></span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a>Given world point $X_w$ and camera $j$ with pose $(R_j,t_j)$:</span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a>X_j = T_{j\leftarrow w} X_w,\qquad</span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>\begin{bmatrix}u<span class="sc">\\</span> v<span class="sc">\\</span> 1\end{bmatrix} \propto K\,X_j,\quad</span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>u = f_x X_{j,x}/X_{j,z}+c_x,\; v = f_y X_{j,y}/X_{j,z}+c_y.</span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>Per-frame 2D observations $(u,v)$ form the **track**; BA/direct methods minimize reprojection/photometric error over all visible frames <span class="co">[</span><span class="ot">@HartleyZisserman</span><span class="co">]</span>.</span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a><span class="fu">### What the Aria files mean</span></span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`semidense_points.csv.gz`** (world frame):</span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>  <span class="in">`uid`</span>, <span class="in">`graph_uid`</span>, <span class="in">`p{x,y,z}_world`</span>, <span class="in">`inv_dist_std`</span>, <span class="in">`dist_std`</span>.</span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>  $\rightarrow$ One row **per 3D landmark** (from a track) in the closed-loop world frame.</span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`semidense_observations.csv.gz`** (image frame):</span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>  <span class="in">`uid`</span>, <span class="in">`frame_tracking_timestamp_us`</span>, <span class="in">`camera_serial`</span>, <span class="in">`u`</span>, <span class="in">`v`</span>.</span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>  $\rightarrow$ All **2D sightings** of each landmark; this is the **visibility set**.</span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a>  Importantly, visibility refers to the subset of frames in which a given point is actually seen (i.e. projects into the image bounds and is not occluded). The observations file encodes this – each line lists a frame timestamp and camera for which $(u,v)$ was recorded. A longer track (more observations) generally means the point had more parallax and a more reliable depth estimate. Conversely, if a point appears in only two frames with small baseline, its depth will be very uncertain (large σ). By examining the 2D tracks, one can reconstruct the camera trajectory and scene geometry: this is the classical structure-from-motion problem. In summary, semi-dense visibility information is simply the collection of 2D measurements $(u,v)$ for each world point in all frames it was tracked, establishing the 3D–2D correspondences that underpin the SLAM solution.</span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a><span class="fu">### EVL/EFM3D context (for NBV)</span></span>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a>EVL lifts 2D features to a **gravity-aligned voxel volume** and concatenates **point** and **freespace** masks derived from semi-dense tracks to guide 3D heads (occupancy/OBB) <span class="co">[</span><span class="ot">@EFM3D-straub2024, Sec. 4</span><span class="co">]</span>.</span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Point mask**: voxels containing semi-dense surface points.</span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Freespace mask**: voxels along camera$\rightarrow$surface rays (evidence of empty space).</span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a><span class="fu">### Practical guidance</span></span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Keep points with small <span class="in">`inv_dist_std`</span> / <span class="in">`dist_std`</span>; down-weight or drop large-uncertainty landmarks.</span>
+<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Longer tracks (more parallax) $\implies$ smaller $\sigma_\rho$. Small baselines/low texture $\implies$ large $\sigma_\rho$.</span>
+<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use observation lists to reconstruct per-point **visibility** and to validate projections against intrinsics/extrinsics.</span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

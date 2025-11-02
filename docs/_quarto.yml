@@ -40,7 +40,23 @@ website:
   navbar:
     search: true
     left:
-      - text: Home
+      - text: TODOs
+        href: contents/todos.qmd
+      - text: Project State
+        menu:
+          - text: Roadmap
+            href: contents/roadmap.qmd
+          - text: Research Questions
+            href: contents/research_questions.qmd
+      - text: Ressources
+        menu:
+        - text: Resources (External Links, Repos, Docs, etc.)
+          href: contents/resources.qmd
+        - text: ASE Dataset
+          href: contents/ase_dataset.qmd
+        - text: Glossary
+          href: contents/glossary.qmd
+    right:
       - icon: github
         menu:
           - text: "View Source"
@@ -52,24 +68,19 @@ website:
     search: true
     collapse-level: 2
     contents:
-      - section: "Overview"
-        contents:
-          - index.qmd
       - section: "Literature"
         contents:
           - contents/literature/vin_nbv.qmd
           - contents/literature/gen_nbv.qmd
           - contents/literature/scene_script.qmd
           - contents/literature/efm3d.qmd
-          - contents/glossary.qmd
       - section: "Project State"
         contents:
           - contents/questions.qmd
           - contents/roadmap.qmd
           - contents/todos.qmd
-      - section: "Resources"
+      - section: "Theory & Implementations"
         contents:
-          - contents/ase_dataset.qmd
           - section: "Metrics"
             contents:
               - contents/metrics/index.qmd
@@ -77,7 +88,9 @@ website:
               - contents/metrics/atek_implementation.qmd
               - contents/metrics/efm3d_implementation.qmd
               - contents/metrics/rri_computation.qmd
-          - contents/resources.qmd
+          - section: Theory
+            contents:
+              - contents/theory/semi-dense-pc.qmd
       - section: "Presentations"
         contents:
           - text: "Typst Slides 1"

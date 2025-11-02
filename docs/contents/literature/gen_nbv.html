@@ -601,13 +601,13 @@ window.Quarto = {
 
 <section id="gen-nbv" class="level2" data-number="1">
 <h2 data-number="1" class="anchored" data-anchor-id="gen-nbv"><span class="header-section-number">1</span> GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction</h2>
-<p><span class="citation" data-cites="GenNBV-chen2024"><a href="#ref-GenNBV-chen2024" role="doc-biblioref">[1]</a></span> introduce GenNBV, an end-to-end reinforcement-learning policy that plans in a continuous five-degree-of-freedom view space and generalizes from synthetic training scenes to novel buildings.</p>
+<p><span class="citation" data-cites="GenNBV-chen2024"><a href="#ref-GenNBV-chen2024" role="doc-biblioref">[1]</a></span> introduce GenNBV, an end-to-end reinforcement-learning policy that plans in a continuous five-degree-of-freedom view space.</p>
 <p><strong>Links</strong>: <a href="https://gennbv.tech/">Project Page</a>, <a href="https://github.com/zjwzcx/GenNBV">GitHub</a></p>
 <ul>
 <li><strong>Free-space control</strong>: Actions are sampled from a learned 5D Gaussian over <span class="math inline">\((x,y,z,\text{yaw},\text{pitch})\)</span>, enabling collision-aware trajectories without hand-crafted candidates.</li>
 <li><strong>Multi-source embedding</strong>: Probabilistic occupancy, RGB semantics, and action history are fused into a shared state representation that predicts reconstruction progress.</li>
-<li><strong>Training</strong>: Thousands of Isaac Gym workers optimize the policy with PPO.</li>
-<li><strong>Benchmarking</strong>: Established a benchmark using the Isaac Gym Simulator with the Houses3K and OmniObject3D datasets, yielding 98.3% AUC and 97.1% coverage ratio on unseen building-scale scenes.</li>
+<li><strong>Training</strong>: In Isaac Gym; 24h on an NVIDIA Tesla V100 (16GB VRAM)</li>
+<li><strong>Benchmarking</strong>: Established a benchmark using the Isaac Gym Simulator with the Houses3K (3k textured 3D building models) and OmniObject3D (4k high-fidelity scans of objects across 190 categories) datasets, yielding 98.3% AUC and 97.1% <em>final coverage ratio</em> on unseen building-scale scenes.</li>
 </ul>
 <section id="problem-setup-and-io" class="level3" data-number="1.1">
 <h3 data-number="1.1" class="anchored" data-anchor-id="problem-setup-and-io"><span class="header-section-number">1.1</span> Problem Setup and I/O</h3>
@@ -635,7 +635,7 @@ a_t \sim \pi_\theta(a\,|\,s_t) = \mathcal{N}\!\left(\mu_\theta(s_t),\,\Sigma_\th
 <h3 data-number="1.3" class="anchored" data-anchor-id="reward-design-and-optimization"><span class="header-section-number">1.3</span> Reward Design and Optimization</h3>
 <p>Coverage is measured by thresholding <span class="math inline">\(F_t^G\)</span> to count occupied voxels <span class="math inline">\(\tilde N_t\)</span> relative to the ground-truth surface voxel count <span class="math inline">\(N^*\)</span>: <span class="math display">\[
 \text{CR}_t = \frac{\tilde N_t}{N^*}\cdot 100\%.
-\]</span> The primary reward is the temporal gain in coverage, <span class="math display">\[
+\]</span> The primary reward is the temporal gain in coverage, similar to TD(0): <span class="math display">\[
 r^{\text{CR}}_{t+1} = \text{CR}_{t+1} - \text{CR}_t,
 \]</span> augmented with penalties for collisions and overly long trajectories. Policy parameters are optimized with proximal policy optimization (PPO) using the clipped surrogate, <span class="math display">\[
 L^{\text{CLIP}}(\theta) = \mathbb{E}_t\!\left[\min\!\big(\eta_t(\theta) A_t,\; \mathrm{clip}(\eta_t(\theta), 1-\epsilon, 1+\epsilon) A_t\big)\right],
@@ -1134,14 +1134,14 @@ L^{\text{CLIP}}(\theta) = \mathbb{E}_t\!\left[\min\!\big(\eta_t(\theta) A_t,\; \
   </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">## GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction {#gen-nbv}</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>@GenNBV-chen2024 introduce GenNBV, an end-to-end reinforcement-learning policy that plans in a continuous five-degree-of-freedom view space and generalizes from synthetic training scenes to novel buildings.</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>@GenNBV-chen2024 introduce GenNBV, an end-to-end reinforcement-learning policy that plans in a continuous five-degree-of-freedom view space.</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>**Links**: <span class="co">[</span><span class="ot">Project Page</span><span class="co">](https://gennbv.tech/)</span>, <span class="co">[</span><span class="ot">GitHub</span><span class="co">](https://github.com/zjwzcx/GenNBV)</span></span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Free-space control**: Actions are sampled from a learned 5D Gaussian over $(x,y,z,\text{yaw},\text{pitch})$, enabling collision-aware trajectories without hand-crafted candidates.</span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Multi-source embedding**: Probabilistic occupancy, RGB semantics, and action history are fused into a shared state representation that predicts reconstruction progress.</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Training**: Thousands of Isaac Gym workers optimize the policy with PPO.</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Benchmarking**: Established a benchmark using the Isaac Gym Simulator with the Houses3K and OmniObject3D datasets, yielding 98.3% AUC and 97.1% coverage ratio on unseen building-scale scenes.</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Training**: In Isaac Gym; 24h on an NVIDIA Tesla V100 (16GB VRAM)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Benchmarking**: Established a benchmark using the Isaac Gym Simulator with the Houses3K (3k textured 3D building models) and OmniObject3D (4k high-fidelity scans of objects across 190 categories) datasets, yielding 98.3% AUC and 97.1% _final coverage ratio_ on unseen building-scale scenes.</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="fu">### Problem Setup and I/O</span></span>
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
@@ -1184,7 +1184,7 @@ L^{\text{CLIP}}(\theta) = \mathbb{E}_t\!\left[\min\!\big(\eta_t(\theta) A_t,\; \
 <span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>$$</span>
 <span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>\text{CR}_t = \frac{\tilde N_t}{N^*}\cdot 100\%.</span>
 <span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>The primary reward is the temporal gain in coverage,</span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>The primary reward is the temporal gain in coverage, similar to TD(0):</span>
 <span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a>$$</span>
 <span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a>r^{\text{CR}}_{t+1} = \text{CR}_{t+1} - \text{CR}_t,</span>
 <span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>$$</span>
