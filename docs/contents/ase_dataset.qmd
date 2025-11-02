@@ -9,25 +9,39 @@ bibliography: ../references.bib
 
 The Aria Synthetic Environments (ASE) dataset [@SceneScript-avetisyan2024] is a large-scale collection of 100,000 unique procedurally-generated indoor scenes with realistic Aria glasses sensor simulations. It serves as the primary training and evaluation dataset for SceneScript and provides valuable data for scene understanding research.
 
+## Links
+- **ASE Project Page**: [
+- [ASE Documentation](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)
+
 ## Dataset Scale
 
 - **100,000 unique multi-room interior scenes**
 - **58M+ RGB images** captured from egocentric trajectories
 - **67 days** of total trajectory time
-- **7,800 km** of total trajectory distance (equivalent to London → San Francisco)
+- **7,800 km** of total trajectory distance
 - **~23 TB** total dataset size
-- **~8,000 3D objects** populating the scenes
+
+## Ground Truth Annotations
+
+- 6DoF camera trajectory
+- 3D floor plan in Euston Structure Scene Language (SSL) format
+- 2D instance segmentation
+  - With per-scene mappings from the object instance image IDs to object classes
+- 2D depth map
+- **3M OBBs** across 43 classes released with @EFM3D-straub2024
+- **GT Meshes** for 100 scenes released with @EFM3D-straub2024
 
 ## Scene Characteristics
 
 Each scene contains:
 
-- **Multi-room layouts**: Up to 5 complex Manhattan-world rooms
+- **Multi-room layouts**: Up to 5 complex Manhattan-world rooms - Scenes composed of axis-aligned walls, floors, and ceilings.
 - **Egocentric trajectories**: ~2-minute walkthroughs per scene
 - **Realistic sensor simulation**: Aria camera and lens characteristics
 - **Rich object diversity**: Furniture, decorations, architectural elements
 
-![ASE Dataset Modalities](../figures/ase_modalities.jpg){width=100%}
+
+![ASE Dataset Modalities](../figures/scene-script/ase_modalities.jpg){width=100%}
 
 # Data Structure
 
@@ -42,15 +56,12 @@ scene_id/
 ├── semidense_observations.csv.gz    # Point observations (which images see which points in the PC)
 ├── rgb/                             # RGB image frames
 │   ├── 000000.png
-│   ├── 000001.png
 │   └── ...
 ├── depth/                           # Ground truth depth maps
 │   ├── 000000.png
-│   ├── 000001.png
 │   └── ...
 └── instances/                       # Instance segmentation masks
     ├── 000000.png
-    ├── 000001.png
     └── ...
 ```
 
@@ -58,7 +69,7 @@ scene_id/
 
 ## Scene Language (`ase_scene_language.txt`)
 
-The ground truth scene layout encoded in SceneScript's Structured Scene Language (SSL). Each line represents a primitive with its parameters:
+The ground truth scene layout encoded in [SceneScript's Structured Scene Language](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_data_format#scene_language) (SSL). Each line represents a primitive with its parameters:
 
 ```plaintext
 make_wall, id=0, a_x=-2.56, a_y=6.16, a_z=0.0, b_x=5.07, b_y=6.16, b_z=0.0, height=3.26, thickness=0.0
@@ -71,6 +82,7 @@ make_window, id=2000, wall0_id=0, position_x=4.45, position_y=6.16, position_z=1
 - `make_wall`: 3D line segments defining room boundaries
 - `make_door`: Door positions, dimensions, and wall connections
 - `make_window`: Window positions and sizes
+- `make_prim`: Generic 3D primitives (boxes, cylinders, bezier shapes, ...)
 - Implicitly defines floors and ceilings through wall heights
 
 ## Object Instance Mapping (`object_instances_to_classes.json`)
@@ -108,6 +120,8 @@ graph_uid,tracking_timestamp_us,utc_timestamp_ns,tx_world_device,ty_world_device
 ...
 ```
 
+See [MPS Output - Trajectory](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_trajectory) in the Project Aria documentation for details.
+
 **Columns:**
 
 - `graph_uid`: Unique identifier for the coordinate frame
@@ -117,7 +131,7 @@ graph_uid,tracking_timestamp_us,utc_timestamp_ns,tx_world_device,ty_world_device
 
 ## Semi-Dense Point Cloud (`semidense_points.csv.gz`)
 
-3D points reconstructed from SLAM, representing the scene geometry:
+3D points reconstructed from [Project Aria Machine Perception Services](https://facebookresearch.github.io/projectaria_tools/docs/ARK/mps)' SLAM, representing the scene geometry:
 
 ```csv
 uid,graph_uid,px_world,py_world,pz_world,inv_dist_std,dist_std
@@ -129,10 +143,12 @@ uid,graph_uid,px_world,py_world,pz_world,inv_dist_std,dist_std
 **Columns:**
 
 - `uid`: Unique point identifier
-- `graph_uid`: Coordinate frame identifier
+- `graph_uid`: Coordinate frame identifier, depending on the frame this point was first observed in.
 - `px,py,pz_world`: 3D coordinates in world frame (meters)
-- `inv_dist_std`: Inverse of distance standard deviation (alternative uncertainty metric)
+- `inv_dist_std`: Inverse of distance standard deviation in [$m^{-1}$], measure for the quality of the 3D PC
 - `dist_std`: Distance standard deviation in meters (depth uncertainty)
+
+Nominal threshold values are a maximum inv_dist_std of 0.005 and a maximum dist_std of 0.01.
 
 ## Point Observations (`semidense_observations.csv.gz`)
 
@@ -148,10 +164,10 @@ uid,frame_tracking_timestamp_us,camera_serial,u,v
 
 **Columns:**
 
-- `uid`: Point identifier (references `uid` in semidense_points.csv.gz)
+- `uid`: Point identifier (ref to `uid` in `semidense_points.csv.gz`)
 - `frame_tracking_timestamp_us`: Frame timestamp in microseconds
-- `camera_serial`: Camera identifier
-- `u,v`: Pixel coordinates in the image (not distorted - coordinates in the observed frame)
+- `camera_serial`: Identifier of the camera which observed the point
+- `u,v`: Sub-Pixel coordinates in the image frame of the camera that observed the point
 
 Useful for:
 
@@ -159,6 +175,9 @@ Useful for:
 - Information about the surfaces in the scene, as well as free space
 - Computing information gain for NBV
 - Analyzing coverage and redundancy
+
+For further information on both SLAM point clouds and visibility information, see [MPS Output - Semi-Dense Point Cloud](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_pointcloud).
+
 
 ## RGB Images (`rgb/*.png`)
 

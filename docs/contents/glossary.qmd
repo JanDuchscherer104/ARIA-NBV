@@ -43,6 +43,10 @@ format: html
 **SLAM** - Simultaneous Localization and Mapping
 : A technique for building a map of an unknown environment while simultaneously tracking the position of the sensor within it.
 
+**Track**
+: Temporal sequence of 2D detections of corresponding image features across successive frames. I.e. points with high-gradient pixels, with per-frame (u,v) coordinates, timestamps and associated camera ID. From that track, one corresponding 3D point can be filtered (i.e. using bundle adjustment) and parametrized with an inverse distance (uncertainty measure).
+    Can be expressed as $\mathcal{T}={(u_k,v_k,\text{cam}*k,t_k)}*{k=0}^{N}$.
+
 **SSL** - Structure Scene Language / SceneScript Language
 : A structured language format for representing 3D scene layouts using primitives like walls, doors, windows, and objects with geometric parameters.
 

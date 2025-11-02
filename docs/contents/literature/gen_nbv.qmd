@@ -1,31 +1,69 @@
 ## GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction {#gen-nbv}
 
+@GenNBV-chen2024 introduce GenNBV, an end-to-end reinforcement-learning policy that plans in a continuous five-degree-of-freedom view space and generalizes from synthetic training scenes to novel buildings.
 
-GenNBV@GenNBV-chen2024 addresses the generalization challenge in NBV planning through reinforcement learning and a continuous 5D action space.
+**Links**: [Project Page](https://gennbv.tech/), [GitHub](https://github.com/zjwzcx/GenNBV)
 
-### Key Contributions
+- **Free-space control**: Actions are sampled from a learned 5D Gaussian over $(x,y,z,\text{yaw},\text{pitch})$, enabling collision-aware trajectories without hand-crafted candidates.
+- **Multi-source embedding**: Probabilistic occupancy, RGB semantics, and action history are fused into a shared state representation that predicts reconstruction progress.
+- **Training**: In Isaac Gym; 24h on an NVIDIA Tesla V100 (16GB VRAM)
+- **Benchmarking**: Established a benchmark using the Isaac Gym Simulator with the Houses3K (3k textured 3D building models) and OmniObject3D (4k high-fidelity scans of objects across 190 categories) datasets, yielding 98.3% AUC and 97.1% _final coverage ratio_ on unseen building-scale scenes.
 
-- **Continuous Action Space**: 5-DOF pose prediction (3D position + 2D orientation) allows smooth, collision-free trajectories
-- **Multi-Source State Embedding**: Combines geometric features, semantic information, and action history
-- **Cross-Dataset Generalization**: Achieves 98.26% and 97.12% coverage on unseen building datasets
-- **Reinforcement Learning**: Trained in Isaac Gym simulator using PPO algorithm
+### Problem Setup and I/O
 
-### Architecture Components
+Each time step $t$ yields an observation
+$$
+o_t = \{I_{1:t}, D_{1:t}, a_{1:t}, p_t\},
+$$
+where $I$ and $D$ are RGB and depth frames, $a_{1:t} \in \mathcal{A} \subset \text{SE}(3)$ are historic actions, and $p_t \in \mathbb{R}^3$ encodes the current pose. The policy applies an encoder $\phi$ to produce a state embedding $s_t=\phi(o_t)$ and samples the next viewpoint from a Gaussian policy,
+$$
+a_t \sim \pi_\theta(a\,|\,s_t) = \mathcal{N}\!\left(\mu_\theta(s_t),\,\Sigma_\theta(s_t)\right),
+$$
+yielding a 5D camera pose that is executed by a CrazyFlie UAV in simulation.
 
-1. **Geometric Encoder**: Processes partial point clouds to extract shape features
-2. **Semantic Encoder**: Encodes object categories and semantic labels
-3. **Action History Encoder**: Maintains context of recent viewpoints
-4. **Policy Network**: Predicts continuous viewpoint parameters
+GenNBV’s geometric backbone maintains a probabilistic occupancy grid $F_t^G$ that is updated by log-odds accumulation along each sensor ray $z_j$:
 
-### Limitations
+with constant $C$ reflecting ray confidence. Voxels are thresholded into $\{\text{occupied}, \text{free}, \text{unknown}\}$ to summarize coverage and guide planning.
 
-- **Coverage-Based Objective**: Optimizes for geometric coverage rather than reconstruction quality
-- **Limited Semantic Reasoning**: Treats all surfaces equally without task-specific prioritization
+### State Embedding and Policy Architecture
 
-### Relevance to Our Work
+**Geometric encoder**:
 
-GenNBV demonstrates the value of:
+Depth maps are back-projected to obtain a 3D PC, voxelized, and mapped to a three-state occupancy grid:
+  $F_t^G \in \{\text{occupied}, \text{free}, \text{unknown}\}^{H\times W \times D }$, where each voxel is assigned to a state of it being _occupied_, _free_, or _unknown_ (i.e. to what degree the voxel has been observed). $F_t^G$ is updated at each step using [Bresenham's line algorithm](https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm) by tracing rays from the camera origin and the back-projected 3D points:
 
-- **Continuous action spaces** rather than random sampling with subsequent fitness-based selection
-- **Structured state representations** combining multiple modalities
-- **Learning-based policies** that generalize across scenes
+$$
+\log \mathrm{Odd}(v_i \mid z_j) = \log \mathrm{Odd}(v_i) + C,
+$$
+
+where $v_i$ denotes the occupancy likelihood of the $i$-th voxel given the probability of the $j$-th ray from the camera passes through it. The classification into the three states is done by thresholding the log-odds values. The encoder network consists of a simple MLP after flattening the occupancy grid.
+
+**Semantic encoder**: A two-layer CNN, with consequent one-layer MLP consumes the concatenated $I_{t-k:t}$ grayscale frames to produce $s_t^S$.
+
+**Action history encoder**: Recent 5D poses are linearly projected to $s_t^A$.
+
+**State Embedding and Policy Network**: The concatenated vector $s_t = \mathrm{Linear}(s_t^G; s_t^S; s_t^A)$ feeds a three-layer MLP that outputs the mean and variance of the continuous action distribution.
+
+### Reward Design and Optimization
+
+Coverage is measured by thresholding $F_t^G$ to count occupied voxels $\tilde N_t$ relative to the ground-truth surface voxel count $N^*$:
+$$
+\text{CR}_t = \frac{\tilde N_t}{N^*}\cdot 100\%.
+$$
+The primary reward is the temporal gain in coverage, similar to TD(0) rewards:
+$$
+r^{\text{CR}}_{t+1} = \text{CR}_{t+1} - \text{CR}_t,
+$$
+augmented with penalties for collisions and overly long trajectories. Policy parameters are optimized with proximal policy optimization (PPO) using the clipped surrogate,
+$$
+L^{\text{CLIP}}(\theta) = \mathbb{E}_t\!\left[\min\!\big(\eta_t(\theta) A_t,\; \mathrm{clip}(\eta_t(\theta), 1-\epsilon, 1+\epsilon) A_t\big)\right],
+$$
+where $\eta_t(\theta)=\tfrac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t)}$ and $A_t$ is the advantage estimate.
+
+### Notes and Limitations
+
+- Coverage-centric rewards ignore reconstruction fidelity; surfaces with equal occupancy weight receive identical priority.
+- Semantic reasoning is limited to appearance cues and lacks task-driven surface weighting.
+- Architecture lacks explicit 3D spatial reasoning-
+- Doesn't leverage powerful geometric embeddings (e.g. Fourier features)
+- Primitive Architecture: simple MLPs and CNNs without leveraging pre-trained models or advanced architectures.1

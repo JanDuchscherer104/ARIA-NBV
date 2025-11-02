@@ -127,6 +127,35 @@ div.csl-indent {
   }
 }</script>
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 </head>
 
@@ -635,6 +664,10 @@ A metric quantifying how much a candidate view would improve the quality of 3D r
 <dt><strong>SLAM</strong> - Simultaneous Localization and Mapping</dt>
 <dd>
 A technique for building a map of an unknown environment while simultaneously tracking the position of the sensor within it.
+</dd>
+<dt><strong>Track</strong></dt>
+<dd>
+Temporal sequence of 2D detections of corresponding image features across successive frames. I.e. points with high-gradient pixels, with per-frame (u,v) coordinates, timestamps and associated camera ID. From that track, one corresponding 3D point can be filtered (i.e.&nbsp;using bundle adjustment) and parametrized with an inverse distance (uncertainty measure). Can be expressed as <span class="math inline">\(\mathcal{T}={(u_k,v_k,\text{cam}*k,t_k)}*{k=0}^{N}\)</span>.
 </dd>
 <dt><strong>SSL</strong> - Structure Scene Language / SceneScript Language</dt>
 <dd>
@@ -1180,17 +1213,21 @@ A short, fixed-length temporal window (typically 1 s / 10 frames) of synchroni
 <span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>**SLAM** - Simultaneous Localization and Mapping</span>
 <span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>: A technique for building a map of an unknown environment while simultaneously tracking the position of the sensor within it.</span>
 <span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a>**SSL** - Structure Scene Language / SceneScript Language</span>
-<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a>: A structured language format for representing 3D scene layouts using primitives like walls, doors, windows, and objects with geometric parameters.</span>
-<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a>**VIO** - Visual-Inertial Odometry</span>
-<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>: A method of estimating pose and motion by combining visual features from cameras with inertial measurements from IMUs.</span>
-<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>**VRS** - Virtual Reality Standard (file format)</span>
-<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>: A file format developed by Meta for storing and accessing multi-modal sensor data streams efficiently, used for Project Aria recordings.</span>
-<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a>**Snippet**</span>
-<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>: A short, fixed-length temporal window (typically 1 s / 10 frames) of synchronized Aria sensor data (RGB, SLAM cameras, poses, semi-dense points) that EVL lifts into a gravity-aligned 3D voxel grid for inference.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a>**Track**</span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a>: Temporal sequence of 2D detections of corresponding image features across successive frames. I.e. points with high-gradient pixels, with per-frame (u,v) coordinates, timestamps and associated camera ID. From that track, one corresponding 3D point can be filtered (i.e. using bundle adjustment) and parametrized with an inverse distance (uncertainty measure).</span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>    Can be expressed as $\mathcal{T}={(u_k,v_k,\text{cam}*k,t_k)}*{k=0}^{N}$.</span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>**SSL** - Structure Scene Language / SceneScript Language</span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>: A structured language format for representing 3D scene layouts using primitives like walls, doors, windows, and objects with geometric parameters.</span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>**VIO** - Visual-Inertial Odometry</span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a>: A method of estimating pose and motion by combining visual features from cameras with inertial measurements from IMUs.</span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>**VRS** - Virtual Reality Standard (file format)</span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a>: A file format developed by Meta for storing and accessing multi-modal sensor data streams efficiently, used for Project Aria recordings.</span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>**Snippet**</span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>: A short, fixed-length temporal window (typically 1 s / 10 frames) of synchronized Aria sensor data (RGB, SLAM cameras, poses, semi-dense points) that EVL lifts into a gravity-aligned 3D voxel grid for inference.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

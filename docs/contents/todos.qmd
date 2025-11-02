@@ -10,13 +10,34 @@ format: html
 - Each ASE scene provides only one pre-recorded egocentric trajectory. We cannot query arbitrary novel viewpoints.
     - EFM3D introduces GT meshes for 100 validation scenes. We can use these to compute oracle RRI for candidate views. Use the mesh predicted by EFM3D as pseudo-GT for other scenes.
 
-- depth maps in ASE data set are ground-truth!
+- depth maps in ASE dataset are ground-truth!
+
+- non-gt point clouds are sparse! How to sample a PC from the candidate view that can be compared to the pre-existing semi-dense SLAM PC that is provided in the ASE dataset?
 
 - Should NBV prediction output discrete selection (VIN-NBV) or continuous pose (GenNBV)?
   - Start with randomly sampled candidate views for which the RRI is computed. Action space is then the selection among these candidates.
   - Future work: learn to generate continuous poses directly, whose fitness can than be quantified using the RRI predictor; here we can also consider the free space voxels that are used in EFM3D to avoid collisions.
 
-- non-gt point clouds are sparse! How to sample a PC from the candidate view that can be compared to the pre-existing semi-dense SLAM PC that is provided in the ASE dataset?
 
 # Action Items
+
+- [ ] Implement a custom data downloader for the ASE dataset, using the tools provided in ATEK:
+  - Download all 3 forms of the dataset for scenes for which the GT meshes are available.
+
+  ```bash
+  external/ATEK/tools
+  ├── ase_mesh_downloader.py
+  ├── atek_wds_data_downloader.py
+  ├── benchmarking_static_object_detection.py
+  ├── benchmarking_surface_reconstruction.py
+  ├── infer_cubercnn.py
+  └── train_cubercnn.py
+  ```
+
+  ```bash
+  .data/aria_download_urls
+  ├── AriaSyntheticEnvironment_ATEK_download_urls.json
+  ├── aria_synthetic_environments_dataset_download_urls.json
+  └── ase_mesh_download_urls.json  # contains download links for 100 GT meshes ("scene_ply_<scene_id>.ply")
+  ```
 

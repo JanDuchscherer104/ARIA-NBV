@@ -78,7 +78,7 @@ Hand-crafted criteria include:
 
 - **Volumetric uncertainty** (unseen voxels)
 - **Information gain** (entropy reduction)
-- **Surface coverage**  [@VIN-NBV-frahm2025]
+- **Surface coverage** (reconstruction quality) [@VIN-NBV-frahm2025]
 
 ## Coverage-Based Learning: GenNBV
 [**GenNBV**](contents/literature/gen_nbv.qmd) [@GenNBV-chen2024] introduced learning-based NBV with:
