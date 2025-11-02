@@ -36,154 +36,24 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - Entity-aware reconstruction tracking through EVL's OBB detection capabilities.
 - Extend towards human-in-the-loop AR guidance, where entity-aware RRI weighting delivers task-specific view suggestions.
 
-# Important Resources
-
-- see [Resources & Tools](contents/resources.qmd) for libraries, tools, docs and datasets used in this project
-
-## Papers
-
-### Core NBV Methods
-
-- **[VIN-NBV: A View Introspection Network for Next-Best-View Selection](https://arxiv.org/abs/2505.06219)** [@VIN-NBV-frahm2025] - Direct RRI optimization approach
-- **[GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction](https://arxiv.org/abs/2402.16174)** [@GenNBV-chen2024] - RL-based coverage optimization
-
-### Project Aria Ecosystem
-
-- **[EFM3D: A Benchmark for Measuring Progress Towards 3D Egocentric Foundation Models](https://arxiv.org/abs/2406.10224)** [@EFM3D-straub2024] - EVL backbone and benchmarks
-- **[SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model](https://arxiv.org/abs/2403.13064)** [@SceneScript-avetisyan2024] - Structured scene representation
-- **[Project Aria: A New Tool for Egocentric Multi-Modal AI Research](https://arxiv.org/abs/2308.13561)** [@projectaria-engel2023] - ASE dataset foundation
-- **[Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling](https://arxiv.org/abs/2503.11806)** [@HITL-SceneScript-xie2025] - Interactive scene editing
-
-## Resources, Tools, Docs and Datasets
-
-### Project Aria Ecosystem
-
-- **[Project Aria Homepage](https://www.projectaria.com/)** - Main portal for datasets and tools
-- **[Project Aria Documentation](https://facebookresearch.github.io/projectaria_tools/docs/intro)** - APIs and utilities
-- **[ASE Dataset Documentation](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)** - 100K synthetic scenes
-- **[Project Aria Dataset Explorer](https://explorer.projectaria.com/)** - Interactive data browser
-
-### Development Tools
-
-- **[ATEK GitHub Repository](https://github.com/facebookresearch/ATEK)** - ML training and evaluation toolkit
-- **[ATEK Documentation](https://facebookresearch.github.io/projectaria_tools/docs/ATEK/about_ATEK)** - Complete setup and usage guide
-- **[EFM3D GitHub Repository](https://github.com/facebookresearch/efm3d)** - Foundation model implementation
-- **[SceneScript GitHub Repository](https://github.com/facebookresearch/scenescript)** - Structured scene language
-- **[Project Aria Tools GitHub](https://github.com/facebookresearch/projectaria_tools)** - Core data processing utilities
-
-# NBV Background
-
-## Classical Methods: Geometric Heuristics
-Hand-crafted criteria include:
-
-- **Volumetric uncertainty** (unseen voxels)
-- **Information gain** (entropy reduction)
-- **Surface coverage** (reconstruction quality) [@VIN-NBV-frahm2025]
-
-## Coverage-Based Learning: GenNBV
-[**GenNBV**](contents/literature/gen_nbv.qmd) [@GenNBV-chen2024] introduced learning-based NBV with:
-
-- RL-based training with continuous 5DoF actions
-- Coverage-focused rewards for geometric completeness
-
-
-**Limitation**: Still optimizes geometric coverage, not reconstruction quality.
-
-## Direct Quality Optimization: VIN-NBV
-
-[**VIN-NBV**](contents/literature/vin_nbv.qmd) [@VIN-NBV-frahm2025] directly optimizes **Relative Reconstruction Improvement (RRI)**:
-
-$$\text{RRI}(v) = \frac{\text{Quality}(R_{t+1}) - \text{Quality}(R_t)}{\text{Quality}(R_{\text{complete}})}$$
-
-- Predicts actual reconstruction quality improvement
-- Uses surface metrics (Chamfer distance, F-score) as quality measures
-- Demonstrates ≈30% improvement over coverage-based methods
-
-**Limitation**: Custom CNN backbone limits generalization to complex scenes.
-
-# Relative Reconstruction Improvement (RRI)
-
-## RRI Metric
-
-The [RRI metric](contents/metrics/surface_metrics.qmd), introduced by VIN-NBV, quantifies the expected reconstruction quality gain from capturing a new viewpoint:
-
-$$\text{RRI}(\mathbf{q}) = \frac{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}}) - \text{CD}(\mathcal{P}_{t \cup \mathbf{q}}, \mathcal{M}_{\text{GT}})}{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}})}$$
-
-Where:
-
-- $\mathbf{q} \in SE(3)$: Candidate viewpoint (5DoF pose as roll typically fixed to 0°)
-- $\mathcal{P}_t$: Current reconstruction point cloud from first $t$ views
-- $\mathcal{P}_{t \cup \mathbf{q}}$: Updated reconstruction after capturing from viewpoint $\mathbf{q}$
-- $\mathcal{M}_{\text{GT}}$: Ground truth mesh (available only during training)
-- $\text{CD}(\cdot, \cdot)$: Chamfer distance (bidirectional surface similarity metric)
-
-**Properties**:
-
-- Range: [0, 1] where higher values indicate better viewpoints
-- Normalized by current error $ \rightarrow $ limited scale/object-independence
-- Requires ground truth RRI during training
-- Directly correlates with reconstruction quality improvement
-
-For more information on see the pages under [*Metrics*](contents/metrics/index.qmd).
-
-## NBV Task Formulation using RRI
-
-Given the current reconstruction state and a set of candidate viewpoints, the NBV task is formulated as:
-
-**Input**:
-
-- Current partial reconstruction $\mathcal{P}_t$ from $t$ captured views
-- Set of candidate viewpoints at time $t$: $\mathcal{Q}_t = \{\mathbf{q}_1, \mathbf{q}_2, ..., \mathbf{q}_n\}$
-- Current camera trajectory $\mathcal{T}_t = \{\mathbf{c}_1, \mathbf{c}_2, ..., \mathbf{c}_t\}$
-
-**Objective**: Find the next-best viewpoint that maximizes reconstruction improvement:
-
-$$\mathbf{q}^* = \underset{\mathbf{q} \in \mathcal{Q}_t}{\text{argmax}} \; \text{RRI}(\mathbf{q} \mid \mathcal{P}_t, \mathcal{T}_t)$$
-
-**Sequential Planning**: For planning a sequence of $k$ views, the optimal camera trajectory $\boldsymbol{\tau}^*_{t+k} = \{\mathbf{q}_1, \mathbf{q}_2, ..., \mathbf{q}_k\}$ is:
-
-$$\boldsymbol{\tau}^*_{t+k} = \underset{\boldsymbol{\tau}_{t+k}}{\text{argmax}} \sum_{i=1}^{k} \text{RRI}(\mathbf{q}_i \mid \mathcal{P}_{t+i-1}, \boldsymbol{\tau}_{t+i-1})$$
-
-Subject to:
-
-- **Collision constraints**: $\mathbf{q} \notin \mathcal{O}_{\text{occupied}}$ (candidate poses must be in free space)
-- **Kinematic constraints**: $\|\text{pos}(\mathbf{q}_i) - \text{pos}(\mathbf{q}_{i-1})\| \leq d_{\max}$ (reachability limits)
-- **Field-of-view constraints**: $\mathcal{V}(\mathbf{q}) \cap \mathcal{S} \neq \emptyset$ (scene entities $\mathcal{S}$ must be visible from frustum $\mathcal{V}(\mathbf{q})$)
-- **Resource constraints**: Total trajectory length, time, or number of views within budget
-
-
-# EFM Backbone
-
-## [Egocentric Voxel Lifting (EVL)](contents/literature/efm3d.qmd)
-
-- **3D voxel lifting**: Frozen DinoV2.5 features from multi-stream egocentric snippets are lifted into gravity-aligned voxel grids (4 m³ crops with task-dependent resolution).
-- **Multi-modal fusion**: Inputs include calibrated and posed RGB and SLAM fisheye cameras, semi-dense points, visibility information, and derived point/free-space masks that are aggregated across time.
-- **Outputs**: EVL predicts voxel occupancy probs, centerness-scores, 7-DoF OBB regressions, and semantic class scores. Post-processing fuses dense predictions via tracking, NMS, and TSDF occupancy accumulation.
-- **Training specifics**: OBB head trained on 526K ASE snippets, surface head on 54K snippets, both optimized with Adam and task-specific loss weightings.
-- **Limitations**: Inference currently operates on fixed 4 m³ frustums, assumes static scenes with accurate calibration, and degrades on distant or highly dynamic content—considerations for NBV deployment.
-
-## Benchmark
-
-- EFM3D establishes two egocentric perception tasks: 3D oriented bounding box detection and 3D surface regression [@EFM3D-straub2024].
-- Training uses the large-scale simulated ASE dataset (100K indoor sequences with GT meshes and annotations). Evaluation spans both ASE and real-world Project Aria datasets: ADT for surface regression and AEO for object detection.
-- Benchmarked methods leverage synchronized egocentric video, precise camera poses, calibration data, and semi-dense SLAM points, emphasizing full-field-of-view processing.
-
-
-# Integration Strategy
-
-1. Use EVL's `voxel/feat` tensor and occupancy logits as the scene representation.
-2. Project the candidate view frustum into the voxel grid to accumulate visible features, depth statistics, and free-space overlap or project features into the candidate view.
-3. Concatenate scene context, candidate embeddings, pose metadata, and uncertainty cues before passing them to a small RRI head trained with [CORAL ordinal loss](https://raschka-research-group.github.io/coral-pytorch/) on binned RRIs.
-4. Enforce collision constraints by discarding candidates that intersect high-occupancy voxels or detected OBBs.
-
 
 # Documentation Navigation
 
-## Dataset & Resources
+## Project State
 
-- **[Technical Resources](contents/resources.qmd)**: External tools and APIs
 - **[Project Roadmap](contents/roadmap.qmd)**: Development phases and timeline
 - **[Research Questions](contents/questions.qmd)**: Open problems and directions
+- **[Roadmap](contents/roadmap.qmd)**: Detailed project roadmap
+
+## Theory & Background
+- **[RRI Theory](contents/theory/rri_theory.qmd)**: Mathematical formulation and properties of RRI
+- **[Surface Metrics](contents/theory/surface_metrics.qmd)**: Accuracy, completeness, Chamfer distance
+- **[Semi-Dense Point Clouds](contents/theory/semi-dense-pc.qmd)**: SLAM-based 3D reconstruction techniques
+
+
+## Dataset & Resources
+
+- **[Technical Resources](contents/resources.qmd)**: External links to libraries, tools, docs and datasets used in this project
 - **[ASE Dataset](contents/ase_dataset.qmd)**: 100K scenes, modalities, NBV suitability
 
 ## Literature Reviews
@@ -193,12 +63,11 @@ Subject to:
 - **[EFM3D/EVL](contents/literature/efm3d.qmd)**: Egocentric foundation models and voxel lifting
 - **[SceneScript](contents/literature/scene_script.qmd)**: Structured scene language and entity representation
 
-## Metrics & Evaluation
+## Implementation Overviews
 
-- **[Surface Metrics](contents/metrics/surface_metrics.qmd)**: Accuracy, completeness, Chamfer distance
-- **[ATEK Implementation](contents/metrics/atek_implementation.qmd)**: Production-ready mesh evaluation
-- **[EFM3D Implementation](contents/metrics/efm3d_implementation.qmd)**: Point cloud and voxel utilities
-- **[RRI Computation](contents/metrics/rri_computation.qmd)**: Complete oracle implementation
+- **[ATEK Implementation](contents/impl/atek_implementation.qmd)**: Production-ready mesh evaluation
+- **[EFM3D Implementation](contents/impl/efm3d_implementation.qmd)**: Point cloud and voxel utilities
+- **[RRI Computation](contents/impl/rri_computation.qmd)**: Complete oracle implementation
 
 ## Project Slides
 

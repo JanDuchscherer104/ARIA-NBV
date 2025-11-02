@@ -30,6 +30,7 @@ format: html
 - **Candidate Encoder**: View pose + frustum features, projection of partial PC into candidate view -> learnable encoder
 - **Predictor**: MLP regressing RRI score
 
+
 ---
 
 ## Master Thesis Phase (30 ECTS, ~900 hours)

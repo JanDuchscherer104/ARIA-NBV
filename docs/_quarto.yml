@@ -47,7 +47,7 @@ website:
           - text: Roadmap
             href: contents/roadmap.qmd
           - text: Research Questions
-            href: contents/research_questions.qmd
+            href: contents/questions.qmd
       - text: Ressources
         menu:
         - text: Resources (External Links, Repos, Docs, etc.)
@@ -79,18 +79,18 @@ website:
           - contents/questions.qmd
           - contents/roadmap.qmd
           - contents/todos.qmd
-      - section: "Theory & Implementations"
+      - section: Theory
         contents:
-          - section: "Metrics"
-            contents:
-              - contents/metrics/index.qmd
-              - contents/metrics/surface_metrics.qmd
-              - contents/metrics/atek_implementation.qmd
-              - contents/metrics/efm3d_implementation.qmd
-              - contents/metrics/rri_computation.qmd
-          - section: Theory
-            contents:
-              - contents/theory/semi-dense-pc.qmd
+          - contents/theory/nbv_background.qmd
+          - contents/theory/rri_theory.qmd
+          - contents/theory/surface_metrics.qmd
+          - contents/theory/semi-dense-pc.qmd
+      - section: "Implementations"
+        contents:
+          - contents/impl/overview.qmd
+          - contents/impl/atek_implementation.qmd
+          - contents/impl/efm3d_implementation.qmd
+          - contents/impl/rri_computation.qmd
       - section: "Presentations"
         contents:
           - text: "Typst Slides 1"

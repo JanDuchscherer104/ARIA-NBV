@@ -1,5 +1,29 @@
 ## EFM3D & EVL {#efm3d}
 
+<!-- # EFM Backbone
+
+## [Egocentric Voxel Lifting (EVL)](contents/literature/efm3d.qmd)
+
+- **3D voxel lifting**: Frozen DinoV2.5 features from multi-stream egocentric snippets are lifted into gravity-aligned voxel grids (4 m³ crops with task-dependent resolution).
+- **Multi-modal fusion**: Inputs include calibrated and posed RGB and SLAM fisheye cameras, semi-dense points, visibility information, and derived point/free-space masks that are aggregated across time.
+- **Outputs**: EVL predicts voxel occupancy probs, centerness-scores, 7-DoF OBB regressions, and semantic class scores. Post-processing fuses dense predictions via tracking, NMS, and TSDF occupancy accumulation.
+- **Training specifics**: OBB head trained on 526K ASE snippets, surface head on 54K snippets, both optimized with Adam and task-specific loss weightings.
+- **Limitations**: Inference currently operates on fixed 4 m³ frustums, assumes static scenes with accurate calibration, and degrades on distant or highly dynamic content—considerations for NBV deployment.
+
+## Benchmark
+
+- EFM3D establishes two egocentric perception tasks: 3D oriented bounding box detection and 3D surface regression [@EFM3D-straub2024].
+- Training uses the large-scale simulated ASE dataset (100K indoor sequences with GT meshes and annotations). Evaluation spans both ASE and real-world Project Aria datasets: ADT for surface regression and AEO for object detection.
+- Benchmarked methods leverage synchronized egocentric video, precise camera poses, calibration data, and semi-dense SLAM points, emphasizing full-field-of-view processing.
+
+
+## Integration Strategy
+
+1. Use EVL's `voxel/feat` tensor and occupancy logits as the scene representation.
+2. Project the candidate view frustum into the voxel grid to accumulate visible features, depth statistics, and free-space overlap or project features into the candidate view.
+3. Concatenate scene context, candidate embeddings, pose metadata, and uncertainty cues before passing them to a small RRI head trained with [CORAL ordinal loss](https://raschka-research-group.github.io/coral-pytorch/) on binned RRIs.
+4. Enforce collision constraints by discarding candidates that intersect high-occupancy voxels or detected OBBs. -->
+
 ### Overview
 - **Porposed Method**: **EVL** was designed as a base-line _3D egocentric foundation model_ that leverages strong priors from various egocentric modalities and inherits foundational capabilities from any (frozen) 2D backbone.
   - 86.6 M non-trainable parameters (DinoV2.5)

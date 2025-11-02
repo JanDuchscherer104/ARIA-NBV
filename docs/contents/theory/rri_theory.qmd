@@ -1,0 +1,48 @@
+---
+title: "Relative Reconstruction Improvement (RRI) Theory"
+---
+
+The RRI metric introduced by VIN-NBV, quantifies the expected reconstruction quality gain from capturing a new viewpoint:
+
+$$\text{RRI}(\mathbf{q}) = \frac{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}}) - \text{CD}(\mathcal{P}_{t \cup \mathbf{q}}, \mathcal{M}_{\text{GT}})}{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}})}$$
+
+Where:
+
+- $\mathbf{q} \in SE(3)$: Candidate viewpoint (5DoF pose as roll typically fixed to 0°)
+- $\mathcal{P}_t$: Current reconstruction point cloud from first $t$ views
+- $\mathcal{P}_{t \cup \mathbf{q}}$: Updated reconstruction after capturing from viewpoint $\mathbf{q}$
+- $\mathcal{M}_{\text{GT}}$: Ground truth mesh (available only during training)
+- $\text{CD}(\cdot, \cdot)$: Chamfer distance (bidirectional surface similarity metric)
+
+**Properties**:
+
+- Range: [0, 1] where higher values indicate better viewpoints
+- Normalized by current error $ \rightarrow $ limited scale/object-independence
+- Requires ground truth RRI during training
+- Directly correlates with reconstruction quality improvement
+
+For more information on surface reconstruction metrics, see [Surface Reconstruction Metrics](surface_metrics.qmd).
+
+
+# NBV Task Formulation using RRI
+
+**Input**:
+
+- Current partial reconstruction $\mathcal{P}_t$ from $t$ captured views
+- Set of candidate viewpoints at time $t$: $\mathcal{Q}_t = \{\mathbf{q}_1, \mathbf{q}_2, ..., \mathbf{q}_n\}$
+- Current camera trajectory $\mathcal{T}_t = \{\mathbf{c}_1, \mathbf{c}_2, ..., \mathbf{c}_t\}$
+
+**Objective**: Find the next-best viewpoint that maximizes reconstruction improvement:
+
+$$\mathbf{q}^* = \underset{\mathbf{q} \in \mathcal{Q}_t}{\text{argmax}} \; \text{RRI}(\mathbf{q} \mid \mathcal{P}_t, \mathcal{T}_t)$$
+
+**Sequential Planning**: For planning a sequence of $k$ views, the optimal camera trajectory $\boldsymbol{\tau}^*_{t+k} = \{\mathbf{q}_1, \mathbf{q}_2, ..., \mathbf{q}_k\}$ is:
+
+$$\boldsymbol{\tau}^*_{t+k} = \underset{\boldsymbol{\tau}_{t+k}}{\text{argmax}} \sum_{i=1}^{k} \text{RRI}(\mathbf{q}_i \mid \mathcal{P}_{t+i-1}, \boldsymbol{\tau}_{t+i-1})$$
+
+Subject to:
+
+- **Collision constraints**: $\mathbf{q} \notin \mathcal{O}_{\text{occupied}}$ (candidate poses must be in free space)
+- **Kinematic constraints**: $\|\text{pos}(\mathbf{q}_i) - \text{pos}(\mathbf{q}_{i-1})\| \leq d_{\max}$ (reachability limits)
+- **Field-of-view constraints**: $\mathcal{V}(\mathbf{q}) \cap \mathcal{S} \neq \emptyset$ (scene entities $\mathcal{S}$ must be visible from frustum $\mathcal{V}(\mathbf{q})$)
+- **Resource constraints**: Total trajectory length, time, or number of views within budget

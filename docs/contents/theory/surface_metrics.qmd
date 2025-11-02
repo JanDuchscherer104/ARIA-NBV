@@ -1,10 +1,12 @@
-# Surface Reconstruction Metrics {#surface-metrics}
+---
+title: "Surface Reconstruction Metrics"
+---
 
 This document describes the fundamental metrics used to evaluate 3D reconstruction quality by comparing predicted reconstructions against ground truth meshes.
 
 ## Key Metrics
 
-### 1. Accuracy (Prediction → Ground Truth)
+### Accuracy (Prediction → Ground Truth)
 
 Measures how close predicted points are to the ground truth surface.
 
@@ -25,7 +27,7 @@ $$
 - Detects **over-reconstruction** (extra geometry/noise in prediction)
 - Doesn't penalize missing geometry
 
-### 2. Completeness (Ground Truth → Prediction)
+### Completeness (Ground Truth → Prediction)
 
 Measures how well the prediction covers the ground truth surface.
 
@@ -42,7 +44,7 @@ $$
 
 **Key Insight**: Accuracy and Completeness use the **same distance algorithm** with **source and target swapped**.
 
-### 3. Chamfer Distance (Bidirectional)
+### Chamfer Distance (Bidirectional)
 
 Combines both accuracy and completeness into a single symmetric metric:
 
@@ -58,7 +60,7 @@ $$
 
 This symmetric metric captures both over-reconstruction (accuracy) and under-reconstruction (completeness).
 
-### 4. Precision, Recall & F-score
+### Precision, Recall & F-score
 
 Binary classification metrics at threshold $\tau$ (typically 5cm):
 

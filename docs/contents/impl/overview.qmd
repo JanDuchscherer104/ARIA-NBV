@@ -1,4 +1,9 @@
-# Reconstruction Quality Metrics & RRI Computation
+---
+title: Implementation Overview
+---
+
+
+# Reconstruction Quality Metrics & RRI Computation {#metrics-index}
 
 This section provides a comprehensive overview of reconstruction quality metrics and how to compute the Relative Reconstruction Improvement (RRI) score for Next-Best-View planning.
 
@@ -14,7 +19,7 @@ The evaluation of 3D reconstruction quality relies on comparing predicted recons
 
 This section is organized into the following topics:
 
-1. **[Surface Reconstruction Metrics](surface_metrics.qmd)** - Core metrics: Accuracy, Completeness, Chamfer Distance, Precision/Recall
+1. **[Theory: Surface Reconstruction Metrics](../theory/surface_metrics.qmd)** - Core metrics: Accuracy, Completeness, Chamfer Distance, Precision/Recall
 2. **[ATEK Implementation](atek_implementation.qmd)** - Detailed breakdown of ATEK's mesh evaluation functions
 3. **[EFM3D Implementation](efm3d_implementation.qmd)** - EFM3D utilities for point clouds, rays, and voxels
 4. **[RRI Computation](rri_computation.qmd)** - Complete pipeline for computing RRI oracle with ASE dataset
@@ -22,6 +27,7 @@ This section is organized into the following topics:
 ## Quick Reference: Key Functions
 
 ### From ATEK
+
 
 | Function | Purpose | Location |
 |----------|---------|----------|

@@ -7,11 +7,32 @@ format: html
 
 This section provides an overview of the libraries, tools, and documentation used in this project - all of which stem from the Project Aria ecosystem.
 
+---
+
+## Papers
+
+- **[VIN-NBV: A View Introspection Network for Next-Best-View Selection](https://arxiv.org/abs/2505.06219)** [@VIN-NBV-frahm2025] - Direct RRI optimization approach
+- **[GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction](https://arxiv.org/abs/2402.16174)** [@GenNBV-chen2024] - RL-based coverage optimization
+
+- **[EFM3D: A Benchmark for Measuring Progress Towards 3D Egocentric Foundation Models](https://arxiv.org/abs/2406.10224)** [@EFM3D-straub2024] - EVL backbone and benchmarks
+- **[SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model](https://arxiv.org/abs/2403.13064)** [@SceneScript-avetisyan2024] - Structured scene representation
+- **[Project Aria: A New Tool for Egocentric Multi-Modal AI Research](https://arxiv.org/abs/2308.13561)** [@projectaria-engel2023] - ASE dataset foundation
+- **[Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling](https://arxiv.org/abs/2503.11806)** [@HITL-SceneScript-xie2025] - Interactive scene editing
+
+
 ## Project Aria
+- [Project Aria Homepage](https://www.projectaria.com/): Main portal for datasets and tools
 - [Project Aria Dataset Explorer](https://explorer.projectaria.com/)
 - [Project Aria Docs](https://facebookresearch.github.io/projectaria_tools/docs/intro)
   - [ASE Docs](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)
+  - [ASE Docs](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)
 
+### Tools and Libraries
+- **[ATEK GitHub Repository](https://github.com/facebookresearch/ATEK)** - ML training and evaluation toolkit
+- **[ATEK Documentation](https://facebookresearch.github.io/projectaria_tools/docs/ATEK/about_ATEK)** - Complete setup and usage guide
+- **[EFM3D GitHub Repository](https://github.com/facebookresearch/efm3d)** - Foundation model implementation
+- **[SceneScript GitHub Repository](https://github.com/facebookresearch/scenescript)** - Structured scene language
+- **[Project Aria Tools GitHub](https://github.com/facebookresearch/projectaria_tools)** - Core data processing utilities
 
 ## Aria Training and Evaluation Toolkit (ATEK)
 
