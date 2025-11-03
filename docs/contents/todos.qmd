@@ -13,7 +13,6 @@ format: html
 - depth maps in ASE dataset are ground-truth!
 
 - non-gt point clouds are sparse! How to sample a PC from the candidate view that can be compared to the pre-existing semi-dense SLAM PC that is provided in the ASE dataset?
-
 - Should NBV prediction output discrete selection (VIN-NBV) or continuous pose (GenNBV)?
   - Start with randomly sampled candidate views for which the RRI is computed. Action space is then the selection among these candidates.
   - Future work: learn to generate continuous poses directly, whose fitness can than be quantified using the RRI predictor; here we can also consider the free space voxels that are used in EFM3D to avoid collisions.
@@ -23,6 +22,7 @@ format: html
 
 - [ ] Implement a custom data downloader for the ASE dataset, using the tools provided in ATEK:
   - Download all 3 forms of the dataset for scenes for which the GT meshes are available.
+  - Figure out, how to best manage to download corresponding data files (ATEK, raw ASE, GT meshes) for the same scenes.
 
   ```bash
   external/ATEK/tools
@@ -40,4 +40,43 @@ format: html
   ├── aria_synthetic_environments_dataset_download_urls.json
   └── ase_mesh_download_urls.json  # contains download links for 100 GT meshes ("scene_ply_<scene_id>.ply")
   ```
+  - Use `external/projectaria_tools/projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py` to download the base ASE dataset
+  ```bash
+  # example: download specific scenes
+  python3 projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py --set train --scene-ids 560-569 --cdn-file aria_synthetic_environments_dataset_download_urls.json --output-dir $HOME/projectaria_tools_ase_data --unzip True
+  ```
+
+- Train a light weight network to predict the sampled rays given a canidate view and projection onto the mesh to imitate how their SAM would see it.
+- Or simply generate dense PC from ground truth depth maps - what high-level implementations would be suited?
+
+
+- HIGHEST PRIO:
+  - implement the `OracleRRI` class with chamfer distance computation between two point clouds
+  -
+
+## Data Management
+- [ ] Implement ASE dataset downloader using existing tools (ATEK, ProjectAria, GT meshes)
+- [ ] Create data preprocessing pipeline for RRI computation
+- [ ] Setup data directory structure and caching system
+
+## Oracle RRI Implementation
+- [ ] Implement `OracleRRI` class with Chamfer Distance computation
+- [ ] Create `CandidateViewGenerator` for sampling candidate poses around current position
+- [ ] Integrate EFM3D ray casting with ATEK surface reconstruction evaluation
+- [ ] Add memory-efficient batching to avoid GPU crashes
+
+## Visualization & Analysis
+- [ ] Implement plotting utilities for RRI scores, candidate views, and reconstructions
+- [ ] Create progress tracking and logging system
+- [ ] Add mesh comparison visualizations using trimesh/matplotlib
+
+## Testing & Validation
+- [ ] Validate RRI computation against theoretical expectations
+- [ ] Test memory usage and optimization strategies
+- [ ] Compare with existing NBV methods on ASE validation scenes
+
+## Integration
+- [ ] Connect with EFM3D inference pipeline
+- [ ] Add ATEK evaluation metrics integration
+- [ ] Create end-to-end NBV prediction workflow
 

@@ -33,6 +33,7 @@ This section provides an overview of the libraries, tools, and documentation use
 - **[EFM3D GitHub Repository](https://github.com/facebookresearch/efm3d)** - Foundation model implementation
 - **[SceneScript GitHub Repository](https://github.com/facebookresearch/scenescript)** - Structured scene language
 - **[Project Aria Tools GitHub](https://github.com/facebookresearch/projectaria_tools)** - Core data processing utilities
+  - [ADT depth maps to point cloud example notebook](https://github.com/facebookresearch/projectaria_tools/blob/main/projects/AriaDigitalTwinDatasetTools/examples/adt_depth_maps_to_pointcloud_tutorial.ipynb)
 
 ## Aria Training and Evaluation Toolkit (ATEK)
 

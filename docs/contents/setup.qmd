@@ -1,0 +1,26 @@
+---
+title: "Setup Instructions"
+format: html
+---
+
+# Depüendencies
+
+- conda or mamba
+- uv
+- `git submodule --init --update` to clone the external dependencies (EFM3D is installed from local source)
+
+# Setup Instructions
+
+```bash
+cd oracle_rri
+conda env create -f environment.yml
+conda activate aria-nbv
+
+uv pip install --python "$(which python)" -e ".[dev, notebook]"
+uv pip install --python "$(which python)" -e ".[pytorch3d]"
+uv pip install --python "$(which python)" -e ../external/efm3d
+
+echo "Verifying installation..."
+python -c "import efm3d; import oracle_rri; print('All packages installed successfully')"
+echo "Setup complete! Activate with: conda activate aria-nbv"
+```

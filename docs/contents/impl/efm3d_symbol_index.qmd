@@ -1,0 +1,436 @@
+---
+title: "EFM3D Symbol Index"
+format: html
+bibliography: ../../references.bib
+---
+
+# Purpose
+
+EFM3D is the foundation for our ASE-based NBV research: it standardises Aria sensor snippets, lifts Dino features into volumetric grids, fuses predictions through time, and evaluates reconstruction quality. This page catalogues every symbol from the vendored `external/efm3d` tree that we need, grounding each entry in the relevant theory (see also `rri_theory.qmd`, `oracle_rri_impl.qmd`, and `atek_implementation.qmd`). We emphasise tensor shapes, coordinate conventions, and provide quick usage examples for the key types.
+
+# Core Design Ideas
+
+- **Structured tensors** – all modalities (RGB, SLAM, depth, poses, OBBs) are stored as `TensorWrapper` subclasses and accessed via the `ARIA_*` string constants. Respecting this schema keeps our oracle loaders interoperable with EVL.
+- **SE(3) geometry** – camera and pose utilities rely on Lie-group operations (`PoseTW`, `CameraTW`) to interpolate and project accurately. Candidate view generation must use the same mathematics to stay consistent with GT meshes.
+- **Volumetric reasoning** – EVL constructs cubic voxel volumes populated with feature channels, occupancy masks, and free-space masks. These volumes are the state representation that our RRI computations tap into (cf. Chamfer distance in `rri_theory.qmd`).
+- **Semantic heads** – oriented bounding boxes (OBBs) provide categorical priors. NBV policies can leverage these for task-weighted objectives.
+
+# Exhaustive ARIA Constants Reference (`aria/aria_constants.py`)
+
+The tables below list every constant, its structure, dtype/shape, and what it represents. Shapes are given for batched snippets: `B` (batch size), `T` (frames per snippet), `N` (points per frame), `K` (OBB slots, default 128), `V = D×H×W` (voxel count).
+
+## Sequence and snippet metadata
+
+| Constant | Type / Shape | Description |
+| --- | --- | --- |
+| `ARIA_SEQ_ID` | `str` | Unique identifier of the full sensor sequence. |
+| `ARIA_SEQ_TIME_NS` | `torch.long` scalar | Sequence start time in Aria clock nanoseconds. |
+| `ARIA_SNIPPET_ID` | `torch.long` `[B]` | Index of the snippet within the parent sequence. |
+| `ARIA_SNIPPET_LENGTH_S` | `torch.float32` `[B]` | Duration of each snippet in seconds. |
+| `ARIA_SNIPPET_TIME_NS` | `torch.long` `[B]` | Snippet start timestamp (ns, Aria clock). |
+| `ARIA_SNIPPET_T_WORLD_SNIPPET` | `PoseTW` `[B, 12]` | Transform from snippet frame to world frame. |
+| `ARIA_SNIPPET_ORIGIN_RATIO` | `torch.float32` `[B]` | Fraction of snippet length that defines the origin (default 0.5). |
+
+## Player (streamer) timing
+
+| Constant | Type / Shape | Description |
+| --- | --- | --- |
+| `ARIA_PLAY_TIME_NS` | `torch.long` `[B, T]` | Playback timestamps (ns). |
+| `ARIA_PLAY_SEQUENCE_TIME_S` | `torch.float32` `[B, T]` | Sequence-relative time in seconds. |
+| `ARIA_PLAY_SNIPPET_TIME_S` | `torch.float32` `[B, T]` | Snippet-relative time in seconds. |
+| `ARIA_PLAY_FREQUENCY_HZ` | `torch.float32` `[B]` | Playback frequency. |
+
+## RGB / SLAM image streams
+
+| Constant | Type / Shape | Description |
+| --- | --- | --- |
+| `ARIA_FRAME_ID` | `list[str]` (`rgb/slaml/slamr`) | Per-stream frame IDs in sequence order. |
+| `ARIA_IMG_SNIPPET_TIME_S` | `list[torch.float32]` `[B, T]` each | Snippet-relative timestamps per stream. |
+| `ARIA_IMG_TIME_NS` | `list[torch.long]` `[B, T]` each | Sequence timestamps per stream. |
+| `ARIA_IMG_T_SNIPPET_RIG` | `list[PoseTW]` `[B, T, 12]` each | Pose of rig at capture time for each frame. |
+| `ARIA_IMG` | `list[torch.float32]` `[B, T, C, H, W]` each | Image tensors (RGB: 3×1408×1408, SLAM: 1×640×480). |
+| `ARIA_IMG_FREQUENCY_HZ` | `list[torch.float32]` `[B]` each | Frame rate per stream. |
+
+## Calibration streams
+
+| Constant | Type / Shape | Description |
+| --- | --- | --- |
+| `ARIA_CALIB` | `list[CameraTW]` `[B, T, 26|34]` each | Camera intrinsics/extrinsics tensors. |
+| `ARIA_CALIB_SNIPPET_TIME_S` | `list[torch.float32]` `[B, T]` each | Snippet-relative calibration timestamps. |
+| `ARIA_CALIB_TIME_NS` | `list[torch.long]` `[B, T]` each | Sequence-relative calibration timestamps. |
+
+## Rig poses
+
+| Constant | Type / Shape | Description |
+| --- | --- | --- |
+| `ARIA_POSE_SNIPPET_TIME_S` | `torch.float32` `[B, T]` | Snippet-relative timestamps for rig poses. |
+| `ARIA_POSE_TIME_NS` | `torch.long` `[B, T]` | Sequence timestamps for rig poses. |
+| `ARIA_POSE_T_SNIPPET_RIG` | `PoseTW` `[B, T, 12]` | Transform rig→snippet. |
+| `ARIA_POSE_T_WORLD_RIG` | `PoseTW` `[B, T, 12]` | Transform rig→world. |
+| `ARIA_POSE_FREQUENCY_HZ` | `torch.float32` `[B]` | Pose sampling frequency. |
+
+## Points & depth
+
+| Constant | Type / Shape | Description |
+| --- | --- | --- |
+| `ARIA_POINTS_WORLD` | `torch.float32` `[B, T, N, 3]` | Semi-dense SLAM point cloud (world frame). |
+| `ARIA_POINTS_TIME_NS` | `torch.long` `[B, T, N]` | Sequence timestamps per point sample. |
+| `ARIA_POINTS_SNIPPET_TIME_S` | `torch.float32` `[B, T, N]` | Snippet-relative point timestamps. |
+| `ARIA_POINTS_FREQUENCY_HZ` | `torch.float32` `[B]` | Point stream frequency. |
+| `ARIA_POINTS_INV_DIST_STD` | `torch.float32` `[B, T, N]` | Inverse-distance standard deviation ($σ_ρ$). |
+| `ARIA_POINTS_DIST_STD` | `torch.float32` `[B, T, N]` | Distance standard deviation ($σ_d$). |
+| `ARIA_DEPTH_M` | `list[str]` | Keys for z-depth maps (`rgb/depth_m`, …); tensors `[B, T, 1, H, W]`. |
+| `ARIA_DISTANCE_M` | `list[str]` | Keys for ray-distance maps (`rgb/distance_m`, …); tensors `[B, T, 1, H, W]`. |
+| `ARIA_DEPTH_M_PRED`, `ARIA_DISTANCE_M_PRED` | `list[str]` | Predicted depth/distance keys. |
+
+## IMU & audio
+
+| Constant | Type / Shape | Description |
+| --- | --- | --- |
+| `ARIA_IMU` | `list[str]` (`imur`, `imul`) | IMU stream roots. |
+| `ARIA_IMU_CHANNELS` | nested `list[str]` | Channel names (`lin_acc_ms2`, `rot_vel_rads`). |
+| `ARIA_IMU_SNIPPET_TIME_S`, `ARIA_IMU_TIME_NS` | `list[torch.float32/long]` `[B, T]` | IMU timestamps. |
+| `ARIA_IMU_FACTORY_CALIB` | `list[torch.float32]` | Factory calibration matrices. |
+| `ARIA_IMU_FREQUENCY_HZ` | `list[torch.float32]` | Sampling frequency per IMU. |
+| `ARIA_AUDIO` | `str` (`audio`) | Root key for audio samples. |
+| `ARIA_AUDIO_SNIPPET_TIME_S` | `torch.float32` `[B, T_audio]` | Snippet-relative timestamps. |
+| `ARIA_AUDIO_TIME_NS` | `torch.long` `[B, T_audio]` | Sequence timestamps. |
+| `ARIA_AUDIO_FREQUENCY_HZ` | `torch.float32` `[B]` | Audio sampling frequency. |
+
+## OBB annotations & predictions
+
+| Constant | Type / Shape | Description |
+| --- | --- | --- |
+| `ARIA_OBB_PADDED` | `ObbTW` `[B, T, K, 34]` | GT OBB tensor (snippet frame). |
+| `ARIA_OBB_SEM_ID_TO_NAME` | `dict[int,str]` | Semantic ID → label. |
+| `ARIA_OBB_SNIPPET_TIME_S`, `ARIA_OBB_TIME_NS` | `torch.float32/long` `[B, T, K]` | OBB timestamps. |
+| `ARIA_OBB_FREQUENCY_HZ` | `torch.float32` `[B]` | OBB stream rate. |
+| `ARIA_OBB_PRED`, `ARIA_OBB_PRED_VIZ` | `ObbTW` | Predicted OBBs (raw & filtered). |
+| `ARIA_OBB_PRED_SEM_ID_TO_NAME` | `dict[int,str]` | Predicted semantic mapping. |
+| `ARIA_OBB_PRED_PROBS_FULL`, `ARIA_OBB_PRED_PROBS_FULL_VIZ` | `torch.float32` `[B, T, K, C]` | Class logits (full & viz). |
+| `ARIA_OBB_TRACKED`, `ARIA_OBB_TRACKED_PROBS_FULL` | `ObbTW` / probs | Tracked OBBs after association. |
+| `ARIA_OBB_UNINST` | `ObbTW` | Uninstantiated (filtered) OBBs. |
+| `ARIA_OBB_BB2` | `list[str]` | Keys for 2D BBs per stream. |
+| `ARIA_OBB_BB3` | `str` | Key for 3D BB tensor. |
+
+## SDF, meshes, volumes
+
+| Constant | Type / Shape | Description |
+| --- | --- | --- |
+| `ARIA_SDF` | `torch.float32` `[B, V]` | Snippet signed-distance field values. |
+| `ARIA_SDF_EXT` | `torch.float32` `[B, 6]` | Spatial extent of SDF grids. |
+| `ARIA_SDF_COSY_TIME_NS` | `torch.long` `[B]` | Timestamp linking SDF to snippet frame. |
+| `ARIA_SDF_MASK` | `torch.bool` `[B, V]` | Valid voxel mask. |
+| `ARIA_SDF_T_WORLD_VOXEL` | `PoseTW` `[B, 12]` | Transform from voxel to world frame. |
+| `ARIA_MESH_VERTS_W`, `ARIA_MESH_FACES`, `ARIA_MESH_VERT_NORMS_W` | lists of tensors | Snippet mesh vertices `[B, Nv, 3]`, faces `[B, Nf, 3]`, normals. |
+| `ARIA_SCENE_MESH_VERTS_W`, `ARIA_SCENE_MESH_FACES`, `ARIA_SCENE_MESH_VERT_NORMS_W` | lists | Scene-level meshes. |
+| `ARIA_MESH_VOL_MIN`, `ARIA_MESH_VOL_MAX`, `ARIA_POINTS_VOL_MIN`, `ARIA_POINTS_VOL_MAX` | `torch.float32` `[B, 3]` | Axis-aligned bounds for meshes/points. |
+
+## Image resolution helpers & camera metadata
+
+| Constant | Type / Shape | Description |
+| --- | --- | --- |
+| `RESOLUTION_MAP` | `dict[int, tuple]` | Resolution ID → `(RGB_hw, SLAM_w, SLAM_h)`. |
+| `WH_MULTIPLE_OF_MAP` | `dict[int, int]` | Width/height multiples. |
+| `RGB_RADIUS_FACTOR`, `SLAM_RADIUS_FACTOR` | `float` | Valid fisheye radius fractions. |
+| `ARIA_RGB_WIDTH_TO_RADIUS`, `ARIA_SLAM_WIDTH_TO_RADIUS` | `dict[int, float]` | Valid radius per width. |
+| `ARIA_RGB_SCALE_TO_WH`, `ARIA_SLAM_SCALE_TO_WH` | `dict[int, list[int]]` | Width/height pairs per scale. |
+| `ARIA_IMG_MIN_LUX`, `ARIA_IMG_MAX_LUX`, `ARIA_IMG_MAX_PERC_OVEREXPOSED`, `ARIA_IMG_MAX_PERC_UNDEREXPOSED` | `float` | Quality thresholds. |
+| `ARIA_EFM_OUTPUT` | `str` | Key for EVL inference outputs. |
+| `ARIA_CAM_INFO` | nested dict | Camera names, stream IDs, VRS IDs, display names, spatial order. |
+
+# Key Tensor Wrappers & Geometry Types
+
+## `TensorWrapper` (`aria/tensor_wrapper.py`)
+
+- **Role**: lightweight wrapper around tensors that preserves shape metadata and supports device-aware batching. All higher-level wrappers inherit from it.
+- **Shape**: arbitrary; data stored in `_data` attribute.
+- **Usage**:
+
+```python
+from efm3d.aria.tensor_wrapper import TensorWrapper, smart_stack
+
+w1 = TensorWrapper(torch.zeros(12))
+w2 = TensorWrapper(torch.ones(12))
+stacked = smart_stack([w1, w2])  # TensorWrapper with data shape [2, 12]
+```
+
+## `PoseTW` (`aria/pose.py`)
+
+- **Role**: SE(3) pose wrapper storing rotation and translation flattened into 12 numbers.
+- **Shape**: `[B, T, 12]` or `[T, 12]`; dtype `torch.float32`.
+- **Theory**: interpolation leverages the Lie algebra of SO(3). For poses $(R_i, t_i)$ and $(R_j, t_j)$ at times $t_i, t_j$, EVL computes the twist `log(R_iᵀ R_j)`, scales it by $(t - t_i)/(t_j - t_i)$, exponentiates to obtain $R(t)$, and linearly blends translations.
+- **Usage**:
+
+```python
+from efm3d.aria.pose import PoseTW
+
+times = torch.tensor([0.0, 1.0])
+poses = PoseTW(torch.eye(4).view(1, 12).repeat(2, 1))
+interp, mask = poses.interpolate(times, torch.tensor([0.5]))
+T_world_cam = interp.to_matrix().view(4, 4)
+```
+
+## `CameraTW` (`aria/camera.py`)
+
+- **Role**: camera intrinsics/extrinsics wrapper with distortion parameters and valid radii.
+- **Shape**: `[B, T, 34]` for RGB, `[B, T, 26]` for SLAM streams.
+- **Theory**: projections follow fisheye or pinhole models; `.project` maps camera-frame points to pixels, `.unproject` recovers rays.
+- **Usage**:
+
+```python
+from efm3d.aria.camera import get_aria_camera
+
+cam = get_aria_camera()  # RGB camera at 1408×1408
+points_cam = torch.tensor([[0.0, 0.0, 1.0]])
+pixels, depths = cam.project(points_cam)
+```
+
+## `ObbTW` (`aria/obb.py`)
+
+- **Role**: oriented bounding box tensor (center, extents, quaternion, scores) with utilities for projection and IoU.
+- **Shape**: `[B, T, K, 34]`.
+- **Usage**:
+
+```python
+from efm3d.aria.obb import ObbTW, transform_obbs
+from efm3d.aria.pose import PoseTW
+
+obbs = ObbTW(torch.zeros(1, 1, 128, 34))
+T_world_snippet = PoseTW(torch.eye(4).view(1, 12))
+obbs_world = transform_obbs(obbs, T_world_snippet)
+```
+
+# Dataset & Adaptor Modules
+
+## `WdsStreamDataset` (`dataset/wds_dataset.py`)
+
+- **Role**: streams WebDataset shards into ARIA-structured batches.
+- **Usage**:
+
+```python
+from efm3d.dataset.wds_dataset import WdsStreamDataset
+
+stream = WdsStreamDataset(urls="/data/ase_eval/shards/train-{00000..00099}.tar")
+first = next(iter(stream))
+rgb = first["rgb/img"]  # torch.float32 [T, 3, 1408, 1408]
+```
+
+## `EfmModelAdaptor` (`dataset/efm_model_adaptor.py`)
+
+- **Role**: normalises snippets (origin shift, gravity alignment), selects modalities, and collates batches for EVL.
+- **Usage**:
+
+```python
+from efm3d.dataset.efm_model_adaptor import load_atek_wds_dataset_as_efm
+
+loader = load_atek_wds_dataset_as_efm(
+    input_json_path=".data/aria_download_urls/AriaSyntheticEnvironment_ATEK_download_urls.json",
+    config_name="efm_eval",
+    batch_size=1,
+)
+
+batch = next(iter(loader))
+origin_pose = batch["snippet/t_world_snippet"].to_matrix().view(-1, 4, 4)
+```
+
+# Model Components
+
+## `VideoBackboneDinov2` (`model/video_backbone.py`)
+
+- **Role**: DinoV2.5 encoder returning frame-wise feature maps `rgb/feat`.
+- **Usage**:
+
+```python
+from efm3d.model.video_backbone import VideoBackboneDinov2
+
+backbone = VideoBackboneDinov2(model_name="dinov2_vitg14", img_size=1408)
+features = backbone({"rgb/img": torch.randn(1, 10, 3, 1408, 1408)})
+```
+
+## `Lifter` (`model/lifter.py`)
+
+- **Role**: lifts 2D features into a 3D voxel grid, producing `voxel/feat`, point masks, and free-space masks.
+- **Outputs**: `voxel/feat` `[B, C_out, D, H, W]`, `voxel/pts_world` `[B, D·H·W, 3]`, `voxel/T_world_voxel` `[B, 12]`.
+- **Usage** (conceptual—requires full adaptor batch):
+
+```python
+from efm3d.model.lifter import Lifter
+
+lifter = Lifter(
+    in_dim=1024,
+    out_dim=128,
+    patch_size=16,
+    voxel_size=[64, 64, 64],
+    voxel_extent=[-4, 4, -4, 4, -1, 7],
+)
+outputs = lifter(batch)  # batch from EfmModelAdaptor
+vol = outputs["voxel/feat"]
+```
+
+## `EVL` & `EfmInference`
+
+- **Role**: EVL combines the lifter with occupancy and OBB heads; `EfmInference` wraps configuration and checkpoint loading for inference.
+- **Usage**:
+
+```python
+from efm3d.inference.model import EfmInference
+
+model = EfmInference(
+    cfg_path="external/efm3d/efm3d/config/evl_inf.yaml",
+    ckpt_path="./ckpt/model_release.pth",
+)
+outputs = model.forward(batch)
+occ_logits = outputs["occ/logits"]  # [B, 1, D, H, W]
+```
+
+# Fusion & Evaluation Utilities
+
+## `VolumeFusion` (`inference/fuse.py`)
+
+- **Role**: accumulates per-snippet occupancy logits into a global volume, weighting observations and masking uncertain boundary voxels.
+- **Usage**:
+
+```python
+from efm3d.inference.fuse import VolumeFusion
+from efm3d.aria.pose import PoseTW
+
+fusion = VolumeFusion(voxel_size=[64, 64, 64], voxel_extent=[-4, 4, -4, 4, -1, 7])
+local_logits = torch.rand(64, 64, 64)
+T_l_w = PoseTW(torch.eye(4).view(1, 12))
+fusion.fuse(local_logits, local_extent=[-4, 4, -4, 4, -1, 7], T_l_w=T_l_w)
+```
+
+## `run_one` (`inference/pipeline.py`)
+
+- **Role**: orchestrates dataset streaming, EVL inference, fusion, and metrics aggregation.
+- **Usage**:
+
+```python
+from efm3d.inference.pipeline import run_one
+
+run_one(
+    input_path="datasets/ase_eval/81022",
+    model_ckpt="./ckpt/model_release.pth",
+    model_cfg="external/efm3d/efm3d/config/evl_inf.yaml",
+    max_snip=16,
+    snip_stride=0.1,
+    voxel_res=0.04,
+    output_dir="./output",
+)
+```
+
+## `obb_eval_dataset` (`inference/eval.py`)
+
+- **Role**: loads per-sequence detections and computes joint 3D detection mAP.
+- **Usage**:
+
+```python
+from efm3d.inference.eval import obb_eval_dataset
+
+joint_metrics = obb_eval_dataset("./output/model_release")
+```
+
+# Geometry & Metric Utilities (`efm3d.utils`)
+
+## Point clouds & rays
+
+- **`get_points_world`** – convert depth or semi-dense points into world coordinates.
+
+```python
+from efm3d.utils.pointcloud import get_points_world
+
+points_world, sigma_d = get_points_world(batch)
+```
+
+- **`get_freespace_world`** – sample free-space points along camera rays.
+
+```python
+from efm3d.utils.pointcloud import get_freespace_world
+from efm3d.aria.pose import PoseTW
+
+free_pts = get_freespace_world(
+    batch,
+    batch_idx=0,
+    T_wv=PoseTW(torch.eye(4).view(1, 12)),
+    vW=64,
+    vH=64,
+    vD=64,
+    voxel_extent=torch.tensor([-4, 4, -4, 4, -1, 7], dtype=torch.float32),
+)
+```
+
+- **`pointcloud_to_occupancy_snippet`** – rasterise points into voxel occupancy masks.
+
+```python
+from efm3d.utils.pointcloud import pointcloud_to_occupancy_snippet
+
+occupancy = pointcloud_to_occupancy_snippet(
+    points_world,
+    vW=64,
+    vH=64,
+    vD=64,
+    voxel_extent=torch.tensor([-4, 4, -4, 4, -1, 7], dtype=torch.float32),
+)
+```
+
+- **`ray_grid`** – compute voxel traversal for rays (useful for custom visibility checks).
+
+```python
+from efm3d.utils.ray import ray_grid
+
+rays = torch.tensor([[0., 0., 0., 0., 0., 1.]])  # origin + direction
+steps = ray_grid(
+    rays,
+    voxel_extent=torch.tensor([-4, 4, -4, 4, -1, 7], dtype=torch.float32),
+    vW=64,
+    vH=64,
+    vD=64,
+)
+```
+
+## Mesh metrics
+
+- **`compute_pts_to_mesh_dist`** and **`eval_mesh_to_mesh`** – bidirectional point-to-mesh distances (Chamfer components).
+
+```python
+from efm3d.utils.mesh_utils import compute_pts_to_mesh_dist, eval_mesh_to_mesh
+
+dists = compute_pts_to_mesh_dist(points_world[0], faces, verts)
+metrics, acc, comp = eval_mesh_to_mesh("pred.ply", "gt.ply")
+```
+
+## Losses
+
+- **`compute_occ_losses`** – occupancy BCE + TV.
+- **`compute_obb_losses`** – classification + IoU regression for OBB heads.
+
+```python
+from efm3d.utils.evl_loss import compute_occ_losses
+
+losses = compute_occ_losses(pred_logits, gt_labels, valid_mask)
+```
+
+# How These Symbols Support NBV & RRI
+
+- **Oracle RRIs**: use `get_points_world` for current reconstructions, fuse new predictions with `VolumeFusion`, and evaluate against GT meshes via `compute_pts_to_mesh_dist` to obtain the directed Chamfer terms used in `rri_theory.qmd`.
+- **Visibility & novelty**: `get_freespace_world`, `pointcloud_to_occupancy_snippet`, and `ray_grid` (noted in `efm3d/utils/ray.py`) deliver accurate coverage estimates akin to GenNBV, but grounded in ASE geometry (`ase_dataset.qmd`).
+- **Semantic weighting**: `ObbTW` tensors and `obb_eval_dataset` expose per-class coverage and mAP scores that we can fold into task-specific NBV rewards.
+- **Coordinate consistency**: `run_local_cosy`, `PoseTW.interpolate`, and `CameraTW.project` keep candidate poses, fused reconstructions, and GT meshes in the same world frame—necessary when computing oracle metrics (`oracle_rri_impl.qmd`).
+
+# Quick Reference Table
+
+| Symbol | Location | Concept | Why it matters |
+| --- | --- | --- | --- |
+| `ARIA_*` | `aria/aria_constants.py` | Dataset key schema | Ensure loaders/oracles read/write tensors correctly. |
+| `PoseTW` | `aria/pose.py` | SE(3) interpolation | Align candidate viewpoints with snippet/world frames. |
+| `CameraTW` | `aria/camera.py` | Fisheye projection | Generate rays for coverage & rendering. |
+| `ObbTW` | `aria/obb.py` | Oriented boxes | Semantic coverage metrics & detection losses. |
+| `EfmModelAdaptor` | `dataset/efm_model_adaptor.py` | Snippet normalisation | Keeps EVL and oracle batches aligned. |
+| `Lifter` | `model/lifter.py` | 2D→3D feature lifting | Supplies volumetric priors for RRI. |
+| `VolumeFusion` | `inference/fuse.py` | Occupancy fusion | Accumulates evidence across viewpoints. |
+| `get_freespace_world` | `utils/pointcloud.py` | Free-space sampling | Coverage/information gain cues. |
+| `compute_pts_to_mesh_dist` | `utils/mesh_utils.py` | Chamfer distance term | Core of oracle RRI metric. |
+| `obb_eval_dataset` | `inference/eval.py` | Dataset-level mAP | Benchmarks semantic reconstruction quality. |
+
+Use this catalogue as a map when wiring EVL outputs into our oracle metrics or when you need the exact tensor layout for NBV experiments.

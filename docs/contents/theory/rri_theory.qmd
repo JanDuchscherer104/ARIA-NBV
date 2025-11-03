@@ -17,9 +17,15 @@ Where:
 **Properties**:
 
 - Range: [0, 1] where higher values indicate better viewpoints
-- Normalized by current error $ \rightarrow $ limited scale/object-independence
+- Normalized by current error $\rightarrow$ limited independence on point cloud density
 - Requires ground truth RRI during training
 - Directly correlates with reconstruction quality improvement
+
+**Issues**:
+
+- Requires both PCs to follow the same sampling distribution for valid CD comparison. This is problematic, as a semi-dense point cloud is given as $\mathcal{P}_t$, while extending it with a new view $\mathbf{q}$, requires sampling points from the GT mesh visible from $\mathbf{q}$ that follows the same distribution as $\mathcal{P}_t$.
+- Sampling $\mathcal{P}_q$ as dense PC from the GT mesh visible from $\mathbf{q}$ leads to distribution mismatch with semi-dense $\mathcal{P}_t$.
+- However, we are not interested in $\text{CD}(\mathcal{P}_t, \mathcal{P}_{t \cup \mathbf{q}})$, but rather in the improvement w.r.t. the GT mesh $\mathcal{M}_{\text{GT}}$. Also, we are mostly interested in expressing the fitness of different candidate views $\mathbf{q}$, which should not be strongly affected by the exact sampling distribution of $\mathcal{P}_t$ as a dense sampling from $\mathcal{M}_{\text{GT}}$ should lead to similar relative improvements across different candidate views.
 
 For more information on surface reconstruction metrics, see [Surface Reconstruction Metrics](surface_metrics.qmd).
 

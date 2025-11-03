@@ -91,6 +91,8 @@ website:
           - contents/impl/atek_implementation.qmd
           - contents/impl/efm3d_implementation.qmd
           - contents/impl/rri_computation.qmd
+          - contents/impl/oracle_rri_impl.qmd
+          - contents/impl/efm3d_symbol_index.qmd
       - section: "Presentations"
         contents:
           - text: "Typst Slides 1"

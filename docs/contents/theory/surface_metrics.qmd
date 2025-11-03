@@ -68,7 +68,7 @@ Binary classification metrics at threshold $\tau$ (typically 5cm):
 $$
 \text{Precision}_\tau = \frac{|\{\mathbf{p} \in \mathcal{P} : \min_{\mathbf{q} \in \mathcal{M}_{\text{GT}}} \|\mathbf{p} - \mathbf{q}\| < \tau\}|}{|\mathcal{P}|}
 $$
-
+^
 **Recall** - Fraction of GT points that are "recovered":
 $$
 \text{Recall}_\tau = \frac{|\{\mathbf{q} \in \mathcal{M}_{\text{GT}}: \min_{\mathbf{p} \in \mathcal{P}} \|\mathbf{p} - \mathbf{q}\| < \tau\}|}{|\mathcal{M}_{\text{GT}}|}
@@ -78,6 +78,12 @@ $$
 $$
 \text{F-score}_\tau = \frac{2 \cdot \text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}
 $$
+
+<!-- TODO: add reasoning about a kind of pc to mesh metric that is  -->
+- captures both accuracy and completeness in a single value
+- works when the prediction is a point cloud and the GT is a mesh
+- can be used to evaluate the fitness of a candidate view's point cloud against a GT mesh, and this relative to the previously seen point cloude from all previous views. so it's about expressing the value of a view in terms of how much it improves the overall reconstruction relative to the previous state.
+- must be implementable using torch or other gpu-accelerated libraries for efficiency
 
 ## Example Scenarios
 
