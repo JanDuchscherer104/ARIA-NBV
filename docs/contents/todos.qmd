@@ -2,6 +2,7 @@
 title: "Action Items & TODOs"
 format: html
 ---
+<!-- Agent Instructions: Always work in a test-driven manner.  -->
 
 # Issues & Questions
 
@@ -23,6 +24,11 @@ format: html
 - [ ] Implement a custom data downloader for the ASE dataset, using the tools provided in ATEK:
   - Download all 3 forms of the dataset for scenes for which the GT meshes are available.
   - Figure out, how to best manage to download corresponding data files (ATEK, raw ASE, GT meshes) for the same scenes.
+  - We also want to represents scenes together with the snippets that reside in them (snippets are in atek dataset structure ready for training).
+  - metadata should be comined in a single file for easy access.
+  - should provide mapping from scene_id to snippet_ids and vice versa.
+  - should leverage their download scripts internally to provide a cleaner interface.
+  - we want to be able to download meta data about all datasets withot downloading the full data to be able to explicitly see which scenes are relevant to us (i.e. in terms of having many atek snipptes and gt meshes available)
 
   ```bash
   external/ATEK/tools
@@ -52,7 +58,7 @@ format: html
 
 - HIGHEST PRIO:
   - implement the `OracleRRI` class with chamfer distance computation between two point clouds
-  -
+  - implement `CandidateViewGenerator`
 
 ## Data Management
 - [ ] Implement ASE dataset downloader using existing tools (ATEK, ProjectAria, GT meshes)
@@ -63,7 +69,6 @@ format: html
 - [ ] Implement `OracleRRI` class with Chamfer Distance computation
 - [ ] Create `CandidateViewGenerator` for sampling candidate poses around current position
 - [ ] Integrate EFM3D ray casting with ATEK surface reconstruction evaluation
-- [ ] Add memory-efficient batching to avoid GPU crashes
 
 ## Visualization & Analysis
 - [ ] Implement plotting utilities for RRI scores, candidate views, and reconstructions

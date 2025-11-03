@@ -1,7 +1,7 @@
 ---
 title: "Relative Reconstruction Improvement (RRI) Theory"
 ---
-
+<!-- TODO: review, don't write in terms of CD but at first with generic distance metric -->
 The RRI metric introduced by VIN-NBV, quantifies the expected reconstruction quality gain from capturing a new viewpoint:
 
 $$\text{RRI}(\mathbf{q}) = \frac{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}}) - \text{CD}(\mathcal{P}_{t \cup \mathbf{q}}, \mathcal{M}_{\text{GT}})}{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}})}$$
