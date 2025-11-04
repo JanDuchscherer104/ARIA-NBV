@@ -112,14 +112,6 @@ Witness points enable:
 
 Note: Only Accuracy yields witnesses on the GT mesh. Completeness witnesses lie on the predicted reconstruction (point cloud or mesh).
 
-#### Triangle‑wise closest point (as in ATEK impl)
-
-- Project the query point orthogonally onto the triangle’s plane and compute its barycentric coordinates.
-- If the projection lies inside the triangle (all barycentric in [0,1]), that projection is the witness; otherwise, clamp to the closest edge or vertex (shortest segment/point distance).
-- Handle degenerate triangles (near‑zero area) by falling back to edge/vertex cases.
-
-ATEK implements the interior projection and a vertex fallback. Extending with edge handling (or a standard “barycentric region” test per Ericson/Eberly) gives correct witnesses on boundaries.
-
 #### Computing witnesses for accuracy and completeness
 
 Given a predicted point cloud $\mathcal{P}$ and GT mesh $\mathcal{M}_{GT}$:
@@ -128,11 +120,21 @@ Given a predicted point cloud $\mathcal{P}$ and GT mesh $\mathcal{M}_{GT}$:
 - Completeness witnesses: sample points $\mathcal{Q}$ on $\mathcal{M}_{GT}$ and compute $\mathcal{W}_{\mathcal{M}_{GT}\rightarrow \mathcal{P}} = \{\mathbf{w}(\mathbf{q}) : \mathbf{q}\in\mathcal{Q}\}$ on the prediction.
 
 
+#### Triangle‑wise closest point (as in ATEK impl)
+
+- Project the query point orthogonally onto the triangle’s plane and compute its barycentric coordinates.
+- If the projection lies inside the triangle (all barycentric in [0,1]), that projection is the witness; otherwise, clamp to the closest edge or vertex (shortest segment/point distance).
+- Handle degenerate triangles (near‑zero area) by falling back to edge/vertex cases.
+
+ATEK implements the interior projection and a vertex fallback. Extending with edge handling (or a standard “barycentric region” test per Ericson/Eberly) gives correct witnesses on boundaries.
+
+
+
 #### Practical computation (CPU/GPU)
 
-- `trimesh` (CPU, simple): `trimesh.proximity.closest_point(mesh, points)` returns witness points `(m,3)`, distances `(m,)`, and face indices `(m,)`. This uses spatial acceleration (e.g., Embree if available) and is robust for large meshes.
+- `trimesh` (CPU, simple): `trimesh.proximity.closest_point(mesh, points)`
 - PyTorch3D: [pytorch3d.loss.point_mesh_face_distance](https://pytorch3d.readthedocs.io/en/latest/modules/loss.html#pytorch3d.loss.point_mesh_face_distance) returns squared distances and computes closest faces internally; combine with a custom triangle closest‑point routine to reconstruct witnesses per chosen face. Useful for millions of queries with batching and autograd support.
-- ATEK: Adapt `compute_pts_to_mesh_dist()` to also track the argmin face per point and compute the corresponding closest point/barycentric coordinates.
+- ATEK: Adapt `compute_pts_to_mesh_dist()`
 
 
 ### TSDF error and coverage

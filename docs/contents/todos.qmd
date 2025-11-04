@@ -32,7 +32,7 @@ format: html
 - implement a `CandidateSample` that takes the candidate poses of type `PoseTW` and samples rays from the corresponding view onto the GT mesh to obtain a dense point cloud from this candidate view.
   - candidate pose generation: only within free space and within confines of the room (based on SSL for training); based on predicted occupancy from EFM3D for eval
 
-- implement a class (name to be decided) that fuses the semi-dense SLAM PC $mathcal{P}_t$ with the dense PC from the candidate view  $\mathcal{P}_{\mathbf{q}}$ to obtain the updated PC $mathcal{P}_{t \cup \mathbf{q}}$.
+- implement a class (name to be decided) that fuses the semi-dense SLAM PC $\mathcal{P}_t$ with the dense PC from the candidate view  $\mathcal{P}_{\mathbf{q}}$ to obtain the updated PC $\mathcal{P}_{t \cup \mathbf{q}}$.
 
 
 ### Data Handling
@@ -73,25 +73,3 @@ format: html
 ### Candidate Sampling Strategies
 - Train a light weight network to predict the sampled rays given a canidate view and projection onto the mesh to imitate how their SAM would see it.
 - Or simply generate dense PC ($\mathcal{P}_{\mathbf{t}}$) from ground truth depth maps - what high-level implementations would be suited?
-
-## Data Management
-- [ ] Implement ASE dataset downloader using existing tools (ATEK, ProjectAria, GT meshes)
-- [ ] Create data preprocessing pipeline for RRI computation
-- [ ] Setup data directory structure and caching system
-
-## Oracle RRI Implementation
-- [ ] Implement `OracleRRI` class with Chamfer Distance computation
-- [ ] Create `CandidateViewGenerator` for sampling candidate poses around current position
-- [ ] Integrate EFM3D ray casting with ATEK surface reconstruction evaluation
-
-## Visualization & Analysis
-- [ ] Implement plotting utilities for RRI scores, candidate views, and reconstructions
-- [ ] Create progress tracking and logging system
-- [ ] Add mesh comparison visualizations using trimesh/matplotlib
-
-## Testing & Validation
-- [ ] Validate RRI computation against theoretical expectations
-- [ ] Test memory usage and optimization strategies
-- [ ] Compare with existing NBV methods on ASE validation scenes
-
-
