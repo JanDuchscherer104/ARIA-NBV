@@ -21,7 +21,23 @@ format: html
 
 # Action Items
 
-- [ ] Implement a custom data downloader for the ASE dataset, using the tools provided in ATEK:
+
+## HIGHEST PRIO:
+
+- implement the `OracleRRI` class with PC to mesh distance computation between two point clouds
+  - Mesh to distance field computation??
+  - How can we consider only relevant (observable parts) of the scene, such that we don't have to consider the entire mesh (e.g. there might be different rooms that cannot be considered)
+  - must be implemented as `TorchMetric`
+- implement `CandidateViewGenerator`, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type `PoseTW` (`external/efm3d/efm3d/aria/pose.py`)
+- implement a `CandidateSample` that takes the candidate poses of type `PoseTW` and samples rays from the corresponding view onto the GT mesh to obtain a dense point cloud from this candidate view.
+  - candidate pose generation: only within free space and within confines of the room (based on SSL for training); based on predicted occupancy from EFM3D for eval
+
+- implement a class (name to be decided) that fuses the semi-dense SLAM PC $mathcal{P}_t$ with the dense PC from the candidate view  $\mathcal{P}_{\mathbf{q}}$ to obtain the updated PC $mathcal{P}_{t \cup \mathbf{q}}$.
+
+
+### Data Handling
+
+- [ ] Implement a custom data-handler for the ASE dataset, using the tools provided in ATEK:
   - Download all 3 forms of the dataset for scenes for which the GT meshes are available.
   - Figure out, how to best manage to download corresponding data files (ATEK, raw ASE, GT meshes) for the same scenes.
   - We also want to represents scenes together with the snippets that reside in them (snippets are in atek dataset structure ready for training).
@@ -52,13 +68,11 @@ format: html
   python3 projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py --set train --scene-ids 560-569 --cdn-file aria_synthetic_environments_dataset_download_urls.json --output-dir $HOME/projectaria_tools_ase_data --unzip True
   ```
 
+## Lower Prio:
+
+### Candidate Sampling Strategies
 - Train a light weight network to predict the sampled rays given a canidate view and projection onto the mesh to imitate how their SAM would see it.
-- Or simply generate dense PC from ground truth depth maps - what high-level implementations would be suited?
-
-
-- HIGHEST PRIO:
-  - implement the `OracleRRI` class with chamfer distance computation between two point clouds
-  - implement `CandidateViewGenerator`
+- Or simply generate dense PC ($\mathcal{P}_{\mathbf{t}}$) from ground truth depth maps - what high-level implementations would be suited?
 
 ## Data Management
 - [ ] Implement ASE dataset downloader using existing tools (ATEK, ProjectAria, GT meshes)
@@ -80,8 +94,4 @@ format: html
 - [ ] Test memory usage and optimization strategies
 - [ ] Compare with existing NBV methods on ASE validation scenes
 
-## Integration
-- [ ] Connect with EFM3D inference pipeline
-- [ ] Add ATEK evaluation metrics integration
-- [ ] Create end-to-end NBV prediction workflow
 

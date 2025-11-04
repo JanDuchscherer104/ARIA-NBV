@@ -358,6 +358,10 @@ window.Quarto = {
     <a class="dropdown-item" href="../../contents/questions.html">
  <span class="dropdown-text">Research Questions</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/experiments/findings.html">
+ <span class="dropdown-text">Findings</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -562,6 +566,12 @@ window.Quarto = {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/prj_aria_tools_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ProjectAria Tools: Complete Reference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="../../contents/impl/rri_computation.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Computing RRI with Ground Truth Meshes</span></a>
   </div>
@@ -620,6 +630,7 @@ window.Quarto = {
   <li><a href="#what-the-aria-files-mean" id="toc-what-the-aria-files-mean" class="nav-link" data-scroll-target="#what-the-aria-files-mean"><span class="header-section-number">1.3</span> What the Aria files mean</a></li>
   <li><a href="#evlefm3d-context-for-nbv" id="toc-evlefm3d-context-for-nbv" class="nav-link" data-scroll-target="#evlefm3d-context-for-nbv"><span class="header-section-number">1.4</span> EVL/EFM3D context (for NBV)</a></li>
   <li><a href="#practical-guidance" id="toc-practical-guidance" class="nav-link" data-scroll-target="#practical-guidance"><span class="header-section-number">1.5</span> Practical guidance</a></li>
+  <li><a href="#semi-dense-vs.-dense-ground-truth-in-rri" id="toc-semi-dense-vs.-dense-ground-truth-in-rri" class="nav-link" data-scroll-target="#semi-dense-vs.-dense-ground-truth-in-rri"><span class="header-section-number">1.6</span> Semi-dense vs.&nbsp;dense ground truth in RRI</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -681,7 +692,7 @@ X_{w} = T_{w\leftarrow c_0}\,X_{c_0}(\rho).
 <p><span class="math display">\[
 \sigma_d \;\approx\; \frac{\sigma_\rho}{\rho^2},
 \]</span></p>
-<p>so the published fields <code>inv_dist_std</code> and <code>dist_std</code> are simply <span class="math inline">\(\sigma_\rho\)</span> and <span class="math inline">\(\sigma_d\)</span> respectively. Large <span class="math inline">\(\sigma_\rho\)</span> means the depth is poorly constrained (e.g.&nbsp;from small parallax or noise), while small <span class="math inline">\(\sigma_\rho\)</span> means a confident estimate. In practice, one often filters the semi-dense cloud by uncertainty: for example, only keeping points with <span class="math inline">\(\sigma_\rho\)</span> below a threshold (or equivalently <span class="math inline">\(\sigma_d\)</span> small). Note that a “semi‐dense reconstruction” typically shows only points with small inverse-depth uncertainty. In other words, high-uncertainty tracks are often discarded or downweighted, since they contribute geometric outliers.</p>
+<p>so the published fields <code>inv_dist_std</code> and <code>dist_std</code> are simply <span class="math inline">\(\sigma_\rho\)</span> and <span class="math inline">\(\sigma_d\)</span> respectively. Large <span class="math inline">\(\sigma_\rho\)</span> means the depth is poorly constrained (e.g.&nbsp;from small parallax or noise), while small <span class="math inline">\(\sigma_\rho\)</span> means a confident estimate. In practice, one often filters the semi-dense cloud by uncertainty: for example, only keeping points with <span class="math inline">\(\sigma_\rho\)</span> below a threshold (or equivalently <span class="math inline">\(\sigma_d\)</span> small). Note that a “semi-dense reconstruction” typically shows only points with small inverse-depth uncertainty. In other words, high-uncertainty tracks are often discarded or downweighted, since they contribute geometric outliers.</p>
 </section>
 </section>
 <section id="multi-view-constraints-visibility" class="level3" data-number="1.2">
@@ -697,12 +708,17 @@ u = f_x X_{j,x}/X_{j,z}+c_x,\; v = f_y X_{j,y}/X_{j,z}+c_y.
 <ul>
 <li><p><strong><code>semidense_points.csv.gz</code></strong> (world frame): <code>uid</code>, <code>graph_uid</code>, <code>p{x,y,z}_world</code>, <code>inv_dist_std</code>, <code>dist_std</code>. <span class="math inline">\(\rightarrow\)</span> One row <strong>per 3D landmark</strong> (from a track) in the closed-loop world frame.</p></li>
 <li><p><strong><code>semidense_observations.csv.gz</code></strong> (image frame): <code>uid</code>, <code>frame_tracking_timestamp_us</code>, <code>camera_serial</code>, <code>u</code>, <code>v</code>. <span class="math inline">\(\rightarrow\)</span> All <strong>2D sightings</strong> of each landmark; this is the <strong>visibility set</strong>.</p>
-<p>Importantly, visibility refers to the subset of frames in which a given point is actually seen (i.e.&nbsp;projects into the image bounds and is not occluded). The observations file encodes this – each line lists a frame timestamp and camera for which <span class="math inline">\((u,v)\)</span> was recorded. A longer track (more observations) generally means the point had more parallax and a more reliable depth estimate. Conversely, if a point appears in only two frames with small baseline, its depth will be very uncertain (large σ). By examining the 2D tracks, one can reconstruct the camera trajectory and scene geometry: this is the classical structure-from-motion problem. In summary, semi-dense visibility information is simply the collection of 2D measurements <span class="math inline">\((u,v)\)</span> for each world point in all frames it was tracked, establishing the 3D–2D correspondences that underpin the SLAM solution.</p></li>
+<p>Importantly, visibility refers to the subset of frames in which a given point is actually seen (i.e.&nbsp;projects into the image bounds and is not occluded). The observations file encodes this - each line lists a frame timestamp and camera for which <span class="math inline">\((u,v)\)</span> was recorded. A longer track (more observations) generally means the point had more parallax and a more reliable depth estimate. Conversely, if a point appears in only two frames with small baseline, its depth will be very uncertain (large <span class="math inline">\(\sigma\)</span>). By examining the 2D tracks, one can reconstruct the camera trajectory and scene geometry: this is the classical structure-from-motion problem. In summary, semi-dense visibility information is simply the collection of 2D measurements <span class="math inline">\((u,v)\)</span> for each world point in all frames it was tracked, establishing the 3D-2D correspondences that underpin the SLAM solution.</p></li>
 </ul>
 </section>
 <section id="evlefm3d-context-for-nbv" class="level3" data-number="1.4">
 <h3 data-number="1.4" class="anchored" data-anchor-id="evlefm3d-context-for-nbv"><span class="header-section-number">1.4</span> EVL/EFM3D context (for NBV)</h3>
-<p>EVL lifts 2D features to a <strong>gravity-aligned voxel volume</strong> and concatenates <strong>point</strong> and <strong>freespace</strong> masks derived from semi-dense tracks to guide 3D heads (occupancy/OBB) <span class="citation" data-cites="EFM3D-straub2024"><a href="#ref-EFM3D-straub2024" role="doc-biblioref">[3, Sec. 4]</a></span>. - <strong>Point mask</strong>: voxels containing semi-dense surface points. - <strong>Freespace mask</strong>: voxels along camera<span class="math inline">\(\rightarrow\)</span>surface rays (evidence of empty space).</p>
+<p><strong>EVL</strong> (Egocentric Voxel Lifting) <span class="citation" data-cites="EFM3D-straub2024"><a href="#ref-EFM3D-straub2024" role="doc-biblioref">[3, Sec. 4]</a></span> lifts 2-D features into a <strong>gravity-aligned voxel volume</strong>. It makes explicit use of the semi-dense SLAM tracks:</p>
+<ul>
+<li><strong>Point mask:</strong> voxels containing semi-dense surface points. These provide evidence of observed surfaces.</li>
+<li><strong>Free-space mask:</strong> voxels along the camera → surface rays (between the camera and the first surface point) that are known to be empty. These define free space and help avoid collisions.</li>
+</ul>
+<p>The point and free-space masks are concatenated with lifted image features and fed into 3-D convolutional heads for occupancy prediction and oriented bounding box (OBB) regression. In essence, the semi-dense cloud provides <strong>geometry</strong> (where surfaces exist) and <strong>visibility</strong> (where free space exists), enabling the model to reason about both seen and unseen regions. This volumetric representation is a core building block of our NBV system because it informs where new views can contribute most.</p>
 </section>
 <section id="practical-guidance" class="level3" data-number="1.5">
 <h3 data-number="1.5" class="anchored" data-anchor-id="practical-guidance"><span class="header-section-number">1.5</span> Practical guidance</h3>
@@ -711,6 +727,16 @@ u = f_x X_{j,x}/X_{j,z}+c_x,\; v = f_y X_{j,y}/X_{j,z}+c_y.
 <li>Longer tracks (more parallax) <span class="math inline">\(\implies\)</span> smaller <span class="math inline">\(\sigma_\rho\)</span>. Small baselines/low texture <span class="math inline">\(\implies\)</span> large <span class="math inline">\(\sigma_\rho\)</span>.</li>
 <li>Use observation lists to reconstruct per-point <strong>visibility</strong> and to validate projections against intrinsics/extrinsics.</li>
 </ul>
+</section>
+<section id="semi-dense-vs.-dense-ground-truth-in-rri" class="level3" data-number="1.6">
+<h3 data-number="1.6" class="anchored" data-anchor-id="semi-dense-vs.-dense-ground-truth-in-rri"><span class="header-section-number">1.6</span> Semi-dense vs.&nbsp;dense ground truth in RRI</h3>
+<p>Semi-dense point clouds differ from dense ground-truth meshes not just in density but also in sampling <strong>bias</strong>: semi-dense reconstructions concentrate on edges and textured regions, leaving textureless surfaces underrepresented. When computing <strong>Relative Reconstruction Improvement (RRI)</strong>, this mismatch can skew metrics like Chamfer distance. To address this:</p>
+<ul>
+<li>Prefer <strong>point-to-mesh distances</strong> (see <a href="../../contents/theory/surface_metrics.html">Surface Metrics</a>) instead of point-to-point Chamfer when comparing a semi-dense prediction to a dense mesh.</li>
+<li>Optionally <strong>down-sample</strong> or <strong>up-sample</strong> the mesh to match the average point density of the semi-dense cloud, ensuring the RRI numerator and denominator are comparable【603805067285655†L23-L27】.</li>
+<li>Use the uncertainty fields (<code>inv_dist_std</code>, <code>dist_std</code>) to filter out unreliable semi-dense points before evaluating quality. This reduces noise and helps the NBV system focus on meaningful improvements.</li>
+</ul>
+<p>These considerations are important for training RRI predictors that generalise from synthetic to real data and from semi-dense to dense reconstructions.</p>
 
 
 <!-- -->
@@ -1235,13 +1261,13 @@ u = f_x X_{j,x}/X_{j,z}+c_x,\; v = f_y X_{j,y}/X_{j,z}+c_y.
 <span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>**Uncertainty.**</span>
 <span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>Each point’s depth $d$ is treated probabilistically. Typically the system represents $\rho ~ \mathcal N(\mu_\rho,\sigma_\rho^2)$ with a Gaussian $\mathcal{N}(\mu_\rho, \sigma_\rho^2)$, reflecting measurement noise and triangulation uncertainty. From this, the distance $d=1/\rho$ has (approximate) standard deviation</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>Each point's depth $d$ is treated probabilistically. Typically the system represents $\rho ~ \mathcal N(\mu_\rho,\sigma_\rho^2)$ with a Gaussian $\mathcal{N}(\mu_\rho, \sigma_\rho^2)$, reflecting measurement noise and triangulation uncertainty. From this, the distance $d=1/\rho$ has (approximate) standard deviation</span>
 <span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>$$</span>
 <span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>\sigma_d \;\approx\; \frac{\sigma_\rho}{\rho^2},</span>
 <span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a>$$</span>
 <span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>so the published fields <span class="in">`inv_dist_std`</span> and <span class="in">`dist_std`</span> are simply $\sigma_\rho$ and $\sigma_d$ respectively. Large $\sigma_\rho$ means the depth is poorly constrained (e.g. from small parallax or noise), while small $\sigma_\rho$ means a confident estimate. In practice, one often filters the semi-dense cloud by uncertainty: for example, only keeping points with $\sigma_\rho$ below a threshold (or equivalently $\sigma_d$ small). Note that a “semi‐dense reconstruction” typically shows only points with small inverse-depth uncertainty.</span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>so the published fields <span class="in">`inv_dist_std`</span> and <span class="in">`dist_std`</span> are simply $\sigma_\rho$ and $\sigma_d$ respectively. Large $\sigma_\rho$ means the depth is poorly constrained (e.g. from small parallax or noise), while small $\sigma_\rho$ means a confident estimate. In practice, one often filters the semi-dense cloud by uncertainty: for example, only keeping points with $\sigma_\rho$ below a threshold (or equivalently $\sigma_d$ small). Note that a "semi-dense reconstruction" typically shows only points with small inverse-depth uncertainty.</span>
 <span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>In other words, high-uncertainty tracks are often discarded or downweighted, since they contribute geometric outliers.</span>
 <span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a><span class="fu">### Multi-view constraints &amp; visibility</span></span>
@@ -1263,19 +1289,32 @@ u = f_x X_{j,x}/X_{j,z}+c_x,\; v = f_y X_{j,y}/X_{j,z}+c_y.
 <span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>  <span class="in">`uid`</span>, <span class="in">`frame_tracking_timestamp_us`</span>, <span class="in">`camera_serial`</span>, <span class="in">`u`</span>, <span class="in">`v`</span>.</span>
 <span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>  $\rightarrow$ All **2D sightings** of each landmark; this is the **visibility set**.</span>
 <span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a>  Importantly, visibility refers to the subset of frames in which a given point is actually seen (i.e. projects into the image bounds and is not occluded). The observations file encodes this – each line lists a frame timestamp and camera for which $(u,v)$ was recorded. A longer track (more observations) generally means the point had more parallax and a more reliable depth estimate. Conversely, if a point appears in only two frames with small baseline, its depth will be very uncertain (large σ). By examining the 2D tracks, one can reconstruct the camera trajectory and scene geometry: this is the classical structure-from-motion problem. In summary, semi-dense visibility information is simply the collection of 2D measurements $(u,v)$ for each world point in all frames it was tracked, establishing the 3D–2D correspondences that underpin the SLAM solution.</span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a>  Importantly, visibility refers to the subset of frames in which a given point is actually seen (i.e. projects into the image bounds and is not occluded). The observations file encodes this - each line lists a frame timestamp and camera for which $(u,v)$ was recorded. A longer track (more observations) generally means the point had more parallax and a more reliable depth estimate. Conversely, if a point appears in only two frames with small baseline, its depth will be very uncertain (large $\sigma$). By examining the 2D tracks, one can reconstruct the camera trajectory and scene geometry: this is the classical structure-from-motion problem. In summary, semi-dense visibility information is simply the collection of 2D measurements $(u,v)$ for each world point in all frames it was tracked, establishing the 3D-2D correspondences that underpin the SLAM solution.</span>
 <span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a><span class="fu">### EVL/EFM3D context (for NBV)</span></span>
-<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a>EVL lifts 2D features to a **gravity-aligned voxel volume** and concatenates **point** and **freespace** masks derived from semi-dense tracks to guide 3D heads (occupancy/OBB) <span class="co">[</span><span class="ot">@EFM3D-straub2024, Sec. 4</span><span class="co">]</span>.</span>
-<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Point mask**: voxels containing semi-dense surface points.</span>
-<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Freespace mask**: voxels along camera$\rightarrow$surface rays (evidence of empty space).</span>
-<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a><span class="fu">### Practical guidance</span></span>
-<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Keep points with small <span class="in">`inv_dist_std`</span> / <span class="in">`dist_std`</span>; down-weight or drop large-uncertainty landmarks.</span>
-<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Longer tracks (more parallax) $\implies$ smaller $\sigma_\rho$. Small baselines/low texture $\implies$ large $\sigma_\rho$.</span>
-<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use observation lists to reconstruct per-point **visibility** and to validate projections against intrinsics/extrinsics.</span>
-<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a>**EVL** (Egocentric Voxel Lifting) [@EFM3D-straub2024, Sec.&nbsp;4] lifts 2-D features into a **gravity-aligned voxel volume**.  It makes explicit use of the semi-dense SLAM tracks:</span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>**Point mask:** voxels containing semi-dense surface points.  These provide evidence of observed surfaces.</span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>**Free-space mask:** voxels along the camera → surface rays (between the camera and the first surface point) that are known to be empty.  These define free space and help avoid collisions.</span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a>The point and free-space masks are concatenated with lifted image features and fed into 3-D convolutional heads for occupancy prediction and oriented bounding box (OBB) regression.  In essence, the semi-dense cloud provides **geometry** (where surfaces exist) and **visibility** (where free space exists), enabling the model to reason about both seen and unseen regions.  This volumetric representation is a core building block of our NBV system because it informs where new views can contribute most.</span>
+<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a><span class="fu">### Practical guidance</span></span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Keep points with small <span class="in">`inv_dist_std`</span> / <span class="in">`dist_std`</span>; down-weight or drop large-uncertainty landmarks.</span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Longer tracks (more parallax) $\implies$ smaller $\sigma_\rho$. Small baselines/low texture $\implies$ large $\sigma_\rho$.</span>
+<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use observation lists to reconstruct per-point **visibility** and to validate projections against intrinsics/extrinsics.</span>
+<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a><span class="fu">### Semi-dense vs. dense ground truth in RRI</span></span>
+<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a>Semi-dense point clouds differ from dense ground-truth meshes not just in density but also in sampling **bias**: semi-dense reconstructions concentrate on edges and textured regions, leaving textureless surfaces underrepresented.  When computing **Relative Reconstruction Improvement (RRI)**, this mismatch can skew metrics like Chamfer distance.  To address this:</span>
+<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Prefer **point-to-mesh distances** (see <span class="co">[</span><span class="ot">Surface Metrics</span><span class="co">](surface_metrics.qmd)</span>) instead of point-to-point Chamfer when comparing a semi-dense prediction to a dense mesh.</span>
+<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Optionally **down-sample** or **up-sample** the mesh to match the average point density of the semi-dense cloud, ensuring the RRI numerator and denominator are comparable【603805067285655†L23-L27】.</span>
+<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Use the uncertainty fields (<span class="in">`inv_dist_std`</span>, <span class="in">`dist_std`</span>) to filter out unreliable semi-dense points before evaluating quality.  This reduces noise and helps the NBV system focus on meaningful improvements.</span>
+<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a>These considerations are important for training RRI predictors that generalise from synthetic to real data and from semi-dense to dense reconstructions.</span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

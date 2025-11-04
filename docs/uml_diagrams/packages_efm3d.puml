@@ -1,0 +1,228 @@
+@startuml packages_efm3d
+set namespaceSeparator none
+package "efm3d" as efm3d {
+}
+package "efm3d.aria" as efm3d.aria {
+}
+package "efm3d.aria.aria_constants" as efm3d.aria.aria_constants {
+}
+package "efm3d.aria.camera" as efm3d.aria.camera {
+}
+package "efm3d.aria.obb" as efm3d.aria.obb {
+}
+package "efm3d.aria.pose" as efm3d.aria.pose {
+}
+package "efm3d.aria.projection_utils" as efm3d.aria.projection_utils {
+}
+package "efm3d.aria.tensor_wrapper" as efm3d.aria.tensor_wrapper {
+}
+package "efm3d.inference" as efm3d.inference {
+}
+package "efm3d.inference.eval" as efm3d.inference.eval {
+}
+package "efm3d.inference.fuse" as efm3d.inference.fuse {
+}
+package "efm3d.inference.model" as efm3d.inference.model {
+}
+package "efm3d.inference.pipeline" as efm3d.inference.pipeline {
+}
+package "efm3d.inference.track" as efm3d.inference.track {
+}
+package "efm3d.inference.viz" as efm3d.inference.viz {
+}
+package "efm3d.model" as efm3d.model {
+}
+package "efm3d.model.cnn" as efm3d.model.cnn {
+}
+package "efm3d.model.dinov2_utils" as efm3d.model.dinov2_utils {
+}
+package "efm3d.model.dpt" as efm3d.model.dpt {
+}
+package "efm3d.model.evl" as efm3d.model.evl {
+}
+package "efm3d.model.evl_train" as efm3d.model.evl_train {
+}
+package "efm3d.model.image_tokenizer" as efm3d.model.image_tokenizer {
+}
+package "efm3d.model.lifter" as efm3d.model.lifter {
+}
+package "efm3d.model.video_backbone" as efm3d.model.video_backbone {
+}
+package "efm3d.thirdparty" as efm3d.thirdparty {
+}
+package "efm3d.thirdparty.mmdetection3d" as efm3d.thirdparty.mmdetection3d {
+}
+package "efm3d.thirdparty.mmdetection3d.iou3d" as efm3d.thirdparty.mmdetection3d.iou3d {
+}
+package "efm3d.utils" as efm3d.utils {
+}
+package "efm3d.utils.common" as efm3d.utils.common {
+}
+package "efm3d.utils.depth" as efm3d.utils.depth {
+}
+package "efm3d.utils.detection_utils" as efm3d.utils.detection_utils {
+}
+package "efm3d.utils.evl_loss" as efm3d.utils.evl_loss {
+}
+package "efm3d.utils.file_utils" as efm3d.utils.file_utils {
+}
+package "efm3d.utils.gravity" as efm3d.utils.gravity {
+}
+package "efm3d.utils.image" as efm3d.utils.image {
+}
+package "efm3d.utils.image_sampling" as efm3d.utils.image_sampling {
+}
+package "efm3d.utils.marching_cubes" as efm3d.utils.marching_cubes {
+}
+package "efm3d.utils.mesh_utils" as efm3d.utils.mesh_utils {
+}
+package "efm3d.utils.obb_csv_writer" as efm3d.utils.obb_csv_writer {
+}
+package "efm3d.utils.obb_io" as efm3d.utils.obb_io {
+}
+package "efm3d.utils.obb_matchers" as efm3d.utils.obb_matchers {
+}
+package "efm3d.utils.obb_metrics" as efm3d.utils.obb_metrics {
+}
+package "efm3d.utils.obb_trackers" as efm3d.utils.obb_trackers {
+}
+package "efm3d.utils.obb_utils" as efm3d.utils.obb_utils {
+}
+package "efm3d.utils.pointcloud" as efm3d.utils.pointcloud {
+}
+package "efm3d.utils.ray" as efm3d.utils.ray {
+}
+package "efm3d.utils.reconstruction" as efm3d.utils.reconstruction {
+}
+package "efm3d.utils.render" as efm3d.utils.render {
+}
+package "efm3d.utils.rescale" as efm3d.utils.rescale {
+}
+package "efm3d.utils.viz" as efm3d.utils.viz {
+}
+package "efm3d.utils.voxel" as efm3d.utils.voxel {
+}
+package "efm3d.utils.voxel_sampling" as efm3d.utils.voxel_sampling {
+}
+efm3d.aria --> efm3d.aria.camera
+efm3d.aria --> efm3d.aria.obb
+efm3d.aria --> efm3d.aria.pose
+efm3d.aria --> efm3d.aria.tensor_wrapper
+efm3d.aria.camera --> efm3d.aria.pose
+efm3d.aria.camera --> efm3d.aria.projection_utils
+efm3d.aria.camera --> efm3d.aria.tensor_wrapper
+efm3d.aria.obb --> efm3d.aria.camera
+efm3d.aria.obb --> efm3d.aria.pose
+efm3d.aria.obb --> efm3d.aria.tensor_wrapper
+efm3d.aria.pose --> efm3d.aria.tensor_wrapper
+efm3d.inference.eval --> efm3d.utils.obb_csv_writer
+efm3d.inference.eval --> efm3d.utils.obb_metrics
+efm3d.inference.eval --> efm3d.utils.obb_utils
+efm3d.inference.fuse --> efm3d.aria.pose
+efm3d.inference.fuse --> efm3d.utils.marching_cubes
+efm3d.inference.fuse --> efm3d.utils.reconstruction
+efm3d.inference.fuse --> efm3d.utils.voxel
+efm3d.inference.model --> efm3d.aria.aria_constants
+efm3d.inference.model --> efm3d.aria.obb
+efm3d.inference.model --> efm3d.utils.obb_csv_writer
+efm3d.inference.pipeline --> efm3d.inference.eval
+efm3d.inference.pipeline --> efm3d.inference.fuse
+efm3d.inference.pipeline --> efm3d.inference.model
+efm3d.inference.pipeline --> efm3d.inference.track
+efm3d.inference.pipeline --> efm3d.inference.viz
+efm3d.inference.pipeline --> efm3d.utils.gravity
+efm3d.inference.pipeline --> efm3d.utils.mesh_utils
+efm3d.inference.track --> efm3d.utils.obb_csv_writer
+efm3d.inference.track --> efm3d.utils.obb_trackers
+efm3d.inference.viz --> efm3d.aria.aria_constants
+efm3d.inference.viz --> efm3d.aria.obb
+efm3d.inference.viz --> efm3d.inference.fuse
+efm3d.inference.viz --> efm3d.utils.image
+efm3d.inference.viz --> efm3d.utils.obb_csv_writer
+efm3d.inference.viz --> efm3d.utils.render
+efm3d.inference.viz --> efm3d.utils.viz
+efm3d.model.evl --> efm3d.aria.aria_constants
+efm3d.model.evl --> efm3d.model.cnn
+efm3d.model.evl --> efm3d.model.lifter
+efm3d.model.evl --> efm3d.model.video_backbone
+efm3d.model.evl --> efm3d.utils.detection_utils
+efm3d.model.evl --> efm3d.utils.file_utils
+efm3d.model.evl_train --> efm3d.aria.aria_constants
+efm3d.model.evl_train --> efm3d.aria.obb
+efm3d.model.evl_train --> efm3d.aria.pose
+efm3d.model.evl_train --> efm3d.model.evl
+efm3d.model.evl_train --> efm3d.model.lifter
+efm3d.model.evl_train --> efm3d.model.video_backbone
+efm3d.model.evl_train --> efm3d.utils.evl_loss
+efm3d.model.evl_train --> efm3d.utils.image
+efm3d.model.evl_train --> efm3d.utils.marching_cubes
+efm3d.model.evl_train --> efm3d.utils.obb_utils
+efm3d.model.evl_train --> efm3d.utils.pointcloud
+efm3d.model.evl_train --> efm3d.utils.render
+efm3d.model.evl_train --> efm3d.utils.viz
+efm3d.model.evl_train --> efm3d.utils.voxel
+efm3d.model.evl_train --> efm3d.utils.voxel_sampling
+efm3d.model.image_tokenizer --> efm3d.model.dinov2_utils
+efm3d.model.lifter --> efm3d.aria.aria_constants
+efm3d.model.lifter --> efm3d.model.cnn
+efm3d.model.lifter --> efm3d.model.dpt
+efm3d.model.lifter --> efm3d.utils.gravity
+efm3d.model.lifter --> efm3d.utils.image_sampling
+efm3d.model.lifter --> efm3d.utils.pointcloud
+efm3d.model.lifter --> efm3d.utils.ray
+efm3d.model.lifter --> efm3d.utils.voxel
+efm3d.model.video_backbone --> efm3d.aria.aria_constants
+efm3d.utils.depth --> efm3d.utils.ray
+efm3d.utils.detection_utils --> efm3d.aria.obb
+efm3d.utils.detection_utils --> efm3d.aria.pose
+efm3d.utils.evl_loss --> efm3d.aria.aria_constants
+efm3d.utils.evl_loss --> efm3d.aria.obb
+efm3d.utils.evl_loss --> efm3d.thirdparty.mmdetection3d.iou3d
+efm3d.utils.evl_loss --> efm3d.utils.detection_utils
+efm3d.utils.evl_loss --> efm3d.utils.pointcloud
+efm3d.utils.evl_loss --> efm3d.utils.reconstruction
+efm3d.utils.file_utils --> efm3d.aria
+efm3d.utils.file_utils --> efm3d.aria.aria_constants
+efm3d.utils.file_utils --> efm3d.utils.rescale
+efm3d.utils.gravity --> efm3d.aria.pose
+efm3d.utils.obb_csv_writer --> efm3d.aria.obb
+efm3d.utils.obb_csv_writer --> efm3d.aria.pose
+efm3d.utils.obb_io --> efm3d.aria.aria_constants
+efm3d.utils.obb_io --> efm3d.aria.pose
+efm3d.utils.obb_io --> efm3d.utils.common
+efm3d.utils.obb_matchers --> efm3d.aria.obb
+efm3d.utils.obb_matchers --> efm3d.utils.obb_utils
+efm3d.utils.obb_metrics --> efm3d.aria.camera
+efm3d.utils.obb_metrics --> efm3d.aria.obb
+efm3d.utils.obb_metrics --> efm3d.utils.file_utils
+efm3d.utils.obb_metrics --> efm3d.utils.obb_utils
+efm3d.utils.obb_trackers --> efm3d.aria.camera
+efm3d.utils.obb_trackers --> efm3d.aria.obb
+efm3d.utils.obb_trackers --> efm3d.aria.pose
+efm3d.utils.obb_trackers --> efm3d.utils.obb_matchers
+efm3d.utils.obb_trackers --> efm3d.utils.obb_utils
+efm3d.utils.obb_utils --> efm3d.aria.obb
+efm3d.utils.pointcloud --> efm3d.aria.aria_constants
+efm3d.utils.pointcloud --> efm3d.utils.depth
+efm3d.utils.pointcloud --> efm3d.utils.ray
+efm3d.utils.pointcloud --> efm3d.utils.voxel
+efm3d.utils.ray --> efm3d.aria.camera
+efm3d.utils.ray --> efm3d.utils.voxel
+efm3d.utils.reconstruction --> efm3d.aria.aria_constants
+efm3d.utils.reconstruction --> efm3d.utils.depth
+efm3d.utils.reconstruction --> efm3d.utils.detection_utils
+efm3d.utils.reconstruction --> efm3d.utils.pointcloud
+efm3d.utils.reconstruction --> efm3d.utils.voxel_sampling
+efm3d.utils.render --> efm3d.aria
+efm3d.utils.render --> efm3d.utils.image
+efm3d.utils.rescale --> efm3d.aria
+efm3d.utils.rescale --> efm3d.aria.aria_constants
+efm3d.utils.viz --> efm3d.aria.aria_constants
+efm3d.utils.viz --> efm3d.aria.camera
+efm3d.utils.viz --> efm3d.aria.obb
+efm3d.utils.viz --> efm3d.aria.pose
+efm3d.utils.viz --> efm3d.utils.common
+efm3d.utils.viz --> efm3d.utils.depth
+efm3d.utils.viz --> efm3d.utils.gravity
+efm3d.utils.viz --> efm3d.utils.render
+@enduml

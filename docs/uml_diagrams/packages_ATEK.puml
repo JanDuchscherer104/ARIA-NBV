@@ -1,0 +1,199 @@
+@startuml packages_ATEK
+set namespaceSeparator none
+package "atek" as atek {
+}
+package "atek.configs" as atek.configs {
+}
+package "atek.data_download" as atek.data_download {
+}
+package "atek.data_download.atek_data_store_download" as atek.data_download.atek_data_store_download {
+}
+package "atek.data_loaders" as atek.data_loaders {
+}
+package "atek.data_loaders.atek_raw_dataloader_as_cubercnn" as atek.data_loaders.atek_raw_dataloader_as_cubercnn {
+}
+package "atek.data_loaders.atek_wds_dataloader" as atek.data_loaders.atek_wds_dataloader {
+}
+package "atek.data_loaders.cubercnn_model_adaptor" as atek.data_loaders.cubercnn_model_adaptor {
+}
+package "atek.data_loaders.sam2_model_adaptor" as atek.data_loaders.sam2_model_adaptor {
+}
+package "atek.data_loaders.test" as atek.data_loaders.test {
+}
+package "atek.data_loaders.test.atek_wds_dataloader_test" as atek.data_loaders.test.atek_wds_dataloader_test {
+}
+package "atek.data_preprocess" as atek.data_preprocess {
+}
+package "atek.data_preprocess.atek_data_sample" as atek.data_preprocess.atek_data_sample {
+}
+package "atek.data_preprocess.atek_wds_writer" as atek.data_preprocess.atek_wds_writer {
+}
+package "atek.data_preprocess.genera_atek_preprocessor_factory" as atek.data_preprocess.genera_atek_preprocessor_factory {
+}
+package "atek.data_preprocess.general_atek_preprocessor" as atek.data_preprocess.general_atek_preprocessor {
+}
+package "atek.data_preprocess.processors" as atek.data_preprocess.processors {
+}
+package "atek.data_preprocess.processors.aria_camera_processor" as atek.data_preprocess.processors.aria_camera_processor {
+}
+package "atek.data_preprocess.processors.depth_image_processor" as atek.data_preprocess.processors.depth_image_processor {
+}
+package "atek.data_preprocess.processors.efm_gt_processor" as atek.data_preprocess.processors.efm_gt_processor {
+}
+package "atek.data_preprocess.processors.mps_online_calib_processor" as atek.data_preprocess.processors.mps_online_calib_processor {
+}
+package "atek.data_preprocess.processors.mps_semidense_processor" as atek.data_preprocess.processors.mps_semidense_processor {
+}
+package "atek.data_preprocess.processors.mps_traj_processor" as atek.data_preprocess.processors.mps_traj_processor {
+}
+package "atek.data_preprocess.processors.obb2_gt_processor" as atek.data_preprocess.processors.obb2_gt_processor {
+}
+package "atek.data_preprocess.processors.obb3_gt_processor" as atek.data_preprocess.processors.obb3_gt_processor {
+}
+package "atek.data_preprocess.sample_builders" as atek.data_preprocess.sample_builders {
+}
+package "atek.data_preprocess.sample_builders.atek_data_paths_provider" as atek.data_preprocess.sample_builders.atek_data_paths_provider {
+}
+package "atek.data_preprocess.sample_builders.efm_sample_builder" as atek.data_preprocess.sample_builders.efm_sample_builder {
+}
+package "atek.data_preprocess.sample_builders.obb_sample_builder" as atek.data_preprocess.sample_builders.obb_sample_builder {
+}
+package "atek.data_preprocess.subsampling_lib" as atek.data_preprocess.subsampling_lib {
+}
+package "atek.data_preprocess.subsampling_lib.temporal_subsampler" as atek.data_preprocess.subsampling_lib.temporal_subsampler {
+}
+package "atek.data_preprocess.test" as atek.data_preprocess.test {
+}
+package "atek.data_preprocess.test.aria_camera_processor_test" as atek.data_preprocess.test.aria_camera_processor_test {
+}
+package "atek.data_preprocess.test.atek_data_sample_test" as atek.data_preprocess.test.atek_data_sample_test {
+}
+package "atek.data_preprocess.test.depth_image_processor_test" as atek.data_preprocess.test.depth_image_processor_test {
+}
+package "atek.data_preprocess.test.file_io_utils_test" as atek.data_preprocess.test.file_io_utils_test {
+}
+package "atek.data_preprocess.test.mps_processor_test" as atek.data_preprocess.test.mps_processor_test {
+}
+package "atek.data_preprocess.test.obb2_gt_processor_test" as atek.data_preprocess.test.obb2_gt_processor_test {
+}
+package "atek.data_preprocess.test.obb3_gt_processor_test" as atek.data_preprocess.test.obb3_gt_processor_test {
+}
+package "atek.data_preprocess.test.obb_sample_builder_test" as atek.data_preprocess.test.obb_sample_builder_test {
+}
+package "atek.data_preprocess.util" as atek.data_preprocess.util {
+}
+package "atek.evaluation" as atek.evaluation {
+}
+package "atek.evaluation.static_object_detection" as atek.evaluation.static_object_detection {
+}
+package "atek.evaluation.static_object_detection.eval_obb3" as atek.evaluation.static_object_detection.eval_obb3 {
+}
+package "atek.evaluation.static_object_detection.eval_obb3_metrics_utils" as atek.evaluation.static_object_detection.eval_obb3_metrics_utils {
+}
+package "atek.evaluation.static_object_detection.obb3_csv_io" as atek.evaluation.static_object_detection.obb3_csv_io {
+}
+package "atek.evaluation.static_object_detection.static_object_detection_metrics" as atek.evaluation.static_object_detection.static_object_detection_metrics {
+}
+package "atek.evaluation.surface_reconstruction" as atek.evaluation.surface_reconstruction {
+}
+package "atek.evaluation.surface_reconstruction.surface_reconstruction_metrics" as atek.evaluation.surface_reconstruction.surface_reconstruction_metrics {
+}
+package "atek.evaluation.surface_reconstruction.surface_reconstruction_utils" as atek.evaluation.surface_reconstruction.surface_reconstruction_utils {
+}
+package "atek.util" as atek.util {
+}
+package "atek.util.atek_constants" as atek.util.atek_constants {
+}
+package "atek.util.camera_calib_utils" as atek.util.camera_calib_utils {
+}
+package "atek.util.file_io_utils" as atek.util.file_io_utils {
+}
+package "atek.util.tensor_utils" as atek.util.tensor_utils {
+}
+package "atek.util.viz_utils" as atek.util.viz_utils {
+}
+package "atek.viz" as atek.viz {
+}
+package "atek.viz.atek_visualizer" as atek.viz.atek_visualizer {
+}
+package "atek.viz.cubercnn_visualizer" as atek.viz.cubercnn_visualizer {
+}
+atek.data_loaders.atek_raw_dataloader_as_cubercnn --> atek.data_loaders.atek_wds_dataloader
+atek.data_loaders.atek_raw_dataloader_as_cubercnn --> atek.data_loaders.cubercnn_model_adaptor
+atek.data_loaders.atek_raw_dataloader_as_cubercnn --> atek.data_preprocess.atek_data_sample
+atek.data_loaders.atek_raw_dataloader_as_cubercnn --> atek.data_preprocess.sample_builders.obb_sample_builder
+atek.data_loaders.atek_raw_dataloader_as_cubercnn --> atek.data_preprocess.subsampling_lib.temporal_subsampler
+atek.data_loaders.atek_wds_dataloader --> atek.util.file_io_utils
+atek.data_loaders.atek_wds_dataloader --> atek.util.tensor_utils
+atek.data_loaders.cubercnn_model_adaptor --> atek.data_loaders.atek_wds_dataloader
+atek.data_loaders.cubercnn_model_adaptor --> atek.util.atek_constants
+atek.data_loaders.sam2_model_adaptor --> atek.data_loaders.atek_wds_dataloader
+atek.data_loaders.test.atek_wds_dataloader_test --> atek.data_loaders.atek_wds_dataloader
+atek.data_loaders.test.atek_wds_dataloader_test --> atek.data_preprocess.atek_wds_writer
+atek.data_loaders.test.atek_wds_dataloader_test --> atek.data_preprocess.sample_builders.obb_sample_builder
+atek.data_loaders.test.atek_wds_dataloader_test --> atek.data_preprocess.subsampling_lib.temporal_subsampler
+atek.data_loaders.test.atek_wds_dataloader_test --> atek.util.tensor_utils
+atek.data_preprocess.atek_data_sample --> atek.util.tensor_utils
+atek.data_preprocess.atek_wds_writer --> atek.data_preprocess.atek_data_sample
+atek.data_preprocess.atek_wds_writer --> atek.util.file_io_utils
+atek.data_preprocess.atek_wds_writer --> atek.util.tensor_utils
+atek.data_preprocess.genera_atek_preprocessor_factory --> atek.data_preprocess.atek_wds_writer
+atek.data_preprocess.genera_atek_preprocessor_factory --> atek.data_preprocess.general_atek_preprocessor
+atek.data_preprocess.genera_atek_preprocessor_factory --> atek.data_preprocess.sample_builders.atek_data_paths_provider
+atek.data_preprocess.genera_atek_preprocessor_factory --> atek.data_preprocess.sample_builders.efm_sample_builder
+atek.data_preprocess.genera_atek_preprocessor_factory --> atek.data_preprocess.sample_builders.obb_sample_builder
+atek.data_preprocess.genera_atek_preprocessor_factory --> atek.data_preprocess.subsampling_lib.temporal_subsampler
+atek.data_preprocess.genera_atek_preprocessor_factory --> atek.viz.atek_visualizer
+atek.data_preprocess.general_atek_preprocessor --> atek.data_preprocess.atek_data_sample
+atek.data_preprocess.general_atek_preprocessor --> atek.data_preprocess.atek_wds_writer
+atek.data_preprocess.general_atek_preprocessor --> atek.viz.atek_visualizer
+atek.data_preprocess.processors.aria_camera_processor --> atek.data_preprocess.atek_data_sample
+atek.data_preprocess.processors.aria_camera_processor --> atek.util.camera_calib_utils
+atek.data_preprocess.processors.depth_image_processor --> atek.data_preprocess.atek_data_sample
+atek.data_preprocess.processors.efm_gt_processor --> atek.data_preprocess.processors.obb3_gt_processor
+atek.data_preprocess.processors.mps_online_calib_processor --> atek.data_preprocess.atek_data_sample
+atek.data_preprocess.processors.mps_semidense_processor --> atek.data_preprocess.atek_data_sample
+atek.data_preprocess.processors.obb2_gt_processor --> atek.util.file_io_utils
+atek.data_preprocess.processors.obb3_gt_processor --> atek.util.file_io_utils
+atek.data_preprocess.sample_builders.efm_sample_builder --> atek.data_preprocess.atek_data_sample
+atek.data_preprocess.sample_builders.efm_sample_builder --> atek.data_preprocess.processors.aria_camera_processor
+atek.data_preprocess.sample_builders.efm_sample_builder --> atek.data_preprocess.processors.depth_image_processor
+atek.data_preprocess.sample_builders.efm_sample_builder --> atek.data_preprocess.processors.efm_gt_processor
+atek.data_preprocess.sample_builders.efm_sample_builder --> atek.data_preprocess.processors.mps_semidense_processor
+atek.data_preprocess.sample_builders.efm_sample_builder --> atek.data_preprocess.processors.mps_traj_processor
+atek.data_preprocess.sample_builders.obb_sample_builder --> atek.data_preprocess.atek_data_sample
+atek.data_preprocess.sample_builders.obb_sample_builder --> atek.data_preprocess.processors.aria_camera_processor
+atek.data_preprocess.sample_builders.obb_sample_builder --> atek.data_preprocess.processors.mps_traj_processor
+atek.data_preprocess.sample_builders.obb_sample_builder --> atek.data_preprocess.processors.obb2_gt_processor
+atek.data_preprocess.sample_builders.obb_sample_builder --> atek.data_preprocess.processors.obb3_gt_processor
+atek.data_preprocess.test.aria_camera_processor_test --> atek.data_preprocess.processors.aria_camera_processor
+atek.data_preprocess.test.atek_data_sample_test --> atek.data_preprocess.atek_data_sample
+atek.data_preprocess.test.depth_image_processor_test --> atek.data_preprocess.processors.aria_camera_processor
+atek.data_preprocess.test.depth_image_processor_test --> atek.data_preprocess.processors.depth_image_processor
+atek.data_preprocess.test.file_io_utils_test --> atek.util.file_io_utils
+atek.data_preprocess.test.file_io_utils_test --> atek.util.tensor_utils
+atek.data_preprocess.test.mps_processor_test --> atek.data_preprocess.processors.mps_online_calib_processor
+atek.data_preprocess.test.mps_processor_test --> atek.data_preprocess.processors.mps_semidense_processor
+atek.data_preprocess.test.mps_processor_test --> atek.data_preprocess.processors.mps_traj_processor
+atek.data_preprocess.test.obb2_gt_processor_test --> atek.data_preprocess.processors.aria_camera_processor
+atek.data_preprocess.test.obb2_gt_processor_test --> atek.data_preprocess.processors.obb2_gt_processor
+atek.data_preprocess.test.obb3_gt_processor_test --> atek.data_preprocess.processors.obb3_gt_processor
+atek.data_preprocess.test.obb_sample_builder_test --> atek.data_preprocess.processors.obb3_gt_processor
+atek.data_preprocess.test.obb_sample_builder_test --> atek.data_preprocess.sample_builders.obb_sample_builder
+atek.evaluation.static_object_detection.eval_obb3 --> atek.evaluation.static_object_detection.eval_obb3_metrics_utils
+atek.evaluation.static_object_detection.eval_obb3 --> atek.evaluation.static_object_detection.obb3_csv_io
+atek.evaluation.static_object_detection.eval_obb3 --> atek.evaluation.static_object_detection.static_object_detection_metrics
+atek.evaluation.static_object_detection.eval_obb3 --> atek.util.atek_constants
+atek.evaluation.static_object_detection.eval_obb3 --> atek.util.tensor_utils
+atek.evaluation.static_object_detection.obb3_csv_io --> atek.data_loaders.cubercnn_model_adaptor
+atek.evaluation.static_object_detection.obb3_csv_io --> atek.util.tensor_utils
+atek.evaluation.static_object_detection.static_object_detection_metrics --> atek.evaluation.static_object_detection.eval_obb3_metrics_utils
+atek.evaluation.surface_reconstruction.surface_reconstruction_metrics --> atek.evaluation.surface_reconstruction.surface_reconstruction_utils
+atek.util.viz_utils --> atek.util.tensor_utils
+atek.viz.atek_visualizer --> atek.data_preprocess.atek_data_sample
+atek.viz.atek_visualizer --> atek.util.tensor_utils
+atek.viz.atek_visualizer --> atek.util.viz_utils
+atek.viz.cubercnn_visualizer --> atek.data_loaders.cubercnn_model_adaptor
+atek.viz.cubercnn_visualizer --> atek.util.tensor_utils
+atek.viz.cubercnn_visualizer --> atek.viz.atek_visualizer
+@enduml

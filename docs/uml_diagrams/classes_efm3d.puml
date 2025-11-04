@@ -1,0 +1,825 @@
+@startuml classes_efm3d
+set namespaceSeparator none
+class "Attention" as efm3d.model.dinov2_utils.Attention {
+  attn_drop : Dropout
+  num_heads : int
+  proj : Linear
+  proj_drop : Dropout
+  qkv : Linear
+  scale
+  forward(x: Tensor) -> Tensor
+}
+class "Block" as efm3d.model.dinov2_utils.Block {
+  attn
+  drop_path1 : Identity
+  drop_path2 : Identity
+  ls1 : Identity
+  ls2 : Identity
+  mlp : Mlp
+  norm1 : LayerNorm
+  norm2 : LayerNorm
+  sample_drop_ratio : float
+  forward(x: Tensor) -> Tensor
+}
+class "BlockChunk" as efm3d.model.dinov2_utils.BlockChunk {
+  forward(x)
+}
+class "CameraTW" as efm3d.aria.camera.CameraTW {
+  C_IND
+  DIST_IND
+  EXPOSURE_S_IND : int
+  F_IND
+  GAIN_IND : int
+  K : torch.Tensor
+  K44 : torch.Tensor
+  SIZE_IND
+  T_CAM_RIG_IND
+  T_camera_rig : torch.Tensor
+  VALID_RADIUS_IND
+  c : torch.Tensor
+  dist : torch.Tensor
+  exposure_s : torch.Tensor
+  f : torch.Tensor
+  gain : torch.Tensor
+  is_fisheye624
+  is_kb3
+  is_linear
+  params : torch.Tensor
+  size : torch.Tensor
+  valid_radius : torch.Tensor
+  crop(left_top: Tuple[float], size: Tuple[int])
+  from_parameters(width: torch.Tensor, height: torch.Tensor, fx: torch.Tensor, fy: torch.Tensor, cx: torch.Tensor, cy: torch.Tensor, gain: torch.Tensor, exposure_s: torch.Tensor, valid_radiusx: torch.Tensor, valid_radiusy: torch.Tensor, T_camera_rig: Union[torch.Tensor, PoseTW], dist_params: Union[torch.Tensor, DefaultCameraTWDistParam])
+  from_surreal(width: torch.Tensor, height: torch.Tensor, type_str: str, params: Union[torch.Tensor, DefaultCameraTWParam], gain: torch.Tensor, exposure_s: torch.Tensor, valid_radius: torch.Tensor, T_camera_rig: Union[torch.Tensor, PoseTW])
+  in_image(p2d: torch.Tensor)
+  in_radius(p2d: torch.Tensor)
+  in_radius_mask()
+  project(p3d: torch.Tensor) -> Tuple[torch.Tensor]
+  rotate_90(clock_wise: bool)
+  rotate_90_ccw()
+  rotate_90_cw()
+  scale(scales: Union[float, int, Tuple[Union[float, int]]])
+  scale_to(im: torch.Tensor)
+  scale_to_size(size_wh: Union[int, Tuple[int]])
+  set_T_camera_rig(T_camera_rig: PoseTW)
+  set_valid_radius(valid_radius: torch.Tensor)
+  unproject(p2d: torch.Tensor) -> Tuple[torch.Tensor]
+}
+class "CrossAttention" as efm3d.model.dinov2_utils.CrossAttention {
+  attn_drop : Dropout
+  kv : Linear
+  num_heads : int
+  proj : Linear
+  proj_drop : Dropout
+  q : Linear
+  scale
+  forward(x_kv: Tensor, x_q: Tensor) -> Tensor
+}
+class "CrossBlock" as efm3d.model.dinov2_utils.CrossBlock {
+  attn
+  drop_path1 : Identity
+  drop_path2 : Identity
+  ls1 : Identity
+  ls2 : Identity
+  mlp : Mlp
+  norm1_kv : LayerNorm
+  norm1_q : LayerNorm
+  norm2 : LayerNorm
+  sample_drop_ratio : float
+  forward(x_kv: Tensor, x_q: Tensor) -> Tensor
+}
+class "DINOHead" as efm3d.model.dinov2_utils.DINOHead {
+  last_layer : Linear
+  mlp : Linear, Sequential
+  forward(x)
+}
+class "DPTOri" as efm3d.model.dpt.DPTOri {
+  conv_0 : Conv2d
+  conv_1 : Conv2d
+  conv_2 : Conv2d
+  conv_3 : Conv2d
+  conv_final : Conv2d
+  conv_up1 : Conv2d
+  depth : bool
+  depth_head : Sequential
+  ref_0
+  ref_1
+  ref_2
+  ref_3
+  relu : ReLU
+  resample_conv0 : ConvTranspose2d
+  resample_conv1 : ConvTranspose2d
+  resample_conv2 : Conv2d
+  resample_conv3 : Conv2d
+  forward(feats)
+}
+class "DefaultCameraTWData" as efm3d.aria.camera.DefaultCameraTWData {
+  shape
+}
+class "DefaultCameraTWDistParam" as efm3d.aria.camera.DefaultCameraTWDistParam {
+  shape
+}
+class "DefaultCameraTWParam" as efm3d.aria.camera.DefaultCameraTWParam {
+  shape
+}
+class "DinoV2Wrapper" as efm3d.model.dinov2_utils.DinoV2Wrapper {
+  feat_dim : int
+  forward_fn
+  img_size : Optional[Union[int, Tuple[int, int]]]
+  model
+  normalize_fn : Normalize
+  patch_size : int
+  forward(img)
+}
+class "DinoVisionTransformer" as efm3d.model.dinov2_utils.DinoVisionTransformer {
+  blocks : ModuleList
+  chunked_blocks : bool
+  cls_token : Parameter
+  embed_dim : int
+  head : Identity
+  interpolate_antialias : bool
+  interpolate_offset : float
+  mask_token : Parameter
+  n_blocks : int
+  norm
+  num_features : int
+  num_heads : int
+  num_register_tokens : int
+  num_tokens : int
+  patch_embed
+  patch_size : int
+  pos_embed : Parameter
+  register_tokens : NoneType
+  forward()
+  forward_features(x, masks)
+  forward_features_list(x_list, masks_list)
+  forward_features_multi(x, masks)
+  get_intermediate_layers(x: torch.Tensor, n: Union[int, Sequence], reshape: bool, return_class_token: bool, norm) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor]]]
+  init_weights()
+  interpolate_pos_encoding(x, w, h)
+  prepare_tokens_with_masks(x, masks)
+}
+class "DropPath" as efm3d.model.dinov2_utils.DropPath {
+  drop_prob : NoneType
+  forward(x)
+}
+class "EVL" as efm3d.model.evl.EVL {
+  backbone2d : NoneType, Union[VideoBackbone, DictConfig]
+  backbone3d : NoneType, Union[VideoBackbone3d, DictConfig]
+  bbox_head
+  bbox_max : float
+  bbox_min : float
+  cent_head
+  clas_head
+  det_thresh : float
+  head_layers : int
+  iou_thres : float
+  neck
+  num_class
+  occ_head
+  offset_max
+  scene : NoneType
+  sem2name
+  splat_sigma
+  ve
+  yaw_max : float
+  forward(batch)
+  post_process(batch, out)
+}
+class "EVLTrain" as efm3d.model.evl_train.EVLTrain {
+  bbox_weight : float
+  cent_weight : float
+  cham_weight : float
+  clas_weight : float
+  iou_weight : float
+  metrics : dict
+  occ_weight : float
+  scene
+  tv_weight : float
+  compute_losses(outputs, batch)
+  compute_metrics()
+  get_log_images(batch, outputs)
+  log_single(batch, outputs, batch_idx)
+  log_single_obb(batch, outputs, batch_idx)
+  render2d(imgs, obbs, Ts_wr, cams)
+  render3d_mesh(voxel_vals, Ts_wr, T_ws, cams, voxel_obb, view, alpha_min, T_wv, voxel_mask, volume_feat)
+  render3d_obb(voxel_vals, obb, Ts_wr, T_ws, cams, voxel_w, voxel_obb, view, alpha_min)
+  render3d_occ(voxel_vals, Ts_wr, T_ws, cams, voxel_w, voxel_obb, view, alpha_min, voxel_mask)
+  render3d_points(p3s_w, Ts_wr, T_ws, cams, voxel_obb, view, values, alpha_min, mask, more_p3s_w, more2_p3s_w)
+  reset_metrics()
+  update_metrics(outputs, batch)
+}
+class "EfmInference" as efm3d.inference.model.EfmInference {
+  Ts_wv : list
+  device
+  gt_obb_csv_path
+  gt_obb_writer : NoneType
+  metadata_saved : bool
+  model
+  obb_csv_path
+  obb_writer : NoneType
+  output_dir
+  per_snip_dir
+  scene_gt_obbs_w : list
+  streamer
+  zip
+  run()
+  save_output(data, idx, output_dir)
+  save_tensor(tensor, key, idx, output_dir)
+}
+class "FeatureFusionBlock" as efm3d.model.dpt.FeatureFusionBlock {
+  resConfUnit1
+  resConfUnit2
+  with_skip : bool
+  forward(x, skip_x)
+}
+class "FeatureFusionBlock3d" as efm3d.model.cnn.FeatureFusionBlock3d {
+  resConfUnit1
+  resConfUnit2
+  with_skip : bool
+  forward(x, skip_x)
+}
+class "FpnUpConv3d" as efm3d.model.cnn.FpnUpConv3d {
+  cnn_lat : Conv3d
+  cnn_up : Conv3d
+  dim_in
+  dim_out
+  norm : BatchNorm3d
+  upsample : Upsample
+  forward(x_up, x_lat)
+}
+class "GELU" as efm3d.model.cnn.GELU {
+  forward(x)
+}
+class "HungarianMatcher2d3d" as efm3d.utils.obb_matchers.HungarianMatcher2d3d {
+  cost_bbox2 : float
+  cost_bbox3 : float
+  cost_class : float
+  cost_giou2 : float
+  cost_iou3 : float
+  forward(pred_logits, pred_bb2s, pred_center_world, pred_bb3s, tgt_labels, tgt_bb2s, tgt_center_world, tgt_bb3s, logits_is_prob: bool)
+  forward_obbs(prd: ObbTW, tgt: ObbTW, prd_logits, logits_is_prob: bool)
+}
+class "ImageToDinoV2Tokens" as efm3d.model.image_tokenizer.ImageToDinoV2Tokens {
+  dim_out : int
+  freeze : bool
+  handle_rotated_data : bool
+  lin : Linear, NoneType
+  model
+  out_patch_size : int
+  feat_dim()
+  forward(img: torch.Tensor) -> torch.Tensor
+  forward_resize(img: torch.Tensor) -> torch.Tensor
+  patch_size()
+  post_process(feats, B, T, out_size)
+}
+class "Interpolate" as efm3d.model.dpt.Interpolate {
+  align_corners : bool
+  interp
+  mode
+  scale_factor
+  forward(x)
+}
+class "InvBottleNeck3d" as efm3d.model.cnn.InvBottleNeck3d {
+  cnn1 : Conv3d
+  cnn2 : Conv3d
+  cnn3 : Conv3d
+  dim_hidden : int
+  dim_in
+  dim_out
+  norm : BatchNorm3d
+  relu : ReLU
+  stride : int
+  forward(x)
+}
+class "InvResnetBlock3d" as efm3d.model.cnn.InvResnetBlock3d {
+  inv_bottles : ModuleList
+  num_bottles
+  forward(x)
+}
+class "InvResnetFpn3d" as efm3d.model.cnn.InvResnetFpn3d {
+  block1
+  block2
+  block3
+  block4
+  fpn1
+  fpn2
+  fpn3
+  forward(x)
+}
+class "IouOutputs" as efm3d.utils.obb_utils.IouOutputs {
+  iou : Tensor
+  vol : Tensor
+}
+class "LayerNorm2d" as efm3d.model.cnn.LayerNorm2d {
+  forward(x: torch.Tensor) -> torch.Tensor
+}
+class "LayerNorm3d" as efm3d.model.cnn.LayerNorm3d {
+  forward(x: torch.Tensor) -> torch.Tensor
+}
+class "LayerScale" as efm3d.model.dinov2_utils.LayerScale {
+  gamma : Parameter
+  inplace : bool
+  forward(x: Tensor) -> Tensor
+}
+class "Lifter" as efm3d.model.lifter.Lifter {
+  head : NoneType
+  joint_slam_streams
+  joint_streams : bool
+  num_free_samples : int
+  out_dim
+  stream2id : dict
+  streams : Optional[List[str]], list
+  voxel_extent : list
+  voxel_meters
+  voxel_size : List[float]
+  aggregate(vox_feats, vox_valid)
+  forward(batch)
+  get_freespace_counts(batch, T_wv, vW, vH, vD, MAX_NUM_POINTS_VOXEL, return_mask)
+  get_freespace_world(batch, batch_idx, T_wv, vW, vH, vD, S)
+  get_points_counts(batch, T_wv, vW, vH, vD, MAX_NUM_POINTS_VOXEL, return_mask, keep_T)
+  get_points_world(batch, batch_idx, keep_T)
+  get_voxelgrid_pose(cams, T_ws, Ts_sr)
+  lift(feats2d, vox_w, cam, Ts_wr, vD, vH, vW)
+  lift_aggregate_centers(batch, feats2d, vox_w, Ts_wr, T_wv)
+  output_dim()
+}
+class "MAPMetricResults3D" as efm3d.utils.obb_utils.MAPMetricResults3D {
+  map
+  map_25
+  map_50
+  map_large
+  map_medium
+  map_small
+}
+class "MeanAveragePrecision3D" as efm3d.utils.obb_utils.MeanAveragePrecision3D {
+  bbox_area_ranges : Optional[Dict[str, Tuple[float, float]]], dict
+  box_format : str
+  class_metrics : bool
+  eval_imgs : NoneType
+  max_detection_thresholds
+  ret_all_prec_rec : bool
+  compute(sem_id_to_name_mapping: Optional[Dict[int, str]]) -> dict
+  update(preds: List[Dict[str, Tensor]], target: List[Dict[str, Tensor]]) -> None
+}
+class "MemEffAttention" as efm3d.model.dinov2_utils.MemEffAttention {
+  forward(x: Tensor, attn_bias) -> Tensor
+}
+class "MemEffCrossAttention" as efm3d.model.dinov2_utils.MemEffCrossAttention {
+  forward(x_kv: Tensor, x_q: Tensor, attn_bias) -> Tensor
+}
+class "Mlp" as efm3d.model.dinov2_utils.Mlp {
+  act : GELU
+  drop : Dropout
+  fc1 : Linear
+  fc2 : Linear
+  forward(x: Tensor) -> Tensor
+}
+class "NestedTensorBlock" as efm3d.model.dinov2_utils.NestedTensorBlock {
+  forward(x_or_x_list)
+  forward_nested(x_list: List[Tensor]) -> List[Tensor]
+}
+class "ObbCsvReader" as efm3d.utils.obb_csv_writer.ObbCsvReader {
+  all_obbs : NoneType, dict
+  csv_reader : DictReader
+  file_name
+  file_reader
+  next_row : NoneType
+  obbs
+  sem_ids_to_names : dict
+  parse_row(row)
+}
+class "ObbCsvWriter" as efm3d.utils.obb_csv_writer.ObbCsvWriter {
+  file_name : str
+  file_writer
+  num_cols
+  rows : list
+  flush()
+  write(obb_padded: ObbTW, timestamps_ns: int, sem_id_to_name: Optional[Dict[int, str]], flush_at_end: bool)
+  write_rows()
+}
+class "ObbMetrics" as efm3d.utils.obb_metrics.ObbMetrics {
+  cam_id_to_name
+  cam_ids : list
+  cam_names : list
+  eval_2d : bool
+  eval_3d : bool
+  ignore_bb2d_visibility : bool
+  metric_2d : ModuleDict
+  metric_3d : ModuleDict
+  sem_id_to_name : NoneType
+  compute()
+  forward(prediction: ObbTW, target: ObbTW)
+  reset()
+  update(prediction: ObbTW, target: ObbTW, cam: Optional[CameraTW])
+  update_2d(pred_bb2: torch.Tensor, pred_scores: torch.Tensor, pred_labels: torch.Tensor, tgt_bb2: torch.Tensor, tgt_labels: torch.Tensor, cam_id: int)
+  update_2d_instances(preds, tgts, cam_id: int)
+  update_3d(pred_bb3corners: torch.Tensor, pred_scores: torch.Tensor, pred_labels: torch.Tensor, tgt_bb3corners: torch.Tensor, tgt_labels: torch.Tensor, cam_id: int)
+}
+class "ObbTW" as efm3d.aria.obb.ObbTW {
+  T_world_object : torch.Tensor
+  bb2_rgb : torch.Tensor
+  bb2_slaml : torch.Tensor
+  bb2_slamr : torch.Tensor
+  bb3_center_object : torch.Tensor
+  bb3_center_world : torch.Tensor
+  bb3_diagonal : torch.Tensor
+  bb3_max_object : torch.Tensor
+  bb3_min_object : torch.Tensor
+  bb3_object : torch.Tensor
+  bb3_volumes : torch.Tensor
+  bb3corners_object : torch.Tensor
+  bb3corners_world : torch.Tensor
+  inst_id : torch.Tensor
+  moveable : torch.Tensor
+  prob : torch.Tensor
+  sem_id : torch.Tensor
+  add_padding(max_elts: int) -> 'ObbTW'
+  batch_points_inside_bb3(pts_world: torch.Tensor) -> torch.Tensor
+  bb2(cam_id) -> torch.Tensor
+  bb3edge_pts_object(num_samples_per_edge: int) -> torch.Tensor
+  center()
+  crop_bb2(left_top_rgb: Tuple[float], left_top_slam: Tuple[float])
+  filter_bb2_center_by_radius(calib, cam_id)
+  filter_by_prob(prob_thr: float)
+  filter_by_sem_id(keep_sem_ids)
+  from_lmc(bb3_object: torch.Tensor, bb2_rgb: torch.Tensor, bb2_slaml: torch.Tensor, bb2_slamr: torch.Tensor, T_world_object: Union[torch.Tensor, PoseTW], sem_id: torch.Tensor, inst_id: torch.Tensor, prob: torch.Tensor, moveable: torch.Tensor)
+  get_bb2_areas(cam_id)
+  get_bb2_centers(cam_id)
+  get_bb2_heights(cam_id)
+  get_bb2_widths(cam_id)
+  get_padding_mask() -> torch.Tensor
+  get_pseudo_bb2(cam: CameraTW, T_world_rig: PoseTW, num_samples_per_edge: int, return_frac_valids: bool)
+  num_valid() -> int
+  points_inside_bb3(pts_world: torch.Tensor, scale_obb: float) -> torch.Tensor
+  rectify_obb2(fisheye_cams: List[CameraTW], pinhole_cams: List[CameraTW])
+  remove_padding() -> List['ObbTW']
+  rotate_bb2_cw(image_sizes: List[Tuple[int]])
+  scale_bb2(scale_rgb: float, scale_slam: float)
+  set_T_world_object(T_world_object: PoseTW)
+  set_bb2(cam_id, bb2d, use_mask)
+  set_bb3_object(bb3_object, use_mask) -> torch.Tensor
+  set_inst_id(inst_id: torch.Tensor)
+  set_prob(prob, use_mask)
+  set_sem_id(sem_id: torch.Tensor)
+  transform(T_new_world)
+  visible_bb3_ind(cam_id) -> torch.Tensor
+  voxel_grid(vD: int, vH: int, vW: int)
+}
+class "ObbTracker" as efm3d.utils.obb_trackers.ObbTracker {
+  R90s
+  counts_as_prob : bool
+  device : device
+  dt_max_inst : float
+  dt_max_occ : float
+  hz : float
+  last_obs_time : NoneType
+  last_possible_obs_time : NoneType
+  matcher
+  max_assoc_dist : float
+  max_assoc_iou2 : float
+  max_assoc_iou3 : float
+  nms_iou2_thr : float
+  nms_iou3_max_thr : float
+  nms_iou3_thr : float
+  num_instances_so_far : int
+  num_semcls : int
+  obbs_world
+  prob_assoc_thr : float
+  prob_inst_thr : float
+  scene_obbs_w : NoneType
+  scene_probs_full : NoneType
+  time : int
+  track_best : bool
+  track_running_average : bool
+  w : NoneType
+  w_max : int
+  w_min : int
+  add_new_obbs(new_obbs, new_probs_full)
+  nms_2d(obbs)
+  nms_3d(obbs)
+  reset()
+  set_2d_bbs(obbs_w: ObbTW, cam: CameraTW, T_world_rig: PoseTW)
+  set_hz(hz: float)
+  track(obbs_w: ObbTW, probs_full: Optional[torch.Tensor], cam: Optional[CameraTW], T_world_rig: Optional[PoseTW])
+  update_last_obs_time(cam, T_world_rig)
+}
+class "PatchEmbed" as efm3d.model.dinov2_utils.PatchEmbed {
+  embed_dim : int
+  flatten_embedding : bool
+  img_size : int, tuple
+  in_chans : int
+  norm : Identity
+  num_patches
+  patch_size : int, tuple
+  patches_resolution : tuple
+  proj : Conv2d
+  flops() -> float
+  forward(x: Tensor) -> Tensor
+}
+class "PoseTW" as efm3d.aria.pose.PoseTW {
+  R : torch.Tensor
+  matrix : torch.Tensor
+  matrix3x4 : torch.Tensor
+  q : torch.Tensor
+  q_xyzw : torch.Tensor
+  t : torch.Tensor
+  align(other, self_times, other_times)
+  batch_transform(p3d: torch.Tensor) -> torch.Tensor
+  compose(other: 'PoseTW') -> 'PoseTW'
+  exp(u_omega: torch.Tensor, eps: float)
+  fit_to_SO3()
+  from_Rt(R: torch.Tensor, t: torch.Tensor)
+  from_aa(aa: torch.Tensor, t: torch.Tensor)
+  from_matrix(T: torch.Tensor)
+  from_matrix3x4(T_3x4: torch.Tensor)
+  from_qt(quaternion_wxyz: torch.Tensor, t: torch.Tensor)
+  interpolate(times: torch.Tensor, interp_times: torch.Tensor)
+  inverse() -> 'PoseTW'
+  log(eps: float) -> torch.Tensor
+  magnitude(deg, eps) -> Tuple[torch.Tensor]
+  numpy() -> Tuple[np.ndarray]
+  rotate(p3d: torch.Tensor) -> torch.Tensor
+  so3_geodesic(other: 'PoseTW', deg) -> 'PoseTW'
+  to_euler(rad) -> torch.Tensor
+  to_ypr(rad) -> torch.Tensor
+  transform(p3d: torch.Tensor) -> torch.Tensor
+}
+class "ResidualConvUnit" as efm3d.model.dpt.ResidualConvUnit {
+  conv : Sequential
+  forward(x)
+}
+class "ResidualConvUnit3d" as efm3d.model.cnn.ResidualConvUnit3d {
+  conv : Sequential
+  forward(x)
+}
+class "RotatedIoU3DLoss" as efm3d.thirdparty.mmdetection3d.iou3d.RotatedIoU3DLoss {
+  loss_weight : float
+  forward(pred, target)
+}
+class "SceneView" as efm3d.utils.viz.SceneView {
+  P : ndarray
+  bg_color : Tuple[float, float, float]
+  ctx : Context, NoneType
+  f
+  fbo1 : Framebuffer
+  fbo2 : Framebuffer
+  height : int
+  prog : Program
+  prog_mesh : Program
+  prog_mesh_rgb : Program
+  prog_rgb_point_cloud : Program
+  prog_scalar_field : Program
+  width : int
+  z_far : float
+  z_near : float
+  clear(bg_color: Optional[Tuple[float, float, float]])
+  finish()
+  set_birds_eye_view(T_world_camera: PoseTW, zoom_factor: float)
+  set_birds_eye_view_from_bb(bb_scene_xyzxyz: torch.Tensor, zoom_factor: float)
+  set_default_view(T_world_camera: PoseTW, zoom_factor: float)
+  set_follow_view(T_world_camera: PoseTW, zoom_factor: float)
+  set_side_view(T_world_camera: PoseTW, zoom_factor: float)
+  set_view(mv: Union[PoseTW, np.array])
+  valid()
+}
+class "SortVertices" as efm3d.thirdparty.mmdetection3d.iou3d.SortVertices {
+  backward(ctx, gradout)
+  forward(ctx, vertices, mask, num_valid)
+}
+class "SwiGLUFFN" as efm3d.model.dinov2_utils.SwiGLUFFN {
+  w12 : Linear
+  w3 : Linear
+  forward(x: Tensor) -> Tensor
+}
+class "SwiGLUFFNFused" as efm3d.model.dinov2_utils.SwiGLUFFNFused {
+}
+class "TensorWrapper" as efm3d.aria.tensor_wrapper.TensorWrapper {
+  collate_fn
+  device
+  dtype
+  grad
+  grad_fn
+  is_contiguous
+  is_cuda
+  ndim
+  requires_grad
+  shape
+  allclose(input: torch.Tensor, other: torch.Tensor, rtol, atol, equal_nan)
+  cat(objects: List, dim)
+  clone()
+  contiguous()
+  cpu()
+  cuda(gpu_id)
+  detach()
+  dim()
+  double()
+  expand()
+  flatten(obj, start_dim, end_dim)
+  float()
+  nelement()
+  numel()
+  numpy()
+  pin_memory()
+  repeat()
+  requires_grad_(requires_grad: bool)
+  reshape()
+  squeeze(dim)
+  stack(objects: List, dim)
+  take_along_dim(obj, indices, dim)
+  tensor()
+  to()
+  tolist()
+  unsqueeze(dim)
+  view()
+}
+class "UpConv3d" as efm3d.model.cnn.UpConv3d {
+  cnn_up : Conv3d
+  dim_in
+  dim_out
+  norm : BatchNorm3d
+  upsample : Upsample
+  forward(x_up)
+}
+class "UpsampleCNN" as efm3d.model.cnn.UpsampleCNN {
+  bn1 : BatchNorm2d
+  bn1u : BatchNorm2d
+  bn2u : BatchNorm2d
+  bn3u : BatchNorm2d
+  bn4u : BatchNorm2d
+  conv1 : Conv2d
+  conv1u : Conv2d
+  conv2u : Conv2d
+  conv3u : Conv2d
+  conv4u : Conv2d
+  conv_final : Conv2d
+  relu : ReLU
+  upsample : Upsample
+  upsample_power : int
+  forward(x, force_hw)
+}
+class "VideoBackbone" as efm3d.model.video_backbone.VideoBackbone {
+  ensure_rgb : bool
+  feat_dim
+  pass_batch : bool
+  patch_size
+  stream_to_id : dict
+  video_streams : Optional[List[str]], list
+  vignette_correction : ModuleDict, dict
+  forward(batch)
+  {abstract}forward_impl(img, stream) -> Dict[str, torch.Tensor]
+}
+class "VideoBackbone3d" as efm3d.model.lifter.VideoBackbone3d {
+  feat_dim
+  forward(batch)
+  {abstract}forward_impl(batch)
+}
+class "VideoBackboneDinov2" as efm3d.model.video_backbone.VideoBackboneDinov2 {
+  feat_dim
+  image_tokenizer : DictConfig, NoneType
+  patch_size
+  forward_impl(img, stream)
+}
+class "VolumeCNN" as efm3d.model.cnn.VolumeCNN {
+  bn1 : BatchNorm3d
+  bn1u : BatchNorm3d
+  bn2 : BatchNorm3d
+  bn2u : BatchNorm3d
+  bn3 : BatchNorm3d
+  conv1 : Conv3d
+  conv1u : Conv3d
+  conv2 : Conv3d
+  conv2u : Conv3d
+  conv3 : Conv3d
+  out_dim
+  pool : MaxPool3d
+  relu : ReLU
+  upsample : Upsample
+  forward(x)
+}
+class "VolumeCNNHead" as efm3d.model.cnn.VolumeCNNHead {
+  bn1 : BatchNorm3d
+  bn2 : BatchNorm3d
+  bn3 : BatchNorm3d
+  conv1 : Conv3d
+  conv2 : Conv3d
+  conv3 : Conv3d
+  conv4 : Conv3d
+  num_layers : int
+  relu : ReLU
+  forward(x)
+}
+class "VolumeFusion" as efm3d.inference.fuse.VolumeFusion {
+  boundary_thres : int
+  device : str
+  global_volume
+  global_volume_points
+  global_volume_weights
+  surface_thres : float
+  vD : int
+  vH : int
+  vW : int
+  voxel_extent : List[float]
+  voxel_size : List[float]
+  w_max : float
+  w_min : float
+  fuse(local_volume: torch.Tensor, local_extent: List[float], T_l_w: PoseTW, new_obs_w, visiblity_mask)
+  get_mask(reshape)
+  get_trimesh(iso_level)
+  get_volume(reshape)
+  get_weights(reshape)
+  set_boundary_mask(mask)
+}
+class "VolumeResnet" as efm3d.model.cnn.VolumeResnet {
+  bn1 : BatchNorm3d
+  bn1u : BatchNorm3d
+  bn2 : BatchNorm3d
+  bn2u : BatchNorm3d
+  bn3 : BatchNorm3d
+  conv1 : Conv3d
+  conv1u : Conv3d
+  conv2 : Conv3d
+  conv2u : Conv3d
+  conv3 : Conv3d
+  out_dim
+  pool : MaxPool3d
+  relu : ReLU
+  resconv1
+  resconv2
+  resconv3
+  upsample : Upsample
+  forward(x)
+}
+class "VolumetricFusion" as efm3d.inference.fuse.VolumetricFusion {
+  Ts_wv : RecursiveScriptModule
+  boundary_thresh : int
+  device : str
+  f_occ_preds
+  global_vol : NoneType
+  input_folder
+  local_extent : RecursiveScriptModule
+  per_snip_folder
+  vis_norm_grad_occ_thr : float
+  vol_max
+  vol_min
+  voxel_res : float
+  w_max : float
+  w_min : float
+  get_trimesh()
+  init_from_range(xyz_min, xyz_max)
+  reinit()
+  run()
+  run_step(i)
+}
+efm3d.aria.camera.CameraTW --|> efm3d.aria.tensor_wrapper.TensorWrapper
+efm3d.aria.camera.DefaultCameraTWData --|> efm3d.aria.tensor_wrapper.TensorWrapper
+efm3d.aria.camera.DefaultCameraTWDistParam --|> efm3d.aria.tensor_wrapper.TensorWrapper
+efm3d.aria.camera.DefaultCameraTWParam --|> efm3d.aria.tensor_wrapper.TensorWrapper
+efm3d.aria.obb.ObbTW --|> efm3d.aria.tensor_wrapper.TensorWrapper
+efm3d.aria.pose.PoseTW --|> efm3d.aria.tensor_wrapper.TensorWrapper
+efm3d.model.dinov2_utils.MemEffAttention --|> efm3d.model.dinov2_utils.Attention
+efm3d.model.dinov2_utils.MemEffCrossAttention --|> efm3d.model.dinov2_utils.CrossAttention
+efm3d.model.dinov2_utils.NestedTensorBlock --|> efm3d.model.dinov2_utils.Block
+efm3d.model.dinov2_utils.SwiGLUFFNFused --|> efm3d.model.dinov2_utils.SwiGLUFFN
+efm3d.model.evl_train.EVLTrain --|> efm3d.model.evl.EVL
+efm3d.model.lifter.Lifter --|> efm3d.model.lifter.VideoBackbone3d
+efm3d.model.video_backbone.VideoBackboneDinov2 --|> efm3d.model.video_backbone.VideoBackbone
+efm3d.model.dinov2_utils.Block --> efm3d.model.dinov2_utils.DropPath : drop_path1
+efm3d.model.dinov2_utils.Block --> efm3d.model.dinov2_utils.DropPath : drop_path2
+efm3d.model.dinov2_utils.CrossBlock --> efm3d.model.dinov2_utils.DropPath : drop_path1
+efm3d.model.dinov2_utils.CrossBlock --> efm3d.model.dinov2_utils.DropPath : drop_path2
+efm3d.inference.fuse.VolumeFusion --* efm3d.inference.fuse.VolumetricFusion : global_vol
+efm3d.model.cnn.FpnUpConv3d --* efm3d.model.cnn.InvResnetFpn3d : fpn1
+efm3d.model.cnn.FpnUpConv3d --* efm3d.model.cnn.InvResnetFpn3d : fpn2
+efm3d.model.cnn.FpnUpConv3d --* efm3d.model.cnn.InvResnetFpn3d : fpn3
+efm3d.model.cnn.InvResnetBlock3d --* efm3d.model.cnn.InvResnetFpn3d : block1
+efm3d.model.cnn.InvResnetBlock3d --* efm3d.model.cnn.InvResnetFpn3d : block2
+efm3d.model.cnn.InvResnetBlock3d --* efm3d.model.cnn.InvResnetFpn3d : block3
+efm3d.model.cnn.InvResnetBlock3d --* efm3d.model.cnn.InvResnetFpn3d : block4
+efm3d.model.cnn.InvResnetFpn3d --* efm3d.model.evl.EVL : neck
+efm3d.model.cnn.ResidualConvUnit3d --* efm3d.model.cnn.FeatureFusionBlock3d : resConfUnit1
+efm3d.model.cnn.ResidualConvUnit3d --* efm3d.model.cnn.FeatureFusionBlock3d : resConfUnit2
+efm3d.model.cnn.ResidualConvUnit3d --* efm3d.model.cnn.VolumeResnet : resconv1
+efm3d.model.cnn.ResidualConvUnit3d --* efm3d.model.cnn.VolumeResnet : resconv2
+efm3d.model.cnn.ResidualConvUnit3d --* efm3d.model.cnn.VolumeResnet : resconv3
+efm3d.model.cnn.UpsampleCNN --* efm3d.model.lifter.Lifter : head
+efm3d.model.cnn.VolumeCNNHead --* efm3d.model.evl.EVL : occ_head
+efm3d.model.cnn.VolumeCNNHead --* efm3d.model.evl.EVL : cent_head
+efm3d.model.cnn.VolumeCNNHead --* efm3d.model.evl.EVL : bbox_head
+efm3d.model.cnn.VolumeCNNHead --* efm3d.model.evl.EVL : clas_head
+efm3d.model.dinov2_utils.Attention --* efm3d.model.dinov2_utils.Block : attn
+efm3d.model.dinov2_utils.Attention --* efm3d.model.dinov2_utils.CrossBlock : attn
+efm3d.model.dinov2_utils.DinoV2Wrapper --* efm3d.model.image_tokenizer.ImageToDinoV2Tokens : model
+efm3d.model.dinov2_utils.PatchEmbed --* efm3d.model.dinov2_utils.DinoVisionTransformer : patch_embed
+efm3d.model.dpt.DPTOri --* efm3d.model.lifter.Lifter : head
+efm3d.model.dpt.FeatureFusionBlock --* efm3d.model.dpt.DPTOri : ref_0
+efm3d.model.dpt.FeatureFusionBlock --* efm3d.model.dpt.DPTOri : ref_1
+efm3d.model.dpt.FeatureFusionBlock --* efm3d.model.dpt.DPTOri : ref_2
+efm3d.model.dpt.FeatureFusionBlock --* efm3d.model.dpt.DPTOri : ref_3
+efm3d.model.dpt.ResidualConvUnit --* efm3d.model.dpt.FeatureFusionBlock : resConfUnit1
+efm3d.model.dpt.ResidualConvUnit --* efm3d.model.dpt.FeatureFusionBlock : resConfUnit2
+efm3d.utils.obb_csv_writer.ObbCsvWriter --* efm3d.inference.model.EfmInference : obb_writer
+efm3d.utils.obb_csv_writer.ObbCsvWriter --* efm3d.inference.model.EfmInference : gt_obb_writer
+efm3d.utils.obb_matchers.HungarianMatcher2d3d --* efm3d.utils.obb_trackers.ObbTracker : matcher
+efm3d.utils.viz.SceneView --* efm3d.model.evl_train.EVLTrain : scene
+efm3d.model.dinov2_utils.DinoVisionTransformer --o efm3d.model.dinov2_utils.DinoV2Wrapper : model
+@enduml

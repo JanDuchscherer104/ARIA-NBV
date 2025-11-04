@@ -48,6 +48,8 @@ website:
             href: contents/roadmap.qmd
           - text: Research Questions
             href: contents/questions.qmd
+          - text: Findings
+            href: contents/experiments/findings.qmd
       - text: Ressources
         menu:
         - text: Resources (External Links, Repos, Docs, etc.)
@@ -90,6 +92,7 @@ website:
           - contents/impl/overview.qmd
           - contents/impl/atek_implementation.qmd
           - contents/impl/efm3d_implementation.qmd
+          - contents/impl/prj_aria_tools_impl.qmd
           - contents/impl/rri_computation.qmd
           - contents/impl/oracle_rri_impl.qmd
           - contents/impl/efm3d_symbol_index.qmd
@@ -103,3 +106,9 @@ website:
   page-footer:
     left: ""
     right: "Built with Quarto"
+
+
+# export QUARTO_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python  # put in your shell rc if you like
+
+# # 2) Install the Jupyter stack + cache into that env
+# conda install -n aria-nbv -c conda-forge jupyter-cache nbclient nbformat ipykernel jupyter

@@ -1,0 +1,131 @@
+@startuml packages_projectaria_tools
+set namespaceSeparator none
+package "projectaria_tools" as projectaria_tools {
+}
+package "projectaria_tools.core" as projectaria_tools.core {
+}
+package "projectaria_tools.core.calibration" as projectaria_tools.core.calibration {
+}
+package "projectaria_tools.core.data_provider" as projectaria_tools.core.data_provider {
+}
+package "projectaria_tools.core.gen2_mp_csv_exporter" as projectaria_tools.core.gen2_mp_csv_exporter {
+}
+package "projectaria_tools.core.image" as projectaria_tools.core.image {
+}
+package "projectaria_tools.core.mps" as projectaria_tools.core.mps {
+}
+package "projectaria_tools.core.mps.utils" as projectaria_tools.core.mps.utils {
+}
+package "projectaria_tools.core.sensor_data" as projectaria_tools.core.sensor_data {
+}
+package "projectaria_tools.core.sophus" as projectaria_tools.core.sophus {
+}
+package "projectaria_tools.core.stream_id" as projectaria_tools.core.stream_id {
+}
+package "projectaria_tools.core.vrs" as projectaria_tools.core.vrs {
+}
+package "projectaria_tools.core.xprs" as projectaria_tools.core.xprs {
+}
+package "projectaria_tools.projects" as projectaria_tools.projects {
+}
+package "projectaria_tools.projects.adt" as projectaria_tools.projects.adt {
+}
+package "projectaria_tools.projects.adt.utils" as projectaria_tools.projects.adt.utils {
+}
+package "projectaria_tools.projects.aea" as projectaria_tools.projects.aea {
+}
+package "projectaria_tools.projects.ase" as projectaria_tools.projects.ase {
+}
+package "projectaria_tools.projects.ase.interpreter" as projectaria_tools.projects.ase.interpreter {
+}
+package "projectaria_tools.projects.ase.readers" as projectaria_tools.projects.ase.readers {
+}
+package "projectaria_tools.projects.dtc_objects" as projectaria_tools.projects.dtc_objects {
+}
+package "projectaria_tools.projects.dtc_objects.downloader_lib" as projectaria_tools.projects.dtc_objects.downloader_lib {
+}
+package "projectaria_tools.projects.dtc_objects.downloader_main" as projectaria_tools.projects.dtc_objects.downloader_main {
+}
+package "projectaria_tools.tools" as projectaria_tools.tools {
+}
+package "projectaria_tools.tools.aria_rerun_viewer" as projectaria_tools.tools.aria_rerun_viewer {
+}
+package "projectaria_tools.tools.aria_rerun_viewer.aria_data_plotter" as projectaria_tools.tools.aria_rerun_viewer.aria_data_plotter {
+}
+package "projectaria_tools.tools.aria_rerun_viewer.aria_rerun_viewer" as projectaria_tools.tools.aria_rerun_viewer.aria_rerun_viewer {
+}
+package "projectaria_tools.tools.dataset_downloader" as projectaria_tools.tools.dataset_downloader {
+}
+package "projectaria_tools.tools.dataset_downloader.dataset_download_status_manager" as projectaria_tools.tools.dataset_downloader.dataset_download_status_manager {
+}
+package "projectaria_tools.tools.dataset_downloader.dataset_downloader" as projectaria_tools.tools.dataset_downloader.dataset_downloader {
+}
+package "projectaria_tools.tools.dataset_downloader.dataset_downloader_main" as projectaria_tools.tools.dataset_downloader.dataset_downloader_main {
+}
+package "projectaria_tools.tools.dataset_downloader.dataset_downloader_utils" as projectaria_tools.tools.dataset_downloader.dataset_downloader_utils {
+}
+package "projectaria_tools.tools.gen2_mp_csv_exporter" as projectaria_tools.tools.gen2_mp_csv_exporter {
+}
+package "projectaria_tools.tools.gen2_mp_csv_exporter.run_gen2_mp_csv_exporter" as projectaria_tools.tools.gen2_mp_csv_exporter.run_gen2_mp_csv_exporter {
+}
+package "projectaria_tools.tools.viewer_mps" as projectaria_tools.tools.viewer_mps {
+}
+package "projectaria_tools.tools.viewer_mps.rerun_viewer_mps" as projectaria_tools.tools.viewer_mps.rerun_viewer_mps {
+}
+package "projectaria_tools.tools.viewer_mps.viewer_mps" as projectaria_tools.tools.viewer_mps.viewer_mps {
+}
+package "projectaria_tools.tools.vrs_to_mp4" as projectaria_tools.tools.vrs_to_mp4 {
+}
+package "projectaria_tools.tools.vrs_to_mp4.vrs_to_mp4" as projectaria_tools.tools.vrs_to_mp4.vrs_to_mp4 {
+}
+package "projectaria_tools.tools.vrs_to_mp4.vrs_to_mp4_utils" as projectaria_tools.tools.vrs_to_mp4.vrs_to_mp4_utils {
+}
+package "projectaria_tools.utils" as projectaria_tools.utils {
+}
+package "projectaria_tools.utils.calibration_utils" as projectaria_tools.utils.calibration_utils {
+}
+package "projectaria_tools.utils.rerun_helpers" as projectaria_tools.utils.rerun_helpers {
+}
+projectaria_tools.projects.adt.utils --> projectaria_tools.core.calibration
+projectaria_tools.projects.adt.utils --> projectaria_tools.projects.adt
+projectaria_tools.projects.ase.readers --> projectaria_tools.core
+projectaria_tools.projects.ase.readers --> projectaria_tools.core.mps
+projectaria_tools.projects.ase.readers --> projectaria_tools.core.sophus
+projectaria_tools.projects.dtc_objects.downloader_main --> projectaria_tools.projects.dtc_objects.downloader_lib
+projectaria_tools.tools.aria_rerun_viewer.aria_data_plotter --> projectaria_tools.core.calibration
+projectaria_tools.tools.aria_rerun_viewer.aria_data_plotter --> projectaria_tools.core.mps
+projectaria_tools.tools.aria_rerun_viewer.aria_data_plotter --> projectaria_tools.core.sensor_data
+projectaria_tools.tools.aria_rerun_viewer.aria_data_plotter --> projectaria_tools.utils.rerun_helpers
+projectaria_tools.tools.aria_rerun_viewer.aria_rerun_viewer --> projectaria_tools.core.calibration
+projectaria_tools.tools.aria_rerun_viewer.aria_rerun_viewer --> projectaria_tools.core.sensor_data
+projectaria_tools.tools.aria_rerun_viewer.aria_rerun_viewer --> projectaria_tools.tools.aria_rerun_viewer.aria_data_plotter
+projectaria_tools.tools.dataset_downloader.dataset_downloader --> projectaria_tools.tools.dataset_downloader.dataset_download_status_manager
+projectaria_tools.tools.dataset_downloader.dataset_downloader --> projectaria_tools.tools.dataset_downloader.dataset_downloader_utils
+projectaria_tools.tools.dataset_downloader.dataset_downloader_main --> projectaria_tools.tools.dataset_downloader.dataset_downloader
+projectaria_tools.tools.dataset_downloader.dataset_downloader_main --> projectaria_tools.tools.dataset_downloader.dataset_downloader_utils
+projectaria_tools.tools.gen2_mp_csv_exporter.run_gen2_mp_csv_exporter --> projectaria_tools.core
+projectaria_tools.tools.gen2_mp_csv_exporter.run_gen2_mp_csv_exporter --> projectaria_tools.core.gen2_mp_csv_exporter
+projectaria_tools.tools.viewer_mps.rerun_viewer_mps --> projectaria_tools.core
+projectaria_tools.tools.viewer_mps.rerun_viewer_mps --> projectaria_tools.core.calibration
+projectaria_tools.tools.viewer_mps.rerun_viewer_mps --> projectaria_tools.core.data_provider
+projectaria_tools.tools.viewer_mps.rerun_viewer_mps --> projectaria_tools.core.mps
+projectaria_tools.tools.viewer_mps.rerun_viewer_mps --> projectaria_tools.core.mps.utils
+projectaria_tools.tools.viewer_mps.rerun_viewer_mps --> projectaria_tools.core.sensor_data
+projectaria_tools.tools.viewer_mps.rerun_viewer_mps --> projectaria_tools.core.sophus
+projectaria_tools.tools.viewer_mps.rerun_viewer_mps --> projectaria_tools.core.stream_id
+projectaria_tools.tools.viewer_mps.rerun_viewer_mps --> projectaria_tools.utils.rerun_helpers
+projectaria_tools.tools.viewer_mps.viewer_mps --> projectaria_tools.core.mps
+projectaria_tools.tools.viewer_mps.viewer_mps --> projectaria_tools.tools.viewer_mps.rerun_viewer_mps
+projectaria_tools.tools.vrs_to_mp4.vrs_to_mp4 --> projectaria_tools.tools.vrs_to_mp4.vrs_to_mp4_utils
+projectaria_tools.tools.vrs_to_mp4.vrs_to_mp4_utils --> projectaria_tools.core
+projectaria_tools.tools.vrs_to_mp4.vrs_to_mp4_utils --> projectaria_tools.core.calibration
+projectaria_tools.tools.vrs_to_mp4.vrs_to_mp4_utils --> projectaria_tools.core.data_provider
+projectaria_tools.tools.vrs_to_mp4.vrs_to_mp4_utils --> projectaria_tools.core.sensor_data
+projectaria_tools.tools.vrs_to_mp4.vrs_to_mp4_utils --> projectaria_tools.core.stream_id
+projectaria_tools.utils.calibration_utils --> projectaria_tools.core
+projectaria_tools.utils.calibration_utils --> projectaria_tools.core.calibration
+projectaria_tools.utils.rerun_helpers --> projectaria_tools.core
+projectaria_tools.utils.rerun_helpers --> projectaria_tools.core.calibration
+projectaria_tools.utils.rerun_helpers --> projectaria_tools.core.mps
+projectaria_tools.utils.rerun_helpers --> projectaria_tools.core.sophus
+@enduml

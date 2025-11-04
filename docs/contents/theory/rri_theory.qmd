@@ -4,28 +4,28 @@ title: "Relative Reconstruction Improvement (RRI) Theory"
 <!-- TODO: review, don't write in terms of CD but at first with generic distance metric -->
 The RRI metric introduced by VIN-NBV, quantifies the expected reconstruction quality gain from capturing a new viewpoint:
 
-$$\text{RRI}(\mathbf{q}) = \frac{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}}) - \text{CD}(\mathcal{P}_{t \cup \mathbf{q}}, \mathcal{M}_{\text{GT}})}{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}})}$$
+$$\text{RRI}(\mathbf{q}) = \frac{\text{d}(\mathcal{P}_t, \mathcal{M}_{\text{GT}}) - \text{d}(\mathcal{P}_{t \cup \mathbf{q}}, \mathcal{M}_{\text{GT}})}{\text{d}(\mathcal{P}_t, \mathcal{M}_{\text{GT}})}$$
 
 Where:
 
-- $\mathbf{q} \in SE(3)$: Candidate viewpoint (5DoF pose as roll typically fixed to 0°)
-- $\mathcal{P}_t$: Current reconstruction point cloud from first $t$ views
-- $\mathcal{P}_{t \cup \mathbf{q}}$: Updated reconstruction after capturing from viewpoint $\mathbf{q}$
-- $\mathcal{M}_{\text{GT}}$: Ground truth mesh (available only during training)
-- $\text{CD}(\cdot, \cdot)$: Chamfer distance (bidirectional surface similarity metric)
+- $\mathbf{q} \in SE(3)$: Candidate viewpoint (5DoF pose as roll typically fixed to 0°). Each candidate defines a frustum and a set of visible surfaces.
+- $\mathcal{P}_t$: Current reconstruction point cloud from first $t$ views.
+- $\mathcal{P}_{t \cup \mathbf{q}}$: the reconstruction after fusing the depth from view $\mathbf{q}$ into $\mathcal{P}_t$.
+- $\mathcal{M}_{\text{GT}}$: Ground truth mesh.
+- $\text{d}(\cdot, \cdot)$: a bidirectional surface similarity metric, typically Chamfer distance for PC to PC comparison, defined in [Surface Reconstruction Metrics](surface_metrics.qmd).
+
 
 **Properties**:
 
 - Range: [0, 1] where higher values indicate better viewpoints
 - Normalized by current error $\rightarrow$ limited independence on point cloud density
-- Requires ground truth RRI during training
 - Directly correlates with reconstruction quality improvement
 
 **Issues**:
 
 - Requires both PCs to follow the same sampling distribution for valid CD comparison. This is problematic, as a semi-dense point cloud is given as $\mathcal{P}_t$, while extending it with a new view $\mathbf{q}$, requires sampling points from the GT mesh visible from $\mathbf{q}$ that follows the same distribution as $\mathcal{P}_t$.
 - Sampling $\mathcal{P}_q$ as dense PC from the GT mesh visible from $\mathbf{q}$ leads to distribution mismatch with semi-dense $\mathcal{P}_t$.
-- However, we are not interested in $\text{CD}(\mathcal{P}_t, \mathcal{P}_{t \cup \mathbf{q}})$, but rather in the improvement w.r.t. the GT mesh $\mathcal{M}_{\text{GT}}$. Also, we are mostly interested in expressing the fitness of different candidate views $\mathbf{q}$, which should not be strongly affected by the exact sampling distribution of $\mathcal{P}_t$ as a dense sampling from $\mathcal{M}_{\text{GT}}$ should lead to similar relative improvements across different candidate views.
+- However, we are not interested in $\text{d}(\mathcal{P}_t, \mathcal{P}_{t \cup \mathbf{q}})$, but rather in the improvement w.r.t. the GT mesh $\mathcal{M}_{\text{GT}}$. Also, we are mostly interested in expressing the fitness of different candidate views $\mathbf{q}$, which should not be strongly affected by the exact sampling distribution of $\mathcal{P}_t$ as a dense sampling from $\mathcal{M}_{\text{GT}}$ should lead to similar relative improvements across different candidate views.
 
 For more information on surface reconstruction metrics, see [Surface Reconstruction Metrics](surface_metrics.qmd).
 
