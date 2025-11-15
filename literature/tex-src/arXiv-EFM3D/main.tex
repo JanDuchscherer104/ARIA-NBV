@@ -1,0 +1,133 @@
+%\pdfoutput=1
+% last updated in April 2002 by Antje Endemann
+% Based on CVPR 07 and LNCS, with modifications by DAF, AZ and elle, 2008 and AA, 2010, and CC, 2011; TT, 2014; AAS, 2016
+
+\documentclass[runningheads]{llncs}
+
+% ---------------------------------------------------------------
+% Include basic ECCV package
+ 
+% TODO REVIEW: Insert your submission number below by replacing '*****'
+% TODO FINAL: Comment out the following line for the camera-ready version
+%\usepackage[review,year=2024,ID=10246]{eccv}
+% TODO FINAL: Un-comment the following line for the camera-ready version
+%\usepackage{eccv}
+
+% OPTIONAL: Un-comment the following line for a version which is easier to read
+% on small portrait-orientation screens (e.g., mobile phones, or beside other windows)
+\usepackage[mobile]{eccv}
+
+
+% ---------------------------------------------------------------
+% Other packages
+
+% Commonly used abbreviations (\eg, \ie, \etc, \cf, \etal, etc.)
+\usepackage{eccvabbrv}
+
+% Include other packages here, before hyperref.
+%\usepackage{graphicx}
+\usepackage{booktabs}
+
+% The "axessiblity" package can be found at: https://ctan.org/pkg/axessibility?lang=en
+\usepackage[accsupp]{axessibility}  % Improves PDF readability for those with disabilities.
+
+
+% ---------------------------------------------------------------
+% Hyperref package
+
+% It is strongly recommended to use hyperref, especially for the review version.
+% Please disable hyperref *only* if you encounter grave issues.
+% hyperref with option pagebackref eases the reviewers' job, but should be disabled for the final version.
+%
+% If you comment hyperref and then uncomment it, you should delete
+% main.aux before re-running LaTeX.
+% (Or just hit 'q' on the first LaTeX run, let it finish, and you
+%  should be clear).
+
+% TODO FINAL: Comment out the following line for the camera-ready version
+\usepackage[pagebackref,breaklinks,colorlinks,citecolor=eccvblue]{hyperref}
+% TODO FINAL: Un-comment the following line for the camera-ready version
+%\usepackage{hyperref}
+
+% Support for ORCID icon
+\usepackage{orcidlink}
+
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{rotating} % For rotating text
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb} % define this before the line numbering.
+%\usepackage{ruler}
+\usepackage{color}
+\usepackage{pifont}% http://ctan.org/pkg/pifont
+%\usepackage[width=122mm,left=12mm,paperwidth=146mm,height=193mm,top=12mm,paperheight=217mm]{geometry}
+\usepackage{subcaption}
+\usepackage{comment}
+\usepackage{tabularx}
+%\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{xcolor}
+
+\definecolor{darkgreen}{RGB}{0,100,0}
+\definecolor{darkyellow}{RGB}{150,150,0}
+
+
+\input{defines}
+
+\newcommand{\footremember}[2]{%
+\footnote{#2}
+\newcounter{#1}
+\setcounter{#1}{\value{footnote}}%
+}
+\newcommand{\footrecall}[1]{%
+\footnotemark[\value{#1}]%
+}
+
+\newcommand{\specificthanks}[1]{\@fnsymbol{#1}}% Inserts a specific \thanks symbol
+
+\begin{document}
+
+% \renewcommand\thelinenumber{\color[rgb]{0.2,0.5,0.8}\normalfont\sffamily\scriptsize\arabic{linenumber}\color[rgb]{0,0,0}}
+% \renewcommand\makeLineNumber {\hss\thelinenumber\ \hspace{6mm} \rlap{\hskip\textwidth\ \hspace{6.5mm}\thelinenumber}}
+% \linenumbers
+% \pagestyle{headings}
+%\mainmatter
+%\def\ECCV16SubNumber{10246}  % Insert your submission number here
+
+% \title{EFM3D: Measuring Progress Towards 3D Egocentric Foundation Models via 3D Object Detection and Surface Regression} 
+\title{EFM3D: A Benchmark for Measuring Progress Towards 3D Egocentric Foundation Models} 
+
+\titlerunning{EFM3D}
+\authorrunning{J.~Straub~\etal}
+\author{Julian Straub\thanks{Project lead.}, Daniel DeTone\thanks{Equal contribution in alphabetic order.}, Tianwei Shen$^{\star\star}$, Nan Yang$^{\star\star}$, \\
+Chris Sweeney, Richard Newcombe}
+\institute{Meta Reality Labs Research}
+
+
+
+\maketitle
+
+\begin{abstract}
+\input{abstract}
+\end{abstract}
+
+\input{intro}
+\input{related}
+\input{dataset}
+\input{method}
+\input{experiments}
+\input{limitations_impact}
+\input{conclusion}
+\input{acknowledgements}
+
+
+\clearpage
+
+\bibliographystyle{splncs04}
+\bibliography{main}
+
+\clearpage
+
+\appendix
+\input{supplemental_text}
+
+\end{document}

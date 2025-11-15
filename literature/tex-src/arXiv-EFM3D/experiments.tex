@@ -1,0 +1,162 @@
+\section{The EFM3D Benchmark and Experiments}
+In this section we describe the EFM3D benchmark, which consists of two egocentric tasks: 3D oriented bounding box detection and 3D surface regression. For the object detection task, we use the Aria Everyday Objects (\AEO{}) dataset. For the surface estimation task, we use the Aria Digital Twin (\ADT{}) dataset.
+%
+To demonstrate the value of this benchmark, we evaluate the proposed \EFMmodel{} model together with state-of-the-art-approaches on the 3D OBB detection and the 3D surface reconstruction tasks.
+These tasks on egocentric data can leverage the video streams, poses and camera calibration as well as semi-dense point outputs extracted from the video streams via a SLAM~\cite{engel2023project} system. For both tasks we train on the large-scale simulated \ASE{} dataset and evaluate performance both in domain on \ASE{} as well as on real sequences with ground-truth annotations in \ADT{} and \AOThree{} recorded with Project Aria.
+
+% we alrady say this in the implementation details
+%\noindent \textbf{Model Input Details.} In all experiments we use a video snippet length of $1s$ which is 10 frames at 10~fps. We use the visibility information of the semidense points to compute the set of visible points in a snippet. The points observed in a given frame are \textit{causal}, meaning that the points at time $T_t$ depend only on sensor data from previous timesteps and the current timestep $T_0, T_1, ..., T_T$. This ensures that real-time and near real-time systems are supported in this experimental framework.
+
+\input{figures/camera_model}
+\noindent \textbf{Field-of-view matters.} While \EFMmodel{} uses a non-linear camera model to leverage the full field of view (FoV) of the Aria cameras, various related methods~\cite{sun2021neucon,sayed2022simplerecon,rukhovich2022imvoxelnet,Brazil_2023_CVPR} rely on linear cameras. For the off-the-shelf (OTS) models trained on ScanNet, we undistort the images into the ScanNet intrinsics in order to provide the data in the format the models were trained with. For other OTS models~\cite{bhat2023zoedepth,khan2023tcod} that are not constrained by camera models, we provide the largest possible linear camera model (max-linear). As can be seen in Fig.~\ref{fig:camera_lin}, there is a substantial different in FoV between the two linear models. The max-linear model covers almost the same FoV as the distorted camera. As we show in the following experiments, larger FoV provides better coverage of the scene thus better performance.
+
+\noindent\textbf{Persisting 3D Predictions}.
+%We argue that persisting 3D inferences is
+%As argued in the introduction, persisting 3D inferences is critical to enable compressed context for AI assitants. 
+Inferring the 3D scene state from individual frame or snippet-level 3D inferences is not only useful for downstream systems but also enables comparing different algorithms and measuring how consistent these 3D inferences are across the full sequence. 
+In the following experiments, we use tracking and fusion systems for both 3D OBBs as well as surface predictions to enable accumulation and improvement of 3D OBBs and 3D surfaces reconstructions. Predicted 3D OBBs are associated to the scene OBBs using a set of metrics including 3D intersection over union (IoU) and then fused via a running average over OBB parameters. For 3D reconstruction we use the implementation from~\cite{zeng20163dmatch} with minor improvements to fuse depth maps into an truncated signed distance field (TSDF)~\cite{newcombe2011kinectfusion}. The occupancy volume predicted by~\EFMmodel{} is fused using a per voxel running average in a global grid. The meshes are extracted using the marching cubes algorithm~\cite{lorensen1998marching} at the iso-level of $0$ for TSDF fusion and $0.5$ for occupancy fusion.
+% In surface extraction, we set a minimal number of observations for a voxel to be considered valid, which is 2 for TSDF fusion and 5 for occupancy fusion.
+See supplemental for more details.
+
+\subsection{3D Bounding Box Detection and Persistence}
+
+Broadly speaking there are three different types of ML architectures that can run on these modalities: 2D CNNs running on individual frames~\cite{Brazil_2023_CVPR}, 3D CNNs running on 3D geometric quantities~\cite{rukhovich2022imvoxelnet} and Transformers that compute on the point cloud~\cite{misra2021end} or snippets~\cite{Xie_2023_ICCV}.
+%
+For Cube R-CNN~\cite{Brazil_2023_CVPR}, we rectify the images using the max-linear camera setting.
+%
+For ImVoxelNet~\cite{rukhovich2022imvoxelnet} we show performance of the base configuration following the training recipe for OBB training. We provide max-linear rectified RGB snippets. 
+We freeze the ResNet50 image encoder to help sim-to-real transfer.
+%We use random volume translation jittering in x-y direction as augmentation. 
+%
+3DETR~\cite{misra2021end} is trained on the per snippet visible point cloud using the author's OBB training recipe and the random point-cloud crop augmentation from the paper.
+%
+% PARQ~\cite{Xie_2023_ICCV} is trained without relative pose constraints on the snippets like all other methods. We use a DINOv2.5 base backbone.
+%
+All models are trained on 10k sequences of \ASE{} containing 600k snippets for 10 epochs except for the transformer-based models which are trained for 50 epochs, as we found its convergence to be slow. We report the mean Average Precision (mAP) averaged over IoU thresholds in the range $[0.0, 0.05, ..., 0.5]$ and semantic classes following Cube R-CNN~\cite{Brazil_2023_CVPR}. 
+%
+
+\input{tables/obb_eval}
+We compare a representative set of related approaches that cover different subsets of modalities and architecture types in Tab.~\ref{tab:obj_det_perf} quantitatively.
+Across all methods the OBB tracker increases the mAP---in most cases by almost a factor of $2\times$---when comparing the snippet to the sequence-level mAP on \ASE{}.  For the sequence results we perform a search over tracker instantiation thresholds for each model and report the best mAP.
+%\TODO{this may not be true for transformer methods}
+% \TODO{See more training details in the supplement.}
+%
+Interestingly, when comparing performance on the challenging \AEO{} real-world dataset, the image based models suffer the strongest from the sim-to-real gap: Cube R-CNN (-32 mAP), ImVoxelNet (-49 mAP) and \EFMmodel{} (-48 mAP) . The points only method 3DETR has a smaller drop in mAP (-17 mAP). We attribute this to the fact that point-clouds are lower dimensional data than video and are less sensitive to photorealistic rendering artifacts in synthetic renderers. \EFMmodel{} performs best in both synthetic and real data scenarios.  We note that although the Cube R-CNN OTS (off-the-shelf) model is trained a diverse dataset it does not generalize well to egocentric data.
+
+\input{figures/obb_scenes_ase}
+We show overhead views of the sequence level OBB prediction results on held out synthetic scenes for the GT, \EFMmodel{} and ImVoxelNet in Fig.~\ref{fig:obj_det_samples_ase}. Both approaches perform relatively well on the synthetic data. ImVoxelNet has more false positives and the \EFMmodel{} has tighter bounding boxes. We attribute this gap mostly to the additional pointcloud input that the \EFMmodel{} has that provides a strong geometric cue for localizing the OBBs in 3D space.
+
+
+% AEO Scene \#14
+% AEO Scene \#3
+% AEO Scene \#24
+% figures/aeo_obb_viz/gt1_v2.png
+% figures/aeo_obb_viz/gt2_v2.png
+% figures/aeo_obb_viz/gt3_v2.png
+% figures/aeo_obb_viz/center1_v2.png
+% figures/aeo_obb_viz/center2_v2.png
+% figures/aeo_obb_viz/center3_v2.png
+% figures/aeo_obb_viz/im1_v2.png
+% figures/aeo_obb_viz/im2_v2.png
+% figures/aeo_obb_viz/im3_v2.png
+
+\begin{figure}[t!]
+\centering
+\begin{tabular}{cccc}
+% Empty corner cell
+ & {\tiny GT} & {\tiny \EFMmodel{}} & {\tiny ImVoxelNet} \\
+% First row with rotated row header
+\begin{sideways}{\tiny \ \ \ \ \ \ \ \ \ AEO Scene \#14}\end{sideways} & 
+\includegraphics[width=0.3\textwidth]{figures/aeo_obb_viz/gt1_v2.png}\hfill &
+\includegraphics[width=0.3\textwidth]{figures/aeo_obb_viz/center1_v2.png}\hfill &
+\includegraphics[width=0.3\textwidth]{figures/aeo_obb_viz/im1_v2.png}\hfill \\
+% % Second row with rotated row header
+% \begin{sideways}{\tiny \ \ \ \ \ \ \ \ \ AEO Scene \#3}\end{sideways} & 
+% \includegraphics[width=0.3\textwidth]{figures/aeo_obb_viz/gt2_v2.png}\hfill &
+% \includegraphics[width=0.3\textwidth]{figures/aeo_obb_viz/center2_v2.png}\hfill &
+% \includegraphics[width=0.3\textwidth]{figures/aeo_obb_viz/im2_v2.png}\hfill \\
+% Third row with rotated row header
+\begin{sideways}{\tiny \ \ \ \ \ \ \ \ \ AEO Scene \#24}\end{sideways} & 
+\includegraphics[width=0.3\textwidth]{figures/aeo_obb_viz/gt3_v2.png}\hfill &
+\includegraphics[width=0.3\textwidth]{figures/aeo_obb_viz/center3_v2.png}\hfill &
+\includegraphics[width=0.3\textwidth]{figures/aeo_obb_viz/im3_v2.png}\hfill \\
+\end{tabular}
+\caption{Aria Everyday Object (\AEO{}) scenes overlaid with the camera trajectories (blue) and the colored 3D bounding boxes from Ground Truth (left), \EFMmodel{} (middle), and ImVoxelNet (right).
+\label{fig:obj_det_samples_aeo}}
+\end{figure}
+
+
+In Fig.~\ref{fig:obj_det_samples_aeo} we show a similar comparison but on real data on the \AOThree{} dataset. Textured meshes are not available for this real data so we show the OBBs overlaid on top of the semi-dense point clouds. In this visualization the sim-to-real gap is more apparent. For example, there are never any bay windows in the \ASE{} dataset, but in the top row (AEO Scene $\#14$) shown in cyan there are four bay windows. \EFMmodel{} does a reasonable job to approximate them with a single window, whereas ImVoxelNet fails to detect any window . Another example of the sim-to-real gap is in the bottom-most row (AEO Scene $\#24$) there is a plant shown in a light green OBB on top of the table shown in a yellow OBB. The \ASE{} dataset does not have plants on top of other objects, so it is reasonable that both models fail to detect the plant on top of the table.
+
+\input{tables/obb_ablation}
+We perform a sensitivity analysis of \EFMmodel{} in Table~\ref{tab:obb_ablation}. Geometric augmentation at training time is more important than photometric augmentation. We find that standard deviation aggregation is more important than mean aggregation, but using both is best. Removing the freespace encoding has a smaller effect than remove the point mask, but using both is best. 
+
+
+
+% Qualitatively we can observe the different levels of performance in Fig.~\ref{fig:obj_det_samples_ase}. \TODO{take away}
+
+
+% \begin{figure}
+%     \centering
+%     \includegraphics{}
+%     \caption{We show fused 3D bounding box detections from the different methods (columns) for a variate of simulated \ASE{} and real \AOThree{} sequences (rows).}
+%     \label{fig:obj_det_samples_ao3}
+% \end{figure}
+
+
+
+
+
+% In Tab.~\ref{tab:obj_modality_ablation} we ablate different parameters for \EFMmodel{}. Using all available modalities of Aria, both SLAM streams and points inputs leads to the highest performance. 
+% % \TODO{describe result}
+
+
+% \TODO{Euston numbers for camera ready }
+% \TODO{stretch: 3d object detection from CLIP + segmentation + 3d Obb fitting}
+
+
+\subsection{3D Surface Estimation and Reconstruction}
+
+
+We evaluate the performance of the proposed \EFMmodel{} with occupancy output in comparison to a set of most relevant baseline methods on the final fused reconstructions. The representative methods are from different surface regression categories: monocular depth~\cite{bhat2023zoedepth} estimation, multi-view depth~\cite{sayed2022simplerecon,khan2023tcod} estimation, volumetric surface reconstruction~\cite{sun2021neucon}. For all depth-based methods, we adjust the depth values by aligning the depth output to the semidense points. We use the learned fusion module for NeuralRecon~\cite{sun2021neucon} instead of the aforementioned fusion system to generate the final outputs. Since NeuralRecon is the most similar method to \EFMmodel{}, we also re-train it on the same ASE training dataset. For other methods, we use off-the-shelf (OTS) models.
+In addition, we also evaluate the GT depths and semi-dense points that are provided with the datasets.
+%
+% we already have this up front
+%\noindent \textbf{Global Surface fusion.} The output of each method is fused into a global TSDF~\cite{newcombe2011kinectfusion} volume at $4cm$ resolution from which a mesh model is extracted to be evaluated against the GT mesh. For depth-based methods~\cite{bhat2023zoedepth,khan2023tcod,sayed2022simplerecon}, we use an off-the-shelf TSDF fusion implementation~\cite{zeng20163dmatch} to fuse the depths and extract meshes. 
+%NeuralRecon~\cite{sun2021neucon} comes with a learned fusion module to get global TSDF volume. 
+% We use volumetric fusion to obtained global TSDF volume for \EFMmodel{}.
+%
+%\noindent \textbf{Error Metrics.} 
+
+
+\newcommand{\subfigwidth}{0.24}
+\input{figures/surface_ase}
+
+Surface reconstructions are evaluated against GT meshes. We follow~\cite{jensen2014large} to compute mesh-to-mesh metrics as point-cloud-to-mesh metrics, with $Acc$ being the mean distance of points sampled from prediction to GT mesh triangles, and $Comp$ the  other way around (sampled points from GT to predicted surfaces). Please see the supplemental for a rigorous definition of the metrics.
+
+
+Figure~\ref{fig:mesh_ase} and~\ref{fig:mesh_adt} show qualitative examples. The first three rows in Table~\ref{tab:surf_perf} demonstrate the quality of the GT depth maps, with a comparison of different camera models.
+%We first compare the GT depth fusion results with different camera models. Using depths with original fisheye camera (GT-Depth-Fisheye) yields the best results, followed by using the linear model with maximum FoV (GT-Depth-Max). 
+% define this width once here for both figures
+
+\renewcommand{\subfigwidth}{0.24}
+\input{figures/surface_adt}
+
+Using ScanNet-linear camera makes the fusion results much worse on completeness as it has limited FoV as shown in Fig.~\ref{fig:camera_lin}.
+Fusing monocular depth methods generally does not work well as the scale of the per-frame depth maps can change due to inherent scale ambiguity which leads to incorrect fusion. 
+
+Fusion of multi-view depth methods visually looks more consistent as shown in Fig.~\ref{fig:mesh_ase} and~\ref{fig:mesh_adt}, but does not have a good result quantitatively, mainly due to noisy depth estimation on low-textured regions such as walls. 
+Volumetric methods generally perform better than depth-based methods. We test both the OTS NeuralRecon model trained on ScanNet, and the model re-trained on ASE dataset. Since the input to the OTS NeuralRecon model is ScanNet-linear images, the input has limited FoV and hence has worse completeness.
+\input{tables/surf_eval}
+Both visually and quantitatively, \EFMmodel{} produces much better reconstruction with more smooth surfaces in contrast to the noisy fusion results from depth-based methods. Compared with NeuralRecon trained on the same data, \EFMmodel{} also adds more finer object details shown in zoom-in views.
+We hypothesise that \EFMmodel{} performs better than NeuralRecon for two reasons. First, \EFMmodel{} takes advantages of the input semi-dense points, which provide a strong cue for surface prediction and have high accuracy as shown in the \textit{semi-dense points} row. Second, \EFMmodel{} uses DINOv2.5 as the 2D backbone.
+%
+
+
+
+
+
+
+
+
+% \TODO{surface eval ablations}

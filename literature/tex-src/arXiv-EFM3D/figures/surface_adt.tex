@@ -1,0 +1,77 @@
+%%%% ADT surface figure %%%%%
+\begin{comment}
+\begin{table}[ht]
+\centering
+\begin{tabular}{ccc} % Adjust for three columns
+\small
+GT Mesh & GT Depth Fusion & ZoeDepth \\ % Headers for the first row of images
+\includegraphics[width=0.3\textwidth]{figures/adt_mesh_viz/gt_mesh.jpg} & 
+\includegraphics[width=0.3\textwidth]{figures/adt_mesh_viz/gt_fusion.jpg} & 
+\includegraphics[width=0.3\textwidth]{figures/adt_mesh_viz/zoe.jpg} \\ 
+SimpleRecon & NeuralRecon & \OCCmodel{} \\ % Headers for the second row of images
+\includegraphics[width=0.3\textwidth]{figures/adt_mesh_viz/simplerecon.jpg} & 
+\includegraphics[width=0.3\textwidth]{figures/adt_mesh_viz/neural_recon.jpg} & 
+\includegraphics[width=0.3\textwidth]{figures/adt_mesh_viz/efm.jpg} \\
+\end{tabular}
+\caption{Surface reconstruction on the ADT work 106 sequence. For ZoeDepth and SimpleRecon we use the pretrained models while for \OCCmodel{} and NeuralRecon we re-trained on the ASE 1k training set. \TODO{Add NeuralRecon; Check Zoe isse; Add zoom-in view; GT Mesh and GT Depth shading.} }
+\label{fig:mesh_adt}
+\end{table}
+\end{comment}
+
+
+%%%% ASE surface figure %%%%%
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{GT Mesh}}
+        \includegraphics[width=\textwidth]{figures/adt_mesh_viz/gt_mesh_comb.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth \textwidth}
+        \centering
+        \caption{\tiny \textbf{GT Depth Fusion}}
+        \includegraphics[width=\textwidth]{figures/adt_mesh_viz/gt_depth_comb.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{\EFMmodel{}}}
+        \includegraphics[width=\textwidth]{figures/adt_mesh_viz/openocc_comb.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{NeuralRecon}}
+        \includegraphics[width=\textwidth]{figures/adt_mesh_viz/neuralrecon_trained_comb.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{NeuralRecon OTS}}
+        \includegraphics[width=\textwidth]{figures/adt_mesh_viz/neuralrecon_ots_comb.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth \textwidth}
+        \centering
+        \caption{\tiny \textbf{ZoeDepth}}
+        \includegraphics[width=\textwidth]{figures/adt_mesh_viz/zoe_comb.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{SimpleRecon}}
+        \includegraphics[width=\textwidth]{figures/adt_mesh_viz/simplerecon_scaling_comb.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{ConsistentDepth}}
+        \includegraphics[width=\textwidth]{figures/adt_mesh_viz/consistent_depth_comb.png}
+    \end{subfigure}
+    
+    
+    \caption{Surface reconstruction on ADT-106. It shows how models trained on simulation generalize to real data. \EFMmodel{} has the best generalization ability among all the methods.}
+    \label{fig:mesh_adt}
+    \vspace{-5mm}
+\end{figure}

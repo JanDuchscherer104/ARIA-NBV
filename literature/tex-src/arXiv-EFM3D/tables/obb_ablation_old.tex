@@ -1,0 +1,97 @@
+%\begin{table}[]
+%    \centering
+%    \begin{tabular}{c|c|c| c|c|c|c|}
+%         rgb & slams & points    & ASE mAP & ASE mAP & AO3D mAP \\ 
+%        & &                      & Snippet  & Sequence  &   Sequence  \\ \hline           
+%          & & \cmark             & 0.27 & 0.59 & 0.45 \\
+%        \cmark & &               & 0.30 & 0.66 & \TODO{0.36} \\
+%          & \cmark &             & 0.33 & 0.71 & 0.41 \\
+%        \cmark  & \cmark &       & 0.36 & 0.72 & \TODO{0.37} \\
+%        \cmark & & \cmark        & 0.42 & 0.78 & \TODO{0.40} 0.44? \\
+%          & \cmark & \cmark      & 0.43 & 0.79 & 0.45 \\
+%        \cmark & \cmark & \cmark & 0.45 & 0.80 & \TODO{0.41} \\
+%    \end{tabular}
+%    \caption{We ablate different input modalities for \EFMmodel{}: rgb video snippets, left and right slam stream snippets and semidense points. }
+%    \label{tab:obj_ablation}
+%\end{table}
+
+\begin{table}[]
+    \centering
+    % https://docs.google.com/spreadsheets/d/1-C4hIRjXC9phLz-k_BGhe0bWYeCYPMVtjMZgcpshQFs/edit#gid=789119799
+
+    % after joint mAP computation for all but snippet results
+    % TODO update the snippet results 
+    \begin{tabular}{c|c|c| c|c|c|c|c| c|c|c|}
+         rgb   & greys  & points & free  & agg.  & agg.  & aug   & aug   & \ASE{} mAP & \ASE{} mAP & \AOThree{} mAP \\ 
+               &        &        &       & mean  & std   & geom  & photo & Snippet  & Sequence  &   Sequence  \\ \hline           
+               &        & \cmark &       &\cmark &       &       &       & 0.24 & 0.42 & 0.19 \\
+        \cmark &        &        &       &\cmark &       &       &       & 0.26 & 0.52 & 0.13 \\
+               & \cmark &        &       &\cmark &       &       &       & 0.29 & 0.58 & 0.13 \\
+        \cmark & \cmark &        &       &\cmark &       &       &       & 0.31 & 0.62 & 0.15 \\  
+    %   \cmark & \cmark &        &       &\cmark &       &       &       & 0.32 & 0.61 & 0. \\  % with compression of features
+        \cmark &        & \cmark &       &\cmark &       &       &       & 0.38 & 0.72 & 0.22 \\
+               & \cmark & \cmark &       &\cmark &       &       &       & 0.39 & 0.73 & 0.25 \\
+        \cmark & \cmark & \cmark &       &\cmark &       &       &       & 0.40 & 0.75 & 0.22 \\ \hline
+        \cmark &        & \cmark &       &       &\cmark &       &       & 0.37 & 0.66 & 0.21 \\
+        \cmark &        & \cmark &       &\cmark &\cmark &       &       & 0.39 & 0.71 & 0.23 \\ \hline
+        \cmark &        & \cmark &       &\cmark &       &\cmark &       & 0.38 & 0.67 & 0.25 \\
+        \cmark &        & \cmark &       &\cmark &       &\cmark &\cmark & 0.38 & 0.68 & 0.23 \\ \hline
+        \cmark &        &        &\cmark &\cmark &       &       &       &\todo & 0.69 & 0.23 \\
+        \cmark &        & \cmark &\cmark &\cmark &       &       &       &\todo & 0.71 & 0.26 ›\\
+
+    %   \cmark & \cmark & \cmark & 0.41 & 0.75 & 0.  \\ # with compression
+    \end{tabular}
+    \caption{We ablate different input modalities for \EFMmodel{}: RGB video, left and right grey-scale streams and semidense points. }
+    \label{tab:obj_modality_ablation}
+\end{table}
+
+
+\begin{table}[]
+    \centering
+    % https://docs.google.com/spreadsheets/d/1-C4hIRjXC9phLz-k_BGhe0bWYeCYPMVtjMZgcpshQFs/edit#gid=789119799
+    \begin{tabular}{c|c|c|c|c|}
+        geom. aug. & photo aug. & \ASE{} mAP & \ASE{} mAP & \AOThree{} mAP \\ 
+                   &            & Snippet  & Sequence  &   Sequence  \\ \hline           
+                   &            & 0.26 & 0.52 & 0.13 \\
+        \cmark     &            & 0.38 & 0.67 & 0.25 \\
+        \cmark     &    \cmark  & 0.38 & 0.68 & 0.23 \\
+    \end{tabular}
+    \caption{We ablate training with augmentations for \EFMmodel{}. With RGB stream and points input.}
+    \label{tab:obj_aug_ablation}
+\end{table}
+
+
+\begin{table}[]
+    \centering
+    % https://docs.google.com/spreadsheets/d/1-C4hIRjXC9phLz-k_BGhe0bWYeCYPMVtjMZgcpshQFs/edit#gid=789119799
+    \begin{tabular}{c|c|c|c|c|c|}
+         pts   & free    & \ASE{} mAP & \ASE{} mAP & \AOThree{} mAP \\ 
+               &           & Snippet  & Sequence  &   Sequence  \\ \hline   
+        %       &           & 0.26 & 0.52 & 0.13 \\
+        \cmark &           & 0.38 & 0.72 & 0.22 \\
+               & \cmark    &\todo & 0.69 & 0.23 \\
+        \cmark & \cmark    &\todo & 0.71 & 0.26 \\
+        % compress mean \& std    & 0.39 & 0.72 & 0.33 \\
+    \end{tabular}
+    \caption{We ablate the use of points and freespace masks for the \EFMmodel{}. With RGB stream as the base input. }
+    \label{tab:obj_freespace_ablation}
+\end{table}
+
+
+
+%\begin{table}[]
+%    \centering
+%    \begin{tabular}{c|c|c| c|c|c|c|}
+%         rgb & slams & points    & \ASE{} mAP & \ASE{} mAP & \AOThree{} mAP \\ 
+%        & &                      & Snippet  & Sequence  &   Sequence  \\ \hline           
+%        \cmark & &               & 0.30 & 0.66 & \TODO{0.36} \\
+%        \cmark  & \cmark &       & 0.36 & 0.72 & \TODO{0.37} \\
+%        \cmark & & \cmark        & 0.42 & 0.78 & \TODO{0.40} 0.44? \\
+%          & \cmark &             & 0.33 & 0.71 & 0.41 \\
+%        \cmark & \cmark & \cmark & 0.45 & 0.80 & \TODO{0.41} \\
+%          & & \cmark             & 0.27 & 0.59 & 0.45 \\
+%          & \cmark & \cmark      & 0.43 & 0.79 & 0.45 \\
+%    \end{tabular}
+%    \caption{We ablate different input modalities for \EFMmodel{}: rgb video snippets, left and right slam stream snippets and semidense points. }
+%    \label{tab:obj_ablation}
+%\end{table}

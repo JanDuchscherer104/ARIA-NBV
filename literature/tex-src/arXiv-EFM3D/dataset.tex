@@ -1,0 +1,49 @@
+\section{Dataset Contributions}
+\label{sec:dataset}
+
+% \begin{figure}[ht]
+% \centering
+% \includegraphics[width=0.333\textwidth]{figures/ase_obb_viz/compressed/100576_gt.jpg}\hfill
+% \includegraphics[width=0.333\textwidth]{figures/ase_obb_viz/compressed/100303_gt.jpg}\hfill
+% \includegraphics[width=0.333\textwidth]{figures/ase_obb_viz/compressed/11132_gt.jpg}\hfill
+% \caption{Groundtruth \ASE{} validation scenes overlaid with the 3D bounding boxes and camera trajectories.\TODO{\ADT{} and \AOThree{}}}
+% \label{fig:gt_obbs_ase}
+% \end{figure}
+
+
+%Yes - so far only windows and doors and walls, floors ceilings are out \TODO{are we the first to release the OBBs themselves too?} 
+To facilitate novel research in 3D Egocentric Foundation Models, we release new data for both training and evaluation, spanning both synthetic and real egocentric Aria data. We summarize the three types of this new data below.
+
+\noindent\textbf{Large-scale Synthetic OBB Metadata}. We release the 3D oriented bounding boxes (OBBs) corresponding to the \ASE{} dataset. This consists of approximately 3 million OBBs across 43 object classes. This includes visibility metadata for \ASE{} which enables image-based detector training and evaluation. We define the visibility of an OBB on a certain image based on its \textit{observability} and \textit{occlusion}.
+
+\noindent\textbf{Small-scale Real world OBB Dataset}. We introduce a small real-world egocentric validation dataset, termed Aria Everyday Objects (\AOThree{}). It has high quality 3D OBB annotations to allow evaluation on real Project Aria sequences. 
+One key aspect of this dataset is that the sequences were collected by non computer vision experts, without any specific guidance to scan the scene. This ensures realistic egocentric motion. 
+%
+%Data collectors give consent to releasing the data and we blur any personally identifiable information like faces and license plates to preserve privacy.
+%
+The annotations are made by human annotators that use the semi-dense point depths, camera poses, calibrated multi-camera rig to label the 3D OBBs in a 3D viewer. 
+%
+%One key aspect of this dataset is that the sequences were collected by non computer vision experts, without any specific guidance to scan the scene. This differs from datasets like ScanNet~\cite{dai2017scannet} where data collection users were specifically instructed to move iPads slowly throughout the scene and scan it from different angles. 
+%
+The dataset contains 26 diverse scenes with 584 OBB instances across 9 classes: Chair, Table, Sofa, Bed, WallArt, Lamp, Plant, Window and Mirror. These semantic classes overlap with the ASE dataset and enable testing of sim-to-real generalization.
+
+\noindent\textbf{Ground-truth Meshes}. For 3D reconstruction training the \ASE{} dataset already contains groundtruth depth images. We release the 3D groundtruth mesh for the simulated \ASE{} validation dataset as well as for the real-world \ADT{} dataset to enable benchmarking 3D reconstruction methods. 
+
+
+% \TODO{talk about statistics of OBB datasets}
+% Table~\ref{tab:obj_datasets} shows key statistics of the proposed datasets in relation to commonly used 3D object detection datasets. 
+% We show the object class histograms for the three dataset splits in Fig.~\ref{fig:class_hist}.
+
+
+% \TODO{Show differences between Internet image datasets, Scanning datasets and Egocentric datasets.
+% 2d bb distributions
+% 3d bb distributions in a BEV grid
+% max angle of viewdirections on objects
+% visibility distribution of objects - from where are objects observed?
+% visualize 3d trajectory distribution in the snippet?
+% }
+
+
+
+
+

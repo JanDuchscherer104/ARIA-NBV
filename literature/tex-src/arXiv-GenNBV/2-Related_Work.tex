@@ -1,0 +1,36 @@
+% \vspace{3pt}
+\section{Related Work}
+\label{sec:related work}
+    \noindent\textbf{Traditional 3D Reconstruction.}
+    Photometry and geometry are two crucial aspects of reconstruction evaluation. Neural implicit representations~\citep{park2019deepsdf, mildenhall2020nerf} have shown progress in photometric rendering but faces challenges like time-consuming optimization and poor generalization, hindering its application in real-time reconstruction scenarios like 3D SLAM~\citep{sucar2021imap, iSDF2022, zhu2022nice, rosinol2022nerf}. Geometry, in contrast, typically corresponds to 3D representations such as point clouds and 3D mesh and is directly related to issues like collision avoidance. Considering these properties, researchers tend to focus on geometric reconstruction in practical applications and we also follow this stream.
+
+
+    \noindent\textbf{Active 3D Reconstruction.}
+    Active 3D reconstruction is a promising field that has not been thoroughly benchmarked yet. The pipeline of active 3D reconstruction frameworks alternates between inferring optimal viewpoints, capturing new data, and updating the rebuilt 3D model. With the optimal sequence of key viewpoints, a continuous planning path can be generated using the classic planners, such as Fast Marching Method (FMM)~\citep{sethian1996fast}.  % RRT~\citep{lavalle2001randomized}
+    % The pioneering work is the Next-Best-View (NBV) policy for reconstruction, which determines the sequence of optimal viewpoints for scanning~\citep{lee2022uncertainty, pan2022activenerf,zhan2022activermap,peralta2020next, guedonscone, ran2023neurar}. 
+    % Another branch, the Next-Best-View (NBV) policy for 3D reconstruction, which determines the sequence of optimal viewpoints within predefined action space for complete scanning~\citep{lee2022uncertainty, pan2022activenerf, zhan2022activermap, peralta2020next, guedonscone, ran2023neurar}. With the optimal sequence of key viewpoints, a continuous piloting path can be generated using the classic planners, such as RRT~\citep{lavalle2001randomized} and FMM~\citep{sethian1996fast}.
+
+    Existing works can be pivotally differentiated based on the paradigm of NBV policies: rule-based or learning-based.
+    Rule-based approaches like uncertainty-driven works~\citep{isler2016information, lee2022uncertainty, zhan2022activermap, ran2023neurar} typically yield the next best view from hand-crafted rules from scene representations, which tends to overfit specific scenes. 
+    Most learning-based policies~\citep{chenlearning, chaplotlearning, peralta2020next} use a deep reinforcement learning algorithm like PPO~\citep{schulman2017proximal} to sequentially predict the optimal viewpoints based on observation. They must obtain feedback from task-related rewards such as coverage ratio~\citep{peralta2020next, guedonscone} and optimize during massive iteration with task environment.
+
+    The action space is designed based on the paradigm of NBV policies. Most rule-based NBV policies select views from a limited action space, such as a set composed of only one hundred candidate viewpoints~\citep{pan2022activenerf}, a tiny pre-defined space like a hemisphere~\citep{lee2022uncertainty, zhan2022activermap, guedonscone, ran2023neurar}, making it possible to overlook some important viewpoints due to unavailability. Even though learning-based categories further explore the larger action space like a 2D plain~\citep{chenlearning, chaplotlearning} or a constrained 3D space~\citep{peralta2020next}, their limited action space still prevents them from capturing sufficient details for 3D reconstruction.
+    
+    Scene representation built from history observations, which directly provide reconstruction progress to NBV policies, is also a crucial aspect of the active 3D reconstruction framework. Previous works have explored visual representations for NBV policies, such as TSDF~\citep{hardouin2020next}, neural radiance field~\citep{adamkiewicz2022vision}, and 2D BEV maps~\citep{chaplotlearning, ye2022multi, guo2022asynchronous}. However, implicit representations are hard to jointly with learning-based NBV policies, and 2D BEV map lacks sufficient information for large-scale outdoor scenes that contain numerous geometric details in 3D space. 
+
+    In our benchmark, we select Scan-RL~\citep{peralta2020next} as our main RL-based baseline. Compared to it, we introduce a much larger action space and informative visual representations for better generalizability. Additionally, we don't benchmark the mentioned baselines~\citep{chenlearning,chaplotlearning}, mainly due to their reliance on pretraining from human demonstration using imitation learning, while our focus lies on learning through iterations and end-to-end training. Different from our 3D free-space movement, they only explore the traversable 2D areas of indoor scenes using ground robots, thus limiting their motion space in 2D.
+
+    \begin{figure*}[t!]
+      \centering
+      \includegraphics[width=1\textwidth]{Figure/Fig_Method_v3.pdf}
+      \caption{Overview of our proposed framework GenNBV. Our end-to-end policy takes the historical multi-source observations as input,  transforms them into a more informative scene representation, and produces the next viewpoint position. A reward signal will be returned at training time to optimize the end-to-end policy for maximizing the expected cumulative reward in one episode. Specifically, the signal is the increased coverage ratio after collecting a new viewpoint.}
+      \label{fig:method}
+      \vspace{-10pt}
+    \end{figure*}
+
+    \noindent\textbf{Generalizable Reinforcement Learning.}
+    Increasing the diversity of training data leads to better generalizability~\citep{cobbe2020leveraging}.
+    In the robotics field, domain randomization~\citep{tobin2017domain} allows legged robots to walk on various terrains absent from the training environment. For end-to-end driving policy, training in large-scale synthetic and realistic scenarios improves the safety of autonomous cars~\citep{li2022metadrive, li2023scenarionet} in unseen test scenarios.
+    The advanced work~\citep{devrim2017reinforcement} presents an RL-based formulation for the view planning problem. Based on similar frameworks of active 3D reconstruction, Scan-RL~\citep{peralta2020next} and SCONE~\citep{guedonscone} are two pioneering works showing the generalizability of their frameworks, while both of them suffer from the constrain of viewpoint sampling in limited space and lack of in-depth analysis.
+    In this work, we tackle the aforementioned issues by predicting NBV in free 3D space with a learning-based planner, which is trained with a dataset containing buildings in various shapes and poses for acquiring generalizability for unseen buildings. 
+

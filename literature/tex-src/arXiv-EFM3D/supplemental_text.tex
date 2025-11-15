@@ -1,0 +1,357 @@
+
+In the following we provide additional details for the models we trained on ASE including \EVL{}, the ASE and AEO datasets we release,  more details for the EFM3D benchmark, and finally some additional experiments. 
+
+\section{Model and Training Details}
+
+We first describe more details for the \EVL{} model before detailing training procedures for all models.
+
+\subsection{\EVL{} Model Details}
+
+\noindent\textbf{\EVL{} Architecture Details}:
+We use a frozen base DINOv2.5 backbone with an output feature dimension of 768. We upsample it using a simple 2D upsample network.
+The 2D upsample network alternates 2D upsampling by a factor of $2\times$, $3\times3$ 2D convolution, ReLU activation, and batch-norm. In the upsampling we reduce the input feature dimension to an output dimension of 64. These upsampled 64-dimensional features are at the same resolution of the input image.
+%
+After resampling and aggregating these image features into the feature volume, we run a simple 3D U-Net to process the features in 3D.
+The 3D U-Net downsamples the 3D volume three times down to 1/8th of the input resolution by iterating $3\times 3$ 3D convolutions, batch norm, ReLU activation and max pooling. The upsampling uses tri-linear $2\times$ upsampling layers that get combined with skip connections and then processed with a sequence of $3\times 3$ 3D convolutions, batch norm and ReLU. All intermediate feature dimensions are kept at 256. We currently keep the 3D object detection model and surface reconstruction model separate. 
+The DINOv2.5 base model has 86.6M non-trainable parameters. 
+% On top of that the EVL-OBB model and EVL-Occupancy model have 16.7M and 67.1M trainable parameters respectively.  
+On top of that the EVL model has 16.7M trainable parameters.  
+
+%The number of total parameters for the OBB model and the Occupancy model are 103M and 89.1M respectively.
+
+
+\begin{comment}
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|c|c|c|c|}
+        \hline
+        Model & Trainable \#params & Non-Trainable \#params & Total \#params \\
+        \hline
+        EVL OBB & 16.7M & 86.6M & 103M \\
+        EVL Occupancy & 67.1M & 22.1M & 89.1M \\
+        \hline
+    \end{tabular}
+    \caption{Numbers of model parameters. \textbf{EVL OBB} model is for 3D object detection while \textbf{EVL Occupancy} is for surface reconstruction. Both models use the frozen DinoV2.5 backbone.\TODO{lets only report overall parameters in the text.}}
+    \label{tab:model_num_params}
+\end{table}
+\end{comment}
+
+
+\noindent\textbf{Computing Gravity-Aligned Voxel Grid}
+%
+We define a gravity-aligned voxel grid pose by aligning the camera pose to gravity as follows.
+Given camera rotation $R_{wc} = [r_x, r_y, r_z]$ and unit-length gravity direction $g_w$ in world coordinates we compute the gravity aligned rotation $R_{wg}$ as:
+\begin{align}
+    R_{wg} &= [g_w, \lceil d_z \times g_w \rceil, \lceil d_z\rceil ] \quad \text{where}\quad
+     d_z %= \text{reject}(R_{wc}_2, g_w) 
+     = r_z - g_w^T r_z g_w \,,
+\end{align}
+and $\lceil x \rceil $ normalizes a vector $x$ to unit length.
+
+\subsection{Model Training Details}
+
+%\begin{itemize}
+%\item full model detail diagram (which layers where and what dimensions)
+%\item training configs and weights (if not in main paper)
+%\item snippet numbers for ASE training dataset (could put that into training details)
+%\item runtime
+%\item number of parameters
+%\end{itemize}
+
+
+Overall the ASE training dataset contains 100k sequences. 
+For OBB training we use a 10k sequence subset which contains 600k 1s snippets. 
+For surface regression training we use a 1k sequence subset of 60k 1s snippets. We find these subsets are sufficiently large for solid performance at reasonable training times. For OBBs we find that the validation set performance saturates at 10k sequences with the current model architecture of \EVL{} (see Sec.~\ref{sup:scaling}). More details in Sec.~\ref{sup:dataset}.
+
+\noindent\textbf{\EVL{} OBB training}: We train all configurations for 3D OBB regression for 10 epochs on the ASE 10k training dataset. We use a max learning rate of 5e-4 with an effective batch size of $160$. The learning rate is linear warmed up for $8\%$ and the cosine annealed. 
+We set the loss weights to $w_c=100$, $w_{iou}=10$ and $w_{cls}=1$.
+
+\noindent\textbf{\EVL{} Occupancy training}: We train all configurations for occupancy regression for 60 epochs on the ASE 1k training dataset. We use a max learning rate of 4e-4 with an effective batch size of 128. Similar to the OBB training the learning rate is linear warmed up until $8\%$ for the first 5 epochs. The surface loss by a factor of $1.0$ and the TV-loss by $0.01$.
+
+\noindent\textbf{3DETR training}: We choose the base configuration of 3DETR targeted for SUN-RGBD with a GIoU matching cost of $5.0$ to train for oriented bounding box regression. We train for 50 epochs on the ASE training dataset and a cosine learning rate schedule with linear warmup. The max learning rate is 7e-4 and the effective batch size 320. We use the same point cloud cropping data augmentation as in the original implementation.
+
+\noindent\textbf{ImVoxelNet training}: We choose the base configuration of ImVoxelNet with the SUB-RGBD config to train for oriented bounding box regression. We freeze the ResNet50 backbone to help with sim-to-real transfer. We train for 10 epochs on the ASE training dataset and a step learning rate schedule. The starting learning rate is $1e-4$ and gets reduced by a factor of 10x after $67\%$ and again after $83\%$ of training. The effective batch size is $320$. We provide max-linear rectified images.
+
+\noindent\textbf{Cube R-CNN training}: We use the DLA backbone and train it on the ASE training dataset for 10 epochs. A max learning rate of 1e-4 is cosine rate scheduled. The effective batch size is 640. We train on max-linear rectified images.
+
+\noindent\textbf{NeuralRecon training}: Among the surface reconstruction baseline methods, NeuralRecon is the only one we did the retraining. We train NeuralRecon using the default hyper-parameters on the ASE 1k training subset. It has a similar voxel configuration to \EVL{} Occupancy model, with a $[96, 96, 96]$ local volume and a 0.04m voxel size. We use a start learning rate of 2e-4. NeuralRecon has a two-phase training scheme, i.e. TSDF local volume regression and learned fusion training. We train each phase for 10 epochs.  
+
+% \TODO{Nan: is the time dimension pushed into batch dim? i.e. do we have 64*10 for batch size?}
+
+
+
+\section{Dataset Details}
+\label{sup:dataset}
+In the following we describe details of the Aria Synthetic Environment (ASE) training dataset as well as the real-world Aria Everyday Objects (AEO) 3D OBB validation dataset. 
+
+\subsection{Aria Synthetic Environment (ASE) Details}
+
+% https://fb.workplace.com/groups/366392775583769/permalink/636997895189921/
+\textbf{Subselecting ASE Sequences}. As described earlier in Section \ref{sup:scaling}, we found that scaling the training beyond 10k sequences resulted in diminishing returns in terms of 3D Object Detection results on holdout ASE sequences. We thus report all OBB experimental results using a 10k sequence subset of the 100k sequences to reduce the engineering and infrastructure requirements for training.
+
+
+% https://fb.workplace.com/groups/366392775583769/permalink/636997895189921/
+\noindent\textbf{Subselecting ASE Classes}. We sub-select 27 total semantic classes in the ASE dataset by combining similar and filtering out certain classes from the original 42 semantic labels. We removed pure structural elements such as “Floor”, “Wall”, “Ceiling” and “Stairs”, because we assume that the full extent of the object can be reasonably visible within a short video snippet. We combined certain similar categories such as "Ottoman", “SittingChair” and “bench” into a single class called “Chair”. We also removed some vague classes such as “ElectricalCable” and “Decoration”. “Cutlery” and “BatteryCharger” are also removed because they are filtered by the absolute pixel counting. In the end we were left with 27 total classes.
+
+\begin{figure}
+    \includegraphics[width=1.0\textwidth]{figures/ase_association.png}
+    \caption{Heuristic for assigning 2D-3D observability. For a given RGB image (left), we visualize various thresholds for 2D-3D observability, going from more objects (left-middle) to fewer objects (right). We ultimately used the 100px threshold (middle-right).  \label{fig:ase_association}}
+\end{figure}
+
+\noindent\textbf{Visibility Annotation Details}. In order to train a 3D object detector that operates on short video snippets, it is necessary that we select which 3D objects to assign as "visible" within the video snippet. With a simulated dataset such as \ASE{}, we have per pixel observability information for each camera. We first associate the 3D OBBs with the 2D instance masks of the images to determine the observability. As no OBBs in \ASE{} intersects with each other, we achieve this by simply unprojecting the pixels inside an instance mask using ground-truth depth maps and the camera calibrations, then associate the mask with the OBB which contains the unprojected points. We further filter out the OBBs of which the mask contains too few pixels to account for the occlusion and very far away objects. In this paper, we use a simple heuristic which is to filter out the OBB observations with less than $100$ pixels in the 704x704 RGB camera image.
+
+
+\begin{figure}
+\centering
+    \includegraphics[width=0.8\textwidth]{figures/ase_gt_class_hist.png}
+    \caption{3D Object Bounding box per class frequency histogram for ASE.}
+    \label{fig:class_hist_ase}
+\end{figure}
+
+\noindent\textbf{\ASE{} Per Class Statistics}. A histogram of the per-class 3d orientend bounding box counts are shown for 10k \ASE{} sequences in Fig.~\ref{fig:class_hist_ase}, for a total of about 251k OBBs.
+
+
+\subsection{Aria Everyday Objects (AEO) Details}
+
+\noindent\textbf{AEO More Details.} The AEO dataset consists of short (1-2 minute) recordings from Project Aria, collected by non-computer vision expert wearers. This results in trajectories that do not scan entire scenes but rather explore scenes in a more natural way, often focused on one or a handful of objects. The dataset consists of 20 unique scenes across 26 sequences with 584 total OBBs. Most sequences are collected indoors, though there are a few collected in backyards and a garage. Top down views of the dataset are visualized in Fig.~\ref{fig:aeo_overhead} and visualizations with the 3D OBBs projected onto the three Project Aria images are shown in Fig.~\ref{fig:aeo_examples}.
+
+\noindent\textbf{Remapping ASE Classes to AEO}. The ASE taxonomy does not perfectly match the AEO taxonomy. The classes "Couch", "Table", "Bed", "Chair", "Window", "Mirror" and "Lamp" have the same name so we match those directly. The classes "PictureFrameOrPainting" is mapped to "wall art" and "PlantOrFlowerPot" is mapped to "plant". We note that the definition of each OBB differs slightly, for example "lamp" in AEO covers floor lamps, chandeliers and recessed overhead lighting for example, while in ASE it typically only covers floor lamp. These slight differences in taxonomy definition are another potential source of limitations for sim-to-real generalization. Per-class object detection performance differences shown in Sec.~\ref{supp:per_class_perf} indicate as much.
+We leave open-taxonomy OBB detection to future work which should mitigate this issue.
+
+\begin{figure}
+\centering
+    \includegraphics[width=0.7\textwidth]{figures/aeo_gt_class_hist_v2.png}
+    \caption{3D Object Bounding box per class frequency histogram for AEO. The colored bars for AEO correspond to the classes visualized throughout this paper.}
+    \label{fig:class_hist_aeo}
+\end{figure}
+
+\noindent\textbf{\AEO{} Per Class Statistics}. A histogram of the per-class 3d orientend bounding box counts are shown for 26 \AEO{} sequences in Fig.~\ref{fig:class_hist_aeo}, for a total of 584 OBBs.
+
+\begin{figure}
+\centering
+    \includegraphics[width=0.88\textwidth]{figures/aeo_grid_v2.png}
+    \caption{Top-down view of each of the 26 scenes from the AEO dataset show the OBBs (colored by class), point cloud (black) and Project Aria trajectory (blue). \label{fig:aeo_overhead}}
+\end{figure}
+
+
+\begin{figure}
+\centering
+    \includegraphics[width=0.88\textwidth]{figures/aeo_rgb/viz1.jpg}
+    \includegraphics[width=0.88\textwidth]{figures/aeo_rgb/viz2.jpg}
+    \includegraphics[width=0.88\textwidth]{figures/aeo_rgb/viz3.jpg}
+    \includegraphics[width=0.88\textwidth]{figures/aeo_rgb/viz4.jpg}
+
+    \caption{Example Ground Truth 3D Object Bounding Box Labels for AEO, each row is from a different sequence. The left two images show the OBBs visualized in the greyscale images, the middle shows the OBBs in the RGB image, and the right side shows a 3D visualization of the OBBs alongside the full scene point cloud \label{fig:aeo_examples}}
+\end{figure}
+
+
+\section{EFM3D Benchmark Details}
+
+We first provide more details for the tracking and fusion of 3D OBBs as well as scene surfaces before describing the surface error metrics in more detail.
+
+\input{persistence}
+
+\subsection{Surface Error Metrics}
+Unlikely the previous evaluations~\cite{sun2021neucon,murez2020atlas} that degenerates the metrics to point-cloud-to-point-cloud distance, we strictly evaluate mesh-to-mesh distance, since having GT meshes is one of the unique values of the proposed datasets. We follow Jensen \etal~\cite{jensen2014large} to compute accuracy and completeness errors, denoted as $Acc$ and $Comp$. Accuracy is the distance of the reconstruction (i.e. the input) to the ground truth (i.e. the reference); completeness is the distance from ground truth to reconstruction. When input and reference are meshes, both accuracy and completeness is computed. When the input is the semi-dense points, only accuracy is computed. 
+To compute mesh-to-mesh distance, the implementation first samples a fixed number (=10k) of points on the input mesh, and then computes the distance of these points to the closest face of the reference mesh.
+Like previous evaluations, we also compute $Precision@5cm$ ($Prec$) and $Recall@5cm$ ($Recal$) which are the ratio of point-to-mesh distances that are within $5cm$. These metrics are mathematically defined in Table.~\ref{tab:surf_metrics}, where $P$ and $P^{*}$ denote the sampled point sets from the predicted and GT mesh. $T$ and $T^{*}$ denote the triangles for the predicted and GT meshes. $\textbf{Dist}(p, f)$ is the orthogonal distance from a point $p$ to a triangle face $f$.  
+\begin{table}[]
+    \centering
+    \begin{tabular}{c|c}
+       \hline \hline
+       Acc  &   $\text{mean}_{p\in P} (\min_{f \in T^{*}} \textbf{Dist}(p, f) )$ \\ \hline 
+       Comp     &  $\text{mean}_{p\in P^{*}} (\min_{f \in T} \textbf{Dist}(p, f) )$  \\ \hline           
+       Prec     &     $\text{mean}_{p\in P} (\min_{f \in T^{*}} \textbf{Dist}(p, f) < 0.05 )$        \\ \hline
+       Recal     &      $\text{mean}_{p\in P^{*}} (\min_{f \in T} \textbf{Dist}(p, f) < 0.05)$         \\
+       \hline \hline
+    \end{tabular}
+    \caption{Surface metric definitions.}
+    \label{tab:surf_metrics}
+\end{table}
+
+
+\section{Additional Experiments and Details}
+
+We provide more details for \EVL{} OBB detection performance by drilling into per-class mAPs, show more qualitative experiments on AEO, and illustrate some failure cases for OBB detection. 
+Additionally, we provide additional sensitivity studies for surface regression with \EVL{} and show failure modes of Gaussian Splats for surface estimation on egocentric data. The later justifies why we did not compare against Gaussian Splats.
+
+%\begin{itemize}
+% \item per class OBB results AEO 
+%\item per class OBB results ASE for top classes
+%\item parameters for OBB Tracker
+%\item parameters for TSDF fusion
+%\item surface ablations or sensitivity study 
+%\end{itemize}
+
+
+
+\subsection{EVL per-class Object Detection Performance} 
+\label{supp:per_class_perf}
+In Table~\ref{tab:obj_det_per_class_aeo} we show per-class mAPs for the four models on \AOThree{} and in Table~\ref{tab:obj_det_per_class_ase} on the \ASE{} validation dataset. Unlike on \ASE{}, no model does well on the Mirror, Lamp or Plant/FlowerPot class on \AOThree{}  which is likely due to substantial sim-to-real gap in the class examples in the ASE training dataset. For the Lamp and Plant/FlowerPot class the typical position on top of other objects in the real world may also contribute to the sim-to-real gap since in \ASE{} all objects are placed on the floor. 
+Both ImVoxelNet and 3DETR struggle with the WallArt/Picture and Window classes which \EVL{} performs well on.
+Larger, relatively well defined objects such as Bed, Chair, Sofa/Couch and Table are detected reasonably well by all detectors.
+
+\begin{table}[]
+    \centering
+    \begin{tabular}{c| c|c|c|c| c|c|c|c| c|c|c|c|}
+     % $&  \AOThree{} mAP  & & & & & & \\ 
+     &  Bed & Chair & Couch & Lamp & Mirror & Plant & Table & WallArt & Window \\ \hline
+        Cube R-CNN    & 0.32 & 0.08 & 0.33 & 0.00 & 0.00 & 0.00 & 0.02 & 0.00 & 0.00 \\ 
+        ImVoxelNet    & 0.49 & 0.22 & 0.46 & 0.05 & 0.00 & 0.00 & 0.08 & 0.01 & 0.05 \\ 
+        3DETR         & 0.24 & 0.23 & 0.66 & 0.03 & 0.00 & 0.00 & 0.10 & 0.06 & 0.07 \\
+        \EVL{} (ours) & 0.46 & 0.25 & 0.65 & 0.04 & 0.01 & 0.00 & 0.14 & 0.21 & 0.18 \\  % joint image Pts model
+    \end{tabular}
+    \caption{Four models trained on \ASE{} are evaluated the real-world \AOThree{} dataset. }
+    \label{tab:obj_det_per_class_aeo}
+\end{table}
+
+
+\begin{table}[]
+    \centering
+    \begin{tabular}{c| c|c|c|c| c|c|c|c| c|c|c|c|}
+     &  Bed & Chair & FlowerPot & Lamp & Mirror & Picture & Sofa & Table & Window \\ \hline
+        Cube R-CNN    & 0.78 & 0.62 & 0.32 & 0.37 & 0.04 & 0.02 & 0.71 & 0.54 & 0.19 \\ 
+        ImVoxelNet    & 0.94 & 0.92 & 0.68 & 0.83 & 0.19 & 0.11 & 0.95 & 0.91 & 0.61 \\ 
+        3DETR         & 0.90 & 0.78 & 0.18 & 0.34 & 0.10 & 0.13 & 0.87 & 0.62 & 0.36 \\
+        \EVL{} (ours) & 0.95 & 0.91 & 0.77 & 0.86 & 0.44 & 0.37 & 0.94 & 0.88 & 0.73 \\  % joint image Pts model
+    \end{tabular}
+    \caption{Four models trained on \ASE{} are evaluated on the \ASE{} validation dataset. }
+    \label{tab:obj_det_per_class_ase}
+\end{table}
+
+
+
+\subsection{\EVL{} Object Detection Scaling Experiments}
+\label{sup:scaling}
+
+What training dataset size is big enough to saturate the current \EVL{} model? 
+We train \EVL{} on increasingly large subsets of the ASE training dataset and measure detection performance on the same validation set. We find that \EVL{}s performance saturates at 10k sequences.
+This is the foundation of our choice to train on the 600k 1s snippets of a subset of 10k sequences from ASE.
+We expect that transformer-based methods would exhibit better scaling behavior and leave this investigation for future work.
+
+% frozen vs unfrozen ablation
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.65\textwidth,trim=0 0 0 10,clip]{figures/EVL_scaling_ASE.png}
+    \caption{\EVL{} performance on the same validation set saturates at 10k ASE sequences (the last data point on the log-scaled x-axis).
+    %We train \EVL{} on increasingly large subsets of the ASE training dataset and measure detection performance on the same validation set. We find that \EVL{}s performance saturates at 10k sequences.
+    }
+\end{figure}
+
+%https://docs.google.com/document/d/1XEv4IuPpDRcKJ7VXirzrLUTqacZJ79GIDdFYtMKav9w/edit#heading=h.sx02p5guwdgy
+%https://docs.google.com/spreadsheets/d/1-C4hIRjXC9phLz-k_BGhe0bWYeCYPMVtjMZgcpshQFs/edit#gid=1329688625
+
+%\TODO{make figure and add text  scaling experiments -- plateau at around 10k}
+
+
+
+% \subsection{EVL Qualitative Results for Object Detection on AEO}
+% \TODO{Daniel}
+
+% \TODO{rows of qualtiative results of EVL}
+
+\subsection{EVL Failure Cases and Limitations}
+
+EVL has only been trained on the simulated ASE training dataset and therefore has only seen a limited set of scene variations. Particularly it has only seen indoor scenes with all objects located on the ground.
+
+\noindent\textbf{Failure cases.}
+In Fig.~\ref{fig:sup_object_on_top} we show that EVL has problems detecting objects on top of other objects. In this case the plant object on the table is not detected. This domain gap in relative object poses contributes to the substantially lower mAPs seen in objects that are typically not located on the floor (see~Sec.~\ref{supp:per_class_perf}).
+%
+In Fig.~\ref{fig:sup_mirror} we show that the presence of mirrors in the ASE dataset leads to erroneous reflected detections outside the room behind the mirrors. This shows that the model has not yet learned to correctly reason about reflections via mirrors.
+
+\noindent\textbf{Limitations.}
+We show EVL running on an outdoor sequence from AEO in Fig.~\ref{fig:evl_outdoor} . 
+As noted before EVL has only seen indoor scenes during training which means that trees and open sky are completely out of the training distribution. 
+EVL reconstruction quality degrades gracefully on this sequence by still predicting smooth surfaces for the tree, table and grass, but struggles with the fine detail of the tree branches. Another drawback is that the EVL model has a limited 3D viewing frustum ($4m \times 4m \times 4m$ by default), which cannot process distant scene geometry which is more common outdoors.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{figures/ase_obb_viz/Mirror-Figure.pdf}
+    \caption{\EVL{} fails to reason about the reflections and predicts false-positives on the reflected image from the mirror on the wall. 
+    \label{fig:sup_mirror}
+    }
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{figures/failure_plant_on_table.png}
+    \caption{\EVL{} fails to detect the plant on the table (shown in the green OBB). This is due to a limitation in the training data where there are no objects on top of on another in \ASE{}.
+    \label{fig:sup_object_on_top}
+    }
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.45\textwidth]{figures/evl_surface_outdoor.png}
+    \includegraphics[width=0.45\textwidth]{figures/evl_surface_outdoor_bev.jpg}
+    \caption{\EVL{} was trained only on indoor data from \ASE{} yet generalizes reasonably well on outdoor real Project Aria data. However, the limited FoV and lack of detail on tree branches remain problematic, and the 3D viewing frustum ($4m \times 4m \times 4m$) limits the range of reconstructions that \EVL{} can deliver. 
+    \label{fig:evl_outdoor}
+    }
+\end{figure}
+
+
+\subsection{EVL Sensitivity Study for Surface Estimation}
+
+\noindent\textbf{Camera Model Sensitivity:}
+We test \EVL{} surface regression when changing the camera model. Specifically, we rectify the original Fisheye camera model to linear camera models and use the rectified images as the inputs to the \EVL{} model.
+As shown in Table~\ref{tab:surf_cam_ablation}, the performance does not degrade substantially with different camera models. Camera models with smaller field of view like the ScanNet-linear camera model do lead to the largest degradation. Insensitivity to the particular camera model is a valuable property since it theoretically allows training the same model on different kinds of cameras. Likely the semi-dense points inputs are important in keeping performance relatively high independent of the camera model.
+%\TODO{why does it matter?}
+% we are not showing surface ablations 
+% \input{tables/surf_ablation}
+\input{tables/surf_cameramodels}
+
+\noindent\textbf{Ablation Studies:} We show the ablation studies of \EVL{} on Surface regression. Specifically, in Table~\ref{tab:surf_ablation} we show the effectiveness of using the points mask and the freespace mask. We can see that using point masks from the semi-dense points gives a large boost on the performance and by modeling the freespace it gets further improved.
+\input{tables/surf_ablation}
+% \input{tables/obb_ablation}
+
+
+\subsection{Gaussian Splats Experiments}
+We evaluated 3D Gaussian Splatting \cite{kerbl3Dgaussians} as a surface estimator  using NerfStudio's Splatfacto model \cite{nerfstudio}. The images from the RGB stream were undistorted from fisheye to linear cameras using the Max. Linear camera model before training and the Gaussian point cloud is optimized for 30K iterations with the default settings. 
+
+The rendered results of the optimized 3D Gaussian point cloud are shown in Fig.~\ref{fig:gaussian_adt}. Notice the inconsistent floor texture with many areas of dark patches or fog. These areas exactly correspond to the areas where the device-wearer moved while capturing the video. When the video used to train the 3D Gaussian point cloud contains observations of the wearer (as shown in Fig.~\ref{fig:gaussian_breakdown}) the model will attempt to create new Gaussians at the along the wearer's trajectory to explain those observations (incorrectly) as static Gaussians. This is particularly a problem when computing the depth via rendering because these artifacts create false surfaces or otherwise degrade the depth value output by the rasterization process (see Fig.~\ref{fig:gaussian_breakdown} right). The ADT dataset sequences contain significant dynamics of this nature, and so we did not evaluate Gaussian Splatting results for the surface estimation task. We expect that this rapidly evolving area will provide significant opportunity for future EFM algorithms.
+
+\begin{figure}[htbp]
+    \centering
+    % Top cell for the large image
+    \begin{minipage}{\textwidth}
+        \centering
+        \includegraphics[width=0.75\textwidth]{figures/gaussian-splatting/birdseye.png} % Adjust width as needed
+        \caption{Top-down view of ADT-136 "work" reconstructed using 3D Gaussian Splatting \cite{kerbl3Dgaussians}. Egocentric data contains sparse, dynamic observations of the user throughout the scene. The inability for 3D Gaussians to model these sparse dynamics leads to "fog" throughout the scene placed exactly at the user's trajectory\label{fig:gaussian_adt}. This "fog" degrades the accuracy of the rendered depth from Gaussian Splatting.}
+    \end{minipage}
+\end{figure}
+\begin{figure}[htbp]
+    % Bottom cell for the 2x3 grid of images
+    % Adjust the width of each subfigure to fit the 3 columns layout
+    \begin{minipage}{\textwidth}
+        \centering
+        % Row 1
+        \begin{subfigure}{0.32\textwidth}
+            \includegraphics[angle=-90,width=\textwidth]{figures/gaussian-splatting/tablet_gt.jpg}
+        \end{subfigure}
+        \hfill % Space between images
+        \begin{subfigure}{0.32\textwidth}
+            \includegraphics[angle=-90,width=\textwidth]{figures/gaussian-splatting/tablet_rgb.png}            
+        \end{subfigure}
+        \hfill % Space between images
+        \begin{subfigure}{0.32\textwidth}
+            \includegraphics[angle=-90,width=\textwidth]{figures/gaussian-splatting/tablet_depth.png}           
+        \end{subfigure}
+
+
+       \begin{subfigure}{0.32\textwidth}
+            \includegraphics[angle=-90,width=\textwidth]{figures/gaussian-splatting/coffee_gt.png}
+        \end{subfigure} 
+        \hfill % Space between images
+        \begin{subfigure}{0.32\textwidth}
+            \includegraphics[angle=-90,width=\textwidth]{figures/gaussian-splatting/coffee_rgb.png}            
+        \end{subfigure}      
+        \hfill % Space between images
+        \begin{subfigure}{0.32\textwidth}
+            \includegraphics[angle=-90,width=\textwidth]{figures/gaussian-splatting/coffee_depth.png}           
+        \end{subfigure}
+
+            \caption{\textbf{Left:} Two video frames from ADT-136 "work" containing observations of the user dynamically interacting with the scene. \textbf{Center:} The rendered RGB image of the same viewpoint using the optimized 3D Gaussian point cloud. \textbf{Right:} The rendered depth maps using the optimized 3D Gaussian point cloud.\label{fig:gaussian_breakdown}}
+    \end{minipage}
+\end{figure}

@@ -1,0 +1,60 @@
+
+\begin{comment}
+\begin{table}[]
+    \centering
+    \tiny
+    \begin{tabular}{c|c| c|c|c|c|c|c|c|c|}
+           & Modality & ASE & ASE  & ASE & ASE & ADT & ADT  & ADT & ADT \\ 
+           &         &  Acc $\downarrow$   & Comp $\downarrow$ & Prec $\uparrow$  &  Recal $\uparrow$ &  Acc $\downarrow$ & Comp $\downarrow$ & Prec $\uparrow$   &  Recal $\uparrow$ \\ \hline 
+        GT Depth ScanNet Linear & frame & 0.015 & 1.18  & 0.95 & 0.39 & 0.020 & 2.74 & 0.91  & 0.18 \\
+        GT Depth Max Linear & frame & 0.014 & 0.49 & 0.94 & 0.51 & 0.052 & 1.46 & 0.81 & 0.38 \\
+        GT Depth Distorted & frame & 0.011 & 0.47 & 0.95 & 0.57 & 0.050 & 1.39 & 0.85 & 0.40 \\ \hline
+        Semidense Points & pts & 0.034 & - & 0.94 & - &0.122 & - & 0.72 & - \\
+        % Semidense Points (max-std=0.01) & pts & 0.071 & - & 0.825 & - &0.801 & - & 0.536 & - \\
+        OTS ZoeDepth~\cite{bhat2023zoedepth} & frame & 0.368 & 1.225 & 0.29 & 0.13 & 0.417 & 2.127 & 0.200 &  0.076 \\
+        OTS ConsistentDepth~\cite{khan2023tcod} & frame & 0.349 & 1.304 & 0.277 & 0.125 & 0.603 & 2.759 & 0.145 & 0.045 \\
+        OTS SimpleRecon~\cite{sayed2022simplerecon} & snippet & 0.33 & 1.90 & 0.14 & 0.040 & 0.46 & 3.60 & 0.14 & 0.021 \\ 
+        OTS NeuralRecon~\cite{sun2021neucon}& snippet  & 0.110 & 1.952 &0.491 & 0.160 & 0.183 & 3.905& 0.371& 0.043\\
+        NeuralRecon~\cite{sun2021neucon} & snippet  & 0.212 & 1.103 & 0.512 & 0.241 &0.307 &3.383 & 0.474 & 0.061\\
+        OpenOcc & snipp \& pts & 0.075 & 0.95 & 0.73 & 0.35 & 0.39 & 3.11 & 0.44 & 0.077 \\
+        OpenOcc NewExtent & snipp \& pts & 0.060 & 1.52 & 0.79 & 0.29 & 0.13 & 3.58 & 0.67 & 0.085 \\
+        % Gaussian Splats~\cite{kerbl3Dgaussians} & full video & & & & & & & & \\
+    \end{tabular}
+    \caption{We show in domain performance on ASE validation dataset as well as sim-to-real generalization performance on the ADT dataset. Accuracy and completeness are measured in meters. Precision and recall are given at a 5cm threshold.\TODO{revisit all numbers}. \TODO{revisit font size} \TODO{Rectification Column} \TODO{ZoeDepth aligns the scale wrt semi-dense points}}
+    \label{tab:surf_perf}
+\end{table}
+\end{comment}
+
+
+\begin{table}[]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{c|c|c||c|c|c|c||c|c|c|c}
+           & Model & Modality & ASE & ASE  & ASE & ASE & ADT & ADT  & ADT & ADT \\ 
+           &   &      &  Acc $\downarrow$   & Comp $\downarrow$ & Prec $\uparrow$  &  Recal $\uparrow$ &  Acc $\downarrow$ & Comp $\downarrow$ & Prec $\uparrow$   &  Recal $\uparrow$ \\ \hline 
+        \textit{GT-Depth-Fisheye} & - & frame & 0.011 & 0.473 & 0.945 & 0.568 & 0.060 & 1.392 & 0.793 & 0.360 \\ 
+        \textit{GT-Depth-MaxLinear} & - & frame & 0.014 & 0.487 & 0.944 & 0.507 & 0.052 & 1.463 & 0.807 & 0.357 \\
+        \textit{GT-Depth-ScanNet}  & - & frame & 0.015 & 1.183  & 0.952 & 0.386 & 0.020 & 2.744 & 0.907  & 0.178 \\ 
+        \textit{Semidense Points} & - & pts & 0.034 & - & 0.943 & - & 0.122 & - & 0.720 & - \\ \hline
+        % Semidense Points (max-std=0.01) & pts & 0.071 & - & 0.825 & - &0.801 & - & 0.536 & - \\
+        ZoeDepth~\cite{bhat2023zoedepth} & OTS & frame & 0.368 & 1.225 & 0.290 & 0.130 & 0.417 & \textbf{2.127} & 0.200 &  0.076 \\
+        ConsistentDepth~\cite{khan2023tcod} & OTS & frame & 0.349 & 1.304 & 0.277 & 0.125 & 0.603 & 2.759 & 0.145 & 0.045 \\
+        % SimpleRecon~\cite{sayed2022simplerecon} & OTS & snippet & 0.33 & 1.90 & 0.14 & 0.040 & 0.46 & 3.60 & 0.14 & 0.021 \\ 
+        SimpleRecon~\cite{sayed2022simplerecon} & OTS & snippet & 0.539 & 3.064 & 0.257 & 0.064 & 0.326 & 3.063 & 0.257 & 0.064 \\ 
+        NeuralRecon~\cite{sun2021neucon}& OTS & snippet  & 0.110 & 1.952 &0.491 & 0.160 & 0.183 & 3.905& 0.371& 0.043\\
+        NeuralRecon~\cite{sun2021neucon} & ASE & snippet  & 0.212 & 1.103 & 0.512 & 0.241 &0.307 &3.383 & 0.474 & 0.061\\
+        % OpenOcc & ASE & snipp \& pts & 0.075 & 0.95 & 0.73 & 0.35 & 0.39 & 3.11 & 0.44 & 0.077 \\ % old extent
+        % \EFMmodel{} & ASE & snip$+$pts & 0.060 & 1.52 & 0.79 & 0.29 & 0.13 & 3.58 & 0.67 & 0.085 \\ 
+        \EFMmodel{} (ours) & ASE & snip$+$pts & \textbf{0.057} & \textbf{0.877} & \textbf{0.822} & \textbf{0.405} & \textbf{0.182} & 3.105 & \textbf{0.594} & \textbf{0.106} \\ 
+        % Gaussian Splats~\cite{kerbl3Dgaussians} & full video & & & & & & & & \\
+    \end{tabular}
+    }
+    \caption{We show in-domain performance on ASE validation dataset as well as sim-to-real generalization performance on the ADT dataset. Accuracy and completeness are measured in meters. Precision and recall are given at a 5cm threshold. We train NeuralRecon and \EFMmodel{} on the ASE dataset. For other baseline methods we use the off-the-shelf (OTS) models. Depth-based methods such as ZoeDepth have better completeness on ADT as they are not limited by a 3D bounding volume.}
+    \label{tab:surf_perf}
+    \vspace{-5mm}
+\end{table}
+
+% semidense points using max-std=0.001
+% zoedepth aligned depth scale with semidense points
+% consistentDepth aligned depth scale with semidense points
+% simpleRecon aligned depth scale (f538392050 f538391978), using 10x truncation size

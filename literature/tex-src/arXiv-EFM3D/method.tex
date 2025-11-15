@@ -1,0 +1,111 @@
+% \section{3D Egocentric Foundation Model (\EFMmodel{})}
+\section{Egocentric Voxel Lifting (\EFMmodel{})}
+
+We design \EFMmodel{} as a universal 3D backbone that lifts 2D foundation features from posed and calibrated video streams into a 3D gravity-aligned voxel grid of features. Before processing this 3D feature volume with a 3D U-Net we concatenate masks derived from semi-dense points that indicate surface points as well as freespace. As shown in Fig.~\ref{fig:efm_model}, on this feature volume we can run different kinds of 3D-CNN heads to regress desired 3D quantities such as 3D OBB parameters and occupancy values.
+%We propose the first 3D egocentric foundation model,\EFMmodel{}, inspired by related work~\cite{murez2020atlas,philion2020lift,rukhovich2022imvoxelnet,sun2021neucon} to lift 2D foundation features~\cite{oquab2023dinov2,darcet2023vitneedreg} extracted from posed video snippets into an explicit gravity-aligned feature volume. This feature volume is defined on a voxel grid in a local coordinate system. 
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{figures/efm3d_arch_v1.pdf}
+    \caption{\EFMmodel{} lifts 2D features extracted from frozen image foundation models into an local gravity-aligned 3D voxel grid of features. After concatenating point masks a U-Net processes the 3D feature volume before running 3D CNN heads. These heads regress target parameters such as 3D OBBs and occupancy values.
+    %\TODO{show gravity aligned voxel grid}
+    \label{fig:efm_model}}
+\end{figure}
+
+%\subsection{2D-3D Lifting Backbone}
+%The 2D-3D lifting backbone is the core \EFMmodel{} module that enables 3D reasoning from 2D posed image observations. It first encodes the images, then lifts those features into 3D. In 3D we concatenate with a semidense points mask before running a 3D U-Net to produce the final 3D feature volume.
+
+\noindent\textbf{2D-3D Lifting Encoder} We run a 2D foundation model~\cite{oquab2023dinov2} with frozen weights on $T$ posed input images from each video stream. The resulting 2D foundation features are up-sampled to the full input image resolution using stacked 2D CNN \& upsample layers.  
+%
+We instantiate a local, gravity-aligned 3D voxel grid in front of the most recent Aria camera rig. We choose the last RGB camera pose and gravity align its rotation to obtain the anchor pose of the voxel grid.
+%\TODO{could go to supplement}
+%Given camera rotation $R_{wc} = [r_x, r_y, r_z]$ and unit-length gravity direction $g_w$ in world coordinates we compute the gravity aligned rotation $R_{wg}$ as:
+%\begin{align}
+%    R_{wg} &= [g_w, \lceil d_z \times g_w \rceil, \lceil d_z\rceil ] \quad \text{where}\quad
+%     d_z %= \text{reject}(R_{wc}_2, g_w) 
+%     = r_z - g_w^T r_z g_w \,,
+%\end{align}
+%and $\lceil x \rceil $ normalizes a vector $x$ to unit length.
+%
+Using known camera poses and calibrations, we project the voxel grid centers into each image and sample the 2D feature maps using bi-linear interpolation while respecting the valid radius of the distorted camera models.
+This yields a feature volume of $T\times F \times D\times H\times W$ for every stream. 
+We aggregate features across all streams and the time dimension using mean and standard deviation to obtain a lifted feature volume of shape $2F \times D\times H\times W$.
+The metric size and resolution of the voxel grid can be defined freely. 
+%
+Note that this lifting formulation is camera model agnostic and supports online-calibrated video streams from Aria. Please refer to the supplemental for the experiments of \EFMmodel{} using different camera models.
+
+\noindent\textbf{Semi-Dense Point Encoder}. We additionally input the semi-dense 3D point cloud provided by the Aria research toolkit~\cite{engel2023project} to provide a geometric prior for the lifting backbone. Together with the visibility information from where each point was observed this point cloud contains not only information about the surfaces in the scene but also the freespace. To provide this information to \EFMmodel{} we compute a point and a free-space mask tensor to concatenate to the lifted feature volume. 
+%After transforming the 3D point positions into the voxel grid coordinate system, 
+The point mask indicates where there are surface points. It is computed by discretizing points into a binary mask sized $D\times H\times W$ corresponding to the voxel grid resolution.
+The freespace mask indicates the voxel locations between the camera centers to the known surface points.
+We compute it by sampling $S$ points along each ray within the bounds of the feature volume. 
+We concatenate both masks to the lifted 3D features resulting in a 3D feature volume shaped $(F+2)\times D\times H\times W$.
+
+\noindent\textbf{3D U-Net}. Once the 3D feature volume is instantiated, we run a 3D U-Net to allow 3D processing. The U-Net reduces the spatial resolution by a factor of 8x before upsampling back to the full 3D resolution.
+See a more detailed model diagram in the supplemental.
+
+%\TODO{mention vignette removal?}
+
+
+% key bits: sample with interpolation; concat the point mask; gravity aligend voxel grid;
+% joint slam stream lifting
+% multi-stream lifting and compression
+% Lifter backbone
+% 3d unet 
+
+\subsection{3D Bounding Box Detection}
+%
+We assume all object bounding boxes are gravity-aligned. We take inspiration from the ImVoxelNet~\cite{rukhovich2022imvoxelnet} to build a proposal-free and anchor-free 3D detection head. 
+This head runs on top of the output of \EFMmodel{} and regresses the class distribution ($v^{cls}$) and eight values defining the geometric properties of a 3D bounding box. 
+It first predicts a centerness score of $[0,1]$ for each voxel $v$. The centerness ($v^c$) of each voxel defines the probability of containing any object bounding box center.
+%
+Then the head regresses the seven parameters ($v^{obb}$) that describe the bounding box: three for the height, width and depth of the box, three that predict a small offset for the bounding box center to account for discretization of the voxel grid, and lastly a single yaw rotation parameter that determines the rotation of the bounding box around the gravity direction.
+%
+The predictions are then filtered with Non-Maximum Suppression (NMS) using 3D Intersection over Union (IoU) and the centerness confidence score. There are three losses used for training, one for each head. The centerness and the classifier heads are trained with focal loss (FL)~\cite{lin2017focal}, and the parameters head is trained using gravity oriented 3D IoU loss. With $N_v$ being the number of voxels:
+% We directly supervise with observable 3D bounding boxes for each snippet.
+%\TODO{how is the GT centerness defined?} 
+% \TODO{Data preparation of GT Obbs in impl.}
+% \TODO{shorten no moe than one line; need to explain variables}
+\begin{align}\textstyle
+    L_{obj} = \frac{1}{N_v}\sum^{N_v}_{n} & w_{c}\text{FL}(v_{n}^{c}, \widehat{v_{n}^{c}}) + w_{iou}\text{IoU}(v_{n}^{obb}, \widehat{v_{n}^{obb}}) + w_{cls}\text{FL}(v_{n}^{cls}, \widehat{v_{n}^{cls}}),
+\end{align}
+
+
+\subsection{3D Surface Regression}
+To regress 3D surfaces in the local gravity-aligned voxel grid we regress an occupancy value for every voxel. 
+%
+We supervise occupancy using the GT depth maps. For each GT depth value we obtain three kinds of occupancy supervisions: one surface point, one free-space point, and one occupied point. We compute the surface point $p_\text{surf}$ by unprojecting the GT depth values using the camera calibrations. The free-space point $p_\text{free}$ is sampled in front of the surface, while the occupied point $p_\text{occ}$ is sampled behind the surface. Both $p_\text{free}$ and $p_\text{occ}$ are randomly sampled up to $\delta$ distance from the surface, which we choose as the length of a voxel.
+%
+At these locations we sample into the predicted occupancy grid via tri-linear interpolation to obtain predicted values for all three kinds of points. The final loss is then computed via the focal loss~\cite{lin2017focal} by defining the ground-truth probability of free-space point, surface point, and occupied point being $0.0$, $0.5$, and $1.0$, respectively:
+\begin{align}
+   L_{surf} = \textstyle\frac{1}{N}\sum^{N}_{n} \text{FL}(p_\text{free}^n, 0.0) + \text{FL}(p_\text{surf}^n, 0.5) + \text{FL}(p_\text{occ}^n, 1.0),
+\end{align}
+where $\text{FL}(\cdot)$ is the focal loss and $N$ is the number of unprojected points from the GT depth maps. Note that we use focal loss to make the optimization to focus less on the easy samples like flat surfaces while more on the hard samples like sharp object boundaries. We further add a total variation (TV) regularization loss on the predicted occupancy volume to encourage local smoothness. 
+%to fill in unobserved areas in the volume.
+
+\subsection{Implementation and Training Details}
+% We introduce implentation details of~\EFMmodel{} and training details.
+
+\noindent\textbf{Input Snippet Data Preparation}. We sample 1s snippets from the RGB and greyscale video streams of Aria running at 10Hz.
+% This yields $T=10$ frames per stream per snippet. 
+% We resize the original RGB video to $240\times 240\times3$ and the greyscale video to $320\times240\times1$ which leads to approximately the same angular resolution per pixel. The semi-dense points inputs are causally optimized and only visible within the snippet, which ensures that trained models can operate in an online manner. 
+The input resolution for RGB and greyscale videos are $240\times 240\times3$ and $320\times240\times1$, which has approximately the same angular resolution per pixel.
+% The points observed in a given frame are \textit{causal}, meaning that the points at time $T_t$ depend only on sensor data from previous timesteps and the current timestep $T_0, T_1, ..., T_T$. This ensures that trained models can operate in an online causal way. 
+We leave exploring other image sampling strategies like key-framing~\cite{Xie_2023_ICCV} for future research.
+For the GT OBB labels, we use the OBBs which are visible inside the snippet and discretize the centers into the volume to obtain the centerness supervision signal. We further filter out the OBBs which are heavily occluded in the snippet as decribed in Sec.~\ref{sec:dataset}.
+% Note that we splat the centerness probability into its neighbours using a Gaussian kernel to facilitate the training convergence. 
+%\TODO{confirm the RGB resolution}
+%\TODO{add SLAM image details if used}
+
+\noindent\textbf{2D Foundation Model Encoder}. While we could use other 2D foundation models like CLIP~\cite{radford2021learning} to encode the video streams, we find the base DinoV2.5~\cite{oquab2023dinov2,darcet2023vitneedreg} model works well for our tasks and is reasonably efficient. 
+%The train with input RGB images are resized to $240\times240\times3$. 
+%We use DinoV2.5-base which operates on $14\times14$ patches and outputs features of dimension $17\times17\times768$ for the whole image. In all experiments we freeze the DinoV2.5 weights. The 2D feature maps are upsampled back to the input image $240\times240$ resolution\TODO{check this} using stacked CNN \& upsample layers. See more detailed model diagram in the supplemental.
+
+\noindent\textbf{Feature Volume} We choose a $4m^3$ voxel grid. We adapt the grid resolution to the task. For 3D object detection we find a $6.25cm$ voxel size ($D=H=W=64$) is sufficient and for surface regression we push to $4cm$ ($D=H=W=96$) to be comparable with related work~\cite{sun2021neucon}. 
+%The feature dimension of the feature volume is $F$.
+%The voxel grid size is chosen as $4\times4\times4$ meter cube, but this is easily configurable. We use a voxel grid resolution of $F\times64\times64\times64$, where $F$ is the final 2D feature dimension, each voxel having a unit length of 6.25 cm on each 3D dimension. \TODO
+
+\noindent\textbf{Hyperparameters}. The 3D Bounding Box Detection head is trained on ASE 10k sequences (with 526k snippets) for $10$ epochs and the 3D Surface Regression head is trained on the ASE 1k sequences (with 54k snippets). Both heads were trained with a base learning rate of $2e^{-4}$ using Adam~\cite{kingma2014adam} optimizer with cosine annealing scheduler. We set $w_{cent}=100$, $w_{iou} = 10$, and $w_{class} = 1.0$ for training 3D bounding box detection. For the inference, we use the centerness threshold of $0.2$ to select the candidate detections and performs simple 3D NMS with radius of $2$ voxels based on the 3D IoU. The focal loss paramters in the 3D Surface training is set to $\alpha=0.25$ and $\gamma=2.0$.
+
+% moved to supplement
+% \input{EFM3Dv0/persistence}
