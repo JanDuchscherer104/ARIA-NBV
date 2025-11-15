@@ -236,7 +236,42 @@ Collectively these channels encode texture, geometry, free space, and semantics�
 
 # EVL Training Format (ATEK WebDataset) {#atek-wds-format}
 
-EFM3D trains EVL on ATEK WebDataset (WDS) snippets: 2 s shards (20 frames) are streamed and cropped into overlapping 1 s windows (10 frames) via `AtekWdsStreamDataset` [efm3d/dataset/atek_wds_dataset.py:70](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/atek_wds_dataset.py#L70). The adaptor enforces fixed shapes and timestamps [efm3d/dataset/efm_model_adaptor.py:604](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/efm_model_adaptor.py#L604).
+EFM3D trains EVL on ATEK WebDataset (WDS) snippets: 2 s shards (20 frames) are streamed and cropped into overlapping 1 s windows (10 frames) via `AtekWdsStreamDataset` [efm3d/dataset/atek_wds_dataset.py:70](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/atek_wds_dataset.py#L70). The adaptor enforces fixed shapes and timestamps [efm3d/dataset/efm_model_adaptor.py:604](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/efm_model_adaptor.py#L604).
+
+## ATEK Key Naming Convention
+
+ATEK uses a structured naming scheme for data keys:
+
+**Format**: `<prefix>#<identifier>+<parameter>`
+
+**Prefixes**:
+
+- `mtd` = **M**otion **T**rajectory **D**ata (device poses over time)
+- `mfcd` = **M**ulti-**F**rame **C**amera **D**ata (per-frame camera data)
+- `msdpd` = **M**ulti-**S**emi-**D**ense **P**oint **D**ata (SLAM point clouds)
+
+**Separators**:
+
+- `#` separates prefix from identifier
+- `+` separates identifier from parameter
+
+**Examples**:
+
+```python
+# Motion trajectory: (T, 3, 4) SE(3) transformation matrices
+ts_world_device = sample["mtd#ts_world_device"]
+
+# Camera projection parameters
+projection_params = sample["mfcd#camera-rgb+projection_params"]
+
+# Depth images: (T, 1, H, W)
+depth_images = sample["mfcd#camera-rgb-depth+images"]
+
+# Semi-dense SLAM points: (N, 3) in world coordinates
+points_world = sample["msdpd#points_world+stacked"]
+```
+
+## ATEK Data Keys
 
 | Key | Shape | Type | Description |
 | --- | --- | --- | --- |

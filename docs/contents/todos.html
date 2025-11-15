@@ -616,10 +616,6 @@ window.Quarto = {
   <ul class="collapse">
   <li><a href="#candidate-sampling-strategies" id="toc-candidate-sampling-strategies" class="nav-link" data-scroll-target="#candidate-sampling-strategies"><span class="header-section-number">2.2.1</span> Candidate Sampling Strategies</a></li>
   </ul></li>
-  <li><a href="#data-management" id="toc-data-management" class="nav-link" data-scroll-target="#data-management"><span class="header-section-number">2.3</span> Data Management</a></li>
-  <li><a href="#oracle-rri-implementation" id="toc-oracle-rri-implementation" class="nav-link" data-scroll-target="#oracle-rri-implementation"><span class="header-section-number">2.4</span> Oracle RRI Implementation</a></li>
-  <li><a href="#visualization-analysis" id="toc-visualization-analysis" class="nav-link" data-scroll-target="#visualization-analysis"><span class="header-section-number">2.5</span> Visualization &amp; Analysis</a></li>
-  <li><a href="#testing-validation" id="toc-testing-validation" class="nav-link" data-scroll-target="#testing-validation"><span class="header-section-number">2.6</span> Testing &amp; Validation</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -682,8 +678,11 @@ window.Quarto = {
 <li>implement a <code>CandidateSample</code> that takes the candidate poses of type <code>PoseTW</code> and samples rays from the corresponding view onto the GT mesh to obtain a dense point cloud from this candidate view.
 <ul>
 <li>candidate pose generation: only within free space and within confines of the room (based on SSL for training); based on predicted occupancy from EFM3D for eval</li>
+<li>ray mesh intersection: check if both poses can see each other</li>
+<li>sampling based on occupancy grid?</li>
 </ul></li>
-<li>implement a class (name to be decided) that fuses the semi-dense SLAM PC <span class="math inline">\(mathcal{P}_t\)</span> with the dense PC from the candidate view <span class="math inline">\(\mathcal{P}_{\mathbf{q}}\)</span> to obtain the updated PC <span class="math inline">\(mathcal{P}_{t \cup \mathbf{q}}\)</span>.</li>
+<li>implement a class (name to be decided) that fuses the semi-dense SLAM PC <span class="math inline">\(\mathcal{P}_t\)</span> with the dense PC from the candidate view <span class="math inline">\(\mathcal{P}_{\mathbf{q}}\)</span> to obtain the updated PC <span class="math inline">\(\mathcal{P}_{t \cup \mathbf{q}}\)</span>.</li>
+<li>crop GT mesh to relevant volume around the trajectory to speed up computation, this is especially relevant for completeness computation.</li>
 </ul>
 <section id="data-handling" class="level3" data-number="2.1.1">
 <h3 data-number="2.1.1" class="anchored" data-anchor-id="data-handling"><span class="header-section-number">2.1.1</span> Data Handling</h3>
@@ -724,44 +723,13 @@ window.Quarto = {
 <ul>
 <li>Train a light weight network to predict the sampled rays given a canidate view and projection onto the mesh to imitate how their SAM would see it.</li>
 <li>Or simply generate dense PC (<span class="math inline">\(\mathcal{P}_{\mathbf{t}}\)</span>) from ground truth depth maps - what high-level implementations would be suited?</li>
-</ul>
-</section>
-</section>
-<section id="data-management" class="level2" data-number="2.3">
-<h2 data-number="2.3" class="anchored" data-anchor-id="data-management"><span class="header-section-number">2.3</span> Data Management</h2>
-<ul class="task-list">
-<li><label><input type="checkbox">Implement ASE dataset downloader using existing tools (ATEK, ProjectAria, GT meshes)</label></li>
-<li><label><input type="checkbox">Create data preprocessing pipeline for RRI computation</label></li>
-<li><label><input type="checkbox">Setup data directory structure and caching system</label></li>
-</ul>
-</section>
-<section id="oracle-rri-implementation" class="level2" data-number="2.4">
-<h2 data-number="2.4" class="anchored" data-anchor-id="oracle-rri-implementation"><span class="header-section-number">2.4</span> Oracle RRI Implementation</h2>
-<ul class="task-list">
-<li><label><input type="checkbox">Implement <code>OracleRRI</code> class with Chamfer Distance computation</label></li>
-<li><label><input type="checkbox">Create <code>CandidateViewGenerator</code> for sampling candidate poses around current position</label></li>
-<li><label><input type="checkbox">Integrate EFM3D ray casting with ATEK surface reconstruction evaluation</label></li>
-</ul>
-</section>
-<section id="visualization-analysis" class="level2" data-number="2.5">
-<h2 data-number="2.5" class="anchored" data-anchor-id="visualization-analysis"><span class="header-section-number">2.5</span> Visualization &amp; Analysis</h2>
-<ul class="task-list">
-<li><label><input type="checkbox">Implement plotting utilities for RRI scores, candidate views, and reconstructions</label></li>
-<li><label><input type="checkbox">Create progress tracking and logging system</label></li>
-<li><label><input type="checkbox">Add mesh comparison visualizations using trimesh/matplotlib</label></li>
-</ul>
-</section>
-<section id="testing-validation" class="level2" data-number="2.6">
-<h2 data-number="2.6" class="anchored" data-anchor-id="testing-validation"><span class="header-section-number">2.6</span> Testing &amp; Validation</h2>
-<ul class="task-list">
-<li><label><input type="checkbox">Validate RRI computation against theoretical expectations</label></li>
-<li><label><input type="checkbox">Test memory usage and optimization strategies</label></li>
-<li><label><input type="checkbox">Compare with existing NBV methods on ASE validation scenes</label></li>
+<li></li>
 </ul>
 
 
 <!-- -->
 
+</section>
 </section>
 </section>
 
@@ -1268,69 +1236,54 @@ window.Quarto = {
 <span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>implement <span class="in">`CandidateViewGenerator`</span>, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type <span class="in">`PoseTW`</span> (<span class="in">`external/efm3d/efm3d/aria/pose.py`</span>)</span>
 <span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>implement a <span class="in">`CandidateSample`</span> that takes the candidate poses of type <span class="in">`PoseTW`</span> and samples rays from the corresponding view onto the GT mesh to obtain a dense point cloud from this candidate view.</span>
 <span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>candidate pose generation: only within free space and within confines of the room (based on SSL for training); based on predicted occupancy from EFM3D for eval</span>
-<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>implement a class (name to be decided) that fuses the semi-dense SLAM PC $mathcal{P}_t$ with the dense PC from the candidate view  $\mathcal{P}_{\mathbf{q}}$ to obtain the updated PC $mathcal{P}_{t \cup \mathbf{q}}$.</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>ray mesh intersection: check if both poses can see each other</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>sampling based on occupancy grid?</span>
 <span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a><span class="fu">### Data Handling</span></span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>implement a class (name to be decided) that fuses the semi-dense SLAM PC $\mathcal{P}_t$ with the dense PC from the candidate view  $\mathcal{P}_{\mathbf{q}}$ to obtain the updated PC $\mathcal{P}_{t \cup \mathbf{q}}$.</span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>crop GT mesh to relevant volume around the trajectory to speed up computation, this is especially relevant for completeness computation.</span>
 <span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Implement a custom data-handler for the ASE dataset, using the tools provided in ATEK:</span>
-<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Download all 3 forms of the dataset for scenes for which the GT meshes are available.</span>
-<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Figure out, how to best manage to download corresponding data files (ATEK, raw ASE, GT meshes) for the same scenes.</span>
-<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>We also want to represents scenes together with the snippets that reside in them (snippets are in atek dataset structure ready for training).</span>
-<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>metadata should be comined in a single file for easy access.</span>
-<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>should provide mapping from scene_id to snippet_ids and vice versa.</span>
-<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>should leverage their download scripts internally to provide a cleaner interface.</span>
-<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>we want to be able to download meta data about all datasets withot downloading the full data to be able to explicitly see which scenes are relevant to us (i.e. in terms of having many atek snipptes and gt meshes available)</span>
-<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a>  <span class="in">```bash</span></span>
-<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a>  <span class="ex">external/ATEK/tools</span></span>
-<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> ase_mesh_downloader.py</span>
-<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> atek_wds_data_downloader.py</span>
-<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> benchmarking_static_object_detection.py</span>
-<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> benchmarking_surface_reconstruction.py</span>
-<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> infer_cubercnn.py</span>
-<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a>  <span class="ex">└──</span> train_cubercnn.py</span>
-<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a>  <span class="in">```</span></span>
-<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a>  <span class="in">```bash</span></span>
-<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a>  <span class="ex">.data/aria_download_urls</span></span>
-<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> AriaSyntheticEnvironment_ATEK_download_urls.json</span>
-<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> aria_synthetic_environments_dataset_download_urls.json</span>
-<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a>  <span class="ex">└──</span> ase_mesh_download_urls.json  <span class="co"># contains download links for 100 GT meshes ("scene_ply_&lt;scene_id&gt;.ply")</span></span>
-<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a>  <span class="in">```</span></span>
-<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Use <span class="in">`external/projectaria_tools/projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py`</span> to download the base ASE dataset</span>
-<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a>  <span class="in">```bash</span></span>
-<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a>  <span class="co"># example: download specific scenes</span></span>
-<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a>  <span class="ex">python3</span> projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py <span class="at">--set</span> train <span class="at">--scene-ids</span> 560-569 <span class="at">--cdn-file</span> aria_synthetic_environments_dataset_download_urls.json <span class="at">--output-dir</span> <span class="va">$HOME</span>/projectaria_tools_ase_data <span class="at">--unzip</span> True</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a><span class="fu">### Data Handling</span></span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Implement custom data handling for the ASE dataset, using the tools provided in ATEK:</span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Should provide easy access to the ASE dataset in ATEK WDS format together with the ground truth meshes.</span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Should wrap around their existing dataset and dataset downloader implementations to provide easy acces to the data we need.</span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Download all 3 forms of the dataset for scenes for which the GT meshes are available.</span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Figure out, how to best manage to download corresponding data files (ATEK, raw ASE, GT meshes) for the same scenes.</span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>We also want to represents scenes together with the snippets that reside in them (snippets are in atek dataset structure ready for training).</span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>metadata should be comined in a single file for easy access.</span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>should provide mapping from scene_id to snippet_ids and vice versa.</span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>should leverage their download scripts internally to provide a cleaner interface.</span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>we want to be able to download meta data about all datasets withot downloading the full data to be able to explicitly see which scenes are relevant to us (i.e. in terms of having many atek snipptes and gt meshes available)</span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a>  <span class="in">```bash</span></span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a>  <span class="ex">external/ATEK/tools</span></span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> ase_mesh_downloader.py</span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> atek_wds_data_downloader.py</span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> benchmarking_static_object_detection.py</span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> benchmarking_surface_reconstruction.py</span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> infer_cubercnn.py</span>
+<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a>  <span class="ex">└──</span> train_cubercnn.py</span>
+<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a>  <span class="in">```</span></span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a>  <span class="in">```bash</span></span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a>  <span class="ex">.data/aria_download_urls</span></span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> AriaSyntheticEnvironment_ATEK_download_urls.json</span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> aria_synthetic_environments_dataset_download_urls.json</span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a>  <span class="ex">└──</span> ase_mesh_download_urls.json  <span class="co"># contains download links for 100 GT meshes ("scene_ply_&lt;scene_id&gt;.ply")</span></span>
 <span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a>  <span class="in">```</span></span>
-<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a><span class="fu">## Lower Prio:</span></span>
-<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a><span class="fu">### Candidate Sampling Strategies</span></span>
-<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Train a light weight network to predict the sampled rays given a canidate view and projection onto the mesh to imitate how their SAM would see it.</span>
-<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Or simply generate dense PC ($\mathcal{P}_{\mathbf{t}}$) from ground truth depth maps - what high-level implementations would be suited?</span>
-<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a><span class="fu">## Data Management</span></span>
-<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Implement ASE dataset downloader using existing tools (ATEK, ProjectAria, GT meshes)</span>
-<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Create data preprocessing pipeline for RRI computation</span>
-<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Setup data directory structure and caching system</span>
-<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a><span class="fu">## Oracle RRI Implementation</span></span>
-<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Implement <span class="in">`OracleRRI`</span> class with Chamfer Distance computation</span>
-<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Create <span class="in">`CandidateViewGenerator`</span> for sampling candidate poses around current position</span>
-<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Integrate EFM3D ray casting with ATEK surface reconstruction evaluation</span>
-<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a><span class="fu">## Visualization &amp; Analysis</span></span>
-<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Implement plotting utilities for RRI scores, candidate views, and reconstructions</span>
-<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Create progress tracking and logging system</span>
-<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Add mesh comparison visualizations using trimesh/matplotlib</span>
-<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a><span class="fu">## Testing &amp; Validation</span></span>
-<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Validate RRI computation against theoretical expectations</span>
-<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Test memory usage and optimization strategies</span>
-<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Compare with existing NBV methods on ASE validation scenes</span>
-<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Use <span class="in">`external/projectaria_tools/projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py`</span> to download the base ASE dataset</span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a>  <span class="in">```bash</span></span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a>  <span class="co"># example: download specific scenes</span></span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a>  <span class="ex">python3</span> projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py <span class="at">--set</span> train <span class="at">--scene-ids</span> 560-569 <span class="at">--cdn-file</span> aria_synthetic_environments_dataset_download_urls.json <span class="at">--output-dir</span> <span class="va">$HOME</span>/projectaria_tools_ase_data <span class="at">--unzip</span> True</span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a>  <span class="in">```</span></span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a><span class="fu">## Lower Prio:</span></span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a><span class="fu">### Candidate Sampling Strategies</span></span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Train a light weight network to predict the sampled rays given a canidate view and projection onto the mesh to imitate how their SAM would see it.</span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Or simply generate dense PC ($\mathcal{P}_{\mathbf{t}}$) from ground truth depth maps - what high-level implementations would be suited?</span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a>-</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

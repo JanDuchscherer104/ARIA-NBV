@@ -360,6 +360,10 @@ window.Quarto = {
     <a class="dropdown-item" href="../contents/questions.html">
  <span class="dropdown-text">Research Questions</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="../contents/experiments/findings.html">
+ <span class="dropdown-text">Findings</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -564,8 +568,26 @@ window.Quarto = {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="../contents/impl/prj_aria_tools_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ProjectAria Tools: Complete Reference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="../contents/impl/rri_computation.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Computing RRI with Ground Truth Meshes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../contents/impl/oracle_rri_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Oracle RRI Implementation Overview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../contents/impl/efm3d_symbol_index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D Symbol Index</span></a>
   </div>
 </li>
       </ul>
@@ -1748,65 +1770,100 @@ make_window, id=2000, wall0_id=0, position_x=4.45, position_y=6.16, position_z=1
 <span id="cb8-236"><a href="#cb8-236" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-237"><a href="#cb8-237" aria-hidden="true" tabindex="-1"></a><span class="fu"># EVL Training Format (ATEK WebDataset) {#atek-wds-format}</span></span>
 <span id="cb8-238"><a href="#cb8-238" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-239"><a href="#cb8-239" aria-hidden="true" tabindex="-1"></a>EFM3D trains EVL on ATEK WebDataset (WDS) snippets: 2 s shards (20 frames) are streamed and cropped into overlapping 1 s windows (10 frames) via <span class="in">`AtekWdsStreamDataset`</span> <span class="co">[</span><span class="ot">efm3d/dataset/atek_wds_dataset.py:70</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/atek_wds_dataset.py#L70)</span>. The adaptor enforces fixed shapes and timestamps <span class="co">[</span><span class="ot">efm3d/dataset/efm_model_adaptor.py:604</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/efm_model_adaptor.py#L604)</span>.</span>
+<span id="cb8-239"><a href="#cb8-239" aria-hidden="true" tabindex="-1"></a>EFM3D trains EVL on ATEK WebDataset (WDS) snippets: 2 s shards (20 frames) are streamed and cropped into overlapping 1 s windows (10 frames) via <span class="in">`AtekWdsStreamDataset`</span> <span class="co">[</span><span class="ot">efm3d/dataset/atek_wds_dataset.py:70</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/atek_wds_dataset.py#L70)</span>. The adaptor enforces fixed shapes and timestamps <span class="co">[</span><span class="ot">efm3d/dataset/efm_model_adaptor.py:604</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/efm_model_adaptor.py#L604)</span>.</span>
 <span id="cb8-240"><a href="#cb8-240" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-241"><a href="#cb8-241" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Key <span class="pp">|</span> Shape <span class="pp">|</span> Type <span class="pp">|</span> Description <span class="pp">|</span></span>
-<span id="cb8-242"><a href="#cb8-242" aria-hidden="true" tabindex="-1"></a><span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">|</span></span>
-<span id="cb8-243"><a href="#cb8-243" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/img`</span>, <span class="in">`slaml/img`</span>, <span class="in">`slamr/img`</span> <span class="pp">|</span> <span class="in">`[F, C, H, W]`</span> (≈<span class="in">`[10, 3/1, 1408, 1408]`</span>) <span class="pp">|</span> float32 <span class="pp">|</span> Normalized frames per stream. <span class="pp">|</span></span>
-<span id="cb8-244"><a href="#cb8-244" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/calib`</span>, <span class="in">`slaml/calib`</span>, <span class="in">`slamr/calib`</span> <span class="pp">|</span> CameraTW <span class="pp">|</span> TensorWrapper <span class="pp">|</span> Intrinsics/extrinsics replicated across frames. <span class="pp">|</span></span>
-<span id="cb8-245"><a href="#cb8-245" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/t_snippet_rig`</span>, … <span class="pp">|</span> <span class="in">`[F, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Camera poses in snippet frame. <span class="pp">|</span></span>
-<span id="cb8-246"><a href="#cb8-246" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`pose/t_snippet_rig`</span> <span class="pp">|</span> <span class="in">`[F, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Rig trajectory used for lifting. <span class="pp">|</span></span>
-<span id="cb8-247"><a href="#cb8-247" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`points/p3s_world`</span> <span class="pp">|</span> <span class="in">`[F, N, 3]`</span> (N≈50 000) <span class="pp">|</span> float32 <span class="pp">|</span> Semi-dense SLAM points (NaN padded). <span class="pp">|</span></span>
-<span id="cb8-248"><a href="#cb8-248" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`points/dist_std`</span>, <span class="in">`points/inv_dist_std`</span> <span class="pp">|</span> <span class="in">`[F, N, 1]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Depth uncertainty per point. <span class="pp">|</span></span>
-<span id="cb8-249"><a href="#cb8-249" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/distance_m`</span> <span class="pp">|</span> <span class="in">`[F, 1, H, W]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Ray distances from GT depth. <span class="pp">|</span></span>
-<span id="cb8-250"><a href="#cb8-250" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`obbs/padded_snippet`</span> <span class="pp">|</span> <span class="in">`[F, 128, 34]`</span> <span class="pp">|</span> ObbTW <span class="pp">|</span> Padded oriented boxes with semantics. <span class="pp">|</span></span>
-<span id="cb8-251"><a href="#cb8-251" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`obbs/sem_id_to_name`</span> <span class="pp">|</span> dict <span class="pp">|</span> mapping <span class="pp">|</span> Semantic lookup table. <span class="pp">|</span></span>
-<span id="cb8-252"><a href="#cb8-252" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`snippet/t_world_snippet`</span> <span class="pp">|</span> <span class="in">`[1, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Snippet anchor pose in world frame. <span class="pp">|</span></span>
-<span id="cb8-253"><a href="#cb8-253" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`snippet/time_ns`</span> <span class="pp">|</span> <span class="in">`[1, 1]`</span> <span class="pp">|</span> int64 <span class="pp">|</span> Start timestamp for relative times. <span class="pp">|</span></span>
-<span id="cb8-254"><a href="#cb8-254" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/img/snippet_time_s`</span>, … <span class="pp">|</span> <span class="in">`[F, 1]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Relative timestamps per modality. <span class="pp">|</span></span>
-<span id="cb8-255"><a href="#cb8-255" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-256"><a href="#cb8-256" aria-hidden="true" tabindex="-1"></a>**Practical notes.**</span>
+<span id="cb8-241"><a href="#cb8-241" aria-hidden="true" tabindex="-1"></a><span class="fu">## ATEK Key Naming Convention</span></span>
+<span id="cb8-242"><a href="#cb8-242" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-243"><a href="#cb8-243" aria-hidden="true" tabindex="-1"></a>ATEK uses a structured naming scheme for data keys:</span>
+<span id="cb8-244"><a href="#cb8-244" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-245"><a href="#cb8-245" aria-hidden="true" tabindex="-1"></a>**Format**: <span class="in">`&lt;prefix&gt;#&lt;identifier&gt;+&lt;parameter&gt;`</span></span>
+<span id="cb8-246"><a href="#cb8-246" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-247"><a href="#cb8-247" aria-hidden="true" tabindex="-1"></a>**Prefixes**:</span>
+<span id="cb8-248"><a href="#cb8-248" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-249"><a href="#cb8-249" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`mtd`</span> = **M**otion **T**rajectory **D**ata (device poses over time)</span>
+<span id="cb8-250"><a href="#cb8-250" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`mfcd`</span> = **M**ulti-**F**rame **C**amera **D**ata (per-frame camera data)</span>
+<span id="cb8-251"><a href="#cb8-251" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`msdpd`</span> = **M**ulti-**S**emi-**D**ense **P**oint **D**ata (SLAM point clouds)</span>
+<span id="cb8-252"><a href="#cb8-252" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-253"><a href="#cb8-253" aria-hidden="true" tabindex="-1"></a>**Separators**:</span>
+<span id="cb8-254"><a href="#cb8-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-255"><a href="#cb8-255" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`#`</span> separates prefix from identifier</span>
+<span id="cb8-256"><a href="#cb8-256" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`+`</span> separates identifier from parameter</span>
 <span id="cb8-257"><a href="#cb8-257" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-258"><a href="#cb8-258" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Tensor wrappers (<span class="in">`CameraTW`</span>, <span class="in">`PoseTW`</span>, <span class="in">`ObbTW`</span>) behave like torch tensors while exposing interpolation/transform helpers.</span>
-<span id="cb8-259"><a href="#cb8-259" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`points/p3s_world`</span> is already aligned with the snippet frame; invalid slots are NaN so masks can be inferred cheaply.</span>
-<span id="cb8-260"><a href="#cb8-260" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`obbs/padded_snippet`</span> is present for ASE training snippets; if absent (<span class="in">`gt_exists_flag=False`</span>) the adaptor skips OBB processing.</span>
-<span id="cb8-261"><a href="#cb8-261" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Ground-truth meshes stay on disk—resolve them lazily when computing Chamfer/F-score or oracle RRIs.</span>
-<span id="cb8-262"><a href="#cb8-262" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-263"><a href="#cb8-263" aria-hidden="true" tabindex="-1"></a><span class="fu"># Coordinate Conventions</span></span>
-<span id="cb8-264"><a href="#cb8-264" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-265"><a href="#cb8-265" aria-hidden="true" tabindex="-1"></a>ASE follows Project Aria's coordinate conventions:</span>
+<span id="cb8-258"><a href="#cb8-258" aria-hidden="true" tabindex="-1"></a>**Examples**:</span>
+<span id="cb8-259"><a href="#cb8-259" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-260"><a href="#cb8-260" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb8-261"><a href="#cb8-261" aria-hidden="true" tabindex="-1"></a><span class="co"># Motion trajectory: (T, 3, 4) SE(3) transformation matrices</span></span>
+<span id="cb8-262"><a href="#cb8-262" aria-hidden="true" tabindex="-1"></a>ts_world_device <span class="op">=</span> sample[<span class="st">"mtd#ts_world_device"</span>]</span>
+<span id="cb8-263"><a href="#cb8-263" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-264"><a href="#cb8-264" aria-hidden="true" tabindex="-1"></a><span class="co"># Camera projection parameters</span></span>
+<span id="cb8-265"><a href="#cb8-265" aria-hidden="true" tabindex="-1"></a>projection_params <span class="op">=</span> sample[<span class="st">"mfcd#camera-rgb+projection_params"</span>]</span>
 <span id="cb8-266"><a href="#cb8-266" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-267"><a href="#cb8-267" aria-hidden="true" tabindex="-1"></a><span class="fu">## World Frame</span></span>
-<span id="cb8-268"><a href="#cb8-268" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-269"><a href="#cb8-269" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Origin**: Arbitrary world coordinate origin for each scene</span>
-<span id="cb8-270"><a href="#cb8-270" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Axes**: Typically Z-up, Manhattan-world aligned</span>
-<span id="cb8-271"><a href="#cb8-271" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Units**: Meters</span>
-<span id="cb8-272"><a href="#cb8-272" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-273"><a href="#cb8-273" aria-hidden="true" tabindex="-1"></a><span class="fu">## Camera Frame</span></span>
-<span id="cb8-274"><a href="#cb8-274" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-275"><a href="#cb8-275" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Origin**: At camera's optical center</span>
-<span id="cb8-276"><a href="#cb8-276" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**X-axis**: Points right (from camera perspective)</span>
-<span id="cb8-277"><a href="#cb8-277" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Y-axis**: Points down</span>
-<span id="cb8-278"><a href="#cb8-278" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Z-axis**: Points forward (optical axis)</span>
-<span id="cb8-279"><a href="#cb8-279" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-280"><a href="#cb8-280" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-281"><a href="#cb8-281" aria-hidden="true" tabindex="-1"></a><span class="fu">### Using ATEK for ML Workflows</span></span>
-<span id="cb8-282"><a href="#cb8-282" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-283"><a href="#cb8-283" aria-hidden="true" tabindex="-1"></a>For training and evaluation, use ATEK's preprocessed datasets and tools:</span>
-<span id="cb8-284"><a href="#cb8-284" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-285"><a href="#cb8-285" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
-<span id="cb8-286"><a href="#cb8-286" aria-hidden="true" tabindex="-1"></a><span class="co"># Download preprocessed ASE data (PyTorch WebDataset format)</span></span>
-<span id="cb8-287"><a href="#cb8-287" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/atek_wds_data_downloader.py <span class="dt">\</span></span>
-<span id="cb8-288"><a href="#cb8-288" aria-hidden="true" tabindex="-1"></a>  <span class="at">--config-name</span> efm <span class="dt">\</span></span>
-<span id="cb8-289"><a href="#cb8-289" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_ATEK_download_urls.json <span class="dt">\</span></span>
-<span id="cb8-290"><a href="#cb8-290" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./data/ase_atek <span class="dt">\</span></span>
-<span id="cb8-291"><a href="#cb8-291" aria-hidden="true" tabindex="-1"></a>  <span class="at">--download-wds-to-local</span></span>
+<span id="cb8-267"><a href="#cb8-267" aria-hidden="true" tabindex="-1"></a><span class="co"># Depth images: (T, 1, H, W)</span></span>
+<span id="cb8-268"><a href="#cb8-268" aria-hidden="true" tabindex="-1"></a>depth_images <span class="op">=</span> sample[<span class="st">"mfcd#camera-rgb-depth+images"</span>]</span>
+<span id="cb8-269"><a href="#cb8-269" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-270"><a href="#cb8-270" aria-hidden="true" tabindex="-1"></a><span class="co"># Semi-dense SLAM points: (N, 3) in world coordinates</span></span>
+<span id="cb8-271"><a href="#cb8-271" aria-hidden="true" tabindex="-1"></a>points_world <span class="op">=</span> sample[<span class="st">"msdpd#points_world+stacked"</span>]</span>
+<span id="cb8-272"><a href="#cb8-272" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb8-273"><a href="#cb8-273" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-274"><a href="#cb8-274" aria-hidden="true" tabindex="-1"></a><span class="fu">## ATEK Data Keys</span></span>
+<span id="cb8-275"><a href="#cb8-275" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-276"><a href="#cb8-276" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Key <span class="pp">|</span> Shape <span class="pp">|</span> Type <span class="pp">|</span> Description <span class="pp">|</span></span>
+<span id="cb8-277"><a href="#cb8-277" aria-hidden="true" tabindex="-1"></a><span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">|</span></span>
+<span id="cb8-278"><a href="#cb8-278" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/img`</span>, <span class="in">`slaml/img`</span>, <span class="in">`slamr/img`</span> <span class="pp">|</span> <span class="in">`[F, C, H, W]`</span> (≈<span class="in">`[10, 3/1, 1408, 1408]`</span>) <span class="pp">|</span> float32 <span class="pp">|</span> Normalized frames per stream. <span class="pp">|</span></span>
+<span id="cb8-279"><a href="#cb8-279" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/calib`</span>, <span class="in">`slaml/calib`</span>, <span class="in">`slamr/calib`</span> <span class="pp">|</span> CameraTW <span class="pp">|</span> TensorWrapper <span class="pp">|</span> Intrinsics/extrinsics replicated across frames. <span class="pp">|</span></span>
+<span id="cb8-280"><a href="#cb8-280" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/t_snippet_rig`</span>, … <span class="pp">|</span> <span class="in">`[F, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Camera poses in snippet frame. <span class="pp">|</span></span>
+<span id="cb8-281"><a href="#cb8-281" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`pose/t_snippet_rig`</span> <span class="pp">|</span> <span class="in">`[F, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Rig trajectory used for lifting. <span class="pp">|</span></span>
+<span id="cb8-282"><a href="#cb8-282" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`points/p3s_world`</span> <span class="pp">|</span> <span class="in">`[F, N, 3]`</span> (N≈50 000) <span class="pp">|</span> float32 <span class="pp">|</span> Semi-dense SLAM points (NaN padded). <span class="pp">|</span></span>
+<span id="cb8-283"><a href="#cb8-283" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`points/dist_std`</span>, <span class="in">`points/inv_dist_std`</span> <span class="pp">|</span> <span class="in">`[F, N, 1]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Depth uncertainty per point. <span class="pp">|</span></span>
+<span id="cb8-284"><a href="#cb8-284" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/distance_m`</span> <span class="pp">|</span> <span class="in">`[F, 1, H, W]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Ray distances from GT depth. <span class="pp">|</span></span>
+<span id="cb8-285"><a href="#cb8-285" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`obbs/padded_snippet`</span> <span class="pp">|</span> <span class="in">`[F, 128, 34]`</span> <span class="pp">|</span> ObbTW <span class="pp">|</span> Padded oriented boxes with semantics. <span class="pp">|</span></span>
+<span id="cb8-286"><a href="#cb8-286" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`obbs/sem_id_to_name`</span> <span class="pp">|</span> dict <span class="pp">|</span> mapping <span class="pp">|</span> Semantic lookup table. <span class="pp">|</span></span>
+<span id="cb8-287"><a href="#cb8-287" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`snippet/t_world_snippet`</span> <span class="pp">|</span> <span class="in">`[1, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Snippet anchor pose in world frame. <span class="pp">|</span></span>
+<span id="cb8-288"><a href="#cb8-288" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`snippet/time_ns`</span> <span class="pp">|</span> <span class="in">`[1, 1]`</span> <span class="pp">|</span> int64 <span class="pp">|</span> Start timestamp for relative times. <span class="pp">|</span></span>
+<span id="cb8-289"><a href="#cb8-289" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/img/snippet_time_s`</span>, … <span class="pp">|</span> <span class="in">`[F, 1]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Relative timestamps per modality. <span class="pp">|</span></span>
+<span id="cb8-290"><a href="#cb8-290" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-291"><a href="#cb8-291" aria-hidden="true" tabindex="-1"></a>**Practical notes.**</span>
 <span id="cb8-292"><a href="#cb8-292" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-293"><a href="#cb8-293" aria-hidden="true" tabindex="-1"></a><span class="co"># Download ground truth meshes for evaluation</span></span>
-<span id="cb8-294"><a href="#cb8-294" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/ase_mesh_downloader.py <span class="dt">\</span></span>
-<span id="cb8-295"><a href="#cb8-295" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_mesh_download_urls.json <span class="dt">\</span></span>
-<span id="cb8-296"><a href="#cb8-296" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./ase_meshes</span>
-<span id="cb8-297"><a href="#cb8-297" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb8-293"><a href="#cb8-293" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Tensor wrappers (<span class="in">`CameraTW`</span>, <span class="in">`PoseTW`</span>, <span class="in">`ObbTW`</span>) behave like torch tensors while exposing interpolation/transform helpers.</span>
+<span id="cb8-294"><a href="#cb8-294" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`points/p3s_world`</span> is already aligned with the snippet frame; invalid slots are NaN so masks can be inferred cheaply.</span>
+<span id="cb8-295"><a href="#cb8-295" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`obbs/padded_snippet`</span> is present for ASE training snippets; if absent (<span class="in">`gt_exists_flag=False`</span>) the adaptor skips OBB processing.</span>
+<span id="cb8-296"><a href="#cb8-296" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Ground-truth meshes stay on disk—resolve them lazily when computing Chamfer/F-score or oracle RRIs.</span>
+<span id="cb8-297"><a href="#cb8-297" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-298"><a href="#cb8-298" aria-hidden="true" tabindex="-1"></a><span class="fu"># Coordinate Conventions</span></span>
+<span id="cb8-299"><a href="#cb8-299" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-300"><a href="#cb8-300" aria-hidden="true" tabindex="-1"></a>ASE follows Project Aria's coordinate conventions:</span>
+<span id="cb8-301"><a href="#cb8-301" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-302"><a href="#cb8-302" aria-hidden="true" tabindex="-1"></a><span class="fu">## World Frame</span></span>
+<span id="cb8-303"><a href="#cb8-303" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-304"><a href="#cb8-304" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Origin**: Arbitrary world coordinate origin for each scene</span>
+<span id="cb8-305"><a href="#cb8-305" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Axes**: Typically Z-up, Manhattan-world aligned</span>
+<span id="cb8-306"><a href="#cb8-306" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Units**: Meters</span>
+<span id="cb8-307"><a href="#cb8-307" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-308"><a href="#cb8-308" aria-hidden="true" tabindex="-1"></a><span class="fu">## Camera Frame</span></span>
+<span id="cb8-309"><a href="#cb8-309" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-310"><a href="#cb8-310" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Origin**: At camera's optical center</span>
+<span id="cb8-311"><a href="#cb8-311" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**X-axis**: Points right (from camera perspective)</span>
+<span id="cb8-312"><a href="#cb8-312" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Y-axis**: Points down</span>
+<span id="cb8-313"><a href="#cb8-313" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Z-axis**: Points forward (optical axis)</span>
+<span id="cb8-314"><a href="#cb8-314" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-315"><a href="#cb8-315" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-316"><a href="#cb8-316" aria-hidden="true" tabindex="-1"></a><span class="fu">### Using ATEK for ML Workflows</span></span>
+<span id="cb8-317"><a href="#cb8-317" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-318"><a href="#cb8-318" aria-hidden="true" tabindex="-1"></a>For training and evaluation, use ATEK's preprocessed datasets and tools:</span>
+<span id="cb8-319"><a href="#cb8-319" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-320"><a href="#cb8-320" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
+<span id="cb8-321"><a href="#cb8-321" aria-hidden="true" tabindex="-1"></a><span class="co"># Download preprocessed ASE data (PyTorch WebDataset format)</span></span>
+<span id="cb8-322"><a href="#cb8-322" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/atek_wds_data_downloader.py <span class="dt">\</span></span>
+<span id="cb8-323"><a href="#cb8-323" aria-hidden="true" tabindex="-1"></a>  <span class="at">--config-name</span> efm <span class="dt">\</span></span>
+<span id="cb8-324"><a href="#cb8-324" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_ATEK_download_urls.json <span class="dt">\</span></span>
+<span id="cb8-325"><a href="#cb8-325" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./data/ase_atek <span class="dt">\</span></span>
+<span id="cb8-326"><a href="#cb8-326" aria-hidden="true" tabindex="-1"></a>  <span class="at">--download-wds-to-local</span></span>
+<span id="cb8-327"><a href="#cb8-327" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-328"><a href="#cb8-328" aria-hidden="true" tabindex="-1"></a><span class="co"># Download ground truth meshes for evaluation</span></span>
+<span id="cb8-329"><a href="#cb8-329" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/ase_mesh_downloader.py <span class="dt">\</span></span>
+<span id="cb8-330"><a href="#cb8-330" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_mesh_download_urls.json <span class="dt">\</span></span>
+<span id="cb8-331"><a href="#cb8-331" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./ase_meshes</span>
+<span id="cb8-332"><a href="#cb8-332" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

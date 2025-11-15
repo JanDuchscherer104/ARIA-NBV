@@ -68,6 +68,7 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - **[ATEK Implementation](contents/impl/atek_implementation.qmd)**: Production-ready mesh evaluation
 - **[EFM3D Implementation](contents/impl/efm3d_implementation.qmd)**: Point cloud and voxel utilities
 - **[RRI Computation](contents/impl/rri_computation.qmd)**: Complete oracle implementation
+- **[Oracle RRI Notebook](../notebooks/ase_oracle_rri_simplified.ipynb)**: Clean, working implementation with fixes
 
 ## Project Slides
 

@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Jan Duchscherer, Munich University of Applied Sciences">
-<meta name="dcterms.date" content="2025-11-04">
+<meta name="dcterms.date" content="2025-11-14">
 
 <title>Next-Best-View Planning with Foundation Models – Semantic NBV Planning</title>
 <style>
@@ -634,7 +634,7 @@ div.csl-indent {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">November 4, 2025</p>
+      <p class="date">November 14, 2025</p>
     </div>
   </div>
   
@@ -710,6 +710,7 @@ div.csl-indent {
 <li><strong><a href="./contents/impl/atek_implementation.html">ATEK Implementation</a></strong>: Production-ready mesh evaluation</li>
 <li><strong><a href="./contents/impl/efm3d_implementation.html">EFM3D Implementation</a></strong>: Point cloud and voxel utilities</li>
 <li><strong><a href="./contents/impl/rri_computation.html">RRI Computation</a></strong>: Complete oracle implementation</li>
+<li><strong><a href="../notebooks/ase_oracle_rri_simplified.ipynb">Oracle RRI Notebook</a></strong>: Clean, working implementation with fixes</li>
 </ul>
 </section>
 <section id="project-slides" class="level2" data-number="3.6">
@@ -1291,28 +1292,29 @@ notebooks/
 <span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ATEK Implementation](contents/impl/atek_implementation.qmd)**: Production-ready mesh evaluation</span>
 <span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D Implementation](contents/impl/efm3d_implementation.qmd)**: Point cloud and voxel utilities</span>
 <span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[RRI Computation](contents/impl/rri_computation.qmd)**: Complete oracle implementation</span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project Slides</span></span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 01</span><span class="co">](/docs/typst/slides/slides_1.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_1.typ)</span></span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 02</span><span class="co">](/docs/typst/slides/slides_2.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_2.typ)</span></span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a><span class="fu"># External Code &amp; Notebooks</span></span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a><span class="in">external/</span></span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a><span class="in">├── ATEK/                    # Aria toolkit for data processing</span></span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a><span class="in">├── efm3d/                   # EFM3D model implementation</span></span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a><span class="in">├── projectaria_tools/       # ASE dataset access utilities</span></span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="in">└── scenescript/             # Scene specification language tools</span></span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a><span class="in">notebooks/</span></span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_data_exploration.ipynb    # ASE dataset exploration</span></span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a><span class="in">├── download_ase_meshes.ipynb          # GT mesh acquisition</span></span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_exploration.ipynb         # ATEK integration testing</span></span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_exploration.ipynb              # Basic ASE data analysis</span></span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="in">└── inference.ipynb                    # Model inference experiments</span></span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Oracle RRI Notebook](../notebooks/ase_oracle_rri_simplified.ipynb)**: Clean, working implementation with fixes</span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project Slides</span></span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 01</span><span class="co">](/docs/typst/slides/slides_1.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_1.typ)</span></span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 02</span><span class="co">](/docs/typst/slides/slides_2.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_2.typ)</span></span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a><span class="fu"># External Code &amp; Notebooks</span></span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a><span class="in">external/</span></span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a><span class="in">├── ATEK/                    # Aria toolkit for data processing</span></span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a><span class="in">├── efm3d/                   # EFM3D model implementation</span></span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="in">├── projectaria_tools/       # ASE dataset access utilities</span></span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a><span class="in">└── scenescript/             # Scene specification language tools</span></span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a><span class="in">notebooks/</span></span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_data_exploration.ipynb    # ASE dataset exploration</span></span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a><span class="in">├── download_ase_meshes.ipynb          # GT mesh acquisition</span></span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_exploration.ipynb         # ATEK integration testing</span></span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_exploration.ipynb              # Basic ASE data analysis</span></span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a><span class="in">└── inference.ipynb                    # Model inference experiments</span></span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

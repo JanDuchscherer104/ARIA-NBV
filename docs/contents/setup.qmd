@@ -3,7 +3,7 @@ title: "Setup Instructions"
 format: html
 ---
 
-# Depüendencies
+# Dependencies
 
 - conda or mamba
 - uv
