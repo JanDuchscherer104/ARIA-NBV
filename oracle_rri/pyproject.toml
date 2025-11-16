@@ -45,6 +45,9 @@ dependencies = [
     "streamlit>=1.51.0",
 ]
 
+[project.scripts]
+nbv-downloader = "oracle_rri.data.downloader:main"
+
     [project.optional-dependencies]
     dev = ["pytest>=8.4.2", "pytest-cov>=7.0.0", "ruff>=0.1.0", "mypy>=1.0.0"]
 

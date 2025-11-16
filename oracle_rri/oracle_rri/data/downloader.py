@@ -4,15 +4,20 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sys
 import zipfile
 from pathlib import Path
 from typing import Literal
 
 import requests
 from atek.data_download.atek_data_store_download import download_atek_wds_sequences
-from pydantic import Field, field_validator, model_validator
-from pydantic_settings import CLI_SUPPRESS, BaseSettings, CliSuppress, SettingsConfigDict
+from pydantic import AliasChoices, Field, field_validator
+from pydantic_settings import (
+    CLI_SUPPRESS,
+    BaseSettings,
+    CliPositionalArg,
+    CliSuppress,
+    SettingsConfigDict,
+)
 from tqdm import tqdm
 
 from ..configs import PathConfig
@@ -23,8 +28,8 @@ from .metadata import ASEMetadata, SceneMetadata
 class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     """Configuration for ASE downloader with CLI support.
 
-    Supports two CLI modes:
-        1. Download mode (default): Download N scenes with meshes + ATEK snippets
+    Supports two CLI modes (explicitly selected via positional `mode`):
+        1. Download mode: Download N scenes with meshes + ATEK snippets
         2. List mode: List available scenes
 
     Example (Programmatic):
@@ -34,8 +39,8 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
         >>> downloader.download_scenes(scenes)
 
     Example (CLI - Download):
-        $ python -m oracle_rri.data.downloader --n_scenes=5 --max_snippets=2
-        $ python -m oracle_rri.data.downloader --n_scenes=10 --skip_meshes
+        $ python -m oracle_rri.data.downloader download --n_scenes=5 --max_snippets=2
+        $ python -m oracle_rri.data.downloader download --ns=10 --skip_meshes
 
     Example (CLI - List):
         $ python -m oracle_rri.data.downloader list --n=10
@@ -43,7 +48,17 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
 
     # Internal fields (excluded from CLI)
     target: CliSuppress[type[ASEDownloader]] = Field(default_factory=lambda: ASEDownloader, description=CLI_SUPPRESS)
-    mode: CliSuppress[Literal["download", "list"]] = Field(default="download", description=CLI_SUPPRESS)
+
+    # CLI dispatch
+    mode: CliPositionalArg[Literal["download", "list"]]
+    """Execution mode (positional)."""
+
+    list_n: int | None = Field(
+        default=None,
+        alias="n",
+        validation_alias=AliasChoices("n", "list-n"),
+        description="Number of scenes to show in list mode",
+    )
 
     paths: PathConfig = Field(default_factory=PathConfig)
     url_dir: Path | None = Field(default=None, description="Directory containing download URL JSONs")
@@ -67,16 +82,30 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     """ATEK configuration name."""
 
     # Download selection
-    n_scenes: int = Field(default=5, ge=0)
+    n_scenes: int = Field(
+        default=5,
+        ge=0,
+        validation_alias=AliasChoices("n_scenes", "ns", "s"),
+    )
     """Number of scenes to download (0 = all available scenes)."""
 
-    max_snippets: int | None = Field(default=None, ge=1)
+    max_snippets: int | None = Field(
+        default=None,
+        ge=1,
+        validation_alias=AliasChoices("max_snippets", "ms"),
+    )
     """Maximum snippets per scene (None = all snippets)."""
 
-    skip_meshes: bool = Field(default=False)
+    skip_meshes: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("skip_meshes", "sm"),
+    )
     """Skip downloading GT meshes (only download ATEK data)."""
 
-    skip_atek: bool = Field(default=False)
+    skip_atek: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("skip_atek", "sa"),
+    )
     """Skip downloading ATEK WDS data (only download meshes)."""
 
     # ATEK downloader options (from atek_wds_data_downloader.py)
@@ -96,9 +125,18 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     """Path to custom train/val split JSON (overrides train_val_split_ratio)."""
 
     model_config = SettingsConfigDict(
-        cli_parse_args=False,  # disable argparse scanning so pytest args don't trip validation
+        cli_parse_args=True,
         env_prefix="ASE_",
         extra="allow",  # tolerate legacy/unused CLI fields used in tests
+        cli_shortcuts={
+            "mode": "m",
+            "list_n": "n",
+            "n_scenes": "ns",
+            "max_snippets": "ms",
+            "skip_meshes": "sm",
+            "skip_atek": "sa",
+            "atek_config_name": "cfg",
+        },
     )
 
     @field_validator("train_val_split_json_path", mode="before")
@@ -339,14 +377,15 @@ class ASEDownloader:
 # ============================================================================
 
 
-def cli_download() -> None:
+def cli_download(config: ASEDownloaderConfig | None = None) -> None:
     """CLI entry point for downloading scenes.
 
     Usage:
-        python -m oracle_rri.data.downloader --n_scenes=5 --max_snippets=2
-        python -m oracle_rri.data.downloader --n_scenes=10 --skip_meshes
+        python -m oracle_rri.data.downloader download --n_scenes=5 --max_snippets=2
+        python -m oracle_rri.data.downloader download --ns=10 --skip_meshes
     """
-    config = ASEDownloaderConfig()
+    config = config or ASEDownloaderConfig()
+    console = Console.with_prefix("DownloaderCLI").set_verbose(config.verbose)
     downloader = config.setup_target()
 
     # Get scenes
@@ -381,18 +420,18 @@ def cli_download() -> None:
     if n:
         scenes = scenes[:n]
 
-    print(f"\n{'=' * 60}")
-    print("ASE Dataset Downloader")
-    print(f"{'=' * 60}")
-    print(f"Downloading {len(scenes)} scenes:")
+    console.log("=" * 60)
+    console.log("ASE Dataset Downloader")
+    console.log("=" * 60)
+    console.log(f"Downloading {len(scenes)} scenes:")
     for scene in scenes[:10]:  # Show first 10
-        print(f"  - Scene {scene.scene_id}: {len(scene.snippet_ids)} snippets")
+        console.log(f"  - Scene {scene.scene_id}: {len(scene.snippet_ids)} snippets")
     if len(scenes) > 10:
-        print(f"  ... and {len(scenes) - 10} more")
+        console.log(f"  ... and {len(scenes) - 10} more")
 
     total_snippets = sum(len(s.snippet_ids) for s in scenes)
     mesh_note = " (mesh-required)" if not config.skip_meshes else ""
-    print(f"\nTotal: {len(scenes)} scenes{mesh_note}, {total_snippets} snippets")
+    console.log(f"\nTotal: {len(scenes)} scenes{mesh_note}, {total_snippets} snippets")
 
     # Download
     downloader.download_scenes(
@@ -401,12 +440,12 @@ def cli_download() -> None:
         download_atek=not config.skip_atek,
     )
 
-    print(f"\n{'=' * 60}")
-    print("✓ Download complete!")
-    print(f"{'=' * 60}\n")
+    console.log("=" * 60)
+    console.log("✓ Download complete!")
+    console.log("=" * 60)
 
 
-def cli_list(n: int | None = None) -> None:
+def cli_list(config: ASEDownloaderConfig, n: int | None = None) -> None:
     """CLI entry point for listing scenes.
 
     Args:
@@ -416,8 +455,7 @@ def cli_list(n: int | None = None) -> None:
         python -m oracle_rri.data.downloader list
         python -m oracle_rri.data.downloader list --n=10
     """
-    # Create config without CLI parsing for list mode
-    config = ASEDownloaderConfig.model_validate({})
+    console = Console.with_prefix("DownloaderCLI").set_verbose(config.verbose)
     downloader = config.setup_target()
 
     scenes = downloader.metadata.get_scenes_with_meshes()
@@ -426,46 +464,29 @@ def cli_list(n: int | None = None) -> None:
     if n:
         scenes = scenes[:n]
 
-    print(f"\n{'=' * 60}")
-    print("ASE Dataset - Available Scenes")
-    print(f"{'=' * 60}")
-    print(f"Total scenes with GT meshes: {len(downloader.metadata.get_scenes_with_meshes())}")
-    print(f"\nShowing {len(scenes)} scenes:")
+    console.log("=" * 60)
+    console.log("ASE Dataset - Available Scenes")
+    console.log("=" * 60)
+    console.log(f"Total scenes with GT meshes: {len(downloader.metadata.get_scenes_with_meshes())}")
+    console.log(f"\nShowing {len(scenes)} scenes:")
     for scene in scenes:
-        print(f"  Scene {scene.scene_id}: {len(scene.snippet_ids)} snippets")
-    print(f"{'=' * 60}\n")
+        console.log(f"  Scene {scene.scene_id}: {len(scene.snippet_ids)} snippets")
+    console.log("=" * 60)
 
 
 def main() -> None:
-    """Main CLI entry point with mode-based dispatching.
+    """Main CLI entry point with mode-based dispatching."""
 
-    Supports two modes:
-        - 'download' (default): Download scenes with full CLI argument parsing
-        - 'list': List available scenes with minimal arguments
-    """
-    # Check for 'list' subcommand
-    if len(sys.argv) > 1 and sys.argv[1] == "list":
-        # Remove 'list' from argv
-        sys.argv.pop(1)
+    config = ASEDownloaderConfig()
+    console = Console.with_prefix("DownloaderCLI").set_verbose(config.verbose)
 
-        # Parse --n argument manually for list mode
-        n = None
-        if len(sys.argv) > 1:
-            for i, arg in enumerate(sys.argv[1:], 1):
-                if arg.startswith("--n="):
-                    n = int(arg.split("=")[1])
-                    sys.argv.pop(i)
-                    break
-                elif arg == "--n" and i + 1 < len(sys.argv):
-                    n = int(sys.argv[i + 1])
-                    sys.argv.pop(i)
-                    sys.argv.pop(i)
-                    break
-
-        cli_list(n=n)
-    else:
-        # Download mode - use full pydantic-settings CLI parsing
-        cli_download()
+    match config.mode:
+        case "list":
+            cli_list(config=config, n=config.list_n)
+        case "download":
+            cli_download(config=config)
+        case _:
+            console.error(f"Unsupported mode: {config.mode}")
 
 
 if __name__ == "__main__":

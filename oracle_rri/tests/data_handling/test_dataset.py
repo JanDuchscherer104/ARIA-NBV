@@ -231,3 +231,36 @@ class TestASEDataset:
 
         assert samples[0].mesh is samples[1].mesh
         assert samples[0].mesh is not None
+
+
+class TestGTViewRealData:
+    def test_parses_efm_gt_obb3(self):
+        tar = Path(".data/ase_efm_eval/81286/shards-0000.tar")
+        if not tar.exists():
+            pytest.skip("real ASE shard missing locally")
+
+        config = ASEDatasetConfig(
+            tar_urls=[tar],
+            scene_to_mesh={},
+            load_meshes=False,
+            batch_size=None,
+            shuffle=False,
+            repeat=False,
+            verbose=False,
+        )
+        sample = next(iter(ASEDataset(config)))
+        gt = sample.gt
+
+        assert isinstance(gt.efm_gt, dict) and gt.efm_gt, "efm_gt should be populated from real shard"
+
+        ts_key, cam_dict = next(iter(gt.efm_gt.items()))
+        assert {"camera-rgb"} <= set(cam_dict), "camera-rgb entries expected in efm_gt"
+
+        rgb = cam_dict["camera-rgb"]
+        k = rgb["category_ids"].shape[0]
+
+        assert rgb["object_dimensions"].shape == (k, 3)
+        assert rgb["ts_world_object"].shape == (k, 3, 4)
+        assert rgb["instance_ids"].shape == (k,)
+        assert rgb["category_ids"].shape == (k,)
+        assert len(rgb["category_names"]) == k

@@ -15,6 +15,7 @@ class TestASEDownloaderConfig:
     def test_creation(self, tmp_url_dir: Path, tmp_output_dir: Path):
         """Test creating config instance."""
         config = ASEDownloaderConfig(
+            mode="download",
             url_dir=tmp_url_dir,
             output_dir=tmp_output_dir,
             verbose=True,
@@ -27,6 +28,7 @@ class TestASEDownloaderConfig:
     def test_path_resolution(self, tmp_path: Path):
         """Test automatic path resolution."""
         config = ASEDownloaderConfig(
+            mode="download",
             url_dir=str(tmp_path / "urls"),
             output_dir=str(tmp_path / "output"),
         )
@@ -44,6 +46,7 @@ class TestASEDownloaderConfig:
     ):
         """Test setup_target creates downloader."""
         config = ASEDownloaderConfig(
+            mode="download",
             url_dir=tmp_url_dir,
             output_dir=tmp_output_dir,
         )
@@ -60,6 +63,7 @@ class TestASEDownloaderConfig:
         nonexistent = tmp_path / "does_not_exist"
 
         config = ASEDownloaderConfig(
+            mode="download",
             url_dir=nonexistent,
             output_dir=tmp_output_dir,
         )
@@ -81,6 +85,7 @@ class TestASEDownloader:
     ) -> ASEDownloader:
         """Create downloader instance for testing."""
         config = ASEDownloaderConfig(
+            mode="download",
             url_dir=tmp_url_dir,
             output_dir=tmp_output_dir,
             verbose=False,
