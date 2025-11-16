@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from oracle_rri.data_handling.cli import CLIDownloaderSettings, main
+from oracle_rri.data.cli import CLIDownloaderSettings, main
 
 
 class TestCLIDownloaderSettings:
@@ -44,8 +44,8 @@ class TestCLIDownloaderSettings:
 class TestCLIMain:
     """Tests for CLI main function."""
 
-    @patch("oracle_rri.data_handling.cli.ASEDownloaderConfig")
-    @patch("oracle_rri.data_handling.cli.CLIDownloaderSettings")
+    @patch("oracle_rri.data.cli.ASEDownloaderConfig")
+    @patch("oracle_rri.data.cli.CLIDownloaderSettings")
     def test_main_all_with_meshes(
         self,
         mock_settings_class: MagicMock,
@@ -81,8 +81,8 @@ class TestCLIMain:
             overwrite=False,
         )
 
-    @patch("oracle_rri.data_handling.cli.ASEDownloaderConfig")
-    @patch("oracle_rri.data_handling.cli.CLIDownloaderSettings")
+    @patch("oracle_rri.data.cli.ASEDownloaderConfig")
+    @patch("oracle_rri.data.cli.CLIDownloaderSettings")
     def test_main_specific_scenes(
         self,
         mock_settings_class: MagicMock,
@@ -115,8 +115,8 @@ class TestCLIMain:
         call_kwargs = mock_downloader.download_scenes.call_args[1]
         assert call_kwargs["scene_ids"] == ["82832", "81022"]
 
-    @patch("oracle_rri.data_handling.cli.ASEDownloaderConfig")
-    @patch("oracle_rri.data_handling.cli.CLIDownloaderSettings")
+    @patch("oracle_rri.data.cli.ASEDownloaderConfig")
+    @patch("oracle_rri.data.cli.CLIDownloaderSettings")
     def test_main_meshes_only(
         self,
         mock_settings_class: MagicMock,
@@ -148,8 +148,8 @@ class TestCLIMain:
             overwrite=False,
         )
 
-    @patch("oracle_rri.data_handling.cli.ASEDownloaderConfig")
-    @patch("oracle_rri.data_handling.cli.CLIDownloaderSettings")
+    @patch("oracle_rri.data.cli.ASEDownloaderConfig")
+    @patch("oracle_rri.data.cli.CLIDownloaderSettings")
     @patch("builtins.print")
     def test_main_no_action(
         self,
@@ -180,8 +180,8 @@ class TestCLIMain:
         print_calls = [str(call) for call in mock_print.call_args_list]
         assert any("No download action specified" in str(call) for call in print_calls)
 
-    @patch("oracle_rri.data_handling.cli.ASEDownloaderConfig")
-    @patch("oracle_rri.data_handling.cli.CLIDownloaderSettings")
+    @patch("oracle_rri.data.cli.ASEDownloaderConfig")
+    @patch("oracle_rri.data.cli.CLIDownloaderSettings")
     def test_main_with_config_path(
         self,
         mock_settings_class: MagicMock,
@@ -190,7 +190,7 @@ class TestCLIMain:
     ):
         """Test main with config file."""
         config_file = tmp_path / "config.toml"
-        config_file.write_text("[oracle_rri.data_handling.downloader]\nverbose = true\n")
+        config_file.write_text("[oracle_rri.data.downloader]\nverbose = true\n")
 
         mock_settings = MagicMock()
         mock_settings.config_path = config_file

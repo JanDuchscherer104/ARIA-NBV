@@ -1,1 +1,1 @@
-"""Tests for oracle_rri.data_handling module."""
+"""Tests for oracle_rri.data module."""

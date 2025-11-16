@@ -211,3 +211,4 @@ __marimo__/
 _site
 # Large download manifests (keep out of git)
 .data/aria_download_urls/
+.data

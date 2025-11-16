@@ -66,6 +66,8 @@ class PathConfig(SingletonConfig):
     @classmethod
     def _resolve_dirs(cls, value: str | Path, info: ValidationInfo) -> Path:
         path = cls._resolve_path(value, info)
+        if info.field_name == "url_dir":
+            return path  # do not auto-create; callers may want missing detection
         return cls._ensure_dir(path, info.field_name)
 
     @field_validator("metadata_cache", mode="before")
@@ -140,3 +142,17 @@ class PathConfig(SingletonConfig):
         if not atek_path.exists():
             raise FileNotFoundError(f"ATEK source not found at {atek_path}. Please ensure external/ATEK is cloned.")
         return atek_path
+
+    def get_atek_url_json_path(self, json_filename: str = "AriaSyntheticEnvironment_ATEK_download_urls.json") -> Path:
+        """Get path to ATEK download URLs JSON.
+
+        Args:
+            json_filename: Name of the ATEK URL JSON file.
+
+        Returns:
+            Path to the ATEK URL JSON file.
+        """
+        json_path = (self.url_dir / json_filename).resolve()
+        if not json_path.exists():
+            raise FileNotFoundError(f"ATEK URL JSON not found at {json_path}.")
+        return json_path

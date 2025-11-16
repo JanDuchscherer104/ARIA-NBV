@@ -571,6 +571,12 @@ window.Quarto = {
  <span class="menu-text">EFM3D Symbol Index</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../contents/impl/oracle_rri_package.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Oracle RRI Package</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
@@ -606,21 +612,39 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#issues-questions" id="toc-issues-questions" class="nav-link active" data-scroll-target="#issues-questions"><span class="header-section-number">1</span> Issues &amp; Questions</a>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview"><span class="header-section-number">1</span> Overview</a></li>
+  <li><a href="#open-questions-constraints" id="toc-open-questions-constraints" class="nav-link" data-scroll-target="#open-questions-constraints"><span class="header-section-number">2</span> Open Questions &amp; Constraints</a></li>
+  <li><a href="#highest-priority" id="toc-highest-priority" class="nav-link" data-scroll-target="#highest-priority"><span class="header-section-number">3</span> Highest Priority</a>
   <ul class="collapse">
-  <li><a href="#ase-single-trajectory-per-scene" id="toc-ase-single-trajectory-per-scene" class="nav-link" data-scroll-target="#ase-single-trajectory-per-scene"><span class="header-section-number">1.1</span> ASE: Single Trajectory Per Scene</a></li>
-  </ul></li>
-  <li><a href="#action-items" id="toc-action-items" class="nav-link" data-scroll-target="#action-items"><span class="header-section-number">2</span> Action Items</a>
+  <li><a href="#metrics" id="toc-metrics" class="nav-link" data-scroll-target="#metrics"><span class="header-section-number">3.1</span> Metrics</a></li>
+  <li><a href="#candidate-view-generation-sampling" id="toc-candidate-view-generation-sampling" class="nav-link" data-scroll-target="#candidate-view-generation-sampling"><span class="header-section-number">3.2</span> Candidate View Generation &amp; Sampling</a>
   <ul class="collapse">
-  <li><a href="#highest-prio" id="toc-highest-prio" class="nav-link" data-scroll-target="#highest-prio"><span class="header-section-number">2.1</span> HIGHEST PRIO:</a>
+  <li><a href="#raycasting-to-generate-candidate-point-clouds-" id="toc-raycasting-to-generate-candidate-point-clouds-" class="nav-link" data-scroll-target="#raycasting-to-generate-candidate-point-clouds-"><span class="header-section-number">3.2.1</span> Raycasting to Generate Candidate Point Clouds-</a></li>
+  <li><a href="#point-cloud-fusion" id="toc-point-cloud-fusion" class="nav-link" data-scroll-target="#point-cloud-fusion"><span class="header-section-number">3.2.2</span> Point Cloud Fusion</a></li>
+  </ul></li>
+  <li><a href="#visualization-streamlit" id="toc-visualization-streamlit" class="nav-link" data-scroll-target="#visualization-streamlit"><span class="header-section-number">3.3</span> Visualization (Streamlit)</a></li>
+  <li><a href="#data-handling" id="toc-data-handling" class="nav-link" data-scroll-target="#data-handling"><span class="header-section-number">3.4</span> Data Handling</a></li>
+  </ul></li>
+  <li><a href="#medium-priority" id="toc-medium-priority" class="nav-link" data-scroll-target="#medium-priority"><span class="header-section-number">4</span> Medium Priority</a>
   <ul class="collapse">
-  <li><a href="#data-handling" id="toc-data-handling" class="nav-link" data-scroll-target="#data-handling"><span class="header-section-number">2.1.1</span> Data Handling</a></li>
+  <li><a href="#candidate-sampling-learning-variants" id="toc-candidate-sampling-learning-variants" class="nav-link" data-scroll-target="#candidate-sampling-learning-variants"><span class="header-section-number">4.1</span> Candidate Sampling (learning variants)</a></li>
+  <li><a href="#evaluation-benchmarking" id="toc-evaluation-benchmarking" class="nav-link" data-scroll-target="#evaluation-benchmarking"><span class="header-section-number">4.2</span> Evaluation &amp; Benchmarking</a></li>
+  <li><a href="#download-data-ops" id="toc-download-data-ops" class="nav-link" data-scroll-target="#download-data-ops"><span class="header-section-number">4.3</span> Download &amp; Data Ops</a></li>
   </ul></li>
-  <li><a href="#lower-prio" id="toc-lower-prio" class="nav-link" data-scroll-target="#lower-prio"><span class="header-section-number">2.2</span> Lower Prio:</a>
+  <li><a href="#lower-priority-backlog" id="toc-lower-priority-backlog" class="nav-link" data-scroll-target="#lower-priority-backlog"><span class="header-section-number">5</span> Lower Priority / Backlog</a>
   <ul class="collapse">
-  <li><a href="#candidate-sampling-strategies" id="toc-candidate-sampling-strategies" class="nav-link" data-scroll-target="#candidate-sampling-strategies"><span class="header-section-number">2.2.1</span> Candidate Sampling Strategies</a></li>
+  <li><a href="#pose-navigation" id="toc-pose-navigation" class="nav-link" data-scroll-target="#pose-navigation"><span class="header-section-number">5.1</span> Pose &amp; Navigation</a></li>
+  <li><a href="#misc" id="toc-misc" class="nav-link" data-scroll-target="#misc"><span class="header-section-number">5.2</span> Misc</a></li>
   </ul></li>
+  <li><a href="#references-pointers" id="toc-references-pointers" class="nav-link" data-scroll-target="#references-pointers"><span class="header-section-number">6</span> References &amp; Pointers</a>
+  <ul class="collapse">
+  <li><a href="#atek-tools-externalatektools" id="toc-atek-tools-externalatektools" class="nav-link" data-scroll-target="#atek-tools-externalatektools"><span class="header-section-number">6.1</span> ATEK tools (external/ATEK/tools)</a></li>
+  <li><a href="#ase-download-helpers-projectaria_tools" id="toc-ase-download-helpers-projectaria_tools" class="nav-link" data-scroll-target="#ase-download-helpers-projectaria_tools"><span class="header-section-number">6.2</span> ASE download helpers (projectaria_tools)</a></li>
+  <li><a href="#data-manifests-.dataaria_download_urls" id="toc-data-manifests-.dataaria_download_urls" class="nav-link" data-scroll-target="#data-manifests-.dataaria_download_urls"><span class="header-section-number">6.3</span> Data manifests (.data/aria_download_urls)</a></li>
+  <li><a href="#atek-wds-format-shapesdtypes-excerpt" id="toc-atek-wds-format-shapesdtypes-excerpt" class="nav-link" data-scroll-target="#atek-wds-format-shapesdtypes-excerpt"><span class="header-section-number">6.4</span> ATEK WDS format (shapes/dtypes excerpt)</a></li>
+  <li><a href="#wds-file-urls-excerpt" id="toc-wds-file-urls-excerpt" class="nav-link" data-scroll-target="#wds-file-urls-excerpt"><span class="header-section-number">6.5</span> WDS file URLs (excerpt)</a></li>
   </ul></li>
+  <li><a href="#notes-on-implementation-approach" id="toc-notes-on-implementation-approach" class="nav-link" data-scroll-target="#notes-on-implementation-approach"><span class="header-section-number">7</span> Notes on Implementation Approach</a></li>
   </ul>
 </nav>
     </div>
@@ -647,209 +671,205 @@ window.Quarto = {
 </header>
 
 
-<!-- Agent Instructions: Always work in a test-driven manner.  -->
-<section id="issues-questions" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> Issues &amp; Questions</h1>
-<section id="ase-single-trajectory-per-scene" class="level2" data-number="1.1">
-<h2 data-number="1.1" class="anchored" data-anchor-id="ase-single-trajectory-per-scene"><span class="header-section-number">1.1</span> ASE: Single Trajectory Per Scene</h2>
+<!-- Agent Instructions: Always work in a test-driven manner. -->
+<section id="overview" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Overview</h1>
+<p>This page consolidates all open tasks, questions, and references for the ASE/ATEK + EFM3D NBV project. Nothing has been removed; items are reorganized for clarity.</p>
+</section>
+<section id="open-questions-constraints" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Open Questions &amp; Constraints</h1>
 <ul>
-<li><p>Each ASE scene provides only one pre-recorded egocentric trajectory. We cannot query arbitrary novel viewpoints.</p>
+<li><strong>ASE single trajectory</strong>: Each scene has one prerecorded egocentric path; no arbitrary novel viewpoints.
 <ul>
-<li>EFM3D introduces GT meshes for 100 validation scenes. We can use these to compute oracle RRI for candidate views. Use the mesh predicted by EFM3D as pseudo-GT for other scenes.</li>
+<li>For 100 validation scenes, GT meshes exist (EFM3D release) → usable for oracle RRI.</li>
+<li>For other scenes, EFM3D-predicted meshes act as pseudo-GT.</li>
 </ul></li>
-<li><p>depth maps in ASE dataset are ground-truth!</p></li>
-<li><p>non-gt point clouds are sparse! How to sample a PC from the candidate view that can be compared to the pre-existing semi-dense SLAM PC that is provided in the ASE dataset?</p></li>
-<li><p>Should NBV prediction output discrete selection (VIN-NBV) or continuous pose (GenNBV)?</p>
+<li><strong>Depth</strong>: ASE depth maps are GT.</li>
+<li><strong>Sparse SLAM PC</strong>: Non-GT point clouds are semi-dense; need a strategy to compare candidate-view point clouds against provided SLAM PCs.</li>
+<li><strong>Action space</strong>: Start with discrete candidate selection (VIN-NBV style). Later: continuous pose generation (GenNBV) with collision-free sampling using free-space voxels.
 <ul>
-<li>Start with randomly sampled candidate views for which the RRI is computed. Action space is then the selection among these candidates.</li>
 <li>Future work: learn to generate continuous poses directly, whose fitness can than be quantified using the RRI predictor; here we can also consider the free space voxels that are used in EFM3D to avoid collisions.</li>
 </ul></li>
 </ul>
 </section>
+<section id="highest-priority" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Highest Priority</h1>
+<section id="metrics" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="metrics"><span class="header-section-number">3.1</span> Metrics</h2>
+<ul>
+<li>Implement <code>OracleRRI</code> with point-cloud–to–mesh distance (Chamfer components).</li>
+<li>Consider mesh-to-distance-field acceleration and room-level cropping to avoid unrelated geometry - How can we consider only relevant (observable parts) of the scene, such that we don’t have to consider the entire mesh (e.g.&nbsp;there might be different rooms that cannot be considered)?</li>
+<li>Later: deliver as <code>TorchMetric</code>.</li>
+</ul>
 </section>
-<section id="action-items" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> Action Items</h1>
-<section id="highest-prio" class="level2" data-number="2.1">
-<h2 data-number="2.1" class="anchored" data-anchor-id="highest-prio"><span class="header-section-number">2.1</span> HIGHEST PRIO:</h2>
+<section id="candidate-view-generation-sampling" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="candidate-view-generation-sampling"><span class="header-section-number">3.2</span> Candidate View Generation &amp; Sampling</h2>
 <ul>
-<li>implement the <code>OracleRRI</code> class with PC to mesh distance computation between two point clouds
+<li>implement <code>CandidateViewGenerator</code>, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type <code>PoseTW</code> (<code>external/efm3d/efm3d/aria/pose.py</code>)
 <ul>
-<li>Mesh to distance field computation??</li>
-<li>How can we consider only relevant (observable parts) of the scene, such that we don’t have to consider the entire mesh (e.g.&nbsp;there might be different rooms that cannot be considered)</li>
-<li>must be implemented as <code>TorchMetric</code></li>
-</ul></li>
-<li>implement <code>CandidateViewGenerator</code>, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type <code>PoseTW</code> (<code>external/efm3d/efm3d/aria/pose.py</code>)</li>
-<li>implement a <code>CandidateSample</code> that takes the candidate poses of type <code>PoseTW</code> and samples rays from the corresponding view onto the GT mesh to obtain a dense point cloud from this candidate view.
-<ul>
-<li>candidate pose generation: only within free space and within confines of the room (based on SSL for training); based on predicted occupancy from EFM3D for eval</li>
-<li>ray mesh intersection: check if both poses can see each other</li>
-<li>sampling based on occupancy grid?</li>
-</ul></li>
-<li>implement a class (name to be decided) that fuses the semi-dense SLAM PC <span class="math inline">\(\mathcal{P}_t\)</span> with the dense PC from the candidate view <span class="math inline">\(\mathcal{P}_{\mathbf{q}}\)</span> to obtain the updated PC <span class="math inline">\(\mathcal{P}_{t \cup \mathbf{q}}\)</span>.</li>
-<li>crop GT mesh to relevant volume around the trajectory to speed up computation, this is especially relevant for completeness computation.</li>
-</ul>
-<section id="data-handling" class="level3" data-number="2.1.1">
-<h3 data-number="2.1.1" class="anchored" data-anchor-id="data-handling"><span class="header-section-number">2.1.1</span> Data Handling</h3>
-<ul>
-<li>Implement custom data handling for the ASE dataset, using the tools provided in ATEK:
-<ul>
-<li><p>Should provide easy access to the ASE dataset in ATEK WDS format together with the ground truth meshes.</p></li>
-<li><p>Should wrap around their existing dataset and dataset downloader implementations to provide easy acces to the data we need.</p></li>
-<li><p>Download all 3 forms of the dataset for scenes for which the GT meshes are available.</p></li>
-<li><p>Figure out, how to best manage to download corresponding data files (ATEK, raw ASE, GT meshes) for the same scenes.</p></li>
-<li><p>We also want to represents scenes together with the snippets that reside in them (snippets are in atek dataset structure ready for training).</p></li>
-<li><p>metadata should be comined in a single file for easy access.</p></li>
-<li><p>should provide mapping from scene_id to snippet_ids and vice versa.</p></li>
-<li><p>should leverage their download scripts internally to provide a cleaner interface.</p></li>
-<li><p>we want to be able to download meta data about all datasets withot downloading the full data to be able to explicitly see which scenes are relevant to us (i.e.&nbsp;in terms of having many atek snipptes and gt meshes available)</p></li>
-<li><p>Selection of ATEK WDS snippets based on the available GT meshes - i.e.&nbsp;in <code>.data/aria_download_urls/ase_mesh_download_urls.json</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ot">[</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"filename"</span><span class="fu">:</span> <span class="st">"scene_ply_81022.zip"</span><span class="fu">,</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"cdn"</span><span class="fu">:</span> <span class="st">"https://scontent.xx.fbcdn.net/m1/v/t6/An-P6UxdW2UCcDGjnRfIWHlkPjn7dRbmCcaQdmJGuOg5AWqcqm2x5w9i4ERYfd1_J1oxJ9OoDz-VNFw1RKmqxAA2zVlsGpGZazodN0Cu4UrRUYrXjbShQLo3s7ojK_iUQRTR5Q.zip?_nc_gid&amp;ccb=10-5&amp;oh=00_Afd13a-0sLEMI02bJLU1UKhIAUPjgrDupi5py69tn6xb2w&amp;oe=691C7C49&amp;_nc_sid=1a752d"</span><span class="fu">,</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"sha"</span><span class="fu">:</span> <span class="st">"ecfcbfd76ed6079810d4305ddb718a84739b25bb"</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span><span class="ot">,</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"filename"</span><span class="fu">:</span> <span class="st">"scene_ply_81048.zip"</span><span class="fu">,</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="er">...</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="ot">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<ul>
-<li><p>The scene IDs can be extracted from the filenames (e.g.&nbsp;<code>81022</code> from <code>scene_ply_81022.zip</code>).</p></li>
-<li><p><code>.data/aria_download_urls/AriaSyntheticEnvironment_ATEK_download_urls.json</code> contains the download links for the ATEK WDS dataset:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="dt">"raw_dataset_name"</span><span class="fu">:</span> <span class="st">"AriaSyntheticEnvironment"</span><span class="fu">,</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="dt">"raw_dataset_release_version"</span><span class="fu">:</span> <span class="st">"1.0"</span><span class="fu">,</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="dt">"atek_data_for_all_configs"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"cubercnn"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"atek_preprocessing_config_name"</span><span class="fu">:</span> <span class="st">"cubercnn"</span><span class="fu">,</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"atek_wds_version"</span><span class="fu">:</span> <span class="st">"v0.1.1"</span><span class="fu">,</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"atek_preprocessing_config_content"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"atek_config_name"</span><span class="fu">:</span> <span class="st">"cubercnn"</span><span class="fu">,</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"camera_temporal_subsampler"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"main_camera_label"</span><span class="fu">:</span> <span class="st">"camera-rgb"</span><span class="fu">,</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"time_domain"</span><span class="fu">:</span> <span class="st">"DEVICE_TIME"</span><span class="fu">,</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"main_camera_target_freq_hz"</span><span class="fu">:</span> <span class="dv">10</span><span class="fu">,</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"sample_length_in_num_frames"</span><span class="fu">:</span> <span class="dv">1</span><span class="fu">,</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"stride_length_in_num_frames"</span><span class="fu">:</span> <span class="dv">2</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>          <span class="fu">},</span></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"processors"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"rgb"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"selected"</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span></span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"sensor_label"</span><span class="fu">:</span> <span class="st">"camera-rgb"</span><span class="fu">,</span></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"time_domain"</span><span class="fu">:</span> <span class="st">"DEVICE_TIME"</span><span class="fu">,</span></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"tolerance_ns"</span><span class="fu">:</span> <span class="dv">10000000</span><span class="fu">,</span></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"undistort_to_linear_camera"</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"target_camera_resolution"</span><span class="fu">:</span> <span class="fu">{},</span></span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"rotate_image_cw90deg"</span><span class="fu">:</span> <span class="kw">true</span></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>              <span class="fu">},</span></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"slam_left"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"selected"</span><span class="fu">:</span> <span class="kw">false</span></span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>              <span class="fu">},</span></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"slam_right"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"selected"</span><span class="fu">:</span> <span class="kw">false</span></span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>              <span class="fu">},</span></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"mps_traj"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"selected"</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span></span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"tolerance_ns"</span><span class="fu">:</span> <span class="dv">10000000</span></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>              <span class="fu">},</span></span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"mps_semidense"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"selected"</span><span class="fu">:</span> <span class="kw">false</span></span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>              <span class="fu">},</span></span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"obb_gt"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"selected"</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span></span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"tolerance_ns"</span><span class="fu">:</span> <span class="dv">10000000</span><span class="fu">,</span></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"category_mapping_field_name"</span><span class="fu">:</span> <span class="st">"category"</span><span class="fu">,</span></span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>                  <span class="dt">"bbox2d_num_samples_on_edge"</span><span class="fu">:</span> <span class="dv">10</span></span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>              <span class="fu">}</span></span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>          <span class="fu">},</span></span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"wds_writer"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"prefix_string"</span><span class="fu">:</span> <span class="st">"AsePublicRelease2023"</span><span class="fu">,</span></span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>              <span class="dt">"max_samples_per_shard"</span><span class="fu">:</span> <span class="dv">32</span></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>          <span class="fu">}</span></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>      <span class="fu">},</span></span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"atek_wds_shapes"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+capture_timestamps_ns"</span><span class="fu">:</span> <span class="st">"1"</span><span class="fu">,</span></span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+exposure_durations_s"</span><span class="fu">:</span> <span class="st">"1"</span><span class="fu">,</span></span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+frame_ids"</span><span class="fu">:</span> <span class="st">"1"</span><span class="fu">,</span></span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+gains"</span><span class="fu">:</span> <span class="st">"1"</span><span class="fu">,</span></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+projection_params"</span><span class="fu">:</span> <span class="st">"4"</span><span class="fu">,</span></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+t_device_camera"</span><span class="fu">:</span> <span class="st">"3, 4"</span><span class="fu">,</span></span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mtd#capture_timestamps_ns"</span><span class="fu">:</span> <span class="st">"1"</span><span class="fu">,</span></span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mtd#gravity_in_world"</span><span class="fu">:</span> <span class="st">"3"</span><span class="fu">,</span></span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mtd#ts_world_device"</span><span class="fu">:</span> <span class="st">"1, 3, 4"</span><span class="fu">,</span></span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+images"</span><span class="fu">:</span> <span class="st">"1, 3, 704, 704"</span></span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>      <span class="fu">},</span></span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"atek_wds_dtypes"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"gt_data"</span><span class="fu">:</span> <span class="st">"dict"</span><span class="fu">,</span></span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+camera_label"</span><span class="fu">:</span> <span class="st">"str"</span><span class="fu">,</span></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+camera_model_name"</span><span class="fu">:</span> <span class="st">"str"</span><span class="fu">,</span></span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+capture_timestamps_ns"</span><span class="fu">:</span> <span class="st">"torch.int64"</span><span class="fu">,</span></span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+exposure_durations_s"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+frame_ids"</span><span class="fu">:</span> <span class="st">"torch.int64"</span><span class="fu">,</span></span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+gains"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+origin_camera_label"</span><span class="fu">:</span> <span class="st">"str"</span><span class="fu">,</span></span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+projection_params"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+t_device_camera"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mtd#capture_timestamps_ns"</span><span class="fu">:</span> <span class="st">"torch.int64"</span><span class="fu">,</span></span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mtd#gravity_in_world"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mtd#ts_world_device"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"sequence_name"</span><span class="fu">:</span> <span class="st">"str"</span><span class="fu">,</span></span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"mfcd#camera-rgb+images"</span><span class="fu">:</span> <span class="st">"torch.uint8"</span></span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>      <span class="fu">},</span></span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"wds_file_urls"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"0"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>          <span class="er">...</span></span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>          <span class="dt">"81048"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>                        <span class="dt">"shards-0000_tar"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>                            <span class="dt">"filename"</span><span class="fu">:</span> <span class="st">"AriaSyntheticEnvironment_1_0_ATEK_cubercnn_81048_shards-0000.tar"</span><span class="fu">,</span></span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>                            <span class="dt">"sha1sum"</span><span class="fu">:</span> <span class="st">"05840565afd9702f985e1c483170f5d6e8825f07"</span><span class="fu">,</span></span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>                            <span class="dt">"file_size_bytes"</span><span class="fu">:</span> <span class="dv">8570880</span><span class="fu">,</span></span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>                            <span class="dt">"download_url"</span><span class="fu">:</span> <span class="st">"https://scontent.xx.fbcdn.net/m1/v/t6/An9oQjW7U2aCTPOcBSIZbdpnELJZXW4VbKjxqjSM09txkZdhmaV-CwVmCPD3-x05L4DuXSadV_zDu_b_cGkZG52fAXuqt5_YQLP_GuikCPPYlDUqXPqJ0UDZPxGLwIJ6SERi_a3pX6K7eWUWgS1DHc1LgQ.tar/AriaSyntheticEnvironment_1_0_ATEK_cubercnn_81048_shards-0000.tar?_nc_gid&amp;ccb=10-5&amp;oh=00_AfeTftnWBgk7x5YeD9j7MEdoArTu2ZMPJj6ApcZJ7_SXYg&amp;oe=691D4B7D&amp;_nc_sid=c228f2"</span></span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">},</span></span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>                        <span class="er">...</span></span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>                      <span class="fu">}</span></span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>      <span class="fu">}</span></span>
-<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
-<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>  <span class="er">...</span></span>
-<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span>
-<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li>Strategies: uniform over half-sphere with min/max radius &amp; elevation, free-space only, room-bounded (SSL for train, occupancy for eval).</li>
+<li>Collision check: segment from last pose to candidate must not intersect mesh/voxels.</li>
+<li>Modular strategy selection via enums/config that allows easy extension and combination of strategies / sampling rules.</li>
 </ul></li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">external/ATEK/tools</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> ase_mesh_downloader.py</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> atek_wds_data_downloader.py</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> benchmarking_static_object_detection.py</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> benchmarking_surface_reconstruction.py</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> infer_cubercnn.py</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="ex">└──</span> train_cubercnn.py</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">.data/aria_download_urls</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> AriaSyntheticEnvironment_ATEK_download_urls.json</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> aria_synthetic_environments_dataset_download_urls.json</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="ex">└──</span> ase_mesh_download_urls.json  <span class="co"># contains download links for 100 GT meshes ("scene_ply_&lt;scene_id&gt;.ply")</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="raycasting-to-generate-candidate-point-clouds-" class="level3" data-number="3.2.1">
+<h3 data-number="3.2.1" class="anchored" data-anchor-id="raycasting-to-generate-candidate-point-clouds-"><span class="header-section-number">3.2.1</span> Raycasting to Generate Candidate Point Clouds-</h3>
 <ul>
-<li>Use <code>external/projectaria_tools/projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py</code> to download the base ASE dataset</li>
+<li>Implement <code>CandidatePointCloudGenerator</code>: for each candidate pose, cast rays to GT to render depth map using existing GPU implementations from <code>efm3d</code>.
+<ul>
+<li>Input: candidate <code>PoseTW</code>, GT mesh.</li>
+<li>Output: Depth map.</li>
+</ul></li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># example: download specific scenes</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py <span class="at">--set</span> train <span class="at">--scene-ids</span> 560-569 <span class="at">--cdn-file</span> aria_synthetic_environments_dataset_download_urls.json <span class="at">--output-dir</span> <span class="va">$HOME</span>/projectaria_tools_ase_data <span class="at">--unzip</span> True</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+</section>
+<section id="point-cloud-fusion" class="level3" data-number="3.2.2">
+<h3 data-number="3.2.2" class="anchored" data-anchor-id="point-cloud-fusion"><span class="header-section-number">3.2.2</span> Point Cloud Fusion</h3>
+<ul>
+<li>Implement <code>DepthToPointCloud</code> module: for each candidate pose’s depth map, backproject to point cloud `<span class="math inline">\(\mathcal{P}_{\mathbf{q}}\)</span> in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC <span class="math inline">\(\mathcal{P}_t\)</span> with candidate-view PC <span class="math inline">\(\mathcal{P}_{\mathbf{q}}\)</span> → <span class="math inline">\(\mathcal{P}_{t \cup \mathbf{q}}\)</span>.</li>
 </ul>
 </section>
 </section>
-<section id="lower-prio" class="level2" data-number="2.2">
-<h2 data-number="2.2" class="anchored" data-anchor-id="lower-prio"><span class="header-section-number">2.2</span> Lower Prio:</h2>
-<section id="candidate-sampling-strategies" class="level3" data-number="2.2.1">
-<h3 data-number="2.2.1" class="anchored" data-anchor-id="candidate-sampling-strategies"><span class="header-section-number">2.2.1</span> Candidate Sampling Strategies</h3>
+<section id="visualization-streamlit" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="visualization-streamlit"><span class="header-section-number">3.3</span> Visualization (Streamlit)</h2>
 <ul>
-<li>Train a light weight network to predict the sampled rays given a canidate view and projection onto the mesh to imitate how their SAM would see it.</li>
-<li>Or simply generate dense PC (<span class="math inline">\(\mathcal{P}_{\mathbf{t}}\)</span>) from ground truth depth maps - what high-level implementations would be suited?</li>
-<li></li>
+<li>Interactive app to visualize candidate sampling, PC–mesh distances, and RRI.</li>
+<li>Efficient caching; quick scene/trajectory switching.</li>
+</ul>
+</section>
+<section id="data-handling" class="level2" data-number="3.4">
+<h2 data-number="3.4" class="anchored" data-anchor-id="data-handling"><span class="header-section-number">3.4</span> Data Handling</h2>
+<ul>
+<li>Link ASE ATEK shards and GT meshes to raw ASE; resolve scene_id/snippet_id mapping.</li>
+<li>Wrap ATEK dataset/downloader to expose:
+<ul>
+<li>easy ASE ATEK WDS access + GT meshes,</li>
+<li>metadata file combining scene↔︎snippet mapping,</li>
+<li>download of metadata without full payload,</li>
+<li>selection of ATEK snippets based on available GT meshes (<code>ase_mesh_download_urls.json</code>).</li>
+</ul></li>
+<li>Download all dataset variants (ATEK, raw ASE, meshes) for scenes with GT.</li>
+</ul>
+</section>
+</section>
+<section id="medium-priority" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Medium Priority</h1>
+<section id="candidate-sampling-learning-variants" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="candidate-sampling-learning-variants"><span class="header-section-number">4.1</span> Candidate Sampling (learning variants)</h2>
+<ul>
+<li>Lightweight net on top of EVL to predict candidate rays / projections given pose + mesh.</li>
+</ul>
+</section>
+<section id="evaluation-benchmarking" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="evaluation-benchmarking"><span class="header-section-number">4.2</span> Evaluation &amp; Benchmarking</h2>
+<ul>
+<li>Surface reconstruction: F-Score vs GT meshes (ATEK + EFM3D utils).</li>
+<li>Static object detection: CubeRCNN baselines.</li>
+<li>Reproduce benchmarking scripts in <code>external/ATEK/tools</code>.</li>
+</ul>
+</section>
+<section id="download-data-ops" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="download-data-ops"><span class="header-section-number">4.3</span> Download &amp; Data Ops</h2>
+<ul>
+<li>Automate downloads using ATEK/Project Aria tools; ensure integrity (sha1).</li>
+<li>Provide CLI wrappers for scene filters and variant selection (train/val/test).</li>
+</ul>
+</section>
+</section>
+<section id="lower-priority-backlog" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Lower Priority / Backlog</h1>
+<section id="pose-navigation" class="level2" data-number="5.1">
+<h2 data-number="5.1" class="anchored" data-anchor-id="pose-navigation"><span class="header-section-number">5.1</span> Pose &amp; Navigation</h2>
+<ul>
+<li>Free-space validation using EFM3D occupancy; collision-aware NBV pathing.</li>
+</ul>
+</section>
+<section id="misc" class="level2" data-number="5.2">
+<h2 data-number="5.2" class="anchored" data-anchor-id="misc"><span class="header-section-number">5.2</span> Misc</h2>
+<ul>
+<li>Extend candidate generation to continuous policy conditioned on fused occupancy / OBB priors.</li>
+</ul>
+</section>
+</section>
+<section id="references-pointers" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> References &amp; Pointers</h1>
+<section id="atek-tools-externalatektools" class="level2" data-number="6.1">
+<h2 data-number="6.1" class="anchored" data-anchor-id="atek-tools-externalatektools"><span class="header-section-number">6.1</span> ATEK tools (external/ATEK/tools)</h2>
+<pre><code>ase_mesh_downloader.py
+atek_wds_data_downloader.py
+benchmarking_static_object_detection.py
+benchmarking_surface_reconstruction.py
+infer_cubercnn.py
+train_cubercnn.py</code></pre>
+</section>
+<section id="ase-download-helpers-projectaria_tools" class="level2" data-number="6.2">
+<h2 data-number="6.2" class="anchored" data-anchor-id="ase-download-helpers-projectaria_tools"><span class="header-section-number">6.2</span> ASE download helpers (projectaria_tools)</h2>
+<p><code>external/projectaria_tools/projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py</code> Example:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py <span class="dt">\</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--set</span> train <span class="at">--scene-ids</span> 560-569 <span class="dt">\</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--cdn-file</span> aria_synthetic_environments_dataset_download_urls.json <span class="dt">\</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-dir</span> <span class="va">$HOME</span>/projectaria_tools_ase_data <span class="at">--unzip</span> True</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="data-manifests-.dataaria_download_urls" class="level2" data-number="6.3">
+<h2 data-number="6.3" class="anchored" data-anchor-id="data-manifests-.dataaria_download_urls"><span class="header-section-number">6.3</span> Data manifests (.data/aria_download_urls)</h2>
+<pre><code>AriaSyntheticEnvironment_ATEK_download_urls.json
+aria_synthetic_environments_dataset_download_urls.json
+ase_mesh_download_urls.json    # 100 GT meshes: scene_ply_&lt;scene_id&gt;.ply</code></pre>
+</section>
+<section id="atek-wds-format-shapesdtypes-excerpt" class="level2" data-number="6.4">
+<h2 data-number="6.4" class="anchored" data-anchor-id="atek-wds-format-shapesdtypes-excerpt"><span class="header-section-number">6.4</span> ATEK WDS format (shapes/dtypes excerpt)</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"atek_wds_shapes"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+capture_timestamps_ns"</span><span class="fu">:</span> <span class="st">"1"</span><span class="fu">,</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+exposure_durations_s"</span><span class="fu">:</span> <span class="st">"1"</span><span class="fu">,</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+frame_ids"</span><span class="fu">:</span> <span class="st">"1"</span><span class="fu">,</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+gains"</span><span class="fu">:</span> <span class="st">"1"</span><span class="fu">,</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+projection_params"</span><span class="fu">:</span> <span class="st">"4"</span><span class="fu">,</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+t_device_camera"</span><span class="fu">:</span> <span class="st">"3, 4"</span><span class="fu">,</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mtd#capture_timestamps_ns"</span><span class="fu">:</span> <span class="st">"1"</span><span class="fu">,</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mtd#gravity_in_world"</span><span class="fu">:</span> <span class="st">"3"</span><span class="fu">,</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mtd#ts_world_device"</span><span class="fu">:</span> <span class="st">"1, 3, 4"</span><span class="fu">,</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+images"</span><span class="fu">:</span> <span class="st">"1, 3, 704, 704"</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"atek_wds_dtypes"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"gt_data"</span><span class="fu">:</span> <span class="st">"dict"</span><span class="fu">,</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+camera_label"</span><span class="fu">:</span> <span class="st">"str"</span><span class="fu">,</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+camera_model_name"</span><span class="fu">:</span> <span class="st">"str"</span><span class="fu">,</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+capture_timestamps_ns"</span><span class="fu">:</span> <span class="st">"torch.int64"</span><span class="fu">,</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+exposure_durations_s"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+frame_ids"</span><span class="fu">:</span> <span class="st">"torch.int64"</span><span class="fu">,</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+gains"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+origin_camera_label"</span><span class="fu">:</span> <span class="st">"str"</span><span class="fu">,</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+projection_params"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+t_device_camera"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mtd#capture_timestamps_ns"</span><span class="fu">:</span> <span class="st">"torch.int64"</span><span class="fu">,</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mtd#gravity_in_world"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mtd#ts_world_device"</span><span class="fu">:</span> <span class="st">"torch.float32"</span><span class="fu">,</span></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"sequence_name"</span><span class="fu">:</span> <span class="st">"str"</span><span class="fu">,</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"mfcd#camera-rgb+images"</span><span class="fu">:</span> <span class="st">"torch.uint8"</span></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="wds-file-urls-excerpt" class="level2" data-number="6.5">
+<h2 data-number="6.5" class="anchored" data-anchor-id="wds-file-urls-excerpt"><span class="header-section-number">6.5</span> WDS file URLs (excerpt)</h2>
+<pre><code>81048:
+  shards-0000_tar:
+    filename: AriaSyntheticEnvironment_1_0_ATEK_cubercnn_81048_shards-0000.tar
+    sha1sum: 05840565afd9702f985e1c483170f5d6e8825f07
+    file_size_bytes: 8570880
+    download_url: https://scontent.xx.fbcdn.net/m1/v/t6/An9oQjW...</code></pre>
+</section>
+</section>
+<section id="notes-on-implementation-approach" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Notes on Implementation Approach</h1>
+<ul>
+<li>Use enums/configs to compose candidate sampling rules; keep modules orthogonal (generation, filtering, scoring).</li>
+<li>Prefer streaming + caching in visualization to avoid recomputation.</li>
+<li>Keep tests close to metrics and candidate generation (test-driven as per agent instruction).</li>
 </ul>
 
 
 <!-- -->
 
-</section>
-</section>
 </section>
 
 </main> <!-- /main -->
@@ -1326,198 +1346,158 @@ window.Quarto = {
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Action Items &amp; TODOs"</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> html</span></span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- Agent Instructions: Always work in a test-driven manner.  --&gt;</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- Agent Instructions: Always work in a test-driven manner. --&gt;</span></span>
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="fu"># Issues &amp; Questions</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="fu"># Overview</span></span>
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="fu">## ASE: Single Trajectory Per Scene</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>This page consolidates all open tasks, questions, and references for the ASE/ATEK + EFM3D NBV project. Nothing has been removed; items are reorganized for clarity.</span>
 <span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Each ASE scene provides only one pre-recorded egocentric trajectory. We cannot query arbitrary novel viewpoints.</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span>EFM3D introduces GT meshes for 100 validation scenes. We can use these to compute oracle RRI for candidate views. Use the mesh predicted by EFM3D as pseudo-GT for other scenes.</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>depth maps in ASE dataset are ground-truth!</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>non-gt point clouds are sparse! How to sample a PC from the candidate view that can be compared to the pre-existing semi-dense SLAM PC that is provided in the ASE dataset?</span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Should NBV prediction output discrete selection (VIN-NBV) or continuous pose (GenNBV)?</span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Start with randomly sampled candidate views for which the RRI is computed. Action space is then the selection among these candidates.</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="fu"># Open Questions &amp; Constraints</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**ASE single trajectory**: Each scene has one prerecorded egocentric path; no arbitrary novel viewpoints.</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>For 100 validation scenes, GT meshes exist (EFM3D release) → usable for oracle RRI.</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>For other scenes, EFM3D-predicted meshes act as pseudo-GT.</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Depth**: ASE depth maps are GT.</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Sparse SLAM PC**: Non-GT point clouds are semi-dense; need a strategy to compare candidate-view point clouds against provided SLAM PCs.</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Action space**: Start with discrete candidate selection (VIN-NBV style). Later: continuous pose generation (GenNBV) with collision-free sampling using free-space voxels.</span>
 <span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Future work: learn to generate continuous poses directly, whose fitness can than be quantified using the RRI predictor; here we can also consider the free space voxels that are used in EFM3D to avoid collisions.</span>
 <span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="fu"># Action Items</span></span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="fu">## HIGHEST PRIO:</span></span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>implement the <span class="in">`OracleRRI`</span> class with PC to mesh distance computation between two point clouds</span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Mesh to distance field computation??</span>
-<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>How can we consider only relevant (observable parts) of the scene, such that we don't have to consider the entire mesh (e.g. there might be different rooms that cannot be considered)</span>
-<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>must be implemented as <span class="in">`TorchMetric`</span></span>
-<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>implement <span class="in">`CandidateViewGenerator`</span>, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type <span class="in">`PoseTW`</span> (<span class="in">`external/efm3d/efm3d/aria/pose.py`</span>)</span>
-<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>implement a <span class="in">`CandidateSample`</span> that takes the candidate poses of type <span class="in">`PoseTW`</span> and samples rays from the corresponding view onto the GT mesh to obtain a dense point cloud from this candidate view.</span>
-<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>candidate pose generation: only within free space and within confines of the room (based on SSL for training); based on predicted occupancy from EFM3D for eval</span>
-<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>ray mesh intersection: check if both poses can see each other</span>
-<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>sampling based on occupancy grid?</span>
-<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>implement a class (name to be decided) that fuses the semi-dense SLAM PC $\mathcal{P}_t$ with the dense PC from the candidate view  $\mathcal{P}_{\mathbf{q}}$ to obtain the updated PC $\mathcal{P}_{t \cup \mathbf{q}}$.</span>
-<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>crop GT mesh to relevant volume around the trajectory to speed up computation, this is especially relevant for completeness computation.</span>
-<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a><span class="fu">### Data Handling</span></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="fu"># Highest Priority</span></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a><span class="fu">## Metrics</span></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Implement <span class="in">`OracleRRI`</span> with point-cloud–to–mesh distance (Chamfer components).</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Consider mesh-to-distance-field acceleration and room-level cropping to avoid unrelated geometry - How can we consider only relevant (observable parts) of the scene, such that we don't have to consider the entire mesh (e.g. there might be different rooms that cannot be considered)?</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Later: deliver as <span class="in">`TorchMetric`</span>.</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a><span class="fu">## Candidate View Generation &amp; Sampling</span></span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>implement <span class="in">`CandidateViewGenerator`</span>, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type <span class="in">`PoseTW`</span> (<span class="in">`external/efm3d/efm3d/aria/pose.py`</span>)</span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Strategies: uniform over half-sphere with min/max radius &amp; elevation, free-space only, room-bounded (SSL for train, occupancy for eval).</span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Collision check: segment from last pose to candidate must not intersect mesh/voxels.</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Modular strategy selection via enums/config that allows easy extension and combination of strategies / sampling rules.</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a><span class="fu">### Raycasting to Generate Candidate Point Clouds-</span></span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Implement <span class="in">`CandidatePointCloudGenerator`</span>: for each candidate pose, cast rays to GT  to render depth map using existing GPU implementations from <span class="in">`efm3d`</span>.</span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Input: candidate <span class="in">`PoseTW`</span>, GT mesh.</span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Output: Depth map.</span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a><span class="fu">### Point Cloud Fusion</span></span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Implement <span class="in">`DepthToPointCloud`</span> module: for each candidate pose's depth map, backproject to point cloud `$\mathcal{P}_{\mathbf{q}}$ in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC $\mathcal{P}_t$ with candidate-view PC $\mathcal{P}_{\mathbf{q}}$ → $\mathcal{P}_{t \cup \mathbf{q}}$.</span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Implement custom data handling for the ASE dataset, using the tools provided in ATEK:</span>
-<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Should provide easy access to the ASE dataset in ATEK WDS format together with the ground truth meshes.</span>
-<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Should wrap around their existing dataset and dataset downloader implementations to provide easy acces to the data we need.</span>
-<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Download all 3 forms of the dataset for scenes for which the GT meshes are available.</span>
-<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Figure out, how to best manage to download corresponding data files (ATEK, raw ASE, GT meshes) for the same scenes.</span>
-<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>We also want to represents scenes together with the snippets that reside in them (snippets are in atek dataset structure ready for training).</span>
-<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>metadata should be comined in a single file for easy access.</span>
-<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>should provide mapping from scene_id to snippet_ids and vice versa.</span>
-<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>should leverage their download scripts internally to provide a cleaner interface.</span>
-<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>we want to be able to download meta data about all datasets withot downloading the full data to be able to explicitly see which scenes are relevant to us (i.e. in terms of having many atek snipptes and gt meshes available)</span>
-<span id="cb6-53"><a href="#cb6-53" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Selection of ATEK WDS snippets based on the available GT meshes - i.e. in <span class="in">`.data/aria_download_urls/ase_mesh_download_urls.json`</span>:</span>
-<span id="cb6-54"><a href="#cb6-54" aria-hidden="true" tabindex="-1"></a>    <span class="in">```json</span></span>
-<span id="cb6-55"><a href="#cb6-55" aria-hidden="true" tabindex="-1"></a>    [</span>
-<span id="cb6-56"><a href="#cb6-56" aria-hidden="true" tabindex="-1"></a>    {</span>
-<span id="cb6-57"><a href="#cb6-57" aria-hidden="true" tabindex="-1"></a>        <span class="st">"filename"</span><span class="op">:</span> <span class="st">"scene_ply_81022.zip"</span><span class="op">,</span></span>
-<span id="cb6-58"><a href="#cb6-58" aria-hidden="true" tabindex="-1"></a>        <span class="st">"cdn"</span><span class="op">:</span> <span class="st">"https://scontent.xx.fbcdn.net/m1/v/t6/An-P6UxdW2UCcDGjnRfIWHlkPjn7dRbmCcaQdmJGuOg5AWqcqm2x5w9i4ERYfd1_J1oxJ9OoDz-VNFw1RKmqxAA2zVlsGpGZazodN0Cu4UrRUYrXjbShQLo3s7ojK_iUQRTR5Q.zip?_nc_gid&amp;ccb=10-5&amp;oh=00_Afd13a-0sLEMI02bJLU1UKhIAUPjgrDupi5py69tn6xb2w&amp;oe=691C7C49&amp;_nc_sid=1a752d"</span><span class="op">,</span></span>
-<span id="cb6-59"><a href="#cb6-59" aria-hidden="true" tabindex="-1"></a>        <span class="st">"sha"</span><span class="op">:</span> <span class="st">"ecfcbfd76ed6079810d4305ddb718a84739b25bb"</span></span>
-<span id="cb6-60"><a href="#cb6-60" aria-hidden="true" tabindex="-1"></a>    }<span class="op">,</span></span>
-<span id="cb6-61"><a href="#cb6-61" aria-hidden="true" tabindex="-1"></a>    {</span>
-<span id="cb6-62"><a href="#cb6-62" aria-hidden="true" tabindex="-1"></a>        <span class="st">"filename"</span><span class="op">:</span> <span class="st">"scene_ply_81048.zip"</span><span class="op">,</span></span>
-<span id="cb6-63"><a href="#cb6-63" aria-hidden="true" tabindex="-1"></a>    <span class="op">...</span></span>
-<span id="cb6-64"><a href="#cb6-64" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb6-65"><a href="#cb6-65" aria-hidden="true" tabindex="-1"></a>    ]</span>
-<span id="cb6-66"><a href="#cb6-66" aria-hidden="true" tabindex="-1"></a>    <span class="in">```</span></span>
-<span id="cb6-67"><a href="#cb6-67" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span>The scene IDs can be extracted from the filenames (e.g. <span class="in">`81022`</span> from <span class="in">`scene_ply_81022.zip`</span>).</span>
-<span id="cb6-68"><a href="#cb6-68" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span><span class="in">`.data/aria_download_urls/AriaSyntheticEnvironment_ATEK_download_urls.json`</span> contains the download links for the ATEK WDS dataset:</span>
-<span id="cb6-69"><a href="#cb6-69" aria-hidden="true" tabindex="-1"></a>      <span class="in">```json</span></span>
-<span id="cb6-70"><a href="#cb6-70" aria-hidden="true" tabindex="-1"></a>      {</span>
-<span id="cb6-71"><a href="#cb6-71" aria-hidden="true" tabindex="-1"></a>    <span class="st">"raw_dataset_name"</span><span class="op">:</span> <span class="st">"AriaSyntheticEnvironment"</span><span class="op">,</span></span>
-<span id="cb6-72"><a href="#cb6-72" aria-hidden="true" tabindex="-1"></a>    <span class="st">"raw_dataset_release_version"</span><span class="op">:</span> <span class="st">"1.0"</span><span class="op">,</span></span>
-<span id="cb6-73"><a href="#cb6-73" aria-hidden="true" tabindex="-1"></a>    <span class="st">"atek_data_for_all_configs"</span><span class="op">:</span> {</span>
-<span id="cb6-74"><a href="#cb6-74" aria-hidden="true" tabindex="-1"></a>        <span class="st">"cubercnn"</span><span class="op">:</span> {</span>
-<span id="cb6-75"><a href="#cb6-75" aria-hidden="true" tabindex="-1"></a>            <span class="st">"atek_preprocessing_config_name"</span><span class="op">:</span> <span class="st">"cubercnn"</span><span class="op">,</span></span>
-<span id="cb6-76"><a href="#cb6-76" aria-hidden="true" tabindex="-1"></a>            <span class="st">"atek_wds_version"</span><span class="op">:</span> <span class="st">"v0.1.1"</span><span class="op">,</span></span>
-<span id="cb6-77"><a href="#cb6-77" aria-hidden="true" tabindex="-1"></a>            <span class="st">"atek_preprocessing_config_content"</span><span class="op">:</span> {</span>
-<span id="cb6-78"><a href="#cb6-78" aria-hidden="true" tabindex="-1"></a>                <span class="st">"atek_config_name"</span><span class="op">:</span> <span class="st">"cubercnn"</span><span class="op">,</span></span>
-<span id="cb6-79"><a href="#cb6-79" aria-hidden="true" tabindex="-1"></a>                <span class="st">"camera_temporal_subsampler"</span><span class="op">:</span> {</span>
-<span id="cb6-80"><a href="#cb6-80" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"main_camera_label"</span><span class="op">:</span> <span class="st">"camera-rgb"</span><span class="op">,</span></span>
-<span id="cb6-81"><a href="#cb6-81" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"time_domain"</span><span class="op">:</span> <span class="st">"DEVICE_TIME"</span><span class="op">,</span></span>
-<span id="cb6-82"><a href="#cb6-82" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"main_camera_target_freq_hz"</span><span class="op">:</span> <span class="dv">10</span><span class="op">,</span></span>
-<span id="cb6-83"><a href="#cb6-83" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"sample_length_in_num_frames"</span><span class="op">:</span> <span class="dv">1</span><span class="op">,</span></span>
-<span id="cb6-84"><a href="#cb6-84" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"stride_length_in_num_frames"</span><span class="op">:</span> <span class="dv">2</span></span>
-<span id="cb6-85"><a href="#cb6-85" aria-hidden="true" tabindex="-1"></a>                }<span class="op">,</span></span>
-<span id="cb6-86"><a href="#cb6-86" aria-hidden="true" tabindex="-1"></a>                <span class="st">"processors"</span><span class="op">:</span> {</span>
-<span id="cb6-87"><a href="#cb6-87" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"rgb"</span><span class="op">:</span> {</span>
-<span id="cb6-88"><a href="#cb6-88" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"selected"</span><span class="op">:</span> <span class="kw">true</span><span class="op">,</span></span>
-<span id="cb6-89"><a href="#cb6-89" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"sensor_label"</span><span class="op">:</span> <span class="st">"camera-rgb"</span><span class="op">,</span></span>
-<span id="cb6-90"><a href="#cb6-90" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"time_domain"</span><span class="op">:</span> <span class="st">"DEVICE_TIME"</span><span class="op">,</span></span>
-<span id="cb6-91"><a href="#cb6-91" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"tolerance_ns"</span><span class="op">:</span> <span class="dv">10000000</span><span class="op">,</span></span>
-<span id="cb6-92"><a href="#cb6-92" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"undistort_to_linear_camera"</span><span class="op">:</span> <span class="kw">true</span><span class="op">,</span></span>
-<span id="cb6-93"><a href="#cb6-93" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"target_camera_resolution"</span><span class="op">:</span> {}<span class="op">,</span></span>
-<span id="cb6-94"><a href="#cb6-94" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"rotate_image_cw90deg"</span><span class="op">:</span> <span class="kw">true</span></span>
-<span id="cb6-95"><a href="#cb6-95" aria-hidden="true" tabindex="-1"></a>                    }<span class="op">,</span></span>
-<span id="cb6-96"><a href="#cb6-96" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"slam_left"</span><span class="op">:</span> {</span>
-<span id="cb6-97"><a href="#cb6-97" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"selected"</span><span class="op">:</span> <span class="kw">false</span></span>
-<span id="cb6-98"><a href="#cb6-98" aria-hidden="true" tabindex="-1"></a>                    }<span class="op">,</span></span>
-<span id="cb6-99"><a href="#cb6-99" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"slam_right"</span><span class="op">:</span> {</span>
-<span id="cb6-100"><a href="#cb6-100" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"selected"</span><span class="op">:</span> <span class="kw">false</span></span>
-<span id="cb6-101"><a href="#cb6-101" aria-hidden="true" tabindex="-1"></a>                    }<span class="op">,</span></span>
-<span id="cb6-102"><a href="#cb6-102" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"mps_traj"</span><span class="op">:</span> {</span>
-<span id="cb6-103"><a href="#cb6-103" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"selected"</span><span class="op">:</span> <span class="kw">true</span><span class="op">,</span></span>
-<span id="cb6-104"><a href="#cb6-104" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"tolerance_ns"</span><span class="op">:</span> <span class="dv">10000000</span></span>
-<span id="cb6-105"><a href="#cb6-105" aria-hidden="true" tabindex="-1"></a>                    }<span class="op">,</span></span>
-<span id="cb6-106"><a href="#cb6-106" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"mps_semidense"</span><span class="op">:</span> {</span>
-<span id="cb6-107"><a href="#cb6-107" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"selected"</span><span class="op">:</span> <span class="kw">false</span></span>
-<span id="cb6-108"><a href="#cb6-108" aria-hidden="true" tabindex="-1"></a>                    }<span class="op">,</span></span>
-<span id="cb6-109"><a href="#cb6-109" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"obb_gt"</span><span class="op">:</span> {</span>
-<span id="cb6-110"><a href="#cb6-110" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"selected"</span><span class="op">:</span> <span class="kw">true</span><span class="op">,</span></span>
-<span id="cb6-111"><a href="#cb6-111" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"tolerance_ns"</span><span class="op">:</span> <span class="dv">10000000</span><span class="op">,</span></span>
-<span id="cb6-112"><a href="#cb6-112" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"category_mapping_field_name"</span><span class="op">:</span> <span class="st">"category"</span><span class="op">,</span></span>
-<span id="cb6-113"><a href="#cb6-113" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"bbox2d_num_samples_on_edge"</span><span class="op">:</span> <span class="dv">10</span></span>
-<span id="cb6-114"><a href="#cb6-114" aria-hidden="true" tabindex="-1"></a>                    }</span>
-<span id="cb6-115"><a href="#cb6-115" aria-hidden="true" tabindex="-1"></a>                }<span class="op">,</span></span>
-<span id="cb6-116"><a href="#cb6-116" aria-hidden="true" tabindex="-1"></a>                <span class="st">"wds_writer"</span><span class="op">:</span> {</span>
-<span id="cb6-117"><a href="#cb6-117" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"prefix_string"</span><span class="op">:</span> <span class="st">"AsePublicRelease2023"</span><span class="op">,</span></span>
-<span id="cb6-118"><a href="#cb6-118" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"max_samples_per_shard"</span><span class="op">:</span> <span class="dv">32</span></span>
-<span id="cb6-119"><a href="#cb6-119" aria-hidden="true" tabindex="-1"></a>                }</span>
-<span id="cb6-120"><a href="#cb6-120" aria-hidden="true" tabindex="-1"></a>            }<span class="op">,</span></span>
-<span id="cb6-121"><a href="#cb6-121" aria-hidden="true" tabindex="-1"></a>            <span class="st">"atek_wds_shapes"</span><span class="op">:</span> {</span>
-<span id="cb6-122"><a href="#cb6-122" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+capture_timestamps_ns"</span><span class="op">:</span> <span class="st">"1"</span><span class="op">,</span></span>
-<span id="cb6-123"><a href="#cb6-123" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+exposure_durations_s"</span><span class="op">:</span> <span class="st">"1"</span><span class="op">,</span></span>
-<span id="cb6-124"><a href="#cb6-124" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+frame_ids"</span><span class="op">:</span> <span class="st">"1"</span><span class="op">,</span></span>
-<span id="cb6-125"><a href="#cb6-125" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+gains"</span><span class="op">:</span> <span class="st">"1"</span><span class="op">,</span></span>
-<span id="cb6-126"><a href="#cb6-126" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+projection_params"</span><span class="op">:</span> <span class="st">"4"</span><span class="op">,</span></span>
-<span id="cb6-127"><a href="#cb6-127" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+t_device_camera"</span><span class="op">:</span> <span class="st">"3, 4"</span><span class="op">,</span></span>
-<span id="cb6-128"><a href="#cb6-128" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mtd#capture_timestamps_ns"</span><span class="op">:</span> <span class="st">"1"</span><span class="op">,</span></span>
-<span id="cb6-129"><a href="#cb6-129" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mtd#gravity_in_world"</span><span class="op">:</span> <span class="st">"3"</span><span class="op">,</span></span>
-<span id="cb6-130"><a href="#cb6-130" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mtd#ts_world_device"</span><span class="op">:</span> <span class="st">"1, 3, 4"</span><span class="op">,</span></span>
-<span id="cb6-131"><a href="#cb6-131" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+images"</span><span class="op">:</span> <span class="st">"1, 3, 704, 704"</span></span>
-<span id="cb6-132"><a href="#cb6-132" aria-hidden="true" tabindex="-1"></a>            }<span class="op">,</span></span>
-<span id="cb6-133"><a href="#cb6-133" aria-hidden="true" tabindex="-1"></a>            <span class="st">"atek_wds_dtypes"</span><span class="op">:</span> {</span>
-<span id="cb6-134"><a href="#cb6-134" aria-hidden="true" tabindex="-1"></a>                <span class="st">"gt_data"</span><span class="op">:</span> <span class="st">"dict"</span><span class="op">,</span></span>
-<span id="cb6-135"><a href="#cb6-135" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+camera_label"</span><span class="op">:</span> <span class="st">"str"</span><span class="op">,</span></span>
-<span id="cb6-136"><a href="#cb6-136" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+camera_model_name"</span><span class="op">:</span> <span class="st">"str"</span><span class="op">,</span></span>
-<span id="cb6-137"><a href="#cb6-137" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+capture_timestamps_ns"</span><span class="op">:</span> <span class="st">"torch.int64"</span><span class="op">,</span></span>
-<span id="cb6-138"><a href="#cb6-138" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+exposure_durations_s"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
-<span id="cb6-139"><a href="#cb6-139" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+frame_ids"</span><span class="op">:</span> <span class="st">"torch.int64"</span><span class="op">,</span></span>
-<span id="cb6-140"><a href="#cb6-140" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+gains"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
-<span id="cb6-141"><a href="#cb6-141" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+origin_camera_label"</span><span class="op">:</span> <span class="st">"str"</span><span class="op">,</span></span>
-<span id="cb6-142"><a href="#cb6-142" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+projection_params"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
-<span id="cb6-143"><a href="#cb6-143" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+t_device_camera"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
-<span id="cb6-144"><a href="#cb6-144" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mtd#capture_timestamps_ns"</span><span class="op">:</span> <span class="st">"torch.int64"</span><span class="op">,</span></span>
-<span id="cb6-145"><a href="#cb6-145" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mtd#gravity_in_world"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
-<span id="cb6-146"><a href="#cb6-146" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mtd#ts_world_device"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
-<span id="cb6-147"><a href="#cb6-147" aria-hidden="true" tabindex="-1"></a>                <span class="st">"sequence_name"</span><span class="op">:</span> <span class="st">"str"</span><span class="op">,</span></span>
-<span id="cb6-148"><a href="#cb6-148" aria-hidden="true" tabindex="-1"></a>                <span class="st">"mfcd#camera-rgb+images"</span><span class="op">:</span> <span class="st">"torch.uint8"</span></span>
-<span id="cb6-149"><a href="#cb6-149" aria-hidden="true" tabindex="-1"></a>            }<span class="op">,</span></span>
-<span id="cb6-150"><a href="#cb6-150" aria-hidden="true" tabindex="-1"></a>            <span class="st">"wds_file_urls"</span><span class="op">:</span> {</span>
-<span id="cb6-151"><a href="#cb6-151" aria-hidden="true" tabindex="-1"></a>                <span class="st">"0"</span><span class="op">:</span> {</span>
-<span id="cb6-152"><a href="#cb6-152" aria-hidden="true" tabindex="-1"></a>                <span class="op">...</span></span>
-<span id="cb6-153"><a href="#cb6-153" aria-hidden="true" tabindex="-1"></a>                <span class="st">"81048"</span><span class="op">:</span> {</span>
-<span id="cb6-154"><a href="#cb6-154" aria-hidden="true" tabindex="-1"></a>                              <span class="st">"shards-0000_tar"</span><span class="op">:</span> {</span>
-<span id="cb6-155"><a href="#cb6-155" aria-hidden="true" tabindex="-1"></a>                                  <span class="st">"filename"</span><span class="op">:</span> <span class="st">"AriaSyntheticEnvironment_1_0_ATEK_cubercnn_81048_shards-0000.tar"</span><span class="op">,</span></span>
-<span id="cb6-156"><a href="#cb6-156" aria-hidden="true" tabindex="-1"></a>                                  <span class="st">"sha1sum"</span><span class="op">:</span> <span class="st">"05840565afd9702f985e1c483170f5d6e8825f07"</span><span class="op">,</span></span>
-<span id="cb6-157"><a href="#cb6-157" aria-hidden="true" tabindex="-1"></a>                                  <span class="st">"file_size_bytes"</span><span class="op">:</span> <span class="dv">8570880</span><span class="op">,</span></span>
-<span id="cb6-158"><a href="#cb6-158" aria-hidden="true" tabindex="-1"></a>                                  <span class="st">"download_url"</span><span class="op">:</span> <span class="st">"https://scontent.xx.fbcdn.net/m1/v/t6/An9oQjW7U2aCTPOcBSIZbdpnELJZXW4VbKjxqjSM09txkZdhmaV-CwVmCPD3-x05L4DuXSadV_zDu_b_cGkZG52fAXuqt5_YQLP_GuikCPPYlDUqXPqJ0UDZPxGLwIJ6SERi_a3pX6K7eWUWgS1DHc1LgQ.tar/AriaSyntheticEnvironment_1_0_ATEK_cubercnn_81048_shards-0000.tar?_nc_gid&amp;ccb=10-5&amp;oh=00_AfeTftnWBgk7x5YeD9j7MEdoArTu2ZMPJj6ApcZJ7_SXYg&amp;oe=691D4B7D&amp;_nc_sid=c228f2"</span></span>
-<span id="cb6-159"><a href="#cb6-159" aria-hidden="true" tabindex="-1"></a>                              }<span class="op">,</span></span>
-<span id="cb6-160"><a href="#cb6-160" aria-hidden="true" tabindex="-1"></a>                              <span class="op">...</span></span>
-<span id="cb6-161"><a href="#cb6-161" aria-hidden="true" tabindex="-1"></a>                            }</span>
-<span id="cb6-162"><a href="#cb6-162" aria-hidden="true" tabindex="-1"></a>            }</span>
-<span id="cb6-163"><a href="#cb6-163" aria-hidden="true" tabindex="-1"></a>        }<span class="op">,</span></span>
-<span id="cb6-164"><a href="#cb6-164" aria-hidden="true" tabindex="-1"></a>        <span class="op">...</span></span>
-<span id="cb6-165"><a href="#cb6-165" aria-hidden="true" tabindex="-1"></a>      }</span>
-<span id="cb6-166"><a href="#cb6-166" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb6-167"><a href="#cb6-167" aria-hidden="true" tabindex="-1"></a><span class="vs">```</span></span>
-<span id="cb6-168"><a href="#cb6-168" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-169"><a href="#cb6-169" aria-hidden="true" tabindex="-1"></a><span class="vs">  ```</span>bash</span>
-<span id="cb6-170"><a href="#cb6-170" aria-hidden="true" tabindex="-1"></a>  external<span class="op">/</span>ATEK<span class="op">/</span>tools</span>
-<span id="cb6-171"><a href="#cb6-171" aria-hidden="true" tabindex="-1"></a>  ├── ase_mesh_downloader<span class="op">.</span><span class="at">py</span></span>
-<span id="cb6-172"><a href="#cb6-172" aria-hidden="true" tabindex="-1"></a>  ├── atek_wds_data_downloader<span class="op">.</span><span class="at">py</span></span>
-<span id="cb6-173"><a href="#cb6-173" aria-hidden="true" tabindex="-1"></a>  ├── benchmarking_static_object_detection<span class="op">.</span><span class="at">py</span></span>
-<span id="cb6-174"><a href="#cb6-174" aria-hidden="true" tabindex="-1"></a>  ├── benchmarking_surface_reconstruction<span class="op">.</span><span class="at">py</span></span>
-<span id="cb6-175"><a href="#cb6-175" aria-hidden="true" tabindex="-1"></a>  ├── infer_cubercnn<span class="op">.</span><span class="at">py</span></span>
-<span id="cb6-176"><a href="#cb6-176" aria-hidden="true" tabindex="-1"></a>  └── train_cubercnn<span class="op">.</span><span class="at">py</span></span>
-<span id="cb6-177"><a href="#cb6-177" aria-hidden="true" tabindex="-1"></a>  <span class="vs">```</span></span>
-<span id="cb6-178"><a href="#cb6-178" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-179"><a href="#cb6-179" aria-hidden="true" tabindex="-1"></a><span class="vs">  ```</span>bash</span>
-<span id="cb6-180"><a href="#cb6-180" aria-hidden="true" tabindex="-1"></a>  <span class="op">.</span><span class="at">data</span><span class="op">/</span>aria_download_urls</span>
-<span id="cb6-181"><a href="#cb6-181" aria-hidden="true" tabindex="-1"></a>  ├── AriaSyntheticEnvironment_ATEK_download_urls<span class="op">.</span><span class="at">json</span></span>
-<span id="cb6-182"><a href="#cb6-182" aria-hidden="true" tabindex="-1"></a>  ├── aria_synthetic_environments_dataset_download_urls<span class="op">.</span><span class="at">json</span></span>
-<span id="cb6-183"><a href="#cb6-183" aria-hidden="true" tabindex="-1"></a>  └── ase_mesh_download_urls<span class="op">.</span><span class="at">json</span>  # contains download links <span class="cf">for</span> <span class="dv">100</span> GT <span class="fu">meshes</span> (<span class="st">"scene_ply_&lt;scene_id&gt;.ply"</span>)</span>
-<span id="cb6-184"><a href="#cb6-184" aria-hidden="true" tabindex="-1"></a>  <span class="vs">```</span></span>
-<span id="cb6-185"><a href="#cb6-185" aria-hidden="true" tabindex="-1"></a><span class="vs">  - Use `</span>external<span class="op">/</span>projectaria_tools<span class="op">/</span>projects<span class="op">/</span>AriaSyntheticEnvironment<span class="op">/</span>aria_synthetic_environments_downloader<span class="op">.</span><span class="fu">py</span><span class="vs">` to download the base ASE dataset</span></span>
-<span id="cb6-186"><a href="#cb6-186" aria-hidden="true" tabindex="-1"></a><span class="vs">  ```</span>bash</span>
-<span id="cb6-187"><a href="#cb6-187" aria-hidden="true" tabindex="-1"></a>  # <span class="dt">example</span><span class="op">:</span> download specific scenes</span>
-<span id="cb6-188"><a href="#cb6-188" aria-hidden="true" tabindex="-1"></a>  python3 projects<span class="op">/</span>AriaSyntheticEnvironment<span class="op">/</span>aria_synthetic_environments_downloader<span class="op">.</span><span class="at">py</span> <span class="op">--</span><span class="kw">set</span> train <span class="op">--</span>scene<span class="op">-</span>ids <span class="dv">560</span><span class="op">-</span><span class="dv">569</span> <span class="op">--</span>cdn<span class="op">-</span>file aria_synthetic_environments_dataset_download_urls<span class="op">.</span><span class="at">json</span> <span class="op">--</span>output<span class="op">-</span>dir $HOME<span class="op">/</span>projectaria_tools_ase_data <span class="op">--</span>unzip True</span>
-<span id="cb6-189"><a href="#cb6-189" aria-hidden="true" tabindex="-1"></a>  <span class="vs">```</span></span>
-<span id="cb6-190"><a href="#cb6-190" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-191"><a href="#cb6-191" aria-hidden="true" tabindex="-1"></a><span class="vs">## Lower Prio:</span></span>
-<span id="cb6-192"><a href="#cb6-192" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-193"><a href="#cb6-193" aria-hidden="true" tabindex="-1"></a><span class="vs">### Candidate Sampling Strategies</span></span>
-<span id="cb6-194"><a href="#cb6-194" aria-hidden="true" tabindex="-1"></a><span class="vs">- Train a light weight network to predict the sampled rays given a canidate view and projection onto the mesh to imitate how their SAM would see it.</span></span>
-<span id="cb6-195"><a href="#cb6-195" aria-hidden="true" tabindex="-1"></a><span class="vs">- Or simply generate dense PC ($</span><span class="sc">\m</span><span class="vs">athcal{P}_{</span><span class="sc">\m</span><span class="vs">athbf{t}}$) from ground truth depth maps - what high-level implementations would be suited?</span></span>
-<span id="cb6-196"><a href="#cb6-196" aria-hidden="true" tabindex="-1"></a><span class="vs">-</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a><span class="fu">## Visualization (Streamlit)</span></span>
+<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Interactive app to visualize candidate sampling, PC–mesh distances, and RRI.</span>
+<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Efficient caching; quick scene/trajectory switching.</span>
+<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a><span class="fu">## Data Handling</span></span>
+<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Link ASE ATEK shards and GT meshes to raw ASE; resolve scene_id/snippet_id mapping.</span>
+<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Wrap ATEK dataset/downloader to expose:</span>
+<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>easy ASE ATEK WDS access + GT meshes,</span>
+<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>metadata file combining scene↔snippet mapping,</span>
+<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>download of metadata without full payload,</span>
+<span id="cb6-53"><a href="#cb6-53" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>selection of ATEK snippets based on available GT meshes (<span class="in">`ase_mesh_download_urls.json`</span>).</span>
+<span id="cb6-54"><a href="#cb6-54" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Download all dataset variants (ATEK, raw ASE, meshes) for scenes with GT.</span>
+<span id="cb6-55"><a href="#cb6-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-56"><a href="#cb6-56" aria-hidden="true" tabindex="-1"></a><span class="fu"># Medium Priority</span></span>
+<span id="cb6-57"><a href="#cb6-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-58"><a href="#cb6-58" aria-hidden="true" tabindex="-1"></a><span class="fu">## Candidate Sampling (learning variants)</span></span>
+<span id="cb6-59"><a href="#cb6-59" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Lightweight net on top of EVL to predict candidate rays / projections given pose + mesh.</span>
+<span id="cb6-60"><a href="#cb6-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-61"><a href="#cb6-61" aria-hidden="true" tabindex="-1"></a><span class="fu">## Evaluation &amp; Benchmarking</span></span>
+<span id="cb6-62"><a href="#cb6-62" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Surface reconstruction: F-Score vs GT meshes (ATEK + EFM3D utils).</span>
+<span id="cb6-63"><a href="#cb6-63" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Static object detection: CubeRCNN baselines.</span>
+<span id="cb6-64"><a href="#cb6-64" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Reproduce benchmarking scripts in <span class="in">`external/ATEK/tools`</span>.</span>
+<span id="cb6-65"><a href="#cb6-65" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-66"><a href="#cb6-66" aria-hidden="true" tabindex="-1"></a><span class="fu">## Download &amp; Data Ops</span></span>
+<span id="cb6-67"><a href="#cb6-67" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Automate downloads using ATEK/Project Aria tools; ensure integrity (sha1).</span>
+<span id="cb6-68"><a href="#cb6-68" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Provide CLI wrappers for scene filters and variant selection (train/val/test).</span>
+<span id="cb6-69"><a href="#cb6-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-70"><a href="#cb6-70" aria-hidden="true" tabindex="-1"></a><span class="fu"># Lower Priority / Backlog</span></span>
+<span id="cb6-71"><a href="#cb6-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-72"><a href="#cb6-72" aria-hidden="true" tabindex="-1"></a><span class="fu">## Pose &amp; Navigation</span></span>
+<span id="cb6-73"><a href="#cb6-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Free-space validation using EFM3D occupancy; collision-aware NBV pathing.</span>
+<span id="cb6-74"><a href="#cb6-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-75"><a href="#cb6-75" aria-hidden="true" tabindex="-1"></a><span class="fu">## Misc</span></span>
+<span id="cb6-76"><a href="#cb6-76" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Extend candidate generation to continuous policy conditioned on fused occupancy / OBB priors.</span>
+<span id="cb6-77"><a href="#cb6-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-78"><a href="#cb6-78" aria-hidden="true" tabindex="-1"></a><span class="fu"># References &amp; Pointers</span></span>
+<span id="cb6-79"><a href="#cb6-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-80"><a href="#cb6-80" aria-hidden="true" tabindex="-1"></a><span class="fu">## ATEK tools (external/ATEK/tools)</span></span>
+<span id="cb6-81"><a href="#cb6-81" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb6-82"><a href="#cb6-82" aria-hidden="true" tabindex="-1"></a><span class="in">ase_mesh_downloader.py</span></span>
+<span id="cb6-83"><a href="#cb6-83" aria-hidden="true" tabindex="-1"></a><span class="in">atek_wds_data_downloader.py</span></span>
+<span id="cb6-84"><a href="#cb6-84" aria-hidden="true" tabindex="-1"></a><span class="in">benchmarking_static_object_detection.py</span></span>
+<span id="cb6-85"><a href="#cb6-85" aria-hidden="true" tabindex="-1"></a><span class="in">benchmarking_surface_reconstruction.py</span></span>
+<span id="cb6-86"><a href="#cb6-86" aria-hidden="true" tabindex="-1"></a><span class="in">infer_cubercnn.py</span></span>
+<span id="cb6-87"><a href="#cb6-87" aria-hidden="true" tabindex="-1"></a><span class="in">train_cubercnn.py</span></span>
+<span id="cb6-88"><a href="#cb6-88" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb6-89"><a href="#cb6-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-90"><a href="#cb6-90" aria-hidden="true" tabindex="-1"></a><span class="fu">## ASE download helpers (projectaria_tools)</span></span>
+<span id="cb6-91"><a href="#cb6-91" aria-hidden="true" tabindex="-1"></a><span class="in">`external/projectaria_tools/projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py`</span></span>
+<span id="cb6-92"><a href="#cb6-92" aria-hidden="true" tabindex="-1"></a>Example:</span>
+<span id="cb6-93"><a href="#cb6-93" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
+<span id="cb6-94"><a href="#cb6-94" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py <span class="dt">\</span></span>
+<span id="cb6-95"><a href="#cb6-95" aria-hidden="true" tabindex="-1"></a>  <span class="at">--set</span> train <span class="at">--scene-ids</span> 560-569 <span class="dt">\</span></span>
+<span id="cb6-96"><a href="#cb6-96" aria-hidden="true" tabindex="-1"></a>  <span class="at">--cdn-file</span> aria_synthetic_environments_dataset_download_urls.json <span class="dt">\</span></span>
+<span id="cb6-97"><a href="#cb6-97" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-dir</span> <span class="va">$HOME</span>/projectaria_tools_ase_data <span class="at">--unzip</span> True</span>
+<span id="cb6-98"><a href="#cb6-98" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb6-99"><a href="#cb6-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-100"><a href="#cb6-100" aria-hidden="true" tabindex="-1"></a><span class="fu">## Data manifests (.data/aria_download_urls)</span></span>
+<span id="cb6-101"><a href="#cb6-101" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb6-102"><a href="#cb6-102" aria-hidden="true" tabindex="-1"></a><span class="in">AriaSyntheticEnvironment_ATEK_download_urls.json</span></span>
+<span id="cb6-103"><a href="#cb6-103" aria-hidden="true" tabindex="-1"></a><span class="in">aria_synthetic_environments_dataset_download_urls.json</span></span>
+<span id="cb6-104"><a href="#cb6-104" aria-hidden="true" tabindex="-1"></a><span class="in">ase_mesh_download_urls.json    # 100 GT meshes: scene_ply_&lt;scene_id&gt;.ply</span></span>
+<span id="cb6-105"><a href="#cb6-105" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb6-106"><a href="#cb6-106" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-107"><a href="#cb6-107" aria-hidden="true" tabindex="-1"></a><span class="fu">## ATEK WDS format (shapes/dtypes excerpt)</span></span>
+<span id="cb6-108"><a href="#cb6-108" aria-hidden="true" tabindex="-1"></a><span class="in">```json</span></span>
+<span id="cb6-109"><a href="#cb6-109" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb6-110"><a href="#cb6-110" aria-hidden="true" tabindex="-1"></a>  <span class="st">"atek_wds_shapes"</span><span class="op">:</span> {</span>
+<span id="cb6-111"><a href="#cb6-111" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+capture_timestamps_ns"</span><span class="op">:</span> <span class="st">"1"</span><span class="op">,</span></span>
+<span id="cb6-112"><a href="#cb6-112" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+exposure_durations_s"</span><span class="op">:</span> <span class="st">"1"</span><span class="op">,</span></span>
+<span id="cb6-113"><a href="#cb6-113" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+frame_ids"</span><span class="op">:</span> <span class="st">"1"</span><span class="op">,</span></span>
+<span id="cb6-114"><a href="#cb6-114" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+gains"</span><span class="op">:</span> <span class="st">"1"</span><span class="op">,</span></span>
+<span id="cb6-115"><a href="#cb6-115" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+projection_params"</span><span class="op">:</span> <span class="st">"4"</span><span class="op">,</span></span>
+<span id="cb6-116"><a href="#cb6-116" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+t_device_camera"</span><span class="op">:</span> <span class="st">"3, 4"</span><span class="op">,</span></span>
+<span id="cb6-117"><a href="#cb6-117" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mtd#capture_timestamps_ns"</span><span class="op">:</span> <span class="st">"1"</span><span class="op">,</span></span>
+<span id="cb6-118"><a href="#cb6-118" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mtd#gravity_in_world"</span><span class="op">:</span> <span class="st">"3"</span><span class="op">,</span></span>
+<span id="cb6-119"><a href="#cb6-119" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mtd#ts_world_device"</span><span class="op">:</span> <span class="st">"1, 3, 4"</span><span class="op">,</span></span>
+<span id="cb6-120"><a href="#cb6-120" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+images"</span><span class="op">:</span> <span class="st">"1, 3, 704, 704"</span></span>
+<span id="cb6-121"><a href="#cb6-121" aria-hidden="true" tabindex="-1"></a>  }<span class="op">,</span></span>
+<span id="cb6-122"><a href="#cb6-122" aria-hidden="true" tabindex="-1"></a>  <span class="st">"atek_wds_dtypes"</span><span class="op">:</span> {</span>
+<span id="cb6-123"><a href="#cb6-123" aria-hidden="true" tabindex="-1"></a>    <span class="st">"gt_data"</span><span class="op">:</span> <span class="st">"dict"</span><span class="op">,</span></span>
+<span id="cb6-124"><a href="#cb6-124" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+camera_label"</span><span class="op">:</span> <span class="st">"str"</span><span class="op">,</span></span>
+<span id="cb6-125"><a href="#cb6-125" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+camera_model_name"</span><span class="op">:</span> <span class="st">"str"</span><span class="op">,</span></span>
+<span id="cb6-126"><a href="#cb6-126" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+capture_timestamps_ns"</span><span class="op">:</span> <span class="st">"torch.int64"</span><span class="op">,</span></span>
+<span id="cb6-127"><a href="#cb6-127" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+exposure_durations_s"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
+<span id="cb6-128"><a href="#cb6-128" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+frame_ids"</span><span class="op">:</span> <span class="st">"torch.int64"</span><span class="op">,</span></span>
+<span id="cb6-129"><a href="#cb6-129" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+gains"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
+<span id="cb6-130"><a href="#cb6-130" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+origin_camera_label"</span><span class="op">:</span> <span class="st">"str"</span><span class="op">,</span></span>
+<span id="cb6-131"><a href="#cb6-131" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+projection_params"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
+<span id="cb6-132"><a href="#cb6-132" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+t_device_camera"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
+<span id="cb6-133"><a href="#cb6-133" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mtd#capture_timestamps_ns"</span><span class="op">:</span> <span class="st">"torch.int64"</span><span class="op">,</span></span>
+<span id="cb6-134"><a href="#cb6-134" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mtd#gravity_in_world"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
+<span id="cb6-135"><a href="#cb6-135" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mtd#ts_world_device"</span><span class="op">:</span> <span class="st">"torch.float32"</span><span class="op">,</span></span>
+<span id="cb6-136"><a href="#cb6-136" aria-hidden="true" tabindex="-1"></a>    <span class="st">"sequence_name"</span><span class="op">:</span> <span class="st">"str"</span><span class="op">,</span></span>
+<span id="cb6-137"><a href="#cb6-137" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mfcd#camera-rgb+images"</span><span class="op">:</span> <span class="st">"torch.uint8"</span></span>
+<span id="cb6-138"><a href="#cb6-138" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb6-139"><a href="#cb6-139" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb6-140"><a href="#cb6-140" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb6-141"><a href="#cb6-141" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-142"><a href="#cb6-142" aria-hidden="true" tabindex="-1"></a><span class="fu">## WDS file URLs (excerpt)</span></span>
+<span id="cb6-143"><a href="#cb6-143" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb6-144"><a href="#cb6-144" aria-hidden="true" tabindex="-1"></a><span class="in">81048:</span></span>
+<span id="cb6-145"><a href="#cb6-145" aria-hidden="true" tabindex="-1"></a><span class="in">  shards-0000_tar:</span></span>
+<span id="cb6-146"><a href="#cb6-146" aria-hidden="true" tabindex="-1"></a><span class="in">    filename: AriaSyntheticEnvironment_1_0_ATEK_cubercnn_81048_shards-0000.tar</span></span>
+<span id="cb6-147"><a href="#cb6-147" aria-hidden="true" tabindex="-1"></a><span class="in">    sha1sum: 05840565afd9702f985e1c483170f5d6e8825f07</span></span>
+<span id="cb6-148"><a href="#cb6-148" aria-hidden="true" tabindex="-1"></a><span class="in">    file_size_bytes: 8570880</span></span>
+<span id="cb6-149"><a href="#cb6-149" aria-hidden="true" tabindex="-1"></a><span class="in">    download_url: https://scontent.xx.fbcdn.net/m1/v/t6/An9oQjW...</span></span>
+<span id="cb6-150"><a href="#cb6-150" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb6-151"><a href="#cb6-151" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-152"><a href="#cb6-152" aria-hidden="true" tabindex="-1"></a><span class="fu"># Notes on Implementation Approach</span></span>
+<span id="cb6-153"><a href="#cb6-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-154"><a href="#cb6-154" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use enums/configs to compose candidate sampling rules; keep modules orthogonal (generation, filtering, scoring).</span>
+<span id="cb6-155"><a href="#cb6-155" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Prefer streaming + caching in visualization to avoid recomputation.</span>
+<span id="cb6-156"><a href="#cb6-156" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Keep tests close to metrics and candidate generation (test-driven as per agent instruction).</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

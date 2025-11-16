@@ -1,25 +1,8 @@
-"""ASE dataset handling - simplified."""
+"""Backward-compat shims for legacy test paths."""
 
-from .dataset import (
-    ASEDataset,
-    ASEDatasetConfig,
-    ASESample,
-    AtekSnippet,
-    CameraLabel,
-    ase_collate,
-)
-from .downloader import ASEDownloader, ASEDownloaderConfig
-from .metadata import ASEMetadata, SceneMetadata
+from oracle_rri.data.dataset import *  # noqa: F401,F403
+from oracle_rri.data.downloader import *  # noqa: F401,F403
+from oracle_rri.data.metadata import *  # noqa: F401,F403
+from oracle_rri.data.cli import *  # noqa: F401,F403
 
-__all__ = [
-    "ASEMetadata",
-    "SceneMetadata",
-    "ASEDownloader",
-    "ASEDownloaderConfig",
-    "ASEDataset",
-    "ASEDatasetConfig",
-    "ASESample",
-    "AtekSnippet",
-    "CameraLabel",
-    "ase_collate",
-]
+__all__ = []

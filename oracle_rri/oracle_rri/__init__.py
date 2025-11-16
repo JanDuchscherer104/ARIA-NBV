@@ -1,15 +1,13 @@
 """Oracle RRI package."""
 
 from .config import DatasetPaths, OracleConfig
-from .data_handling import (
+from .data import (
     ASEDataset,
     ASEDatasetConfig,
     ASEMetadata,
-    ASESample,
-    AtekSnippet,
-    CameraLabel,
-    ase_collate,
     SceneMetadata,
+    TypedSample,
+    ase_collate,
 )
 
 __all__ = [
@@ -20,6 +18,7 @@ __all__ = [
     "ASESample",
     "AtekSnippet",
     "CameraLabel",
+    "TypedSample",
     "ase_collate",
     "ASEMetadata",
     "SceneMetadata",

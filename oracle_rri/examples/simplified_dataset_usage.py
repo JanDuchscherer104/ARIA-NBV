@@ -1,8 +1,7 @@
 """Example usage of the typed ASE dataset."""
 
-from torch.utils.data import DataLoader
-
 from oracle_rri.data_handling import ASEDatasetConfig, ase_collate
+from torch.utils.data import DataLoader
 
 
 def basic_usage() -> None:

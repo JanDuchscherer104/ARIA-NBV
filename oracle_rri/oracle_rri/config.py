@@ -52,5 +52,19 @@ class OracleConfig(BaseConfig):
         value.mkdir(parents=True, exist_ok=True)
         return value
 
+    @field_validator("batch_size")
+    @classmethod
+    def _check_batch_size(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("batch_size must be >= 1")
+        return value
+
+    @field_validator("max_sequences", "max_snippets")
+    @classmethod
+    def _check_positive(cls, value: int | None, info):
+        if value is not None and value < 1:
+            raise ValueError(f"{info.field_name} must be positive when provided")
+        return value
+
 
 __all__ = ["DatasetPaths", "OracleConfig"]

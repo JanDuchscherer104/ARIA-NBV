@@ -42,7 +42,6 @@ dependencies = [
     "pydantic-settings>=2.12.0",
     "tqdm-stubs>=0.2.1",
     "types-requests>=2.32.4.20250913",
-    "jaxtyping",
     "streamlit>=1.51.0",
 ]
 
@@ -100,7 +99,9 @@ indent-width   = 4
         "N",  # pep8-naming
     ]
     ignore = [
-        "E501", # line too long (handled by formatter)
+        "E501",  # line too long (handled by formatter)
+        "UP037",
+        "F722",
     ]
 
     [tool.ruff.format]

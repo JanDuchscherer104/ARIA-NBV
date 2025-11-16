@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from oracle_rri.data_handling.downloader import ASEDownloader, ASEDownloaderConfig
+from oracle_rri.data.downloader import ASEDownloader, ASEDownloaderConfig
 from oracle_rri.utils import Console
 
 
@@ -93,7 +93,7 @@ class TestASEDownloader:
         assert len(downloader.metadata.scenes) > 0
         assert downloader.mesh_dir.exists()
 
-    @patch("oracle_rri.data_handling.downloader.requests.get")
+    @patch("oracle_rri.data.downloader.requests.get")
     def test_download_single_mesh(
         self,
         mock_get: MagicMock,

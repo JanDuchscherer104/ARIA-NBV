@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from oracle_rri.data_handling.utils import (
+from oracle_rri.data.utils import (
     extract_scene_id_from_sequence_name,
     validate_scene_data,
 )

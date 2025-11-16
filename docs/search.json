@@ -525,7 +525,7 @@
     "href": "contents/todos.html",
     "title": "Action Items & TODOs",
     "section": "",
-    "text": "Each ASE scene provides only one pre-recorded egocentric trajectory. We cannot query arbitrary novel viewpoints.\n\nEFM3D introduces GT meshes for 100 validation scenes. We can use these to compute oracle RRI for candidate views. Use the mesh predicted by EFM3D as pseudo-GT for other scenes.\n\ndepth maps in ASE dataset are ground-truth!\nnon-gt point clouds are sparse! How to sample a PC from the candidate view that can be compared to the pre-existing semi-dense SLAM PC that is provided in the ASE dataset?\nShould NBV prediction output discrete selection (VIN-NBV) or continuous pose (GenNBV)?\n\nStart with randomly sampled candidate views for which the RRI is computed. Action space is then the selection among these candidates.\nFuture work: learn to generate continuous poses directly, whose fitness can than be quantified using the RRI predictor; here we can also consider the free space voxels that are used in EFM3D to avoid collisions.",
+    "text": "This page consolidates all open tasks, questions, and references for the ASE/ATEK + EFM3D NBV project. Nothing has been removed; items are reorganized for clarity.",
     "crumbs": [
       "TODOs",
       "Project State",
@@ -2697,5 +2697,257 @@
     "title": "Next-Best-View Planning with Foundation Models",
     "section": "3.1 Setup & Installation",
     "text": "3.1 Setup & Installation\n\nSetup Instructions: Environment setup and dependencies"
+  },
+  {
+    "objectID": "contents/todos.html#metrics",
+    "href": "contents/todos.html#metrics",
+    "title": "Action Items & TODOs",
+    "section": "3.1 Metrics",
+    "text": "3.1 Metrics\n\nImplement OracleRRI with point-cloud–to–mesh distance (Chamfer components).\nConsider mesh-to-distance-field acceleration and room-level cropping to avoid unrelated geometry - How can we consider only relevant (observable parts) of the scene, such that we don’t have to consider the entire mesh (e.g. there might be different rooms that cannot be considered)?\nLater: deliver as TorchMetric.",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#candidate-view-generation-sampling",
+    "href": "contents/todos.html#candidate-view-generation-sampling",
+    "title": "Action Items & TODOs",
+    "section": "3.2 Candidate View Generation & Sampling",
+    "text": "3.2 Candidate View Generation & Sampling\n\nimplement CandidateViewGenerator, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type PoseTW (external/efm3d/efm3d/aria/pose.py)\n\nStrategies: uniform over half-sphere with min/max radius & elevation, free-space only, room-bounded (SSL for train, occupancy for eval).\nCollision check: segment from last pose to candidate must not intersect mesh/voxels.\nModular strategy selection via enums/config that allows easy extension and combination of strategies / sampling rules.\n\n\n\n3.2.1 Raycasting to Generate Candidate Point Clouds-\n\nImplement CandidatePointCloudGenerator: for each candidate pose, cast rays to GT to render depth map using existing GPU implementations from efm3d.\n\nInput: candidate PoseTW, GT mesh.\nOutput: Depth map.\n\n\n\n\n3.2.2 Point Cloud Fusion\n\nImplement DepthToPointCloud module: for each candidate pose’s depth map, backproject to point cloud `\\(\\mathcal{P}_{\\mathbf{q}}\\) in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC \\(\\mathcal{P}_t\\) with candidate-view PC \\(\\mathcal{P}_{\\mathbf{q}}\\) → \\(\\mathcal{P}_{t \\cup \\mathbf{q}}\\).",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#point-cloud-fusion",
+    "href": "contents/todos.html#point-cloud-fusion",
+    "title": "Action Items & TODOs",
+    "section": "3.3 Point Cloud Fusion",
+    "text": "3.3 Point Cloud Fusion\n\nFuse semi-dense SLAM PC \\(\\mathcal{P}_t\\) with candidate-view PC \\(\\mathcal{P}_{\\mathbf{q}}\\) → \\(\\mathcal{P}_{t \\cup \\mathbf{q}}\\).\nCrop GT mesh to relevant volume (trajectory neighborhood) to speed completeness.",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#visualization-streamlit",
+    "href": "contents/todos.html#visualization-streamlit",
+    "title": "Action Items & TODOs",
+    "section": "3.3 Visualization (Streamlit)",
+    "text": "3.3 Visualization (Streamlit)\n\nInteractive app to visualize candidate sampling, PC–mesh distances, and RRI.\nEfficient caching; quick scene/trajectory switching.",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#data-handling",
+    "href": "contents/todos.html#data-handling",
+    "title": "Action Items & TODOs",
+    "section": "3.4 Data Handling",
+    "text": "3.4 Data Handling\n\nLink ASE ATEK shards and GT meshes to raw ASE; resolve scene_id/snippet_id mapping.\nWrap ATEK dataset/downloader to expose:\n\neasy ASE ATEK WDS access + GT meshes,\nmetadata file combining scene↔︎snippet mapping,\ndownload of metadata without full payload,\nselection of ATEK snippets based on available GT meshes (ase_mesh_download_urls.json).\n\nDownload all dataset variants (ATEK, raw ASE, meshes) for scenes with GT.",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#candidate-sampling-learning-variants",
+    "href": "contents/todos.html#candidate-sampling-learning-variants",
+    "title": "Action Items & TODOs",
+    "section": "4.1 Candidate Sampling (learning variants)",
+    "text": "4.1 Candidate Sampling (learning variants)\n\nLightweight net on top of EVL to predict candidate rays / projections given pose + mesh.",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#evaluation-benchmarking",
+    "href": "contents/todos.html#evaluation-benchmarking",
+    "title": "Action Items & TODOs",
+    "section": "4.2 Evaluation & Benchmarking",
+    "text": "4.2 Evaluation & Benchmarking\n\nSurface reconstruction: F-Score vs GT meshes (ATEK + EFM3D utils).\nStatic object detection: CubeRCNN baselines.\nReproduce benchmarking scripts in external/ATEK/tools.",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#download-data-ops",
+    "href": "contents/todos.html#download-data-ops",
+    "title": "Action Items & TODOs",
+    "section": "4.3 Download & Data Ops",
+    "text": "4.3 Download & Data Ops\n\nAutomate downloads using ATEK/Project Aria tools; ensure integrity (sha1).\nProvide CLI wrappers for scene filters and variant selection (train/val/test).",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#pose-navigation",
+    "href": "contents/todos.html#pose-navigation",
+    "title": "Action Items & TODOs",
+    "section": "5.1 Pose & Navigation",
+    "text": "5.1 Pose & Navigation\n\nFree-space validation using EFM3D occupancy; collision-aware NBV pathing.",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#misc",
+    "href": "contents/todos.html#misc",
+    "title": "Action Items & TODOs",
+    "section": "5.2 Misc",
+    "text": "5.2 Misc\n\nExtend candidate generation to continuous policy conditioned on fused occupancy / OBB priors.",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#atek-tools-externalatektools",
+    "href": "contents/todos.html#atek-tools-externalatektools",
+    "title": "Action Items & TODOs",
+    "section": "6.1 ATEK tools (external/ATEK/tools)",
+    "text": "6.1 ATEK tools (external/ATEK/tools)\nase_mesh_downloader.py\natek_wds_data_downloader.py\nbenchmarking_static_object_detection.py\nbenchmarking_surface_reconstruction.py\ninfer_cubercnn.py\ntrain_cubercnn.py",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#ase-download-helpers-projectaria_tools",
+    "href": "contents/todos.html#ase-download-helpers-projectaria_tools",
+    "title": "Action Items & TODOs",
+    "section": "6.2 ASE download helpers (projectaria_tools)",
+    "text": "6.2 ASE download helpers (projectaria_tools)\nexternal/projectaria_tools/projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py Example:\npython3 projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py \\\n  --set train --scene-ids 560-569 \\\n  --cdn-file aria_synthetic_environments_dataset_download_urls.json \\\n  --output-dir $HOME/projectaria_tools_ase_data --unzip True",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#data-manifests-.dataaria_download_urls",
+    "href": "contents/todos.html#data-manifests-.dataaria_download_urls",
+    "title": "Action Items & TODOs",
+    "section": "6.3 Data manifests (.data/aria_download_urls)",
+    "text": "6.3 Data manifests (.data/aria_download_urls)\nAriaSyntheticEnvironment_ATEK_download_urls.json\naria_synthetic_environments_dataset_download_urls.json\nase_mesh_download_urls.json    # 100 GT meshes: scene_ply_&lt;scene_id&gt;.ply",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#atek-wds-format-shapesdtypes-excerpt",
+    "href": "contents/todos.html#atek-wds-format-shapesdtypes-excerpt",
+    "title": "Action Items & TODOs",
+    "section": "6.4 ATEK WDS format (shapes/dtypes excerpt)",
+    "text": "6.4 ATEK WDS format (shapes/dtypes excerpt)\n{\n  \"atek_wds_shapes\": {\n    \"mfcd#camera-rgb+capture_timestamps_ns\": \"1\",\n    \"mfcd#camera-rgb+exposure_durations_s\": \"1\",\n    \"mfcd#camera-rgb+frame_ids\": \"1\",\n    \"mfcd#camera-rgb+gains\": \"1\",\n    \"mfcd#camera-rgb+projection_params\": \"4\",\n    \"mfcd#camera-rgb+t_device_camera\": \"3, 4\",\n    \"mtd#capture_timestamps_ns\": \"1\",\n    \"mtd#gravity_in_world\": \"3\",\n    \"mtd#ts_world_device\": \"1, 3, 4\",\n    \"mfcd#camera-rgb+images\": \"1, 3, 704, 704\"\n  },\n  \"atek_wds_dtypes\": {\n    \"gt_data\": \"dict\",\n    \"mfcd#camera-rgb+camera_label\": \"str\",\n    \"mfcd#camera-rgb+camera_model_name\": \"str\",\n    \"mfcd#camera-rgb+capture_timestamps_ns\": \"torch.int64\",\n    \"mfcd#camera-rgb+exposure_durations_s\": \"torch.float32\",\n    \"mfcd#camera-rgb+frame_ids\": \"torch.int64\",\n    \"mfcd#camera-rgb+gains\": \"torch.float32\",\n    \"mfcd#camera-rgb+origin_camera_label\": \"str\",\n    \"mfcd#camera-rgb+projection_params\": \"torch.float32\",\n    \"mfcd#camera-rgb+t_device_camera\": \"torch.float32\",\n    \"mtd#capture_timestamps_ns\": \"torch.int64\",\n    \"mtd#gravity_in_world\": \"torch.float32\",\n    \"mtd#ts_world_device\": \"torch.float32\",\n    \"sequence_name\": \"str\",\n    \"mfcd#camera-rgb+images\": \"torch.uint8\"\n  }\n}",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/todos.html#wds-file-urls-excerpt",
+    "href": "contents/todos.html#wds-file-urls-excerpt",
+    "title": "Action Items & TODOs",
+    "section": "6.5 WDS file URLs (excerpt)",
+    "text": "6.5 WDS file URLs (excerpt)\n81048:\n  shards-0000_tar:\n    filename: AriaSyntheticEnvironment_1_0_ATEK_cubercnn_81048_shards-0000.tar\n    sha1sum: 05840565afd9702f985e1c483170f5d6e8825f07\n    file_size_bytes: 8570880\n    download_url: https://scontent.xx.fbcdn.net/m1/v/t6/An9oQjW...",
+    "crumbs": [
+      "TODOs",
+      "Project State",
+      "Action Items & TODOs"
+    ]
+  },
+  {
+    "objectID": "contents/impl/oracle_rri_package.html",
+    "href": "contents/impl/oracle_rri_package.html",
+    "title": "Oracle RRI Package",
+    "section": "",
+    "text": "Purpose: Typed, PyTorch-friendly wrappers around ASE/ATEK data, mesh pairing, downloads, and visualization utilities used for the oracle RRI pipeline.\nStructure:\n\nconfigs/, config.py, utils/ – config + logging infrastructure.\ndata/ – lightweight scene/snippet containers.\ndata_handling/ – ATEK WebDataset loader, metadata resolver, downloader.\nanalysis/ – debugging helpers (depth/point cloud).\nviz/ – mesh and distance visualisation.\n\n\nclassDiagram\n    BaseConfig &lt;|-- PathConfig\n    BaseConfig &lt;|-- ASEDownloaderConfig\n    BaseConfig &lt;|-- ASEDatasetConfig\n\n    ASEDownloaderConfig --&gt; ASEDownloader\n    ASEDatasetConfig --&gt; ASEDataset\n\n    ASEDataset o--&gt; AtekSnippet\n    AtekSnippet o--&gt; CameraStream\n    AtekSnippet o--&gt; Trajectory\n    AtekSnippet o--&gt; SemiDensePoints\n    ASEDataset o--&gt; trimesh.Trimesh : gt_mesh\n\n    ASEDownloader --&gt; ASEMetadata\n    ASEMetadata o--&gt; SceneInfo",
+    "crumbs": [
+      "TODOs",
+      "Implementations",
+      "Oracle RRI Package"
+    ]
+  },
+  {
+    "objectID": "contents/impl/oracle_rri_package.html#config-logging",
+    "href": "contents/impl/oracle_rri_package.html#config-logging",
+    "title": "Oracle RRI Package",
+    "section": "2.1 Config & Logging",
+    "text": "2.1 Config & Logging\n\nutils.base_config.BaseConfig: Pydantic-powered factory base with TOML IO and inspect() rendering (Rich).\nconfigs.path_config.PathConfig: Singleton paths to data roots, ATEK/ASE URL manifests, mesh directories.\nutils.console.Console: Rich wrapper with prefixes and optional shared PL logger hook.",
+    "crumbs": [
+      "TODOs",
+      "Implementations",
+      "Oracle RRI Package"
+    ]
+  },
+  {
+    "objectID": "contents/impl/oracle_rri_package.html#data-containers-datastructures.py",
+    "href": "contents/impl/oracle_rri_package.html#data-containers-datastructures.py",
+    "title": "Oracle RRI Package",
+    "section": "2.2 Data Containers (data/structures.py)",
+    "text": "2.2 Data Containers (data/structures.py)\n\nFrameSlice: timestamp + rig pose (3×4), points, std, extras.\nSnippetSample: sequence of FrameSlice with snippet id; iterates points.\nSceneRecord: scene id plus shard paths (+ optional mesh).",
+    "crumbs": [
+      "TODOs",
+      "Implementations",
+      "Oracle RRI Package"
+    ]
+  },
+  {
+    "objectID": "contents/impl/oracle_rri_package.html#data-handling-data_handling",
+    "href": "contents/impl/oracle_rri_package.html#data-handling-data_handling",
+    "title": "Oracle RRI Package",
+    "section": "2.3 Data Handling (data_handling/)",
+    "text": "2.3 Data Handling (data_handling/)\n\n2.3.1 Dataset loader (dataset.py)\n\n\n\n\n\nclassDiagram\n    class ASEDatasetConfig{\n      +tar_urls: list[str]\n      +scene_to_mesh: dict[str,Path]\n      +batch_size:int?\n      +load_meshes: bool\n      +mesh_simplify_ratio: float?\n      +setup_target()-&gt;ASEDataset\n    }\n    class ASEDataset{\n      -_atek_wds\n      -_mesh_cache\n      +__iter__()-&gt;ASESample\n    }\n    class AtekSnippet{\n      +cameras: dict[CameraLabel,CameraStream]\n      +trajectory: Trajectory?\n      +semidense: SemiDensePoints?\n      +gt_data: dict\n      +to_flatten_dict()\n    }\n    class ASESample{\n      +scene_id:str\n      +snippet_id:str\n      +atek:AtekSnippet\n      +gt_mesh:trimesh.Trimesh?\n      +to_efm_dict(include_mesh)\n    }\n    ASEDatasetConfig --&gt; ASEDataset\n    ASEDataset --&gt; ASESample\n    ASESample --&gt; AtekSnippet\n    AtekSnippet o--&gt; CameraStream\n    AtekSnippet o--&gt; Trajectory\n    AtekSnippet o--&gt; SemiDensePoints\n    ASESample --&gt; trimesh.Trimesh\n\n\n\n\n\n\n\nExternal dependencies used:\n\natek.data_loaders.load_atek_wds_dataset, select_and_remap_dict_keys for WebDataset ingest.\nefm3d.aria.PoseTW, CameraTW for typed geometry conversion (to_camera_tw).\ntrimesh for GT mesh loading/simplification.\n\nBatch handling: _explode_batched_dict splits WebDataset B-dim into per-sample dicts; ase_collate returns lists plus EFM-ready dicts.\nMesh pairing: scene_to_mesh mapping + optional decimation + caching; tolerant when meshes absent unless require_mesh=True.\nKey typing: CameraStream, Trajectory, SemiDensePoints mirror ATEK dataclasses; preserve Aria frame (x-left, y-up, z-forward), T_A_B convention.\nEFM remap: ASESample.to_efm_dict() applies EfmModelAdaptor.get_dict_key_mapping_all() and can include gt_mesh.\n\n\n\n2.3.2 Metadata & Download\n\nmetadata.ASEMetadata: parses ase_mesh_download_urls.json and AriaSyntheticEnvironment_ATEK_download_urls.json → SceneInfo(scene_id, mesh_url, mesh_sha, snippet_ids).\ndownloader.ASEDownloaderConfig/ASEDownloader: orchestrates mesh + WDS downloads (uses ATEK download_atek_wds_sequences, requests for meshes, SHA1 verification, unzip). CLI-friendly via pydantic_settings.",
+    "crumbs": [
+      "TODOs",
+      "Implementations",
+      "Oracle RRI Package"
+    ]
+  },
+  {
+    "objectID": "contents/impl/oracle_rri_package.html#analysis",
+    "href": "contents/impl/oracle_rri_package.html#analysis",
+    "title": "Oracle RRI Package",
+    "section": "2.4 Analysis",
+    "text": "2.4 Analysis\n\nanalysis/depth_debugger.py: utilities to inspect depth/point clouds; useful for validating candidate sampling and fusion (see TODOs).",
+    "crumbs": [
+      "TODOs",
+      "Implementations",
+      "Oracle RRI Package"
+    ]
+  },
+  {
+    "objectID": "contents/impl/oracle_rri_package.html#visualisation",
+    "href": "contents/impl/oracle_rri_package.html#visualisation",
+    "title": "Oracle RRI Package",
+    "section": "2.5 Visualisation",
+    "text": "2.5 Visualisation\n\nviz/mesh_viz.py: rendering helpers (Trimesh + matplotlib) for meshes and point clouds; wire into Streamlit dashboard per TODOs.",
+    "crumbs": [
+      "TODOs",
+      "Implementations",
+      "Oracle RRI Package"
+    ]
   }
 ]

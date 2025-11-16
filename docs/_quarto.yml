@@ -98,6 +98,7 @@ website:
           - contents/impl/rri_computation.qmd
           - contents/impl/oracle_rri_impl.qmd
           - contents/impl/efm3d_symbol_index.qmd
+          - contents/impl/oracle_rri_package.qmd
       - section: "Presentations"
         contents:
           - text: "Typst Slides 1"

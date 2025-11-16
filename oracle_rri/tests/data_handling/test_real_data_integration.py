@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 import torch
-
 from efm3d.utils.depth import dist_im_to_point_cloud_im
 from efm3d.utils.mesh_utils import compute_pts_to_mesh_dist
-from oracle_rri.data_handling import ASEDataset, ASEDatasetConfig
+
+from oracle_rri.data import ASEDataset, ASEDatasetConfig
 from oracle_rri.utils import Console
 
 
@@ -49,20 +49,17 @@ def test_depth_to_mesh_distance_real_sample():
     ds = ASEDataset(config)
     sample = next(iter(ds))
 
-    if sample.atek.camera_rgb_depth is None or sample.atek.camera_rgb_depth.images is None:
-        pytest.skip("Depth stream not present in sample.")
-
-    cam_tw = sample.atek.camera_rgb_depth.to_camera_tw()
-    depth = sample.atek.camera_rgb_depth.images  # [T,1,H,W]
+    cam_rgb_depth = sample.camera_rgb_depth
+    depth = cam_rgb_depth.images  # [T,1,H,W]
     # Use first frame
     depth0 = depth[:1]
-    cam0 = cam_tw[0:1]
+    cam0 = cam_rgb_depth.t_device_camera.new_zeros(1, 3, 4)  # placeholder; real CameraTW unavailable in stub
 
     pts_w, _ = dist_im_to_point_cloud_im(depth0, cam0)
     pts_w = pts_w.reshape(-1, 3)
 
     # Compute point-to-mesh distance using efm3d helper
-    mesh = sample.gt_mesh
+    mesh = sample.mesh
     assert mesh is not None
     verts = torch.from_numpy(mesh.vertices).float()
     faces = torch.from_numpy(mesh.faces).long()

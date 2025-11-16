@@ -1,5 +1,6 @@
 """Tests for typed ASE dataset wrapper."""
 
+from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -8,13 +9,8 @@ import torch
 import trimesh
 from torch.utils.data import DataLoader
 
-from oracle_rri.data_handling.dataset import (
-    ASEDataset,
-    ASEDatasetConfig,
-    ASESample,
-    CameraLabel,
-    ase_collate,
-)
+import oracle_rri.data.views
+from oracle_rri.data.dataset import ASEDataset, ASEDatasetConfig, TypedSample, ase_collate
 
 
 def _mock_flat_sample(scene: str = "81022", snippet: str = "shards-0000") -> dict:
@@ -31,6 +27,33 @@ def _mock_flat_sample(scene: str = "81022", snippet: str = "shards-0000") -> dic
         "mfcd#camera-rgb+gains": torch.tensor([1.0, 1.0]),
         "mfcd#camera-rgb+camera_model_name": "fisheye624",
         "mfcd#camera-rgb+camera_valid_radius": torch.tensor([1.0]),
+        "mfcd#camera-slam-left+images": torch.randn(2, 1, 4, 4),
+        "mfcd#camera-slam-left+projection_params": torch.tensor([90.0, 90.0, 2.0, 2.0]),
+        "mfcd#camera-slam-left+t_device_camera": torch.randn(2, 3, 4),
+        "mfcd#camera-slam-left+capture_timestamps_ns": torch.tensor([0, 1], dtype=torch.int64),
+        "mfcd#camera-slam-left+frame_ids": torch.tensor([0, 1], dtype=torch.int64),
+        "mfcd#camera-slam-left+exposure_durations_s": torch.tensor([0.01, 0.01]),
+        "mfcd#camera-slam-left+gains": torch.tensor([1.0, 1.0]),
+        "mfcd#camera-slam-left+camera_model_name": "fisheye624",
+        "mfcd#camera-slam-left+camera_valid_radius": torch.tensor([1.0]),
+        "mfcd#camera-slam-right+images": torch.randn(2, 1, 4, 4),
+        "mfcd#camera-slam-right+projection_params": torch.tensor([90.0, 90.0, 2.0, 2.0]),
+        "mfcd#camera-slam-right+t_device_camera": torch.randn(2, 3, 4),
+        "mfcd#camera-slam-right+capture_timestamps_ns": torch.tensor([0, 1], dtype=torch.int64),
+        "mfcd#camera-slam-right+frame_ids": torch.tensor([0, 1], dtype=torch.int64),
+        "mfcd#camera-slam-right+exposure_durations_s": torch.tensor([0.01, 0.01]),
+        "mfcd#camera-slam-right+gains": torch.tensor([1.0, 1.0]),
+        "mfcd#camera-slam-right+camera_model_name": "fisheye624",
+        "mfcd#camera-slam-right+camera_valid_radius": torch.tensor([1.0]),
+        "mfcd#camera-rgb-depth+images": torch.randn(2, 1, 4, 4),
+        "mfcd#camera-rgb-depth+projection_params": torch.tensor([100.0, 100.0, 2.0, 2.0]),
+        "mfcd#camera-rgb-depth+t_device_camera": torch.randn(2, 3, 4),
+        "mfcd#camera-rgb-depth+capture_timestamps_ns": torch.tensor([0, 1], dtype=torch.int64),
+        "mfcd#camera-rgb-depth+frame_ids": torch.tensor([0, 1], dtype=torch.int64),
+        "mfcd#camera-rgb-depth+exposure_durations_s": torch.tensor([0.01, 0.01]),
+        "mfcd#camera-rgb-depth+gains": torch.tensor([1.0, 1.0]),
+        "mfcd#camera-rgb-depth+camera_model_name": "fisheye624",
+        "mfcd#camera-rgb-depth+camera_valid_radius": torch.tensor([1.0]),
         "mtd#ts_world_device": torch.eye(3, 4).unsqueeze(0).repeat(2, 1, 1),
         "mtd#capture_timestamps_ns": torch.tensor([0, 1], dtype=torch.int64),
         "mtd#gravity_in_world": torch.tensor([0.0, 0.0, -9.81]),
@@ -52,14 +75,21 @@ class TestASEDatasetConfig:
 
 class TestASEDataset:
     @pytest.fixture
-    def dataset(self) -> ASEDataset:
+    def tar_file(self, tmp_path: Path) -> Path:
+        tar = tmp_path / "fake.tar"
+        tar.write_bytes(b"")
+        return tar
+
+    @pytest.fixture
+    def dataset(self, tar_file: Path) -> Generator[ASEDataset, None, None]:
         flat = _mock_flat_sample()
         mock_loader = MagicMock()
         mock_loader.__iter__.return_value = iter([flat])
+        mock_loader.__len__.return_value = 1
 
-        with patch("oracle_rri.data_handling.dataset.load_atek_wds_dataset", return_value=mock_loader):
+        with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
             config = ASEDatasetConfig(
-                tar_urls=["/tmp/fake.tar"],
+                tar_urls=[tar_file],
                 scene_to_mesh={},
                 load_meshes=False,
                 batch_size=None,
@@ -69,43 +99,36 @@ class TestASEDataset:
 
     def test_iter_yields_typed_sample(self, dataset: ASEDataset):
         sample = next(iter(dataset))
-        assert isinstance(sample, ASESample)
+        assert isinstance(sample, TypedSample)
         assert sample.scene_id == "81022"
         assert sample.snippet_id == "shards-0000"
-        assert sample.has_rgb is True
-        assert sample.has_slam_points is True
-        assert sample.has_mesh is False
-
-        rgb = sample.atek.camera_rgb
-        assert rgb is not None
-        assert rgb.label == CameraLabel.RGB
-        assert rgb.images.shape == (2, 3, 4, 4)
-
-        traj = sample.atek.trajectory
-        assert traj is not None
+        cam = sample.camera_rgb
+        traj = sample.trajectory
+        assert cam.images is not None
+        assert traj.ts_world_device is not None
+        assert cam.images.shape == (2, 3, 4, 4)
         assert traj.ts_world_device.shape == (2, 3, 4)
-
-        # GT data now typed
-        assert sample.atek.gt_data.obb3_gt is not None or sample.atek.gt_data.raw is not None
+        # GT data exists as raw dict (may be empty)
+        assert isinstance(sample.gt.raw, dict)
 
     def test_to_efm_dict_remaps_keys(self, dataset: ASEDataset):
         sample = next(iter(dataset))
         efm = sample.to_efm_dict()
-
         assert "rgb/img" in efm
         assert "pose/t_world_rig" in efm
         assert "points/p3s_world" in efm
         assert efm["scene_id"] == "81022"
 
-    def test_dataloader_collation(self):
+    def test_dataloader_collation(self, tar_file: Path):
         flat1 = _mock_flat_sample(scene="81022", snippet="shards-0000")
         flat2 = _mock_flat_sample(scene="81048", snippet="shards-0001")
         mock_loader = MagicMock()
         mock_loader.__iter__.return_value = iter([flat1, flat2])
+        mock_loader.__len__.return_value = 2
 
-        with patch("oracle_rri.data_handling.dataset.load_atek_wds_dataset", return_value=mock_loader):
+        with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
             config = ASEDatasetConfig(
-                tar_urls=["/tmp/fake.tar"],
+                tar_urls=[tar_file],
                 scene_to_mesh={},
                 load_meshes=False,
                 batch_size=None,
@@ -119,6 +142,73 @@ class TestASEDataset:
         assert len(batch["atek"]) == 2
         assert batch["gt_mesh"] == [None, None]
 
+    def test_missing_camera_key_raises(self, tar_file: Path):
+        flat = _mock_flat_sample()
+        flat.pop("mfcd#camera-rgb+images")
+        mock_loader = MagicMock()
+        mock_loader.__iter__.return_value = iter([flat])
+        mock_loader.__len__.return_value = 1
+
+        with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
+            config = ASEDatasetConfig(
+                tar_urls=[tar_file],
+                scene_to_mesh={},
+                load_meshes=False,
+                batch_size=None,
+                verbose=False,
+            )
+            dataset = ASEDataset(config)
+            sample = next(iter(dataset))
+
+        with pytest.raises(KeyError):
+            _ = sample.camera_rgb
+
+    def test_repr_is_multiline_and_summarized(self, tar_file: Path):
+        flat = _mock_flat_sample()
+        mock_loader = MagicMock()
+        mock_loader.__iter__.return_value = iter([flat])
+        mock_loader.__len__.return_value = 1
+
+        with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
+            config = ASEDatasetConfig(
+                tar_urls=[tar_file],
+                scene_to_mesh={},
+                load_meshes=False,
+                batch_size=None,
+                verbose=False,
+            )
+            sample = next(iter(ASEDataset(config)))
+
+        rep = repr(sample)
+        assert "scene_id" in rep and "cameras" in rep
+        assert "shape" in rep
+        assert "\n" in rep  # multiline formatting
+
+    def test_camera_docstring_has_shapes(self):
+        doc = oracle_rri.data.views.CameraView.__doc__
+        assert doc is not None and "(F, C, H, W)" in doc
+
+    def test_to_moves_tensors(self, tar_file: Path):
+        flat = _mock_flat_sample()
+        mock_loader = MagicMock()
+        mock_loader.__iter__.return_value = iter([flat])
+        mock_loader.__len__.return_value = 1
+
+        with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
+            config = ASEDatasetConfig(
+                tar_urls=[tar_file],
+                scene_to_mesh={},
+                load_meshes=False,
+                batch_size=None,
+                verbose=False,
+            )
+            sample = next(iter(ASEDataset(config)))
+
+        cam = sample.camera_rgb
+        moved = cam.to("cpu")
+        assert moved.images.device.type == "cpu"
+        assert moved is not cam  # copy
+
     def test_mesh_loading_and_caching(self, tmp_path: Path):
         mesh_path = tmp_path / "scene_ply_81022.ply"
         trimesh.Trimesh(vertices=[[0, 0, 0], [1, 0, 0], [0, 1, 0]], faces=[[0, 1, 2]]).export(mesh_path)
@@ -127,7 +217,7 @@ class TestASEDataset:
         mock_loader = MagicMock()
         mock_loader.__iter__.return_value = iter([flat, flat])
 
-        with patch("oracle_rri.data_handling.dataset.load_atek_wds_dataset", return_value=mock_loader):
+        with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
             config = ASEDatasetConfig(
                 tar_urls=["/tmp/fake.tar"],
                 scene_to_mesh={"81022": mesh_path},
@@ -139,5 +229,5 @@ class TestASEDataset:
             dataset = ASEDataset(config)
             samples = list(dataset)
 
-        assert samples[0].gt_mesh is samples[1].gt_mesh
-        assert samples[0].has_mesh is True
+        assert samples[0].mesh is samples[1].mesh
+        assert samples[0].mesh is not None
