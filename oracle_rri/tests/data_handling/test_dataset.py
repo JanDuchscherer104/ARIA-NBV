@@ -38,9 +38,9 @@ def _mock_flat_sample(scene: str = "81022", snippet: str = "shards-0000") -> dic
         "msdpd#points_dist_std": [torch.ones(1), torch.ones(1)],
         "msdpd#points_inv_dist_std": [torch.ones(1), torch.ones(1)],
         "msdpd#capture_timestamps_ns": torch.tensor([0, 1], dtype=torch.int64),
-        "msdpd#points_volumn_min": torch.zeros(3),
-        "msdpd#points_volumn_max": torch.ones(3),
-        "gt_data": {"efm_gt": {}},
+        "msdpd#points_volume_min": torch.zeros(3),
+        "msdpd#points_volume_max": torch.ones(3),
+        "gt_data": {"obb3_gt": {}},
     }
 
 
@@ -84,6 +84,9 @@ class TestASEDataset:
         traj = sample.atek.trajectory
         assert traj is not None
         assert traj.ts_world_device.shape == (2, 3, 4)
+
+        # GT data now typed
+        assert sample.atek.gt_data.obb3_gt is not None or sample.atek.gt_data.raw is not None
 
     def test_to_efm_dict_remaps_keys(self, dataset: ASEDataset):
         sample = next(iter(dataset))

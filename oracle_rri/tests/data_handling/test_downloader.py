@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from oracle_rri.data_handling.downloader import ASEDownloader, ASEDownloaderConfig
+from oracle_rri.utils import Console
 
 
 class TestASEDownloaderConfig:
@@ -52,6 +53,7 @@ class TestASEDownloaderConfig:
         assert isinstance(downloader, ASEDownloader)
         assert downloader.config == config
         assert len(downloader.metadata.scenes) > 0
+        Console.with_prefix("test_downloader").log("setup_target ok")
 
     def test_setup_target_missing_url_dir(self, tmp_path: Path, tmp_output_dir: Path):
         """Test setup_target with missing URL directory."""

@@ -1,15 +1,4 @@
-"""Typed, PyTorch-friendly ASE/ATEK dataset wrapper with GT mesh pairing.
-
-This module wraps ATEK's WebDataset loader and converts the flattened samples
-into typed dataclasses that are IDE-friendly and EFM3D-compatible. Each yielded
-sample carries the original `AtekDataSample`, typed views of camera/trajectory
-fields, optional GT mesh, and helper utilities to remap keys to the EFM3D
-schema.
-
-All tensors follow the Aria camera frame (x-left, y-up, z-forward). Transforms
-use the `T_A_B` convention (pose that maps points from frame B into frame A).
-"""
-# ruff: noqa: F722,F821,UP037
+"""Typed, PyTorch-friendly ASE/ATEK dataset wrapper with GT mesh pairing."""
 
 from __future__ import annotations
 
@@ -17,7 +6,6 @@ import re
 import sys
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -27,293 +15,21 @@ from atek.data_loaders.atek_wds_dataloader import (
     load_atek_wds_dataset,
     select_and_remap_dict_keys,
 )
-from atek.data_preprocess.atek_data_sample import (
-    AtekDataSample,
-    MpsSemiDensePointData,
-    MpsTrajData,
-    MultiFrameCameraData,
-    create_atek_data_sample_from_flatten_dict,
-)
-from devtools import pformat
 
 try:  # Prefer installed efm3d, otherwise fall back to vendored source.
-    from efm3d.aria import CameraTW, PoseTW
     from efm3d.dataset.efm_model_adaptor import EfmModelAdaptor
 except ModuleNotFoundError:  # pragma: no cover - exercised in CI fallback
     vendor_root = Path(__file__).resolve().parents[3] / "external" / "efm3d"
     sys.path.append(str(vendor_root))
-    from efm3d.aria import CameraTW, PoseTW
     from efm3d.dataset.efm_model_adaptor import EfmModelAdaptor
-from jaxtyping import Float, Int
 from pydantic import Field, field_validator, model_validator
-from torch import Tensor
 from torch.utils.data import IterableDataset
 
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console
+from .schemas import AtekSnippet, CameraLabel
 
-SEQ_PATTERN = re.compile(r".*?(?P<scene_id>\\d{4,})(?:_|-)(?P<snippet_id>[\\w-]+)")
-
-
-class CameraLabel(str, Enum):
-    """Canonical camera stream labels used by ATEK."""
-
-    RGB = "camera-rgb"
-    SLAM_LEFT = "camera-slam-left"
-    SLAM_RIGHT = "camera-slam-right"
-    RGB_DEPTH = "camera-rgb-depth"
-
-
-@dataclass(slots=True)
-class CameraStream:
-    """Typed view of `MultiFrameCameraData`.
-
-    Attributes:
-        label: ATEK camera label (e.g. ``"camera-rgb"``).
-        images: Float tensor shaped ``[frames, channels, height, width]`` in the
-            camera frame.
-        projection_params: Float tensor of intrinsics per frame
-            ``[frames, num_params]``.
-        t_device_camera: Pose ``T_device_camera`` per frame shaped ``[frames, 3, 4]``.
-        capture_timestamps_ns: Frame timestamps in nanoseconds ``[frames]``.
-        frame_ids: Frame indices ``[frames]``.
-        exposure_durations_s: Exposure duration per frame in seconds ``[frames]``.
-        gains: Analog gain per frame ``[frames]``.
-        camera_model_name: Camera model identifier (e.g. ``"fisheye624"``).
-        camera_valid_radius: Valid pixel radius mask. Shape ``[frames, 1]`` or ``[1]``.
-    """
-
-    label: CameraLabel
-    images: Float[Tensor, "frames channels height width"] | None  # noqa: F722,F821
-    projection_params: Float[Tensor, "frames params"] | None  # noqa: F722,F821
-    t_device_camera: Float[Tensor, "frames 3 4"] | None  # noqa: F722,F821
-    capture_timestamps_ns: Int[Tensor, "frames"] | None  # noqa: F722,F821
-    frame_ids: Int[Tensor, "frames"] | None  # noqa: F722,F821
-    exposure_durations_s: Float[Tensor, "frames"] | None  # noqa: F722,F821
-    gains: Float[Tensor, "frames"] | None  # noqa: F722,F821
-    camera_model_name: str | None
-    camera_valid_radius: Float[Tensor, "frames 1"] | Float[Tensor, "1"] | None  # noqa: F722,F821
-
-    @staticmethod
-    def from_multiframe(camera: MultiFrameCameraData | None, label: CameraLabel) -> CameraStream | None:
-        """Create a typed stream from a raw ATEK dataclass."""
-        if camera is None:
-            return None
-
-        return CameraStream(
-            label=label,
-            images=camera.images,
-            projection_params=camera.projection_params,
-            t_device_camera=camera.T_Device_Camera,
-            capture_timestamps_ns=camera.capture_timestamps_ns,
-            frame_ids=camera.frame_ids,
-            exposure_durations_s=camera.exposure_durations_s,
-            gains=camera.gains,
-            camera_model_name=camera.camera_model_name,
-            camera_valid_radius=camera.camera_valid_radius,
-        )
-
-    def to_camera_tw(self) -> CameraTW | None:
-        """Convert to ``CameraTW`` for downstream EFM3D operations."""
-        if self.images is None or self.projection_params is None or self.t_device_camera is None:
-            return None
-
-        frames = self.images.shape[0]
-        width = torch.full((frames, 1), self.images.shape[3], dtype=torch.float32)
-        height = torch.full((frames, 1), self.images.shape[2], dtype=torch.float32)
-        params = (
-            self.projection_params.unsqueeze(0).expand(frames, -1)
-            if self.projection_params.ndim == 1
-            else self.projection_params
-        )
-
-        gain = self.gains if self.gains is not None else torch.zeros(frames, 1, dtype=torch.float32)
-        exposure = (
-            self.exposure_durations_s
-            if self.exposure_durations_s is not None
-            else torch.zeros(frames, 1, dtype=torch.float32)
-        )
-        valid_radius = (
-            self.camera_valid_radius
-            if self.camera_valid_radius is not None
-            else torch.full((frames, 1), 0.0, dtype=torch.float32)
-        )
-        if valid_radius.dim() == 1:
-            valid_radius = valid_radius.view(1, -1).expand(frames, -1)
-        elif valid_radius.shape[0] == 1 and frames > 1:
-            valid_radius = valid_radius.expand(frames, -1)
-
-        return CameraTW.from_surreal(
-            width=width,
-            height=height,
-            type_str=self.camera_model_name or "",
-            params=params,
-            gain=gain,
-            exposure_s=exposure,
-            valid_radius=valid_radius,
-            T_camera_rig=PoseTW.from_matrix3x4(self.t_device_camera).inverse(),
-        ).float()
-
-
-@dataclass(slots=True)
-class Trajectory:
-    """Device trajectory in world coordinates."""
-
-    ts_world_device: Float[Tensor, "frames 3 4"] | None  # noqa: F722,F821
-    capture_timestamps_ns: Int[Tensor, "frames"] | None  # noqa: F722,F821
-    gravity_in_world: Float[Tensor, "3"] | None  # noqa: F722,F821
-
-    @staticmethod
-    def from_mps(data: MpsTrajData | None) -> Trajectory | None:
-        if data is None:
-            return None
-        return Trajectory(
-            ts_world_device=data.Ts_World_Device,
-            capture_timestamps_ns=data.capture_timestamps_ns,
-            gravity_in_world=data.gravity_in_world,
-        )
-
-    def as_pose_tw(self) -> PoseTW | None:
-        """Return poses as ``PoseTW`` batch if available."""
-        if self.ts_world_device is None:
-            return None
-        return PoseTW.from_matrix3x4(self.ts_world_device)
-
-
-@dataclass(slots=True)
-class SemiDensePoints:
-    """Semi-dense SLAM point observations."""
-
-    points_world: list[Float[Tensor, "points 3"]]  # noqa: F722,F821
-    points_dist_std: list[Float[Tensor, "points"]] | None  # noqa: F722,F821
-    points_inv_dist_std: list[Float[Tensor, "points"]] | None  # noqa: F722,F821
-    capture_timestamps_ns: Int[Tensor, "frames"] | None  # noqa: F722,F821
-
-    @staticmethod
-    def from_mps(data: MpsSemiDensePointData | None) -> SemiDensePoints | None:
-        if data is None:
-            return None
-        return SemiDensePoints(
-            points_world=data.points_world,
-            points_dist_std=data.points_dist_std,
-            points_inv_dist_std=data.points_inv_dist_std,
-            capture_timestamps_ns=data.capture_timestamps_ns,
-        )
-
-    def stacked(self) -> Float[Tensor, "frames points 3"] | None:  # noqa: F722,F821
-        """Stack per-frame points into shape ``[frames, points, 3]`` (NaNs preserved)."""
-        if not self.points_world:
-            return None
-        return torch.stack(self.points_world, dim=0)
-
-
-@dataclass(slots=True)
-class Obb3CameraView:
-    """GT 3D boxes for a single camera stream."""
-
-    instance_ids: Tensor | None
-    category_ids: Tensor | None
-    category_names: list[str] | None
-    object_dimensions: Tensor | None  # [K,3] xyz lengths
-    ts_world_object: Tensor | None  # [K,3,4]
-
-
-@dataclass(slots=True)
-class GTData:
-    """Ground-truth annotations stored in ATEK `gt_data`."""
-
-    obb3_gt: dict[str, Obb3CameraView] | None
-    obb2_gt: dict[str, dict[str, Any]] | None
-    scores: Tensor | None
-    raw: dict[str, Any]
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "GTData":
-        obb3_raw = data.get("obb3_gt")
-        obb3 = None
-        if isinstance(obb3_raw, dict):
-            obb3 = {}
-            for cam, d in obb3_raw.items():
-                obb3[cam] = Obb3CameraView(
-                    instance_ids=d.get("instance_ids"),
-                    category_ids=d.get("category_ids"),
-                    category_names=d.get("category_names"),
-                    object_dimensions=d.get("object_dimensions"),
-                    ts_world_object=d.get("ts_world_object"),
-                )
-        obb2 = data.get("obb2_gt") if isinstance(data.get("obb2_gt"), dict) else None
-        scores = data.get("scores") if isinstance(data.get("scores"), Tensor) else None
-        return cls(obb3_gt=obb3, obb2_gt=obb2, scores=scores, raw=data)
-
-    def to_raw(self) -> dict[str, Any]:
-        """Return the original dictionary for compatibility with downstream loaders."""
-        return self.raw
-
-
-@dataclass(slots=True)
-class AtekSnippet:
-    """Typed and raw ATEK snippet."""
-
-    sequence_name: str
-    cameras: dict[CameraLabel, CameraStream]
-    trajectory: Trajectory | None
-    semidense: SemiDensePoints | None
-    gt_data: GTData
-    raw: AtekDataSample
-    flat: dict[str, Any]
-
-    @property
-    def camera_rgb(self) -> CameraStream | None:
-        return self.cameras.get(CameraLabel.RGB)
-
-    @property
-    def camera_slam_left(self) -> CameraStream | None:
-        return self.cameras.get(CameraLabel.SLAM_LEFT)
-
-    @property
-    def camera_slam_right(self) -> CameraStream | None:
-        return self.cameras.get(CameraLabel.SLAM_RIGHT)
-
-    @property
-    def camera_rgb_depth(self) -> CameraStream | None:
-        return self.cameras.get(CameraLabel.RGB_DEPTH)
-
-    @property
-    def pose_world_device(self) -> PoseTW | None:
-        return self.trajectory.as_pose_tw() if self.trajectory else None
-
-    @classmethod
-    def from_flat(cls, flat: Mapping[str, Any]) -> AtekSnippet:
-        """Build a typed snippet from a flattened ATEK dict."""
-        raw_sample = create_atek_data_sample_from_flatten_dict(flat)
-        gt_data = GTData.from_dict(raw_sample.gt_data or {})
-
-        cameras: dict[CameraLabel, CameraStream] = {}
-        for label, mfcd in (
-            (CameraLabel.RGB, raw_sample.camera_rgb),
-            (CameraLabel.SLAM_LEFT, raw_sample.camera_slam_left),
-            (CameraLabel.SLAM_RIGHT, raw_sample.camera_slam_right),
-            (CameraLabel.RGB_DEPTH, raw_sample.camera_rgb_depth),
-        ):
-            stream = CameraStream.from_multiframe(mfcd, label=label)
-            if stream is not None:
-                cameras[label] = stream
-
-        return cls(
-            sequence_name=raw_sample.sequence_name or "unknown",
-            cameras=cameras,
-            trajectory=Trajectory.from_mps(raw_sample.mps_traj_data),
-            semidense=SemiDensePoints.from_mps(raw_sample.mps_semidense_point_data),
-            gt_data=gt_data,
-            raw=raw_sample,
-            flat=dict(flat),
-        )
-
-    def to_flatten_dict(self) -> dict[str, Any]:
-        """Return the original flattened dict (unchanged)."""
-        flat = dict(self.flat)
-        flat["gt_data"] = self.gt_data.to_raw()
-        return flat
+SEQ_PATTERN = re.compile(r".*?(?P<scene_id>\d{4,})(?:_|-)(?P<snippet_id>[\w-]+)")
 
 
 @dataclass(slots=True)
@@ -500,24 +216,7 @@ class ASEDataset(IterableDataset[ASESample]):
 
 
 class ASEDatasetConfig(BaseConfig[ASEDataset]):
-    """Configuration for :class:`ASEDataset`.
-
-    Attributes:
-        target: Factory target (Dataset class).
-        paths: Shared path configuration.
-        tar_urls: Absolute tar file paths or glob patterns.
-        scene_to_mesh: Mapping ``scene_id -> mesh path``.
-        atek_variant: Subdirectory name under ``.data/ase_atek`` (e.g. ``"efm"``).
-        scene_ids: Optional scene filter used to auto-resolve tar paths and meshes.
-        batch_size: WebDataset batch size (set ``None`` to let DataLoader handle batching).
-        shuffle: Enable WebDataset shuffling.
-        repeat: Repeat dataset indefinitely.
-        load_meshes: Whether to attach GT meshes to each sample.
-        require_mesh: Raise if a mesh is missing for a scene.
-        mesh_simplify_ratio: Optional decimation ratio (0-1).
-        cache_meshes: Cache loaded meshes in memory.
-        verbose: Enable verbose Console logging.
-    """
+    """Configuration for :class:`ASEDataset`."""
 
     target: type[ASEDataset] = Field(default=ASEDataset, exclude=True)
     paths: PathConfig = Field(default_factory=PathConfig)
@@ -538,7 +237,6 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
 
     load_meshes: bool = Field(default=True)
     require_mesh: bool = Field(default=False)
-
     mesh_simplify_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
     cache_meshes: bool = Field(default=True)
 
@@ -583,7 +281,6 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
         """Populate tar paths and mesh mapping from scene IDs when unset."""
         base = self._resolve_atek_root()
 
-        # If no tar URLs provided, auto-discover
         if not self.tar_urls:
             if self.scene_ids:
                 resolved: list[str] = []
@@ -597,12 +294,13 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
             if self.scene_ids:
                 self.scene_to_mesh = {scene: self.paths.resolve_mesh_path(scene) for scene in self.scene_ids}
             else:
-                # discover meshes for all scenes present under ase_meshes
                 mesh_dir = self.paths.ase_meshes
                 self.scene_to_mesh = {
-                    p.stem.replace("scene_ply_", ""): p
-                    for p in mesh_dir.glob("scene_ply_*.ply")
+                    p.stem.replace("scene_ply_", ""): p for p in mesh_dir.glob("scene_ply_*.ply")
                 }
+
+        if self.is_debug and self.mesh_simplify_ratio is None:
+            self.mesh_simplify_ratio = 0.1
 
         if not self.tar_urls:
             raise ValueError("No tar files configured. Provide `tar_urls` or `scene_ids`.")
@@ -626,8 +324,12 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
         return self.target(self)
 
     def __repr__(self) -> str:
-        # TODO: add informative repr
-        return pformat("")
+        return (
+            f"ASEDatasetConfig(tars={len(self.tar_urls)}, meshes={len(self.scene_to_mesh)}, "
+            f"batch_size={self.batch_size}, shuffle={self.shuffle}, repeat={self.repeat}, "
+            f"load_meshes={self.load_meshes}, simplify={self.mesh_simplify_ratio}, "
+            f"atek_variant='{self.atek_variant}')"
+        )
 
 
 __all__ = [

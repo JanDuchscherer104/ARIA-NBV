@@ -9,11 +9,11 @@ from .dataset import (
     ase_collate,
 )
 from .downloader import ASEDownloader, ASEDownloaderConfig
-from .metadata import ASEMetadata, SceneInfo
+from .metadata import ASEMetadata, SceneMetadata
 
 __all__ = [
     "ASEMetadata",
-    "SceneInfo",
+    "SceneMetadata",
     "ASEDownloader",
     "ASEDownloaderConfig",
     "ASEDataset",

@@ -1,16 +1,26 @@
-"""Oracle RRI package scaffolding.
-
-This module exposes high-level stubs that mirror the final architecture of the
-oracle-RRI pipeline.  Each component currently wraps the upstream libraries
-(EFM3D, ATEK, Project Aria) without committing to a concrete implementation so
-that future iterations can swap in optimised code while keeping a stable API.
-"""
+"""Oracle RRI package."""
 
 from .config import DatasetPaths, OracleConfig
-from .data.factory import DatasetFactory
+from .data_handling import (
+    ASEDataset,
+    ASEDatasetConfig,
+    ASEMetadata,
+    ASESample,
+    AtekSnippet,
+    CameraLabel,
+    ase_collate,
+    SceneMetadata,
+)
 
 __all__ = [
     "DatasetPaths",
     "OracleConfig",
-    "DatasetFactory",
+    "ASEDataset",
+    "ASEDatasetConfig",
+    "ASESample",
+    "AtekSnippet",
+    "CameraLabel",
+    "ase_collate",
+    "ASEMetadata",
+    "SceneMetadata",
 ]

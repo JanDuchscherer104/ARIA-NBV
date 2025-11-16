@@ -17,7 +17,7 @@ from tqdm import tqdm
 
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console
-from .metadata import ASEMetadata, SceneInfo
+from .metadata import ASEMetadata, SceneMetadata
 
 
 class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
@@ -118,7 +118,7 @@ class ASEDownloader:
 
     def download_scenes(
         self,
-        scenes: list[SceneInfo],
+        scenes: list[SceneMetadata],
         download_meshes: bool = True,
         download_atek: bool = True,
     ) -> None:
@@ -135,7 +135,7 @@ class ASEDownloader:
         if download_atek:
             self._download_atek(scenes)
 
-    def _download_meshes(self, scenes: list[SceneInfo]) -> None:
+    def _download_meshes(self, scenes: list[SceneMetadata]) -> None:
         """Download GT meshes from CDN.
 
         Adapted from ATEK's ase_mesh_downloader.py to align with our design patterns.
@@ -205,7 +205,7 @@ class ASEDownloader:
 
         self.console.log("✓ Mesh downloads complete")
 
-    def _download_atek(self, scenes: list[SceneInfo]) -> None:
+    def _download_atek(self, scenes: list[SceneMetadata]) -> None:
         """Download ATEK WDS snippets using ATEK's download_atek_wds_sequences."""
         self.console.log(f"Downloading ATEK data for {len(scenes)} scenes...")
 
@@ -279,6 +279,12 @@ class ASEDownloader:
 
         finally:
             tmp_json.unlink(missing_ok=True)
+
+    def download_scenes_with_meshes(self, min_snippets: int, config: str, overwrite: bool) -> None:
+        """Download scenes that have meshes and at least `min_snippets` snippets for a given config."""
+        scenes = self.metadata.filter_scenes(min_snippets=min_snippets, require_mesh=True, config=config)
+        self.config.overwrite = overwrite
+        self.download_scenes(scenes, download_meshes=not self.config.skip_meshes, download_atek=not self.config.skip_atek)
 
 
 # ============================================================================
