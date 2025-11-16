@@ -88,7 +88,6 @@ def _explode_batched_dict(batch: Mapping[str, Any]) -> list[dict[str, Any]]:
     return per_item
 
 
-# TODO:
 def ase_collate(batch: Sequence[TypedSample]) -> dict[str, Any]:
     return {
         "scene_id": [s.scene_id for s in batch],
@@ -165,13 +164,14 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
 
     target: type[ASEDataset] = Field(default=ASEDataset, exclude=True)
     paths: PathConfig = Field(default_factory=PathConfig)
-    tar_urls: list[str] = Field(
-        default_factory=list, description="List of ATEK WebDataset shard paths (may include globs)."
-    )
-    scene_to_mesh: dict[str, Path] = Field(default_factory=dict, description="Mapping scene_id -> GT mesh path.")
-    atek_variant: str = Field(default="efm_eval", description="Subdirectory name under data_root for ATEK shards.")
     scene_ids: list[str] | None = Field(default=None, description="Optional list of scene ids to include.")
     atek_root: Path | None = Field(default=None, description="Override root directory containing scene shard folders.")
+    atek_variant: str = Field(default="efm_eval", description="Subdirectory name under data_root for ATEK shards.")
+    tar_urls: list[str] = Field(
+        default_factory=list,
+        description="List of ATEK WebDataset shard paths (auto-populated; external override disallowed).",
+    )
+    scene_to_mesh: dict[str, Path] = Field(default_factory=dict, description="Mapping scene_id -> GT mesh path.")
 
     batch_size: int | None = Field(
         default=None, description="Optional batch size for load_atek_wds_dataset; None yields single samples."
@@ -190,43 +190,8 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
 
     @field_validator("tar_urls", mode="before")
     @classmethod
-    def _normalize_tar_urls(cls, value: list[str | Path] | str | Path) -> list[str]:
-        if isinstance(value, (str, Path)):
-            value = [value]
-        return [str(v) for v in value]
-
-    @field_validator("tar_urls")
-    @classmethod
-    def _ensure_tars_exist(cls, value: list[str]) -> list[str]:
-        # Allow globs/nonexistent in test environments; presence will be checked when loading.
-        return value
-
-    @field_validator("tar_urls", mode="before")
-    @classmethod
-    def _populate_tar_urls(cls, value: list[str], info: ValidationInfo) -> list[str]:
-        """Fill tar_urls from scene_ids or atek_root if user left it empty."""
-
-        paths: PathConfig = info.data["paths"]
-        atek_variant: str = info.data.get("atek_variant", "efm_eval")
-        scene_ids: list[str] | None = info.data.get("scene_ids")
-        atek_root: Path | None = info.data.get("atek_root")
-
-        base = atek_root if atek_root is not None else paths.resolve_atek_data_dir(atek_variant)
-
-        if value:
-            return value
-
-        if scene_ids:
-            resolved: list[str] = []
-            for scene in scene_ids:
-                resolved.extend(sorted(str(p) for p in (base / scene).glob("*.tar")))
-            value = resolved
-        else:
-            raise ValueError("No tar files configured. Provide tar_urls or scene_ids.")
-
-        if not value:
-            raise ValueError("No tar files configured. Provide tar_urls or ensure scene shards exist on disk.")
-
+    def _disallow_external_tar_urls(cls, value: Any) -> None:
+        # Ignore any externally supplied value; tar_urls is populated from scene_ids.
         return value
 
     @field_validator("atek_root", mode="before")
@@ -238,23 +203,61 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
         return path
 
     def _resolve_atek_root(self) -> Path:
-        if self.atek_root is not None:
-            base = self.atek_root
+        return self._resolve_atek_root_static(self.paths, self.atek_root, self.atek_variant)
+
+    @staticmethod
+    def _resolve_atek_root_static(paths: PathConfig, atek_root: Path | None, atek_variant: str) -> Path:
+        if atek_root is not None:
+            base = Path(atek_root).expanduser()
             if not base.is_absolute():
-                base = self.paths.data_root / base
+                base = (Path.cwd() / base).resolve()
             return base
         candidates = [
-            self.paths.data_root / "ase_atek" / self.atek_variant,
-            self.paths.data_root / f"ase_{self.atek_variant}",
-            self.paths.data_root / "ase_efm_eval",
+            paths.data_root / "ase_atek" / atek_variant,
+            paths.data_root / f"ase_{atek_variant}",
+            paths.data_root / "ase_efm_eval",
         ]
         for candidate in candidates:
             if candidate.exists():
                 return candidate
         return candidates[0]
 
+    @field_validator("tar_urls", mode="before")
+    @classmethod
+    def _populate_tar_urls(cls, value: list[str] | None, info: ValidationInfo) -> list[str]:
+        data = info.data
+        paths: PathConfig = data.get("paths") or PathConfig()
+        scene_ids: list[str] | None = data.get("scene_ids")
+        atek_variant: str = data.get("atek_variant", "efm_eval")
+        atek_root: Path | None = data.get("atek_root")
+
+        if value:
+            return value
+
+        base = cls._resolve_atek_root_static(paths, atek_root, atek_variant)
+
+        resolved: list[str] = []
+        if scene_ids:
+            for scene in scene_ids:
+                resolved.extend(str(p) for p in sorted((base / scene).glob("*.tar")))
+        else:
+            resolved = [str(p) for p in sorted(base.glob("**/*.tar"))]
+
+        if not resolved:
+            raise ValueError(f"No tar files found under {base}; provide tar_urls or scene_ids.")
+        return resolved
+
     @model_validator(mode="after")
     def _autofill_paths(self) -> ASEDatasetConfig:
+        if not self.scene_ids:
+            raise ValueError("scene_ids must be provided; tar_urls are derived internally.")
+
+        if not self.tar_urls:
+            base = self._resolve_atek_root()
+            self.tar_urls = [str(p) for scene in self.scene_ids for p in sorted((base / scene).glob("*.tar"))]
+            if not self.tar_urls:
+                raise ValueError(f"No tar files found under {base} for scenes: {self.scene_ids}")
+
         if self.load_meshes and not self.scene_to_mesh:
             if self.scene_ids:
                 self.scene_to_mesh = {scene: self.paths.resolve_mesh_path(scene) for scene in self.scene_ids}
@@ -264,17 +267,21 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
 
         if self.load_meshes and not self.scene_to_mesh and self.require_mesh:
             raise ValueError("load_meshes=True but no meshes resolved.")
+
+        Console.with_prefix(self.__class__.__name__, "config").set_verbose(self.verbose).log(
+            f"Resolved {len(self.tar_urls)} tar shards" + (f" for scenes {self.scene_ids}" if self.scene_ids else "")
+        )
         return self
 
     def setup_target(self) -> ASEDataset:  # type: ignore[override]
         console = Console.with_prefix(self.__class__.__name__, "setup_target").set_verbose(self.verbose)
         expanded_urls = [
             str(path)
-            for url in self.tar_urls
+            for url in self.tar_urls or []
             for path in (sorted(Path().glob(url)) if any(ch in url for ch in "*?[]") else [Path(url)])
         ]
         if not expanded_urls:
-            raise FileNotFoundError("No tar files matched provided tar_urls")
+            raise FileNotFoundError("No tar files matched derived tar_urls")
         self.tar_urls = expanded_urls
         console.log(f"Preparing ASEDataset (tar URLs: {len(self.tar_urls)}, scenes: {len(self.scene_to_mesh)})")
         return self.target(self)

@@ -198,15 +198,24 @@ def streamlit_mesh_viewer(
 ) -> None:
     """Render a Streamlit page with mesh + points + poses using Plotly."""
     import streamlit as st
+    from plotly.errors import PlotlyError
 
     cfg = config or StreamlitMeshViewerConfig()
-    fig = plot_mesh_scene(mesh, points, poses, title=cfg.title)
-    if not cfg.show_legend:
-        fig.update_layout(showlegend=False)
-    if points is not None:
-        for trace in fig.data:
-            if isinstance(trace, go.Scatter3d) and trace.name == "Points":
-                trace.marker.size = cfg.point_size
-
+    st.set_page_config(page_title=cfg.title, layout="wide")
     st.title(cfg.title)
-    st.plotly_chart(fig, use_container_width=True)
+
+    try:
+        fig = plot_mesh_scene(mesh, points, poses, title=cfg.title)
+        if not cfg.show_legend:
+            fig.update_layout(showlegend=False)
+        if points is not None:
+            for trace in fig.data:
+                if isinstance(trace, go.Scatter3d) and trace.name == "Points":
+                    trace.marker.size = cfg.point_size
+
+        st.plotly_chart(fig, use_container_width=True)
+    except PlotlyError as exc:  # pragma: no cover
+        st.error(f"Plotly error: {exc}")
+    except Exception as exc:  # pragma: no cover
+        st.error(f"Unexpected error: {exc}")
+        st.exception(exc)

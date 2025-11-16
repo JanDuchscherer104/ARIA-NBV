@@ -14,7 +14,7 @@ from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import (
     CLI_SUPPRESS,
     BaseSettings,
-    CliPositionalArg,
+    CliSettingsSource,
     CliSuppress,
     SettingsConfigDict,
 )
@@ -33,7 +33,7 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
         2. List mode: List available scenes
 
     Example (Programmatic):
-        >>> config = ASEDownloaderConfig()
+        >>> config = ASEDownloaderConfig(mode="download")
         >>> downloader = config.setup_target()
         >>> scenes = downloader.metadata.get_scenes(n=5, max_snippets=2)
         >>> downloader.download_scenes(scenes)
@@ -50,8 +50,7 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     target: CliSuppress[type[ASEDownloader]] = Field(default_factory=lambda: ASEDownloader, description=CLI_SUPPRESS)
 
     # CLI dispatch
-    mode: CliPositionalArg[Literal["download", "list"]]
-    """Execution mode (positional)."""
+    mode: Literal["download", "list"] = Field(default="download", description="Execution mode.")
 
     list_n: int | None = Field(
         default=None,
@@ -61,12 +60,17 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     )
 
     paths: PathConfig = Field(default_factory=PathConfig)
-    url_dir: Path | None = Field(default=None, description="Directory containing download URL JSONs")
+    url_dir: Path = Field(
+        default_factory=lambda: PathConfig().url_dir, description="Directory containing download URL JSONs"
+    )
     output_dir: Path | None = Field(default=None, description="Root output dir for downloads")
     # Core configuration
 
     verbose: bool = Field(default=True)
     """Enable verbose logging."""
+
+    is_debug: bool = Field(default=True)
+    """Enable debug logging (forces verbose)."""
 
     prefer_scenes_with_max_snippets: bool = True
     """Prefer scenes with maximum snippets when limiting number of scenes."""
@@ -125,11 +129,12 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     """Path to custom train/val split JSON (overrides train_val_split_ratio)."""
 
     model_config = SettingsConfigDict(
-        cli_parse_args=True,
+        cli_parse_args=False,  # explicit CLI parsing is triggered via from_cli() to avoid pytest args interference
         env_prefix="ASE_",
         extra="allow",  # tolerate legacy/unused CLI fields used in tests
+        cli_ignore_unknown_args=True,
+        cli_exit_on_error=False,
         cli_shortcuts={
-            "mode": "m",
             "list_n": "n",
             "n_scenes": "ns",
             "max_snippets": "ms",
@@ -156,7 +161,38 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
 
         data = tomllib.loads(Path(path).read_text())
         section = data.get("oracle_rri.data.downloader", data.get("downloader", {}))
-        return ASEDownloaderConfig(**section)
+        merged = {"mode": section.get("mode", "download"), **section}
+        return ASEDownloaderConfig(**merged)
+
+    @classmethod
+    def from_cli(cls) -> "ASEDownloaderConfig":
+        """Instantiate config using pydantic-settings CLI parser (explicit opt-in)."""
+
+        cli_source = CliSettingsSource(
+            cls,
+            cli_parse_args=True,
+            cli_ignore_unknown_args=cls.model_config.get("cli_ignore_unknown_args"),
+            cli_exit_on_error=cls.model_config.get("cli_exit_on_error"),
+            cli_shortcuts=cls.model_config.get("cli_shortcuts"),
+        )
+        data = cli_source()
+        return cls(**data)
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+        cli_settings=None,
+    ):
+        sources = [init_settings]
+        if cli_settings is not None:
+            sources.append(cli_settings)
+        sources.extend([env_settings, dotenv_settings, file_secret_settings])
+        return tuple(sources)
 
 
 class ASEDownloader:
@@ -164,7 +200,11 @@ class ASEDownloader:
 
     def __init__(self, config: ASEDownloaderConfig):
         self.config = config
-        self.console = Console.with_prefix(self.__class__.__name__).set_verbose(config.verbose)
+        self.console = (
+            Console.with_prefix(self.__class__.__name__)
+            .set_verbose(config.verbose)
+            .set_debug(config.is_debug)
+        )
 
         base_url_dir = Path(self.config.url_dir) if self.config.url_dir is not None else self.config.paths.url_dir
         if not base_url_dir.exists():
@@ -177,6 +217,12 @@ class ASEDownloader:
             atek_json_filename=self.config.atek_json_filename,
         )
         self.mesh_dir = self.config.paths.ase_meshes
+
+        self.console.log(
+            f"Configured paths: mesh_json={base_url_dir / self.config.mesh_json_filename}, "
+            f"atek_json={base_url_dir / self.config.atek_json_filename}, "
+            f"mesh_dir={self.mesh_dir}"
+        )
 
     def download_scenes(
         self,
@@ -220,12 +266,14 @@ class ASEDownloader:
         mesh_dir = self.config.paths.ase_meshes
         mesh_dir.mkdir(parents=True, exist_ok=True)
 
+        self.console.log(f"Mesh download destination: {mesh_dir}")
+
         # Check which meshes already exist
         scenes_to_download = []
         for scene in scenes:
             mesh_path = mesh_dir / f"scene_ply_{scene.scene_id}.ply"
             if mesh_path.exists():
-                self.console.log(f"Scene {scene.scene_id}: mesh already exists, skipping")
+                self.console.log(f"Scene {scene.scene_id}: mesh already exists at {mesh_path}, skipping")
             else:
                 scenes_to_download.append(scene)
 
@@ -245,6 +293,7 @@ class ASEDownloader:
             assert isinstance(scene, SceneMetadata)
             try:
                 zip_path = self._download_file(scene.mesh_url, dest_path=Path(zip_filename))
+                self.console.dbg(f"Downloaded zip to {zip_path}")
 
                 # Verify SHA1 checksum
                 self._validate_sha(zip_path, scene.mesh_sha)
@@ -256,7 +305,7 @@ class ASEDownloader:
                 # Move to output directory
                 ply_path = mesh_dir / ply_filename
                 if ply_path.exists():
-                    self.console.log(f"Scene {scene.scene_id}: mesh downloaded ✓")
+                    self.console.log(f"Scene {scene.scene_id}: mesh downloaded ✓ -> {ply_path}")
                 else:
                     self.console.warn(f"Scene {scene.scene_id}: PLY not found in ZIP")
 
@@ -276,6 +325,8 @@ class ASEDownloader:
         atek_json = self.config.paths.url_dir / self.config.atek_json_filename
         if not atek_json.exists():
             raise FileNotFoundError(f"ATEK JSON not found: {atek_json}")
+
+        self.console.log(f"Using ATEK URL json: {atek_json}")
 
         with atek_json.open() as f:
             atek_data = json.load(f)
@@ -321,8 +372,11 @@ class ASEDownloader:
         with tmp_json.open("w") as f:
             json.dump(filtered_data, f)
 
+        self.console.dbg(f"Temp filtered ATEK json written to {tmp_json}")
+
         try:
             output_dir = self.config.paths.resolve_atek_data_dir(self.config.atek_config_name)
+            self.console.log(f"ATEK output dir: {output_dir}")
 
             # Call ATEK downloader directly (no subprocess)
             download_atek_wds_sequences(
@@ -385,7 +439,7 @@ def cli_download(config: ASEDownloaderConfig | None = None) -> None:
         python -m oracle_rri.data.downloader download --ns=10 --skip_meshes
     """
     config = config or ASEDownloaderConfig()
-    console = Console.with_prefix("DownloaderCLI").set_verbose(config.verbose)
+    console = Console.with_prefix("DownloaderCLI").set_verbose(config.verbose).set_debug(config.is_debug)
     downloader = config.setup_target()
 
     # Get scenes
@@ -455,7 +509,7 @@ def cli_list(config: ASEDownloaderConfig, n: int | None = None) -> None:
         python -m oracle_rri.data.downloader list
         python -m oracle_rri.data.downloader list --n=10
     """
-    console = Console.with_prefix("DownloaderCLI").set_verbose(config.verbose)
+    console = Console.with_prefix("DownloaderCLI").set_verbose(config.verbose).set_debug(config.is_debug)
     downloader = config.setup_target()
 
     scenes = downloader.metadata.get_scenes_with_meshes()
@@ -477,7 +531,7 @@ def cli_list(config: ASEDownloaderConfig, n: int | None = None) -> None:
 def main() -> None:
     """Main CLI entry point with mode-based dispatching."""
 
-    config = ASEDownloaderConfig()
+    config = ASEDownloaderConfig.from_cli()
     console = Console.with_prefix("DownloaderCLI").set_verbose(config.verbose)
 
     match config.mode:

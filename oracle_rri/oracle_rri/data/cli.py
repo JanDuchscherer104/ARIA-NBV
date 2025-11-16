@@ -41,7 +41,12 @@ class CLIDownloaderSettings:
 
 def main() -> None:
     settings = CLIDownloaderSettings()
-    cfg_kwargs = {"url_dir": settings.url_dir, "output_dir": settings.output_dir, "verbose": settings.verbose}
+    cfg_kwargs = {
+        "mode": "download",
+        "url_dir": settings.url_dir,
+        "output_dir": settings.output_dir,
+        "verbose": settings.verbose,
+    }
     if settings.config_path:
         config = ASEDownloaderConfig.from_toml(settings.config_path)
     else:

@@ -19,7 +19,7 @@ from pydantic import Field
 
 from ..utils import BaseConfig, Console
 
-Rule = Callable[[torch.Tensor, dict], dict]  # rule(poses, ctx) -> ctx with updated mask
+Rule = Callable[[dict], dict]  # rule(ctx) -> ctx with updated mask
 
 
 class SamplingStrategy(str, Enum):
@@ -36,6 +36,7 @@ class CollisionBackend(str, Enum):
     TRIMESH = "trimesh"
 
 
+# TODO we want to be able to display the space of potential candidate views as well as actually drawn candidate views!
 class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Config for candidate generation.
 
@@ -133,7 +134,7 @@ class CandidateViewGenerator:
             ctx_batch = self._seed(ctx, remaining)
             masks: list[torch.Tensor] = []
             for rule in self.rules:
-                ctx_batch = rule(ctx_batch["poses"], ctx_batch)
+                ctx_batch = rule(ctx_batch)
                 masks.append(ctx_batch["mask"])
             mask_valid = (
                 torch.stack(masks, dim=0).all(dim=0)
@@ -171,13 +172,13 @@ class CandidateViewGenerator:
         pos_local = self._sample_directions(n, az, dev, cfg)
         pos_local = pos_local * r.unsqueeze(1)
 
-        pose_last = ctx["last_pose"].to_matrix()
+        pose_last = ctx["last_pose"].matrix3x4
         r_mat = pose_last[:3, :3]
         t = pose_last[:3, 3]
         pos_world = (r_mat @ pos_local.T).T + t
 
         forward = torch.nn.functional.normalize(t - pos_world, dim=1)
-        up = torch.tensor([0, 1, 0], device=dev).expand_as(forward)
+        up = torch.tensor([0.0, 1.0, 0.0], device=dev, dtype=forward.dtype).expand_as(forward)
         right = torch.nn.functional.normalize(torch.cross(forward, up, dim=1), dim=1)
         up_corrected = torch.cross(right, forward, dim=1)
         r_cam = torch.stack([right, up_corrected, forward], dim=2)  # [n,3,3]
@@ -209,7 +210,7 @@ class CandidateViewGenerator:
         z = torch.cos(elev) * torch.sin(az)
         return torch.stack([x, y, z], dim=1)
 
-    def _rule_min_distance_to_mesh(self, poses: torch.Tensor, ctx: dict) -> dict:
+    def _rule_min_distance_to_mesh(self, ctx: dict) -> dict:
         """Disallow viewpoints closer than `min_distance_to_mesh` to the GT mesh."""
 
         mask = ctx["mask"]
@@ -218,22 +219,22 @@ class CandidateViewGenerator:
             ctx["mask"] = mask
             return ctx
 
-        positions = poses[:, 9:12]
+        positions = ctx["poses"][:, 9:12]
         query = trimesh.proximity.ProximityQuery(mesh)
         dist = query.signed_distance(positions.detach().cpu().numpy())
         clear = torch.from_numpy(dist).to(mask.device) > self.config.min_distance_to_mesh
         ctx["mask"] = mask & clear
         return ctx
 
-    def _rule_path_collision(self, poses: torch.Tensor, ctx: dict) -> dict:
+    def _rule_path_collision(self, ctx: dict) -> dict:
         mask = ctx["mask"]
         mesh: trimesh.Trimesh | None = ctx.get("gt_mesh")
         if mesh is None:
             ctx["mask"] = mask
             return ctx
-        pose_last = ctx["last_pose"].to_matrix()
+        pose_last = ctx["last_pose"].matrix3x4
         origin = pose_last[:3, 3].view(1, 3)
-        targets = poses[:, 9:12]
+        targets = ctx["poses"][:, 9:12]
         dirs = targets - origin
         dists = torch.linalg.norm(dirs, dim=1).clamp(min=1e-6)
         dirs_norm = dirs / dists.unsqueeze(1)
@@ -260,7 +261,7 @@ class CandidateViewGenerator:
         ctx["mask"] = mask & free
         return ctx
 
-    def _rule_free_space(self, poses: torch.Tensor, ctx: dict) -> dict:
+    def _rule_free_space(self, ctx: dict) -> dict:
         mask = ctx["mask"]
         extent = ctx.get("occupancy_extent")
         if extent is None:
@@ -268,7 +269,7 @@ class CandidateViewGenerator:
             return ctx
         extent = extent.to(mask.device)
         xmin, xmax, ymin, ymax, zmin, zmax = extent
-        p = poses[:, 9:12]
+        p = ctx["poses"][:, 9:12]
         in_box = (
             (p[:, 0] >= xmin)
             & (p[:, 0] <= xmax)
