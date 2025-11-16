@@ -42,6 +42,8 @@ website:
     left:
       - text: TODOs
         href: contents/todos.qmd
+      - text: Setup
+        href: contents/setup.qmd
       - text: Project State
         menu:
           - text: Roadmap

@@ -39,6 +39,10 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 
 # Documentation Navigation
 
+## Setup & Installation
+
+- [Setup Instructions](contents/setup.qmd): Environment setup and dependencies
+
 ## Project State
 
 - **[Project Roadmap](contents/roadmap.qmd)**: Development phases and timeline
@@ -49,7 +53,6 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - **[RRI Theory](contents/theory/rri_theory.qmd)**: Mathematical formulation and properties of RRI
 - **[Surface Metrics](contents/theory/surface_metrics.qmd)**: Accuracy, completeness, Chamfer distance
 - **[Semi-Dense Point Clouds](contents/theory/semi-dense-pc.qmd)**: SLAM-based 3D reconstruction techniques
-
 
 ## Dataset & Resources
 
