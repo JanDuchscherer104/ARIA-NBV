@@ -43,6 +43,13 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 ## Visualization (Streamlit)
 - Interactive app to visualize candidate sampling, PC–mesh distances, and RRI.
 - Efficient caching; quick scene/trajectory switching.
+- should allow for easy adaptation of config (i.e. which scene and snippet to use)
+- all streamlit variables must be fully typed
+- should allow display of the different pipeline stages in different tabs:
+  - candidate view sampling (display candidate poses around current camera pose)
+  - candidate depth rendering (display rendered depth maps from GT mesh for each candidate pose)
+  - candidate point cloud fusion (display fused point clouds for each candidate pose)
+  - RRI scoring (display RRI scores for each candidate pose)
 
 ## Data Handling
 - Link ASE ATEK shards and GT meshes to raw ASE; resolve scene_id/snippet_id mapping.

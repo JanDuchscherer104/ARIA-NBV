@@ -95,3 +95,109 @@ notebooks/
 └── inference.ipynb                    # Model inference experiments
 ```
 
+# Codebase Trees with Module Notes
+
+```text
+NBV/
+├── notebooks/
+│   ├── ase_oracle_rri.py                # Helpers for log-depth transforms, PC↔mesh summary, pose/intrinsics utils
+│   └── ase_oracle_rri_new.py            # Clean duplicate of the above helpers
+├── oracle_rri/
+│   ├── main.py                          # Entrypoint building default config and diagnostics
+│   ├── examples/
+│   │   └── simplified_dataset_usage.py  # Minimal loader + DataLoader batching demo
+│   ├── oracle_rri/                      # Package code
+│   │   ├── analysis/depth_debugger.py   # Projects depth to 3D and compares to GT mesh
+│   │   ├── config.py                    # Dataset/Oracle config models
+│   │   ├── configs/path_config.py       # Centralised filesystem paths + helpers
+│   │   ├── data/cli.py                  # Tiny CLI shim for downloader tests
+│   │   ├── data/dataset.py              # Typed ATEK WebDataset wrapper + mesh pairing
+│   │   ├── data/downloader.py           # ASE mesh + ATEK snippet downloader/CLI
+│   │   ├── data/metadata.py             # Parse mesh & ATEK URL JSON into scene metadata
+│   │   ├── data/schemas.py              # Typed sample/stream containers + EFM remap
+│   │   ├── data/utils.py                # Scene id extraction and data validation
+│   │   ├── utils/base_config.py         # Pydantic base + TOML IO + Rich inspect
+│   │   ├── utils/console.py             # Rich console wrapper
+│   │   ├── views/candidate_generation.py# Pose generator around latest trajectory pose
+│   │   └── viz/mesh_viz.py              # Trimesh/Plotly/Streamlit mesh + PC viz helpers
+│   └── tests/                           # Data-handling tests
+│       ├── conftest.py                  # Shared fixtures
+│       ├── test_cli.py                  # CLI wiring tests
+│       ├── test_dataset.py              # Dataset iteration & collation tests
+│       ├── test_downloader.py           # Mesh/WebDataset download orchestration tests
+│       ├── test_metadata.py             # Scene metadata parsing tests
+│       ├── test_real_data_integration.py# Depth→mesh distance on real sample
+│       └── test_utils.py                # Scene id / data validation tests
+├── scripts/get_context.py               # AST-based repo scanner for symbol overviews
+├── tools/ase_coordinated_downloader.py  # Wrapper to pull meshes + ATEK data in sync
+├── tools/generate_uml_svg.py            # Generate Mermaid UML → SVG helper
+└── notebooks/ase_oracle_rri*.py         # (see above helper scripts)
+```
+
+```text
+external/efm3d/
+├── data/
+│   ├── dataverse_url_parser.py      # Split/download helper for WDS tars + manifests
+│   └── download_ase_mesh.py         # Fetch ASE meshes (CLI stub)
+├── efm3d/
+│   ├── aria/
+│   │   ├── aria_constants.py        # Key names for all snippet tensors
+│   │   ├── camera.py                # CameraTW calibration tensors + projections
+│   │   ├── obb.py                   # ObbTW bounding-box tensor wrapper + ops
+│   │   ├── pose.py                  # PoseTW SE(3) math & interpolations
+│   │   ├── projection_utils.py      # Fisheye/pinhole project & unproject
+│   │   └── tensor_wrapper.py        # Smart tensor wrapper base + collate helpers
+│   ├── dataset/
+│   │   ├── atek_vrs_dataset.py      # Stream VRS into EVL-form snippets
+│   │   ├── atek_wds_dataset.py      # WDS stream → fixed-length snippets
+│   │   ├── augmentation.py          # Photometric/point jitter/drop augmentations
+│   │   ├── efm_model_adaptor.py     # Map ATEK fields into EVL schema + poses
+│   │   ├── vrs_dataset.py           # VRS reader dataset with configs
+│   │   └── wds_dataset.py           # WebDataset loader producing EVL tensors
+│   ├── inference/
+│   │   ├── eval.py                  # Accuracy/completeness AUC utilities
+│   │   ├── fuse.py                  # Depth/feature fusion into points/voxels
+│   │   ├── model.py                 # Load frozen EVL checkpoints for inference
+│   │   ├── pipeline.py              # End-to-end EVL inference driver
+│   │   ├── track.py                 # Trajectory utilities for snippets
+│   │   └── viz.py                   # Simple matplotlib plotting helpers
+│   ├── model/
+│   │   ├── cnn.py                   # Build EVL 2D CNN backbone
+│   │   ├── dinov2_utils.py          # DinoV2 backbone + schedulers/weight decay
+│   │   ├── dpt.py                   # DPT depth head backed by DinoV2
+│   │   ├── evl.py                   # EVL model wrapper
+│   │   ├── evl_train.py             # Training loop orchestration
+│   │   ├── image_tokenizer.py       # Image → DinoV2 tokens
+│   │   ├── lifter.py                # Lift 2D tokens into 3D volumes
+│   │   └── video_backbone.py        # Video backbones (DinoV2 variants)
+│   ├── thirdparty/mmdetection3d/
+│   │   └── iou3d.py                 # Rotated 3D IoU + CUDA NMS bindings
+│   └── utils/
+│       ├── common.py                # Nearest-neighbour helpers
+│       ├── depth.py                 # Depth → point cloud conversion
+│       ├── detection_utils.py       # Heatmap ⇄ OBB conversions + NMS
+│       ├── evl_loss.py              # OBB/occupancy loss assembly
+│       ├── file_utils.py            # Calibration/mesh/trajectory/file loaders
+│       ├── gravity.py               # Align gravity / fix orientation
+│       ├── image.py                 # Image color/resize/overlay utilities
+│       ├── image_sampling.py        # Patch extraction + feature sampling
+│       ├── marching_cubes.py        # Occupancy → mesh via marching cubes
+│       ├── mesh_utils.py            # Mesh IO + sampling + writing
+│       ├── obb_csv_writer.py        # Write OBBs to CSV/TSV
+│       ├── obb_io.py                # Load OBBs and convert to wrappers
+│       ├── obb_matchers.py          # IOU-based OBB matching
+│       ├── obb_metrics.py           # OBB IoU metrics and summaries
+│       ├── obb_trackers.py          # Track OBBs over time
+│       ├── obb_utils.py             # OBB validity, transforms, pruning
+│       ├── pointcloud.py            # PC downsample/visualise/save helpers
+│       ├── ray.py                   # Ray grids + intersections + sampling
+│       ├── reconstruction.py        # GT occupancy building + TV/occ loss
+│       ├── render.py                # OpenGL-based viz primitives
+│       ├── rescale.py               # Resize/rescale cameras, depth, OBBs
+│       ├── viz.py                   # EGL viewer + rendering utilities
+│       ├── voxel.py                 # Voxel grid creation/erosion helpers
+│       └── voxel_sampling.py        # Sample voxels / coordinate transforms
+├── eval.py                          # Top-level evaluation script stub
+├── infer.py                         # Inference entrypoint
+└── train.py                         # Training entrypoint + LR scheduler helper
+```

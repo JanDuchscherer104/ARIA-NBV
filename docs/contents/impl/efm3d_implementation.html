@@ -324,6 +324,10 @@ window.Quarto = {
     <a class="nav-link active" href="../../contents/todos.html" aria-current="page"> 
 <span class="menu-text">TODOs</span></a>
   </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../contents/setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-project-state" role="link" data-bs-toggle="dropdown" aria-expanded="false">
  <span class="menu-text">Project State</span>
@@ -567,6 +571,12 @@ window.Quarto = {
  <span class="menu-text">EFM3D Symbol Index</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/oracle_rri_package.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Oracle RRI Package</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
@@ -655,6 +665,7 @@ window.Quarto = {
 <li><strong><code>WdsStreamDataset</code></strong> (<code>dataset/wds_dataset.py</code>): streams 2 s ARIA WDS shards, slicing rolling windows (<code>snippet_length_s</code>, <code>stride_length_s</code>). Converts JPEG stacks to tensors (<code>rgb/slaml/slamr/img</code>), wraps poses/calib as <code>PoseTW</code>/<code>CameraTW</code>, preserves GT meshes/OBBs/points. Cropping skips static fields (<code>snippet/t_world_snippet</code>, volume bounds).</li>
 <li><strong><code>AtekWdsStreamDataset</code></strong> (<code>dataset/atek_wds_dataset.py</code>): same slicing logic, but sources ATEK shards already remapped to EFM keys and schema via the adaptor below.</li>
 <li><strong><code>EfmModelAdaptor</code></strong> (<code>dataset/efm_model_adaptor.py</code>): remaps ATEK flattened keys to EVL (<code>mfcd#camera-rgb+images → rgb/img</code>, etc.), pads semidense points to <code>[T, N_max, 3|1]</code>, converts calibration to batched <code>CameraTW</code>, splits world poses into <code>snippet/t_world_snippet</code> + <code>pose/t_snippet_rig</code>, aligns gravity (<code>[0,-9.81,0] → [0,0,-9.81]</code>), and re-centers snippet time/origin via <code>run_local_cosy()</code>. GT OBBs are fused per-instance across cameras and padded to 128 slots (<code>obbs/padded_snippet</code>), with optional taxonomy CSV remap. Entry points: <code>load_atek_wds_dataset_as_efm</code> / <code>load_atek_wds_dataset_as_efm_train</code> (the latter enables WDS resampling for training).</li>
+<li><strong>oracle_rri pairing</strong>: <code>oracle_rri.data_handling.ASEDataset</code> wraps the native ATEK loader, attaches GT meshes, and exposes <code>ASESample.to_efm_dict()</code> using the same <code>EfmModelAdaptor</code> key map so downstream EVL utilities can consume snippets without re-processing.</li>
 </ul>
 </section>
 <section id="mesh-utilities" class="level2" data-number="1.2">
