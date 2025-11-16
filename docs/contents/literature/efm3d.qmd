@@ -16,6 +16,14 @@
 - Training uses the large-scale simulated ASE dataset (100K indoor sequences with GT meshes and annotations). Evaluation spans both ASE and real-world Project Aria datasets: ADT for surface regression and AEO for object detection.
 - Benchmarked methods leverage synchronized egocentric video, precise camera poses, calibration data, and semi-dense SLAM points, emphasizing full-field-of-view processing.
 
+### Local \LaTeX{} Sources
+
+- [`main.tex`](../../literature/tex-src/arXiv-EFM3D/main.tex) – authoritative manuscript (includes references via `main.bib`).
+- [`method.tex`](../../literature/tex-src/arXiv-EFM3D/method.tex) & [`dataset.tex`](../../literature/tex-src/arXiv-EFM3D/dataset.tex) – implementation and data collection details.
+- [`supplemental_text.tex`](../../literature/tex-src/arXiv-EFM3D/supplemental_text.tex) – additional experiments and ablations.
+- [`figures/EFM3D_teaser_v1.pdf`](../../literature/tex-src/arXiv-EFM3D/figures/EFM3D_teaser_v1.pdf) – canonical teaser; the `figures/` folder contains all referenced visual assets.
+- [`tables/surf_eval.tex`](../../literature/tex-src/arXiv-EFM3D/tables/surf_eval.tex) – detailed quantitative tables (OBB + surface heads).
+
 
 ## Integration Strategy
 

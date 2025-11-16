@@ -203,35 +203,55 @@ obbs_world = transform_obbs(obbs, T_world_snippet)
 
 # Dataset & Adaptor Modules
 
-## `WdsStreamDataset` (`dataset/wds_dataset.py`)
+## Streamed ATEK → EFM Datasets
 
-- **Role**: streams WebDataset shards into ARIA-structured batches.
-- **Usage**:
+### `WdsStreamDataset` (`dataset/wds_dataset.py`)
+
+- Converts raw ARIA multimodal WDS snippets to EVL-ready tensors; iterates 2 s shards with configurable stride/snippet length.
+- Keys converted via `convert_to_aria_multimodal_dataset()`:
+  - Images: `rgb/img`, `slaml/img`, `slamr/img` as `torch.float32` `[T,C,H,W]`, SLAM frames forced to 1 channel.
+  - Poses/calib: `pose/t_world_rig`, `pose/t_snippet_rig`, `rgb/t_snippet_rig`, … stored as `PoseTW`; calibration as `CameraTW`.
+  - Optional GT: `obb/padded`, `points/world`, `points/vol_min/max`.
+- Snippet slicing: crops a rolling window (`snippet_length_s`, stride `stride_length_s`) out of 2 s WDS chunks; world/snippet transforms and volume bounds are NOT cropped.
+
+### `AtekWdsStreamDataset` (`dataset/atek_wds_dataset.py`)
+
+- Wraps ATEK WDS shards and runs **`load_atek_wds_dataset_as_efm()`** to remap keys and adapt schema before slicing windows.
+- Uses FPS, snippet length, and stride identical to `WdsStreamDataset`, but upstream samples already include EFM-compliant keys produced by the adaptor (see below).
+
+### `EfmModelAdaptor` (`dataset/efm_model_adaptor.py`)
+
+Bridges ATEK WebDataset samples to the EVL schema and enforces fixed shapes for batching.
+
+- **Key remapping**: `get_dict_key_mapping_all()` maps ATEK flattened keys to EFM names (`mfcd#camera-rgb+images → rgb/img`, `mtd#ts_world_device → pose/t_world_rig`, `msdpd#points_world → points/p3s_world`, etc.).
+- **Padding and typing**:
+  - `fixed_num_frames = snippet_length_s * freq` (default 2 s @ 10 Hz → 20 frames).
+  - Semidense lists padded to `[T, N_max, 3|1]` (`semidense_points_pad_to_num=50k` default).
+  - Cameras converted to `CameraTW` with per-frame gains/exposures, shared intrinsics/extrinsics; duplicated calibrations get `/calib/time_ns` & `/calib/snippet_time_s`.
+  - All images promoted to float32 and scaled to `[0,1]` (RGB stays RGB order).
+- **Pose realignment**:
+  - Optional gravity fix: if ATEK world gravity is `[0,-9.81,0]`, rotate to EFM’s `[0,0,-9.81]`.
+  - Split world pose into `snippet/t_world_snippet` (first frame) and `pose/t_snippet_rig`; duplicate to each camera `*/t_snippet_rig`.
+  - Timestamp split: `snippet/time_ns = rgb/img/time_ns[0]`; per-stream `/snippet_time_s` computed relative to it.
+  - `run_local_cosy()` recenters snippet time at `origin_ratio` (default 0.5) to stabilise interpolation; transforms OBBs into the new snippet frame.
+- **GT handling**: OBB GT converted to `ObbTW`, padded to 128 slots, optional taxonomy remap (CSV) applied; `obbs/time_ns` stored alongside `obbs/sem_id_to_name`.
+- **Entry points**:
 
 ```python
-from efm3d.dataset.wds_dataset import WdsStreamDataset
-
-stream = WdsStreamDataset(urls="/data/ase_eval/shards/train-{00000..00099}.tar")
-first = next(iter(stream))
-rgb = first["rgb/img"]  # torch.float32 [T, 3, 1408, 1408]
-```
-
-## `EfmModelAdaptor` (`dataset/efm_model_adaptor.py`)
-
-- **Role**: normalises snippets (origin shift, gravity alignment), selects modalities, and collates batches for EVL.
-- **Usage**:
-
-```python
-from efm3d.dataset.efm_model_adaptor import load_atek_wds_dataset_as_efm
-
-loader = load_atek_wds_dataset_as_efm(
-    input_json_path=".data/aria_download_urls/AriaSyntheticEnvironment_ATEK_download_urls.json",
-    config_name="efm_eval",
-    batch_size=1,
+from efm3d.dataset.efm_model_adaptor import (
+    load_atek_wds_dataset_as_efm,
+    load_atek_wds_dataset_as_efm_train,
 )
 
-batch = next(iter(loader))
-origin_pose = batch["snippet/t_world_snippet"].to_matrix().view(-1, 4, 4)
+dataset = load_atek_wds_dataset_as_efm(
+    urls="/data/ase_eval/train-{00000..00099}.tar",
+    freq=10,
+    snippet_length_s=2.0,
+    atek_to_efm_taxonomy_mapping_file="atek_to_efm.csv",
+    batch_size=1,
+)
+sample = next(iter(dataset))
+assert sample["rgb/img"].shape == (20, 3, 1408, 1408)  # fixed frame count
 ```
 
 # Model Components

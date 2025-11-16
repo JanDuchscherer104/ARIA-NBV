@@ -2,6 +2,13 @@
 
 The EFM3D codebase provides additional utilities for working with point clouds, meshes, and voxel grids in the context of egocentric reconstruction. This document covers the key utilities relevant for RRI computation.
 
+## Dataset Loaders & Adaptors
+
+- **`WdsStreamDataset`** (`dataset/wds_dataset.py`): streams 2 s ARIA WDS shards, slicing rolling windows (`snippet_length_s`, `stride_length_s`). Converts JPEG stacks to tensors (`rgb/slaml/slamr/img`), wraps poses/calib as `PoseTW`/`CameraTW`, preserves GT meshes/OBBs/points. Cropping skips static fields (`snippet/t_world_snippet`, volume bounds).
+- **`AtekWdsStreamDataset`** (`dataset/atek_wds_dataset.py`): same slicing logic, but sources ATEK shards already remapped to EFM keys and schema via the adaptor below.
+- **`EfmModelAdaptor`** (`dataset/efm_model_adaptor.py`): remaps ATEK flattened keys to EVL (`mfcd#camera-rgb+images → rgb/img`, etc.), pads semidense points to `[T, N_max, 3|1]`, converts calibration to batched `CameraTW`, splits world poses into `snippet/t_world_snippet` + `pose/t_snippet_rig`, aligns gravity (`[0,-9.81,0] → [0,0,-9.81]`), and re-centers snippet time/origin via `run_local_cosy()`. GT OBBs are fused per-instance across cameras and padded to 128 slots (`obbs/padded_snippet`), with optional taxonomy CSV remap. Entry points: `load_atek_wds_dataset_as_efm` / `load_atek_wds_dataset_as_efm_train` (the latter enables WDS resampling for training).
+- **oracle\_rri pairing**: `oracle_rri.data_handling.ASEDataset` wraps the native ATEK loader, attaches GT meshes, and exposes `ASESample.to_efm_dict()` using the same `EfmModelAdaptor` key map so downstream EVL utilities can consume snippets without re-processing.
+
 ## Mesh Utilities
 
 ### `eval_mesh_to_mesh()`

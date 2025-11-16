@@ -12,6 +12,18 @@ This section contains detailed reviews of key papers and methods related to Next
 - **[EFM3D/EVL](efm3d.qmd)**: Egocentric foundation models for 3D perception and voxel lifting
 - **[SceneScript](scene_script.qmd)**: Structured scene language for semantic scene manipulation
 
+## Local \LaTeX{} Corpus
+
+The full source of every referenced paper is mirrored under `literature/tex-src/`. Key entry points:
+
+- [`arXiv-EFM3D/main.tex`](../../literature/tex-src/arXiv-EFM3D/main.tex)
+- [`arXiv-GenNBV/main.tex`](../../literature/tex-src/arXiv-GenNBV/main.tex)
+- [`arXiv-VIN-NBV/main.tex`](../../literature/tex-src/arXiv-VIN-NBV/main.tex)
+- [`arXiv-project-aria/main.tex`](../../literature/tex-src/arXiv-project-aria/main.tex)
+- [`arXiv-scene-script/main.tex`](../../literature/tex-src/arXiv-scene-script/main.tex)
+
+Each directory contains the canonical figures (`figures/`), tables, and supplemental PDFs required to reproduce results or cite specific numbers in our documentation.
+
 ## Research Context
 
 These literature reviews form the theoretical foundation for integrating pre-trained egocentric models with quality-driven NBV planning. The combination of VIN-NBV's RRI optimization with EFM3D's foundation model capabilities enables better generalization to complex indoor environments compared to traditional coverage-based approaches.

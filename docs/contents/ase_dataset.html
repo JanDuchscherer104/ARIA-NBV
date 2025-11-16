@@ -347,6 +347,10 @@ window.Quarto = {
     <a class="nav-link active" href="../contents/todos.html" aria-current="page"> 
 <span class="menu-text">TODOs</span></a>
   </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../contents/setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-project-state" role="link" data-bs-toggle="dropdown" aria-expanded="false">
  <span class="menu-text">Project State</span>
@@ -649,7 +653,11 @@ window.Quarto = {
   <li><a href="#oriented-bounding-boxes" id="toc-oriented-bounding-boxes" class="nav-link" data-scroll-target="#oriented-bounding-boxes"><span class="header-section-number">4.1</span> Oriented Bounding Boxes</a></li>
   <li><a href="#ground-truth-meshes" id="toc-ground-truth-meshes" class="nav-link" data-scroll-target="#ground-truth-meshes"><span class="header-section-number">4.2</span> Ground-Truth Meshes</a></li>
   </ul></li>
-  <li><a href="#atek-wds-format" id="toc-atek-wds-format" class="nav-link" data-scroll-target="#atek-wds-format"><span class="header-section-number">5</span> EVL Training Format (ATEK WebDataset)</a></li>
+  <li><a href="#atek-wds-format" id="toc-atek-wds-format" class="nav-link" data-scroll-target="#atek-wds-format"><span class="header-section-number">5</span> EVL Training Format (ATEK WebDataset)</a>
+  <ul class="collapse">
+  <li><a href="#atek-key-naming-convention" id="toc-atek-key-naming-convention" class="nav-link" data-scroll-target="#atek-key-naming-convention"><span class="header-section-number">5.1</span> ATEK Key Naming Convention</a></li>
+  <li><a href="#atek-data-keys" id="toc-atek-data-keys" class="nav-link" data-scroll-target="#atek-data-keys"><span class="header-section-number">5.2</span> ATEK Data Keys</a></li>
+  </ul></li>
   <li><a href="#coordinate-conventions" id="toc-coordinate-conventions" class="nav-link" data-scroll-target="#coordinate-conventions"><span class="header-section-number">6</span> Coordinate Conventions</a>
   <ul class="collapse">
   <li><a href="#world-frame" id="toc-world-frame" class="nav-link" data-scroll-target="#world-frame"><span class="header-section-number">6.1</span> World Frame</a></li>
@@ -914,7 +922,37 @@ make_window, id=2000, wall0_id=0, position_x=4.45, position_y=6.16, position_z=1
 </section>
 <section id="atek-wds-format" class="level1" data-number="5">
 <h1 data-number="5"><span class="header-section-number">5</span> EVL Training Format (ATEK WebDataset)</h1>
-<p>EFM3D trains EVL on ATEK WebDataset (WDS) snippets: 2 s shards (20 frames) are streamed and cropped into overlapping 1 s windows (10 frames) via <code>AtekWdsStreamDataset</code> <a href="https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/atek_wds_dataset.py#L70">efm3d/dataset/atek_wds_dataset.py:70</a>. The adaptor enforces fixed shapes and timestamps <a href="https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/efm_model_adaptor.py#L604">efm3d/dataset/efm_model_adaptor.py:604</a>.</p>
+<p>EFM3D trains EVL on ATEK WebDataset (WDS) snippets: 2 s shards (20 frames) are streamed and cropped into overlapping 1 s windows (10 frames) via <code>AtekWdsStreamDataset</code> <a href="https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/atek_wds_dataset.py#L70">efm3d/dataset/atek_wds_dataset.py:70</a>. The adaptor enforces fixed shapes and timestamps <a href="https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/efm_model_adaptor.py#L604">efm3d/dataset/efm_model_adaptor.py:604</a>.</p>
+<section id="atek-key-naming-convention" class="level2" data-number="5.1">
+<h2 data-number="5.1" class="anchored" data-anchor-id="atek-key-naming-convention"><span class="header-section-number">5.1</span> ATEK Key Naming Convention</h2>
+<p>ATEK uses a structured naming scheme for data keys:</p>
+<p><strong>Format</strong>: <code>&lt;prefix&gt;#&lt;identifier&gt;+&lt;parameter&gt;</code></p>
+<p><strong>Prefixes</strong>:</p>
+<ul>
+<li><code>mtd</code> = <strong>M</strong>otion <strong>T</strong>rajectory <strong>D</strong>ata (device poses over time)</li>
+<li><code>mfcd</code> = <strong>M</strong>ulti-<strong>F</strong>rame <strong>C</strong>amera <strong>D</strong>ata (per-frame camera data)</li>
+<li><code>msdpd</code> = <strong>M</strong>ulti-<strong>S</strong>emi-<strong>D</strong>ense <strong>P</strong>oint <strong>D</strong>ata (SLAM point clouds)</li>
+</ul>
+<p><strong>Separators</strong>:</p>
+<ul>
+<li><code>#</code> separates prefix from identifier</li>
+<li><code>+</code> separates identifier from parameter</li>
+</ul>
+<p><strong>Examples</strong>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Motion trajectory: (T, 3, 4) SE(3) transformation matrices</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>ts_world_device <span class="op">=</span> sample[<span class="st">"mtd#ts_world_device"</span>]</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Camera projection parameters</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>projection_params <span class="op">=</span> sample[<span class="st">"mfcd#camera-rgb+projection_params"</span>]</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Depth images: (T, 1, H, W)</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>depth_images <span class="op">=</span> sample[<span class="st">"mfcd#camera-rgb-depth+images"</span>]</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Semi-dense SLAM points: (N, 3) in world coordinates</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>points_world <span class="op">=</span> sample[<span class="st">"msdpd#points_world+stacked"</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="atek-data-keys" class="level2" data-number="5.2">
+<h2 data-number="5.2" class="anchored" data-anchor-id="atek-data-keys"><span class="header-section-number">5.2</span> ATEK Data Keys</h2>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 25%">
@@ -1013,6 +1051,7 @@ make_window, id=2000, wall0_id=0, position_x=4.45, position_y=6.16, position_z=1
 <li>Ground-truth meshes stay on disk—resolve them lazily when computing Chamfer/F-score or oracle RRIs.</li>
 </ul>
 </section>
+</section>
 <section id="coordinate-conventions" class="level1" data-number="6">
 <h1 data-number="6"><span class="header-section-number">6</span> Coordinate Conventions</h1>
 <p>ASE follows Project Aria’s coordinate conventions:</p>
@@ -1035,17 +1074,17 @@ make_window, id=2000, wall0_id=0, position_x=4.45, position_y=6.16, position_z=1
 <section id="using-atek-for-ml-workflows" class="level3" data-number="6.2.1">
 <h3 data-number="6.2.1" class="anchored" data-anchor-id="using-atek-for-ml-workflows"><span class="header-section-number">6.2.1</span> Using ATEK for ML Workflows</h3>
 <p>For training and evaluation, use ATEK’s preprocessed datasets and tools:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Download preprocessed ASE data (PyTorch WebDataset format)</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/atek_wds_data_downloader.py <span class="dt">\</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--config-name</span> efm <span class="dt">\</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_ATEK_download_urls.json <span class="dt">\</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./data/ase_atek <span class="dt">\</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--download-wds-to-local</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Download ground truth meshes for evaluation</span></span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/ase_mesh_downloader.py <span class="dt">\</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_mesh_download_urls.json <span class="dt">\</span></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./ase_meshes</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Download preprocessed ASE data (PyTorch WebDataset format)</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/atek_wds_data_downloader.py <span class="dt">\</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--config-name</span> efm <span class="dt">\</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_ATEK_download_urls.json <span class="dt">\</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./data/ase_atek <span class="dt">\</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--download-wds-to-local</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Download ground truth meshes for evaluation</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/ase_mesh_downloader.py <span class="dt">\</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_mesh_download_urls.json <span class="dt">\</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./ase_meshes</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 
 <!-- -->
@@ -1532,338 +1571,338 @@ make_window, id=2000, wall0_id=0, position_x=4.45, position_y=6.16, position_z=1
     }
   });
   </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Aria Synthetic Environments (ASE) Dataset"</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> html</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="an">bibliography:</span><span class="co"> ../references.bib</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="fu"># Overview</span></span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>The Aria Synthetic Environments (ASE) dataset <span class="co">[</span><span class="ot">@SceneScript-avetisyan2024</span><span class="co">]</span> is a large-scale collection of 100,000 unique procedurally-generated indoor scenes with realistic Aria glasses sensor simulations. It serves as the primary training and evaluation dataset for SceneScript and provides valuable data for scene understanding research.</span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="fu">## Links</span></span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">ASE Documentation</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)</span></span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">ATEK Datastore</span><span class="co">](https://github.com/facebookresearch/ATEK/blob/main/docs/ATEK_Data_Store.md)</span></span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="fu">## Dataset Scale</span></span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**100,000 unique multi-room interior scenes**</span>
-<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**58M+ RGB images** captured from egocentric trajectories</span>
-<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**67 days** of total trajectory time</span>
-<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**7,800 km** of total trajectory distance</span>
-<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**~23 TB** total dataset size</span>
-<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a><span class="fu">## Ground Truth Annotations</span></span>
-<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>6DoF camera trajectory</span>
-<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>3D floor plan in Euston Structure Scene Language (SSL) format</span>
-<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>2D instance segmentation</span>
-<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>With per-scene mappings from the object instance image IDs to object classes</span>
-<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>2D depth map</span>
-<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**3M OBBs** across 43 classes released with @EFM3D-straub2024</span>
-<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**GT Meshes** for 100 scenes released with @EFM3D-straub2024</span>
-<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a><span class="fu">## Scene Characteristics</span></span>
-<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>Each scene contains:</span>
-<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Multi-room layouts**: Up to 5 complex Manhattan-world rooms - Scenes composed of axis-aligned walls, floors, and ceilings.</span>
-<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Egocentric trajectories**: ~2-minute walkthroughs per scene</span>
-<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Realistic sensor simulation**: Aria camera and lens characteristics</span>
-<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Rich object diversity**: Furniture, decorations, architectural elements</span>
-<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a><span class="al">![ASE Dataset Modalities](../figures/scene-script/ase_modalities.jpg)</span>{width=100%}</span>
-<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a><span class="fu"># Data Structure</span></span>
-<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a>Each scene in the ASE dataset follows a consistent directory structure:</span>
-<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a><span class="in">scene_id/</span></span>
-<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_scene_language.txt          # Ground truth scene layout in SSL format</span></span>
-<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a><span class="in">├── object_instances_to_classes.json # Mapping from instance IDs to semantic classes</span></span>
-<span id="cb8-55"><a href="#cb8-55" aria-hidden="true" tabindex="-1"></a><span class="in">├── trajectory.csv                   # 6DoF camera poses along the egocentric path</span></span>
-<span id="cb8-56"><a href="#cb8-56" aria-hidden="true" tabindex="-1"></a><span class="in">├── semidense_points.csv.gz          # Semi-dense 3D point cloud from MPS SLAM</span></span>
-<span id="cb8-57"><a href="#cb8-57" aria-hidden="true" tabindex="-1"></a><span class="in">├── semidense_observations.csv.gz    # Point observations (which images see which points in the PC)</span></span>
-<span id="cb8-58"><a href="#cb8-58" aria-hidden="true" tabindex="-1"></a><span class="in">├── rgb/                             # RGB image frames</span></span>
-<span id="cb8-59"><a href="#cb8-59" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── 000000.png</span></span>
-<span id="cb8-60"><a href="#cb8-60" aria-hidden="true" tabindex="-1"></a><span class="in">│   └── ...</span></span>
-<span id="cb8-61"><a href="#cb8-61" aria-hidden="true" tabindex="-1"></a><span class="in">├── depth/                           # Ground truth depth maps</span></span>
-<span id="cb8-62"><a href="#cb8-62" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── 000000.png</span></span>
-<span id="cb8-63"><a href="#cb8-63" aria-hidden="true" tabindex="-1"></a><span class="in">│   └── ...</span></span>
-<span id="cb8-64"><a href="#cb8-64" aria-hidden="true" tabindex="-1"></a><span class="in">└── instances/                       # Instance segmentation masks</span></span>
-<span id="cb8-65"><a href="#cb8-65" aria-hidden="true" tabindex="-1"></a><span class="in">    ├── 000000.png</span></span>
-<span id="cb8-66"><a href="#cb8-66" aria-hidden="true" tabindex="-1"></a><span class="in">    └── ...</span></span>
-<span id="cb8-67"><a href="#cb8-67" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-68"><a href="#cb8-68" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-69"><a href="#cb8-69" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-70"><a href="#cb8-70" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-71"><a href="#cb8-71" aria-hidden="true" tabindex="-1"></a><span class="fu">## Scene Language (`ase_scene_language.txt`)</span></span>
-<span id="cb8-72"><a href="#cb8-72" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-73"><a href="#cb8-73" aria-hidden="true" tabindex="-1"></a>The ground truth scene layout encoded in <span class="co">[</span><span class="ot">SceneScript's Structured Scene Language</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_data_format#scene_language)</span> (SSL). Each line represents a primitive with its parameters:</span>
-<span id="cb8-74"><a href="#cb8-74" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-75"><a href="#cb8-75" aria-hidden="true" tabindex="-1"></a><span class="in">```plaintext</span></span>
-<span id="cb8-76"><a href="#cb8-76" aria-hidden="true" tabindex="-1"></a>make_wall, id=<span class="dv">0</span>, a_x=-<span class="fl">2.56</span>, a_y=<span class="fl">6.16</span>, a_z=<span class="fl">0.0</span>, b_x=<span class="fl">5.07</span>, b_y=<span class="fl">6.16</span>, b_z=<span class="fl">0.0</span>, height=<span class="fl">3.26</span>, thickness=<span class="fl">0.0</span></span>
-<span id="cb8-77"><a href="#cb8-77" aria-hidden="true" tabindex="-1"></a>make_door, id=<span class="dv">1000</span>, wall0_id=<span class="dv">2</span>, wall1_id=<span class="dv">4</span>, position_x=-<span class="fl">1.51</span>, position_y=<span class="fl">1.84</span>, position_z=<span class="fl">1.01</span>, width=<span class="fl">1.82</span>, height=<span class="fl">2.02</span></span>
-<span id="cb8-78"><a href="#cb8-78" aria-hidden="true" tabindex="-1"></a>make_window, id=<span class="dv">2000</span>, wall0_id=<span class="dv">0</span>, position_x=<span class="fl">4.45</span>, position_y=<span class="fl">6.16</span>, position_z=<span class="fl">1.64</span>, width=<span class="fl">1.01</span>, height=<span class="fl">2.12</span></span>
-<span id="cb8-79"><a href="#cb8-79" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-80"><a href="#cb8-80" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-81"><a href="#cb8-81" aria-hidden="true" tabindex="-1"></a>**Primitives include:**</span>
-<span id="cb8-82"><a href="#cb8-82" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-83"><a href="#cb8-83" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`make_wall`</span>: 3D line segments defining room boundaries</span>
-<span id="cb8-84"><a href="#cb8-84" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`make_door`</span>: Door positions, dimensions, and wall connections</span>
-<span id="cb8-85"><a href="#cb8-85" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`make_window`</span>: Window positions and sizes</span>
-<span id="cb8-86"><a href="#cb8-86" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`make_prim`</span>: Generic 3D primitives (boxes, cylinders, bezier shapes, ...)</span>
-<span id="cb8-87"><a href="#cb8-87" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Implicitly defines floors and ceilings through wall heights</span>
-<span id="cb8-88"><a href="#cb8-88" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-89"><a href="#cb8-89" aria-hidden="true" tabindex="-1"></a><span class="fu">## Object Instance Mapping (`object_instances_to_classes.json`)</span></span>
-<span id="cb8-90"><a href="#cb8-90" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-91"><a href="#cb8-91" aria-hidden="true" tabindex="-1"></a>Maps pixel values in instance segmentation masks to semantic categories:</span>
-<span id="cb8-92"><a href="#cb8-92" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-93"><a href="#cb8-93" aria-hidden="true" tabindex="-1"></a><span class="in">```json</span></span>
-<span id="cb8-94"><a href="#cb8-94" aria-hidden="true" tabindex="-1"></a>{</span>
-<span id="cb8-95"><a href="#cb8-95" aria-hidden="true" tabindex="-1"></a>    <span class="st">"0"</span><span class="op">:</span> <span class="st">"empty_space"</span><span class="op">,</span></span>
-<span id="cb8-96"><a href="#cb8-96" aria-hidden="true" tabindex="-1"></a>    <span class="st">"1"</span><span class="op">:</span> <span class="st">"background"</span><span class="op">,</span></span>
-<span id="cb8-97"><a href="#cb8-97" aria-hidden="true" tabindex="-1"></a>    <span class="st">"2"</span><span class="op">:</span> <span class="st">"wall"</span><span class="op">,</span></span>
-<span id="cb8-98"><a href="#cb8-98" aria-hidden="true" tabindex="-1"></a>    <span class="st">"18"</span><span class="op">:</span> <span class="st">"bed"</span><span class="op">,</span></span>
-<span id="cb8-99"><a href="#cb8-99" aria-hidden="true" tabindex="-1"></a>    <span class="st">"23"</span><span class="op">:</span> <span class="st">"chair"</span><span class="op">,</span></span>
-<span id="cb8-100"><a href="#cb8-100" aria-hidden="true" tabindex="-1"></a>    <span class="st">"31"</span><span class="op">:</span> <span class="st">"dresser"</span><span class="op">,</span></span>
-<span id="cb8-101"><a href="#cb8-101" aria-hidden="true" tabindex="-1"></a>    <span class="st">"45"</span><span class="op">:</span> <span class="st">"plant_or_flower_pot"</span><span class="op">,</span></span>
-<span id="cb8-102"><a href="#cb8-102" aria-hidden="true" tabindex="-1"></a>    <span class="op">...</span></span>
-<span id="cb8-103"><a href="#cb8-103" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb8-104"><a href="#cb8-104" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-105"><a href="#cb8-105" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-106"><a href="#cb8-106" aria-hidden="true" tabindex="-1"></a>**Major object categories:**</span>
-<span id="cb8-107"><a href="#cb8-107" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-108"><a href="#cb8-108" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Architectural: walls, floors, ceilings, doors, windows</span>
-<span id="cb8-109"><a href="#cb8-109" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Furniture: bed, chair, sofa, table, cabinet, dresser, shelf</span>
-<span id="cb8-110"><a href="#cb8-110" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Decorations: lamp, mirror, picture_frame, plant, rug</span>
-<span id="cb8-111"><a href="#cb8-111" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Utilities: fan, container, clothes_rack</span>
-<span id="cb8-112"><a href="#cb8-112" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-113"><a href="#cb8-113" aria-hidden="true" tabindex="-1"></a><span class="fu">## Trajectory (`trajectory.csv`)</span></span>
-<span id="cb8-114"><a href="#cb8-114" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-115"><a href="#cb8-115" aria-hidden="true" tabindex="-1"></a>6DoF camera poses at each frame, aligned with the scene coordinate system:</span>
-<span id="cb8-116"><a href="#cb8-116" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-117"><a href="#cb8-117" aria-hidden="true" tabindex="-1"></a><span class="in">```csv</span></span>
-<span id="cb8-118"><a href="#cb8-118" aria-hidden="true" tabindex="-1"></a>graph_uid<span class="op">,</span>tracking_timestamp_us<span class="op">,</span>utc_timestamp_ns<span class="op">,</span>tx_world_device<span class="op">,</span>ty_world_device<span class="op">,</span>tz_world_device<span class="op">,</span>qx_world_device<span class="op">,</span>qy_world_device<span class="op">,</span>qz_world_device<span class="op">,</span>qw_world_device</span>
-<span id="cb8-119"><a href="#cb8-119" aria-hidden="true" tabindex="-1"></a><span class="op">&lt;</span>uuid<span class="op">&gt;,</span><span class="dv">100000</span><span class="op">,-</span><span class="dv">1</span><span class="op">,</span><span class="fl">1.234</span><span class="op">,-</span><span class="fl">0.567</span><span class="op">,</span><span class="fl">1.650</span><span class="op">,</span><span class="fl">0.012</span><span class="op">,</span><span class="fl">0.034</span><span class="op">,-</span><span class="fl">0.456</span><span class="op">,</span><span class="fl">0.889</span></span>
-<span id="cb8-120"><a href="#cb8-120" aria-hidden="true" tabindex="-1"></a><span class="op">&lt;</span>uuid<span class="op">&gt;,</span><span class="dv">133333</span><span class="op">,-</span><span class="dv">1</span><span class="op">,</span><span class="fl">1.245</span><span class="op">,-</span><span class="fl">0.578</span><span class="op">,</span><span class="fl">1.651</span><span class="op">,</span><span class="fl">0.013</span><span class="op">,</span><span class="fl">0.035</span><span class="op">,-</span><span class="fl">0.457</span><span class="op">,</span><span class="fl">0.888</span></span>
-<span id="cb8-121"><a href="#cb8-121" aria-hidden="true" tabindex="-1"></a><span class="op">...</span></span>
-<span id="cb8-122"><a href="#cb8-122" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-123"><a href="#cb8-123" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-124"><a href="#cb8-124" aria-hidden="true" tabindex="-1"></a>See <span class="co">[</span><span class="ot">MPS Output - Trajectory</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_trajectory)</span> in the Project Aria documentation for details.</span>
-<span id="cb8-125"><a href="#cb8-125" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-126"><a href="#cb8-126" aria-hidden="true" tabindex="-1"></a>**Columns:**</span>
-<span id="cb8-127"><a href="#cb8-127" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-128"><a href="#cb8-128" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`graph_uid`</span>: Unique identifier for the coordinate frame</span>
-<span id="cb8-129"><a href="#cb8-129" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tracking_timestamp_us`</span>: Device timestamp in microseconds</span>
-<span id="cb8-130"><a href="#cb8-130" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tx,ty,tz_world_device`</span>: 3D translation in meters</span>
-<span id="cb8-131"><a href="#cb8-131" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`qx,qy,qz,qw_world_device`</span>: Rotation quaternion (Hamilton convention)</span>
-<span id="cb8-132"><a href="#cb8-132" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-133"><a href="#cb8-133" aria-hidden="true" tabindex="-1"></a><span class="fu">## Semi-Dense Point Cloud (`semidense_points.csv.gz`)</span></span>
-<span id="cb8-134"><a href="#cb8-134" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-135"><a href="#cb8-135" aria-hidden="true" tabindex="-1"></a>3D points reconstructed from <span class="co">[</span><span class="ot">Project Aria Machine Perception Services</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/ARK/mps)</span>' SLAM, representing the scene geometry:</span>
-<span id="cb8-136"><a href="#cb8-136" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-137"><a href="#cb8-137" aria-hidden="true" tabindex="-1"></a><span class="in">```csv</span></span>
-<span id="cb8-138"><a href="#cb8-138" aria-hidden="true" tabindex="-1"></a>uid<span class="op">,</span>graph_uid<span class="op">,</span>px_world<span class="op">,</span>py_world<span class="op">,</span>pz_world<span class="op">,</span>inv_dist_std<span class="op">,</span>dist_std</span>
-<span id="cb8-139"><a href="#cb8-139" aria-hidden="true" tabindex="-1"></a><span class="dv">12345</span><span class="op">,&lt;</span>uuid<span class="op">&gt;,</span><span class="fl">1.234</span><span class="op">,-</span><span class="fl">0.567</span><span class="op">,</span><span class="fl">2.345</span><span class="op">,</span><span class="fl">8.130</span><span class="op">,</span><span class="fl">0.123</span></span>
-<span id="cb8-140"><a href="#cb8-140" aria-hidden="true" tabindex="-1"></a><span class="dv">12346</span><span class="op">,&lt;</span>uuid<span class="op">&gt;,</span><span class="fl">1.235</span><span class="op">,-</span><span class="fl">0.566</span><span class="op">,</span><span class="fl">2.346</span><span class="op">,</span><span class="fl">8.065</span><span class="op">,</span><span class="fl">0.124</span></span>
-<span id="cb8-141"><a href="#cb8-141" aria-hidden="true" tabindex="-1"></a><span class="op">...</span></span>
-<span id="cb8-142"><a href="#cb8-142" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-143"><a href="#cb8-143" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-144"><a href="#cb8-144" aria-hidden="true" tabindex="-1"></a>**Columns:**</span>
-<span id="cb8-145"><a href="#cb8-145" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-146"><a href="#cb8-146" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`uid`</span>: Unique point identifier</span>
-<span id="cb8-147"><a href="#cb8-147" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`graph_uid`</span>: Coordinate frame identifier, depending on the frame this point was first observed in.</span>
-<span id="cb8-148"><a href="#cb8-148" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`px,py,pz_world`</span>: 3D coordinates in world frame (meters)</span>
-<span id="cb8-149"><a href="#cb8-149" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`inv_dist_std`</span>: Inverse of distance standard deviation in <span class="co">[</span><span class="ot">$m^{-1}$</span><span class="co">]</span>, measure for the quality of the 3D PC</span>
-<span id="cb8-150"><a href="#cb8-150" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`dist_std`</span>: Distance standard deviation in meters (depth uncertainty)</span>
-<span id="cb8-151"><a href="#cb8-151" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-152"><a href="#cb8-152" aria-hidden="true" tabindex="-1"></a>Nominal threshold values are a maximum inv_dist_std of 0.005 and a maximum dist_std of 0.01.</span>
-<span id="cb8-153"><a href="#cb8-153" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-154"><a href="#cb8-154" aria-hidden="true" tabindex="-1"></a><span class="fu">## Point Observations (`semidense_observations.csv.gz`)</span></span>
-<span id="cb8-155"><a href="#cb8-155" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-156"><a href="#cb8-156" aria-hidden="true" tabindex="-1"></a>Records which camera frames observe which 3D points (visibility information):</span>
-<span id="cb8-157"><a href="#cb8-157" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-158"><a href="#cb8-158" aria-hidden="true" tabindex="-1"></a><span class="in">```csv</span></span>
-<span id="cb8-159"><a href="#cb8-159" aria-hidden="true" tabindex="-1"></a>uid<span class="op">,</span>frame_tracking_timestamp_us<span class="op">,</span>camera_serial<span class="op">,</span>u<span class="op">,</span>v</span>
-<span id="cb8-160"><a href="#cb8-160" aria-hidden="true" tabindex="-1"></a><span class="dv">12345</span><span class="op">,</span><span class="dv">100000</span><span class="op">,&lt;</span>serial<span class="op">&gt;,</span><span class="fl">512.3</span><span class="op">,</span><span class="fl">384.7</span></span>
-<span id="cb8-161"><a href="#cb8-161" aria-hidden="true" tabindex="-1"></a><span class="dv">12345</span><span class="op">,</span><span class="dv">133333</span><span class="op">,&lt;</span>serial<span class="op">&gt;,</span><span class="fl">515.1</span><span class="op">,</span><span class="fl">382.9</span></span>
-<span id="cb8-162"><a href="#cb8-162" aria-hidden="true" tabindex="-1"></a><span class="dv">12346</span><span class="op">,</span><span class="dv">100000</span><span class="op">,&lt;</span>serial<span class="op">&gt;,</span><span class="fl">620.8</span><span class="op">,</span><span class="fl">401.2</span></span>
-<span id="cb8-163"><a href="#cb8-163" aria-hidden="true" tabindex="-1"></a><span class="op">...</span></span>
-<span id="cb8-164"><a href="#cb8-164" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-165"><a href="#cb8-165" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-166"><a href="#cb8-166" aria-hidden="true" tabindex="-1"></a>**Columns:**</span>
-<span id="cb8-167"><a href="#cb8-167" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-168"><a href="#cb8-168" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`uid`</span>: Point identifier (ref to <span class="in">`uid`</span> in <span class="in">`semidense_points.csv.gz`</span>)</span>
-<span id="cb8-169"><a href="#cb8-169" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`frame_tracking_timestamp_us`</span>: Frame timestamp in microseconds</span>
-<span id="cb8-170"><a href="#cb8-170" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`camera_serial`</span>: Identifier of the camera which observed the point</span>
-<span id="cb8-171"><a href="#cb8-171" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`u,v`</span>: Sub-Pixel coordinates in the image frame of the camera that observed the point</span>
-<span id="cb8-172"><a href="#cb8-172" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-173"><a href="#cb8-173" aria-hidden="true" tabindex="-1"></a>Useful for:</span>
-<span id="cb8-174"><a href="#cb8-174" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-175"><a href="#cb8-175" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Understanding point visibility across views</span>
-<span id="cb8-176"><a href="#cb8-176" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Information about the surfaces in the scene, as well as free space</span>
-<span id="cb8-177"><a href="#cb8-177" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Computing information gain for NBV</span>
-<span id="cb8-178"><a href="#cb8-178" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Analyzing coverage and redundancy</span>
-<span id="cb8-179"><a href="#cb8-179" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-180"><a href="#cb8-180" aria-hidden="true" tabindex="-1"></a>For further information on both SLAM point clouds and visibility information, see <span class="co">[</span><span class="ot">MPS Output - Semi-Dense Point Cloud</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_pointcloud)</span>.</span>
-<span id="cb8-181"><a href="#cb8-181" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-182"><a href="#cb8-182" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-183"><a href="#cb8-183" aria-hidden="true" tabindex="-1"></a><span class="fu">## RGB Images (`rgb/*.png`)</span></span>
-<span id="cb8-184"><a href="#cb8-184" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-185"><a href="#cb8-185" aria-hidden="true" tabindex="-1"></a>Simulated Aria camera images (1408×1408 resolution, typical):</span>
-<span id="cb8-186"><a href="#cb8-186" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-187"><a href="#cb8-187" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Realistic lens distortion</span>
-<span id="cb8-188"><a href="#cb8-188" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Simulated lighting and materials</span>
-<span id="cb8-189"><a href="#cb8-189" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Egocentric perspective</span>
-<span id="cb8-190"><a href="#cb8-190" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-191"><a href="#cb8-191" aria-hidden="true" tabindex="-1"></a><span class="fu">## Depth Maps (`depth/*.png`)</span></span>
-<span id="cb8-192"><a href="#cb8-192" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-193"><a href="#cb8-193" aria-hidden="true" tabindex="-1"></a>**Ground truth** depth for each RGB frame (16-bit PNG, metric depth in millimeters):</span>
-<span id="cb8-194"><a href="#cb8-194" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-195"><a href="#cb8-195" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Perfect ground truth depth</span>
-<span id="cb8-196"><a href="#cb8-196" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Depth values stored as 16-bit integers representing millimeters</span>
-<span id="cb8-197"><a href="#cb8-197" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Corresponds 1:1 with RGB pixels</span>
-<span id="cb8-198"><a href="#cb8-198" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Metric depth enables direct unprojection to 3D point clouds</span>
-<span id="cb8-199"><a href="#cb8-199" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Useful for supervised learning and evaluation</span>
-<span id="cb8-200"><a href="#cb8-200" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Can still be used to obtain the oracle RRI to evaluate candidate views</span>
-<span id="cb8-201"><a href="#cb8-201" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-202"><a href="#cb8-202" aria-hidden="true" tabindex="-1"></a><span class="fu">## Instance Segmentation (`instances/*.png`)</span></span>
-<span id="cb8-203"><a href="#cb8-203" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-204"><a href="#cb8-204" aria-hidden="true" tabindex="-1"></a>Per-pixel instance labels (16-bit PNG):</span>
-<span id="cb8-205"><a href="#cb8-205" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-206"><a href="#cb8-206" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Each pixel value corresponds to an instance ID</span>
-<span id="cb8-207"><a href="#cb8-207" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Map IDs to classes using <span class="in">`object_instances_to_classes.json`</span></span>
-<span id="cb8-208"><a href="#cb8-208" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Enables entity-level analysis</span>
-<span id="cb8-209"><a href="#cb8-209" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-210"><a href="#cb8-210" aria-hidden="true" tabindex="-1"></a><span class="al">![ASE Primitives Visualization](../figures/scene-script/ase_primitives.jpg)</span>{width=90%}</span>
-<span id="cb8-211"><a href="#cb8-211" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-212"><a href="#cb8-212" aria-hidden="true" tabindex="-1"></a><span class="fu"># Modalities in EVL: Intuition &amp; Math</span></span>
-<span id="cb8-213"><a href="#cb8-213" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-214"><a href="#cb8-214" aria-hidden="true" tabindex="-1"></a>EVL consumes ASE snippets by projecting every voxel center $\mathbf{v}$ of a gravity-aligned grid $\mathcal{V}$ into all observed modalities and concatenating the resulting signals before 3D reasoning.</span>
-<span id="cb8-215"><a href="#cb8-215" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-216"><a href="#cb8-216" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Multi-stream images**: For each stream $s \in <span class="sc">\{</span>\text{rgb}, \text{slaml}, \text{slamr}<span class="sc">\}</span>$ and frame $f$, calibrated poses $\mathbf{T}_f^s$ and intrinsics $\mathbf{K}^s$ project $\mathbf{v}$ to pixels $\mathbf{p}^s_f = \pi(\mathbf{K}^s (\mathbf{T}_f^s)^{-1} \mathbf{v})$. DinoV2 features $\mathbf{F}^s_f(u,v)$ are sampled via bilinear interpolation and aggregated across time/streams by masked means and variances <span class="co">[</span><span class="ot">efm3d/model/lifter.py:398</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/lifter.py#L398)</span>.</span>
-<span id="cb8-217"><a href="#cb8-217" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Depth &amp; semi-dense points**: Distance maps provide metric rays $\mathbf{x}(u,v) = \mathcal{D}(u,v)\mathbf{K}^{-1}<span class="co">[</span><span class="ot">u,v,1</span><span class="co">]</span>^\top$, while SLAM points $\mathbf{P}_t$ with uncertainty (`dist_std`) voxelize into binary surface masks. Rays traced through measured points mark free-space voxels $\mathcal{M}_{\text{free}}$ <span class="co">[</span><span class="ot">efm3d/model/lifter.py:180</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/lifter.py#L180)</span> and <span class="co">[</span><span class="ot">efm3d/utils/ray.py:179</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/ray.py#L179)</span>.</span>
-<span id="cb8-218"><a href="#cb8-218" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**OBB supervision**: Snippets include oriented boxes stored as 34-channel <span class="in">`ObbTW`</span> tensors (<span class="in">`obbs/padded_snippet`</span>), already expressed in snippet coordinates with per-frame timestamps <span class="co">[</span><span class="ot">efm3d/aria/obb.py:97</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/aria/obb.py#L97)</span>. These supervise centerness, IoU, and class heads during training <span class="co">[</span><span class="ot">efm3d/utils/evl_loss.py:120</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/evl_loss.py#L120)</span>.</span>
-<span id="cb8-219"><a href="#cb8-219" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Occupancy targets &amp; meshes**: Ground-truth meshes $\mathcal{M}$ or depth samples populate occupancy grids through <span class="in">`pointcloud_to_occupancy_snippet`</span>, enabling per-voxel losses <span class="co">[</span><span class="ot">efm3d/utils/reconstruction.py:37</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/reconstruction.py#L37)</span> and later fusion/evaluation via marching cubes <span class="co">[</span><span class="ot">efm3d/inference/fuse.py:187</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/inference/fuse.py#L187)</span>.</span>
-<span id="cb8-220"><a href="#cb8-220" aria-hidden="true" tabindex="-1"></a>    **Note**: GT meshes are provided only for **100 validation scenes**!</span>
-<span id="cb8-221"><a href="#cb8-221" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-222"><a href="#cb8-222" aria-hidden="true" tabindex="-1"></a>Collectively these channels encode texture, geometry, free space, and semantics—the same ingredients we need for VIN-style RRI prediction on ASE sequences.</span>
-<span id="cb8-223"><a href="#cb8-223" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-224"><a href="#cb8-224" aria-hidden="true" tabindex="-1"></a><span class="fu"># GT 3D Assets &amp; Annotations</span></span>
-<span id="cb8-225"><a href="#cb8-225" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-226"><a href="#cb8-226" aria-hidden="true" tabindex="-1"></a><span class="fu">## Oriented Bounding Boxes</span></span>
-<span id="cb8-227"><a href="#cb8-227" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-228"><a href="#cb8-228" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The ASE → EFM adaptor injects <span class="in">`obbs/padded_snippet`</span> (shape <span class="in">`[T, 128, 34]`</span>) plus <span class="in">`obbs/sem_id_to_name`</span> for each snippet. Helper methods keep them aligned with the snippet frame <span class="co">[</span><span class="ot">efm3d/dataset/efm_model_adaptor.py:480</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/efm_model_adaptor.py#L480)</span>.</span>
-<span id="cb8-229"><a href="#cb8-229" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Classes follow the 43-category taxonomy shipped with EFM3D; optional remapping via <span class="in">`config/taxonomy/atek_to_efm.csv`</span> harmonises ATEK labels.</span>
-<span id="cb8-230"><a href="#cb8-230" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Access pattern: <span class="in">`batch[ARIA_OBB_PADDED]`</span> returns an <span class="in">`ObbTW`</span> wrapper supporting <span class="in">`.transform`</span>, <span class="in">`.bb3_center_world`</span>, etc.</span>
-<span id="cb8-231"><a href="#cb8-231" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-232"><a href="#cb8-232" aria-hidden="true" tabindex="-1"></a><span class="fu">## Ground-Truth Meshes</span></span>
-<span id="cb8-233"><a href="#cb8-233" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-234"><a href="#cb8-234" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Validation scenes deliver watertight meshes stored as <span class="in">`scene_ply_{scene_id}.ply`</span> (ASE) or <span class="in">`gt_mesh.ply`</span> (ADT). EVL tooling resolves them via <span class="in">`get_gt_mesh_ply()`</span> using the sequence id <span class="co">[</span><span class="ot">efm3d/inference/pipeline.py:33</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/inference/pipeline.py#L33)</span>.</span>
-<span id="cb8-235"><a href="#cb8-235" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Meshes are not embedded in the snippet batch; load them on demand for evaluation or to create oracle RRIs. Surface samples feed algorithms like <span class="in">`eval_mesh_to_mesh`</span> for Chamfer/F-score computation <span class="co">[</span><span class="ot">efm3d/utils/mesh_utils.py:136</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/mesh_utils.py#L136)</span>.</span>
-<span id="cb8-236"><a href="#cb8-236" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-237"><a href="#cb8-237" aria-hidden="true" tabindex="-1"></a><span class="fu"># EVL Training Format (ATEK WebDataset) {#atek-wds-format}</span></span>
-<span id="cb8-238"><a href="#cb8-238" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-239"><a href="#cb8-239" aria-hidden="true" tabindex="-1"></a>EFM3D trains EVL on ATEK WebDataset (WDS) snippets: 2 s shards (20 frames) are streamed and cropped into overlapping 1 s windows (10 frames) via <span class="in">`AtekWdsStreamDataset`</span> <span class="co">[</span><span class="ot">efm3d/dataset/atek_wds_dataset.py:70</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/atek_wds_dataset.py#L70)</span>. The adaptor enforces fixed shapes and timestamps <span class="co">[</span><span class="ot">efm3d/dataset/efm_model_adaptor.py:604</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/efm_model_adaptor.py#L604)</span>.</span>
-<span id="cb8-240"><a href="#cb8-240" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-241"><a href="#cb8-241" aria-hidden="true" tabindex="-1"></a><span class="fu">## ATEK Key Naming Convention</span></span>
-<span id="cb8-242"><a href="#cb8-242" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-243"><a href="#cb8-243" aria-hidden="true" tabindex="-1"></a>ATEK uses a structured naming scheme for data keys:</span>
-<span id="cb8-244"><a href="#cb8-244" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-245"><a href="#cb8-245" aria-hidden="true" tabindex="-1"></a>**Format**: <span class="in">`&lt;prefix&gt;#&lt;identifier&gt;+&lt;parameter&gt;`</span></span>
-<span id="cb8-246"><a href="#cb8-246" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-247"><a href="#cb8-247" aria-hidden="true" tabindex="-1"></a>**Prefixes**:</span>
-<span id="cb8-248"><a href="#cb8-248" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-249"><a href="#cb8-249" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`mtd`</span> = **M**otion **T**rajectory **D**ata (device poses over time)</span>
-<span id="cb8-250"><a href="#cb8-250" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`mfcd`</span> = **M**ulti-**F**rame **C**amera **D**ata (per-frame camera data)</span>
-<span id="cb8-251"><a href="#cb8-251" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`msdpd`</span> = **M**ulti-**S**emi-**D**ense **P**oint **D**ata (SLAM point clouds)</span>
-<span id="cb8-252"><a href="#cb8-252" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-253"><a href="#cb8-253" aria-hidden="true" tabindex="-1"></a>**Separators**:</span>
-<span id="cb8-254"><a href="#cb8-254" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-255"><a href="#cb8-255" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`#`</span> separates prefix from identifier</span>
-<span id="cb8-256"><a href="#cb8-256" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`+`</span> separates identifier from parameter</span>
-<span id="cb8-257"><a href="#cb8-257" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-258"><a href="#cb8-258" aria-hidden="true" tabindex="-1"></a>**Examples**:</span>
-<span id="cb8-259"><a href="#cb8-259" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-260"><a href="#cb8-260" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
-<span id="cb8-261"><a href="#cb8-261" aria-hidden="true" tabindex="-1"></a><span class="co"># Motion trajectory: (T, 3, 4) SE(3) transformation matrices</span></span>
-<span id="cb8-262"><a href="#cb8-262" aria-hidden="true" tabindex="-1"></a>ts_world_device <span class="op">=</span> sample[<span class="st">"mtd#ts_world_device"</span>]</span>
-<span id="cb8-263"><a href="#cb8-263" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-264"><a href="#cb8-264" aria-hidden="true" tabindex="-1"></a><span class="co"># Camera projection parameters</span></span>
-<span id="cb8-265"><a href="#cb8-265" aria-hidden="true" tabindex="-1"></a>projection_params <span class="op">=</span> sample[<span class="st">"mfcd#camera-rgb+projection_params"</span>]</span>
-<span id="cb8-266"><a href="#cb8-266" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-267"><a href="#cb8-267" aria-hidden="true" tabindex="-1"></a><span class="co"># Depth images: (T, 1, H, W)</span></span>
-<span id="cb8-268"><a href="#cb8-268" aria-hidden="true" tabindex="-1"></a>depth_images <span class="op">=</span> sample[<span class="st">"mfcd#camera-rgb-depth+images"</span>]</span>
-<span id="cb8-269"><a href="#cb8-269" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-270"><a href="#cb8-270" aria-hidden="true" tabindex="-1"></a><span class="co"># Semi-dense SLAM points: (N, 3) in world coordinates</span></span>
-<span id="cb8-271"><a href="#cb8-271" aria-hidden="true" tabindex="-1"></a>points_world <span class="op">=</span> sample[<span class="st">"msdpd#points_world+stacked"</span>]</span>
-<span id="cb8-272"><a href="#cb8-272" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-273"><a href="#cb8-273" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-274"><a href="#cb8-274" aria-hidden="true" tabindex="-1"></a><span class="fu">## ATEK Data Keys</span></span>
-<span id="cb8-275"><a href="#cb8-275" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-276"><a href="#cb8-276" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Key <span class="pp">|</span> Shape <span class="pp">|</span> Type <span class="pp">|</span> Description <span class="pp">|</span></span>
-<span id="cb8-277"><a href="#cb8-277" aria-hidden="true" tabindex="-1"></a><span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">|</span></span>
-<span id="cb8-278"><a href="#cb8-278" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/img`</span>, <span class="in">`slaml/img`</span>, <span class="in">`slamr/img`</span> <span class="pp">|</span> <span class="in">`[F, C, H, W]`</span> (≈<span class="in">`[10, 3/1, 1408, 1408]`</span>) <span class="pp">|</span> float32 <span class="pp">|</span> Normalized frames per stream. <span class="pp">|</span></span>
-<span id="cb8-279"><a href="#cb8-279" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/calib`</span>, <span class="in">`slaml/calib`</span>, <span class="in">`slamr/calib`</span> <span class="pp">|</span> CameraTW <span class="pp">|</span> TensorWrapper <span class="pp">|</span> Intrinsics/extrinsics replicated across frames. <span class="pp">|</span></span>
-<span id="cb8-280"><a href="#cb8-280" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/t_snippet_rig`</span>, … <span class="pp">|</span> <span class="in">`[F, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Camera poses in snippet frame. <span class="pp">|</span></span>
-<span id="cb8-281"><a href="#cb8-281" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`pose/t_snippet_rig`</span> <span class="pp">|</span> <span class="in">`[F, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Rig trajectory used for lifting. <span class="pp">|</span></span>
-<span id="cb8-282"><a href="#cb8-282" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`points/p3s_world`</span> <span class="pp">|</span> <span class="in">`[F, N, 3]`</span> (N≈50 000) <span class="pp">|</span> float32 <span class="pp">|</span> Semi-dense SLAM points (NaN padded). <span class="pp">|</span></span>
-<span id="cb8-283"><a href="#cb8-283" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`points/dist_std`</span>, <span class="in">`points/inv_dist_std`</span> <span class="pp">|</span> <span class="in">`[F, N, 1]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Depth uncertainty per point. <span class="pp">|</span></span>
-<span id="cb8-284"><a href="#cb8-284" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/distance_m`</span> <span class="pp">|</span> <span class="in">`[F, 1, H, W]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Ray distances from GT depth. <span class="pp">|</span></span>
-<span id="cb8-285"><a href="#cb8-285" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`obbs/padded_snippet`</span> <span class="pp">|</span> <span class="in">`[F, 128, 34]`</span> <span class="pp">|</span> ObbTW <span class="pp">|</span> Padded oriented boxes with semantics. <span class="pp">|</span></span>
-<span id="cb8-286"><a href="#cb8-286" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`obbs/sem_id_to_name`</span> <span class="pp">|</span> dict <span class="pp">|</span> mapping <span class="pp">|</span> Semantic lookup table. <span class="pp">|</span></span>
-<span id="cb8-287"><a href="#cb8-287" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`snippet/t_world_snippet`</span> <span class="pp">|</span> <span class="in">`[1, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Snippet anchor pose in world frame. <span class="pp">|</span></span>
-<span id="cb8-288"><a href="#cb8-288" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`snippet/time_ns`</span> <span class="pp">|</span> <span class="in">`[1, 1]`</span> <span class="pp">|</span> int64 <span class="pp">|</span> Start timestamp for relative times. <span class="pp">|</span></span>
-<span id="cb8-289"><a href="#cb8-289" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/img/snippet_time_s`</span>, … <span class="pp">|</span> <span class="in">`[F, 1]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Relative timestamps per modality. <span class="pp">|</span></span>
-<span id="cb8-290"><a href="#cb8-290" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-291"><a href="#cb8-291" aria-hidden="true" tabindex="-1"></a>**Practical notes.**</span>
-<span id="cb8-292"><a href="#cb8-292" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-293"><a href="#cb8-293" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Tensor wrappers (<span class="in">`CameraTW`</span>, <span class="in">`PoseTW`</span>, <span class="in">`ObbTW`</span>) behave like torch tensors while exposing interpolation/transform helpers.</span>
-<span id="cb8-294"><a href="#cb8-294" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`points/p3s_world`</span> is already aligned with the snippet frame; invalid slots are NaN so masks can be inferred cheaply.</span>
-<span id="cb8-295"><a href="#cb8-295" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`obbs/padded_snippet`</span> is present for ASE training snippets; if absent (<span class="in">`gt_exists_flag=False`</span>) the adaptor skips OBB processing.</span>
-<span id="cb8-296"><a href="#cb8-296" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Ground-truth meshes stay on disk—resolve them lazily when computing Chamfer/F-score or oracle RRIs.</span>
-<span id="cb8-297"><a href="#cb8-297" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-298"><a href="#cb8-298" aria-hidden="true" tabindex="-1"></a><span class="fu"># Coordinate Conventions</span></span>
-<span id="cb8-299"><a href="#cb8-299" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-300"><a href="#cb8-300" aria-hidden="true" tabindex="-1"></a>ASE follows Project Aria's coordinate conventions:</span>
-<span id="cb8-301"><a href="#cb8-301" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-302"><a href="#cb8-302" aria-hidden="true" tabindex="-1"></a><span class="fu">## World Frame</span></span>
-<span id="cb8-303"><a href="#cb8-303" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-304"><a href="#cb8-304" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Origin**: Arbitrary world coordinate origin for each scene</span>
-<span id="cb8-305"><a href="#cb8-305" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Axes**: Typically Z-up, Manhattan-world aligned</span>
-<span id="cb8-306"><a href="#cb8-306" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Units**: Meters</span>
-<span id="cb8-307"><a href="#cb8-307" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-308"><a href="#cb8-308" aria-hidden="true" tabindex="-1"></a><span class="fu">## Camera Frame</span></span>
-<span id="cb8-309"><a href="#cb8-309" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-310"><a href="#cb8-310" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Origin**: At camera's optical center</span>
-<span id="cb8-311"><a href="#cb8-311" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**X-axis**: Points right (from camera perspective)</span>
-<span id="cb8-312"><a href="#cb8-312" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Y-axis**: Points down</span>
-<span id="cb8-313"><a href="#cb8-313" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Z-axis**: Points forward (optical axis)</span>
-<span id="cb8-314"><a href="#cb8-314" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-315"><a href="#cb8-315" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-316"><a href="#cb8-316" aria-hidden="true" tabindex="-1"></a><span class="fu">### Using ATEK for ML Workflows</span></span>
-<span id="cb8-317"><a href="#cb8-317" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-318"><a href="#cb8-318" aria-hidden="true" tabindex="-1"></a>For training and evaluation, use ATEK's preprocessed datasets and tools:</span>
-<span id="cb8-319"><a href="#cb8-319" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-320"><a href="#cb8-320" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
-<span id="cb8-321"><a href="#cb8-321" aria-hidden="true" tabindex="-1"></a><span class="co"># Download preprocessed ASE data (PyTorch WebDataset format)</span></span>
-<span id="cb8-322"><a href="#cb8-322" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/atek_wds_data_downloader.py <span class="dt">\</span></span>
-<span id="cb8-323"><a href="#cb8-323" aria-hidden="true" tabindex="-1"></a>  <span class="at">--config-name</span> efm <span class="dt">\</span></span>
-<span id="cb8-324"><a href="#cb8-324" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_ATEK_download_urls.json <span class="dt">\</span></span>
-<span id="cb8-325"><a href="#cb8-325" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./data/ase_atek <span class="dt">\</span></span>
-<span id="cb8-326"><a href="#cb8-326" aria-hidden="true" tabindex="-1"></a>  <span class="at">--download-wds-to-local</span></span>
-<span id="cb8-327"><a href="#cb8-327" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-328"><a href="#cb8-328" aria-hidden="true" tabindex="-1"></a><span class="co"># Download ground truth meshes for evaluation</span></span>
-<span id="cb8-329"><a href="#cb8-329" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/ase_mesh_downloader.py <span class="dt">\</span></span>
-<span id="cb8-330"><a href="#cb8-330" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_mesh_download_urls.json <span class="dt">\</span></span>
-<span id="cb8-331"><a href="#cb8-331" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./ase_meshes</span>
-<span id="cb8-332"><a href="#cb8-332" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Aria Synthetic Environments (ASE) Dataset"</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> html</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="an">bibliography:</span><span class="co"> ../references.bib</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="fu"># Overview</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>The Aria Synthetic Environments (ASE) dataset <span class="co">[</span><span class="ot">@SceneScript-avetisyan2024</span><span class="co">]</span> is a large-scale collection of 100,000 unique procedurally-generated indoor scenes with realistic Aria glasses sensor simulations. It serves as the primary training and evaluation dataset for SceneScript and provides valuable data for scene understanding research.</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="fu">## Links</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">ASE Documentation</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">ATEK Datastore</span><span class="co">](https://github.com/facebookresearch/ATEK/blob/main/docs/ATEK_Data_Store.md)</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="fu">## Dataset Scale</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**100,000 unique multi-room interior scenes**</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**58M+ RGB images** captured from egocentric trajectories</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**67 days** of total trajectory time</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**7,800 km** of total trajectory distance</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**~23 TB** total dataset size</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a><span class="fu">## Ground Truth Annotations</span></span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>6DoF camera trajectory</span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>3D floor plan in Euston Structure Scene Language (SSL) format</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>2D instance segmentation</span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>With per-scene mappings from the object instance image IDs to object classes</span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>2D depth map</span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**3M OBBs** across 43 classes released with @EFM3D-straub2024</span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**GT Meshes** for 100 scenes released with @EFM3D-straub2024</span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a><span class="fu">## Scene Characteristics</span></span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>Each scene contains:</span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Multi-room layouts**: Up to 5 complex Manhattan-world rooms - Scenes composed of axis-aligned walls, floors, and ceilings.</span>
+<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Egocentric trajectories**: ~2-minute walkthroughs per scene</span>
+<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Realistic sensor simulation**: Aria camera and lens characteristics</span>
+<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Rich object diversity**: Furniture, decorations, architectural elements</span>
+<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a><span class="al">![ASE Dataset Modalities](../figures/scene-script/ase_modalities.jpg)</span>{width=100%}</span>
+<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a><span class="fu"># Data Structure</span></span>
+<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-49"><a href="#cb9-49" aria-hidden="true" tabindex="-1"></a>Each scene in the ASE dataset follows a consistent directory structure:</span>
+<span id="cb9-50"><a href="#cb9-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-51"><a href="#cb9-51" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-52"><a href="#cb9-52" aria-hidden="true" tabindex="-1"></a><span class="in">scene_id/</span></span>
+<span id="cb9-53"><a href="#cb9-53" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_scene_language.txt          # Ground truth scene layout in SSL format</span></span>
+<span id="cb9-54"><a href="#cb9-54" aria-hidden="true" tabindex="-1"></a><span class="in">├── object_instances_to_classes.json # Mapping from instance IDs to semantic classes</span></span>
+<span id="cb9-55"><a href="#cb9-55" aria-hidden="true" tabindex="-1"></a><span class="in">├── trajectory.csv                   # 6DoF camera poses along the egocentric path</span></span>
+<span id="cb9-56"><a href="#cb9-56" aria-hidden="true" tabindex="-1"></a><span class="in">├── semidense_points.csv.gz          # Semi-dense 3D point cloud from MPS SLAM</span></span>
+<span id="cb9-57"><a href="#cb9-57" aria-hidden="true" tabindex="-1"></a><span class="in">├── semidense_observations.csv.gz    # Point observations (which images see which points in the PC)</span></span>
+<span id="cb9-58"><a href="#cb9-58" aria-hidden="true" tabindex="-1"></a><span class="in">├── rgb/                             # RGB image frames</span></span>
+<span id="cb9-59"><a href="#cb9-59" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── 000000.png</span></span>
+<span id="cb9-60"><a href="#cb9-60" aria-hidden="true" tabindex="-1"></a><span class="in">│   └── ...</span></span>
+<span id="cb9-61"><a href="#cb9-61" aria-hidden="true" tabindex="-1"></a><span class="in">├── depth/                           # Ground truth depth maps</span></span>
+<span id="cb9-62"><a href="#cb9-62" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── 000000.png</span></span>
+<span id="cb9-63"><a href="#cb9-63" aria-hidden="true" tabindex="-1"></a><span class="in">│   └── ...</span></span>
+<span id="cb9-64"><a href="#cb9-64" aria-hidden="true" tabindex="-1"></a><span class="in">└── instances/                       # Instance segmentation masks</span></span>
+<span id="cb9-65"><a href="#cb9-65" aria-hidden="true" tabindex="-1"></a><span class="in">    ├── 000000.png</span></span>
+<span id="cb9-66"><a href="#cb9-66" aria-hidden="true" tabindex="-1"></a><span class="in">    └── ...</span></span>
+<span id="cb9-67"><a href="#cb9-67" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-68"><a href="#cb9-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-69"><a href="#cb9-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-70"><a href="#cb9-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-71"><a href="#cb9-71" aria-hidden="true" tabindex="-1"></a><span class="fu">## Scene Language (`ase_scene_language.txt`)</span></span>
+<span id="cb9-72"><a href="#cb9-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-73"><a href="#cb9-73" aria-hidden="true" tabindex="-1"></a>The ground truth scene layout encoded in <span class="co">[</span><span class="ot">SceneScript's Structured Scene Language</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_data_format#scene_language)</span> (SSL). Each line represents a primitive with its parameters:</span>
+<span id="cb9-74"><a href="#cb9-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-75"><a href="#cb9-75" aria-hidden="true" tabindex="-1"></a><span class="in">```plaintext</span></span>
+<span id="cb9-76"><a href="#cb9-76" aria-hidden="true" tabindex="-1"></a>make_wall, id=<span class="dv">0</span>, a_x=-<span class="fl">2.56</span>, a_y=<span class="fl">6.16</span>, a_z=<span class="fl">0.0</span>, b_x=<span class="fl">5.07</span>, b_y=<span class="fl">6.16</span>, b_z=<span class="fl">0.0</span>, height=<span class="fl">3.26</span>, thickness=<span class="fl">0.0</span></span>
+<span id="cb9-77"><a href="#cb9-77" aria-hidden="true" tabindex="-1"></a>make_door, id=<span class="dv">1000</span>, wall0_id=<span class="dv">2</span>, wall1_id=<span class="dv">4</span>, position_x=-<span class="fl">1.51</span>, position_y=<span class="fl">1.84</span>, position_z=<span class="fl">1.01</span>, width=<span class="fl">1.82</span>, height=<span class="fl">2.02</span></span>
+<span id="cb9-78"><a href="#cb9-78" aria-hidden="true" tabindex="-1"></a>make_window, id=<span class="dv">2000</span>, wall0_id=<span class="dv">0</span>, position_x=<span class="fl">4.45</span>, position_y=<span class="fl">6.16</span>, position_z=<span class="fl">1.64</span>, width=<span class="fl">1.01</span>, height=<span class="fl">2.12</span></span>
+<span id="cb9-79"><a href="#cb9-79" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-80"><a href="#cb9-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-81"><a href="#cb9-81" aria-hidden="true" tabindex="-1"></a>**Primitives include:**</span>
+<span id="cb9-82"><a href="#cb9-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-83"><a href="#cb9-83" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`make_wall`</span>: 3D line segments defining room boundaries</span>
+<span id="cb9-84"><a href="#cb9-84" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`make_door`</span>: Door positions, dimensions, and wall connections</span>
+<span id="cb9-85"><a href="#cb9-85" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`make_window`</span>: Window positions and sizes</span>
+<span id="cb9-86"><a href="#cb9-86" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`make_prim`</span>: Generic 3D primitives (boxes, cylinders, bezier shapes, ...)</span>
+<span id="cb9-87"><a href="#cb9-87" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Implicitly defines floors and ceilings through wall heights</span>
+<span id="cb9-88"><a href="#cb9-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-89"><a href="#cb9-89" aria-hidden="true" tabindex="-1"></a><span class="fu">## Object Instance Mapping (`object_instances_to_classes.json`)</span></span>
+<span id="cb9-90"><a href="#cb9-90" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-91"><a href="#cb9-91" aria-hidden="true" tabindex="-1"></a>Maps pixel values in instance segmentation masks to semantic categories:</span>
+<span id="cb9-92"><a href="#cb9-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-93"><a href="#cb9-93" aria-hidden="true" tabindex="-1"></a><span class="in">```json</span></span>
+<span id="cb9-94"><a href="#cb9-94" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb9-95"><a href="#cb9-95" aria-hidden="true" tabindex="-1"></a>    <span class="st">"0"</span><span class="op">:</span> <span class="st">"empty_space"</span><span class="op">,</span></span>
+<span id="cb9-96"><a href="#cb9-96" aria-hidden="true" tabindex="-1"></a>    <span class="st">"1"</span><span class="op">:</span> <span class="st">"background"</span><span class="op">,</span></span>
+<span id="cb9-97"><a href="#cb9-97" aria-hidden="true" tabindex="-1"></a>    <span class="st">"2"</span><span class="op">:</span> <span class="st">"wall"</span><span class="op">,</span></span>
+<span id="cb9-98"><a href="#cb9-98" aria-hidden="true" tabindex="-1"></a>    <span class="st">"18"</span><span class="op">:</span> <span class="st">"bed"</span><span class="op">,</span></span>
+<span id="cb9-99"><a href="#cb9-99" aria-hidden="true" tabindex="-1"></a>    <span class="st">"23"</span><span class="op">:</span> <span class="st">"chair"</span><span class="op">,</span></span>
+<span id="cb9-100"><a href="#cb9-100" aria-hidden="true" tabindex="-1"></a>    <span class="st">"31"</span><span class="op">:</span> <span class="st">"dresser"</span><span class="op">,</span></span>
+<span id="cb9-101"><a href="#cb9-101" aria-hidden="true" tabindex="-1"></a>    <span class="st">"45"</span><span class="op">:</span> <span class="st">"plant_or_flower_pot"</span><span class="op">,</span></span>
+<span id="cb9-102"><a href="#cb9-102" aria-hidden="true" tabindex="-1"></a>    <span class="op">...</span></span>
+<span id="cb9-103"><a href="#cb9-103" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-104"><a href="#cb9-104" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-105"><a href="#cb9-105" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-106"><a href="#cb9-106" aria-hidden="true" tabindex="-1"></a>**Major object categories:**</span>
+<span id="cb9-107"><a href="#cb9-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-108"><a href="#cb9-108" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Architectural: walls, floors, ceilings, doors, windows</span>
+<span id="cb9-109"><a href="#cb9-109" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Furniture: bed, chair, sofa, table, cabinet, dresser, shelf</span>
+<span id="cb9-110"><a href="#cb9-110" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Decorations: lamp, mirror, picture_frame, plant, rug</span>
+<span id="cb9-111"><a href="#cb9-111" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Utilities: fan, container, clothes_rack</span>
+<span id="cb9-112"><a href="#cb9-112" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-113"><a href="#cb9-113" aria-hidden="true" tabindex="-1"></a><span class="fu">## Trajectory (`trajectory.csv`)</span></span>
+<span id="cb9-114"><a href="#cb9-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-115"><a href="#cb9-115" aria-hidden="true" tabindex="-1"></a>6DoF camera poses at each frame, aligned with the scene coordinate system:</span>
+<span id="cb9-116"><a href="#cb9-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-117"><a href="#cb9-117" aria-hidden="true" tabindex="-1"></a><span class="in">```csv</span></span>
+<span id="cb9-118"><a href="#cb9-118" aria-hidden="true" tabindex="-1"></a>graph_uid<span class="op">,</span>tracking_timestamp_us<span class="op">,</span>utc_timestamp_ns<span class="op">,</span>tx_world_device<span class="op">,</span>ty_world_device<span class="op">,</span>tz_world_device<span class="op">,</span>qx_world_device<span class="op">,</span>qy_world_device<span class="op">,</span>qz_world_device<span class="op">,</span>qw_world_device</span>
+<span id="cb9-119"><a href="#cb9-119" aria-hidden="true" tabindex="-1"></a><span class="op">&lt;</span>uuid<span class="op">&gt;,</span><span class="dv">100000</span><span class="op">,-</span><span class="dv">1</span><span class="op">,</span><span class="fl">1.234</span><span class="op">,-</span><span class="fl">0.567</span><span class="op">,</span><span class="fl">1.650</span><span class="op">,</span><span class="fl">0.012</span><span class="op">,</span><span class="fl">0.034</span><span class="op">,-</span><span class="fl">0.456</span><span class="op">,</span><span class="fl">0.889</span></span>
+<span id="cb9-120"><a href="#cb9-120" aria-hidden="true" tabindex="-1"></a><span class="op">&lt;</span>uuid<span class="op">&gt;,</span><span class="dv">133333</span><span class="op">,-</span><span class="dv">1</span><span class="op">,</span><span class="fl">1.245</span><span class="op">,-</span><span class="fl">0.578</span><span class="op">,</span><span class="fl">1.651</span><span class="op">,</span><span class="fl">0.013</span><span class="op">,</span><span class="fl">0.035</span><span class="op">,-</span><span class="fl">0.457</span><span class="op">,</span><span class="fl">0.888</span></span>
+<span id="cb9-121"><a href="#cb9-121" aria-hidden="true" tabindex="-1"></a><span class="op">...</span></span>
+<span id="cb9-122"><a href="#cb9-122" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-123"><a href="#cb9-123" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-124"><a href="#cb9-124" aria-hidden="true" tabindex="-1"></a>See <span class="co">[</span><span class="ot">MPS Output - Trajectory</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_trajectory)</span> in the Project Aria documentation for details.</span>
+<span id="cb9-125"><a href="#cb9-125" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-126"><a href="#cb9-126" aria-hidden="true" tabindex="-1"></a>**Columns:**</span>
+<span id="cb9-127"><a href="#cb9-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-128"><a href="#cb9-128" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`graph_uid`</span>: Unique identifier for the coordinate frame</span>
+<span id="cb9-129"><a href="#cb9-129" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tracking_timestamp_us`</span>: Device timestamp in microseconds</span>
+<span id="cb9-130"><a href="#cb9-130" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`tx,ty,tz_world_device`</span>: 3D translation in meters</span>
+<span id="cb9-131"><a href="#cb9-131" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`qx,qy,qz,qw_world_device`</span>: Rotation quaternion (Hamilton convention)</span>
+<span id="cb9-132"><a href="#cb9-132" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-133"><a href="#cb9-133" aria-hidden="true" tabindex="-1"></a><span class="fu">## Semi-Dense Point Cloud (`semidense_points.csv.gz`)</span></span>
+<span id="cb9-134"><a href="#cb9-134" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-135"><a href="#cb9-135" aria-hidden="true" tabindex="-1"></a>3D points reconstructed from <span class="co">[</span><span class="ot">Project Aria Machine Perception Services</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/ARK/mps)</span>' SLAM, representing the scene geometry:</span>
+<span id="cb9-136"><a href="#cb9-136" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-137"><a href="#cb9-137" aria-hidden="true" tabindex="-1"></a><span class="in">```csv</span></span>
+<span id="cb9-138"><a href="#cb9-138" aria-hidden="true" tabindex="-1"></a>uid<span class="op">,</span>graph_uid<span class="op">,</span>px_world<span class="op">,</span>py_world<span class="op">,</span>pz_world<span class="op">,</span>inv_dist_std<span class="op">,</span>dist_std</span>
+<span id="cb9-139"><a href="#cb9-139" aria-hidden="true" tabindex="-1"></a><span class="dv">12345</span><span class="op">,&lt;</span>uuid<span class="op">&gt;,</span><span class="fl">1.234</span><span class="op">,-</span><span class="fl">0.567</span><span class="op">,</span><span class="fl">2.345</span><span class="op">,</span><span class="fl">8.130</span><span class="op">,</span><span class="fl">0.123</span></span>
+<span id="cb9-140"><a href="#cb9-140" aria-hidden="true" tabindex="-1"></a><span class="dv">12346</span><span class="op">,&lt;</span>uuid<span class="op">&gt;,</span><span class="fl">1.235</span><span class="op">,-</span><span class="fl">0.566</span><span class="op">,</span><span class="fl">2.346</span><span class="op">,</span><span class="fl">8.065</span><span class="op">,</span><span class="fl">0.124</span></span>
+<span id="cb9-141"><a href="#cb9-141" aria-hidden="true" tabindex="-1"></a><span class="op">...</span></span>
+<span id="cb9-142"><a href="#cb9-142" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-143"><a href="#cb9-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-144"><a href="#cb9-144" aria-hidden="true" tabindex="-1"></a>**Columns:**</span>
+<span id="cb9-145"><a href="#cb9-145" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-146"><a href="#cb9-146" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`uid`</span>: Unique point identifier</span>
+<span id="cb9-147"><a href="#cb9-147" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`graph_uid`</span>: Coordinate frame identifier, depending on the frame this point was first observed in.</span>
+<span id="cb9-148"><a href="#cb9-148" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`px,py,pz_world`</span>: 3D coordinates in world frame (meters)</span>
+<span id="cb9-149"><a href="#cb9-149" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`inv_dist_std`</span>: Inverse of distance standard deviation in <span class="co">[</span><span class="ot">$m^{-1}$</span><span class="co">]</span>, measure for the quality of the 3D PC</span>
+<span id="cb9-150"><a href="#cb9-150" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`dist_std`</span>: Distance standard deviation in meters (depth uncertainty)</span>
+<span id="cb9-151"><a href="#cb9-151" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-152"><a href="#cb9-152" aria-hidden="true" tabindex="-1"></a>Nominal threshold values are a maximum inv_dist_std of 0.005 and a maximum dist_std of 0.01.</span>
+<span id="cb9-153"><a href="#cb9-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-154"><a href="#cb9-154" aria-hidden="true" tabindex="-1"></a><span class="fu">## Point Observations (`semidense_observations.csv.gz`)</span></span>
+<span id="cb9-155"><a href="#cb9-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-156"><a href="#cb9-156" aria-hidden="true" tabindex="-1"></a>Records which camera frames observe which 3D points (visibility information):</span>
+<span id="cb9-157"><a href="#cb9-157" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-158"><a href="#cb9-158" aria-hidden="true" tabindex="-1"></a><span class="in">```csv</span></span>
+<span id="cb9-159"><a href="#cb9-159" aria-hidden="true" tabindex="-1"></a>uid<span class="op">,</span>frame_tracking_timestamp_us<span class="op">,</span>camera_serial<span class="op">,</span>u<span class="op">,</span>v</span>
+<span id="cb9-160"><a href="#cb9-160" aria-hidden="true" tabindex="-1"></a><span class="dv">12345</span><span class="op">,</span><span class="dv">100000</span><span class="op">,&lt;</span>serial<span class="op">&gt;,</span><span class="fl">512.3</span><span class="op">,</span><span class="fl">384.7</span></span>
+<span id="cb9-161"><a href="#cb9-161" aria-hidden="true" tabindex="-1"></a><span class="dv">12345</span><span class="op">,</span><span class="dv">133333</span><span class="op">,&lt;</span>serial<span class="op">&gt;,</span><span class="fl">515.1</span><span class="op">,</span><span class="fl">382.9</span></span>
+<span id="cb9-162"><a href="#cb9-162" aria-hidden="true" tabindex="-1"></a><span class="dv">12346</span><span class="op">,</span><span class="dv">100000</span><span class="op">,&lt;</span>serial<span class="op">&gt;,</span><span class="fl">620.8</span><span class="op">,</span><span class="fl">401.2</span></span>
+<span id="cb9-163"><a href="#cb9-163" aria-hidden="true" tabindex="-1"></a><span class="op">...</span></span>
+<span id="cb9-164"><a href="#cb9-164" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-165"><a href="#cb9-165" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-166"><a href="#cb9-166" aria-hidden="true" tabindex="-1"></a>**Columns:**</span>
+<span id="cb9-167"><a href="#cb9-167" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-168"><a href="#cb9-168" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`uid`</span>: Point identifier (ref to <span class="in">`uid`</span> in <span class="in">`semidense_points.csv.gz`</span>)</span>
+<span id="cb9-169"><a href="#cb9-169" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`frame_tracking_timestamp_us`</span>: Frame timestamp in microseconds</span>
+<span id="cb9-170"><a href="#cb9-170" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`camera_serial`</span>: Identifier of the camera which observed the point</span>
+<span id="cb9-171"><a href="#cb9-171" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`u,v`</span>: Sub-Pixel coordinates in the image frame of the camera that observed the point</span>
+<span id="cb9-172"><a href="#cb9-172" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-173"><a href="#cb9-173" aria-hidden="true" tabindex="-1"></a>Useful for:</span>
+<span id="cb9-174"><a href="#cb9-174" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-175"><a href="#cb9-175" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Understanding point visibility across views</span>
+<span id="cb9-176"><a href="#cb9-176" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Information about the surfaces in the scene, as well as free space</span>
+<span id="cb9-177"><a href="#cb9-177" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Computing information gain for NBV</span>
+<span id="cb9-178"><a href="#cb9-178" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Analyzing coverage and redundancy</span>
+<span id="cb9-179"><a href="#cb9-179" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-180"><a href="#cb9-180" aria-hidden="true" tabindex="-1"></a>For further information on both SLAM point clouds and visibility information, see <span class="co">[</span><span class="ot">MPS Output - Semi-Dense Point Cloud</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_pointcloud)</span>.</span>
+<span id="cb9-181"><a href="#cb9-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-182"><a href="#cb9-182" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-183"><a href="#cb9-183" aria-hidden="true" tabindex="-1"></a><span class="fu">## RGB Images (`rgb/*.png`)</span></span>
+<span id="cb9-184"><a href="#cb9-184" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-185"><a href="#cb9-185" aria-hidden="true" tabindex="-1"></a>Simulated Aria camera images (1408×1408 resolution, typical):</span>
+<span id="cb9-186"><a href="#cb9-186" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-187"><a href="#cb9-187" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Realistic lens distortion</span>
+<span id="cb9-188"><a href="#cb9-188" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Simulated lighting and materials</span>
+<span id="cb9-189"><a href="#cb9-189" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Egocentric perspective</span>
+<span id="cb9-190"><a href="#cb9-190" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-191"><a href="#cb9-191" aria-hidden="true" tabindex="-1"></a><span class="fu">## Depth Maps (`depth/*.png`)</span></span>
+<span id="cb9-192"><a href="#cb9-192" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-193"><a href="#cb9-193" aria-hidden="true" tabindex="-1"></a>**Ground truth** depth for each RGB frame (16-bit PNG, metric depth in millimeters):</span>
+<span id="cb9-194"><a href="#cb9-194" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-195"><a href="#cb9-195" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Perfect ground truth depth</span>
+<span id="cb9-196"><a href="#cb9-196" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Depth values stored as 16-bit integers representing millimeters</span>
+<span id="cb9-197"><a href="#cb9-197" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Corresponds 1:1 with RGB pixels</span>
+<span id="cb9-198"><a href="#cb9-198" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Metric depth enables direct unprojection to 3D point clouds</span>
+<span id="cb9-199"><a href="#cb9-199" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Useful for supervised learning and evaluation</span>
+<span id="cb9-200"><a href="#cb9-200" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Can still be used to obtain the oracle RRI to evaluate candidate views</span>
+<span id="cb9-201"><a href="#cb9-201" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-202"><a href="#cb9-202" aria-hidden="true" tabindex="-1"></a><span class="fu">## Instance Segmentation (`instances/*.png`)</span></span>
+<span id="cb9-203"><a href="#cb9-203" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-204"><a href="#cb9-204" aria-hidden="true" tabindex="-1"></a>Per-pixel instance labels (16-bit PNG):</span>
+<span id="cb9-205"><a href="#cb9-205" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-206"><a href="#cb9-206" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Each pixel value corresponds to an instance ID</span>
+<span id="cb9-207"><a href="#cb9-207" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Map IDs to classes using <span class="in">`object_instances_to_classes.json`</span></span>
+<span id="cb9-208"><a href="#cb9-208" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Enables entity-level analysis</span>
+<span id="cb9-209"><a href="#cb9-209" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-210"><a href="#cb9-210" aria-hidden="true" tabindex="-1"></a><span class="al">![ASE Primitives Visualization](../figures/scene-script/ase_primitives.jpg)</span>{width=90%}</span>
+<span id="cb9-211"><a href="#cb9-211" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-212"><a href="#cb9-212" aria-hidden="true" tabindex="-1"></a><span class="fu"># Modalities in EVL: Intuition &amp; Math</span></span>
+<span id="cb9-213"><a href="#cb9-213" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-214"><a href="#cb9-214" aria-hidden="true" tabindex="-1"></a>EVL consumes ASE snippets by projecting every voxel center $\mathbf{v}$ of a gravity-aligned grid $\mathcal{V}$ into all observed modalities and concatenating the resulting signals before 3D reasoning.</span>
+<span id="cb9-215"><a href="#cb9-215" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-216"><a href="#cb9-216" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Multi-stream images**: For each stream $s \in <span class="sc">\{</span>\text{rgb}, \text{slaml}, \text{slamr}<span class="sc">\}</span>$ and frame $f$, calibrated poses $\mathbf{T}_f^s$ and intrinsics $\mathbf{K}^s$ project $\mathbf{v}$ to pixels $\mathbf{p}^s_f = \pi(\mathbf{K}^s (\mathbf{T}_f^s)^{-1} \mathbf{v})$. DinoV2 features $\mathbf{F}^s_f(u,v)$ are sampled via bilinear interpolation and aggregated across time/streams by masked means and variances <span class="co">[</span><span class="ot">efm3d/model/lifter.py:398</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/lifter.py#L398)</span>.</span>
+<span id="cb9-217"><a href="#cb9-217" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Depth &amp; semi-dense points**: Distance maps provide metric rays $\mathbf{x}(u,v) = \mathcal{D}(u,v)\mathbf{K}^{-1}<span class="co">[</span><span class="ot">u,v,1</span><span class="co">]</span>^\top$, while SLAM points $\mathbf{P}_t$ with uncertainty (`dist_std`) voxelize into binary surface masks. Rays traced through measured points mark free-space voxels $\mathcal{M}_{\text{free}}$ <span class="co">[</span><span class="ot">efm3d/model/lifter.py:180</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/lifter.py#L180)</span> and <span class="co">[</span><span class="ot">efm3d/utils/ray.py:179</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/ray.py#L179)</span>.</span>
+<span id="cb9-218"><a href="#cb9-218" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**OBB supervision**: Snippets include oriented boxes stored as 34-channel <span class="in">`ObbTW`</span> tensors (<span class="in">`obbs/padded_snippet`</span>), already expressed in snippet coordinates with per-frame timestamps <span class="co">[</span><span class="ot">efm3d/aria/obb.py:97</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/aria/obb.py#L97)</span>. These supervise centerness, IoU, and class heads during training <span class="co">[</span><span class="ot">efm3d/utils/evl_loss.py:120</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/evl_loss.py#L120)</span>.</span>
+<span id="cb9-219"><a href="#cb9-219" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Occupancy targets &amp; meshes**: Ground-truth meshes $\mathcal{M}$ or depth samples populate occupancy grids through <span class="in">`pointcloud_to_occupancy_snippet`</span>, enabling per-voxel losses <span class="co">[</span><span class="ot">efm3d/utils/reconstruction.py:37</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/reconstruction.py#L37)</span> and later fusion/evaluation via marching cubes <span class="co">[</span><span class="ot">efm3d/inference/fuse.py:187</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/inference/fuse.py#L187)</span>.</span>
+<span id="cb9-220"><a href="#cb9-220" aria-hidden="true" tabindex="-1"></a>    **Note**: GT meshes are provided only for **100 validation scenes**!</span>
+<span id="cb9-221"><a href="#cb9-221" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-222"><a href="#cb9-222" aria-hidden="true" tabindex="-1"></a>Collectively these channels encode texture, geometry, free space, and semantics—the same ingredients we need for VIN-style RRI prediction on ASE sequences.</span>
+<span id="cb9-223"><a href="#cb9-223" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-224"><a href="#cb9-224" aria-hidden="true" tabindex="-1"></a><span class="fu"># GT 3D Assets &amp; Annotations</span></span>
+<span id="cb9-225"><a href="#cb9-225" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-226"><a href="#cb9-226" aria-hidden="true" tabindex="-1"></a><span class="fu">## Oriented Bounding Boxes</span></span>
+<span id="cb9-227"><a href="#cb9-227" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-228"><a href="#cb9-228" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The ASE → EFM adaptor injects <span class="in">`obbs/padded_snippet`</span> (shape <span class="in">`[T, 128, 34]`</span>) plus <span class="in">`obbs/sem_id_to_name`</span> for each snippet. Helper methods keep them aligned with the snippet frame <span class="co">[</span><span class="ot">efm3d/dataset/efm_model_adaptor.py:480</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/efm_model_adaptor.py#L480)</span>.</span>
+<span id="cb9-229"><a href="#cb9-229" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Classes follow the 43-category taxonomy shipped with EFM3D; optional remapping via <span class="in">`config/taxonomy/atek_to_efm.csv`</span> harmonises ATEK labels.</span>
+<span id="cb9-230"><a href="#cb9-230" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Access pattern: <span class="in">`batch[ARIA_OBB_PADDED]`</span> returns an <span class="in">`ObbTW`</span> wrapper supporting <span class="in">`.transform`</span>, <span class="in">`.bb3_center_world`</span>, etc.</span>
+<span id="cb9-231"><a href="#cb9-231" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-232"><a href="#cb9-232" aria-hidden="true" tabindex="-1"></a><span class="fu">## Ground-Truth Meshes</span></span>
+<span id="cb9-233"><a href="#cb9-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-234"><a href="#cb9-234" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Validation scenes deliver watertight meshes stored as <span class="in">`scene_ply_{scene_id}.ply`</span> (ASE) or <span class="in">`gt_mesh.ply`</span> (ADT). EVL tooling resolves them via <span class="in">`get_gt_mesh_ply()`</span> using the sequence id <span class="co">[</span><span class="ot">efm3d/inference/pipeline.py:33</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/inference/pipeline.py#L33)</span>.</span>
+<span id="cb9-235"><a href="#cb9-235" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Meshes are not embedded in the snippet batch; load them on demand for evaluation or to create oracle RRIs. Surface samples feed algorithms like <span class="in">`eval_mesh_to_mesh`</span> for Chamfer/F-score computation <span class="co">[</span><span class="ot">efm3d/utils/mesh_utils.py:136</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/mesh_utils.py#L136)</span>.</span>
+<span id="cb9-236"><a href="#cb9-236" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-237"><a href="#cb9-237" aria-hidden="true" tabindex="-1"></a><span class="fu"># EVL Training Format (ATEK WebDataset) {#atek-wds-format}</span></span>
+<span id="cb9-238"><a href="#cb9-238" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-239"><a href="#cb9-239" aria-hidden="true" tabindex="-1"></a>EFM3D trains EVL on ATEK WebDataset (WDS) snippets: 2 s shards (20 frames) are streamed and cropped into overlapping 1 s windows (10 frames) via <span class="in">`AtekWdsStreamDataset`</span> <span class="co">[</span><span class="ot">efm3d/dataset/atek_wds_dataset.py:70</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/atek_wds_dataset.py#L70)</span>. The adaptor enforces fixed shapes and timestamps <span class="co">[</span><span class="ot">efm3d/dataset/efm_model_adaptor.py:604</span><span class="co">](https://github.com/facebookresearch/efm3d/blob/main/efm3d/dataset/efm_model_adaptor.py#L604)</span>.</span>
+<span id="cb9-240"><a href="#cb9-240" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-241"><a href="#cb9-241" aria-hidden="true" tabindex="-1"></a><span class="fu">## ATEK Key Naming Convention</span></span>
+<span id="cb9-242"><a href="#cb9-242" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-243"><a href="#cb9-243" aria-hidden="true" tabindex="-1"></a>ATEK uses a structured naming scheme for data keys:</span>
+<span id="cb9-244"><a href="#cb9-244" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-245"><a href="#cb9-245" aria-hidden="true" tabindex="-1"></a>**Format**: <span class="in">`&lt;prefix&gt;#&lt;identifier&gt;+&lt;parameter&gt;`</span></span>
+<span id="cb9-246"><a href="#cb9-246" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-247"><a href="#cb9-247" aria-hidden="true" tabindex="-1"></a>**Prefixes**:</span>
+<span id="cb9-248"><a href="#cb9-248" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-249"><a href="#cb9-249" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`mtd`</span> = **M**otion **T**rajectory **D**ata (device poses over time)</span>
+<span id="cb9-250"><a href="#cb9-250" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`mfcd`</span> = **M**ulti-**F**rame **C**amera **D**ata (per-frame camera data)</span>
+<span id="cb9-251"><a href="#cb9-251" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`msdpd`</span> = **M**ulti-**S**emi-**D**ense **P**oint **D**ata (SLAM point clouds)</span>
+<span id="cb9-252"><a href="#cb9-252" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-253"><a href="#cb9-253" aria-hidden="true" tabindex="-1"></a>**Separators**:</span>
+<span id="cb9-254"><a href="#cb9-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-255"><a href="#cb9-255" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`#`</span> separates prefix from identifier</span>
+<span id="cb9-256"><a href="#cb9-256" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`+`</span> separates identifier from parameter</span>
+<span id="cb9-257"><a href="#cb9-257" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-258"><a href="#cb9-258" aria-hidden="true" tabindex="-1"></a>**Examples**:</span>
+<span id="cb9-259"><a href="#cb9-259" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-260"><a href="#cb9-260" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb9-261"><a href="#cb9-261" aria-hidden="true" tabindex="-1"></a><span class="co"># Motion trajectory: (T, 3, 4) SE(3) transformation matrices</span></span>
+<span id="cb9-262"><a href="#cb9-262" aria-hidden="true" tabindex="-1"></a>ts_world_device <span class="op">=</span> sample[<span class="st">"mtd#ts_world_device"</span>]</span>
+<span id="cb9-263"><a href="#cb9-263" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-264"><a href="#cb9-264" aria-hidden="true" tabindex="-1"></a><span class="co"># Camera projection parameters</span></span>
+<span id="cb9-265"><a href="#cb9-265" aria-hidden="true" tabindex="-1"></a>projection_params <span class="op">=</span> sample[<span class="st">"mfcd#camera-rgb+projection_params"</span>]</span>
+<span id="cb9-266"><a href="#cb9-266" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-267"><a href="#cb9-267" aria-hidden="true" tabindex="-1"></a><span class="co"># Depth images: (T, 1, H, W)</span></span>
+<span id="cb9-268"><a href="#cb9-268" aria-hidden="true" tabindex="-1"></a>depth_images <span class="op">=</span> sample[<span class="st">"mfcd#camera-rgb-depth+images"</span>]</span>
+<span id="cb9-269"><a href="#cb9-269" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-270"><a href="#cb9-270" aria-hidden="true" tabindex="-1"></a><span class="co"># Semi-dense SLAM points: (N, 3) in world coordinates</span></span>
+<span id="cb9-271"><a href="#cb9-271" aria-hidden="true" tabindex="-1"></a>points_world <span class="op">=</span> sample[<span class="st">"msdpd#points_world+stacked"</span>]</span>
+<span id="cb9-272"><a href="#cb9-272" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-273"><a href="#cb9-273" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-274"><a href="#cb9-274" aria-hidden="true" tabindex="-1"></a><span class="fu">## ATEK Data Keys</span></span>
+<span id="cb9-275"><a href="#cb9-275" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-276"><a href="#cb9-276" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Key <span class="pp">|</span> Shape <span class="pp">|</span> Type <span class="pp">|</span> Description <span class="pp">|</span></span>
+<span id="cb9-277"><a href="#cb9-277" aria-hidden="true" tabindex="-1"></a><span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">|</span></span>
+<span id="cb9-278"><a href="#cb9-278" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/img`</span>, <span class="in">`slaml/img`</span>, <span class="in">`slamr/img`</span> <span class="pp">|</span> <span class="in">`[F, C, H, W]`</span> (≈<span class="in">`[10, 3/1, 1408, 1408]`</span>) <span class="pp">|</span> float32 <span class="pp">|</span> Normalized frames per stream. <span class="pp">|</span></span>
+<span id="cb9-279"><a href="#cb9-279" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/calib`</span>, <span class="in">`slaml/calib`</span>, <span class="in">`slamr/calib`</span> <span class="pp">|</span> CameraTW <span class="pp">|</span> TensorWrapper <span class="pp">|</span> Intrinsics/extrinsics replicated across frames. <span class="pp">|</span></span>
+<span id="cb9-280"><a href="#cb9-280" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/t_snippet_rig`</span>, … <span class="pp">|</span> <span class="in">`[F, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Camera poses in snippet frame. <span class="pp">|</span></span>
+<span id="cb9-281"><a href="#cb9-281" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`pose/t_snippet_rig`</span> <span class="pp">|</span> <span class="in">`[F, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Rig trajectory used for lifting. <span class="pp">|</span></span>
+<span id="cb9-282"><a href="#cb9-282" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`points/p3s_world`</span> <span class="pp">|</span> <span class="in">`[F, N, 3]`</span> (N≈50 000) <span class="pp">|</span> float32 <span class="pp">|</span> Semi-dense SLAM points (NaN padded). <span class="pp">|</span></span>
+<span id="cb9-283"><a href="#cb9-283" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`points/dist_std`</span>, <span class="in">`points/inv_dist_std`</span> <span class="pp">|</span> <span class="in">`[F, N, 1]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Depth uncertainty per point. <span class="pp">|</span></span>
+<span id="cb9-284"><a href="#cb9-284" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/distance_m`</span> <span class="pp">|</span> <span class="in">`[F, 1, H, W]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Ray distances from GT depth. <span class="pp">|</span></span>
+<span id="cb9-285"><a href="#cb9-285" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`obbs/padded_snippet`</span> <span class="pp">|</span> <span class="in">`[F, 128, 34]`</span> <span class="pp">|</span> ObbTW <span class="pp">|</span> Padded oriented boxes with semantics. <span class="pp">|</span></span>
+<span id="cb9-286"><a href="#cb9-286" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`obbs/sem_id_to_name`</span> <span class="pp">|</span> dict <span class="pp">|</span> mapping <span class="pp">|</span> Semantic lookup table. <span class="pp">|</span></span>
+<span id="cb9-287"><a href="#cb9-287" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`snippet/t_world_snippet`</span> <span class="pp">|</span> <span class="in">`[1, 12]`</span> <span class="pp">|</span> PoseTW <span class="pp">|</span> Snippet anchor pose in world frame. <span class="pp">|</span></span>
+<span id="cb9-288"><a href="#cb9-288" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`snippet/time_ns`</span> <span class="pp">|</span> <span class="in">`[1, 1]`</span> <span class="pp">|</span> int64 <span class="pp">|</span> Start timestamp for relative times. <span class="pp">|</span></span>
+<span id="cb9-289"><a href="#cb9-289" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`rgb/img/snippet_time_s`</span>, … <span class="pp">|</span> <span class="in">`[F, 1]`</span> <span class="pp">|</span> float32 <span class="pp">|</span> Relative timestamps per modality. <span class="pp">|</span></span>
+<span id="cb9-290"><a href="#cb9-290" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-291"><a href="#cb9-291" aria-hidden="true" tabindex="-1"></a>**Practical notes.**</span>
+<span id="cb9-292"><a href="#cb9-292" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-293"><a href="#cb9-293" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Tensor wrappers (<span class="in">`CameraTW`</span>, <span class="in">`PoseTW`</span>, <span class="in">`ObbTW`</span>) behave like torch tensors while exposing interpolation/transform helpers.</span>
+<span id="cb9-294"><a href="#cb9-294" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`points/p3s_world`</span> is already aligned with the snippet frame; invalid slots are NaN so masks can be inferred cheaply.</span>
+<span id="cb9-295"><a href="#cb9-295" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`obbs/padded_snippet`</span> is present for ASE training snippets; if absent (<span class="in">`gt_exists_flag=False`</span>) the adaptor skips OBB processing.</span>
+<span id="cb9-296"><a href="#cb9-296" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Ground-truth meshes stay on disk—resolve them lazily when computing Chamfer/F-score or oracle RRIs.</span>
+<span id="cb9-297"><a href="#cb9-297" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-298"><a href="#cb9-298" aria-hidden="true" tabindex="-1"></a><span class="fu"># Coordinate Conventions</span></span>
+<span id="cb9-299"><a href="#cb9-299" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-300"><a href="#cb9-300" aria-hidden="true" tabindex="-1"></a>ASE follows Project Aria's coordinate conventions:</span>
+<span id="cb9-301"><a href="#cb9-301" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-302"><a href="#cb9-302" aria-hidden="true" tabindex="-1"></a><span class="fu">## World Frame</span></span>
+<span id="cb9-303"><a href="#cb9-303" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-304"><a href="#cb9-304" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Origin**: Arbitrary world coordinate origin for each scene</span>
+<span id="cb9-305"><a href="#cb9-305" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Axes**: Typically Z-up, Manhattan-world aligned</span>
+<span id="cb9-306"><a href="#cb9-306" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Units**: Meters</span>
+<span id="cb9-307"><a href="#cb9-307" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-308"><a href="#cb9-308" aria-hidden="true" tabindex="-1"></a><span class="fu">## Camera Frame</span></span>
+<span id="cb9-309"><a href="#cb9-309" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-310"><a href="#cb9-310" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Origin**: At camera's optical center</span>
+<span id="cb9-311"><a href="#cb9-311" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**X-axis**: Points right (from camera perspective)</span>
+<span id="cb9-312"><a href="#cb9-312" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Y-axis**: Points down</span>
+<span id="cb9-313"><a href="#cb9-313" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Z-axis**: Points forward (optical axis)</span>
+<span id="cb9-314"><a href="#cb9-314" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-315"><a href="#cb9-315" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-316"><a href="#cb9-316" aria-hidden="true" tabindex="-1"></a><span class="fu">### Using ATEK for ML Workflows</span></span>
+<span id="cb9-317"><a href="#cb9-317" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-318"><a href="#cb9-318" aria-hidden="true" tabindex="-1"></a>For training and evaluation, use ATEK's preprocessed datasets and tools:</span>
+<span id="cb9-319"><a href="#cb9-319" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-320"><a href="#cb9-320" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
+<span id="cb9-321"><a href="#cb9-321" aria-hidden="true" tabindex="-1"></a><span class="co"># Download preprocessed ASE data (PyTorch WebDataset format)</span></span>
+<span id="cb9-322"><a href="#cb9-322" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/atek_wds_data_downloader.py <span class="dt">\</span></span>
+<span id="cb9-323"><a href="#cb9-323" aria-hidden="true" tabindex="-1"></a>  <span class="at">--config-name</span> efm <span class="dt">\</span></span>
+<span id="cb9-324"><a href="#cb9-324" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_ATEK_download_urls.json <span class="dt">\</span></span>
+<span id="cb9-325"><a href="#cb9-325" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./data/ase_atek <span class="dt">\</span></span>
+<span id="cb9-326"><a href="#cb9-326" aria-hidden="true" tabindex="-1"></a>  <span class="at">--download-wds-to-local</span></span>
+<span id="cb9-327"><a href="#cb9-327" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-328"><a href="#cb9-328" aria-hidden="true" tabindex="-1"></a><span class="co"># Download ground truth meshes for evaluation</span></span>
+<span id="cb9-329"><a href="#cb9-329" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/ase_mesh_downloader.py <span class="dt">\</span></span>
+<span id="cb9-330"><a href="#cb9-330" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_mesh_download_urls.json <span class="dt">\</span></span>
+<span id="cb9-331"><a href="#cb9-331" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./ase_meshes</span>
+<span id="cb9-332"><a href="#cb9-332" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

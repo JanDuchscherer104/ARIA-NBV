@@ -9,6 +9,13 @@
 - **Training**: In Isaac Gym; 24h on an NVIDIA Tesla V100 (16GB VRAM)
 - **Benchmarking**: Established a benchmark using the Isaac Gym Simulator with the Houses3K (3k textured 3D building models) and OmniObject3D (4k high-fidelity scans of objects across 190 categories) datasets, yielding 98.3% AUC and 97.1% _final coverage ratio_ on unseen building-scale scenes.
 
+### Local \LaTeX{} Sources
+
+- [`main.tex`](../../literature/tex-src/arXiv-GenNBV/main.tex) – full CVPR submission.
+- [`Supp/supp.tex`](../../literature/tex-src/arXiv-GenNBV/Supp/supp.tex) – supplemental material and AUC curves.
+- [`Figure/Fig_Teaser_v5.pdf`](../../literature/tex-src/arXiv-GenNBV/Figure/Fig_Teaser_v5.pdf) – teaser used in our docs.
+- [`README.md`](../../literature/tex-src/arXiv-GenNBV/README.md) – build instructions and compilation notes.
+
 ### Problem Setup and I/O
 
 Each time step $t$ yields an observation

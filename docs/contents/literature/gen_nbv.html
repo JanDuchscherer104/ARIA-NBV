@@ -357,6 +357,10 @@ window.Quarto = {
     <a class="dropdown-item" href="../../contents/questions.html">
  <span class="dropdown-text">Research Questions</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/experiments/findings.html">
+ <span class="dropdown-text">Findings</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -561,6 +565,12 @@ window.Quarto = {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/prj_aria_tools_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ProjectAria Tools: Complete Reference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="../../contents/impl/rri_computation.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Computing RRI with Ground Truth Meshes</span></a>
   </div>
@@ -614,10 +624,11 @@ window.Quarto = {
   <ul>
   <li><a href="#gen-nbv" id="toc-gen-nbv" class="nav-link active" data-scroll-target="#gen-nbv"><span class="header-section-number">1</span> GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction</a>
   <ul class="collapse">
-  <li><a href="#problem-setup-and-io" id="toc-problem-setup-and-io" class="nav-link" data-scroll-target="#problem-setup-and-io"><span class="header-section-number">1.1</span> Problem Setup and I/O</a></li>
-  <li><a href="#state-embedding-and-policy-architecture" id="toc-state-embedding-and-policy-architecture" class="nav-link" data-scroll-target="#state-embedding-and-policy-architecture"><span class="header-section-number">1.2</span> State Embedding and Policy Architecture</a></li>
-  <li><a href="#reward-design-and-optimization" id="toc-reward-design-and-optimization" class="nav-link" data-scroll-target="#reward-design-and-optimization"><span class="header-section-number">1.3</span> Reward Design and Optimization</a></li>
-  <li><a href="#notes-and-limitations" id="toc-notes-and-limitations" class="nav-link" data-scroll-target="#notes-and-limitations"><span class="header-section-number">1.4</span> Notes and Limitations</a></li>
+  <li><a href="#local-sources" id="toc-local-sources" class="nav-link" data-scroll-target="#local-sources"><span class="header-section-number">1.1</span> Local Sources</a></li>
+  <li><a href="#problem-setup-and-io" id="toc-problem-setup-and-io" class="nav-link" data-scroll-target="#problem-setup-and-io"><span class="header-section-number">1.2</span> Problem Setup and I/O</a></li>
+  <li><a href="#state-embedding-and-policy-architecture" id="toc-state-embedding-and-policy-architecture" class="nav-link" data-scroll-target="#state-embedding-and-policy-architecture"><span class="header-section-number">1.3</span> State Embedding and Policy Architecture</a></li>
+  <li><a href="#reward-design-and-optimization" id="toc-reward-design-and-optimization" class="nav-link" data-scroll-target="#reward-design-and-optimization"><span class="header-section-number">1.4</span> Reward Design and Optimization</a></li>
+  <li><a href="#notes-and-limitations" id="toc-notes-and-limitations" class="nav-link" data-scroll-target="#notes-and-limitations"><span class="header-section-number">1.5</span> Notes and Limitations</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -639,8 +650,17 @@ window.Quarto = {
 <li><strong>Training</strong>: In Isaac Gym; 24h on an NVIDIA Tesla V100 (16GB VRAM)</li>
 <li><strong>Benchmarking</strong>: Established a benchmark using the Isaac Gym Simulator with the Houses3K (3k textured 3D building models) and OmniObject3D (4k high-fidelity scans of objects across 190 categories) datasets, yielding 98.3% AUC and 97.1% <em>final coverage ratio</em> on unseen building-scale scenes.</li>
 </ul>
-<section id="problem-setup-and-io" class="level3" data-number="1.1">
-<h3 data-number="1.1" class="anchored" data-anchor-id="problem-setup-and-io"><span class="header-section-number">1.1</span> Problem Setup and I/O</h3>
+<section id="local-sources" class="level3" data-number="1.1">
+<h3 data-number="1.1" class="anchored" data-anchor-id="local-sources"><span class="header-section-number">1.1</span> Local Sources</h3>
+<ul>
+<li><a href="../../literature/tex-src/arXiv-GenNBV/main.tex"><code>main.tex</code></a> – full CVPR submission.</li>
+<li><a href="../../literature/tex-src/arXiv-GenNBV/Supp/supp.tex"><code>Supp/supp.tex</code></a> – supplemental material and AUC curves.</li>
+<li><a href="../../literature/tex-src/arXiv-GenNBV/Figure/Fig_Teaser_v5.pdf"><code>Figure/Fig_Teaser_v5.pdf</code></a> – teaser used in our docs.</li>
+<li><a href="../../literature/tex-src/arXiv-GenNBV/README.md"><code>README.md</code></a> – build instructions and compilation notes.</li>
+</ul>
+</section>
+<section id="problem-setup-and-io" class="level3" data-number="1.2">
+<h3 data-number="1.2" class="anchored" data-anchor-id="problem-setup-and-io"><span class="header-section-number">1.2</span> Problem Setup and I/O</h3>
 <p>Each time step <span class="math inline">\(t\)</span> yields an observation <span class="math display">\[
 o_t = \{I_{1:t}, D_{1:t}, a_{1:t}, p_t\},
 \]</span> where <span class="math inline">\(I\)</span> and <span class="math inline">\(D\)</span> are RGB and depth frames, <span class="math inline">\(a_{1:t} \in \mathcal{A} \subset \text{SE}(3)\)</span> are historic actions, and <span class="math inline">\(p_t \in \mathbb{R}^3\)</span> encodes the current pose. The policy applies an encoder <span class="math inline">\(\phi\)</span> to produce a state embedding <span class="math inline">\(s_t=\phi(o_t)\)</span> and samples the next viewpoint from a Gaussian policy, <span class="math display">\[
@@ -649,8 +669,8 @@ a_t \sim \pi_\theta(a\,|\,s_t) = \mathcal{N}\!\left(\mu_\theta(s_t),\,\Sigma_\th
 <p>GenNBV’s geometric backbone maintains a probabilistic occupancy grid <span class="math inline">\(F_t^G\)</span> that is updated by log-odds accumulation along each sensor ray <span class="math inline">\(z_j\)</span>:</p>
 <p>with constant <span class="math inline">\(C\)</span> reflecting ray confidence. Voxels are thresholded into <span class="math inline">\(\{\text{occupied}, \text{free}, \text{unknown}\}\)</span> to summarize coverage and guide planning.</p>
 </section>
-<section id="state-embedding-and-policy-architecture" class="level3" data-number="1.2">
-<h3 data-number="1.2" class="anchored" data-anchor-id="state-embedding-and-policy-architecture"><span class="header-section-number">1.2</span> State Embedding and Policy Architecture</h3>
+<section id="state-embedding-and-policy-architecture" class="level3" data-number="1.3">
+<h3 data-number="1.3" class="anchored" data-anchor-id="state-embedding-and-policy-architecture"><span class="header-section-number">1.3</span> State Embedding and Policy Architecture</h3>
 <p><strong>Geometric encoder</strong>:</p>
 <p>Depth maps are back-projected to obtain a 3D PC, voxelized, and mapped to a three-state occupancy grid: <span class="math inline">\(F_t^G \in \{\text{occupied}, \text{free}, \text{unknown}\}^{H\times W \times D }\)</span>, where each voxel is assigned to a state of it being <em>occupied</em>, <em>free</em>, or <em>unknown</em> (i.e.&nbsp;to what degree the voxel has been observed). <span class="math inline">\(F_t^G\)</span> is updated at each step using <a href="https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm">Bresenham’s line algorithm</a> by tracing rays from the camera origin and the back-projected 3D points:</p>
 <p><span class="math display">\[
@@ -661,8 +681,8 @@ a_t \sim \pi_\theta(a\,|\,s_t) = \mathcal{N}\!\left(\mu_\theta(s_t),\,\Sigma_\th
 <p><strong>Action history encoder</strong>: Recent 5D poses are linearly projected to <span class="math inline">\(s_t^A\)</span>.</p>
 <p><strong>State Embedding and Policy Network</strong>: The concatenated vector <span class="math inline">\(s_t = \mathrm{Linear}(s_t^G; s_t^S; s_t^A)\)</span> feeds a three-layer MLP that outputs the mean and variance of the continuous action distribution.</p>
 </section>
-<section id="reward-design-and-optimization" class="level3" data-number="1.3">
-<h3 data-number="1.3" class="anchored" data-anchor-id="reward-design-and-optimization"><span class="header-section-number">1.3</span> Reward Design and Optimization</h3>
+<section id="reward-design-and-optimization" class="level3" data-number="1.4">
+<h3 data-number="1.4" class="anchored" data-anchor-id="reward-design-and-optimization"><span class="header-section-number">1.4</span> Reward Design and Optimization</h3>
 <p>Coverage is measured by thresholding <span class="math inline">\(F_t^G\)</span> to count occupied voxels <span class="math inline">\(\tilde N_t\)</span> relative to the ground-truth surface voxel count <span class="math inline">\(N^*\)</span>: <span class="math display">\[
 \text{CR}_t = \frac{\tilde N_t}{N^*}\cdot 100\%.
 \]</span> The primary reward is the temporal gain in coverage, similar to TD(0): <span class="math display">\[
@@ -671,8 +691,8 @@ r^{\text{CR}}_{t+1} = \text{CR}_{t+1} - \text{CR}_t,
 L^{\text{CLIP}}(\theta) = \mathbb{E}_t\!\left[\min\!\big(\eta_t(\theta) A_t,\; \mathrm{clip}(\eta_t(\theta), 1-\epsilon, 1+\epsilon) A_t\big)\right],
 \]</span> where <span class="math inline">\(\eta_t(\theta)=\tfrac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t)}\)</span> and <span class="math inline">\(A_t\)</span> is the advantage estimate.</p>
 </section>
-<section id="notes-and-limitations" class="level3" data-number="1.4">
-<h3 data-number="1.4" class="anchored" data-anchor-id="notes-and-limitations"><span class="header-section-number">1.4</span> Notes and Limitations</h3>
+<section id="notes-and-limitations" class="level3" data-number="1.5">
+<h3 data-number="1.5" class="anchored" data-anchor-id="notes-and-limitations"><span class="header-section-number">1.5</span> Notes and Limitations</h3>
 <ul>
 <li>Coverage-centric rewards ignore reconstruction fidelity; surfaces with equal occupancy weight receive identical priority.</li>
 <li>Semantic reasoning is limited to appearance cues and lacks task-driven surface weighting.</li>
@@ -1173,64 +1193,71 @@ L^{\text{CLIP}}(\theta) = \mathbb{E}_t\!\left[\min\!\big(\eta_t(\theta) A_t,\; \
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Training**: In Isaac Gym; 24h on an NVIDIA Tesla V100 (16GB VRAM)</span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Benchmarking**: Established a benchmark using the Isaac Gym Simulator with the Houses3K (3k textured 3D building models) and OmniObject3D (4k high-fidelity scans of objects across 190 categories) datasets, yielding 98.3% AUC and 97.1% _final coverage ratio_ on unseen building-scale scenes.</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="fu">### Problem Setup and I/O</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="fu">### Local \LaTeX{} Sources</span></span>
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>Each time step $t$ yields an observation</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>o_t = <span class="sc">\{</span>I_{1:t}, D_{1:t}, a_{1:t}, p_t<span class="sc">\}</span>,</span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>where $I$ and $D$ are RGB and depth frames, $a_{1:t} \in \mathcal{A} \subset \text{SE}(3)$ are historic actions, and $p_t \in \mathbb{R}^3$ encodes the current pose. The policy applies an encoder $\phi$ to produce a state embedding $s_t=\phi(o_t)$ and samples the next viewpoint from a Gaussian policy,</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>a_t \sim \pi_\theta(a\,|\,s_t) = \mathcal{N}<span class="sc">\!</span>\left(\mu_\theta(s_t),\,\Sigma_\theta(s_t)\right),</span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>yielding a 5D camera pose that is executed by a CrazyFlie UAV in simulation.</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>GenNBV’s geometric backbone maintains a probabilistic occupancy grid $F_t^G$ that is updated by log-odds accumulation along each sensor ray $z_j$:</span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>with constant $C$ reflecting ray confidence. Voxels are thresholded into $<span class="sc">\{</span>\text{occupied}, \text{free}, \text{unknown}<span class="sc">\}</span>$ to summarize coverage and guide planning.</span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="fu">### State Embedding and Policy Architecture</span></span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>**Geometric encoder**:</span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>Depth maps are back-projected to obtain a 3D PC, voxelized, and mapped to a three-state occupancy grid:</span>
-<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>  $F_t^G \in <span class="sc">\{</span>\text{occupied}, \text{free}, \text{unknown}<span class="sc">\}</span>^{H\times W \times D }$, where each voxel is assigned to a state of it being _occupied_, _free_, or _unknown_ (i.e. to what degree the voxel has been observed). $F_t^G$ is updated at each step using <span class="co">[</span><span class="ot">Bresenham's line algorithm</span><span class="co">](https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm)</span> by tracing rays from the camera origin and the back-projected 3D points:</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`main.tex`</span><span class="co">](../../literature/tex-src/arXiv-GenNBV/main.tex)</span> – full CVPR submission.</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`Supp/supp.tex`</span><span class="co">](../../literature/tex-src/arXiv-GenNBV/Supp/supp.tex)</span> – supplemental material and AUC curves.</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`Figure/Fig_Teaser_v5.pdf`</span><span class="co">](../../literature/tex-src/arXiv-GenNBV/Figure/Fig_Teaser_v5.pdf)</span> – teaser used in our docs.</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`README.md`</span><span class="co">](../../literature/tex-src/arXiv-GenNBV/README.md)</span> – build instructions and compilation notes.</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="fu">### Problem Setup and I/O</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>Each time step $t$ yields an observation</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>o_t = <span class="sc">\{</span>I_{1:t}, D_{1:t}, a_{1:t}, p_t<span class="sc">\}</span>,</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>where $I$ and $D$ are RGB and depth frames, $a_{1:t} \in \mathcal{A} \subset \text{SE}(3)$ are historic actions, and $p_t \in \mathbb{R}^3$ encodes the current pose. The policy applies an encoder $\phi$ to produce a state embedding $s_t=\phi(o_t)$ and samples the next viewpoint from a Gaussian policy,</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>a_t \sim \pi_\theta(a\,|\,s_t) = \mathcal{N}<span class="sc">\!</span>\left(\mu_\theta(s_t),\,\Sigma_\theta(s_t)\right),</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>yielding a 5D camera pose that is executed by a CrazyFlie UAV in simulation.</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>GenNBV’s geometric backbone maintains a probabilistic occupancy grid $F_t^G$ that is updated by log-odds accumulation along each sensor ray $z_j$:</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>with constant $C$ reflecting ray confidence. Voxels are thresholded into $<span class="sc">\{</span>\text{occupied}, \text{free}, \text{unknown}<span class="sc">\}</span>$ to summarize coverage and guide planning.</span>
 <span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>\log \mathrm{Odd}(v_i \mid z_j) = \log \mathrm{Odd}(v_i) + C,</span>
-<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="fu">### State Embedding and Policy Architecture</span></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>**Geometric encoder**:</span>
 <span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>where $v_i$ denotes the occupancy likelihood of the $i$-th voxel given the probability of the $j$-th ray from the camera passes through it. The classification into the three states is done by thresholding the log-odds values. The encoder network consists of a simple MLP after flattening the occupancy grid.</span>
-<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a>**Semantic encoder**: A two-layer CNN, with consequent one-layer MLP consumes the concatenated $I_{t-k:t}$ grayscale frames to produce $s_t^S$.</span>
-<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>**Action history encoder**: Recent 5D poses are linearly projected to $s_t^A$.</span>
-<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>**State Embedding and Policy Network**: The concatenated vector $s_t = \mathrm{Linear}(s_t^G; s_t^S; s_t^A)$ feeds a three-layer MLP that outputs the mean and variance of the continuous action distribution.</span>
-<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a><span class="fu">### Reward Design and Optimization</span></span>
-<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a>Coverage is measured by thresholding $F_t^G$ to count occupied voxels $\tilde N_t$ relative to the ground-truth surface voxel count $N^*$:</span>
-<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>\text{CR}_t = \frac{\tilde N_t}{N^*}\cdot 100\%.</span>
-<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>The primary reward is the temporal gain in coverage, similar to TD(0):</span>
-<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a>r^{\text{CR}}_{t+1} = \text{CR}_{t+1} - \text{CR}_t,</span>
-<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a>augmented with penalties for collisions and overly long trajectories. Policy parameters are optimized with proximal policy optimization (PPO) using the clipped surrogate,</span>
-<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>L^{\text{CLIP}}(\theta) = \mathbb{E}_t<span class="sc">\!</span>\left<span class="co">[</span><span class="ot">\min\!\big(\eta_t(\theta) A_t,\; \mathrm{clip}(\eta_t(\theta), 1-\epsilon, 1+\epsilon) A_t\big)\right</span><span class="co">]</span>,</span>
-<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a>where $\eta_t(\theta)=\tfrac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t)}$ and $A_t$ is the advantage estimate.</span>
-<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a><span class="fu">### Notes and Limitations</span></span>
-<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Coverage-centric rewards ignore reconstruction fidelity; surfaces with equal occupancy weight receive identical priority.</span>
-<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Semantic reasoning is limited to appearance cues and lacks task-driven surface weighting.</span>
-<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Architecture lacks explicit 3D spatial reasoning-</span>
-<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Doesn't leverage powerful geometric embeddings (e.g. Fourier features)</span>
-<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Primitive Architecture: simple MLPs and CNNs without leveraging pre-trained models or advanced architectures.1</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>Depth maps are back-projected to obtain a 3D PC, voxelized, and mapped to a three-state occupancy grid:</span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>  $F_t^G \in <span class="sc">\{</span>\text{occupied}, \text{free}, \text{unknown}<span class="sc">\}</span>^{H\times W \times D }$, where each voxel is assigned to a state of it being _occupied_, _free_, or _unknown_ (i.e. to what degree the voxel has been observed). $F_t^G$ is updated at each step using <span class="co">[</span><span class="ot">Bresenham's line algorithm</span><span class="co">](https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm)</span> by tracing rays from the camera origin and the back-projected 3D points:</span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>\log \mathrm{Odd}(v_i \mid z_j) = \log \mathrm{Odd}(v_i) + C,</span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a>where $v_i$ denotes the occupancy likelihood of the $i$-th voxel given the probability of the $j$-th ray from the camera passes through it. The classification into the three states is done by thresholding the log-odds values. The encoder network consists of a simple MLP after flattening the occupancy grid.</span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>**Semantic encoder**: A two-layer CNN, with consequent one-layer MLP consumes the concatenated $I_{t-k:t}$ grayscale frames to produce $s_t^S$.</span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>**Action history encoder**: Recent 5D poses are linearly projected to $s_t^A$.</span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>**State Embedding and Policy Network**: The concatenated vector $s_t = \mathrm{Linear}(s_t^G; s_t^S; s_t^A)$ feeds a three-layer MLP that outputs the mean and variance of the continuous action distribution.</span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a><span class="fu">### Reward Design and Optimization</span></span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>Coverage is measured by thresholding $F_t^G$ to count occupied voxels $\tilde N_t$ relative to the ground-truth surface voxel count $N^*$:</span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a>\text{CR}_t = \frac{\tilde N_t}{N^*}\cdot 100\%.</span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>The primary reward is the temporal gain in coverage, similar to TD(0):</span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>r^{\text{CR}}_{t+1} = \text{CR}_{t+1} - \text{CR}_t,</span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a>augmented with penalties for collisions and overly long trajectories. Policy parameters are optimized with proximal policy optimization (PPO) using the clipped surrogate,</span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a>L^{\text{CLIP}}(\theta) = \mathbb{E}_t<span class="sc">\!</span>\left<span class="co">[</span><span class="ot">\min\!\big(\eta_t(\theta) A_t,\; \mathrm{clip}(\eta_t(\theta), 1-\epsilon, 1+\epsilon) A_t\big)\right</span><span class="co">]</span>,</span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a>where $\eta_t(\theta)=\tfrac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t)}$ and $A_t$ is the advantage estimate.</span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a><span class="fu">### Notes and Limitations</span></span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Coverage-centric rewards ignore reconstruction fidelity; surfaces with equal occupancy weight receive identical priority.</span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Semantic reasoning is limited to appearance cues and lacks task-driven surface weighting.</span>
+<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Architecture lacks explicit 3D spatial reasoning-</span>
+<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Doesn't leverage powerful geometric embeddings (e.g. Fourier features)</span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Primitive Architecture: simple MLPs and CNNs without leveraging pre-trained models or advanced architectures.1</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

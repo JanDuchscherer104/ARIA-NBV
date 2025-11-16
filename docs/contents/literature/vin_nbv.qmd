@@ -2,6 +2,14 @@
 
 VIN-NBV@VIN-NBV-frahm2025 presents a learning-based approach to NBV that directly optimizes for **reconstruction quality** rather than coverage. The key innovation is the View Introspection Network (VIN), which predicts the **Relative Reconstruction Improvement (RRI)** of candidate viewpoints without actually capturing new images.
 
+### Local \LaTeX{} Sources
+
+- [`main.tex`](../../literature/tex-src/arXiv-VIN-NBV/main.tex) – complete manuscript (sections live in `sec/`).
+- [`sec/3_methods.tex`](../../literature/tex-src/arXiv-VIN-NBV/sec/3_methods.tex) – VIN architecture details.
+- [`sec/4_experiments.tex`](../../literature/tex-src/arXiv-VIN-NBV/sec/4_experiments.tex) – NBV benchmarks and Chamfer-distance evaluations.
+- [`Figures/VIN-NBV_diagram.png`](../../literature/tex-src/arXiv-VIN-NBV/Figures/VIN-NBV_diagram.png) – reference architecture figure.
+- [`main.bib`](../../literature/tex-src/arXiv-VIN-NBV/main.bib) – BibTeX entries for cross-referencing in our docs.
+
 ### Key Contributions
 
 1. **Reconstruction Quality Optimization**: First NBV method to directly maximize reconstruction quality (measured via Chamfer Distance) rather than coverage

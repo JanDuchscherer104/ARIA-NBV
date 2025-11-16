@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Jan Duchscherer, Munich University of Applied Sciences">
-<meta name="dcterms.date" content="2025-11-14">
+<meta name="dcterms.date" content="2025-11-16">
 
 <title>Next-Best-View Planning with Foundation Models – Semantic NBV Planning</title>
 <style>
@@ -317,6 +317,10 @@ div.csl-indent {
     <a class="nav-link active" href="./contents/todos.html" aria-current="page"> 
 <span class="menu-text">TODOs</span></a>
   </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./contents/setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-project-state" role="link" data-bs-toggle="dropdown" aria-expanded="false">
  <span class="menu-text">Project State</span>
@@ -599,12 +603,13 @@ div.csl-indent {
   <li><a href="#project-vision-and-goals" id="toc-project-vision-and-goals" class="nav-link" data-scroll-target="#project-vision-and-goals"><span class="header-section-number">2</span> Project Vision and Goals</a></li>
   <li><a href="#documentation-navigation" id="toc-documentation-navigation" class="nav-link" data-scroll-target="#documentation-navigation"><span class="header-section-number">3</span> Documentation Navigation</a>
   <ul class="collapse">
-  <li><a href="#project-state" id="toc-project-state" class="nav-link" data-scroll-target="#project-state"><span class="header-section-number">3.1</span> Project State</a></li>
-  <li><a href="#theory-background" id="toc-theory-background" class="nav-link" data-scroll-target="#theory-background"><span class="header-section-number">3.2</span> Theory &amp; Background</a></li>
-  <li><a href="#dataset-resources" id="toc-dataset-resources" class="nav-link" data-scroll-target="#dataset-resources"><span class="header-section-number">3.3</span> Dataset &amp; Resources</a></li>
-  <li><a href="#literature-reviews" id="toc-literature-reviews" class="nav-link" data-scroll-target="#literature-reviews"><span class="header-section-number">3.4</span> Literature Reviews</a></li>
-  <li><a href="#implementation-overviews" id="toc-implementation-overviews" class="nav-link" data-scroll-target="#implementation-overviews"><span class="header-section-number">3.5</span> Implementation Overviews</a></li>
-  <li><a href="#project-slides" id="toc-project-slides" class="nav-link" data-scroll-target="#project-slides"><span class="header-section-number">3.6</span> Project Slides</a></li>
+  <li><a href="#setup-installation" id="toc-setup-installation" class="nav-link" data-scroll-target="#setup-installation"><span class="header-section-number">3.1</span> Setup &amp; Installation</a></li>
+  <li><a href="#project-state" id="toc-project-state" class="nav-link" data-scroll-target="#project-state"><span class="header-section-number">3.2</span> Project State</a></li>
+  <li><a href="#theory-background" id="toc-theory-background" class="nav-link" data-scroll-target="#theory-background"><span class="header-section-number">3.3</span> Theory &amp; Background</a></li>
+  <li><a href="#dataset-resources" id="toc-dataset-resources" class="nav-link" data-scroll-target="#dataset-resources"><span class="header-section-number">3.4</span> Dataset &amp; Resources</a></li>
+  <li><a href="#literature-reviews" id="toc-literature-reviews" class="nav-link" data-scroll-target="#literature-reviews"><span class="header-section-number">3.5</span> Literature Reviews</a></li>
+  <li><a href="#implementation-overviews" id="toc-implementation-overviews" class="nav-link" data-scroll-target="#implementation-overviews"><span class="header-section-number">3.6</span> Implementation Overviews</a></li>
+  <li><a href="#project-slides" id="toc-project-slides" class="nav-link" data-scroll-target="#project-slides"><span class="header-section-number">3.7</span> Project Slides</a></li>
   </ul></li>
   <li><a href="#external-code-notebooks" id="toc-external-code-notebooks" class="nav-link" data-scroll-target="#external-code-notebooks"><span class="header-section-number">4</span> External Code &amp; Notebooks</a></li>
   </ul>
@@ -634,7 +639,7 @@ div.csl-indent {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">November 14, 2025</p>
+      <p class="date">November 16, 2025</p>
     </div>
   </div>
   
@@ -672,31 +677,37 @@ div.csl-indent {
 </section>
 <section id="documentation-navigation" class="level1" data-number="3">
 <h1 data-number="3"><span class="header-section-number">3</span> Documentation Navigation</h1>
-<section id="project-state" class="level2" data-number="3.1">
-<h2 data-number="3.1" class="anchored" data-anchor-id="project-state"><span class="header-section-number">3.1</span> Project State</h2>
+<section id="setup-installation" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="setup-installation"><span class="header-section-number">3.1</span> Setup &amp; Installation</h2>
+<ul>
+<li><a href="./contents/setup.html">Setup Instructions</a>: Environment setup and dependencies</li>
+</ul>
+</section>
+<section id="project-state" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="project-state"><span class="header-section-number">3.2</span> Project State</h2>
 <ul>
 <li><strong><a href="./contents/roadmap.html">Project Roadmap</a></strong>: Development phases and timeline</li>
 <li><strong><a href="./contents/questions.html">Research Questions</a></strong>: Open problems and directions</li>
 <li><strong><a href="./contents/roadmap.html">Roadmap</a></strong>: Detailed project roadmap</li>
 </ul>
 </section>
-<section id="theory-background" class="level2" data-number="3.2">
-<h2 data-number="3.2" class="anchored" data-anchor-id="theory-background"><span class="header-section-number">3.2</span> Theory &amp; Background</h2>
+<section id="theory-background" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="theory-background"><span class="header-section-number">3.3</span> Theory &amp; Background</h2>
 <ul>
 <li><strong><a href="./contents/theory/rri_theory.html">RRI Theory</a></strong>: Mathematical formulation and properties of RRI</li>
 <li><strong><a href="./contents/theory/surface_metrics.html">Surface Metrics</a></strong>: Accuracy, completeness, Chamfer distance</li>
 <li><strong><a href="./contents/theory/semi-dense-pc.html">Semi-Dense Point Clouds</a></strong>: SLAM-based 3D reconstruction techniques</li>
 </ul>
 </section>
-<section id="dataset-resources" class="level2" data-number="3.3">
-<h2 data-number="3.3" class="anchored" data-anchor-id="dataset-resources"><span class="header-section-number">3.3</span> Dataset &amp; Resources</h2>
+<section id="dataset-resources" class="level2" data-number="3.4">
+<h2 data-number="3.4" class="anchored" data-anchor-id="dataset-resources"><span class="header-section-number">3.4</span> Dataset &amp; Resources</h2>
 <ul>
 <li><strong><a href="./contents/resources.html">Technical Resources</a></strong>: External links to libraries, tools, docs and datasets used in this project</li>
 <li><strong><a href="./contents/ase_dataset.html">ASE Dataset</a></strong>: 100K scenes, modalities, NBV suitability</li>
 </ul>
 </section>
-<section id="literature-reviews" class="level2" data-number="3.4">
-<h2 data-number="3.4" class="anchored" data-anchor-id="literature-reviews"><span class="header-section-number">3.4</span> Literature Reviews</h2>
+<section id="literature-reviews" class="level2" data-number="3.5">
+<h2 data-number="3.5" class="anchored" data-anchor-id="literature-reviews"><span class="header-section-number">3.5</span> Literature Reviews</h2>
 <ul>
 <li><strong><a href="./contents/literature/vin_nbv.html">VIN-NBV</a></strong>: Direct quality optimization with RRI</li>
 <li><strong><a href="./contents/literature/gen_nbv.html">GenNBV</a></strong>: Continuous action spaces and RL approaches</li>
@@ -704,8 +715,8 @@ div.csl-indent {
 <li><strong><a href="./contents/literature/scene_script.html">SceneScript</a></strong>: Structured scene language and entity representation</li>
 </ul>
 </section>
-<section id="implementation-overviews" class="level2" data-number="3.5">
-<h2 data-number="3.5" class="anchored" data-anchor-id="implementation-overviews"><span class="header-section-number">3.5</span> Implementation Overviews</h2>
+<section id="implementation-overviews" class="level2" data-number="3.6">
+<h2 data-number="3.6" class="anchored" data-anchor-id="implementation-overviews"><span class="header-section-number">3.6</span> Implementation Overviews</h2>
 <ul>
 <li><strong><a href="./contents/impl/atek_implementation.html">ATEK Implementation</a></strong>: Production-ready mesh evaluation</li>
 <li><strong><a href="./contents/impl/efm3d_implementation.html">EFM3D Implementation</a></strong>: Point cloud and voxel utilities</li>
@@ -713,8 +724,8 @@ div.csl-indent {
 <li><strong><a href="../notebooks/ase_oracle_rri_simplified.ipynb">Oracle RRI Notebook</a></strong>: Clean, working implementation with fixes</li>
 </ul>
 </section>
-<section id="project-slides" class="level2" data-number="3.6">
-<h2 data-number="3.6" class="anchored" data-anchor-id="project-slides"><span class="header-section-number">3.6</span> Project Slides</h2>
+<section id="project-slides" class="level2" data-number="3.7">
+<h2 data-number="3.7" class="anchored" data-anchor-id="project-slides"><span class="header-section-number">3.7</span> Project Slides</h2>
 <ul>
 <li><a href="./docs/typst/slides/slides_1.pdf">Presentation 01</a>, <a href="./docs/typst/slides/slides_1.typ">typst-src</a></li>
 <li><a href="./docs/typst/slides/slides_2.pdf">Presentation 02</a>, <a href="./docs/typst/slides/slides_2.typ">typst-src</a></li>
@@ -1263,58 +1274,61 @@ notebooks/
 <span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a><span class="fu"># Documentation Navigation</span></span>
 <span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project State</span></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a><span class="fu">## Setup &amp; Installation</span></span>
 <span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Roadmap](contents/roadmap.qmd)**: Development phases and timeline</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Research Questions](contents/questions.qmd)**: Open problems and directions</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Roadmap](contents/roadmap.qmd)**: Detailed project roadmap</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Setup Instructions</span><span class="co">](contents/setup.qmd)</span>: Environment setup and dependencies</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project State</span></span>
 <span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a><span class="fu">## Theory &amp; Background</span></span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[RRI Theory](contents/theory/rri_theory.qmd)**: Mathematical formulation and properties of RRI</span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Surface Metrics](contents/theory/surface_metrics.qmd)**: Accuracy, completeness, Chamfer distance</span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Semi-Dense Point Clouds](contents/theory/semi-dense-pc.qmd)**: SLAM-based 3D reconstruction techniques</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="fu">## Dataset &amp; Resources</span></span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Technical Resources](contents/resources.qmd)**: External links to libraries, tools, docs and datasets used in this project</span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ASE Dataset](contents/ase_dataset.qmd)**: 100K scenes, modalities, NBV suitability</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Roadmap](contents/roadmap.qmd)**: Development phases and timeline</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Research Questions](contents/questions.qmd)**: Open problems and directions</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Roadmap](contents/roadmap.qmd)**: Detailed project roadmap</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a><span class="fu">## Theory &amp; Background</span></span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[RRI Theory](contents/theory/rri_theory.qmd)**: Mathematical formulation and properties of RRI</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Surface Metrics](contents/theory/surface_metrics.qmd)**: Accuracy, completeness, Chamfer distance</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Semi-Dense Point Clouds](contents/theory/semi-dense-pc.qmd)**: SLAM-based 3D reconstruction techniques</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a><span class="fu">## Dataset &amp; Resources</span></span>
 <span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="fu">## Literature Reviews</span></span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[VIN-NBV](contents/literature/vin_nbv.qmd)**: Direct quality optimization with RRI</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[GenNBV](contents/literature/gen_nbv.qmd)**: Continuous action spaces and RL approaches</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D/EVL](contents/literature/efm3d.qmd)**: Egocentric foundation models and voxel lifting</span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript](contents/literature/scene_script.qmd)**: Structured scene language and entity representation</span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a><span class="fu">## Implementation Overviews</span></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ATEK Implementation](contents/impl/atek_implementation.qmd)**: Production-ready mesh evaluation</span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D Implementation](contents/impl/efm3d_implementation.qmd)**: Point cloud and voxel utilities</span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[RRI Computation](contents/impl/rri_computation.qmd)**: Complete oracle implementation</span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Oracle RRI Notebook](../notebooks/ase_oracle_rri_simplified.ipynb)**: Clean, working implementation with fixes</span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project Slides</span></span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 01</span><span class="co">](/docs/typst/slides/slides_1.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_1.typ)</span></span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 02</span><span class="co">](/docs/typst/slides/slides_2.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_2.typ)</span></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Technical Resources](contents/resources.qmd)**: External links to libraries, tools, docs and datasets used in this project</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ASE Dataset](contents/ase_dataset.qmd)**: 100K scenes, modalities, NBV suitability</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a><span class="fu">## Literature Reviews</span></span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[VIN-NBV](contents/literature/vin_nbv.qmd)**: Direct quality optimization with RRI</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[GenNBV](contents/literature/gen_nbv.qmd)**: Continuous action spaces and RL approaches</span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D/EVL](contents/literature/efm3d.qmd)**: Egocentric foundation models and voxel lifting</span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript](contents/literature/scene_script.qmd)**: Structured scene language and entity representation</span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a><span class="fu">## Implementation Overviews</span></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ATEK Implementation](contents/impl/atek_implementation.qmd)**: Production-ready mesh evaluation</span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D Implementation](contents/impl/efm3d_implementation.qmd)**: Point cloud and voxel utilities</span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[RRI Computation](contents/impl/rri_computation.qmd)**: Complete oracle implementation</span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Oracle RRI Notebook](../notebooks/ase_oracle_rri_simplified.ipynb)**: Clean, working implementation with fixes</span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project Slides</span></span>
 <span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a><span class="fu"># External Code &amp; Notebooks</span></span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a><span class="in">external/</span></span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a><span class="in">├── ATEK/                    # Aria toolkit for data processing</span></span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a><span class="in">├── efm3d/                   # EFM3D model implementation</span></span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="in">├── projectaria_tools/       # ASE dataset access utilities</span></span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a><span class="in">└── scenescript/             # Scene specification language tools</span></span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a><span class="in">notebooks/</span></span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_data_exploration.ipynb    # ASE dataset exploration</span></span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a><span class="in">├── download_ase_meshes.ipynb          # GT mesh acquisition</span></span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_exploration.ipynb         # ATEK integration testing</span></span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_exploration.ipynb              # Basic ASE data analysis</span></span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a><span class="in">└── inference.ipynb                    # Model inference experiments</span></span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 01</span><span class="co">](/docs/typst/slides/slides_1.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_1.typ)</span></span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 02</span><span class="co">](/docs/typst/slides/slides_2.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_2.typ)</span></span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a><span class="fu"># External Code &amp; Notebooks</span></span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="in">external/</span></span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a><span class="in">├── ATEK/                    # Aria toolkit for data processing</span></span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a><span class="in">├── efm3d/                   # EFM3D model implementation</span></span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a><span class="in">├── projectaria_tools/       # ASE dataset access utilities</span></span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a><span class="in">└── scenescript/             # Scene specification language tools</span></span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a><span class="in">notebooks/</span></span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_data_exploration.ipynb    # ASE dataset exploration</span></span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a><span class="in">├── download_ase_meshes.ipynb          # GT mesh acquisition</span></span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_exploration.ipynb         # ATEK integration testing</span></span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_exploration.ipynb              # Basic ASE data analysis</span></span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a><span class="in">└── inference.ipynb                    # Model inference experiments</span></span>
+<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

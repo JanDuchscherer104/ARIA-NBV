@@ -2,6 +2,14 @@
 
 SceneScript@SceneScript-avetisyan2024 represents a paradigm shift in scene understanding by using structured language to describe complete 3D layouts.
 
+## Local \LaTeX{} Sources
+
+- [`main.tex`](../../literature/tex-src/arXiv-scene-script/main.tex) – ECCV manuscript entry point.
+- [`sections/dataset.tex`](../../literature/tex-src/arXiv-scene-script/sections/dataset.tex) – ASE dataset specification used for training SceneScript.
+- [`sections/structured_scene_language.tex`](../../literature/tex-src/arXiv-scene-script/sections/structured_scene_language.tex) – command grammar & token definitions.
+- [`figs/Main-Figure.pdf`](../../literature/tex-src/arXiv-scene-script/figs/Main-Figure.pdf) – canonical teaser referenced in this page.
+- [`supp.tex`](../../literature/tex-src/arXiv-scene-script/supp.tex) – supplemental experiments and qualitative visualizations.
+
 ## Key Contributions
 
 - **Structured Scene Language**: Represents scenes as sequences of language-like commands (walls, doors, windows, objects)

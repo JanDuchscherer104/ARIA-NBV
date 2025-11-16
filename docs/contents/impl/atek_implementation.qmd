@@ -2,6 +2,72 @@
 
 ATEK provides production-ready mesh evaluation functions for computing reconstruction quality metrics. This document details the implementation and usage.
 
+## Data Sample Schema (ATEK → WDS)
+
+ATEK packages every snippet as an `AtekDataSample` (`external/ATEK/atek/data_preprocess/atek_data_sample.py`) built from nested dataclasses and then **flattened** into WebDataset (WDS) keys. Key containers and shapes:
+
+- **`MultiFrameCameraData`** (`mfcd#<camera>+*`): `images` `[F,C,H,W]`, `capture_timestamps_ns` `[F]`, `frame_ids` `[F]`, `exposure_durations_s` `[F]`, `gains` `[F]`, intrinsics `projection_params` `[15]`, extrinsics `T_Device_Camera` `[F,3,4]`, `camera_valid_radius` `[1]`. Cameras: `camera-rgb`, `camera-slam-left`, `camera-slam-right`, optionally depth via `camera-rgb-depth`.
+- **`MpsTrajData`** (`mtd#*`): `Ts_World_Device` `[F,3,4]`, `capture_timestamps_ns` `[F]`, `gravity_in_world` `[3]` (ATEK world gravity can be `[0,-9.81,0]` before alignment).
+- **`MpsSemiDensePointData`** (`msdpd#*`): per-frame lists of `points_world` `[N,3]`, `points_dist_std` `[N]`, `points_inv_dist_std` `[N]`, volume bounds `points_volume_min/max` `[3]`, timestamps `[F]`. Stored in WDS as a stacked tensor plus `points_world_lengths` to resurrect the list-per-frame layout.
+- **`MpsOnlineCalibData`** (`mocd#*`): optional per-timestamp calibration stream.
+- **`gt_data`**: arbitrary dict (OBB annotations, depth, etc.) preserved as-is; tensors flattened with `gt_data#<key>` and merged back during load.
+
+The helper `create_atek_data_sample_from_flatten_dict()` recreates the structured dataclass from flattened keys, while `to_flatten_dict()` on each dataclass produces the WDS-friendly dict (`mfcd#camera-rgb+images`, `mtd#ts_world_device`, …).
+
+### Flattened Dataset Item (per-sample, unbatched)
+
+**Coordinate conventions**: Aria/ATEK world uses `x` left, `y` up, `z` forward. `T_A_B` maps a point from frame B into frame A, so `T_world_cam = T_world_device @ T_device_camera` and depth points already reside in world.
+
+| Key | Shape / Type | Meaning / frame |
+| --- | --- | --- |
+| `sequence_name` | `str` | ASE sequence identifier. |
+| `mfcd#camera-rgb+images` | `[F,3,H,W]` `uint8` | RGB frames. |
+| `mfcd#camera-rgb+capture_timestamps_ns` | `[F]` `int64` | Device-clock timestamps; align with trajectory. |
+| `mfcd#camera-rgb+frame_ids` | `[F]` `int64` | Monotonic frame counters. |
+| `mfcd#camera-rgb+exposure_durations_s`, `+gains` | `[F]` `float32` | Per-frame photometric metadata. |
+| `mfcd#camera-rgb+projection_params` | `[15]` `float32` | Surreal fisheye intrinsics. |
+| `mfcd#camera-rgb+camera_model_name` | `str` | Usually `Fisheye624`. |
+| `mfcd#camera-rgb+camera_valid_radius` | `[1]` `float32` | Normalized valid fisheye radius. |
+| `mfcd#camera-rgb+t_device_camera` | `[F,3,4]` `float32` | Extrinsics rig→camera (`T_device_camera`). |
+| `mfcd#camera-slam-{left,right}+*` | `[F,1,H',W']` | SLAM grayscale streams with same meta fields; images are 1-channel. |
+| `mfcd#camera-rgb-depth+images` | `[F,1,H,W]` `float32` | Depth in meters (when present). |
+| `mtd#ts_world_device` | `[F,3,4]` `float32` | Rig trajectory `T_world_device`. |
+| `mtd#capture_timestamps_ns` | `[F]` `int64` | Pose timestamps. |
+| `mtd#gravity_in_world` | `[3]` `float32` | Gravity vector (often `[0,-9.81,0]`). |
+| `msdpd#points_world` | `List[F × (N_i,3)]` | Semi-dense SLAM points in world frame. |
+| `msdpd#points_dist_std` / `msdpd#points_inv_dist_std` | `List[F × (N_i)]` | Depth std / inverse std per point. |
+| `msdpd#capture_timestamps_ns` | `[F]` `int64` | Point-cloud timestamps per frame. |
+| `msdpd#points_volume_min/max` | `[3]` `float32` | World-frame axis-aligned bounds. |
+| `mocd#capture_timestamps_ns` | `[T]` `int64` | Optional online calib timestamps. |
+| `mocd#projection_params` | `[T,15]` `float32` | Optional time-varying intrinsics. |
+| `mocd#ts_device_camera` | `[T,C,3,4]` `float32` | Optional time-varying extrinsics. |
+| `gt_data` | `dict` | See below. |
+
+**GT layout (ASE/ATEK)**:
+
+- `gt_data["obb3_gt"][cam_label]`: per-camera 3D boxes with `instance_ids [K]`, `category_ids [K]`, `category_names (list[str])`, `object_dimensions [K,3]` (x,y,z lengths), `ts_world_object [K,3,4]` (object pose). 2D bboxes live in `obb2_gt`.
+- `gt_data["scores"]`: detection confidences `[K]` when produced by detectors.
+- Additional tensors (e.g., depth) are serialized as `gt_data#<name>.pth` and reassembled by `process_wds_sample()`.
+
+**Naming conventions**: prefixes mirror the producing dataclass — `mfcd#` (multi-frame camera data), `mtd#` (MPS trajectory), `msdpd#` (semi-dense points), `mocd#` (online calib); suffixes use `+` to join the camera label and field name to stay filename-safe inside WDS shards.
+
+### Pairing with GT meshes (oracle_rri)
+
+- `oracle_rri.data_handling.ASEDataset` streams flattened ATEK samples and attaches `scene_ply_<scene>.ply` meshes (optional simplification + caching).
+- Typed wrappers: `CameraStream` (per camera), `Trajectory`, `SemiDensePoints`, `AtekSnippet`, and `ASESample` with `has_mesh/has_rgb/has_slam_points/has_depth`.
+- `ASESample.to_efm_dict()` remaps ATEK keys to EFM3D schema via `EfmModelAdaptor.get_dict_key_mapping_all()` while preserving `scene_id/snippet_id` and the attached `gt_mesh`.
+
+## WebDataset I/O and Collation
+
+ATEK ships a minimal but robust WDS pipeline (`external/ATEK/atek/data_loaders/atek_wds_dataloader.py`):
+
+- **`process_wds_sample()`**: re-stacks per-frame JPEGs into `torch.Tensor` `[F,C,H,W]`, casts `.pth` tensors to float32, unwraps stacked semidense tensors back into lists (using stored lengths), and merges `gt_data#*` shards into a single `gt_data` dict.
+- **`select_and_remap_dict_keys(sample, key_mapping)`**: keeps only requested keys and renames them (used by EFMs to map `mfcd#camera-rgb+images → rgb/img`, etc.).
+- **`load_atek_wds_dataset()`**: composes decode → optional shuffle → key remap → optional transform → batching. Defaults to `atek_default_collation_fn`, which stacks tensors when shapes/dtypes align and otherwise leaves lists untouched.
+- **`create_native_atek_dataloader()`**: wraps the WDS pipeline in a PyTorch `DataLoader` (batch_size is controlled inside WDS via `.batched`).
+
+> Tip: semidense point lists are the only nested list tensors; when remapping or adapting to EVL, pad them to a fixed `num_frames × num_points` block before stacking (see EFMs’ `EfmModelAdaptor`).
+
 ## `evaluate_single_mesh_pair()`
 
 **Source**: [`atek/evaluation/surface_reconstruction/surface_reconstruction_metrics.py`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_metrics.py#L32)
