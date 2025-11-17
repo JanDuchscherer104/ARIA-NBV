@@ -8,6 +8,8 @@ import torch
 import trimesh
 from efm3d.aria import PoseTW
 
+from oracle_rri.utils.frames import view_axes_from_points
+
 from .types import CandidateContext, CollisionBackend, SamplingStrategy
 
 if TYPE_CHECKING:
@@ -34,11 +36,9 @@ class ShellSamplingRule:
         pose_last: PoseTW = ctx["last_pose"]
         pos_world = pose_last.transform(pos_local)
 
-        forward = torch.nn.functional.normalize(pose_last.t - pos_world, dim=1)
-        up = torch.tensor([0.0, 1.0, 0.0], device=dev, dtype=forward.dtype).expand_as(forward)
-        right = torch.nn.functional.normalize(torch.cross(forward, up, dim=1), dim=1)
-        up_corrected = torch.cross(right, forward, dim=1)
-        r_cam = torch.stack([right, up_corrected, forward], dim=2)  # [n,3,3]
+        # Orient each candidate camera to look back at the last pose
+        look_at = pose_last.t.expand_as(pos_world)
+        r_cam = view_axes_from_points(cam_pos=pos_world, look_at=look_at)
         poses_tw = PoseTW.from_Rt(r_cam, pos_world)
         ctx["poses"] = poses_tw
         ctx["mask"] = torch.ones(n, dtype=torch.bool, device=dev)
@@ -48,14 +48,15 @@ class ShellSamplingRule:
         min_elev = torch.deg2rad(torch.tensor(self.config.min_elev_deg, device=device))
         max_elev = torch.deg2rad(torch.tensor(self.config.max_elev_deg, device=device))
 
-        if self.config.sampling_strategy == SamplingStrategy.FORWARD_GAUSSIAN:
-            mean = (min_elev + max_elev) / 2
-            std = (max_elev - min_elev) / 4
-            elev = torch.clamp(torch.randn(n, device=device) * std + mean, min=min_elev, max=max_elev)
-        else:
-            sin_min, sin_max = torch.sin(min_elev), torch.sin(max_elev)
-            u = torch.rand(n, device=device) * (sin_max - sin_min) + sin_min
-            elev = torch.arcsin(torch.clamp(u, -0.999999, 0.999999))
+        match self.config.sampling_strategy:
+            case SamplingStrategy.FORWARD_GAUSSIAN:
+                mean = (min_elev + max_elev) / 2
+                std = (max_elev - min_elev) / 4
+                elev = torch.clamp(torch.randn(n, device=device) * std + mean, min=min_elev, max=max_elev)
+            case SamplingStrategy.SHELL_UNIFORM:
+                sin_min, sin_max = torch.sin(min_elev), torch.sin(max_elev)
+                u = torch.rand(n, device=device) * (sin_max - sin_min) + sin_min
+                elev = torch.arcsin(torch.clamp(u, -0.999999, 0.999999))
 
         x = torch.cos(elev) * torch.cos(az)
         y = torch.sin(elev)

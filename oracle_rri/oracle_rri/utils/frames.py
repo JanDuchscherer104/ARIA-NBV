@@ -22,12 +22,10 @@ def view_axes_from_points(
         eps: Small value to avoid degeneracy when forward is close to up.
 
     Returns:
-        (..., 3, 3) rotation matrix R_world_cam with columns:
+        (..., 3, 3) R_world_cam in SO(3) with columns:
             - [:, 0] = right  (+X, R in RDF)
             - [:, 1] = up     (+Y, approximately aligned with world_up)
             - [:, 2] = forward(+Z, F in RDF, points from camera to look_at)
-        The returned matrix is guaranteed to be a proper rotation
-        (determinant +1) up to numerical precision.
     """
     # Forward (camera z-axis) from camera to target.
     fwd = F.normalize(look_at - cam_pos, dim=-1)
