@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import torch
 import trimesh
@@ -169,7 +169,9 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
         description="Optional list of scene ids to include. Will be auto-populated if not provided.",
     )
     atek_root: Path | None = Field(default=None, description="Override root directory containing scene shard folders.")
-    atek_variant: str = Field(default="efm_eval", description="Subdirectory name under data_root for ATEK shards.")
+    atek_variant: Literal["efm", "efm_eval", "cubercnn", "cubercnn_eval"] = Field(
+        default="efm_eval", description="Subdirectory name under data_root for ATEK shards."
+    )
     tar_urls: list[str] = Field(
         default_factory=list,
         description="List of ATEK WebDataset shard paths (auto-populated; external override disallowed).",
@@ -218,7 +220,6 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
         candidates = [
             paths.data_root / "ase_atek" / atek_variant,
             paths.data_root / f"ase_{atek_variant}",
-            paths.data_root / "ase_efm_eval",
         ]
         for candidate in candidates:
             if candidate.exists():

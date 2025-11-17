@@ -50,7 +50,7 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     target: CliSuppress[type[ASEDownloader]] = Field(default_factory=lambda: ASEDownloader, description=CLI_SUPPRESS)
 
     # CLI dispatch
-    mode: Literal["download", "list"] = Field(default="download", description="Execution mode.")
+    mode: Literal["download", "list"] = Field(default="download", description="Execution mode.", alias="m")
 
     list_n: int | None = Field(
         default=None,
@@ -82,14 +82,14 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     atek_json_filename: str = Field(default="AriaSyntheticEnvironment_ATEK_download_urls.json")
     """Filename of the ATEK download URLs JSON in url_dir."""
 
-    atek_config_name: Literal["efm", "efm_eval", "cubercnn", "cubercnn_eval"] = Field(default="efm_eval")
+    atek_config_name: Literal["efm", "efm_eval", "cubercnn", "cubercnn_eval"] = Field(default="efm_eval", alias="c")
     """ATEK configuration name."""
 
     # Download selection
     n_scenes: int = Field(
         default=5,
         ge=0,
-        validation_alias=AliasChoices("n_scenes", "ns", "s"),
+        validation_alias=AliasChoices("n_scenes", "ns"),
     )
     """Number of scenes to download (0 = all available scenes)."""
 
@@ -130,18 +130,7 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
 
     model_config = SettingsConfigDict(
         cli_parse_args=False,  # explicit CLI parsing is triggered via from_cli() to avoid pytest args interference
-        env_prefix="ASE_",
-        extra="allow",  # tolerate legacy/unused CLI fields used in tests
-        cli_ignore_unknown_args=True,
         cli_exit_on_error=False,
-        cli_shortcuts={
-            "list_n": "n",
-            "n_scenes": "ns",
-            "max_snippets": "ms",
-            "skip_meshes": "sm",
-            "skip_atek": "sa",
-            "atek_config_name": "cfg",
-        },
     )
 
     @field_validator("train_val_split_json_path", mode="before")
@@ -201,9 +190,7 @@ class ASEDownloader:
     def __init__(self, config: ASEDownloaderConfig):
         self.config = config
         self.console = (
-            Console.with_prefix(self.__class__.__name__)
-            .set_verbose(config.verbose)
-            .set_debug(config.is_debug)
+            Console.with_prefix(self.__class__.__name__).set_verbose(config.verbose).set_debug(config.is_debug)
         )
 
         base_url_dir = Path(self.config.url_dir) if self.config.url_dir is not None else self.config.paths.url_dir

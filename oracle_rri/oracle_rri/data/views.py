@@ -14,11 +14,10 @@ from typing import Any
 import torch
 import trimesh
 from efm3d.aria.pose import PoseTW
-from rich.text import Text
-from rich.tree import Tree
 from torch import Tensor
 
 from ..utils import Console
+from ..utils.rich_summary import build_nested, rich_summary
 
 
 def _summ(value: Any) -> Any:
@@ -149,14 +148,16 @@ class CameraView(BaseView):
     """Shape `(F,)` int64 device timestamps aligned to images."""
     frame_ids: Tensor
     """Shape `(F,)` int64 frame identifiers per stream."""
-    exposure_durations_s: Tensor
+    exposure_durations_s: Tensor | None
     """Shape `(F,)` float32 exposure durations (seconds)."""
-    gains: Tensor
+    gains: Tensor | None
     """Shape `(F,)` float32 analog gains."""
-    camera_model_name: str
+    camera_model_name: str | None
     """Camera model name (e.g., `FISHEYE624`)."""
-    camera_valid_radius: Tensor
+    camera_valid_radius: Tensor | None
     """Shape `(1)` or `(F,1)` float32; valid fisheye radius in pixels."""
+    camera_label: str | None = None
+    origin_camera_label: str | None = None
 
 
 @dataclass(slots=True)
@@ -195,16 +196,18 @@ class SemiDenseView(BaseView):
 
     points_world: list[Tensor]
     """List length F; each tensor `(N,3)` float32 world-frame points."""
-    points_dist_std: list[Tensor]
+    points_dist_std: list[Tensor] | None
     """List length F; each `(N,)` float32 per-point distance stddev."""
-    points_inv_dist_std: list[Tensor]
+    points_inv_dist_std: list[Tensor] | None
     """List length F; each `(N,)` float32 inverse distance stddev."""
-    capture_timestamps_ns: Tensor
+    capture_timestamps_ns: Tensor | None
     """Shape `(F,)` int64; timestamps corresponding to each points slice."""
-    volume_min: Tensor
+    volume_min: Tensor | None
     """Shape `(3,)` float32; world AABB minimum for points."""
-    volume_max: Tensor
+    volume_max: Tensor | None
     """Shape `(3,)` float32; world AABB maximum for points."""
+    points_world_lengths: Tensor | None = None
+    """Shape `(F,)` int64; number of points per frame."""
 
 
 @dataclass(slots=True)
@@ -475,7 +478,7 @@ class TypedSample(BaseView):
             raise KeyError(f"Missing required key '{key}' in sample {self.scene_id}/{self.snippet_id}")
         return val
 
-    def _camera(self, prefix: str) -> CameraView:
+    def _camera(self, prefix: str, *, require_projection: bool = True, require_t_dev: bool = True) -> CameraView:
         f = self.flat
         images = f.get(f"{prefix}+images")
         proj = f.get(f"{prefix}+projection_params")
@@ -486,13 +489,17 @@ class TypedSample(BaseView):
         gains = f.get(f"{prefix}+gains")
         model = f.get(f"{prefix}+camera_model_name")
         radius = f.get(f"{prefix}+camera_valid_radius")
-        if images is None or proj is None or t_dev_cam is None or ts is None or frame_ids is None:
+        cam_label = f.get(f"{prefix}+camera_label")
+        origin_label = f.get(f"{prefix}+origin_camera_label")
+        if images is None or ts is None or frame_ids is None or (require_projection and proj is None) or (
+            require_t_dev and t_dev_cam is None
+        ):
             missing = [
                 k
                 for k, v in {
                     "images": images,
-                    "projection_params": proj,
-                    "t_device_camera": t_dev_cam,
+                    "projection_params": proj if require_projection else True,
+                    "t_device_camera": t_dev_cam if require_t_dev else True,
                     "capture_timestamps_ns": ts,
                     "frame_ids": frame_ids,
                 }.items()
@@ -501,14 +508,16 @@ class TypedSample(BaseView):
             raise KeyError(f"Incomplete camera stream '{prefix}' missing {missing}")
         return CameraView(
             images=images,
-            projection_params=proj,
-            t_device_camera=t_dev_cam,
+            projection_params=proj if proj is not None else torch.empty(0),
+            t_device_camera=t_dev_cam if t_dev_cam is not None else torch.empty(0),
             capture_timestamps_ns=ts,
             frame_ids=frame_ids,
             exposure_durations_s=exposure,  # type: ignore[arg-type]
             gains=gains,  # type: ignore[arg-type]
             camera_model_name=model,  # type: ignore[arg-type]
             camera_valid_radius=radius,  # type: ignore[arg-type]
+            camera_label=cam_label,
+            origin_camera_label=origin_label,
         )
 
     @property
@@ -529,7 +538,7 @@ class TypedSample(BaseView):
     @property
     def camera_rgb_depth(self) -> CameraView:
         """Aligned depth stream: `mfcd#camera-rgb-depth` (C=1 distance/ray-length)."""
-        return self._camera("mfcd#camera-rgb-depth")
+        return self._camera("mfcd#camera-rgb-depth", require_projection=False, require_t_dev=False)
 
     @property
     def trajectory(self) -> TrajectoryView:
@@ -553,6 +562,7 @@ class TypedSample(BaseView):
         vol_max = f.get("msdpd#points_volume_max")
         if vol_max is None:
             vol_max = f.get("msdpd#points_volumn_max")
+        lengths = f.get("msdpd#points_world_lengths")
         return SemiDenseView(
             points_world=points,
             points_dist_std=f.get("msdpd#points_dist_std"),  # type: ignore[arg-type]
@@ -560,6 +570,7 @@ class TypedSample(BaseView):
             capture_timestamps_ns=f.get("msdpd#capture_timestamps_ns"),  # type: ignore[arg-type]
             volume_min=vol_min,  # type: ignore[arg-type]
             volume_max=vol_max,  # type: ignore[arg-type]
+            points_world_lengths=lengths,
         )
 
     @property
@@ -740,94 +751,32 @@ class TypedSample(BaseView):
         base = self._base_summary(include_efm_details=True)
         return _repr_dict(base, width=width)
 
-    def rich_summary(self, show_semidense: bool = True, show_gt: bool = True) -> None:
-        """Render a rich tree summary similar to BaseConfig.inspect().
-
-        This uses the project Console and rich Tree formatting to display a
-        structured overview of the sample: cameras, trajectory, semidense
-        volume, GT annotations, and mesh stats.
-        """
+    def rich_summary(
+        self,
+        show_semidense: bool = True,
+        show_gt: bool = True,
+        *,
+        with_shape: bool = False,
+        show_only_sample: list[str] | None = None,
+    ) -> None:
+        """Render a recursive tree using the shared rich_summary utility."""
 
         console = Console.with_prefix(self.__class__.__name__, "rich_summary")
-        base = self._base_summary(include_efm_details=True)
 
-        root = Tree(Text(f"TypedSample {self.scene_id}/{self.snippet_id}", style="config.name"))
+        nested, path_map = build_nested(self.flat, show_semidense=show_semidense, show_gt=show_gt)
+        tree_dict: dict[str, Any] = {
+            "data": nested,
+            "mesh": self.mesh,
+        }
 
-        # Basic identifiers
-        meta = root.add(Text("meta", style="config.field"))
-        meta.add(Text(f"scene: {self.scene_id}", style="config.field"))
-        meta.add(Text(f"snippet: {self.snippet_id}", style="config.field"))
-
-        # Cameras
-        cam_node = root.add(Text("cameras", style="config.field"))
-        for name, info in base["cameras"].items():
-            node = cam_node.add(Text(f"{name}:", style="config.field"))
-            node.add(Text(_repr_dict(info, indent=2, width=80), style="config.value"))
-
-        # Trajectory
-        traj_node = root.add(Text("traj", style="config.field"))
-        for k, v in base["traj"].items():
-            traj_node.add(Text(f"{k}: {v}", style="config.value"))
-
-        # Semi-dense SLAM
-        if show_semidense:
-            sem_node = root.add(Text("semidense", style="config.field"))
-            sem_summary = base["semidense"]
-            if "frames" in sem_summary:
-                sem_node.add(Text(f"frames: {sem_summary['frames']}", style="config.value"))
-            points_example = sem_summary.get("points_example")
-            if points_example is not None:
-                sem_node.add(Text(f"points_example: {points_example}", style="config.value"))
-            volume = sem_summary.get("volume", {})
-            vol_node = sem_node.add(Text("volume", style="config.field"))
-            if "min" in volume:
-                vol_node.add(Text(f"min: {volume['min']}", style="config.value"))
-            if "max" in volume:
-                vol_node.add(Text(f"max: {volume['max']}", style="config.value"))
-
-        # Ground truth annotations
-        if show_gt:
-            gt_summary = base["gt"]
-            gt_node = root.add(Text("gt", style="config.field"))
-            gt_node.add(Text(f"keys: {gt_summary.get('keys')}", style="config.value"))
-            if gt_summary.get("obb3"):
-                obb3_node = gt_node.add(Text("obb3", style="config.field"))
-                for cam_name, obb3 in gt_summary["obb3"].items():
-                    obb3_node.add(Text(f"{cam_name}: {obb3}", style="config.value"))
-            if gt_summary.get("obb2"):
-                gt_node.add(Text(f"obb2: {gt_summary['obb2']}", style="config.value"))
-            if gt_summary.get("scores") is not None:
-                gt_node.add(Text(f"scores: {gt_summary['scores']}", style="config.value"))
-
-            efm_gt = gt_summary.get("efm_gt")
-            if efm_gt:
-                efm_node = gt_node.add(Text("efm_gt", style="config.field"))
-                if isinstance(efm_gt, dict):
-                    efm_node.add(Text(f"count: {efm_gt.get('count')}", style="config.value"))
-                    efm_node.add(Text(f"keys: {efm_gt.get('keys')}", style="config.value"))
-                    examples = efm_gt.get("examples", {}) or {}
-                    for ts, cams in examples.items():
-                        ts_node = efm_node.add(Text(str(ts), style="config.field"))
-                        for cam_id, cam_info in cams.items():
-                            cam_node = ts_node.add(Text(f"{cam_id}:", style="config.field"))
-                            cam_node.add(Text(_repr_dict(cam_info, indent=2, width=80), style="config.value"))
-                else:
-                    efm_node.add(Text(str(efm_gt), style="config.value"))
-
-            if gt_summary.get("rri_targets"):
-                gt_node.add(Text(f"rri_targets: {gt_summary['rri_targets']}", style="config.value"))
-
-        # Mesh
-        mesh_node = root.add(Text("mesh", style="config.field"))
-        if base["mesh"] is None:
-            mesh_node.add(Text("None", style="config.value"))
-        else:
-            mesh_node.add(
-                Text(
-                    str(self.mesh),
-                    style="config.value",
-                )
-            )
+        root = rich_summary(
+            tree_dict=tree_dict,
+            path_map=path_map,
+            root_label=f"TypedSample {self.scene_id}/{self.snippet_id}",
+            with_shape=with_shape,
+            show_only_sample=show_only_sample,
+            is_print=False,
+        )
 
         console.print(root, soft_wrap=False, highlight=True, markup=True, emoji=False)
 
