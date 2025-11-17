@@ -1,0 +1,1786 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.25">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>ASE Data Pipeline Overview – Semantic NBV Planning</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-707d8167ce6003fca903bfe2be84ab7f.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-74ccc60397116b75c66017aca1c58e3c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-8867f034249725ad380f9d6206564ba2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-74ccc60397116b75c66017aca1c58e3c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+</head>
+
+<body class="nav-sidebar docked nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../../index.html" class="navbar-brand navbar-brand-logo">
+    </a>
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Semantic NBV Planning</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="../../contents/todos.html" aria-current="page"> 
+<span class="menu-text">TODOs</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../contents/setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-project-state" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Project State</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-project-state">    
+        <li>
+    <a class="dropdown-item" href="../../contents/roadmap.html">
+ <span class="dropdown-text">Roadmap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/questions.html">
+ <span class="dropdown-text">Research Questions</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/experiments/findings.html">
+ <span class="dropdown-text">Findings</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-ressources" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Ressources</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-ressources">    
+        <li>
+    <a class="dropdown-item" href="../../contents/resources.html">
+ <span class="dropdown-text">Resources (External Links, Repos, Docs, etc.)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/ase_dataset.html">
+ <span class="dropdown-text">ASE Dataset</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/glossary.html">
+ <span class="dropdown-text">Glossary</span></a>
+  </li>  
+    </ul>
+  </li>
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-bi-github" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+      <i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="nav-menu-bi-github">    
+        <li>
+    <a class="dropdown-item" href="https://github.com/JanDuchscherer104/NBV">
+ <span class="dropdown-text">View Source</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="https://github.com/JanDuchscherer104/NBV/issues">
+ <span class="dropdown-text">Open Issue</span></a>
+  </li>  
+    </ul>
+  </li>
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/impl/oracle_rri_package.html">Oracle RRI Package</a></li><li class="breadcrumb-item"><a href="../../contents/impl/data_pipeline_overview.html">ASE Data Pipeline Overview</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+      <a href="../../index.html" class="sidebar-logo-link">
+      </a>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Literature</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/literature/vin_nbv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">VIN-NBV: A View Introspection Network for Next-Best-View Selection</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/literature/gen_nbv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/literature/scene_script.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/literature/efm3d.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D &amp; EVL</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Project State</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/questions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Research Questions</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/roadmap.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Project Roadmap</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/todos.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Action Items &amp; TODOs</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Theory</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/theory/nbv_background.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">NBV Background</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/theory/rri_theory.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Relative Reconstruction Improvement (RRI) Theory</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/theory/surface_metrics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Surface Reconstruction Metrics</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/theory/semi-dense-pc.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Semi-Dense Point Clouds</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Implementations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Implementation Overview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/atek_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ATEK Implementation Details</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/efm3d_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D Implementation Details</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/prj_aria_tools_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ProjectAria Tools: Complete Reference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/rri_computation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Computing RRI with Ground Truth Meshes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/oracle_rri_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Oracle RRI Implementation Overview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/efm3d_symbol_index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D Symbol Index</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Oracle RRI Package</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/oracle_rri_package.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Oracle RRI Package</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/data_pipeline_overview.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">ASE Data Pipeline Overview</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
+ <span class="menu-text">Presentations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../typst/slides/slides_1.pdf" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Typst Slides 1</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../typst/slides/slides_2.pdf" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Typst Slides 2</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#datsase-download" id="toc-datsase-download" class="nav-link active" data-scroll-target="#datsase-download"><span class="header-section-number">1</span> Datsase Download</a></li>
+  <li><a href="#dataset-config-auto-discovery" id="toc-dataset-config-auto-discovery" class="nav-link" data-scroll-target="#dataset-config-auto-discovery"><span class="header-section-number">2</span> Dataset config &amp; auto-discovery</a></li>
+  <li><a href="#typed-views" id="toc-typed-views" class="nav-link" data-scroll-target="#typed-views"><span class="header-section-number">3</span> Typed views</a></li>
+  <li><a href="#mesh-handling" id="toc-mesh-handling" class="nav-link" data-scroll-target="#mesh-handling"><span class="header-section-number">4</span> Mesh handling</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/impl/oracle_rri_package.html">Oracle RRI Package</a></li><li class="breadcrumb-item"><a href="../../contents/impl/data_pipeline_overview.html">ASE Data Pipeline Overview</a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">ASE Data Pipeline Overview</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<hr>
+<section id="datsase-download" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Datsase Download</h1>
+<p>Since the option <code>prefer_scenes_with_max_snippets</code> is true per default, this will list all scenes sorted by the number of snippets they contain (descending). The <code>-n 5</code> flag limits the output to the top 5 scenes.</p>
+<div id="b4fcd3bc" class="cell" data-execution_count="1">
+<div class="cell-output cell-output-stdout">
+<div class="ansi-escaped-output">
+<pre>&lt;frozen runpy&gt;:128: RuntimeWarning: 'oracle_rri.data.downloader' found in sys.modules after import of package 'oracle_rri.data', but prior to execution of 'oracle_rri.data.downloader'; this may result in unpredictable behaviour
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">ASEDownloader</span><span class="ansi-bold">]</span>: Configured paths: <span class="ansi-yellow-fg">mesh_json</span>=<span class="ansi-magenta-fg">/home/jandu/repos/NBV/.data/aria_download_urls/</span><span class="ansi-bright-magenta-fg">ase_mesh_download_urls.json</span>,
+
+<span class="ansi-yellow-fg">atek_json</span>=<span class="ansi-magenta-fg">/home/jandu/repos/NBV/.data/aria_download_urls/</span><span class="ansi-bright-magenta-fg">AriaSyntheticEnvironment_ATEK_download_urls.json</span>, 
+
+<span class="ansi-yellow-fg">mesh_dir</span>=<span class="ansi-magenta-fg">/home/jandu/repos/NBV/.data/</span><span class="ansi-bright-magenta-fg">ase_meshes</span>
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">DownloaderCLI</span><span class="ansi-bold">]</span>: ============================================================
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">DownloaderCLI</span><span class="ansi-bold">]</span>: ASE Dataset - Available Scenes
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">DownloaderCLI</span><span class="ansi-bold">]</span>: ============================================================
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">DownloaderCLI</span><span class="ansi-bold">]</span>: Total scenes with GT meshes: <span class="ansi-cyan-fg ansi-bold">100</span>
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">DownloaderCLI</span><span class="ansi-bold">]</span>: 
+
+Showing <span class="ansi-cyan-fg ansi-bold">5</span> scenes:
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">DownloaderCLI</span><span class="ansi-bold">]</span>:   Scene <span class="ansi-cyan-fg ansi-bold">83550</span>: <span class="ansi-cyan-fg ansi-bold">49</span> snippets
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">DownloaderCLI</span><span class="ansi-bold">]</span>:   Scene <span class="ansi-cyan-fg ansi-bold">81283</span>: <span class="ansi-cyan-fg ansi-bold">45</span> snippets
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">DownloaderCLI</span><span class="ansi-bold">]</span>:   Scene <span class="ansi-cyan-fg ansi-bold">81286</span>: <span class="ansi-cyan-fg ansi-bold">43</span> snippets
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">DownloaderCLI</span><span class="ansi-bold">]</span>:   Scene <span class="ansi-cyan-fg ansi-bold">83515</span>: <span class="ansi-cyan-fg ansi-bold">42</span> snippets
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">DownloaderCLI</span><span class="ansi-bold">]</span>:   Scene <span class="ansi-cyan-fg ansi-bold">82647</span>: <span class="ansi-cyan-fg ansi-bold">40</span> snippets
+
+<span class="ansi-bold">[</span><span class="ansi-cyan-fg ansi-bold">DownloaderCLI</span><span class="ansi-bold">]</span>: ============================================================
+</pre>
+</div>
+</div>
+</div>
+<p>This will download the top 5 scenes with the most snippets, but limit each scene to a maximum of 10 snippets. <code>-c efm_eval</code> specifies the configuration to use (here: EFM evaluation set).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> oracle_rri.data.downloader <span class="at">-m</span> download <span class="at">-c</span> efm_eval <span class="at">-n</span> 5 <span class="at">--ms</span> 10</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This will download the top 5 scenes with the most snippets, using the default configuration (here: EFM training set).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> oracle_rri.data.downloader <span class="at">-m</span> download <span class="at">-c</span> efm <span class="at">-n</span> 5</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="dataset-config-auto-discovery" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Dataset config &amp; auto-discovery</h1>
+<p>The <code>ASEDatasetConfig</code> provides several options for configuring the dataset loading process. See the docstring for details.</p>
+<ul>
+<li><strong>Auto tar resolution</strong>: if <code>tar_urls</code> is empty, shards are globbed under resolved ATEK root; if <code>scene_ids</code> are provided, only those subdirs are used.</li>
+<li><strong>Mesh resolution</strong>: when <code>load_meshes=True</code>, meshes are loaded from <code>.data/ase_meshes/scene_ply_{scene}.ply</code> (or inferred from <code>scene_ids</code>).</li>
+</ul>
+<div id="d941cc7f" class="cell" data-execution_count="2">
+<div class="cell-output cell-output-display">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-weight: bold">[</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">ASEDatasetConfig</span>::<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">config</span><span style="font-weight: bold">]</span>: Resolved <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">84</span> tar shards for scenes <span style="font-weight: bold">[</span><span style="color: #008000; text-decoration-color: #008000">'81283'</span>, <span style="color: #008000; text-decoration-color: #008000">'81286'</span>, <span style="color: #008000; text-decoration-color: #008000">'82004'</span>, <span style="color: #008000; text-decoration-color: #008000">'83515'</span>, <span style="color: #008000; text-decoration-color: #008000">'83550'</span><span style="font-weight: bold">]</span>
+</pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-weight: bold">[</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">ASEDatasetConfig</span>::<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">config</span><span style="font-weight: bold">]</span>: Resolved <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">84</span> tar shards for scenes <span style="font-weight: bold">[</span><span style="color: #008000; text-decoration-color: #008000">'81283'</span>, <span style="color: #008000; text-decoration-color: #008000">'81286'</span>, <span style="color: #008000; text-decoration-color: #008000">'82004'</span>, <span style="color: #008000; text-decoration-color: #008000">'83515'</span>, <span style="color: #008000; text-decoration-color: #008000">'83550'</span><span style="font-weight: bold">]</span>
+</pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-weight: bold">[</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">ASEDatasetConfig</span>::<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">config</span><span style="font-weight: bold">]</span>: Resolved <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">84</span> tar shards for scenes <span style="font-weight: bold">[</span><span style="color: #008000; text-decoration-color: #008000">'81283'</span>, <span style="color: #008000; text-decoration-color: #008000">'81286'</span>, <span style="color: #008000; text-decoration-color: #008000">'82004'</span>, <span style="color: #008000; text-decoration-color: #008000">'83515'</span>, <span style="color: #008000; text-decoration-color: #008000">'83550'</span><span style="font-weight: bold">]</span>
+</pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #000080; text-decoration-color: #000080; font-weight: bold">ASEDatasetConfig</span>
+├── <span style="color: #008000; text-decoration-color: #008000">target: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">ASEDataset</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (type[ASEDataset])</span>
+├── <span style="color: #008000; text-decoration-color: #008000">propagated_fields: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{}</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (dict[str, Any])</span>
+├── <span style="color: #008000; text-decoration-color: #008000">paths:</span>
+│   └── <span style="color: #000080; text-decoration-color: #000080; font-weight: bold">PathConfig</span>
+│       ├── <span style="color: #008000; text-decoration-color: #008000">target: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">NoTarget</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (type[TargetType])</span>
+│       ├── <span style="color: #008000; text-decoration-color: #008000">propagated_fields: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{}</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (dict[str, Any])</span>
+│       ├── <span style="color: #008000; text-decoration-color: #008000">root: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">/home/jandu/repos/NBV</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'pathlib.Path'&gt;)</span>
+│       ├── <span style="color: #008000; text-decoration-color: #008000">data_root: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">/home/jandu/repos/NBV/.data</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'pathlib.Path'&gt;)</span>
+│       ├── <span style="color: #008000; text-decoration-color: #008000">checkpoints: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">/home/jandu/repos/NBV/.logs/checkpoints</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'pathlib.Path'&gt;)</span>
+│       ├── <span style="color: #008000; text-decoration-color: #008000">configs_dir: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">/home/jandu/repos/NBV/.configs</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'pathlib.Path'&gt;)</span>
+│       ├── <span style="color: #008000; text-decoration-color: #008000">url_dir: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">/home/jandu/repos/NBV/.data/aria_download_urls</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'pathlib.Path'&gt;)</span>
+│       ├── <span style="color: #008000; text-decoration-color: #008000">metadata_cache: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">/home/jandu/repos/NBV/.data/ase_metadata.json</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'pathlib.Path'&gt;)</span>
+│       ├── <span style="color: #008000; text-decoration-color: #008000">ase_meshes: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">/home/jandu/repos/NBV/.data/ase_meshes</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'pathlib.Path'&gt;)</span>
+│       └── <span style="color: #008000; text-decoration-color: #008000">external_dir: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">/home/jandu/repos/NBV/external</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'pathlib.Path'&gt;)</span>
+├── <span style="color: #008000; text-decoration-color: #008000">scene_ids: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">['81283', '81286', '82004', '83515', '83550']</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (list[str])</span>
+├── <span style="color: #008000; text-decoration-color: #008000">atek_root: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">None</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (pathlib.Path | None)</span>
+├── <span style="color: #008000; text-decoration-color: #008000">atek_variant: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">"efm_eval"</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'str'&gt;)</span>
+├── <span style="color: #008000; text-decoration-color: #008000">tar_urls: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">['/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0000.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0001.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0002.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0003.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0004.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0005.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0006.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0007.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0008.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0009.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0010.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0011.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0012.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0013.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0014.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0015.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0016.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0000.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0001.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0002.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0003.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0004.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0005.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0006.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0007.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0008.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0009.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0010.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0011.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0012.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0013.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0014.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0015.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/81286/shards-0016.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0000.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0001.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0002.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0003.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0004.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0005.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0006.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0007.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0008.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0009.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0010.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0011.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0012.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0013.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/82004/shards-0014.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0000.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0001.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0002.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0003.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0004.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0005.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0006.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0007.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0008.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0009.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0010.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0011.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0012.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0013.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0014.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83515/shards-0015.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0000.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0001.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0002.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0003.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0004.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0005.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0006.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0007.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0008.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0009.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0010.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0011.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0012.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0013.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0014.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0015.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0016.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0017.tar', </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">'/home/jandu/repos/NBV/.data/ase_efm_eval/83550/shards-0018.tar']</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (list[str])</span>
+├── <span style="color: #008000; text-decoration-color: #008000">scene_to_mesh: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{81283: PosixPath('/home/jandu/repos/NBV/.data/ase_meshes/scene_ply_81283.ply'), 81286: </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">PosixPath('/home/jandu/repos/NBV/.data/ase_meshes/scene_ply_81286.ply'), 82004: </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">PosixPath('/home/jandu/repos/NBV/.data/ase_meshes/scene_ply_82004.ply'), 83515: </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">PosixPath('/home/jandu/repos/NBV/.data/ase_meshes/scene_ply_83515.ply'), 83550: </span>
+│   <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">PosixPath('/home/jandu/repos/NBV/.data/ase_meshes/scene_ply_83550.ply')}</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (dict[str, Path])</span>
+├── <span style="color: #008000; text-decoration-color: #008000">batch_size: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">None</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (int | None)</span>
+├── <span style="color: #008000; text-decoration-color: #008000">shuffle: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">False</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'bool'&gt;)</span>
+├── <span style="color: #008000; text-decoration-color: #008000">repeat: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">False</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'bool'&gt;)</span>
+├── <span style="color: #008000; text-decoration-color: #008000">load_meshes: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">True</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'bool'&gt;)</span>
+├── <span style="color: #008000; text-decoration-color: #008000">require_mesh: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">False</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'bool'&gt;)</span>
+├── <span style="color: #008000; text-decoration-color: #008000">mesh_simplify_ratio: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">None</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (float | None)</span>
+├── <span style="color: #008000; text-decoration-color: #008000">cache_meshes: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">True</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'bool'&gt;)</span>
+└── <span style="color: #008000; text-decoration-color: #008000">verbose: </span><span style="color: #c0c0c0; text-decoration-color: #c0c0c0">True</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> (&lt;class 'bool'&gt;)</span>
+</pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-weight: bold">[</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">ASEDatasetConfig</span>::<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">config</span><span style="font-weight: bold">]</span>: Resolved <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">84</span> tar shards for scenes <span style="font-weight: bold">[</span><span style="color: #008000; text-decoration-color: #008000">'81283'</span>, <span style="color: #008000; text-decoration-color: #008000">'81286'</span>, <span style="color: #008000; text-decoration-color: #008000">'82004'</span>, <span style="color: #008000; text-decoration-color: #008000">'83515'</span>, <span style="color: #008000; text-decoration-color: #008000">'83550'</span><span style="font-weight: bold">]</span>
+</pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-weight: bold">[</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">ASEDatasetConfig</span>::<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">setup_target</span><span style="font-weight: bold">]</span>: Preparing ASEDataset <span style="font-weight: bold">(</span>tar URLs: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">84</span>, scenes: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span><span style="font-weight: bold">)</span>
+</pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-weight: bold">[</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">ASEDataset</span><span style="font-weight: bold">]</span>: Loading ATEK WebDataset from <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">84</span> shards
+</pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-weight: bold">[</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">ASEDataset</span><span style="font-weight: bold">]</span>: ATEK loader ready
+</pre>
+</div>
+</div>
+<p>The dataset object <code>ds</code> yields samples of type “TyppedASESample”, this dataclass stores the complex flat-dict from the <code>AtekWDSDataset</code> in <code>ds.flat</code> and provides typed views via properties.</p>
+<div id="246f08aa" class="cell" data-execution_count="3">
+<div class="cell-output cell-output-display">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #000080; text-decoration-color: #000080; font-weight: bold">TypedSample 81283/shards-0000</span>
+├── <span style="color: #008000; text-decoration-color: #008000">data &lt;dict&gt;</span>
+│   ├── <span style="color: #008000; text-decoration-color: #008000">__key__ &lt;str&gt; [flat: __key__]</span>
+│   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">AriaSyntheticEnvironment_81283_AtekDataSample_000000</span>
+│   ├── <span style="color: #008000; text-decoration-color: #008000">__url__ &lt;str&gt; [flat: __url__]</span>
+│   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">/home/jandu/repos/NBV/.data/ase_efm_eval/81283/shards-0000.tar</span>
+│   ├── <span style="color: #008000; text-decoration-color: #008000">gt_data &lt;dict&gt; [flat: gt_data]</span>
+│   │   └── <span style="color: #008000; text-decoration-color: #008000">efm_gt &lt;dict&gt;</span>
+│   │       ├── <span style="color: #008000; text-decoration-color: #008000">0 &lt;dict&gt;</span>
+│   │       │   ├── <span style="color: #008000; text-decoration-color: #008000">camera-rgb &lt;dict&gt;</span>
+│   │       │   │   ├── <span style="color: #008000; text-decoration-color: #008000">category_names &lt;list&gt;</span>
+│   │       │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{len: 20, elem_type: str, first: picture, last: chair}</span>
+│   │       │   │   ├── <span style="color: #008000; text-decoration-color: #008000">category_ids &lt;Tensor&gt;</span>
+│   │       │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │       │   │   ├── <span style="color: #008000; text-decoration-color: #008000">instance_ids &lt;Tensor&gt;</span>
+│   │       │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │       │   │   ├── <span style="color: #008000; text-decoration-color: #008000">object_dimensions &lt;Tensor&gt;</span>
+│   │       │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20, 3), dtype: torch.float32}</span>
+│   │       │   │   └── <span style="color: #008000; text-decoration-color: #008000">ts_world_object &lt;Tensor&gt;</span>
+│   │       │   │       └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20, 3, 4), dtype: torch.float32}</span>
+│   │       │   ├── <span style="color: #008000; text-decoration-color: #008000">camera-slam-left &lt;dict&gt;</span>
+│   │       │   │   ├── <span style="color: #008000; text-decoration-color: #008000">category_names &lt;list&gt;</span>
+│   │       │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{len: 7, elem_type: str, first: window, last: shelves}</span>
+│   │       │   │   ├── <span style="color: #008000; text-decoration-color: #008000">category_ids &lt;Tensor&gt;</span>
+│   │       │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (7,), dtype: torch.int64}</span>
+│   │       │   │   ├── <span style="color: #008000; text-decoration-color: #008000">instance_ids &lt;Tensor&gt;</span>
+│   │       │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (7,), dtype: torch.int64}</span>
+│   │       │   │   ├── <span style="color: #008000; text-decoration-color: #008000">object_dimensions &lt;Tensor&gt;</span>
+│   │       │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (7, 3), dtype: torch.float32}</span>
+│   │       │   │   └── <span style="color: #008000; text-decoration-color: #008000">ts_world_object &lt;Tensor&gt;</span>
+│   │       │   │       └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (7, 3, 4), dtype: torch.float32}</span>
+│   │       │   └── <span style="color: #008000; text-decoration-color: #008000">camera-slam-right &lt;dict&gt;</span>
+│   │       │       ├── <span style="color: #008000; text-decoration-color: #008000">category_names &lt;list&gt;</span>
+│   │       │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{len: 17, elem_type: str, first: picture, last: sofa}</span>
+│   │       │       ├── <span style="color: #008000; text-decoration-color: #008000">category_ids &lt;Tensor&gt;</span>
+│   │       │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (17,), dtype: torch.int64}</span>
+│   │       │       ├── <span style="color: #008000; text-decoration-color: #008000">instance_ids &lt;Tensor&gt;</span>
+│   │       │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (17,), dtype: torch.int64}</span>
+│   │       │       ├── <span style="color: #008000; text-decoration-color: #008000">object_dimensions &lt;Tensor&gt;</span>
+│   │       │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (17, 3), dtype: torch.float32}</span>
+│   │       │       └── <span style="color: #008000; text-decoration-color: #008000">ts_world_object &lt;Tensor&gt;</span>
+│   │       │           └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (17, 3, 4), dtype: torch.float32}</span>
+│   │       └── <span style="color: #008000; text-decoration-color: #008000">1900000000 &lt;dict&gt;</span>
+│   │           ├── <span style="color: #008000; text-decoration-color: #008000">camera-rgb &lt;dict&gt;</span>
+│   │           │   ├── <span style="color: #008000; text-decoration-color: #008000">category_names &lt;list&gt;</span>
+│   │           │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{len: 10, elem_type: str, first: table, last: bed}</span>
+│   │           │   ├── <span style="color: #008000; text-decoration-color: #008000">category_ids &lt;Tensor&gt;</span>
+│   │           │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (10,), dtype: torch.int64}</span>
+│   │           │   ├── <span style="color: #008000; text-decoration-color: #008000">instance_ids &lt;Tensor&gt;</span>
+│   │           │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (10,), dtype: torch.int64}</span>
+│   │           │   ├── <span style="color: #008000; text-decoration-color: #008000">object_dimensions &lt;Tensor&gt;</span>
+│   │           │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (10, 3), dtype: torch.float32}</span>
+│   │           │   └── <span style="color: #008000; text-decoration-color: #008000">ts_world_object &lt;Tensor&gt;</span>
+│   │           │       └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (10, 3, 4), dtype: torch.float32}</span>
+│   │           ├── <span style="color: #008000; text-decoration-color: #008000">camera-slam-left &lt;dict&gt;</span>
+│   │           │   ├── <span style="color: #008000; text-decoration-color: #008000">category_names &lt;list&gt;</span>
+│   │           │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{len: 22, elem_type: str, first: chair, last: chair}</span>
+│   │           │   ├── <span style="color: #008000; text-decoration-color: #008000">category_ids &lt;Tensor&gt;</span>
+│   │           │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (22,), dtype: torch.int64}</span>
+│   │           │   ├── <span style="color: #008000; text-decoration-color: #008000">instance_ids &lt;Tensor&gt;</span>
+│   │           │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (22,), dtype: torch.int64}</span>
+│   │           │   ├── <span style="color: #008000; text-decoration-color: #008000">object_dimensions &lt;Tensor&gt;</span>
+│   │           │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (22, 3), dtype: torch.float32}</span>
+│   │           │   └── <span style="color: #008000; text-decoration-color: #008000">ts_world_object &lt;Tensor&gt;</span>
+│   │           │       └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (22, 3, 4), dtype: torch.float32}</span>
+│   │           └── <span style="color: #008000; text-decoration-color: #008000">camera-slam-right &lt;dict&gt;</span>
+│   │               ├── <span style="color: #008000; text-decoration-color: #008000">category_names &lt;list&gt;</span>
+│   │               │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{len: 2, elem_type: str, first: floor mat, last: sofa}</span>
+│   │               ├── <span style="color: #008000; text-decoration-color: #008000">category_ids &lt;Tensor&gt;</span>
+│   │               │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (2,), dtype: torch.int64}</span>
+│   │               ├── <span style="color: #008000; text-decoration-color: #008000">instance_ids &lt;Tensor&gt;</span>
+│   │               │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (2,), dtype: torch.int64}</span>
+│   │               ├── <span style="color: #008000; text-decoration-color: #008000">object_dimensions &lt;Tensor&gt;</span>
+│   │               │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (2, 3), dtype: torch.float32}</span>
+│   │               └── <span style="color: #008000; text-decoration-color: #008000">ts_world_object &lt;Tensor&gt;</span>
+│   │                   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (2, 3, 4), dtype: torch.float32}</span>
+│   ├── <span style="color: #008000; text-decoration-color: #008000">mfcd &lt;dict&gt;</span>
+│   │   ├── <span style="color: #008000; text-decoration-color: #008000">camera-rgb &lt;dict&gt;</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">camera_label &lt;str&gt; [flat: mfcd#camera-rgb+camera_label]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">camera-rgb</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">camera_model_name &lt;str&gt; [flat: mfcd#camera-rgb+camera_model_name]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">CameraModelType.FISHEYE624</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">camera_valid_radius &lt;Tensor&gt; [flat: mfcd#camera-rgb+camera_valid_radius]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (1,), dtype: torch.float32}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">capture_timestamps_ns &lt;Tensor&gt; [flat: mfcd#camera-rgb+capture_timestamps_ns]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">exposure_durations_s &lt;Tensor&gt; [flat: mfcd#camera-rgb+exposure_durations_s]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.float32}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">frame_ids &lt;Tensor&gt; [flat: mfcd#camera-rgb+frame_ids]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">gains &lt;Tensor&gt; [flat: mfcd#camera-rgb+gains]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.float32}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">origin_camera_label &lt;str&gt; [flat: mfcd#camera-rgb+origin_camera_label]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">camera-slam-left</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">projection_params &lt;Tensor&gt; [flat: mfcd#camera-rgb+projection_params]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (15,), dtype: torch.float32}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">t_device_camera &lt;Tensor&gt; [flat: mfcd#camera-rgb+t_device_camera]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (3, 4), dtype: torch.float32}</span>
+│   │   │   └── <span style="color: #008000; text-decoration-color: #008000">images &lt;Tensor&gt; [flat: mfcd#camera-rgb+images]</span>
+│   │   │       └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20, 3, 240, 240), dtype: torch.uint8}</span>
+│   │   ├── <span style="color: #008000; text-decoration-color: #008000">camera-rgb-depth &lt;dict&gt;</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">camera_label &lt;str&gt; [flat: mfcd#camera-rgb-depth+camera_label]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">camera-rgb-depth</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">capture_timestamps_ns &lt;Tensor&gt; [flat: mfcd#camera-rgb-depth+capture_timestamps_ns]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">frame_ids &lt;Tensor&gt; [flat: mfcd#camera-rgb-depth+frame_ids]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │   │   └── <span style="color: #008000; text-decoration-color: #008000">images &lt;Tensor&gt; [flat: mfcd#camera-rgb-depth+images]</span>
+│   │   │       └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20, 1, 240, 240), dtype: torch.float32}</span>
+│   │   ├── <span style="color: #008000; text-decoration-color: #008000">camera-slam-left &lt;dict&gt;</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">camera_label &lt;str&gt; [flat: mfcd#camera-slam-left+camera_label]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">camera-slam-left</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">camera_model_name &lt;str&gt; [flat: mfcd#camera-slam-left+camera_model_name]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">CameraModelType.FISHEYE624</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">camera_valid_radius &lt;Tensor&gt; [flat: mfcd#camera-slam-left+camera_valid_radius]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (1,), dtype: torch.float32}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">capture_timestamps_ns &lt;Tensor&gt; [flat: mfcd#camera-slam-left+capture_timestamps_ns]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">exposure_durations_s &lt;Tensor&gt; [flat: mfcd#camera-slam-left+exposure_durations_s]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.float32}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">frame_ids &lt;Tensor&gt; [flat: mfcd#camera-slam-left+frame_ids]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">gains &lt;Tensor&gt; [flat: mfcd#camera-slam-left+gains]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.float32}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">origin_camera_label &lt;str&gt; [flat: mfcd#camera-slam-left+origin_camera_label]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">camera-slam-left</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">projection_params &lt;Tensor&gt; [flat: mfcd#camera-slam-left+projection_params]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (15,), dtype: torch.float32}</span>
+│   │   │   ├── <span style="color: #008000; text-decoration-color: #008000">t_device_camera &lt;Tensor&gt; [flat: mfcd#camera-slam-left+t_device_camera]</span>
+│   │   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (3, 4), dtype: torch.float32}</span>
+│   │   │   └── <span style="color: #008000; text-decoration-color: #008000">images &lt;Tensor&gt; [flat: mfcd#camera-slam-left+images]</span>
+│   │   │       └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20, 1, 240, 320), dtype: torch.uint8}</span>
+│   │   └── <span style="color: #008000; text-decoration-color: #008000">camera-slam-right &lt;dict&gt;</span>
+│   │       ├── <span style="color: #008000; text-decoration-color: #008000">camera_label &lt;str&gt; [flat: mfcd#camera-slam-right+camera_label]</span>
+│   │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">camera-slam-right</span>
+│   │       ├── <span style="color: #008000; text-decoration-color: #008000">camera_model_name &lt;str&gt; [flat: mfcd#camera-slam-right+camera_model_name]</span>
+│   │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">CameraModelType.FISHEYE624</span>
+│   │       ├── <span style="color: #008000; text-decoration-color: #008000">camera_valid_radius &lt;Tensor&gt; [flat: mfcd#camera-slam-right+camera_valid_radius]</span>
+│   │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (1,), dtype: torch.float32}</span>
+│   │       ├── <span style="color: #008000; text-decoration-color: #008000">capture_timestamps_ns &lt;Tensor&gt; [flat: mfcd#camera-slam-right+capture_timestamps_ns]</span>
+│   │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │       ├── <span style="color: #008000; text-decoration-color: #008000">exposure_durations_s &lt;Tensor&gt; [flat: mfcd#camera-slam-right+exposure_durations_s]</span>
+│   │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.float32}</span>
+│   │       ├── <span style="color: #008000; text-decoration-color: #008000">frame_ids &lt;Tensor&gt; [flat: mfcd#camera-slam-right+frame_ids]</span>
+│   │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │       ├── <span style="color: #008000; text-decoration-color: #008000">gains &lt;Tensor&gt; [flat: mfcd#camera-slam-right+gains]</span>
+│   │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.float32}</span>
+│   │       ├── <span style="color: #008000; text-decoration-color: #008000">origin_camera_label &lt;str&gt; [flat: mfcd#camera-slam-right+origin_camera_label]</span>
+│   │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">camera-slam-left</span>
+│   │       ├── <span style="color: #008000; text-decoration-color: #008000">projection_params &lt;Tensor&gt; [flat: mfcd#camera-slam-right+projection_params]</span>
+│   │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (15,), dtype: torch.float32}</span>
+│   │       ├── <span style="color: #008000; text-decoration-color: #008000">t_device_camera &lt;Tensor&gt; [flat: mfcd#camera-slam-right+t_device_camera]</span>
+│   │       │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (3, 4), dtype: torch.float32}</span>
+│   │       └── <span style="color: #008000; text-decoration-color: #008000">images &lt;Tensor&gt; [flat: mfcd#camera-slam-right+images]</span>
+│   │           └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20, 1, 240, 320), dtype: torch.uint8}</span>
+│   ├── <span style="color: #008000; text-decoration-color: #008000">msdpd &lt;dict&gt;</span>
+│   │   ├── <span style="color: #008000; text-decoration-color: #008000">capture_timestamps_ns &lt;Tensor&gt; [flat: msdpd#capture_timestamps_ns]</span>
+│   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │   ├── <span style="color: #008000; text-decoration-color: #008000">points_dist_std &lt;list&gt; [flat: msdpd#points_dist_std]</span>
+│   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{len: 20, elem_type: Tensor}</span>
+│   │   ├── <span style="color: #008000; text-decoration-color: #008000">points_inv_dist_std &lt;list&gt; [flat: msdpd#points_inv_dist_std]</span>
+│   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{len: 20, elem_type: Tensor}</span>
+│   │   ├── <span style="color: #008000; text-decoration-color: #008000">points_volumn_max &lt;Tensor&gt; [flat: msdpd#points_volumn_max]</span>
+│   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (3,), dtype: torch.float32}</span>
+│   │   ├── <span style="color: #008000; text-decoration-color: #008000">points_volumn_min &lt;Tensor&gt; [flat: msdpd#points_volumn_min]</span>
+│   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (3,), dtype: torch.float32}</span>
+│   │   ├── <span style="color: #008000; text-decoration-color: #008000">points_world &lt;list&gt; [flat: msdpd#points_world]</span>
+│   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{len: 20, elem_type: Tensor}</span>
+│   │   └── <span style="color: #008000; text-decoration-color: #008000">points_world_lengths &lt;Tensor&gt; [flat: msdpd#points_world_lengths]</span>
+│   │       └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   ├── <span style="color: #008000; text-decoration-color: #008000">mtd &lt;dict&gt;</span>
+│   │   ├── <span style="color: #008000; text-decoration-color: #008000">capture_timestamps_ns &lt;Tensor&gt; [flat: mtd#capture_timestamps_ns]</span>
+│   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20,), dtype: torch.int64}</span>
+│   │   ├── <span style="color: #008000; text-decoration-color: #008000">gravity_in_world &lt;Tensor&gt; [flat: mtd#gravity_in_world]</span>
+│   │   │   └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (3,), dtype: torch.float32}</span>
+│   │   └── <span style="color: #008000; text-decoration-color: #008000">ts_world_device &lt;Tensor&gt; [flat: mtd#ts_world_device]</span>
+│   │       └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">{shape: (20, 3, 4), dtype: torch.float32}</span>
+│   └── <span style="color: #008000; text-decoration-color: #008000">sequence_name &lt;str&gt; [flat: sequence_name]</span>
+│       └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">81283</span>
+└── <span style="color: #008000; text-decoration-color: #008000">mesh &lt;Trimesh&gt;</span>
+    └── <span style="color: #c0c0c0; text-decoration-color: #c0c0c0">&lt;trimesh.Trimesh(vertices.shape=(5512522, 3), faces.shape=(4599814, 3), name=`scene_ply_81283.ply`)&gt;</span>
+</pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="typed-views" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Typed views</h1>
+<div id="ddaf4324" class="cell" data-execution_count="4">
+<div class="cell-output cell-output-stdout">
+<pre><code>CameraView(images=tensor([[[[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]]],
+
+
+        [[[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]]],
+
+
+        [[[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]]],
+
+
+        ...,
+
+
+        [[[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]]],
+
+
+        [[[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]]],
+
+
+        [[[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]],
+
+         [[0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          ...,
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0],
+          [0, 0, 0,  ..., 0, 0, 0]]]], dtype=torch.uint8), projection_params=tensor([ 1.0147e+02,  1.2160e+02,  1.2029e+02,  3.6509e-01, -1.7381e-01,
+        -7.5349e-01,  2.4348e+00, -2.5779e+00,  8.7885e-01,  8.0052e-04,
+        -2.9424e-04, -1.5784e-03,  2.5914e-04,  8.7793e-04, -2.6080e-04]), t_device_camera=tensor([[ 0.9961, -0.0439,  0.0771, -0.0075],
+        [ 0.0821,  0.7847, -0.6144, -0.0109],
+        [-0.0335,  0.6183,  0.7852, -0.0036]]), capture_timestamps_ns=tensor([         0,  100000000,  200000000,  300000000,  400000000,  500000000,
+         600000000,  700000000,  800000000,  900000000, 1000000000, 1100000000,
+        1200000000, 1300000000, 1400000000, 1500000000, 1600000000, 1700000000,
+        1800000000, 1900000000]), frame_ids=tensor([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17,
+        18, 19]), exposure_durations_s=tensor([0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100,
+        0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100,
+        0.0100, 0.0100]), gains=tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
+        1., 1.]), camera_model_name='CameraModelType.FISHEYE624', camera_valid_radius=tensor([120.5966]), camera_label='camera-rgb', origin_camera_label='camera-slam-left')</code></pre>
+</div>
+</div>
+<ul>
+<li><strong>CameraView</strong>: images <code>(F,C,H,W)</code>, intrinsics, T_device_camera; uses <code>PoseTW</code> convention.</li>
+<li><strong>TrajectoryView</strong>: <code>ts_world_device</code> <code>(F,3,4)</code>, timestamps, gravity.</li>
+<li><strong>SemiDenseView</strong>: per-frame SLAM points + stds + volume bounds.</li>
+<li><strong>GTView</strong>: parses <code>obb3_gt</code>, <code>obb2_gt</code>, <code>scores</code>, <code>efm_gt</code>, <code>rri_targets</code>; preserves raw.</li>
+</ul>
+<hr>
+</section>
+<section id="mesh-handling" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Mesh handling</h1>
+<ul>
+<li>Mesh loaded once per scene (cached if <code>cache_meshes=True</code>).</li>
+<li>Mesh shape hints in repr: <code>{'verts': N, 'faces': M}</code>.</li>
+</ul>
+<hr>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "ASE Data Pipeline Overview"</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> html</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="fu"># Datsase Download</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>Since the option <span class="in">`prefer_scenes_with_max_snippets`</span> is true per default, this will list all scenes sorted by the number of snippets they contain (descending). The <span class="in">`-n 5`</span> flag limits the output to the top 5 scenes.</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>python <span class="op">-</span>m oracle_rri.data.downloader <span class="op">-</span>m <span class="bu">list</span> <span class="op">-</span>c efm_eval <span class="op">-</span>n <span class="dv">5</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>This will download the top 5 scenes with the most snippets, but limit each scene to a maximum of 10 snippets. <span class="in">`-c efm_eval`</span> specifies the configuration to use (here: EFM evaluation set).</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="in">```sh</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> oracle_rri.data.downloader <span class="at">-m</span> download <span class="at">-c</span> efm_eval <span class="at">-n</span> 5 <span class="at">--ms</span> 10</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>This will download the top 5 scenes with the most snippets, using the default configuration (here: EFM training set).</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a><span class="in">```sh</span></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> oracle_rri.data.downloader <span class="at">-m</span> download <span class="at">-c</span> efm <span class="at">-n</span> 5</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a><span class="fu"># Dataset config &amp; auto-discovery</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>The <span class="in">`ASEDatasetConfig`</span> provides several options for configuring the dataset loading process. See the docstring for details.</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Auto tar resolution**: if <span class="in">`tar_urls`</span> is empty, shards are globbed under resolved ATEK root; if <span class="in">`scene_ids`</span> are provided, only those subdirs are used.</span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Mesh resolution**: when <span class="in">`load_meshes=True`</span>, meshes are loaded from <span class="in">`.data/ase_meshes/scene_ply_{scene}.ply`</span> (or inferred from <span class="in">`scene_ids`</span>).</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> oracle_rri.data.dataset <span class="im">import</span> ASEDatasetConfig</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>cfg <span class="op">=</span> ASEDatasetConfig(verbose<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>cfg.inspect()</span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a>ds <span class="op">=</span> cfg.setup_target()</span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a>The dataset object <span class="in">`ds`</span> yields samples of type "TyppedASESample", this dataclass stores the complex flat-dict from the <span class="in">`AtekWDSDataset`</span> in <span class="in">`ds.flat`</span> and provides typed views via properties.</span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a>sample <span class="op">=</span> <span class="bu">next</span>(<span class="bu">iter</span>(ds))</span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a>sample.rich_summary(show_only_sample<span class="op">=</span>[<span class="st">"efm_gt"</span>])</span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a><span class="fu"># Typed views</span></span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(</span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a>    sample.camera_rgb,  <span class="co"># CameraView</span></span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a>    <span class="co"># type(sample.camera_slam_left),  # CameraView</span></span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a>    <span class="co"># type(sample.camera_slam_right),  # CameraView</span></span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a>    <span class="co"># # sample.camera_rgb_depth if "mfcd#camera-rgb-depth+images" in sample.flat else None</span></span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a>    <span class="co"># type(sample.trajectory),  # TrajectoryView</span></span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a>    <span class="co"># type(sample.semidense),  # SemiDenseView</span></span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a>    <span class="co"># type(sample.gt),  # GTView (obb2/obb3/efm_gt/rri_targets)</span></span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a>    <span class="co"># type(sample.mesh),  # trimesh.Trimesh or None</span></span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**CameraView**: images <span class="in">`(F,C,H,W)`</span>, intrinsics, T_device_camera; uses <span class="in">`PoseTW`</span> convention.</span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**TrajectoryView**: <span class="in">`ts_world_device`</span> <span class="in">`(F,3,4)`</span>, timestamps, gravity.</span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**SemiDenseView**: per-frame SLAM points + stds + volume bounds.</span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**GTView**: parses <span class="in">`obb3_gt`</span>, <span class="in">`obb2_gt`</span>, <span class="in">`scores`</span>, <span class="in">`efm_gt`</span>, <span class="in">`rri_targets`</span>; preserves raw.</span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a><span class="fu"># Mesh handling</span></span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Mesh loaded once per scene (cached if <span class="in">`cache_meshes=True`</span>).</span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Mesh shape hints in repr: <span class="in">`{'verts': N, 'faces': M}`</span>.</span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a>---</span>
+</code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p>Built with Quarto</p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

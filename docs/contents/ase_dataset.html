@@ -594,6 +594,15 @@ window.Quarto = {
  <span class="menu-text">EFM3D Symbol Index</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../contents/impl/oracle_rri_package.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Oracle RRI Package</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+ <span class="menu-text">contents/iml/data_pipeline_overview.qmd</span>
+  </li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
@@ -661,7 +670,7 @@ window.Quarto = {
   <li><a href="#coordinate-conventions" id="toc-coordinate-conventions" class="nav-link" data-scroll-target="#coordinate-conventions"><span class="header-section-number">6</span> Coordinate Conventions</a>
   <ul class="collapse">
   <li><a href="#world-frame" id="toc-world-frame" class="nav-link" data-scroll-target="#world-frame"><span class="header-section-number">6.1</span> World Frame</a></li>
-  <li><a href="#camera-frame" id="toc-camera-frame" class="nav-link" data-scroll-target="#camera-frame"><span class="header-section-number">6.2</span> Camera Frame</a>
+  <li><a href="#camera-frames" id="toc-camera-frames" class="nav-link" data-scroll-target="#camera-frames"><span class="header-section-number">6.2</span> Camera Frames</a>
   <ul class="collapse">
   <li><a href="#using-atek-for-ml-workflows" id="toc-using-atek-for-ml-workflows" class="nav-link" data-scroll-target="#using-atek-for-ml-workflows"><span class="header-section-number">6.2.1</span> Using ATEK for ML Workflows</a></li>
   </ul></li>
@@ -1054,7 +1063,7 @@ make_window, id=2000, wall0_id=0, position_x=4.45, position_y=6.16, position_z=1
 </section>
 <section id="coordinate-conventions" class="level1" data-number="6">
 <h1 data-number="6"><span class="header-section-number">6</span> Coordinate Conventions</h1>
-<p>ASE follows Project Aria’s coordinate conventions:</p>
+<p>ASE follows <a href="https://facebookresearch.github.io/projectaria_tools/docs/data_formats/coordinate_convention/3d_coordinate_frame_convention">Project Aria’s coordinate conventions</a>:</p>
 <section id="world-frame" class="level2" data-number="6.1">
 <h2 data-number="6.1" class="anchored" data-anchor-id="world-frame"><span class="header-section-number">6.1</span> World Frame</h2>
 <ul>
@@ -1062,15 +1071,18 @@ make_window, id=2000, wall0_id=0, position_x=4.45, position_y=6.16, position_z=1
 <li><strong>Axes</strong>: Typically Z-up, Manhattan-world aligned</li>
 <li><strong>Units</strong>: Meters</li>
 </ul>
+<p>In the EFM3D / ATEK preprocessing used in this project, world gravity is always aligned with the <strong>VIO convention</strong>, i.e.&nbsp;the gravity vector in world coordinates is <code>[0, 0, -g]</code> (<code>pose/gravity_in_world</code> and <code>GRAVITY_DIRECTION_VIO</code> / <code>EFM_GRAVITY_IN_WORLD</code> in <code>efm3d</code>). For ASE and ADT sequences, any dataset-specific gravity (e.g.&nbsp;<code>[0, -g, 0]</code> in ADT) is rotated into this VIO frame before training or evaluation, so <strong>+Z is consistently “up”</strong> in the world frame we use for RRI and NBV.</p>
 </section>
-<section id="camera-frame" class="level2" data-number="6.2">
-<h2 data-number="6.2" class="anchored" data-anchor-id="camera-frame"><span class="header-section-number">6.2</span> Camera Frame</h2>
+<section id="camera-frames" class="level2" data-number="6.2">
+<h2 data-number="6.2" class="anchored" data-anchor-id="camera-frames"><span class="header-section-number">6.2</span> Camera Frames</h2>
 <ul>
 <li><strong>Origin</strong>: At camera’s optical center</li>
 <li><strong>X-axis</strong>: Points right (from camera perspective)</li>
 <li><strong>Y-axis</strong>: Points down</li>
 <li><strong>Z-axis</strong>: Points forward (optical axis)</li>
 </ul>
+<p>EFM3D follows the <strong>RDF camera convention</strong> (<code>X = Right, Y = Down, Z = Forward</code>) with image origin in the <strong>top-left</strong> pixel (<code>projection_matrix_rdf_top_left</code> in <code>efm3d.utils.viz</code>). When we construct viewing poses (e.g.&nbsp;NBV candidate views) we always build camera rotations in this same RDF convention and then express them in the Z-up VIO world frame above, so the axes are consistent between ASE, ATEK, EFM3D and our oracle/NBV code.</p>
+<p><img src="../figures/aria-docs/coord_conventions.png" class="img-fluid" style="width:70.0%" alt="Coordinate Conventions"> Figure from <a href="https://facebookresearch.github.io/projectaria_tools/docs/data_formats/coordinate_convention/3d_coordinate_frame_convention">aria-docs</a> / <span class="citation" data-cites="projectaria-engel2023"><a href="#ref-projectaria-engel2023" role="doc-biblioref">[3]</a></span>.</p>
 <section id="using-atek-for-ml-workflows" class="level3" data-number="6.2.1">
 <h3 data-number="6.2.1" class="anchored" data-anchor-id="using-atek-for-ml-workflows"><span class="header-section-number">6.2.1</span> Using ATEK for ML Workflows</h3>
 <p>For training and evaluation, use ATEK’s preprocessed datasets and tools:</p>
@@ -1100,6 +1112,9 @@ make_window, id=2000, wall0_id=0, position_x=4.45, position_y=6.16, position_z=1
 </div>
 <div id="ref-EFM3D-straub2024" class="csl-entry" role="listitem">
 <div class="csl-left-margin">[2] </div><div class="csl-right-inline">J. Straub, D. DeTone, T. Shen, N. Yang, C. Sweeney, and R. Newcombe, <span>“EFM3D: A benchmark for measuring progress towards 3D egocentric foundation models.”</span> 2024. Available: <a href="https://arxiv.org/abs/2406.10224">https://arxiv.org/abs/2406.10224</a></div>
+</div>
+<div id="ref-projectaria-engel2023" class="csl-entry" role="listitem">
+<div class="csl-left-margin">[3] </div><div class="csl-right-inline">J. Engel <em>et al.</em>, <span>“Project aria: A new tool for egocentric multi-modal AI research.”</span> 2023. Available: <a href="https://arxiv.org/abs/2308.13561">https://arxiv.org/abs/2308.13561</a></div>
 </div>
 </div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
@@ -1870,7 +1885,7 @@ make_window, id=2000, wall0_id=0, position_x=4.45, position_y=6.16, position_z=1
 <span id="cb9-297"><a href="#cb9-297" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-298"><a href="#cb9-298" aria-hidden="true" tabindex="-1"></a><span class="fu"># Coordinate Conventions</span></span>
 <span id="cb9-299"><a href="#cb9-299" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-300"><a href="#cb9-300" aria-hidden="true" tabindex="-1"></a>ASE follows Project Aria's coordinate conventions:</span>
+<span id="cb9-300"><a href="#cb9-300" aria-hidden="true" tabindex="-1"></a>ASE follows <span class="co">[</span><span class="ot">Project Aria's coordinate conventions</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/coordinate_convention/3d_coordinate_frame_convention)</span>:</span>
 <span id="cb9-301"><a href="#cb9-301" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-302"><a href="#cb9-302" aria-hidden="true" tabindex="-1"></a><span class="fu">## World Frame</span></span>
 <span id="cb9-303"><a href="#cb9-303" aria-hidden="true" tabindex="-1"></a></span>
@@ -1878,31 +1893,49 @@ make_window, id=2000, wall0_id=0, position_x=4.45, position_y=6.16, position_z=1
 <span id="cb9-305"><a href="#cb9-305" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Axes**: Typically Z-up, Manhattan-world aligned</span>
 <span id="cb9-306"><a href="#cb9-306" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Units**: Meters</span>
 <span id="cb9-307"><a href="#cb9-307" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-308"><a href="#cb9-308" aria-hidden="true" tabindex="-1"></a><span class="fu">## Camera Frame</span></span>
-<span id="cb9-309"><a href="#cb9-309" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-310"><a href="#cb9-310" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Origin**: At camera's optical center</span>
-<span id="cb9-311"><a href="#cb9-311" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**X-axis**: Points right (from camera perspective)</span>
-<span id="cb9-312"><a href="#cb9-312" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Y-axis**: Points down</span>
-<span id="cb9-313"><a href="#cb9-313" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Z-axis**: Points forward (optical axis)</span>
-<span id="cb9-314"><a href="#cb9-314" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-308"><a href="#cb9-308" aria-hidden="true" tabindex="-1"></a>In the EFM3D / ATEK preprocessing used in this project, world gravity is always</span>
+<span id="cb9-309"><a href="#cb9-309" aria-hidden="true" tabindex="-1"></a>aligned with the **VIO convention**, i.e. the gravity vector in world</span>
+<span id="cb9-310"><a href="#cb9-310" aria-hidden="true" tabindex="-1"></a>coordinates is <span class="in">`[0, 0, -g]`</span> (<span class="in">`pose/gravity_in_world`</span> and</span>
+<span id="cb9-311"><a href="#cb9-311" aria-hidden="true" tabindex="-1"></a><span class="in">`GRAVITY_DIRECTION_VIO`</span> / <span class="in">`EFM_GRAVITY_IN_WORLD`</span> in <span class="in">`efm3d`</span>). For ASE and ADT</span>
+<span id="cb9-312"><a href="#cb9-312" aria-hidden="true" tabindex="-1"></a>sequences, any dataset-specific gravity (e.g. <span class="in">`[0, -g, 0]`</span> in ADT) is rotated</span>
+<span id="cb9-313"><a href="#cb9-313" aria-hidden="true" tabindex="-1"></a>into this VIO frame before training or evaluation, so **+Z is consistently</span>
+<span id="cb9-314"><a href="#cb9-314" aria-hidden="true" tabindex="-1"></a>“up”** in the world frame we use for RRI and NBV.</span>
 <span id="cb9-315"><a href="#cb9-315" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-316"><a href="#cb9-316" aria-hidden="true" tabindex="-1"></a><span class="fu">### Using ATEK for ML Workflows</span></span>
+<span id="cb9-316"><a href="#cb9-316" aria-hidden="true" tabindex="-1"></a><span class="fu">## Camera Frames</span></span>
 <span id="cb9-317"><a href="#cb9-317" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-318"><a href="#cb9-318" aria-hidden="true" tabindex="-1"></a>For training and evaluation, use ATEK's preprocessed datasets and tools:</span>
-<span id="cb9-319"><a href="#cb9-319" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-320"><a href="#cb9-320" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
-<span id="cb9-321"><a href="#cb9-321" aria-hidden="true" tabindex="-1"></a><span class="co"># Download preprocessed ASE data (PyTorch WebDataset format)</span></span>
-<span id="cb9-322"><a href="#cb9-322" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/atek_wds_data_downloader.py <span class="dt">\</span></span>
-<span id="cb9-323"><a href="#cb9-323" aria-hidden="true" tabindex="-1"></a>  <span class="at">--config-name</span> efm <span class="dt">\</span></span>
-<span id="cb9-324"><a href="#cb9-324" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_ATEK_download_urls.json <span class="dt">\</span></span>
-<span id="cb9-325"><a href="#cb9-325" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./data/ase_atek <span class="dt">\</span></span>
-<span id="cb9-326"><a href="#cb9-326" aria-hidden="true" tabindex="-1"></a>  <span class="at">--download-wds-to-local</span></span>
-<span id="cb9-327"><a href="#cb9-327" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-328"><a href="#cb9-328" aria-hidden="true" tabindex="-1"></a><span class="co"># Download ground truth meshes for evaluation</span></span>
-<span id="cb9-329"><a href="#cb9-329" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/ase_mesh_downloader.py <span class="dt">\</span></span>
-<span id="cb9-330"><a href="#cb9-330" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_mesh_download_urls.json <span class="dt">\</span></span>
-<span id="cb9-331"><a href="#cb9-331" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./ase_meshes</span>
-<span id="cb9-332"><a href="#cb9-332" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb9-318"><a href="#cb9-318" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Origin**: At camera's optical center</span>
+<span id="cb9-319"><a href="#cb9-319" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**X-axis**: Points right (from camera perspective)</span>
+<span id="cb9-320"><a href="#cb9-320" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Y-axis**: Points down</span>
+<span id="cb9-321"><a href="#cb9-321" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Z-axis**: Points forward (optical axis)</span>
+<span id="cb9-322"><a href="#cb9-322" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-323"><a href="#cb9-323" aria-hidden="true" tabindex="-1"></a>EFM3D follows the **RDF camera convention** (`X = Right, Y = Down, Z =</span>
+<span id="cb9-324"><a href="#cb9-324" aria-hidden="true" tabindex="-1"></a>Forward`) with image origin in the **top-left** pixel</span>
+<span id="cb9-325"><a href="#cb9-325" aria-hidden="true" tabindex="-1"></a>(<span class="in">`projection_matrix_rdf_top_left`</span> in <span class="in">`efm3d.utils.viz`</span>). When we construct</span>
+<span id="cb9-326"><a href="#cb9-326" aria-hidden="true" tabindex="-1"></a>viewing poses (e.g. NBV candidate views) we always build camera rotations in</span>
+<span id="cb9-327"><a href="#cb9-327" aria-hidden="true" tabindex="-1"></a>this same RDF convention and then express them in the Z-up VIO world frame</span>
+<span id="cb9-328"><a href="#cb9-328" aria-hidden="true" tabindex="-1"></a>above, so the axes are consistent between ASE, ATEK, EFM3D and our oracle/NBV</span>
+<span id="cb9-329"><a href="#cb9-329" aria-hidden="true" tabindex="-1"></a>code.</span>
+<span id="cb9-330"><a href="#cb9-330" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-331"><a href="#cb9-331" aria-hidden="true" tabindex="-1"></a><span class="al">![Coordinate Conventions](../figures/aria-docs/coord_conventions.png)</span>{width=70%}</span>
+<span id="cb9-332"><a href="#cb9-332" aria-hidden="true" tabindex="-1"></a>Figure from <span class="co">[</span><span class="ot">aria-docs</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/coordinate_convention/3d_coordinate_frame_convention)</span> / @projectaria-engel2023.</span>
+<span id="cb9-333"><a href="#cb9-333" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-334"><a href="#cb9-334" aria-hidden="true" tabindex="-1"></a><span class="fu">### Using ATEK for ML Workflows</span></span>
+<span id="cb9-335"><a href="#cb9-335" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-336"><a href="#cb9-336" aria-hidden="true" tabindex="-1"></a>For training and evaluation, use ATEK's preprocessed datasets and tools:</span>
+<span id="cb9-337"><a href="#cb9-337" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-338"><a href="#cb9-338" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
+<span id="cb9-339"><a href="#cb9-339" aria-hidden="true" tabindex="-1"></a><span class="co"># Download preprocessed ASE data (PyTorch WebDataset format)</span></span>
+<span id="cb9-340"><a href="#cb9-340" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/atek_wds_data_downloader.py <span class="dt">\</span></span>
+<span id="cb9-341"><a href="#cb9-341" aria-hidden="true" tabindex="-1"></a>  <span class="at">--config-name</span> efm <span class="dt">\</span></span>
+<span id="cb9-342"><a href="#cb9-342" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_ATEK_download_urls.json <span class="dt">\</span></span>
+<span id="cb9-343"><a href="#cb9-343" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./data/ase_atek <span class="dt">\</span></span>
+<span id="cb9-344"><a href="#cb9-344" aria-hidden="true" tabindex="-1"></a>  <span class="at">--download-wds-to-local</span></span>
+<span id="cb9-345"><a href="#cb9-345" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-346"><a href="#cb9-346" aria-hidden="true" tabindex="-1"></a><span class="co"># Download ground truth meshes for evaluation</span></span>
+<span id="cb9-347"><a href="#cb9-347" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> atek/tools/ase_mesh_downloader.py <span class="dt">\</span></span>
+<span id="cb9-348"><a href="#cb9-348" aria-hidden="true" tabindex="-1"></a>  <span class="at">--input-json-path</span> ase_mesh_download_urls.json <span class="dt">\</span></span>
+<span id="cb9-349"><a href="#cb9-349" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output-folder-path</span> ./ase_meshes</span>
+<span id="cb9-350"><a href="#cb9-350" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

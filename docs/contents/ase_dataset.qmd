@@ -305,12 +305,28 @@ ASE follows [Project Aria's coordinate conventions](https://facebookresearch.git
 - **Axes**: Typically Z-up, Manhattan-world aligned
 - **Units**: Meters
 
+In the EFM3D / ATEK preprocessing used in this project, world gravity is always
+aligned with the **VIO convention**, i.e. the gravity vector in world
+coordinates is `[0, 0, -g]` (`pose/gravity_in_world` and
+`GRAVITY_DIRECTION_VIO` / `EFM_GRAVITY_IN_WORLD` in `efm3d`). For ASE and ADT
+sequences, any dataset-specific gravity (e.g. `[0, -g, 0]` in ADT) is rotated
+into this VIO frame before training or evaluation, so **+Z is consistently
+“up”** in the world frame we use for RRI and NBV.
+
 ## Camera Frames
 
 - **Origin**: At camera's optical center
 - **X-axis**: Points right (from camera perspective)
 - **Y-axis**: Points down
 - **Z-axis**: Points forward (optical axis)
+
+EFM3D follows the **RDF camera convention** (`X = Right, Y = Down, Z =
+Forward`) with image origin in the **top-left** pixel
+(`projection_matrix_rdf_top_left` in `efm3d.utils.viz`). When we construct
+viewing poses (e.g. NBV candidate views) we always build camera rotations in
+this same RDF convention and then express them in the Z-up VIO world frame
+above, so the axes are consistent between ASE, ATEK, EFM3D and our oracle/NBV
+code.
 
 ![Coordinate Conventions](../figures/aria-docs/coord_conventions.png){width=70%}
 Figure from [aria-docs](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/coordinate_convention/3d_coordinate_frame_convention) / @projectaria-engel2023.
