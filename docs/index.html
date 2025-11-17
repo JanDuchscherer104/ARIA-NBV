@@ -570,6 +570,9 @@ div.csl-indent {
  <span class="menu-text">Oracle RRI Package</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+ <span class="menu-text">contents/iml/data_pipeline_overview.qmd</span>
+  </li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
@@ -618,6 +621,7 @@ div.csl-indent {
   <li><a href="#project-slides" id="toc-project-slides" class="nav-link" data-scroll-target="#project-slides"><span class="header-section-number">3.7</span> Project Slides</a></li>
   </ul></li>
   <li><a href="#external-code-notebooks" id="toc-external-code-notebooks" class="nav-link" data-scroll-target="#external-code-notebooks"><span class="header-section-number">4</span> External Code &amp; Notebooks</a></li>
+  <li><a href="#codebase-trees-with-module-notes" id="toc-codebase-trees-with-module-notes" class="nav-link" data-scroll-target="#codebase-trees-with-module-notes"><span class="header-section-number">5</span> Codebase Trees with Module Notes</a></li>
   </ul>
 </nav>
     </div>
@@ -752,6 +756,108 @@ notebooks/
 ├── ase_atek_exploration.ipynb         # ATEK integration testing
 ├── ase_exploration.ipynb              # Basic ASE data analysis
 └── inference.ipynb                    # Model inference experiments</code></pre>
+</section>
+<section id="codebase-trees-with-module-notes" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Codebase Trees with Module Notes</h1>
+<pre class="text"><code>NBV/
+├── notebooks/
+│   ├── ase_oracle_rri.py                # Helpers for log-depth transforms, PC↔mesh summary, pose/intrinsics utils
+│   └── ase_oracle_rri_new.py            # Clean duplicate of the above helpers
+├── oracle_rri/
+│   ├── main.py                          # Entrypoint building default config and diagnostics
+│   ├── examples/
+│   │   └── simplified_dataset_usage.py  # Minimal loader + DataLoader batching demo
+│   ├── oracle_rri/                      # Package code
+│   │   ├── analysis/depth_debugger.py   # Projects depth to 3D and compares to GT mesh
+│   │   ├── config.py                    # Dataset/Oracle config models
+│   │   ├── configs/path_config.py       # Centralised filesystem paths + helpers
+│   │   ├── data/cli.py                  # Tiny CLI shim for downloader tests
+│   │   ├── data/dataset.py              # Typed ATEK WebDataset wrapper + mesh pairing
+│   │   ├── data/downloader.py           # ASE mesh + ATEK snippet downloader/CLI
+│   │   ├── data/metadata.py             # Parse mesh &amp; ATEK URL JSON into scene metadata
+│   │   ├── data/schemas.py              # Typed sample/stream containers + EFM remap
+│   │   ├── data/utils.py                # Scene id extraction and data validation
+│   │   ├── utils/base_config.py         # Pydantic base + TOML IO + Rich inspect
+│   │   ├── utils/console.py             # Rich console wrapper
+│   │   ├── views/candidate_generation.py# Pose generator around latest trajectory pose
+│   │   └── viz/mesh_viz.py              # Trimesh/Plotly/Streamlit mesh + PC viz helpers
+│   └── tests/                           # Data-handling tests
+│       ├── conftest.py                  # Shared fixtures
+│       ├── test_cli.py                  # CLI wiring tests
+│       ├── test_dataset.py              # Dataset iteration &amp; collation tests
+│       ├── test_downloader.py           # Mesh/WebDataset download orchestration tests
+│       ├── test_metadata.py             # Scene metadata parsing tests
+│       ├── test_real_data_integration.py# Depth→mesh distance on real sample
+│       └── test_utils.py                # Scene id / data validation tests
+├── scripts/get_context.py               # AST-based repo scanner for symbol overviews
+├── tools/ase_coordinated_downloader.py  # Wrapper to pull meshes + ATEK data in sync
+├── tools/generate_uml_svg.py            # Generate Mermaid UML → SVG helper
+└── notebooks/ase_oracle_rri*.py         # (see above helper scripts)</code></pre>
+<pre class="text"><code>external/efm3d/
+├── data/
+│   ├── dataverse_url_parser.py      # Split/download helper for WDS tars + manifests
+│   └── download_ase_mesh.py         # Fetch ASE meshes (CLI stub)
+├── efm3d/
+│   ├── aria/
+│   │   ├── aria_constants.py        # Key names for all snippet tensors
+│   │   ├── camera.py                # CameraTW calibration tensors + projections
+│   │   ├── obb.py                   # ObbTW bounding-box tensor wrapper + ops
+│   │   ├── pose.py                  # PoseTW SE(3) math &amp; interpolations
+│   │   ├── projection_utils.py      # Fisheye/pinhole project &amp; unproject
+│   │   └── tensor_wrapper.py        # Smart tensor wrapper base + collate helpers
+│   ├── dataset/
+│   │   ├── atek_vrs_dataset.py      # Stream VRS into EVL-form snippets
+│   │   ├── atek_wds_dataset.py      # WDS stream → fixed-length snippets
+│   │   ├── augmentation.py          # Photometric/point jitter/drop augmentations
+│   │   ├── efm_model_adaptor.py     # Map ATEK fields into EVL schema + poses
+│   │   ├── vrs_dataset.py           # VRS reader dataset with configs
+│   │   └── wds_dataset.py           # WebDataset loader producing EVL tensors
+│   ├── inference/
+│   │   ├── eval.py                  # Accuracy/completeness AUC utilities
+│   │   ├── fuse.py                  # Depth/feature fusion into points/voxels
+│   │   ├── model.py                 # Load frozen EVL checkpoints for inference
+│   │   ├── pipeline.py              # End-to-end EVL inference driver
+│   │   ├── track.py                 # Trajectory utilities for snippets
+│   │   └── viz.py                   # Simple matplotlib plotting helpers
+│   ├── model/
+│   │   ├── cnn.py                   # Build EVL 2D CNN backbone
+│   │   ├── dinov2_utils.py          # DinoV2 backbone + schedulers/weight decay
+│   │   ├── dpt.py                   # DPT depth head backed by DinoV2
+│   │   ├── evl.py                   # EVL model wrapper
+│   │   ├── evl_train.py             # Training loop orchestration
+│   │   ├── image_tokenizer.py       # Image → DinoV2 tokens
+│   │   ├── lifter.py                # Lift 2D tokens into 3D volumes
+│   │   └── video_backbone.py        # Video backbones (DinoV2 variants)
+│   ├── thirdparty/mmdetection3d/
+│   │   └── iou3d.py                 # Rotated 3D IoU + CUDA NMS bindings
+│   └── utils/
+│       ├── common.py                # Nearest-neighbour helpers
+│       ├── depth.py                 # Depth → point cloud conversion
+│       ├── detection_utils.py       # Heatmap ⇄ OBB conversions + NMS
+│       ├── evl_loss.py              # OBB/occupancy loss assembly
+│       ├── file_utils.py            # Calibration/mesh/trajectory/file loaders
+│       ├── gravity.py               # Align gravity / fix orientation
+│       ├── image.py                 # Image color/resize/overlay utilities
+│       ├── image_sampling.py        # Patch extraction + feature sampling
+│       ├── marching_cubes.py        # Occupancy → mesh via marching cubes
+│       ├── mesh_utils.py            # Mesh IO + sampling + writing
+│       ├── obb_csv_writer.py        # Write OBBs to CSV/TSV
+│       ├── obb_io.py                # Load OBBs and convert to wrappers
+│       ├── obb_matchers.py          # IOU-based OBB matching
+│       ├── obb_metrics.py           # OBB IoU metrics and summaries
+│       ├── obb_trackers.py          # Track OBBs over time
+│       ├── obb_utils.py             # OBB validity, transforms, pruning
+│       ├── pointcloud.py            # PC downsample/visualise/save helpers
+│       ├── ray.py                   # Ray grids + intersections + sampling
+│       ├── reconstruction.py        # GT occupancy building + TV/occ loss
+│       ├── render.py                # OpenGL-based viz primitives
+│       ├── rescale.py               # Resize/rescale cameras, depth, OBBs
+│       ├── viz.py                   # EGL viewer + rendering utilities
+│       ├── voxel.py                 # Voxel grid creation/erosion helpers
+│       └── voxel_sampling.py        # Sample voxels / coordinate transforms
+├── eval.py                          # Top-level evaluation script stub
+├── infer.py                         # Inference entrypoint
+└── train.py                         # Training entrypoint + LR scheduler helper</code></pre>
 
 
 <!-- -->
@@ -1239,102 +1345,209 @@ notebooks/
     }
   });
   </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Next-Best-View Planning with Foundation Models"</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "VCML Seminar: RRI based NBV Prediction using EFM3D Backbones"</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="an">author:</span><span class="co"> "Jan Duchscherer, Munich University of Applied Sciences"</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="an">date:</span><span class="co"> last-modified</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">    toc: true</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">    number-sections: true</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="an">bibliography:</span><span class="co"> references.bib</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-1: must provide concise collection of all important links to papers, resources and datasets, as well as a toc for of the entire project page --&gt;</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-2: must start with an abstract. abstract should be written in typst and included into the quarto page. use #resolve-library-id then #get-library-docs --&gt;</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-1: In the abstract describe general task of nbv, why rri based, why use EFM3D and briefly limitations of existing approaches, must be well structured flowing text --&gt;</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- After abstract have a more detailed introduction to NBV, RRI, EFM3D, --&gt;</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-X: Then Theory section --&gt;</span></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-3: Then mention tools like ATEK, Project Aria Project pages / docs --&gt;</span></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="fu"># Abstract</span></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>Next-Best-View (NBV) planning addresses the fundamental challenge of autonomous viewpoint selection in active 3D reconstruction, aiming to maximize the acquisition quality while minimizing the acquisition cost (i.e. number of views, traversed distance, capture time).</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>Classical NBV methods rely on hand-crafted criteria, limited action spaces, or per-scene optimized representations. While learning-based NBV methods like GenNBV <span class="co">[</span><span class="ot">@GenNBV-chen2024</span><span class="co">]</span> have improved generalization by leveraging reinforcement learning, they still optimize for geometric coverage as a proxy for reconstruction quality. Since coverage maximization does not necessarily correlate with improved reconstruction quality, these methods can struggle in complex scenes with occlusions and fine details. Diretly optimizing reconstruction quality, as pioneered by VIN-NBV <span class="co">[</span><span class="ot">@VIN-NBV-frahm2025</span><span class="co">]</span>, has shown significant improvements by predicting Relative Reconstruction Improvement (RRI) to quantify the fitness of candidate viewpoints. However, even VIN-NBV's generalization capabilities are rather limited to simple object-centric NBV scenarios as it does not leverage pre-tained foundation models with rich 3D spatial understanding.</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>This project aims to develop an NBV system that integrates VIN-NBV's key insight to directly optimize reconstruction quality rather than proxies like coverage, leveraging a pre-trained _egocentric foundation model_ as backbone to provide strong priors for 3D spatial reasoning in complex indoor scenes. We adapt the [EVL (_Egocentric Voxel Lifting_)](contents/literature/efm3d.qmd) 3D EFM <span class="co">[</span><span class="ot">@EFM3D-straub2024</span><span class="co">]</span> which is pre-trained on the <span class="co">[</span><span class="ot">Aria Synthetic Environments (ASE)</span><span class="co">](contents/ase_dataset.qmd)</span> dataset - a large-scale synthetic egocentric dataset with 100k indoor scenes, to provide rich 3D feature volumes that capture scene geometry, semantics, and free-space priors. On top of this frozen backbone, we train a lightweight RRI prediction head that introspects both the current scene representation and candidate viewpoints to express the fitness of given candidate views.</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="fu"># Project Vision and Goals</span></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Directly optimize reconstruction quality rather than surrogate coverage metrics, following RRI-based policies as per VIN-NBV.</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Develop an <span class="co">[</span><span class="ot">oracle RRI computation pipeline</span><span class="co">](contents/metrics/rri_computation.qmd)</span> using ASE visibility data, semi-dense point clouds  and GT meshes.</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Develop computational tools to efficiently simulate candidate viewpoints and their expected observations utilizing implementations in <span class="co">[</span><span class="ot">EFM3D</span><span class="co">](https://github.com/facebookresearch/efm3d)</span> and <span class="co">[</span><span class="ot">ATEK</span><span class="co">](https://github.com/facebookresearch/ATEK)</span>.</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Train an RRI predictor head on top of a frozen EFM backbone that introspects the current reconstruction and a candidate pose via imitation learning on oracle RRIs.</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Leverage EVL's 3D foundation features—voxel occupancy, centerness, semantic channels, and OBB priors—as state embeddings for RRI estimation and NBV decision making.</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Entity-aware reconstruction tracking through EVL's OBB detection capabilities.</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Extend towards human-in-the-loop AR guidance, where entity-aware RRI weighting delivers task-specific view suggestions.</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a><span class="fu"># Documentation Navigation</span></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a><span class="fu">## Setup &amp; Installation</span></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Setup Instructions</span><span class="co">](contents/setup.qmd)</span>: Environment setup and dependencies</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project State</span></span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Roadmap](contents/roadmap.qmd)**: Development phases and timeline</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Research Questions](contents/questions.qmd)**: Open problems and directions</span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Roadmap](contents/roadmap.qmd)**: Detailed project roadmap</span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a><span class="fu">## Theory &amp; Background</span></span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[RRI Theory](contents/theory/rri_theory.qmd)**: Mathematical formulation and properties of RRI</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Surface Metrics](contents/theory/surface_metrics.qmd)**: Accuracy, completeness, Chamfer distance</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Semi-Dense Point Clouds](contents/theory/semi-dense-pc.qmd)**: SLAM-based 3D reconstruction techniques</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a><span class="fu">## Dataset &amp; Resources</span></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Technical Resources](contents/resources.qmd)**: External links to libraries, tools, docs and datasets used in this project</span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ASE Dataset](contents/ase_dataset.qmd)**: 100K scenes, modalities, NBV suitability</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a><span class="fu">## Literature Reviews</span></span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[VIN-NBV](contents/literature/vin_nbv.qmd)**: Direct quality optimization with RRI</span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[GenNBV](contents/literature/gen_nbv.qmd)**: Continuous action spaces and RL approaches</span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D/EVL](contents/literature/efm3d.qmd)**: Egocentric foundation models and voxel lifting</span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript](contents/literature/scene_script.qmd)**: Structured scene language and entity representation</span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a><span class="fu">## Implementation Overviews</span></span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ATEK Implementation](contents/impl/atek_implementation.qmd)**: Production-ready mesh evaluation</span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D Implementation](contents/impl/efm3d_implementation.qmd)**: Point cloud and voxel utilities</span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[RRI Computation](contents/impl/rri_computation.qmd)**: Complete oracle implementation</span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Oracle RRI Notebook](../notebooks/ase_oracle_rri_simplified.ipynb)**: Clean, working implementation with fixes</span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project Slides</span></span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 01</span><span class="co">](/docs/typst/slides/slides_1.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_1.typ)</span></span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 02</span><span class="co">](/docs/typst/slides/slides_2.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_2.typ)</span></span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a><span class="fu"># External Code &amp; Notebooks</span></span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="in">external/</span></span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a><span class="in">├── ATEK/                    # Aria toolkit for data processing</span></span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a><span class="in">├── efm3d/                   # EFM3D model implementation</span></span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a><span class="in">├── projectaria_tools/       # ASE dataset access utilities</span></span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a><span class="in">└── scenescript/             # Scene specification language tools</span></span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a><span class="in">notebooks/</span></span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_data_exploration.ipynb    # ASE dataset exploration</span></span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a><span class="in">├── download_ase_meshes.ipynb          # GT mesh acquisition</span></span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_exploration.ipynb         # ATEK integration testing</span></span>
-<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_exploration.ipynb              # Basic ASE data analysis</span></span>
-<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a><span class="in">└── inference.ipynb                    # Model inference experiments</span></span>
-<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Next-Best-View Planning with Foundation Models"</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "VCML Seminar: RRI based NBV Prediction using EFM3D Backbones"</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="an">author:</span><span class="co"> "Jan Duchscherer, Munich University of Applied Sciences"</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="an">date:</span><span class="co"> last-modified</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co">    toc: true</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co">    number-sections: true</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="an">bibliography:</span><span class="co"> references.bib</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-1: must provide concise collection of all important links to papers, resources and datasets, as well as a toc for of the entire project page --&gt;</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-2: must start with an abstract. abstract should be written in typst and included into the quarto page. use #resolve-library-id then #get-library-docs --&gt;</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-1: In the abstract describe general task of nbv, why rri based, why use EFM3D and briefly limitations of existing approaches, must be well structured flowing text --&gt;</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- After abstract have a more detailed introduction to NBV, RRI, EFM3D, --&gt;</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-X: Then Theory section --&gt;</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-3: Then mention tools like ATEK, Project Aria Project pages / docs --&gt;</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="fu"># Abstract</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>Next-Best-View (NBV) planning addresses the fundamental challenge of autonomous viewpoint selection in active 3D reconstruction, aiming to maximize the acquisition quality while minimizing the acquisition cost (i.e. number of views, traversed distance, capture time).</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>Classical NBV methods rely on hand-crafted criteria, limited action spaces, or per-scene optimized representations. While learning-based NBV methods like GenNBV <span class="co">[</span><span class="ot">@GenNBV-chen2024</span><span class="co">]</span> have improved generalization by leveraging reinforcement learning, they still optimize for geometric coverage as a proxy for reconstruction quality. Since coverage maximization does not necessarily correlate with improved reconstruction quality, these methods can struggle in complex scenes with occlusions and fine details. Diretly optimizing reconstruction quality, as pioneered by VIN-NBV <span class="co">[</span><span class="ot">@VIN-NBV-frahm2025</span><span class="co">]</span>, has shown significant improvements by predicting Relative Reconstruction Improvement (RRI) to quantify the fitness of candidate viewpoints. However, even VIN-NBV's generalization capabilities are rather limited to simple object-centric NBV scenarios as it does not leverage pre-tained foundation models with rich 3D spatial understanding.</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>This project aims to develop an NBV system that integrates VIN-NBV's key insight to directly optimize reconstruction quality rather than proxies like coverage, leveraging a pre-trained _egocentric foundation model_ as backbone to provide strong priors for 3D spatial reasoning in complex indoor scenes. We adapt the [EVL (_Egocentric Voxel Lifting_)](contents/literature/efm3d.qmd) 3D EFM <span class="co">[</span><span class="ot">@EFM3D-straub2024</span><span class="co">]</span> which is pre-trained on the <span class="co">[</span><span class="ot">Aria Synthetic Environments (ASE)</span><span class="co">](contents/ase_dataset.qmd)</span> dataset - a large-scale synthetic egocentric dataset with 100k indoor scenes, to provide rich 3D feature volumes that capture scene geometry, semantics, and free-space priors. On top of this frozen backbone, we train a lightweight RRI prediction head that introspects both the current scene representation and candidate viewpoints to express the fitness of given candidate views.</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="fu"># Project Vision and Goals</span></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Directly optimize reconstruction quality rather than surrogate coverage metrics, following RRI-based policies as per VIN-NBV.</span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Develop an <span class="co">[</span><span class="ot">oracle RRI computation pipeline</span><span class="co">](contents/metrics/rri_computation.qmd)</span> using ASE visibility data, semi-dense point clouds  and GT meshes.</span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Develop computational tools to efficiently simulate candidate viewpoints and their expected observations utilizing implementations in <span class="co">[</span><span class="ot">EFM3D</span><span class="co">](https://github.com/facebookresearch/efm3d)</span> and <span class="co">[</span><span class="ot">ATEK</span><span class="co">](https://github.com/facebookresearch/ATEK)</span>.</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Train an RRI predictor head on top of a frozen EFM backbone that introspects the current reconstruction and a candidate pose via imitation learning on oracle RRIs.</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Leverage EVL's 3D foundation features—voxel occupancy, centerness, semantic channels, and OBB priors—as state embeddings for RRI estimation and NBV decision making.</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Entity-aware reconstruction tracking through EVL's OBB detection capabilities.</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Extend towards human-in-the-loop AR guidance, where entity-aware RRI weighting delivers task-specific view suggestions.</span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a><span class="fu"># Documentation Navigation</span></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a><span class="fu">## Setup &amp; Installation</span></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Setup Instructions</span><span class="co">](contents/setup.qmd)</span>: Environment setup and dependencies</span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project State</span></span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Roadmap](contents/roadmap.qmd)**: Development phases and timeline</span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Research Questions](contents/questions.qmd)**: Open problems and directions</span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Roadmap](contents/roadmap.qmd)**: Detailed project roadmap</span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a><span class="fu">## Theory &amp; Background</span></span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[RRI Theory](contents/theory/rri_theory.qmd)**: Mathematical formulation and properties of RRI</span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Surface Metrics](contents/theory/surface_metrics.qmd)**: Accuracy, completeness, Chamfer distance</span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Semi-Dense Point Clouds](contents/theory/semi-dense-pc.qmd)**: SLAM-based 3D reconstruction techniques</span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a><span class="fu">## Dataset &amp; Resources</span></span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Technical Resources](contents/resources.qmd)**: External links to libraries, tools, docs and datasets used in this project</span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ASE Dataset](contents/ase_dataset.qmd)**: 100K scenes, modalities, NBV suitability</span>
+<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a><span class="fu">## Literature Reviews</span></span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[VIN-NBV](contents/literature/vin_nbv.qmd)**: Direct quality optimization with RRI</span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[GenNBV](contents/literature/gen_nbv.qmd)**: Continuous action spaces and RL approaches</span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D/EVL](contents/literature/efm3d.qmd)**: Egocentric foundation models and voxel lifting</span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript](contents/literature/scene_script.qmd)**: Structured scene language and entity representation</span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a><span class="fu">## Implementation Overviews</span></span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ATEK Implementation](contents/impl/atek_implementation.qmd)**: Production-ready mesh evaluation</span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D Implementation](contents/impl/efm3d_implementation.qmd)**: Point cloud and voxel utilities</span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[RRI Computation](contents/impl/rri_computation.qmd)**: Complete oracle implementation</span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Oracle RRI Notebook](../notebooks/ase_oracle_rri_simplified.ipynb)**: Clean, working implementation with fixes</span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project Slides</span></span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 01</span><span class="co">](/docs/typst/slides/slides_1.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_1.typ)</span></span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 02</span><span class="co">](/docs/typst/slides/slides_2.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_2.typ)</span></span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a><span class="fu"># External Code &amp; Notebooks</span></span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a><span class="in">external/</span></span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a><span class="in">├── ATEK/                    # Aria toolkit for data processing</span></span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a><span class="in">├── efm3d/                   # EFM3D model implementation</span></span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a><span class="in">├── projectaria_tools/       # ASE dataset access utilities</span></span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a><span class="in">└── scenescript/             # Scene specification language tools</span></span>
+<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a><span class="in">notebooks/</span></span>
+<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_data_exploration.ipynb    # ASE dataset exploration</span></span>
+<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a><span class="in">├── download_ase_meshes.ipynb          # GT mesh acquisition</span></span>
+<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_exploration.ipynb         # ATEK integration testing</span></span>
+<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_exploration.ipynb              # Basic ASE data analysis</span></span>
+<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a><span class="in">└── inference.ipynb                    # Model inference experiments</span></span>
+<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a><span class="fu"># Codebase Trees with Module Notes</span></span>
+<span id="cb4-99"><a href="#cb4-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-100"><a href="#cb4-100" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a><span class="in">NBV/</span></span>
+<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a><span class="in">├── notebooks/</span></span>
+<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── ase_oracle_rri.py                # Helpers for log-depth transforms, PC↔mesh summary, pose/intrinsics utils</span></span>
+<span id="cb4-104"><a href="#cb4-104" aria-hidden="true" tabindex="-1"></a><span class="in">│   └── ase_oracle_rri_new.py            # Clean duplicate of the above helpers</span></span>
+<span id="cb4-105"><a href="#cb4-105" aria-hidden="true" tabindex="-1"></a><span class="in">├── oracle_rri/</span></span>
+<span id="cb4-106"><a href="#cb4-106" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── main.py                          # Entrypoint building default config and diagnostics</span></span>
+<span id="cb4-107"><a href="#cb4-107" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── examples/</span></span>
+<span id="cb4-108"><a href="#cb4-108" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   └── simplified_dataset_usage.py  # Minimal loader + DataLoader batching demo</span></span>
+<span id="cb4-109"><a href="#cb4-109" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── oracle_rri/                      # Package code</span></span>
+<span id="cb4-110"><a href="#cb4-110" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── analysis/depth_debugger.py   # Projects depth to 3D and compares to GT mesh</span></span>
+<span id="cb4-111"><a href="#cb4-111" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── config.py                    # Dataset/Oracle config models</span></span>
+<span id="cb4-112"><a href="#cb4-112" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── configs/path_config.py       # Centralised filesystem paths + helpers</span></span>
+<span id="cb4-113"><a href="#cb4-113" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── data/cli.py                  # Tiny CLI shim for downloader tests</span></span>
+<span id="cb4-114"><a href="#cb4-114" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── data/dataset.py              # Typed ATEK WebDataset wrapper + mesh pairing</span></span>
+<span id="cb4-115"><a href="#cb4-115" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── data/downloader.py           # ASE mesh + ATEK snippet downloader/CLI</span></span>
+<span id="cb4-116"><a href="#cb4-116" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── data/metadata.py             # Parse mesh &amp; ATEK URL JSON into scene metadata</span></span>
+<span id="cb4-117"><a href="#cb4-117" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── data/schemas.py              # Typed sample/stream containers + EFM remap</span></span>
+<span id="cb4-118"><a href="#cb4-118" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── data/utils.py                # Scene id extraction and data validation</span></span>
+<span id="cb4-119"><a href="#cb4-119" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── utils/base_config.py         # Pydantic base + TOML IO + Rich inspect</span></span>
+<span id="cb4-120"><a href="#cb4-120" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── utils/console.py             # Rich console wrapper</span></span>
+<span id="cb4-121"><a href="#cb4-121" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── views/candidate_generation.py# Pose generator around latest trajectory pose</span></span>
+<span id="cb4-122"><a href="#cb4-122" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   └── viz/mesh_viz.py              # Trimesh/Plotly/Streamlit mesh + PC viz helpers</span></span>
+<span id="cb4-123"><a href="#cb4-123" aria-hidden="true" tabindex="-1"></a><span class="in">│   └── tests/                           # Data-handling tests</span></span>
+<span id="cb4-124"><a href="#cb4-124" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── conftest.py                  # Shared fixtures</span></span>
+<span id="cb4-125"><a href="#cb4-125" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── test_cli.py                  # CLI wiring tests</span></span>
+<span id="cb4-126"><a href="#cb4-126" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── test_dataset.py              # Dataset iteration &amp; collation tests</span></span>
+<span id="cb4-127"><a href="#cb4-127" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── test_downloader.py           # Mesh/WebDataset download orchestration tests</span></span>
+<span id="cb4-128"><a href="#cb4-128" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── test_metadata.py             # Scene metadata parsing tests</span></span>
+<span id="cb4-129"><a href="#cb4-129" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── test_real_data_integration.py# Depth→mesh distance on real sample</span></span>
+<span id="cb4-130"><a href="#cb4-130" aria-hidden="true" tabindex="-1"></a><span class="in">│       └── test_utils.py                # Scene id / data validation tests</span></span>
+<span id="cb4-131"><a href="#cb4-131" aria-hidden="true" tabindex="-1"></a><span class="in">├── scripts/get_context.py               # AST-based repo scanner for symbol overviews</span></span>
+<span id="cb4-132"><a href="#cb4-132" aria-hidden="true" tabindex="-1"></a><span class="in">├── tools/ase_coordinated_downloader.py  # Wrapper to pull meshes + ATEK data in sync</span></span>
+<span id="cb4-133"><a href="#cb4-133" aria-hidden="true" tabindex="-1"></a><span class="in">├── tools/generate_uml_svg.py            # Generate Mermaid UML → SVG helper</span></span>
+<span id="cb4-134"><a href="#cb4-134" aria-hidden="true" tabindex="-1"></a><span class="in">└── notebooks/ase_oracle_rri*.py         # (see above helper scripts)</span></span>
+<span id="cb4-135"><a href="#cb4-135" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-136"><a href="#cb4-136" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-137"><a href="#cb4-137" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb4-138"><a href="#cb4-138" aria-hidden="true" tabindex="-1"></a><span class="in">external/efm3d/</span></span>
+<span id="cb4-139"><a href="#cb4-139" aria-hidden="true" tabindex="-1"></a><span class="in">├── data/</span></span>
+<span id="cb4-140"><a href="#cb4-140" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── dataverse_url_parser.py      # Split/download helper for WDS tars + manifests</span></span>
+<span id="cb4-141"><a href="#cb4-141" aria-hidden="true" tabindex="-1"></a><span class="in">│   └── download_ase_mesh.py         # Fetch ASE meshes (CLI stub)</span></span>
+<span id="cb4-142"><a href="#cb4-142" aria-hidden="true" tabindex="-1"></a><span class="in">├── efm3d/</span></span>
+<span id="cb4-143"><a href="#cb4-143" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── aria/</span></span>
+<span id="cb4-144"><a href="#cb4-144" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── aria_constants.py        # Key names for all snippet tensors</span></span>
+<span id="cb4-145"><a href="#cb4-145" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── camera.py                # CameraTW calibration tensors + projections</span></span>
+<span id="cb4-146"><a href="#cb4-146" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── obb.py                   # ObbTW bounding-box tensor wrapper + ops</span></span>
+<span id="cb4-147"><a href="#cb4-147" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── pose.py                  # PoseTW SE(3) math &amp; interpolations</span></span>
+<span id="cb4-148"><a href="#cb4-148" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── projection_utils.py      # Fisheye/pinhole project &amp; unproject</span></span>
+<span id="cb4-149"><a href="#cb4-149" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   └── tensor_wrapper.py        # Smart tensor wrapper base + collate helpers</span></span>
+<span id="cb4-150"><a href="#cb4-150" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── dataset/</span></span>
+<span id="cb4-151"><a href="#cb4-151" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── atek_vrs_dataset.py      # Stream VRS into EVL-form snippets</span></span>
+<span id="cb4-152"><a href="#cb4-152" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── atek_wds_dataset.py      # WDS stream → fixed-length snippets</span></span>
+<span id="cb4-153"><a href="#cb4-153" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── augmentation.py          # Photometric/point jitter/drop augmentations</span></span>
+<span id="cb4-154"><a href="#cb4-154" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── efm_model_adaptor.py     # Map ATEK fields into EVL schema + poses</span></span>
+<span id="cb4-155"><a href="#cb4-155" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── vrs_dataset.py           # VRS reader dataset with configs</span></span>
+<span id="cb4-156"><a href="#cb4-156" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   └── wds_dataset.py           # WebDataset loader producing EVL tensors</span></span>
+<span id="cb4-157"><a href="#cb4-157" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── inference/</span></span>
+<span id="cb4-158"><a href="#cb4-158" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── eval.py                  # Accuracy/completeness AUC utilities</span></span>
+<span id="cb4-159"><a href="#cb4-159" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── fuse.py                  # Depth/feature fusion into points/voxels</span></span>
+<span id="cb4-160"><a href="#cb4-160" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── model.py                 # Load frozen EVL checkpoints for inference</span></span>
+<span id="cb4-161"><a href="#cb4-161" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── pipeline.py              # End-to-end EVL inference driver</span></span>
+<span id="cb4-162"><a href="#cb4-162" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── track.py                 # Trajectory utilities for snippets</span></span>
+<span id="cb4-163"><a href="#cb4-163" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   └── viz.py                   # Simple matplotlib plotting helpers</span></span>
+<span id="cb4-164"><a href="#cb4-164" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── model/</span></span>
+<span id="cb4-165"><a href="#cb4-165" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── cnn.py                   # Build EVL 2D CNN backbone</span></span>
+<span id="cb4-166"><a href="#cb4-166" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── dinov2_utils.py          # DinoV2 backbone + schedulers/weight decay</span></span>
+<span id="cb4-167"><a href="#cb4-167" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── dpt.py                   # DPT depth head backed by DinoV2</span></span>
+<span id="cb4-168"><a href="#cb4-168" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── evl.py                   # EVL model wrapper</span></span>
+<span id="cb4-169"><a href="#cb4-169" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── evl_train.py             # Training loop orchestration</span></span>
+<span id="cb4-170"><a href="#cb4-170" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── image_tokenizer.py       # Image → DinoV2 tokens</span></span>
+<span id="cb4-171"><a href="#cb4-171" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   ├── lifter.py                # Lift 2D tokens into 3D volumes</span></span>
+<span id="cb4-172"><a href="#cb4-172" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   └── video_backbone.py        # Video backbones (DinoV2 variants)</span></span>
+<span id="cb4-173"><a href="#cb4-173" aria-hidden="true" tabindex="-1"></a><span class="in">│   ├── thirdparty/mmdetection3d/</span></span>
+<span id="cb4-174"><a href="#cb4-174" aria-hidden="true" tabindex="-1"></a><span class="in">│   │   └── iou3d.py                 # Rotated 3D IoU + CUDA NMS bindings</span></span>
+<span id="cb4-175"><a href="#cb4-175" aria-hidden="true" tabindex="-1"></a><span class="in">│   └── utils/</span></span>
+<span id="cb4-176"><a href="#cb4-176" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── common.py                # Nearest-neighbour helpers</span></span>
+<span id="cb4-177"><a href="#cb4-177" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── depth.py                 # Depth → point cloud conversion</span></span>
+<span id="cb4-178"><a href="#cb4-178" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── detection_utils.py       # Heatmap ⇄ OBB conversions + NMS</span></span>
+<span id="cb4-179"><a href="#cb4-179" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── evl_loss.py              # OBB/occupancy loss assembly</span></span>
+<span id="cb4-180"><a href="#cb4-180" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── file_utils.py            # Calibration/mesh/trajectory/file loaders</span></span>
+<span id="cb4-181"><a href="#cb4-181" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── gravity.py               # Align gravity / fix orientation</span></span>
+<span id="cb4-182"><a href="#cb4-182" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── image.py                 # Image color/resize/overlay utilities</span></span>
+<span id="cb4-183"><a href="#cb4-183" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── image_sampling.py        # Patch extraction + feature sampling</span></span>
+<span id="cb4-184"><a href="#cb4-184" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── marching_cubes.py        # Occupancy → mesh via marching cubes</span></span>
+<span id="cb4-185"><a href="#cb4-185" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── mesh_utils.py            # Mesh IO + sampling + writing</span></span>
+<span id="cb4-186"><a href="#cb4-186" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── obb_csv_writer.py        # Write OBBs to CSV/TSV</span></span>
+<span id="cb4-187"><a href="#cb4-187" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── obb_io.py                # Load OBBs and convert to wrappers</span></span>
+<span id="cb4-188"><a href="#cb4-188" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── obb_matchers.py          # IOU-based OBB matching</span></span>
+<span id="cb4-189"><a href="#cb4-189" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── obb_metrics.py           # OBB IoU metrics and summaries</span></span>
+<span id="cb4-190"><a href="#cb4-190" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── obb_trackers.py          # Track OBBs over time</span></span>
+<span id="cb4-191"><a href="#cb4-191" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── obb_utils.py             # OBB validity, transforms, pruning</span></span>
+<span id="cb4-192"><a href="#cb4-192" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── pointcloud.py            # PC downsample/visualise/save helpers</span></span>
+<span id="cb4-193"><a href="#cb4-193" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── ray.py                   # Ray grids + intersections + sampling</span></span>
+<span id="cb4-194"><a href="#cb4-194" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── reconstruction.py        # GT occupancy building + TV/occ loss</span></span>
+<span id="cb4-195"><a href="#cb4-195" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── render.py                # OpenGL-based viz primitives</span></span>
+<span id="cb4-196"><a href="#cb4-196" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── rescale.py               # Resize/rescale cameras, depth, OBBs</span></span>
+<span id="cb4-197"><a href="#cb4-197" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── viz.py                   # EGL viewer + rendering utilities</span></span>
+<span id="cb4-198"><a href="#cb4-198" aria-hidden="true" tabindex="-1"></a><span class="in">│       ├── voxel.py                 # Voxel grid creation/erosion helpers</span></span>
+<span id="cb4-199"><a href="#cb4-199" aria-hidden="true" tabindex="-1"></a><span class="in">│       └── voxel_sampling.py        # Sample voxels / coordinate transforms</span></span>
+<span id="cb4-200"><a href="#cb4-200" aria-hidden="true" tabindex="-1"></a><span class="in">├── eval.py                          # Top-level evaluation script stub</span></span>
+<span id="cb4-201"><a href="#cb4-201" aria-hidden="true" tabindex="-1"></a><span class="in">├── infer.py                         # Inference entrypoint</span></span>
+<span id="cb4-202"><a href="#cb4-202" aria-hidden="true" tabindex="-1"></a><span class="in">└── train.py                         # Training entrypoint + LR scheduler helper</span></span>
+<span id="cb4-203"><a href="#cb4-203" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

@@ -53,6 +53,9 @@ format: html
 **VIO** - Visual-Inertial Odometry
 : A method of estimating pose and motion by combining visual features from cameras with inertial measurements from IMUs.
 
+**RDF** - Right–Down–Forward
+: A camera coordinate convention where the X axis points right, the Y axis points down, and the Z axis points forward.
+
 **VRS** - Virtual Reality Standard (file format)
 : A file format developed by Meta for storing and accessing multi-modal sensor data streams efficiently, used for Project Aria recordings.
 

@@ -297,7 +297,7 @@ points_world = sample["msdpd#points_world+stacked"]
 
 # Coordinate Conventions
 
-ASE follows Project Aria's coordinate conventions:
+ASE follows [Project Aria's coordinate conventions](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/coordinate_convention/3d_coordinate_frame_convention):
 
 ## World Frame
 
@@ -305,13 +305,15 @@ ASE follows Project Aria's coordinate conventions:
 - **Axes**: Typically Z-up, Manhattan-world aligned
 - **Units**: Meters
 
-## Camera Frame
+## Camera Frames
 
 - **Origin**: At camera's optical center
 - **X-axis**: Points right (from camera perspective)
 - **Y-axis**: Points down
 - **Z-axis**: Points forward (optical axis)
 
+![Coordinate Conventions](../figures/aria-docs/coord_conventions.png){width=70%}
+Figure from [aria-docs](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/coordinate_convention/3d_coordinate_frame_convention) / @projectaria-engel2023.
 
 ### Using ATEK for ML Workflows
 

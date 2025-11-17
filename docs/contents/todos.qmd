@@ -35,6 +35,10 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 - Implement `CandidatePointCloudGenerator`: for each candidate pose, cast rays to GT  to render depth map using existing GPU implementations from `efm3d`.
   - Input: candidate `PoseTW`, GT mesh.
   - Output: Depth map.
+- Question: Which camera params should we use for rendering candidate views / projections? RGB camera intrinsics and extrinsics from ASE (see @oracle_rri/oracle_rri/data/views.py)?
+In which coordinate frame? ego camera for now!
+This should be implemented in candidate_rendering.py
+Consider that we have already tried implementing the entire pipeline in a single script. extract the relevant parts and criticise them!
 
 ### Point Cloud Fusion
 - Implement `DepthToPointCloud` module: for each candidate pose's depth map, backproject to point cloud `$\mathcal{P}_{\mathbf{q}}$ in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC $\mathcal{P}_t$ with candidate-view PC $\mathcal{P}_{\mathbf{q}}$ → $\mathcal{P}_{t \cup \mathbf{q}}$.
@@ -50,6 +54,7 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
   - candidate depth rendering (display rendered depth maps from GT mesh for each candidate pose)
   - candidate point cloud fusion (display fused point clouds for each candidate pose)
   - RRI scoring (display RRI scores for each candidate pose)
+- should have debug print tab where we can easily see the repr prints of the different data structures and logs!
 
 ## Data Handling
 - Link ASE ATEK shards and GT meshes to raw ASE; resolve scene_id/snippet_id mapping.

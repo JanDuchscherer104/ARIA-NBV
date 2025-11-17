@@ -1,0 +1,120 @@
+---
+title: "ASE Data Pipeline Overview"
+format: html
+---
+
+# What this doc covers
+
+- Dataset config & auto-discovery (`ASEDatasetConfig`)
+- Typed views (`TypedSample`, `CameraView`, `TrajectoryView`, `SemiDenseView`, `GTView`)
+- Mesh handling
+- Conversion helpers (EFM3D remapping)
+- Visualization hooks (Streamlit/Plotly/pytransform3d)
+- Testing notes
+
+All examples assume the `aria-nbv` conda env and repo root as CWD.
+
+```{python}
+# quick smoke
+from oracle_rri.data.dataset import ASEDatasetConfig
+sample = next(iter(ASEDatasetConfig(verbose=False).setup_target()))
+print(sample.summary())  # concise overview
+```
+
+---
+
+# Dataset config & auto-discovery
+
+```{python}
+from oracle_rri.data.dataset import ASEDatasetConfig
+
+cfg = ASEDatasetConfig(
+    scene_ids=None,          # optional; if omitted, glob all shards under data_root/ase_efm_eval
+    load_meshes=True,
+    cache_meshes=True,
+    batch_size=None,         # let DataLoader batch
+    shuffle=False,
+    repeat=False,
+    verbose=True,
+)
+ds = cfg.setup_target()
+sample = next(iter(ds))
+```
+
+- **Auto tar resolution**: if `tar_urls` is empty, shards are globbed under resolved ATEK root; if `scene_ids` are provided, only those subdirs are used.
+- **Mesh resolution**: when `load_meshes=True`, meshes are loaded from `.data/ase_meshes/scene_ply_{scene}.ply` (or inferred from `scene_ids`).
+- **Console logging**: shard resolution is logged via `Console` for transparency.
+
+---
+
+# Typed views
+
+```{python}
+sample.camera_rgb         # CameraView
+sample.camera_slam_left   # CameraView
+sample.camera_slam_right  # CameraView
+sample.camera_rgb_depth if "mfcd#camera-rgb-depth+images" in sample.flat else None
+sample.trajectory         # TrajectoryView
+sample.semidense          # SemiDenseView
+sample.gt                 # GTView (obb2/obb3/efm_gt/rri_targets)
+sample.mesh               # trimesh.Trimesh or None
+```
+
+- **CameraView**: images `(F,C,H,W)`, intrinsics, T_device_camera; uses `PoseTW` convention.
+- **TrajectoryView**: `ts_world_device` `(F,3,4)`, timestamps, gravity.
+- **SemiDenseView**: per-frame SLAM points + stds + volume bounds.
+- **GTView**: parses `obb3_gt`, `obb2_gt`, `scores`, `efm_gt`, `rri_targets`; preserves raw.
+
+Friendly display:
+
+```{python}
+print(sample.summary())   # compact dict; hides None fields, truncates long lists
+```
+
+---
+
+# Mesh handling
+
+- Mesh loaded once per scene (cached if `cache_meshes=True`).
+- Mesh shape hints in repr: `{'verts': N, 'faces': M}`.
+
+---
+
+# Conversion to EFM3D schema
+
+```{python}
+efm_dict = sample.to_efm_dict(include_mesh=False)
+```
+
+Maps ATEK keys to EFM3D (`rgb/img`, `pose/t_world_rig`, `points/p3s_world`) using `EfmModelAdaptor` if available; falls back to a minimal mapping otherwise.
+
+---
+
+# Visualization hooks
+
+- **Streamlit demo**: `streamlit run -m oracle_rri.visualization.candidate_app`
+  - Sidebar: load real ASE sample, scene picker, next-sample button
+  - Shows candidate positions (Plotly) + optional frustums (`pytransform3d.plot_camera`)
+  - Uses real intrinsics from sample for frustum rendering
+- **Mesh viewer**: `streamlit run -m oracle_rri.viz.mesh_viz` (synthetic cube if no mesh passed)
+
+---
+
+# Testing notes
+
+- Non-integration suite: `{python} -m pytest -m 'not integration'` (61 passed)
+- Candidate rendering tests use `CameraTW.from_surreal` pinhole setup and check ray/depth consistency.
+- GT parsing tested with real shards (`TestGTViewRealData`).
+
+---
+
+# Quick recipe: iterate and inspect
+
+```{python}
+from oracle_rri.data.dataset import ASEDatasetConfig
+cfg = ASEDatasetConfig(load_meshes=True, verbose=False)
+for i, sample in enumerate(cfg.setup_target()):
+    print(sample.summary())
+    if i == 2:
+        break
+```
