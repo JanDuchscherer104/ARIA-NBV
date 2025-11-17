@@ -261,9 +261,7 @@ class CandidateViewGenerator:
             mask_valid_out = torch.zeros(self.config.num_samples, dtype=torch.bool, device=device)
         poses_valid = PoseTW(poses_cat)
         shell_poses = (
-            torch.cat([p._data for p in shell_accum], dim=0)
-            if shell_accum
-            else torch.zeros(0, 12, device=device)
+            torch.cat([p._data for p in shell_accum], dim=0) if shell_accum else torch.zeros(0, 12, device=device)
         )
         return {
             "poses": poses_valid,
