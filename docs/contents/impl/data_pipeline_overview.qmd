@@ -15,31 +15,15 @@ format: html
 All examples assume the `aria-nbv` conda env and repo root as CWD.
 
 ```{python}
-# quick smoke
 from oracle_rri.data.dataset import ASEDatasetConfig
+
 sample = next(iter(ASEDatasetConfig(verbose=False).setup_target()))
-print(sample.summary())  # concise overview
+sample.rich_summary()  # concise overview
 ```
 
 ---
 
 # Dataset config & auto-discovery
-
-```{python}
-from oracle_rri.data.dataset import ASEDatasetConfig
-
-cfg = ASEDatasetConfig(
-    scene_ids=None,          # optional; if omitted, glob all shards under data_root/ase_efm_eval
-    load_meshes=True,
-    cache_meshes=True,
-    batch_size=None,         # let DataLoader batch
-    shuffle=False,
-    repeat=False,
-    verbose=True,
-)
-ds = cfg.setup_target()
-sample = next(iter(ds))
-```
 
 - **Auto tar resolution**: if `tar_urls` is empty, shards are globbed under resolved ATEK root; if `scene_ids` are provided, only those subdirs are used.
 - **Mesh resolution**: when `load_meshes=True`, meshes are loaded from `.data/ase_meshes/scene_ply_{scene}.ply` (or inferred from `scene_ids`).
@@ -99,22 +83,3 @@ Maps ATEK keys to EFM3D (`rgb/img`, `pose/t_world_rig`, `points/p3s_world`) usin
 - **Mesh viewer**: `streamlit run -m oracle_rri.viz.mesh_viz` (synthetic cube if no mesh passed)
 
 ---
-
-# Testing notes
-
-- Non-integration suite: `{python} -m pytest -m 'not integration'` (61 passed)
-- Candidate rendering tests use `CameraTW.from_surreal` pinhole setup and check ray/depth consistency.
-- GT parsing tested with real shards (`TestGTViewRealData`).
-
----
-
-# Quick recipe: iterate and inspect
-
-```{python}
-from oracle_rri.data.dataset import ASEDatasetConfig
-cfg = ASEDatasetConfig(load_meshes=True, verbose=False)
-for i, sample in enumerate(cfg.setup_target()):
-    print(sample.summary())
-    if i == 2:
-        break
-```

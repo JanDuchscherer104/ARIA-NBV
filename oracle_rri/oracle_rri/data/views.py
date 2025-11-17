@@ -91,14 +91,17 @@ def _truncate_list(items: list[Any], *, max_items: int = 5) -> list[Any] | str:
 class BaseView:
     """Shared helpers for zero-copy tensor views."""
 
-    def to(self, device: str | torch.device, *, dtype: torch.dtype = None):  # pragma: no cover - simple cast
+    def to(self, device: str | torch.device, *, dtype: torch.dtype | None = None):
         moved = {}
         for f in fields(self):
             val = getattr(self, f.name)
             if isinstance(val, torch.Tensor):
                 moved[f.name] = val.to(device=device, dtype=dtype)
             elif isinstance(val, list) and val and isinstance(val[0], torch.Tensor):
-                moved[f.name] = [v.to(device=device, dtype=dtype) for v in val]
+                kwargs = {}
+                if dtype is not None:
+                    kwargs["dtype"] = dtype
+                moved[f.name] = [v.to(device=device, **kwargs) for v in val]
             else:
                 moved[f.name] = val
         return replace(self, **moved)
@@ -117,7 +120,7 @@ class CameraView(BaseView):
 
     Image tensors are shaped `(F, C, H, W)` with C=3 for RGB or C=1 for depth.
 
-    **Intrinsics.** `projection_params` follow Project Aria's *Fisheye624* (rad–tan–thin-prism)
+    **Intrinsics.** `projection_params` follow Project Aria's *Fisheye624* (rad-tan-thin-prism)
     parameterisation: `[fu, fv, cu, cv, k0, k1, k2, k3, k4, k5, p0, p1, s0, s1, s2]`.
     The pinhole block is
 
@@ -131,7 +134,7 @@ class CameraView(BaseView):
     with radial coefficients `k*`, tangential `p0/p1`, and thin-prism `s0..s2` applied by
     the fisheye projection model. Values are in **pixels** at the native render resolution.
 
-    **Extrinsics.** `t_device_camera` stores `T_device_camera`: a 3×4 SE(3) that maps camera
+    **Extrinsics.** `t_device_camera` stores `T_device_camera`: a 3x4 SE(3) that maps camera
     coordinates → device/rig frame. World poses recover as `T_world_camera = T_world_device @
     T_device_camera` using the trajectory view.
     """
@@ -183,10 +186,10 @@ class TrajectoryView(BaseView):
 class SemiDenseView(BaseView):
     """Semi-dense SLAM point observations (world frame, metres).
 
-    Each element in `points_world` corresponds to one frame and lives in \n
-    the same world coordinate system as `ts_world_device`. Uncertainty is\n
-    captured via optional distance and inverse-distance standard deviations.\n
-    `volume_min/max` provide an axis-aligned bounding box over all points in\n
+    Each element in `points_world` corresponds to one frame and lives in
+    the same world coordinate system as `ts_world_device`. Uncertainty is
+    captured via optional distance and inverse-distance standard deviations.
+    `volume_min/max` provide an axis-aligned bounding box over all points in
     the snippet, useful for normalising or voxelisation.
     """
 
@@ -203,34 +206,32 @@ class SemiDenseView(BaseView):
     volume_max: Tensor
     """Shape `(3,)` float32; world AABB maximum for points."""
 
-    # repr/to inherited from BaseView
-
 
 @dataclass(slots=True)
 class Obb3View(BaseView):
     """3D oriented bounding boxes expressed in world frame.
 
-    instance_ids : Tensor | None
+    instance_ids : Tensor
         `(K,)` int64 instance ids, shared with 2D OBBs when present.
-    category_ids : Tensor | None
+    category_ids : Tensor
         `(K,)` int64 category ids (see ATEK category map).
-    category_names : list[str] | None
+    category_names : list[str]
         Human readable category names aligned with `category_ids`.
-    object_dimensions : Tensor | None
+    object_dimensions : Tensor
         `(K,3)` float32 box side lengths in XYZ order.
-    ts_world_object : Tensor | None
+    ts_world_object : Tensor
         `(K,3,4)` float32 poses (world←object).
     """
 
-    instance_ids: Tensor | None
+    instance_ids: Tensor
     """Shape `(K,)` int64; unique instance ids per object."""
-    category_ids: Tensor | None
+    category_ids: Tensor
     """Shape `(K,)` int64; semantic category ids."""
-    category_names: list[str] | None
+    category_names: list[str]
     """List length `K`; category labels aligned with `category_ids`."""
-    object_dimensions: Tensor | None
+    object_dimensions: Tensor
     """Shape `(K,3)` float32; box side lengths (x, y, z) in metres."""
-    ts_world_object: Tensor | None
+    ts_world_object: Tensor
     """Shape `(K,3,4)` float32; T_world_object per instance."""
 
 
@@ -415,11 +416,11 @@ class GTView(BaseView):
                 continue
             if {"object_dimensions", "ts_world_object"} & set(cam_dict):
                 out[cam_id] = Obb3View(
-                    instance_ids=cam_dict.get("instance_ids"),
-                    category_ids=cam_dict.get("category_ids"),
-                    category_names=cam_dict.get("category_names"),
-                    object_dimensions=cam_dict.get("object_dimensions"),
-                    ts_world_object=cam_dict.get("ts_world_object"),
+                    instance_ids=cam_dict.get("instance_ids"),  # type: ignore[arg-type]
+                    category_ids=cam_dict.get("category_ids"),  # type: ignore[arg-type]
+                    category_names=cam_dict.get("category_names"),  # type: ignore[arg-type]
+                    object_dimensions=cam_dict.get("object_dimensions"),  # type: ignore[arg-type]
+                    ts_world_object=cam_dict.get("ts_world_object"),  # type: ignore[arg-type]
                 )
             else:
                 out[cam_id] = EfmPerCamera(raw=cam_dict)
@@ -433,11 +434,11 @@ class GTView(BaseView):
             if not isinstance(cam_dict, dict):
                 continue
             cameras[cam_id] = Obb3View(
-                instance_ids=cam_dict.get("instance_ids"),
-                category_ids=cam_dict.get("category_ids"),
-                category_names=cam_dict.get("category_names"),
-                object_dimensions=cam_dict.get("object_dimensions"),
-                ts_world_object=cam_dict.get("ts_world_object"),
+                instance_ids=cam_dict.get("instance_ids"),  # type: ignore[arg-type]
+                category_ids=cam_dict.get("category_ids"),  # type: ignore[arg-type]
+                category_names=cam_dict.get("category_names"),  # type: ignore[arg-type]
+                object_dimensions=cam_dict.get("object_dimensions"),  # type: ignore[arg-type]
+                ts_world_object=cam_dict.get("ts_world_object"),  # type: ignore[arg-type]
             )
         return cameras
 
@@ -504,10 +505,10 @@ class TypedSample(BaseView):
             t_device_camera=t_dev_cam,
             capture_timestamps_ns=ts,
             frame_ids=frame_ids,
-            exposure_durations_s=exposure,
-            gains=gains,
-            camera_model_name=model,
-            camera_valid_radius=radius,
+            exposure_durations_s=exposure,  # type: ignore[arg-type]
+            gains=gains,  # type: ignore[arg-type]
+            camera_model_name=model,  # type: ignore[arg-type]
+            camera_valid_radius=radius,  # type: ignore[arg-type]
         )
 
     @property
@@ -536,7 +537,7 @@ class TypedSample(BaseView):
         return TrajectoryView(
             ts_world_device=self._require("mtd#ts_world_device"),
             capture_timestamps_ns=self._require("mtd#capture_timestamps_ns"),
-            gravity_in_world=self.flat.get("mtd#gravity_in_world"),
+            gravity_in_world=self.flat.get("mtd#gravity_in_world"),  # type: ignore[arg-type]
         )
 
     @property
@@ -554,11 +555,11 @@ class TypedSample(BaseView):
             vol_max = f.get("msdpd#points_volumn_max")
         return SemiDenseView(
             points_world=points,
-            points_dist_std=f.get("msdpd#points_dist_std"),
-            points_inv_dist_std=f.get("msdpd#points_inv_dist_std"),
-            capture_timestamps_ns=f.get("msdpd#capture_timestamps_ns"),
-            volume_min=vol_min,
-            volume_max=vol_max,
+            points_dist_std=f.get("msdpd#points_dist_std"),  # type: ignore[arg-type]
+            points_inv_dist_std=f.get("msdpd#points_inv_dist_std"),  # type: ignore[arg-type]
+            capture_timestamps_ns=f.get("msdpd#capture_timestamps_ns"),  # type: ignore[arg-type]
+            volume_min=vol_min,  # type: ignore[arg-type]
+            volume_max=vol_max,  # type: ignore[arg-type]
         )
 
     @property
@@ -574,9 +575,33 @@ class TypedSample(BaseView):
         return _compact_dict(
             {
                 "rgb": _summ(self.flat.get("mfcd#camera-rgb+images")),
+                "rgb_proj": _summ(self.flat.get("mfcd#camera-rgb+projection_params")),
+                "rgb_t_dev": _summ(self.flat.get("mfcd#camera-rgb+t_device_camera")),
+                "rgb_ts": _summ(self.flat.get("mfcd#camera-rgb+capture_timestamps_ns")),
+                "rgb_frame_ids": _summ(self.flat.get("mfcd#camera-rgb+frame_ids")),
+                "rgb_exposure": _summ(self.flat.get("mfcd#camera-rgb+exposure_durations_s")),
+                "rgb_gains": _summ(self.flat.get("mfcd#camera-rgb+gains")),
+                "rgb_model": self.flat.get("mfcd#camera-rgb+camera_model_name"),
+                "rgb_valid_radius": _summ(self.flat.get("mfcd#camera-rgb+camera_valid_radius")),
                 "rgb_depth": _summ(self.flat.get("mfcd#camera-rgb-depth+images")),
                 "slam_l": _summ(self.flat.get("mfcd#camera-slam-left+images")),
+                "slam_l_proj": _summ(self.flat.get("mfcd#camera-slam-left+projection_params")),
+                "slam_l_t_dev": _summ(self.flat.get("mfcd#camera-slam-left+t_device_camera")),
+                "slam_l_ts": _summ(self.flat.get("mfcd#camera-slam-left+capture_timestamps_ns")),
+                "slam_l_frame_ids": _summ(self.flat.get("mfcd#camera-slam-left+frame_ids")),
+                "slam_l_exposure": _summ(self.flat.get("mfcd#camera-slam-left+exposure_durations_s")),
+                "slam_l_gains": _summ(self.flat.get("mfcd#camera-slam-left+gains")),
+                "slam_l_model": self.flat.get("mfcd#camera-slam-left+camera_model_name"),
+                "slam_l_valid_radius": _summ(self.flat.get("mfcd#camera-slam-left+camera_valid_radius")),
                 "slam_r": _summ(self.flat.get("mfcd#camera-slam-right+images")),
+                "slam_r_proj": _summ(self.flat.get("mfcd#camera-slam-right+projection_params")),
+                "slam_r_t_dev": _summ(self.flat.get("mfcd#camera-slam-right+t_device_camera")),
+                "slam_r_ts": _summ(self.flat.get("mfcd#camera-slam-right+capture_timestamps_ns")),
+                "slam_r_frame_ids": _summ(self.flat.get("mfcd#camera-slam-right+frame_ids")),
+                "slam_r_exposure": _summ(self.flat.get("mfcd#camera-slam-right+exposure_durations_s")),
+                "slam_r_gains": _summ(self.flat.get("mfcd#camera-slam-right+gains")),
+                "slam_r_model": self.flat.get("mfcd#camera-slam-right+camera_model_name"),
+                "slam_r_valid_radius": _summ(self.flat.get("mfcd#camera-slam-right+camera_valid_radius")),
             }
         )
 
@@ -659,13 +684,13 @@ class TypedSample(BaseView):
             "traj": _summ(self.trajectory),
             "semidense": sem,
             "gt": gt_summary,
-            "mesh": None if self.mesh is None else {"verts": len(self.mesh.vertices), "faces": len(self.mesh.faces)},
+            "mesh": None if self.mesh is None else str(self.mesh),
         }
 
     def to_efm_dict(
         self,
         include_mesh: bool = False,
-        key_mapping: dict[str, str] = None,
+        key_mapping: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """Remap to EFM3D schema using the provided key mapping."""
 
@@ -799,7 +824,7 @@ class TypedSample(BaseView):
         else:
             mesh_node.add(
                 Text(
-                    f"verts: {base['mesh']['verts']}, faces: {base['mesh']['faces']}",
+                    str(self.mesh),
                     style="config.value",
                 )
             )

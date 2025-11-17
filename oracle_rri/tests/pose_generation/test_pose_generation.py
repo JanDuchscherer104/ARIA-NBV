@@ -276,7 +276,7 @@ def test_candidate_generator_real_orientation_and_extent():
     """Real-data check: candidates look back at last_pose and lie inside inferred extent."""
 
     try:
-        dataset = ASEDatasetConfig(load_meshes=False, verbose=False).setup_target()
+        dataset = ASEDatasetConfig(load_meshes=True, verbose=False, require_mesh=False).setup_target()
         sample = next(iter(dataset))
     except Exception as exc:  # pragma: no cover - environment dependent
         pytest.skip(f"ASE dataset not available locally: {exc}")
@@ -307,11 +307,16 @@ def test_candidate_generator_real_orientation_and_extent():
     assert torch.all(cos_sim > 0.9)
 
     # Check positions fall inside the occupancy extent used (if any).
-    if sample.gt_mesh is not None:
-        bounds = torch.from_numpy(sample.gt_mesh.bounds).float()
-        vmin, vmax = bounds[0], bounds[1]
-        extent = torch.stack([vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]])
-    else:
+    extent = None
+    try:
+        if sample.gt_mesh is not None:
+            bounds = torch.from_numpy(sample.gt_mesh.bounds).float()
+            vmin, vmax = bounds[0], bounds[1]
+            extent = torch.stack([vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]])
+    except KeyError:
+        # Mesh not attached; fall back to occupancy extent inference.
+        pass
+    if extent is None:
         extent = gen._occupancy_extent_from_sample(sample)
 
     if extent is not None:
