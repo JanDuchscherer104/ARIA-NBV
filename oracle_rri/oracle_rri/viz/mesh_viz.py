@@ -1,3 +1,4 @@
+# NOTE: This file is deprecated and not integrated with the current version of our dataset and the viewgenerator. Only use it for reference!
 """Mesh/point/pose visualization helpers for oracle RRI.
 
 Supports Plotly rendering, minimal Streamlit embedding, and mesh-aware pose
@@ -188,6 +189,7 @@ class StreamlitMeshViewerConfig(BaseConfig[None]):
     title: str = "Mesh Viewer"
     point_size: int = 2
     show_legend: bool = True
+    auto_run: bool = True
 
 
 def streamlit_mesh_viewer(
@@ -219,3 +221,13 @@ def streamlit_mesh_viewer(
     except Exception as exc:  # pragma: no cover
         st.error(f"Unexpected error: {exc}")
         st.exception(exc)
+
+
+def main() -> None:  # pragma: no cover - streamlit entry
+    # Minimal demo using the synthetic cube if run directly.
+    cube = trimesh.creation.box()
+    streamlit_mesh_viewer(cube)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()

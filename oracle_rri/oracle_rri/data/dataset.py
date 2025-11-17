@@ -249,14 +249,19 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
 
     @model_validator(mode="after")
     def _autofill_paths(self) -> ASEDatasetConfig:
-        if not self.scene_ids:
-            raise ValueError("scene_ids must be provided; tar_urls are derived internally.")
-
         if not self.tar_urls:
             base = self._resolve_atek_root()
             self.tar_urls = [str(p) for scene in self.scene_ids for p in sorted((base / scene).glob("*.tar"))]
             if not self.tar_urls:
                 raise ValueError(f"No tar files found under {base} for scenes: {self.scene_ids}")
+
+        if not self.scene_ids:
+            inferred: set[str] = set()
+            for url in self.tar_urls:
+                parent = Path(url).parent.name
+                if parent.isdigit():
+                    inferred.add(parent)
+            self.scene_ids = sorted(inferred) if inferred else None
 
         if self.load_meshes and not self.scene_to_mesh:
             if self.scene_ids:

@@ -5,6 +5,7 @@ Runs even without local ASE data by falling back to synthetic poses.
 
 from __future__ import annotations
 
+import itertools
 import traceback
 from dataclasses import dataclass
 
@@ -30,7 +31,6 @@ from oracle_rri.data import ASEDataset, ASEDatasetConfig
 from oracle_rri.utils import BaseConfig, Console
 from oracle_rri.views.candidate_generation import CandidateViewGeneratorConfig
 from oracle_rri.views.candidate_rendering import (
-    CandidatePointCloudGenerator,
     CandidatePointCloudGeneratorConfig,
 )
 
@@ -74,7 +74,7 @@ class CandidateVizApp:
         st.title("NBV Candidate Sampling Explorer")
 
         try:
-            num_samples = st.sidebar.slider("Candidates", 64, 1024, self.config.generator.num_samples, 64)
+            num_samples = st.sidebar.slider("Candidates", 4, 128, self.config.generator.num_samples, 64)
             device = st.sidebar.selectbox("Device", ["cpu", "cuda"], index=0)
 
             generator_cfg = self.config.generator.model_copy(update={"num_samples": num_samples, "device": device})
@@ -83,10 +83,38 @@ class CandidateVizApp:
             renderer = renderer_cfg.setup_target()
 
             sample = None
-            if self.config.dataset is not None:
+            load_real = st.sidebar.checkbox("Load real ASE sample", value=self.config.dataset is not None)
+            if load_real:
+                ds_cfg = self.config.dataset or ASEDatasetConfig(
+                    load_meshes=True,
+                    cache_meshes=True,
+                    batch_size=None,
+                    shuffle=True,
+                    repeat=False,
+                    verbose=False,
+                )
+
+                # Typed session wrapper for clarity
+                class SessionKeys:
+                    CFG = "sample_cfg"
+                    INDEX = "sample_index"
+                    LAST_SAMPLE = "cached_sample"
+
+                def _cfg_changed() -> bool:
+                    return st.session_state.get(SessionKeys.CFG) != ds_cfg.model_dump()
+
                 try:
-                    ds = ASEDataset(self.config.dataset)
-                    sample = next(iter(ds))
+                    if _cfg_changed():
+                        st.session_state[SessionKeys.CFG] = ds_cfg.model_dump()
+                        st.session_state[SessionKeys.INDEX] = 0
+                        st.session_state.pop(SessionKeys.LAST_SAMPLE, None)
+
+                    if st.sidebar.button("Next sample"):
+                        st.session_state[SessionKeys.INDEX] += 1
+
+                    ds = ASEDataset(ds_cfg)
+                    sample = next(itertools.islice(ds, st.session_state[SessionKeys.INDEX], None))
+                    st.session_state[SessionKeys.LAST_SAMPLE] = sample
                 except Exception as data_exc:  # pragma: no cover - UI feedback
                     st.warning(f"Dataset load failed, using synthetic scene. Details: {data_exc}")
                     console.warn(f"Dataset load failed: {data_exc}")
@@ -161,6 +189,45 @@ class CandidateVizApp:
                 )
             fig.update_layout(scene_aspectmode="data")
             st.plotly_chart(fig, use_container_width=True)
+
+            # Optional camera frustum plot (pytransform3d -> matplotlib -> streamlit)
+            with st.expander("Show camera frustums (pytransform3d)"):
+                try:
+                    from pytransform3d.camera import plot_camera
+                    from pytransform3d.plot_utils import make_3d_axis
+
+                    ax = make_3d_axis(1, 1)
+                    if sample is not None:
+                        cam_view = sample.camera_rgb
+                        proj = cam_view.projection_params
+                        if proj.ndim > 1:
+                            proj = proj[frame_idx]
+                        fx, fy, cx, cy = proj[:4].double()
+                        K = torch.tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=torch.float64)
+                        w, h = cam_view.images.shape[-1], cam_view.images.shape[-2]
+                        sensor_size = (float(w), float(h))
+                    else:
+                        K = torch.tensor(
+                            [[200.0, 0.0, 120.0], [0.0, 200.0, 120.0], [0.0, 0.0, 1.0]],
+                            dtype=torch.float64,
+                        )
+                        sensor_size = (240.0, 240.0)
+                    max_show = min(50, len(valid_indices))
+                    for idx in valid_indices[:max_show]:
+                        cam2world = poses[idx].matrix3x4.double()
+                        plot_camera(ax, cam2world=cam2world, K=K, sensor_size=sensor_size, color="r", alpha=0.2)
+                    plot_camera(
+                        ax,
+                        cam2world=last_pose.matrix3x4.double(),
+                        K=K,
+                        sensor_size=sensor_size,
+                        color="b",
+                        alpha=0.8,
+                    )
+                    ax.set_title(f"Frustums (showing {max_show} / {len(valid_indices)})")
+                    st.pyplot(ax.figure, use_container_width=True)
+                except Exception as exc:  # pragma: no cover - plotting-only
+                    st.info(f"Frustum plot unavailable: {exc}")
 
         with tabs[1]:
             st.subheader("Depth Rendering (RGB intrinsics)")
@@ -329,3 +396,12 @@ def _make_unit_cube_mesh() -> trimesh.Trimesh:
         dtype=torch.int64,
     ).numpy()
     return trimesh.Trimesh(vertices=verts, faces=faces, process=False)
+
+
+def main() -> None:  # Convenience entrypoint for `streamlit run candidate_app.py`
+    app = CandidateVizConfig().setup_target()
+    app.run()
+
+
+if __name__ == "__main__":  # pragma: no cover - streamlit entry
+    main()

@@ -1,7 +1,7 @@
 """Typed, zero-copy views over flattened ATEK samples.
 
-Properties fetch values lazily from the underlying dict using ``.get`` and
-raise ``KeyError`` when required fields are missing. Shapes, dtypes, and frame
+Properties fetch values lazily from the underlying dict using `.get` and
+raise `KeyError` when required fields are missing. Shapes, dtypes, and frame
 conventions are documented per attribute for quick reference.
 """
 
@@ -23,7 +23,18 @@ def _summ(value: Any) -> Any:
     if value is None:
         return None
     if isinstance(value, torch.Tensor):
-        return {"shape": tuple(value.shape), "dtype": str(value.dtype)}
+        if value.numel() <= 10 and value.dtype.is_floating_point:
+            return {
+                "shape": tuple(value.shape),
+                "dtype": str(value.dtype),
+                "min": float(value.min()),
+                "max": float(value.max()),
+                "mean": float(value.mean()),
+            }
+        return {
+            "shape": tuple(value.shape),
+            "dtype": str(value.dtype),
+        }
     if isinstance(value, list) and value and isinstance(value[0], torch.Tensor):
         first = value[0]
         return {"len": len(value), "first": {"shape": tuple(first.shape), "dtype": str(first.dtype)}}
@@ -42,6 +53,19 @@ def _summ(value: Any) -> Any:
 
 def _repr_dict(block: dict[str, Any]) -> str:
     return pformat(block, indent=2, compact=False)
+
+
+def _compact_dict(d: dict[str, Any]) -> dict[str, Any]:
+    """Remove None entries and truncate long lists for human-friendly repr."""
+    out: dict[str, Any] = {}
+    for k, v in d.items():
+        if v is None:
+            continue
+        if isinstance(v, (list, tuple)) and len(v) > 5:
+            out[k] = f"{len(v)} items (first 3): {list(v)[:3]}"
+        else:
+            out[k] = v
+    return out
 
 
 @dataclass(slots=True)
@@ -72,10 +96,10 @@ class BaseView:
 class CameraView(BaseView):
     """Multi-frame camera stream (Aria camera frame: +x right, +y down, +z forward).
 
-    Image tensors are shaped ``(F, C, H, W)`` with C=3 for RGB or C=1 for depth.
+    Image tensors are shaped `(F, C, H, W)` with C=3 for RGB or C=1 for depth.
 
-    **Intrinsics.** ``projection_params`` follow Project Aria's *Fisheye624* (rad–tan–thin-prism)
-    parameterisation: ``[fu, fv, cu, cv, k0, k1, k2, k3, k4, k5, p0, p1, s0, s1, s2]``.
+    **Intrinsics.** `projection_params` follow Project Aria's *Fisheye624* (rad–tan–thin-prism)
+    parameterisation: `[fu, fv, cu, cv, k0, k1, k2, k3, k4, k5, p0, p1, s0, s1, s2]`.
     The pinhole block is
 
     .. math::
@@ -85,49 +109,49 @@ class CameraView(BaseView):
         0 & 0 & 1
         \\end{bmatrix},
 
-    with radial coefficients ``k*``, tangential ``p0/p1``, and thin-prism ``s0..s2`` applied by
+    with radial coefficients `k*`, tangential `p0/p1`, and thin-prism `s0..s2` applied by
     the fisheye projection model. Values are in **pixels** at the native render resolution.
 
-    **Extrinsics.** ``t_device_camera`` stores ``T_device_camera``: a 3×4 SE(3) that maps camera
-    coordinates → device/rig frame. World poses recover as ``T_world_camera = T_world_device @
-    T_device_camera`` using the trajectory view.
+    **Extrinsics.** `t_device_camera` stores `T_device_camera`: a 3×4 SE(3) that maps camera
+    coordinates → device/rig frame. World poses recover as `T_world_camera = T_world_device @
+    T_device_camera` using the trajectory view.
     """
 
     images: Tensor
-    """Shape ``(F,C,H,W)`` uint8|float32 in camera frame (C=3 RGB, C=1 depth)."""
+    """Shape `(F,C,H,W)` uint8|float32 in camera frame (C=3 RGB, C=1 depth)."""
     projection_params: Tensor
-    """Shape ``(15,)`` or ``(F,15)`` float32 intrinsics (fu, fv, cu, cv, k0..k5, p0, p1, s0..s2)."""
+    """Shape `(15,)` or `(F,15)` float32 intrinsics (fu, fv, cu, cv, k0..k5, p0, p1, s0..s2)."""
     t_device_camera: Tensor
-    """Shape ``(3,4)`` or ``(F,3,4)`` float32; ``T_device_camera`` (camera→rig) per frame."""
+    """Shape `(3,4)` or `(F,3,4)` float32; `T_device_camera` (camera→rig) per frame."""
     capture_timestamps_ns: Tensor
-    """Shape ``(F,)`` int64 device timestamps aligned to images."""
+    """Shape `(F,)` int64 device timestamps aligned to images."""
     frame_ids: Tensor
-    """Shape ``(F,)`` int64 frame identifiers per stream."""
+    """Shape `(F,)` int64 frame identifiers per stream."""
     exposure_durations_s: Tensor
-    """Shape ``(F,)`` float32 exposure durations (seconds)."""
+    """Shape `(F,)` float32 exposure durations (seconds)."""
     gains: Tensor
-    """Shape ``(F,)`` float32 analog gains."""
+    """Shape `(F,)` float32 analog gains."""
     camera_model_name: str
-    """Camera model name (e.g., ``FISHEYE624``)."""
+    """Camera model name (e.g., `FISHEYE624`)."""
     camera_valid_radius: Tensor
-    """Shape ``(1)`` or ``(F,1)`` float32; valid fisheye radius in pixels."""
+    """Shape `(1)` or `(F,1)` float32; valid fisheye radius in pixels."""
 
 
 @dataclass(slots=True)
 class TrajectoryView(BaseView):
     """Rig trajectory from MPS (world frame; Z-up, metres).
 
-    ``ts_world_device`` stores ``T_world_device`` (camera rig pose) for each frame, aligned to the
-    timestamps in the camera streams. Compose with ``T_device_camera`` to obtain per-camera world
+    `ts_world_device` stores `T_world_device` (camera rig pose) for each frame, aligned to the
+    timestamps in the camera streams. Compose with `T_device_camera` to obtain per-camera world
     poses. Gravity is reported in world coordinates to aid frame alignment.
     """
 
     ts_world_device: Tensor
-    """Shape ``(F,3,4)`` float32; rig pose per frame (world←device)."""
+    """Shape `(F,3,4)` float32; rig pose per frame (world←device)."""
     capture_timestamps_ns: Tensor
-    """Shape ``(F,)`` int64; device timestamps for the trajectory samples."""
+    """Shape `(F,)` int64; device timestamps for the trajectory samples."""
     gravity_in_world: Tensor
-    """Shape ``(3,)`` float32; gravity vector expressed in world frame."""
+    """Shape `(3,)` float32; gravity vector expressed in world frame."""
 
     # repr/to inherited from BaseView
 
@@ -136,25 +160,25 @@ class TrajectoryView(BaseView):
 class SemiDenseView(BaseView):
     """Semi-dense SLAM point observations (world frame, metres).
 
-    Each element in ``points_world`` corresponds to one frame and lives in \n
-    the same world coordinate system as ``ts_world_device``. Uncertainty is\n
+    Each element in `points_world` corresponds to one frame and lives in \n
+    the same world coordinate system as `ts_world_device`. Uncertainty is\n
     captured via optional distance and inverse-distance standard deviations.\n
-    ``volume_min/max`` provide an axis-aligned bounding box over all points in\n
+    `volume_min/max` provide an axis-aligned bounding box over all points in\n
     the snippet, useful for normalising or voxelisation.
     """
 
     points_world: list[Tensor]
-    """List length F; each tensor ``(N,3)`` float32 world-frame points."""
+    """List length F; each tensor `(N,3)` float32 world-frame points."""
     points_dist_std: list[Tensor]
-    """List length F; each ``(N,)`` float32 per-point distance stddev."""
+    """List length F; each `(N,)` float32 per-point distance stddev."""
     points_inv_dist_std: list[Tensor]
-    """List length F; each ``(N,)`` float32 inverse distance stddev."""
+    """List length F; each `(N,)` float32 inverse distance stddev."""
     capture_timestamps_ns: Tensor
-    """Shape ``(F,)`` int64; timestamps corresponding to each points slice."""
+    """Shape `(F,)` int64; timestamps corresponding to each points slice."""
     volume_min: Tensor
-    """Shape ``(3,)`` float32; world AABB minimum for points."""
+    """Shape `(3,)` float32; world AABB minimum for points."""
     volume_max: Tensor
-    """Shape ``(3,)`` float32; world AABB maximum for points."""
+    """Shape `(3,)` float32; world AABB maximum for points."""
 
     # repr/to inherited from BaseView
 
@@ -164,27 +188,27 @@ class Obb3View(BaseView):
     """3D oriented bounding boxes expressed in world frame.
 
     instance_ids : Tensor | None
-        ``(K,)`` int64 instance ids, shared with 2D OBBs when present.
+        `(K,)` int64 instance ids, shared with 2D OBBs when present.
     category_ids : Tensor | None
-        ``(K,)`` int64 category ids (see ATEK category map).
+        `(K,)` int64 category ids (see ATEK category map).
     category_names : list[str] | None
-        Human readable category names aligned with ``category_ids``.
+        Human readable category names aligned with `category_ids`.
     object_dimensions : Tensor | None
-        ``(K,3)`` float32 box side lengths in XYZ order.
+        `(K,3)` float32 box side lengths in XYZ order.
     ts_world_object : Tensor | None
-        ``(K,3,4)`` float32 poses (world←object).
+        `(K,3,4)` float32 poses (world←object).
     """
 
     instance_ids: Tensor | None
-    """Shape ``(K,)`` int64; unique instance ids per object."""
+    """Shape `(K,)` int64; unique instance ids per object."""
     category_ids: Tensor | None
-    """Shape ``(K,)`` int64; semantic category ids."""
+    """Shape `(K,)` int64; semantic category ids."""
     category_names: list[str] | None
-    """List length ``K``; category labels aligned with ``category_ids``."""
+    """List length `K`; category labels aligned with `category_ids`."""
     object_dimensions: Tensor | None
-    """Shape ``(K,3)`` float32; box side lengths (x, y, z) in metres."""
+    """Shape `(K,3)` float32; box side lengths (x, y, z) in metres."""
     ts_world_object: Tensor | None
-    """Shape ``(K,3,4)`` float32; T_world_object per instance."""
+    """Shape `(K,3,4)` float32; T_world_object per instance."""
 
 
 @dataclass(slots=True)
@@ -192,7 +216,7 @@ class GTView(BaseView):
     """Ground-truth annotations (OBB3/OBB2) wrapped in typed views."""
 
     raw: dict[str, Any]
-    """Original ``gt_data`` mapping as provided by ATEK."""
+    """Original `gt_data` mapping as provided by ATEK."""
     obb3_gt: dict[str, Obb3View] | None = None
     """Per-camera OBB3 annotations; keys are camera labels."""
     obb2_gt: dict[str, dict[str, Any]] | None = None
@@ -201,6 +225,8 @@ class GTView(BaseView):
     """Optional quality scores tensor associated with this snippet."""
     efm_gt: dict[str, Any] | None = None
     """Optional EVL/EFM-formatted targets (e.g., padded OBB tensors)."""
+    rri_targets: dict[str, Any] | None = None
+    """Any precomputed RRI supervision targets."""
 
     def __post_init__(self) -> None:
         """Parse the raw mapping into typed sub-views."""
@@ -230,6 +256,9 @@ class GTView(BaseView):
         efm_raw = raw_dict.get("efm_gt")
         if isinstance(efm_raw, dict):
             self.efm_gt = efm_raw
+        rri_raw = raw_dict.get("rri_targets")
+        if isinstance(rri_raw, dict):
+            self.rri_targets = rri_raw
 
     @property
     def has_obb3(self) -> bool:
@@ -238,7 +267,7 @@ class GTView(BaseView):
         return bool(self.obb3_gt)
 
     def to_raw(self) -> dict[str, Any]:
-        """Return the original ``gt_data`` mapping (unmodified)."""
+        """Return the original `gt_data` mapping (unmodified)."""
 
         return self.raw
 
@@ -252,14 +281,15 @@ class TypedSample(BaseView):
     scene_id: str
     """Scene identifier extracted from sequence name or shard path."""
     snippet_id: str
-    """Snippet identifier (e.g., ``shards-0000``)."""
-    mesh: trimesh.Trimesh = None
+    """Snippet identifier (e.g., `shards-0000`)."""
+    mesh: trimesh.Trimesh | None = None
     """Optional GT mesh paired with the snippet."""
 
     @property
-    def gt_mesh(self) -> trimesh.Trimesh:
-        """Convenience accessor for attached GT mesh (may be ``None``)."""
-
+    def gt_mesh(self) -> trimesh.Trimesh | None:
+        """Convenience accessor for attached GT mesh (may be `None`)."""
+        if self.mesh is None:
+            raise KeyError("No GT mesh attached to this sample")
         return self.mesh
 
     @property
@@ -310,30 +340,29 @@ class TypedSample(BaseView):
             camera_valid_radius=radius,
         )
 
-    # TODO: all properties must have doc-strings!
     @property
     def camera_rgb(self) -> CameraView:
-        """RGB stream: ``mfcd#camera-rgb`` (F≈20, C=3)."""
+        """RGB stream: `mfcd#camera-rgb` (F≈20, C=3)."""
         return self._camera("mfcd#camera-rgb")
 
     @property
     def camera_slam_left(self) -> CameraView:
-        """Left SLAM grayscale stream: ``mfcd#camera-slam-left`` (C=1)."""
+        """Left SLAM grayscale stream: `mfcd#camera-slam-left` (C=1)."""
         return self._camera("mfcd#camera-slam-left")
 
     @property
     def camera_slam_right(self) -> CameraView:
-        """Right SLAM grayscale stream: ``mfcd#camera-slam-right`` (C=1)."""
+        """Right SLAM grayscale stream: `mfcd#camera-slam-right` (C=1)."""
         return self._camera("mfcd#camera-slam-right")
 
     @property
     def camera_rgb_depth(self) -> CameraView:
-        """Aligned depth stream: ``mfcd#camera-rgb-depth`` (C=1 distance/ray-length)."""
+        """Aligned depth stream: `mfcd#camera-rgb-depth` (C=1 distance/ray-length)."""
         return self._camera("mfcd#camera-rgb-depth")
 
     @property
     def trajectory(self) -> TrajectoryView:
-        """Rig poses ``mtd#ts_world_device`` aligned to camera timestamps."""
+        """Rig poses `mtd#ts_world_device` aligned to camera timestamps."""
         return TrajectoryView(
             ts_world_device=self._require("mtd#ts_world_device"),
             capture_timestamps_ns=self._require("mtd#capture_timestamps_ns"),
@@ -342,7 +371,7 @@ class TypedSample(BaseView):
 
     @property
     def semidense(self) -> SemiDenseView:
-        """Semi-dense SLAM points ``msdpd#points_world`` plus uncertainty and AABB."""
+        """Semi-dense SLAM points `msdpd#points_world` plus uncertainty and AABB."""
         f = self.flat
         points = f.get("msdpd#points_world")
         if points is None:
@@ -364,7 +393,7 @@ class TypedSample(BaseView):
 
     @property
     def gt(self) -> GTView:
-        """Ground-truth dict ``gt_data`` (OBB2/OBB3/EFM targets)."""
+        """Ground-truth dict `gt_data` (OBB2/OBB3/EFM targets)."""
         return GTView(raw=self.flat.get("gt_data", {}))
 
     def to_efm_dict(
@@ -398,21 +427,47 @@ class TypedSample(BaseView):
         return out
 
     def __repr__(self) -> str:  # pragma: no cover - formatting-only
+        cam = _compact_dict(
+            {
+                "rgb": _summ(self.flat.get("mfcd#camera-rgb+images")),
+                "rgb_depth": _summ(self.flat.get("mfcd#camera-rgb-depth+images")),
+                "slam_l": _summ(self.flat.get("mfcd#camera-slam-left+images")),
+                "slam_r": _summ(self.flat.get("mfcd#camera-slam-right+images")),
+            }
+        )
+        sem = _compact_dict(
+            {
+                "frames": len(self.semidense.points_world) if self.semidense.points_world else 0,
+                "points_example": _summ(self.semidense.points_world[0]) if self.semidense.points_world else None,
+                "volume": {
+                    "min": _summ(self.semidense.volume_min),
+                    "max": _summ(self.semidense.volume_max),
+                },
+            }
+        )
+        gt_summary = _compact_dict(
+            {
+                "keys": list(self.gt.raw.keys()),
+                "obb3": None
+                if self.gt.obb3_gt is None
+                else {k: _summ(v.object_dimensions) for k, v in self.gt.obb3_gt.items()},
+                "obb2": None if self.gt.obb2_gt is None else list(self.gt.obb2_gt.keys()),
+                "scores": _summ(self.gt.scores),
+                "efm_gt": None if self.gt.efm_gt is None else list(self.gt.efm_gt.keys()),
+                "rri_targets": None if self.gt.rri_targets is None else list(self.gt.rri_targets.keys()),
+            }
+        )
+
         return _repr_dict(
             {
                 "scene_id": self.scene_id,
                 "snippet_id": self.snippet_id,
                 "atek": {
-                    "sequence_name": self.flat.get("sequence_name"),
-                    "cameras": {
-                        "RGB": _summ(self.camera_rgb),
-                        "SLAM_LEFT": _summ(self.camera_slam_left),
-                        "SLAM_RIGHT": _summ(self.camera_slam_right),
-                        "RGB_DEPTH": _summ(self.camera_rgb_depth),
-                    },
+                    "sequence": self.flat.get("sequence_name"),
+                    "cameras": cam,
                     "trajectory": _summ(self.trajectory),
-                    "semidense": _summ(self.semidense),
-                    "gt_data_keys": list(self.gt.raw.keys()),
+                    "semidense": sem,
+                    "gt": gt_summary,
                 },
                 "gt_mesh": None
                 if self.mesh is None
@@ -420,8 +475,55 @@ class TypedSample(BaseView):
             }
         )
 
+    def summary(self, width: int = 120) -> str:
+        """Concise human-friendly summary; hides None fields and truncates long lists."""
+
+        cam = _compact_dict(
+            {
+                "rgb": _summ(self.flat.get("mfcd#camera-rgb+images")),
+                "rgb_depth": _summ(self.flat.get("mfcd#camera-rgb-depth+images")),
+                "slam_l": _summ(self.flat.get("mfcd#camera-slam-left+images")),
+                "slam_r": _summ(self.flat.get("mfcd#camera-slam-right+images")),
+            }
+        )
+        sem = _compact_dict(
+            {
+                "frames": len(self.semidense.points_world) if self.semidense.points_world else 0,
+                "points_example": _summ(self.semidense.points_world[0]) if self.semidense.points_world else None,
+                "volume": {
+                    "min": _summ(self.semidense.volume_min),
+                    "max": _summ(self.semidense.volume_max),
+                },
+            }
+        )
+        gt_summary = _compact_dict(
+            {
+                "keys": list(self.gt.raw.keys()),
+                "obb3": None
+                if self.gt.obb3_gt is None
+                else {k: _summ(v.object_dimensions) for k, v in self.gt.obb3_gt.items()},
+                "obb2": None if self.gt.obb2_gt is None else list(self.gt.obb2_gt.keys()),
+                "scores": _summ(self.gt.scores),
+                "efm_gt": None if self.gt.efm_gt is None else list(self.gt.efm_gt.keys()),
+                "rri_targets": None if self.gt.rri_targets is None else list(self.gt.rri_targets.keys()),
+            }
+        )
+        return _repr_dict(
+            {
+                "scene": self.scene_id,
+                "snippet": self.snippet_id,
+                "cameras": cam,
+                "traj": _summ(self.trajectory),
+                "semidense": sem,
+                "gt": gt_summary,
+                "mesh": None
+                if self.mesh is None
+                else {"verts": len(self.mesh.vertices), "faces": len(self.mesh.faces)},
+            }
+        )
+
     def to(self, device: str | torch.device, *, dtype: torch.dtype = None) -> "TypedSample":
-        """Return a shallow copy; consumers can call ``.to`` on sub-views explicitly."""
+        """Return a shallow copy; consumers can call `.to` on sub-views explicitly."""
 
         return replace(self)
 

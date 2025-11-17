@@ -69,14 +69,17 @@ def _mock_flat_sample(scene: str = "81022", snippet: str = "shards-0000") -> dic
 
 class TestASEDatasetConfig:
     def test_requires_tar_urls(self):
-        with pytest.raises(ValueError):
-            ASEDatasetConfig()
+        cfg = ASEDatasetConfig()
+        assert cfg.tar_urls, "tar_urls should auto-populate when none are provided"
 
 
 class TestASEDataset:
     @pytest.fixture
     def tar_file(self, tmp_path: Path) -> Path:
-        tar = tmp_path / "fake.tar"
+        scene = "99999"
+        tar_dir = tmp_path / scene
+        tar_dir.mkdir()
+        tar = tar_dir / "fake.tar"
         tar.write_bytes(b"")
         return tar
 
@@ -89,7 +92,8 @@ class TestASEDataset:
 
         with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
             config = ASEDatasetConfig(
-                tar_urls=[tar_file],
+                scene_ids=[tar_file.parent.name],
+                atek_root=tar_file.parent.parent,
                 scene_to_mesh={},
                 load_meshes=False,
                 batch_size=None,
@@ -128,7 +132,8 @@ class TestASEDataset:
 
         with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
             config = ASEDatasetConfig(
-                tar_urls=[tar_file],
+                scene_ids=[tar_file.parent.name],
+                atek_root=tar_file.parent.parent,
                 scene_to_mesh={},
                 load_meshes=False,
                 batch_size=None,
@@ -151,7 +156,8 @@ class TestASEDataset:
 
         with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
             config = ASEDatasetConfig(
-                tar_urls=[tar_file],
+                scene_ids=[tar_file.parent.name],
+                atek_root=tar_file.parent.parent,
                 scene_to_mesh={},
                 load_meshes=False,
                 batch_size=None,
@@ -171,7 +177,8 @@ class TestASEDataset:
 
         with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
             config = ASEDatasetConfig(
-                tar_urls=[tar_file],
+                scene_ids=[tar_file.parent.name],
+                atek_root=tar_file.parent.parent,
                 scene_to_mesh={},
                 load_meshes=False,
                 batch_size=None,
@@ -196,7 +203,8 @@ class TestASEDataset:
 
         with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
             config = ASEDatasetConfig(
-                tar_urls=[tar_file],
+                scene_ids=[tar_file.parent.name],
+                atek_root=tar_file.parent.parent,
                 scene_to_mesh={},
                 load_meshes=False,
                 batch_size=None,
@@ -210,8 +218,14 @@ class TestASEDataset:
         assert moved is not cam  # copy
 
     def test_mesh_loading_and_caching(self, tmp_path: Path):
+        scene_id = "81022"
         mesh_path = tmp_path / "scene_ply_81022.ply"
         trimesh.Trimesh(vertices=[[0, 0, 0], [1, 0, 0], [0, 1, 0]], faces=[[0, 1, 2]]).export(mesh_path)
+
+        tar_dir = tmp_path / scene_id
+        tar_dir.mkdir(exist_ok=True)
+        tar_path = tar_dir / "fake.tar"
+        tar_path.write_bytes(b"")
 
         flat = _mock_flat_sample()
         mock_loader = MagicMock()
@@ -219,8 +233,9 @@ class TestASEDataset:
 
         with patch("oracle_rri.data.dataset.load_atek_wds_dataset", return_value=mock_loader):
             config = ASEDatasetConfig(
-                tar_urls=["/tmp/fake.tar"],
-                scene_to_mesh={"81022": mesh_path},
+                scene_ids=[scene_id],
+                atek_root=tmp_path,
+                scene_to_mesh={scene_id: mesh_path},
                 load_meshes=True,
                 cache_meshes=True,
                 batch_size=None,
@@ -240,7 +255,8 @@ class TestGTViewRealData:
             pytest.skip("real ASE shard missing locally")
 
         config = ASEDatasetConfig(
-            tar_urls=[tar],
+            scene_ids=[tar.parent.name],
+            atek_root=tar.parent.parent,
             scene_to_mesh={},
             load_meshes=False,
             batch_size=None,

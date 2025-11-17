@@ -45,8 +45,8 @@ dependencies = [
     "streamlit>=1.51.0",
 ]
 
-[project.scripts]
-nbv-downloader = "oracle_rri.data.downloader:main"
+    [project.scripts]
+    nbv-downloader = "oracle_rri.data.downloader:main"
 
     [project.optional-dependencies]
     dev = ["pytest>=8.4.2", "pytest-cov>=7.0.0", "ruff>=0.1.0", "mypy>=1.0.0"]
@@ -70,6 +70,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["oracle_rri"]
+
+[tool.hatch.envs.default.scripts]
+nbv      = "python -m oracle_rri.data.downloader"
+nbv-list = "python -m oracle_rri.data.downloader list"
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -135,8 +139,8 @@ exclude_lines = [
     "if __name__ == .__main__.:",
 ]
 
-files = ["traenslenzor", "tests"]
+files = ["tests"]
 
     [[tool.mypy.overrides]]
-    module                 = ["atek.*"]
+    module                 = ["atek.*", "plotly.graph_objects.*"]
     ignore_missing_imports = true

@@ -160,7 +160,7 @@ Located in `*Integration` test classes:
 
 ```python
 def test_config_to_instance():
-    config = ASEDownloaderConfig(url_dir=Path(".data/urls"))
+    config = ASEDownloaderConfig(mode="download", url_dir=Path(".data/urls"))
     instance = config.setup_target()
     assert isinstance(instance, ASEDownloader)
 ```

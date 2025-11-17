@@ -37,7 +37,7 @@ from pathlib import Path
 from oracle_rri.data_handling import ASEDownloaderConfig
 
 # Create downloader
-config = ASEDownloaderConfig(verbose=True)
+config = ASEDownloaderConfig(mode="download", verbose=True)
 downloader = config.setup_target()
 
 # Get 5 scenes, max 2 snippets each

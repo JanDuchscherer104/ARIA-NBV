@@ -209,6 +209,7 @@ class TestASEDownloader:
             shutil.rmtree(mesh_dir)
 
         config = ASEDownloaderConfig(
+            mode="download",
             url_dir=tmp_url_dir,
             output_dir=tmp_output_dir,
         )
@@ -231,6 +232,7 @@ class TestASEDownloaderIntegration:
         """Test complete config → downloader → metadata flow."""
         # Create config
         config = ASEDownloaderConfig(
+            mode="download",
             url_dir=tmp_url_dir,
             output_dir=tmp_output_dir,
             metadata_cache_path=tmp_output_dir / "cache.json",
