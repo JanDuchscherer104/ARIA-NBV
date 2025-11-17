@@ -9,9 +9,7 @@ points from frame B into frame A).
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from enum import Enum
-from typing import Annotated, Literal, Self, TypedDict
+from typing import Annotated, Literal, Self
 
 import torch
 import trimesh
@@ -20,24 +18,14 @@ from pydantic import Field, field_validator, model_validator
 
 from ..data.views import TypedSample
 from ..utils import BaseConfig, Console
-
-Rule = Callable[[dict], dict]  # rule(ctx) -> ctx with updated mask
-
-
-class SamplingStrategy(str, Enum):
-    """Sampling strategy for candidate viewpoints."""
-
-    # TODO: add explanatory doc-strings for both strategies - must describe what they do - include conceptual overview and references if applicable
-    SHELL_UNIFORM = "shell_uniform"
-    FORWARD_GAUSSIAN = "forward_gaussian"
-
-
-class CollisionBackend(str, Enum):
-    """Backend for collision tests."""
-
-    PYEMBREE = "pyembree"
-    """Use [:class:`trimesh.ray.ray_pyembree.RayMeshIntersector`](https://trimesh.org/trimesh.ray.ray_pyembree.html#trimesh.ray.ray_pyembree.RayMeshIntersector) if available for faster ray-mesh tests."""
-    TRIMESH = "trimesh"
+from .candidate_generation_rules import (
+    FreeSpaceRule,
+    MinDistanceToMeshRule,
+    PathCollisionRule,
+    Rule,
+    ShellSamplingRule,
+)
+from .types import CandidateContext, CandidateSamplingResult, CollisionBackend, SamplingStrategy
 
 
 # TODO we want to be able to display the space of potential candidate views as well as actually drawn candidate views!
@@ -87,15 +75,39 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     sampling_strategy: SamplingStrategy = SamplingStrategy.SHELL_UNIFORM
     """Distribution strategy for yaw/pitch sampling (area-uniform or forward-biased)."""
 
-    # TODO: doc-strings for rules must be more descriptive - explain what each rule does conceptually!
     ensure_collision_free: bool = True
-    """Enable mesh-based path collision filtering (ray intersection tests)."""
+    """Enable straight-line path collision filtering.
+
+    When True, `_rule_path_collision` casts a ray from the last camera pose
+    to each candidate viewpoint and rejects candidates whose path intersects
+    the GT mehs.
+    """
+
     collision_backend: CollisionBackend = CollisionBackend.PYEMBREE
-    """Backend to use for ray/mesh intersection tests (prefer pyembree if available)."""
+    """Backend for ray/mesh intersection tests.
+
+    `PYEMBREE` uses `RayMeshIntersector` (if installed) for fast queries;
+    `TRIMESH` falls back to the pure-Python trimesh ray engine.
+    """
+
     min_distance_to_mesh: float = 0.05
-    """Minimum clearance (m) required between viewpoint and the GT mesh."""
+    """Minimum clearance (metres) between the candidate camera centre and
+    the GT mesh.
+
+    `_rule_min_distance_to_mesh` rejects candidates whose camera centre is
+    closer than this threshold, preventing views that start "inside" walls
+    or geometry.
+    """
+
     ensure_free_space: bool = True
-    """Enable bounding-box occupancy filtering for candidate positions."""
+    """Enable workspace AABB filtering.
+
+    When True, `_rule_free_space` enforces that candidate camera centres
+    lie inside an axis-aligned bounding box defined by `occupancy_extent`.
+    Use this to restrict sampling to the room / region covered by the
+    snippet's points or mesh.
+    """
+
     occupancy_extent: torch.Tensor | None = None  # [6]
     """Optional [6] tensor (xmin,xmax,ymin,ymax,zmin,zmax) describing allowed workspace bounds."""
 
@@ -130,15 +142,6 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
         return self
 
 
-class CandidateSamplingResult(TypedDict):
-    """Typed mapping for candidate generation output."""
-
-    poses: PoseTW
-    mask_valid: torch.Tensor
-    masks: list[torch.Tensor]
-    shell_poses: torch.Tensor
-
-
 class CandidateViewGenerator:
     """Generate candidate `PoseTW` around latest pose with composable rules."""
 
@@ -149,11 +152,11 @@ class CandidateViewGenerator:
         self._build_default_rules()
 
     def _build_default_rules(self) -> None:
-        self.rules = [self._rule_shell_sampling, self._rule_min_distance_to_mesh]
+        self.rules = [ShellSamplingRule(self.config), MinDistanceToMeshRule(self.config)]
         if self.config.ensure_collision_free:
-            self.rules.append(self._rule_path_collision)
+            self.rules.append(PathCollisionRule(self.config))
         if self.config.ensure_free_space:
-            self.rules.append(self._rule_free_space)
+            self.rules.append(FreeSpaceRule(self.config))
 
     def generate_from_typed_sample(self, sample: TypedSample) -> CandidateSamplingResult:
         """Generate candidate poses using data from a TypedSample.
@@ -163,13 +166,39 @@ class CandidateViewGenerator:
         Returns:
             CandidateSamplingResult with sampled poses and masks.
         """
-        # TODO: implement this, get all relevant data from sample!
-        # TODO: occupancy_extent must be derived from sample.mesh if it is not None - it shouldn't be configurable via the config!
-        raise NotImplementedError
-        return self.generate(...)
+        occupancy_extent = self._occupancy_extent_from_sample(sample)
+        gt_mesh = sample.mesh
+        last_pose = sample.trajectory.final_pose
+
+        return self.generate(
+            last_pose=last_pose,
+            gt_mesh=gt_mesh,
+            occupancy_extent=occupancy_extent,
+        )
+
+    def _occupancy_extent_from_sample(
+        self,
+        sample: TypedSample,
+    ) -> torch.Tensor | None:
+        """Return [xmin,xmax,ymin,ymax,zmin,zmax] AABB in world frame."""
+        if sample.has_mesh:
+            bounds = torch.from_numpy(sample.gt_mesh.bounds).to(device=self.config.device, dtype=torch.float32)
+            vmin, vmax = bounds[0], bounds[1]
+            return torch.stack(
+                [vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]],
+                dim=0,
+            )
+        sem = sample.semidense
+        if sem.volume_min is not None and sem.volume_max is not None:
+            vmin = sem.volume_min.to(device=self.config.device, dtype=torch.float32)
+            vmax = sem.volume_max.to(device=self.config.device, dtype=torch.float32)
+            return torch.stack(
+                [vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]],
+                dim=0,
+            )
+        return None
 
     # TODO: sampling must be done from the pose belonging to the camera_index specified in the config and also consider the cameras intrinsics to do correct sampling!
-    # TODO: doc-string must mention the frame in which the poses lie!
     def generate(
         self,
         last_pose: PoseTW,
@@ -191,16 +220,17 @@ class CandidateViewGenerator:
         """
 
         device = self.config.device
-        # TODO: make this a typed dict! And add type annotations where ever it is used!
-        ctx = {
+        ctx: CandidateContext = {
             "last_pose": last_pose.to(device),
             "gt_mesh": gt_mesh,
             "occupancy_extent": occupancy_extent if occupancy_extent is not None else self.config.occupancy_extent,
             "device": device,
+            "poses": torch.empty(0, 12, device=device),
+            "mask": torch.empty(0, dtype=torch.bool, device=device),
         }
         poses_accum: list[torch.Tensor] = []
         masks_accum: list[torch.Tensor] = []
-        shell_accum: list[torch.Tensor] = []
+        shell_accum: list[PoseTW] = []
         remaining = self.config.num_samples
         attempts = 0
 
@@ -211,7 +241,7 @@ class CandidateViewGenerator:
                 ctx_batch = rule(ctx_batch)
                 masks.append(ctx_batch["mask"])
             # preserve the raw sampled poses (before masking) for visualization of the full candidate space
-            shell_accum.append(ctx_batch["poses"].detach().clone())
+            shell_accum.append(ctx_batch["poses"].clone())
             mask_valid = (
                 torch.stack(masks, dim=0).all(dim=0)
                 if masks
@@ -230,7 +260,11 @@ class CandidateViewGenerator:
             poses_cat = torch.zeros(self.config.num_samples, 12, device=device)
             mask_valid_out = torch.zeros(self.config.num_samples, dtype=torch.bool, device=device)
         poses_valid = PoseTW(poses_cat)
-        shell_poses = torch.cat(shell_accum, dim=0) if shell_accum else torch.zeros(0, 12, device=device)
+        shell_poses = (
+            torch.cat([p._data for p in shell_accum], dim=0)
+            if shell_accum
+            else torch.zeros(0, 12, device=device)
+        )
         return {
             "poses": poses_valid,
             "mask_valid": mask_valid_out,
@@ -239,140 +273,16 @@ class CandidateViewGenerator:
         }
 
     # ------------------------------------------------------------------ rules
-    # TODO: ctx must be a typed dict or a dataclass!
-    def _seed(self, ctx: dict, n: int) -> dict:
+    def _seed(self, ctx: CandidateContext, n: int) -> CandidateContext:
         """Initialise pose tensor placeholder."""
         ctx["poses"] = torch.zeros(n, 12, device=ctx["device"])
         ctx["mask"] = torch.ones(n, dtype=torch.bool, device=ctx["device"])
-        return ctx
-
-    # TODO: ctx must be a typed dict or a dataclass!
-    def _rule_shell_sampling(self, ctx: dict) -> dict:
-        cfg = self.config
-        n = ctx["poses"].shape[0]
-        dev = ctx["device"]
-        r = torch.rand(n, device=dev) * (cfg.max_radius - cfg.min_radius) + cfg.min_radius
-        az = torch.rand(n, device=dev) * (2 * torch.pi if cfg.azimuth_full_circle else torch.pi)
-        pos_local = self._sample_directions(n, az, dev, cfg)
-        pos_local = pos_local * r.unsqueeze(1)
-
-        pose_last = ctx["last_pose"].matrix3x4
-        r_mat = pose_last[:3, :3]
-        t = pose_last[:3, 3]
-        pos_world = (r_mat @ pos_local.T).T + t
-
-        forward = torch.nn.functional.normalize(t - pos_world, dim=1)
-        up = torch.tensor([0.0, 1.0, 0.0], device=dev, dtype=forward.dtype).expand_as(forward)
-        right = torch.nn.functional.normalize(torch.cross(forward, up, dim=1), dim=1)
-        up_corrected = torch.cross(right, forward, dim=1)
-        r_cam = torch.stack([right, up_corrected, forward], dim=2)  # [n,3,3]
-        rt = torch.cat([r_cam, pos_world.unsqueeze(2)], dim=2).reshape(n, 12)
-        ctx["poses"] = rt
-        ctx["mask"] = torch.ones(n, dtype=torch.bool, device=dev)
-        return ctx
-
-    def _sample_directions(
-        self, n: int, az: torch.Tensor, device: torch.device, cfg: CandidateViewGeneratorConfig
-    ) -> torch.Tensor:
-        """Sample direction unit vectors given yaw samples and config elevation band."""
-
-        min_elev = torch.deg2rad(torch.tensor(cfg.min_elev_deg, device=device))
-        max_elev = torch.deg2rad(torch.tensor(cfg.max_elev_deg, device=device))
-
-        if cfg.sampling_strategy == SamplingStrategy.FORWARD_GAUSSIAN:
-            mean = (min_elev + max_elev) / 2
-            std = (max_elev - min_elev) / 4
-            elev = torch.clamp(torch.randn(n, device=device) * std + mean, min=min_elev, max=max_elev)
-        else:
-            # area-uniform over spherical band using inverse CDF of sin(elev)
-            sin_min, sin_max = torch.sin(min_elev), torch.sin(max_elev)
-            u = torch.rand(n, device=device) * (sin_max - sin_min) + sin_min
-            elev = torch.arcsin(torch.clamp(u, -0.999999, 0.999999))
-
-        x = torch.cos(elev) * torch.cos(az)
-        y = torch.sin(elev)
-        z = torch.cos(elev) * torch.sin(az)
-        return torch.stack([x, y, z], dim=1)
-
-    # TODO: ctx must be a typed dict or a dataclass!
-    def _rule_min_distance_to_mesh(self, ctx: dict) -> dict:
-        """Disallow viewpoints closer than `min_distance_to_mesh` to the GT mesh."""
-
-        mask = ctx["mask"]
-        mesh: trimesh.Trimesh | None = ctx.get("gt_mesh")
-        if mesh is None or self.config.min_distance_to_mesh <= 0:
-            ctx["mask"] = mask
-            return ctx
-
-        positions = ctx["poses"][:, 9:12]
-        query = trimesh.proximity.ProximityQuery(mesh)
-        dist = query.signed_distance(positions.detach().cpu().numpy())
-        clear = torch.from_numpy(dist).to(mask.device) > self.config.min_distance_to_mesh
-        ctx["mask"] = mask & clear
-        return ctx
-
-    # TODO: ctx must be a typed dict or a dataclass!
-    def _rule_path_collision(self, ctx: dict) -> dict:
-        mask = ctx["mask"]
-        mesh: trimesh.Trimesh | None = ctx.get("gt_mesh")
-        if mesh is None:
-            ctx["mask"] = mask
-            return ctx
-        pose_last = ctx["last_pose"].matrix3x4
-        origin = pose_last[:3, 3].view(1, 3)
-        targets = ctx["poses"][:, 9:12]
-        dirs = targets - origin
-        dists = torch.linalg.norm(dirs, dim=1).clamp(min=1e-6)
-        dirs_norm = dirs / dists.unsqueeze(1)
-
-        origins_np = origin.expand_as(targets).detach().cpu().numpy()
-        dirs_np = dirs_norm.detach().cpu().numpy()
-        max_dist = dists.detach().cpu().numpy()
-        ray_engine = mesh.ray
-        if self.config.collision_backend == CollisionBackend.PYEMBREE:
-            try:
-                from trimesh.ray.ray_pyembree import RayMeshIntersector
-
-                ray_engine = RayMeshIntersector(mesh)
-            except ImportError:
-                pass
-
-        intersects = ray_engine.intersects_any(
-            origins_np,
-            dirs_np,
-            multiple_hits=False,
-            max_distance=max_dist,
-        )
-        free = torch.from_numpy(~intersects).to(mask.device)
-        ctx["mask"] = mask & free
-        return ctx
-
-    # TODO: ctx must be a typed dict or a dataclass!
-    def _rule_free_space(self, ctx: dict) -> dict:
-        mask = ctx["mask"]
-        extent = ctx.get("occupancy_extent")
-        if extent is None:
-            ctx["mask"] = mask
-            return ctx
-        extent = extent.to(mask.device)
-        xmin, xmax, ymin, ymax, zmin, zmax = extent
-        p = ctx["poses"][:, 9:12]
-        in_box = (
-            (p[:, 0] >= xmin)
-            & (p[:, 0] <= xmax)
-            & (p[:, 1] >= ymin)
-            & (p[:, 1] <= ymax)
-            & (p[:, 2] >= zmin)
-            & (p[:, 2] <= zmax)
-        )
-        ctx["mask"] = mask & in_box
         return ctx
 
 
 __all__ = [
     "CandidateViewGenerator",
     "CandidateViewGeneratorConfig",
-    "CandidateSamplingResult",
     "SamplingStrategy",
     "CollisionBackend",
 ]

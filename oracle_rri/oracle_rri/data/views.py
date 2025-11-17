@@ -13,8 +13,12 @@ from typing import Any
 
 import torch
 import trimesh
+from efm3d.aria.pose import PoseTW
+from rich.text import Text
+from rich.tree import Tree
+from torch import Tensor
 
-Tensor = torch.Tensor
+from ..utils import Console
 
 
 def _summ(value: Any) -> Any:
@@ -51,8 +55,14 @@ def _summ(value: Any) -> Any:
     return value
 
 
-def _repr_dict(block: dict[str, Any]) -> str:
-    return pformat(block, indent=2, compact=False)
+def _repr_dict(
+    block: dict[str, Any],
+    *,
+    indent: int = 2,
+    width: int = 120,
+) -> str:
+    """Pretty-print a nested dict with controllable indent and width."""
+    return pformat(block, indent=indent, width=width, compact=False)
 
 
 def _compact_dict(d: dict[str, Any]) -> dict[str, Any]:
@@ -153,7 +163,11 @@ class TrajectoryView(BaseView):
     gravity_in_world: Tensor
     """Shape `(3,)` float32; gravity vector expressed in world frame."""
 
-    # repr/to inherited from BaseView
+    @property
+    def final_pose(self) -> PoseTW:
+        """Final rig pose `T_world_device` (world←device)."""
+
+        return PoseTW.from_matrix3x4(self.ts_world_device[-1, ...])
 
 
 @dataclass(slots=True)
@@ -286,7 +300,7 @@ class TypedSample(BaseView):
     """Optional GT mesh paired with the snippet."""
 
     @property
-    def gt_mesh(self) -> trimesh.Trimesh | None:
+    def gt_mesh(self) -> trimesh.Trimesh:
         """Convenience accessor for attached GT mesh (may be `None`)."""
         if self.mesh is None:
             raise KeyError("No GT mesh attached to this sample")
@@ -519,8 +533,94 @@ class TypedSample(BaseView):
                 "mesh": None
                 if self.mesh is None
                 else {"verts": len(self.mesh.vertices), "faces": len(self.mesh.faces)},
+            },
+            width=width,
+        )
+
+    def rich_summary(self, show_semidense: bool = True, show_gt: bool = True) -> None:
+        """Render a rich tree summary similar to BaseConfig.inspect().
+
+        This uses the project Console and rich Tree formatting to display a
+        structured overview of the sample: cameras, trajectory, semidense
+        volume, GT annotations, and mesh stats.
+        """
+
+        console = Console.with_prefix(self.__class__.__name__, "rich_summary")
+
+        root = Tree(Text(f"TypedSample {self.scene_id}/{self.snippet_id}", style="config.name"))
+
+        # Basic identifiers
+        meta = root.add(Text("meta", style="config.field"))
+        meta.add(Text(f"scene: {self.scene_id}", style="config.field"))
+        meta.add(Text(f"snippet: {self.snippet_id}", style="config.field"))
+
+        # Cameras
+        cam_dict = _compact_dict(
+            {
+                "rgb": _summ(self.flat.get("mfcd#camera-rgb+images")),
+                "rgb_depth": _summ(self.flat.get("mfcd#camera-rgb-depth+images")),
+                "slam_l": _summ(self.flat.get("mfcd#camera-slam-left+images")),
+                "slam_r": _summ(self.flat.get("mfcd#camera-slam-right+images")),
             }
         )
+        cam_node = root.add(Text("cameras", style="config.field"))
+        for name, info in cam_dict.items():
+            node = cam_node.add(Text(f"{name}:", style="config.field"))
+            node.add(Text(_repr_dict(info, indent=2, width=80), style="config.value"))
+
+        # Trajectory
+        traj_node = root.add(Text("traj", style="config.field"))
+        traj_summary = _summ(self.trajectory)
+        for k, v in traj_summary.items():
+            traj_node.add(Text(f"{k}: {v}", style="config.value"))
+
+        # Semi-dense SLAM
+        if show_semidense:
+            sem = self.semidense
+            sem_node = root.add(Text("semidense", style="config.field"))
+            sem_node.add(Text(f"frames: {len(sem.points_world)}", style="config.value"))
+            if sem.points_world:
+                sem_node.add(Text(f"points_example: {_summ(sem.points_world[0])}", style="config.value"))
+            vol_node = sem_node.add(Text("volume", style="config.field"))
+            vol_node.add(Text(f"min: {_summ(sem.volume_min)}", style="config.value"))
+            vol_node.add(Text(f"max: {_summ(sem.volume_max)}", style="config.value"))
+
+        # Ground truth annotations
+        if show_gt:
+            gt = self.gt
+            gt_node = root.add(Text("gt", style="config.field"))
+            gt_node.add(Text(f"keys: {list(gt.raw.keys())}", style="config.value"))
+            if gt.obb3_gt:
+                obb3_node = gt_node.add(Text("obb3", style="config.field"))
+                for cam_name, obb3 in gt.obb3_gt.items():
+                    obb3_node.add(
+                        Text(
+                            f"{cam_name}: {_summ(obb3.object_dimensions)}",
+                            style="config.value",
+                        )
+                    )
+            if gt.obb2_gt:
+                gt_node.add(Text(f"obb2: {list(gt.obb2_gt.keys())}", style="config.value"))
+            if gt.scores is not None:
+                gt_node.add(Text(f"scores: {_summ(gt.scores)}", style="config.value"))
+            if gt.efm_gt is not None:
+                gt_node.add(Text(f"efm_gt: {list(gt.efm_gt.keys())}", style="config.value"))
+            if gt.rri_targets is not None:
+                gt_node.add(Text(f"rri_targets: {list(gt.rri_targets.keys())}", style="config.value"))
+
+        # Mesh
+        mesh_node = root.add(Text("mesh", style="config.field"))
+        if self.mesh is None:
+            mesh_node.add(Text("None", style="config.value"))
+        else:
+            mesh_node.add(
+                Text(
+                    f"verts: {len(self.mesh.vertices)}, faces: {len(self.mesh.faces)}",
+                    style="config.value",
+                )
+            )
+
+        console.print(root, soft_wrap=False, highlight=True, markup=True, emoji=False)
 
     def to(self, device: str | torch.device, *, dtype: torch.dtype = None) -> "TypedSample":
         """Return a shallow copy; consumers can call `.to` on sub-views explicitly."""
