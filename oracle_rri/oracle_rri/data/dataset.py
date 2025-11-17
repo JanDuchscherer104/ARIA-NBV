@@ -164,7 +164,10 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
 
     target: type[ASEDataset] = Field(default=ASEDataset, exclude=True)
     paths: PathConfig = Field(default_factory=PathConfig)
-    scene_ids: list[str] | None = Field(default=None, description="Optional list of scene ids to include.")
+    scene_ids: list[str] = Field(
+        default_factory=list,
+        description="Optional list of scene ids to include. Will be auto-populated if not provided.",
+    )
     atek_root: Path | None = Field(default=None, description="Override root directory containing scene shard folders.")
     atek_variant: str = Field(default="efm_eval", description="Subdirectory name under data_root for ATEK shards.")
     tar_urls: list[str] = Field(
@@ -227,7 +230,7 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
     def _populate_tar_urls(cls, value: list[str] | None, info: ValidationInfo) -> list[str]:
         data = info.data
         paths: PathConfig = data.get("paths") or PathConfig()
-        scene_ids: list[str] | None = data.get("scene_ids")
+        scene_ids: list[str] = data.get("scene_ids")  # type: ignore[assignment]
         atek_variant: str = data.get("atek_variant", "efm_eval")
         atek_root: Path | None = data.get("atek_root")
 
@@ -261,7 +264,11 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
                 parent = Path(url).parent.name
                 if parent.isdigit():
                     inferred.add(parent)
-            self.scene_ids = sorted(inferred) if inferred else None
+
+            if not inferred:
+                raise ValueError("scene_ids not provided and could not be inferred from tar_urls.")
+
+            self.scene_ids = sorted(inferred)
 
         if self.load_meshes and not self.scene_to_mesh:
             if self.scene_ids:

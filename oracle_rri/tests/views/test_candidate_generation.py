@@ -1,4 +1,9 @@
-"""Functional tests for candidate view generation."""
+"""Functional tests for candidate view generation (legacy).
+
+This module is kept for reference but the implementation it targets has been
+superseded. If the original `oracle_rri.views.candidate_generation` module is
+unavailable, the entire module is skipped.
+"""
 
 from __future__ import annotations
 
@@ -8,10 +13,17 @@ import pytest
 import torch
 import trimesh
 
-from oracle_rri.views.candidate_generation import (
-    CandidateViewGenerator,
-    CandidateViewGeneratorConfig,
-)
+
+try:
+    from oracle_rri.views.candidate_generation import (
+        CandidateViewGenerator,
+        CandidateViewGeneratorConfig,
+    )
+except ModuleNotFoundError:
+    pytest.skip(
+        "Legacy candidate_generation module not present; tests superseded by pose_generation suite.",
+        allow_module_level=True,
+    )
 
 
 class _DummyPose:

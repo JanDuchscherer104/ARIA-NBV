@@ -78,6 +78,15 @@ def _compact_dict(d: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _truncate_list(items: list[Any], *, max_items: int = 5) -> list[Any] | str:
+    """Return a shortened representation for long lists."""
+
+    if len(items) > max_items:
+        head = items[:max_items]
+        return f"{len(items)} items (first {max_items}): {head}"
+    return items
+
+
 @dataclass(slots=True)
 class BaseView:
     """Shared helpers for zero-copy tensor views."""
@@ -226,6 +235,63 @@ class Obb3View(BaseView):
 
 
 @dataclass(slots=True)
+class EfmFrame(BaseView):
+    """Frame-level EVL/EFM ground truth.
+
+    Older EFM adapters store frame-level tensors under ``efm_gt[ts]["frame"]``
+    (e.g. padded OBB3D arrays). Newer ATEK shards expose the same data per
+    camera directly under ``efm_gt[ts][camera_id]`` without a wrapping
+    ``"frame"`` key. This view stays flexible by simply wrapping the provided
+    dict; the convenience accessors return ``None`` when a given key is not
+    present so callers can write defensive code.
+    """
+
+    raw: dict[str, Tensor]
+    """Underlying frame-level EFM GT dict (zero-copy backing store)."""
+
+    @property
+    def obb3d(self) -> Tensor | None:
+        return self.raw.get("obb3d")
+
+    @property
+    def obb3d_mask(self) -> Tensor | None:
+        return self.raw.get("obb3d_mask")
+
+    @property
+    def category_ids(self) -> Tensor | None:
+        return self.raw.get("category_ids")
+
+    @property
+    def instance_ids(self) -> Tensor | None:
+        return self.raw.get("instance_ids")
+
+
+@dataclass(slots=True)
+class EfmPerCamera(BaseView):
+    """Per-camera EVL/EFM ground truth.
+
+    Mirrors :class:`EfmFrame` but for per-camera tensors such as 2D boxes or
+    per-camera visibility flags. As above, keys are adapter-dependent and may
+    be missing; consumers should guard for ``None``.
+    """
+
+    raw: dict[str, Tensor]
+    """Underlying per-camera EFM GT dict."""
+
+    @property
+    def obb2d(self) -> Tensor | None:
+        return self.raw.get("obb2d")
+
+    @property
+    def obb2d_mask(self) -> Tensor | None:
+        return self.raw.get("obb2d_mask")
+
+    @property
+    def visibility(self) -> Tensor | None:
+        return self.raw.get("visibility")
+
+
+@dataclass(slots=True)
 class GTView(BaseView):
     """Ground-truth annotations (OBB3/OBB2) wrapped in typed views."""
 
@@ -238,7 +304,12 @@ class GTView(BaseView):
     scores: Tensor | None = None
     """Optional quality scores tensor associated with this snippet."""
     efm_gt: dict[str, Any] | None = None
-    """Optional EVL/EFM-formatted targets (e.g., padded OBB tensors)."""
+    """Optional EVL/EFM-formatted targets.
+
+    Current ATEK shards expose EFM targets as a mapping from timestamp strings
+    to per-camera dictionaries, e.g. ``efm_gt[ts][\"camera-rgb\"]`` with
+    3D OBB tensors.
+    """
     rri_targets: dict[str, Any] | None = None
     """Any precomputed RRI supervision targets."""
 
@@ -275,15 +346,100 @@ class GTView(BaseView):
             self.rri_targets = rri_raw
 
     @property
-    def has_obb3(self) -> bool:
-        """True when 3D bounding boxes are available."""
+    def efm_keys(self) -> list[str]:
+        """List of EFM variants present in :pyattr:`efm_gt`.
 
-        return bool(self.obb3_gt)
+        Empty list if no EFM ground truth is attached.
+        """
+        return [] if self.efm_gt is None else sorted(self.efm_gt.keys())
 
-    def to_raw(self) -> dict[str, Any]:
-        """Return the original `gt_data` mapping (unmodified)."""
+    def _get_efm_entry(self, efm_key: str | int | None = None) -> dict[str, Any]:
+        """Internal: resolve an EFM entry by key or integer index."""
+        if self.efm_gt is None:
+            raise RuntimeError("No `efm_gt` available on this GTView instance.")
 
-        return self.raw
+        efm_key = efm_key or self.efm_keys[0]
+
+        if isinstance(efm_key, int):
+            keys = self.efm_keys
+            if not keys:
+                raise RuntimeError("`efm_gt` is non-empty but `efm_keys` is empty.")
+            try:
+                efm_key = keys[efm_key]
+            except IndexError as exc:
+                raise IndexError(f"efm_key index {efm_key} out of range for keys {keys}") from exc
+
+        entry = self.efm_gt.get(efm_key)
+        if entry is None:
+            raise KeyError(f"Unknown efm_key {efm_key!r}; available keys: {self.efm_keys}")
+        return entry
+
+    def efm_frame(self, efm_key: str | int | None = None) -> EfmFrame | dict[str, Obb3View]:
+        """Frame-level or per-camera EFM targets for the given key.
+
+        If a legacy "frame" block exists it is wrapped as :class:`EfmFrame`.
+        Otherwise the current schema (cameras directly under the timestamp
+        key) is returned as a mapping of camera id → :class:`Obb3View`.
+        """
+
+        entry = self._get_efm_entry(efm_key)
+        frame_dict = entry.get("frame") if isinstance(entry, dict) else None
+        if isinstance(frame_dict, dict):
+            return EfmFrame(raw=frame_dict)
+
+        if not isinstance(entry, dict):
+            raise TypeError(f"Unexpected efm_gt entry type {type(entry)!r}; expected dict")
+
+        return self._efm_cameras_from_entry(entry)
+
+    def efm_per_camera(self, efm_key: str | int | None = None) -> dict[str, EfmPerCamera | Obb3View]:
+        """Per-camera EFM ground truth for a given EFM variant.
+
+        Supports both legacy ``"per_camera"`` blocks and the current schema
+        where cameras sit directly under the timestamp key. Payloads with
+        3D OBB tensors are returned as :class:`Obb3View`; other payloads use
+        :class:`EfmPerCamera`.
+        """
+
+        entry = self._get_efm_entry(efm_key)
+        per_cam = entry.get("per_camera") if isinstance(entry, dict) else None
+        if per_cam is None and isinstance(entry, dict):
+            per_cam = entry  # cameras stored directly
+
+        if not isinstance(per_cam, dict):
+            raise TypeError(f"Expected per-camera EFM dict, got {type(per_cam)!r}")
+
+        out: dict[str, EfmPerCamera | Obb3View] = {}
+        for cam_id, cam_dict in per_cam.items():
+            if not isinstance(cam_dict, dict):
+                continue
+            if {"object_dimensions", "ts_world_object"} & set(cam_dict):
+                out[cam_id] = Obb3View(
+                    instance_ids=cam_dict.get("instance_ids"),
+                    category_ids=cam_dict.get("category_ids"),
+                    category_names=cam_dict.get("category_names"),
+                    object_dimensions=cam_dict.get("object_dimensions"),
+                    ts_world_object=cam_dict.get("ts_world_object"),
+                )
+            else:
+                out[cam_id] = EfmPerCamera(raw=cam_dict)
+        return out
+
+    def _efm_cameras_from_entry(self, entry: dict[str, Any]) -> dict[str, Obb3View]:
+        """Helper: map camera ids to :class:`Obb3View` for a given EFM entry."""
+
+        cameras: dict[str, Obb3View] = {}
+        for cam_id, cam_dict in entry.items():
+            if not isinstance(cam_dict, dict):
+                continue
+            cameras[cam_id] = Obb3View(
+                instance_ids=cam_dict.get("instance_ids"),
+                category_ids=cam_dict.get("category_ids"),
+                category_names=cam_dict.get("category_names"),
+                object_dimensions=cam_dict.get("object_dimensions"),
+                ts_world_object=cam_dict.get("ts_world_object"),
+            )
+        return cameras
 
 
 @dataclass(slots=True)
@@ -410,6 +566,102 @@ class TypedSample(BaseView):
         """Ground-truth dict `gt_data` (OBB2/OBB3/EFM targets)."""
         return GTView(raw=self.flat.get("gt_data", {}))
 
+    # ------------------------------------------------------------------
+    # Summaries
+    # ------------------------------------------------------------------
+
+    def _camera_summary(self) -> dict[str, Any]:
+        return _compact_dict(
+            {
+                "rgb": _summ(self.flat.get("mfcd#camera-rgb+images")),
+                "rgb_depth": _summ(self.flat.get("mfcd#camera-rgb-depth+images")),
+                "slam_l": _summ(self.flat.get("mfcd#camera-slam-left+images")),
+                "slam_r": _summ(self.flat.get("mfcd#camera-slam-right+images")),
+            }
+        )
+
+    def _semidense_summary(self) -> dict[str, Any]:
+        sem = self.semidense
+        return _compact_dict(
+            {
+                "frames": len(sem.points_world) if sem.points_world else 0,
+                "points_example": _summ(sem.points_world[0]) if sem.points_world else None,
+                "volume": {
+                    "min": _summ(sem.volume_min),
+                    "max": _summ(sem.volume_max),
+                },
+            }
+        )
+
+    def _efm_summary(self, max_entries: int = 2) -> dict[str, Any] | None:
+        gt = self.gt
+        if gt.efm_gt is None:
+            return None
+
+        keys = gt.efm_keys
+        examples: dict[str, Any] = {}
+        for key in keys[:max_entries]:
+            entry = gt._get_efm_entry(key)
+            if not isinstance(entry, dict):
+                continue
+            cams: dict[str, Any] = {}
+            for cam_id, cam_dict in entry.items():
+                if not isinstance(cam_dict, dict):
+                    continue
+                cams[cam_id] = _compact_dict(
+                    {
+                        "category_ids": _summ(cam_dict.get("category_ids")),
+                        "instance_ids": _summ(cam_dict.get("instance_ids")),
+                        "object_dimensions": _summ(cam_dict.get("object_dimensions")),
+                        "ts_world_object": _summ(cam_dict.get("ts_world_object")),
+                        "category_names": _summ(cam_dict.get("category_names")),
+                    }
+                )
+            if cams:
+                examples[str(key)] = cams
+
+        return {
+            "count": len(keys),
+            "keys": _truncate_list(keys),
+            "examples": examples,
+        }
+
+    def _gt_summary(self, *, include_efm_details: bool = False, efm_examples: int = 2) -> dict[str, Any]:
+        gt = self.gt
+        efm_gt_summary: dict[str, Any] | list[str] | str | None
+        if include_efm_details:
+            efm_gt_summary = self._efm_summary(max_entries=efm_examples)
+        elif gt.efm_gt is None:
+            efm_gt_summary = None
+        else:
+            efm_gt_summary = _truncate_list(gt.efm_keys)
+
+        return _compact_dict(
+            {
+                "keys": list(gt.raw.keys()),
+                "obb3": None if gt.obb3_gt is None else {k: _summ(v.object_dimensions) for k, v in gt.obb3_gt.items()},
+                "obb2": None if gt.obb2_gt is None else list(gt.obb2_gt.keys()),
+                "scores": _summ(gt.scores),
+                "efm_gt": efm_gt_summary,
+                "rri_targets": None if gt.rri_targets is None else list(gt.rri_targets.keys()),
+            }
+        )
+
+    def _base_summary(self, *, include_efm_details: bool) -> dict[str, Any]:
+        cam = self._camera_summary()
+        sem = self._semidense_summary()
+        gt_summary = self._gt_summary(include_efm_details=include_efm_details)
+
+        return {
+            "scene": self.scene_id,
+            "snippet": self.snippet_id,
+            "cameras": cam,
+            "traj": _summ(self.trajectory),
+            "semidense": sem,
+            "gt": gt_summary,
+            "mesh": None if self.mesh is None else {"verts": len(self.mesh.vertices), "faces": len(self.mesh.faces)},
+        }
+
     def to_efm_dict(
         self,
         include_mesh: bool = False,
@@ -441,101 +693,27 @@ class TypedSample(BaseView):
         return out
 
     def __repr__(self) -> str:  # pragma: no cover - formatting-only
-        cam = _compact_dict(
-            {
-                "rgb": _summ(self.flat.get("mfcd#camera-rgb+images")),
-                "rgb_depth": _summ(self.flat.get("mfcd#camera-rgb-depth+images")),
-                "slam_l": _summ(self.flat.get("mfcd#camera-slam-left+images")),
-                "slam_r": _summ(self.flat.get("mfcd#camera-slam-right+images")),
-            }
-        )
-        sem = _compact_dict(
-            {
-                "frames": len(self.semidense.points_world) if self.semidense.points_world else 0,
-                "points_example": _summ(self.semidense.points_world[0]) if self.semidense.points_world else None,
-                "volume": {
-                    "min": _summ(self.semidense.volume_min),
-                    "max": _summ(self.semidense.volume_max),
-                },
-            }
-        )
-        gt_summary = _compact_dict(
-            {
-                "keys": list(self.gt.raw.keys()),
-                "obb3": None
-                if self.gt.obb3_gt is None
-                else {k: _summ(v.object_dimensions) for k, v in self.gt.obb3_gt.items()},
-                "obb2": None if self.gt.obb2_gt is None else list(self.gt.obb2_gt.keys()),
-                "scores": _summ(self.gt.scores),
-                "efm_gt": None if self.gt.efm_gt is None else list(self.gt.efm_gt.keys()),
-                "rri_targets": None if self.gt.rri_targets is None else list(self.gt.rri_targets.keys()),
-            }
-        )
-
+        base = self._base_summary(include_efm_details=True)
         return _repr_dict(
             {
                 "scene_id": self.scene_id,
                 "snippet_id": self.snippet_id,
                 "atek": {
                     "sequence": self.flat.get("sequence_name"),
-                    "cameras": cam,
-                    "trajectory": _summ(self.trajectory),
-                    "semidense": sem,
-                    "gt": gt_summary,
+                    "cameras": base["cameras"],
+                    "trajectory": base["traj"],
+                    "semidense": base["semidense"],
+                    "gt": base["gt"],
                 },
-                "gt_mesh": None
-                if self.mesh is None
-                else {"verts": len(self.mesh.vertices), "faces": len(self.mesh.faces)},
+                "gt_mesh": base["mesh"],
             }
         )
 
     def summary(self, width: int = 120) -> str:
         """Concise human-friendly summary; hides None fields and truncates long lists."""
 
-        cam = _compact_dict(
-            {
-                "rgb": _summ(self.flat.get("mfcd#camera-rgb+images")),
-                "rgb_depth": _summ(self.flat.get("mfcd#camera-rgb-depth+images")),
-                "slam_l": _summ(self.flat.get("mfcd#camera-slam-left+images")),
-                "slam_r": _summ(self.flat.get("mfcd#camera-slam-right+images")),
-            }
-        )
-        sem = _compact_dict(
-            {
-                "frames": len(self.semidense.points_world) if self.semidense.points_world else 0,
-                "points_example": _summ(self.semidense.points_world[0]) if self.semidense.points_world else None,
-                "volume": {
-                    "min": _summ(self.semidense.volume_min),
-                    "max": _summ(self.semidense.volume_max),
-                },
-            }
-        )
-        gt_summary = _compact_dict(
-            {
-                "keys": list(self.gt.raw.keys()),
-                "obb3": None
-                if self.gt.obb3_gt is None
-                else {k: _summ(v.object_dimensions) for k, v in self.gt.obb3_gt.items()},
-                "obb2": None if self.gt.obb2_gt is None else list(self.gt.obb2_gt.keys()),
-                "scores": _summ(self.gt.scores),
-                "efm_gt": None if self.gt.efm_gt is None else list(self.gt.efm_gt.keys()),
-                "rri_targets": None if self.gt.rri_targets is None else list(self.gt.rri_targets.keys()),
-            }
-        )
-        return _repr_dict(
-            {
-                "scene": self.scene_id,
-                "snippet": self.snippet_id,
-                "cameras": cam,
-                "traj": _summ(self.trajectory),
-                "semidense": sem,
-                "gt": gt_summary,
-                "mesh": None
-                if self.mesh is None
-                else {"verts": len(self.mesh.vertices), "faces": len(self.mesh.faces)},
-            },
-            width=width,
-        )
+        base = self._base_summary(include_efm_details=True)
+        return _repr_dict(base, width=width)
 
     def rich_summary(self, show_semidense: bool = True, show_gt: bool = True) -> None:
         """Render a rich tree summary similar to BaseConfig.inspect().
@@ -546,6 +724,7 @@ class TypedSample(BaseView):
         """
 
         console = Console.with_prefix(self.__class__.__name__, "rich_summary")
+        base = self._base_summary(include_efm_details=True)
 
         root = Tree(Text(f"TypedSample {self.scene_id}/{self.snippet_id}", style="config.name"))
 
@@ -555,74 +734,79 @@ class TypedSample(BaseView):
         meta.add(Text(f"snippet: {self.snippet_id}", style="config.field"))
 
         # Cameras
-        cam_dict = _compact_dict(
-            {
-                "rgb": _summ(self.flat.get("mfcd#camera-rgb+images")),
-                "rgb_depth": _summ(self.flat.get("mfcd#camera-rgb-depth+images")),
-                "slam_l": _summ(self.flat.get("mfcd#camera-slam-left+images")),
-                "slam_r": _summ(self.flat.get("mfcd#camera-slam-right+images")),
-            }
-        )
         cam_node = root.add(Text("cameras", style="config.field"))
-        for name, info in cam_dict.items():
+        for name, info in base["cameras"].items():
             node = cam_node.add(Text(f"{name}:", style="config.field"))
             node.add(Text(_repr_dict(info, indent=2, width=80), style="config.value"))
 
         # Trajectory
         traj_node = root.add(Text("traj", style="config.field"))
-        traj_summary = _summ(self.trajectory)
-        for k, v in traj_summary.items():
+        for k, v in base["traj"].items():
             traj_node.add(Text(f"{k}: {v}", style="config.value"))
 
         # Semi-dense SLAM
         if show_semidense:
-            sem = self.semidense
             sem_node = root.add(Text("semidense", style="config.field"))
-            sem_node.add(Text(f"frames: {len(sem.points_world)}", style="config.value"))
-            if sem.points_world:
-                sem_node.add(Text(f"points_example: {_summ(sem.points_world[0])}", style="config.value"))
+            sem_summary = base["semidense"]
+            if "frames" in sem_summary:
+                sem_node.add(Text(f"frames: {sem_summary['frames']}", style="config.value"))
+            points_example = sem_summary.get("points_example")
+            if points_example is not None:
+                sem_node.add(Text(f"points_example: {points_example}", style="config.value"))
+            volume = sem_summary.get("volume", {})
             vol_node = sem_node.add(Text("volume", style="config.field"))
-            vol_node.add(Text(f"min: {_summ(sem.volume_min)}", style="config.value"))
-            vol_node.add(Text(f"max: {_summ(sem.volume_max)}", style="config.value"))
+            if "min" in volume:
+                vol_node.add(Text(f"min: {volume['min']}", style="config.value"))
+            if "max" in volume:
+                vol_node.add(Text(f"max: {volume['max']}", style="config.value"))
 
         # Ground truth annotations
         if show_gt:
-            gt = self.gt
+            gt_summary = base["gt"]
             gt_node = root.add(Text("gt", style="config.field"))
-            gt_node.add(Text(f"keys: {list(gt.raw.keys())}", style="config.value"))
-            if gt.obb3_gt:
+            gt_node.add(Text(f"keys: {gt_summary.get('keys')}", style="config.value"))
+            if gt_summary.get("obb3"):
                 obb3_node = gt_node.add(Text("obb3", style="config.field"))
-                for cam_name, obb3 in gt.obb3_gt.items():
-                    obb3_node.add(
-                        Text(
-                            f"{cam_name}: {_summ(obb3.object_dimensions)}",
-                            style="config.value",
-                        )
-                    )
-            if gt.obb2_gt:
-                gt_node.add(Text(f"obb2: {list(gt.obb2_gt.keys())}", style="config.value"))
-            if gt.scores is not None:
-                gt_node.add(Text(f"scores: {_summ(gt.scores)}", style="config.value"))
-            if gt.efm_gt is not None:
-                gt_node.add(Text(f"efm_gt: {list(gt.efm_gt.keys())}", style="config.value"))
-            if gt.rri_targets is not None:
-                gt_node.add(Text(f"rri_targets: {list(gt.rri_targets.keys())}", style="config.value"))
+                for cam_name, obb3 in gt_summary["obb3"].items():
+                    obb3_node.add(Text(f"{cam_name}: {obb3}", style="config.value"))
+            if gt_summary.get("obb2"):
+                gt_node.add(Text(f"obb2: {gt_summary['obb2']}", style="config.value"))
+            if gt_summary.get("scores") is not None:
+                gt_node.add(Text(f"scores: {gt_summary['scores']}", style="config.value"))
+
+            efm_gt = gt_summary.get("efm_gt")
+            if efm_gt:
+                efm_node = gt_node.add(Text("efm_gt", style="config.field"))
+                if isinstance(efm_gt, dict):
+                    efm_node.add(Text(f"count: {efm_gt.get('count')}", style="config.value"))
+                    efm_node.add(Text(f"keys: {efm_gt.get('keys')}", style="config.value"))
+                    examples = efm_gt.get("examples", {}) or {}
+                    for ts, cams in examples.items():
+                        ts_node = efm_node.add(Text(str(ts), style="config.field"))
+                        for cam_id, cam_info in cams.items():
+                            cam_node = ts_node.add(Text(f"{cam_id}:", style="config.field"))
+                            cam_node.add(Text(_repr_dict(cam_info, indent=2, width=80), style="config.value"))
+                else:
+                    efm_node.add(Text(str(efm_gt), style="config.value"))
+
+            if gt_summary.get("rri_targets"):
+                gt_node.add(Text(f"rri_targets: {gt_summary['rri_targets']}", style="config.value"))
 
         # Mesh
         mesh_node = root.add(Text("mesh", style="config.field"))
-        if self.mesh is None:
+        if base["mesh"] is None:
             mesh_node.add(Text("None", style="config.value"))
         else:
             mesh_node.add(
                 Text(
-                    f"verts: {len(self.mesh.vertices)}, faces: {len(self.mesh.faces)}",
+                    f"verts: {base['mesh']['verts']}, faces: {base['mesh']['faces']}",
                     style="config.value",
                 )
             )
 
         console.print(root, soft_wrap=False, highlight=True, markup=True, emoji=False)
 
-    def to(self, device: str | torch.device, *, dtype: torch.dtype = None) -> "TypedSample":
+    def to(self, device: str | torch.device, *, dtype: torch.dtype | None = None) -> "TypedSample":
         """Return a shallow copy; consumers can call `.to` on sub-views explicitly."""
 
         return replace(self)

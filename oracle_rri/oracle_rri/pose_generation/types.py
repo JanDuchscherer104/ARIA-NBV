@@ -1,3 +1,10 @@
+"""Type definitions for candidate pose generation.
+
+This module centralises small enums and TypedDicts shared between the
+candidate generation core and individual rule implementations.
+"""
+from __future__ import annotations
+
 from enum import StrEnum
 from typing import TYPE_CHECKING, TypedDict
 
@@ -11,7 +18,20 @@ class SamplingStrategy(StrEnum):
     """Sampling strategy for candidate viewpoints.
 
     The strategy controls how directions on the spherical shell around the
-    current camera pose are sampled.
+    current camera pose are sampled. Both strategies operate on a *spherical
+    cap* (elevation band) defined by ``min_elev_deg`` and ``max_elev_deg`` and
+    use standard spherical coordinates:
+
+    .. math::
+
+        x = \\cos(\\text{elev}) \\cos(\\text{az}), \\\\
+        y = \\sin(\\text{elev}), \\\\
+        z = \\cos(\\text{elev}) \\sin(\\text{az}).
+
+    For background on sphere sampling see, e.g.,
+    `Sphere point picking <https://mathworld.wolfram.com/SpherePointPicking.html>`_
+    or the discussion in
+    `Ray Tracing: The Rest of Your Life <https://raytracing.github.io/books/RayTracingTheRestOfYourLife.html>`_.
     """
 
     SHELL_UNIFORM = "shell_uniform"
@@ -30,15 +50,25 @@ class SamplingStrategy(StrEnum):
     `min_elev_deg` and `max_elev_deg` and clamped to that band. This
     biases viewpoints towards the current forward direction while still
     respecting the configured angular limits.
-    ```
     """
 
 
 class CollisionBackend(StrEnum):
-    """Backend for collision tests."""
+    """Backend for collision tests.
+
+    The backend controls how rays are intersected with the GT mesh in
+    :class:`oracle_rri.pose_generation.candidate_generation_rules.PathCollisionRule`.
+    """
 
     PYEMBREE = "pyembree"
-    """Use [:class:`trimesh.ray.ray_pyembree.RayMeshIntersector`](https://trimesh.org/trimesh.ray.ray_pyembree.html#trimesh.ray.ray_pyembree.RayMeshIntersector) if available for faster ray-mesh tests."""
+    """Use :class:`trimesh.ray.ray_pyembree.RayMeshIntersector` for fast
+    ray-mesh tests when available.
+
+    See
+    [:class:`trimesh.ray.ray_pyembree.RayMeshIntersector`](https://trimesh.org/trimesh.ray.ray_pyembree.html#trimesh.ray.ray_pyembree.RayMeshIntersector)
+    for implementation details.
+    """
+
     TRIMESH = "trimesh"
 
 

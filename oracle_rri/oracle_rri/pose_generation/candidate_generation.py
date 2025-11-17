@@ -1,10 +1,26 @@
 """Candidate view generation with composable pruning rules.
 
-Implements Config-as-Factory (see copilot-instructions). Sampling is vectorised
-and GPU-capable; rules are modular and can be composed or replaced.
+This module implements a *sampling-and-prune* pipeline for Next-Best-View
+planning in ASE scenes:
 
-Frames: Aria/ATEK world (x-left, y-up, z-forward). Poses are `PoseTW` (T_A_B: maps
-points from frame B into frame A).
+1. Sample candidate camera centres on a spherical shell around the latest
+   pose, using either area-uniform or forward-biased distributions in
+   spherical coordinates.
+2. Orient each candidate to look back at the most recent pose using
+   :func:`oracle_rri.utils.frames.view_axes_from_points`, consistent with the
+   EFM3D RDF camera convention (X-right, Y-down, Z-forward).
+3. Apply a sequence of rules (see :mod:`oracle_rri.pose_generation.candidate_generation_rules`)
+   that remove candidates which violate geometric constraints (too close to
+   the mesh, path collisions, outside occupancy bounds, ...).
+
+Frames:
+    * **World**: VIO-aligned world frame with gravity in ``[0, 0, -g]``
+      (Z-up). All positions are expressed in this frame.
+    * **Cameras**: RDF convention, X-right, Y-down, Z-forward, as in
+      :mod:`efm3d.utils.viz`.
+
+Poses are :class:`efm3d.aria.PoseTW` with :math:`T_\\text{world,cam}` mapping
+points from the camera frame into the VIO world frame.
 """
 
 from __future__ import annotations
@@ -33,21 +49,44 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Config for candidate generation.
 
     Attributes:
-        target: factory target.
-        num_samples: number of candidate poses to sample.
-        max_resamples: maximum rounds of resampling to replace invalid candidates.
-        min_radius/max_radius: spherical shell radii (m).
-        min_elev_deg/max_elev_deg: elevation bounds for sampling (deg).
-        azimuth_full_circle: if False sample half-sphere about forward axis.
-        sampling_strategy: distribution for yaw/pitch sampling.
-        ensure_collision_free: enable mesh-based path filtering.
-        collision_backend: ray backend (pyembree if available, else trimesh).
-        min_distance_to_mesh: clearance to enforce between pose and mesh (m).
-        ensure_free_space: enable voxel-extent filtering.
-        occupancy_extent: optional [6] tensor (xmin,xmax,ymin,ymax,zmin,zmax) in world.
-        ray_subsample: number of samples along path for collision test.
-        step_clearance: step size for distance checks (m).
-        device: torch device for vectorised ops.
+        target: Factory target for the config. Runtime class instantiated by
+            :meth:`BaseConfig.setup_target`.
+        num_samples: Number of candidate poses to sample per call to
+            :meth:`CandidateViewGenerator.generate`.
+        max_resamples: Maximum number of re-sampling rounds used to fill
+            the requested ``num_samples`` after applying pruning rules.
+        min_radius: Inner radius (metres) of the spherical shell from which
+            candidate camera centres are drawn (around ``last_pose``).
+        max_radius: Outer radius (metres) of the spherical shell.
+        min_elev_deg: Minimum elevation angle (degrees) for sampled view
+            directions, measured in the last-pose rig frame.
+        max_elev_deg: Maximum elevation angle (degrees) for sampled view
+            directions.
+        azimuth_full_circle: If ``True``, sample azimuth uniformly over
+            :math:`[0, 2\\pi)`; otherwise only over a half-sphere about the
+            forward axis.
+        sampling_strategy: Distribution for yaw/pitch sampling, see
+            :class:`oracle_rri.pose_generation.types.SamplingStrategy`.
+        ensure_collision_free: Enable mesh-based straight-line path
+            filtering using :class:`PathCollisionRule`.
+        collision_backend: Ray backend, choosing between pure trimesh and
+            :mod:`trimesh.ray.ray_pyembree`.
+        min_distance_to_mesh: Clearance (metres) enforced between candidate
+            camera centres and the GT mesh via
+            :class:`MinDistanceToMeshRule`.
+        ensure_free_space: Enable voxel-extent filtering via
+            :class:`FreeSpaceRule`.
+        occupancy_extent: Optional tensor of shape ``[6]`` encoding
+            ``[xmin, xmax, ymin, ymax, zmin, zmax]`` bounds in the VIO
+            world frame. If provided, overrides any bounds inferred from
+            the sample.
+        ray_subsample: Number of ray samples / subdivisions when evaluating
+            path collisions (currently unused but reserved for finer
+            segment-based checks).
+        step_clearance: Step size (metres) for distance checks along paths
+            when needed.
+        device: Torch device used for vectorised ops (e.g. ``"cuda"`` or
+            ``"cpu"``); in debug mode this is forced to CPU.
     """
 
     target: type["CandidateViewGenerator"] = Field(default_factory=lambda: CandidateViewGenerator, exclude=True)
@@ -143,7 +182,23 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
 
 
 class CandidateViewGenerator:
-    """Generate candidate `PoseTW` around latest pose with composable rules."""
+    """Generate candidate :class:`PoseTW` around the latest pose using rules.
+
+    The generator implements a simple Monte Carlo NBV scheme:
+
+    1. Draw ``num_samples`` candidate camera centres on a spherical shell
+       around the latest pose using :class:`ShellSamplingRule`.
+    2. Optionally cull candidates that start too close to the mesh
+       (:class:`MinDistanceToMeshRule`).
+    3. Optionally cull candidates whose straight-line path intersects the
+       mesh (:class:`PathCollisionRule`).
+    4. Optionally restrict candidates to a world-space AABB
+       (:class:`FreeSpaceRule`).
+
+    The result is a batch of candidate :math:`T_\\text{world,cam}` poses
+    expressed in the VIO world frame, ready for oracle RRI evaluation or
+    backbone feature extraction.
+    """
 
     def __init__(self, config: CandidateViewGeneratorConfig):
         self.config = config
@@ -152,6 +207,7 @@ class CandidateViewGenerator:
         self._build_default_rules()
 
     def _build_default_rules(self) -> None:
+        """Construct the default rule sequence based on the config."""
         self.rules = [ShellSamplingRule(self.config), MinDistanceToMeshRule(self.config)]
         if self.config.ensure_collision_free:
             self.rules.append(PathCollisionRule(self.config))
@@ -162,7 +218,10 @@ class CandidateViewGenerator:
         """Generate candidate poses using data from a TypedSample.
 
         Args:
-            sample: TypedSample containing last pose and optional GT mesh/occupancy.
+            sample: :class:`oracle_rri.data.views.TypedSample` containing
+                the final pose of the trajectory, semi-dense points and
+                optionally a GT mesh.
+
         Returns:
             CandidateSamplingResult with sampled poses and masks.
         """
@@ -180,7 +239,21 @@ class CandidateViewGenerator:
         self,
         sample: TypedSample,
     ) -> torch.Tensor | None:
-        """Return [xmin,xmax,ymin,ymax,zmin,zmax] AABB in world frame."""
+        """Return ``[xmin, xmax, ymin, ymax, zmin, zmax]`` AABB in world frame.
+
+        The extent is derived from either:
+
+        * The GT mesh bounding box, if available, or
+        * The ``volume_min`` / ``volume_max`` fields of the semi-dense
+          point cloud.
+
+        Args:
+            sample: TypedSample providing mesh or semi-dense volume info.
+
+        Returns:
+            Tensor of shape ``(6,)`` with axis-aligned bounds in the VIO
+            world frame, or ``None`` if no extent can be inferred.
+        """
         if sample.has_mesh:
             bounds = torch.from_numpy(sample.gt_mesh.bounds).to(device=self.config.device, dtype=torch.float32)
             vmin, vmax = bounds[0], bounds[1]
@@ -205,18 +278,34 @@ class CandidateViewGenerator:
         gt_mesh: trimesh.Trimesh | None = None,
         occupancy_extent: torch.Tensor | None = None,
     ) -> CandidateSamplingResult:
-        """Sample candidate poses and apply pruning rules.
+        """Sample candidate poses around ``last_pose`` and apply pruning rules.
+
+        This method performs up to ``max_resamples`` rounds of sampling to
+        accumulate ``num_samples`` valid poses:
+
+        * In each round, a fresh batch of candidates is seeded and passed
+          through the configured rule sequence.
+        * Per-rule boolean masks are collected and combined into a single
+          ``mask_valid`` requiring a candidate to satisfy *all* rules.
+        * Valid candidates are concatenated until the desired batch size
+          is reached or the resampling budget is exhausted.
 
         Args:
-            last_pose: current rig pose (PoseTW).
-            gt_mesh: optional mesh for collision checks.
-            occupancy_extent: optional [6] bounds (overrides config.occupancy_extent).
+            last_pose: Current rig pose (PoseTW) in the VIO world frame;
+                candidate positions are sampled around its translation.
+            gt_mesh: Optional GT mesh for collision and distance checks.
+            occupancy_extent: Optional explicit ``[6]`` bounds overriding
+                :attr:`CandidateViewGeneratorConfig.occupancy_extent`.
 
         Returns:
-            dict with:
-                poses: PoseTW of valid candidates.
-                mask_valid: bool mask before wrapping to PoseTW.
-                masks: list of per-rule masks.
+            CandidateSamplingResult dictionary with:
+
+            * ``poses`` - PoseTW of valid candidates (possibly padded).
+            * ``mask_valid`` - Boolean mask over ``poses`` indicating which
+              entries passed all rules.
+            * ``masks`` - Per-rule masks in the order rules were applied.
+            * ``shell_poses`` - Raw shell-sampled poses before masking,
+              useful for visualisation.
         """
 
         device = self.config.device
@@ -234,13 +323,19 @@ class CandidateViewGenerator:
         remaining = self.config.num_samples
         attempts = 0
 
+        # Iteratively sample until we either collect ``num_samples`` valid
+        # candidates or exhaust the resampling budget.
         while remaining > 0 and attempts < self.config.max_resamples:
+            # Seed a fresh batch of candidate pose slots and full mask.
             ctx_batch = self._seed(ctx, remaining)
             masks: list[torch.Tensor] = []
+            # Apply each rule in sequence; rules update ``poses`` and
+            # refine ``ctx['mask']`` in-place.
             for rule in self.rules:
                 ctx_batch = rule(ctx_batch)
                 masks.append(ctx_batch["mask"])
-            # preserve the raw sampled poses (before masking) for visualization of the full candidate space
+            # Preserve the raw sampled poses (before masking) for
+            # visualisation of the full candidate space.
             shell_accum.append(ctx_batch["poses"].clone())
             mask_valid = (
                 torch.stack(masks, dim=0).all(dim=0)
@@ -250,16 +345,24 @@ class CandidateViewGenerator:
             if mask_valid.any():
                 poses_accum.append(ctx_batch["poses"][mask_valid])
             masks_accum.extend(masks)
+            # Update the remaining quota and round counter.
             remaining = self.config.num_samples - sum(p.shape[0] for p in poses_accum)
             attempts += 1
 
         if poses_accum:
-            poses_cat = torch.cat(poses_accum, dim=0)[: self.config.num_samples]
+            # `poses_accum` may contain `PoseTW` TensorWrappers; extract raw tensors
+            # before concatenation to avoid passing TensorWrapper objects into
+            # `PoseTW` again.
+            pose_tensors = [
+                p._data if isinstance(p, PoseTW) else p  # noqa: SLF001 - accessing protected attr for unwrap
+                for p in poses_accum
+            ]
+            poses_cat = torch.cat(pose_tensors, dim=0)[: self.config.num_samples]
             mask_valid_out = torch.ones(poses_cat.shape[0], dtype=torch.bool, device=device)
         else:
             poses_cat = torch.zeros(self.config.num_samples, 12, device=device)
             mask_valid_out = torch.zeros(self.config.num_samples, dtype=torch.bool, device=device)
-        poses_valid = PoseTW(poses_cat)
+        poses_valid = PoseTW(poses_cat if isinstance(poses_cat, torch.Tensor) else poses_cat._data)  # type: ignore[arg-type]  # noqa: SLF001
         shell_poses = (
             torch.cat([p._data for p in shell_accum], dim=0) if shell_accum else torch.zeros(0, 12, device=device)
         )
@@ -272,7 +375,13 @@ class CandidateViewGenerator:
 
     # ------------------------------------------------------------------ rules
     def _seed(self, ctx: CandidateContext, n: int) -> CandidateContext:
-        """Initialise pose tensor placeholder."""
+        """Initialise pose tensor placeholders for a fresh sampling round.
+
+        This resets ``ctx['poses']`` to a zero tensor of shape ``(n, 12)``,
+        representing flattened :math:`[R \\mid t]` pose blocks, and sets
+        ``ctx['mask']`` to an all-True mask. Subsequent rules will fill
+        the pose tensor and progressively refine the mask.
+        """
         ctx["poses"] = torch.zeros(n, 12, device=ctx["device"])
         ctx["mask"] = torch.ones(n, dtype=torch.bool, device=ctx["device"])
         return ctx
