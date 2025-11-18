@@ -1,21 +1,28 @@
 """ASE dataset handling - simplified."""
 
-from .dataset import ASEDataset, ASEDatasetConfig, TypedSample, ase_collate
 from .downloader import ASEDownloader, ASEDownloaderConfig
+from .efm_dataset import AseEfmDataset, AseEfmDatasetConfig
+from .efm_views import (
+    EfmCameraView,
+    EfmGTView,
+    EfmObbView,
+    EfmPointsView,
+    EfmSnippetView,
+    EfmTrajectoryView,
+)
 from .metadata import ASEMetadata, SceneMetadata
-from .views import CameraView, GTView, SemiDenseView, TrajectoryView
 
 __all__ = [
     "ASEMetadata",
     "SceneMetadata",
     "ASEDownloader",
     "ASEDownloaderConfig",
-    "ASEDataset",
-    "ASEDatasetConfig",
-    "TypedSample",
-    "ase_collate",
-    "CameraView",
-    "TrajectoryView",
-    "SemiDenseView",
-    "GTView",
+    "AseEfmDataset",
+    "AseEfmDatasetConfig",
+    "EfmCameraView",
+    "EfmTrajectoryView",
+    "EfmPointsView",
+    "EfmObbView",
+    "EfmGTView",
+    "EfmSnippetView",
 ]

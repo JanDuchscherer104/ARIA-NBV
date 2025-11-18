@@ -1,68 +1,24 @@
-"""Minimal ATEK WebDataset wrapper with GT mesh insertion and typed view."""
+"""EFM-formatted ASE dataset wrapper."""
 
 from __future__ import annotations
 
-import re
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any, Literal
 
 import torch
 import trimesh
-from atek.data_loaders.atek_wds_dataloader import (  # type: ignore[import]
-    load_atek_wds_dataset,
-)
+from efm3d.dataset.efm_model_adaptor import load_atek_wds_dataset_as_efm
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 from torch.utils.data import IterableDataset
 
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console
-from .views import TypedSample
-
-SEQ_PATTERN = re.compile(r".*?(?P<scene_id>\d{4,})(?:_|-)(?P<snippet_id>[\w-]+)")
-
-
-def _parse_sequence_name(sequence_name: str) -> tuple[str, str]:
-    if not sequence_name:
-        return "unknown", "unknown"
-    parts = sequence_name.split("_")
-    if len(parts) >= 3 and parts[-2].isdigit():
-        return parts[-2], parts[-1]
-    match = SEQ_PATTERN.match(sequence_name)
-    if match:
-        return match.group("scene_id"), match.group("snippet_id")
-    if len(parts) >= 2:
-        return parts[-2], parts[-1]
-    return sequence_name, "unknown"
-
-
-def _infer_ids(flat_dict: Mapping[str, Any], sequence_name: str) -> tuple[str, str]:
-    scene_id, snippet_id = _parse_sequence_name(sequence_name)
-    if snippet_id != "unknown":
-        return scene_id, snippet_id
-    key = flat_dict.get("__key__")
-    if isinstance(key, str):
-        part = key.split("_")[-1]
-        if part:
-            snippet_id = part
-    url = flat_dict.get("__url__")
-    if isinstance(url, str):
-        stem = Path(url).stem
-        if stem:
-            snippet_id = stem
-        parent = Path(url).parent.name
-        if parent.isdigit():
-            scene_id = parent
-    return scene_id, snippet_id
+from .efm_views import EfmSnippetView
 
 
 def _explode_batched_dict(batch: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Split a batched dict from WebDataset into per-item dicts.
-
-    Supports leading-batch tensors and lists; non-batched items are copied to
-    each output dict. This mirrors ATEK/efm3d loader behaviour where each
-    field shares the same batch dimension.
-    """
+    """Split a batched dict from WebDataset into per-item dicts."""
 
     batch_size: int | None = None
     for value in batch.values():
@@ -88,35 +44,43 @@ def _explode_batched_dict(batch: Mapping[str, Any]) -> list[dict[str, Any]]:
     return per_item
 
 
-def ase_collate(batch: Sequence[TypedSample]) -> dict[str, Any]:
-    return {
-        "scene_id": [s.scene_id for s in batch],
-        "snippet_id": [s.snippet_id for s in batch],
-        "atek": list(batch),
-        "efm": [s.to_efm_dict() for s in batch],
-        "gt_mesh": [s.mesh for s in batch],
-    }
+def _infer_ids(efm_dict: Mapping[str, Any], sequence_name: str | None = None) -> tuple[str, str]:
+    """Infer scene and snippet ids from keys/url."""
+
+    scene_id = str(sequence_name or efm_dict.get("sequence_name", "unknown"))
+    snippet_id = efm_dict.get("__key__") or efm_dict.get("__url__")
+    if isinstance(snippet_id, str):
+        snippet_id = Path(snippet_id).stem
+    else:
+        snippet_id = "unknown"
+    if scene_id == "unknown" and "__url__" in efm_dict:
+        parent = Path(str(efm_dict["__url__"])).parent.name
+        if parent.isdigit():
+            scene_id = parent
+    return scene_id, str(snippet_id)
 
 
-class ASEDataset(IterableDataset[TypedSample]):
-    """Iterable dataset yielding TypedSample with optional GT mesh pairing."""
+class AseEfmDataset(IterableDataset[EfmSnippetView]):
+    """Iterable dataset yielding :class:`EfmSnippetView` with optional GT mesh."""
 
-    def __init__(self, config: ASEDatasetConfig):
+    def __init__(self, config: "AseEfmDatasetConfig"):
         super().__init__()
         self.config = config
         self.console = Console.with_prefix(self.__class__.__name__).set_verbose(config.verbose)
 
-        self.console.log(f"Loading ATEK WebDataset from {len(config.tar_urls)} shards")
-        self._atek_wds = load_atek_wds_dataset(
+        self.console.log(f"Loading EFM-formatted ATEK WDS from {len(config.tar_urls)} shards")
+        self._efm_wds = load_atek_wds_dataset_as_efm(
             urls=config.tar_urls,
+            freq=config.freq_hz,
+            snippet_length_s=config.snippet_length_s,
+            semidense_points_pad_to_num=config.semidense_points_pad,
+            atek_to_efm_taxonomy_mapping_file=str(config.taxonomy_csv) if config.taxonomy_csv else None,
             batch_size=config.batch_size,
-            shuffle_flag=config.shuffle,
-            repeat_flag=config.repeat,
+            collation_fn=None,
         )
         self._mesh_cache: dict[str, trimesh.Trimesh] = {}
-        self.console.log("ATEK loader ready")
+        self.console.log("EFM loader ready")
 
-    # How can we vectorize this for batching?
     def _load_mesh(self, scene_id: str) -> trimesh.Trimesh | None:
         if scene_id in self._mesh_cache:
             return self._mesh_cache[scene_id]
@@ -128,19 +92,18 @@ class ASEDataset(IterableDataset[TypedSample]):
         mesh = trimesh.load(str(mesh_path), process=False)
         if not isinstance(mesh, trimesh.Trimesh):
             raise TypeError(f"Mesh for scene {scene_id} is not Trimesh")
-        if self.config.mesh_simplify_ratio is not None:
+        if self.config.mesh_simplify_ratio not in (None, 0):
             mesh = mesh.simplify_quadric_decimation(self.config.mesh_simplify_ratio)
             self.console.dbg(f"Simplified mesh {scene_id}")
         if self.config.cache_meshes:
             self._mesh_cache[scene_id] = mesh
         return mesh
 
-    def _iter_flat_samples(self) -> Iterator[dict[str, Any]]:
-        for raw in self._atek_wds:
+    def _iter_efm_samples(self) -> Iterator[dict[str, Any]]:
+        for raw in self._efm_wds:
             if isinstance(raw, Mapping):
                 samples = _explode_batched_dict(raw) if self.config.batch_size else [dict(raw)]
-                for sample in samples:
-                    yield sample
+                yield from samples
             elif isinstance(raw, (list, tuple)):
                 for sample in raw:
                     if not isinstance(sample, Mapping):
@@ -149,55 +112,39 @@ class ASEDataset(IterableDataset[TypedSample]):
             else:
                 raise TypeError(f"Unexpected sample type from loader: {type(raw)}")
 
-    def __iter__(self) -> Iterator[TypedSample]:
-        for flat_dict in self._iter_flat_samples():
-            scene_id, snippet_id = _infer_ids(flat_dict, flat_dict.get("sequence_name", ""))
+    def __iter__(self) -> Iterator[EfmSnippetView]:
+        for efm_dict in self._iter_efm_samples():
+            scene_id, snippet_id = _infer_ids(efm_dict, efm_dict.get("sequence_name", ""))
             mesh = self._load_mesh(scene_id) if self.config.load_meshes else None
-            yield TypedSample(flat=flat_dict, scene_id=scene_id, snippet_id=snippet_id, mesh=mesh)
+            yield EfmSnippetView(efm=efm_dict, scene_id=scene_id, snippet_id=snippet_id, mesh=mesh)
 
 
-class ASEDatasetConfig(BaseConfig[ASEDataset]):
-    """Configuration for ASEDataset.
+class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
+    """Configuration for :class:`AseEfmDataset`."""
 
-    Fields mirror ATEK/ASE layout documented in docs/contents/ase_dataset.qmd.
-    """
-
-    target: type[ASEDataset] = Field(default=ASEDataset, exclude=True)
-    """Factory target for the config. This is the runtime dataset class instantiated by `setup_target()`.
-    Excluded from serialization via `exclude=True`."""
+    target: type[AseEfmDataset] = Field(default=AseEfmDataset, exclude=True)
     paths: PathConfig = Field(default_factory=PathConfig)
-    """Path resolution config used to locate ATEK shards and mesh directories."""
-    scene_ids: list[str] = Field(
-        default_factory=list,
-    )
-    """Optional list of scene ids to include. Will be auto-populated if not provided."""
     atek_variant: Literal["efm", "efm_eval", "cubercnn", "cubercnn_eval"] = Field(default="efm")
-    """Subdirectory name under `paths` `atek` root that contains the ATEK shards (e.g. 'efm' or 'efm_eval')."""
-    tar_urls: list[str] = Field(
-        default_factory=list,
-    )
-    """List of ATEK WebDataset shard paths. Auto-populated from `scene_ids`/`paths`; external overrides are ignored."""
+    scene_ids: list[str] = Field(default_factory=list)
+    tar_urls: list[str] = Field(default_factory=list)
     scene_to_mesh: dict[str, Path] = Field(default_factory=dict)
-    """Mapping from `scene_id` to ground-truth mesh `Path` on disk. Populated automatically if left empty and `load_meshes=True`."""
 
+    taxonomy_csv_filename: str = Field(default="atek_to_efm.csv")
     batch_size: int | None = Field(default=None)
-    """Optional batch size forwarded to `load_atek_wds_dataset`. `None` yields single-sample streaming behaviour."""
-    shuffle: bool = Field(default=False)
-    """Whether to shuffle the order of WebDataset shards before iteration."""
-    repeat: bool = Field(default=False)
-    """If True, repeat shards indefinitely to produce a streaming dataset (use with care)."""
+    snippet_length_s: float = Field(default=2.0, gt=0)
+    freq_hz: int = Field(default=10, gt=0)
+    semidense_points_pad: int = Field(default=50000, gt=0)
 
     load_meshes: bool = Field(default=True)
-    """If True, attempt to load and attach GT meshes for each sample when available."""
     require_mesh: bool = Field(default=False)
-    """If True and `load_meshes=True`, raise an error when a mesh for a resolved `scene_id` cannot be found."""
     mesh_simplify_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
-    """Optional quadric decimation ratio (0..1) to simplify loaded meshes for faster processing."""
     cache_meshes: bool = Field(default=True)
-    """If True, cache loaded meshes in-memory keyed by `scene_id` to avoid repeated disk loads."""
-
     verbose: bool = Field(default=True)
-    """Enable verbose `Console` logging for dataset initialization and mesh loading diagnostics."""
+
+    @field_validator("taxonomy_csv_filename", mode="before")
+    @classmethod
+    def _strip_taxonomy(cls, value: str | Path) -> str:
+        return Path(value).name
 
     @field_validator("tar_urls", mode="before")
     @classmethod
@@ -220,8 +167,22 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
             raise ValueError(f"No tar files found under {base}; provide tar_urls or scene_ids.")
         return resolved
 
+    @property
+    def taxonomy_csv(self) -> Path:
+        """Resolved taxonomy mapping CSV path."""
+
+        return (
+            self.paths.root
+            / self.paths.external_dir
+            / "efm3d"
+            / "efm3d"
+            / "config"
+            / "taxonomy"
+            / self.taxonomy_csv_filename
+        )
+
     @model_validator(mode="after")
-    def _autofill_paths(self) -> ASEDatasetConfig:
+    def _autofill_paths(self) -> "AseEfmDatasetConfig":
         if not self.tar_urls:
             base = self.paths.resolve_atek_data_dir(self.atek_variant)
             self.tar_urls = [str(p) for scene in self.scene_ids for p in sorted((base / scene).glob("*.tar"))]
@@ -250,12 +211,17 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
         if self.load_meshes and not self.scene_to_mesh and self.require_mesh:
             raise ValueError("load_meshes=True but no meshes resolved.")
 
+        if self.taxonomy_csv and not self.taxonomy_csv.exists():
+            raise FileNotFoundError(f"Taxonomy CSV not found at {self.taxonomy_csv}")
+
         Console.with_prefix(self.__class__.__name__, "config").set_verbose(self.verbose).log(
-            f"Resolved {len(self.tar_urls)} tar shards" + (f" for scenes {self.scene_ids}" if self.scene_ids else "")
+            f"Resolved {len(self.tar_urls)} tar shards"
+            + (f" for scenes {self.scene_ids}" if self.scene_ids else "")
+            + f" | taxonomy={self.taxonomy_csv.name}"
         )
         return self
 
-    def setup_target(self) -> ASEDataset:  # type: ignore[override]
+    def setup_target(self) -> AseEfmDataset:  # type: ignore[override]
         console = Console.with_prefix(self.__class__.__name__, "setup_target").set_verbose(self.verbose)
         expanded_urls = [
             str(path)
@@ -265,13 +231,8 @@ class ASEDatasetConfig(BaseConfig[ASEDataset]):
         if not expanded_urls:
             raise FileNotFoundError("No tar files matched derived tar_urls")
         self.tar_urls = expanded_urls
-        console.log(f"Preparing ASEDataset (tar URLs: {len(self.tar_urls)}, scenes: {len(self.scene_to_mesh)})")
+        console.log(f"Preparing AseEfmDataset (tar URLs: {len(self.tar_urls)}, scenes: {len(self.scene_to_mesh)})")
         return self.target(self)
 
 
-__all__ = [
-    "ASEDataset",
-    "ASEDatasetConfig",
-    "TypedSample",
-    "ase_collate",
-]
+__all__ = ["AseEfmDataset", "AseEfmDatasetConfig"]

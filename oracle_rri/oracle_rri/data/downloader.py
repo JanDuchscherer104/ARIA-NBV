@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 import requests
-from atek.data_download.atek_data_store_download import download_atek_wds_sequences
+from atek.data_download.atek_data_store_download import download_atek_wds_sequences  # type: ignore[import-untyped]
 from pydantic import AliasChoices, Field
 from pydantic_settings import (
     CLI_SUPPRESS,
