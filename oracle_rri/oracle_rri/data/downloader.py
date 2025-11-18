@@ -10,7 +10,7 @@ from typing import Literal
 
 import requests
 from atek.data_download.atek_data_store_download import download_atek_wds_sequences
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field
 from pydantic_settings import (
     CLI_SUPPRESS,
     BaseSettings,
@@ -31,12 +31,6 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     Supports two CLI modes (explicitly selected via positional `mode`):
         1. Download mode: Download N scenes with meshes + ATEK snippets
         2. List mode: List available scenes
-
-    Example (Programmatic):
-        >>> config = ASEDownloaderConfig(mode="download")
-        >>> downloader = config.setup_target()
-        >>> scenes = downloader.metadata.get_scenes(n=5, max_snippets=2)
-        >>> downloader.download_scenes(scenes)
 
     Example (CLI - Download):
         $ python -m oracle_rri.data.downloader download --n_scenes=5 --max_snippets=2
@@ -60,12 +54,11 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     )
 
     paths: PathConfig = Field(default_factory=PathConfig)
-    url_dir: Path = Field(
-        default_factory=lambda: PathConfig().url_dir, description="Directory containing download URL JSONs"
+    output_dir: Path | None = Field(
+        default=None, description="Root output dir for downloads. Defaults to `paths.data_root / cfg.mode` "
     )
-    output_dir: Path | None = Field(default=None, description="Root output dir for downloads")
-    # Core configuration
 
+    # Core configuration
     verbose: bool = Field(default=True)
     """Enable verbose logging."""
 
@@ -77,13 +70,13 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
 
     # JSON file configuration
     mesh_json_filename: str = Field(default="ase_mesh_download_urls.json")
-    """Filename of the mesh download URLs JSON in url_dir."""
+    """Filename of the mesh download URLs JSON in url_dir. Relative to paths.url_dir."""
 
     atek_json_filename: str = Field(default="AriaSyntheticEnvironment_ATEK_download_urls.json")
-    """Filename of the ATEK download URLs JSON in url_dir."""
+    """Filename of the ATEK download URLs JSON in url_dir. Relative to paths.url_dir."""
 
     atek_config_name: Literal["efm", "efm_eval", "cubercnn", "cubercnn_eval"] = Field(default="efm_eval", alias="c")
-    """ATEK configuration name."""
+    """ATEK configuration name. No difference between `efm` and `efm_eval`. This will select the specified config in the json file under :field:`atek_json_filename`."""
 
     # Download selection
     n_scenes: int = Field(
@@ -125,39 +118,16 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     overwrite: bool = Field(default=False)
     """Always overwrite existing ATEK files (re-download even if present)."""
 
-    train_val_split_json_path: Path | None = Field(default=None)
-    """Path to custom train/val split JSON (overrides train_val_split_ratio)."""
-
     model_config = SettingsConfigDict(
         cli_parse_args=False,  # explicit CLI parsing is triggered via from_cli() to avoid pytest args interference
         cli_exit_on_error=False,
     )
 
-    @field_validator("train_val_split_json_path", mode="before")
-    @classmethod
-    def _validate_split_json_path(cls, v: str | Path | None) -> Path | None:
-        """Convert string to Path and validate existence."""
-        if v is None:
-            return None
-        path = Path(v) if isinstance(v, str) else v
-        if not path.exists():
-            raise ValueError(f"Train/val split JSON not found: {path}")
-        return path
-
-    @staticmethod
-    def from_toml(path: Path) -> "ASEDownloaderConfig":
-        import tomllib
-
-        data = tomllib.loads(Path(path).read_text())
-        section = data.get("oracle_rri.data.downloader", data.get("downloader", {}))
-        merged = {"mode": section.get("mode", "download"), **section}
-        return ASEDownloaderConfig(**merged)
-
     @classmethod
     def from_cli(cls) -> "ASEDownloaderConfig":
         """Instantiate config using pydantic-settings CLI parser (explicit opt-in)."""
 
-        cli_source = CliSettingsSource(
+        cli_source = CliSettingsSource(  # type: ignore
             cls,
             cli_parse_args=True,
             cli_ignore_unknown_args=cls.model_config.get("cli_ignore_unknown_args"),
@@ -193,21 +163,17 @@ class ASEDownloader:
             Console.with_prefix(self.__class__.__name__).set_verbose(config.verbose).set_debug(config.is_debug)
         )
 
-        base_url_dir = Path(self.config.url_dir) if self.config.url_dir is not None else self.config.paths.url_dir
-        if not base_url_dir.exists():
-            raise FileNotFoundError("URL directory not found")
-
         # Parse metadata from JSONs
         self.metadata = ASEMetadata(
-            url_dir=base_url_dir,
+            url_dir=self.config.paths.url_dir,
             mesh_json_filename=self.config.mesh_json_filename,
             atek_json_filename=self.config.atek_json_filename,
         )
         self.mesh_dir = self.config.paths.ase_meshes
 
         self.console.log(
-            f"Configured paths: mesh_json={base_url_dir / self.config.mesh_json_filename}, "
-            f"atek_json={base_url_dir / self.config.atek_json_filename}, "
+            f"Configured paths: mesh_json={self.config.paths.url_dir / self.config.mesh_json_filename}, "
+            f"atek_json={self.config.paths.url_dir / self.config.atek_json_filename}, "
             f"mesh_dir={self.mesh_dir}"
         )
 
@@ -279,7 +245,7 @@ class ASEDownloader:
 
             assert isinstance(scene, SceneMetadata)
             try:
-                zip_path = self._download_file(scene.mesh_url, dest_path=Path(zip_filename))
+                zip_path = self._download_file(scene.mesh_url, dest_path=Path(zip_filename))  # type: ignore[arg-type]
                 self.console.dbg(f"Downloaded zip to {zip_path}")
 
                 # Verify SHA1 checksum
@@ -374,9 +340,6 @@ class ASEDownloader:
                 output_folder_path=str(output_dir),
                 max_num_sequences=len(filtered_urls) if filtered_urls else None,
                 download_wds_to_local=self.config.download_wds_to_local,
-                train_val_split_json_path=str(self.config.train_val_split_json_path)
-                if self.config.train_val_split_json_path
-                else None,
                 overwrite=self.config.overwrite,
             )
 
