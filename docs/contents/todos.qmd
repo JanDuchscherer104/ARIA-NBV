@@ -26,19 +26,22 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 - Later: deliver as `TorchMetric`.
 
 ## Candidate View Generation & Sampling
-- implement `CandidateViewGenerator`, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type `PoseTW` (`external/efm3d/efm3d/aria/pose.py`)
+- implement `CandidateViewGenerator` and auxiliary mdoules in `oracle_rri/oracle_rri/pose_generation`, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type `PoseTW` (`external/efm3d/efm3d/aria/pose.py`)
   - Strategies: uniform over half-sphere with min/max radius & elevation, free-space only, room-bounded (SSL for train, occupancy for eval).
   - Collision check: segment from last pose to candidate must not intersect mesh/voxels.
   - Modular strategy selection via enums/config that allows easy extension and combination of strategies / sampling rules.
 
 ### Raycasting to Generate Candidate Point Clouds-
-- Implement `CandidatePointCloudGenerator`: for each candidate pose, cast rays to GT  to render depth map using existing GPU implementations from `efm3d`.
+- Implement `CandidatePointCloudGenerator` and all necessary auxiliary modules in : for each candidate pose, cast rays to GT  to render depth map using existing GPU implementations from `efm3d`.
   - Input: candidate `PoseTW`, GT mesh.
   - Output: Depth map.
-- Question: Which camera params should we use for rendering candidate views / projections? RGB camera intrinsics and extrinsics from ASE (see @oracle_rri/oracle_rri/data/views.py)?
-In which coordinate frame? ego camera for now!
-This should be implemented in candidate_rendering.py
+- Questions:
+  - Which camera params should we use for rendering candidate views / projections? RGB camera intrinsics and extrinsics from ASE (see @oracle_rri/oracle_rri/data/views.py)?
+  - In which coordinate frame? ego camera for now!
+  - Should we use the rendering utilities from EFM3D or some other gpu based renderer (e.g. pyrender, pytorch3d)?
+This should be implemented in `oracle_rri/oracle_rri/rendering`.
 Consider that we have already tried implementing the entire pipeline in a single script. extract the relevant parts and criticise them!
+*panda3d*.
 
 ### Point Cloud Fusion
 - Implement `DepthToPointCloud` module: for each candidate pose's depth map, backproject to point cloud `$\mathcal{P}_{\mathbf{q}}$ in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC $\mathcal{P}_t$ with candidate-view PC $\mathcal{P}_{\mathbf{q}}$ → $\mathcal{P}_{t \cup \mathbf{q}}$.
