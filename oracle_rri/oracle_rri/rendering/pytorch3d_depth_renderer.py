@@ -11,9 +11,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
 import torch
+import trimesh
 from pydantic import Field
-from pytorch3d.renderer import FoVPerspectiveCameras, MeshRasterizer, RasterizationSettings
+from pytorch3d.renderer import MeshRasterizer, RasterizationSettings
+from pytorch3d.renderer.cameras import PerspectiveCameras
 from pytorch3d.structures import Meshes
 from torch import Tensor
 
@@ -45,8 +48,13 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     faces_per_pixel: int = 1
     """Number of faces stored per pixel; 1 = closest triangle only."""
 
-    cull_backfaces: bool = True
-    """If ``True`` drop triangles with normals pointing away from the camera."""
+    cull_backfaces: bool = False
+    """If ``True`` drop triangles with normals pointing away from the camera.
+
+    NBV cameras are typically *inside* closed meshes (rooms); backface culling
+    would therefore remove the interior walls. Default is ``False`` so both
+    sides are rendered.
+    """
 
     blur_radius: float = 0.0
     """Soft rasterizer blur radius; keep ``0`` for hard z-buffer."""
@@ -56,6 +64,18 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
 
     max_faces_per_bin: int | None = None
     """Performance knob mirroring ``RasterizationSettings.max_faces_per_bin``."""
+
+    two_sided: bool = True
+    """If ``True`` duplicate faces with reversed winding so interior walls remain visible."""
+
+    add_proxy_walls: bool = True
+    """If ``True`` add a thin bounding box shell when large wall areas are missing."""
+
+    proxy_wall_area_threshold: float = 0.2
+    """If existing faces cover < this fraction of the expected wall area, add proxy walls."""
+
+    proxy_eps: float = 0.05
+    """Epsilon (m) for detecting faces near scene bounds."""
 
     verbose: bool = False
     """Enable :class:`Console` logging."""
@@ -126,6 +146,7 @@ class Pytorch3DDepthRenderer:
         camera: CameraTW,
         *,
         frame_index: int | None = None,
+        occupancy_extent: torch.Tensor | None = None,
     ) -> Tensor:
         """Render depth for a batch of poses."""
 
@@ -135,14 +156,20 @@ class Pytorch3DDepthRenderer:
         rotations = rotations.to(self.device)
         translations = translations.to(self.device)
 
-        mesh_struct = self._mesh_to_struct(mesh, batch_size=rotations.shape[0])
-        cameras = self._build_cameras(
-            rotations=rotations,
-            translations=translations,
-            height=height,
-            width=width,
-            fy=fy,
-            aspect_ratio=width / height,
+        mesh_struct = self._mesh_to_struct(
+            mesh,
+            batch_size=rotations.shape[0],
+            occupancy_extent=occupancy_extent,
+        )
+        focal, principal = self._perspective_params(camera, width, height)
+        cameras = PerspectiveCameras(
+            device=self.device,
+            R=rotations,
+            T=translations,
+            focal_length=focal,
+            principal_point=principal,
+            image_size=torch.tensor([[height, width]], device=self.device),
+            in_ndc=True,
         )
         raster_settings = RasterizationSettings(
             image_size=(int(height), int(width)),
@@ -155,7 +182,27 @@ class Pytorch3DDepthRenderer:
         rasterizer = MeshRasterizer(cameras=cameras, raster_settings=raster_settings)
         fragments = rasterizer(mesh_struct)
         depth = fragments.zbuf[..., 0]
-        depth = torch.where(torch.isfinite(depth), depth, torch.full_like(depth, self.config.zfar))
+        far = torch.full_like(depth, self.config.zfar)
+        depth = torch.where(torch.isfinite(depth), depth, far)
+        depth = torch.where(depth <= 0, far, depth)
+        hit_mask = depth < self.config.zfar
+        hit_ratio = float(hit_mask.float().mean().item())
+        if self.console.is_debug:
+            self.console.dbg_summary(
+                "depth_stats",
+                {
+                    "hits_ratio": hit_ratio,
+                    "min": float(depth.min().item()),
+                    "max": float(depth.max().item()),
+                    "zfar": float(self.config.zfar),
+                    "cull_backfaces": self.config.cull_backfaces,
+                },
+            )
+        if hit_ratio == 0.0 and self.config.cull_backfaces:
+            self.console.warn(
+                "No depth hits recorded (all pixels at zfar). Consider disabling backface culling "
+                "for interior viewpoints."
+            )
         return depth
 
     # ------------------------------------------------------------------
@@ -183,36 +230,112 @@ class Pytorch3DDepthRenderer:
         fy = float(focals[1].item())
         return width, height, fx, fy
 
-    def _build_cameras(
+    def _perspective_params(
         self,
-        *,
-        rotations: Tensor,
-        translations: Tensor,
-        height: float,
+        camera: CameraTW,
         width: float,
-        fy: float,
-        aspect_ratio: float,
-    ) -> FoVPerspectiveCameras:
-        """Create PyTorch3D cameras for the batch."""
+        height: float,
+    ) -> tuple[Tensor, Tensor]:
+        """Convert CameraTW intrinsics to PyTorch3D-normalised parameters."""
 
-        fov_y = 2.0 * float(torch.atan(torch.tensor(0.5 * height / fy)).item()) * 180.0 / torch.pi
-        return FoVPerspectiveCameras(
-            device=self.device,
-            R=rotations,
-            T=translations,
-            znear=self.config.znear,
-            zfar=self.config.zfar,
-            fov=fov_y,
-            aspect_ratio=aspect_ratio,
-        )
+        focal_vals = camera.f.reshape(-1, 2)
+        center_vals = camera.c.reshape(-1, 2)
+        fx = float(focal_vals[0, 0].item())
+        fy = float(focal_vals[0, 1].item())
+        cx = float(center_vals[0, 0].item())
+        cy = float(center_vals[0, 1].item())
+        fx_ndc = 2.0 * fx / width
+        fy_ndc = 2.0 * fy / height
+        px_ndc = -2.0 * (cx - width / 2.0) / width
+        py_ndc = 2.0 * (cy - height / 2.0) / height
+        focal = torch.tensor([[fx_ndc, fy_ndc]], device=self.device)
+        principal = torch.tensor([[px_ndc, py_ndc]], device=self.device)
+        return focal, principal
 
-    def _mesh_to_struct(self, mesh: Trimesh, batch_size: int) -> Meshes:
+    def _mesh_to_struct(
+        self,
+        mesh: Trimesh,
+        batch_size: int,
+        occupancy_extent: torch.Tensor | None = None,
+    ) -> Meshes:
         """Convert ``trimesh`` mesh to a PyTorch3D ``Meshes`` batch."""
 
-        verts = torch.as_tensor(mesh.vertices, dtype=torch.float32, device=self.device)
-        faces = torch.as_tensor(mesh.faces, dtype=torch.int64, device=self.device)
+        mesh_use = self._maybe_with_proxy_walls(mesh, occupancy_extent=occupancy_extent)
+        verts = torch.as_tensor(mesh_use.vertices, dtype=torch.float32, device=self.device)
+        faces = torch.as_tensor(mesh_use.faces, dtype=torch.int64, device=self.device)
+        if self.config.two_sided:
+            faces_rev = faces[:, [0, 2, 1]]
+            faces = torch.cat([faces, faces_rev], dim=0)
         mesh_struct = Meshes(verts=[verts], faces=[faces]).extend(batch_size)
         return mesh_struct
+
+    # ------------------------------------------------------------------
+    # Proxy walls helper
+    # ------------------------------------------------------------------
+    def _maybe_with_proxy_walls(self, mesh: Trimesh) -> Trimesh:
+        """Append a thin bounding-box shell when major walls are missing."""
+
+        if not self.config.add_proxy_walls:
+            return mesh
+
+        vmin, vmax = mesh.bounds
+        extents = vmax - vmin
+        desired_area = {
+            "xmin": extents[1] * extents[2],
+            "xmax": extents[1] * extents[2],
+            "ymin": extents[0] * extents[2],
+            "ymax": extents[0] * extents[2],
+            "zmin": extents[0] * extents[1],
+            "zmax": extents[0] * extents[1],
+        }
+        centers = mesh.triangles_center
+        areas = mesh.area_faces
+        eps = self.config.proxy_eps
+        plane_masks = {
+            "xmin": centers[:, 0] <= vmin[0] + eps,
+            "xmax": centers[:, 0] >= vmax[0] - eps,
+            "ymin": centers[:, 1] <= vmin[1] + eps,
+            "ymax": centers[:, 1] >= vmax[1] - eps,
+            "zmin": centers[:, 2] <= vmin[2] + eps,
+            "zmax": centers[:, 2] >= vmax[2] - eps,
+        }
+        coverage = {k: areas[m].sum() for k, m in plane_masks.items()}
+        missing = [
+            k for k, cov in coverage.items() if desired_area[k] > 0 and cov < desired_area[k] * self.config.proxy_wall_area_threshold
+        ]
+        if not missing:
+            return mesh
+
+        # Build a box shell at bounds; keep only faces for missing planes to avoid doubling others.
+        box = Trimesh(
+            *trimesh.creation.box(
+                extents=extents,
+                transform=trimesh.transformations.translation_matrix(vmin + extents / 2.0),
+            ).to_mesh()
+        )
+        mask_keep = []
+        for n in box.face_normals:
+            if (
+                np.allclose(n, [1, 0, 0]) and "xmax" in missing
+                or np.allclose(n, [-1, 0, 0]) and "xmin" in missing
+                or np.allclose(n, [0, 1, 0]) and "ymax" in missing
+                or np.allclose(n, [0, -1, 0]) and "ymin" in missing
+                or np.allclose(n, [0, 0, 1]) and "zmax" in missing
+                or np.allclose(n, [0, 0, -1]) and "zmin" in missing
+            ):
+                mask_keep.append(True)
+            else:
+                mask_keep.append(False)
+        mask_keep = np.array(mask_keep, dtype=bool)
+        if not mask_keep.any():
+            return mesh
+        proxy = Trimesh(vertices=box.vertices, faces=box.faces[mask_keep], process=False)
+        merged = trimesh.util.concatenate([mesh, proxy])
+        if self.console.is_debug:
+            self.console.dbg(
+                f"Added proxy walls for planes {missing}; proxy faces={proxy.faces.shape[0]}, total={merged.faces.shape[0]}"
+            )
+        return merged
 
     def _pose_to_r_t(self, poses: PoseTW) -> tuple[Tensor, Tensor]:
         """Convert ``T_world_camera`` into PyTorch3D view matrices."""

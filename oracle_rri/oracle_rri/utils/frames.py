@@ -1,9 +1,75 @@
 import numpy as np
 import torch
 import torch.nn.functional as F  # noqa: N812
-from efm3d.utils.gravity import GRAVITY_DIRECTION_VIO  # [0, 0, -1]
+from efm3d.aria.pose import PoseTW
+from efm3d.utils.gravity import (
+    GRAVITY_DIRECTION_VIO,  # [0, 0, -1]
+    gravity_align_T_world_cam,  # type: ignore
+)
 from pytransform3d.plot_utils import make_3d_axis
 from pytransform3d.transformations import plot_transform
+
+
+# NOTE: Helper to align camera pose for display (used in both data and candidate plotting).
+def pose_for_display(
+    t_world_cam: PoseTW,
+    gravity_w: torch.Tensor | None = None,
+    *,
+    align_gravity: bool = True,
+) -> PoseTW:
+    """Return a display-friendly PoseTW with gravity-up and UI roll/yaw corrections.
+
+    Steps (mirrors data.plotting):
+    1) Gravity-align so world +Z is up (undo VIO gravity tilt).
+    2) Apply fixed rotations:
+       - roll -90° about camera z to match rotated image display,
+       - yaw +90° about camera y to align RDF forward/right/down with viewer.
+    This keeps frusta upright in Plotly and avoids roll (x-axis) tilt.
+    """
+    if align_gravity:
+        if gravity_w is None:
+            gravity_w = GRAVITY_DIRECTION_VIO
+        t_aligned = gravity_align_T_world_cam(t_world_cam.unsqueeze(0), gravity_w=gravity_w).squeeze(0)
+    else:
+        t_aligned = t_world_cam
+    cz, sz = torch.cos(torch.tensor(-np.pi / 2, device=t_aligned.device, dtype=t_aligned.dtype)), torch.sin(
+        torch.tensor(-np.pi / 2, device=t_aligned.device, dtype=t_aligned.dtype)
+    )
+    cy, sy = torch.cos(torch.tensor(np.pi / 2, device=t_aligned.device, dtype=t_aligned.dtype)), torch.sin(
+        torch.tensor(np.pi / 2, device=t_aligned.device, dtype=t_aligned.dtype)
+    )
+    r_z = torch.tensor(
+        [[cz, -sz, 0.0], [sz, cz, 0.0], [0.0, 0.0, 1.0]],
+        device=t_aligned.device,
+        dtype=t_aligned.dtype,
+    )
+    r_y = torch.tensor(
+        [[cy, 0.0, sy], [0.0, 1.0, 0.0], [-sy, 0.0, cy]],
+        device=t_aligned.device,
+        dtype=t_aligned.dtype,
+    )
+    r_corr = r_z @ r_y
+    r_disp = t_aligned.R @ r_corr
+    return PoseTW.from_Rt(r_disp, t_aligned.t)
+
+
+def world_up_tensor(
+    device: torch.device | None = None,
+    dtype: torch.dtype | None = None,
+) -> torch.Tensor:
+    """Return world up vector as tensor. Default world-up: +Z (gravity up in EFM3D; gravity is [0, 0, -1]).
+
+    Args:
+        device: Desired device of the returned tensor.
+        dtype: Desired data type of the returned tensor.
+    Returns:
+        (3,) world up vector tensor.
+    """
+    return torch.tensor(
+        -GRAVITY_DIRECTION_VIO,
+        device=device,
+        dtype=dtype,
+    )
 
 
 def view_axes_from_points(
@@ -30,13 +96,8 @@ def view_axes_from_points(
     # Forward (camera z-axis) from camera to target.
     fwd = F.normalize(look_at - cam_pos, dim=-1)
 
-    # Default world-up: +Z (gravity up in EFM3D; gravity is [0, 0, -1]).
     if world_up is None:
-        world_up = torch.tensor(
-            -GRAVITY_DIRECTION_VIO,
-            device=cam_pos.device,
-            dtype=cam_pos.dtype,
-        )
+        world_up = world_up_tensor(device=cam_pos.device, dtype=cam_pos.dtype)
 
     # Broadcast world_up to match fwd's batch dimensions.
     while world_up.ndim < fwd.ndim:

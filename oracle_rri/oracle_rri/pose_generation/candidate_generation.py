@@ -129,7 +129,7 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     `TRIMESH` falls back to the pure-Python trimesh ray engine.
     """
 
-    min_distance_to_mesh: float = 0.05
+    min_distance_to_mesh: float = 0.0
     """Minimum clearance (metres) between the candidate camera centre and
     the GT mesh.
 
@@ -224,7 +224,17 @@ class CandidateViewGenerator:
         """Generate candidate poses using data from an :class:`EfmSnippetView`."""
         occupancy_extent = self._occupancy_extent_from_sample(sample)
         gt_mesh = sample.mesh
-        last_pose = sample.trajectory.final_pose
+        # NOTE: respect configured camera_index by converting rig pose -> camera pose.
+        cam_map = {
+            "rgb": sample.camera_rgb,
+            "rgb_depth": sample.camera_rgb,  # depth shares extrinsics with rgb for our snippets
+            "slam_l": sample.camera_slam_left,
+            "slam_r": sample.camera_slam_right,
+        }
+        cam_view = cam_map.get(self.config.camera_index, sample.camera_rgb)
+        t_cam_rig = cam_view.calib.T_camera_rig[0]
+        last_pose_rig = sample.trajectory.final_pose
+        last_pose = last_pose_rig @ t_cam_rig.inverse()
         self.console.log(
             f"generate_from_typed_sample scene={sample.scene_id} snippet={sample.snippet_id} mesh={gt_mesh is not None}"
         )
@@ -287,7 +297,8 @@ class CandidateViewGenerator:
             * ``poses`` - PoseTW of valid candidates (possibly padded).
             * ``mask_valid`` - Boolean mask over ``poses`` indicating which
               entries passed all rules.
-            * ``masks`` - Per-rule masks in the order rules were applied.
+            * ``masks`` - Stacked per-rule masks aligned with ``shell_poses``.
+            * ``rule_names`` - Names matching ``masks`` first dimension.
             * ``shell_poses`` - Raw shell-sampled poses before masking,
               useful for visualisation.
         """
@@ -304,7 +315,7 @@ class CandidateViewGenerator:
         if ctx["occupancy_extent"] is not None:
             self.console.dbg_summary("ctx.occupancy_extent", ctx["occupancy_extent"])
         poses_accum: list[torch.Tensor] = []
-        masks_accum: list[torch.Tensor] = []
+        masks_accum: list[torch.Tensor] = []  # NOTE: store per-round stacked masks for debugging
         shell_accum: list[PoseTW] = []
         remaining = self.config.num_samples
         attempts = 0
@@ -326,6 +337,11 @@ class CandidateViewGenerator:
                 self.console.dbg(
                     f"Rule {rule.__class__.__name__}: {survivors}/{ctx_batch['mask'].numel()} candidates remain"
                 )
+                if survivors == 0:
+                    self.console.warn(
+                        f"Rule {rule.__class__.__name__} rejected all candidates in this round "
+                        f"(attempt {attempts + 1}/{self.config.max_resamples})."
+                    )
                 masks.append(ctx_batch["mask"])
             # Preserve the raw sampled poses (before masking) for
             # visualisation of the full candidate space.
@@ -337,7 +353,7 @@ class CandidateViewGenerator:
             )
             if mask_valid.any():
                 poses_accum.append(ctx_batch["poses"][mask_valid])
-            masks_accum.extend(masks)
+            masks_accum.append(torch.stack(masks, dim=0))  # shape (num_rules, batch)
             # Update the remaining quota and round counter.
             remaining = self.config.num_samples - sum(p.shape[0] for p in poses_accum)
             attempts += 1
@@ -360,6 +376,8 @@ class CandidateViewGenerator:
         shell_poses = (
             torch.cat([p._data for p in shell_accum], dim=0) if shell_accum else torch.zeros(0, 12, device=device)
         )
+        # NOTE: make per-rule masks align with shell_poses for debugging which rule killed which sample.
+        masks_stacked = torch.cat(masks_accum, dim=1) if masks_accum else torch.zeros(len(self.rules), 0, device=device)
         survivor_count = int(mask_valid_out.sum().item())
         if survivor_count == 0:
             self.console.warn("All candidate poses were rejected; returning zero-padded PoseTW batch.")
@@ -369,7 +387,8 @@ class CandidateViewGenerator:
         return {
             "poses": poses_valid,
             "mask_valid": mask_valid_out,
-            "masks": masks_accum,
+            "masks": masks_stacked,
+            "rule_names": [r.__class__.__name__ for r in self.rules],
             "shell_poses": shell_poses,
         }
 

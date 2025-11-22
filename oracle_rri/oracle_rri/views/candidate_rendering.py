@@ -52,6 +52,7 @@ class CandidatePointCloudGeneratorConfig(BaseConfig["CandidatePointCloudGenerato
         description="Clamp depth (m) for rays with no intersection; acts as far plane.",
     )
     verbose: bool = Field(default=False)
+    is_debug: bool = Field(default=False, description="Enable debug logging for ray stats.")
 
 
 @dataclass(slots=True)
@@ -66,7 +67,9 @@ class CandidatePointCloudGenerator:
         object.__setattr__(
             self,
             "console",
-            Console.with_prefix(self.__class__.__name__).set_verbose(self.config.verbose),
+            Console.with_prefix(self.__class__.__name__)
+            .set_verbose(self.config.verbose)
+            .set_debug(self.config.is_debug),
         )
         object.__setattr__(self, "_pyembree_available", hasattr(trimesh.ray, "ray_pyembree"))
 
@@ -135,6 +138,17 @@ class CandidatePointCloudGenerator:
             update_idx = torch.from_numpy(index_ray).to(device)
             valid_indices = torch.nonzero(valid_flat, as_tuple=False).squeeze(-1)
             depth.view(-1)[valid_indices[update_idx]] = ray_depth
+        hit_ratio = (depth < self.config.max_depth).float().mean().item()
+        if self.console.is_debug:
+            self.console.dbg_summary(
+                "depth_render_stats",
+                {
+                    "hit_ratio": hit_ratio,
+                    "n_rays": int(valid_flat.numel()),
+                    "n_valid": int(valid_flat.sum().item()),
+                    "mesh_faces": mesh.faces.shape[0] if hasattr(mesh, "faces") else None,
+                },
+            )
 
         return depth
 

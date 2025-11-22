@@ -12,7 +12,12 @@ from efm3d.aria.pose import PoseTW
 
 from oracle_rri.configs import PathConfig
 from oracle_rri.data import AseEfmDatasetConfig
+from oracle_rri.data.plotting import SnippetPlotBuilder, _frustum_segments, _mesh_to_plotly
 from oracle_rri.pose_generation import CandidateViewGenerator, CandidateViewGeneratorConfig
+from oracle_rri.utils import Console
+from oracle_rri.utils.frames import pose_for_display
+
+console = Console.with_prefix("pose_plotting")
 
 
 def _ensure_plot_dir() -> Path:
@@ -21,25 +26,28 @@ def _ensure_plot_dir() -> Path:
     return out
 
 
-def _pose_positions(poses: torch.Tensor | "PoseTW") -> np.ndarray:  # type: ignore[name-defined]
+# NOTE: data.plotting doesn't expose pose extraction; reintroduce a local robust helper.
+def _pose_positions(poses: torch.Tensor | "PoseTW") -> np.ndarray:
     """Extract Nx3 positions from PoseTW or (N,12)/(N,3,4)/(N,3) tensors."""
+
     if hasattr(poses, "matrix3x4"):
         arr = poses.matrix3x4
     elif hasattr(poses, "_data"):
         arr = poses._data  # PoseTW stores raw tensor as _data
     else:
         arr = poses
+
     if arr.dim() == 2 and arr.shape == torch.Size([3, 4]):
-        pos = arr[..., :3, 3].unsqueeze(0)
+        pos = arr[:3, 3].unsqueeze(0)
     elif arr.dim() == 2 and arr.shape[1] == 12:
-        arr = arr.view(-1, 3, 4)
-        pos = arr[..., :3, 3]
+        pos = arr.view(-1, 3, 4)[..., :3, 3]
     elif arr.dim() == 3 and arr.shape[1:] == (3, 4):
         pos = arr[..., :3, 3]
     elif arr.dim() == 2 and arr.shape[1] == 3:
         pos = arr
     else:
-        pos = arr.t()
+        # NOTE: fallback to last column if shape unexpected
+        pos = arr[..., :3]
     return pos.detach().cpu().numpy()
 
 
@@ -52,6 +60,7 @@ def camera_intrinsics(cam, frame_idx: int = 0) -> np.ndarray:
     return np.array([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=np.float64)
 
 
+# NOTE: still using pinhole proxy intrinsics; fisheye distortion ignored (known limitation).
 def camera_wireframe_segments(
     intrinsics: np.ndarray,
     cam2world: np.ndarray,
@@ -103,47 +112,36 @@ def plot_candidates(
     mesh: trimesh.Trimesh | None,
     title: str = "Candidate positions",
     path: Path | None = None,
+    center: np.ndarray | None = None,
 ) -> go.Figure:
-    """Plot candidate camera centres with optional mesh overlay.
-
-    Args:
-        poses: Candidate poses as PoseTW or tensor ``[N,12]/[N,3,4]``.
-        mesh: Optional scene mesh to show as translucent surface.
-        title: Plot title.
-        path: Optional output path; if provided, the figure is written as HTML.
-
-    Returns:
-        Plotly figure ready for inline rendering (e.g. Streamlit).
-    """
-    fig = go.Figure()
+    """Plot candidate camera centres with optional mesh overlay."""
     pos = _pose_positions(poses)
-    fig.add_trace(
+    builder = SnippetPlotBuilder(title=title, scene_ranges={"xaxis": {}, "yaxis": {}, "zaxis": {}}, height=700)
+    if mesh is not None:
+        builder.add_mesh(mesh, double_sided=True)
+    builder.fig.add_trace(
         go.Scatter3d(
             x=pos[:, 0],
             y=pos[:, 1],
             z=pos[:, 2],
             mode="markers",
-            marker={"size": 3, "color": "blue", "opacity": 0.6},
-            name="candidates",
+            marker={"size": 4, "color": "royalblue", "opacity": 0.7},
+            name="Candidates",
         )
     )
-    if mesh is not None:
-        verts = mesh.vertices
-        faces = mesh.faces
-        fig.add_trace(
-            go.Mesh3d(
-                x=verts[:, 0],
-                y=verts[:, 1],
-                z=verts[:, 2],
-                i=faces[:, 0],
-                j=faces[:, 1],
-                k=faces[:, 2],
-                opacity=0.15,
-                color="gray",
-                name="mesh",
+    if center is not None:
+        builder.fig.add_trace(
+            go.Scatter3d(
+                x=[center[0]],
+                y=[center[1]],
+                z=[center[2]],
+                mode="markers",
+                marker={"size": 4, "color": "red", "symbol": "x"},
+                name="sampling center",
             )
         )
-    fig.update_layout(scene_aspectmode="data", title=title)
+    builder.fig.update_layout(scene={"aspectmode": "data"})
+    fig = builder.finalize()
     if path is not None:
         fig.write_html(str(path))
     return fig
@@ -163,76 +161,34 @@ def plot_sampling_shell(
 ) -> go.Figure:
     """Visualise the spherical sampling band and a subset of raw shell samples."""
 
-    pos = _pose_positions(shell_poses)
     center = _pose_positions(last_pose.unsqueeze(0) if isinstance(last_pose, torch.Tensor) else last_pose)[0]
 
-    # Candidate subset for clarity
-    if pos.shape[0] > sample_n:
-        idx = np.random.choice(pos.shape[0], sample_n, replace=False)
-        pos_sub = pos[idx]
-    else:
-        pos_sub = pos
-
     u = np.linspace(0, (2 if azimuth_full_circle else 1) * np.pi, 60)
-    v = np.radians(np.linspace(min_elev_deg, max_elev_deg, 30))
+    v = np.radians(np.linspace(min_elev_deg, max_elev_deg, 15))
     uu, vv = np.meshgrid(u, v)
     fig = go.Figure()
-    sphere_specs = [
-        (min_radius, "rgba(255,80,80,0.35)", "min radius"),
-        (max_radius, "rgba(80,120,255,0.25)", "max radius"),
-    ]
-    for r, color, name in sphere_specs:
-        xs = center[0] + r * np.cos(uu) * np.cos(vv)
-        ys = center[1] + r * np.sin(uu) * np.cos(vv)
-        zs = center[2] + r * np.sin(vv)
-        fig.add_trace(
-            go.Surface(
-                x=xs,
-                y=ys,
-                z=zs,
-                showscale=False,
-                opacity=0.35,
-                surfacecolor=np.zeros_like(xs),
-                name=name,
-                colorscale=[[0, color], [1, color]],
-                contours={
-                    "x": {"show": True, "color": color, "width": 2, "highlightwidth": 4},
-                    "y": {"show": True, "color": color, "width": 2, "highlightwidth": 4},
-                    "z": {"show": True, "color": color, "width": 2, "highlightwidth": 4},
-                },
-            )
-        )
-    # add an equator ring to make the band visible
-    ring_theta = np.linspace(min_elev_deg, max_elev_deg, 3)
-    for theta_deg, ring_color in zip(ring_theta, ["#ff5050", "#8080ff", "#5050ff"], strict=False):
-        theta = np.radians(theta_deg)
-        ring_r = (min_radius + max_radius) * 0.5
-        x_ring = center[0] + ring_r * np.cos(u) * np.cos(theta)
-        y_ring = center[1] + ring_r * np.sin(u) * np.cos(theta)
-        z_ring = center[2] + ring_r * np.sin(theta) * np.ones_like(u)
-        fig.add_trace(
-            go.Scatter3d(
-            x=x_ring,
-            y=y_ring,
-            z=z_ring,
-            mode="lines",
-            line={"color": ring_color, "width": 6, "dash": "dash"},
-            name=f"elev {theta_deg:.1f}°",
-            showlegend=False,
-            opacity=0.8,
+    # show a single mid-shell fragment with stronger alpha
+    r_mid = (min_radius + max_radius) * 0.5
+    xs = center[0] + r_mid * np.cos(uu) * np.cos(vv)
+    ys = center[1] + r_mid * np.sin(uu) * np.cos(vv)
+    zs = center[2] + r_mid * np.sin(vv)
+    fig.add_trace(
+        go.Surface(
+            x=xs,
+            y=ys,
+            z=zs,
+            showscale=False,
+            opacity=0.6,
+            surfacecolor=np.zeros_like(xs),
+            name="sampling band",
+            colorscale=[[0, "rgba(80,120,255,0.9)"], [1, "rgba(80,120,255,0.9)"]],
+            contours={
+                "x": {"show": True, "color": "#5078ff", "width": 2, "highlightwidth": 4},
+                "y": {"show": True, "color": "#5078ff", "width": 2, "highlightwidth": 4},
+                "z": {"show": True, "color": "#5078ff", "width": 2, "highlightwidth": 4},
+            },
         )
     )
-
-        fig.add_trace(
-            go.Scatter3d(
-                x=pos_sub[:, 0],
-                y=pos_sub[:, 1],
-                z=pos_sub[:, 2],
-                mode="markers",
-                marker={"size": 3, "color": "darkorange", "opacity": 0.6},
-                name="shell samples",
-            )
-        )
     fig.add_trace(
         go.Scatter3d(
             x=[center[0]],
@@ -244,22 +200,8 @@ def plot_sampling_shell(
         )
     )
     if mesh is not None:
-        verts = mesh.vertices
-        faces = mesh.faces
-        fig.add_trace(
-            go.Mesh3d(
-                x=verts[:, 0],
-                y=verts[:, 1],
-                z=verts[:, 2],
-                i=faces[:, 0],
-                j=faces[:, 1],
-                k=faces[:, 2],
-                opacity=0.15,
-                color="gray",
-                name="mesh",
-                hoverinfo="skip",
-            )
-        )
+        for trace in _mesh_to_plotly(mesh, double_sided=True):
+            fig.add_trace(trace)
     fig.update_layout(scene_aspectmode="data", title="Sampling shell (r_min/r_max + elev cap)")
     if path is not None:
         fig.write_html(str(path))
@@ -270,67 +212,30 @@ def plot_candidate_frustums(
     poses: torch.Tensor | "PoseTW",  # type: ignore[name-defined]
     camera,
     mesh: trimesh.Trimesh | None,
-    traj_positions: np.ndarray,
     path: Path | None = None,
     max_frustums: int = 12,
+    frustum_scale: float = 1.0,
 ) -> go.Figure:
-    """Plot trajectory, mesh, all candidate centres, and frustums for a few."""
+    """Plot mesh, candidate centres, and frustums for a subset using the shared SnippetPlotBuilder."""
 
     pos = _pose_positions(poses)
-    fig = go.Figure()
-
+    builder = SnippetPlotBuilder(title="Candidates with frustums", scene_ranges={"xaxis": {}, "yaxis": {}, "zaxis": {}}, height=900)
     if mesh is not None:
-        verts = mesh.vertices
-        faces = mesh.faces
-        fig.add_trace(
-            go.Mesh3d(
-                x=verts[:, 0],
-                y=verts[:, 1],
-                z=verts[:, 2],
-                i=faces[:, 0],
-                j=faces[:, 1],
-                k=faces[:, 2],
-                opacity=0.18,
-                color="lightgray",
-                name="mesh",
-                hoverinfo="skip",
-            )
-        )
-
-    fig.add_trace(
-        go.Scatter3d(
-            x=traj_positions[:, 0],
-            y=traj_positions[:, 1],
-            z=traj_positions[:, 2],
-            mode="lines+markers",
-            marker={"size": 3, "color": "black"},
-            line={"color": "black", "width": 4},
-            name="trajectory",
-        )
-    )
-
-    fig.add_trace(
+        builder.add_mesh(mesh, double_sided=True)
+    builder.fig.add_trace(
         go.Scatter3d(
             x=pos[:, 0],
             y=pos[:, 1],
             z=pos[:, 2],
             mode="markers",
-            marker={"size": 2, "color": "royalblue", "opacity": 0.4},
+            marker={"size": 2, "color": "royalblue", "opacity": 0.35},
             name="candidates",
         )
     )
 
-    intrinsics = camera_intrinsics(camera, frame_idx=0)
-    cam_tw = camera.calib if hasattr(camera, "calib") else camera
-    cam_data = cam_tw.tensor()
-    if hasattr(camera, "images"):
-        image_h = int(camera.images.shape[-2])
-        image_w = int(camera.images.shape[-1])
-    else:
-        image_h = int(cam_data[0, cam_tw.SIZE_IND][1].item()) if hasattr(cam_tw, "SIZE_IND") else 480
-        image_w = int(cam_data[0, cam_tw.SIZE_IND][0].item()) if hasattr(cam_tw, "SIZE_IND") else 640
-
     frustum_ids = np.linspace(0, pos.shape[0] - 1, num=min(max_frustums, pos.shape[0]), dtype=int)
+    cam_tw = camera.calib if hasattr(camera, "calib") else camera
+    cam0 = cam_tw[0] if hasattr(cam_tw, "__getitem__") else cam_tw
     for idx in frustum_ids:
         p = poses[idx]
         if hasattr(p, "matrix"):
@@ -344,9 +249,14 @@ def plot_candidate_frustums(
                 t_world_cam[:3, :4] = arr.detach().cpu().numpy()
             else:
                 raise ValueError("Unsupported pose format for frustum plotting.")
-        segments = camera_wireframe_segments(intrinsics, t_world_cam, (image_w, image_h))
-        for j, seg in enumerate(segments):
-            fig.add_trace(
+
+        pose_tw = PoseTW.from_matrix(t_world_cam)
+        # Use shared display transform (gravity align + display roll/yaw) for consistent axis orientation.
+        pose_disp = pose_for_display(pose_tw, align_gravity=True)
+
+        frustum_segments = _frustum_segments(cam0, pose_disp, scale=frustum_scale)
+        for j, seg in enumerate(frustum_segments):
+            builder.fig.add_trace(
                 go.Scatter3d(
                     x=seg[:, 0],
                     y=seg[:, 1],
@@ -357,8 +267,11 @@ def plot_candidate_frustums(
                     showlegend=bool(idx == frustum_ids[0] and j == 0),
                 )
             )
+        # add camera axes (RGB XYZ) for this candidate
+        axes = pose_disp.rotate(torch.eye(3)).detach().cpu().numpy()
+        builder.add_camera_axes(pose_disp.t.detach().cpu().numpy(), axes)
 
-    fig.update_layout(title="Candidates with frustums + trajectory", scene={"aspectmode": "data"}, height=900)
+    fig = builder.finalize()
     if path is not None:
         fig.write_html(str(path))
     return fig

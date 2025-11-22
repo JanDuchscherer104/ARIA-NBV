@@ -102,6 +102,7 @@ def crop_mesh_with_bounds(
     margin_m: float,
     *,
     max_faces: int | None = None,
+    min_keep_ratio: float = 0.1,
     console: Console | None = None,
 ) -> trimesh.Trimesh:
     """Return a copy of ``mesh`` cropped to an AABB with optional margin."""
@@ -125,6 +126,15 @@ def crop_mesh_with_bounds(
         return mesh
 
     cropped = mesh.submesh([face_mask], append=True)
+    keep_ratio = cropped.faces.shape[0] / float(mesh.faces.shape[0])
+    if keep_ratio < min_keep_ratio:
+        if console:
+            console.warn(
+                f"Mesh cropping would remove {(1.0 - keep_ratio):.0%} of faces (keep_ratio={keep_ratio:.3f}); "
+                "using original mesh instead to preserve walls."
+            )
+        return mesh
+
     if max_faces is not None and cropped.faces.shape[0] > max_faces:
         cropped = cropped.simplify_quadric_decimation(face_count=max_faces)
         if console:
@@ -222,6 +232,7 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
                         bounds,
                         self.config.mesh_crop_margin_m,
                         max_faces=self.config.mesh_max_faces,
+                        min_keep_ratio=self.config.mesh_crop_min_keep_ratio,
                         console=self.console if self.config.verbose else None,
                     )
                 elif self.config.verbose:
@@ -256,6 +267,12 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
     mesh_crop_margin_m: float | None = Field(default=0.5, ge=0.0)
     """Margin added to semidense bounds when cropping meshes. ``None`` disables cropping."""
     cache_meshes: bool = Field(default=True)
+    mesh_crop_min_keep_ratio: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Abort cropping if fewer than this fraction of faces would remain (protects walls).",
+    )
 
     verbose: bool = Field(default=True)
     is_debug: bool = Field(default=False)

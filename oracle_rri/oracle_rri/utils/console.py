@@ -2,12 +2,15 @@
 
 import inspect
 import traceback
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from devtools import pformat
 from rich.console import Console as RichConsole
 from rich.theme import Theme
+
+from .summary import summarize
 
 if TYPE_CHECKING:
     from lightning.pytorch.loggers.logger import Logger
@@ -16,10 +19,12 @@ if TYPE_CHECKING:
 class Console(RichConsole):
     """Console wrapper that centralises formatting and convenience helpers."""
 
-    is_debug: bool
-    prefix: str | None = None
     _shared_pl_logger: ClassVar["Logger | None"] = None
     _shared_global_step: ClassVar[int] = 0
+    _global_verbose: ClassVar[bool] = True
+    _global_debug: ClassVar[bool] = False
+    _external_sink: ClassVar[Callable[[str], None] | None] = None
+    prefix: str | None = None
 
     default_settings = {
         "theme": Theme(
@@ -44,8 +49,6 @@ class Console(RichConsole):
         settings = self.default_settings.copy()
         settings.update(kwargs)
         super().__init__(**settings)
-        self.is_debug = False
-        self.verbose = True
         self.show_timestamps = False
         self.prefix = None
 
@@ -66,6 +69,24 @@ class Console(RichConsole):
     @_global_step.setter
     def _global_step(self, value: int) -> None:
         type(self)._shared_global_step = value
+
+    @property
+    def verbose(self) -> bool:
+        """Global verbose flag shared across all Console instances."""
+        return type(self)._global_verbose
+
+    @verbose.setter
+    def verbose(self, value: bool) -> None:
+        type(self)._global_verbose = value
+
+    @property
+    def is_debug(self) -> bool:
+        """Global debug flag shared across all Console instances."""
+        return type(self)._global_debug
+
+    @is_debug.setter
+    def is_debug(self, value: bool) -> None:
+        type(self)._global_debug = value
 
     @classmethod
     def with_prefix(cls, *parts: str) -> "Console":
@@ -116,43 +137,62 @@ class Console(RichConsole):
         """Emit an informational message when verbosity is enabled."""
         if not self.verbose:
             return
-        self.print(self._format_message(message))
+        formatted = self._format_message(message)
+        self.print(formatted)
+        self._emit_sink(formatted)
         if self._pl_logger is not None:
             self._log_to_lightning("info", message)
+
+    def log_summary(self, label: str, value: Any) -> None:
+        """Log a structured summary built from :func:`summarize`."""
+        summary = summarize(value)
+        self.log(f"{label}: {summary}")
 
     def warn(self, message: str) -> None:
         """Emit a warning message and include a short caller stack."""
         if self.verbose:
-            self.print(
+            formatted = (
                 f"[bright_yellow]Warning:[/bright_yellow] {self._format_message(message)}\n"
-                f"[dim]{self._get_caller_stack()}[/dim]",
+                f"[dim]{self._get_caller_stack()}[/dim]"
             )
+            self.print(formatted)
+            self._emit_sink(formatted)
         if self._pl_logger is not None:
             self._log_to_lightning("warning", message)
 
     def error(self, message: str) -> None:
         """Emit an error message and show the relevant caller stack."""
-        self.print(
-            f"[bright_red]Error:[/bright_red] {self._format_message(message)}\n[dim]{self._get_caller_stack()}[/dim]",
+        formatted = (
+            f"[bright_red]Error:[/bright_red] {self._format_message(message)}\n[dim]{self._get_caller_stack()}[/dim]"
         )
+        self.print(formatted)
+        self._emit_sink(formatted)
         if self._pl_logger is not None:
             self._log_to_lightning("error", message)
 
     def plog(self, obj: Any, **kwargs) -> None:
         """Pretty-print an object using the best available formatter."""
         if self.verbose:
-            self.print(pformat(obj, **kwargs))
+            formatted = pformat(obj, **kwargs)
+            self.print(formatted)
+            self._emit_sink(formatted)
         if self._pl_logger is not None:
             self._log_to_lightning("info", pformat(obj, **kwargs))
 
     def dbg(self, message: str) -> None:
         """Emit a debug message when debug mode is enabled."""
         if self.is_debug:
-            self.print(
-                f"[bold magenta]Debug:[/bold magenta] {self._format_message(message)}",
-            )
+            formatted = f"[bold magenta]Debug:[/bold magenta] {self._format_message(message)}"
+            self.print(formatted)
+            self._emit_sink(formatted)
             if self._pl_logger is not None:
                 self._log_to_lightning("debug", message)
+
+    def dbg_summary(self, label: str, value: Any) -> None:
+        """Debug-level structured summary."""
+        if self.is_debug:
+            summary = summarize(value)
+            self.dbg(f"{label}: {summary}")
 
     def set_verbose(self, verbose: bool) -> "Console":
         """Toggle verbose logging output."""
@@ -282,3 +322,19 @@ class Console(RichConsole):
         except Exception:
             # Fallback: silent failure to avoid breaking training
             pass
+
+    @classmethod
+    def set_sink(cls, sink: Callable[[str], None] | None) -> None:
+        """Register an external sink to receive plain-text log lines."""
+
+        cls._external_sink = sink
+
+    def _emit_sink(self, message: str) -> None:
+        """Emit formatted message to external sink if registered."""
+
+        if self._external_sink is not None:
+            try:
+                self._external_sink(message)
+            except Exception:
+                # Sink failures should not disrupt logging
+                pass

@@ -1,0 +1,183 @@
+import numpy as np
+import pytest
+import torch
+import trimesh
+from efm3d.aria import CameraTW, PoseTW
+from efm3d.aria.aria_constants import (
+    ARIA_CALIB,
+    ARIA_FRAME_ID,
+    ARIA_IMG,
+    ARIA_IMG_TIME_NS,
+    ARIA_POINTS_DIST_STD,
+    ARIA_POINTS_INV_DIST_STD,
+    ARIA_POINTS_TIME_NS,
+    ARIA_POINTS_VOL_MAX,
+    ARIA_POINTS_VOL_MIN,
+    ARIA_POINTS_WORLD,
+    ARIA_POSE_T_WORLD_RIG,
+    ARIA_POSE_TIME_NS,
+)
+
+from oracle_rri.data.efm_views import EfmSnippetView
+from oracle_rri.pose_generation.types import CandidateSamplingResult
+
+try:
+    import pytorch3d.renderer as _pytorch3d_renderer  # noqa: F401
+except Exception:  # pragma: no cover - availability guard
+    PYTORCH3D_AVAILABLE = False
+else:  # pragma: no cover - availability guard
+    PYTORCH3D_AVAILABLE = True
+
+if PYTORCH3D_AVAILABLE:
+    from oracle_rri.rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
+else:  # pragma: no cover - availability guard
+    CandidateDepthRendererConfig = None  # type: ignore[assignment]
+    Pytorch3DDepthRendererConfig = None  # type: ignore[assignment]
+
+pytestmark = pytest.mark.skipif(
+    not PYTORCH3D_AVAILABLE,
+    reason="PyTorch3D renderer bindings are required for renderer tests.",
+)
+
+
+def _make_camera(width: int = 64, height: int = 64) -> CameraTW:
+    params = torch.tensor([[60.0, 60.0, width / 2.0, height / 2.0]], dtype=torch.float32)
+    return CameraTW.from_surreal(
+        width=torch.tensor([float(width)], dtype=torch.float32),
+        height=torch.tensor([float(height)], dtype=torch.float32),
+        type_str="Pinhole",
+        params=params,
+        gain=torch.zeros(1),
+        exposure_s=torch.zeros(1),
+        valid_radius=torch.tensor([max(width, height)], dtype=torch.float32),
+        T_camera_rig=PoseTW.from_matrix3x4(torch.eye(3, 4).unsqueeze(0)),
+    )
+
+
+def _make_pose(z: float = 0.0) -> PoseTW:
+    rot = torch.eye(3).unsqueeze(0)
+    t = torch.tensor([[0.0, 0.0, z]], dtype=torch.float32)
+    return PoseTW.from_Rt(rot, t)
+
+
+def _make_mesh(z_center: float = 4.0, extent: float = 10.0) -> trimesh.Trimesh:
+    verts = np.array(
+        [
+            [-extent, -extent, z_center],
+            [extent, -extent, z_center],
+            [extent, extent, z_center],
+            [-extent, extent, z_center],
+        ],
+        dtype=np.float32,
+    )
+    faces = np.array([[0, 2, 1], [0, 3, 2]])
+    return trimesh.Trimesh(vertices=verts, faces=faces, process=False)
+
+
+def _make_snippet(mesh: trimesh.Trimesh, camera: CameraTW) -> EfmSnippetView:
+    num_frames = 1
+    rgb_key = ARIA_IMG[0]
+    calib_key = ARIA_CALIB[0]
+    time_key = ARIA_IMG_TIME_NS[0]
+    frame_key = ARIA_FRAME_ID[0]
+
+    size = camera.size.squeeze()
+    img_w = int(size[0].item())
+    img_h = int(size[1].item())
+    images = torch.zeros(num_frames, 3, img_h, img_w)
+    times = torch.zeros(num_frames, dtype=torch.int64)
+    frame_ids = torch.arange(num_frames, dtype=torch.int64)
+    pose_seq = PoseTW.from_matrix3x4(torch.eye(3, 4).unsqueeze(0))
+    sem_points = torch.zeros(num_frames, 1, 3)
+    efm = {
+        rgb_key: images,
+        calib_key: camera,
+        time_key: times,
+        frame_key: frame_ids,
+        ARIA_POSE_T_WORLD_RIG: pose_seq,
+        ARIA_POSE_TIME_NS: times,
+        "pose/gravity_in_world": torch.tensor([0.0, 0.0, -9.81]),
+        ARIA_POINTS_WORLD: sem_points,
+        ARIA_POINTS_DIST_STD: torch.zeros(num_frames, 1),
+        ARIA_POINTS_INV_DIST_STD: torch.zeros(num_frames, 1),
+        ARIA_POINTS_TIME_NS: times,
+        ARIA_POINTS_VOL_MIN: torch.tensor([-1.0, -1.0, -1.0]),
+        ARIA_POINTS_VOL_MAX: torch.tensor([1.0, 1.0, 1.0]),
+    }
+    return EfmSnippetView(
+        efm=efm,
+        scene_id="demo_scene",
+        snippet_id="demo_snippet",
+        mesh=mesh,
+    )
+
+
+def _make_candidates(num: int = 1, z: float = 2.0) -> CandidateSamplingResult:
+    poses = _make_pose(z=z).repeat(num, 1)
+    mask = torch.ones(num, dtype=torch.bool)
+    shell = poses.tensor()
+    return {
+        "poses": poses,
+        "mask_valid": mask,
+        "masks": [mask],
+        "shell_poses": shell,
+    }
+
+
+def test_pytorch3d_renderer_produces_depth():
+    mesh = _make_mesh()
+    cam = _make_camera()
+    pose = _make_pose()
+
+    cfg = Pytorch3DDepthRendererConfig(device="cpu", verbose=False)
+    renderer = cfg.setup_target()
+
+    depth = renderer.render_depth(pose_world_cam=pose, mesh=mesh, camera=cam)
+    assert depth.shape == (64, 64)
+    hit_ratio = float((depth < cfg.zfar).float().mean().item())
+    assert torch.isfinite(depth).all()
+    assert hit_ratio > 0.2  # large plane should cover most pixels
+    assert depth.min().item() < cfg.zfar
+
+
+def test_candidate_depth_renderer_respects_mask():
+    mesh = _make_mesh()
+    cam = _make_camera()
+    sample = _make_snippet(mesh, cam)
+    candidates = _make_candidates(num=2, z=2.0)
+    candidates["mask_valid"][0] = False
+
+    cfg = CandidateDepthRendererConfig(
+        camera_stream="rgb",
+        renderer=Pytorch3DDepthRendererConfig(device="cpu", verbose=False),
+        max_candidates=1,
+    )
+    renderer = cfg.setup_target()
+
+    batch = renderer.render(sample=sample, candidates=candidates)
+    assert batch["depths"].shape[0] == 1
+    assert batch["candidate_indices"].shape[0] == 1
+    assert batch["candidate_indices"][0].item() == 1
+    assert torch.equal(batch["mask_valid"], candidates["mask_valid"])
+
+
+def test_backface_culling_blocks_interior_walls():
+    """Backface culling hides interiors unless two-sided faces are added."""
+
+    cam = _make_camera()
+    pose = _make_pose(z=0.0)
+    mesh = trimesh.creation.box(extents=(2.0, 2.0, 2.0))
+
+    cfg_culled = Pytorch3DDepthRendererConfig(device="cpu", cull_backfaces=True, two_sided=False)
+    depth_culled = cfg_culled.setup_target().render_depth(pose_world_cam=pose, mesh=mesh, camera=cam)
+
+    cfg_two_sided = Pytorch3DDepthRendererConfig(device="cpu", cull_backfaces=True, two_sided=True)
+    depth_two_sided = cfg_two_sided.setup_target().render_depth(
+        pose_world_cam=pose, mesh=mesh, camera=cam
+    )
+
+    hit_ratio_culled = float((depth_culled < cfg_culled.zfar).float().mean().item())
+    hit_ratio_two_sided = float((depth_two_sided < cfg_two_sided.zfar).float().mean().item())
+
+    assert hit_ratio_culled == 0.0
+    assert hit_ratio_two_sided > 0.5

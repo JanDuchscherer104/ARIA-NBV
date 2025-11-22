@@ -15,13 +15,14 @@ from __future__ import annotations
 import numpy as np
 import plotly.graph_objects as go
 import torch
+import trimesh
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
-from efm3d.utils.gravity import GRAVITY_DIRECTION_VIO, gravity_align_T_world_cam
 from plotly.subplots import make_subplots
 
 from oracle_rri.data import EfmCameraView, EfmSnippetView, EfmTrajectoryView
 from oracle_rri.utils import Console
+from oracle_rri.utils.frames import pose_for_display
 
 console = Console.with_prefix("plotting")
 
@@ -99,46 +100,56 @@ def _bbox_edges(min_pt: np.ndarray, max_pt: np.ndarray) -> list[np.ndarray]:
     return [corners[list(pair)] for pair in edges_idx]
 
 
-def _mesh_to_plotly(mesh, *, double_sided: bool = False) -> list[go.Mesh3d]:
-    """Convert a Trimesh to one or two Plotly Mesh3d traces (inner + outer)."""
+def _proxy_box_mesh(bounds: np.ndarray) -> "trimesh.Trimesh":
+    import trimesh
+
+    vmin, vmax = bounds
+    extents = vmax - vmin
+    box = trimesh.creation.box(extents=extents, transform=trimesh.transformations.translation_matrix(vmin + extents / 2.0))
+    return box
+
+
+def _mesh_to_plotly(mesh, *, double_sided: bool = False, add_proxy_walls: bool = True) -> list[go.Mesh3d]:
+    """Convert a Trimesh to Plotly Mesh3d traces.
+
+    double_sided=True duplicates faces with reversed winding so interior walls remain
+    visible when the camera is inside the mesh (Plotly only shades front faces).
+    add_proxy_walls=True adds missing wall planes from the mesh bounds when coverage is low.
+    """
 
     vertices = mesh.vertices
     faces = mesh.faces
     traces: list[go.Mesh3d] = []
 
-    traces.append(
-        go.Mesh3d(
-            x=vertices[:, 0],
-            y=vertices[:, 1],
-            z=vertices[:, 2],
-            i=faces[:, 0],
-            j=faces[:, 1],
-            k=faces[:, 2],
-            color="lightgray",
-            opacity=0.35,
-            flatshading=True,
-            lighting={"ambient": 1.0, "diffuse": 0.3, "specular": 0.0, "fresnel": 0.0, "roughness": 1.0},
-            name="GT Mesh",
-            hoverinfo="skip",
-            showscale=False,
-        )
+    base_trace = go.Mesh3d(
+        x=vertices[:, 0],
+        y=vertices[:, 1],
+        z=vertices[:, 2],
+        i=faces[:, 0],
+        j=faces[:, 1],
+        k=faces[:, 2],
+        color="lightgray",
+        opacity=0.35,
+        flatshading=True,
+        lighting={"ambient": 1.0, "diffuse": 0.3, "specular": 0.0, "fresnel": 0.0, "roughness": 1.0},
+        name="GT Mesh",
+        hoverinfo="skip",
+        showscale=False,
     )
+    traces.append(base_trace)
 
     if double_sided:
-        eps = 0.003
-        v_normals = mesh.vertex_normals
-        inner_vertices = vertices - eps * v_normals
         faces_rev = faces[:, [0, 2, 1]]
         traces.append(
             go.Mesh3d(
-                x=inner_vertices[:, 0],
-                y=inner_vertices[:, 1],
-                z=inner_vertices[:, 2],
+                x=vertices[:, 0],
+                y=vertices[:, 1],
+                z=vertices[:, 2],
                 i=faces_rev[:, 0],
                 j=faces_rev[:, 1],
                 k=faces_rev[:, 2],
                 color="#c0c0c0",
-                opacity=0.45,
+                opacity=0.35,
                 flatshading=True,
                 lighting={"ambient": 1.0, "diffuse": 0.0, "specular": 0.0, "fresnel": 0.0, "roughness": 1.0},
                 name="GT Mesh (inner)",
@@ -146,6 +157,53 @@ def _mesh_to_plotly(mesh, *, double_sided: bool = False) -> list[go.Mesh3d]:
                 showscale=False,
             )
         )
+
+    if add_proxy_walls:
+        # Detect missing wall coverage (very low area near bounds); add thin box faces if needed.
+        centers = mesh.triangles_center
+        areas = mesh.area_faces
+        vmin, vmax = mesh.bounds
+        extents = vmax - vmin
+        desired = {
+            "xmin": extents[1] * extents[2],
+            "xmax": extents[1] * extents[2],
+            "ymin": extents[0] * extents[2],
+            "ymax": extents[0] * extents[2],
+            "zmin": extents[0] * extents[1],
+            "zmax": extents[0] * extents[1],
+        }
+        eps = 0.05
+        planes = {
+            "xmin": centers[:, 0] <= vmin[0] + eps,
+            "xmax": centers[:, 0] >= vmax[0] - eps,
+            "ymin": centers[:, 1] <= vmin[1] + eps,
+            "ymax": centers[:, 1] >= vmax[1] - eps,
+            "zmin": centers[:, 2] <= vmin[2] + eps,
+            "zmax": centers[:, 2] >= vmax[2] - eps,
+        }
+        coverage = {k: areas[m].sum() for k, m in planes.items()}
+        missing = [
+            k for k, cov in coverage.items() if desired[k] > 0 and cov < 0.2 * desired[k]
+        ]
+        if missing:
+            proxy = _proxy_box_mesh(mesh.bounds)
+            traces.append(
+                go.Mesh3d(
+                    x=proxy.vertices[:, 0],
+                    y=proxy.vertices[:, 1],
+                    z=proxy.vertices[:, 2],
+                    i=proxy.faces[:, 0],
+                    j=proxy.faces[:, 1],
+                    k=proxy.faces[:, 2],
+                    color="#b0c4de",
+                    opacity=0.12,
+                    flatshading=True,
+                    lighting={"ambient": 1.0, "diffuse": 0.0, "specular": 0.0, "fresnel": 0.0, "roughness": 1.0},
+                    name="Proxy walls",
+                    hoverinfo="skip",
+                    showscale=False,
+                )
+            )
 
     return traces
 
@@ -162,24 +220,11 @@ def _aligned_pose_world_cam(cam: EfmCameraView, traj: EfmTrajectoryView, frame_i
     t_world_rig = traj.t_world_rig[traj_idx]
     t_cam_rig = cam.calib.T_camera_rig[frame_idx]
     t_world_cam = t_world_rig @ t_cam_rig.inverse()
-
-    t_world_cam = gravity_align_T_world_cam(t_world_cam.unsqueeze(0), gravity_w=GRAVITY_DIRECTION_VIO).squeeze(0)
-
-    cz, sz = np.cos(-np.pi / 2), np.sin(-np.pi / 2)
-    cy, sy = np.cos(np.pi / 2), np.sin(np.pi / 2)
-    r_z = torch.tensor(
-        [[cz, -sz, 0.0], [sz, cz, 0.0], [0.0, 0.0, 1.0]], device=t_world_cam.device, dtype=t_world_cam.dtype
-    )
-    r_y = torch.tensor(
-        [[cy, 0.0, sy], [0.0, 1.0, 0.0], [-sy, 0.0, cy]], device=t_world_cam.device, dtype=t_world_cam.dtype
-    )
-    r_corr = r_z @ r_y
-    r_disp = t_world_cam.R @ r_corr
-    return PoseTW.from_Rt(r_disp, t_world_cam.t)
+    return pose_for_display(t_world_cam, align_gravity=True)
 
 
-class TrajectoryPlotBuilder:
-    """Composable builder for the trajectory + semidense + mesh Plotly figure."""
+class SnippetPlotBuilder:
+    """Composable builder for mesh/points/frusta visuals with optional trajectory."""
 
     def __init__(self, *, scene_ranges: dict, title: str, height: int = 900):
         self.fig = go.Figure()
@@ -187,14 +232,14 @@ class TrajectoryPlotBuilder:
         self.title = title
         self.height = height
 
-    def add_mesh(self, mesh, *, double_sided: bool = False) -> "TrajectoryPlotBuilder":
+    def add_mesh(self, mesh, *, double_sided: bool = False) -> "SnippetPlotBuilder":
         if mesh is None:
             return self
         for trace in _mesh_to_plotly(mesh, double_sided=double_sided):
             self.fig.add_trace(trace)
         return self
 
-    def add_semidense(self, pts_np: np.ndarray, *, name: str = "Semidense points") -> "TrajectoryPlotBuilder":
+    def add_semidense(self, pts_np: np.ndarray, *, name: str = "Semidense points") -> "SnippetPlotBuilder":
         if pts_np.size == 0:
             return self
         self.fig.add_trace(
@@ -216,7 +261,10 @@ class TrajectoryPlotBuilder:
         mark_first_last: bool = True,
         first_color: str = "green",
         last_color: str = "red",
-    ) -> "TrajectoryPlotBuilder":
+        show: bool = True,
+    ) -> "SnippetPlotBuilder":
+        if not show:
+            return self
         traj_x, traj_y, traj_z = traj_positions.T
         self.fig.add_trace(
             go.Scatter3d(
@@ -257,7 +305,7 @@ class TrajectoryPlotBuilder:
 
     def add_frustum(
         self, cam: CameraTW, pose_world_cam: PoseTW, *, scale: float = 1.0, name: str = "Frustum"
-    ) -> "TrajectoryPlotBuilder":
+    ) -> "SnippetPlotBuilder":
         frustum_segments = _frustum_segments(cam, pose_world_cam, scale=scale)
         for idx, seg in enumerate(frustum_segments):
             self.fig.add_trace(
@@ -270,10 +318,10 @@ class TrajectoryPlotBuilder:
                     name=name if idx == 0 else None,
                     showlegend=idx == 0,
                 )
-            )
+        )
         return self
 
-    def add_camera_axes(self, cam_center: np.ndarray, cam_axes: np.ndarray) -> "TrajectoryPlotBuilder":
+    def add_camera_axes(self, cam_center: np.ndarray, cam_axes: np.ndarray) -> "SnippetPlotBuilder":
         axis_colors = ["red", "green", "blue"]
         for axis, color in enumerate(axis_colors):
             axis_end = cam_center + cam_axes[axis] * 0.4
@@ -292,7 +340,7 @@ class TrajectoryPlotBuilder:
 
     def add_camera_center(
         self, cam_center: np.ndarray, *, color: str = "red", symbol: str = "diamond"
-    ) -> "TrajectoryPlotBuilder":
+    ) -> "SnippetPlotBuilder":
         self.fig.add_trace(
             go.Scatter3d(
                 x=[cam_center[0]],
@@ -314,7 +362,7 @@ class TrajectoryPlotBuilder:
         color: str = "gray",
         dash: str = "dash",
         width: int = 2,
-    ) -> "TrajectoryPlotBuilder":
+    ) -> "SnippetPlotBuilder":
         for idx, seg in enumerate(_bbox_edges(min_pt, max_pt)):
             self.fig.add_trace(
                 go.Scatter3d(
@@ -327,7 +375,7 @@ class TrajectoryPlotBuilder:
                     showlegend=idx == 0,
                     hoverinfo="skip",
                 )
-            )
+        )
         return self
 
     def finalize(self) -> go.Figure:
@@ -463,9 +511,9 @@ def plot_trajectory(
         scene_min = sem.volume_min.detach().cpu().numpy()
         scene_max = sem.volume_max.detach().cpu().numpy()
 
-    builder = TrajectoryPlotBuilder(title="Mesh + semidense + trajectory + camera frustum", scene_ranges=scene_ranges)
+    builder = SnippetPlotBuilder(title="Mesh + semidense + trajectory + camera frustum", scene_ranges=scene_ranges)
     builder.add_mesh(mesh, double_sided=double_sided_mesh).add_trajectory(
-        traj_positions, mark_first_last=mark_first_last
+        traj_positions, mark_first_last=mark_first_last, show=True
     )
 
     if pts_np.size > 0:

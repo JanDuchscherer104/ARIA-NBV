@@ -99,7 +99,9 @@ class CandidateSamplingResult(TypedDict):
     """PoseTW containing the final, filtered candidate viewpoints in Aria world frame (T_world_camera). """
     mask_valid: Tensor
     """Boolean mask of length `poses.batch_size` indicating which sampled poses survived all rules."""
-    masks: list[Tensor]
-    """Per-rule boolean masks in the order rules were applied; useful for debugging which rule killed which candidates."""
+    masks: Tensor
+    """Per-rule boolean masks stacked as [num_rules, num_shell_samples] aligned with shell_poses."""
+    rule_names: list[str]
+    """Names of rules corresponding to the first dimension of masks."""
     shell_poses: Tensor  # (N_shell, 12) float32
     """Raw sampled poses on the spherical shell *before* applying any rules, shape (N_shell, 12) as flattened [R|t] blocks. This is used purely for visualising the sampling distribution."""

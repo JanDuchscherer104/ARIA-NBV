@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, TypedDict
+from typing import Literal, TypedDict
 
 import torch
-from efm3d.aria import PoseTW
+from efm3d.aria import CameraTW, PoseTW
 from pydantic import Field
 
 from ..data.efm_views import EfmCameraView, EfmSnippetView
 from ..pose_generation.types import CandidateSamplingResult
 from ..utils import BaseConfig, Console
 from .pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig
-
-if TYPE_CHECKING:
-    from efm3d.aria import CameraTW, PoseTW
 
 CameraStream = Literal["rgb", "rgb_depth", "slam_left", "slam_right"]
 FrameSelection = Literal["first", "last"]
@@ -63,6 +60,9 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
     verbose: bool = False
     """Enable structured logging."""
 
+    is_debug: bool = False
+    """Enable detailed debug logging."""
+
 
 class CandidateDepthRenderer:
     """High-level helper that renders depth for candidate poses."""
@@ -71,7 +71,10 @@ class CandidateDepthRenderer:
 
     def __init__(self, config: CandidateDepthRendererConfig) -> None:
         self.config = config
-        self.console = Console.with_prefix(self.__class__.__name__).set_verbose(self.config.verbose)
+        debug_flag = self.config.is_debug or getattr(self.config.renderer, "is_debug", False)
+        self.console = (
+            Console.with_prefix(self.__class__.__name__).set_verbose(self.config.verbose).set_debug(debug_flag)
+        )
         self.renderer = self.config.renderer.setup_target()
 
     def render(
@@ -82,23 +85,38 @@ class CandidateDepthRenderer:
         """Render depth maps for valid candidate poses within a snippet."""
 
         if not sample.has_mesh or sample.mesh is None:
-            raise ValueError("CandidateDepthRenderer requires snippets with attached meshes.")
+            msg = "CandidateDepthRenderer requires snippets with attached meshes."
+            self.console.error(msg)
+            raise ValueError(msg)
+        self.console.log(
+            f"Rendering depths: candidates={candidates['poses'].tensor().shape[0]} stream={self.config.camera_stream}"
+        )
+        self.console.log(f"Mesh stats verts={sample.mesh.vertices.shape[0]:,} faces={sample.mesh.faces.shape[0]:,}")
         pose_batch, mask_valid, candidate_indices = self._filter_candidates(candidates)
+        self.console.log_summary("candidate_indices", candidate_indices)
         camera_view = self._camera_view(sample)
         frame_idx = 0 if self.config.frame_selection == "first" else -1
+        frame_calib = self._frame_calib(camera_view.calib, frame_idx)
+        self.console.log_summary("camera_calib_frame", frame_calib.tensor())
+        self.console.dbg_summary("pose_batch_tensor", pose_batch.tensor())
         depths = self.renderer.render_batch(
             poses=pose_batch,
             mesh=sample.mesh,
             camera=camera_view.calib,
             frame_index=frame_idx,
         )
-        camera_calib = camera_view.calib[frame_idx]
+        hit_ratio = float((depths < self.renderer.config.zfar).float().mean().item())
+        self.console.log_summary("depth_batch_stats", {"hit_ratio": hit_ratio, "zfar": self.renderer.config.zfar})
+        if hit_ratio == 0.0:
+            self.console.warn(
+                "All candidate depth pixels are at zfar; check camera poses, mesh normals, or backface culling."
+            )
         return {
             "depths": depths,
             "poses": pose_batch,
             "mask_valid": mask_valid,
             "candidate_indices": candidate_indices,
-            "camera": camera_calib,
+            "camera": frame_calib,
         }
 
     # ------------------------------------------------------------------
@@ -114,6 +132,13 @@ class CandidateDepthRenderer:
             return sample.camera_slam_right
         raise ValueError(f"Unsupported camera stream '{stream}'.")
 
+    def _frame_calib(self, calib: CameraTW, frame_idx: int) -> CameraTW:
+        tensor = calib.tensor()
+        if tensor.ndim == 1:
+            return calib
+        frame = tensor[frame_idx].unsqueeze(0)
+        return CameraTW(frame)
+
     def _filter_candidates(
         self,
         candidates: CandidateSamplingResult,
@@ -124,6 +149,7 @@ class CandidateDepthRenderer:
             mask_valid = torch.ones(len(poses), dtype=torch.bool, device=poses.tensor().device)
         valid_idx = torch.nonzero(mask_valid, as_tuple=False).squeeze(-1)
         if valid_idx.numel() == 0:
+            self.console.warn("No valid candidates available for rendering.")
             raise ValueError("No valid candidates to render.")
         if self.config.max_candidates is not None:
             valid_idx = valid_idx[: self.config.max_candidates]

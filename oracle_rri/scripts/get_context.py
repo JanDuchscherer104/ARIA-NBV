@@ -16,7 +16,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-EXCLUDE_PATHS: list[str] = []
+EXCLUDE_PATHS: list[str] = ["__init__.py"]
 
 
 @dataclass
