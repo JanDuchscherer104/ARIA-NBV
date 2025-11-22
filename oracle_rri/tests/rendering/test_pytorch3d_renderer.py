@@ -74,7 +74,13 @@ def _make_mesh(z_center: float = 4.0, extent: float = 10.0) -> trimesh.Trimesh:
     return trimesh.Trimesh(vertices=verts, faces=faces, process=False)
 
 
-def _make_snippet(mesh: trimesh.Trimesh, camera: CameraTW) -> EfmSnippetView:
+def _make_snippet(
+    mesh: trimesh.Trimesh,
+    camera: CameraTW,
+    *,
+    volume_min: torch.Tensor | None = None,
+    volume_max: torch.Tensor | None = None,
+) -> EfmSnippetView:
     num_frames = 1
     rgb_key = ARIA_IMG[0]
     calib_key = ARIA_CALIB[0]
@@ -89,6 +95,11 @@ def _make_snippet(mesh: trimesh.Trimesh, camera: CameraTW) -> EfmSnippetView:
     frame_ids = torch.arange(num_frames, dtype=torch.int64)
     pose_seq = PoseTW.from_matrix3x4(torch.eye(3, 4).unsqueeze(0))
     sem_points = torch.zeros(num_frames, 1, 3)
+    if volume_min is None:
+        volume_min = torch.tensor([-1.0, -1.0, -1.0])
+    if volume_max is None:
+        volume_max = torch.tensor([1.0, 1.0, 1.0])
+
     efm = {
         rgb_key: images,
         calib_key: camera,
@@ -101,8 +112,8 @@ def _make_snippet(mesh: trimesh.Trimesh, camera: CameraTW) -> EfmSnippetView:
         ARIA_POINTS_DIST_STD: torch.zeros(num_frames, 1),
         ARIA_POINTS_INV_DIST_STD: torch.zeros(num_frames, 1),
         ARIA_POINTS_TIME_NS: times,
-        ARIA_POINTS_VOL_MIN: torch.tensor([-1.0, -1.0, -1.0]),
-        ARIA_POINTS_VOL_MAX: torch.tensor([1.0, 1.0, 1.0]),
+        ARIA_POINTS_VOL_MIN: volume_min,
+        ARIA_POINTS_VOL_MAX: volume_max,
     }
     return EfmSnippetView(
         efm=efm,
@@ -172,12 +183,57 @@ def test_backface_culling_blocks_interior_walls():
     depth_culled = cfg_culled.setup_target().render_depth(pose_world_cam=pose, mesh=mesh, camera=cam)
 
     cfg_two_sided = Pytorch3DDepthRendererConfig(device="cpu", cull_backfaces=True, two_sided=True)
-    depth_two_sided = cfg_two_sided.setup_target().render_depth(
-        pose_world_cam=pose, mesh=mesh, camera=cam
-    )
+    depth_two_sided = cfg_two_sided.setup_target().render_depth(pose_world_cam=pose, mesh=mesh, camera=cam)
 
     hit_ratio_culled = float((depth_culled < cfg_culled.zfar).float().mean().item())
     hit_ratio_two_sided = float((depth_two_sided < cfg_two_sided.zfar).float().mean().item())
 
     assert hit_ratio_culled == 0.0
     assert hit_ratio_two_sided > 0.5
+
+
+def test_proxy_walls_expand_to_occupancy_bounds():
+    """Proxy walls should use semidense AABB even when mesh is tiny."""
+
+    # Single floor quad; no walls.
+    mesh = trimesh.Trimesh(
+        vertices=np.array(
+            [
+                [-0.5, -0.5, 0.0],
+                [0.5, -0.5, 0.0],
+                [0.5, 0.5, 0.0],
+                [-0.5, 0.5, 0.0],
+            ],
+            dtype=np.float32,
+        ),
+        faces=np.array([[0, 1, 2], [0, 2, 3]]),
+        process=False,
+    )
+    cfg = Pytorch3DDepthRendererConfig(device="cpu", verbose=False)
+    renderer = cfg.setup_target()
+    occ_extent = torch.tensor([-2.0, 2.0, -3.0, 3.0, -4.0, 4.0])
+
+    merged = renderer._maybe_with_proxy_walls(mesh, occupancy_extent=occ_extent)
+    vmin, vmax = merged.bounds
+    assert np.allclose(vmin, [-2.0, -3.0, -4.0], atol=1e-4)
+    assert np.allclose(vmax, [2.0, 3.0, 4.0], atol=1e-4)
+    assert merged.faces.shape[0] > mesh.faces.shape[0]
+
+
+def test_candidate_renderer_builds_ordered_occupancy_extent():
+    mesh = _make_mesh()
+    cam = _make_camera()
+    volume_min = torch.tensor([-4.0, -2.0, -1.0])
+    volume_max = torch.tensor([5.0, 3.0, 7.0])
+    sample = _make_snippet(mesh, cam, volume_min=volume_min, volume_max=volume_max)
+
+    cfg = CandidateDepthRendererConfig(
+        camera_stream="rgb",
+        renderer=Pytorch3DDepthRendererConfig(device="cpu", verbose=False, add_proxy_walls=False),
+    )
+    renderer = cfg.setup_target()
+
+    occ_extent = renderer._occupancy_extent(sample, device=torch.device("cpu"))
+    assert occ_extent is not None
+    expected = torch.tensor([-4.0, 5.0, -2.0, 3.0, -1.0, 7.0])
+    assert torch.allclose(occ_extent.cpu(), expected)

@@ -109,7 +109,13 @@ def _proxy_box_mesh(bounds: np.ndarray) -> "trimesh.Trimesh":
     return box
 
 
-def _mesh_to_plotly(mesh, *, double_sided: bool = False, add_proxy_walls: bool = True) -> list[go.Mesh3d]:
+def _mesh_to_plotly(
+    mesh,
+    *,
+    double_sided: bool = False,
+    add_proxy_walls: bool = True,
+    occupancy_extent: np.ndarray | None = None,
+) -> list[go.Mesh3d]:
     """Convert a Trimesh to Plotly Mesh3d traces.
 
     double_sided=True duplicates faces with reversed winding so interior walls remain
@@ -162,7 +168,10 @@ def _mesh_to_plotly(mesh, *, double_sided: bool = False, add_proxy_walls: bool =
         # Detect missing wall coverage (very low area near bounds); add thin box faces if needed.
         centers = mesh.triangles_center
         areas = mesh.area_faces
-        vmin, vmax = mesh.bounds
+        if occupancy_extent is not None and occupancy_extent.shape == (2, 3):
+            vmin, vmax = occupancy_extent
+        else:
+            vmin, vmax = mesh.bounds
         extents = vmax - vmin
         desired = {
             "xmin": extents[1] * extents[2],
@@ -186,7 +195,8 @@ def _mesh_to_plotly(mesh, *, double_sided: bool = False, add_proxy_walls: bool =
             k for k, cov in coverage.items() if desired[k] > 0 and cov < 0.2 * desired[k]
         ]
         if missing:
-            proxy = _proxy_box_mesh(mesh.bounds)
+            proxy_bounds = occupancy_extent if occupancy_extent is not None else mesh.bounds
+            proxy = _proxy_box_mesh(proxy_bounds)
             traces.append(
                 go.Mesh3d(
                     x=proxy.vertices[:, 0],
@@ -196,7 +206,7 @@ def _mesh_to_plotly(mesh, *, double_sided: bool = False, add_proxy_walls: bool =
                     j=proxy.faces[:, 1],
                     k=proxy.faces[:, 2],
                     color="#b0c4de",
-                    opacity=0.12,
+                    opacity=0.3,
                     flatshading=True,
                     lighting={"ambient": 1.0, "diffuse": 0.0, "specular": 0.0, "fresnel": 0.0, "roughness": 1.0},
                     name="Proxy walls",
@@ -232,10 +242,16 @@ class SnippetPlotBuilder:
         self.title = title
         self.height = height
 
-    def add_mesh(self, mesh, *, double_sided: bool = False) -> "SnippetPlotBuilder":
+    def add_mesh(
+        self,
+        mesh,
+        *,
+        double_sided: bool = False,
+        occupancy_extent: np.ndarray | None = None,
+    ) -> "SnippetPlotBuilder":
         if mesh is None:
             return self
-        for trace in _mesh_to_plotly(mesh, double_sided=double_sided):
+        for trace in _mesh_to_plotly(mesh, double_sided=double_sided, occupancy_extent=occupancy_extent):
             self.fig.add_trace(trace)
         return self
 
@@ -512,7 +528,7 @@ def plot_trajectory(
         scene_max = sem.volume_max.detach().cpu().numpy()
 
     builder = SnippetPlotBuilder(title="Mesh + semidense + trajectory + camera frustum", scene_ranges=scene_ranges)
-    builder.add_mesh(mesh, double_sided=double_sided_mesh).add_trajectory(
+    builder.add_mesh(mesh, double_sided=double_sided_mesh, occupancy_extent=None if scene_min is None else np.stack([scene_min, scene_max])).add_trajectory(
         traj_positions, mark_first_last=mark_first_last, show=True
     )
 

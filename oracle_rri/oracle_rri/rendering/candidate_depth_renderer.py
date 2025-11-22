@@ -99,11 +99,13 @@ class CandidateDepthRenderer:
         frame_calib = self._frame_calib(camera_view.calib, frame_idx)
         self.console.log_summary("camera_calib_frame", frame_calib.tensor())
         self.console.dbg_summary("pose_batch_tensor", pose_batch.tensor())
+        occ_extent = self._occupancy_extent(sample, device=pose_batch.tensor().device)
         depths = self.renderer.render_batch(
             poses=pose_batch,
             mesh=sample.mesh,
             camera=camera_view.calib,
             frame_index=frame_idx,
+            occupancy_extent=occ_extent,
         )
         hit_ratio = float((depths < self.renderer.config.zfar).float().mean().item())
         self.console.log_summary("depth_batch_stats", {"hit_ratio": hit_ratio, "zfar": self.renderer.config.zfar})
@@ -157,6 +159,17 @@ class CandidateDepthRenderer:
         pose_tensor = poses.tensor()[valid_idx]
         pose_batch = PoseTW(pose_tensor)
         return pose_batch, mask_valid, valid_idx
+
+    def _occupancy_extent(self, sample: EfmSnippetView, *, device: torch.device) -> torch.Tensor | None:
+        """Return ``[xmin, xmax, ymin, ymax, zmin, zmax]`` bounds from semidense metadata."""
+
+        volume_min = getattr(sample.semidense, "volume_min", None)
+        volume_max = getattr(sample.semidense, "volume_max", None)
+        if volume_min is None or volume_max is None:
+            return None
+        vmin = volume_min.to(device=device, dtype=torch.float32)
+        vmax = volume_max.to(device=device, dtype=torch.float32)
+        return torch.stack([vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]], dim=0)
 
 
 __all__ = [

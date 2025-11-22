@@ -9,7 +9,6 @@ from typing import Any, Literal, TypedDict, cast
 
 import streamlit as st
 import torch
-from streamlit import experimental_rerun
 from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
 
 from oracle_rri.data import AseEfmDatasetConfig, EfmSnippetView
@@ -475,7 +474,7 @@ def _start_task(stage: str, target: callable, *args: Any, **kwargs: Any) -> None
             task_state["thread"] = None
             task_state["status"] = "error" if task_state.get("error") else "done"
             try:
-                experimental_rerun()
+                st.rerun()
             except Exception:
                 pass
 
