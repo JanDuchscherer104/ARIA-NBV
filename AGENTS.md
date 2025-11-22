@@ -32,52 +32,27 @@ We are building an **active Next-Best-View planning system** for complex indoor 
 ### Agentic Behaviors
 
 - **On Initialization**:
-  - **Always** run `python -m syrenka classdiagram oracle_rri/oracle_rri` (in active `aria-nbv` conda env) to generate an up-to-date class diagram of the `oracle_rri` package for reference.
-  - **Always** read: `index.qmd`, `todos.qmd`, `ase_dataset.qmd`,
-  - **Optional** (depending on your task) read:`resources.qmd`, `questions.qmd`, `oracle_rri_impl.qmd`, `efm3d_implementation.qmd`, `efm3d_symbol_index.qmd`, `prj_aria_tools_impl.qmd`, `rri_computation.qmd` to get a comprehensive understanding of the project goals, architecture, and technical details.
+  - **Always** run `make context` (in active `aria-nbv` conda env) to generate an up-to-date class diagram of the `oracle_rri` package and get an overview of all defined symbols for reference.
+  - **Always** run `make context-dir-tree` right after `make context` to get the current oracle_rri directory tree snapshot.
+  - **Always** read: `index.qmd`, `todos.qmd`.
+  - **Optional** (depending on your task) read: `ase_dataset.qmd`, `resources.qmd`, `oracle_rri_impl.qmd`, `efm3d_implementation.qmd`, `efm3d_symbol_index.qmd`, `prj_aria_tools_impl.qmd`, `rri_computation.qmd` to get a comprehensive understanding of the project goals, architecture, and technical details.
 - **Always** start with condensing the problem description, then do initial exploration of all potentially relvant files before presenting a rough outline of the solution together with termination and acceptance criteria then implement incrementally while testing along the way. Always maintain a list of tasks.
 - **Always** follow code conventions (type hints, Google docstrings, Column enums)
 - **Prefer** using existing external implementations rather than reinventing the wheel - when confronted with a new requirement or problem, We can always add new libraries! Feel free to test code ideas in the terminal before proceeding.
 - **Follow** established patterns and aim for clear separation of concerns (modularity, single responsibility principle, config-as-factory pattern).
 - **Ensure** code quality:
   - **For package code:** Run `ruff format <file>` -> `ruff check <file>` -> `pytest <file>` to ensure code style compliance after finishing work on a file; Work test-driven and run pytest for changed code.
-   Execute `make ci` for changes affecting multiple files to validate the full continuous integration pipeline before terminating.
-- **Use** your **MCP tools** (upstash_context7 [get-library-docs, resolve-library-id], code-index [find_files, get_file_summary, get_file_watcher_status], ithub_github_mcp_server) to retrieve helpful context from external libraries or our own codebase when needed.
+- **Use** your **MCP tools** (upstash_context7 [get-library-docs, resolve-library-id], code-index [find_files, get_file_summary, get_file_watcher_status], github_mcp_server) to retrieve helpful context from external libraries or our own codebase when needed. `make context-dir-tree` can be used to get an overview of the project directory structure. And `make context-external` to get a summary of the `efm3d` and `atek` packages.
 - **Use** your web search capabilities to find further sources (i.e. papers on arXiv, Wikipedia)
 - **Regularly** step back and think about your alignment, high-level design and implementation strategy before diving into code changes. Checking your alignment with the project goals must be done by #think-ing about the problem at hand.
 - **Frequenty** summarize your findings and understandings of the project and use your scratchpad in @.github/codex_memory.md. Keep track of your todos and progress.
 - **Always** inspect all referenced symbols or files and get an initial understanding, then #think to plan your next steps before potentially gathering additional context or making code changes.
 - **When in doubt**, ask for clarification or additional context rather than making assumptions or gether relevant context autonomously.
 - **Never** terminate without confirming that all of your changes have been tested with real-life pytest scenearios - i.e. using real data, not just mocks: the full functionality of all modules must be verified in integration tests.
+- **Never** make any changes that have not been requested or are outside the scope of the current task.
 - **Always** keep the documentation up to date with any code changes!
-
-
-### Repository Structure
-
-#### Python Package
-
-```
-NBV/
-├── oracle_rri/            # Main package - See below more in [index.qmd]
-│   └── ...                # Oracle RRI implementation
-├── external/              # Vendored dependencies
-│   ├── efm3d/             # EFM3D model implementation - See below more in [index.qmd]
-│   ├── ATEK/              # Aria toolkit
-│   ├── projectaria_tools/ # ASE dataset utilities
-│   └── scenescript/       # Scene specification tools
-├── notebooks/             # Exploration and prototyping
-│   └── ase_oracle_rri_simplified.ipynb  # Oracle RRI implementation
-└──  docs/                   # Project documentation (Quarto)
-    ├── index.qmd           # Main documentation index
-    └── contents/
-        ├── todos.qmd      # Action items and development tasks
-        ├── impl/
-        │   ├── oracle_rri_impl.qmd        # Oracle RRI implementation guide
-        │   ├── efm3d_implementation.qmd   # EFM3D utilities reference
-        │   └── efm3d_symbol_index.qmd     # Complete EFM3D symbol catalog
-        ├── theory/        # Mathematical foundations (RRI, surface metrics)
-        └── literature/    # Paper summaries (VIN-NBV, GenNBV, EFM3D)
-```
+- **Before terminating**: replace any temporary citation placeholders of the form `cite…` with either (a) direct markdown links to authoritative sources, or (b) valid bib references already present in `references.bib`. Do not leave the placeholder markers in committed text.
+- **Finally**, before terminating, summarize all important findings, changes made, and any open suggestions that remain in your final report. All crucial finfings and suggestions must be documented in `.codex/<label for tasks>.md` for future reference. Here include potential problems in the current implementation, suggestions for future improvements, and any other relevant insights gained during your work that could benefit future contributors.
 
 ## Key Documentation Files
 
@@ -139,8 +114,19 @@ NBV/
 
 - ✓ **Docstrings**: All public methods must have Google-style docstrings including type and shape for tensor/array arguments and return values
 
-**Example (Typing + Docstring)**:
 
+## Documentation and Paper Conventions
+
+- `typst` for presentations and publications
+- `quarto` for documentation site
+- **Always** use `docs/references.bib` for bibliography management.
+- **Always** use `make context-qmd-tree` when working on documentation to get an up-to-date overview of the documentation structure.
+- **In documentation**, include links to relevant documentations pages or external references like Wikipedia when mentioning key concepts or algorithms for the first time. Cite them as `[Wikipedia :: Concept Name](https://en.wikipedia.org/wiki/...)` in the text and add the corresponding entry in `references.bib`.
+- Aim for clarity and conciseness in explanations. Use diagrams or code snippets where appropriate to illustrate complex ideas.
+- Aim for a high educational value in explanations, assuming the reader has a graduate-level understanding of computer vision and machine learning but may not be familiar with the specific techniques used in this project.
+- **Always** ensure that the quarto project can be compiled wihtout issues, when making larger changes to the documentation run `quarto check` and `quarto render` to verify.
+
+**Example (Typing + Docstring)**:
 ```python
 from torch import Tensor
 
@@ -336,3 +322,9 @@ All fields are views over the dict produced by `load_atek_wds_dataset_as_efm`; c
 - `/websites/quarto` - For our documentation site
 
 **Note**: For EFM3D, ATEK, and ProjectAria tools, refer to the vendored source code in `external/` and the symbol index at `docs/contents/impl/efm3d_symbol_index.qmd`.
+
+---
+
+## Warning
+
+**This document may sometimes be out of date. Hence, references to file, classes, functions or design patterns may not always be accurate. Always verify against the actual codebase and project documentation - here `make context*` provide up-to-date snapshots of the code structure and symbol definitions that can be considered ground truth.**
