@@ -32,7 +32,7 @@ import trimesh
 from efm3d.aria import PoseTW
 from pydantic import Field, field_validator, model_validator
 
-from ..data.views import TypedSample
+from ..data.efm_views import EfmSnippetView
 from ..utils import BaseConfig, Console
 from .candidate_generation_rules import (
     FreeSpaceRule,
@@ -202,32 +202,39 @@ class CandidateViewGenerator:
 
     def __init__(self, config: CandidateViewGeneratorConfig):
         self.config = config
-        self.console = Console.with_prefix(self.__class__.__name__).set_verbose(True)
+        self.console = (
+            Console.with_prefix(self.__class__.__name__)
+            .set_verbose(self.config.verbose)
+            .set_debug(self.config.is_debug)
+        )
         self.rules: list[Rule] = []
         self._build_default_rules()
 
     def _build_default_rules(self) -> None:
         """Construct the default rule sequence based on the config."""
-        self.rules = [ShellSamplingRule(self.config), MinDistanceToMeshRule(self.config)]
+        self.rules = [ShellSamplingRule(self.config)]
+        if self.config.min_distance_to_mesh > 0:
+            self.rules.append(MinDistanceToMeshRule(self.config))
         if self.config.ensure_collision_free:
             self.rules.append(PathCollisionRule(self.config))
         if self.config.ensure_free_space:
             self.rules.append(FreeSpaceRule(self.config))
 
-    def generate_from_typed_sample(self, sample: TypedSample) -> CandidateSamplingResult:
-        """Generate candidate poses using data from a TypedSample.
-
-        Args:
-            sample: :class:`oracle_rri.data.views.TypedSample` containing
-                the final pose of the trajectory, semi-dense points and
-                optionally a GT mesh.
-
-        Returns:
-            CandidateSamplingResult with sampled poses and masks.
-        """
+    def generate_from_typed_sample(self, sample: EfmSnippetView) -> CandidateSamplingResult:
+        """Generate candidate poses using data from an :class:`EfmSnippetView`."""
         occupancy_extent = self._occupancy_extent_from_sample(sample)
         gt_mesh = sample.mesh
         last_pose = sample.trajectory.final_pose
+        self.console.log(
+            f"generate_from_typed_sample scene={sample.scene_id} snippet={sample.snippet_id} mesh={gt_mesh is not None}"
+        )
+        if occupancy_extent is not None:
+            self.console.log_summary("occupancy_extent", occupancy_extent)
+        if gt_mesh is not None:
+            self.console.log(
+                f"mesh stats verts={gt_mesh.vertices.shape[0]:,} faces={gt_mesh.faces.shape[0]:,}"
+            )
+        self.console.log_summary("last_pose_matrix", last_pose.matrix3x4)
 
         return self.generate(
             last_pose=last_pose,
@@ -235,40 +242,17 @@ class CandidateViewGenerator:
             occupancy_extent=occupancy_extent,
         )
 
-    def _occupancy_extent_from_sample(
-        self,
-        sample: TypedSample,
-    ) -> torch.Tensor | None:
-        """Return ``[xmin, xmax, ymin, ymax, zmin, zmax]`` AABB in world frame.
-
-        The extent is derived from either:
-
-        * The GT mesh bounding box, if available, or
-        * The ``volume_min`` / ``volume_max`` fields of the semi-dense
-          point cloud.
-
-        Args:
-            sample: TypedSample providing mesh or semi-dense volume info.
-
-        Returns:
-            Tensor of shape ``(6,)`` with axis-aligned bounds in the VIO
-            world frame, or ``None`` if no extent can be inferred.
-        """
-        if sample.has_mesh:
-            bounds = torch.from_numpy(sample.gt_mesh.bounds).to(device=self.config.device, dtype=torch.float32)
+    def _occupancy_extent_from_sample(self, sample: EfmSnippetView) -> torch.Tensor | None:
+        """Return ``[xmin, xmax, ymin, ymax, zmin, zmax]`` AABB in world frame."""
+        if sample.has_mesh and sample.mesh is not None and sample.mesh.vertices.size > 0:
+            bounds = torch.tensor(sample.mesh.bounds, device=self.config.device, dtype=torch.float32)
             vmin, vmax = bounds[0], bounds[1]
-            return torch.stack(
-                [vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]],
-                dim=0,
-            )
+            return torch.stack([vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]], dim=0)
         sem = sample.semidense
         if sem.volume_min is not None and sem.volume_max is not None:
             vmin = sem.volume_min.to(device=self.config.device, dtype=torch.float32)
             vmax = sem.volume_max.to(device=self.config.device, dtype=torch.float32)
-            return torch.stack(
-                [vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]],
-                dim=0,
-            )
+            return torch.stack([vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]], dim=0)
         return None
 
     # TODO: sampling must be done from the pose belonging to the camera_index specified in the config and also consider the cameras intrinsics to do correct sampling!
@@ -317,11 +301,16 @@ class CandidateViewGenerator:
             "poses": torch.empty(0, 12, device=device),
             "mask": torch.empty(0, dtype=torch.bool, device=device),
         }
+        if ctx["occupancy_extent"] is not None:
+            self.console.dbg_summary("ctx.occupancy_extent", ctx["occupancy_extent"])
         poses_accum: list[torch.Tensor] = []
         masks_accum: list[torch.Tensor] = []
         shell_accum: list[PoseTW] = []
         remaining = self.config.num_samples
         attempts = 0
+        self.console.log(
+            f"Sampling {self.config.num_samples} candidates (max_resamples={self.config.max_resamples}) on {device}"
+        )
 
         # Iteratively sample until we either collect ``num_samples`` valid
         # candidates or exhaust the resampling budget.
@@ -333,6 +322,10 @@ class CandidateViewGenerator:
             # refine ``ctx['mask']`` in-place.
             for rule in self.rules:
                 ctx_batch = rule(ctx_batch)
+                survivors = int(ctx_batch["mask"].sum().item())
+                self.console.dbg(
+                    f"Rule {rule.__class__.__name__}: {survivors}/{ctx_batch['mask'].numel()} candidates remain"
+                )
                 masks.append(ctx_batch["mask"])
             # Preserve the raw sampled poses (before masking) for
             # visualisation of the full candidate space.
@@ -348,6 +341,7 @@ class CandidateViewGenerator:
             # Update the remaining quota and round counter.
             remaining = self.config.num_samples - sum(p.shape[0] for p in poses_accum)
             attempts += 1
+            self.console.dbg(f"Sampling attempt {attempts} complete; remaining quota {remaining}")
 
         if poses_accum:
             # `poses_accum` may contain `PoseTW` TensorWrappers; extract raw tensors
@@ -366,6 +360,12 @@ class CandidateViewGenerator:
         shell_poses = (
             torch.cat([p._data for p in shell_accum], dim=0) if shell_accum else torch.zeros(0, 12, device=device)
         )
+        survivor_count = int(mask_valid_out.sum().item())
+        if survivor_count == 0:
+            self.console.warn("All candidate poses were rejected; returning zero-padded PoseTW batch.")
+        else:
+            self.console.log(f"Generated {survivor_count} valid candidates.")
+            self.console.dbg_summary("valid_pose_tensor", poses_cat[:survivor_count])
         return {
             "poses": poses_valid,
             "mask_valid": mask_valid_out,

@@ -3,6 +3,7 @@
 This module centralises small enums and TypedDicts shared between the
 candidate generation core and individual rule implementations.
 """
+
 from __future__ import annotations
 
 from enum import StrEnum
