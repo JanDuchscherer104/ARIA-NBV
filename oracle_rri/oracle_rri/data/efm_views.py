@@ -12,6 +12,7 @@ from dataclasses import dataclass, fields, replace
 from pprint import pformat
 from typing import Any, TypedDict
 
+import numpy as np
 import torch
 from efm3d.aria.aria_constants import (
     ARIA_CALIB,
@@ -33,34 +34,15 @@ from efm3d.aria.camera import CameraTW
 from efm3d.aria.obb import ObbTW
 from efm3d.aria.pose import PoseTW
 from efm3d.aria.tensor_wrapper import TensorWrapper
+from efm3d.utils.pointcloud import collapse_pointcloud_time
 from torch import Tensor
 from trimesh import Trimesh
 
-
-def _summary(val: Any) -> Any:
-    """Small helper for succinct repr output."""
-    if val is None:
-        return None
-    if isinstance(val, Tensor):
-        return {"shape": tuple(val.shape), "dtype": str(val.dtype)}
-    if isinstance(val, TensorWrapper):
-        data = val.tensor() if callable(getattr(val, "tensor", None)) else val.tensor  # type: ignore[operator]
-        return {"shape": tuple(data.shape), "dtype": str(data.dtype)}
-    if isinstance(val, PoseTW):
-        return {"shape": tuple(val.matrix.shape), "dtype": str(val.matrix.dtype)}
-    if isinstance(val, CameraTW):
-        data = val.tensor() if callable(getattr(val, "tensor", None)) else val.tensor  # type: ignore[operator]
-        return {"shape": tuple(data.shape), "dtype": str(data.dtype)}
-    if isinstance(val, ObbTW):
-        data = val.tensor() if callable(getattr(val, "tensor", None)) else val.tensor  # type: ignore[operator]
-        return {"shape": tuple(data.shape), "dtype": str(data.dtype)}
-    if isinstance(val, list):
-        return {"len": len(val)}
-    return val
+from ..utils import summarize
 
 
 def _repr(obj: Any) -> str:
-    return pformat({f.name: _summary(getattr(obj, f.name)) for f in fields(obj)}, indent=2, width=100, compact=False)
+    return pformat({f.name: summarize(getattr(obj, f.name)) for f in fields(obj)}, indent=2, width=100, compact=False)
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +201,7 @@ class EfmTrajectoryView:
     def final_pose(self) -> PoseTW:
         """Final rig pose in snippet."""
 
-        return PoseTW.from_matrix3x4(self.t_world_rig.matrix[-1])
+        return PoseTW.from_matrix3x4(self.t_world_rig.matrix3x4[-1])
 
     def to(self, device: str | torch.device, *, dtype: torch.dtype | None = None) -> "EfmTrajectoryView":
         target_device = torch.device(device)
@@ -280,6 +262,55 @@ class EfmPointsView:
             volume_max=self.volume_max.to(device=target_device, dtype=dtype),
             lengths=self.lengths.to(target_device),
         )
+
+    def collapse_points_np(self, max_points: int | None = None) -> np.ndarray:
+        """Collapse points across time and optionally subsample for plotting."""
+
+        points = self.points_world
+        if points.numel() == 0:
+            return np.zeros((0, 3), dtype=np.float32)
+
+        lengths = self.lengths.to(device=points.device)
+        max_len = points.shape[1]
+        valid_mask = torch.arange(max_len, device=points.device).unsqueeze(0) < lengths.clamp_max(max_len).unsqueeze(-1)
+        points_collapsed = collapse_pointcloud_time(torch.where(valid_mask.unsqueeze(-1), points, torch.nan))
+        if points_collapsed.numel() == 0:
+            return np.zeros((0, 3), dtype=np.float32)
+
+        if max_points is not None and points_collapsed.shape[0] > max_points:
+            idx = torch.randperm(points_collapsed.shape[0], device=points_collapsed.device)[:max_points]
+            points_collapsed = points_collapsed[idx]
+
+        return points_collapsed.detach().cpu().numpy()
+
+    def last_frame_points_np(self, max_points: int | None = None) -> np.ndarray:
+        """Return points from the latest frame with valid points, subsampled if needed."""
+
+        points = self.points_world
+        lengths = self.lengths.to(device=points.device)
+        if points.numel() == 0 or lengths.numel() == 0:
+            return np.zeros((0, 3), dtype=np.float32)
+
+        if torch.any(lengths > 0):
+            last_idx = int(torch.nonzero(lengths > 0, as_tuple=False).max().item())
+        else:
+            return np.zeros((0, 3), dtype=np.float32)
+
+        n_valid = min(int(lengths[last_idx].item()), points.shape[1])
+        if n_valid == 0:
+            return np.zeros((0, 3), dtype=np.float32)
+
+        pts = points[last_idx, :n_valid]
+        finite = torch.isfinite(pts).all(dim=-1)
+        pts = pts[finite]
+        if pts.numel() == 0:
+            return np.zeros((0, 3), dtype=np.float32)
+
+        if max_points is not None and pts.shape[0] > max_points:
+            idx = torch.randperm(pts.shape[0], device=pts.device)[:max_points]
+            pts = pts[idx]
+
+        return pts.detach().cpu().numpy()
 
     def __repr__(self) -> str:  # pragma: no cover
         return _repr(self)
@@ -370,7 +401,7 @@ class EfmSnippetView:
         """Semi-dense SLAM points (padded to fixed length)."""
 
         efm = self.efm
-        points = efm[ARIA_POINTS_WORLD]
+        points = efm[ARIA_POINTS_WORLD]  # NOTE: all are nan
         lengths = efm.get("msdpd#points_world_lengths") or efm.get("points/lengths")
         if lengths is None:
             lengths = torch.full(
@@ -447,13 +478,13 @@ class EfmSnippetView:
             "scene": self.scene_id,
             "snippet": self.snippet_id,
             "cameras": {
-                "rgb": _summary(self.efm.get("rgb/img")),
-                "slaml": _summary(self.efm.get("slaml/img")),
-                "slamr": _summary(self.efm.get("slamr/img")),
+                "rgb": summarize(self.efm.get("rgb/img")),
+                "slaml": summarize(self.efm.get("slaml/img")),
+                "slamr": summarize(self.efm.get("slamr/img")),
             },
-            "trajectory": _summary(self.efm.get(ARIA_POSE_T_WORLD_RIG)),
-            "semidense": _summary(self.efm.get(ARIA_POINTS_WORLD)),
-            "obbs": _summary(self.efm.get(ARIA_OBB_PADDED)),
+            "trajectory": summarize(self.efm.get(ARIA_POSE_T_WORLD_RIG)),
+            "semidense": summarize(self.efm.get(ARIA_POINTS_WORLD)),
+            "obbs": summarize(self.efm.get(ARIA_OBB_PADDED)),
             "mesh": str(self.mesh) if self.mesh is not None else None,
         }
         return pformat(base, indent=2, width=120, compact=False)
