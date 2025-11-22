@@ -5,10 +5,10 @@ project:
     - figures/
 
 # Global execution defaults (fast iterations; deterministic rebuilds)
-execute:
+execute: # see https://quarto.org/docs/computations/execution-options.html
   freeze: auto      # re-render only when source changes
   cache: true       # cache expensive chunks across renders
-  echo: false       # hide code by default (toggle via code-tools below)
+  echo: true       # hide code by default (toggle via code-tools below)
   warning: false
   message: false
 
@@ -22,6 +22,9 @@ format:
     code-copy: true          # copy-to-clipboard buttons for code blocks
     code-tools: true         # per-page "Show code" toggle
     code-fold: show          # collapse long code by default
+    mermaid:
+      theme: dark                # mermaid diagrams in dark mode
+
     link-external-newwindow: true
     fig-cap-location: bottom
     tbl-cap-location: top
@@ -92,16 +95,15 @@ website:
       - section: "Implementations"
         contents:
           - contents/impl/overview.qmd
-          - contents/impl/atek_implementation.qmd
-          - contents/impl/efm3d_implementation.qmd
-          - contents/impl/prj_aria_tools_impl.qmd
-          - contents/impl/rri_computation.qmd
-          - contents/impl/oracle_rri_impl.qmd
-          - contents/impl/efm3d_symbol_index.qmd
-      - section: "Oracle RRI Package"
-        contents:
-          - contents/impl/oracle_rri_package.qmd
+          - contents/impl/aria_nbv_overview.qmd
           - contents/impl/data_pipeline_overview.qmd
+          - contents/impl/rri_computation.qmd
+      - section: "External Implementations"
+        contents:
+          - contents/ext-impl/atek_implementation.qmd
+          - contents/ext-impl/efm3d_implementation.qmd
+          - contents/ext-impl/prj_aria_tools_impl.qmd
+          - contents/ext-impl/efm3d_symbol_index.qmd
       - section: "Presentations"
         contents:
           - text: "Typst Slides 1"

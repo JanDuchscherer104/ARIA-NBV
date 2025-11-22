@@ -29,7 +29,7 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 # Project Vision and Goals
 
 - Directly optimize reconstruction quality rather than surrogate coverage metrics, following RRI-based policies as per VIN-NBV.
-- Develop an [oracle RRI computation pipeline](contents/metrics/rri_computation.qmd) using ASE visibility data, semi-dense point clouds  and GT meshes.
+- Develop an [oracle RRI computation pipeline](contents/impl/rri_computation.qmd) using ASE visibility data, semi-dense point clouds  and GT meshes.
 - Develop computational tools to efficiently simulate candidate viewpoints and their expected observations utilizing implementations in [EFM3D](https://github.com/facebookresearch/efm3d) and [ATEK](https://github.com/facebookresearch/ATEK).
 - Train an RRI predictor head on top of a frozen EFM backbone that introspects the current reconstruction and a candidate pose via imitation learning on oracle RRIs.
 - Leverage EVL's 3D foundation features—voxel occupancy, centerness, semantic channels, and OBB priors—as state embeddings for RRI estimation and NBV decision making.
@@ -68,8 +68,8 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 
 ## Implementation Overviews
 
-- **[ATEK Implementation](contents/impl/atek_implementation.qmd)**: Production-ready mesh evaluation
-- **[EFM3D Implementation](contents/impl/efm3d_implementation.qmd)**: Point cloud and voxel utilities
+- **[ATEK Implementation](contents/ext-impl/atek_implementation.qmd)**: Production-ready mesh evaluation
+- **[EFM3D Implementation](contents/ext-impl/efm3d_implementation.qmd)**: Point cloud and voxel utilities
 - **[RRI Computation](contents/impl/rri_computation.qmd)**: Complete oracle implementation
 - **[Oracle RRI Notebook](../notebooks/ase_oracle_rri_simplified.ipynb)**: Clean, working implementation with fixes
 
@@ -98,40 +98,63 @@ notebooks/
 # Codebase Trees with Module Notes
 
 ```text
-NBV/
-├── notebooks/
-│   ├── ase_oracle_rri.py                # Helpers for log-depth transforms, PC↔mesh summary, pose/intrinsics utils
-│   └── ase_oracle_rri_new.py            # Clean duplicate of the above helpers
-├── oracle_rri/
-│   ├── main.py                          # Entrypoint building default config and diagnostics
-│   ├── examples/
-│   │   └── simplified_dataset_usage.py  # Minimal loader + DataLoader batching demo
-│   ├── oracle_rri/                      # Package code
-│   │   ├── analysis/depth_debugger.py   # Projects depth to 3D and compares to GT mesh
-│   │   ├── config.py                    # Dataset/Oracle config models
-│   │   ├── configs/path_config.py       # Centralised filesystem paths + helpers
-│   │   ├── data/cli.py                  # Tiny CLI shim for downloader tests
-│   │   ├── data/dataset.py              # Typed ATEK WebDataset wrapper + mesh pairing
-│   │   ├── data/downloader.py           # ASE mesh + ATEK snippet downloader/CLI
-│   │   ├── data/metadata.py             # Parse mesh & ATEK URL JSON into scene metadata
-│   │   ├── data/schemas.py              # Typed sample/stream containers + EFM remap
-│   │   ├── data/utils.py                # Scene id extraction and data validation
-│   │   ├── utils/base_config.py         # Pydantic base + TOML IO + Rich inspect
-│   │   ├── utils/console.py             # Rich console wrapper
-│   │   ├── views/candidate_generation.py# Pose generator around latest trajectory pose
-│   │   └── viz/mesh_viz.py              # Trimesh/Plotly/Streamlit mesh + PC viz helpers
-│   └── tests/                           # Data-handling tests
-│       ├── conftest.py                  # Shared fixtures
-│       ├── test_cli.py                  # CLI wiring tests
-│       ├── test_dataset.py              # Dataset iteration & collation tests
-│       ├── test_downloader.py           # Mesh/WebDataset download orchestration tests
-│       ├── test_metadata.py             # Scene metadata parsing tests
-│       ├── test_real_data_integration.py# Depth→mesh distance on real sample
-│       └── test_utils.py                # Scene id / data validation tests
-├── scripts/get_context.py               # AST-based repo scanner for symbol overviews
-├── tools/ase_coordinated_downloader.py  # Wrapper to pull meshes + ATEK data in sync
-├── tools/generate_uml_svg.py            # Generate Mermaid UML → SVG helper
-└── notebooks/ase_oracle_rri*.py         # (see above helper scripts)
+oracle_rri/                         # Project root (this repo)
+├── main.py                        # Builds default configs and diagnostics
+├── examples/simplified_dataset_usage.py
+├── scripts/
+│   ├── get_context.py             # AST-based symbol scanner (feeds docs)
+│   └── run_efm3d_on_ase.py        # Helper to invoke EVL on ASE shards
+├── oracle_rri/                    # Package code
+│   ├── analysis/depth_debugger.py # Depth→mesh distance + stats
+│   ├── configs/path_config.py     # Filesystem paths + helpers
+│   ├── data/                      # Typed views and dataset helpers
+│   │   ├── efm_dataset.py         # WebDataset→typed EFM snippets
+│   │   ├── efm_views.py           # Camera/trajectory/points/OBB typed wrappers
+│   │   ├── downloader.py          # ASE mesh + ATEK tar downloader
+│   │   ├── metadata.py            # Scene metadata parsing/filtering
+│   │   ├── plotting.py            # Plotly helpers for snippets/meshes
+│   │   └── utils.py               # Scene id parsing, validation
+│   ├── data_handling/             # New entrypoints and CLI over data
+│   │   ├── dataset.py             # Higher-level dataset wrapper + mesh pairing
+│   │   ├── downloader.py          # CLI-friendly download orchestrator
+│   │   ├── metadata.py            # Metadata cache/load utilities
+│   │   └── cli.py                 # Minimal CLI shims
+│   ├── pose_generation/           # Candidate pose sampling rules
+│   │   ├── candidate_generation.py
+│   │   ├── candidate_generation_rules.py
+│   │   ├── plotting.py
+│   │   └── types.py
+│   ├── rendering/                 # Candidate depth rendering backends
+│   │   ├── candidate_depth_renderer.py
+│   │   ├── efm3d_depth_renderer.py
+│   │   ├── pytorch3d_depth_renderer.py
+│   │   └── plotting.py
+│   ├── views/candidate_rendering.py # Point-cloud rendering from candidate poses
+│   ├── visualization/candidate_app.py # Streamlit UI for sampling/RRI inspection
+│   ├── viz/mesh_viz.py            # Trimesh/Plotly/Streamlit mesh + PC viz
+│   ├── utils/                     # Shared utilities
+│   │   ├── base_config.py         # Pydantic factory base + TOML IO
+│   │   ├── console.py             # Structured logging
+│   │   ├── frames.py              # Coordinate-frame helpers
+│   │   ├── rich_summary.py        # Rich-style summaries
+│   │   └── summary.py             # Text summaries
+│   └── streamlit_app.py           # Legacy Streamlit dashboard entrypoint
+├── tests/                         # Pytest suites
+│   ├── data_handling/             # Dataset/downloader/metadata tests
+│   ├── pose_generation/           # Sampling rule tests
+│   ├── rendering/                 # Depth rendering tests
+│   ├── views/                     # Candidate rendering tests
+│   ├── test_candidate_rendering.py
+│   ├── test_console.py
+│   ├── test_efm_dataset.py
+│   ├── test_mesh_cropping.py
+│   ├── test_plotting_semidense.py
+│   └── test_pose_generation.py
+├── SIMPLIFIED_DATA_HANDLING.md    # How-to for minimal data usage
+├── download_config.example.toml   # Downloader config template
+├── environment.yml                # Conda environment
+├── pyproject.toml / uv.lock       # Python packaging
+└── notebooks/ase_oracle_rri*.py   # Helper notebooks/scripts
 ```
 
 ```text

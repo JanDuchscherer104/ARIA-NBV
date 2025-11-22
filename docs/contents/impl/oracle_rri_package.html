@@ -106,6 +106,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     "search-label": "Search"
   }
 }</script>
+<meta name="mermaid-theme" content="dark">
 <script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
 <script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
 <link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
@@ -371,7 +372,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/impl/overview.html">Implementations</a></li><li class="breadcrumb-item"><a href="../../contents/impl/oracle_rri_package.html">Oracle RRI Package</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/pkg/class_diag.html">Oracle RRI Package</a></li><li class="breadcrumb-item"><a href="../../contents/pkg/oracle_rri_package.html">Oracle RRI Package</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
       <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
@@ -545,26 +546,46 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="menu-text">EFM3D Symbol Index</span></a>
   </div>
 </li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../contents/impl/oracle_rri_package.html" class="sidebar-item-text sidebar-link active">
- <span class="menu-text">Oracle RRI Package</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
- <span class="menu-text">contents/iml/data_pipeline_overview.qmd</span>
-  </li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
- <span class="menu-text">Presentations</span></a>
+ <span class="menu-text">Oracle RRI Package</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
       <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/pkg/class_diag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Oracle RRI Architecture Diagrams</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/pkg/oracle_rri_package.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Oracle RRI Package</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/pkg/data_pipeline_overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ASE Data Pipeline Overview</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
+ <span class="menu-text">Presentations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../../typst/slides/slides_1.pdf" class="sidebar-item-text sidebar-link">
@@ -593,14 +614,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#core-modules-classes" id="toc-core-modules-classes" class="nav-link" data-scroll-target="#core-modules-classes"><span class="header-section-number">2</span> Core Modules &amp; Classes</a>
   <ul class="collapse">
   <li><a href="#config-logging" id="toc-config-logging" class="nav-link" data-scroll-target="#config-logging"><span class="header-section-number">2.1</span> Config &amp; Logging</a></li>
-  <li><a href="#data-containers-datastructures.py" id="toc-data-containers-datastructures.py" class="nav-link" data-scroll-target="#data-containers-datastructures.py"><span class="header-section-number">2.2</span> Data Containers (<code>data/structures.py</code>)</a></li>
-  <li><a href="#data-handling-data_handling" id="toc-data-handling-data_handling" class="nav-link" data-scroll-target="#data-handling-data_handling"><span class="header-section-number">2.3</span> Data Handling (<code>data_handling/</code>)</a>
+  <li><a href="#data-handling-data_handling" id="toc-data-handling-data_handling" class="nav-link" data-scroll-target="#data-handling-data_handling"><span class="header-section-number">2.2</span> Data Handling (<code>data_handling/</code>)</a>
   <ul class="collapse">
-  <li><a href="#dataset-loader-dataset.py" id="toc-dataset-loader-dataset.py" class="nav-link" data-scroll-target="#dataset-loader-dataset.py"><span class="header-section-number">2.3.1</span> Dataset loader (<code>dataset.py</code>)</a></li>
-  <li><a href="#metadata-download" id="toc-metadata-download" class="nav-link" data-scroll-target="#metadata-download"><span class="header-section-number">2.3.2</span> Metadata &amp; Download</a></li>
+  <li><a href="#dataset-loader-dataset.py" id="toc-dataset-loader-dataset.py" class="nav-link" data-scroll-target="#dataset-loader-dataset.py"><span class="header-section-number">2.2.1</span> Dataset loader (<code>dataset.py</code>)</a></li>
+  <li><a href="#metadata-download" id="toc-metadata-download" class="nav-link" data-scroll-target="#metadata-download"><span class="header-section-number">2.2.2</span> Metadata &amp; Download</a></li>
   </ul></li>
-  <li><a href="#analysis" id="toc-analysis" class="nav-link" data-scroll-target="#analysis"><span class="header-section-number">2.4</span> Analysis</a></li>
-  <li><a href="#visualisation" id="toc-visualisation" class="nav-link" data-scroll-target="#visualisation"><span class="header-section-number">2.5</span> Visualisation</a></li>
+  <li><a href="#analysis" id="toc-analysis" class="nav-link" data-scroll-target="#analysis"><span class="header-section-number">2.3</span> Analysis</a></li>
+  <li><a href="#visualisation" id="toc-visualisation" class="nav-link" data-scroll-target="#visualisation"><span class="header-section-number">2.4</span> Visualisation</a></li>
   </ul></li>
   <li><a href="#how-to-structure-the-package-moving-forward" id="toc-how-to-structure-the-package-moving-forward" class="nav-link" data-scroll-target="#how-to-structure-the-package-moving-forward"><span class="header-section-number">3</span> How to Structure the Package Moving Forward</a></li>
   <li><a href="#external-library-hooks-per-component" id="toc-external-library-hooks-per-component" class="nav-link" data-scroll-target="#external-library-hooks-per-component"><span class="header-section-number">4</span> External Library Hooks (per component)</a></li>
@@ -612,9 +632,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <main class="content" id="quarto-document-content">
 
 
-<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/impl/overview.html">Implementations</a></li><li class="breadcrumb-item"><a href="../../contents/impl/oracle_rri_package.html">Oracle RRI Package</a></li></ol></nav>
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/pkg/class_diag.html">Oracle RRI Package</a></li><li class="breadcrumb-item"><a href="../../contents/pkg/oracle_rri_package.html">Oracle RRI Package</a></li></ol></nav>
 <div class="quarto-title">
-<div class="quarto-title-block"><div><h1 class="title">Oracle RRI Package</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+<div class="quarto-title-block"><div><h1 class="title">Oracle RRI Package</h1><button type="button" class="btn code-tools-button dropdown-toggle" id="quarto-code-tools-menu" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi"></i> Code</button><ul class="dropdown-menu dropdown-menu-end" aria-labelelledby="quarto-code-tools-menu"><li><a id="quarto-show-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Show All Code</a></li><li><a id="quarto-hide-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Hide All Code</a></li><li><hr class="dropdown-divider"></li><li><a id="quarto-view-source" class="dropdown-item" href="javascript:void(0)" role="button">View Source</a></li></ul></div></div>
 </div>
 
 
@@ -644,22 +664,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><code>viz/</code> – mesh and distance visualisation.</li>
 </ul></li>
 </ul>
-<pre class="mermaid"><code>classDiagram
-    BaseConfig &lt;|-- PathConfig
-    BaseConfig &lt;|-- ASEDownloaderConfig
-    BaseConfig &lt;|-- ASEDatasetConfig
-
-    ASEDownloaderConfig --&gt; ASEDownloader
-    ASEDatasetConfig --&gt; ASEDataset
-
-    ASEDataset o--&gt; AtekSnippet
-    AtekSnippet o--&gt; CameraStream
-    AtekSnippet o--&gt; Trajectory
-    AtekSnippet o--&gt; SemiDensePoints
-    ASEDataset o--&gt; trimesh.Trimesh : gt_mesh
-
-    ASEDownloader --&gt; ASEMetadata
-    ASEMetadata o--&gt; SceneInfo</code></pre>
 </section>
 <section id="core-modules-classes" class="level1" data-number="2">
 <h1 data-number="2"><span class="header-section-number">2</span> Core Modules &amp; Classes</h1>
@@ -671,64 +675,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong><code>utils.console.Console</code></strong>: Rich wrapper with prefixes and optional shared PL logger hook.</li>
 </ul>
 </section>
-<section id="data-containers-datastructures.py" class="level2" data-number="2.2">
-<h2 data-number="2.2" class="anchored" data-anchor-id="data-containers-datastructures.py"><span class="header-section-number">2.2</span> Data Containers (<code>data/structures.py</code>)</h2>
-<ul>
-<li><code>FrameSlice</code>: timestamp + rig pose (3×4), points, std, extras.</li>
-<li><code>SnippetSample</code>: sequence of <code>FrameSlice</code> with snippet id; iterates points.</li>
-<li><code>SceneRecord</code>: scene id plus shard paths (+ optional mesh).</li>
-</ul>
-</section>
-<section id="data-handling-data_handling" class="level2" data-number="2.3">
-<h2 data-number="2.3" class="anchored" data-anchor-id="data-handling-data_handling"><span class="header-section-number">2.3</span> Data Handling (<code>data_handling/</code>)</h2>
-<section id="dataset-loader-dataset.py" class="level3" data-number="2.3.1">
-<h3 data-number="2.3.1" class="anchored" data-anchor-id="dataset-loader-dataset.py"><span class="header-section-number">2.3.1</span> Dataset loader (<code>dataset.py</code>)</h3>
-<div class="cell" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p><figure class="figure"><p></p>
-<div>
-<pre class="mermaid mermaid-js">classDiagram
-    class ASEDatasetConfig{
-      +tar_urls: list[str]
-      +scene_to_mesh: dict[str,Path]
-      +batch_size:int?
-      +load_meshes: bool
-      +mesh_simplify_ratio: float?
-      +setup_target()-&gt;ASEDataset
-    }
-    class ASEDataset{
-      -_atek_wds
-      -_mesh_cache
-      +__iter__()-&gt;ASESample
-    }
-    class AtekSnippet{
-      +cameras: dict[CameraLabel,CameraStream]
-      +trajectory: Trajectory?
-      +semidense: SemiDensePoints?
-      +gt_data: dict
-      +to_flatten_dict()
-    }
-    class ASESample{
-      +scene_id:str
-      +snippet_id:str
-      +atek:AtekSnippet
-      +gt_mesh:trimesh.Trimesh?
-      +to_efm_dict(include_mesh)
-    }
-    ASEDatasetConfig --&gt; ASEDataset
-    ASEDataset --&gt; ASESample
-    ASESample --&gt; AtekSnippet
-    AtekSnippet o--&gt; CameraStream
-    AtekSnippet o--&gt; Trajectory
-    AtekSnippet o--&gt; SemiDensePoints
-    ASESample --&gt; trimesh.Trimesh
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
-</div>
+<section id="data-handling-data_handling" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="data-handling-data_handling"><span class="header-section-number">2.2</span> Data Handling (<code>data_handling/</code>)</h2>
+<section id="dataset-loader-dataset.py" class="level3" data-number="2.2.1">
+<h3 data-number="2.2.1" class="anchored" data-anchor-id="dataset-loader-dataset.py"><span class="header-section-number">2.2.1</span> Dataset loader (<code>dataset.py</code>)</h3>
 <ul>
 <li><strong>External dependencies used</strong>:
 <ul>
@@ -742,22 +692,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>EFM remap</strong>: <code>ASESample.to_efm_dict()</code> applies <code>EfmModelAdaptor.get_dict_key_mapping_all()</code> and can include <code>gt_mesh</code>.</li>
 </ul>
 </section>
-<section id="metadata-download" class="level3" data-number="2.3.2">
-<h3 data-number="2.3.2" class="anchored" data-anchor-id="metadata-download"><span class="header-section-number">2.3.2</span> Metadata &amp; Download</h3>
+<section id="metadata-download" class="level3" data-number="2.2.2">
+<h3 data-number="2.2.2" class="anchored" data-anchor-id="metadata-download"><span class="header-section-number">2.2.2</span> Metadata &amp; Download</h3>
 <ul>
 <li><strong><code>metadata.ASEMetadata</code></strong>: parses <code>ase_mesh_download_urls.json</code> and <code>AriaSyntheticEnvironment_ATEK_download_urls.json</code> → <code>SceneInfo(scene_id, mesh_url, mesh_sha, snippet_ids)</code>.</li>
 <li><strong><code>downloader.ASEDownloaderConfig/ASEDownloader</code></strong>: orchestrates mesh + WDS downloads (uses ATEK <code>download_atek_wds_sequences</code>, <code>requests</code> for meshes, SHA1 verification, unzip). CLI-friendly via <code>pydantic_settings</code>.</li>
 </ul>
 </section>
 </section>
-<section id="analysis" class="level2" data-number="2.4">
-<h2 data-number="2.4" class="anchored" data-anchor-id="analysis"><span class="header-section-number">2.4</span> Analysis</h2>
+<section id="analysis" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="analysis"><span class="header-section-number">2.3</span> Analysis</h2>
 <ul>
 <li><strong><code>analysis/depth_debugger.py</code></strong>: utilities to inspect depth/point clouds; useful for validating candidate sampling and fusion (see TODOs).</li>
 </ul>
 </section>
-<section id="visualisation" class="level2" data-number="2.5">
-<h2 data-number="2.5" class="anchored" data-anchor-id="visualisation"><span class="header-section-number">2.5</span> Visualisation</h2>
+<section id="visualisation" class="level2" data-number="2.4">
+<h2 data-number="2.4" class="anchored" data-anchor-id="visualisation"><span class="header-section-number">2.4</span> Visualisation</h2>
 <ul>
 <li><strong><code>viz/mesh_viz.py</code></strong>: rendering helpers (Trimesh + matplotlib) for meshes and point clouds; wire into Streamlit dashboard per TODOs.</li>
 </ul>
@@ -772,6 +722,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li>Candidate generation (<code>candidate/generator.py</code>),</li>
 <li>Raycast depth rendering (<code>candidate/depth_renderer.py</code>, leveraging <code>efm3d.utils.ray</code> + <code>trimesh</code> intersections),</li>
+<li>PyTorch3D depth rendering (<code>rendering/pytorch3d_depth_renderer.py</code> + <code>rendering/candidate_depth_renderer.py</code>) for batched GPU rasterisation tied to <code>CandidateSamplingResult</code> / <code>EfmSnippetView</code> inputs,</li>
 <li>Point-cloud fusion (<code>fusion/pc_fusion.py</code>, reusing EFM3D <code>pointcloud</code> + <code>voxel</code> utils).</li>
 </ul></li>
 <li><strong>Metrics layer</strong>: <code>metrics/oracle_rri.py</code> wrapping ATEK + EFM3D mesh/PC distance (Chamfer, F-score) with <code>torchmetrics</code> API.</li>
@@ -799,6 +750,26 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="suggested-mermaid-for-planned-processing-layer" class="level1" data-number="5">
 <h1 data-number="5"><span class="header-section-number">5</span> Suggested Mermaid for planned processing layer</h1>
 <div class="cell" data-layout-align="default">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>classDiagram</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    class CandidateViewGenerator{</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>      +sample_poses(last_pose, strategy_cfg)-&gt;list[PoseTW]</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    class CandidatePointCloudGenerator{</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>      +render_depth(pose, mesh)-&gt;depth</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>      +to_point_cloud(depth, cam)-&gt;Tensor[N,3]</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    class PointCloudFusion{</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>      +merge(P_t, P_q)-&gt;P_fused</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    class OracleRRI{</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>      +chamfer_before_after(P_t, P_fused, mesh)-&gt;float</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    CandidateViewGenerator --&gt; CandidatePointCloudGenerator</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    CandidatePointCloudGenerator --&gt; PointCloudFusion</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    PointCloudFusion --&gt; OracleRRI</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 <div class="cell-output-display">
 <div>
 <p></p><figure class="figure"><p></p>
@@ -1317,143 +1288,83 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`analysis/`</span> – debugging helpers (depth/point cloud).</span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`viz/`</span> – mesh and distance visualisation.</span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="in">```mermaid</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>classDiagram</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    BaseConfig &lt;|-- PathConfig</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    BaseConfig &lt;|-- ASEDownloaderConfig</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    BaseConfig &lt;|-- ASEDatasetConfig</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    ASEDownloaderConfig --&gt; ASEDownloader</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    ASEDatasetConfig --&gt; ASEDataset</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="fu"># Core Modules &amp; Classes</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="fu">## Config &amp; Logging</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`utils.base_config.BaseConfig`**: Pydantic-powered factory base with TOML IO and <span class="in">`inspect()`</span> rendering (Rich).</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`configs.path_config.PathConfig`**: Singleton paths to data roots, ATEK/ASE URL manifests, mesh directories.</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`utils.console.Console`**: Rich wrapper with prefixes and optional shared PL logger hook.</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="fu">## Data Handling (`data_handling/`)</span></span>
 <span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    ASEDataset o--&gt; AtekSnippet</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    AtekSnippet o--&gt; CameraStream</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    AtekSnippet o--&gt; Trajectory</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    AtekSnippet o--&gt; SemiDensePoints</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    ASEDataset o--&gt; trimesh.Trimesh : gt_mesh</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    ASEDownloader --&gt; ASEMetadata</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    ASEMetadata o--&gt; SceneInfo</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a><span class="fu"># Core Modules &amp; Classes</span></span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="fu">## Config &amp; Logging</span></span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`utils.base_config.BaseConfig`**: Pydantic-powered factory base with TOML IO and <span class="in">`inspect()`</span> rendering (Rich).</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`configs.path_config.PathConfig`**: Singleton paths to data roots, ATEK/ASE URL manifests, mesh directories.</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`utils.console.Console`**: Rich wrapper with prefixes and optional shared PL logger hook.</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a><span class="fu">## Data Containers (`data/structures.py`)</span></span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`FrameSlice`</span>: timestamp + rig pose (3×4), points, std, extras.</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`SnippetSample`</span>: sequence of <span class="in">`FrameSlice`</span> with snippet id; iterates points.</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`SceneRecord`</span>: scene id plus shard paths (+ optional mesh).</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="fu">## Data Handling (`data_handling/`)</span></span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a><span class="fu">### Dataset loader (`dataset.py`)</span></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>classDiagram</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>    class ASEDatasetConfig{</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>      +tar_urls: list[str]</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>      +scene_to_mesh: dict[str,Path]</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>      +batch_size:<span class="fu">int</span>?</span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>      +load_meshes: bool</span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>      +mesh_simplify_ratio: float?</span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>      +setup_target()-&gt;ASEDataset</span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>    class ASEDataset{</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>      -_atek_wds</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>      -_mesh_cache</span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>      +__iter__()-&gt;ASESample</span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>    class AtekSnippet{</span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>      +cameras: dict[CameraLabel,CameraStream]</span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>      +trajectory: Trajectory?</span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>      +semidense: SemiDensePoints?</span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>      +gt_data: dict</span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>      +to_flatten_dict()</span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>    class ASESample{</span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>      +scene_id:str</span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>      +snippet_id:str</span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>      +atek:AtekSnippet</span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>      +gt_mesh:trimesh.Trimesh?</span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>      +to_efm_dict(include_mesh)</span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>    ASEDatasetConfig --&gt; ASEDataset</span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>    ASEDataset --&gt; ASESample</span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>    ASESample --&gt; AtekSnippet</span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>    AtekSnippet o--&gt; CameraStream</span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>    AtekSnippet o--&gt; Trajectory</span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>    AtekSnippet o--&gt; SemiDensePoints</span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>    ASESample --&gt; trimesh.Trimesh</span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**External dependencies used**:</span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`atek.data_loaders.load_atek_wds_dataset`</span>, <span class="in">`select_and_remap_dict_keys`</span> for WebDataset ingest.</span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`efm3d.aria.PoseTW`</span>, <span class="in">`CameraTW`</span> for typed geometry conversion (<span class="in">`to_camera_tw`</span>).</span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`trimesh`</span> for GT mesh loading/simplification.</span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Batch handling**: <span class="in">`_explode_batched_dict`</span> splits WebDataset B-dim into per-sample dicts; <span class="in">`ase_collate`</span> returns lists plus EFM-ready dicts.</span>
-<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Mesh pairing**: <span class="in">`scene_to_mesh`</span> mapping + optional decimation + caching; tolerant when meshes absent unless <span class="in">`require_mesh=True`</span>.</span>
-<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Key typing**: <span class="in">`CameraStream`</span>, <span class="in">`Trajectory`</span>, <span class="in">`SemiDensePoints`</span> mirror ATEK dataclasses; preserve Aria frame (x-left, y-up, z-forward), <span class="in">`T_A_B`</span> convention.</span>
-<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**EFM remap**: <span class="in">`ASESample.to_efm_dict()`</span> applies <span class="in">`EfmModelAdaptor.get_dict_key_mapping_all()`</span> and can include <span class="in">`gt_mesh`</span>.</span>
-<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a><span class="fu">### Metadata &amp; Download</span></span>
-<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`metadata.ASEMetadata`**: parses <span class="in">`ase_mesh_download_urls.json`</span> and <span class="in">`AriaSyntheticEnvironment_ATEK_download_urls.json`</span> → <span class="in">`SceneInfo(scene_id, mesh_url, mesh_sha, snippet_ids)`</span>.</span>
-<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`downloader.ASEDownloaderConfig/ASEDownloader`**: orchestrates mesh + WDS downloads (uses ATEK <span class="in">`download_atek_wds_sequences`</span>, <span class="in">`requests`</span> for meshes, SHA1 verification, unzip). CLI-friendly via <span class="in">`pydantic_settings`</span>.</span>
-<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a><span class="fu">## Analysis</span></span>
-<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`analysis/depth_debugger.py`**: utilities to inspect depth/point clouds; useful for validating candidate sampling and fusion (see TODOs).</span>
-<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a><span class="fu">## Visualisation</span></span>
-<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`viz/mesh_viz.py`**: rendering helpers (Trimesh + matplotlib) for meshes and point clouds; wire into Streamlit dashboard per TODOs.</span>
-<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a><span class="fu"># How to Structure the Package Moving Forward</span></span>
-<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Top-level configs**: keep <span class="in">`PathConfig`</span> singleton and small, push task-specific knobs into <span class="in">`ASEDatasetConfig`</span>, <span class="in">`ASEDownloaderConfig`</span>, <span class="in">`OracleRRIConfig`</span> (to be added for metrics/candidate sampling).</span>
-<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Data-handling layer**: maintain pure data classes (<span class="in">`CameraStream`</span>, <span class="in">`Trajectory`</span>, <span class="in">`SemiDensePoints`</span>) that stay ATEK/EFM-compatible; avoid side effects (no device moves).</span>
-<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Processing layer** (new): add modules for</span>
-<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Candidate generation (<span class="in">`candidate/generator.py`</span>),</span>
-<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Raycast depth rendering (<span class="in">`candidate/depth_renderer.py`</span>, leveraging <span class="in">`efm3d.utils.ray`</span> + <span class="in">`trimesh`</span> intersections),</span>
-<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Point-cloud fusion (<span class="in">`fusion/pc_fusion.py`</span>, reusing EFM3D <span class="in">`pointcloud`</span> + <span class="in">`voxel`</span> utils).</span>
-<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Metrics layer**: <span class="in">`metrics/oracle_rri.py`</span> wrapping ATEK + EFM3D mesh/PC distance (Chamfer, F-score) with <span class="in">`torchmetrics`</span> API.</span>
-<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**Apps**: Streamlit UI in <span class="in">`apps/streamlit_nbv.py`</span> calling viz + candidate + metrics with caching.</span>
-<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a><span class="fu"># External Library Hooks (per component)</span></span>
-<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Trimesh**: mesh IO, surface sampling, ray–mesh intersections; optional quadric decimation when loading GT meshes.</span>
-<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**EFM3D**:</span>
-<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`PoseTW`</span>, <span class="in">`CameraTW`</span>: camera/pose typing + operations.</span>
-<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`utils.ray`</span> (<span class="in">`ray_grid`</span>, <span class="in">`transform_rays`</span>, <span class="in">`ray_obb_intersection`</span>) for candidate depth rendering.</span>
-<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`utils.pointcloud`</span> (<span class="in">`dist_im_to_point_cloud_im`</span>, <span class="in">`pointcloud_to_occupancy_snippet`</span>) for depth → PC and occupancy.</span>
-<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**ATEK**:</span>
-<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`load_atek_wds_dataset`</span>, <span class="in">`process_wds_sample`</span> for streaming shards.</span>
-<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Key mapping (<span class="in">`EfmModelAdaptor.get_dict_key_mapping_all`</span>) when exporting to EFM schema.</span>
-<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Download helpers (<span class="in">`atek_data_store_download.download_atek_wds_sequences`</span>) via <span class="in">`ASEDownloader`</span>.</span>
-<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a><span class="fu"># Suggested Mermaid for planned processing layer</span></span>
-<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
-<span id="cb2-136"><a href="#cb2-136" aria-hidden="true" tabindex="-1"></a>classDiagram</span>
-<span id="cb2-137"><a href="#cb2-137" aria-hidden="true" tabindex="-1"></a>    class CandidateViewGenerator{</span>
-<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a>      +sample_poses(last_pose, strategy_cfg)-&gt;list[PoseTW]</span>
-<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a>    class CandidatePointCloudGenerator{</span>
-<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a>      +render_depth(pose, mesh)-&gt;depth</span>
-<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a>      +to_point_cloud(depth, cam)-&gt;Tensor[N,<span class="dv">3</span>]</span>
-<span id="cb2-143"><a href="#cb2-143" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a>    class PointCloudFusion{</span>
-<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a>      +merge(P_t, P_q)-&gt;P_fused</span>
-<span id="cb2-146"><a href="#cb2-146" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb2-147"><a href="#cb2-147" aria-hidden="true" tabindex="-1"></a>    class OracleRRI{</span>
-<span id="cb2-148"><a href="#cb2-148" aria-hidden="true" tabindex="-1"></a>      +chamfer_before_after(P_t, P_fused, mesh)-&gt;float</span>
-<span id="cb2-149"><a href="#cb2-149" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb2-150"><a href="#cb2-150" aria-hidden="true" tabindex="-1"></a>    CandidateViewGenerator --&gt; CandidatePointCloudGenerator</span>
-<span id="cb2-151"><a href="#cb2-151" aria-hidden="true" tabindex="-1"></a>    CandidatePointCloudGenerator --&gt; PointCloudFusion</span>
-<span id="cb2-152"><a href="#cb2-152" aria-hidden="true" tabindex="-1"></a>    PointCloudFusion --&gt; OracleRRI</span>
-<span id="cb2-153"><a href="#cb2-153" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-154"><a href="#cb2-154" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-155"><a href="#cb2-155" aria-hidden="true" tabindex="-1"></a>Use this layout to guide module additions under <span class="in">`oracle_rri/`</span> while keeping current data-handling and config patterns.</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="fu">### Dataset loader (`dataset.py`)</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**External dependencies used**:</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`atek.data_loaders.load_atek_wds_dataset`</span>, <span class="in">`select_and_remap_dict_keys`</span> for WebDataset ingest.</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`efm3d.aria.PoseTW`</span>, <span class="in">`CameraTW`</span> for typed geometry conversion (<span class="in">`to_camera_tw`</span>).</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`trimesh`</span> for GT mesh loading/simplification.</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Batch handling**: <span class="in">`_explode_batched_dict`</span> splits WebDataset B-dim into per-sample dicts; <span class="in">`ase_collate`</span> returns lists plus EFM-ready dicts.</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Mesh pairing**: <span class="in">`scene_to_mesh`</span> mapping + optional decimation + caching; tolerant when meshes absent unless <span class="in">`require_mesh=True`</span>.</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Key typing**: <span class="in">`CameraStream`</span>, <span class="in">`Trajectory`</span>, <span class="in">`SemiDensePoints`</span> mirror ATEK dataclasses; preserve Aria frame (x-left, y-up, z-forward), <span class="in">`T_A_B`</span> convention.</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**EFM remap**: <span class="in">`ASESample.to_efm_dict()`</span> applies <span class="in">`EfmModelAdaptor.get_dict_key_mapping_all()`</span> and can include <span class="in">`gt_mesh`</span>.</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="fu">### Metadata &amp; Download</span></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`metadata.ASEMetadata`**: parses <span class="in">`ase_mesh_download_urls.json`</span> and <span class="in">`AriaSyntheticEnvironment_ATEK_download_urls.json`</span> → <span class="in">`SceneInfo(scene_id, mesh_url, mesh_sha, snippet_ids)`</span>.</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`downloader.ASEDownloaderConfig/ASEDownloader`**: orchestrates mesh + WDS downloads (uses ATEK <span class="in">`download_atek_wds_sequences`</span>, <span class="in">`requests`</span> for meshes, SHA1 verification, unzip). CLI-friendly via <span class="in">`pydantic_settings`</span>.</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a><span class="fu">## Analysis</span></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`analysis/depth_debugger.py`**: utilities to inspect depth/point clouds; useful for validating candidate sampling and fusion (see TODOs).</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a><span class="fu">## Visualisation</span></span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`viz/mesh_viz.py`**: rendering helpers (Trimesh + matplotlib) for meshes and point clouds; wire into Streamlit dashboard per TODOs.</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="fu"># How to Structure the Package Moving Forward</span></span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Top-level configs**: keep <span class="in">`PathConfig`</span> singleton and small, push task-specific knobs into <span class="in">`ASEDatasetConfig`</span>, <span class="in">`ASEDownloaderConfig`</span>, <span class="in">`OracleRRIConfig`</span> (to be added for metrics/candidate sampling).</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Data-handling layer**: maintain pure data classes (<span class="in">`CameraStream`</span>, <span class="in">`Trajectory`</span>, <span class="in">`SemiDensePoints`</span>) that stay ATEK/EFM-compatible; avoid side effects (no device moves).</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Processing layer** (new): add modules for</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Candidate generation (<span class="in">`candidate/generator.py`</span>),</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Raycast depth rendering (<span class="in">`candidate/depth_renderer.py`</span>, leveraging <span class="in">`efm3d.utils.ray`</span> + <span class="in">`trimesh`</span> intersections),</span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>PyTorch3D depth rendering (<span class="in">`rendering/pytorch3d_depth_renderer.py`</span> + <span class="in">`rendering/candidate_depth_renderer.py`</span>) for batched GPU rasterisation tied to <span class="in">`CandidateSamplingResult`</span> / <span class="in">`EfmSnippetView`</span> inputs,</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Point-cloud fusion (<span class="in">`fusion/pc_fusion.py`</span>, reusing EFM3D <span class="in">`pointcloud`</span> + <span class="in">`voxel`</span> utils).</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Metrics layer**: <span class="in">`metrics/oracle_rri.py`</span> wrapping ATEK + EFM3D mesh/PC distance (Chamfer, F-score) with <span class="in">`torchmetrics`</span> API.</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**Apps**: Streamlit UI in <span class="in">`apps/streamlit_nbv.py`</span> calling viz + candidate + metrics with caching.</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a><span class="fu"># External Library Hooks (per component)</span></span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Trimesh**: mesh IO, surface sampling, ray–mesh intersections; optional quadric decimation when loading GT meshes.</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**EFM3D**:</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`PoseTW`</span>, <span class="in">`CameraTW`</span>: camera/pose typing + operations.</span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`utils.ray`</span> (<span class="in">`ray_grid`</span>, <span class="in">`transform_rays`</span>, <span class="in">`ray_obb_intersection`</span>) for candidate depth rendering.</span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`utils.pointcloud`</span> (<span class="in">`dist_im_to_point_cloud_im`</span>, <span class="in">`pointcloud_to_occupancy_snippet`</span>) for depth → PC and occupancy.</span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**ATEK**:</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`load_atek_wds_dataset`</span>, <span class="in">`process_wds_sample`</span> for streaming shards.</span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Key mapping (<span class="in">`EfmModelAdaptor.get_dict_key_mapping_all`</span>) when exporting to EFM schema.</span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Download helpers (<span class="in">`atek_data_store_download.download_atek_wds_sequences`</span>) via <span class="in">`ASEDownloader`</span>.</span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a><span class="fu"># Suggested Mermaid for planned processing layer</span></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>classDiagram</span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>    class CandidateViewGenerator{</span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>      +sample_poses(last_pose, strategy_cfg)-&gt;list[PoseTW]</span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>    class CandidatePointCloudGenerator{</span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>      +render_depth(pose, mesh)-&gt;depth</span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>      +to_point_cloud(depth, cam)-&gt;Tensor[N,<span class="dv">3</span>]</span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>    class PointCloudFusion{</span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>      +merge(P_t, P_q)-&gt;P_fused</span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>    class OracleRRI{</span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>      +chamfer_before_after(P_t, P_fused, mesh)-&gt;float</span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>    CandidateViewGenerator --&gt; CandidatePointCloudGenerator</span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>    CandidatePointCloudGenerator --&gt; PointCloudFusion</span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>    PointCloudFusion --&gt; OracleRRI</span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>Use this layout to guide module additions under <span class="in">`oracle_rri/`</span> while keeping current data-handling and config patterns.</span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

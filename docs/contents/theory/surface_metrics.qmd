@@ -165,4 +165,4 @@ Both ATEK and EFM3D provide implementations:
 - **ATEK**: [`evaluate_single_mesh_pair()`](https://github.com/facebookresearch/ATEK/blob/main/atek/evaluation/surface_reconstruction/surface_reconstruction_metrics.py) - Production-ready evaluation
 - **EFM3D**: [`eval_mesh_to_mesh()`](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/mesh_utils.py) - Includes visualization utilities
 
-See [ATEK Implementation](atek_implementation.qmd) for detailed breakdown.
+See [ATEK Implementation](../ext-impl/atek_implementation.qmd) for detailed breakdown.

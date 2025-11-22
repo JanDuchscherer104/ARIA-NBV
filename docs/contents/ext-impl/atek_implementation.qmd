@@ -1,0 +1,141 @@
+---
+title: "ATEK Implementation Index"
+format: html
+---
+
+# Purpose
+
+ATEK is the production data pipeline for Aria Synthetic Environments. This index lists signatures, shapes, and theory for building/flattening/loading snippets and for evaluation utilities we depend on (plus items we underuse).
+
+## Wikipedia theory primer
+
+- **SLAM (Simultaneous Localization and Mapping)**: joint estimation of a sensor’s pose and a map of the environment from the same observations—classically solved with probabilistic filters combining odometry and landmark updates. ATEK’s trajectory + semidense streams are the outputs of this SLAM stage.  
+  Source: [Wikipedia — Simultaneous localization and mapping](https://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping).
+- **SE(3) pose representation**: Special Euclidean group combining 3D rotations (SO(3)) and translations; pose composition is associative and invertible, which keeps `T_world_device @ T_device_camera` well-defined for every frame.  
+  Sources: [Special Euclidean group](https://en.wikipedia.org/wiki/Special_Euclidean_group) and [Special orthogonal group](https://en.wikipedia.org/wiki/Special_orthogonal_group).
+
+# File-by-file implementation guide (ATEK)
+
+- `data_preprocess/atek_data_sample.py`  
+  Nested dataclasses for camera, trajectory, semidense, online calib, and GT containers; `to_flatten_dict`/`create_atek_data_sample_from_flatten_dict` handle stable WDS key naming and reconstruction.
+- `processors/aria_camera_processor.py`  
+  Reads VRS streams, extracts per-frame calibration, applies pixel transforms, and outputs `MultiFrameCameraData`; supports label-dependent resize/crop.
+- `processors/depth_image_processor.py`  
+  Loads depth VRS, converts z-depth to distance, precomputes pixel-to-ray cache, and aligns timestamps to RGB/trajectory; returns `[F,1,H,W]` float depth.
+- `processors/mps_traj_processor.py`  
+  Reads closed-loop trajectories, optionally interpolates, outputs `ts_world_device` and timing; keeps gravity vector per sequence.
+- `processors/mps_semidense_processor.py`  
+  Loads semidense global points and per-frame observations; computes volume bounds and preserves per-point std/1/std. Key helper `_find_matching_timestamps_in_df` aligns to requested timestamps.
+- `processors/mps_online_calib_processor.py`  
+  Optional time-varying intrinsics/extrinsics; returns `projection_params[T,15]` and `ts_device_camera[T,C,3,4]`.
+- `processors/obb2_gt_processor.py` and `processors/obb3_gt_processor.py`  
+  Parse ADT/ASE OBB GT (2D and 3D). The 3D processor recenters AABB, maps instance/category IDs via taxonomy, and outputs camera-specific boxes and world poses.
+- `processors/efm_gt_processor.py`  
+  Wraps `Obb3GtProcessor` but returns nested per-camera OBB3 dicts compatible with EVL; useful for oracle RRI training.
+- `sample_builders/atek_data_paths_provider.py`  
+  Resolves per-sequence file paths for ADT/ASE given `data_root_path`; supports both mesh+ATEK variants.
+- `sample_builders/obb_sample_builder.py`  
+  Composes processors into `AtekDataSample` for CubeRCNN tasks; orchestrates timestamp subsampling.
+- `sample_builders/efm_sample_builder.py`  
+  EFM-oriented builder that includes depth and OBB3; validates timestamp consistency between RGB, depth, and trajectory; raises if off by tolerance.
+- `subsampling_lib/temporal_subsampler.py`  
+  Computes subsampling factor to hit target frequency; provides `get_timestamps_by_sample_index` used by builders and WDS writers.
+- `data_loaders/atek_wds_dataloader.py`  
+  `process_wds_sample` (reshape, type cast, merge `gt_data` shards), `select_and_remap_dict_keys`, `atek_default_collation_fn`, and `load_atek_wds_dataset`/`create_native_atek_dataloader`.
+- `data_loaders/cubercnn_model_adaptor.py` and `data_loaders/sam2_model_adaptor.py`  
+  Key maps + minimal transforms to feed CubeRCNN or SAM2; keep tensor dtypes and shapes aligned to those models’ expectations.
+- `evaluation/surface_reconstruction/surface_reconstruction_metrics.py`  
+  `evaluate_single_mesh_pair` orchestrates mesh loading, optional gravity correction, surface sampling, and bidirectional point-to-mesh distances; thresholds default to 5 cm for AR tasks.
+- `evaluation/static_object_detection/static_object_detection_metrics.py`  
+  `AtekObb3Metrics` wraps `MeanAveragePrecision3D`; supports per-class and per-volume-range metrics, and respects configurable max detections.
+- `evaluation/static_object_detection/obb3_csv_io.py`  
+  CSV writers/readers for OBB3 eval; preserve timestamps and SE(3) fields for reproducibility.
+- `viz/atek_visualizer.py` and `viz/cubercnn_visualizer.py`  
+  Matplotlib-based inspection of images, semidense points, OBBs, trajectories; used for quick QC before training/evaluation.
+
+# End-to-End Pipeline (build → flatten → WDS)
+
+- Dataclasses (`external/ATEK/atek/data_preprocess/atek_data_sample.py`):  
+  - `MultiFrameCameraData(images: Tensor["F,C,H,W"], capture_timestamps_ns: Tensor["F"], frame_ids: Tensor["F"], projection_params: Tensor[15], t_device_camera: Tensor["F,3,4"], camera_valid_radius: Tensor[1], …)`; methods `to_flatten_dict()` / `from_flatten_dict`.  
+  - `MpsTrajData(ts_world_device: Tensor["F,3,4"], capture_timestamps_ns: Tensor["F"], gravity_in_world: Tensor[3])`.  
+  - `MpsSemiDensePointData(points_world: list[Tensor["Ni,3"]], dist_std: list[Tensor["Ni"]], inv_dist_std: list[Tensor["Ni"]], capture_timestamps_ns: Tensor["F"], points_volume_min/max: Tensor[3])`.  
+  - `MpsOnlineCalibData(projection_params: Tensor["T,15"], ts_device_camera: Tensor["T,C,3,4"], capture_timestamps_ns: Tensor["T"])`.  
+  - `AtekDataSample` aggregates the above; `to_flatten_dict()` prefixes fields (`mfcd#`, `mtd#`, `msdpd#`, `mocd#`) and stores `gt_data` dict intact. **Theory**: flattening keeps shard-friendly keys while preserving tensor semantics for reconstruction and detection.
+- Processors (`data_preprocess/processors/`):  
+  - `aria_camera_processor.py` – reads VRS streams; outputs `MultiFrameCameraData`. Theory: ensures RGB/SLAM frames align with rig poses.  
+  - `depth_image_processor.py` – converts z-depth to distance; caches rays; outputs depth frames `[F,1,H,W]`. Theory: enables GT depth backprojection consistency.  
+  - `mps_traj_processor.py` – closed-loop trajectory to `ts_world_device`. Theory: provides world poses for all modalities.  
+  - `mps_semidense_processor.py` – loads semidense points + stats per timestamp. Theory: preserves uncertainty for later weighting.  
+  - `mps_online_calib_processor.py` – time-varying intrinsics/extrinsics. Theory: avoids calibration drift over long snippets.  
+  - `obb2_gt_processor.py`, `obb3_gt_processor.py`, `efm_gt_processor.py` – assemble 2D/3D OBB GT per timestamp/camera. Theory: maintains consistent category/instance mapping for EVL/OBB metrics.
+- Sample builders (`data_preprocess/sample_builders/`):  
+  - `AtekDataPathsProvider(data_root_path)` → dict of raw file paths for ADT/ASE.  
+  - `ObbSampleBuilder(conf, vrs_file, sequence_name, mps_files, gt_files)` → `AtekDataSample` with OBB GT.  
+  - `EfmSampleBuilder(conf, vrs_file, depth_vrs_file, sequence_name, mps_files, gt_files)` → `AtekDataSample` tailored for EVL (includes depth + OBB3).  
+  - `CameraTemporalSubsampler(vrs_file, conf)` → subsampled timestamp lists via `get_timestamps_by_sample_index(i)`. **Theory**: controls snippet length/stride; guarantees even spacing.
+- Writing: `AtekWdsWriter(output_tar)`  
+  - `add_sample(sample: dict)` flattens and writes; `get_num_samples()`, `close()`. **Theory**: deterministic flattening for WebDataset shards.
+
+# Flattened Schema Highlights (per snippet, unbatched)
+
+- Images: `mfcd#camera-rgb+images [F,3,H,W] uint8`; SLAM streams `[F,1,H',W']`.
+- Camera meta: `mfcd#camera-<lbl>+projection_params [15] float32`; `+camera_valid_radius [1]`; `+t_device_camera [F,3,4]`.
+- Trajectory: `mtd#ts_world_device [F,3,4] float32`; `mtd#capture_timestamps_ns [F]`; `mtd#gravity_in_world [3]`.
+- Semi-dense: `msdpd#points_world` stacked tensor with `points_world_lengths` to recover per-frame lists; `points_volume_min/max [3]`; per-point `dist_std`, `inv_dist_std`.
+- Online calib (optional): `mocd#projection_params [T,15]`; `mocd#ts_device_camera [T,C,3,4]`.
+- `gt_data`: nested dict for `obb2_gt`, `obb3_gt`, `scores`, etc.; tensors stored as `gt_data#<name>.pth`.
+- Naming rule: `<producer>#<cam>+<field>` stays filename-safe inside WDS shards.
+
+# Loading & Adaptors
+
+- `process_wds_sample(sample: dict) -> dict` (`data_loaders/atek_wds_dataloader.py`)  
+  Restacks JPEGs to tensors, merges `gt_data#*` back, unpacks semidense lists using stored lengths. **Theory**: lossless inverse of flattening.
+- `select_and_remap_dict_keys(sample_dict, key_mapping) -> dict`  
+  Keeps/renames fields for downstream schemas (CubeRCNN, SAM2, EVL).
+- `atek_default_collation_fn(samples: list[dict]) -> dict`  
+  Stacks tensors when shapes agree, leaves lists otherwise. **Theory**: mixed dtypes/shapes preserved for EVL padding later.
+- `load_atek_wds_dataset(urls, nodesplitter=None, dict_key_mapping=None, data_transform_fn=None, batch_size=None, collation_fn=None, repeat_flag=False, shuffle_flag=False)`  
+  Returns iterable WebDataset pipeline.  
+- `create_native_atek_dataloader(..., num_workers)`  
+  Torch DataLoader wrapper for the above.
+- Model adaptors:  
+  - `CubeRCNNModelAdaptor.get_dict_key_mapping_all()` – ATEK→CubeRCNN.  
+  - `Sam2ModelAdaptor.get_dict_key_mapping_all()` – ATEK→SAM2.  
+  - For EVL use `EfmModelAdaptor` (see `efm3d_implementation.qmd`).
+- Raw VRS helper: `atek_raw_dataloader_as_cubercnn.py::AtekRawDataloaderAsCubercnn` mirrors the interface without WDS.
+
+# Evaluation Modules
+
+- Surface reconstruction: `evaluate_single_mesh_pair(pred_mesh_filename, gt_mesh_filename, sample_num=10000, step=50000, threshold=0.05, correct_mesh_gravity=False, cut_height=None, rnd_seed=42)` (`evaluation/surface_reconstruction/surface_reconstruction_metrics.py`)  
+  **Returns** `(metrics, accuracy, completeness)` where accuracy = pred→GT distances, completeness = GT→pred. **Theory**: bidirectional point-to-mesh distance approximates Chamfer; prec/recall/F@5 cm derived from distance histograms.
+- Helper: `compute_pts_to_mesh_dist(pts, faces, vertices, step)`  
+  Projects points onto triangles (barycentric test) else nearest vertex; batch-processed for memory safety.
+- Static object detection: `AtekObb3Metrics(class_metrics=False, max_detection_thresholds=100, ret_all_prec_rec=False)` (`evaluation/static_object_detection/static_object_detection_metrics.py`)  
+  Methods: `update(pred_dict, tgt_dict)`, `compute()`, `reset()`. **Theory**: wraps `MeanAveragePrecision3D` for ATEK-format OBB dicts; IoU over oriented boxes.
+- IoU helper: `eval_obb3_metrics_utils.IouOutputs(vol, iou)`.
+- CSV I/O:  
+  - `AtekObb3CsvWriter(output_filename)` → `write_from_atek_dict(atek_dict, score, timestamp_ns, flush_at_end)`  
+  - `GroupAtekObb3CsvWriter(output_folder, output_filename)` → per-sequence CSVs  
+  - `AtekObb3CsvReader(input_filename)` → `read_as_obb_dict()`  
+  **Theory**: reproducible export/import for metric computation and viz.
+
+# Visualisation & Debug
+
+- `NativeAtekSampleVisualizer` (`viz/atek_visualizer.py`)  
+  `plot_atek_sample(sample_dict, show_gt=True, save_path=None)`; supports plotting images, semidense points, trajectories, OBB2/OBB3, and 3D overlays. **Theory**: quick sanity checks on flattened→loaded fidelity.
+- `CubercnnVisualizer` (`viz/cubercnn_visualizer.py`)  
+  `plot_cubercnn_dict(cubercnn_dict, save_path=None)`.
+
+# NBV / Oracle Tips
+
+- Coordinate convention: Aria world x left, y up, z forward. Camera pose: `T_world_cam = T_world_device @ T_device_camera`; depth points already in world frame.
+- Preserve `sequence_name`, `snippet_id`, and `points_volume_min/max` to pair shards with meshes (`scene_ply_<scene>.ply`).
+- Prefer `load_atek_wds_dataset()` + `EfmModelAdaptor` so EVL/EFM utilities see consistent padded tensors.
+
+# Underused / To Integrate Better
+
+- `depth_image_processor.py` – enable RGB-depth ingestion to compare candidate renderings with GT distance maps directly.
+- `mps_online_calib_processor.py` – incorporate time-varying intrinsics/extrinsics for long snippets to curb drift in RRI.
+- `efm_gt_processor.py` – use nested multi-camera OBB3 GT instead of per-camera flattening for better EVL alignment.
+- `AtekObb3Metrics` – run during candidate evaluation to measure view impact on OBB recall/precision.
+- `NativeAtekSampleVisualizer` – integrate into debug loops before RRI runs to catch schema/remap issues early.

@@ -6,7 +6,7 @@ bibliography: ../../references.bib
 
 # Purpose
 
-EFM3D is the foundation for our ASE-based NBV research: it standardises Aria sensor snippets, lifts Dino features into volumetric grids, fuses predictions through time, and evaluates reconstruction quality. This page catalogues every symbol from the vendored `external/efm3d` tree that we need, grounding each entry in the relevant theory (see also `rri_theory.qmd`, `oracle_rri_impl.qmd`, and `atek_implementation.qmd`). We emphasise tensor shapes, coordinate conventions, and provide quick usage examples for the key types.
+EFM3D is the foundation for our ASE-based NBV research: it standardises Aria sensor snippets, lifts Dino features into volumetric grids, fuses predictions through time, and evaluates reconstruction quality. This page catalogues every symbol from the vendored `external/efm3d` tree that we need, grounding each entry in the relevant theory (see also `../theory/rri_theory.qmd`, `../impl/oracle_rri_impl.qmd`, and `atek_implementation.qmd`). We emphasise tensor shapes, coordinate conventions, and provide quick usage examples for the key types.
 
 # Core Design Ideas
 

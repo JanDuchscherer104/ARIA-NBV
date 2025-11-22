@@ -1,0 +1,103 @@
+---
+title: "aria_nbv Overview & Architecture"
+format:
+  html:
+    page-layout: full
+---
+
+# What is `aria_nbv`?
+
+- In-repo NBV toolkit (import path currently `oracle_rri`) for ASE/ATEK + EFM3D experiments.
+- Responsibilities: load typed ASE snippets, generate collision‑aware candidate views, render/raycast depth, fuse point clouds, and score Relative Reconstruction Improvement (RRI).
+
+# Directory layout (code)
+
+```text
+oracle_rri/oracle_rri/
+├── configs/              # PathConfig
+├── utils/                # BaseConfig, Console, frames helpers
+├── data/                 # Typed EFM views (cameras, traj, semidense, GT)
+├── data_handling/        # ATEK WDS loader, metadata, downloader CLI
+├── pose_generation/      # CandidateViewGenerator + rules + types
+├── rendering/            # Pytorch3D + trimesh depth renderers
+├── views/                # Candidate point-cloud rendering
+├── viz/ & visualization/ # Mesh/trajectory viz + Streamlit app
+├── analysis/             # DepthDebugger
+└── streamlit_app.py      # Minimal dashboard entry
+```
+
+# End-to-end NBV loop
+
+```{mermaid}
+flowchart LR
+    A[ASE/ATEK shard\n+ GT mesh] --> B(data_handling.dataset\nEfmSnippetView)
+    B --> C(pose_generation.\nCandidateViewGenerator)
+    C -->|PoseTW batch + masks| D(rendering.\nCandidateDepthRenderer)
+    D -->|Depth→PC (EFM3D pointcloud utils)| E[Fused reconstruction P_{t∪q}]
+    E --> F[Metrics: RRI / Chamfer]
+    F --> G[Policy: pick NBV]
+    G -->|advance pose| C
+```
+
+# Core modules (shortcuts)
+
+- **Config/Logging**: `configs.path_config.PathConfig`, `utils.base_config.BaseConfig`, `utils.console.Console`.
+- **Data views**: `data.efm_views` (`EfmSnippetView`, cameras, trajectory, semidense, GT/OBBs).
+- **Dataset handling**: `data_handling.dataset.ASEDataset`, `data_handling.downloader.ASEDownloader`, metadata parsers.
+- **Candidate generation**: `pose_generation.candidate_generation` + rules (shell sampling, min-distance, path collision, free-space).
+- **Rendering**: `rendering.candidate_depth_renderer` (wraps PyTorch3D backend), `rendering.efm3d_depth_renderer` (CPU raycast).
+- **Metrics/RRI**: see `rri_computation.qmd`; uses Chamfer components against GT mesh.
+- **Visualisation**: `viz.mesh_viz`, `visualization.candidate_app`, `streamlit_app.py`.
+- **Debugging**: `analysis.depth_debugger.DepthDebugger`.
+
+# RRI essentials (used by metrics)
+
+Let \(P_t\) be current reconstruction points, \(P_q\) the candidate-view points, \(M\) the GT surface (sampled). Symmetric Chamfer:
+$$
+\mathrm{CD}(P,M)=\frac{1}{|P|}\sum_{p\in P}\min_{m\in M}\|p-m\|_2^2+\frac{1}{|M|}\sum_{m\in M}\min_{p\in P}\|m-p\|_2^2.
+$$
+Relative improvement:
+$$
+\mathrm{RRI}(P_t,P_q,M)=\frac{\mathrm{CD}(P_t,M)-\mathrm{CD}(P_t\cup P_q,M)}{\mathrm{CD}(P_t,M)+\varepsilon},
+$$
+with small \(\varepsilon\) for stability. Positive RRI ⇒ candidate improves reconstruction.
+
+# External APIs we lean on (from merged oracle_rri_impl)
+
+- **EFM3D**: `PoseTW`, `CameraTW`, `utils.ray.ray_grid/transform_rays`, `utils.pointcloud.dist_im_to_point_cloud_im`, `utils.mesh_utils.eval_mesh_to_mesh`.
+- **ATEK**: `load_atek_wds_dataset`, `process_wds_sample`, surface metrics (`surface_reconstruction_metrics.py`).
+- **trimesh**: IO, surface sampling, proximity queries, ray intersections; optional pyembree backend.
+
+# Architecture snapshot (class diagram)
+
+```{mermaid}
+classDiagram
+    class PathConfig
+    class BaseConfig
+    class Console
+    class ASEDataset
+    class AseEfmDataset
+    class CandidateViewGenerator
+    class CandidateDepthRenderer
+    class DepthDebugger
+    class MeshViz
+
+    PathConfig <|-- ASEDataset
+    BaseConfig <|-- CandidateViewGenerator
+    BaseConfig <|-- CandidateDepthRenderer
+    BaseConfig <|-- AseEfmDataset
+    Console <.. CandidateViewGenerator
+    Console <.. CandidateDepthRenderer
+    Console <.. ASEDataset
+    ASEDataset --> AseEfmDataset : typed view export
+    CandidateViewGenerator --> CandidateDepthRenderer : PoseTW candidates
+    CandidateDepthRenderer --> MeshViz : depth/PC viz
+    DepthDebugger --> MeshViz
+```
+
+# Where to dive deeper
+
+- Data ingestion & typed views: `data_pipeline_overview.qmd`
+- Oracle metric details: `rri_computation.qmd`
+- External libraries: `../ext-impl/atek_implementation.qmd`, `../ext-impl/efm3d_implementation.qmd`
+- Notebook reference: `../notebooks/ase_oracle_rri_simplified.ipynb`

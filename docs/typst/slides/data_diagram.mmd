@@ -1,0 +1,162 @@
+---
+title: 
+config:
+  class:
+    hideEmptyMembersBox: true
+---
+classDiagram
+namespace dataset{
+    class ASEDataset{
+        +config
+        +console
+        -_atek_wds
+        +\_\_init\_\_(self, ASEDatasetConfig config)
+        -_load_mesh(self, str scene_id)
+        -_iter_flat_samples(self)
+        +\_\_iter\_\_(self)
+    }
+    class ASEDatasetConfig{
+        -_populate_tar_urls(cls, value, ValidationInfo info)
+        -_autofill_paths(self)
+        +setup_target(self)
+    }
+}
+namespace efm_views{
+    class EfmGtCameraObbView{
+        +category_names
+        +category_ids
+        +instance_ids
+        +object_dimensions
+        +ts_world_object
+        +\_\_repr\_\_(self)
+    }
+    class EfmGtTimestampView{
+        +time_id
+        +cameras
+        +\_\_repr\_\_(self)
+    }
+    class EfmGTView{
+        +raw
+        +efm_gt
+        +raw
+        +efm_gt
+        +\_\_init\_\_(self, raw)
+        +timestamps(self)
+        +cameras_at(self, ts)
+        +\_\_repr\_\_(self)
+    }
+    class EfmCameraView{
+        +images
+        +calib
+        +time_ns
+        +frame_ids
+        +to(self, device)
+        +\_\_repr\_\_(self)
+    }
+    class EfmTrajectoryView{
+        +t_world_rig
+        +time_ns
+        +gravity_in_world
+        +final_pose(self)
+        +to(self, device)
+        +\_\_repr\_\_(self)
+    }
+    class EfmPointsView{
+        +points_world
+        +dist_std
+        +inv_dist_std
+        +time_ns
+        +volume_min
+        +volume_max
+        +lengths
+        +to(self, device)
+        +\_\_repr\_\_(self)
+    }
+    class EfmObbView{
+        +obbs
+        +hz
+        +\_\_repr\_\_(self)
+    }
+    class EfmSnippetView{
+        +efm
+        +scene_id
+        +snippet_id
+        +mesh
+        -_camera(self, str prefix)
+        +camera_rgb(self)
+        +camera_slam_left(self)
+        +camera_slam_right(self)
+        +trajectory(self)
+        +semidense(self)
+        +obbs(self)
+        +gt(self)
+        +has_mesh(self)
+        +to(self, device)
+        +\_\_repr\_\_(self)
+    }
+}
+namespace metadata{
+    class SceneMetadata{
+        +scene_id
+        +has_gt_mesh
+        +mesh_url
+        +mesh_sha
+        +snippet_count
+        +snippet_ids
+        +atek_config
+        +total_frames
+    }
+    class ASEMetadata{
+        +url_dir
+        +mesh_json
+        +atek_json
+        +\_\_init\_\_(self, Path url_dir, str mesh_json_filename, str atek_json_filename)
+        -_maybe_store(self, str scene_id, SceneMetadata meta)
+        -_parse(self)
+        +get_scenes_with_meshes(self)
+        +filter_scenes(self, int min_snippets, bool require_mesh, config)
+        +get_scenes(self, n, max_snippets)
+        +save(self, Path path)
+        +load(Path path)
+    }
+}
+namespace efm_dataset{
+    class AseEfmDataset{
+        +config
+        +console
+        -_efm_wds
+        +\_\_init\_\_(self, 'AseEfmDatasetConfig' config)
+        -_load_mesh(self, str scene_id)
+        -_iter_efm_samples(self)
+        +\_\_iter\_\_(self)
+    }
+    class AseEfmDatasetConfig{
+        -_strip_taxonomy(cls, value)
+        -_populate_tar_urls(cls, value, ValidationInfo info)
+        +taxonomy_csv(self)
+        -_autofill_paths(self)
+        +setup_target(self)
+    }
+}
+namespace downloader{
+    class ASEDownloaderConfig{
+        +from_cli(cls)
+        +settings_customise_sources(cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings, cli_settings)
+    }
+    class ASEDownloader{
+        +config
+        +console
+        +metadata
+        +mesh_dir
+        +\_\_init\_\_(self, ASEDownloaderConfig config)
+        +download_scenes(self, scenes, scene_ids, bool download_meshes, bool download_atek)
+        +download_meshes(self, scene_ids, bool overwrite)
+        +download_atek(self, scene_ids)
+        -_download_meshes(self, scenes)
+        -_download_atek(self, scenes)
+        -_validate_sha(self, Path path, expected_sha)
+        +download_scenes_with_meshes(self, int min_snippets, str config, bool overwrite)
+        -_download_file(self, str url, Path dest_path)
+    }
+}
+%% inheritance

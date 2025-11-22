@@ -1,0 +1,150 @@
+---
+title: "EFM3D Implementation Index"
+format: html
+---
+
+# Purpose
+
+EFM3D is our egocentric foundation stack for ASE snippets. This index gives signatures, tensor shapes, and theory for the pieces NBV/oracle code touches (and a few we underuse).
+
+## Wikipedia theory primer
+
+- **SLAM (Simultaneous Localization and Mapping)**: the core upstream problem—estimating sensor pose while building a map from the same observations. Classical SLAM fuses odometry and landmarks (often with EKF/particle filters). Our loaders consume its outputs (poses, semidense points) as given.  
+  Source: [Wikipedia — Simultaneous localization and mapping](https://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping).
+- **SE(3) rigid motions**: the Special Euclidean group combines SO(3) rotations with translations; pose composition is group multiplication, inversion is group inverse. PoseTW instances live in SE(3), so chaining rig↔camera↔world transforms remains associative. SO(3) is the rotation subgroup used inside many utilities.  
+  Sources: [Special Euclidean group](https://en.wikipedia.org/wiki/Special_Euclidean_group) and [Special orthogonal group](https://en.wikipedia.org/wiki/Special_orthogonal_group).
+
+# Benchmark and model background
+
+- **EFM3D benchmark** targets two core tasks on egocentric Aria data: 3D object detection (OBBs) and surface reconstruction. The official release provides pretrained EVL weights and ASE/ADT/AEO datasets for eval and training, with native ATEK integration. See the repo: [facebookresearch/efm3d](https://github.com/facebookresearch/efm3d).  
+- **EVL (Egocentric Voxel Lifting)** is the baseline architecture: DinoV2 2D features are lifted into 3D voxel grids, followed by 3D CNN heads for occupancy and OBB detection. It consumes synchronized RGB/SLAM frames, poses, semidense points, and calibration and fuses them in voxel space. Overview: [Project Aria EVL docs](https://facebookresearch.github.io/projectaria_tools/docs/open_models/evl).  
+- **ASE dataset context**: 100k procedurally generated indoor scenes with GT meshes, semidense maps, and simulated Aria sensor streams; trajectories are ~2 minutes with realistic motion. This explains why loaders handle large tar shards, padding, and gravity alignment. Dataset description: [ASE docs](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset).
+
+# Data Ingestion & Adaptors
+
+- `WdsStreamDataset(urls, snippet_length_s: float, stride_length_s: float, freq: float, transforms=None)`  
+  **Yields** dict with EFM keys; images `[T,C,H,W]`, poses `PoseTW[T]`, cameras `CameraTW[T]`, semidense lists padded to fixed length. **Theory**: sliding-window WebDataset reader that enforces fixed temporal receptive fields for EVL/NBV.
+- `AtekWdsStreamDataset(tar_list: list[str], fps: float, snippet_length_s=2.0, stride_length_s=2.0, **cfg)`  
+  Wraps `WdsStreamDataset` after remapping ATEK keys; keeps shard-level metadata. **Theory**: isolates ATEK-specific URL handling from downstream geometry.
+- `load_atek_wds_dataset_as_efm(urls, freq, snippet_length_s=2.0, stride_length_s=2.0, seed=0, resample=False)`  
+  **Returns** WebDataset iterator; semidense points padded to `[T, N_max, 3|1]`, cameras batched. **Theory**: deterministic padding and key remap to EVL schema avoids schema drift.
+- `EfmModelAdaptor.get_dict_key_mapping_all() -> dict[str, str]`  
+  Complete ATEK→EVL key map (e.g., `mfcd#camera-rgb+images → rgb/img`, `mtd#ts_world_device → pose/t_world_rig`). **Theory**: zero-copy field renaming preserves original numeric precision.
+- `augmentation.py` transforms: `fn(sample: dict) -> dict`. Photometric / point jitter; disable for deterministic oracle evaluation.
+
+# File-by-file implementation guide (EFM3D)
+
+- `dataset/wds_dataset.py`  
+  Implements sharded WebDataset reader with rolling windows; key routines `_slice_snippet`, `_stack_and_cast`, and `collate` keep tensors contiguous. Uses `CameraTW` and `PoseTW` constructors to standardize geometry.
+- `dataset/atek_wds_dataset.py`  
+  Wraps the above with ATEK tar parsing, fixing FPS/length and delegating to `EfmModelAdaptor`. The `tar_list` handling ensures deterministic order for multi-tar shards.
+- `dataset/efm_model_adaptor.py`  
+  Core schema remap and padding logic: merges `gt_data#` keys, pads semidense to `semidense_points_pad`, converts `projection_params` → `CameraTW`, splits world poses into snippet frame (`t_world_snippet`) and snippet-relative rig poses (`pose/t_snippet_rig`), aligns gravity to `[0,0,-9.81]`, and fuses multi-camera OBBs to a padded `ObbTW` (128 slots by default). Entry helpers: `load_atek_wds_dataset_as_efm*`.
+- `aria/pose.py`  
+  Provides Lie-group SE(3) math (`from_matrix`, `compose`, `log/exp`, geodesic distances), interpolation across timestamps, and batched transforms used throughout candidate rendering and RRI.
+- `aria/camera.py`  
+  Batched fisheye camera model with projection/unprojection, valid-radius masks, scaling/cropping, and `T_camera_rig` storage. Projection utils allow consistent ray grids for rendering and depth backprojection.
+- `aria/obb.py`  
+  `ObbTW` tensor wrapper with padding/unpadding, per-camera 2D boxes, world/object transforms, semantic/instance filtering, and helper projections. Used both for GT and predictions.
+- `utils/ray.py`  
+  Ray grid generation (`ray_grid`, `grid_ray`), frame transforms (`transform_rays`), voxel-box intersection (`ray_obb_intersection`), and depth sampling (`sample_depths_in_grid`) for free-space checks.
+- `utils/depth.py`  
+  `dist_im_to_point_cloud_im` converts distance maps plus camera/pose to world points; handles batch/time dims and validity masks.
+- `utils/pointcloud.py`  
+  `get_points_world`, `collapse_pointcloud_time`, `pointcloud_to_voxel_ids/counts`, and occupancy sampling (`pointcloud_occupancy_samples`, `pointcloud_to_occupancy_snippet`) underpin reconstruction/RRI.
+- `utils/voxel.py` and `utils/voxel_sampling.py`  
+  Voxel extent normalization, grid generation, and trilinear sampling (`sample_voxels`/`diff_grid_sample`) to lift 2D features into 3D and query features at arbitrary 3D points.
+- `utils/reconstruction.py`  
+  Occupancy ground-truth builders and losses (`compute_occupancy_loss_subvoxel`) mirroring EVL training; useful for oracle occupancy checks.
+- `utils/mesh_utils.py`  
+  Mesh IO, decimation, surface sampling, proxy-wall augmentation, and `eval_mesh_to_mesh` metric computation (accuracy/completeness, prec/recall/F-score).
+- `inference/*` and `model/*`  
+  EVL runtime: DinoV2 backbone (`model/cnn.py`, `model/image_tokenizer.py`), voxel lifting (`model/lifter.py`), heads (`model/evl.py`), training loop (`model/evl_train.py`), and inference driver (`inference/pipeline.py`, `inference/model.py`).
+- `viz`/`render` helpers  
+  Lightweight EGL/Matplotlib point and mesh visualization for debugging candidate geometry and OBB predictions.
+
+# Geometry Primitives
+
+- `PoseTW(data: Tensor["...,3,4"])`  
+  Methods: `compose(other)`, `inverse()`, `transform(p3d: Tensor["...,3"]) -> Tensor["...,3"]`, `rotate(p3d)`, `interpolate(times, interp_times)`, `log()/exp()`. **Shapes**: stored as `[3,4]` or flattened 12. **Theory**: SE(3) in Aria RDF (x left, y up, z forward); Lie ops ensure smooth interpolation for ray alignment.
+- `CameraTW(data: Tensor["...,34"])` (fisheye)  
+  Methods: `project(p3d) -> Tensor["...,2"]`, `unproject(p2d) -> Tensor["...,3"]`, `in_radius(p2d)`, `scale_to_size(size_wh)`, `crop(left_top, size)`. Contains `T_camera_rig: PoseTW`. **Theory**: keeps intrinsics/extrinsics coherent; valid radius bounds fisheye domain.
+- `ObbTW(data: Tensor["...,K,34"])` (padded)  
+  Methods: `bb3corners_world() -> Tensor["...,K,8,3"]`, `bb2(cam_id)`, `filter_by_prob(prob_thr)`, `filter_by_sem_id(ids)`, `transform(T_new_world)`, `add_padding(max_elts)`. **Theory**: oriented boxes carry semantic/instance priors; transforms allow world↔object consistency.
+- `TensorWrapper`  
+  Thin base with `.tensor`, `.to(device)`, `.shape`, `.dtype`; enforces consistent semantics across wrapped tensors.
+
+# Rays, Depth, Point Clouds
+
+- `ray_grid(cam: CameraTW) -> (Tensor["B,H,W,6"], Tensor["B,H,W"])`  
+  Origins/directions in rig frame; `valid` masks fisheye outside-FOV rays. **Theory**: pixel unprojection followed by rig transform.
+- `transform_rays(rays_old: Tensor["...,6"], T_new_old: PoseTW) -> Tensor["...,6"]`  
+  Applies SE(3) to origins, SO(3) to directions. **Theory**: frame change for world intersections.
+- `sample_depths_in_grid(rays_v: Tensor["B,T,N,6"], ds_max: Tensor["B,T,N"], voxel_extent: Tensor[6], W:int, H:int, D:int, num_samples:int, d_near:float, d_far:float, sample_mode:Literal["uniform","random"], ds_min=None) -> tuple[Tensor["B,T,N,S"], Tensor["B,T,N"], Tensor["B,T,N"]]`  
+  Returns sampled depths, per-ray max depth, validity. **Theory**: slab intersection bounds rays to voxel AABB; useful for free-space sampling and collision pruning.
+- `dist_im_to_point_cloud_im(dist_m: Tensor["B,T,1,H,W"], cams: CameraTW) -> (Tensor["B,T,N,3"], Tensor["B,T,N"])`  
+  Backprojects distance images using `ray_grid`; filters non-positive depths. **Theory**: converts depth to world points consistent with rig frame.
+- `get_points_world(batch, batch_idx=None, use_depth=True, use_semidense=True) -> (Tensor["T,N,3"], Tensor["T,N"])`  
+  Fuses depth-derived and semidense points; aligns via rig/world poses. **Theory**: forms reconstruction state \(P_t\) for RRI.
+- `collapse_pointcloud_time(pc_w: Tensor["T,N,3"]) -> Tensor["TN,3"]`  
+  Flattens time, drops NaNs/dups. **Theory**: prepares for Chamfer and occupancy.
+- `pointcloud_to_voxel_ids(pc_v: Tensor["...,3"], vW:int, vH:int, vD:int, voxel_extent: Tensor[6]) -> (Tensor["...,3"], Tensor["..."])`  
+  Maps points to integer voxel indices + validity. **Theory**: discretises continuous points to grid coordinates.
+- `pointcloud_to_voxel_counts(pc_v, vW, vH, vD, voxel_extent) -> Tensor["...,D,H,W"]`  
+  Per-voxel point density; occupancy proxy.
+- `pointcloud_to_occupancy_snippet(pc_w, rays_w, voxel_extent, S:int=1) -> Tensor["D,H,W"]`  
+  Marks camera origins and ray samples as free, surfaces as occupied. **Theory**: conservative free-space carving for oracle volumes.
+- `pointcloud_occupancy_samples(p3s_w, Ts_wc, cams, voxel_extent, vW,H,D, num_samples=1) -> tuple[occupied,surface,free]`  
+  Returns three point sets for occupancy supervision.
+
+# Voxels & Sampling
+
+- `tensor_wrap_voxel_extent(extent, B=None, device="cpu") -> Tensor["B,6"]`  
+  Normalises list/array extents.
+- `create_voxel_grid(vW:int, vH:int, vD:int, voxel_extent) -> Tensor["D,H,W,3"]`  
+  Centers of voxels in voxel frame. **Theory**: regular grid for interpolation.
+- `pc_to_vox(pts_v: Tensor["...,3"], vW,H,D:int, voxel_extent) -> (Tensor["...,3"], Tensor["..."])`  
+  Converts to normalised \([-1,1]\) coordinates for grid sampling.
+- `sample_voxels(feat3d: Tensor["B,C,D,H,W"], pts_v: Tensor["B,N,3"], differentiable=False) -> Tensor["B,N,C"]`  
+  Trilinear interpolation; `diff_grid_sample` variant is differentiable w.r.t. points. **Theory**: feature queries for RRI head or gradient-based candidate refinement.
+- `build_gt_occupancy(occ, visible, p3s_w, Ts_wc, cams, T_wv, voxel_extent)` / `compute_occupancy_loss_subvoxel(...) -> Tensor`  
+  Occupancy label construction and loss (focal/CE/L1/L2/logL1). **Theory**: subvoxel sampling reduces aliasing and supports free/occupied/surface supervision.
+
+# Mesh & Evaluation Utilities
+
+- `eval_mesh_to_mesh(pred: str|trimesh.Trimesh, gt: str|trimesh.Trimesh, sample_num=10000, thresholds=(0.01,0.05)) -> (metrics:dict, viz:dict, raw:dict)`  
+  Samples surfaces, computes bidirectional distances and prec/recall/F-score; also returns coloured point clouds. **Theory**: symmetric surface distance ≈ Chamfer; multi-threshold visual cues aid debugging.
+- Supporting IO/decimation/proxy walls in `mesh_utils.py` keep indoor scenes well-conditioned for ray tests.
+
+# OBB Detection, Matching, Tracking
+
+- `MeanAveragePrecision3D(box_format="corners", iou_thresholds=np.linspace(.5,.95,10), rec_thresholds=None, max_detection_thresholds=100, class_metrics=False, ret_all_prec_rec=False)`  
+  Updates with `preds/target` (ObbTW + scores) and computes COCO-style mAP in 3D. **Theory**: integrates volume-based IoU to evaluate OBB quality.
+- `HungarianMatcher2d3d(cost_class, cost_bbox2, cost_giou2, cost_bbox3, cost_iou3)`  
+  `forward_obbs(prd: ObbTW, tgt: ObbTW, prd_logits, logits_is_prob=False)` → match indices. **Theory**: bipartite matching jointly on 2D/3D cues reduces duplicate assignments.
+- `ObbMetrics(class_metrics: bool, volume_range_metrics: bool, eval_2d: bool, eval_3d: bool, ...)`  
+  `update(pred: ObbTW, tgt: ObbTW, cam)` and `compute()` return per-class/volume-range precision-recall. **Theory**: bridges 2D+3D box quality for downstream task-weighted RRI.
+- `ObbTracker(track_best=True, track_running_average=True, max_assoc_dist, max_assoc_iou2, max_assoc_iou3, ...)`  
+  `track(obbs_w: ObbTW, probs_full, cam: CameraTW, T_world_rig: PoseTW) -> ObbTW`; maintains temporal associations, NMS, and confidence decay. **Theory**: stabilises entity hypotheses over time for entity-aware NBV.
+- `obb_csv_writer.py` / `obb_io.py` provide CSV/TSV export/import for offline evaluation and visualisation.
+
+# Inference, Rendering, Viz
+
+- `inference/pipeline.py`, `model/*.py` (EVL): load frozen checkpoints, fuse depth/features, run OBB/occupancy heads. Backbone uses DinoV2 tokens → 3D lifting (`lifter.py`). **Theory**: 2D/3D cross-attention supplies priors for RRI head inputs.
+- Viz helpers: `inference/viz.py`, `utils/render.py`, `utils/viz.py` – EGL/Matplotlib point and mesh rendering for debugging candidate geometry.
+
+# NBV/Oracle Usage Checklist
+
+- Generate rays with `ray_grid` → world via `transform_rays`; intersect GT meshes with `trimesh` for candidate depth/PCs.
+- Convert camera depth to points via `dist_im_to_point_cloud_im`; fuse temporally with `collapse_pointcloud_time`.
+- Map fused points to voxels (`pointcloud_to_voxel_counts` or `pc_to_vox`) before feeding EVL volumes or RRI calculations.
+- Use `eval_mesh_to_mesh` for quick accuracy/completeness checks against GT meshes.
+- Keep all poses/cameras as `PoseTW`/`CameraTW` to stay consistent with ATEK/EFM conventions.
+
+# Underused / To Integrate Better
+
+- `build_gt_occupancy` + `compute_occupancy_loss_subvoxel` – add GT occupancy supervision so RRI head aligns with voxel truth.
+- `ObbTracker` – integrate for temporally stable entity priors in entity-aware RRI.
+- `ObbMetrics` – run per-view/per-candidate box diagnostics instead of bespoke IoU code.
+- `diff_grid_sample` – enable differentiable 3D feature queries to refine candidate poses with gradients.
+- `sample_depths_in_grid` – use for voxel-AABB free-space pruning before expensive mesh raycasts.

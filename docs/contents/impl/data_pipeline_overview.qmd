@@ -1,80 +1,106 @@
 ---
-title: "ASE Data Pipeline Overview"
+title: "ASE Data Pipeline & Streamlit Usage"
 format: html
 ---
 
----
+# Quickstart (Streamlit UI)
 
-# Datsase Download
-
-Since the option `prefer_scenes_with_max_snippets` is true per default, this will list all scenes sorted by the number of snippets they contain (descending). The `-n 5` flag limits the output to the top 5 scenes.
-```{python}
-!python -m oracle_rri.data.downloader -m list -c efm_eval -n 5
+```bash
+cd /home/jandu/repos/NBV
+source activate aria-nbv          # or conda activate aria-nbv
+streamlit run -m oracle_rri.streamlit_app
 ```
 
-This will download the top 5 scenes with the most snippets, but limit each scene to a maximum of 10 snippets. `-c efm_eval` specifies the configuration to use (here: EFM evaluation set).
-```sh
-python -m oracle_rri.data.downloader -m download -c efm_eval -n 5 --ms 10
+Pages in the app:
+- **Data**: load one `EfmSnippetView` from ASE/ATEK (GT mesh optional).
+- **Candidate Poses**: sample NBV candidates with collision / free-space rules.
+- **Candidate Renders**: render depth for valid candidates via PyTorch3D.
+
+The app caches configs + results in `st.session_state`. “Run previous” auto-runs earlier stages with cached settings; background threads keep the UI responsive.
+
+# Dataset loading (Data page)
+
+Sidebar controls map to `AseEfmDatasetConfig` (defaults baked in streamlit_app):
+- `scene_ids`: `[]` (auto-discover shards under `.data/ase_efm*`)
+- `atek_variant`: `"efm"` (fixed)
+- `load_meshes`: `True`, `require_mesh`: checkbox (default on)
+- Mesh simplification: `mesh_simplify_ratio` slider (0 → no decimation)
+- Mesh crop: `mesh_crop_margin_m` and `mesh_crop_min_keep_ratio`
+- Verbosity/debug: `verbose=True`, `is_debug=True`
+
+Buttons:
+- **Run / refresh data**: loads first snippet (or cached index)
+- **Next sample**: increments index then reloads
+- **Clear cache**: drops all cached stages
+
+# Candidate generation (Candidate Poses page)
+
+Config fields surfaced from `CandidateViewGeneratorConfig`:
+- `num_samples`, `min_radius`, `max_radius`, `min_elev_deg`, `max_elev_deg`
+- `ensure_collision_free`, `min_distance_to_mesh`
+- `ensure_free_space`
+- `device` (`cpu`/`cuda`), `is_debug`
+
+Plot controls:
+- frustum scale, max frustums, option to plot only rejected poses
+
+Actions:
+- **Run previous**: re-run Data stage with cached config
+- **Run / refresh candidates**: background thread; results cached under `STATE_KEYS["candidates"]`
+
+# Depth rendering (Candidate Renders page)
+
+Config mirrors `CandidateDepthRendererConfig` + nested `Pytorch3DDepthRendererConfig`:
+- `max_candidates` (subset render), renderer `device`, `zfar`, `faces_per_pixel`, `is_debug`
+- Checkbox: “Compute depth renders”
+
+Actions:
+- **Run previous**: ensures data + candidates exist
+- **Run / refresh renders**: background thread; stores `CandidateDepthBatch`
+
+# Logging & scratchpad
+
+- Console logs collected via `Console.set_sink` into a textarea; clearable per page.
+- “Interactive Python console” executes arbitrary code in the app process (uses `st`, `torch` pre-populated); output appended to logs.
+
+# CLI: download datasets (unchanged)
+
+```bash
+# list top scenes by snippet count
+python -m oracle_rri.data.downloader -m list -c efm -n 5
+
+# download scenes (limit snippets to 10 each)
+python -m oracle_rri.data.downloader -m download -c efm -n 5 --ms 10
 ```
 
-This will download the top 5 scenes with the most snippets, using the default configuration (here: EFM training set).
-```sh
-python -m oracle_rri.data.downloader -m download -c efm -n 5
-```
+# Programmatic dataset use
 
+```python
+from oracle_rri.data_handling.dataset import ASEDatasetConfig
 
-# Dataset config & auto-discovery
-
-The `ASEDatasetConfig` provides several options for configuring the dataset loading process. See the docstring for details.
-
-- **Auto tar resolution**: if `tar_urls` is empty, shards are globbed under resolved ATEK root; if `scene_ids` are provided, only those subdirs are used.
-- **Mesh resolution**: when `load_meshes=True`, meshes are loaded from `.data/ase_meshes/scene_ply_{scene}.ply` (or inferred from `scene_ids`).
-
-
-```{python}
-from oracle_rri.data.dataset import ASEDatasetConfig
-
-
-cfg = ASEDatasetConfig(verbose=True)
-cfg.inspect()
-
+cfg = ASEDatasetConfig(atek_variant="efm", load_meshes=True, require_mesh=True)
 ds = cfg.setup_target()
+sample = next(iter(ds))  # EfmSnippetView
 ```
 
-The dataset object `ds` yields samples of type "TyppedASESample", this dataclass stores the complex flat-dict from the `AtekWDSDataset` in `ds.flat` and provides typed views via properties.
+Typed views exposed on `sample`:
+- `camera_rgb`, `camera_slam_left`, `camera_slam_right` → images + `CameraTW`
+- `trajectory` → `PoseTW` series (`t_world_rig`)
+- `semidense` → padded SLAM points + stds + bounds
+- `gt` → OBBs / efm_gt
+- `mesh` / `has_mesh`
 
-```{python}
-sample = next(iter(ds))
-sample.rich_summary(show_only_sample=["efm_gt"])
+# Pipeline recap (in-app)
+
+```{mermaid}
+flowchart LR
+    A[Dataset cfg\n(ASE/ATEK)] --> B[Load snippet\nEfmSnippetView]
+    B --> C[Sample NBV poses\nCandidateViewGenerator]
+    C --> D[Render depth\nCandidateDepthRenderer]
+    D --> E[Inspect depth grid\n& pick NBV]
 ```
-
----
-
-# Typed views
-
-```{python}
-print(
-    sample.camera_rgb,  # CameraView
-    # type(sample.camera_slam_left),  # CameraView
-    # type(sample.camera_slam_right),  # CameraView
-    # # sample.camera_rgb_depth if "mfcd#camera-rgb-depth+images" in sample.flat else None
-    # type(sample.trajectory),  # TrajectoryView
-    # type(sample.semidense),  # SemiDenseView
-    # type(sample.gt),  # GTView (obb2/obb3/efm_gt/rri_targets)
-    # type(sample.mesh),  # trimesh.Trimesh or None
-)
-```
-
-- **CameraView**: images `(F,C,H,W)`, intrinsics, T_device_camera; uses `PoseTW` convention.
-- **TrajectoryView**: `ts_world_device` `(F,3,4)`, timestamps, gravity.
-- **SemiDenseView**: per-frame SLAM points + stds + volume bounds.
-- **GTView**: parses `obb3_gt`, `obb2_gt`, `scores`, `efm_gt`, `rri_targets`; preserves raw.
-
----
 
 # Mesh handling
 
-- Mesh loaded once per scene (cached if `cache_meshes=True`).
-- Mesh shape hints in repr: `{'verts': N, 'faces': M}`.
-
----
+- Meshes are loaded once per scene (cached if `cache_meshes=True`).
+- Optional decimation via `mesh_simplify_ratio`; optional crop AABB (`crop_aabb_from_semidense` in UI).

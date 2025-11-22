@@ -24,3 +24,15 @@ echo "Verifying installation..."
 python -c "import efm3d; import oracle_rri; print('All packages installed successfully')"
 echo "Setup complete! Activate with: conda activate aria-nbv"
 ```
+
+<!-- #TODO: Correct -->
+## PyTorch3D Setup
+https://github.com/facebookresearch/pytorch3d/blob/main/INSTALL.md
+```py
+╰─ conda install pytorch3d -c pytorch3d
+```
+
+# Data Setup
+
+- download the [Dinov2 ViTB14 checkpoint](https://huggingface.co/zgcr654321/pretrained_models/blob/cc2e7aace55d6f06716dcf444c29d97bac0a99da/dinov2_pretrain_official_pytorch_weights/dinov2_vitb14_reg4_pretrain.pth) and place it in `.logs/ckpts/`
+-
