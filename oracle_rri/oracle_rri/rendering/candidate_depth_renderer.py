@@ -11,6 +11,7 @@ from pydantic import Field
 from ..data.efm_views import EfmCameraView, EfmSnippetView
 from ..pose_generation.types import CandidateSamplingResult
 from ..utils import BaseConfig, Console
+from .efm3d_depth_renderer import Efm3dDepthRendererConfig
 from .pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig
 
 CameraStream = Literal["rgb", "rgb_depth", "slam_left", "slam_right"]
@@ -36,6 +37,9 @@ class CandidateDepthBatch(TypedDict):
     """Camera calibration used for rendering (single frame)."""
 
 
+RendererConfig = Pytorch3DDepthRendererConfig | Efm3dDepthRendererConfig
+
+
 class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
     """Config-as-factory wrapper for :class:`CandidateDepthRenderer`."""
 
@@ -45,8 +49,8 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
     )
     """Factory target for :meth:`BaseConfig.setup_target`."""
 
-    renderer: Pytorch3DDepthRendererConfig = Field(default_factory=Pytorch3DDepthRendererConfig)
-    """Nested config describing the underlying PyTorch3D renderer."""
+    renderer: RendererConfig = Field(default_factory=Pytorch3DDepthRendererConfig)
+    """Nested config describing the underlying renderer (PyTorch3D or CPU)."""
 
     camera_stream: CameraStream = "rgb"
     """Which camera stream to pull calibration from."""
@@ -56,6 +60,12 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
 
     max_candidates: int | None = None
     """Optional cap on number of valid candidates rendered per call."""
+
+    low_res: bool = False
+    """If True, downscale camera+images to 320x240 before rendering (runtime saver)."""
+
+    resolution_scale: float | None = None
+    """Optional uniform scale (0<scale<=1) applied to H,W for rendering. Ignored if ``low_res`` is True."""
 
     verbose: bool = False
     """Enable structured logging."""
@@ -93,20 +103,38 @@ class CandidateDepthRenderer:
         )
         self.console.log(f"Mesh stats verts={sample.mesh.vertices.shape[0]:,} faces={sample.mesh.faces.shape[0]:,}")
         pose_batch, mask_valid, candidate_indices = self._filter_candidates(candidates)
+        self.console.log(f"Attempting renders for {pose_batch.tensor().shape[0]} candidates (GUI slice).")
         self.console.log_summary("candidate_indices", candidate_indices)
         camera_view = self._camera_view(sample)
+        if self.config.low_res:
+            camera_view = self._downscale_camera_view(camera_view, target_size=(320, 240))
+        elif self.config.resolution_scale is not None:
+            camera_view = self._downscale_camera_view(camera_view, scale=self.config.resolution_scale)
         frame_idx = 0 if self.config.frame_selection == "first" else -1
         frame_calib = self._frame_calib(camera_view.calib, frame_idx)
         self.console.log_summary("camera_calib_frame", frame_calib.tensor())
         self.console.dbg_summary("pose_batch_tensor", pose_batch.tensor())
         occ_extent = self._occupancy_extent(sample, device=pose_batch.tensor().device)
-        depths = self.renderer.render_batch(
-            poses=pose_batch,
-            mesh=sample.mesh,
-            camera=camera_view.calib,
-            frame_index=frame_idx,
-            occupancy_extent=occ_extent,
-        )
+        if hasattr(self.renderer, "render_batch"):
+            depths = self.renderer.render_batch(
+                poses=pose_batch,
+                mesh=sample.mesh,
+                camera=camera_view.calib,
+                frame_index=frame_idx,
+                occupancy_extent=occ_extent,
+            )
+        else:  # pragma: no cover - defensive; current backends expose render_batch
+            depth_list = []
+            for pose in pose_batch:
+                depth_i = self.renderer.render_depth(
+                    pose_world_cam=pose,
+                    mesh=sample.mesh,
+                    camera=camera_view.calib,
+                    frame_index=frame_idx,
+                    occupancy_extent=occ_extent,
+                )
+                depth_list.append(depth_i)
+            depths = torch.stack(depth_list, dim=0)
         hit_ratio = float((depths < self.renderer.config.zfar).float().mean().item())
         self.console.log_summary("depth_batch_stats", {"hit_ratio": hit_ratio, "zfar": self.renderer.config.zfar})
         if hit_ratio == 0.0:
@@ -140,6 +168,37 @@ class CandidateDepthRenderer:
             return calib
         frame = tensor[frame_idx].unsqueeze(0)
         return CameraTW(frame)
+
+    def _downscale_camera_view(
+        self,
+        view: EfmCameraView,
+        target_size: tuple[int, int] | None = None,
+        *,
+        scale: float | None = None,
+    ) -> EfmCameraView:
+        """Downscale images and intrinsics for faster rendering."""
+
+        _, _, h, w = view.images.shape
+        if target_size is None and scale is not None:
+            new_w = max(64, int(w * scale))
+            new_h = max(64, int(h * scale))
+            target_size = (new_w, new_h)
+        if target_size is None:
+            return view
+        new_w, new_h = target_size
+        if (w, h) == (new_w, new_h):
+            return view
+        with torch.no_grad():
+            images_small = torch.nn.functional.interpolate(
+                view.images, size=(new_h, new_w), mode="bilinear", align_corners=False
+            )
+        calib_small = view.calib.scale_to_size((new_w, new_h))
+        return EfmCameraView(
+            images=images_small,
+            calib=calib_small,
+            time_ns=view.time_ns,
+            frame_ids=view.frame_ids,
+        )
 
     def _filter_candidates(
         self,

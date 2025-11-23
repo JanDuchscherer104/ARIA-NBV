@@ -1,0 +1,140 @@
+import sys
+from pathlib import Path
+
+import numpy as np
+import torch
+
+# Make vendored efm3d importable
+sys.path.append(str(Path(__file__).resolve().parents[2] / "external" / "efm3d"))
+
+try:
+    import pytorch3d.renderer as _pytorch3d_renderer  # noqa: F401
+except Exception:  # pragma: no cover - availability guard
+    PYTORCH3D_AVAILABLE = False
+else:  # pragma: no cover - availability guard
+    PYTORCH3D_AVAILABLE = True
+
+from efm3d.aria.aria_constants import ARIA_CALIB, ARIA_IMG  # noqa: E402
+
+from oracle_rri.configs import PathConfig  # noqa: E402
+from oracle_rri.data import AseEfmDatasetConfig  # noqa: E402
+from oracle_rri.data.efm_views import EfmSnippetView  # noqa: E402
+from oracle_rri.pose_generation.types import CandidateSamplingResult  # noqa: E402
+from oracle_rri.rendering import (  # noqa: E402
+    CandidateDepthRendererConfig,
+    Efm3dDepthRendererConfig,
+    Pytorch3DDepthRendererConfig,
+)
+
+
+def _skip_if_missing_data():
+    paths = PathConfig()
+    atek_dir = paths.resolve_atek_data_dir("efm")
+    if not atek_dir.exists():
+        pytest.skip(f"ATEK data dir missing: {atek_dir}", allow_module_level=True)
+    if not any(atek_dir.glob("**/*.tar")):
+        pytest.skip(f"No ATEK shards found under {atek_dir}", allow_module_level=True)
+    mesh_dir = paths.ase_meshes
+    if not any(mesh_dir.glob("scene_ply_*.ply")):
+        pytest.skip(f"No ASE meshes found under {mesh_dir}", allow_module_level=True)
+
+
+import pytest  # isort: split  # noqa: E402,E401
+
+_skip_if_missing_data()
+
+
+@pytest.fixture(scope="session")
+def path_cfg():
+    return PathConfig()
+
+
+@pytest.fixture(scope="session")
+def efm_config(path_cfg):
+    return AseEfmDatasetConfig(
+        paths=path_cfg,
+        scene_ids=["81283"],
+        batch_size=None,
+        verbose=False,
+        load_meshes=True,
+        require_mesh=True,
+        mesh_simplify_ratio=0.02,  # aggressive decimation for test speed
+    )
+
+
+@pytest.fixture(scope="session")
+def efm_sample(efm_config):
+    ds = efm_config.setup_target()
+    return next(iter(ds))
+
+
+def _single_candidate(sample):
+    pose = sample.trajectory.t_world_rig[-1]
+    poses = pose.unsqueeze(0)
+    mask = torch.ones(1, dtype=torch.bool)
+    shell = poses.tensor()
+    return CandidateSamplingResult(poses=poses, mask_valid=mask, masks=[mask], shell_poses=shell)
+
+
+@pytest.mark.skipif(not PYTORCH3D_AVAILABLE, reason="PyTorch3D required for this backend")
+def test_integration_pytorch3d_backend(efm_sample):
+    candidates = _single_candidate(efm_sample)
+    cfg = CandidateDepthRendererConfig(
+        camera_stream="slam_left",
+        frame_selection="last",
+        max_candidates=1,
+        renderer=Pytorch3DDepthRendererConfig(device="cpu", faces_per_pixel=1, verbose=False),
+    )
+    renderer = cfg.setup_target()
+    batch = renderer.render(sample=efm_sample, candidates=candidates)
+    depths = batch["depths"]
+    hit_ratio = float((depths < renderer.renderer.config.zfar).float().mean().item())
+    assert depths.shape[0] == 1
+    assert hit_ratio > 0.1  # should see some geometry in real scene
+
+
+def test_integration_cpu_backend(efm_sample):
+    # Downscale camera for speed on CPU ray tracer.
+    cam = efm_sample.camera_slam_left
+    scaled_calib = cam.calib.scale_to_size((64, 64))
+    num_frames, num_channels, _, _ = cam.images.shape
+    scaled_images = torch.zeros(
+        (num_frames, num_channels, 64, 64),
+        device=cam.images.device,
+        dtype=cam.images.dtype,
+    )
+    efm = dict(efm_sample.efm)
+    efm[ARIA_IMG[1]] = scaled_images
+    efm[ARIA_CALIB[1]] = scaled_calib
+    sample_small = EfmSnippetView(
+        efm=efm,
+        scene_id=efm_sample.scene_id,
+        snippet_id=efm_sample.snippet_id,
+        mesh=efm_sample.mesh,
+    )
+
+    # Heavily decimate mesh for speed while keeping real-scene geometry.
+    mesh = efm_sample.mesh
+    assert mesh is not None
+    keep = np.linspace(0, len(mesh.faces) - 1, num=min(len(mesh.faces), 5_000), dtype=int)
+    mesh_small = mesh.submesh([keep], append=True)
+    sample_cpu = EfmSnippetView(
+        efm=sample_small.efm,
+        scene_id=sample_small.scene_id,
+        snippet_id=sample_small.snippet_id,
+        mesh=mesh_small,
+    )
+
+    candidates = _single_candidate(sample_cpu)
+    cfg = CandidateDepthRendererConfig(
+        camera_stream="slam_left",
+        frame_selection="last",
+        max_candidates=1,
+        renderer=Efm3dDepthRendererConfig(device="cpu", add_proxy_walls=True, chunk_rays=150_000),
+    )
+    renderer = cfg.setup_target()
+    batch = renderer.render(sample=sample_cpu, candidates=candidates)
+    depths = batch["depths"]
+    hit_ratio = float((depths < renderer.renderer.config.zfar).float().mean().item())
+    assert depths.shape[0] == 1
+    assert hit_ratio > 0.1

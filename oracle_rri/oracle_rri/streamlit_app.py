@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import io
 from contextlib import redirect_stderr, redirect_stdout
-from threading import Thread
 from typing import Any, Literal, TypedDict, cast
 
 import streamlit as st
 import torch
-from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
 
 from oracle_rri.data import AseEfmDatasetConfig, EfmSnippetView
 from oracle_rri.data.plotting import crop_aabb_from_semidense, plot_first_last_frames, plot_trajectory
@@ -20,7 +18,11 @@ from oracle_rri.pose_generation.plotting import (
     plot_sampling_shell,
 )
 from oracle_rri.pose_generation.types import CandidateSamplingResult
-from oracle_rri.rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
+from oracle_rri.rendering import (
+    CandidateDepthRendererConfig,
+    Efm3dDepthRendererConfig,
+    Pytorch3DDepthRendererConfig,
+)
 from oracle_rri.rendering.candidate_depth_renderer import CandidateDepthBatch
 from oracle_rri.rendering.plotting import depth_grid
 from oracle_rri.utils import Console
@@ -47,7 +49,6 @@ class TaskState(TypedDict):
     """Background task state tracked in session_state."""
 
     status: Literal["idle", "running", "done", "error"]
-    thread: Thread | None
     error: str | None
 
 
@@ -67,20 +68,42 @@ def _state() -> SessionVars:
     return cast(SessionVars, st.session_state)
 
 
-def _load_sample(cfg: AseEfmDatasetConfig) -> EfmSnippetView:
+def _safe_rerun() -> None:
+    """Call Streamlit rerun with backward compatibility."""
+
+    if hasattr(st, "rerun"):
+        st.rerun()
+    elif hasattr(st, "experimental_rerun"):
+        st.experimental_rerun()  # type: ignore[attr-defined]
+    else:  # pragma: no cover - unexpected env
+        raise RuntimeError("Streamlit rerun API not available.")
+
+
+@st.cache_resource(show_spinner=False)
+def _load_dataset(cfg: AseEfmDatasetConfig):
+    """Cache dataset construction to avoid reloading shards on reruns."""
+
+    return cfg.setup_target()
+
+
+def _load_sample(cfg: AseEfmDatasetConfig, sample_idx: int = 0) -> EfmSnippetView:
     """Load a single snippet from the configured dataset."""
 
-    dataset = cfg.setup_target()
-    return next(iter(dataset))
+    dataset = _load_dataset(cfg)
+    it = iter(dataset)
+    for _ in range(sample_idx + 1):
+        sample = next(it)
+    return sample
 
 
 def _candidate_config_from_ui(
-    default: CandidateViewGeneratorConfig, ui: st.delta_generator.DeltaGenerator
+    default: CandidateViewGeneratorConfig, ui: st.delta_generator.DeltaGenerator, super_fast: bool = False
 ) -> CandidateViewGeneratorConfig:
     """Sidebar controls for candidate generation."""
 
     ui.subheader("Candidate Generator")
-    num_samples = ui.slider("num_samples", 8, 512, default.num_samples, step=8)
+    num_samples_default = 2 if super_fast else default.num_samples
+    num_samples = ui.slider("num_samples", 2, 512, num_samples_default, step=2)
     min_radius = ui.slider("min_radius (m)", 0.1, 2.0, float(default.min_radius), step=0.05)
     max_radius = ui.slider("max_radius (m)", 0.2, 3.0, float(default.max_radius), step=0.05)
     min_elev = ui.slider("min_elev_deg", -45.0, 0.0, float(default.min_elev_deg), step=1.0)
@@ -95,7 +118,7 @@ def _candidate_config_from_ui(
         step=0.01,
     )
     device = ui.selectbox("Generator device", ["cpu", "cuda"], index=0 if str(default.device) == "cpu" else 1)
-    is_debug = ui.checkbox("generator is_debug", value=default.is_debug)
+    is_debug = ui.checkbox("generator is_debug", value=True)
 
     return default.model_copy(
         update={
@@ -114,63 +137,83 @@ def _candidate_config_from_ui(
 
 
 def _renderer_config_from_ui(
-    default: CandidateDepthRendererConfig, ui: st.delta_generator.DeltaGenerator
+    default: CandidateDepthRendererConfig, ui: st.delta_generator.DeltaGenerator, super_fast: bool = False
 ) -> CandidateDepthRendererConfig:
     """Sidebar controls for depth rendering."""
 
     ui.subheader("Depth Renderer")
-    max_candidates = ui.slider(
-        "max_candidates",
-        1,
-        16,
-        default.max_candidates if default.max_candidates is not None else 4,
-    )
-    renderer_device = ui.selectbox("renderer device", ["cpu", "cuda"], index=0)
+    backend_options = ["pytorch3d (raster)", "cpu (trimesh rays)"]
+    default_backend_idx = 0 if isinstance(default.renderer, Pytorch3DDepthRendererConfig) else 1
+    backend_choice = ui.selectbox("backend", backend_options, index=default_backend_idx)
+    max_candidates_default = 2 if super_fast else (default.max_candidates if default.max_candidates is not None else 4)
+    max_candidates = ui.slider("max_candidates", 1, 16, max_candidates_default)
+    low_res = ui.checkbox("Low-res render (downscale to 320x240)", value=super_fast)
+    res_scale = ui.slider("Render resolution scale", 0.1, 1.0, 0.25 if super_fast else 1.0, step=0.05)
+    renderer_device_options = ["cpu", "cuda"]
+    default_device_idx = renderer_device_options.index(str(getattr(default.renderer, "device", "cpu")))
+    renderer_device = ui.selectbox("renderer device", renderer_device_options, index=default_device_idx)
     zfar = ui.slider("zfar (m)", 5.0, 50.0, default.renderer.zfar, step=1.0)
-    faces_pp = ui.slider("faces_per_pixel", 1, 4, default.renderer.faces_per_pixel)
-    is_debug = ui.checkbox("renderer is_debug", value=default.is_debug)
+    is_debug = ui.checkbox("renderer is_debug", value=True)
 
-    renderer_cfg = default.renderer.model_copy(
-        update={
-            "device": renderer_device,
-            "zfar": float(zfar),
-            "faces_per_pixel": int(faces_pp),
-            "is_debug": is_debug,
-        }
-    )
+    if backend_choice.startswith("pytorch3d"):
+        faces_default = default.renderer.faces_per_pixel if isinstance(default.renderer, Pytorch3DDepthRendererConfig) else 1
+        faces_pp = ui.slider("faces_per_pixel", 1, 4, faces_default)
+        renderer_cfg: Pytorch3DDepthRendererConfig | Efm3dDepthRendererConfig = Pytorch3DDepthRendererConfig(
+            device=renderer_device,
+            zfar=float(zfar),
+            faces_per_pixel=int(faces_pp),
+            is_debug=is_debug,
+        )
+    else:
+        chunk_rays = ui.slider("chunk_rays", 50_000, 500_000, 200_000, step=50_000)
+        proxy_default = getattr(default.renderer, "add_proxy_walls", True)
+        renderer_cfg = Efm3dDepthRendererConfig(
+            device="cpu",
+            zfar=float(zfar),
+            add_proxy_walls=bool(proxy_default),
+            chunk_rays=int(chunk_rays),
+            is_debug=is_debug,
+        )
     return default.model_copy(
         update={
             "max_candidates": int(max_candidates),
             "renderer": renderer_cfg,
             "is_debug": is_debug,
+            "low_res": low_res,
+            "resolution_scale": float(res_scale),
         }
     )
 
 
-def _dataset_config_from_ui(ui: st.delta_generator.DeltaGenerator) -> AseEfmDatasetConfig:
+def _dataset_config_from_ui(ui: st.delta_generator.DeltaGenerator, *, super_fast: bool) -> AseEfmDatasetConfig:
     """Sidebar controls for dataset (data page only)."""
 
     ui.subheader("Dataset")
     # Fixed defaults (no user control).
     scene_ids: list[str] = []
-    atek_variant = "efm"
     load_meshes = True
-    mesh_ratio = ui.slider("mesh decimation ratio", 0.0, 1.0, 0.0, step=0.05)
+    mesh_ratio = ui.slider("mesh decimation ratio", 0.0, 1.0, 0.02 if super_fast else 0.02, step=0.02)
+    mesh_max_faces = ui.number_input(
+        "max mesh faces (cap after decimation)",
+        min_value=1_000,
+        max_value=2_000_000,
+        value=100_000 if super_fast else 300_000,
+        step=10_000,
+    )
     mesh_crop_margin = ui.slider(
         "crop margin (m)",
         0.0,
         2.0,
-        0.5,
+        0.2 if super_fast else 0.5,
         step=0.05,
     )
     mesh_keep_ratio = ui.slider(
         "min keep ratio (after crop)",
         0.0,
         1.0,
-        0.5,
+        0.9 if super_fast else 0.7,
         step=0.05,
     )
-    mesh_face_cap = None
     batch_size = None
     verbose = True
     is_debug = True
@@ -178,16 +221,17 @@ def _dataset_config_from_ui(ui: st.delta_generator.DeltaGenerator) -> AseEfmData
 
     return AseEfmDatasetConfig(
         scene_ids=scene_ids,
-        atek_variant=atek_variant,
+        atek_variant="efm",
         load_meshes=load_meshes,
         mesh_simplify_ratio=mesh_ratio if mesh_ratio > 0 else None,
         mesh_crop_margin_m=mesh_crop_margin,
         mesh_crop_min_keep_ratio=mesh_keep_ratio,
-        mesh_max_faces=mesh_face_cap,
+        mesh_max_faces=int(mesh_max_faces),
         require_mesh=require_mesh,
         batch_size=batch_size,
         verbose=verbose,
         is_debug=is_debug,
+        DEBUG_DEFAULTS=AseEfmDatasetConfig.DEBUG_DEFAULTS,
     )
 
 
@@ -325,12 +369,11 @@ def _render_candidates_page(
     last_center = last_pose_cam.t.detach().cpu().numpy()
 
     st.header("Candidate Poses")
-    st.plotly_chart(
-        plot_candidates(candidates["poses"], sample.mesh, title="Candidate positions", center=last_center),
-        width="stretch",
-    )
-    st.plotly_chart(
-        plot_sampling_shell(
+    with st.status("Building candidate plots...", expanded=False):
+        cand_fig = plot_candidates(
+            candidates["poses"], sample.mesh, title="Candidate positions", center=last_center
+        )
+        shell_fig = plot_sampling_shell(
             shell_poses=candidates["shell_poses"],
             last_pose=last_pose_cam,
             min_radius=float(cand_cfg.min_radius),
@@ -339,58 +382,59 @@ def _render_candidates_page(
             max_elev_deg=float(cand_cfg.max_elev_deg),
             azimuth_full_circle=bool(cand_cfg.azimuth_full_circle),
             mesh=sample.mesh,
-        ),
-        width="stretch",
-    )
+        )
+    st.plotly_chart(cand_fig, width="stretch")
+    st.plotly_chart(shell_fig, width="stretch")
     if candidates["mask_valid"].sum() == 0:
         st.warning("All candidates were rejected; frustum plot omitted.")
     else:
-        st.plotly_chart(
-            plot_candidate_frustums(
+        with st.status("Rendering frustums...", expanded=False):
+            frust_fig = plot_candidate_frustums(
                 poses=candidates["poses"],
                 camera=sample.camera_rgb,
                 mesh=sample.mesh,
                 frustum_scale=frustum_scale,
                 max_frustums=max_frustums,
-            ),
-            width="stretch",
-        )
+            )
+        st.plotly_chart(frust_fig, width="stretch")
 
     rejected_poses = _rejected_pose_tensor(candidates)
     if plot_rejected_only:
         if rejected_poses is None:
             st.info("No rejected poses to plot; all sampled candidates survived rule filtering.")
         else:
-            st.plotly_chart(
-                plot_candidates(
+            with st.status("Rendering rejected candidates plot...", expanded=False):
+                rej_fig = plot_candidates(
                     rejected_poses,
                     sample.mesh,
                     title=f"Rejected candidate positions ({rejected_poses.shape[0]})",
                     center=last_center,
-                ),
-                width="stretch",
-            )
+                )
+            st.plotly_chart(rej_fig, width="stretch")
 
 
 def _render_depth_page(depth_batch: CandidateDepthBatch) -> None:
     """Render the Candidate Renders page."""
 
     st.header("Candidate Renders")
-    depths = depth_batch["depths"]
-    indices = depth_batch["candidate_indices"].tolist()
-    titles = [f"Candidate {i}" for i in indices]
-    fig = depth_grid(depths, titles=titles, zmax=float(depths.max().item()))
+    with st.status("Building depth grid...", expanded=False):
+        depths = depth_batch["depths"]
+        indices = depth_batch["candidate_indices"].tolist()
+        titles = [f"Candidate {i}" for i in indices]
+        fig = depth_grid(depths, titles=titles, zmax=float(depths.max().item()))
     st.plotly_chart(fig, width="stretch")
 
 
 def _append_log(line: str) -> None:
     """Append a line to the Streamlit log buffer with bounded length."""
 
-    buf = _state().get(LOG_STATE_KEY, [])
+    state = cast(dict[str, Any], st.session_state)
+    buf_obj = state.get(LOG_STATE_KEY, [])
+    buf: list[str] = list(buf_obj) if isinstance(buf_obj, list) else []
     buf.append(line)
     if len(buf) > MAX_LOG_LINES:
         buf = buf[-MAX_LOG_LINES:]
-    _state()[LOG_STATE_KEY] = buf
+    state[LOG_STATE_KEY] = buf
 
 
 def _tap_console(console: Console) -> Console:
@@ -429,59 +473,9 @@ def _init_task_state() -> None:
             key,
             TaskState(
                 status="idle",
-                thread=None,
                 error=None,
             ),
         )
-
-
-def _task_running(stage: str) -> bool:
-    """Return True if a task is running and refresh status."""
-
-    task = _state()[TASK_KEYS[stage]]
-    thread = task.get("thread")
-    if task["status"] == "running" and thread is not None:
-        if not thread.is_alive():
-            task["status"] = "done" if task.get("error") is None else "error"
-    return task["status"] == "running"
-
-
-def _task_status(stage: str) -> tuple[str, str | None]:
-    task = _state()[TASK_KEYS[stage]]
-    return task.get("status", "idle"), task.get("error")
-
-
-def _start_task(stage: str, target: callable, *args: Any, **kwargs: Any) -> None:
-    """Start background thread for stage if not already running."""
-
-    if _task_running(stage):
-        st.info(f"{stage.title()} task already running; you can switch tabs while it completes.")
-        return
-
-    task_key = TASK_KEYS[stage]
-    _state().setdefault(
-        task_key,
-        TaskState(status="idle", thread=None, error=None),
-    )
-
-    def runner() -> None:
-        try:
-            target(*args, **kwargs)
-        except Exception as exc:  # pragma: no cover - background guard
-            _state()[TASK_KEYS[stage]]["error"] = str(exc)
-        finally:
-            task_state = _state()[TASK_KEYS[stage]]
-            task_state["thread"] = None
-            task_state["status"] = "error" if task_state.get("error") else "done"
-            try:
-                st.rerun()
-            except Exception:
-                pass
-
-    thread = Thread(target=runner, daemon=True)
-    add_script_run_ctx(thread, get_script_run_ctx())
-    _state()[task_key].update({"status": "running", "thread": thread, "error": None})
-    thread.start()
 
 
 def _render_log_panel() -> None:
@@ -489,11 +483,13 @@ def _render_log_panel() -> None:
 
     st.divider()
     st.subheader("Console Logs")
+    state = cast(dict[str, Any], st.session_state)
     col_clear, _ = st.columns([1, 5])
     with col_clear:
         if st.button("Clear logs", key="clear_logs"):
-            _state()[LOG_STATE_KEY] = []
-    log_lines = _state().get(LOG_STATE_KEY, [])
+            state[LOG_STATE_KEY] = []
+    log_lines_obj = state.get(LOG_STATE_KEY, [])
+    log_lines = list(log_lines_obj) if isinstance(log_lines_obj, list) else []
     st.text_area(
         "Console output",
         value="\n".join(log_lines),
@@ -533,6 +529,7 @@ def main() -> None:
     console = Console.with_prefix("streamlit_app").set_verbose(True)
 
     st.sidebar.markdown("---")
+    super_fast = st.sidebar.checkbox("Super-fast debug mode", value=False, help="Use tiny meshes, 2 candidates, low-res renders.")
     st.sidebar.write("Pages")
     page = st.sidebar.radio("Select view", ("Data", "Candidate Poses", "Candidate Renders"))
 
@@ -586,11 +583,7 @@ def main() -> None:
                 st.warning("No cached dataset config. Configure the dataset on the Data page first.")
             return None
         try:
-            sample_local = _load_sample(cfg)
-            if sample_idx > 0:
-                dataset_iter = iter(cfg.setup_target())
-                for _ in range(sample_idx + 1):
-                    sample_local = next(dataset_iter)
+            sample_local = _load_sample(cfg, sample_idx=sample_idx)
             _store(STATE_KEYS["sample"], sample_local)
             _store(STATE_KEYS["sample_cfg"], _cfg_to_dict(cfg))
             _store(STATE_KEYS["sample_idx"], sample_idx)
@@ -599,6 +592,8 @@ def main() -> None:
             _store(STATE_KEYS["depth"], None)
             _store(STATE_KEYS["depth_cfg"], None)
             cfg_changed["sample"] = False
+            if allow_ui:
+                _safe_rerun()
             return sample_local
         except Exception as exc:  # pragma: no cover - UI feedback
             if allow_ui:
@@ -618,14 +613,23 @@ def main() -> None:
             if allow_ui:
                 st.warning("Load data first on the Data page, then run candidates.")
             return None
-        generator = cfg.setup_target()
-        candidates_local = generator.generate_from_typed_sample(local_sample)
-        _store(STATE_KEYS["candidates"], candidates_local)
-        _store(STATE_KEYS["cand_cfg"], _cfg_to_dict(cfg))
-        _store(STATE_KEYS["depth"], None)
-        _store(STATE_KEYS["depth_cfg"], None)
-        cfg_changed["cand"] = False
-        return candidates_local
+        try:
+            generator = cfg.setup_target()
+            with st.status("Generating candidates...", expanded=False):
+                candidates_local = generator.generate_from_typed_sample(local_sample)
+            _store(STATE_KEYS["candidates"], candidates_local)
+            _store(STATE_KEYS["cand_cfg"], _cfg_to_dict(cfg))
+            _store(STATE_KEYS["depth"], None)
+            _store(STATE_KEYS["depth_cfg"], None)
+            cfg_changed["cand"] = False
+            if allow_ui:
+                _safe_rerun()
+            return candidates_local
+        except Exception as exc:  # pragma: no cover
+            if allow_ui:
+                st.error(f"Candidate generation failed: {exc}")
+            console.error(str(exc))
+            return None
 
     def _run_depth_stage(
         cfg: CandidateDepthRendererConfig | None,
@@ -647,10 +651,14 @@ def main() -> None:
             return None
         renderer = cfg.setup_target()
         try:
+            with st.status("Rendering depth maps...", expanded=False):
+                depth_local = renderer.render(local_sample, local_candidates)
             depth_local = renderer.render(local_sample, local_candidates)
             _store(STATE_KEYS["depth"], depth_local)
             _store(STATE_KEYS["depth_cfg"], _cfg_to_dict(cfg))
             cfg_changed["depth"] = False
+            if allow_ui:
+                _safe_rerun()
             return depth_local
         except Exception as exc:  # pragma: no cover - rendering failures
             if allow_ui:
@@ -684,7 +692,7 @@ def main() -> None:
 
     if page == "Data":
         with st.sidebar.form("data_form"):
-            dataset_cfg = _dataset_config_from_ui(st.sidebar)
+            dataset_cfg = _dataset_config_from_ui(st.sidebar, super_fast=super_fast)
             sample_idx = int(_get(STATE_KEYS["sample_idx"]) or 0)
             next_sample = st.form_submit_button("Next sample")
             run_data = st.form_submit_button("Run / refresh data")
@@ -715,7 +723,7 @@ def main() -> None:
     # Candidate page controls
     if page == "Candidate Poses":
         with st.sidebar.form("cand_form"):
-            candidate_cfg = _candidate_config_from_ui(CandidateViewGeneratorConfig(), st.sidebar)
+            candidate_cfg = _candidate_config_from_ui(CandidateViewGeneratorConfig(), st.sidebar, super_fast=super_fast)
             st.sidebar.subheader("Candidate plot options")
             frustum_scale = st.sidebar.slider("Frustum scale", 0.1, 1.0, 0.5, step=0.05)
             max_frustums = st.sidebar.slider("Max frustums", 1, 24, 6)
@@ -724,14 +732,11 @@ def main() -> None:
             run_cand = st.form_submit_button("Run / refresh candidates")
         cfg_changed["cand"] = _get(STATE_KEYS["cand_cfg"]) != _cfg_to_dict(candidate_cfg)
 
-        if _task_running("candidates"):
-            st.info("Candidate generation running... you can switch tabs while it finishes.")
-
         if run_prev:
             _run_previous_stages("candidates")
 
         if run_cand:
-            _start_task("candidates", _run_candidates_stage, candidate_cfg, allow_ui=False)
+            _run_candidates_stage(candidate_cfg, allow_ui=False)
         _refresh_stage_vars()
 
         if candidates is None:
@@ -747,31 +752,32 @@ def main() -> None:
             )
         if cfg_changed["cand"]:
             st.info("Candidate settings changed; rerun to refresh results.")
-        status, err = _task_status("candidates")
-        if status == "error" and err:
-            st.error(f"Candidate generation failed: {err}")
         _render_log_panel()
         return
 
     # Render page controls
     with st.sidebar.form("depth_form"):
         renderer_cfg = _renderer_config_from_ui(
-            CandidateDepthRendererConfig(renderer=Pytorch3DDepthRendererConfig(device="cpu")), st.sidebar
+            CandidateDepthRendererConfig(renderer=Pytorch3DDepthRendererConfig(device="cpu")),
+            st.sidebar,
+            super_fast=super_fast,
         )
         render_depths = st.checkbox("Compute depth renders", value=True, key="compute_depths")
         run_prev = st.form_submit_button("Run previous")
         run_depth = st.form_submit_button("Run / refresh renders")
     cfg_changed["depth"] = _get(STATE_KEYS["depth_cfg"]) != _cfg_to_dict(renderer_cfg)
 
-    if _task_running("depth"):
-        st.info("Depth rendering running... you can switch tabs while it finishes.")
-
     if run_prev:
         _run_previous_stages("depth")
 
-    if run_depth and render_depths:
-        _start_task("depth", _run_depth_stage, renderer_cfg, render_depths, allow_ui=False)
-    _refresh_stage_vars()
+    if run_depth:
+        if render_depths:
+            _run_depth_stage(renderer_cfg, render_depths, allow_ui=True)
+        elif depth_batch is None:
+            st.warning("No cached depths available; enable 'Compute depth renders' or run renders first.")
+        else:
+            st.info("Using cached depths to rebuild plots.")
+        _refresh_stage_vars()
 
     if depth_batch is None:
         if candidates is None:
@@ -786,10 +792,6 @@ def main() -> None:
     stale_parts = [name for name, changed in cfg_changed.items() if changed]
     if stale_parts:
         st.info(f"Cached results are stale for: {', '.join(stale_parts)}. Click the page's run button to update.")
-
-    status, err = _task_status("depth")
-    if status == "error" and err:
-        st.error(f"Depth rendering failed: {err}")
 
     _render_log_panel()
     return

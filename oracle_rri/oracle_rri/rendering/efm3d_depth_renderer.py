@@ -1,307 +1,360 @@
-"""
-EFM3D depth renderer for the oracle RRI processing layer.
+"""CPU ray-based depth renderer using trimesh.
 
-This module implements a CPU‑based depth renderer using explicit ray
-generation and mesh intersection.  It is designed as a lightweight
-alternative to GPU rasterisation when PyTorch3D is unavailable or when
-users prefer a dependency‑free approach.  The renderer is wrapped in a
-factory configuration class to integrate with ``oracle_rri``'s
-configuration system.  If either ``numpy`` or ``torch`` is missing the
-renderer will return a depth map filled with ``max_depth`` to allow
-tests to proceed without external libraries.
+This renderer mirrors the public API of :class:`Pytorch3DDepthRenderer`
+but uses pure CPU ray-mesh intersection so it works without a GPU. It is
+intended as a correctness-oriented fallback and for lightweight testing.
 
-Unlike the PyTorch3D version, this implementation does not support
-batch rendering: poses must be passed one at a time.  It also does not
-produce surface normals or colours.  Depth values are computed by
-casting a ray from the camera centre through each pixel and measuring
-the distance to the first intersection with the mesh.  If no
-intersection occurs, ``max_depth`` is used instead.
-
-Example usage::
-
-    from efm3d_depth_renderer import Efm3dDepthRendererConfig, Efm3dDepthRenderer
-    cfg = Efm3dDepthRendererConfig(max_depth=20.0)
-    renderer = Efm3dDepthRenderer(cfg)
-    depth = renderer.render_depth(pose_world_cam, mesh, camera)
-
-At the bottom of this file there is a self‑test that can be run via::
-
-    python efm3d_depth_renderer.py
-
-The test defines dummy pose, camera and mesh objects and checks the
-returned depth statistics.
+Key features:
+    - Config-as-factory pattern (`BaseConfig.setup_target()`).
+    - Optional proxy-wall insertion to seal incomplete meshes, using the
+      union of mesh bounds and semidense occupancy extents.
+    - Chunked ray casting to avoid excessive memory use on high-res
+      images.
+    - Optional PyEmbree backend when available for faster intersections.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-try:
-    import numpy as np
-except ImportError:  # pragma: no cover
-    np = None  # type: ignore
+import numpy as np
+import torch
+import trimesh
+from pydantic import Field
+from trimesh import Trimesh
 
-try:
-    import torch
+from ..utils import BaseConfig, Console
+
+if TYPE_CHECKING:
+    from efm3d.aria import CameraTW, PoseTW
     from torch import Tensor
-except ImportError:  # pragma: no cover
-    torch = None  # type: ignore
-    Tensor = object  # type: ignore
+    from trimesh import Trimesh
 
 
-class BaseConfig:
-    """Minimal stand‑in for ``oracle_rri.utils.BaseConfig``.
+class Efm3dDepthRendererConfig(BaseConfig["Efm3dDepthRenderer"]):
+    """Configuration for :class:`Efm3dDepthRenderer`."""
 
-    In the full project this base class provides Pydantic features and a
-    ``setup_target`` method for instantiation.  Here we simply store
-    attributes on the instance.
-    """
+    target: type["Efm3dDepthRenderer"] = Field(  # type: ignore[assignment]
+        default_factory=lambda: Efm3dDepthRenderer,
+        exclude=True,
+    )
+    """Factory target for :meth:`BaseConfig.setup_target`."""
 
-    def __init__(self, **kwargs) -> None:
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+    device: str = "cpu"
+    """Torch device for the returned depth tensor."""
 
-    def setup_target(self, **kwargs):  # pragma: no cover
-        raise NotImplementedError("setup_target should be provided by oracle_rri")
+    zfar: float = 20.0
+    """Depth value (metres) for rays that miss the mesh."""
 
+    add_proxy_walls: bool = True
+    """If ``True`` seal missing walls with thin box proxies."""
 
-class Console:
-    """Simple logger with prefix and verbosity support."""
+    proxy_wall_area_threshold: float = 0.2
+    """Minimum fraction of expected wall area required to skip proxies."""
 
-    def __init__(self, prefix: str = "", verbose: bool = False) -> None:
-        self.prefix = prefix
-        self.verbose = verbose
+    proxy_eps: float = 0.05
+    """Epsilon (metres) for detecting faces near bounds."""
 
-    @classmethod
-    def with_prefix(cls, prefix: str) -> "Console":
-        return cls(prefix=prefix)
+    chunk_rays: int = 200_000
+    """Number of rays processed per chunk to limit memory."""
 
-    def set_verbose(self, verbose: bool) -> "Console":
-        self.verbose = verbose
-        return self
+    backend: str = "auto"
+    """Ray backend: ``'auto'`` (pyembree if available else native),
+    ``'pyembree'`` or ``'trimesh'``."""
 
-    def log(self, msg: str) -> None:
-        if self.verbose:
-            print(f"[{self.prefix}] {msg}")
+    verbose: bool = False
+    """Enable structured logging."""
 
-    def warn(self, msg: str) -> None:
-        if self.verbose:
-            print(f"[WARN {self.prefix}] {msg}")
+    is_debug: bool = False
+    """Enable extra debug logging."""
 
 
-class Efm3dDepthRendererConfig(BaseConfig):
-    """Configuration for :class:`Efm3dDepthRenderer`.
-
-    Parameters
-    ----------
-    device : str, default "cpu"
-        Torch device for the returned tensor.  Since this renderer runs on
-        the CPU it is recommended to leave this as "cpu".
-    max_depth : float, default 20.0
-        Depth value to assign when a ray does not hit the mesh.
-    verbose : bool, default False
-        Enable logging via :class:`Console`.
-    target : type, optional
-        Class to instantiate when using ``BaseConfig.setup_target``.
-    """
-
-    def __init__(
-        self,
-        *,
-        device: str = "cpu",
-        max_depth: float = 20.0,
-        verbose: bool = False,
-        target: type | None = None,
-    ) -> None:
-        if target is None:
-            target = Efm3dDepthRenderer
-        super().__init__(target=target, device=device, max_depth=max_depth, verbose=verbose)
-
-
-@dataclass(slots=True)
 class Efm3dDepthRenderer:
-    """Ray‑based depth renderer that does not depend on PyTorch3D.
+    """CPU depth renderer built on trimesh ray tracing."""
 
-    This renderer computes the depth for each pixel by casting a ray
-    through the pixel centre and finding the first intersection with
-    the mesh.  It requires that the mesh exposes a ``ray.intersects_location``
-    method compatible with the API provided by ``trimesh``.  When either
-    ``numpy`` or ``torch`` is unavailable the renderer returns a depth
-    map filled with ``max_depth``.
-    """
+    def __init__(self, config: Efm3dDepthRendererConfig) -> None:
+        self.config = config
+        self.console = (
+            Console.with_prefix(self.__class__.__name__)
+            .set_verbose(self.config.verbose)
+            .set_debug(self.config.is_debug)
+        )
+        self._device = torch.device(self.config.device)
 
-    config: Efm3dDepthRendererConfig
-    console: Console | None = None
+    @property
+    def device(self) -> torch.device:
+        """Torch device used for outputs."""
 
-    def __post_init__(self) -> None:
-        if self.console is None:
-            self.console = Console.with_prefix(self.__class__.__name__).set_verbose(
-                getattr(self.config, "verbose", False)
-            )
+        return self._device
 
-    def _to_tensor(self, arr, dtype: "torch.dtype" | None = None, device: "torch.device" | None = None) -> Tensor:
-        if torch is None:
-            raise ImportError("torch is required for _to_tensor")
-        if dtype is None:
-            dtype = torch.float32
-        return torch.as_tensor(arr, dtype=dtype, device=device)
-
+    # ------------------------------------------------------------------ #
+    # Public API
+    # ------------------------------------------------------------------ #
     def render_depth(
         self,
-        pose_world_cam: "PoseTW",
-        mesh: "trimesh.Trimesh",
-        camera: "CameraTW",
+        pose_world_cam: PoseTW,
+        mesh: Trimesh,
+        camera: CameraTW,
+        *,
+        frame_index: int | None = None,
+        occupancy_extent: Tensor | None = None,
     ) -> Tensor:
-        """Render a depth map for a single candidate pose.
+        """Render a depth map for a single pose.
 
-        Parameters
-        ----------
-        pose_world_cam : PoseTW
-            Transform from camera frame to world frame (T_world_camera).  Must
-            implement ``matrix()`` returning a 4×4 transform.
-        mesh : trimesh.Trimesh
-            Ground‑truth mesh; should provide a ``ray.intersects_location`` method.
-        camera : CameraTW
-            Camera intrinsics container providing ``fx``, ``fy``, ``width`` and
-            ``height`` attributes and optionally ``cx``, ``cy``.  We assume
-            ``cx`` and ``cy`` are the principal point; if missing they default
-            to the image centre.
+        Args:
+            pose_world_cam: ``T_world_camera`` pose to render from.
+            mesh: Trimesh instance in world coordinates.
+            camera: Camera intrinsics/extrinsics (``CameraTW``).
+            frame_index: Optional frame index for the calib tensor; defaults
+                to the last frame if omitted.
+            occupancy_extent: Optional ``[6]`` tensor ``[xmin,xmax,ymin,ymax,zmin,zmax]``
+                to expand bounds when synthesising proxy walls.
 
-        Returns
-        -------
-        torch.Tensor
-            Depth map of shape ``(H, W)`` on the configured device.  When
-            dependencies are missing the tensor is filled with ``max_depth``.
+        Returns:
+            Tensor[H, W] on ``config.device`` filled with ``zfar`` on misses.
         """
-        # Determine resolution from camera
-        h = int(getattr(camera, "height", getattr(camera, "H", 1)))
-        w = int(getattr(camera, "width", getattr(camera, "W", 1)))
-        max_depth = float(self.config.max_depth)
 
-        # Quick bailout if numpy or torch is missing.  We cannot use
-        # `_to_tensor` here because torch may be None, so return a
-        # Python list of lists instead.  The calling code should be
-        # prepared to handle this fallback.
-        if np is None or torch is None:
-            self.console.warn("numpy or torch missing; returning max_depth map")
-            return [[max_depth] * w for _ in range(h)]  # type: ignore[return-value]
+        if mesh.vertices.size == 0 or mesh.faces.size == 0:
+            raise ValueError("Mesh must contain vertices and faces.")
 
-        # Pixel coordinates
-        u = np.arange(w, dtype=np.float32)
-        v = np.arange(h, dtype=np.float32)
+        mesh_use = self._maybe_with_proxy_walls(mesh, occupancy_extent=occupancy_extent)
+        cam_single = self._slice_camera(camera, frame_index)
+        width, height, fx, fy, cx, cy = self._camera_parameters(cam_single)
+        r_wc, t_wc = self._pose_rt(pose_world_cam)
+
+        origins, directions = self._ray_grid(
+            width=int(width),
+            height=int(height),
+            fx=fx,
+            fy=fy,
+            cx=cx,
+            cy=cy,
+            r_wc=r_wc,
+            t_wc=t_wc,
+        )
+        depths = self._intersect(mesh_use, origins, directions)
+        depth_map = depths.reshape(int(height), int(width))
+        hit_ratio = float((depth_map < self.config.zfar).mean())
+        if hit_ratio == 0.0:
+            self.console.warn(
+                "All rays missed the mesh (depth=zfar everywhere). Check poses, mesh bounds, or proxy walls."
+            )
+        if self.console.is_debug:
+            self.console.dbg_summary(
+                "depth_stats",
+                {"hits_ratio": hit_ratio, "min": float(depth_map.min()), "max": float(depth_map.max())},
+            )
+        return torch.as_tensor(depth_map, dtype=torch.float32, device=self.device)
+
+    def render_batch(
+        self,
+        poses: PoseTW,
+        mesh: Trimesh,
+        camera: CameraTW,
+        *,
+        frame_index: int | None = None,
+        occupancy_extent: Tensor | None = None,
+    ) -> torch.Tensor:
+        """Render depth for a batch of poses (iterative CPU fallback)."""
+
+        pose_tensor = poses.tensor()
+        if pose_tensor.ndim == 1:
+            poses_list = [poses]
+        else:
+            poses_list = [poses[i] for i in range(pose_tensor.shape[0])]
+
+        mesh_use = self._maybe_with_proxy_walls(mesh, occupancy_extent=occupancy_extent)
+        cam_single = self._slice_camera(camera, frame_index)
+        width, height, fx, fy, cx, cy = self._camera_parameters(cam_single)
+
+        depth_maps: list[torch.Tensor] = []
+        for pose in poses_list:
+            r_wc, t_wc = self._pose_rt(pose)
+            origins, directions = self._ray_grid(
+                width=int(width),
+                height=int(height),
+                fx=fx,
+                fy=fy,
+                cx=cx,
+                cy=cy,
+                r_wc=r_wc,
+                t_wc=t_wc,
+            )
+            depths = self._intersect(mesh_use, origins, directions)
+            depth_map = depths.reshape(int(height), int(width))
+            depth_maps.append(torch.as_tensor(depth_map, dtype=torch.float32, device=self.device))
+
+        return torch.stack(depth_maps, dim=0)
+
+    # ------------------------------------------------------------------ #
+    # Helpers
+    # ------------------------------------------------------------------ #
+    def _slice_camera(self, camera: CameraTW, frame_index: int | None) -> CameraTW:
+        """Return a single-frame ``CameraTW``."""
+
+        data = camera.tensor()
+        if data.ndim == 1:
+            return camera
+        idx = data.shape[0] - 1 if frame_index is None else frame_index
+        idx = max(-data.shape[0], min(data.shape[0] - 1, idx))
+        return camera[idx]
+
+    def _camera_parameters(self, camera: CameraTW) -> tuple[float, float, float, float, float, float]:
+        """Extract width, height, fx, fy, cx, cy."""
+
+        size = camera.size.squeeze(0)
+        focals = camera.f.reshape(-1, 2)
+        centers = camera.c.reshape(-1, 2)
+        width = float(size[0].item())
+        height = float(size[1].item())
+        fx = float(focals[0, 0].item())
+        fy = float(focals[0, 1].item())
+        cx = float(centers[0, 0].item())
+        cy = float(centers[0, 1].item())
+        return width, height, fx, fy, cx, cy
+
+    def _pose_rt(self, pose_world_cam: PoseTW) -> tuple[np.ndarray, np.ndarray]:
+        """Return rotation and translation (world←cam) as numpy arrays."""
+
+        mat = pose_world_cam.matrix
+        r_wc = mat[:3, :3] if mat.ndim == 2 else mat[0, :3, :3]
+        t_wc = mat[:3, 3] if mat.ndim == 2 else mat[0, :3, 3]
+        return r_wc.detach().cpu().numpy(), t_wc.detach().cpu().numpy()
+
+    def _ray_grid(
+        self,
+        *,
+        width: int,
+        height: int,
+        fx: float,
+        fy: float,
+        cx: float,
+        cy: float,
+        r_wc: np.ndarray,
+        t_wc: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Generate per-pixel ray origins and directions in world frame."""
+
+        u = np.arange(width, dtype=np.float32)
+        v = np.arange(height, dtype=np.float32)
         uu, vv = np.meshgrid(u, v)
-        fx = float(camera.fx)
-        fy = float(camera.fy)
-        cx = float(getattr(camera, "cx", (w - 1) / 2.0))
-        cy = float(getattr(camera, "cy", (h - 1) / 2.0))
-
-        # Rays in camera coordinates: normalised directions
-        dirs_cam = np.stack(
-            [
-                (uu - cx) / fx,
-                (vv - cy) / fy,
-                np.ones_like(uu),
-            ],
-            axis=-1,
-        )  # (H,W,3)
+        dirs_cam = np.stack([(uu - cx) / fx, (vv - cy) / fy, np.ones_like(uu)], axis=-1)  # (H,W,3)
         norms = np.linalg.norm(dirs_cam, axis=-1, keepdims=True) + 1e-8
         dirs_cam /= norms
+        dirs_world = dirs_cam.reshape(-1, 3) @ r_wc.T
+        origins = np.repeat(t_wc.reshape(1, 3), dirs_world.shape[0], axis=0)
+        return origins.astype(np.float32), dirs_world.astype(np.float32)
 
-        # Extract pose matrix and invert to world→camera orientation
-        T_w_c = pose_world_cam.matrix()
-        if hasattr(T_w_c, "detach"):
-            T_w_c_np = T_w_c.detach().cpu().numpy()
-        else:
-            T_w_c_np = np.asarray(T_w_c)
-        R_wc = T_w_c_np[:3, :3]
-        t_wc = T_w_c_np[:3, 3]
+    def _ray_engine(self, mesh: Trimesh):
+        """Return a ray-mesh intersector."""
 
-        # Compute origins and directions in world coordinates
-        origins_flat = np.tile(t_wc, (h * w, 1))
-        dirs_flat = dirs_cam.reshape(-1, 3) @ R_wc.T
+        if self.config.backend in {"auto", "pyembree"}:
+            try:
+                from trimesh.ray.ray_pyembree import RayMeshIntersector
 
-        # Prepare depth array filled with max_depth
-        depth_flat = np.full(h * w, max_depth, dtype=np.float32)
+                return RayMeshIntersector(mesh)
+            except Exception as exc:  # pragma: no cover - optional dependency
+                if self.config.backend == "pyembree":
+                    raise ImportError("pyembree backend requested but unavailable") from exc
+                self.console.warn("pyembree unavailable; falling back to trimesh.ray.")
+        return mesh.ray
 
-        try:
-            ray_engine = getattr(mesh, "ray", None)
-            if ray_engine is None or not hasattr(ray_engine, "intersects_location"):
-                raise AttributeError("mesh does not support ray.intersects_location")
-            locations, index_ray, _ = ray_engine.intersects_location(
-                ray_origins=origins_flat,
-                ray_directions=dirs_flat,
+    def _intersect(self, mesh: Trimesh, origins: np.ndarray, directions: np.ndarray) -> np.ndarray:
+        """Chunked ray-mesh intersection returning flat depth array."""
+
+        max_depth = self.config.zfar
+        depth = np.full(origins.shape[0], max_depth, dtype=np.float32)
+        ray_engine = self._ray_engine(mesh)
+        chunk = self.config.chunk_rays
+        for start in range(0, origins.shape[0], chunk):
+            end = min(start + chunk, origins.shape[0])
+            loc, idx, _ = ray_engine.intersects_location(
+                ray_origins=origins[start:end],
+                ray_directions=directions[start:end],
                 multiple_hits=False,
             )
-            if len(locations) > 0:
-                hit_origins = origins_flat[index_ray]
-                distances = np.linalg.norm(locations - hit_origins, axis=1)
-                depth_flat[index_ray] = distances
-        except Exception as exc:
-            self.console.warn(f"Ray intersection failed: {exc}; using max_depth")
+            if len(loc) == 0:
+                continue
+            hit_orig = origins[start:end][idx]
+            dist = np.linalg.norm(loc - hit_orig, axis=1)
+            depth[start:end][idx] = dist
+        return depth
 
-        depth = depth_flat.reshape(h, w)
-        return self._to_tensor(depth, dtype=torch.float32, device=torch.device(self.config.device))
+    def _maybe_with_proxy_walls(
+        self,
+        mesh: Trimesh,
+        occupancy_extent: Tensor | None = None,
+    ) -> Trimesh:
+        """Append proxy walls if large boundary areas are missing."""
+
+        if not self.config.add_proxy_walls:
+            return mesh
+
+        mesh_vmin, mesh_vmax = mesh.bounds
+        vmin = mesh_vmin
+        vmax = mesh_vmax
+        if occupancy_extent is not None and occupancy_extent.numel() == 6:
+            extent_cpu = occupancy_extent.detach().cpu().float()
+            xmin, xmax, ymin, ymax, zmin, zmax = extent_cpu.tolist()
+            occ_vmin = np.array([xmin, ymin, zmin], dtype=np.float32)
+            occ_vmax = np.array([xmax, ymax, zmax], dtype=np.float32)
+            vmin = np.minimum(mesh_vmin, occ_vmin)
+            vmax = np.maximum(mesh_vmax, occ_vmax)
+
+        extents = vmax - vmin
+        desired_area = {
+            "xmin": extents[1] * extents[2],
+            "xmax": extents[1] * extents[2],
+            "ymin": extents[0] * extents[2],
+            "ymax": extents[0] * extents[2],
+            "zmin": extents[0] * extents[1],
+            "zmax": extents[0] * extents[1],
+        }
+        centers = mesh.triangles_center
+        areas = mesh.area_faces
+        eps = self.config.proxy_eps
+        planes = {
+            "xmin": centers[:, 0] <= vmin[0] + eps,
+            "xmax": centers[:, 0] >= vmax[0] - eps,
+            "ymin": centers[:, 1] <= vmin[1] + eps,
+            "ymax": centers[:, 1] >= vmax[1] - eps,
+            "zmin": centers[:, 2] <= vmin[2] + eps,
+            "zmax": centers[:, 2] >= vmax[2] - eps,
+        }
+        coverage = {k: areas[m].sum() for k, m in planes.items()}
+        missing = [
+            k
+            for k, cov in coverage.items()
+            if desired_area[k] > 0 and cov < desired_area[k] * self.config.proxy_wall_area_threshold
+        ]
+        if not missing:
+            return mesh
+
+        box = trimesh.creation.box(
+            extents=extents,
+            transform=trimesh.transformations.translation_matrix(vmin + extents / 2.0),
+        )
+        mask_keep = []
+        for normal in box.face_normals:
+            keep = (
+                (np.allclose(normal, [1, 0, 0]) and "xmax" in missing)
+                or (np.allclose(normal, [-1, 0, 0]) and "xmin" in missing)
+                or (np.allclose(normal, [0, 1, 0]) and "ymax" in missing)
+                or (np.allclose(normal, [0, -1, 0]) and "ymin" in missing)
+                or (np.allclose(normal, [0, 0, 1]) and "zmax" in missing)
+                or (np.allclose(normal, [0, 0, -1]) and "zmin" in missing)
+            )
+            mask_keep.append(keep)
+        mask_keep = np.array(mask_keep, dtype=bool)
+        if not mask_keep.any():
+            return mesh
+        proxy = Trimesh(vertices=box.vertices, faces=box.faces[mask_keep], process=False)
+        merged = trimesh.util.concatenate([mesh, proxy])
+        if self.console.is_debug:
+            self.console.dbg(
+                f"Added proxy walls for planes {missing}; proxy faces={proxy.faces.shape[0]}, total={merged.faces.shape[0]}"
+            )
+        return merged
 
 
-def _test():  # pragma: no cover
-    """Self‑test for Efm3dDepthRenderer.
-
-    Creates dummy pose, camera and mesh classes and verifies that the
-    depth map contains reasonable values when a simple planar mesh is
-    intersected.  If numpy or torch is missing the test prints the
-    fallback result.
-    """
-
-    class DummyPoseTW:
-        def __init__(self) -> None:
-            import numpy as _np
-
-            self._mat = _np.eye(4, dtype=_np.float32)
-
-        def matrix(self):
-            return self._mat
-
-    class DummyCameraTW:
-        def __init__(self, fx, fy, cx, cy, width, height) -> None:
-            self.fx = fx
-            self.fy = fy
-            self.cx = cx
-            self.cy = cy
-            self.width = width
-            self.height = height
-
-    class DummyRayEngine:
-        def intersects_location(self, ray_origins, ray_directions, multiple_hits=False):
-            import numpy as _np
-
-            locations = []
-            idxs = []
-            for i, (o, d) in enumerate(zip(ray_origins, ray_directions, strict=False)):
-                # Intersect with plane z=2: solve o_z + t d_z = 2
-                if abs(d[2]) < 1e-8:
-                    continue
-                t = (2.0 - o[2]) / d[2]
-                if t <= 0:
-                    continue
-                locations.append(o + t * d)
-                idxs.append(i)
-            return _np.array(locations, dtype=_np.float32), _np.array(idxs, dtype=_np.int64), None
-
-    class DummyMesh:
-        def __init__(self) -> None:
-            self.ray = DummyRayEngine()
-
-    cfg = Efm3dDepthRendererConfig(max_depth=5.0, verbose=True)
-    renderer = Efm3dDepthRenderer(cfg)
-    pose = DummyPoseTW()
-    cam = DummyCameraTW(fx=100.0, fy=100.0, cx=32.0, cy=32.0, width=64, height=64)
-    mesh = DummyMesh()
-    depth = renderer.render_depth(pose, mesh, cam)
-    if np is None or torch is None:
-        print("Depth (fallback):", depth[0][:4], "...")
-    else:
-        print("Depth stats", float(depth.min()), float(depth.max()))
-
-
-if __name__ == "__main__":  # pragma: no cover
-    _test()
+__all__ = ["Efm3dDepthRenderer", "Efm3dDepthRendererConfig"]
