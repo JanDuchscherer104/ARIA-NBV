@@ -4,7 +4,6 @@ format: html
 bibliography: ../references.bib
 ---
 
-
 # Overview
 
 The Aria Synthetic Environments (ASE) dataset [@SceneScript-avetisyan2024] is a large-scale collection of 100,000 unique procedurally-generated indoor scenes with realistic Aria glasses sensor simulations. It serves as the primary training and evaluation dataset for SceneScript and provides valuable data for scene understanding research.
@@ -41,7 +40,6 @@ Each scene contains:
 - **Realistic sensor simulation**: Aria camera and lens characteristics
 - **Rich object diversity**: Furniture, decorations, architectural elements
 
-
 ![ASE Dataset Modalities](../figures/scene-script/ase_modalities.jpg){width=100%}
 
 # Data Structure
@@ -65,8 +63,6 @@ scene_id/
     ├── 000000.png
     └── ...
 ```
-
-
 
 ## Scene Language (`ase_scene_language.txt`)
 
@@ -178,7 +174,6 @@ Useful for:
 - Analyzing coverage and redundancy
 
 For further information on both SLAM point clouds and visibility information, see [MPS Output - Semi-Dense Point Cloud](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_pointcloud).
-
 
 ## RGB Images (`rgb/*.png`)
 
@@ -320,16 +315,14 @@ into this VIO frame before training or evaluation, so **+Z is consistently
 - **Y-axis**: Points down
 - **Z-axis**: Points forward (optical axis)
 
-EFM3D follows the **RDF camera convention** (`X = Right, Y = Down, Z =
+EFM3D follows the **LUF camera convention** (`X = Left, Y = Up, Z =
 Forward`) with image origin in the **top-left** pixel
 (`projection_matrix_rdf_top_left` in `efm3d.utils.viz`). When we construct
 viewing poses (e.g. NBV candidate views) we always build camera rotations in
-this same RDF convention and then express them in the Z-up VIO world frame
+this same LUF convention and then express them in the Z-up VIO world frame
 above, so the axes are consistent between ASE, ATEK, EFM3D and our oracle/NBV
 code.
 
-![Coordinate Conventions](../figures/aria-docs/coord_conventions.png){width=70%}
-Figure from [aria-docs](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/coordinate_convention/3d_coordinate_frame_convention) / @projectaria-engel2023.
 
 ### Using ATEK for ML Workflows
 

@@ -10,6 +10,7 @@ format: html
 ### Phase 1: Foundation & Familiarization
 
 **Goal**:
+
 - Get familiar with the NBV problem domain and read relevant literature
 - Understand the Aria ecosystem — ASE data, SceneScript, Project Aria Tools, ATEK, EFM3D/ EVL
 
@@ -17,10 +18,10 @@ format: html
 
 **Goal**: Implement an "oracle" Relative Reconstruction Improvement (RRI) computation method based on the GT meshes and semi-dense point clouds or compute dense PC from GT depth maps (problem: they are only covering actual trajectory)
 
-
 ### Phase 3: RRI Prediction Network w/ EVL or Scene-Script backbone
 
 **Goal**:
+
 - Use pre-trained SceneScript or EFM3D/ EVL model to predict RRI for candidate views based on previous observations (partial point cloud, previous poses and calibrated video frames).
 - Define training procedures and loss functions.
 
@@ -30,7 +31,6 @@ format: html
 - **Candidate Encoder**: View pose + frustum features, projection of partial PC into candidate view -> learnable encoder
 - **Predictor**: MLP regressing RRI score
 
-
 ---
 
 ## Master Thesis Phase (30 ECTS, ~900 hours)
@@ -39,7 +39,6 @@ format: html
 ### Phase 5: View Synthesis Integration
 
 ### Phase 6: Learning-Based NBV Prediction
-
 
 ### Phase 7: Fine-Tune EFM for NBV on Target Platform
 
@@ -64,7 +63,6 @@ format: html
    - AR arrows/markers showing optimal viewpoints
    - Distance and quality indicators
    - Real-time voice2voice feedback
-
 
 ### Phase 9: Real-World Deployment & Evaluation (Months 7-8, ~200 hours)
 

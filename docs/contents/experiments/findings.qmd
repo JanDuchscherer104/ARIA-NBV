@@ -7,7 +7,6 @@ format: html
 
 ![ASE GT Mesh Sample](../../figures/gt_mesh_manhattan_sample.png)
 
-
 ![Candidate Pose Sampling Visualization](../../figures/candidate_pose.png)
 
 ![Candidate Pose Sampling Visualization](../../figures/candidate_pose2.png)

@@ -42,11 +42,13 @@ SceneScript uses a two-stage architecture combining geometric encoding with auto
 ##### 1. Sparse 3D ResNet Encoder
 
 **Input Processing**:
+
 - **Point Cloud Discretization**: Input point clouds discretized to **5cm resolution**
 - **Sparse Representation**: Uses `torchsparse` for efficient handling of sparse 3D data
 - **Preprocessing**: Points normalized and voxelized
 
 **Architecture**:
+
 - **ResNet-Style Encoder**: Sparse 3D ResNet using sparse convolutions
 - **Downsampling**: **5 down convolutional layers** with kernel size 3 and stride 2
 - **Point Reduction**: Reduces number of active sites by ~1000×
@@ -55,6 +57,7 @@ SceneScript uses a two-stage architecture combining geometric encoding with auto
 **Output**: Sparse feature tensor → converted to sequence of features $\mathbf{F} \in \mathbb{R}^{N \times d_{model}}$ where $N$ is number of non-empty voxels (much smaller than input)
 
 **Coordinate Encoding**:
+
 - Active site coordinates appended to feature vectors: $\mathbf{f}_i \leftarrow \text{cat}(\mathbf{f_i}, \mathbf{c_i})$
 - Features sorted lexicographically by coordinate
 - Provides positional information for transformer decoder
@@ -73,6 +76,7 @@ embedding = position_emb + value_emb + type_emb
 ```
 
 **Autoregressive Generation**:
+
 1. Start with `<START>` token
 2. For each timestep $t$:
    - Feed sequence $\{\text{token}_1, ..., \text{token}_t\}$ to decoder
@@ -82,14 +86,17 @@ embedding = position_emb + value_emb + type_emb
 3. Generate until `<STOP>` token
 
 **Type-Guided Decoding**:
+
 - Entity generation follows strict grammar:
   ```
   <PART> → <COMMAND> → param_1 → param_2 → ... → param_n → <PART>
   ```
+
 - Type token determines valid next parameters (e.g., after `make_wall` expect `a_x`, `a_y`, ...)
 - Enforces structural consistency during generation
 
 **Decoder Details**:
+
 - **8 transformer decoder layers** (fixed architecture)
 - **8 attention heads** for multi-head attention
 - **Feature dimension**: 512 ($d_{model} = 512$)
@@ -114,6 +121,7 @@ PARAMS = {
     'thickness': float   # Always 0.0 (legacy)
 }
 ```
+
 - Defines 3D line segment with vertical extrusion
 - Implicitly defines floor/ceiling at z=0 and z=height
 
@@ -128,10 +136,12 @@ PARAMS = {
     'height': float      # Door height
 }
 ```
+
 - Attached to parent wall
 - Oriented parallel to wall
 
 ##### Window Entity
+
 - Inherits same parameters as Door
 - Differentiated only by command type
 
@@ -145,22 +155,26 @@ PARAMS = {
     'scale_x', 'scale_y', 'scale_z': float  # Bounding box size
 }
 ```
+
 - Represents furniture and objects
 - Oriented bounding box with Z-axis rotation
 
 #### Input/Output Formulation
 
 **Input**:
+
 - **Point Cloud**: $\mathbf{P} \in \mathbb{R}^{N_p \times 3}$ from MPS semi-dense SLAM
 - **Discretization**: Points discretized to **5cm resolution**
 - **Features**: XYZ coordinates serve as input features
 
 **Output**:
+
 - **Token Sequence**: $\{\text{tok}_1, \text{tok}_2, ..., \text{tok}_T\}$ where $T \leq T_{max} = 2048$
 - **Structured Language**: Each entity encoded as:
   ```
   <PART> <CMD> <param_1> <param_2> ... <param_n> <PART> ...
   ```
+
 - **Example**:
   ```
   <PART> make_wall 42 156 200 0 198 312 200 0 255 0 <PART>
@@ -168,12 +182,14 @@ PARAMS = {
   (Discretized integer tokens, later undiscretized to continuous floats)
 
 **Tokenization**:
+
 - **Integer parameters**: $t = \text{int}(x)$
 - **Float parameters**: $t = \text{round}(x / \text{res})$ where res = 5cm resolution
 - **Vocabulary**: 2048 tokens maximum
 - Not BPE-based (unlike NLP); custom discretization scheme
 
 **Post-Processing**:
+
 1. Parse token sequence into entities
 2. Undiscretize parameters back to continuous values
 3. Assign doors/windows to nearest wall
@@ -182,21 +198,25 @@ PARAMS = {
 #### Training Methodology
 
 **Dataset**: 100K ASE synthetic scenes
+
 - **Train/Val/Test**: 80K / 10K / 10K split
 - **Augmentation**: Random rotations, translations, point subsampling
 
 **Loss Function**:
+
 - **Cross-Entropy**: On discretized token predictions
 - **Type-Aware**: Separate losses for each token type
 - **Weighted**: Higher weight on command tokens vs parameters
 
 **Training Strategy**:
+
 - **Teacher Forcing**: During training, feed ground truth previous tokens
 - **Nucleus Sampling**: At inference, use nucleus sampling (top-p) for diversity
 - **Greedy Decoding**: Quantitative results decoded greedily
 - **Augmentation**: Random z-axis rotation (360°), random point subsampling (up to 500K points)
 
 **Optimization**:
+
 - **Optimizer**: AdamW with **learning rate 1e-4** (10^-3 for image-only encoder variant)
 - **Batch Size**: **64 scenes** (effective batch size, distributed across multiple nodes)
 - **Training Time**: **~3-4 days** (hardware not specified in paper)
@@ -213,12 +233,14 @@ SceneScript provides a **semantic backbone** for NBV planning:
 4. **Semantic Awareness**: Different entity types (walls vs doors vs objects) can be weighted differently for NBV
 
 **Key Insight**: SceneScript's structured representation enables **entity-aware NBV planning** where we can:
+
 - Compute RRI separately for each wall, door, or object
 - Prioritize views that improve reconstruction of specific entities
 - Integrate user-specified importance weights per entity type
 - Track reconstruction completeness at entity-level granularity
 
 **NBV Integration Strategy**:
+
 1. Run SceneScript on partial point cloud → get predicted entities
 2. Compare predicted vs (incrementally estimated) ground truth entities
 3. Compute per-entity reconstruction error
@@ -233,7 +255,6 @@ SceneScript provides:
 - **Backbone for NBV**: Potential to serve as a semantic encoder for NBV prediction
 
 **Key Insight**: SceneScript's structured representation enables **entity-aware NBV planning** where we can compute RRI separately for each room, wall, or object of interest.
-
 
 ### Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling
 

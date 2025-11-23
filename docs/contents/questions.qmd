@@ -8,7 +8,6 @@ bibliography: ../references.bib
 
 This section documents key research questions that guide our investigation into semantic Next-Best-View planning.
 
-
 ## 1. RRI Computation Strategies
 
 **1.1**: Which oracle RRI formulation is most predictive of actual reconstruction improvement?
@@ -28,7 +27,6 @@ This section documents key research questions that guide our investigation into 
   - Occupancy probabilities, centerness scores, visibility scores for known points in the semi-dense SLAM point cloud...
 
 ---
-
 
 ## 2. EFMs as NBV Backbone
 
@@ -55,7 +53,6 @@ This section documents key research questions that guide our investigation into 
 
 **Hypothesis**: Entity-aware NBV allows task-specific prioritization and should outperform allow the model to pay attention to the objects of interest and hence improve the reconstruction quality for those. This is especially useful in human-in-the-loop scenarios, allowing the user to spcify "I want this table scanned well". This should allow to leverage pre-trained semantic and geometric understanding; Entity-level representations come with rich priors about typical shapes.
 
-
 **Proposed Formulation**:
 
 $$
@@ -64,7 +61,6 @@ $$
 
 - $\text{RRI}_e$: Reconstruction score for entity $e$
 - $w_e$: Importance weight (user-specified or uncertainty-based)
-
 
 ---
 

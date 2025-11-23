@@ -295,6 +295,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="nav-link active" href="../../contents/todos.html" aria-current="page"> 
 <span class="menu-text">TODOs</span></a>
   </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../contents/setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-project-state" role="link" data-bs-toggle="dropdown" aria-expanded="false">
  <span class="menu-text">Project State</span>
@@ -504,20 +508,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../contents/impl/atek_implementation.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">ATEK Implementation Details</span></a>
+  <a href="../../contents/impl/aria_nbv_overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">aria_nbv Overview &amp; Architecture</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../contents/impl/efm3d_implementation.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">EFM3D Implementation Details</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../contents/impl/prj_aria_tools_impl.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">ProjectAria Tools: Complete Reference</span></a>
+  <a href="../../contents/impl/data_pipeline_overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ASE Data Pipeline &amp; Streamlit Usage</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -526,15 +524,38 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="menu-text">Computing RRI with Ground Truth Meshes</span></a>
   </div>
 </li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">External Implementations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../contents/impl/oracle_rri_impl.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Oracle RRI Implementation Overview</span></a>
+  <a href="../../contents/ext-impl/atek_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ATEK Implementation Index</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../contents/impl/efm3d_symbol_index.html" class="sidebar-item-text sidebar-link">
+  <a href="../../contents/ext-impl/efm3d_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D Implementation Index</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ext-impl/prj_aria_tools_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ProjectAria Tools: Complete Reference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ext-impl/efm3d_symbol_index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">EFM3D Symbol Index</span></a>
   </div>
 </li>
@@ -542,13 +563,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
  <span class="menu-text">Presentations</span></a>
-          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
-      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../../typst/slides/slides_1.pdf" class="sidebar-item-text sidebar-link">
@@ -1117,32 +1138,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">## Key Papers</span></span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">### Next-Best-View Planning</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[VIN-NBV](vin_nbv.qmd)**: Learning-based RRI prediction for quality-driven view planning</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[GenNBV](gen_nbv.qmd)**: Continuous action spaces and reinforcement learning approaches</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">### Foundation Models &amp; Scene Understanding  </span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D/EVL](efm3d.qmd)**: Egocentric foundation models for 3D perception and voxel lifting</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript](scene_script.qmd)**: Structured scene language for semantic scene manipulation</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="fu">## Local \LaTeX{} Corpus</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[VIN-NBV](vin_nbv.qmd)**: Learning-based RRI prediction for quality-driven view planning</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[GenNBV](gen_nbv.qmd)**: Continuous action spaces and reinforcement learning approaches</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="fu">### Foundation Models &amp; Scene Understanding  </span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D/EVL](efm3d.qmd)**: Egocentric foundation models for 3D perception and voxel lifting</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript](scene_script.qmd)**: Structured scene language for semantic scene manipulation</span>
 <span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>The full source of every referenced paper is mirrored under <span class="in">`literature/tex-src/`</span>. Key entry points:</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="fu">## Local \LaTeX{} Corpus</span></span>
 <span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`arXiv-EFM3D/main.tex`</span><span class="co">](../../literature/tex-src/arXiv-EFM3D/main.tex)</span></span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`arXiv-GenNBV/main.tex`</span><span class="co">](../../literature/tex-src/arXiv-GenNBV/main.tex)</span></span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`arXiv-VIN-NBV/main.tex`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/main.tex)</span></span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`arXiv-project-aria/main.tex`</span><span class="co">](../../literature/tex-src/arXiv-project-aria/main.tex)</span></span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`arXiv-scene-script/main.tex`</span><span class="co">](../../literature/tex-src/arXiv-scene-script/main.tex)</span></span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>Each directory contains the canonical figures (<span class="in">`figures/`</span>), tables, and supplemental PDFs required to reproduce results or cite specific numbers in our documentation.</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>The full source of every referenced paper is mirrored under <span class="in">`literature/tex-src/`</span>. Key entry points:</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`arXiv-EFM3D/main.tex`</span><span class="co">](../../literature/tex-src/arXiv-EFM3D/main.tex)</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`arXiv-GenNBV/main.tex`</span><span class="co">](../../literature/tex-src/arXiv-GenNBV/main.tex)</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`arXiv-VIN-NBV/main.tex`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/main.tex)</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`arXiv-project-aria/main.tex`</span><span class="co">](../../literature/tex-src/arXiv-project-aria/main.tex)</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`arXiv-scene-script/main.tex`</span><span class="co">](../../literature/tex-src/arXiv-scene-script/main.tex)</span></span>
 <span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="fu">## Research Context</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>Each directory contains the canonical figures (<span class="in">`figures/`</span>), tables, and supplemental PDFs required to reproduce results or cite specific numbers in our documentation.</span>
 <span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>These literature reviews form the theoretical foundation for integrating pre-trained egocentric models with quality-driven NBV planning. The combination of VIN-NBV's RRI optimization with EFM3D's foundation model capabilities enables better generalization to complex indoor environments compared to traditional coverage-based approaches.</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="fu">## Research Context</span></span>
 <span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="fu">## Navigation</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>These literature reviews form the theoretical foundation for integrating pre-trained egocentric models with quality-driven NBV planning. The combination of VIN-NBV's RRI optimization with EFM3D's foundation model capabilities enables better generalization to complex indoor environments compared to traditional coverage-based approaches.</span>
 <span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>Return to <span class="co">[</span><span class="ot">main documentation</span><span class="co">](../../index.qmd)</span> or explore specific <span class="co">[</span><span class="ot">metrics and evaluation</span><span class="co">](../metrics/index.qmd)</span> approaches.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a><span class="fu">## Navigation</span></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>Return to <span class="co">[</span><span class="ot">main documentation</span><span class="co">](../../index.qmd)</span> or explore specific <span class="co">[</span><span class="ot">metrics and evaluation</span><span class="co">](../metrics/index.qmd)</span> approaches.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

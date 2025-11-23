@@ -644,7 +644,7 @@ window.Quarto = {
 
 <header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/impl/overview.html">Implementations</a></li><li class="breadcrumb-item"><a href="../../contents/impl/aria_nbv_overview.html">aria_nbv Overview &amp; Architecture</a></li></ol></nav>
 <div class="quarto-title">
-<div class="quarto-title-block"><div><h1 class="title">aria_nbv Overview &amp; Architecture</h1><button type="button" class="btn code-tools-button dropdown-toggle" id="quarto-code-tools-menu" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi"></i> Code</button><ul class="dropdown-menu dropdown-menu-end" aria-labelelledby="quarto-code-tools-menu"><li><a id="quarto-show-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Show All Code</a></li><li><a id="quarto-hide-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Hide All Code</a></li><li><hr class="dropdown-divider"></li><li><a id="quarto-view-source" class="dropdown-item" href="javascript:void(0)" role="button">View Source</a></li></ul></div></div>
+<h1 class="title">aria_nbv Overview &amp; Architecture</h1>
 </div>
 
 
@@ -664,7 +664,7 @@ window.Quarto = {
 <section id="what-is-aria_nbv" class="level1" data-number="1">
 <h1 data-number="1"><span class="header-section-number">1</span> What is <code>aria_nbv</code>?</h1>
 <ul>
-<li>In-repo NBV toolkit (import path currently <code>oracle_rri</code>) for ASE/ATEK + EFM3D experiments.</li>
+<li>In-repo NBV toolkit (import path currently <code>oracle_rri</code>, pending rename to <code>aria_nbv</code>) for ASE/ATEK + EFM3D experiments.</li>
 <li>Responsibilities: load typed ASE snippets, generate collision‑aware candidate views, render/raycast depth, fuse point clouds, and score Relative Reconstruction Improvement (RRI).</li>
 </ul>
 </section>
@@ -685,29 +685,29 @@ window.Quarto = {
 <section id="end-to-end-nbv-loop" class="level1" data-number="3">
 <h1 data-number="3"><span class="header-section-number">3</span> End-to-end NBV loop</h1>
 <div class="cell" data-layout-align="default">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    A[ASE/ATEK shard\n+ GT mesh] --&gt; B(data_handling.dataset\nEfmSnippetView)</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    B --&gt; C(pose_generation.\nCandidateViewGenerator)</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    C --&gt;|PoseTW batch + masks| D(rendering.\nCandidateDepthRenderer)</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    D --&gt;|Depth→PC (EFM3D pointcloud utils)| E[Fused reconstruction P_{t∪q}]</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    A[ASE/ATEK shard&lt;br/&gt;+ GT mesh] --&gt; B[data_handling.dataset&lt;br/&gt;EfmSnippetView]</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    B --&gt; C[pose_generation&lt;br/&gt;CandidateViewGenerator]</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    C --&gt;|"PoseTW batch + masks"| D[rendering&lt;br/&gt;CandidateDepthRenderer]</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    D --&gt;|"Depth to PC (EFM3D utils)"| E[Fused reconstruction P_t+q]</span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    E --&gt; F[Metrics: RRI / Chamfer]</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    F --&gt; G[Policy: pick NBV]</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    G --&gt;|advance pose| C</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    F --&gt; G[Policy: choose NBV]</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    G --&gt;|"advance pose"| C</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output-display">
 <div>
 <p></p><figure class="figure"><p></p>
 <div>
 <pre class="mermaid mermaid-js">flowchart LR
-    A[ASE/ATEK shard\n+ GT mesh] --&gt; B(data_handling.dataset\nEfmSnippetView)
-    B --&gt; C(pose_generation.\nCandidateViewGenerator)
-    C --&gt;|PoseTW batch + masks| D(rendering.\nCandidateDepthRenderer)
-    D --&gt;|Depth→PC (EFM3D pointcloud utils)| E[Fused reconstruction P_{t∪q}]
+    A[ASE/ATEK shard&lt;br/&gt;+ GT mesh] --&gt; B[data_handling.dataset&lt;br/&gt;EfmSnippetView]
+    B --&gt; C[pose_generation&lt;br/&gt;CandidateViewGenerator]
+    C --&gt;|"PoseTW batch + masks"| D[rendering&lt;br/&gt;CandidateDepthRenderer]
+    D --&gt;|"Depth to PC (EFM3D utils)"| E[Fused reconstruction P_t+q]
     E --&gt; F[Metrics: RRI / Chamfer]
-    F --&gt; G[Policy: pick NBV]
-    G --&gt;|advance pose| C
+    F --&gt; G[Policy: choose NBV]
+    G --&gt;|"advance pose"| C
 </pre>
 </div>
 <p></p></figure><p></p>
@@ -747,8 +747,8 @@ window.Quarto = {
 <section id="architecture-snapshot-class-diagram" class="level1" data-number="7">
 <h1 data-number="7"><span class="header-section-number">7</span> Architecture snapshot (class diagram)</h1>
 <div class="cell" data-layout-align="default">
-<details open="" class="code-fold">
-<summary>Code</summary>
+<details class="code-fold">
+<summary>Show code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>classDiagram</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    class PathConfig</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    class BaseConfig</span>
@@ -814,8 +814,6 @@ window.Quarto = {
 <li>Notebook reference: <code>../notebooks/ase_oracle_rri_simplified.ipynb</code></li>
 </ul>
 
-
-<!-- -->
 
 </section>
 
@@ -903,57 +901,6 @@ window.Quarto = {
         container: window.document.getElementById('quarto-embedded-source-code-modal')
       });
       clipboardModal.on('success', onCopySuccess);
-    }
-    const viewSource = window.document.getElementById('quarto-view-source') ||
-                       window.document.getElementById('quarto-code-tools-source');
-    if (viewSource) {
-      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
-      viewSource.addEventListener("click", function(e) {
-        if (sourceUrl) {
-          // rstudio viewer pane
-          if (/\bcapabilities=\b/.test(window.location)) {
-            window.open(sourceUrl);
-          } else {
-            window.location.href = sourceUrl;
-          }
-        } else {
-          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
-          modal.show();
-        }
-        return false;
-      });
-    }
-    function toggleCodeHandler(show) {
-      return function(e) {
-        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
-        for (let i=0; i<detailsSrc.length; i++) {
-          const details = detailsSrc[i].parentElement;
-          if (show) {
-            details.open = true;
-          } else {
-            details.removeAttribute("open");
-          }
-        }
-        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
-        const fromCls = show ? "hidden" : "unhidden";
-        const toCls = show ? "unhidden" : "hidden";
-        for (let i=0; i<cellCodeDivs.length; i++) {
-          const codeDiv = cellCodeDivs[i];
-          if (codeDiv.classList.contains(fromCls)) {
-            codeDiv.classList.remove(fromCls);
-            codeDiv.classList.add(toCls);
-          } 
-        }
-        return false;
-      }
-    }
-    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
-    if (hideAllCode) {
-      hideAllCode.addEventListener("click", toggleCodeHandler(false));
-    }
-    const showAllCode = window.document.getElementById("quarto-show-all-code");
-    if (showAllCode) {
-      showAllCode.addEventListener("click", toggleCodeHandler(true));
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
@@ -1288,112 +1235,7 @@ window.Quarto = {
       }
     }
   });
-  </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "aria_nbv Overview &amp; Architecture"</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co">    page-layout: full</span></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="fu"># What is `aria_nbv`?</span></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>In-repo NBV toolkit (import path currently <span class="in">`oracle_rri`</span>) for ASE/ATEK + EFM3D experiments.</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Responsibilities: load typed ASE snippets, generate collision‑aware candidate views, render/raycast depth, fuse point clouds, and score Relative Reconstruction Improvement (RRI).</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="fu"># Directory layout (code)</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="in">oracle_rri/oracle_rri/</span></span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="in">├── configs/              # PathConfig</span></span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="in">├── utils/                # BaseConfig, Console, frames helpers</span></span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="in">├── data/                 # Typed EFM views (cameras, traj, semidense, GT)</span></span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="in">├── data_handling/        # ATEK WDS loader, metadata, downloader CLI</span></span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a><span class="in">├── pose_generation/      # CandidateViewGenerator + rules + types</span></span>
-<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="in">├── rendering/            # Pytorch3D + trimesh depth renderers</span></span>
-<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a><span class="in">├── views/                # Candidate point-cloud rendering</span></span>
-<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a><span class="in">├── viz/ &amp; visualization/ # Mesh/trajectory viz + Streamlit app</span></span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="in">├── analysis/             # DepthDebugger</span></span>
-<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="in">└── streamlit_app.py      # Minimal dashboard entry</span></span>
-<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="fu"># End-to-end NBV loop</span></span>
-<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
-<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
-<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>    A[ASE/ATEK shard\n+ GT mesh] --&gt; B(data_handling.dataset\nEfmSnippetView)</span>
-<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>    B --&gt; C(pose_generation.\nCandidateViewGenerator)</span>
-<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>    C --&gt;|PoseTW batch + masks| D(rendering.\nCandidateDepthRenderer)</span>
-<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>    D --&gt;|Depth→PC (EFM3D pointcloud utils)| E[Fused reconstruction P_{t∪<span class="ot">q</span>}]</span>
-<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>    E <span class="ot">--</span>&gt; F[Metrics: RRI / Chamfer]</span>
-<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>    F --&gt; G[Policy: pick NBV]</span>
-<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>    G --&gt;|advance pose| C</span>
-<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a><span class="fu"># Core modules (shortcuts)</span></span>
-<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Config/Logging**: <span class="in">`configs.path_config.PathConfig`</span>, <span class="in">`utils.base_config.BaseConfig`</span>, <span class="in">`utils.console.Console`</span>.</span>
-<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Data views**: <span class="in">`data.efm_views`</span> (<span class="in">`EfmSnippetView`</span>, cameras, trajectory, semidense, GT/OBBs).</span>
-<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Dataset handling**: <span class="in">`data_handling.dataset.ASEDataset`</span>, <span class="in">`data_handling.downloader.ASEDownloader`</span>, metadata parsers.</span>
-<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Candidate generation**: <span class="in">`pose_generation.candidate_generation`</span> + rules (shell sampling, min-distance, path collision, free-space).</span>
-<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Rendering**: <span class="in">`rendering.candidate_depth_renderer`</span> (wraps PyTorch3D backend), <span class="in">`rendering.efm3d_depth_renderer`</span> (CPU raycast).</span>
-<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Metrics/RRI**: see <span class="in">`rri_computation.qmd`</span>; uses Chamfer components against GT mesh.</span>
-<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Visualisation**: <span class="in">`viz.mesh_viz`</span>, <span class="in">`visualization.candidate_app`</span>, <span class="in">`streamlit_app.py`</span>.</span>
-<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Debugging**: <span class="in">`analysis.depth_debugger.DepthDebugger`</span>.</span>
-<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a><span class="fu"># RRI essentials (used by metrics)</span></span>
-<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a>Let <span class="sc">\(</span>P_t<span class="sc">\)</span> be current reconstruction points, <span class="sc">\(</span>P_q<span class="sc">\)</span> the candidate-view points, <span class="sc">\(</span>M<span class="sc">\)</span> the GT surface (sampled). Symmetric Chamfer:</span>
-<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a>\mathrm{CD}(P,M)=\frac{1}{|P|}\sum_{p\in P}\min_{m\in M}<span class="sc">\|</span>p-m<span class="sc">\|</span>_2^2+\frac{1}{|M|}\sum_{m\in M}\min_{p\in P}<span class="sc">\|</span>m-p<span class="sc">\|</span>_2^2.</span>
-<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a>Relative improvement:</span>
-<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a>\mathrm{RRI}(P_t,P_q,M)=\frac{\mathrm{CD}(P_t,M)-\mathrm{CD}(P_t\cup P_q,M)}{\mathrm{CD}(P_t,M)+\varepsilon},</span>
-<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a>with small <span class="sc">\(</span>\varepsilon<span class="sc">\)</span> for stability. Positive RRI ⇒ candidate improves reconstruction.</span>
-<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a><span class="fu"># External APIs we lean on (from merged oracle_rri_impl)</span></span>
-<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**EFM3D**: <span class="in">`PoseTW`</span>, <span class="in">`CameraTW`</span>, <span class="in">`utils.ray.ray_grid/transform_rays`</span>, <span class="in">`utils.pointcloud.dist_im_to_point_cloud_im`</span>, <span class="in">`utils.mesh_utils.eval_mesh_to_mesh`</span>.</span>
-<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**ATEK**: <span class="in">`load_atek_wds_dataset`</span>, <span class="in">`process_wds_sample`</span>, surface metrics (<span class="in">`surface_reconstruction_metrics.py`</span>).</span>
-<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**trimesh**: IO, surface sampling, proximity queries, ray intersections; optional pyembree backend.</span>
-<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a><span class="fu"># Architecture snapshot (class diagram)</span></span>
-<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
-<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a>classDiagram</span>
-<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a>    class PathConfig</span>
-<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a>    class BaseConfig</span>
-<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a>    class Console</span>
-<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a>    class ASEDataset</span>
-<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a>    class AseEfmDataset</span>
-<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a>    class CandidateViewGenerator</span>
-<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a>    class CandidateDepthRenderer</span>
-<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a>    class DepthDebugger</span>
-<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a>    class MeshViz</span>
-<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a>    PathConfig &lt;|-- ASEDataset</span>
-<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a>    BaseConfig &lt;|-- CandidateViewGenerator</span>
-<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a>    BaseConfig &lt;|-- CandidateDepthRenderer</span>
-<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a>    BaseConfig &lt;|-- AseEfmDataset</span>
-<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a>    Console &lt;.. CandidateViewGenerator</span>
-<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a>    Console &lt;.. CandidateDepthRenderer</span>
-<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a>    Console &lt;.. ASEDataset</span>
-<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a>    ASEDataset --&gt; AseEfmDataset : typed view export</span>
-<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a>    CandidateViewGenerator --&gt; CandidateDepthRenderer : PoseTW candidates</span>
-<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a>    CandidateDepthRenderer --&gt; MeshViz : depth/PC viz</span>
-<span id="cb4-99"><a href="#cb4-99" aria-hidden="true" tabindex="-1"></a>    DepthDebugger --&gt; MeshViz</span>
-<span id="cb4-100"><a href="#cb4-100" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a><span class="fu"># Where to dive deeper</span></span>
-<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-104"><a href="#cb4-104" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Data ingestion &amp; typed views: <span class="in">`data_pipeline_overview.qmd`</span></span>
-<span id="cb4-105"><a href="#cb4-105" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Oracle metric details: <span class="in">`rri_computation.qmd`</span></span>
-<span id="cb4-106"><a href="#cb4-106" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>External libraries: <span class="in">`../ext-impl/atek_implementation.qmd`</span>, <span class="in">`../ext-impl/efm3d_implementation.qmd`</span></span>
-<span id="cb4-107"><a href="#cb4-107" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Notebook reference: <span class="in">`../notebooks/ase_oracle_rri_simplified.ipynb`</span></span>
-</code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
-</div></div></div></div></div>
+  </script>
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">

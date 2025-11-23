@@ -112,6 +112,7 @@ Output: RRI = (CD_before - CD_after) / CD_before
 ### Stage 1: Candidate View Simulation - $\mathcal{P}_t \to \mathcal{P}_{\mathbf{q}}$
 
 **Input**:
+
 - Candidate pose: $\mathbf{q} = (R_q \in SO(3), t_q \in \mathbb{R}^3)$
 - Camera intrinsics: $K = \text{diag}(f_x, f_y, c_x, c_y, w, h)$
 - Ground truth mesh: $\mathcal{M}_{\text{GT}} = (V_{GT}, F_{GT})$
@@ -173,6 +174,7 @@ P_t_union_q_sampled = voxel_downsample(P_t_union_q, voxel_size=v)
 ```
 
 **Output**:
+
 - $\mathcal{P}_t' \in \mathbb{R}^{N_t' \times 3}$ (downsampled current reconstruction)
 - $\mathcal{P}_{t \cup \mathbf{q}}' \in \mathbb{R}^{N_{tq}' \times 3}$ (downsampled combined reconstruction)
 
@@ -510,7 +512,6 @@ def compute_rri_oracle_scalable(
 
     return rri
 
-
 # === USAGE EXAMPLE ===
 def evaluate_candidate_views_batch(
     P_t: torch.Tensor,
@@ -591,6 +592,7 @@ def ray_grid(camera: CameraTW) -> torch.Tensor:
         rays: (H, W, 6) tensor [orig_x, orig_y, orig_z, dir_x, dir_y, dir_z]
     """
 ```
+
 - **Key Insight**: Eliminates manual pixel iteration → $O(1)$ instead of $O(H \times W)$
 - **Memory**: Pre-allocates full ray tensor
 - **Transforms**: Handles camera intrinsics and coordinate frames correctly
@@ -751,7 +753,6 @@ def compute_rri_oracle_memory_efficient(
 
     rri = (cd_before - cd_after) / cd_before if cd_before > 0 else 0.0
     return rri
-
 
 def simulate_view_numpy_backend(pose, camera, mesh, ray_indices):
     """CPU-only ray-mesh intersection to avoid GPU memory issues."""
@@ -1052,6 +1053,7 @@ For Next-Best-View planning, we need to evaluate RRI for candidate poses $\mathb
 $$\mathbf{q} = \begin{bmatrix} R & t \\ 0 & 1 \end{bmatrix} \in SE(3)$$
 
 Where:
+
 - $R \in SO(3)$: Camera orientation (3 DoF: roll, pitch, yaw)
 - $t \in \mathbb{R}^3$: Camera position (3 DoF: x, y, z)
 - **Total**: 6 DoF pose space
@@ -1221,6 +1223,7 @@ def generate_se3_candidates_informed(
 ### Integration with EFM3D Coordinate Systems
 
 EFM3D uses consistent coordinate conventions:
+
 - **Camera frame**: +Z forward, +X right, +Y down
 - **World frame**: +Z up (gravity aligned)
 - **SE(3) transforms**: Right-multiplication convention
@@ -1255,6 +1258,7 @@ def create_efm3d_compatible_pose(position: np.ndarray, target: np.ndarray) -> Po
 ### The Core Mathematical Challenge
 
 **Given**:
+
 - Current reconstruction: $\mathcal{P}_t = \{p_i\}_{i=1}^{N_t} \subset \mathbb{R}^3$ (semi-dense SLAM)
 - Candidate pose: $\mathbf{q} = (R_q, t_q) \in SE(3)$
 - GT mesh: $\mathcal{M}_{GT} = (V_{GT}, F_{GT})$
@@ -1325,6 +1329,7 @@ where $\mathcal{S}_t$ is the surface coverage of current reconstruction $\mathca
 **Total**: $O(HW \cdot \log F + N' \cdot F + N_s \log N')$
 
 **Scalability**:
+
 - For typical values: $H=W=640$, $F=2M$, $N'=15K$, $N_s=10K$
 - Per-candidate time: ~0.5-2.0 seconds
 - Memory per candidate: ~50-100MB
@@ -1336,6 +1341,7 @@ where $\mathcal{S}_t$ is the surface coverage of current reconstruction $\mathca
 ```
 q → render_depth(M_GT, q) → depth_map → P_q
 ```
+
 - **Pros**: More realistic, handles occlusions naturally
 - **Cons**: Requires rendering pipeline (pyrender/Open3D)
 
@@ -1343,6 +1349,7 @@ q → render_depth(M_GT, q) → depth_map → P_q
 ```
 M_GT → sample_surface(M_GT) → filter_visible(q) → P_q
 ```
+
 - **Pros**: Direct surface sampling, no ray-casting
 - **Cons**: Visibility computation non-trivial
 
@@ -1350,6 +1357,7 @@ M_GT → sample_surface(M_GT) → filter_visible(q) → P_q
 ```
 (P_t, q) → neural_network → P_q
 ```
+
 - **Pros**: Can learn optimal sampling strategy
 - **Cons**: Requires training data, less interpretable
 

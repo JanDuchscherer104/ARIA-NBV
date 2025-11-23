@@ -21,17 +21,20 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 # Highest Priority
 
 ## Metrics
+
 - Implement `OracleRRI` with point-cloud–to–mesh distance (Chamfer components).
 - Consider mesh-to-distance-field acceleration and room-level cropping to avoid unrelated geometry - How can we consider only relevant (observable parts) of the scene, such that we don't have to consider the entire mesh (e.g. there might be different rooms that cannot be considered)?
 - Later: deliver as `TorchMetric`.
 
 ## Candidate View Generation & Sampling
+
 - implement `CandidateViewGenerator` and auxiliary mdoules in `oracle_rri/oracle_rri/pose_generation`, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type `PoseTW` (`external/efm3d/efm3d/aria/pose.py`)
   - Strategies: uniform over half-sphere with min/max radius & elevation, free-space only, room-bounded (SSL for train, occupancy for eval).
   - Collision check: segment from last pose to candidate must not intersect mesh/voxels.
   - Modular strategy selection via enums/config that allows easy extension and combination of strategies / sampling rules.
 
 ### Raycasting to Generate Candidate Point Clouds-
+
 - Implement `CandidatePointCloudGenerator` and all necessary auxiliary modules in : for each candidate pose, cast rays to GT  to render depth map using existing GPU implementations from `efm3d`.
   - Input: candidate `PoseTW`, GT mesh.
   - Output: Depth map.
@@ -44,10 +47,11 @@ Consider that we have already tried implementing the entire pipeline in a single
 *panda3d*.
 
 ### Point Cloud Fusion
+
 - Implement `DepthToPointCloud` module: for each candidate pose's depth map, backproject to point cloud `$\mathcal{P}_{\mathbf{q}}$ in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC $\mathcal{P}_t$ with candidate-view PC $\mathcal{P}_{\mathbf{q}}$ → $\mathcal{P}_{t \cup \mathbf{q}}$.
 
-
 ## Visualization (Streamlit)
+
 - Interactive app to visualize candidate sampling, PC–mesh distances, and RRI.
 - Efficient caching; quick scene/trajectory switching.
 - should allow for easy adaptation of config (i.e. which scene and snippet to use)
@@ -60,6 +64,7 @@ Consider that we have already tried implementing the entire pipeline in a single
 - should have debug print tab where we can easily see the repr prints of the different data structures and logs!
 
 ## Data Handling
+
 - Link ASE ATEK shards and GT meshes to raw ASE; resolve scene_id/snippet_id mapping.
 - Wrap ATEK dataset/downloader to expose:
   - easy ASE ATEK WDS access + GT meshes,
@@ -71,23 +76,28 @@ Consider that we have already tried implementing the entire pipeline in a single
 # Medium Priority
 
 ## Candidate Sampling (learning variants)
+
 - Lightweight net on top of EVL to predict candidate rays / projections given pose + mesh.
 
 ## Evaluation & Benchmarking
+
 - Surface reconstruction: F-Score vs GT meshes (ATEK + EFM3D utils).
 - Static object detection: CubeRCNN baselines.
 - Reproduce benchmarking scripts in `external/ATEK/tools`.
 
 ## Download & Data Ops
+
 - Automate downloads using ATEK/Project Aria tools; ensure integrity (sha1).
 - Provide CLI wrappers for scene filters and variant selection (train/val/test).
 
 # Lower Priority / Backlog
 
 ## Pose & Navigation
+
 - Free-space validation using EFM3D occupancy; collision-aware NBV pathing.
 
 ## Misc
+
 - Extend candidate generation to continuous policy conditioned on fused occupancy / OBB priors.
 
 # References & Pointers

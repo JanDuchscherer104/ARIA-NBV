@@ -24,7 +24,6 @@
 - [`figures/EFM3D_teaser_v1.pdf`](../../literature/tex-src/arXiv-EFM3D/figures/EFM3D_teaser_v1.pdf) – canonical teaser; the `figures/` folder contains all referenced visual assets.
 - [`tables/surf_eval.tex`](../../literature/tex-src/arXiv-EFM3D/tables/surf_eval.tex) – detailed quantitative tables (OBB + surface heads).
 
-
 ## Integration Strategy
 
 1. Use EVL's `voxel/feat` tensor and occupancy logits as the scene representation.
@@ -33,6 +32,7 @@
 4. Enforce collision constraints by discarding candidates that intersect high-occupancy voxels or detected OBBs. -->
 
 ### Overview
+
 - **Porposed Method**: **EVL** was designed as a base-line _3D egocentric foundation model_ that leverages strong priors from various egocentric modalities and inherits foundational capabilities from any (frozen) 2D backbone.
   - 86.6 M non-trainable parameters (DinoV2.5)
   - 16.7 M trainable parameters (3D U-Net + heads)
@@ -65,7 +65,6 @@ $$
 
 To compute $\mathcal{M}_{\text{free}}$, EVL back-projects each observed point for every camera that saw it, samples $S$ evenly spaced depths along the camera ray, and marks all voxels up to (but not including) the surface (which would be $\mathcal{M}_{\text{surf}}$) hit as free space (`voxel/occ_input`) [efm3d/model/lifter.py:180](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/lifter.py#L180). The same projection pass accumulates a visibility count per voxel (`voxel/counts`), indicating how many valid samples support each location; these counts are normalized or thresholded to serve as confidence weights during learning.
 
-
 #### EVL data flow
 
 1. **2D backbone:** Frozen DinoV2.5 extracts per-frame feature maps with $F$ channels for each stream $s \in S$.
@@ -73,7 +72,6 @@ To compute $\mathcal{M}_{\text{free}}$, EVL back-projects each observed point fo
 3. **Temporal/stream aggregation:** Lifted features are aggregated (mean, variance) across $t$ and $s \rightarrow 2F \times D \times H \times W$ feature volume.
 4. **Geometric priors:** Point and free-space masks from $\mathcal{P}_{\text{semi}}$ are appended, yielding $(F'+2) \times D \times H \times W$ before the 3D U-Net.
 5. **3D backbone & heads:** A 3D InvResnet FPN U-Net processes the volume and feeds the surface and detection heads.
-
 
 #### Outputs
 
@@ -120,19 +118,21 @@ Check out [EVL Training Format](#atek-wds-format) for more info.
 - `occ_pr`, `cent_pr`, `bbox_pr`, `clas_pr`: Raw head outputs prior to thresholding/NMS.
 - `obbs_pr_nms`, `cent_pr_nms`: Post-processed detection outputs (sparse OBBs and filtered centerness).
 
-
 ### EVL Architecture
+
 - **Frozen 2D foundation encoder**: `VideoBackboneDinov2` upsamples DinoV2.5 tokens to full resolution per stream, handling RGB and SLAM cameras with optional vignette correction ([efm3d/model/video_backbone.py:132](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/video_backbone.py#L132)).
 - **Egocentric voxel lifter**: The `Lifter` class samples voxel centers into every frame, aggregates valid projections per stream, and appends binary point/free-space masks derived from semi-dense point clouds ([efm3d/model/lifter.py:180](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/lifter.py#L180)). Aggregation uses a masked mean over time/streams while tracking valid sample counts ([efm3d/model/lifter.py:379](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/lifter.py#L379)), and the voxel frame is gravity-aligned via inertial cues ([efm3d/model/lifter.py:345](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/lifter.py#L345)).
 - **3D neck and heads**: `EVL` instantiates an `InvResnetFpn3d` neck followed by task heads for occupancy, centerness, box regression, and classification ([efm3d/model/evl.py:35](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/evl.py#L35)). Bounding boxes are parameterized as sizes, offsets, and yaw relative to the voxel cell, with logits converted through constrained activations ([efm3d/model/evl.py:200](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/evl.py#L200)).
 - **Post-processing and persistence**: Voxel logits are thinned with 3D NMS and converted to sparse OBB predictions in snippet coordinates ([efm3d/model/evl.py:137](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/evl.py#L137)). Sequence-level fusion is handled downstream by volumetric and tracking utilities ([efm3d/inference/fuse.py:55](https://github.com/facebookresearch/efm3d/blob/main/efm3d/inference/fuse.py#L55)).
 
 ### Multi-task Losses & Training Signals
+
 - Occupancy supervision combines sigmoid cross-entropy with total-variation regularization to encourage smooth surfaces ([efm3d/utils/evl_loss.py:150](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/evl_loss.py#L150)).
 - OBB training blends focal loss on centerness/class logits, constrained box regression, and a rotated 3D IoU loss computed on gravity-aligned 7-DoF boxes ([efm3d/utils/evl_loss.py:90](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/evl_loss.py#L90)).
 - Semi-dense point clouds and free-space samples provide geometric supervision signals by rasterizing both into the voxel lattice and masking invalid voxels, ensuring supervision focuses on observed regions ([efm3d/model/lifter.py:262](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/lifter.py#L262)).
 
 ### Assumptions & Failure Modes
+
 - **Accurate poses & calibration:** Lifting assumes precise extrinsics/intrinsics; pose drift or intrinsics errors misplace features and degrade both heads.
 - **Static scenes:** Dynamic objects violate the “semi-dense point = stable surface” assumption and can pollute masks; temporal filtering or motion segmentation is required in real deployments.
 - **Mask imbalance:** Freespace vastly outweighs surface voxels; improper loss weighting can bias the model toward predicting empty space.
@@ -140,14 +140,15 @@ Check out [EVL Training Format](#atek-wds-format) for more info.
 - **Inherent streaming capabilites**: EVL is not designed for online streaming inference, where previous encodings can be reused.
 
 ### EVL as a Backbone for VIN-style RRI Prediction
+
 1. **Scene state encoding**: Use EVL's per-snippet `voxel/feat`, `voxel/counts`, and `voxel/occ_input` tensors as latent inputs for a VIN head. Counts expose coverage; occupancy logits and entropy/variance maps (computed across time or streams) become uncertainty cues; centerness and class volumes provide object-local importance signals @VIN-NBV-frahm2025.
 2. **Safety-constrained action space**: Treat high $\mathbf{V}_{\text{occ}}$ probabilities, fused OBB volumes, and accumulated free-space masks as hard feasibility constraints when sampling NBV poses. Reject candidate waypoints that fall inside solids, intersect predicted support surfaces, or violate robot clearance limits before scoring.
 3. **Coverage & persistence tracking**: Persist EVL outputs into a global log-odds occupancy grid or mesh via `VolumeFusion` ([efm3d/inference/fuse.py:187](https://github.com/facebookresearch/efm3d/blob/main/efm3d/inference/fuse.py#L187)). Maintain per-voxel coverage (`voxel/counts`), visitation timestamps, and uncertainty, enabling RRI computation, diminishing-return penalties, and stop criteria.
 4. **Candidate view scoring**: Use EVL ray utilities (`ray_obb_intersection`, `sample_depths_in_grid`) to simulate visibility from proposed poses ([efm3d/utils/ray.py:99](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/ray.py#L99)). Features such as expected newly-seen surface area, occlusion probability, and semantic novelty can augment VIN inputs and correlate with RRI or information gain.
 5. **Entity-aware & task-aware RRI**: Combine $\mathbf{V}_{\text{class}}$ with tracked OBB semantics to compute class-conditional RRIs, aligning with GenNBV's multi-source embeddings while retaining VIN's reconstruction-driven objective @GenNBV-chen2024. Weight RRIs according to task priorities (e.g., movable assets, structural safety checks).
 
-
 ### Implementation Sources
+
 - [efm3d/model/evl.py:35](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/evl.py#L35) — main EVL module wiring 2D/3D backbones with multi-task heads.
 - [efm3d/model/lifter.py:398](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/lifter.py#L398) — forward pass that constructs gravity-aligned voxels and concatenates point/free-space masks.
 - [efm3d/utils/pointcloud.py:34](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/pointcloud.py#L34) — helpers to collapse ASE point clouds and convert depth to world-space points for supervision and feature crafting.

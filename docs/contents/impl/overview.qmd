@@ -2,7 +2,6 @@
 title: Implementation Overview
 ---
 
-
 # Reconstruction Quality Metrics & RRI Computation {#metrics-index}
 
 This section provides a comprehensive overview of reconstruction quality metrics and how to compute the Relative Reconstruction Improvement (RRI) score for Next-Best-View planning.
@@ -27,7 +26,6 @@ This section is organized into the following topics:
 ## Quick Reference: Key Functions
 
 ### From ATEK
-
 
 | Function | Purpose | Location |
 |----------|---------|----------|

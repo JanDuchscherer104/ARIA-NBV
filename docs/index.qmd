@@ -16,7 +16,6 @@ bibliography: references.bib
 <!-- TODO-X: Then Theory section -->
 <!-- TODO-3: Then mention tools like ATEK, Project Aria Project pages / docs -->
 
-
 # Abstract
 
 Next-Best-View (NBV) planning addresses the fundamental challenge of autonomous viewpoint selection in active 3D reconstruction, aiming to maximize the acquisition quality while minimizing the acquisition cost (i.e. number of views, traversed distance, capture time).
@@ -24,7 +23,6 @@ Next-Best-View (NBV) planning addresses the fundamental challenge of autonomous 
 Classical NBV methods rely on hand-crafted criteria, limited action spaces, or per-scene optimized representations. While learning-based NBV methods like GenNBV [@GenNBV-chen2024] have improved generalization by leveraging reinforcement learning, they still optimize for geometric coverage as a proxy for reconstruction quality. Since coverage maximization does not necessarily correlate with improved reconstruction quality, these methods can struggle in complex scenes with occlusions and fine details. Diretly optimizing reconstruction quality, as pioneered by VIN-NBV [@VIN-NBV-frahm2025], has shown significant improvements by predicting Relative Reconstruction Improvement (RRI) to quantify the fitness of candidate viewpoints. However, even VIN-NBV's generalization capabilities are rather limited to simple object-centric NBV scenarios as it does not leverage pre-tained foundation models with rich 3D spatial understanding.
 
 This project aims to develop an NBV system that integrates VIN-NBV's key insight to directly optimize reconstruction quality rather than proxies like coverage, leveraging a pre-trained _egocentric foundation model_ as backbone to provide strong priors for 3D spatial reasoning in complex indoor scenes. We adapt the [EVL (_Egocentric Voxel Lifting_)](contents/literature/efm3d.qmd) 3D EFM [@EFM3D-straub2024] which is pre-trained on the [Aria Synthetic Environments (ASE)](contents/ase_dataset.qmd) dataset - a large-scale synthetic egocentric dataset with 100k indoor scenes, to provide rich 3D feature volumes that capture scene geometry, semantics, and free-space priors. On top of this frozen backbone, we train a lightweight RRI prediction head that introspects both the current scene representation and candidate viewpoints to express the fitness of given candidate views.
-
 
 # Project Vision and Goals
 
@@ -35,7 +33,6 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - Leverage EVL's 3D foundation features—voxel occupancy, centerness, semantic channels, and OBB priors—as state embeddings for RRI estimation and NBV decision making.
 - Entity-aware reconstruction tracking through EVL's OBB detection capabilities.
 - Extend towards human-in-the-loop AR guidance, where entity-aware RRI weighting delivers task-specific view suggestions.
-
 
 # Documentation Navigation
 
@@ -50,6 +47,7 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - **[Roadmap](contents/roadmap.qmd)**: Detailed project roadmap
 
 ## Theory & Background
+
 - **[RRI Theory](contents/theory/rri_theory.qmd)**: Mathematical formulation and properties of RRI
 - **[Surface Metrics](contents/theory/surface_metrics.qmd)**: Accuracy, completeness, Chamfer distance
 - **[Semi-Dense Point Clouds](contents/theory/semi-dense-pc.qmd)**: SLAM-based 3D reconstruction techniques

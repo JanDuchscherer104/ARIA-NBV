@@ -12,6 +12,7 @@ streamlit run -m oracle_rri.streamlit_app
 ```
 
 Pages in the app:
+
 - **Data**: load one `EfmSnippetView` from ASE/ATEK (GT mesh optional).
 - **Candidate Poses**: sample NBV candidates with collision / free-space rules.
 - **Candidate Renders**: render depth for valid candidates via PyTorch3D.
@@ -21,6 +22,7 @@ The app caches configs + results in `st.session_state`. “Run previous” auto-
 # Dataset loading (Data page)
 
 Sidebar controls map to `AseEfmDatasetConfig` (defaults baked in streamlit_app):
+
 - `scene_ids`: `[]` (auto-discover shards under `.data/ase_efm*`)
 - `atek_variant`: `"efm"` (fixed)
 - `load_meshes`: `True`, `require_mesh`: checkbox (default on)
@@ -29,6 +31,7 @@ Sidebar controls map to `AseEfmDatasetConfig` (defaults baked in streamlit_app):
 - Verbosity/debug: `verbose=True`, `is_debug=True`
 
 Buttons:
+
 - **Run / refresh data**: loads first snippet (or cached index)
 - **Next sample**: increments index then reloads
 - **Clear cache**: drops all cached stages
@@ -36,25 +39,30 @@ Buttons:
 # Candidate generation (Candidate Poses page)
 
 Config fields surfaced from `CandidateViewGeneratorConfig`:
+
 - `num_samples`, `min_radius`, `max_radius`, `min_elev_deg`, `max_elev_deg`
 - `ensure_collision_free`, `min_distance_to_mesh`
 - `ensure_free_space`
 - `device` (`cpu`/`cuda`), `is_debug`
 
 Plot controls:
+
 - frustum scale, max frustums, option to plot only rejected poses
 
 Actions:
+
 - **Run previous**: re-run Data stage with cached config
 - **Run / refresh candidates**: background thread; results cached under `STATE_KEYS["candidates"]`
 
 # Depth rendering (Candidate Renders page)
 
 Config mirrors `CandidateDepthRendererConfig` + nested `Pytorch3DDepthRendererConfig`:
+
 - `max_candidates` (subset render), renderer `device`, `zfar`, `faces_per_pixel`, `is_debug`
 - Checkbox: “Compute depth renders”
 
 Actions:
+
 - **Run previous**: ensures data + candidates exist
 - **Run / refresh renders**: background thread; stores `CandidateDepthBatch`
 
@@ -84,6 +92,7 @@ sample = next(iter(ds))  # EfmSnippetView
 ```
 
 Typed views exposed on `sample`:
+
 - `camera_rgb`, `camera_slam_left`, `camera_slam_right` → images + `CameraTW`
 - `trajectory` → `PoseTW` series (`t_world_rig`)
 - `semidense` → padded SLAM points + stds + bounds
@@ -94,10 +103,10 @@ Typed views exposed on `sample`:
 
 ```{mermaid}
 flowchart LR
-    A[Dataset cfg\n(ASE/ATEK)] --> B[Load snippet\nEfmSnippetView]
-    B --> C[Sample NBV poses\nCandidateViewGenerator]
-    C --> D[Render depth\nCandidateDepthRenderer]
-    D --> E[Inspect depth grid\n& pick NBV]
+    A[Dataset cfg<br/>ASE/ATEK] --> B[Load snippet<br/>EfmSnippetView]
+    B --> C[Sample NBV poses<br/>CandidateViewGenerator]
+    C --> D[Render depth<br/>CandidateDepthRenderer]
+    D --> E[Inspect depth grid<br/>& pick NBV]
 ```
 
 # Mesh handling

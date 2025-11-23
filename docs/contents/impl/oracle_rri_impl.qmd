@@ -19,22 +19,18 @@ This document provides a comprehensive overview of all EFM3D and ATEK functions 
   - **Description**: Unprojects pixel grid coordinates to 3D ray directions
   - **Usage**: Converting image coordinates to world-space rays for rendering candidate views
   - **Theory**: Essential for computing what each camera pixel "sees" in 3D space
-
 - `ray_grid(cam: CameraTW) -> tuple[torch.Tensor, torch.Tensor]`
   - **Description**: Generates rays for all pixels in a camera's image grid
   - **Usage**: Batch ray generation for efficient candidate view rendering
   - **Theory**: Creates the complete ray bundle for a virtual camera
-
 - `transform_rays(rays_old: torch.Tensor, T_new_old: PoseTW) -> torch.Tensor`
   - **Description**: Transforms rays between coordinate systems using pose transformations
   - **Usage**: Moving rays from candidate camera poses to world coordinates
   - **Theory**: Enables coordinate system alignment for multi-view geometry
-
 - `ray_obb_intersection(rays_v: torch.Tensor, voxel_extent: torch.Tensor, ...) -> torch.Tensor | tuple[...]`
   - **Description**: Computes ray intersections with oriented bounding boxes
   - **Usage**: Determining which voxels are intersected by candidate view rays
   - **Theory**: Critical for efficient ray-voxel intersection tests in 3D reconstruction
-
 - `sample_depths_in_grid(rays_v: torch.Tensor, ds_max: torch.Tensor, ...) -> tuple[...]`
   - **Description**: Samples depth values along rays within voxel grids
   - **Usage**: Generating sample points for volume rendering and reconstruction
@@ -48,17 +44,14 @@ This document provides a comprehensive overview of all EFM3D and ATEK functions 
   - **Description**: Extracts world-coordinate point clouds from ASE dataset batches
   - **Usage**: Converting depth images and semi-dense SLAM points to 3D coordinates
   - **Theory**: Foundation for creating the current reconstruction P_t
-
 - `collapse_pointcloud_time(pc_w: torch.Tensor) -> torch.Tensor`
   - **Description**: Merges point clouds across time, removing duplicates and NaN values
   - **Usage**: Combining temporal observations into a single reconstruction
   - **Theory**: Temporal fusion for more complete scene representations
-
 - `pointcloud_to_voxel_ids(pc_v: torch.Tensor, vW: int, vH: int, vD: int, voxel_extent: torch.Tensor) -> tuple[...]`
   - **Description**: Maps 3D points to voxel grid indices with validity checking
   - **Usage**: Converting continuous point clouds to discrete voxel representations
   - **Theory**: Spatial discretization for efficient 3D processing
-
 - `pointcloud_occupancy_samples(p3s_w: torch.Tensor, Ts_wc: torch.Tensor, ...) -> tuple[...]`
   - **Description**: Samples occupied, surface, and free space points from point clouds
   - **Usage**: Creating training data for occupancy field learning
@@ -72,7 +65,6 @@ This document provides a comprehensive overview of all EFM3D and ATEK functions 
   - **Description**: Normalizes voxel extent representations across batches
   - **Usage**: Ensuring consistent voxel coordinate systems
   - **Theory**: Standardizes 3D bounding box representations
-
 - `create_voxel_grid(vW: int, vH: int, vD: int, voxel_extent, device="cpu") -> torch.Tensor`
   - **Description**: Creates 3D coordinate grids for voxel centers
   - **Usage**: Generating sampling coordinates for 3D reconstruction
@@ -86,7 +78,6 @@ This document provides a comprehensive overview of all EFM3D and ATEK functions 
   - **Description**: Converts point cloud coordinates to voxel grid coordinates
   - **Usage**: Mapping between continuous and discrete 3D representations
   - **Theory**: Essential for sampling from learned 3D representations
-
 - `sample_voxels(feat3d: torch.Tensor, pts_v: torch.Tensor, differentiable=False) -> tuple[...]`
   - **Description**: Samples features from 3D voxel grids using trilinear interpolation
   - **Usage**: Querying learned 3D features at arbitrary points
@@ -109,7 +100,6 @@ This document provides a comprehensive overview of all EFM3D and ATEK functions 
   - **Description**: Creates ground truth occupancy grids from point clouds
   - **Usage**: Generating supervision signals for 3D reconstruction
   - **Theory**: Converts sparse points to dense occupancy representations
-
 - `compute_occupancy_loss_subvoxel(occ, visible, p3s_w_all, ...) -> torch.Tensor`
   - **Description**: Computes reconstruction loss using subvoxel sampling
   - **Usage**: Training occupancy networks with point cloud supervision
@@ -123,7 +113,6 @@ This document provides a comprehensive overview of all EFM3D and ATEK functions 
   - **Description**: Computes accuracy/completeness metrics between predicted and ground truth meshes
   - **Usage**: **CRITICAL for RRI computation** - this is the Chamfer Distance calculation we need
   - **Theory**: Implements bidirectional distance evaluation for mesh quality assessment
-
 - `compute_pts_to_mesh_dist(pts: torch.Tensor, faces: torch.Tensor, verts: torch.Tensor, step: int) -> np.ndarray`
   - **Description**: Computes distances from point cloud to mesh surface
   - **Usage**: Core component of Chamfer Distance computation
@@ -162,7 +151,6 @@ This document provides a comprehensive overview of all EFM3D and ATEK functions 
   - **Description**: **CORE FUNCTION for RRI** - computes Chamfer Distance and reconstruction metrics
   - **Usage**: This is exactly what we need for computing RRI = Chamfer(P_{t∪q}, GT) - Chamfer(P_t, GT)
   - **Theory**: Implements the standard surface reconstruction evaluation protocol
-
 - `evaluate_mesh_over_a_dataset(input_folder, pred_mesh_filename, gt_mesh_filename, ...) -> dict`
   - **Description**: Batch evaluation across multiple scenes
   - **Usage**: Evaluating NBV performance across the ASE validation set
@@ -220,11 +208,13 @@ class CandidateViewRenderer:
 ### Integration with EFM3D Pipeline
 
 #### Memory-Efficient Implementation
+
 - Use `sample_voxels` for efficient point cloud querying
 - Batch candidate view processing to avoid memory crashes
 - Implement progressive sampling for large scenes
 
 #### Data Flow
+
 1. **Input**: ASE dataset batch with GT depth and camera poses
 2. **Current Reconstruction**: Use `get_points_world` + `collapse_pointcloud_time`
 3. **Candidate Generation**: `CandidateViewGenerator` around latest pose
@@ -236,12 +226,14 @@ class CandidateViewRenderer:
 ### Theoretical Foundation
 
 The core insight is that RRI measures reconstruction improvement:
+
 - **P_t**: Current point cloud reconstruction from first t views
 - **P_{t∪q}**: Enhanced reconstruction after adding candidate view q
 - **RRI(q) = Chamfer(P_{t∪q}, GT) - Chamfer(P_t, GT)**
 - **Negative RRI = improvement** (lower Chamfer distance is better)
 
 The challenge is ensuring **consistent point cloud sampling** between P_t and P_{t∪q} for valid Chamfer Distance comparison. This requires:
+
 1. Unified voxel discretization using EFM3D utilities
 2. Consistent density sampling to avoid bias
 3. Memory-efficient batching for large scenes

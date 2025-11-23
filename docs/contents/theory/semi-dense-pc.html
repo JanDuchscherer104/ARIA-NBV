@@ -1257,19 +1257,19 @@ u = f_x X_{j,x}/X_{j,z}+c_x,\; v = f_y X_{j,y}/X_{j,z}+c_y.
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co">[</span><span class="ot">**Direct Quote as per Project Aria Docs**</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/data_formats/mps/slam/mps_pointcloud)</span>: Semi-dense points are the 3D points associated with tracks from our semi-dense tracking pipeline. Semi-dense tracks are continually created in pixel locations of input frames that lie in regions of high image gradient, and are then successively tracked in the following frames. Each track is associated with a 3D point, parameterized as an inverse distance along a ray originating from the track's first initial observation, as well as its uncertainty in inverse distance and distance. These points are transformed from their original camera coordinate spaces to the same coordinate frame associated with the closed loop trajectory of the sequence.</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>**Idea.** Semi-dense SLAM reconstructs 3D only at **high-gradient** pixels, tracking them across frames and estimating one 3D point per **temporal track** (multi-frame 2D correspondences) [@Engel2014LSD]. Points are stored in the **world frame** of the closed-loop trajectory.</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="fu">### Inverse-Distance parameterization</span></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>For the first (anchor) observation of a track at pixel $(u_0,v_0)$ with intrinsics $K$:</span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>\hat{\mathbf r}_0=\frac{K^{-1}<span class="co">[</span><span class="ot">u_0,v_0,1</span><span class="co">]</span>^\top}{\lVert K^{-1}<span class="co">[</span><span class="ot">u_0,v_0,1</span><span class="co">]</span>^\top\rVert},\qquad</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>X_{c_0}(\rho)=\frac{1}{\rho}\,\hat{\mathbf r}_0,\qquad</span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>X_{w} = T_{w\leftarrow c_0}\,X_{c_0}(\rho).</span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>Using **inverse distance** $\rho=1/d$ stabilizes optimization and handles far points gracefully <span class="co">[</span><span class="ot">@Engel2014LSD; @HartleyZisserman</span><span class="co">]</span>.</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="fu">#### Symbol definitions (notation)</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>**Idea.** Semi-dense SLAM reconstructs 3D only at **high-gradient** pixels, tracking them across frames and estimating one 3D point per **temporal track** (multi-frame 2D correspondences) [@Engel2014LSD]. Points are stored in the **world frame** of the closed-loop trajectory.</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="fu">### Inverse-Distance parameterization</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>For the first (anchor) observation of a track at pixel $(u_0,v_0)$ with intrinsics $K$:</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>\hat{\mathbf r}_0=\frac{K^{-1}<span class="co">[</span><span class="ot">u_0,v_0,1</span><span class="co">]</span>^\top}{\lVert K^{-1}<span class="co">[</span><span class="ot">u_0,v_0,1</span><span class="co">]</span>^\top\rVert},\qquad</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>X_{c_0}(\rho)=\frac{1}{\rho}\,\hat{\mathbf r}_0,\qquad</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>X_{w} = T_{w\leftarrow c_0}\,X_{c_0}(\rho).</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>Using **inverse distance** $\rho=1/d$ stabilizes optimization and handles far points gracefully <span class="co">[</span><span class="ot">@Engel2014LSD; @HartleyZisserman</span><span class="co">]</span>.</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="fu">#### Symbol definitions (notation)</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$K \in \mathbb R^{3\times 3}$: camera intrinsics with $f_x,f_y,c_x,c_y$.</span>
 <span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$<span class="co">[</span><span class="ot">u_0,v_0</span><span class="co">]</span>$: pixel coordinates (in pixels) of the anchor observation.</span>
 <span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\hat{\mathbf r}_0$: unit back-projection ray in the anchor camera frame; the hat denotes normalization to unit length.</span>
@@ -1300,12 +1300,12 @@ u = f_x X_{j,x}/X_{j,z}+c_x,\; v = f_y X_{j,y}/X_{j,z}+c_y.
 <span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>$$</span>
 <span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>Per-frame 2D observations $(u,v)$ form the **track**; BA/direct methods minimize reprojection/photometric error over all visible frames <span class="co">[</span><span class="ot">@HartleyZisserman</span><span class="co">]</span>.</span>
 <span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a><span class="fu">### What the Aria files mean</span></span>
-<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`semidense_points.csv.gz`** (world frame):</span>
-<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>  <span class="in">`uid`</span>, <span class="in">`graph_uid`</span>, <span class="in">`p{x,y,z}_world`</span>, <span class="in">`inv_dist_std`</span>, <span class="in">`dist_std`</span>.</span>
-<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>  $\rightarrow$ One row **per 3D landmark** (from a track) in the closed-loop world frame.</span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a><span class="fu">### What the Aria files mean</span></span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`semidense_points.csv.gz`** (world frame):</span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a>  <span class="in">`uid`</span>, <span class="in">`graph_uid`</span>, <span class="in">`p{x,y,z}_world`</span>, <span class="in">`inv_dist_std`</span>, <span class="in">`dist_std`</span>.</span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>  $\rightarrow$ One row **per 3D landmark** (from a track) in the closed-loop world frame.</span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`semidense_observations.csv.gz`** (image frame):</span>
 <span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>  <span class="in">`uid`</span>, <span class="in">`frame_tracking_timestamp_us`</span>, <span class="in">`camera_serial`</span>, <span class="in">`u`</span>, <span class="in">`v`</span>.</span>
 <span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>  $\rightarrow$ All **2D sightings** of each landmark; this is the **visibility set**.</span>
@@ -1321,21 +1321,20 @@ u = f_x X_{j,x}/X_{j,z}+c_x,\; v = f_y X_{j,y}/X_{j,z}+c_y.
 <span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a>The point and free-space masks are concatenated with lifted image features and fed into 3-D convolutional heads for occupancy prediction and oriented bounding box (OBB) regression.  In essence, the semi-dense cloud provides **geometry** (where surfaces exist) and **visibility** (where free space exists), enabling the model to reason about both seen and unseen regions.  This volumetric representation is a core building block of our NBV system because it informs where new views can contribute most.</span>
 <span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a><span class="fu">### Practical guidance</span></span>
-<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Keep points with small <span class="in">`inv_dist_std`</span> / <span class="in">`dist_std`</span>; down-weight or drop large-uncertainty landmarks.</span>
-<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Longer tracks (more parallax) $\implies$ smaller $\sigma_\rho$. Small baselines/low texture $\implies$ large $\sigma_\rho$.</span>
-<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use observation lists to reconstruct per-point **visibility** and to validate projections against intrinsics/extrinsics.</span>
-<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a><span class="fu">### Semi-dense vs. dense ground truth in RRI</span></span>
-<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a>Semi-dense point clouds differ from dense ground-truth meshes not just in density but also in sampling **bias**: semi-dense reconstructions concentrate on edges and textured regions, leaving textureless surfaces underrepresented.  When computing **Relative Reconstruction Improvement (RRI)**, this mismatch can skew metrics like Chamfer distance.  To address this:</span>
-<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Prefer **point-to-mesh distances** (see <span class="co">[</span><span class="ot">Surface Metrics</span><span class="co">](surface_metrics.qmd)</span>) instead of point-to-point Chamfer when comparing a semi-dense prediction to a dense mesh.</span>
-<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Optionally **down-sample** or **up-sample** the mesh to match the average point density of the semi-dense cloud, ensuring the RRI numerator and denominator are comparable【603805067285655†L23-L27】.</span>
-<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Use the uncertainty fields (<span class="in">`inv_dist_std`</span>, <span class="in">`dist_std`</span>) to filter out unreliable semi-dense points before evaluating quality.  This reduces noise and helps the NBV system focus on meaningful improvements.</span>
-<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a>These considerations are important for training RRI predictors that generalise from synthetic to real data and from semi-dense to dense reconstructions.</span>
-<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Keep points with small <span class="in">`inv_dist_std`</span> / <span class="in">`dist_std`</span>; down-weight or drop large-uncertainty landmarks.</span>
+<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Longer tracks (more parallax) $\implies$ smaller $\sigma_\rho$. Small baselines/low texture $\implies$ large $\sigma_\rho$.</span>
+<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use observation lists to reconstruct per-point **visibility** and to validate projections against intrinsics/extrinsics.</span>
+<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a><span class="fu">### Semi-dense vs. dense ground truth in RRI</span></span>
+<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a>Semi-dense point clouds differ from dense ground-truth meshes not just in density but also in sampling **bias**: semi-dense reconstructions concentrate on edges and textured regions, leaving textureless surfaces underrepresented.  When computing **Relative Reconstruction Improvement (RRI)**, this mismatch can skew metrics like Chamfer distance.  To address this:</span>
+<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Prefer **point-to-mesh distances** (see <span class="co">[</span><span class="ot">Surface Metrics</span><span class="co">](surface_metrics.qmd)</span>) instead of point-to-point Chamfer when comparing a semi-dense prediction to a dense mesh.</span>
+<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Optionally **down-sample** or **up-sample** the mesh to match the average point density of the semi-dense cloud, ensuring the RRI numerator and denominator are comparable【603805067285655†L23-L27】.</span>
+<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Use the uncertainty fields (<span class="in">`inv_dist_std`</span>, <span class="in">`dist_std`</span>) to filter out unreliable semi-dense points before evaluating quality.  This reduces noise and helps the NBV system focus on meaningful improvements.</span>
+<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a>These considerations are important for training RRI predictors that generalise from synthetic to real data and from semi-dense to dense reconstructions.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

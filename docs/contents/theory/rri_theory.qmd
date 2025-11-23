@@ -14,7 +14,6 @@ Where:
 - $\mathcal{M}_{\text{GT}}$: Ground truth mesh.
 - $\text{d}(\cdot, \cdot)$: a bidirectional surface similarity metric, typically Chamfer distance for PC to PC comparison, defined in [Surface Reconstruction Metrics](surface_metrics.qmd).
 
-
 **Properties**:
 
 - Range: [0, 1] where higher values indicate better viewpoints
@@ -28,7 +27,6 @@ Where:
 - However, we are not interested in $\text{d}(\mathcal{P}_t, \mathcal{P}_{t \cup \mathbf{q}})$, but rather in the improvement w.r.t. the GT mesh $\mathcal{M}_{\text{GT}}$. Also, we are mostly interested in expressing the fitness of different candidate views $\mathbf{q}$, which should not be strongly affected by the exact sampling distribution of $\mathcal{P}_t$ as a dense sampling from $\mathcal{M}_{\text{GT}}$ should lead to similar relative improvements across different candidate views.
 
 For more information on surface reconstruction metrics, see [Surface Reconstruction Metrics](surface_metrics.qmd).
-
 
 # NBV Task Formulation using RRI
 

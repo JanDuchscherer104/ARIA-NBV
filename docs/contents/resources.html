@@ -315,6 +315,10 @@ div.csl-indent {
     <a class="nav-link active" href="../contents/todos.html" aria-current="page"> 
 <span class="menu-text">TODOs</span></a>
   </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../contents/setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-project-state" role="link" data-bs-toggle="dropdown" aria-expanded="false">
  <span class="menu-text">Project State</span>
@@ -524,20 +528,14 @@ div.csl-indent {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../contents/impl/atek_implementation.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">ATEK Implementation Details</span></a>
+  <a href="../contents/impl/aria_nbv_overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">aria_nbv Overview &amp; Architecture</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../contents/impl/efm3d_implementation.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">EFM3D Implementation Details</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../contents/impl/prj_aria_tools_impl.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">ProjectAria Tools: Complete Reference</span></a>
+  <a href="../contents/impl/data_pipeline_overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ASE Data Pipeline &amp; Streamlit Usage</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -546,15 +544,38 @@ div.csl-indent {
  <span class="menu-text">Computing RRI with Ground Truth Meshes</span></a>
   </div>
 </li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">External Implementations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../contents/impl/oracle_rri_impl.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Oracle RRI Implementation Overview</span></a>
+  <a href="../contents/ext-impl/atek_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ATEK Implementation Index</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../contents/impl/efm3d_symbol_index.html" class="sidebar-item-text sidebar-link">
+  <a href="../contents/ext-impl/efm3d_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D Implementation Index</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../contents/ext-impl/prj_aria_tools_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ProjectAria Tools: Complete Reference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../contents/ext-impl/efm3d_symbol_index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">EFM3D Symbol Index</span></a>
   </div>
 </li>
@@ -562,13 +583,13 @@ div.csl-indent {
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
  <span class="menu-text">Presentations</span></a>
-          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
-      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../typst/slides/slides_1.pdf" class="sidebar-item-text sidebar-link">
@@ -647,12 +668,12 @@ div.csl-indent {
 <section id="papers" class="level2" data-number="1.1">
 <h2 data-number="1.1" class="anchored" data-anchor-id="papers"><span class="header-section-number">1.1</span> Papers</h2>
 <ul>
-<li><p><strong><a href="https://arxiv.org/abs/2505.06219">VIN-NBV: A View Introspection Network for Next-Best-View Selection</a></strong> <span class="citation" data-cites="VIN-NBV-frahm2025"><a href="#ref-VIN-NBV-frahm2025" role="doc-biblioref">[1]</a></span> - Direct RRI optimization approach</p></li>
-<li><p><strong><a href="https://arxiv.org/abs/2402.16174">GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction</a></strong> <span class="citation" data-cites="GenNBV-chen2024"><a href="#ref-GenNBV-chen2024" role="doc-biblioref">[2]</a></span> - RL-based coverage optimization</p></li>
-<li><p><strong><a href="https://arxiv.org/abs/2406.10224">EFM3D: A Benchmark for Measuring Progress Towards 3D Egocentric Foundation Models</a></strong> <span class="citation" data-cites="EFM3D-straub2024"><a href="#ref-EFM3D-straub2024" role="doc-biblioref">[3]</a></span> - EVL backbone and benchmarks</p></li>
-<li><p><strong><a href="https://arxiv.org/abs/2403.13064">SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model</a></strong> <span class="citation" data-cites="SceneScript-avetisyan2024"><a href="#ref-SceneScript-avetisyan2024" role="doc-biblioref">[4]</a></span> - Structured scene representation</p></li>
-<li><p><strong><a href="https://arxiv.org/abs/2308.13561">Project Aria: A New Tool for Egocentric Multi-Modal AI Research</a></strong> <span class="citation" data-cites="projectaria-engel2023"><a href="#ref-projectaria-engel2023" role="doc-biblioref">[5]</a></span> - ASE dataset foundation</p></li>
-<li><p><strong><a href="https://arxiv.org/abs/2503.11806">Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling</a></strong> <span class="citation" data-cites="HITL-SceneScript-xie2025"><a href="#ref-HITL-SceneScript-xie2025" role="doc-biblioref">[6]</a></span> - Interactive scene editing</p></li>
+<li><strong><a href="https://arxiv.org/abs/2505.06219">VIN-NBV: A View Introspection Network for Next-Best-View Selection</a></strong> <span class="citation" data-cites="VIN-NBV-frahm2025"><a href="#ref-VIN-NBV-frahm2025" role="doc-biblioref">[1]</a></span> - Direct RRI optimization approach</li>
+<li><strong><a href="https://arxiv.org/abs/2402.16174">GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction</a></strong> <span class="citation" data-cites="GenNBV-chen2024"><a href="#ref-GenNBV-chen2024" role="doc-biblioref">[2]</a></span> - RL-based coverage optimization</li>
+<li><strong><a href="https://arxiv.org/abs/2406.10224">EFM3D: A Benchmark for Measuring Progress Towards 3D Egocentric Foundation Models</a></strong> <span class="citation" data-cites="EFM3D-straub2024"><a href="#ref-EFM3D-straub2024" role="doc-biblioref">[3]</a></span> - EVL backbone and benchmarks</li>
+<li><strong><a href="https://arxiv.org/abs/2403.13064">SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model</a></strong> <span class="citation" data-cites="SceneScript-avetisyan2024"><a href="#ref-SceneScript-avetisyan2024" role="doc-biblioref">[4]</a></span> - Structured scene representation</li>
+<li><strong><a href="https://arxiv.org/abs/2308.13561">Project Aria: A New Tool for Egocentric Multi-Modal AI Research</a></strong> <span class="citation" data-cites="projectaria-engel2023"><a href="#ref-projectaria-engel2023" role="doc-biblioref">[5]</a></span> - ASE dataset foundation</li>
+<li><strong><a href="https://arxiv.org/abs/2503.11806">Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling</a></strong> <span class="citation" data-cites="HITL-SceneScript-xie2025"><a href="#ref-HITL-SceneScript-xie2025" role="doc-biblioref">[6]</a></span> - Interactive scene editing</li>
 </ul>
 </section>
 <section id="project-aria" class="level2" data-number="1.2">
@@ -1499,21 +1520,21 @@ div.csl-indent {
 <span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[VIN-NBV: A View Introspection Network for Next-Best-View Selection](https://arxiv.org/abs/2505.06219)** <span class="co">[</span><span class="ot">@VIN-NBV-frahm2025</span><span class="co">]</span> - Direct RRI optimization approach</span>
 <span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction](https://arxiv.org/abs/2402.16174)** <span class="co">[</span><span class="ot">@GenNBV-chen2024</span><span class="co">]</span> - RL-based coverage optimization</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D: A Benchmark for Measuring Progress Towards 3D Egocentric Foundation Models](https://arxiv.org/abs/2406.10224)** <span class="co">[</span><span class="ot">@EFM3D-straub2024</span><span class="co">]</span> - EVL backbone and benchmarks</span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model](https://arxiv.org/abs/2403.13064)** <span class="co">[</span><span class="ot">@SceneScript-avetisyan2024</span><span class="co">]</span> - Structured scene representation</span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Aria: A New Tool for Egocentric Multi-Modal AI Research](https://arxiv.org/abs/2308.13561)** <span class="co">[</span><span class="ot">@projectaria-engel2023</span><span class="co">]</span> - ASE dataset foundation</span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling](https://arxiv.org/abs/2503.11806)** <span class="co">[</span><span class="ot">@HITL-SceneScript-xie2025</span><span class="co">]</span> - Interactive scene editing</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D: A Benchmark for Measuring Progress Towards 3D Egocentric Foundation Models](https://arxiv.org/abs/2406.10224)** <span class="co">[</span><span class="ot">@EFM3D-straub2024</span><span class="co">]</span> - EVL backbone and benchmarks</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model](https://arxiv.org/abs/2403.13064)** <span class="co">[</span><span class="ot">@SceneScript-avetisyan2024</span><span class="co">]</span> - Structured scene representation</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Aria: A New Tool for Egocentric Multi-Modal AI Research](https://arxiv.org/abs/2308.13561)** <span class="co">[</span><span class="ot">@projectaria-engel2023</span><span class="co">]</span> - ASE dataset foundation</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling](https://arxiv.org/abs/2503.11806)** <span class="co">[</span><span class="ot">@HITL-SceneScript-xie2025</span><span class="co">]</span> - Interactive scene editing</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project Aria</span></span>
 <span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project Aria</span></span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Project Aria Homepage</span><span class="co">](https://www.projectaria.com/)</span>: Main portal for datasets and tools</span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Project Aria Dataset Explorer</span><span class="co">](https://explorer.projectaria.com/)</span></span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Project Aria Docs</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/intro)</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Project Aria Homepage</span><span class="co">](https://www.projectaria.com/)</span>: Main portal for datasets and tools</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Project Aria Dataset Explorer</span><span class="co">](https://explorer.projectaria.com/)</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Project Aria Docs</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/intro)</span></span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="co">[</span><span class="ot">ASE Docs</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)</span></span>
 <span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="co">[</span><span class="ot">ASE Docs</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)</span></span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="co">[</span><span class="ot">ASE Docs</span><span class="co">](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)</span></span>
-<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a><span class="fu">### Tools and Libraries</span></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="fu">### Tools and Libraries</span></span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ATEK GitHub Repository](https://github.com/facebookresearch/ATEK)** - ML training and evaluation toolkit</span>
 <span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ATEK Documentation](https://facebookresearch.github.io/projectaria_tools/docs/ATEK/about_ATEK)** - Complete setup and usage guide</span>
 <span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D GitHub Repository](https://github.com/facebookresearch/efm3d)** - Foundation model implementation</span>
@@ -1835,8 +1856,7 @@ div.csl-indent {
 <span id="cb6-349"><a href="#cb6-349" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`LanguageSequence`</span>: SSL tokenizer and parser</span>
 <span id="cb6-350"><a href="#cb6-350" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`SceneScriptModel`</span>: End-to-end encoder-decoder</span>
 <span id="cb6-351"><a href="#cb6-351" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-352"><a href="#cb6-352" aria-hidden="true" tabindex="-1"></a>---</span>
-<span id="cb6-353"><a href="#cb6-353" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb6-352"><a href="#cb6-352" aria-hidden="true" tabindex="-1"></a>---</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

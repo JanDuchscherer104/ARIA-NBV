@@ -11,10 +11,10 @@
 
 ### Local \LaTeX{} Sources
 
-- [`main.tex`](../../literature/tex-src/arXiv-GenNBV/main.tex) – full CVPR submission.
-- [`Supp/supp.tex`](../../literature/tex-src/arXiv-GenNBV/Supp/supp.tex) – supplemental material and AUC curves.
-- [`Figure/Fig_Teaser_v5.pdf`](../../literature/tex-src/arXiv-GenNBV/Figure/Fig_Teaser_v5.pdf) – teaser used in our docs.
-- [`README.md`](../../literature/tex-src/arXiv-GenNBV/README.md) – build instructions and compilation notes.
+- [`main.tex`](../../../literature/tex-src/arXiv-GenNBV/main.tex) – full CVPR submission.
+- [`Supp/supp.tex`](../../../literature/tex-src/arXiv-GenNBV/Supp/supp.tex) – supplemental material and AUC curves.
+- [`Figure/Fig_Teaser_v5.pdf`](../../../literature/tex-src/arXiv-GenNBV/Figure/Fig_Teaser_v5.pdf) – teaser used in our docs.
+- [`README.md`](../../../literature/tex-src/arXiv-GenNBV/README.md) – build instructions and compilation notes.
 
 ### Problem Setup and I/O
 

@@ -2,7 +2,6 @@
 title: "NBV Background"
 ---
 
-
 # Classical Methods: Geometric Heuristics
 Hand-crafted criteria include:
 
@@ -30,4 +29,3 @@ $$\text{RRI}(v) = \frac{\text{Quality}(R_{t+1}) - \text{Quality}(R_t)}{\text{Qua
 - Demonstrates ≈30% improvement over coverage-based methods
 
 **Limitation**: Custom CNN backbone limits generalization to complex scenes, doesn't leverage ego-centric priors / modalities. Greedy selection of randomly sampled views based on predicted RRI.
-

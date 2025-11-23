@@ -638,24 +638,63 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /home/jandu/repos/NBV</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> activate aria-nbv          <span class="co"># or conda activate aria-nbv</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">streamlit</span> run <span class="at">-m</span> oracle_rri.streamlit_app</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Pages in the app: - <strong>Data</strong>: load one <code>EfmSnippetView</code> from ASE/ATEK (GT mesh optional). - <strong>Candidate Poses</strong>: sample NBV candidates with collision / free-space rules. - <strong>Candidate Renders</strong>: render depth for valid candidates via PyTorch3D.</p>
+<p>Pages in the app:</p>
+<ul>
+<li><strong>Data</strong>: load one <code>EfmSnippetView</code> from ASE/ATEK (GT mesh optional).</li>
+<li><strong>Candidate Poses</strong>: sample NBV candidates with collision / free-space rules.</li>
+<li><strong>Candidate Renders</strong>: render depth for valid candidates via PyTorch3D.</li>
+</ul>
 <p>The app caches configs + results in <code>st.session_state</code>. “Run previous” auto-runs earlier stages with cached settings; background threads keep the UI responsive.</p>
 </section>
 <section id="dataset-loading-data-page" class="level1" data-number="2">
 <h1 data-number="2"><span class="header-section-number">2</span> Dataset loading (Data page)</h1>
-<p>Sidebar controls map to <code>AseEfmDatasetConfig</code> (defaults baked in streamlit_app): - <code>scene_ids</code>: <code>[]</code> (auto-discover shards under <code>.data/ase_efm*</code>) - <code>atek_variant</code>: <code>"efm"</code> (fixed) - <code>load_meshes</code>: <code>True</code>, <code>require_mesh</code>: checkbox (default on) - Mesh simplification: <code>mesh_simplify_ratio</code> slider (0 → no decimation) - Mesh crop: <code>mesh_crop_margin_m</code> and <code>mesh_crop_min_keep_ratio</code> - Verbosity/debug: <code>verbose=True</code>, <code>is_debug=True</code></p>
-<p>Buttons: - <strong>Run / refresh data</strong>: loads first snippet (or cached index) - <strong>Next sample</strong>: increments index then reloads - <strong>Clear cache</strong>: drops all cached stages</p>
+<p>Sidebar controls map to <code>AseEfmDatasetConfig</code> (defaults baked in streamlit_app):</p>
+<ul>
+<li><code>scene_ids</code>: <code>[]</code> (auto-discover shards under <code>.data/ase_efm*</code>)</li>
+<li><code>atek_variant</code>: <code>"efm"</code> (fixed)</li>
+<li><code>load_meshes</code>: <code>True</code>, <code>require_mesh</code>: checkbox (default on)</li>
+<li>Mesh simplification: <code>mesh_simplify_ratio</code> slider (0 → no decimation)</li>
+<li>Mesh crop: <code>mesh_crop_margin_m</code> and <code>mesh_crop_min_keep_ratio</code></li>
+<li>Verbosity/debug: <code>verbose=True</code>, <code>is_debug=True</code></li>
+</ul>
+<p>Buttons:</p>
+<ul>
+<li><strong>Run / refresh data</strong>: loads first snippet (or cached index)</li>
+<li><strong>Next sample</strong>: increments index then reloads</li>
+<li><strong>Clear cache</strong>: drops all cached stages</li>
+</ul>
 </section>
 <section id="candidate-generation-candidate-poses-page" class="level1" data-number="3">
 <h1 data-number="3"><span class="header-section-number">3</span> Candidate generation (Candidate Poses page)</h1>
-<p>Config fields surfaced from <code>CandidateViewGeneratorConfig</code>: - <code>num_samples</code>, <code>min_radius</code>, <code>max_radius</code>, <code>min_elev_deg</code>, <code>max_elev_deg</code> - <code>ensure_collision_free</code>, <code>min_distance_to_mesh</code> - <code>ensure_free_space</code> - <code>device</code> (<code>cpu</code>/<code>cuda</code>), <code>is_debug</code></p>
-<p>Plot controls: - frustum scale, max frustums, option to plot only rejected poses</p>
-<p>Actions: - <strong>Run previous</strong>: re-run Data stage with cached config - <strong>Run / refresh candidates</strong>: background thread; results cached under <code>STATE_KEYS["candidates"]</code></p>
+<p>Config fields surfaced from <code>CandidateViewGeneratorConfig</code>:</p>
+<ul>
+<li><code>num_samples</code>, <code>min_radius</code>, <code>max_radius</code>, <code>min_elev_deg</code>, <code>max_elev_deg</code></li>
+<li><code>ensure_collision_free</code>, <code>min_distance_to_mesh</code></li>
+<li><code>ensure_free_space</code></li>
+<li><code>device</code> (<code>cpu</code>/<code>cuda</code>), <code>is_debug</code></li>
+</ul>
+<p>Plot controls:</p>
+<ul>
+<li>frustum scale, max frustums, option to plot only rejected poses</li>
+</ul>
+<p>Actions:</p>
+<ul>
+<li><strong>Run previous</strong>: re-run Data stage with cached config</li>
+<li><strong>Run / refresh candidates</strong>: background thread; results cached under <code>STATE_KEYS["candidates"]</code></li>
+</ul>
 </section>
 <section id="depth-rendering-candidate-renders-page" class="level1" data-number="4">
 <h1 data-number="4"><span class="header-section-number">4</span> Depth rendering (Candidate Renders page)</h1>
-<p>Config mirrors <code>CandidateDepthRendererConfig</code> + nested <code>Pytorch3DDepthRendererConfig</code>: - <code>max_candidates</code> (subset render), renderer <code>device</code>, <code>zfar</code>, <code>faces_per_pixel</code>, <code>is_debug</code> - Checkbox: “Compute depth renders”</p>
-<p>Actions: - <strong>Run previous</strong>: ensures data + candidates exist - <strong>Run / refresh renders</strong>: background thread; stores <code>CandidateDepthBatch</code></p>
+<p>Config mirrors <code>CandidateDepthRendererConfig</code> + nested <code>Pytorch3DDepthRendererConfig</code>:</p>
+<ul>
+<li><code>max_candidates</code> (subset render), renderer <code>device</code>, <code>zfar</code>, <code>faces_per_pixel</code>, <code>is_debug</code></li>
+<li>Checkbox: “Compute depth renders”</li>
+</ul>
+<p>Actions:</p>
+<ul>
+<li><strong>Run previous</strong>: ensures data + candidates exist</li>
+<li><strong>Run / refresh renders</strong>: background thread; stores <code>CandidateDepthBatch</code></li>
+</ul>
 </section>
 <section id="logging-scratchpad" class="level1" data-number="5">
 <h1 data-number="5"><span class="header-section-number">5</span> Logging &amp; scratchpad</h1>
@@ -679,7 +718,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>cfg <span class="op">=</span> ASEDatasetConfig(atek_variant<span class="op">=</span><span class="st">"efm"</span>, load_meshes<span class="op">=</span><span class="va">True</span>, require_mesh<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>ds <span class="op">=</span> cfg.setup_target()</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>sample <span class="op">=</span> <span class="bu">next</span>(<span class="bu">iter</span>(ds))  <span class="co"># EfmSnippetView</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Typed views exposed on <code>sample</code>: - <code>camera_rgb</code>, <code>camera_slam_left</code>, <code>camera_slam_right</code> → images + <code>CameraTW</code> - <code>trajectory</code> → <code>PoseTW</code> series (<code>t_world_rig</code>) - <code>semidense</code> → padded SLAM points + stds + bounds - <code>gt</code> → OBBs / efm_gt - <code>mesh</code> / <code>has_mesh</code></p>
+<p>Typed views exposed on <code>sample</code>:</p>
+<ul>
+<li><code>camera_rgb</code>, <code>camera_slam_left</code>, <code>camera_slam_right</code> → images + <code>CameraTW</code></li>
+<li><code>trajectory</code> → <code>PoseTW</code> series (<code>t_world_rig</code>)</li>
+<li><code>semidense</code> → padded SLAM points + stds + bounds</li>
+<li><code>gt</code> → OBBs / efm_gt</li>
+<li><code>mesh</code> / <code>has_mesh</code></li>
+</ul>
 </section>
 <section id="pipeline-recap-in-app" class="level1" data-number="8">
 <h1 data-number="8"><span class="header-section-number">8</span> Pipeline recap (in-app)</h1>
@@ -687,20 +733,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <details open="" class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    A[Dataset cfg\n(ASE/ATEK)] --&gt; B[Load snippet\nEfmSnippetView]</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    B --&gt; C[Sample NBV poses\nCandidateViewGenerator]</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    C --&gt; D[Render depth\nCandidateDepthRenderer]</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    D --&gt; E[Inspect depth grid\n&amp; pick NBV]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    A[Dataset cfg&lt;br/&gt;ASE/ATEK] --&gt; B[Load snippet&lt;br/&gt;EfmSnippetView]</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    B --&gt; C[Sample NBV poses&lt;br/&gt;CandidateViewGenerator]</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    C --&gt; D[Render depth&lt;br/&gt;CandidateDepthRenderer]</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    D --&gt; E[Inspect depth grid&lt;br/&gt;&amp; pick NBV]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output-display">
 <div>
 <p></p><figure class="figure"><p></p>
 <div>
 <pre class="mermaid mermaid-js">flowchart LR
-    A[Dataset cfg\n(ASE/ATEK)] --&gt; B[Load snippet\nEfmSnippetView]
-    B --&gt; C[Sample NBV poses\nCandidateViewGenerator]
-    C --&gt; D[Render depth\nCandidateDepthRenderer]
-    D --&gt; E[Inspect depth grid\n&amp; pick NBV]
+    A[Dataset cfg&lt;br/&gt;ASE/ATEK] --&gt; B[Load snippet&lt;br/&gt;EfmSnippetView]
+    B --&gt; C[Sample NBV poses&lt;br/&gt;CandidateViewGenerator]
+    C --&gt; D[Render depth&lt;br/&gt;CandidateDepthRenderer]
+    D --&gt; E[Inspect depth grid&lt;br/&gt;&amp; pick NBV]
 </pre>
 </div>
 <p></p></figure><p></p>
@@ -1204,98 +1250,107 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>Pages in the app:</span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Data**: load one <span class="in">`EfmSnippetView`</span> from ASE/ATEK (GT mesh optional).</span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Candidate Poses**: sample NBV candidates with collision / free-space rules.</span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Candidate Renders**: render depth for valid candidates via PyTorch3D.</span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>The app caches configs + results in <span class="in">`st.session_state`</span>. “Run previous” auto-runs earlier stages with cached settings; background threads keep the UI responsive.</span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="fu"># Dataset loading (Data page)</span></span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>Sidebar controls map to <span class="in">`AseEfmDatasetConfig`</span> (defaults baked in streamlit_app):</span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`scene_ids`</span>: <span class="in">`[]`</span> (auto-discover shards under <span class="in">`.data/ase_efm*`</span>)</span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`atek_variant`</span>: <span class="in">`"efm"`</span> (fixed)</span>
-<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`load_meshes`</span>: <span class="in">`True`</span>, <span class="in">`require_mesh`</span>: checkbox (default on)</span>
-<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Mesh simplification: <span class="in">`mesh_simplify_ratio`</span> slider (0 → no decimation)</span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Mesh crop: <span class="in">`mesh_crop_margin_m`</span> and <span class="in">`mesh_crop_min_keep_ratio`</span></span>
-<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Verbosity/debug: <span class="in">`verbose=True`</span>, <span class="in">`is_debug=True`</span></span>
-<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>Buttons:</span>
-<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Run / refresh data**: loads first snippet (or cached index)</span>
-<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Next sample**: increments index then reloads</span>
-<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Clear cache**: drops all cached stages</span>
-<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a><span class="fu"># Candidate generation (Candidate Poses page)</span></span>
-<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>Config fields surfaced from <span class="in">`CandidateViewGeneratorConfig`</span>:</span>
-<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`num_samples`</span>, <span class="in">`min_radius`</span>, <span class="in">`max_radius`</span>, <span class="in">`min_elev_deg`</span>, <span class="in">`max_elev_deg`</span></span>
-<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`ensure_collision_free`</span>, <span class="in">`min_distance_to_mesh`</span></span>
-<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`ensure_free_space`</span></span>
-<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`device`</span> (<span class="in">`cpu`</span>/<span class="in">`cuda`</span>), <span class="in">`is_debug`</span></span>
-<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a>Plot controls:</span>
-<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>frustum scale, max frustums, option to plot only rejected poses</span>
-<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a>Actions:</span>
-<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Run previous**: re-run Data stage with cached config</span>
-<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Run / refresh candidates**: background thread; results cached under <span class="in">`STATE_KEYS["candidates"]`</span></span>
-<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a><span class="fu"># Depth rendering (Candidate Renders page)</span></span>
-<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a>Config mirrors <span class="in">`CandidateDepthRendererConfig`</span> + nested <span class="in">`Pytorch3DDepthRendererConfig`</span>:</span>
-<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`max_candidates`</span> (subset render), renderer <span class="in">`device`</span>, <span class="in">`zfar`</span>, <span class="in">`faces_per_pixel`</span>, <span class="in">`is_debug`</span></span>
-<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Checkbox: “Compute depth renders”</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Data**: load one <span class="in">`EfmSnippetView`</span> from ASE/ATEK (GT mesh optional).</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Candidate Poses**: sample NBV candidates with collision / free-space rules.</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Candidate Renders**: render depth for valid candidates via PyTorch3D.</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>The app caches configs + results in <span class="in">`st.session_state`</span>. “Run previous” auto-runs earlier stages with cached settings; background threads keep the UI responsive.</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="fu"># Dataset loading (Data page)</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>Sidebar controls map to <span class="in">`AseEfmDatasetConfig`</span> (defaults baked in streamlit_app):</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`scene_ids`</span>: <span class="in">`[]`</span> (auto-discover shards under <span class="in">`.data/ase_efm*`</span>)</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`atek_variant`</span>: <span class="in">`"efm"`</span> (fixed)</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`load_meshes`</span>: <span class="in">`True`</span>, <span class="in">`require_mesh`</span>: checkbox (default on)</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Mesh simplification: <span class="in">`mesh_simplify_ratio`</span> slider (0 → no decimation)</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Mesh crop: <span class="in">`mesh_crop_margin_m`</span> and <span class="in">`mesh_crop_min_keep_ratio`</span></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Verbosity/debug: <span class="in">`verbose=True`</span>, <span class="in">`is_debug=True`</span></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>Buttons:</span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Run / refresh data**: loads first snippet (or cached index)</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Next sample**: increments index then reloads</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Clear cache**: drops all cached stages</span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a><span class="fu"># Candidate generation (Candidate Poses page)</span></span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>Config fields surfaced from <span class="in">`CandidateViewGeneratorConfig`</span>:</span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`num_samples`</span>, <span class="in">`min_radius`</span>, <span class="in">`max_radius`</span>, <span class="in">`min_elev_deg`</span>, <span class="in">`max_elev_deg`</span></span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`ensure_collision_free`</span>, <span class="in">`min_distance_to_mesh`</span></span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`ensure_free_space`</span></span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`device`</span> (<span class="in">`cpu`</span>/<span class="in">`cuda`</span>), <span class="in">`is_debug`</span></span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>Plot controls:</span>
+<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>frustum scale, max frustums, option to plot only rejected poses</span>
+<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a>Actions:</span>
+<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Run previous**: re-run Data stage with cached config</span>
+<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Run / refresh candidates**: background thread; results cached under <span class="in">`STATE_KEYS["candidates"]`</span></span>
 <span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a>Actions:</span>
-<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Run previous**: ensures data + candidates exist</span>
-<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Run / refresh renders**: background thread; stores <span class="in">`CandidateDepthBatch`</span></span>
+<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a><span class="fu"># Depth rendering (Candidate Renders page)</span></span>
+<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a>Config mirrors <span class="in">`CandidateDepthRendererConfig`</span> + nested <span class="in">`Pytorch3DDepthRendererConfig`</span>:</span>
 <span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a><span class="fu"># Logging &amp; scratchpad</span></span>
-<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Console logs collected via <span class="in">`Console.set_sink`</span> into a textarea; clearable per page.</span>
-<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>“Interactive Python console” executes arbitrary code in the app process (uses <span class="in">`st`</span>, <span class="in">`torch`</span> pre-populated); output appended to logs.</span>
+<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`max_candidates`</span> (subset render), renderer <span class="in">`device`</span>, <span class="in">`zfar`</span>, <span class="in">`faces_per_pixel`</span>, <span class="in">`is_debug`</span></span>
+<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Checkbox: “Compute depth renders”</span>
+<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a>Actions:</span>
 <span id="cb5-65"><a href="#cb5-65" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a><span class="fu"># CLI: download datasets (unchanged)</span></span>
-<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-68"><a href="#cb5-68" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
-<span id="cb5-69"><a href="#cb5-69" aria-hidden="true" tabindex="-1"></a><span class="co"># list top scenes by snippet count</span></span>
-<span id="cb5-70"><a href="#cb5-70" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> oracle_rri.data.downloader <span class="at">-m</span> list <span class="at">-c</span> efm <span class="at">-n</span> 5</span>
-<span id="cb5-71"><a href="#cb5-71" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-72"><a href="#cb5-72" aria-hidden="true" tabindex="-1"></a><span class="co"># download scenes (limit snippets to 10 each)</span></span>
-<span id="cb5-73"><a href="#cb5-73" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> oracle_rri.data.downloader <span class="at">-m</span> download <span class="at">-c</span> efm <span class="at">-n</span> 5 <span class="at">--ms</span> 10</span>
-<span id="cb5-74"><a href="#cb5-74" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Run previous**: ensures data + candidates exist</span>
+<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Run / refresh renders**: background thread; stores <span class="in">`CandidateDepthBatch`</span></span>
+<span id="cb5-68"><a href="#cb5-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-69"><a href="#cb5-69" aria-hidden="true" tabindex="-1"></a><span class="fu"># Logging &amp; scratchpad</span></span>
+<span id="cb5-70"><a href="#cb5-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-71"><a href="#cb5-71" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Console logs collected via <span class="in">`Console.set_sink`</span> into a textarea; clearable per page.</span>
+<span id="cb5-72"><a href="#cb5-72" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>“Interactive Python console” executes arbitrary code in the app process (uses <span class="in">`st`</span>, <span class="in">`torch`</span> pre-populated); output appended to logs.</span>
+<span id="cb5-73"><a href="#cb5-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-74"><a href="#cb5-74" aria-hidden="true" tabindex="-1"></a><span class="fu"># CLI: download datasets (unchanged)</span></span>
 <span id="cb5-75"><a href="#cb5-75" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-76"><a href="#cb5-76" aria-hidden="true" tabindex="-1"></a><span class="fu"># Programmatic dataset use</span></span>
-<span id="cb5-77"><a href="#cb5-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-78"><a href="#cb5-78" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
-<span id="cb5-79"><a href="#cb5-79" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> oracle_rri.data_handling.dataset <span class="im">import</span> ASEDatasetConfig</span>
-<span id="cb5-80"><a href="#cb5-80" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-81"><a href="#cb5-81" aria-hidden="true" tabindex="-1"></a>cfg <span class="op">=</span> ASEDatasetConfig(atek_variant<span class="op">=</span><span class="st">"efm"</span>, load_meshes<span class="op">=</span><span class="va">True</span>, require_mesh<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb5-82"><a href="#cb5-82" aria-hidden="true" tabindex="-1"></a>ds <span class="op">=</span> cfg.setup_target()</span>
-<span id="cb5-83"><a href="#cb5-83" aria-hidden="true" tabindex="-1"></a>sample <span class="op">=</span> <span class="bu">next</span>(<span class="bu">iter</span>(ds))  <span class="co"># EfmSnippetView</span></span>
-<span id="cb5-84"><a href="#cb5-84" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb5-76"><a href="#cb5-76" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
+<span id="cb5-77"><a href="#cb5-77" aria-hidden="true" tabindex="-1"></a><span class="co"># list top scenes by snippet count</span></span>
+<span id="cb5-78"><a href="#cb5-78" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> oracle_rri.data.downloader <span class="at">-m</span> list <span class="at">-c</span> efm <span class="at">-n</span> 5</span>
+<span id="cb5-79"><a href="#cb5-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-80"><a href="#cb5-80" aria-hidden="true" tabindex="-1"></a><span class="co"># download scenes (limit snippets to 10 each)</span></span>
+<span id="cb5-81"><a href="#cb5-81" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> oracle_rri.data.downloader <span class="at">-m</span> download <span class="at">-c</span> efm <span class="at">-n</span> 5 <span class="at">--ms</span> 10</span>
+<span id="cb5-82"><a href="#cb5-82" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb5-83"><a href="#cb5-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-84"><a href="#cb5-84" aria-hidden="true" tabindex="-1"></a><span class="fu"># Programmatic dataset use</span></span>
 <span id="cb5-85"><a href="#cb5-85" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-86"><a href="#cb5-86" aria-hidden="true" tabindex="-1"></a>Typed views exposed on <span class="in">`sample`</span>:</span>
-<span id="cb5-87"><a href="#cb5-87" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`camera_rgb`</span>, <span class="in">`camera_slam_left`</span>, <span class="in">`camera_slam_right`</span> → images + <span class="in">`CameraTW`</span></span>
-<span id="cb5-88"><a href="#cb5-88" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`trajectory`</span> → <span class="in">`PoseTW`</span> series (<span class="in">`t_world_rig`</span>)</span>
-<span id="cb5-89"><a href="#cb5-89" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`semidense`</span> → padded SLAM points + stds + bounds</span>
-<span id="cb5-90"><a href="#cb5-90" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`gt`</span> → OBBs / efm_gt</span>
-<span id="cb5-91"><a href="#cb5-91" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`mesh`</span> / <span class="in">`has_mesh`</span></span>
-<span id="cb5-92"><a href="#cb5-92" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-93"><a href="#cb5-93" aria-hidden="true" tabindex="-1"></a><span class="fu"># Pipeline recap (in-app)</span></span>
-<span id="cb5-94"><a href="#cb5-94" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-97"><a href="#cb5-97" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
-<span id="cb5-98"><a href="#cb5-98" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
-<span id="cb5-99"><a href="#cb5-99" aria-hidden="true" tabindex="-1"></a>    A[Dataset cfg\n(ASE/ATEK)] --&gt; B[Load snippet\nEfmSnippetView]</span>
-<span id="cb5-100"><a href="#cb5-100" aria-hidden="true" tabindex="-1"></a>    B --&gt; C[Sample NBV poses\nCandidateViewGenerator]</span>
-<span id="cb5-101"><a href="#cb5-101" aria-hidden="true" tabindex="-1"></a>    C --&gt; D[Render depth\nCandidateDepthRenderer]</span>
-<span id="cb5-102"><a href="#cb5-102" aria-hidden="true" tabindex="-1"></a>    D --&gt; E[Inspect depth grid\n&amp; pick NBV]</span>
-<span id="cb5-103"><a href="#cb5-103" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb5-104"><a href="#cb5-104" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-105"><a href="#cb5-105" aria-hidden="true" tabindex="-1"></a><span class="fu"># Mesh handling</span></span>
-<span id="cb5-106"><a href="#cb5-106" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-107"><a href="#cb5-107" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Meshes are loaded once per scene (cached if <span class="in">`cache_meshes=True`</span>).</span>
-<span id="cb5-108"><a href="#cb5-108" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Optional decimation via <span class="in">`mesh_simplify_ratio`</span>; optional crop AABB (<span class="in">`crop_aabb_from_semidense`</span> in UI).</span>
+<span id="cb5-86"><a href="#cb5-86" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb5-87"><a href="#cb5-87" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> oracle_rri.data_handling.dataset <span class="im">import</span> ASEDatasetConfig</span>
+<span id="cb5-88"><a href="#cb5-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-89"><a href="#cb5-89" aria-hidden="true" tabindex="-1"></a>cfg <span class="op">=</span> ASEDatasetConfig(atek_variant<span class="op">=</span><span class="st">"efm"</span>, load_meshes<span class="op">=</span><span class="va">True</span>, require_mesh<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb5-90"><a href="#cb5-90" aria-hidden="true" tabindex="-1"></a>ds <span class="op">=</span> cfg.setup_target()</span>
+<span id="cb5-91"><a href="#cb5-91" aria-hidden="true" tabindex="-1"></a>sample <span class="op">=</span> <span class="bu">next</span>(<span class="bu">iter</span>(ds))  <span class="co"># EfmSnippetView</span></span>
+<span id="cb5-92"><a href="#cb5-92" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb5-93"><a href="#cb5-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-94"><a href="#cb5-94" aria-hidden="true" tabindex="-1"></a>Typed views exposed on <span class="in">`sample`</span>:</span>
+<span id="cb5-95"><a href="#cb5-95" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-96"><a href="#cb5-96" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`camera_rgb`</span>, <span class="in">`camera_slam_left`</span>, <span class="in">`camera_slam_right`</span> → images + <span class="in">`CameraTW`</span></span>
+<span id="cb5-97"><a href="#cb5-97" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`trajectory`</span> → <span class="in">`PoseTW`</span> series (<span class="in">`t_world_rig`</span>)</span>
+<span id="cb5-98"><a href="#cb5-98" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`semidense`</span> → padded SLAM points + stds + bounds</span>
+<span id="cb5-99"><a href="#cb5-99" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`gt`</span> → OBBs / efm_gt</span>
+<span id="cb5-100"><a href="#cb5-100" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`mesh`</span> / <span class="in">`has_mesh`</span></span>
+<span id="cb5-101"><a href="#cb5-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-102"><a href="#cb5-102" aria-hidden="true" tabindex="-1"></a><span class="fu"># Pipeline recap (in-app)</span></span>
+<span id="cb5-103"><a href="#cb5-103" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-106"><a href="#cb5-106" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb5-107"><a href="#cb5-107" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
+<span id="cb5-108"><a href="#cb5-108" aria-hidden="true" tabindex="-1"></a>    A[Dataset cfg&lt;br/&gt;ASE/ATEK] --&gt; B[Load snippet&lt;br/&gt;EfmSnippetView]</span>
+<span id="cb5-109"><a href="#cb5-109" aria-hidden="true" tabindex="-1"></a>    B --&gt; C[Sample NBV poses&lt;br/&gt;CandidateViewGenerator]</span>
+<span id="cb5-110"><a href="#cb5-110" aria-hidden="true" tabindex="-1"></a>    C --&gt; D[Render depth&lt;br/&gt;CandidateDepthRenderer]</span>
+<span id="cb5-111"><a href="#cb5-111" aria-hidden="true" tabindex="-1"></a>    D --&gt; E[Inspect depth grid&lt;br/&gt;&amp; pick NBV]</span>
+<span id="cb5-112"><a href="#cb5-112" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb5-113"><a href="#cb5-113" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-114"><a href="#cb5-114" aria-hidden="true" tabindex="-1"></a><span class="fu"># Mesh handling</span></span>
+<span id="cb5-115"><a href="#cb5-115" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-116"><a href="#cb5-116" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Meshes are loaded once per scene (cached if <span class="in">`cache_meshes=True`</span>).</span>
+<span id="cb5-117"><a href="#cb5-117" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Optional decimation via <span class="in">`mesh_simplify_ratio`</span>; optional crop AABB (<span class="in">`crop_aabb_from_semidense`</span> in UI).</span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

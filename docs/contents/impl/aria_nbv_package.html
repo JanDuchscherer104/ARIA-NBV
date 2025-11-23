@@ -548,7 +548,7 @@ window.Quarto = {
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../../contents/impl/data_pipeline_overview.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">ASE Data Pipeline Overview</span></a>
+ <span class="menu-text">ASE Data Pipeline &amp; Streamlit Usage</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -777,14 +777,14 @@ window.Quarto = {
 <section id="rri-definition-used-throughout-docscode" class="level1" data-number="5">
 <h1 data-number="5"><span class="header-section-number">5</span> RRI Definition (used throughout docs/code)</h1>
 <ul>
-<li>Let (P_t) be the current reconstruction point cloud, (P_q) the point cloud from a candidate view, and (M) the ground-truth mesh surface (sampled to points (M_s)).</li>
-<li>Bidirectional Chamfer distance: <span class="math display">\[
+<li><p>Let (P_t) be the current reconstruction point cloud, (P_q) the point cloud from a candidate view, and (M) the ground-truth mesh surface (sampled to points (M_s)).</p></li>
+<li><p>Bidirectional Chamfer distance: <span class="math display">\[
 \mathrm{CD}(P, M) = \frac{1}{|P|}\sum_{p\in P}\min_{m\in M}\|p-m\|_2^2
                 + \frac{1}{|M_s|}\sum_{m\in M_s}\min_{p\in P}\|m-p\|_2^2.
-\]</span></li>
-<li>Relative Reconstruction Improvement (higher is better): <span class="math display">\[
+\]</span></p></li>
+<li><p>Relative Reconstruction Improvement (higher is better): <span class="math display">\[
 \mathrm{RRI}(P_t, P_q, M) = \frac{\mathrm{CD}(P_t, M) - \mathrm{CD}(P_t \cup P_q, M)}{\mathrm{CD}(P_t, M) + \varepsilon},
-\]</span> with a small () for stability. Positive values indicate improvement after fusing the candidate view.</li>
+\]</span> with a small () for stability. Positive values indicate improvement after fusing the candidate view.</p></li>
 </ul>
 </section>
 <section id="external-library-hooks-per-component" class="level1" data-number="6">
@@ -1398,114 +1398,119 @@ window.Quarto = {
 <span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="fu"># Core Modules &amp; Classes</span></span>
 <span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a><span class="fu">## Config &amp; Logging</span></span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`utils.base_config.BaseConfig`**: Pydantic-powered factory base with TOML IO and <span class="in">`inspect()`</span> rendering (Rich).</span>
-<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`configs.path_config.PathConfig`**: Singleton paths to data roots, ATEK/ASE URL manifests, mesh directories.</span>
-<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`utils.console.Console`**: Rich wrapper with prefixes and optional shared PL logger hook.</span>
-<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="fu">## Data Handling (`data_handling/`)</span></span>
-<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a><span class="fu">### Dataset loader (`dataset.py`)</span></span>
-<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**External dependencies used**:</span>
-<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`atek.data_loaders.load_atek_wds_dataset`</span>, <span class="in">`select_and_remap_dict_keys`</span> for WebDataset ingest.</span>
-<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`efm3d.aria.PoseTW`</span>, <span class="in">`CameraTW`</span> for typed geometry conversion (<span class="in">`to_camera_tw`</span>).</span>
-<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`trimesh`</span> for GT mesh loading/simplification.</span>
-<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Batch handling**: <span class="in">`_explode_batched_dict`</span> splits WebDataset B-dim into per-sample dicts; <span class="in">`ase_collate`</span> returns lists plus EFM-ready dicts.</span>
-<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Mesh pairing**: <span class="in">`scene_to_mesh`</span> mapping + optional decimation + caching; tolerant when meshes absent unless <span class="in">`require_mesh=True`</span>.</span>
-<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Key typing**: <span class="in">`CameraStream`</span>, <span class="in">`Trajectory`</span>, <span class="in">`SemiDensePoints`</span> mirror ATEK dataclasses; preserve Aria frame (x-left, y-up, z-forward), <span class="in">`T_A_B`</span> convention.</span>
-<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**EFM remap**: <span class="in">`ASESample.to_efm_dict()`</span> applies <span class="in">`EfmModelAdaptor.get_dict_key_mapping_all()`</span> and can include <span class="in">`gt_mesh`</span>.</span>
-<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a><span class="fu">### Metadata &amp; Download</span></span>
-<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`metadata.ASEMetadata`**: parses <span class="in">`ase_mesh_download_urls.json`</span> and <span class="in">`AriaSyntheticEnvironment_ATEK_download_urls.json`</span> → <span class="in">`SceneInfo(scene_id, mesh_url, mesh_sha, snippet_ids)`</span>.</span>
-<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`downloader.ASEDownloaderConfig/ASEDownloader`**: orchestrates mesh + WDS downloads (uses ATEK <span class="in">`download_atek_wds_sequences`</span>, <span class="in">`requests`</span> for meshes, SHA1 verification, unzip). CLI-friendly via <span class="in">`pydantic_settings`</span>.</span>
-<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a><span class="fu">## Analysis</span></span>
-<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`analysis/depth_debugger.py`**: utilities to inspect depth/point clouds; useful for validating candidate sampling and fusion (see TODOs).</span>
-<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a><span class="fu">## Visualisation</span></span>
-<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`viz/mesh_viz.py`**: rendering helpers (Trimesh + matplotlib) for meshes and point clouds; wire into Streamlit dashboard per TODOs.</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`utils.base_config.BaseConfig`**: Pydantic-powered factory base with TOML IO and <span class="in">`inspect()`</span> rendering (Rich).</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`configs.path_config.PathConfig`**: Singleton paths to data roots, ATEK/ASE URL manifests, mesh directories.</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`utils.console.Console`**: Rich wrapper with prefixes and optional shared PL logger hook.</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a><span class="fu">## Data Handling (`data_handling/`)</span></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a><span class="fu">### Dataset loader (`dataset.py`)</span></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**External dependencies used**:</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`atek.data_loaders.load_atek_wds_dataset`</span>, <span class="in">`select_and_remap_dict_keys`</span> for WebDataset ingest.</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`efm3d.aria.PoseTW`</span>, <span class="in">`CameraTW`</span> for typed geometry conversion (<span class="in">`to_camera_tw`</span>).</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`trimesh`</span> for GT mesh loading/simplification.</span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Batch handling**: <span class="in">`_explode_batched_dict`</span> splits WebDataset B-dim into per-sample dicts; <span class="in">`ase_collate`</span> returns lists plus EFM-ready dicts.</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Mesh pairing**: <span class="in">`scene_to_mesh`</span> mapping + optional decimation + caching; tolerant when meshes absent unless <span class="in">`require_mesh=True`</span>.</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Key typing**: <span class="in">`CameraStream`</span>, <span class="in">`Trajectory`</span>, <span class="in">`SemiDensePoints`</span> mirror ATEK dataclasses; preserve Aria frame (x-left, y-up, z-forward), <span class="in">`T_A_B`</span> convention.</span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**EFM remap**: <span class="in">`ASESample.to_efm_dict()`</span> applies <span class="in">`EfmModelAdaptor.get_dict_key_mapping_all()`</span> and can include <span class="in">`gt_mesh`</span>.</span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a><span class="fu">### Metadata &amp; Download</span></span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`metadata.ASEMetadata`**: parses <span class="in">`ase_mesh_download_urls.json`</span> and <span class="in">`AriaSyntheticEnvironment_ATEK_download_urls.json`</span> → <span class="in">`SceneInfo(scene_id, mesh_url, mesh_sha, snippet_ids)`</span>.</span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`downloader.ASEDownloaderConfig/ASEDownloader`**: orchestrates mesh + WDS downloads (uses ATEK <span class="in">`download_atek_wds_sequences`</span>, <span class="in">`requests`</span> for meshes, SHA1 verification, unzip). CLI-friendly via <span class="in">`pydantic_settings`</span>.</span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a><span class="fu">## Analysis</span></span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`analysis/depth_debugger.py`**: utilities to inspect depth/point clouds; useful for validating candidate sampling and fusion (see TODOs).</span>
 <span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a><span class="fu"># NBV Pipeline at a Glance</span></span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a><span class="fu">## Visualisation</span></span>
 <span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
-<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
-<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a>    A[ASE/ATEK shard\n+ GT mesh] --&gt; B(data_handling.dataset\nEfmSnippetView)</span>
-<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a>    B --&gt; C(pose_generation.\nCandidateViewGenerator)</span>
-<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a>    C --&gt;|PoseTW batch| D(rendering.\nCandidateDepthRenderer)</span>
-<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a>    D --&gt;|Depth maps| E[Fuse depth→PC\n(EFM3D pointcloud utils)]</span>
-<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a>    E --&gt; F[Metrics: RRI / Chamfer]</span>
-<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a>    F --&gt; G[Policy: pick NBV]</span>
-<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a>    G --&gt;|update pose| C</span>
-<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a><span class="fu"># RRI Definition (used throughout docs/code)</span></span>
-<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Let <span class="sc">\(</span>P_t<span class="sc">\)</span> be the current reconstruction point cloud, <span class="sc">\(</span>P_q<span class="sc">\)</span> the point cloud from a candidate view, and <span class="sc">\(</span>M<span class="sc">\)</span> the ground-truth mesh surface (sampled to points <span class="sc">\(</span>M_s<span class="sc">\)</span>).</span>
-<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Bidirectional Chamfer distance:</span>
-<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a>\mathrm{CD}(P, M) = \frac{1}{|P|}\sum_{p\in P}\min_{m\in M}<span class="sc">\|</span>p-m<span class="sc">\|</span>_2^2</span>
-<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a><span class="ss">                  + </span>\frac{1}{|M_s|}\sum_{m\in M_s}\min_{p\in P}<span class="sc">\|</span>m-p<span class="sc">\|</span>_2^2.</span>
-<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Relative Reconstruction Improvement (higher is better):</span>
-<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a>\mathrm{RRI}(P_t, P_q, M) = \frac{\mathrm{CD}(P_t, M) - \mathrm{CD}(P_t \cup P_q, M)}{\mathrm{CD}(P_t, M) + \varepsilon},</span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`viz/mesh_viz.py`**: rendering helpers (Trimesh + matplotlib) for meshes and point clouds; wire into Streamlit dashboard per TODOs.</span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a><span class="fu"># NBV Pipeline at a Glance</span></span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
+<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a>    A[ASE/ATEK shard\n+ GT mesh] --&gt; B(data_handling.dataset\nEfmSnippetView)</span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a>    B --&gt; C(pose_generation.\nCandidateViewGenerator)</span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a>    C --&gt;|PoseTW batch| D(rendering.\nCandidateDepthRenderer)</span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a>    D --&gt;|Depth maps| E[Fuse depth→PC\n(EFM3D pointcloud utils)]</span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a>    E --&gt; F[Metrics: RRI / Chamfer]</span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a>    F --&gt; G[Policy: pick NBV]</span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a>    G --&gt;|update pose| C</span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a><span class="fu"># RRI Definition (used throughout docs/code)</span></span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Let <span class="sc">\(</span>P_t<span class="sc">\)</span> be the current reconstruction point cloud, <span class="sc">\(</span>P_q<span class="sc">\)</span> the point cloud from a candidate view, and <span class="sc">\(</span>M<span class="sc">\)</span> the ground-truth mesh surface (sampled to points <span class="sc">\(</span>M_s<span class="sc">\)</span>).</span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Bidirectional Chamfer distance:</span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a>\mathrm{CD}(P, M) = \frac{1}{|P|}\sum_{p\in P}\min_{m\in M}<span class="sc">\|</span>p-m<span class="sc">\|</span>_2^2</span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a><span class="ss">                  + </span>\frac{1}{|M_s|}\sum_{m\in M_s}\min_{p\in P}<span class="sc">\|</span>m-p<span class="sc">\|</span>_2^2.</span>
 <span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a>with a small <span class="sc">\(</span>\varepsilon<span class="sc">\)</span> for stability. Positive values indicate improvement after fusing the candidate view.</span>
-<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a><span class="fu"># External Library Hooks (per component)</span></span>
-<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Trimesh**: mesh IO, surface sampling, ray–mesh intersections; optional quadric decimation when loading GT meshes.</span>
-<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**EFM3D**:</span>
-<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`PoseTW`</span>, <span class="in">`CameraTW`</span>: camera/pose typing + operations.</span>
-<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`utils.ray`</span> (<span class="in">`ray_grid`</span>, <span class="in">`transform_rays`</span>, <span class="in">`ray_obb_intersection`</span>) for candidate depth rendering.</span>
-<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`utils.pointcloud`</span> (<span class="in">`dist_im_to_point_cloud_im`</span>, <span class="in">`pointcloud_to_occupancy_snippet`</span>) for depth → PC and occupancy.</span>
-<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**ATEK**:</span>
-<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`load_atek_wds_dataset`</span>, <span class="in">`process_wds_sample`</span> for streaming shards.</span>
-<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Key mapping (<span class="in">`EfmModelAdaptor.get_dict_key_mapping_all`</span>) when exporting to EFM schema.</span>
-<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Download helpers (<span class="in">`atek_data_store_download.download_atek_wds_sequences`</span>) via <span class="in">`ASEDownloader`</span>.</span>
-<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a><span class="fu"># Theoretical context (Wikipedia quick refs)</span></span>
-<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Active perception/vision**: NBV is an instance of active perception—moving the sensor to harvest more informative observations; active vision systems explicitly reorient cameras to reduce occlusion and improve depth estimates. citeturn1search12turn1search13</span>
-<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Point clouds as state**: Our reconstruction state <span class="sc">\(</span>P_t<span class="sc">\)</span> is a point cloud—an unordered set of 3D samples that approximates scene geometry. citeturn1search0</span>
-<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Chamfer vs. Hausdorff**: The Chamfer distance we use for RRI is a smooth, averaged variant of the symmetric Hausdorff distance between two point sets, trading strict worst-case guarantees for robustness to outliers. citeturn0search12</span>
-<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
-<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a>sequenceDiagram</span>
-<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a>    participant Agent</span>
-<span id="cb4-104"><a href="#cb4-104" aria-hidden="true" tabindex="-1"></a>    participant CandidateGen as CandidateGen</span>
-<span id="cb4-105"><a href="#cb4-105" aria-hidden="true" tabindex="-1"></a>    participant Renderer</span>
-<span id="cb4-106"><a href="#cb4-106" aria-hidden="true" tabindex="-1"></a>    participant Metric</span>
-<span id="cb4-107"><a href="#cb4-107" aria-hidden="true" tabindex="-1"></a>    Agent-&gt;&gt;CandidateGen: <span class="kw">last</span> pose, mesh, extent</span>
-<span id="cb4-108"><a href="#cb4-108" aria-hidden="true" tabindex="-1"></a>    CandidateGen--&gt;&gt;Agent: PoseTW candidates + masks</span>
-<span id="cb4-109"><a href="#cb4-109" aria-hidden="true" tabindex="-1"></a>    Agent-&gt;&gt;Renderer: valid poses + mesh + camera</span>
-<span id="cb4-110"><a href="#cb4-110" aria-hidden="true" tabindex="-1"></a>    Renderer--&gt;&gt;Metric: depth maps → point clouds</span>
-<span id="cb4-111"><a href="#cb4-111" aria-hidden="true" tabindex="-1"></a>    Metric--&gt;&gt;Agent: RRI scores (Chamfer/occupancy)</span>
-<span id="cb4-112"><a href="#cb4-112" aria-hidden="true" tabindex="-1"></a>    Agent-&gt;&gt;Agent: <span class="fu">select</span> <span class="kw">next</span>-best view (argmax)</span>
-<span id="cb4-113"><a href="#cb4-113" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb4-114"><a href="#cb4-114" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-115"><a href="#cb4-115" aria-hidden="true" tabindex="-1"></a><span class="fu"># Suggested Mermaid for planned processing layer</span></span>
-<span id="cb4-116"><a href="#cb4-116" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-119"><a href="#cb4-119" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
-<span id="cb4-120"><a href="#cb4-120" aria-hidden="true" tabindex="-1"></a>classDiagram</span>
-<span id="cb4-121"><a href="#cb4-121" aria-hidden="true" tabindex="-1"></a>    class CandidateViewGenerator{</span>
-<span id="cb4-122"><a href="#cb4-122" aria-hidden="true" tabindex="-1"></a>      +generate(last_pose, mesh, extent)-&gt;CandidateSamplingResult</span>
-<span id="cb4-123"><a href="#cb4-123" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb4-124"><a href="#cb4-124" aria-hidden="true" tabindex="-1"></a>    class CandidateDepthRenderer{</span>
-<span id="cb4-125"><a href="#cb4-125" aria-hidden="true" tabindex="-1"></a>      +render(sample, candidates)-&gt;CandidateDepthBatch</span>
-<span id="cb4-126"><a href="#cb4-126" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb4-127"><a href="#cb4-127" aria-hidden="true" tabindex="-1"></a>    class PointCloudFusion{</span>
-<span id="cb4-128"><a href="#cb4-128" aria-hidden="true" tabindex="-1"></a>      +merge(P_t, P_q)-&gt;P_fused</span>
-<span id="cb4-129"><a href="#cb4-129" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb4-130"><a href="#cb4-130" aria-hidden="true" tabindex="-1"></a>    class OracleRRI{</span>
-<span id="cb4-131"><a href="#cb4-131" aria-hidden="true" tabindex="-1"></a>      +score(P_t, P_q, mesh)-&gt;float</span>
-<span id="cb4-132"><a href="#cb4-132" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb4-133"><a href="#cb4-133" aria-hidden="true" tabindex="-1"></a>    CandidateViewGenerator --&gt; CandidateDepthRenderer : PoseTW batch</span>
-<span id="cb4-134"><a href="#cb4-134" aria-hidden="true" tabindex="-1"></a>    CandidateDepthRenderer --&gt; PointCloudFusion : depth-&gt;PC</span>
-<span id="cb4-135"><a href="#cb4-135" aria-hidden="true" tabindex="-1"></a>    PointCloudFusion --&gt; OracleRRI : fused PC</span>
-<span id="cb4-136"><a href="#cb4-136" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb4-137"><a href="#cb4-137" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-138"><a href="#cb4-138" aria-hidden="true" tabindex="-1"></a>Use this layout to guide module additions under <span class="in">`aria_nbv/`</span> (import path <span class="in">`oracle_rri`</span> for now) while keeping current data-handling and config patterns.</span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Relative Reconstruction Improvement (higher is better):</span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a>\mathrm{RRI}(P_t, P_q, M) = \frac{\mathrm{CD}(P_t, M) - \mathrm{CD}(P_t \cup P_q, M)}{\mathrm{CD}(P_t, M) + \varepsilon},</span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a>with a small <span class="sc">\(</span>\varepsilon<span class="sc">\)</span> for stability. Positive values indicate improvement after fusing the candidate view.</span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a><span class="fu"># External Library Hooks (per component)</span></span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Trimesh**: mesh IO, surface sampling, ray–mesh intersections; optional quadric decimation when loading GT meshes.</span>
+<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**EFM3D**:</span>
+<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`PoseTW`</span>, <span class="in">`CameraTW`</span>: camera/pose typing + operations.</span>
+<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`utils.ray`</span> (<span class="in">`ray_grid`</span>, <span class="in">`transform_rays`</span>, <span class="in">`ray_obb_intersection`</span>) for candidate depth rendering.</span>
+<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`utils.pointcloud`</span> (<span class="in">`dist_im_to_point_cloud_im`</span>, <span class="in">`pointcloud_to_occupancy_snippet`</span>) for depth → PC and occupancy.</span>
+<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**ATEK**:</span>
+<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`load_atek_wds_dataset`</span>, <span class="in">`process_wds_sample`</span> for streaming shards.</span>
+<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Key mapping (<span class="in">`EfmModelAdaptor.get_dict_key_mapping_all`</span>) when exporting to EFM schema.</span>
+<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Download helpers (<span class="in">`atek_data_store_download.download_atek_wds_sequences`</span>) via <span class="in">`ASEDownloader`</span>.</span>
+<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a><span class="fu"># Theoretical context (Wikipedia quick refs)</span></span>
+<span id="cb4-99"><a href="#cb4-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-100"><a href="#cb4-100" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Active perception/vision**: NBV is an instance of active perception—moving the sensor to harvest more informative observations; active vision systems explicitly reorient cameras to reduce occlusion and improve depth estimates. citeturn1search12turn1search13</span>
+<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Point clouds as state**: Our reconstruction state <span class="sc">\(</span>P_t<span class="sc">\)</span> is a point cloud—an unordered set of 3D samples that approximates scene geometry. citeturn1search0</span>
+<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Chamfer vs. Hausdorff**: The Chamfer distance we use for RRI is a smooth, averaged variant of the symmetric Hausdorff distance between two point sets, trading strict worst-case guarantees for robustness to outliers. citeturn0search12</span>
+<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-106"><a href="#cb4-106" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb4-107"><a href="#cb4-107" aria-hidden="true" tabindex="-1"></a>sequenceDiagram</span>
+<span id="cb4-108"><a href="#cb4-108" aria-hidden="true" tabindex="-1"></a>    participant Agent</span>
+<span id="cb4-109"><a href="#cb4-109" aria-hidden="true" tabindex="-1"></a>    participant CandidateGen as CandidateGen</span>
+<span id="cb4-110"><a href="#cb4-110" aria-hidden="true" tabindex="-1"></a>    participant Renderer</span>
+<span id="cb4-111"><a href="#cb4-111" aria-hidden="true" tabindex="-1"></a>    participant Metric</span>
+<span id="cb4-112"><a href="#cb4-112" aria-hidden="true" tabindex="-1"></a>    Agent-&gt;&gt;CandidateGen: <span class="kw">last</span> pose, mesh, extent</span>
+<span id="cb4-113"><a href="#cb4-113" aria-hidden="true" tabindex="-1"></a>    CandidateGen--&gt;&gt;Agent: PoseTW candidates + masks</span>
+<span id="cb4-114"><a href="#cb4-114" aria-hidden="true" tabindex="-1"></a>    Agent-&gt;&gt;Renderer: valid poses + mesh + camera</span>
+<span id="cb4-115"><a href="#cb4-115" aria-hidden="true" tabindex="-1"></a>    Renderer--&gt;&gt;Metric: depth maps → point clouds</span>
+<span id="cb4-116"><a href="#cb4-116" aria-hidden="true" tabindex="-1"></a>    Metric--&gt;&gt;Agent: RRI scores (Chamfer/occupancy)</span>
+<span id="cb4-117"><a href="#cb4-117" aria-hidden="true" tabindex="-1"></a>    Agent-&gt;&gt;Agent: <span class="fu">select</span> <span class="kw">next</span>-best view (argmax)</span>
+<span id="cb4-118"><a href="#cb4-118" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-119"><a href="#cb4-119" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-120"><a href="#cb4-120" aria-hidden="true" tabindex="-1"></a><span class="fu"># Suggested Mermaid for planned processing layer</span></span>
+<span id="cb4-121"><a href="#cb4-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-124"><a href="#cb4-124" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb4-125"><a href="#cb4-125" aria-hidden="true" tabindex="-1"></a>classDiagram</span>
+<span id="cb4-126"><a href="#cb4-126" aria-hidden="true" tabindex="-1"></a>    class CandidateViewGenerator{</span>
+<span id="cb4-127"><a href="#cb4-127" aria-hidden="true" tabindex="-1"></a>      +generate(last_pose, mesh, extent)-&gt;CandidateSamplingResult</span>
+<span id="cb4-128"><a href="#cb4-128" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-129"><a href="#cb4-129" aria-hidden="true" tabindex="-1"></a>    class CandidateDepthRenderer{</span>
+<span id="cb4-130"><a href="#cb4-130" aria-hidden="true" tabindex="-1"></a>      +render(sample, candidates)-&gt;CandidateDepthBatch</span>
+<span id="cb4-131"><a href="#cb4-131" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-132"><a href="#cb4-132" aria-hidden="true" tabindex="-1"></a>    class PointCloudFusion{</span>
+<span id="cb4-133"><a href="#cb4-133" aria-hidden="true" tabindex="-1"></a>      +merge(P_t, P_q)-&gt;P_fused</span>
+<span id="cb4-134"><a href="#cb4-134" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-135"><a href="#cb4-135" aria-hidden="true" tabindex="-1"></a>    class OracleRRI{</span>
+<span id="cb4-136"><a href="#cb4-136" aria-hidden="true" tabindex="-1"></a>      +score(P_t, P_q, mesh)-&gt;float</span>
+<span id="cb4-137"><a href="#cb4-137" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-138"><a href="#cb4-138" aria-hidden="true" tabindex="-1"></a>    CandidateViewGenerator --&gt; CandidateDepthRenderer : PoseTW batch</span>
+<span id="cb4-139"><a href="#cb4-139" aria-hidden="true" tabindex="-1"></a>    CandidateDepthRenderer --&gt; PointCloudFusion : depth-&gt;PC</span>
+<span id="cb4-140"><a href="#cb4-140" aria-hidden="true" tabindex="-1"></a>    PointCloudFusion --&gt; OracleRRI : fused PC</span>
+<span id="cb4-141"><a href="#cb4-141" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-142"><a href="#cb4-142" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-143"><a href="#cb4-143" aria-hidden="true" tabindex="-1"></a>Use this layout to guide module additions under <span class="in">`aria_nbv/`</span> (import path <span class="in">`oracle_rri`</span> for now) while keeping current data-handling and config patterns.</span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

@@ -22,6 +22,7 @@ title: aria_nbv Package (formerly oracle_rri)
 # Core Modules & Classes
 
 ## Config & Logging
+
 - **`utils.base_config.BaseConfig`**: Pydantic-powered factory base with TOML IO and `inspect()` rendering (Rich).
 - **`configs.path_config.PathConfig`**: Singleton paths to data roots, ATEK/ASE URL manifests, mesh directories.
 - **`utils.console.Console`**: Rich wrapper with prefixes and optional shared PL logger hook.
@@ -40,13 +41,16 @@ title: aria_nbv Package (formerly oracle_rri)
 - **EFM remap**: `ASESample.to_efm_dict()` applies `EfmModelAdaptor.get_dict_key_mapping_all()` and can include `gt_mesh`.
 
 ### Metadata & Download
+
 - **`metadata.ASEMetadata`**: parses `ase_mesh_download_urls.json` and `AriaSyntheticEnvironment_ATEK_download_urls.json` → `SceneInfo(scene_id, mesh_url, mesh_sha, snippet_ids)`.
 - **`downloader.ASEDownloaderConfig/ASEDownloader`**: orchestrates mesh + WDS downloads (uses ATEK `download_atek_wds_sequences`, `requests` for meshes, SHA1 verification, unzip). CLI-friendly via `pydantic_settings`.
 
 ## Analysis
+
 - **`analysis/depth_debugger.py`**: utilities to inspect depth/point clouds; useful for validating candidate sampling and fusion (see TODOs).
 
 ## Visualisation
+
 - **`viz/mesh_viz.py`**: rendering helpers (Trimesh + matplotlib) for meshes and point clouds; wire into Streamlit dashboard per TODOs.
 
 # NBV Pipeline at a Glance
@@ -70,6 +74,7 @@ $$
 \mathrm{CD}(P, M) = \frac{1}{|P|}\sum_{p\in P}\min_{m\in M}\|p-m\|_2^2
                   + \frac{1}{|M_s|}\sum_{m\in M_s}\min_{p\in P}\|m-p\|_2^2.
 $$
+
 - Relative Reconstruction Improvement (higher is better):
 $$
 \mathrm{RRI}(P_t, P_q, M) = \frac{\mathrm{CD}(P_t, M) - \mathrm{CD}(P_t \cup P_q, M)}{\mathrm{CD}(P_t, M) + \varepsilon},

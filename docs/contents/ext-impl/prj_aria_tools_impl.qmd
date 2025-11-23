@@ -85,6 +85,7 @@ print("See section 5.2 for ASE dataset loading with actual data")
 ```
 
 **Important Stream IDs:**
+
 - RGB: `"214-1"` or label `"camera-rgb"`
 - SLAM Left: `"1201-1"` or label `"camera-slam-left"`
 - SLAM Right: `"1201-2"` or label `"camera-slam-right"`
@@ -129,6 +130,7 @@ for i, (cmd, params) in enumerate(entities[:3]):
 ```
 
 **File Formats:**
+
 - `trajectory.csv`: Frame-wise 6DoF poses (SE3 transforms)
 - `semidense_points.csv.gz`: 3D points with uncertainty
 - `ase_scene_language.txt`: SceneScript commands (entities, materials, etc.)
@@ -374,6 +376,7 @@ for i, pt in enumerate(test_points):
 ```
 
 **⚠️ Coordinate Frame Convention:**
+
 - Input point must be in **camera frame**, not device or world frame!
 - Use SE3 transforms to convert: `point_camera = T_camera_world @ point_world`
 
@@ -488,6 +491,7 @@ def depth_to_pointcloud(depth_map, camera_calib, T_world_device, subsample=4):
 ```
 
 **Why not Open3D's `create_from_depth_image()`?**
+
 - Open3D assumes **pinhole camera model**
 - Aria uses **fisheye/wide-angle** models (Kannala-Brandt)
 - Using `camera_calib.unproject()` handles distortion correctly!
@@ -737,15 +741,18 @@ T_device_camera = camera_calib.get_transform_device_camera()
 ## 11. Reference Materials
 
 **Official Tutorials:**
+
 - `dataprovider_quickstart_tutorial.ipynb` - VRS data loading
 - `sophus_quickstart_tutorial.ipynb` - SE3/SO3 transforms
 - `ase_tutorial_notebook.ipynb` - ASE dataset loading
 
 **Project Notebooks:**
+
 - `notebooks/ase_exploration.ipynb` - Complete ASE workflow
 - Shows depth→PC conversion, projection, trajectory plotting
 
 **Key Files:**
+
 - `projectaria_tools/core/sophus.pyi` - SE3/SO3 API
 - `projectaria_tools/core/calibration.pyi` - Camera calibration API
 - `projectaria_tools/projects/ase/readers.py` - ASE data loaders
@@ -790,6 +797,7 @@ pixel = camera_calib.project(point_camera)  # CORRECT
 ```
 
 ### Best Practices
+
 1. **Always check projection results**: `if pixel is not None`
 2. **Use vectorized SE3 operations** for batches
 3. **Cache camera calibration**: Don't reload every frame

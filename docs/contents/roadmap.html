@@ -515,7 +515,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../contents/impl/data_pipeline_overview.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">ASE Data Pipeline Overview</span></a>
+ <span class="menu-text">ASE Data Pipeline &amp; Streamlit Usage</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -644,7 +644,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 data-number="1.1" class="anchored" data-anchor-id="seminar-phase-6-ects-180-hours"><span class="header-section-number">1.1</span> Seminar Phase (6 ECTS, ~180 hours)</h2>
 <section id="phase-1-foundation-familiarization" class="level3" data-number="1.1.1">
 <h3 data-number="1.1.1" class="anchored" data-anchor-id="phase-1-foundation-familiarization"><span class="header-section-number">1.1.1</span> Phase 1: Foundation &amp; Familiarization</h3>
-<p><strong>Goal</strong>: - Get familiar with the NBV problem domain and read relevant literature - Understand the Aria ecosystem — ASE data, SceneScript, Project Aria Tools, ATEK, EFM3D/ EVL</p>
+<p><strong>Goal</strong>:</p>
+<ul>
+<li>Get familiar with the NBV problem domain and read relevant literature</li>
+<li>Understand the Aria ecosystem — ASE data, SceneScript, Project Aria Tools, ATEK, EFM3D/ EVL</li>
+</ul>
 </section>
 <section id="phase-2-oracle-rri" class="level3" data-number="1.1.2">
 <h3 data-number="1.1.2" class="anchored" data-anchor-id="phase-2-oracle-rri"><span class="header-section-number">1.1.2</span> Phase 2: Oracle RRI</h3>
@@ -652,7 +656,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="phase-3-rri-prediction-network-w-evl-or-scene-script-backbone" class="level3" data-number="1.1.3">
 <h3 data-number="1.1.3" class="anchored" data-anchor-id="phase-3-rri-prediction-network-w-evl-or-scene-script-backbone"><span class="header-section-number">1.1.3</span> Phase 3: RRI Prediction Network w/ EVL or Scene-Script backbone</h3>
-<p><strong>Goal</strong>: - Use pre-trained SceneScript or EFM3D/ EVL model to predict RRI for candidate views based on previous observations (partial point cloud, previous poses and calibrated video frames). - Define training procedures and loss functions.</p>
+<p><strong>Goal</strong>:</p>
+<ul>
+<li>Use pre-trained SceneScript or EFM3D/ EVL model to predict RRI for candidate views based on previous observations (partial point cloud, previous poses and calibrated video frames).</li>
+<li>Define training procedures and loss functions.</li>
+</ul>
 <section id="architecture" class="level4" data-number="1.1.3.1">
 <h4 data-number="1.1.3.1" class="anchored" data-anchor-id="architecture"><span class="header-section-number">1.1.3.1</span> Architecture</h4>
 <ul>
@@ -1202,26 +1210,26 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">### Phase 1: Foundation &amp; Familiarization</span></span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>**Goal**:</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Get familiar with the NBV problem domain and read relevant literature</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Understand the Aria ecosystem — ASE data, SceneScript, Project Aria Tools, ATEK, EFM3D/ EVL</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">### Phase 2: Oracle RRI</span></span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>**Goal**: Implement an "oracle" Relative Reconstruction Improvement (RRI) computation method based on the GT meshes and semi-dense point clouds or compute dense PC from GT depth maps (problem: they are only covering actual trajectory)</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Get familiar with the NBV problem domain and read relevant literature</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Understand the Aria ecosystem — ASE data, SceneScript, Project Aria Tools, ATEK, EFM3D/ EVL</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="fu">### Phase 2: Oracle RRI</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>**Goal**: Implement an "oracle" Relative Reconstruction Improvement (RRI) computation method based on the GT meshes and semi-dense point clouds or compute dense PC from GT depth maps (problem: they are only covering actual trajectory)</span>
 <span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="fu">### Phase 3: RRI Prediction Network w/ EVL or Scene-Script backbone</span></span>
 <span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>**Goal**:</span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use pre-trained SceneScript or EFM3D/ EVL model to predict RRI for candidate views based on previous observations (partial point cloud, previous poses and calibrated video frames).</span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Define training procedures and loss functions.</span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="fu">#### Architecture</span></span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Encoder**: SceneScript encoder or EVL backbone (frozen or fine-tuned)</span>
-<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Candidate Encoder**: View pose + frustum features, projection of partial PC into candidate view -&gt; learnable encoder</span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Predictor**: MLP regressing RRI score</span>
-<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use pre-trained SceneScript or EFM3D/ EVL model to predict RRI for candidate views based on previous observations (partial point cloud, previous poses and calibrated video frames).</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Define training procedures and loss functions.</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="fu">#### Architecture</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Encoder**: SceneScript encoder or EVL backbone (frozen or fine-tuned)</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Candidate Encoder**: View pose + frustum features, projection of partial PC into candidate view -&gt; learnable encoder</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Predictor**: MLP regressing RRI score</span>
 <span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>---</span>
 <span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a></span>
@@ -1232,35 +1240,33 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="fu">### Phase 6: Learning-Based NBV Prediction</span></span>
 <span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="fu">### Phase 7: Fine-Tune EFM for NBV on Target Platform</span></span>
-<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Project Aria Glasses**: High-fidelity egocentric data</span>
-<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Meta Quest 3**: Inside-out tracking, depth sensor</span>
-<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**iPhone LiDAR**: Portable, high-quality depth</span>
-<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a><span class="fu">### Phase 8: Human-in-the-Loop System</span></span>
-<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>**Goal**: Develop interactive AR interface for real-time NBV guidance</span>
-<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a><span class="fu">#### Components</span></span>
-<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Entity Selection UI**</span>
-<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Tap entities in AR view</span>
-<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Set importance weights</span>
-<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Real-Time NBV Computation**</span>
-<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Streaming point cloud input</span>
-<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Incremental updates of the scene representation</span>
-<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Fast RRI and pose prediction</span>
-<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**View Guidance Overlay**</span>
-<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>AR arrows/markers showing optimal viewpoints</span>
-<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Distance and quality indicators</span>
-<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Real-time voice2voice feedback</span>
-<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="fu">### Phase 7: Fine-Tune EFM for NBV on Target Platform</span></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Project Aria Glasses**: High-fidelity egocentric data</span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Meta Quest 3**: Inside-out tracking, depth sensor</span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**iPhone LiDAR**: Portable, high-quality depth</span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a><span class="fu">### Phase 8: Human-in-the-Loop System</span></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>**Goal**: Develop interactive AR interface for real-time NBV guidance</span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a><span class="fu">#### Components</span></span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Entity Selection UI**</span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Tap entities in AR view</span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Set importance weights</span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Real-Time NBV Computation**</span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Streaming point cloud input</span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Incremental updates of the scene representation</span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Fast RRI and pose prediction</span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**View Guidance Overlay**</span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>AR arrows/markers showing optimal viewpoints</span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Distance and quality indicators</span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Real-time voice2voice feedback</span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a><span class="fu">### Phase 9: Real-World Deployment &amp; Evaluation (Months 7-8, ~200 hours)</span></span>
 <span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a><span class="fu">### Phase 9: Real-World Deployment &amp; Evaluation (Months 7-8, ~200 hours)</span></span>
-<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a>**Goal**: Deploy on mobile devices and validate in real environments</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a>**Goal**: Deploy on mobile devices and validate in real environments</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

@@ -3,11 +3,14 @@ title: "aria_nbv Overview & Architecture"
 format:
   html:
     page-layout: full
+    code-fold: true
+    code-summary: "Show code"
+    code-tools: false
 ---
 
 # What is `aria_nbv`?
 
-- In-repo NBV toolkit (import path currently `oracle_rri`) for ASE/ATEK + EFM3D experiments.
+- In-repo NBV toolkit (import path currently `oracle_rri`, pending rename to `aria_nbv`) for ASE/ATEK + EFM3D experiments.
 - Responsibilities: load typed ASE snippets, generate collision‑aware candidate views, render/raycast depth, fuse point clouds, and score Relative Reconstruction Improvement (RRI).
 
 # Directory layout (code)
@@ -30,13 +33,13 @@ oracle_rri/oracle_rri/
 
 ```{mermaid}
 flowchart LR
-    A[ASE/ATEK shard\n+ GT mesh] --> B(data_handling.dataset\nEfmSnippetView)
-    B --> C(pose_generation.\nCandidateViewGenerator)
-    C -->|PoseTW batch + masks| D(rendering.\nCandidateDepthRenderer)
-    D -->|Depth→PC (EFM3D pointcloud utils)| E[Fused reconstruction P_{t∪q}]
+    A[ASE/ATEK shard<br/>+ GT mesh] --> B[data_handling.dataset<br/>EfmSnippetView]
+    B --> C[pose_generation<br/>CandidateViewGenerator]
+    C -->|"PoseTW batch + masks"| D[rendering<br/>CandidateDepthRenderer]
+    D -->|"Depth to PC (EFM3D utils)"| E[Fused reconstruction P_t+q]
     E --> F[Metrics: RRI / Chamfer]
-    F --> G[Policy: pick NBV]
-    G -->|advance pose| C
+    F --> G[Policy: choose NBV]
+    G -->|"advance pose"| C
 ```
 
 # Core modules (shortcuts)

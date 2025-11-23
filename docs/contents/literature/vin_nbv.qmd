@@ -30,7 +30,6 @@ $$
 C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
 $$
 
-
 **Relative Reconstruction Improvement (RRI)**:
 
 For a query view $q$, RRI quantifies reconstruction improvement:
@@ -52,19 +51,14 @@ $$
 **Three-Stage Pipeline**:
 
 1. **Scene Reconstruction**:
-
    - Backproject RGB-D images to 3D point cloud $\mathcal{P}_{base}$
    - Voxel downsample for efficiency
-
 2. **3D-Aware Featurization**:
-
    - **Surface Normals**: Variance indicates geometric complexity (high variance = complex surfaces needing more views)
    - **Visibility Count**: Tracks how many base views observe each point (low count = potentially informative)
    - **Depth Values**: Distance information for surface consistency
    - **Coverage Feature $F_{empty}$**: Empty pixel mask when projecting $\mathcal{P}_{base}$ to query view
-
 4. **RRI Prediction**:
-
    - **Convolutional Encoder**: 4 layers, hidden dimension 256
    - Processes featurized point cloud projected to query view
    - **Ranking MLP**: 3 layers, hidden dimension 256
@@ -117,7 +111,6 @@ $$
 - **Hardware**: 4× A6000 GPUs, ~24 hours
 - **Batching**: By object (one point cloud per batch projected to all candidate views)
 
-
 **Key Features**:
 
 - **Flexible Constraints**: Can limit by number of captures, time, or distance
@@ -138,6 +131,7 @@ $$
 
 - Cov-NBV baseline uses same greedy strategy but scores views by empty pixel count:
   $$Cov(q) = W \times H - \sum_{u,v} \mathbb{1}(C_q(\mathcal{P}_{base})_{u,v})$$
+
 - VIN-NBV achieves largest gains in early capture stages
 - Late stages: both converge (coverage becomes more important)
 
