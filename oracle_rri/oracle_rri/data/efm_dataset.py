@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Any, ClassVar, Literal, Self
 
 import numpy as np
 import torch
@@ -243,7 +243,11 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
 class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
     """Configuration for :class:`AseEfmDataset`."""
 
-    DEBUG_DEFAULTS: dict = Field({"batch_size": 1, "mesh_simplify_ratio": 0.1, "verbose": True}, exclude=True)
+    # NOTE: Previously defined via Field, making it a Pydantic field; accessing
+    # `AseEfmDatasetConfig.DEBUG_DEFAULTS` in Streamlit raised AttributeError.
+    # We keep it as a ClassVar constant so it stays accessible while being
+    # excluded from model fields.
+    DEBUG_DEFAULTS: ClassVar[dict[str, Any]] = {"batch_size": 1, "mesh_simplify_ratio": 0.1, "verbose": True}
 
     target: type[AseEfmDataset] = Field(default=AseEfmDataset, exclude=True)
     paths: PathConfig = Field(default_factory=PathConfig)

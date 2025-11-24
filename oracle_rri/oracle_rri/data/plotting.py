@@ -1,13 +1,10 @@
 """Plotting utilities for the Streamlit data view.
 
 Conventions (efm3d / ATEK):
-- Camera frame is RDF (x right, y down, z forward); world is Z-up (gravity = [0,0,-g]).
-- Pose: T_world_cam = T_world_rig @ T_camera_rig.inverse() (efm3d render_frustum).
-- Gravity-align to keep +Z up, then rebase orientation so viewer up = -camera x
-  (efm3d viz convention to undo Aria's 90° roll and match displayed frames).
-- Frustum is distortion-aware via CameraTW.unproject of an inscribed valid-radius
-  square (same as efm3d.render_frustum).
-- Images are rotated -90° for display; frustum/axes follow the rebased pose.
+- Camera frame is **LUF** (x left, y up, z forward) per Project Aria docs; world is Z-up (gravity = [0,0,-g]).
+- Pose: T_world_cam = T_world_rig @ T_camera_rig.inverse() (matches efm3d.render_frustum).
+- Frustum geometry is built directly in world+LUF (no display-frame tweaks); Plotly merely visualises it.
+- Images are rotated -90° for display, but the underlying 3D poses stay in LUF.
 """
 
 from __future__ import annotations
@@ -18,55 +15,95 @@ import torch
 import trimesh
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
+from matplotlib import colormaps
 from plotly.subplots import make_subplots
 
 from oracle_rri.data import EfmCameraView, EfmSnippetView, EfmTrajectoryView
 from oracle_rri.utils import Console
-from oracle_rri.utils.frames import pose_for_display
+from oracle_rri.utils.frames import world_from_rig_camera_pose
 
 console = Console.with_prefix("plotting")
 
 
-def _frustum_segments(cam: CameraTW, pose_world_cam: PoseTW, scale: float = 1.0) -> list[np.ndarray]:
-    """Return frustum wireframe segments in world frame using CameraTW.unproject."""
-    c = cam.c.squeeze(0)
-    rs = cam.valid_radius.squeeze(0) * 0.7071  # inscribed square
-    corners_px = torch.stack(
-        [
-            c + torch.tensor([-rs[0], -rs[1]], device=cam.device, dtype=cam.dtype),
-            c + torch.tensor([-rs[0], rs[1]], device=cam.device, dtype=cam.dtype),
-            c + torch.tensor([rs[0], rs[1]], device=cam.device, dtype=cam.dtype),
-            c + torch.tensor([rs[0], -rs[1]], device=cam.device, dtype=cam.dtype),
-        ],
-        dim=0,
-    ).unsqueeze(0)  # 1 x 4 x 2
+def _frustum_segments(
+    cam: CameraTW,
+    pose_world_cam: PoseTW,
+    scale: float = 1.0,
+) -> list[np.ndarray]:
+    """Return frustum wireframe segments in world frame using CameraTW.unproject (LUF pose).
 
-    rays_cam, valid = cam.unproject(corners_px)  # 1 x 4 x 3
-    rays_cam = rays_cam.squeeze(0)
-    valid = valid.squeeze(0)
-    rays_cam = torch.where(valid.unsqueeze(-1), rays_cam, torch.zeros_like(rays_cam))
+    The four image-plane corners are first unprojected in the camera's intrinsic
+    frame, then re-ordered into a canonical sequence
+
+        0: top-left
+        1: bottom-left
+        2: bottom-right
+        3: top-right
+
+    so that:
+
+        - left  edge  is (0, 1)
+        - bottom edge is (1, 2)
+        - right edge is (2, 3)
+        - top   edge is (3, 0)
+
+    This ordering is independent of the initial pixel-corner indexing and
+    robust to the sign conventions used inside CameraTW.project/unproject.
+    A small "hat" is added above the top edge by offsetting along the
+    physical camera +Y axis (LUF), optionally undoing a display roll.
+    """
+    # Construct four pixel corners on an inscribed square
+    c = cam.c.squeeze(0)  # (2,)
+    rs = cam.valid_radius.squeeze(0) / np.sqrt(2.0)  # inscribed square radius per axis
+
+    corners_px = (
+        torch.stack(
+            [
+                c + torch.tensor([-rs[0], -rs[1]]),  # TL
+                c + torch.tensor([-rs[0], rs[1]]),  # BL
+                c + torch.tensor([rs[0], rs[1]]),  # BR
+                c + torch.tensor([rs[0], -rs[1]]),  # TR
+            ],
+            dim=0,
+        )
+        .to(c)
+        .unsqueeze(0)
+    )  # 1 x 4 x 2
+
+    # Unproject to camera-frame rays (LUF) and normalise
+    rays_cam = cam.unproject(corners_px)[0].squeeze(0)  # 4 x 3
     rays_cam = torch.nn.functional.normalize(rays_cam, dim=-1, eps=1e-6)
-    frustum_cam = rays_cam * scale
+    frustum_cam = rays_cam * scale  # 4 x 3
 
-    frustum_world = pose_world_cam.transform(frustum_cam)  # 4 x 3
-    center = pose_world_cam.t
+    # Transform to world frame and build triangular faces
+    frustum_np = pose_world_cam.transform(frustum_cam).detach().cpu().numpy()  # (4, 3)
+    center_np = pose_world_cam.t.detach().cpu().numpy()  # (3,)
 
-    frustum_np = frustum_world.detach().cpu().numpy()
-    center_np = center.detach().cpu().numpy()
+    segments: list[np.ndarray] = []
+    ring_edges = [(0, 1), (1, 2), (2, 3), (3, 0)]
+    for i, j in ring_edges:
+        segments.append(np.vstack([center_np, frustum_np[i], frustum_np[j]]))
 
-    segments = []
-    for i in range(4):
-        segments.append(np.vstack([center_np, frustum_np[i], frustum_np[(i + 1) % 4]]))
-    # small top triangle cue
-    up = frustum_np[0] - frustum_np[1]
+    # Top-edge "hat": offset along physical camera +Y
+    edge_top = (frustum_np[2], frustum_np[1])
+    mid_top = 0.5 * (edge_top[0] + edge_top[1])
+
+    # camera +Y = "up" in LUF
+    up_dir = pose_world_cam.R @ torch.tensor([0.0, 1.0, 0.0], device=cam.device, dtype=cam.dtype)
+
+    up_dir_np = up_dir.detach().cpu().numpy()
+    up_dir_np = up_dir_np / np.linalg.norm(up_dir_np)
+
+    hat_h = 0.1 * scale  # height of the cue relative to frustum scale
     top_pts = np.array(
         [
-            frustum_np[0] + 0.1 * up,
-            0.5 * (frustum_np[0] + frustum_np[3]) + 0.5 * up,
-            frustum_np[3] + 0.1 * up,
+            edge_top[0] + hat_h * up_dir_np,
+            mid_top + 2.5 * hat_h * up_dir_np,
+            edge_top[1] + hat_h * up_dir_np,
         ]
     )
     segments.append(top_pts)
+
     return segments
 
 
@@ -105,7 +142,9 @@ def _proxy_box_mesh(bounds: np.ndarray) -> "trimesh.Trimesh":
 
     vmin, vmax = bounds
     extents = vmax - vmin
-    box = trimesh.creation.box(extents=extents, transform=trimesh.transformations.translation_matrix(vmin + extents / 2.0))
+    box = trimesh.creation.box(
+        extents=extents, transform=trimesh.transformations.translation_matrix(vmin + extents / 2.0)
+    )
     return box
 
 
@@ -191,9 +230,7 @@ def _mesh_to_plotly(
             "zmax": centers[:, 2] >= vmax[2] - eps,
         }
         coverage = {k: areas[m].sum() for k, m in planes.items()}
-        missing = [
-            k for k, cov in coverage.items() if desired[k] > 0 and cov < 0.2 * desired[k]
-        ]
+        missing = [k for k, cov in coverage.items() if desired[k] > 0 and cov < 0.2 * desired[k]]
         if missing:
             proxy_bounds = occupancy_extent if occupancy_extent is not None else mesh.bounds
             proxy = _proxy_box_mesh(proxy_bounds)
@@ -219,7 +256,7 @@ def _mesh_to_plotly(
 
 
 def _aligned_pose_world_cam(cam: EfmCameraView, traj: EfmTrajectoryView, frame_idx: int) -> PoseTW:
-    """Align camera frame to nearest rig pose, gravity-align, and apply display corrections."""
+    """Nearest rig-aligned camera pose in **world+LUF** (no display corrections)."""
 
     cam_ts = np.atleast_1d(cam.time_ns.cpu().numpy())
     traj_ts = np.atleast_1d(traj.time_ns.cpu().numpy())
@@ -228,9 +265,23 @@ def _aligned_pose_world_cam(cam: EfmCameraView, traj: EfmTrajectoryView, frame_i
     traj_idx = int(np.argmin(np.abs(traj_ts - cam_ts[frame_idx])))
 
     t_world_rig = traj.t_world_rig[traj_idx]
-    t_cam_rig = cam.calib.T_camera_rig[frame_idx]
-    t_world_cam = t_world_rig @ t_cam_rig.inverse()
-    return pose_for_display(t_world_cam, align_gravity=True)
+    # Keep the physical pose in LUF; Plotly should render the true sensor frame.
+    return world_from_rig_camera_pose(t_world_rig, cam.calib, frame_idx)
+
+
+def _apply_display_roll(pose_world_cam: PoseTW, roll_rad: float = np.pi / 2) -> PoseTW:
+    """Optionally roll the pose about its +Z (forward) axis for display-only alignment."""
+
+    if roll_rad == 0.0:
+        return pose_world_cam
+    c, s = np.cos(roll_rad), np.sin(roll_rad)
+    r_roll = torch.tensor(
+        [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
+        device=pose_world_cam.R.device,
+        dtype=pose_world_cam.R.dtype,
+    )
+    r_disp = pose_world_cam.R @ r_roll
+    return PoseTW.from_Rt(r_disp, pose_world_cam.t)
 
 
 class SnippetPlotBuilder:
@@ -320,7 +371,12 @@ class SnippetPlotBuilder:
         return self
 
     def add_frustum(
-        self, cam: CameraTW, pose_world_cam: PoseTW, *, scale: float = 1.0, name: str = "Frustum"
+        self,
+        cam: CameraTW,
+        pose_world_cam: PoseTW,
+        *,
+        scale: float = 1.0,
+        name: str = "Frustum",
     ) -> "SnippetPlotBuilder":
         frustum_segments = _frustum_segments(cam, pose_world_cam, scale=scale)
         for idx, seg in enumerate(frustum_segments):
@@ -334,7 +390,8 @@ class SnippetPlotBuilder:
                     name=name if idx == 0 else None,
                     showlegend=idx == 0,
                 )
-        )
+            )
+
         return self
 
     def add_camera_axes(self, cam_center: np.ndarray, cam_axes: np.ndarray) -> "SnippetPlotBuilder":
@@ -391,7 +448,63 @@ class SnippetPlotBuilder:
                     showlegend=idx == 0,
                     hoverinfo="skip",
                 )
-        )
+            )
+        return self
+
+    def add_gt_obbs(
+        self,
+        ts_world_object: np.ndarray,
+        object_dimensions: np.ndarray,
+        *,
+        color: str = "purple",
+        name: str = "GT OBBs",
+        opacity: float = 0.35,
+    ) -> "SnippetPlotBuilder":
+        """Add oriented boxes defined by world←object poses and dimensions."""
+
+        if ts_world_object.size == 0 or object_dimensions.size == 0:
+            return self
+
+        def _obb_corners(rot: np.ndarray, t: np.ndarray, dims: np.ndarray) -> np.ndarray:
+            half = dims / 2.0
+            signs = np.array(
+                [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]]
+            )
+            local = signs * half
+            return (rot @ local.T).T + t
+
+        for corners in (
+            _obb_corners(ts[:3, :3], ts[:3, 3], dims)
+            for ts, dims in zip(ts_world_object, object_dimensions, strict=False)
+        ):
+            edges_idx = [
+                (0, 1),
+                (1, 2),
+                (2, 3),
+                (3, 0),
+                (4, 5),
+                (5, 6),
+                (6, 7),
+                (7, 4),
+                (0, 4),
+                (1, 5),
+                (2, 6),
+                (3, 7),
+            ]
+            for idx, (i0, i1) in enumerate(edges_idx):
+                seg = np.vstack([corners[i0], corners[i1]])
+                self.fig.add_trace(
+                    go.Scatter3d(
+                        x=seg[:, 0],
+                        y=seg[:, 1],
+                        z=seg[:, 2],
+                        mode="lines",
+                        line={"color": color, "width": 3},
+                        name=name if idx == 0 else None,
+                        showlegend=idx == 0,
+                        opacity=opacity,
+                    )
+                )
         return self
 
     def finalize(self) -> go.Figure:
@@ -412,48 +525,246 @@ def _to_uint8_image(img: torch.Tensor, *, rotate_k: int = 0) -> np.ndarray:
     return arr
 
 
-def plot_frames(sample: EfmSnippetView) -> go.Figure:
-    """First RGB/SLAM frames side-by-side."""
-    cam_rgb = sample.camera_rgb
-    cam_l = sample.camera_slam_left
-    cam_r = sample.camera_slam_right
+def _depth_to_color(depth: torch.Tensor, *, rotate_k: int = 0, percentile: float = 99.5) -> np.ndarray:
+    """Colorise a single depth/distance map to uint8 RGB using a perceptual colormap."""
 
-    rotate_k = -1  # legacy UI orientation
-    imgs = [
-        _to_uint8_image(cam_rgb.images[0], rotate_k=rotate_k),
-        _to_uint8_image(cam_l.images[0], rotate_k=rotate_k),
-        _to_uint8_image(cam_r.images[0], rotate_k=rotate_k),
+    depth_np = depth.detach().cpu().squeeze().numpy()
+    finite_mask = np.isfinite(depth_np)
+    if not finite_mask.any():
+        rgb = np.zeros(depth_np.shape + (3,), dtype=np.uint8)
+    else:
+        finite_vals = depth_np[finite_mask]
+        vmin = max(np.nanmin(finite_vals), 0.0)
+        vmax = np.nanpercentile(finite_vals, percentile)
+        if vmax <= vmin:
+            vmax = vmin + 1e-3
+        norm = np.clip((depth_np - vmin) / (vmax - vmin), 0.0, 1.0)
+        cmap = colormaps.get_cmap("viridis")
+        rgb = (cmap(norm)[..., :3] * 255).astype(np.uint8)
+    if rotate_k:
+        rgb = np.rot90(rgb, k=rotate_k)
+    return rgb
+
+
+def _semantic_to_color(mask: torch.Tensor, *, rotate_k: int = 0) -> np.ndarray:
+    """Map integer semantic/instance labels to RGB colours."""
+
+    mask_np = mask.detach().cpu().squeeze().numpy()
+    if mask_np.ndim != 2:
+        mask_np = np.reshape(mask_np, mask_np.shape[-2:])
+    mask_np = np.nan_to_num(mask_np, nan=-1.0).astype(np.int64)
+    if rotate_k:
+        mask_np = np.rot90(mask_np, k=rotate_k)
+
+    palette = (colormaps.get_cmap("tab20", 256)(np.linspace(0, 1, 256))[:, :3] * 255).astype(np.uint8)
+    mapped = palette[np.mod(mask_np, 256)]
+    mapped[mask_np < 0] = 0
+    return mapped
+
+
+class FrameGridBuilder:
+    """Builder for image grids (2D modalities)."""
+
+    def __init__(self, rows: int, cols: int, *, titles: list[str], height: int, width: int, title: str):
+        self.fig = make_subplots(rows=rows, cols=cols, subplot_titles=titles, specs=[[{"type": "image"}] * cols] * rows)
+        self.height = height
+        self.width = width
+        self.title = title
+
+    def add_image(self, img: np.ndarray, *, row: int, col: int) -> "FrameGridBuilder":
+        self.fig.add_trace(go.Image(z=img), row=row, col=col)
+        return self
+
+    def finalize(self) -> go.Figure:
+        self.fig.update_layout(height=self.height, width=self.width, title_text=self.title)
+        return self.fig
+
+
+def collect_frame_modalities(
+    sample: EfmSnippetView,
+    *,
+    include_depth: bool = True,
+    include_semantic: bool = True,
+    rotate_k: int = -1,
+) -> tuple[list[tuple[str, np.ndarray, np.ndarray]], list[str]]:
+    """Collect first/last-frame visualisations for available modalities."""
+
+    missing: list[str] = []
+    missing_set: set[str] = set()
+    modalities: list[tuple[str, np.ndarray, np.ndarray]] = []
+
+    cams: list[tuple[str, EfmCameraView]] = [
+        ("RGB", sample.camera_rgb),
+        ("SLAM-L", sample.camera_slam_left),
+        ("SLAM-R", sample.camera_slam_right),
     ]
 
-    fig = make_subplots(rows=1, cols=3, subplot_titles=("RGB", "SLAM-L", "SLAM-R"), specs=[[{"type": "image"}] * 3])
-    for idx, img in enumerate(imgs, start=1):
-        fig.add_trace(go.Image(z=img), row=1, col=idx)
-    fig.update_layout(height=500, width=1200, title_text="Camera views (frame 0)")
+    for name, cam in cams:
+        if cam.images.numel() == 0:
+            if name not in missing_set:
+                missing.append(name)
+                missing_set.add(name)
+            continue
+        modalities.append(
+            (
+                name,
+                _to_uint8_image(cam.images[0], rotate_k=rotate_k),
+                _to_uint8_image(cam.images[-1], rotate_k=rotate_k),
+            )
+        )
+
+    if include_depth:
+        depth_streams = [
+            ("Depth (RGB)", sample.camera_rgb.distance_m),
+            ("Depth (SLAM-L)", sample.camera_slam_left.distance_m),
+            ("Depth (SLAM-R)", sample.camera_slam_right.distance_m),
+        ]
+        for name, depth in depth_streams:
+            if depth is None or depth.numel() == 0:
+                if name not in missing_set:
+                    missing.append(name)
+                    missing_set.add(name)
+                    console.dbg(f"{name} missing in sample {sample.scene_id}/{sample.snippet_id}")
+                continue
+            modalities.append(
+                (name, _depth_to_color(depth[0], rotate_k=rotate_k), _depth_to_color(depth[-1], rotate_k=rotate_k))
+            )
+
+    return modalities, missing
+
+
+def _rotate_uv(uv: np.ndarray, width: int, height: int, rotate_k: int) -> np.ndarray:
+    """Rotate pixel coords to match an image rotated by np.rot90."""
+
+    if rotate_k % 4 == 0:
+        return uv
+    k = rotate_k % 4
+    u, v = uv[:, 0], uv[:, 1]
+    if k == 1:  # 90° CCW
+        u_new = v
+        v_new = width - 1 - u
+    elif k == 2:  # 180°
+        u_new = width - 1 - u
+        v_new = height - 1 - v
+    elif k == 3:  # 90° CW (equivalent to k=-1)
+        u_new = height - 1 - v
+        v_new = u
+    else:  # pragma: no cover
+        u_new, v_new = u, v
+    return np.stack([u_new, v_new], axis=-1)
+
+
+def project_pointcloud_on_frame(
+    *,
+    img: torch.Tensor,
+    cam: CameraTW,
+    pose_world_cam: PoseTW,
+    points_world: torch.Tensor,
+    rotate_k: int = -1,
+    max_points: int | None = 20000,
+    title: str = "Point cloud overlay",
+    point_size: int = 5,
+) -> go.Figure:
+    """Project 3D points into image plane and overlay on the frame."""
+
+    if points_world.numel() == 0:
+        return go.Figure()
+
+    img_np = _to_uint8_image(img, rotate_k=rotate_k)
+    h, w = img_np.shape[:2]
+
+    pts = points_world
+    if pts.ndim == 3:
+        pts = pts.reshape(-1, pts.shape[-1])
+    finite = torch.isfinite(pts).all(dim=-1)
+    pts = pts[finite]
+    if pts.numel() == 0:
+        return go.Figure()
+    if max_points is not None and pts.shape[0] > max_points:
+        idx = torch.randperm(pts.shape[0], device=pts.device)[:max_points]
+        pts = pts[idx]
+
+    pts_cam = pose_world_cam.inverse().transform(pts)
+    pts_cam_b = pts_cam.unsqueeze(0)  # 1 x N x 3 to satisfy fisheye projection utils
+    p2d, valid = cam.project(pts_cam_b)
+    # p2d: 1 x N x 2, valid: 1 x N (or 1 x N x 1)
+    if valid.ndim == 3:
+        valid = valid.squeeze(0)
+    if valid.ndim > 2:
+        valid = valid.squeeze()
+    valid_flat = valid.squeeze()
+    p2d = p2d.squeeze(0)[valid_flat]
+    depth = pts_cam[valid_flat, -1]
+    if p2d.numel() == 0:
+        return go.Figure()
+
+    uv = p2d.detach().cpu().numpy()
+    depth_np = depth.detach().cpu().numpy()
+    uv = _rotate_uv(uv, width=w, height=h, rotate_k=rotate_k)
+
+    depth_norm = np.clip((depth_np - depth_np.min()) / (depth_np.max() - depth_np.min() + 1e-6), 0, 1)
+    cmap = colormaps.get_cmap("turbo")
+    colors = (cmap(depth_norm)[..., :3] * 255).astype(np.uint8)
+    colors_hex = ["#" + "".join(f"{c:02x}" for c in rgb) for rgb in colors]
+
+    fig = go.Figure()
+    fig.add_trace(go.Image(z=img_np))
+    fig.add_trace(
+        go.Scattergl(
+            x=uv[:, 0],
+            y=uv[:, 1],
+            mode="markers",
+            marker={"size": point_size, "color": colors_hex, "opacity": 0.8},
+            name="Projected points",
+        )
+    )
+    fig.update_yaxes(autorange="reversed")
+    fig.update_layout(height=600, width=600, title=title)
     return fig
+
+
+def plot_frames(sample: EfmSnippetView) -> go.Figure:
+    """First RGB/SLAM frames side-by-side."""
+    modalities, _ = collect_frame_modalities(sample, include_depth=False, include_semantic=False)
+    if len(modalities) == 0:
+        return go.Figure()
+
+    cols = len(modalities)
+    builder = FrameGridBuilder(
+        rows=1,
+        cols=cols,
+        titles=[name for name, _, _ in modalities],
+        height=500,
+        width=max(800, 320 * cols),
+        title="Camera views (frame 0)",
+    )
+    for col, (_, first_img, _) in enumerate(modalities, start=1):
+        builder.add_image(first_img, row=1, col=col)
+    return builder.finalize()
 
 
 def plot_first_last_frames(sample: EfmSnippetView) -> go.Figure:
-    """First and final RGB/SLAM frames in a 2x3 grid."""
+    """First and final frames for all available modalities (RGB/SLAM + optional depth/semantic)."""
 
-    cams = [sample.camera_rgb, sample.camera_slam_left, sample.camera_slam_right]
-    titles = ("RGB", "SLAM-L", "SLAM-R")
-    n_frames = cams[0].images.shape[0]
-    last_idx = max(n_frames - 1, 0)
+    modalities, _ = collect_frame_modalities(sample, include_depth=True, include_semantic=True)
+    if len(modalities) == 0:
+        return go.Figure()
 
-    rotate_k = -1
-    subplot_titles = [f"First {t}" for t in titles]
-    fig = make_subplots(
+    cols = len(modalities)
+    subplot_titles = [f"First {name}" for name, _, _ in modalities] + [f"Last {name}" for name, _, _ in modalities]
+    builder = FrameGridBuilder(
         rows=2,
-        cols=3,
-        subplot_titles=subplot_titles,
-        specs=[[{"type": "image"}] * 3, [{"type": "image"}] * 3],
+        cols=cols,
+        titles=subplot_titles,
+        height=500 if cols <= 3 else int(500 * cols / 3),
+        width=max(1200, 320 * cols),
+        title="First and final frames (rotated for display)",
     )
-    for col, cam in enumerate(cams, start=1):
-        fig.add_trace(go.Image(z=_to_uint8_image(cam.images[0], rotate_k=rotate_k)), row=1, col=col)
-        fig.add_trace(go.Image(z=_to_uint8_image(cam.images[last_idx], rotate_k=rotate_k)), row=2, col=col)
+    for col, (_, first_img, last_img) in enumerate(modalities, start=1):
+        builder.add_image(first_img, row=1, col=col)
+        builder.add_image(last_img, row=2, col=col)
 
-    fig.update_layout(height=900, width=1200, title_text="First and final frames (rotated for display)")
-    return fig
+    return builder.finalize()
 
 
 def plot_trajectory(
@@ -468,8 +779,11 @@ def plot_trajectory(
     show_frustum: bool = True,
     frustum_frame_indices: list[int] | None = None,
     frustum_scale: float = 1.0,
+    display_roll_rad: float = np.pi / 2,  # viewer roll to match rotated RGB display; set 0 to disable
     mark_first_last: bool = True,
     double_sided_mesh: bool = False,
+    show_gt_obbs: bool = False,
+    gt_timestamp: str | int | None = None,
 ) -> go.Figure:
     """Mesh + semidense + trajectory + optional frusta/bounds."""
 
@@ -489,6 +803,8 @@ def plot_trajectory(
 
     clamped_indices = [max(0, min(idx, cam.time_ns.shape[0] - 1)) for idx in frustum_frame_indices]
     frustum_poses = [_aligned_pose_world_cam(cam, traj, idx) for idx in clamped_indices]
+    if display_roll_rad is not None:
+        frustum_poses = [_apply_display_roll(p, display_roll_rad) for p in frustum_poses]
 
     traj_positions = traj.t_world_rig.t.detach().cpu().numpy()
     pts_np = np.zeros((0, 3), dtype=np.float32)
@@ -498,7 +814,8 @@ def plot_trajectory(
         )
 
     cam_centers = np.stack([p.t.detach().cpu().numpy() for p in frustum_poses], axis=0)
-    cam_axes = [p.R.detach().cpu().numpy() for p in frustum_poses]
+    # PoseTW.R stores R_world_cam; its columns are the camera basis in world coords.
+    cam_axes = [p.R.detach().cpu().numpy().T for p in frustum_poses]
 
     bbox = np.vstack(
         [
@@ -528,16 +845,22 @@ def plot_trajectory(
         scene_max = sem.volume_max.detach().cpu().numpy()
 
     builder = SnippetPlotBuilder(title="Mesh + semidense + trajectory + camera frustum", scene_ranges=scene_ranges)
-    builder.add_mesh(mesh, double_sided=double_sided_mesh, occupancy_extent=None if scene_min is None else np.stack([scene_min, scene_max])).add_trajectory(
-        traj_positions, mark_first_last=mark_first_last, show=True
-    )
+    builder.add_mesh(
+        mesh,
+        double_sided=double_sided_mesh,
+        occupancy_extent=None if scene_min is None else np.stack([scene_min, scene_max]),
+    ).add_trajectory(traj_positions, mark_first_last=mark_first_last, show=True)
 
     if pts_np.size > 0:
         builder.add_semidense(pts_np)
 
     if show_frustum:
         for pose, idx in zip(frustum_poses, clamped_indices, strict=False):
-            builder.add_frustum(cam.calib[idx], pose, scale=frustum_scale)
+            builder.add_frustum(
+                cam.calib[idx],
+                pose,
+                scale=frustum_scale,
+            )
         builder.add_camera_axes(cam_centers[0], cam_axes[0])
         builder.add_camera_center(cam_centers[0])
 
@@ -546,6 +869,21 @@ def plot_trajectory(
             builder.add_bounds_box(scene_min, scene_max, name="Scene bounds", color="gray", dash="dash", width=2)
         else:
             builder.add_bounds_box(vmin, vmax, name="Scene bounds", color="gray", dash="dash", width=2)
+
+    if show_gt_obbs and sample.gt is not None:
+        ts_key = (
+            gt_timestamp if gt_timestamp is not None else (sample.gt.timestamps[0] if sample.gt.timestamps else None)
+        )
+        if ts_key is not None:
+            cam_id_map = {"rgb": "camera-rgb", "slam-l": "camera-slam-left", "slam-r": "camera-slam-right"}
+            try:
+                cam_gt = sample.gt.cameras_at(ts_key)[cam_id_map.get(camera, "camera-rgb")]
+                builder.add_gt_obbs(
+                    ts_world_object=cam_gt.ts_world_object.detach().cpu().numpy(),
+                    object_dimensions=cam_gt.object_dimensions.detach().cpu().numpy(),
+                )
+            except KeyError:
+                console.dbg(f"No GT OBBs for ts={ts_key} and camera={camera}")
 
     if show_crop_bounds and crop_aabb is not None:
         builder.add_bounds_box(crop_aabb[0], crop_aabb[1], name="Crop bounds", color="orange", dash="solid", width=3)
