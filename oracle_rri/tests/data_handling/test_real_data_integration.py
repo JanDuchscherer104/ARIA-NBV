@@ -3,11 +3,14 @@
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("efm3d")
+
 import torch
 from efm3d.utils.depth import dist_im_to_point_cloud_im
 from efm3d.utils.mesh_utils import compute_pts_to_mesh_dist
 
-from oracle_rri.data import ASEDataset, ASEDatasetConfig
+from oracle_rri.data import AseEfmDataset, AseEfmDatasetConfig
 from oracle_rri.utils import Console
 
 
@@ -36,29 +39,27 @@ def test_depth_to_mesh_distance_real_sample():
     scene_id, scene_dir, mesh_path = located
     console = Console.with_prefix("integration", scene_id)
 
-    config = ASEDatasetConfig(
+    config = AseEfmDatasetConfig(
         tar_urls=[str(scene_dir / "shards-*.tar")],
         scene_to_mesh={scene_id: mesh_path},
         load_meshes=True,
         batch_size=None,
-        shuffle=False,
-        repeat=False,
         verbose=False,
     )
 
-    ds = ASEDataset(config)
+    ds = AseEfmDataset(config)
     sample = next(iter(ds))
 
-    cam_rgb_depth = sample.camera_rgb_depth
-    depth = cam_rgb_depth.images  # [T,1,H,W]
-    # Use first frame
+    cam_rgb = sample.camera_rgb
+    if cam_rgb.distance_m is None:
+        pytest.skip("Depth channel not present in sample.")
+    depth = cam_rgb.distance_m  # [T,1,H,W]
     depth0 = depth[:1]
-    cam0 = cam_rgb_depth.t_device_camera.new_zeros(1, 3, 4)  # placeholder; real CameraTW unavailable in stub
+    cams = cam_rgb.calib.tensor  # use stored CameraTW tensor
 
-    pts_w, _ = dist_im_to_point_cloud_im(depth0, cam0)
+    pts_w, _ = dist_im_to_point_cloud_im(depth0, cams[:1])
     pts_w = pts_w.reshape(-1, 3)
 
-    # Compute point-to-mesh distance using efm3d helper
     mesh = sample.mesh
     assert mesh is not None
     verts = torch.from_numpy(mesh.vertices).float()

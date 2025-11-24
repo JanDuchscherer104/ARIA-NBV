@@ -105,6 +105,7 @@ def crop_mesh_with_bounds(
     min_keep_ratio: float = 0.1,
     console: Console | None = None,
 ) -> trimesh.Trimesh:
+    # TODO: mesh should be simplified only once - after (optinal cropping). Currently simplification is done twice potentially.
     """Return a copy of ``mesh`` cropped to an AABB with optional margin."""
 
     bounds_min, bounds_max = bounds
@@ -126,6 +127,8 @@ def crop_mesh_with_bounds(
         return mesh
 
     cropped = mesh.submesh([face_mask], append=True)
+    assert isinstance(cropped, trimesh.Trimesh)
+
     keep_ratio = cropped.faces.shape[0] / float(mesh.faces.shape[0])
     if keep_ratio < min_keep_ratio:
         if console:
@@ -138,7 +141,7 @@ def crop_mesh_with_bounds(
     if max_faces is not None and cropped.faces.shape[0] > max_faces:
         cropped = cropped.simplify_quadric_decimation(face_count=max_faces)
         if console:
-            console.dbg(f"Decimated cropped mesh to {max_faces} faces.")
+            console.warn(f"Decimated cropped mesh to {max_faces} faces.")
 
     return cropped
 
@@ -175,27 +178,45 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
         mesh = trimesh.load(str(mesh_path), process=False)
         if not isinstance(mesh, trimesh.Trimesh):
             raise TypeError(f"Mesh for scene {scene_id} is not Trimesh")
-        mesh = self._decimate_mesh(mesh)
         if self.config.cache_meshes:
             self._mesh_cache[scene_id] = mesh
         return mesh
 
-    def _decimate_mesh(self, mesh: trimesh.Trimesh) -> trimesh.Trimesh:
-        faces_before = mesh.faces.shape[0]
+    def _prepare_mesh(
+        self,
+        mesh: trimesh.Trimesh,
+        bounds: tuple[torch.Tensor, torch.Tensor] | None,
+    ) -> trimesh.Trimesh:
+        """Crop (if bounds provided) then simplify once."""
+
+        mesh_use = mesh.copy()
+        if bounds is not None and self.config.mesh_crop_margin_m is not None:
+            mesh_use = crop_mesh_with_bounds(
+                mesh_use,
+                bounds,
+                self.config.mesh_crop_margin_m,
+                max_faces=None,  # simplification handled below
+                min_keep_ratio=self.config.mesh_crop_min_keep_ratio,
+                console=self.console if self.config.verbose else None,
+            )
+
+        faces_before = mesh_use.faces.shape[0]
         target_faces = faces_before
 
         if self.config.mesh_simplify_ratio not in (None, 0):
-            target_faces = min(target_faces, max(4, int(faces_before * self.config.mesh_simplify_ratio)))
+            target_faces = min(target_faces, int(faces_before * self.config.mesh_simplify_ratio))
 
-        # TODO remove mesh_max_faces, only use mesh_simplify_ratio!
         if self.config.mesh_max_faces is not None:
             target_faces = min(target_faces, int(self.config.mesh_max_faces))
 
-        if target_faces < faces_before:
-            mesh = mesh.simplify_quadric_decimation(face_count=target_faces)
-            self.console.dbg(f"Decimated mesh from {faces_before} to {mesh.faces.shape[0]} faces.")
+        if target_faces < mesh_use.faces.shape[0]:
+            mesh_use = mesh_use.simplify_quadric_decimation(face_count=target_faces)
+            self.console.dbg(
+                f"Simplified mesh from {faces_before} to {mesh_use.faces.shape[0]} faces "
+                f"(target={target_faces})."
+            )
 
-        return mesh
+        return mesh_use
 
     def _iter_efm_samples(self) -> Iterator[dict[str, Any]]:
         """Yield per-snippet EFM dicts from the WebDataset loader.
@@ -223,20 +244,13 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
         for efm_dict in self._iter_efm_samples():
             # second inspection here. efm_dict is corrupted. i.e. efm_dict["points/p3s_world"].shape gives torch.Size([50000, 3])
             scene_id, snippet_id = _infer_ids(efm_dict, efm_dict.get("sequence_name", ""))
-            mesh = self._load_mesh(scene_id) if self.config.load_meshes else None
-            if mesh is not None and self.config.mesh_crop_margin_m is not None:
+            mesh_base = self._load_mesh(scene_id) if self.config.load_meshes else None
+            mesh = mesh_base
+            if mesh_base is not None:
                 bounds = infer_semidense_bounds(efm_dict)
-                if bounds is not None:
-                    mesh = crop_mesh_with_bounds(
-                        mesh,
-                        bounds,
-                        self.config.mesh_crop_margin_m,
-                        max_faces=self.config.mesh_max_faces,
-                        min_keep_ratio=self.config.mesh_crop_min_keep_ratio,
-                        console=self.console if self.config.verbose else None,
-                    )
-                elif self.config.verbose:
+                if bounds is None and self.config.verbose:
                     self.console.dbg(f"No semidense bounds available for snippet {snippet_id}; skipping mesh crop.")
+                mesh = self._prepare_mesh(mesh_base, bounds)
             yield EfmSnippetView(efm=efm_dict, scene_id=scene_id, snippet_id=snippet_id, mesh=mesh)
 
 
@@ -288,7 +302,7 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
 
     @field_validator("tar_urls", mode="before")
     @classmethod
-    def _populate_tar_urls(cls, value: list[str] | None, info: ValidationInfo) -> list[str]:
+    def _populate_tar_urls(cls, _: list[str] | None, info: ValidationInfo) -> list[str]:
         data = info.data
         paths: PathConfig = data.get("paths") or PathConfig()
         scene_ids: list[str] = data.get("scene_ids")  # type: ignore[assignment]

@@ -34,7 +34,7 @@ def test_semidense_points_respects_lengths_and_filters_nan() -> None:
         lengths=torch.tensor([2, 1], dtype=torch.int64),
     )
 
-    pts_np = plotting._semidense_points_np(sem, max_points=None)
+    pts_np = sem.collapse_points_np(max_points=None)
     pts_set = {tuple(row) for row in np.round(pts_np, decimals=6)}
 
     assert pts_set == {(0.0, 0.0, 0.0), (1.0, 1.0, 1.0), (2.0, 2.0, 2.0)}
@@ -55,7 +55,7 @@ def test_semidense_points_caps_max_points() -> None:
         lengths=torch.tensor([6, 6], dtype=torch.int64),
     )
 
-    pts_np = plotting._semidense_points_np(sem, max_points=5)
+    pts_np = sem.collapse_points_np(max_points=5)
     pts_set = {tuple(row) for row in np.round(pts_np, decimals=6)}
     expected_pool = {
         tuple(row)

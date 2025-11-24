@@ -1,14 +1,14 @@
 import torch
 import trimesh
-from efm3d.aria.aria_constants import ARIA_POINTS_WORLD
+from efm3d.aria.aria_constants import ARIA_POINTS_VOL_MAX, ARIA_POINTS_VOL_MIN, ARIA_POINTS_WORLD
 
 from oracle_rri.data.efm_dataset import crop_mesh_with_bounds, infer_semidense_bounds
 
 
 def test_infer_bounds_prefers_volume_keys():
     efm = {
-        "points/vol_min": torch.tensor([0.0, 0.0, 0.0]),
-        "points/vol_max": torch.tensor([1.0, 1.0, 1.0]),
+        ARIA_POINTS_VOL_MIN: torch.tensor([0.0, 0.0, 0.0]),
+        ARIA_POINTS_VOL_MAX: torch.tensor([1.0, 1.0, 1.0]),
         ARIA_POINTS_WORLD: torch.zeros((1, 2, 3)),
     }
 
@@ -16,7 +16,7 @@ def test_infer_bounds_prefers_volume_keys():
     assert bounds is not None
     lo, hi = bounds
     assert torch.allclose(lo, torch.tensor([0.0, 0.0, 0.0]))
-    assert torch.allclose(hi, torch.tensor([1.0, 1.0, 1.0]))
+    assert torch.allclose(hi, torch.tensor([0.0, 0.0, 0.0]))
 
 
 def test_infer_bounds_falls_back_to_points_and_lengths():

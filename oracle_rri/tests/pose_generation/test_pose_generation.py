@@ -2,11 +2,14 @@ import math
 
 import numpy as np
 import pytest
+
+pytest.importorskip("efm3d")
+
 import torch
 import trimesh
 from efm3d.aria import PoseTW
 
-from oracle_rri.data import ASEDatasetConfig
+from oracle_rri.data import AseEfmDatasetConfig
 from oracle_rri.pose_generation import (
     CandidateViewGenerator,
     CandidateViewGeneratorConfig,
@@ -247,7 +250,7 @@ def test_candidate_generator_with_real_dataset_sample():
     """
 
     try:
-        dataset = ASEDatasetConfig(load_meshes=True, verbose=False).setup_target()
+        dataset = AseEfmDatasetConfig(load_meshes=True, verbose=False).setup_target()
         sample = next(iter(dataset))
     except Exception as exc:  # pragma: no cover - environment-dependent
         pytest.skip(f"ASE dataset not available locally: {exc}")
@@ -276,7 +279,7 @@ def test_candidate_generator_real_orientation_and_extent():
     """Real-data check: candidates look back at last_pose and lie inside inferred extent."""
 
     try:
-        dataset = ASEDatasetConfig(load_meshes=True, verbose=False, require_mesh=False).setup_target()
+        dataset = AseEfmDatasetConfig(load_meshes=True, verbose=False, require_mesh=False).setup_target()
         sample = next(iter(dataset))
     except Exception as exc:  # pragma: no cover - environment dependent
         pytest.skip(f"ASE dataset not available locally: {exc}")
@@ -308,14 +311,11 @@ def test_candidate_generator_real_orientation_and_extent():
 
     # Check positions fall inside the occupancy extent used (if any).
     extent = None
-    try:
-        if sample.gt_mesh is not None:
-            bounds = torch.from_numpy(sample.gt_mesh.bounds).float()
-            vmin, vmax = bounds[0], bounds[1]
-            extent = torch.stack([vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]])
-    except KeyError:
-        # Mesh not attached; fall back to occupancy extent inference.
-        pass
+    mesh = sample.mesh
+    if mesh is not None:
+        bounds = torch.from_numpy(mesh.bounds).float()
+        vmin, vmax = bounds[0], bounds[1]
+        extent = torch.stack([vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]])
     if extent is None:
         extent = gen._occupancy_extent_from_sample(sample)
 

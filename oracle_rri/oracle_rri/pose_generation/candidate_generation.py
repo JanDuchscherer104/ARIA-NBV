@@ -8,7 +8,7 @@ planning in ASE scenes:
    spherical coordinates.
 2. Orient each candidate to look back at the most recent pose using
    :func:`oracle_rri.utils.frames.view_axes_from_points`, consistent with the
-   EFM3D RDF camera convention (X-right, Y-down, Z-forward).
+   EFM3D LUF camera convention (X-left, Y-up, Z-forward).
 3. Apply a sequence of rules (see :mod:`oracle_rri.pose_generation.candidate_generation_rules`)
    that remove candidates which violate geometric constraints (too close to
    the mesh, path collisions, outside occupancy bounds, ...).
@@ -16,8 +16,11 @@ planning in ASE scenes:
 Frames:
     * **World**: VIO-aligned world frame with gravity in ``[0, 0, -g]``
       (Z-up). All positions are expressed in this frame.
-    * **Cameras**: RDF convention, X-right, Y-down, Z-forward, as in
-      :mod:`efm3d.utils.viz`.
+    * **Cameras**: LUF convention, X-left, Y-up, Z-forward (Project Aria).
+
+NOTE: Earlier revisions treated cameras as RDF and silently mirrored poses.
+We now document the correct LUF convention and rely on display-only transforms
+to align visuals without changing stored poses.
 
 Poses are :class:`efm3d.aria.PoseTW` with :math:`T_\\text{world,cam}` mapping
 points from the camera frame into the VIO world frame.
@@ -25,7 +28,7 @@ points from the camera frame into the VIO world frame.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Self
+from typing import Literal, Self
 
 import torch
 import trimesh
@@ -33,7 +36,7 @@ from efm3d.aria import PoseTW
 from pydantic import Field, field_validator, model_validator
 
 from ..data.efm_views import EfmSnippetView
-from ..utils import BaseConfig, Console
+from ..utils import BaseConfig, Console, select_device
 from .candidate_generation_rules import (
     FreeSpaceRule,
     MinDistanceToMeshRule,
@@ -154,8 +157,10 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Number of ray samples / subdivisions when evaluating path collisions."""
     step_clearance: float = 0.05
     """Step size (m) for distance checks along paths when required."""
-    device: Annotated[torch.device, Literal["cuda", "cpu"]] = "cuda"  # type: ignore[assignment]
-    """Preferred torch device for vectorised operations (e.g., 'cuda' or 'cpu')."""
+    device: torch.device = Field(  # type: ignore[assignment]
+        default_factory=lambda: select_device("auto", component="CandidateViewGenerator")
+    )
+    """Preferred torch device for vectorised operations (auto-resolves to CUDA when available)."""
 
     verbose: bool = True
 
@@ -164,11 +169,8 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
 
     @field_validator("device", mode="before")
     @classmethod
-    def _resolve_device(cls, v: str) -> torch.device:
-        value = v.lower()
-        if value.startswith("cuda") and torch.cuda.is_available():
-            return torch.device(value)
-        return torch.device("cpu") if value.startswith("cuda") else torch.device(value)
+    def _resolve_device(cls, v: str | torch.device) -> torch.device:
+        return select_device(v, component="CandidateViewGenerator")
 
     @model_validator(mode="after")
     def set_debug(self) -> Self:
@@ -241,9 +243,7 @@ class CandidateViewGenerator:
         if occupancy_extent is not None:
             self.console.log_summary("occupancy_extent", occupancy_extent)
         if gt_mesh is not None:
-            self.console.log(
-                f"mesh stats verts={gt_mesh.vertices.shape[0]:,} faces={gt_mesh.faces.shape[0]:,}"
-            )
+            self.console.log(f"mesh stats verts={gt_mesh.vertices.shape[0]:,} faces={gt_mesh.faces.shape[0]:,}")
         self.console.log_summary("last_pose_matrix", last_pose.matrix3x4)
 
         return self.generate(

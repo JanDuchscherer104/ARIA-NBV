@@ -13,7 +13,5 @@ dependencies:
   - anaconda::cudnn
   - gcc=12.1
   - gxx=12.1
-
-  # Only uv for package management - everything else via pyproject.toml
   - pip:
     - uv>=0.9.4

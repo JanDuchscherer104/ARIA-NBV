@@ -21,7 +21,7 @@ from pytorch3d.structures import Meshes
 from torch import Tensor
 from trimesh import Trimesh
 
-from ..utils import BaseConfig, Console
+from ..utils import BaseConfig, Console, select_device
 
 if TYPE_CHECKING:
     from efm3d.aria import CameraTW, PoseTW
@@ -95,13 +95,8 @@ class Pytorch3DDepthRenderer:
             .set_verbose(self.config.verbose)
             .set_debug(self.config.is_debug)
         )
-        requested = torch.device(self.config.device)
-        if self.config.is_debug or (requested.type == "cuda" and not torch.cuda.is_available()):
-            if requested.type == "cuda":
-                self.console.warn("CUDA unavailable; falling back to CPU for PyTorch3D rendering.")
-            self._device = torch.device("cpu")
-        else:
-            self._device = requested
+        preferred = "cpu" if self.config.is_debug else self.config.device
+        self._device = select_device(preferred, component=self.__class__.__name__)
 
     @property
     def device(self) -> torch.device:

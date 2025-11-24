@@ -23,35 +23,23 @@ from oracle_rri.utils import Console
 from oracle_rri.utils.frames import world_from_rig_camera_pose
 
 console = Console.with_prefix("plotting")
+ROTATE_90_CW = -1
 
 
-def _frustum_segments(
+def get_frustum_segments(
     cam: CameraTW,
     pose_world_cam: PoseTW,
     scale: float = 1.0,
 ) -> list[np.ndarray]:
-    """Return frustum wireframe segments in world frame using CameraTW.unproject (LUF pose).
+    """Return frustum wireframe segments in world frame using CameraTW.unproject.
 
     The four image-plane corners are first unprojected in the camera's intrinsic
-    frame, then re-ordered into a canonical sequence
-
-        0: top-left
-        1: bottom-left
-        2: bottom-right
-        3: top-right
-
-    so that:
-
-        - left  edge  is (0, 1)
-        - bottom edge is (1, 2)
-        - right edge is (2, 3)
-        - top   edge is (3, 0)
-
-    This ordering is independent of the initial pixel-corner indexing and
-    robust to the sign conventions used inside CameraTW.project/unproject.
-    A small "hat" is added above the top edge by offsetting along the
-    physical camera +Y axis (LUF), optionally undoing a display roll.
+    frame, then transformed to world frame using pose_world_cam.
     """
+    # Keep all intermediate tensors on the same device/dtype as the camera to
+    # avoid CPU/GPU mismatches when candidate poses live on CUDA.
+    pose_world_cam = pose_world_cam.to(device=cam.device, dtype=cam.dtype)
+
     # Construct four pixel corners on an inscribed square
     c = cam.c.squeeze(0)  # (2,)
     rs = cam.valid_radius.squeeze(0) / np.sqrt(2.0)  # inscribed square radius per axis
@@ -107,7 +95,7 @@ def _frustum_segments(
     return segments
 
 
-def _bbox_edges(min_pt: np.ndarray, max_pt: np.ndarray) -> list[np.ndarray]:
+def bbox_edges(min_pt: np.ndarray, max_pt: np.ndarray) -> list[np.ndarray]:
     corners = np.array(
         [
             [min_pt[0], min_pt[1], min_pt[2]],
@@ -137,36 +125,15 @@ def _bbox_edges(min_pt: np.ndarray, max_pt: np.ndarray) -> list[np.ndarray]:
     return [corners[list(pair)] for pair in edges_idx]
 
 
-def _proxy_box_mesh(bounds: np.ndarray) -> "trimesh.Trimesh":
-    import trimesh
-
-    vmin, vmax = bounds
-    extents = vmax - vmin
-    box = trimesh.creation.box(
-        extents=extents, transform=trimesh.transformations.translation_matrix(vmin + extents / 2.0)
-    )
-    return box
-
-
-def _mesh_to_plotly(
-    mesh,
-    *,
-    double_sided: bool = False,
-    add_proxy_walls: bool = True,
-    occupancy_extent: np.ndarray | None = None,
-) -> list[go.Mesh3d]:
-    """Convert a Trimesh to Plotly Mesh3d traces.
-
-    double_sided=True duplicates faces with reversed winding so interior walls remain
-    visible when the camera is inside the mesh (Plotly only shades front faces).
-    add_proxy_walls=True adds missing wall planes from the mesh bounds when coverage is low.
-    """
+def mesh_to_plotly(
+    mesh: trimesh.Trimesh,
+) -> go.Mesh3d:
+    """Convert a Trimesh to Plotly Mesh3d traces."""
 
     vertices = mesh.vertices
     faces = mesh.faces
-    traces: list[go.Mesh3d] = []
 
-    base_trace = go.Mesh3d(
+    return go.Mesh3d(
         x=vertices[:, 0],
         y=vertices[:, 1],
         z=vertices[:, 2],
@@ -179,134 +146,100 @@ def _mesh_to_plotly(
         lighting={"ambient": 1.0, "diffuse": 0.3, "specular": 0.0, "fresnel": 0.0, "roughness": 1.0},
         name="GT Mesh",
         hoverinfo="skip",
-        showscale=False,
     )
-    traces.append(base_trace)
-
-    if double_sided:
-        faces_rev = faces[:, [0, 2, 1]]
-        traces.append(
-            go.Mesh3d(
-                x=vertices[:, 0],
-                y=vertices[:, 1],
-                z=vertices[:, 2],
-                i=faces_rev[:, 0],
-                j=faces_rev[:, 1],
-                k=faces_rev[:, 2],
-                color="#c0c0c0",
-                opacity=0.35,
-                flatshading=True,
-                lighting={"ambient": 1.0, "diffuse": 0.0, "specular": 0.0, "fresnel": 0.0, "roughness": 1.0},
-                name="GT Mesh (inner)",
-                hoverinfo="skip",
-                showscale=False,
-            )
-        )
-
-    if add_proxy_walls:
-        # Detect missing wall coverage (very low area near bounds); add thin box faces if needed.
-        centers = mesh.triangles_center
-        areas = mesh.area_faces
-        if occupancy_extent is not None and occupancy_extent.shape == (2, 3):
-            vmin, vmax = occupancy_extent
-        else:
-            vmin, vmax = mesh.bounds
-        extents = vmax - vmin
-        desired = {
-            "xmin": extents[1] * extents[2],
-            "xmax": extents[1] * extents[2],
-            "ymin": extents[0] * extents[2],
-            "ymax": extents[0] * extents[2],
-            "zmin": extents[0] * extents[1],
-            "zmax": extents[0] * extents[1],
-        }
-        eps = 0.05
-        planes = {
-            "xmin": centers[:, 0] <= vmin[0] + eps,
-            "xmax": centers[:, 0] >= vmax[0] - eps,
-            "ymin": centers[:, 1] <= vmin[1] + eps,
-            "ymax": centers[:, 1] >= vmax[1] - eps,
-            "zmin": centers[:, 2] <= vmin[2] + eps,
-            "zmax": centers[:, 2] >= vmax[2] - eps,
-        }
-        coverage = {k: areas[m].sum() for k, m in planes.items()}
-        missing = [k for k, cov in coverage.items() if desired[k] > 0 and cov < 0.2 * desired[k]]
-        if missing:
-            proxy_bounds = occupancy_extent if occupancy_extent is not None else mesh.bounds
-            proxy = _proxy_box_mesh(proxy_bounds)
-            traces.append(
-                go.Mesh3d(
-                    x=proxy.vertices[:, 0],
-                    y=proxy.vertices[:, 1],
-                    z=proxy.vertices[:, 2],
-                    i=proxy.faces[:, 0],
-                    j=proxy.faces[:, 1],
-                    k=proxy.faces[:, 2],
-                    color="#b0c4de",
-                    opacity=0.3,
-                    flatshading=True,
-                    lighting={"ambient": 1.0, "diffuse": 0.0, "specular": 0.0, "fresnel": 0.0, "roughness": 1.0},
-                    name="Proxy walls",
-                    hoverinfo="skip",
-                    showscale=False,
-                )
-            )
-
-    return traces
 
 
 def _aligned_pose_world_cam(cam: EfmCameraView, traj: EfmTrajectoryView, frame_idx: int) -> PoseTW:
     """Nearest rig-aligned camera pose in **world+LUF** (no display corrections)."""
 
-    cam_ts = np.atleast_1d(cam.time_ns.cpu().numpy())
-    traj_ts = np.atleast_1d(traj.time_ns.cpu().numpy())
+    cam_ts = cam.time_ns.cpu().numpy()
+    traj_ts = traj.time_ns.cpu().numpy()
     if cam_ts.size == 0 or traj_ts.size == 0:
         return PoseTW.from_Rt(torch.eye(3), torch.zeros(3))
     traj_idx = int(np.argmin(np.abs(traj_ts - cam_ts[frame_idx])))
 
-    t_world_rig = traj.t_world_rig[traj_idx]
     # Keep the physical pose in LUF; Plotly should render the true sensor frame.
-    return world_from_rig_camera_pose(t_world_rig, cam.calib, frame_idx)
+    return world_from_rig_camera_pose(traj.t_world_rig[traj_idx], cam.calib, frame_idx)
 
 
-def _apply_display_roll(pose_world_cam: PoseTW, roll_rad: float = np.pi / 2) -> PoseTW:
-    """Optionally roll the pose about its +Z (forward) axis for display-only alignment."""
-
-    if roll_rad == 0.0:
-        return pose_world_cam
-    c, s = np.cos(roll_rad), np.sin(roll_rad)
+def apply_yaw90(pose_world_cam: PoseTW) -> PoseTW:
+    """Roll the pose about its +Z (forward) axis for alignment."""
+    c, s = np.cos(np.pi / 2), np.sin(np.pi / 2)
     r_roll = torch.tensor(
         [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
         device=pose_world_cam.R.device,
         dtype=pose_world_cam.R.dtype,
     )
-    r_disp = pose_world_cam.R @ r_roll
-    return PoseTW.from_Rt(r_disp, pose_world_cam.t)
+    return PoseTW.from_Rt(pose_world_cam.R @ r_roll, pose_world_cam.t)
 
 
 class SnippetPlotBuilder:
-    """Composable builder for mesh/points/frusta visuals with optional trajectory."""
+    """Composable builder for mesh/points/frusta visuals using a stored snippet.
 
-    def __init__(self, *, scene_ranges: dict, title: str, height: int = 900):
+    All data comes from the snippet; methods only accept visual/customisation params.
+    """
+
+    def __init__(self, snippet: EfmSnippetView, *, title: str, height: int = 900):
+        self.snippet = snippet
         self.fig = go.Figure()
-        self.scene_ranges = scene_ranges
         self.title = title
         self.height = height
+        self.scene_ranges = self._default_scene_ranges()
 
-    def add_mesh(
-        self,
-        mesh,
-        *,
-        double_sided: bool = False,
-        occupancy_extent: np.ndarray | None = None,
-    ) -> "SnippetPlotBuilder":
+    @classmethod
+    def from_snippet(cls, snippet: EfmSnippetView, *, title: str, height: int = 900) -> "SnippetPlotBuilder":
+        return cls(snippet, title=title, height=height)
+
+    def _default_scene_ranges(self) -> dict:
+        mesh = self.snippet.mesh
+        traj_positions = self.snippet.trajectory.t_world_rig.t.detach().cpu().numpy()
+        pts_np = np.zeros((0, 3), dtype=np.float32)
+        sem = self.snippet.semidense
+        if sem is not None and hasattr(sem, "points_world"):
+            pts_np = sem.last_frame_points_np(20000)
+
+        bbox = np.vstack(
+            [
+                pts_np,
+                traj_positions,
+                mesh.vertices if mesh is not None else np.zeros((0, 3)),
+            ]
+        )
+        finite_mask = np.isfinite(bbox).all(axis=1)
+        bbox = bbox[finite_mask]
+        if bbox.shape[0] == 0:
+            bbox = np.array([[0.0, 0.0, 0.0]])
+
+        vmin, vmax = bbox.min(axis=0), bbox.max(axis=0)
+        max_extent = (vmax - vmin).max()
+        padding = max(0.5, 0.1 * max_extent)
+        return {
+            "xaxis": {"title": "X (m)", "range": [vmin[0] - padding, vmax[0] + padding]},
+            "yaxis": {"title": "Y (m)", "range": [vmin[1] - padding, vmax[1] + padding]},
+            "zaxis": {"title": "Z (m)", "range": [vmin[2] - padding, vmax[2] + padding]},
+        }
+
+    def add_mesh(self, *, color: str = "lightgray", opacity: float = 0.35) -> "SnippetPlotBuilder":
+        mesh = self.snippet.mesh
         if mesh is None:
             return self
-        for trace in _mesh_to_plotly(mesh, double_sided=double_sided, occupancy_extent=occupancy_extent):
-            self.fig.add_trace(trace)
+        trace = mesh_to_plotly(mesh)
+        trace.update(color=color, opacity=opacity)
+        self.fig.add_trace(trace)
         return self
 
-    def add_semidense(self, pts_np: np.ndarray, *, name: str = "Semidense points") -> "SnippetPlotBuilder":
+    def add_semidense(
+        self,
+        *,
+        name: str = "Semidense points",
+        max_points: int | None = 20000,
+        last_frame_only: bool = True,
+        color: str = "Viridis",
+    ) -> "SnippetPlotBuilder":
+        sem = self.snippet.semidense
+        if sem is None:
+            return self
+        pts_np = sem.last_frame_points_np(max_points) if last_frame_only else sem.collapse_points_np(max_points)
         if pts_np.size == 0:
             return self
         self.fig.add_trace(
@@ -315,7 +248,7 @@ class SnippetPlotBuilder:
                 y=pts_np[:, 1],
                 z=pts_np[:, 2],
                 mode="markers",
-                marker={"size": 2, "color": pts_np[:, 2], "colorscale": "Viridis", "opacity": 0.5},
+                marker={"size": 2, "color": pts_np[:, 2], "colorscale": color, "opacity": 0.5},
                 name=name,
             )
         )
@@ -323,7 +256,6 @@ class SnippetPlotBuilder:
 
     def add_trajectory(
         self,
-        traj_positions: np.ndarray,
         *,
         mark_first_last: bool = True,
         first_color: str = "green",
@@ -332,6 +264,7 @@ class SnippetPlotBuilder:
     ) -> "SnippetPlotBuilder":
         if not show:
             return self
+        traj_positions = self.snippet.trajectory.t_world_rig.t.detach().cpu().numpy()
         traj_x, traj_y, traj_z = traj_positions.T
         self.fig.add_trace(
             go.Scatter3d(
@@ -353,7 +286,7 @@ class SnippetPlotBuilder:
                     y=[first[1]],
                     z=[first[2]],
                     mode="markers",
-                    marker={"size": 2, "color": first_color, "symbol": "diamond"},
+                    marker={"size": 4, "color": first_color, "symbol": "diamond"},
                     name="Start",
                 )
             )
@@ -364,37 +297,61 @@ class SnippetPlotBuilder:
                         y=[last[1]],
                         z=[last[2]],
                         mode="markers",
-                        marker={"size": 2, "color": last_color, "symbol": "x"},
+                        marker={"size": 4, "color": last_color, "symbol": "x"},
                         name="Final",
                     )
                 )
         return self
 
-    def add_frustum(
+    def add_frusta(
         self,
-        cam: CameraTW,
-        pose_world_cam: PoseTW,
         *,
+        camera: str = "rgb",
+        frame_indices: list[int] | None = None,
         scale: float = 1.0,
+        include_axes: bool = True,
+        include_center: bool = True,
         name: str = "Frustum",
     ) -> "SnippetPlotBuilder":
-        frustum_segments = _frustum_segments(cam, pose_world_cam, scale=scale)
-        for idx, seg in enumerate(frustum_segments):
-            self.fig.add_trace(
-                go.Scatter3d(
-                    x=seg[:, 0],
-                    y=seg[:, 1],
-                    z=seg[:, 2],
-                    mode="lines",
-                    line={"color": "red", "width": 4},
-                    name=name if idx == 0 else None,
-                    showlegend=idx == 0,
-                )
-            )
+        cam_view = self._camera_by_name(camera)
+        if frame_indices is None or len(frame_indices) == 0:
+            frame_indices = [0]
+        clamped = [max(0, min(idx, cam_view.time_ns.shape[0] - 1)) for idx in frame_indices]
+        traj = self.snippet.trajectory
+        traj_count = traj.t_world_rig.shape[0]
+        poses: list[PoseTW] = []
+        for idx in clamped:
+            traj_idx = min(max(0, idx), traj_count - 1)
+            t_world_rig = traj.t_world_rig[traj_idx]
+            poses.append(world_from_rig_camera_pose(t_world_rig, cam_view.calib, idx))
+        poses = [apply_yaw90(p) for p in poses]
 
+        for pose, frame_idx in zip(poses, clamped, strict=False):
+            frustum_segments = get_frustum_segments(cam_view.calib[frame_idx], pose, scale=scale)
+            for idx, seg in enumerate(frustum_segments):
+                self.fig.add_trace(
+                    go.Scatter3d(
+                        x=seg[:, 0],
+                        y=seg[:, 1],
+                        z=seg[:, 2],
+                        mode="lines",
+                        line={"color": "red", "width": 4},
+                        name=name if idx == 0 else None,
+                        showlegend=idx == 0,
+                    )
+                )
+
+        if include_axes or include_center:
+            cam_centers = np.stack([p.t.detach().cpu().numpy() for p in poses], axis=0)
+            cam_axes = [p.R.detach().cpu().numpy().T for p in poses]
+            if include_axes:
+                for center, axes in zip(cam_centers, cam_axes, strict=False):
+                    self._add_camera_axes(center, axes)
+            if include_center:
+                self._add_camera_center(cam_centers[0])
         return self
 
-    def add_camera_axes(self, cam_center: np.ndarray, cam_axes: np.ndarray) -> "SnippetPlotBuilder":
+    def _add_camera_axes(self, cam_center: np.ndarray, cam_axes: np.ndarray) -> "SnippetPlotBuilder":
         axis_colors = ["red", "green", "blue"]
         for axis, color in enumerate(axis_colors):
             axis_end = cam_center + cam_axes[axis] * 0.4
@@ -411,7 +368,7 @@ class SnippetPlotBuilder:
             )
         return self
 
-    def add_camera_center(
+    def _add_camera_center(
         self, cam_center: np.ndarray, *, color: str = "red", symbol: str = "diamond"
     ) -> "SnippetPlotBuilder":
         self.fig.add_trace(
@@ -428,15 +385,25 @@ class SnippetPlotBuilder:
 
     def add_bounds_box(
         self,
-        min_pt: np.ndarray,
-        max_pt: np.ndarray,
         *,
         name: str,
         color: str = "gray",
         dash: str = "dash",
         width: int = 2,
+        aabb: tuple[np.ndarray, np.ndarray] | None = None,
     ) -> "SnippetPlotBuilder":
-        for idx, seg in enumerate(_bbox_edges(min_pt, max_pt)):
+        if aabb is None:
+            sem = self.snippet.semidense
+            if sem is not None and hasattr(sem, "volume_min") and hasattr(sem, "volume_max"):
+                min_pt = sem.volume_min.detach().cpu().numpy()
+                max_pt = sem.volume_max.detach().cpu().numpy()
+            else:
+                traj_positions = self.snippet.trajectory.t_world_rig.t.detach().cpu().numpy()
+                min_pt, max_pt = traj_positions.min(axis=0), traj_positions.max(axis=0)
+        else:
+            min_pt, max_pt = aabb
+
+        for idx, seg in enumerate(bbox_edges(min_pt, max_pt)):
             self.fig.add_trace(
                 go.Scatter3d(
                     x=seg[:, 0],
@@ -453,15 +420,34 @@ class SnippetPlotBuilder:
 
     def add_gt_obbs(
         self,
-        ts_world_object: np.ndarray,
-        object_dimensions: np.ndarray,
         *,
+        camera: str = "rgb",
+        timestamp: str | int | None = None,
         color: str = "purple",
         name: str = "GT OBBs",
         opacity: float = 0.35,
     ) -> "SnippetPlotBuilder":
         """Add oriented boxes defined by world←object poses and dimensions."""
 
+        if self.snippet.gt is None:
+            return self
+
+        ts_key = (
+            timestamp
+            if timestamp is not None
+            else (self.snippet.gt.timestamps[0] if self.snippet.gt.timestamps else None)
+        )
+        if ts_key is None:
+            return self
+
+        cam_id_map = {"rgb": "camera-rgb", "slam-l": "camera-slam-left", "slam-r": "camera-slam-right"}
+        try:
+            cam_gt = self.snippet.gt.cameras_at(ts_key)[cam_id_map.get(camera, "camera-rgb")]
+        except KeyError:
+            return self
+
+        ts_world_object = cam_gt.ts_world_object.detach().cpu().numpy()
+        object_dimensions = cam_gt.object_dimensions.detach().cpu().numpy()
         if ts_world_object.size == 0 or object_dimensions.size == 0:
             return self
 
@@ -511,21 +497,28 @@ class SnippetPlotBuilder:
         self.fig.update_layout(title=self.title, scene=dict(aspectmode="data", **self.scene_ranges), height=self.height)
         return self.fig
 
+    def _camera_by_name(self, camera: str) -> EfmCameraView:
+        cam_map = {
+            "rgb": self.snippet.camera_rgb,
+            "slam-l": self.snippet.camera_slam_left,
+            "slam-r": self.snippet.camera_slam_right,
+        }
+        return cam_map.get(camera, self.snippet.camera_rgb)
 
-def _to_uint8_image(img: torch.Tensor, *, rotate_k: int = 0) -> np.ndarray:
+
+def _to_uint8_image(img: torch.Tensor) -> np.ndarray:
     """Convert tensor image (C,H,W or H,W) to uint8 HWC."""
     arr = img.detach().cpu()
     if arr.ndim == 2:
         arr = arr.unsqueeze(0)
     if arr.shape[0] == 1:
         arr = arr.repeat(3, 1, 1)
-    arr = arr.permute(1, 2, 0).clamp(0, 1).mul(255).to(torch.uint8).numpy()
-    if rotate_k:
-        arr = np.rot90(arr, k=rotate_k)
-    return arr
+    arr = arr.permute(1, 2, 0).clamp(0, 1).mul(255).to(torch.uint8).numpy()  # type: ignore
+
+    return np.rot90(arr, k=ROTATE_90_CW)  # type: ignore
 
 
-def _depth_to_color(depth: torch.Tensor, *, rotate_k: int = 0, percentile: float = 99.5) -> np.ndarray:
+def _depth_to_color(depth: torch.Tensor, *, percentile: float = 99.5) -> np.ndarray:
     """Colorise a single depth/distance map to uint8 RGB using a perceptual colormap."""
 
     depth_np = depth.detach().cpu().squeeze().numpy()
@@ -541,25 +534,7 @@ def _depth_to_color(depth: torch.Tensor, *, rotate_k: int = 0, percentile: float
         norm = np.clip((depth_np - vmin) / (vmax - vmin), 0.0, 1.0)
         cmap = colormaps.get_cmap("viridis")
         rgb = (cmap(norm)[..., :3] * 255).astype(np.uint8)
-    if rotate_k:
-        rgb = np.rot90(rgb, k=rotate_k)
-    return rgb
-
-
-def _semantic_to_color(mask: torch.Tensor, *, rotate_k: int = 0) -> np.ndarray:
-    """Map integer semantic/instance labels to RGB colours."""
-
-    mask_np = mask.detach().cpu().squeeze().numpy()
-    if mask_np.ndim != 2:
-        mask_np = np.reshape(mask_np, mask_np.shape[-2:])
-    mask_np = np.nan_to_num(mask_np, nan=-1.0).astype(np.int64)
-    if rotate_k:
-        mask_np = np.rot90(mask_np, k=rotate_k)
-
-    palette = (colormaps.get_cmap("tab20", 256)(np.linspace(0, 1, 256))[:, :3] * 255).astype(np.uint8)
-    mapped = palette[np.mod(mask_np, 256)]
-    mapped[mask_np < 0] = 0
-    return mapped
+    return np.rot90(rgb, k=ROTATE_90_CW)
 
 
 class FrameGridBuilder:
@@ -584,8 +559,6 @@ def collect_frame_modalities(
     sample: EfmSnippetView,
     *,
     include_depth: bool = True,
-    include_semantic: bool = True,
-    rotate_k: int = -1,
 ) -> tuple[list[tuple[str, np.ndarray, np.ndarray]], list[str]]:
     """Collect first/last-frame visualisations for available modalities."""
 
@@ -608,16 +581,14 @@ def collect_frame_modalities(
         modalities.append(
             (
                 name,
-                _to_uint8_image(cam.images[0], rotate_k=rotate_k),
-                _to_uint8_image(cam.images[-1], rotate_k=rotate_k),
+                _to_uint8_image(cam.images[0]),
+                _to_uint8_image(cam.images[-1]),
             )
         )
 
     if include_depth:
         depth_streams = [
             ("Depth (RGB)", sample.camera_rgb.distance_m),
-            ("Depth (SLAM-L)", sample.camera_slam_left.distance_m),
-            ("Depth (SLAM-R)", sample.camera_slam_right.distance_m),
         ]
         for name, depth in depth_streams:
             if depth is None or depth.numel() == 0:
@@ -626,31 +597,26 @@ def collect_frame_modalities(
                     missing_set.add(name)
                     console.dbg(f"{name} missing in sample {sample.scene_id}/{sample.snippet_id}")
                 continue
-            modalities.append(
-                (name, _depth_to_color(depth[0], rotate_k=rotate_k), _depth_to_color(depth[-1], rotate_k=rotate_k))
-            )
+            modalities.append((name, _depth_to_color(depth[0]), _depth_to_color(depth[-1])))
 
     return modalities, missing
 
 
-def _rotate_uv(uv: np.ndarray, width: int, height: int, rotate_k: int) -> np.ndarray:
-    """Rotate pixel coords to match an image rotated by np.rot90."""
+def _rot_cw90_uv(uv: np.ndarray, width: int, height: int) -> np.ndarray:
+    """Rotate UV coordinates 90° clockwise for display-aligned images.
 
-    if rotate_k % 4 == 0:
-        return uv
-    k = rotate_k % 4
+    Args:
+        uv: Pixel coordinates shaped ``(N, 2)``.
+        width: Image width (pixels).
+        height: Image height (pixels).
+
+    Returns:
+        Rotated coordinates matching the display-rotated image.
+    """
+
     u, v = uv[:, 0], uv[:, 1]
-    if k == 1:  # 90° CCW
-        u_new = v
-        v_new = width - 1 - u
-    elif k == 2:  # 180°
-        u_new = width - 1 - u
-        v_new = height - 1 - v
-    elif k == 3:  # 90° CW (equivalent to k=-1)
-        u_new = height - 1 - v
-        v_new = u
-    else:  # pragma: no cover
-        u_new, v_new = u, v
+    u_new = height - 1 - v
+    v_new = u
     return np.stack([u_new, v_new], axis=-1)
 
 
@@ -660,7 +626,6 @@ def project_pointcloud_on_frame(
     cam: CameraTW,
     pose_world_cam: PoseTW,
     points_world: torch.Tensor,
-    rotate_k: int = -1,
     max_points: int | None = 20000,
     title: str = "Point cloud overlay",
     point_size: int = 5,
@@ -670,7 +635,7 @@ def project_pointcloud_on_frame(
     if points_world.numel() == 0:
         return go.Figure()
 
-    img_np = _to_uint8_image(img, rotate_k=rotate_k)
+    img_np = _to_uint8_image(img)
     h, w = img_np.shape[:2]
 
     pts = points_world
@@ -700,7 +665,7 @@ def project_pointcloud_on_frame(
 
     uv = p2d.detach().cpu().numpy()
     depth_np = depth.detach().cpu().numpy()
-    uv = _rotate_uv(uv, width=w, height=h, rotate_k=rotate_k)
+    uv = _rot_cw90_uv(uv, width=w, height=h)
 
     depth_norm = np.clip((depth_np - depth_np.min()) / (depth_np.max() - depth_np.min() + 1e-6), 0, 1)
     cmap = colormaps.get_cmap("turbo")
@@ -725,7 +690,7 @@ def project_pointcloud_on_frame(
 
 def plot_frames(sample: EfmSnippetView) -> go.Figure:
     """First RGB/SLAM frames side-by-side."""
-    modalities, _ = collect_frame_modalities(sample, include_depth=False, include_semantic=False)
+    modalities, _ = collect_frame_modalities(sample, include_depth=False)
     if len(modalities) == 0:
         return go.Figure()
 
@@ -746,7 +711,7 @@ def plot_frames(sample: EfmSnippetView) -> go.Figure:
 def plot_first_last_frames(sample: EfmSnippetView) -> go.Figure:
     """First and final frames for all available modalities (RGB/SLAM + optional depth/semantic)."""
 
-    modalities, _ = collect_frame_modalities(sample, include_depth=True, include_semantic=True)
+    modalities, _ = collect_frame_modalities(sample, include_depth=True)
     if len(modalities) == 0:
         return go.Figure()
 
@@ -779,117 +744,41 @@ def plot_trajectory(
     show_frustum: bool = True,
     frustum_frame_indices: list[int] | None = None,
     frustum_scale: float = 1.0,
-    display_roll_rad: float = np.pi / 2,  # viewer roll to match rotated RGB display; set 0 to disable
     mark_first_last: bool = True,
-    double_sided_mesh: bool = False,
     show_gt_obbs: bool = False,
     gt_timestamp: str | int | None = None,
 ) -> go.Figure:
     """Mesh + semidense + trajectory + optional frusta/bounds."""
 
-    mesh = sample.mesh
-    traj = sample.trajectory
-    sem = sample.semidense
-
-    cam_map = {
-        "rgb": sample.camera_rgb,
-        "slam-l": sample.camera_slam_left,
-        "slam-r": sample.camera_slam_right,
-    }
-    cam = cam_map.get(camera, sample.camera_rgb)
-
-    if frustum_frame_indices is None or len(frustum_frame_indices) == 0:
-        frustum_frame_indices = [0]
-
-    clamped_indices = [max(0, min(idx, cam.time_ns.shape[0] - 1)) for idx in frustum_frame_indices]
-    frustum_poses = [_aligned_pose_world_cam(cam, traj, idx) for idx in clamped_indices]
-    if display_roll_rad is not None:
-        frustum_poses = [_apply_display_roll(p, display_roll_rad) for p in frustum_poses]
-
-    traj_positions = traj.t_world_rig.t.detach().cpu().numpy()
-    pts_np = np.zeros((0, 3), dtype=np.float32)
-    if show_semidense and sem is not None:
-        pts_np = (
-            sem.last_frame_points_np(max_sem_points) if pc_from_last_only else sem.collapse_points_np(max_sem_points)
-        )
-
-    cam_centers = np.stack([p.t.detach().cpu().numpy() for p in frustum_poses], axis=0)
-    # PoseTW.R stores R_world_cam; its columns are the camera basis in world coords.
-    cam_axes = [p.R.detach().cpu().numpy().T for p in frustum_poses]
-
-    bbox = np.vstack(
-        [
-            pts_np,
-            cam_centers.reshape(-1, 3),
-            traj_positions,
-            mesh.vertices if mesh is not None else np.zeros((0, 3)),
-        ]
+    builder = (
+        SnippetPlotBuilder.from_snippet(sample, title="Mesh + semidense + trajectory + camera frustum")
+        .add_mesh()
+        .add_trajectory(mark_first_last=mark_first_last, show=True)
     )
-    finite_mask = np.isfinite(bbox).all(axis=1)
-    bbox = bbox[finite_mask]
-    if bbox.shape[0] == 0:
-        bbox = np.array([[0.0, 0.0, 0.0]])
 
-    vmin, vmax = bbox.min(axis=0), bbox.max(axis=0)
-    max_extent = (vmax - vmin).max()
-    padding = max(0.5, 0.1 * max_extent)
-    scene_ranges = {
-        "xaxis": {"title": "X (m)", "range": [vmin[0] - padding, vmax[0] + padding]},
-        "yaxis": {"title": "Y (m)", "range": [vmin[1] - padding, vmax[1] + padding]},
-        "zaxis": {"title": "Z (m)", "range": [vmin[2] - padding, vmax[2] + padding]},
-    }
-
-    scene_min = scene_max = None
-    if sem is not None and hasattr(sem, "volume_min") and hasattr(sem, "volume_max"):
-        scene_min = sem.volume_min.detach().cpu().numpy()
-        scene_max = sem.volume_max.detach().cpu().numpy()
-
-    builder = SnippetPlotBuilder(title="Mesh + semidense + trajectory + camera frustum", scene_ranges=scene_ranges)
-    builder.add_mesh(
-        mesh,
-        double_sided=double_sided_mesh,
-        occupancy_extent=None if scene_min is None else np.stack([scene_min, scene_max]),
-    ).add_trajectory(traj_positions, mark_first_last=mark_first_last, show=True)
-
-    if pts_np.size > 0:
-        builder.add_semidense(pts_np)
+    if show_semidense:
+        builder.add_semidense(max_points=max_sem_points, last_frame_only=pc_from_last_only)
 
     if show_frustum:
-        for pose, idx in zip(frustum_poses, clamped_indices, strict=False):
-            builder.add_frustum(
-                cam.calib[idx],
-                pose,
-                scale=frustum_scale,
-            )
-        builder.add_camera_axes(cam_centers[0], cam_axes[0])
-        builder.add_camera_center(cam_centers[0])
+        builder.add_frusta(
+            camera=camera,
+            frame_indices=frustum_frame_indices,
+            scale=frustum_scale,
+            include_axes=True,
+            include_center=True,
+        )
 
     if show_scene_bounds:
-        if scene_min is not None and scene_max is not None:
-            builder.add_bounds_box(scene_min, scene_max, name="Scene bounds", color="gray", dash="dash", width=2)
-        else:
-            builder.add_bounds_box(vmin, vmax, name="Scene bounds", color="gray", dash="dash", width=2)
+        builder.add_bounds_box(name="Scene bounds", color="gray", dash="dash", width=2)
 
-    if show_gt_obbs and sample.gt is not None:
-        ts_key = (
-            gt_timestamp if gt_timestamp is not None else (sample.gt.timestamps[0] if sample.gt.timestamps else None)
-        )
-        if ts_key is not None:
-            cam_id_map = {"rgb": "camera-rgb", "slam-l": "camera-slam-left", "slam-r": "camera-slam-right"}
-            try:
-                cam_gt = sample.gt.cameras_at(ts_key)[cam_id_map.get(camera, "camera-rgb")]
-                builder.add_gt_obbs(
-                    ts_world_object=cam_gt.ts_world_object.detach().cpu().numpy(),
-                    object_dimensions=cam_gt.object_dimensions.detach().cpu().numpy(),
-                )
-            except KeyError:
-                console.dbg(f"No GT OBBs for ts={ts_key} and camera={camera}")
+    if show_gt_obbs:
+        builder.add_gt_obbs(camera=camera, timestamp=gt_timestamp)
 
     if show_crop_bounds and crop_aabb is not None:
-        builder.add_bounds_box(crop_aabb[0], crop_aabb[1], name="Crop bounds", color="orange", dash="solid", width=3)
-    elif show_crop_bounds and mesh is not None:
-        mesh_min, mesh_max = mesh.bounds
-        builder.add_bounds_box(mesh_min, mesh_max, name="Crop bounds", color="orange", dash="solid", width=3)
+        builder.add_bounds_box(name="Crop bounds", color="orange", dash="solid", width=3, aabb=crop_aabb)
+    elif show_crop_bounds and sample.mesh is not None:
+        mesh_min, mesh_max = sample.mesh.bounds
+        builder.add_bounds_box(name="Crop bounds", color="orange", dash="solid", width=3, aabb=(mesh_min, mesh_max))
 
     return builder.finalize()
 

@@ -2,7 +2,9 @@
 
 from .downloader import ASEDownloader, ASEDownloaderConfig
 from .efm_dataset import AseEfmDataset, AseEfmDatasetConfig
-from .efm_views import (
+
+# Backward compatibility: legacy name used in tests.
+from .efm_views import (  # noqa: E402
     EfmCameraView,
     EfmGTView,
     EfmObbView,

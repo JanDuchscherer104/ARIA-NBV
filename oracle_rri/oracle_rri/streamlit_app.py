@@ -2,21 +2,25 @@
 
 from __future__ import annotations
 
-import io
-from contextlib import redirect_stderr, redirect_stdout
+import json
 from typing import Any, Literal, TypedDict, cast
 
+import numpy as np
 import streamlit as st
 import torch
+from efm3d.aria.pose import PoseTW
 
 from oracle_rri.data import AseEfmDatasetConfig, EfmSnippetView
-from oracle_rri.data.plotting import crop_aabb_from_semidense, plot_first_last_frames, plot_trajectory
-from oracle_rri.pose_generation import CandidateViewGeneratorConfig
-from oracle_rri.pose_generation.plotting import (
-    plot_candidate_frustums,
-    plot_candidates,
-    plot_sampling_shell,
+from oracle_rri.data.efm_views import EfmCameraView
+from oracle_rri.data.plotting import (
+    SnippetPlotBuilder,
+    collect_frame_modalities,
+    crop_aabb_from_semidense,
+    plot_first_last_frames,
+    project_pointcloud_on_frame,
 )
+from oracle_rri.pose_generation import CandidateViewGeneratorConfig
+from oracle_rri.pose_generation.plotting import plot_candidate_frustums_simple, plot_candidates, plot_sampling_shell
 from oracle_rri.pose_generation.types import CandidateSamplingResult
 from oracle_rri.rendering import (
     CandidateDepthRendererConfig,
@@ -36,8 +40,6 @@ STATE_KEYS = {
     "depth_cfg": "nbv_depth_cfg",
     "sample_idx": "nbv_sample_idx",
 }
-LOG_STATE_KEY = "nbv_console_logs"
-MAX_LOG_LINES = 500
 TASK_KEYS = {
     "data": "nbv_task_data",
     "candidates": "nbv_task_candidates",
@@ -55,11 +57,9 @@ class TaskState(TypedDict):
 class SessionVars(TypedDict, total=False):
     """Typed view over Streamlit session_state keys used in this app."""
 
-    nbv_console_logs: list[str]
     nbv_task_data: TaskState
     nbv_task_candidates: TaskState
     nbv_task_depth: TaskState
-    py_console_globals: dict[str, Any]
 
 
 def _state() -> SessionVars:
@@ -79,7 +79,10 @@ def _safe_rerun() -> None:
         raise RuntimeError("Streamlit rerun API not available.")
 
 
-@st.cache_resource(show_spinner=False)
+@st.cache_resource(
+    show_spinner=False,
+    hash_funcs={AseEfmDatasetConfig: lambda c: json.dumps(c.model_dump(mode="json", round_trip=True), sort_keys=True)},
+)
 def _load_dataset(cfg: AseEfmDatasetConfig):
     """Cache dataset construction to avoid reloading shards on reruns."""
 
@@ -97,7 +100,11 @@ def _load_sample(cfg: AseEfmDatasetConfig, sample_idx: int = 0) -> EfmSnippetVie
 
 
 def _candidate_config_from_ui(
-    default: CandidateViewGeneratorConfig, ui: st.delta_generator.DeltaGenerator, super_fast: bool = False
+    default: CandidateViewGeneratorConfig,
+    ui: st.delta_generator.DeltaGenerator,
+    *,
+    super_fast: bool = False,
+    is_debug: bool = False,
 ) -> CandidateViewGeneratorConfig:
     """Sidebar controls for candidate generation."""
 
@@ -118,8 +125,6 @@ def _candidate_config_from_ui(
         step=0.01,
     )
     device = ui.selectbox("Generator device", ["cpu", "cuda"], index=0 if str(default.device) == "cpu" else 1)
-    is_debug = ui.checkbox("generator is_debug", value=True)
-
     return default.model_copy(
         update={
             "num_samples": int(num_samples),
@@ -137,7 +142,11 @@ def _candidate_config_from_ui(
 
 
 def _renderer_config_from_ui(
-    default: CandidateDepthRendererConfig, ui: st.delta_generator.DeltaGenerator, super_fast: bool = False
+    default: CandidateDepthRendererConfig,
+    ui: st.delta_generator.DeltaGenerator,
+    *,
+    super_fast: bool = False,
+    is_debug: bool = False,
 ) -> CandidateDepthRendererConfig:
     """Sidebar controls for depth rendering."""
 
@@ -153,10 +162,10 @@ def _renderer_config_from_ui(
     default_device_idx = renderer_device_options.index(str(getattr(default.renderer, "device", "cpu")))
     renderer_device = ui.selectbox("renderer device", renderer_device_options, index=default_device_idx)
     zfar = ui.slider("zfar (m)", 5.0, 50.0, default.renderer.zfar, step=1.0)
-    is_debug = ui.checkbox("renderer is_debug", value=True)
-
     if backend_choice.startswith("pytorch3d"):
-        faces_default = default.renderer.faces_per_pixel if isinstance(default.renderer, Pytorch3DDepthRendererConfig) else 1
+        faces_default = (
+            default.renderer.faces_per_pixel if isinstance(default.renderer, Pytorch3DDepthRendererConfig) else 1
+        )
         faces_pp = ui.slider("faces_per_pixel", 1, 4, faces_default)
         renderer_cfg: Pytorch3DDepthRendererConfig | Efm3dDepthRendererConfig = Pytorch3DDepthRendererConfig(
             device=renderer_device,
@@ -166,11 +175,9 @@ def _renderer_config_from_ui(
         )
     else:
         chunk_rays = ui.slider("chunk_rays", 50_000, 500_000, 200_000, step=50_000)
-        proxy_default = getattr(default.renderer, "add_proxy_walls", True)
         renderer_cfg = Efm3dDepthRendererConfig(
             device="cpu",
             zfar=float(zfar),
-            add_proxy_walls=bool(proxy_default),
             chunk_rays=int(chunk_rays),
             is_debug=is_debug,
         )
@@ -185,13 +192,13 @@ def _renderer_config_from_ui(
     )
 
 
-def _dataset_config_from_ui(ui: st.delta_generator.DeltaGenerator, *, super_fast: bool) -> AseEfmDatasetConfig:
+def _dataset_config_from_ui(
+    ui: st.delta_generator.DeltaGenerator, *, super_fast: bool, is_debug: bool
+) -> AseEfmDatasetConfig:
     """Sidebar controls for dataset (data page only)."""
 
     ui.subheader("Dataset")
     # Fixed defaults (no user control).
-    scene_ids: list[str] = []
-    load_meshes = True
     mesh_ratio = ui.slider("mesh decimation ratio", 0.0, 1.0, 0.02 if super_fast else 0.02, step=0.02)
     mesh_max_faces = ui.number_input(
         "max mesh faces (cap after decimation)",
@@ -216,13 +223,10 @@ def _dataset_config_from_ui(ui: st.delta_generator.DeltaGenerator, *, super_fast
     )
     batch_size = None
     verbose = True
-    is_debug = True
     require_mesh = ui.checkbox("require mesh", value=True)
 
     return AseEfmDatasetConfig(
-        scene_ids=scene_ids,
         atek_variant="efm",
-        load_meshes=load_meshes,
         mesh_simplify_ratio=mesh_ratio if mesh_ratio > 0 else None,
         mesh_crop_margin_m=mesh_crop_margin,
         mesh_crop_min_keep_ratio=mesh_keep_ratio,
@@ -231,7 +235,6 @@ def _dataset_config_from_ui(ui: st.delta_generator.DeltaGenerator, *, super_fast
         batch_size=batch_size,
         verbose=verbose,
         is_debug=is_debug,
-        DEBUG_DEFAULTS=AseEfmDatasetConfig.DEBUG_DEFAULTS,
     )
 
 
@@ -248,9 +251,9 @@ def _plot_options_from_ui(sample: EfmSnippetView) -> dict[str, Any]:
             "Crop bbox",
             "Frustum",
             "Mark start/finish",
-            "Show walls (double-sided mesh)",
+            "GT OBBs",
         ],
-        default=["Semidense", "Scene bounds", "Frustum", "Mark start/finish", "Show walls (double-sided mesh)"],
+        default=["Semidense", "Scene bounds", "Frustum", "Mark start/finish"],
         key="plot_layers",
     )
     show_sem = "Semidense" in layer_choices
@@ -259,7 +262,7 @@ def _plot_options_from_ui(sample: EfmSnippetView) -> dict[str, Any]:
     show_crop_bounds = "Crop bbox" in layer_choices
     show_frustum = "Frustum" in layer_choices
     mark_first_last = "Mark start/finish" in layer_choices
-    double_sided_mesh = "Show walls (double-sided mesh)" in layer_choices
+    show_gt_obbs = "GT OBBs" in layer_choices
 
     max_sem = st.sidebar.slider("Max semidense points", 1000, 50000, 20000, step=1000, key="max_sem_points")
     num_frames = int(sample.camera_rgb.images.shape[0])
@@ -271,6 +274,9 @@ def _plot_options_from_ui(sample: EfmSnippetView) -> dict[str, Any]:
     )
 
     mark_first_last = st.sidebar.checkbox("Mark start / finish", value=True, key="mark_first_last")
+    gt_ts = None
+    if show_gt_obbs and sample.gt.timestamps:
+        gt_ts = st.sidebar.selectbox("GT OBB timestamp", options=sample.gt.timestamps, index=0)
 
     return {
         "show_semidense": show_sem,
@@ -282,8 +288,48 @@ def _plot_options_from_ui(sample: EfmSnippetView) -> dict[str, Any]:
         "frustum_scale": 1.0,
         "frustum_frame_indices": frustum_idx if len(frustum_idx) > 0 else [0],
         "mark_first_last": mark_first_last,
-        "double_sided_mesh": double_sided_mesh,
+        "show_gt_obbs": show_gt_obbs,
+        "gt_timestamp": gt_ts,
     }
+
+
+def _pose_world_cam(sample: EfmSnippetView, cam_view: EfmCameraView, frame_idx: int):
+    """Compute T_world_cam for a specific frame without display reorientation."""
+
+    cam_ts = cam_view.time_ns.cpu().numpy()
+    traj_ts = sample.trajectory.time_ns.cpu().numpy()
+    traj_idx = int(np.argmin(np.abs(traj_ts - cam_ts[frame_idx])))
+
+    t_world_rig = sample.trajectory.t_world_rig[traj_idx]
+    t_cam_rig = cam_view.calib.T_camera_rig[frame_idx]
+    return t_world_rig @ t_cam_rig.inverse(), cam_view.calib[frame_idx]
+
+
+def _semidense_points_for_frame(sample: EfmSnippetView, frame_idx: int | None, *, all_frames: bool) -> torch.Tensor:
+    """Return semidense points in world coords (Torch, CPU)."""
+
+    sem = sample.semidense
+    if sem is None or sem.points_world.numel() == 0:
+        return torch.zeros((0, 3), dtype=torch.float32)
+
+    pts = sem.points_world
+    lengths = sem.lengths
+    if all_frames:
+        if lengths is not None:
+            max_len = pts.shape[1]
+            mask_valid = torch.arange(max_len).unsqueeze(0) < lengths.clamp_max(max_len).unsqueeze(-1)
+            pts = torch.where(mask_valid.unsqueeze(-1), pts, torch.nan)
+        pts = pts.reshape(-1, 3)
+    else:
+        if frame_idx is None:
+            frame_idx = int(torch.argmax(lengths).item()) if lengths.numel() else 0
+        frame_idx = max(0, min(int(frame_idx), pts.shape[0] - 1))
+        n_valid = int(lengths[frame_idx].item()) if lengths is not None else pts.shape[1]
+        pts = pts[frame_idx, :n_valid]
+
+    finite = torch.isfinite(pts).all(dim=-1)
+    pts = pts[finite]
+    return pts.cpu()
 
 
 def _render_data_page(sample: EfmSnippetView, *, crop_margin: float | None = None) -> None:
@@ -292,41 +338,132 @@ def _render_data_page(sample: EfmSnippetView, *, crop_margin: float | None = Non
     st.header("Data")
     st.write(f"Scene: **{sample.scene_id}**, snippet: **{sample.snippet_id}**")
 
-    # Final pose pose_world_rig with orientation summaries (world frame, RDF cameras, gravity in -Z).
-    final_pose = sample.trajectory.final_pose
-    yaw_rad, pitch_rad, roll_rad = final_pose.to_ypr(rad=True)
-    yaw_deg = torch.rad2deg(yaw_rad).item()
-    pitch_deg = torch.rad2deg(pitch_rad).item()
-    roll_deg = torch.rad2deg(roll_rad).item()
-    euler_zyx_deg = torch.rad2deg(final_pose.to_euler(rad=True)).tolist()  # [roll, pitch, yaw] ZYX
-    tx, ty, tz = final_pose.t.tolist()
+    # Final pose pose_world_rig with orientation summaries (world frame, LUF cameras, gravity in -Z).
 
+    first_pose = sample.trajectory.t_world_rig[0]
+    last_pose = sample.trajectory.t_world_rig[-1]
+
+    def _pose_summary(pose: torch.Tensor | PoseTW):
+        if isinstance(pose, PoseTW):
+            pt = pose
+        else:
+            tensor = pose
+            if tensor.shape[-1] == 12:
+                tensor = tensor.view(3, 4)
+            pt = PoseTW.from_matrix3x4(tensor)
+        r, p, y = pt.to_ypr(rad=True)
+        rpy = torch.rad2deg(torch.stack([r, p, y])).tolist()
+        euler = torch.rad2deg(pt.to_euler(rad=True)).tolist()
+        t = pt.t.tolist()
+        return t, rpy, euler
+
+    t_first, rpy_first, eul_first = _pose_summary(first_pose)
+    t_last, rpy_last, eul_last = _pose_summary(last_pose)
     st.markdown(
-        "**Pose frame:** `T_world_rig` (VIO world frame, gravity in -Z; rig/camera frame is RDF: X-right, Y-down, Z-forward)"
+        "- **First frame**: "
+        f"t=({t_first[0]:.3f},{t_first[1]:.3f},{t_first[2]:.3f}) m, "
+        f"RPY=({rpy_first[0]:.2f},{rpy_first[1]:.2f},{rpy_first[2]:.2f})°, "
+        f"Euler ZYX=({eul_first[0]:.2f},{eul_first[1]:.2f},{eul_first[2]:.2f})°"
     )
     st.markdown(
-        "- Translation (m): "
-        f"x={tx:.3f}, y={ty:.3f}, z={tz:.3f}\n"
-        f"- Roll/Pitch/Yaw (deg, ZYX): roll={roll_deg:.2f}, pitch={pitch_deg:.2f}, yaw={yaw_deg:.2f}\n"
-        f"- Euler ZYX (deg): roll={euler_zyx_deg[0]:.2f}, pitch={euler_zyx_deg[1]:.2f}, yaw={euler_zyx_deg[2]:.2f}"
+        "- **Last frame**: "
+        f"t=({t_last[0]:.3f},{t_last[1]:.3f},{t_last[2]:.3f}) m, "
+        f"RPY=({rpy_last[0]:.2f},{rpy_last[1]:.2f},{rpy_last[2]:.2f})°, "
+        f"Euler ZYX=({eul_last[0]:.2f},{eul_last[1]:.2f},{eul_last[2]:.2f})°"
     )
 
+    modalities, missing = collect_frame_modalities(sample, include_depth=True)
     st.plotly_chart(plot_first_last_frames(sample), width="stretch")
+
+    missing_depth = [m for m in missing if m.startswith("Depth")]
+
+    available_depth = [name for name, _, _ in modalities if name.startswith("Depth")]
+
+    if not available_depth:
+        st.info("No metric depth maps present in this snippet.")
+    elif missing_depth:
+        st.info(f"Depth maps missing for: {', '.join(missing_depth)}")
+
+    st.subheader("Point cloud overlay")
+    overlay_cam = st.selectbox("Overlay camera", ["rgb", "slam-l", "slam-r"], index=0, key="overlay_cam")
+    overlay_frame = st.slider("Frame index for overlay", 0, int(sample.camera_rgb.images.shape[0] - 1), 0)
+    overlay_source = st.selectbox(
+        "Point cloud source",
+        ["Semidense (all frames)", "Semidense (selected frame)", "Semidense (last with points)"],
+        index=0,
+    )
+
+    if overlay_source == "Semidense (all frames)":
+        points_world = _semidense_points_for_frame(sample, None, all_frames=True)
+    elif overlay_source == "Semidense (selected frame)":
+        points_world = _semidense_points_for_frame(sample, overlay_frame, all_frames=False)
+    elif overlay_source == "Semidense (last with points)":
+        lengths = sample.semidense.lengths if sample.semidense is not None else None
+        if lengths is not None and torch.any(lengths > 0):
+            last_idx = int(torch.nonzero(lengths > 0, as_tuple=False).max().item())
+        else:
+            last_idx = 0
+        points_world = _semidense_points_for_frame(sample, last_idx, all_frames=False)
+    else:
+        points_world = torch.zeros((0, 3), dtype=torch.float32)
+
+    if points_world is None or points_world.numel() == 0:
+        st.info("No points available for overlay with current selection.")
+    else:
+        cam_map = {
+            "rgb": sample.camera_rgb,
+            "slam-l": sample.camera_slam_left,
+            "slam-r": sample.camera_slam_right,
+        }
+        cam_view = cam_map[overlay_cam]
+        pose_wc, cam_tw = _pose_world_cam(sample, cam_view, overlay_frame)
+        fig_overlay = project_pointcloud_on_frame(
+            img=cam_view.images[overlay_frame],
+            cam=cam_tw,
+            pose_world_cam=pose_wc,
+            points_world=points_world,
+            title=f"Overlay on {overlay_cam.upper()} frame {overlay_frame} ({points_world.shape[0]} pts)",
+            max_points=20000,
+        )
+        st.plotly_chart(fig_overlay, width="stretch")
 
     cam_choice = st.sidebar.selectbox("Camera for frustum", ["rgb", "slam-l", "slam-r"], index=0, key="frustum_cam")
     plot_opts = _plot_options_from_ui(sample)
+    crop_bounds = None
+    if plot_opts["show_crop_bounds"] and crop_margin is not None:
+        crop_bounds = crop_aabb_from_semidense(sample, margin=float(crop_margin))
+        if crop_bounds is None and sample.mesh is not None:
+            mesh_min, mesh_max = sample.mesh.bounds
+            crop_bounds = (mesh_min, mesh_max)
 
-    st.plotly_chart(
-        plot_trajectory(
-            sample,
-            camera=cam_choice,
-            crop_aabb=crop_aabb_from_semidense(sample, margin=float(crop_margin))
-            if plot_opts["show_crop_bounds"]
-            else None,
-            **plot_opts,
-        ),
-        width="stretch",
+    builder = (
+        SnippetPlotBuilder.from_snippet(sample, title="Mesh + semidense + trajectory + camera frustum")
+        .add_mesh()
+        .add_trajectory(mark_first_last=plot_opts["mark_first_last"], show=True)
     )
+
+    if plot_opts["show_semidense"]:
+        builder.add_semidense(max_points=plot_opts["max_sem_points"], last_frame_only=plot_opts["pc_from_last_only"])
+
+    if plot_opts["show_frustum"]:
+        builder.add_frusta(
+            camera=cam_choice,
+            frame_indices=plot_opts["frustum_frame_indices"],
+            scale=plot_opts["frustum_scale"],
+            include_axes=True,
+            include_center=True,
+        )
+
+    if plot_opts["show_scene_bounds"]:
+        builder.add_bounds_box(name="Scene bounds", color="gray", dash="dash", width=2)
+
+    if plot_opts["show_gt_obbs"]:
+        builder.add_gt_obbs(camera=cam_choice, timestamp=plot_opts["gt_timestamp"])
+
+    if crop_bounds is not None:
+        builder.add_bounds_box(name="Crop bounds", color="orange", dash="solid", width=3, aabb=crop_bounds)
+
+    st.plotly_chart(builder.finalize(), width="stretch")
 
 
 def _rejected_pose_tensor(candidates: CandidateSamplingResult) -> torch.Tensor | None:
@@ -370,9 +507,7 @@ def _render_candidates_page(
 
     st.header("Candidate Poses")
     with st.status("Building candidate plots...", expanded=False):
-        cand_fig = plot_candidates(
-            candidates["poses"], sample.mesh, title="Candidate positions", center=last_center
-        )
+        cand_fig = plot_candidates(candidates["poses"], sample.mesh, title="Candidate positions", center=last_center)
         shell_fig = plot_sampling_shell(
             shell_poses=candidates["shell_poses"],
             last_pose=last_pose_cam,
@@ -389,9 +524,9 @@ def _render_candidates_page(
         st.warning("All candidates were rejected; frustum plot omitted.")
     else:
         with st.status("Rendering frustums...", expanded=False):
-            frust_fig = plot_candidate_frustums(
+            frust_fig = plot_candidate_frustums_simple(
                 poses=candidates["poses"],
-                camera=sample.camera_rgb,
+                camera_view=sample.camera_rgb,
                 mesh=sample.mesh,
                 frustum_scale=frustum_scale,
                 max_frustums=max_frustums,
@@ -425,46 +560,6 @@ def _render_depth_page(depth_batch: CandidateDepthBatch) -> None:
     st.plotly_chart(fig, width="stretch")
 
 
-def _append_log(line: str) -> None:
-    """Append a line to the Streamlit log buffer with bounded length."""
-
-    state = cast(dict[str, Any], st.session_state)
-    buf_obj = state.get(LOG_STATE_KEY, [])
-    buf: list[str] = list(buf_obj) if isinstance(buf_obj, list) else []
-    buf.append(line)
-    if len(buf) > MAX_LOG_LINES:
-        buf = buf[-MAX_LOG_LINES:]
-    state[LOG_STATE_KEY] = buf
-
-
-def _tap_console(console: Console) -> Console:
-    """Wrap console methods to also push lines into the UI log buffer."""
-
-    def wrap_simple(method_name: str, level: str) -> None:
-        orig = getattr(console, method_name)
-
-        def wrapped(message: str) -> None:
-            _append_log(f"{level}: {message}")
-            orig(message)
-
-        setattr(console, method_name, wrapped)
-
-    wrap_simple("log", "INFO")
-    wrap_simple("warn", "WARN")
-    wrap_simple("error", "ERROR")
-    wrap_simple("dbg", "DEBUG")
-
-    orig_log_summary = console.log_summary
-
-    def log_summary(label: str, value: Any) -> None:
-        summary_line = f"{label}: {value}"
-        _append_log(f"INFO: {summary_line}")
-        orig_log_summary(label, value)
-
-    console.log_summary = log_summary  # type: ignore[assignment]
-    return console
-
-
 def _init_task_state() -> None:
     """Initialise task state containers in session_state."""
 
@@ -478,58 +573,18 @@ def _init_task_state() -> None:
         )
 
 
-def _render_log_panel() -> None:
-    """Render console log buffer at bottom of each page."""
-
-    st.divider()
-    st.subheader("Console Logs")
-    state = cast(dict[str, Any], st.session_state)
-    col_clear, _ = st.columns([1, 5])
-    with col_clear:
-        if st.button("Clear logs", key="clear_logs"):
-            state[LOG_STATE_KEY] = []
-    log_lines_obj = state.get(LOG_STATE_KEY, [])
-    log_lines = list(log_lines_obj) if isinstance(log_lines_obj, list) else []
-    st.text_area(
-        "Console output",
-        value="\n".join(log_lines),
-        height=250,
-        label_visibility="collapsed",
-        key="console_text_area",
-    )
-
-    with st.expander("Interactive Python console (runs locally)", expanded=False):
-        code = st.text_area("Python code", key="py_console_code", height=140)
-        if st.button("Run code", key="run_py_console"):
-            buf = io.StringIO()
-            err = io.StringIO()
-            # reuse globals across runs
-            globs = _state().setdefault("py_console_globals", {})
-            globs.setdefault("st", st)
-            globs.setdefault("torch", torch)
-            with redirect_stdout(buf), redirect_stderr(err):
-                try:
-                    exec(code, globs)  # noqa: S102 - user-triggered eval within local app
-                except Exception as exc:  # pragma: no cover - UI feedback
-                    print(f"Exception: {exc}")
-            out = err.getvalue() + buf.getvalue()
-            if out.strip():
-                for line in out.strip().splitlines():
-                    _append_log(f"PYCON: {line}")
-            st.toast("Code executed; output appended to console logs.")
-
-
 def main() -> None:
     """Entry point for `streamlit run -m oracle_rri.streamlit_app`."""
 
     st.set_page_config(page_title="NBV Explorer", layout="wide")
-    _state().setdefault(LOG_STATE_KEY, [])
-    Console.set_sink(_append_log)
     _init_task_state()
-    console = Console.with_prefix("streamlit_app").set_verbose(True)
-
     st.sidebar.markdown("---")
-    super_fast = st.sidebar.checkbox("Super-fast debug mode", value=False, help="Use tiny meshes, 2 candidates, low-res renders.")
+    super_fast = st.sidebar.checkbox(
+        "Super-fast debug mode", value=False, help="Use tiny meshes, 2 candidates, low-res renders."
+    )
+    is_debug_global = st.sidebar.checkbox("Debug logging (all modules)", value=True)
+    console = Console.with_prefix("streamlit_app").set_verbose(True).set_debug(is_debug_global)
+
     st.sidebar.write("Pages")
     page = st.sidebar.radio("Select view", ("Data", "Candidate Poses", "Candidate Renders"))
 
@@ -692,7 +747,7 @@ def main() -> None:
 
     if page == "Data":
         with st.sidebar.form("data_form"):
-            dataset_cfg = _dataset_config_from_ui(st.sidebar, super_fast=super_fast)
+            dataset_cfg = _dataset_config_from_ui(st.sidebar, super_fast=super_fast, is_debug=is_debug_global)
             sample_idx = int(_get(STATE_KEYS["sample_idx"]) or 0)
             next_sample = st.form_submit_button("Next sample")
             run_data = st.form_submit_button("Run / refresh data")
@@ -717,13 +772,14 @@ def main() -> None:
             cfg_state = _cfg_from_state(STATE_KEYS["sample_cfg"], AseEfmDatasetConfig)
             show_crop_box = st.sidebar.checkbox("Show crop bbox", value=True, key="show_crop_box")
             _render_data_page(sample, crop_margin=cfg_state.mesh_crop_margin_m if show_crop_box else None)
-        _render_log_panel()
         return
 
     # Candidate page controls
     if page == "Candidate Poses":
         with st.sidebar.form("cand_form"):
-            candidate_cfg = _candidate_config_from_ui(CandidateViewGeneratorConfig(), st.sidebar, super_fast=super_fast)
+            candidate_cfg = _candidate_config_from_ui(
+                CandidateViewGeneratorConfig(), st.sidebar, super_fast=super_fast, is_debug=is_debug_global
+            )
             st.sidebar.subheader("Candidate plot options")
             frustum_scale = st.sidebar.slider("Frustum scale", 0.1, 1.0, 0.5, step=0.05)
             max_frustums = st.sidebar.slider("Max frustums", 1, 24, 6)
@@ -752,7 +808,6 @@ def main() -> None:
             )
         if cfg_changed["cand"]:
             st.info("Candidate settings changed; rerun to refresh results.")
-        _render_log_panel()
         return
 
     # Render page controls
@@ -761,6 +816,7 @@ def main() -> None:
             CandidateDepthRendererConfig(renderer=Pytorch3DDepthRendererConfig(device="cpu")),
             st.sidebar,
             super_fast=super_fast,
+            is_debug=is_debug_global,
         )
         render_depths = st.checkbox("Compute depth renders", value=True, key="compute_depths")
         run_prev = st.form_submit_button("Run previous")
@@ -792,8 +848,6 @@ def main() -> None:
     stale_parts = [name for name, changed in cfg_changed.items() if changed]
     if stale_parts:
         st.info(f"Cached results are stale for: {', '.join(stale_parts)}. Click the page's run button to update.")
-
-    _render_log_panel()
     return
 
 

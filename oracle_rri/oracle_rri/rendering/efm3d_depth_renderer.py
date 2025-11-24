@@ -23,7 +23,7 @@ import trimesh
 from pydantic import Field
 from trimesh import Trimesh
 
-from ..utils import BaseConfig, Console
+from ..utils import BaseConfig, Console, select_device
 
 if TYPE_CHECKING:
     from efm3d.aria import CameraTW, PoseTW
@@ -79,7 +79,7 @@ class Efm3dDepthRenderer:
             .set_verbose(self.config.verbose)
             .set_debug(self.config.is_debug)
         )
-        self._device = torch.device(self.config.device)
+        self._device = select_device(self.config.device, component=self.__class__.__name__)
 
     @property
     def device(self) -> torch.device:

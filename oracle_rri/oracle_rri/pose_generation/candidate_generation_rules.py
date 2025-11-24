@@ -17,7 +17,7 @@ populate candidate poses or prune them:
   from occupancy statistics.
 
 All rules assume the **VIO world frame** used by EFM3D: gravity points along
-``[0, 0, -g]`` and camera frames are RDF (X-right, Y-down, Z-forward).
+``[0, 0, -g]`` and camera frames are LUF (X-left, Y-up, Z-forward).
 """
 
 from __future__ import annotations
@@ -66,7 +66,7 @@ class ShellSamplingRule:
        the VIO world frame using :class:`efm3d.aria.PoseTW`.
 
     3. Use :func:`oracle_rri.utils.frames.view_axes_from_points` to construct
-       an RDF camera rotation for each sampled centre, with the camera
+       an LUF camera rotation for each sampled centre, with the camera
        looking back at ``last_pose``.
     """
 
@@ -105,7 +105,7 @@ class ShellSamplingRule:
         pos_world = pose_last.transform(pos_local)
 
         # 6) Orient each candidate camera to look back at the last pose using
-        #    the shared RDF / VIO-aligned helper.
+        #    the shared LUF / VIO-aligned helper.
         look_at = pose_last.t.expand_as(pos_world)
         r_cam = view_axes_from_points(cam_pos=pos_world, look_at=look_at)
         poses_tw = PoseTW.from_Rt(r_cam, pos_world)

@@ -13,7 +13,7 @@ import torch
 import trimesh
 from atek.data_loaders.atek_wds_dataloader import load_atek_wds_dataset
 from atek.data_preprocess.atek_data_sample import create_atek_data_sample_from_flatten_dict
-from pydantic import Field
+from pydantic import Field, field_validator
 
 try:  # Prefer installed efm3d, otherwise fall back to vendored source.
     from efm3d.aria import CameraTW, PoseTW
@@ -24,7 +24,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised in CI fallback
     from efm3d.aria import CameraTW, PoseTW
     from efm3d.utils.ray import ray_grid, transform_rays
 
-from ..utils import BaseConfig, Console
+from ..utils import BaseConfig, Console, select_device
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,14 +76,7 @@ class DepthDebugger:
         )
         return flat, mesh
 
-    @staticmethod
-    def _orientation_fix(device: torch.device) -> torch.Tensor:
-        """Flip rays from OpenCV to Aria convention (x-left, y-up, z-forward)."""
-        return torch.tensor([-1.0, -1.0, 1.0], device=device)
-
-    def _compute_distances(
-        self, points: np.ndarray, mesh: trimesh.Trimesh, variant: str
-    ) -> DepthDebugResult:
+    def _compute_distances(self, points: np.ndarray, mesh: trimesh.Trimesh, variant: str) -> DepthDebugResult:
         try:
             pq = trimesh.proximity.ProximityQuery(mesh)
             signed = pq.signed_distance(points)
@@ -146,7 +139,7 @@ class DepthDebugger:
             return self._compute_distances(points.detach().cpu().numpy(), mesh, variant="semidense_points")
 
         depth = depth_stream.images
-        device = torch.device(self.config.device)
+        device = self.config.device
         depth = depth.to(device)
 
         camera_tw = CameraTW.from_surreal(
@@ -171,10 +164,6 @@ class DepthDebugger:
         rays_rig = rays_rig.to(device)
         valid = valid.to(device)
 
-        flip = self._orientation_fix(device)
-        rays_rig[..., :3] *= flip
-        rays_rig[..., 3:] *= flip
-
         depth_first = depth[0, 0]  # [H, W]
         rays_world = transform_rays(rays_rig, pose)
         origins = rays_world[..., :3]
@@ -185,13 +174,11 @@ class DepthDebugger:
         points_valid = points_valid[mask]
 
         if points_valid.shape[0] > self.config.max_points:
-            indices = torch.tensor(
-                random.sample(range(points_valid.shape[0]), self.config.max_points), device=device
-            )
+            indices = torch.tensor(random.sample(range(points_valid.shape[0]), self.config.max_points), device=device)
             points_valid = points_valid[indices]
 
         points_np = points_valid.detach().cpu().numpy()
-        return self._compute_distances(points_np, mesh, variant="flipped_xy")
+        return self._compute_distances(points_np, mesh, variant="luf")
 
 
 class DepthDebuggerConfig(BaseConfig[DepthDebugger]):
@@ -205,8 +192,13 @@ class DepthDebuggerConfig(BaseConfig[DepthDebugger]):
     mesh_simplify_ratio: float | None = 0.2
     max_points: int = 1000
     mesh_vertex_cap: int | None = 5000
-    device: str = "cpu"
+    device: torch.device = Field(default_factory=lambda: select_device("auto", component="DepthDebugger"))
     verbose: bool = True
+
+    @field_validator("device", mode="before")
+    @classmethod
+    def _resolve_device(cls, value: str | torch.device) -> torch.device:
+        return select_device(value, component="DepthDebugger")
 
     def setup_target(self) -> DepthDebugger:  # type: ignore[override]
         return DepthDebugger(self)

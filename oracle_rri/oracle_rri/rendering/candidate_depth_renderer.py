@@ -6,11 +6,11 @@ from typing import Literal, TypedDict
 
 import torch
 from efm3d.aria import CameraTW, PoseTW
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ..data.efm_views import EfmCameraView, EfmSnippetView
 from ..pose_generation.types import CandidateSamplingResult
-from ..utils import BaseConfig, Console
+from ..utils import BaseConfig, Console, pick_fast_depth_renderer
 from .efm3d_depth_renderer import Efm3dDepthRendererConfig
 from .pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig
 
@@ -72,6 +72,11 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
 
     is_debug: bool = False
     """Enable detailed debug logging."""
+
+    @model_validator(mode="after")
+    def _apply_performance_mode(self) -> "CandidateDepthRendererConfig":
+        object.__setattr__(self, "renderer", pick_fast_depth_renderer(self.renderer))
+        return self
 
 
 class CandidateDepthRenderer:

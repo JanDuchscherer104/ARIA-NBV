@@ -12,10 +12,9 @@ from efm3d.aria.pose import PoseTW
 
 from oracle_rri.configs import PathConfig
 from oracle_rri.data import AseEfmDatasetConfig
-from oracle_rri.data.plotting import SnippetPlotBuilder, _frustum_segments, _mesh_to_plotly
+from oracle_rri.data.plotting import apply_yaw90, get_frustum_segments, mesh_to_plotly
 from oracle_rri.pose_generation import CandidateViewGenerator, CandidateViewGeneratorConfig
 from oracle_rri.utils import Console
-from oracle_rri.utils.frames import pose_for_display
 
 console = Console.with_prefix("pose_plotting")
 
@@ -58,6 +57,59 @@ def camera_intrinsics(cam, frame_idx: int = 0) -> np.ndarray:
     fx, fy = data[frame_idx, cam_tw.F_IND].tolist()
     cx, cy = data[frame_idx, cam_tw.C_IND].tolist()
     return np.array([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=np.float64)
+
+
+def plot_candidate_frustums_simple(
+    *,
+    poses: PoseTW,
+    camera_view,
+    mesh,
+    frustum_scale: float,
+    max_frustums: int,
+) -> go.Figure:
+    """Plot mesh, candidate centres, and frustums without pose_for_display."""
+
+    pose_mats = poses.matrix3x4 if hasattr(poses, "matrix3x4") else poses
+    if pose_mats.dim() == 2:
+        pose_mats = pose_mats.unsqueeze(0)
+    centers = pose_mats[..., :3, 3].detach().cpu().numpy()
+
+    fig = go.Figure()
+    if mesh is not None:
+        fig.add_trace(mesh_to_plotly(mesh))
+
+    fig.add_trace(
+        go.Scatter3d(
+            x=centers[:, 0],
+            y=centers[:, 1],
+            z=centers[:, 2],
+            mode="markers",
+            marker={"size": 2, "color": "royalblue", "opacity": 0.35},
+            name="candidates",
+        )
+    )
+
+    frustum_ids = np.linspace(0, centers.shape[0] - 1, num=min(max_frustums, centers.shape[0]), dtype=int)
+    cam0 = camera_view.calib[0]
+    for idx in frustum_ids:
+        pose_tw = poses[idx]
+        pose_disp = apply_yaw90(pose_tw)
+        frustum_segments = get_frustum_segments(cam0, pose_disp, scale=frustum_scale)
+        for j, seg in enumerate(frustum_segments):
+            fig.add_trace(
+                go.Scatter3d(
+                    x=seg[:, 0],
+                    y=seg[:, 1],
+                    z=seg[:, 2],
+                    mode="lines",
+                    line={"color": "crimson", "width": 5},
+                    name="frustum" if (idx == frustum_ids[0] and j == 0) else None,
+                    showlegend=bool(idx == frustum_ids[0] and j == 0),
+                )
+            )
+
+    fig.update_layout(scene_aspectmode="data", title="Candidates with frustums", height=900)
+    return fig
 
 
 # NOTE: still using pinhole proxy intrinsics; fisheye distortion ignored (known limitation).
@@ -116,10 +168,10 @@ def plot_candidates(
 ) -> go.Figure:
     """Plot candidate camera centres with optional mesh overlay."""
     pos = _pose_positions(poses)
-    builder = SnippetPlotBuilder(title=title, scene_ranges={"xaxis": {}, "yaxis": {}, "zaxis": {}}, height=700)
+    fig = go.Figure()
     if mesh is not None:
-        builder.add_mesh(mesh, double_sided=True)
-    builder.fig.add_trace(
+        fig.add_trace(mesh_to_plotly(mesh))
+    fig.add_trace(
         go.Scatter3d(
             x=pos[:, 0],
             y=pos[:, 1],
@@ -130,7 +182,7 @@ def plot_candidates(
         )
     )
     if center is not None:
-        builder.fig.add_trace(
+        fig.add_trace(
             go.Scatter3d(
                 x=[center[0]],
                 y=[center[1]],
@@ -140,8 +192,7 @@ def plot_candidates(
                 name="sampling center",
             )
         )
-    builder.fig.update_layout(scene={"aspectmode": "data"})
-    fig = builder.finalize()
+    fig.update_layout(scene={"aspectmode": "data"}, title=title, height=700)
     if path is not None:
         fig.write_html(str(path))
     return fig
@@ -200,15 +251,14 @@ def plot_sampling_shell(
         )
     )
     if mesh is not None:
-        for trace in _mesh_to_plotly(mesh, double_sided=True):
-            fig.add_trace(trace)
+        fig.add_trace(mesh_to_plotly(mesh))
     fig.update_layout(scene_aspectmode="data", title="Sampling shell (r_min/r_max + elev cap)")
     if path is not None:
         fig.write_html(str(path))
     return fig
 
 
-def plot_candidate_frustums(
+def plot_candidate_frusta(
     poses: torch.Tensor | "PoseTW",  # type: ignore[name-defined]
     camera,
     mesh: trimesh.Trimesh | None,
@@ -216,13 +266,13 @@ def plot_candidate_frustums(
     max_frustums: int = 12,
     frustum_scale: float = 1.0,
 ) -> go.Figure:
-    """Plot mesh, candidate centres, and frustums for a subset using the shared SnippetPlotBuilder."""
+    """Plot mesh, candidate centres, and frustums for a subset."""
 
     pos = _pose_positions(poses)
-    builder = SnippetPlotBuilder(title="Candidates with frustums", scene_ranges={"xaxis": {}, "yaxis": {}, "zaxis": {}}, height=900)
+    fig = go.Figure()
     if mesh is not None:
-        builder.add_mesh(mesh, double_sided=True)
-    builder.fig.add_trace(
+        fig.add_trace(mesh_to_plotly(mesh))
+    fig.add_trace(
         go.Scatter3d(
             x=pos[:, 0],
             y=pos[:, 1],
@@ -251,12 +301,11 @@ def plot_candidate_frustums(
                 raise ValueError("Unsupported pose format for frustum plotting.")
 
         pose_tw = PoseTW.from_matrix(t_world_cam)
-        # Use shared display transform (gravity align + display roll/yaw) for consistent axis orientation.
-        pose_disp = pose_for_display(pose_tw, align_gravity=True)
-
-        frustum_segments = _frustum_segments(cam0, pose_disp, scale=frustum_scale)
+        # pose_disp = pose_for_display(pose_tw, align_gravity=True)
+        pose_disp = apply_yaw90(pose_tw)
+        frustum_segments = get_frustum_segments(cam0, pose_tw, scale=frustum_scale)
         for j, seg in enumerate(frustum_segments):
-            builder.fig.add_trace(
+            fig.add_trace(
                 go.Scatter3d(
                     x=seg[:, 0],
                     y=seg[:, 1],
@@ -267,11 +316,22 @@ def plot_candidate_frustums(
                     showlegend=bool(idx == frustum_ids[0] and j == 0),
                 )
             )
-        # add camera axes (RGB XYZ) for this candidate
         axes = pose_disp.rotate(torch.eye(3)).detach().cpu().numpy()
-        builder.add_camera_axes(pose_disp.t.detach().cpu().numpy(), axes)
+        axis_colors = [("X axis", "red", axes[0]), ("Y axis", "green", axes[1]), ("Z axis", "blue", axes[2])]
+        for name, color, vec in axis_colors:
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[pose_disp.t[0].item(), pose_disp.t[0].item() + vec[0]],
+                    y=[pose_disp.t[1].item(), pose_disp.t[1].item() + vec[1]],
+                    z=[pose_disp.t[2].item(), pose_disp.t[2].item() + vec[2]],
+                    mode="lines",
+                    line={"color": color, "width": 6},
+                    name=name if idx == frustum_ids[0] else None,
+                    showlegend=idx == frustum_ids[0],
+                )
+            )
 
-    fig = builder.finalize()
+    fig.update_layout(scene_aspectmode="data", title="Candidates with frustums", height=900)
     if path is not None:
         fig.write_html(str(path))
     return fig
@@ -307,12 +367,10 @@ def main() -> None:
         path=out_dir / "sampling_shell.html",
         sample_n=300,
     )
-    traj_positions = sample.trajectory.t_world_rig.matrix3x4[..., :3, 3].detach().cpu().numpy()
-    plot_candidate_frustums(
+    plot_candidate_frusta(
         poses=result["poses"],
         camera=sample.camera_rgb,
         mesh=sample.mesh,
-        traj_positions=traj_positions,
         path=out_dir / "candidate_frustums.html",
         max_frustums=6,
     )

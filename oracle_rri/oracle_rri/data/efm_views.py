@@ -16,6 +16,8 @@ import numpy as np
 import torch
 from efm3d.aria.aria_constants import (
     ARIA_CALIB,
+    ARIA_DEPTH_TIME_NS,
+    ARIA_DISTANCE_M,
     ARIA_FRAME_ID,
     ARIA_IMG,
     ARIA_IMG_TIME_NS,
@@ -153,16 +155,22 @@ class EfmCameraView:
             - ``CameraTW.tensor`` shape ``(F, 34)`` storing projection params and pose.
         time_ns: ``Tensor["F", int64]`` capture timestamps (device clock).
         frame_ids: ``Tensor["F", float32|int64]`` per-frame ids.
+        distance_m: Optional ``Tensor["F 1 H W", float32]`` ray distances (metric depth).
+        distance_time_ns: Optional ``Tensor["F", int64]`` timestamps aligned to ``distance_m``.
     """
 
     images: Tensor
-    """``Tensor["F C H W", float32]`` normalized camera images in Aria RDF frame."""
+    """``Tensor["F C H W", float32]`` normalized camera images in Aria LUF frame."""
     calib: CameraTW
     """Per-frame camera intrinsics/extrinsics (`CameraTW.tensor` shape ``(F,34)``)."""
     time_ns: Tensor
     """``Tensor["F", int64]`` device timestamps aligned to `images`."""
     frame_ids: Tensor
     """``Tensor["F", int64|float32]`` frame ids within the snippet."""
+    distance_m: Tensor | None = None
+    """Optional metric ray distances ``Tensor["F 1 H W", float32]``."""
+    distance_time_ns: Tensor | None = None
+    """Optional ``Tensor["F", int64]`` timestamps for ``distance_m``."""
 
     def to(self, device: str | torch.device, *, dtype: torch.dtype | None = None) -> "EfmCameraView":
         target_device = torch.device(device)
@@ -174,6 +182,8 @@ class EfmCameraView:
             calib=self.calib.to(device=target_device),  # type: ignore[arg-type]
             time_ns=self.time_ns.to(target_device),
             frame_ids=self.frame_ids.to(target_device),
+            distance_m=None if self.distance_m is None else self.distance_m.to(device=target_device, dtype=dtype),
+            distance_time_ns=None if self.distance_time_ns is None else self.distance_time_ns.to(target_device),
         )
 
     def __repr__(self) -> str:  # pragma: no cover - formatting only
@@ -358,28 +368,40 @@ class EfmSnippetView:
         calib_key = ARIA_CALIB[idx]
         time_key = ARIA_IMG_TIME_NS[idx]
         frame_id_key = ARIA_FRAME_ID[idx]
+        distance_key = ARIA_DISTANCE_M[idx]
+        distance_time_key = ARIA_DEPTH_TIME_NS[idx]
 
         img = self.efm[img_key]
         calib: CameraTW = self.efm[calib_key]
         time_ns = self.efm[time_key]
         frame_ids = self.efm[frame_id_key]
-        return EfmCameraView(images=img, calib=calib, time_ns=time_ns, frame_ids=frame_ids)
+        distance = self.efm.get(distance_key)
+        distance_time_ns = self.efm.get(distance_time_key)
+
+        return EfmCameraView(
+            images=img,
+            calib=calib,
+            time_ns=time_ns,
+            frame_ids=frame_ids,
+            distance_m=distance,
+            distance_time_ns=distance_time_ns,
+        )
 
     @property
     def camera_rgb(self) -> EfmCameraView:
-        """RGB stream (fisheye624, 240x240 in our ASE preprocessing)."""
+        """RGB stream (fisheye624, 240x240 in ASE preprocessing)."""
 
         return self._camera("rgb")
 
     @property
     def camera_slam_left(self) -> EfmCameraView:
-        """Left SLAM mono stream (fisheye624, ~320×240)."""
+        """Left SLAM mono stream (fisheye624, ~320x240)."""
 
         return self._camera("slaml")
 
     @property
     def camera_slam_right(self) -> EfmCameraView:
-        """Right SLAM mono stream (fisheye624, ~320×240)."""
+        """Right SLAM mono stream (fisheye624, ~320x240)."""
 
         return self._camera("slamr")
 
@@ -401,8 +423,8 @@ class EfmSnippetView:
         """Semi-dense SLAM points (padded to fixed length)."""
 
         efm = self.efm
-        points = efm[ARIA_POINTS_WORLD]  # NOTE: all are nan
-        lengths = efm.get("msdpd#points_world_lengths") or efm.get("points/lengths")
+        points = efm[ARIA_POINTS_WORLD]
+        lengths = efm.get("points/lengths")
         if lengths is None:
             lengths = torch.full(
                 (points.shape[0],),

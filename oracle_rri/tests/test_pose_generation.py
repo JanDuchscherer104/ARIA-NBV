@@ -70,7 +70,7 @@ def test_generator_runs_on_efm_sample(efm_sample):
     assert isinstance(mask, torch.Tensor) and mask.dtype == torch.bool
     assert mask.numel() == poses.shape[0]
     assert len(shell) > 0
-    assert isinstance(masks, list) and len(masks) == len(gen.rules)
+    assert isinstance(masks, torch.Tensor) and masks.shape[0] == len(gen.rules)
     # At least one valid candidate
     assert mask.sum() > 0
 

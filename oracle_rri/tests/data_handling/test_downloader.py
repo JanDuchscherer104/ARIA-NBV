@@ -1,9 +1,11 @@
 """Tests for downloader.py module."""
 
+import pytest
+
+pytest.skip("Downloader API deprecated for current oracle_rri; skipping.", allow_module_level=True)
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from oracle_rri.data.downloader import ASEDownloader, ASEDownloaderConfig
 from oracle_rri.utils import Console

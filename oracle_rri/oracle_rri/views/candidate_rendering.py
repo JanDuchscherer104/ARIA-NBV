@@ -19,9 +19,9 @@ import torch
 import trimesh
 from efm3d.aria import CameraTW, PoseTW
 from efm3d.utils.ray import ray_grid, transform_rays
-from pydantic import Field
+from pydantic import Field, field_validator
 
-from ..utils import BaseConfig, Console
+from ..utils import BaseConfig, Console, select_device
 
 #   TODO: Add pytest coverage for: (a) synthetic cube mesh hit/miss depth map, (b) point count vs. valid-ray mask.
 #   TODO: If you want true GPU intersections, swap mesh.ray with a CUDA path (e.g., PyTorch3D’s ray_triangle).
@@ -46,13 +46,21 @@ class CandidatePointCloudGeneratorConfig(BaseConfig["CandidatePointCloudGenerato
         default=IntersectionBackend.PYEMBREE,
         description="Ray-mesh backend (falls back to trimesh if unavailable).",
     )
-    device: str = Field(default="cuda", description="Device for ray generation (rays/depth tensors).")
+    device: torch.device = Field(  # type: ignore[assignment]
+        default_factory=lambda: select_device("auto", component="CandidatePointCloudGenerator"),
+        description="Device for ray generation (rays/depth tensors).",
+    )
     max_depth: float = Field(
         default=20.0,
         description="Clamp depth (m) for rays with no intersection; acts as far plane.",
     )
     verbose: bool = Field(default=False)
     is_debug: bool = Field(default=False, description="Enable debug logging for ray stats.")
+
+    @field_validator("device", mode="before")
+    @classmethod
+    def _resolve_device(cls, value: str | torch.device) -> torch.device:
+        return select_device(value, component="CandidatePointCloudGenerator")
 
 
 @dataclass(slots=True)
@@ -62,6 +70,7 @@ class CandidatePointCloudGenerator:
     config: CandidatePointCloudGeneratorConfig
     console: Console | None = None
     _pyembree_available: bool = False
+    _device: torch.device | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -72,6 +81,11 @@ class CandidatePointCloudGenerator:
             .set_debug(self.config.is_debug),
         )
         object.__setattr__(self, "_pyembree_available", hasattr(trimesh.ray, "ray_pyembree"))
+        object.__setattr__(
+            self,
+            "_device",
+            select_device(self.config.device, component=self.__class__.__name__),
+        )
 
     def render_depth(
         self,
@@ -91,7 +105,7 @@ class CandidatePointCloudGenerator:
             Missing rays are filled with ``max_depth``.
         """
 
-        device = torch.device(self.config.device if torch.cuda.is_available() else "cpu")
+        device = self._device or select_device(self.config.device, component=self.__class__.__name__)
         rays_cam, valid = ray_grid(camera)  # (H,W,6) or (B,H,W,6)
         if rays_cam.ndim == 4:
             rays_cam = rays_cam[0]
