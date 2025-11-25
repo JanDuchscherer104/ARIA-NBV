@@ -11,9 +11,9 @@ from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from efm3d.aria import PoseTW
-    from pytorch3d.structures import Meshes
+    from pytorch3d.structures import Meshes  # type: ignore[import-untyped]
     from torch import Tensor, device
-    from trimesh import Trimesh
+    from trimesh import Trimesh  # type: ignore[import-untyped]
 
 
 class SamplingStrategy(StrEnum):
@@ -63,9 +63,6 @@ class CollisionBackend(StrEnum):
     P3D = "pytorch3d"
     """GPU backend using PyTorch3D sampling + KNN distance queries."""
 
-    EFM3D = "efm3d"
-    """GPU backend using efm3d torch geometry utilities."""
-
     PYEMBREE = "pyembree"
     """Use :class:`trimesh.ray.ray_pyembree.RayMeshIntersector` for fast
     ray-mesh tests when available.
@@ -84,9 +81,8 @@ class CandidateContext(TypedDict):
     last_pose: PoseTW
     gt_mesh: Trimesh | None
     mesh_p3d: "Meshes | None"
-    mesh_samples: Tensor | None
-    mesh_verts: Tensor | None
-    mesh_faces: Tensor | None
+    mesh_verts: Tensor
+    mesh_faces: Tensor
     occupancy_extent: Tensor | None
     device: device
     poses: Tensor

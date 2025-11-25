@@ -369,10 +369,8 @@ class DashboardApp:
                         [b.value for b in CollisionBackend],
                         index=[b.value for b in CollisionBackend].index(cand_cfg.collision_backend.value),
                     )
-                    mesh_samples = st.slider(
-                        "mesh_samples (surface pts)", 1000, 200000, cand_cfg.mesh_samples, step=1000
-                    )
-                    cache_mesh = st.checkbox("cache mesh samples", value=cand_cfg.cache_mesh_samples)
+
+                    cache_mesh = st.checkbox("cache mesh samples", value=cand_cfg.cache_meshes)
                     ray_sub = st.slider("ray_subsample", 1, 64, cand_cfg.ray_subsample)
                     step_clear = st.slider("step_clearance (m)", 0.005, 0.2, float(cand_cfg.step_clearance), step=0.005)
                     sampling = st.selectbox(
@@ -392,8 +390,7 @@ class DashboardApp:
                     new_cand = cand_cfg.model_copy(
                         update={
                             "collision_backend": CollisionBackend(backend),
-                            "mesh_samples": int(mesh_samples),
-                            "cache_mesh_samples": cache_mesh,
+                            "cache_meshes": cache_mesh,
                             "ray_subsample": int(ray_sub),
                             "step_clearance": float(step_clear),
                             "sampling_strategy": SamplingStrategy(sampling),
@@ -492,9 +489,7 @@ class DashboardApp:
             # Auto-upgrade UI result to PyTorch3D on CUDA (default) unless user explicitly picked cpu
             if torch.cuda.is_available() and not isinstance(renderer_cfg.renderer, Pytorch3DDepthRendererConfig):
                 console.log("Upgrading depth renderer to Pytorch3D (cuda) for renders")
-                renderer_cfg = renderer_cfg.model_copy(
-                    update={"renderer": Pytorch3DDepthRendererConfig(device="cuda")}
-                )
+                renderer_cfg = renderer_cfg.model_copy(update={"renderer": Pytorch3DDepthRendererConfig(device="cuda")})
                 store(STATE_KEYS["depth_cfg"], _cfg_to_dict(renderer_cfg))
                 store(STATE_KEYS["depth"], None)
             render_depths = st.checkbox("Compute depth renders", value=True, key="compute_depths")

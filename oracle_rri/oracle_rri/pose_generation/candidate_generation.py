@@ -34,7 +34,6 @@ import torch
 import trimesh
 from efm3d.aria import PoseTW
 from pydantic import AliasChoices, Field, field_validator, model_validator
-from pytorch3d.ops import sample_points_from_meshes  # type: ignore[import-untyped]
 from pytorch3d.structures import Meshes  # type: ignore[import-untyped]
 
 from ..data.efm_views import EfmSnippetView
@@ -94,7 +93,7 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Factory target for the config. Runtime class instantiated by `setup_target()`.
     This is excluded from serialization."""
 
-    camera_index: Literal["rgb", "rgb_depth", "slam_l", "slam_r"] = "rgb_depth"
+    camera_index: Literal["rgb", "slaml", "slamr"] = "rgb"
     """Camera index to use for candidate generation."""
 
     num_samples: int = 512
@@ -156,10 +155,9 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Number of ray samples / subdivisions when evaluating path collisions."""
     step_clearance: float = 0.05
     """Step size (m) for distance checks along paths when required."""
-    mesh_samples: int = 20000
-    """Number of surface samples used for PyTorch3D collision/distance (ignored otherwise)."""
-    cache_mesh_samples: bool = True
-    """If True, cache per-mesh PyTorch3D structures and sampled points for reuse within a process."""
+
+    cache_meshes: bool = True
+    """If True, cache per-mesh PyTorch3D structures for reuse within a process."""
     device: torch.device = Field(  # type: ignore[assignment]
         default_factory=lambda: select_device("auto", component="CandidateViewGenerator")
     )
@@ -251,14 +249,8 @@ class CandidateViewGenerator:
         device = torch.device(self.config.device)
         occupancy_extent = sample.get_occupancy_extend().to(device=device, dtype=torch.float32)
         gt_mesh = sample.mesh
-        # NOTE: respect configured camera_index by converting rig pose -> camera pose.
-        cam_map = {
-            "rgb": sample.camera_rgb,
-            "rgb_depth": sample.camera_rgb,  # depth shares extrinsics with rgb for our snippets
-            "slam_l": sample.camera_slam_left,
-            "slam_r": sample.camera_slam_right,
-        }
-        cam_view = cam_map.get(self.config.camera_index, sample.camera_rgb)
+
+        cam_view = sample.get_camera(self.config.camera_index)
 
         fov = cam_view.get_fov().to(device=device)  # F, 2
 
@@ -276,7 +268,6 @@ class CandidateViewGenerator:
             self.console.log_summary("occupancy_extent", occupancy_extent)
         if gt_mesh is not None:
             self.console.log(f"mesh stats verts={gt_mesh.vertices.shape[0]:,} faces={gt_mesh.faces.shape[0]:,}")
-        self.console.log_summary("last_pose_matrix", last_pose.matrix3x4)
 
         return self.generate(
             last_pose=last_pose,
@@ -328,14 +319,14 @@ class CandidateViewGenerator:
 
         device = self.config.device
         mesh_p3d = None
-        mesh_samples = None
+
         mesh_verts = None
         mesh_faces = None
         effective_backend = self.config.collision_backend
         if gt_mesh is not None:
             mesh_verts = torch.as_tensor(gt_mesh.vertices, device=device, dtype=torch.float32)
             mesh_faces = torch.as_tensor(gt_mesh.faces, device=device, dtype=torch.int64)
-            mesh_p3d, mesh_samples = self._mesh_structures(mesh_verts, mesh_faces, cache_key=id(gt_mesh))
+            mesh_p3d = self._mesh_structures(mesh_verts, mesh_faces, cache_key=id(gt_mesh))
 
             if device.type == "cpu" and self.config.collision_backend == CollisionBackend.P3D:
                 self.console.warn("P3D collision backend requested on CPU; This is very slow!")
@@ -361,7 +352,6 @@ class CandidateViewGenerator:
             "last_pose": last_pose.to(device),
             "gt_mesh": gt_mesh,
             "mesh_p3d": mesh_p3d,
-            "mesh_samples": mesh_samples,
             "mesh_verts": mesh_verts,
             "mesh_faces": mesh_faces,
             "occupancy_extent": occupancy_extent if occupancy_extent is not None else self.config.occupancy_extent,
@@ -373,8 +363,7 @@ class CandidateViewGenerator:
             "azimuth_half_range_deg": az_half_range_deg,
             "collision_backend": effective_backend,
         }
-        if ctx["occupancy_extent"] is not None:
-            self.console.dbg_summary("ctx.occupancy_extent", ctx["occupancy_extent"])
+
         poses_accum: list[torch.Tensor] = []
         masks_accum: list[torch.Tensor] = []  # NOTE: store per-round stacked masks for debugging
         shell_accum: list[PoseTW] = []
@@ -459,10 +448,11 @@ class CandidateViewGenerator:
         self, mesh_verts: torch.Tensor, mesh_faces: torch.Tensor, cache_key: int
     ) -> tuple[Meshes | None, torch.Tensor | None]:
         """Return (Meshes, sampled_points) for PyTorch3D backend with caching."""
+        # TODO: should be handeled by sample so that we don't have to convert it multiple times
         if self.config.collision_backend != CollisionBackend.P3D:
             return None, None
 
-        if self.config.cache_mesh_samples:
+        if self.config.cache_meshes:
             cache = getattr(self, "_mesh_cache", None)
             if cache is None:
                 cache = {}
@@ -472,13 +462,11 @@ class CandidateViewGenerator:
                 return cached
 
         mesh_p3d = Meshes(verts=[mesh_verts], faces=[mesh_faces])
-        mesh_samples = (
-            sample_points_from_meshes(mesh_p3d, self.config.mesh_samples) if self.config.mesh_samples > 0 else None
-        )
 
-        if self.config.cache_mesh_samples:
-            self._mesh_cache[cache_key] = (mesh_p3d, mesh_samples)
-        return mesh_p3d, mesh_samples
+        if self.config.cache_meshes:
+            self._mesh_cache[cache_key] = mesh_p3d
+
+        return mesh_p3d
 
     def _seed(self, ctx: CandidateContext, n: int) -> CandidateContext:
         """Initialise pose tensor placeholders for a fresh sampling round.

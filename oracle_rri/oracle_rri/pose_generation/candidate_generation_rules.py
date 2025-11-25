@@ -303,7 +303,7 @@ class PathCollisionRule:
         dists = torch.linalg.norm(dirs, dim=1).clamp(min=1e-6)
         dirs_norm = dirs / dists.unsqueeze(1)
 
-        if backend in (CollisionBackend.P3D, CollisionBackend.EFM3D) and ctx.get("mesh_verts") is not None:
+        if backend in (CollisionBackend.P3D) and ctx.get("mesh_verts") is not None:
             verts = ctx["mesh_verts"]
             faces = ctx["mesh_faces"]
             steps = max(2, int(self.config.ray_subsample))
@@ -417,7 +417,10 @@ def point_mesh_distance(
     """
 
     # Lazily import to avoid PyTorch3D dependency when the GPU path is unused.
-    from pytorch3d.loss.point_mesh_distance import _DEFAULT_MIN_TRIANGLE_AREA, point_face_distance
+    from pytorch3d.loss.point_mesh_distance import (  # type: ignore[import-untyped]
+        _DEFAULT_MIN_TRIANGLE_AREA,
+        point_face_distance,
+    )
 
     device = points.device
     points = points.to(device)

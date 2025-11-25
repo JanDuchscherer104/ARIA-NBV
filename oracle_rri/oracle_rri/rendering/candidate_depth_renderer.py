@@ -61,9 +61,6 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
     max_candidates: int | None = None
     """Optional cap on number of valid candidates rendered per call."""
 
-    low_res: bool = False
-    """If True, downscale camera+images to 320x240 before rendering (runtime saver)."""
-
     resolution_scale: float | None = None
     """Optional uniform scale (0<scale<=1) applied to H,W for rendering. Ignored if ``low_res`` is True."""
 
@@ -114,40 +111,36 @@ class CandidateDepthRenderer:
             self.console.error(msg)
             raise ValueError(msg)
         self.console.log(
-            f"Rendering depths: candidates={candidates['poses'].tensor().shape[0]} stream={self.config.camera_stream} on {self.renderer.__class__.__name__}"
+            f"Rendering depths: candidates={candidates['poses'].tensor().shape[0]} stream={self.config.camera_stream} on '{self.renderer.__class__.__name__}'"
         )
         self.console.log(f"Mesh stats verts={sample.mesh.vertices.shape[0]:,} faces={sample.mesh.faces.shape[0]:,}")
         pose_batch, mask_valid, candidate_indices = self._filter_candidates(candidates)
         self.console.log(f"Attempting renders for {pose_batch.tensor().shape[0]} candidates (GUI slice).")
         self.console.log_summary("candidate_indices", candidate_indices)
-        # camera_view = self._camera_view(sample)
+
         camera_view = sample.get_camera(self.config.camera_stream)
-        if self.config.low_res:
-            camera_view = self._downscale_camera_view(camera_view, target_size=(320, 240))
-        elif self.config.resolution_scale is not None:
+        if self.config.resolution_scale is not None:
+            self.console.log(f"Downscaling camera view by scale {self.config.resolution_scale}")
             camera_view = self._downscale_camera_view(camera_view, scale=self.config.resolution_scale)
         frame_idx = 0 if self.config.frame_selection == "first" else -1
         frame_calib = self._frame_calib(camera_view.calib, frame_idx)
         self.console.log_summary("camera_calib_frame", frame_calib.tensor())
         self.console.dbg_summary("pose_batch_tensor", pose_batch.tensor())
-        occ_extend = sample.get_occupancy_extend().to(device=pose_batch.device)
         if hasattr(self.renderer, "render_batch"):
             depths = self.renderer.render_batch(
                 poses=pose_batch,
                 mesh=sample.mesh,
-                camera=camera_view.calib,
+                camera=frame_calib,
                 frame_index=frame_idx,
-                occupancy_extent=occ_extend,
             )
-        else:  # pragma: no cover - defensive; current backends expose render_batch
+        else:
             depth_list = []
-            for pose in pose_batch:
+            for pose in pose_batch:  # type: ignore[attr-defined]
                 depth_i = self.renderer.render_depth(
                     pose_world_cam=pose,
                     mesh=sample.mesh,
                     camera=camera_view.calib,
                     frame_index=frame_idx,
-                    occupancy_extent=occ_extend,
                 )
                 depth_list.append(depth_i)
             depths = torch.stack(depth_list, dim=0)
@@ -174,35 +167,41 @@ class CandidateDepthRenderer:
         if tensor.ndim == 1:
             return calib
         frame = tensor[frame_idx].unsqueeze(0)
-        return CameraTW(frame)
+        cam = CameraTW(frame)
+        # TODO: Potential error here!
+
+        # Candidate poses already encode world←camera; avoid double-applying dataset extrinsics
+        cam.set_T_camera_rig(
+            PoseTW.from_Rt(
+                torch.eye(3, device=cam.device, dtype=cam.dtype), torch.zeros(3, device=cam.device, dtype=cam.dtype)
+            )
+        )
+
+        return cam
 
     def _downscale_camera_view(
         self,
         view: EfmCameraView,
-        target_size: tuple[int, int] | None = None,
         *,
         scale: float | None = None,
     ) -> EfmCameraView:
         """Downscale images and intrinsics for faster rendering."""
 
         _, _, h, w = view.images.shape
-        if target_size is None and scale is not None:
+        if scale is not None and scale != 1.0:
             new_w = max(64, int(w * scale))
             new_h = max(64, int(h * scale))
-            target_size = (new_w, new_h)
-        if target_size is None:
+        else:
             return view
-        new_w, new_h = target_size
-        if (w, h) == (new_w, new_h):
-            return view
+
         with torch.no_grad():
             images_small = torch.nn.functional.interpolate(
                 view.images, size=(new_h, new_w), mode="bilinear", align_corners=False
             )
-        calib_small = view.calib.scale_to_size((new_w, new_h))
+
         return EfmCameraView(
             images=images_small,
-            calib=calib_small,
+            calib=view.calib.scale_to_size((new_w, new_h)),  # type: ignore
             time_ns=view.time_ns,
             frame_ids=view.frame_ids,
         )
@@ -225,17 +224,6 @@ class CandidateDepthRenderer:
         pose_tensor = poses.tensor()[valid_idx]
         pose_batch = PoseTW(pose_tensor)
         return pose_batch, mask_valid, valid_idx
-
-    def _occupancy_extent(self, sample: EfmSnippetView, *, device: torch.device) -> torch.Tensor | None:
-        """Return ``[xmin, xmax, ymin, ymax, zmin, zmax]`` bounds from semidense metadata."""
-
-        volume_min = getattr(sample.semidense, "volume_min", None)
-        volume_max = getattr(sample.semidense, "volume_max", None)
-        if volume_min is None or volume_max is None:
-            return None
-        vmin = volume_min.to(device=device, dtype=torch.float32)
-        vmax = volume_max.to(device=device, dtype=torch.float32)
-        return torch.stack([vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]], dim=0)
 
 
 __all__ = [

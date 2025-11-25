@@ -144,7 +144,6 @@ def renderer_config_ui(
     backend_choice = ui.selectbox("backend", backend_options, index=default_backend_idx)
     max_candidates_default = 2 if super_fast else (default.max_candidates if default.max_candidates is not None else 4)
     max_candidates = ui.slider("max_candidates", 1, 16, max_candidates_default)
-    low_res = ui.checkbox("Low-res render (downscale to 320x240)", value=super_fast)
     res_scale = ui.slider("Render resolution scale", 0.1, 1.0, 0.25 if super_fast else 1.0, step=0.05)
     renderer_device_options = ["global (perf mode)", "cpu", "cuda"]
     default_device = str(getattr(default.renderer, "device", "cuda" if torch.cuda.is_available() else "cpu"))
@@ -185,7 +184,6 @@ def renderer_config_ui(
             "max_candidates": int(max_candidates),
             "renderer": renderer_cfg,
             "is_debug": debug_flag,
-            "low_res": low_res,
             "resolution_scale": float(res_scale),
             "verbosity": verbosity,
         }

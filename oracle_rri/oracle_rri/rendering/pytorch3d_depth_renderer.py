@@ -11,9 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-import numpy as np
 import torch
-import trimesh  # type: ignore[import-untyped]
 from pydantic import AliasChoices, Field, field_validator
 from pytorch3d.renderer import MeshRasterizer, RasterizationSettings  # type: ignore[import-untyped]
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
@@ -126,7 +124,6 @@ class Pytorch3DDepthRenderer:
         camera: CameraTW,
         *,
         frame_index: int | None = None,
-        occupancy_extent: torch.Tensor | None = None,
     ) -> Tensor:
         """Render a depth map for a single candidate pose.
 
@@ -145,7 +142,6 @@ class Pytorch3DDepthRenderer:
             mesh=mesh,
             camera=camera,
             frame_index=frame_index,
-            occupancy_extent=occupancy_extent,
         )
         return batched[0]
 
@@ -156,7 +152,6 @@ class Pytorch3DDepthRenderer:
         camera: CameraTW,
         *,
         frame_index: int | None = None,
-        occupancy_extent: torch.Tensor | None = None,
     ) -> Tensor:
         """Render depth for a batch of poses."""
 
@@ -174,7 +169,6 @@ class Pytorch3DDepthRenderer:
         mesh_struct = self._mesh_to_struct(
             mesh,
             batch_size=rotations.shape[0],
-            occupancy_extent=occupancy_extent,
         )
         if dtype != torch.float32:
             mesh_struct = mesh_struct.to(dtype=dtype)
@@ -275,100 +269,16 @@ class Pytorch3DDepthRenderer:
         self,
         mesh: Trimesh,
         batch_size: int,
-        occupancy_extent: torch.Tensor | None = None,
     ) -> Meshes:
         """Convert ``trimesh`` mesh to a PyTorch3D ``Meshes`` batch."""
 
-        mesh_use = self._maybe_with_proxy_walls(mesh, occupancy_extent=occupancy_extent)
-        # mesh_use = mesh
-        verts = torch.as_tensor(mesh_use.vertices, dtype=torch.float32, device=self.device)
-        faces = torch.as_tensor(mesh_use.faces, dtype=torch.int64, device=self.device)
+        verts = torch.as_tensor(mesh.vertices, dtype=torch.float32, device=self.device)
+        faces = torch.as_tensor(mesh.faces, dtype=torch.int64, device=self.device)
         if self.config.two_sided:
             faces_rev = faces[:, [0, 2, 1]]
             faces = torch.cat([faces, faces_rev], dim=0)
         mesh_struct = Meshes(verts=[verts], faces=[faces]).extend(batch_size)
         return mesh_struct
-
-    # ------------------------------------------------------------------
-    # Proxy walls helper
-    # ------------------------------------------------------------------
-    def _maybe_with_proxy_walls(
-        self,
-        mesh: Trimesh,
-        occupancy_extent: torch.Tensor | None = None,
-    ) -> Trimesh:
-        """Append a thin bounding-box shell when major walls are missing."""
-
-        if not self.config.add_proxy_walls:
-            return mesh
-
-        mesh_vmin, mesh_vmax = mesh.bounds
-        vmin = mesh_vmin
-        vmax = mesh_vmax
-        if occupancy_extent is not None and occupancy_extent.numel() == 6:
-            extent_cpu = occupancy_extent.detach().cpu().float()
-            xmin, xmax, ymin, ymax, zmin, zmax = extent_cpu.tolist()
-            occ_vmin = np.array([xmin, ymin, zmin], dtype=np.float32)
-            occ_vmax = np.array([xmax, ymax, zmax], dtype=np.float32)
-            vmin = np.minimum(mesh_vmin, occ_vmin)
-            vmax = np.maximum(mesh_vmax, occ_vmax)
-        extents = vmax - vmin
-        desired_area = {
-            "xmin": extents[1] * extents[2],
-            "xmax": extents[1] * extents[2],
-            "ymin": extents[0] * extents[2],
-            "ymax": extents[0] * extents[2],
-            "zmin": extents[0] * extents[1],
-            "zmax": extents[0] * extents[1],
-        }
-        centers = mesh.triangles_center
-        areas = mesh.area_faces
-        eps = self.config.proxy_eps
-        plane_masks = {
-            "xmin": centers[:, 0] <= vmin[0] + eps,
-            "xmax": centers[:, 0] >= vmax[0] - eps,
-            "ymin": centers[:, 1] <= vmin[1] + eps,
-            "ymax": centers[:, 1] >= vmax[1] - eps,
-            "zmin": centers[:, 2] <= vmin[2] + eps,
-            "zmax": centers[:, 2] >= vmax[2] - eps,
-        }
-        coverage = {k: areas[m].sum() for k, m in plane_masks.items()}
-        missing = [
-            k
-            for k, cov in coverage.items()
-            if desired_area[k] > 0 and cov < desired_area[k] * self.config.proxy_wall_area_threshold
-        ]
-        if not missing:
-            return mesh
-
-        # Build a box shell at bounds; keep only faces for missing planes to avoid doubling others.
-        box = trimesh.creation.box(
-            extents=extents,
-            transform=trimesh.transformations.translation_matrix(vmin + extents / 2.0),
-        )
-        mask_keep = []
-        for n in box.face_normals:
-            if (
-                (np.allclose(n, [1, 0, 0]) and "xmax" in missing)
-                or (np.allclose(n, [-1, 0, 0]) and "xmin" in missing)
-                or (np.allclose(n, [0, 1, 0]) and "ymax" in missing)
-                or (np.allclose(n, [0, -1, 0]) and "ymin" in missing)
-                or (np.allclose(n, [0, 0, 1]) and "zmax" in missing)
-                or (np.allclose(n, [0, 0, -1]) and "zmin" in missing)
-            ):
-                mask_keep.append(True)
-            else:
-                mask_keep.append(False)
-        mask_keep = np.array(mask_keep, dtype=bool)
-        if not mask_keep.any():
-            return mesh
-        proxy = Trimesh(vertices=box.vertices, faces=box.faces[mask_keep], process=False)
-        merged = trimesh.util.concatenate([mesh, proxy])
-        if self.console.is_debug:
-            self.console.dbg(
-                f"Added proxy walls for planes {missing}; proxy faces={proxy.faces.shape[0]}, total={merged.faces.shape[0]}"
-            )
-        return merged
 
     def _pose_to_r_t(self, poses: PoseTW) -> tuple[Tensor, Tensor]:
         """Convert ``T_world_camera`` into PyTorch3D view matrices."""

@@ -443,7 +443,11 @@ class SnippetPlotBuilder:
         return self
 
     def add_camera_axes(
-        self, *, camera: Literal["rgb", "slam-l", "slam-r"] = "rgb", frame_indices: list[int] | None = None
+        self,
+        *,
+        camera: Literal["rgb", "slam-l", "slam-r"] = "rgb",
+        frame_indices: list[int] | None = None,
+        title: str = "Camera axes",
     ) -> "SnippetPlotBuilder":
         cam_view = self._camera_by_name(camera)
         traj = self.snippet.trajectory
@@ -471,11 +475,13 @@ class SnippetPlotBuilder:
         cam_axes = t_world_cam.R.transpose(-1, -2).detach().cpu().numpy()  # (K, 3, 3)
 
         self._update_scene_ranges(cam_centers)
-        self._add_camera_axes(cam_centers, cam_axes)
+        self._add_camera_axes(cam_centers, cam_axes, title)
 
         return self
 
-    def _add_camera_axes(self, cam_centers: np.ndarray, cam_axes: np.ndarray) -> "SnippetPlotBuilder":
+    def _add_camera_axes(
+        self, cam_centers: np.ndarray, cam_axes: np.ndarray, title: str = "Camera axes"
+    ) -> "SnippetPlotBuilder":
         """Add LUF axes for multiple cameras in one go."""
 
         if cam_centers.ndim == 1:
@@ -496,7 +502,7 @@ class SnippetPlotBuilder:
                     z=seg[:, 2],
                     mode="lines",
                     line={"color": color, "width": 8},
-                    name="Camera axes" if axis == 0 else None,
+                    name=title if axis == 0 else None,
                     showlegend=axis == 0,
                 )
             )

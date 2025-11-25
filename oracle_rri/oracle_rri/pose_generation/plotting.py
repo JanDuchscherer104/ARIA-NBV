@@ -58,6 +58,7 @@ def plot_candidates(
         SnippetPlotBuilder.from_snippet(snippet, title=title)
         .add_mesh()
         .add_points(poses, name="Candidates", color="royalblue", size=4, opacity=0.7)
+        .add_camera_axes(camera="rgb", title="Final Camera")
     )
 
     if center is not None:
@@ -65,7 +66,7 @@ def plot_candidates(
             np.asarray(center).reshape(1, 3),
             name="sampling center",
             color="red",
-            size=5,
+            size=1,
             symbol="x",
             opacity=1.0,
         )
@@ -100,6 +101,7 @@ def plot_sampling_shell(
             samples=None,
             sample_n=sample_n,
         )
+        .add_points(shell_poses, name="Shell samples", color="green", size=2, opacity=0.5)
     ).finalize()
 
 
