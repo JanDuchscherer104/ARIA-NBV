@@ -11,6 +11,21 @@ format: html
 
 # Setup Instructions
 
+## Installation via separate uv envirnoment
+
+```bash
+cd oracle_rri
+conda create -f environment.yml
+conda activate aria-nbv
+
+uv sync --extra dev --extra notebook --extra pytorch3d
+```
+
+This will install all dependencies and create a new python environment in `oracle_rri/.venv`.
+
+
+## Direct Installation into the Conda Environment
+
 ```bash
 cd oracle_rri
 conda env create -f environment.yml
