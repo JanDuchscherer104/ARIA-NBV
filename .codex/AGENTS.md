@@ -27,12 +27,13 @@ We are building an **active Next-Best-View planning system** for complex indoor 
 - **3D Processing**: `pytorch3d`, `trimesh`, `pytransform3d`, `open3d`
 - **Visualization**: `plotly`, `streamlit`, `matplotlib`
 - **Deep Learning**: PyTorch, PyTorch Lightning
-- **Python Environment**: Always ensure to work in the conda environment `aria-nbv` located at `/home/jandu/miniforge3/envs/aria-nbv/bin/python`, Python 3.11. All libraries are installed as packages.
+- **Python Environment**: Use the uv-managed virtualenv at `oracle_rri/.venv` (Python 3.11). If it is missing or stale, recreate it with
+  `UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync --extra dev --extra notebook --extra pytorch3d`.
 
 ### Agentic Behaviors
 
 - **On Initialization**:
-  - **Always** run `make context` (in active `aria-nbv` conda env) to generate an up-to-date class diagram of the `oracle_rri` package and get an overview of all defined symbols for reference.
+  - **Always** run `make context` (it uses the uv `.venv` automatically and prints which interpreter is used; if `.venv` is missing, run the sync command above first) to generate an up-to-date class diagram of the `oracle_rri` package.
   - **Always** run `make context-dir-tree` right after `make context` to get the current oracle_rri directory tree snapshot.
   - **Always** read: `index.qmd`, `todos.qmd`.
   - **Optional** (depending on your task) read: `ase_dataset.qmd`, `resources.qmd`, `oracle_rri_impl.qmd`, `efm3d_implementation.qmd`, `efm3d_symbol_index.qmd`, `prj_aria_tools_impl.qmd`, `rri_computation.qmd` to get a comprehensive understanding of the project goals, architecture, and technical details.
@@ -51,37 +52,45 @@ We are building an **active Next-Best-View planning system** for complex indoor 
 - **Never** terminate without confirming that all of your changes have been tested with real-life pytest scenearios - i.e. using real data, not just mocks: the full functionality of all modules must be verified in integration tests.
 - **Never** make any changes that have not been requested or are outside the scope of the current task.
 - **Always** keep the documentation up to date with any code changes!
+- **When editing diagrams**: validate Mermaid/Quarto locally with `quarto render docs/contents/impl/aria_nbv_overview.qmd --to html` (no absolute path in `--output`). Use `{mermaid}` fences, `<br/>` for line breaks inside labels, and avoid math-style braces/subscripts in node IDs to keep Mermaid 11+ happy.
+- **Markdown/QMD formatting**: Run `python scripts/format_qmd_lists.py` before committing docs; it inserts required blank lines before bullet/numbered lists outside code fences so Quarto renders them correctly.
 - **Before terminating**: replace any temporary citation placeholders of the form `cite…` with either (a) direct markdown links to authoritative sources, or (b) valid bib references already present in `references.bib`. Do not leave the placeholder markers in committed text.
 - **Finally**, before terminating, summarize all important findings, changes made, and any open suggestions that remain in your final report. All crucial finfings and suggestions must be documented in `.codex/<label for tasks>.md` for future reference. Here include potential problems in the current implementation, suggestions for future improvements, and any other relevant insights gained during your work that could benefit future contributors.
+
+### Context7 library IDs (for diagrams/docs)
+
+Keep resolved IDs handy for `{mermaid}` diagrams or documentation references:
+
+```{mermaid}
+flowchart LR
+    ctx[Context7]
+    ctx --> m["/mermaid-js/mermaid"]
+    ctx --> q["/websites/quarto"]
+```
+
+### Mermaid validation workflow
+
+- For any diagram edits, first validate standalone with mermaid-cli:
+  `npx -y @mermaid-js/mermaid-cli -i /tmp/diagram.mmd -o /tmp/diagram.svg`
+  (labels that include spaces/parentheses should be wrapped in quotes inside edge labels; avoid braces/subscripts in IDs; use `<br/>` for line breaks).
+- After it renders, copy the verified content into the `{mermaid}` block in the relevant `.qmd`, then run `quarto render <file>.qmd --to html` as a final check.
 
 ## Key Documentation Files
 
 **Always reference these files** for project context and technical details:
 
-- **[docs/index.qmd](../docs/index.qmd)**: Main project overview, vision, goals, and navigation hub
-- **[docs/contents/todos.qmd](../docs/contents/todos.qmd)**: Current action items, priorities, and open questions
-- **[docs/contents/roadmap.qmd](../docs/contents/roadmap.qmd)**: Long-term planning, milestones, and release sequencing
-- **[docs/contents/resources.qmd](../docs/contents/resources.qmd)**: Central index of external links, API references, data sheets, and toolchains
-- **[docs/contents/questions.qmd](../docs/contents/questions.qmd)**: Open research/design questions with historical answers and rationale
-- **[docs/contents/ase_dataset.qmd](../docs/contents/ase_dataset.qmd)**: ASE dataset structure, ATEK data keys, download strategy, and mesh pairing rules
-- **[docs/contents/setup.qmd](../docs/contents/setup.qmd)**: Environment bootstrap instructions (conda, system packages, dataset sync)
-- **[docs/contents/literature/index.qmd](../docs/contents/literature/index.qmd)** plus topic pages (`efm3d.qmd`, `gen_nbv.qmd`, `vin_nbv.qmd`, `scene_script.qmd`): summaries of every paper we rely on
-- **[docs/contents/theory/nbv_background.qmd](../docs/contents/theory/nbv_background.qmd)** and **[docs/contents/theory/rri_theory.qmd](../docs/contents/theory/rri_theory.qmd)**: mathematical derivations for NBV, Chamfer/RRI, and RRI normalization
-- **[docs/contents/theory/semi-dense-pc.qmd](../docs/contents/theory/semi-dense-pc.qmd)** and **[docs/contents/theory/surface_metrics.qmd](../docs/contents/theory/surface_metrics.qmd)**: SLAM point properties & mesh metrics
-- **Implementation series**:
-  - **[docs/contents/impl/overview.qmd](../docs/contents/impl/overview.qmd)**: dependency graph across oracle_rri/geometry/viz modules
-  - **[docs/contents/impl/oracle_rri_impl.qmd](../docs/contents/impl/oracle_rri_impl.qmd)**: Complete Oracle RRI implementation guide with function signatures and usage
-  - **[docs/contents/impl/oracle_rri_class.qmd](../docs/contents/impl/oracle_rri_class.qmd)**: Planned package layout and config flow for the oracle module
-  - **[docs/contents/impl/atek_implementation.qmd](../docs/contents/impl/atek_implementation.qmd)**: ATEK-specific utilities, key maps, and downloader interfaces
-  - **[docs/contents/impl/efm3d_implementation.qmd](../docs/contents/impl/efm3d_implementation.qmd)** and **[docs/contents/impl/efm3d_symbol_index.qmd](../docs/contents/impl/efm3d_symbol_index.qmd)**: EFM3D utilities reference & exhaustive symbol catalog
-  - **[docs/contents/impl/prj_aria_tools_impl.qmd](../docs/contents/impl/prj_aria_tools_impl.qmd)**: Project Aria tooling (trajectory, calibration, GT mesh access)
-  - **[docs/contents/impl/rri_computation.qmd](../docs/contents/impl/rri_computation.qmd)**: Metrics, Chamfer distance recipes, and numerical stability notes
-  - **[docs/contents/impl/efm3d_symbol_index.qmd](../docs/contents/impl/efm3d_symbol_index.qmd)**: (repeat) central reference for constants/classes—use it whenever touching EFM3D
-- **Experiments**: **[docs/contents/experiments/findings.qmd](../docs/contents/experiments/findings.qmd)** tracks every evaluation run and key takeaways
-- **Glossary**: **[docs/contents/glossary.qmd](../docs/contents/glossary.qmd)** defines project-specific terminology (RRI, OBB, candidate pose taxonomies)
-- **[docs/contents/impl/atek_implementation.qmd](../docs/contents/impl/atek_implementation.qmd)** + **[docs/contents/impl/prj_aria_tools_impl.qmd](../docs/contents/impl/prj_aria_tools_impl.qmd)** are mandatory when modifying dataset loaders or downloaders
-- **[docs/contents/questions.qmd](../docs/contents/questions.qmd)** + **[docs/contents/resources.qmd](../docs/contents/resources.qmd)** for context when answering design questions
-- **[notebooks/ase_oracle_rri_simplified.ipynb](../notebooks/ase_oracle_rri_simplified.ipynb)**: Working Oracle RRI implementation with all fixes applied
+- **docs/index.qmd**: Main project overview, vision, goals, and navigation hub.
+- **docs/contents/todos.qmd** and **docs/contents/roadmap.qmd**: Current action items and milestones.
+- **docs/contents/questions.qmd**: Open research/design questions with rationale.
+- **docs/contents/resources.qmd** with **docs/contents/setup.qmd**: External links plus environment/bootstrap instructions.
+- **docs/contents/ase_dataset.qmd**: ASE modality layout, ATEK key mapping, download/mesh pairing rules.
+- **Theory set** — **docs/contents/theory/nbv_background.qmd**, **rri_theory.qmd**, **surface_metrics.qmd**, **semi-dense-pc.qmd**: NBV/RRI derivations, Chamfer metrics, SLAM point properties.
+- **Literature hub** — **docs/contents/literature/index.qmd** and topic pages (`efm3d.qmd`, `vin_nbv.qmd`, `gen_nbv.qmd`, `scene_script.qmd`): Paper summaries and pointers.
+- **Internal implementation guides** — **docs/contents/impl/overview.qmd**, **data_pipeline_overview.qmd**, **class_diag.qmd**, **aria_nbv_package.qmd**, **oracle_rri_impl.qmd**, **rri_computation.qmd**: Package layout, pipelines, UML, and oracle/metric details.
+- **External stack references** — **docs/contents/ext-impl/efm3d_implementation.qmd**, **efm3d_symbol_index.qmd**, **atek_implementation.qmd**, **prj_aria_tools_impl.qmd**: Vendor code notes, symbol catalogs, and tooling specifics.
+- **docs/contents/experiments/findings.qmd**: Log of evaluation runs and key takeaways.
+- **docs/contents/glossary.qmd**: Project terminology (RRI, OBB, pose taxonomies).
+- **notebooks/ase_oracle_rri_simplified.ipynb**: Reference notebook with the working oracle RRI pipeline.
 
 ## Style Guide
 
@@ -320,6 +329,7 @@ All fields are views over the dict produced by `load_atek_wds_dataset_as_efm`; c
 - `/websites/streamlit_io` - Web app framework for data apps
 - `/websites/typst_app` - Presentations and publications
 - `/websites/quarto` - For our documentation site
+- `/websites/astral_sh_uv` - UV package manager
 
 **Note**: For EFM3D, ATEK, and ProjectAria tools, refer to the vendored source code in `external/` and the symbol index at `docs/contents/impl/efm3d_symbol_index.qmd`.
 
