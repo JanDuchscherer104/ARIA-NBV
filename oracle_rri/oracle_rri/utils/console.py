@@ -3,6 +3,7 @@
 import inspect
 import traceback
 from collections.abc import Callable
+from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -16,12 +17,47 @@ if TYPE_CHECKING:
     from lightning.pytorch.loggers.logger import Logger
 
 
+class Verbosity(IntEnum):
+    """Verbosity levels for Console output."""
+
+    QUIET = 0
+    NORMAL = 1
+    VERBOSE = 2
+
+    @classmethod
+    def from_any(cls, value: Any) -> "Verbosity":
+        """Coerce booleans/ints/strings into a Verbosity level."""
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, bool):
+            return cls.NORMAL if value else cls.QUIET
+        if isinstance(value, (int, float)):
+            try:
+                return cls(max(min(int(value), int(cls.VERBOSE)), int(cls.QUIET)))
+            except ValueError:
+                return cls.NORMAL
+        if isinstance(value, str):
+            normalised = value.strip().lower()
+            mapping = {
+                "quiet": cls.QUIET,
+                "silent": cls.QUIET,
+                "normal": cls.NORMAL,
+                "info": cls.NORMAL,
+                "verbose": cls.VERBOSE,
+                "debug": cls.VERBOSE,
+                "max": cls.VERBOSE,
+            }
+            if normalised in mapping:
+                return mapping[normalised]
+        return cls.NORMAL
+
+
 class Console(RichConsole):
     """Console wrapper that centralises formatting and convenience helpers."""
 
     _shared_pl_logger: ClassVar["Logger | None"] = None
     _shared_global_step: ClassVar[int] = 0
-    _global_verbose: ClassVar[bool] = True
+    _global_verbosity: ClassVar[Verbosity] = Verbosity.NORMAL
     _global_debug: ClassVar[bool] = False
     _external_sink: ClassVar[Callable[[str], None] | None] = None
     prefix: str | None = None
@@ -71,13 +107,22 @@ class Console(RichConsole):
         type(self)._shared_global_step = value
 
     @property
+    def verbosity(self) -> Verbosity:
+        """Global verbosity level shared across all Console instances."""
+        return type(self)._global_verbosity
+
+    @verbosity.setter
+    def verbosity(self, value: Verbosity | int | bool) -> None:
+        type(self)._global_verbosity = Verbosity.from_any(value)
+
+    @property
     def verbose(self) -> bool:
-        """Global verbose flag shared across all Console instances."""
-        return type(self)._global_verbose
+        """Boolean view of verbosity (NORMAL or higher)."""
+        return self.verbosity >= Verbosity.NORMAL
 
     @verbose.setter
     def verbose(self, value: bool) -> None:
-        type(self)._global_verbose = value
+        self.verbosity = value
 
     @property
     def is_debug(self) -> bool:
@@ -135,7 +180,7 @@ class Console(RichConsole):
 
     def log(self, message: str) -> None:
         """Emit an informational message when verbosity is enabled."""
-        if not self.verbose:
+        if self.verbosity < Verbosity.NORMAL:
             return
         formatted = self._format_message(message)
         self.print(formatted)
@@ -150,7 +195,7 @@ class Console(RichConsole):
 
     def warn(self, message: str) -> None:
         """Emit a warning message and include a short caller stack."""
-        if self.verbose:
+        if self.verbosity >= Verbosity.NORMAL:
             formatted = (
                 f"[bright_yellow]Warning:[/bright_yellow] {self._format_message(message)}\n"
                 f"[dim]{self._get_caller_stack()}[/dim]"
@@ -172,7 +217,7 @@ class Console(RichConsole):
 
     def plog(self, obj: Any, **kwargs) -> None:
         """Pretty-print an object using the best available formatter."""
-        if self.verbose:
+        if self.verbosity >= Verbosity.NORMAL:
             formatted = pformat(obj, **kwargs)
             self.print(formatted)
             self._emit_sink(formatted)
@@ -194,16 +239,21 @@ class Console(RichConsole):
             summary = summarize(value)
             self.dbg(f"{label}: {summary}")
 
-    def set_verbose(self, verbose: bool) -> "Console":
-        """Toggle verbose logging output."""
-        self.verbose = verbose
+    def set_verbosity(self, level: Verbosity | int | bool) -> "Console":
+        """Set verbosity level (0=quiet, 1=normal, 2=verbose)."""
+        self.verbosity = level
+        return self
+
+    def set_verbose(self, verbose: Verbosity | int | bool) -> "Console":
+        """Backward-compatible alias for :meth:`set_verbosity`."""
+        self.set_verbosity(verbose)
         return self
 
     def set_debug(self, is_debug: bool) -> "Console":
         """Enable or disable debug logging while keeping verbose mode sensible."""
         self.is_debug = is_debug
         if is_debug:
-            self.verbose = True
+            self.verbosity = Verbosity.VERBOSE
         return self
 
     def set_timestamp_display(self, show_timestamps: bool) -> "Console":

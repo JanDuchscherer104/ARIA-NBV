@@ -1,14 +1,14 @@
 """Tests for downloader.py module."""
 
-import pytest
-
-pytest.skip("Downloader API deprecated for current oracle_rri; skipping.", allow_module_level=True)
-
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from oracle_rri.data.downloader import ASEDownloader, ASEDownloaderConfig
-from oracle_rri.utils import Console
+from oracle_rri.utils import Console, Verbosity
+
+pytest.skip("Downloader API deprecated for current oracle_rri; skipping.", allow_module_level=True)
 
 
 class TestASEDownloaderConfig:
@@ -20,12 +20,12 @@ class TestASEDownloaderConfig:
             mode="download",
             url_dir=tmp_url_dir,
             output_dir=tmp_output_dir,
-            verbose=True,
+            verbosity=Verbosity.NORMAL,
         )
 
         assert config.url_dir == tmp_url_dir
         assert config.output_dir == tmp_output_dir
-        assert config.verbose is True
+        assert config.verbosity == Verbosity.NORMAL
 
     def test_path_resolution(self, tmp_path: Path):
         """Test automatic path resolution."""
@@ -90,7 +90,7 @@ class TestASEDownloader:
             mode="download",
             url_dir=tmp_url_dir,
             output_dir=tmp_output_dir,
-            verbose=False,
+            verbosity=Verbosity.QUIET,
         )
         return config.setup_target()
 

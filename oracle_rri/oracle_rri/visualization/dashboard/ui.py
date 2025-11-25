@@ -1,0 +1,192 @@
+"""Sidebar UI helpers for configuring dataset, candidates, and rendering."""
+
+from __future__ import annotations
+
+import streamlit as st
+import torch
+
+from ...data import AseEfmDatasetConfig
+from ...pose_generation import CandidateViewGeneratorConfig
+from ...pose_generation.types import CollisionBackend, SamplingStrategy
+from ...rendering import CandidateDepthRendererConfig, Efm3dDepthRendererConfig, Pytorch3DDepthRendererConfig
+from ...utils import Verbosity
+
+
+def dataset_config_ui(
+    ui: st.delta_generator.DeltaGenerator, *, super_fast: bool, verbosity: Verbosity, is_debug: bool
+) -> AseEfmDatasetConfig:
+    ui.subheader("Dataset")
+    mesh_ratio = ui.slider("mesh decimation ratio", 0.0, 1.0, 0.02 if super_fast else 0.02, step=0.02)
+    mesh_max_faces = ui.number_input(
+        "max mesh faces (cap after decimation)",
+        min_value=1_000,
+        max_value=2_000_000,
+        value=100_000 if super_fast else 300_000,
+        step=10_000,
+    )
+    crop_enable = ui.checkbox("crop mesh", value=True)
+    mesh_crop_margin = (
+        ui.slider("crop margin (m)", 0.0, 2.0, 0.2 if super_fast else 0.5, step=0.05) if crop_enable else None
+    )
+    mesh_keep_ratio = ui.slider("min keep ratio (after crop)", 0.0, 1.0, 0.9 if super_fast else 0.7, step=0.05)
+    require_mesh = ui.checkbox("require mesh", value=True)
+    debug_flag = ui.checkbox("Debug (data)", value=is_debug)
+    device_opts = ["cpu", "cuda"]
+    default_device_idx = 1 if torch.cuda.is_available() and not super_fast else 0
+    device_choice = ui.selectbox(
+        "Dataset device",
+        device_opts,
+        index=default_device_idx,
+        help="Move snippet tensors to this device immediately after loading.",
+    )
+
+    return AseEfmDatasetConfig(
+        atek_variant="efm",
+        mesh_simplify_ratio=mesh_ratio if mesh_ratio > 0 else None,
+        mesh_crop_margin_m=mesh_crop_margin,
+        mesh_crop_min_keep_ratio=mesh_keep_ratio,
+        mesh_max_faces=int(mesh_max_faces),
+        require_mesh=require_mesh,
+        batch_size=None,
+        verbosity=verbosity,
+        is_debug=debug_flag,
+        device=device_choice,
+    )
+
+
+def candidate_config_ui(
+    default: CandidateViewGeneratorConfig,
+    ui: st.delta_generator.DeltaGenerator,
+    *,
+    super_fast: bool = False,
+    is_debug: bool = False,
+    verbosity: Verbosity,
+    perf_mode: str = "auto",
+) -> CandidateViewGeneratorConfig:
+    ui.subheader("Candidate Generator")
+    num_samples_default = 2 if super_fast else default.num_samples
+    debug_flag = ui.checkbox("Debug (candidates)", value=is_debug)
+
+    device_mode = ui.selectbox(
+        "Generator device",
+        ["global (perf mode)", "cpu", "cuda"],
+        index=0,
+        help="Global follows PerformanceMode (auto/gpu/cpu); override per-page if needed.",
+    )
+
+    # Configure backends
+    sampling_opts = list(SamplingStrategy)
+    sampling_choice = ui.selectbox(
+        "sampling_strategy",
+        options=sampling_opts,
+        index=sampling_opts.index(default.sampling_strategy),
+        format_func=lambda s: s.name.lower(),
+    )
+
+    collision_opts = list(CollisionBackend)
+    collision_choice = ui.selectbox(
+        "collision_backend",
+        options=collision_opts,
+        index=collision_opts.index(default.collision_backend),
+        format_func=lambda c: c.value,
+        help="PyTorch3D for GPU, pyembree/trimesh for CPU.",
+    )
+
+    num_samples = ui.slider("num_samples", 2, 512, num_samples_default, step=2)
+    min_radius = ui.slider("min_radius (m)", 0.1, 2.0, float(default.min_radius), step=0.05)
+    max_radius = ui.slider("max_radius (m)", 0.2, 3.0, float(default.max_radius), step=0.05)
+    min_elev = ui.slider("min_elev_deg", -45.0, 0.0, float(default.min_elev_deg), step=1.0)
+    max_elev = ui.slider("max_elev_deg", 0.0, 75.0, float(default.max_elev_deg), step=1.0)
+    ensure_collision_free = ui.checkbox("ensure_collision_free", value=default.ensure_collision_free)
+
+    ensure_free_space = ui.checkbox("ensure_free_space", value=default.ensure_free_space)
+    min_distance = ui.slider("min_distance_to_mesh (m)", 0.0, 0.5, float(default.min_distance_to_mesh), step=0.01)
+
+    if device_mode == "cpu":
+        device_val = "cpu"
+    elif device_mode == "cuda":
+        device_val = "cuda"
+    else:
+        device_val = perf_mode
+    updated = default.model_copy(
+        update={
+            "num_samples": int(num_samples),
+            "min_radius": float(min_radius),
+            "max_radius": float(max_radius),
+            "min_elev_deg": float(min_elev),
+            "max_elev_deg": float(max_elev),
+            "sampling_strategy": sampling_choice,
+            "min_distance_to_mesh": float(min_distance),
+            "ensure_collision_free": ensure_collision_free,
+            "collision_backend": collision_choice,
+            "ensure_free_space": ensure_free_space,
+            "device": device_val,
+            "is_debug": debug_flag,
+            "verbosity": verbosity,
+        }
+    )
+    # Re-validate to ensure device etc. are normalised
+    return CandidateViewGeneratorConfig.model_validate(updated.model_dump())
+
+
+def renderer_config_ui(
+    default: CandidateDepthRendererConfig,
+    ui: st.delta_generator.DeltaGenerator,
+    *,
+    super_fast: bool = False,
+    is_debug: bool = False,
+    verbosity: Verbosity,
+    perf_mode: str = "auto",
+) -> CandidateDepthRendererConfig:
+    ui.subheader("Depth Renderer")
+    backend_options = ["PyTorch3D (raster)", "cpu (trimesh rays)"]
+    default_backend_idx = 0 if isinstance(default.renderer, Pytorch3DDepthRendererConfig) else 1
+    backend_choice = ui.selectbox("backend", backend_options, index=default_backend_idx)
+    max_candidates_default = 2 if super_fast else (default.max_candidates if default.max_candidates is not None else 4)
+    max_candidates = ui.slider("max_candidates", 1, 16, max_candidates_default)
+    low_res = ui.checkbox("Low-res render (downscale to 320x240)", value=super_fast)
+    res_scale = ui.slider("Render resolution scale", 0.1, 1.0, 0.25 if super_fast else 1.0, step=0.05)
+    renderer_device_options = ["global (perf mode)", "cpu", "cuda"]
+    default_device = str(getattr(default.renderer, "device", "cuda" if torch.cuda.is_available() else "cpu"))
+    if default_device not in ("cpu", "cuda"):
+        default_device_idx = 0
+    else:
+        default_device_idx = renderer_device_options.index(default_device if torch.cuda.is_available() else "cpu")
+    renderer_device_sel = ui.selectbox("renderer device", renderer_device_options, index=default_device_idx)
+    if renderer_device_sel == "cpu":
+        renderer_device = "cpu"
+    elif renderer_device_sel == "cuda":
+        renderer_device = "cuda"
+    else:
+        renderer_device = perf_mode
+    zfar = ui.slider("zfar (m)", 5.0, 50.0, default.renderer.zfar, step=1.0)
+    debug_flag = ui.checkbox("Debug (renderer)", value=is_debug)
+    if backend_choice.startswith("pytorch3d"):
+        faces_default = (
+            default.renderer.faces_per_pixel if isinstance(default.renderer, Pytorch3DDepthRendererConfig) else 1
+        )
+        faces_pp = ui.slider("faces_per_pixel", 1, 4, faces_default)
+        renderer_cfg = Pytorch3DDepthRendererConfig(
+            device=renderer_device,
+            zfar=float(zfar),
+            faces_per_pixel=int(faces_pp),
+            is_debug=debug_flag,
+        )
+    else:
+        chunk_rays = ui.slider("chunk_rays", 50_000, 500_000, 200_000, step=50_000)
+        renderer_cfg = Efm3dDepthRendererConfig(
+            device=renderer_device,
+            zfar=float(zfar),
+            chunk_rays=int(chunk_rays),
+            is_debug=debug_flag,
+        )
+    return default.model_copy(
+        update={
+            "max_candidates": int(max_candidates),
+            "renderer": renderer_cfg,
+            "is_debug": debug_flag,
+            "low_res": low_res,
+            "resolution_scale": float(res_scale),
+            "verbosity": verbosity,
+        }
+    )

@@ -1,77 +1,10 @@
-import numpy as np
 import torch
 import torch.nn.functional as F  # noqa: N812
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 from efm3d.utils.gravity import (
     GRAVITY_DIRECTION_VIO,  # [0, 0, -1]
-    gravity_align_T_world_cam,  # type: ignore
 )
-
-LUF_TO_DISPLAY_ROT = torch.tensor(
-    [
-        [-1.0, 0.0, 0.0],  # flip X (left->right) for viewer
-        [0.0, 1.0, 0.0],  # keep Y up to avoid upside-down frustum
-        [0.0, 0.0, 1.0],
-    ]
-)
-# NOTE: Project Aria uses LUF (left–up–forward); see docs. We flip only X to get
-# a right-handed, viewer-friendly frame without inverting Y (prevents upside-down frusta).
-
-
-# NOTE: Helper to align camera pose for display (used in both data and candidate plotting).
-def pose_for_display(
-    t_world_cam: PoseTW,
-    gravity_w: torch.Tensor | None = None,
-    *,
-    align_gravity: bool = True,
-) -> PoseTW:
-    """Return a display-friendly PoseTW with gravity-up and UI roll/yaw corrections.
-
-    Steps (mirrors data.plotting):
-    1) Gravity-align so world +Z is up (undo VIO gravity tilt).
-    2) Convert Aria LUF camera axes to a display frame (180° about +Z).
-    3) Apply fixed rotations:
-       - roll -90° about camera z to match rotated image display,
-       - yaw -90° about camera y to align forward/right/down with viewer.
-    This keeps frusta upright in Plotly and avoids roll (x-axis) tilt.
-    """
-    if align_gravity:
-        if gravity_w is None:
-            gravity_w = GRAVITY_DIRECTION_VIO
-        t_aligned = gravity_align_T_world_cam(t_world_cam.unsqueeze(0), gravity_w=gravity_w).squeeze(0)
-    else:
-        t_aligned = t_world_cam
-    # NOTE: previously omitted; fixes hidden RDF assumption in plotting path.
-    r_luf_to_display = LUF_TO_DISPLAY_ROT.to(device=t_aligned.R.device, dtype=t_aligned.R.dtype)
-    r_base = t_aligned.R @ r_luf_to_display
-    # NOTE:
-    #   cz, sz: roll  -90° about camera z
-    #   cy, sy: display yaw; we use -90° to match efm3d/ATEK frustum orientation.
-    cz, sz = (
-        torch.cos(torch.tensor(-np.pi / 2, device=t_aligned.device, dtype=t_aligned.dtype)),
-        torch.sin(torch.tensor(-np.pi / 2, device=t_aligned.device, dtype=t_aligned.dtype)),
-    )
-    cy, sy = (
-        torch.cos(torch.tensor(-np.pi / 2, device=t_aligned.device, dtype=t_aligned.dtype)),
-        torch.sin(torch.tensor(-np.pi / 2, device=t_aligned.device, dtype=t_aligned.dtype)),
-    )
-    r_z = torch.tensor(
-        [[cz, -sz, 0.0], [sz, cz, 0.0], [0.0, 0.0, 1.0]],
-        device=t_aligned.device,
-        dtype=t_aligned.dtype,
-    )
-    r_y = torch.tensor(
-        [[cy, 0.0, sy], [0.0, 1.0, 0.0], [-sy, 0.0, cy]],
-        device=t_aligned.device,
-        dtype=t_aligned.dtype,
-    )
-    # First yaw about camera +Y (viewer alignment), then roll about camera +Z (image rotation).
-    # NOTE: order matters – we want a pure SO(3) correction that stays compatible with
-    # efm3d/ATEK visualisation.
-    r_corr = r_z @ r_y
-    r_disp = r_base @ r_corr
-    return PoseTW.from_Rt(r_disp, t_aligned.t)
 
 
 def world_up_tensor(
@@ -149,7 +82,7 @@ def view_axes_from_points(
     return torch.stack([left, up, fwd], dim=-1)
 
 
-def world_from_rig_camera_pose(t_world_rig: PoseTW, cam: CameraTW, frame_idx: int = 0) -> PoseTW:
+def world_from_camera(t_world_rig: PoseTW, cam: CameraTW, frame_idx: int) -> PoseTW:
     """Compute T_world_cam from rig pose and CameraTW extrinsics."""
     return t_world_rig @ cam.T_camera_rig[frame_idx].inverse()
 

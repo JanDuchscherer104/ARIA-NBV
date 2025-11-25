@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
 import torch
 from efm3d.aria import CameraTW, PoseTW
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ..data.efm_views import EfmCameraView, EfmSnippetView
 from ..pose_generation.types import CandidateSamplingResult
-from ..utils import BaseConfig, Console, pick_fast_depth_renderer
+from ..utils import BaseConfig, Console, Verbosity, pick_fast_depth_renderer
 from .efm3d_depth_renderer import Efm3dDepthRendererConfig
 from .pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig
 
-CameraStream = Literal["rgb", "rgb_depth", "slam_left", "slam_right"]
+CameraStream = Literal["rgb", "slaml", "slamr"]
 FrameSelection = Literal["first", "last"]
 
 
@@ -67,16 +67,26 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
     resolution_scale: float | None = None
     """Optional uniform scale (0<scale<=1) applied to H,W for rendering. Ignored if ``low_res`` is True."""
 
-    verbose: bool = False
-    """Enable structured logging."""
+    verbosity: Verbosity = Field(
+        default=Verbosity.NORMAL,
+        validation_alias=AliasChoices("verbosity", "verbose"),
+        description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
+    )
+    """Verbosity level for logging."""
 
     is_debug: bool = False
     """Enable detailed debug logging."""
 
     @model_validator(mode="after")
     def _apply_performance_mode(self) -> "CandidateDepthRendererConfig":
-        object.__setattr__(self, "renderer", pick_fast_depth_renderer(self.renderer))
+        upgraded = pick_fast_depth_renderer(self.renderer)
+        object.__setattr__(self, "renderer", upgraded)
         return self
+
+    @field_validator("verbosity", mode="before")
+    @classmethod
+    def _coerce_verbosity(cls, value: Any) -> Verbosity:
+        return Verbosity.from_any(value)
 
 
 class CandidateDepthRenderer:
@@ -88,7 +98,7 @@ class CandidateDepthRenderer:
         self.config = config
         debug_flag = self.config.is_debug or getattr(self.config.renderer, "is_debug", False)
         self.console = (
-            Console.with_prefix(self.__class__.__name__).set_verbose(self.config.verbose).set_debug(debug_flag)
+            Console.with_prefix(self.__class__.__name__).set_verbosity(self.config.verbosity).set_debug(debug_flag)
         )
         self.renderer = self.config.renderer.setup_target()
 
@@ -104,13 +114,14 @@ class CandidateDepthRenderer:
             self.console.error(msg)
             raise ValueError(msg)
         self.console.log(
-            f"Rendering depths: candidates={candidates['poses'].tensor().shape[0]} stream={self.config.camera_stream}"
+            f"Rendering depths: candidates={candidates['poses'].tensor().shape[0]} stream={self.config.camera_stream} on {self.renderer.__class__.__name__}"
         )
         self.console.log(f"Mesh stats verts={sample.mesh.vertices.shape[0]:,} faces={sample.mesh.faces.shape[0]:,}")
         pose_batch, mask_valid, candidate_indices = self._filter_candidates(candidates)
         self.console.log(f"Attempting renders for {pose_batch.tensor().shape[0]} candidates (GUI slice).")
         self.console.log_summary("candidate_indices", candidate_indices)
-        camera_view = self._camera_view(sample)
+        # camera_view = self._camera_view(sample)
+        camera_view = sample.get_camera(self.config.camera_stream)
         if self.config.low_res:
             camera_view = self._downscale_camera_view(camera_view, target_size=(320, 240))
         elif self.config.resolution_scale is not None:
@@ -119,14 +130,14 @@ class CandidateDepthRenderer:
         frame_calib = self._frame_calib(camera_view.calib, frame_idx)
         self.console.log_summary("camera_calib_frame", frame_calib.tensor())
         self.console.dbg_summary("pose_batch_tensor", pose_batch.tensor())
-        occ_extent = self._occupancy_extent(sample, device=pose_batch.tensor().device)
+        occ_extend = sample.get_occupancy_extend().to(device=pose_batch.device)
         if hasattr(self.renderer, "render_batch"):
             depths = self.renderer.render_batch(
                 poses=pose_batch,
                 mesh=sample.mesh,
                 camera=camera_view.calib,
                 frame_index=frame_idx,
-                occupancy_extent=occ_extent,
+                occupancy_extent=occ_extend,
             )
         else:  # pragma: no cover - defensive; current backends expose render_batch
             depth_list = []
@@ -136,7 +147,7 @@ class CandidateDepthRenderer:
                     mesh=sample.mesh,
                     camera=camera_view.calib,
                     frame_index=frame_idx,
-                    occupancy_extent=occ_extent,
+                    occupancy_extent=occ_extend,
                 )
                 depth_list.append(depth_i)
             depths = torch.stack(depth_list, dim=0)
@@ -157,15 +168,6 @@ class CandidateDepthRenderer:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _camera_view(self, sample: EfmSnippetView) -> EfmCameraView:
-        stream = self.config.camera_stream
-        if stream in ("rgb", "rgb_depth"):
-            return sample.camera_rgb
-        if stream == "slam_left":
-            return sample.camera_slam_left
-        if stream == "slam_right":
-            return sample.camera_slam_right
-        raise ValueError(f"Unsupported camera stream '{stream}'.")
 
     def _frame_calib(self, calib: CameraTW, frame_idx: int) -> CameraTW:
         tensor = calib.tensor()

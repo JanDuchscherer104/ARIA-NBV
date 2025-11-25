@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from oracle_rri.data import AseEfmDatasetConfig
-from oracle_rri.utils.frames import view_axes_from_points, world_from_rig_camera_pose
+from oracle_rri.utils.frames import view_axes_from_points, world_from_camera
 
 
 def _first_sample():
@@ -41,7 +41,7 @@ def test_world_from_rig_camera_pose_roundtrip_real():
     sample = _first_sample()
     t_world_rig = sample.trajectory.t_world_rig[0]
     cam = sample.camera_rgb.calib
-    t_world_cam = world_from_rig_camera_pose(t_world_rig, cam, frame_idx=0)
+    t_world_cam = world_from_camera(t_world_rig, cam, frame_idx=0)
     recomposed = t_world_cam @ cam.T_camera_rig[0]
     assert torch.allclose(recomposed.matrix3x4, t_world_rig.matrix3x4, atol=1e-5)
 
@@ -51,7 +51,7 @@ def test_pose_transform_roundtrip_real_point():
     sample = _first_sample()
     t_world_rig = sample.trajectory.t_world_rig[0]
     cam = sample.camera_rgb.calib
-    t_world_cam = world_from_rig_camera_pose(t_world_rig, cam, frame_idx=0)
+    t_world_cam = world_from_camera(t_world_rig, cam, frame_idx=0)
     p_cam = torch.tensor([0.0, 0.0, 1.0])
     p_world = t_world_cam.transform(p_cam)
     p_cam_back = t_world_cam.inverse().transform(p_world)

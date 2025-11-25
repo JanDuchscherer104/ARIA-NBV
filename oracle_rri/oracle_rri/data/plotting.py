@@ -9,21 +9,42 @@ Conventions (efm3d / ATEK):
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Literal
+
 import numpy as np
-import plotly.graph_objects as go
+import plotly.graph_objects as go  # type: ignore[import-untyped]
 import torch
 import trimesh
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 from matplotlib import colormaps
-from plotly.subplots import make_subplots
+from plotly import colors as plotly_colors
+from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 
 from oracle_rri.data import EfmCameraView, EfmSnippetView, EfmTrajectoryView
 from oracle_rri.utils import Console
-from oracle_rri.utils.frames import world_from_rig_camera_pose
+from oracle_rri.utils.frames import world_from_camera
 
 console = Console.with_prefix("plotting")
 ROTATE_90_CW = -1
+BBOX_EDGE_IDX = np.array(
+    [
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 0),
+        (4, 5),
+        (5, 6),
+        (6, 7),
+        (7, 4),
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7),
+    ],
+    dtype=np.int64,
+)
 
 
 def get_frustum_segments(
@@ -44,19 +65,15 @@ def get_frustum_segments(
     c = cam.c.squeeze(0)  # (2,)
     rs = cam.valid_radius.squeeze(0) / np.sqrt(2.0)  # inscribed square radius per axis
 
-    corners_px = (
-        torch.stack(
-            [
-                c + torch.tensor([-rs[0], -rs[1]]),  # TL
-                c + torch.tensor([-rs[0], rs[1]]),  # BL
-                c + torch.tensor([rs[0], rs[1]]),  # BR
-                c + torch.tensor([rs[0], -rs[1]]),  # TR
-            ],
-            dim=0,
-        )
-        .to(c)
-        .unsqueeze(0)
-    )  # 1 x 4 x 2
+    corners_px = torch.stack(
+        [
+            c + torch.tensor([-rs[0], -rs[1]], device=cam.device, dtype=cam.dtype),  # TL
+            c + torch.tensor([-rs[0], rs[1]], device=cam.device, dtype=cam.dtype),  # BL
+            c + torch.tensor([rs[0], rs[1]], device=cam.device, dtype=cam.dtype),  # BR
+            c + torch.tensor([rs[0], -rs[1]], device=cam.device, dtype=cam.dtype),  # TR
+        ],
+        dim=0,
+    ).unsqueeze(0)  # 1 x 4 x 2
 
     # Unproject to camera-frame rays (LUF) and normalise
     rays_cam = cam.unproject(corners_px)[0].squeeze(0)  # 4 x 3
@@ -95,7 +112,22 @@ def get_frustum_segments(
     return segments
 
 
-def bbox_edges(min_pt: np.ndarray, max_pt: np.ndarray) -> list[np.ndarray]:
+def bbox_edges(min_pt: np.ndarray, max_pt: np.ndarray) -> np.ndarray:
+    """Return AABB wireframe segments as (2, 3) arrays in Plotly order.
+
+    Args:
+        min_pt: XYZ lower bounds (metres) for the axis-aligned box.
+        max_pt: XYZ upper bounds (metres) for the axis-aligned box.
+
+    Returns:
+        Array of shape ``(12, 2, 3)`` ready for ``Scatter3d``. The edge ordering
+        matches the efm3d frustum/box helpers to keep consistent legend/colour
+        usage when overlaying boxes.
+    """
+
+    min_pt = np.asarray(min_pt, dtype=float).reshape(3)
+    max_pt = np.asarray(max_pt, dtype=float).reshape(3)
+
     corners = np.array(
         [
             [min_pt[0], min_pt[1], min_pt[2]],
@@ -106,23 +138,19 @@ def bbox_edges(min_pt: np.ndarray, max_pt: np.ndarray) -> list[np.ndarray]:
             [max_pt[0], min_pt[1], max_pt[2]],
             [max_pt[0], max_pt[1], max_pt[2]],
             [min_pt[0], max_pt[1], max_pt[2]],
-        ]
+        ],
+        dtype=float,
     )
-    edges_idx = [
-        (0, 1),
-        (1, 2),
-        (2, 3),
-        (3, 0),
-        (4, 5),
-        (5, 6),
-        (6, 7),
-        (7, 4),
-        (0, 4),
-        (1, 5),
-        (2, 6),
-        (3, 7),
-    ]
-    return [corners[list(pair)] for pair in edges_idx]
+    return corners[BBOX_EDGE_IDX]
+
+
+def _flatten_edges_for_plotly(edges: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Convert ``(N, 2, 3)`` edges to NaN-separated XYZ for a single Scatter3d trace."""
+
+    edges = np.asarray(edges, dtype=float).reshape(-1, 2, 3)
+    edges_sep = np.concatenate([edges, np.full((edges.shape[0], 1, 3), np.nan, dtype=float)], axis=1)
+    flat = edges_sep.reshape(-1, 3)
+    return flat[:, 0], flat[:, 1], flat[:, 2]
 
 
 def mesh_to_plotly(
@@ -150,7 +178,7 @@ def mesh_to_plotly(
 
 
 def _aligned_pose_world_cam(cam: EfmCameraView, traj: EfmTrajectoryView, frame_idx: int) -> PoseTW:
-    """Nearest rig-aligned camera pose in **world+LUF** (no display corrections)."""
+    """Nearest rig-aligned camera pose in **world+LUF**."""
 
     cam_ts = cam.time_ns.cpu().numpy()
     traj_ts = traj.time_ns.cpu().numpy()
@@ -159,10 +187,10 @@ def _aligned_pose_world_cam(cam: EfmCameraView, traj: EfmTrajectoryView, frame_i
     traj_idx = int(np.argmin(np.abs(traj_ts - cam_ts[frame_idx])))
 
     # Keep the physical pose in LUF; Plotly should render the true sensor frame.
-    return world_from_rig_camera_pose(traj.t_world_rig[traj_idx], cam.calib, frame_idx)
+    return world_from_camera(traj.t_world_rig[traj_idx], cam.calib, frame_idx)
 
 
-def apply_yaw90(pose_world_cam: PoseTW) -> PoseTW:
+def rotate_yaw_cw90(pose_world_cam: PoseTW) -> PoseTW:
     """Roll the pose about its +Z (forward) axis for alignment."""
     c, s = np.cos(np.pi / 2), np.sin(np.pi / 2)
     r_roll = torch.tensor(
@@ -171,6 +199,24 @@ def apply_yaw90(pose_world_cam: PoseTW) -> PoseTW:
         dtype=pose_world_cam.R.dtype,
     )
     return PoseTW.from_Rt(pose_world_cam.R @ r_roll, pose_world_cam.t)
+
+
+def _pose_positions(poses: PoseTW | torch.Tensor) -> np.ndarray:
+    """Return positions (...,3) as numpy from PoseTW or compatible tensor shapes."""
+
+    arr = poses.matrix3x4 if isinstance(poses, PoseTW) else poses
+
+    if arr.dim() == 2 and arr.shape == torch.Size([3, 4]):
+        pos = arr[:3, 3].unsqueeze(0)
+    elif arr.dim() == 2 and arr.shape[1] == 12:
+        pos = arr.view(-1, 3, 4)[..., :3, 3]
+    elif arr.dim() == 3 and arr.shape[1:] == (3, 4):
+        pos = arr[..., :3, 3]
+    elif arr.dim() == 2 and arr.shape[1] == 3:
+        pos = arr
+    else:
+        pos = arr[..., :3]
+    return pos.detach().cpu().numpy()
 
 
 class SnippetPlotBuilder:
@@ -184,13 +230,18 @@ class SnippetPlotBuilder:
         self.fig = go.Figure()
         self.title = title
         self.height = height
-        self.scene_ranges = self._default_scene_ranges()
+        self._bounds = self._compute_bounds()
+        self.scene_ranges = self._build_scene_ranges(*self._bounds)
 
     @classmethod
     def from_snippet(cls, snippet: EfmSnippetView, *, title: str, height: int = 900) -> "SnippetPlotBuilder":
         return cls(snippet, title=title, height=height)
 
     def _default_scene_ranges(self) -> dict:
+        self._bounds = self._compute_bounds()
+        return self._build_scene_ranges(*self._bounds)
+
+    def _compute_bounds(self) -> tuple[np.ndarray, np.ndarray]:
         mesh = self.snippet.mesh
         traj_positions = self.snippet.trajectory.t_world_rig.t.detach().cpu().numpy()
         pts_np = np.zeros((0, 3), dtype=np.float32)
@@ -211,13 +262,28 @@ class SnippetPlotBuilder:
             bbox = np.array([[0.0, 0.0, 0.0]])
 
         vmin, vmax = bbox.min(axis=0), bbox.max(axis=0)
+        return vmin, vmax
+
+    def _build_scene_ranges(self, vmin: np.ndarray, vmax: np.ndarray) -> dict:
         max_extent = (vmax - vmin).max()
         padding = max(0.5, 0.1 * max_extent)
         return {
-            "xaxis": {"title": "X (m)", "range": [vmin[0] - padding, vmax[0] + padding]},
-            "yaxis": {"title": "Y (m)", "range": [vmin[1] - padding, vmax[1] + padding]},
-            "zaxis": {"title": "Z (m)", "range": [vmin[2] - padding, vmax[2] + padding]},
+            "xaxis": {"title": "X (m)", "range": [float(vmin[0] - padding), float(vmax[0] + padding)]},
+            "yaxis": {"title": "Y (m)", "range": [float(vmin[1] - padding), float(vmax[1] + padding)]},
+            "zaxis": {"title": "Z (m)", "range": [float(vmin[2] - padding), float(vmax[2] + padding)]},
         }
+
+    def _update_scene_ranges(self, pts: np.ndarray) -> None:
+        finite = np.isfinite(pts).all(axis=1)
+        if not finite.any():
+            return
+        vmin, vmax = self._bounds
+        pts_min = pts[finite].min(axis=0)
+        pts_max = pts[finite].max(axis=0)
+        vmin = np.minimum(vmin, pts_min)
+        vmax = np.maximum(vmax, pts_max)
+        self._bounds = (vmin, vmax)
+        self.scene_ranges = self._build_scene_ranges(vmin, vmax)
 
     def add_mesh(self, *, color: str = "lightgray", opacity: float = 0.35) -> "SnippetPlotBuilder":
         mesh = self.snippet.mesh
@@ -249,6 +315,38 @@ class SnippetPlotBuilder:
                 z=pts_np[:, 2],
                 mode="markers",
                 marker={"size": 2, "color": pts_np[:, 2], "colorscale": color, "opacity": 0.5},
+                name=name,
+            )
+        )
+        return self
+
+    def add_points(
+        self,
+        points: np.ndarray | torch.Tensor | PoseTW,
+        *,
+        name: str = "Points",
+        color: str = "royalblue",
+        size: int = 4,
+        opacity: float = 0.7,
+        symbol: str = "circle",
+    ) -> "SnippetPlotBuilder":
+        """Scatter arbitrary 3D points onto the figure and update bounds."""
+
+        pts_np = _pose_positions(points) if isinstance(points, (PoseTW, torch.Tensor)) else np.asarray(points)
+        pts_np = np.array(pts_np, copy=False)
+        if pts_np.ndim == 1:
+            pts_np = pts_np.reshape(1, -1)
+        if pts_np.size == 0:
+            return self
+
+        self._update_scene_ranges(pts_np)
+        self.fig.add_trace(
+            go.Scatter3d(
+                x=pts_np[:, 0],
+                y=pts_np[:, 1],
+                z=pts_np[:, 2],
+                mode="markers",
+                marker={"size": size, "color": color, "opacity": opacity, "symbol": symbol},
                 name=name,
             )
         )
@@ -306,7 +404,7 @@ class SnippetPlotBuilder:
     def add_frusta(
         self,
         *,
-        camera: str = "rgb",
+        camera: Literal["rgb", "slam-l", "slam-r"] = "rgb",
         frame_indices: list[int] | None = None,
         scale: float = 1.0,
         include_axes: bool = True,
@@ -314,58 +412,95 @@ class SnippetPlotBuilder:
         name: str = "Frustum",
     ) -> "SnippetPlotBuilder":
         cam_view = self._camera_by_name(camera)
-        if frame_indices is None or len(frame_indices) == 0:
-            frame_indices = [0]
-        clamped = [max(0, min(idx, cam_view.time_ns.shape[0] - 1)) for idx in frame_indices]
         traj = self.snippet.trajectory
-        traj_count = traj.t_world_rig.shape[0]
-        poses: list[PoseTW] = []
-        for idx in clamped:
-            traj_idx = min(max(0, idx), traj_count - 1)
-            t_world_rig = traj.t_world_rig[traj_idx]
-            poses.append(world_from_rig_camera_pose(t_world_rig, cam_view.calib, idx))
-        poses = [apply_yaw90(p) for p in poses]
+        idx = self._select_frame_indices(cam_view, frame_indices, default_last=False)
+        if idx.numel() == 0 or traj.time_ns.numel() == 0:
+            return self
 
-        for pose, frame_idx in zip(poses, clamped, strict=False):
-            frustum_segments = get_frustum_segments(cam_view.calib[frame_idx], pose, scale=scale)
-            for idx, seg in enumerate(frustum_segments):
-                self.fig.add_trace(
-                    go.Scatter3d(
-                        x=seg[:, 0],
-                        y=seg[:, 1],
-                        z=seg[:, 2],
-                        mode="lines",
-                        line={"color": "red", "width": 4},
-                        name=name if idx == 0 else None,
-                        showlegend=idx == 0,
-                    )
-                )
+        cam_ts = cam_view.time_ns.to(idx.device)
+        traj_ts = traj.time_ns.to(idx.device)
 
-        if include_axes or include_center:
-            cam_centers = np.stack([p.t.detach().cpu().numpy() for p in poses], axis=0)
-            cam_axes = [p.R.detach().cpu().numpy().T for p in poses]
-            if include_axes:
-                for center, axes in zip(cam_centers, cam_axes, strict=False):
-                    self._add_camera_axes(center, axes)
-            if include_center:
-                self._add_camera_center(cam_centers[0])
+        sel_cam_ts = cam_ts[idx]  # (K,)
+        traj_idx = self._nearest_traj_indices(traj_ts, sel_cam_ts)
+
+        t_world_rig = traj.t_world_rig[traj_idx]
+        t_cam_rig = cam_view.calib.T_camera_rig[idx]
+        t_world_cam = rotate_yaw_cw90(t_world_rig @ t_cam_rig.inverse())
+
+        pose_list = self._pose_list_from_input(t_world_cam)
+        cam_list = cam_view.calib[idx]
+
+        self._add_frusta_for_poses(
+            cams=cam_list,
+            poses=pose_list,
+            scale=scale,
+            color="red",
+            name=name,
+            max_frustums=None,
+            include_axes=include_axes,
+            include_center=include_center,
+        )
         return self
 
-    def _add_camera_axes(self, cam_center: np.ndarray, cam_axes: np.ndarray) -> "SnippetPlotBuilder":
+    def add_camera_axes(
+        self, *, camera: Literal["rgb", "slam-l", "slam-r"] = "rgb", frame_indices: list[int] | None = None
+    ) -> "SnippetPlotBuilder":
+        cam_view = self._camera_by_name(camera)
+        traj = self.snippet.trajectory
+
+        n_cam = cam_view.time_ns.shape[0]
+        n_traj = traj.time_ns.shape[0]
+        if n_cam == 0 or n_traj == 0:
+            return self
+
+        idx = self._select_frame_indices(cam_view, frame_indices, default_last=True)
+        if idx.numel() == 0:
+            return self
+
+        cam_ts = cam_view.time_ns.to(idx.device)
+        traj_ts = traj.time_ns.to(idx.device)
+
+        cam_sel_ts = cam_ts[idx]
+        traj_idx = self._nearest_traj_indices(traj_ts, cam_sel_ts)
+
+        t_world_rig = traj.t_world_rig[traj_idx]  # PoseTW[K]
+        t_cam_rig = cam_view.calib.T_camera_rig[idx]  # PoseTW[K]
+        t_world_cam = t_world_rig @ t_cam_rig.inverse()
+
+        cam_centers = t_world_cam.t.detach().cpu().numpy()
+        cam_axes = t_world_cam.R.transpose(-1, -2).detach().cpu().numpy()  # (K, 3, 3)
+
+        self._update_scene_ranges(cam_centers)
+        self._add_camera_axes(cam_centers, cam_axes)
+
+        return self
+
+    def _add_camera_axes(self, cam_centers: np.ndarray, cam_axes: np.ndarray) -> "SnippetPlotBuilder":
+        """Add LUF axes for multiple cameras in one go."""
+
+        if cam_centers.ndim == 1:
+            cam_centers = cam_centers.reshape(1, 3)
+        if cam_axes.ndim == 2:
+            cam_axes = cam_axes.reshape(1, 3, 3)
+
         axis_colors = ["red", "green", "blue"]
         for axis, color in enumerate(axis_colors):
-            axis_end = cam_center + cam_axes[axis] * 0.4
+            axis_start = cam_centers
+            axis_end = cam_centers + cam_axes[:, axis] * 0.4
+            seg = np.stack([axis_start, axis_end], axis=1)  # (K, 2, 3)
+            seg = np.concatenate([seg, np.full((seg.shape[0], 1, 3), np.nan, dtype=float)], axis=1).reshape(-1, 3)
             self.fig.add_trace(
                 go.Scatter3d(
-                    x=[cam_center[0], axis_end[0]],
-                    y=[cam_center[1], axis_end[1]],
-                    z=[cam_center[2], axis_end[2]],
+                    x=seg[:, 0],
+                    y=seg[:, 1],
+                    z=seg[:, 2],
                     mode="lines",
                     line={"color": color, "width": 8},
                     name="Camera axes" if axis == 0 else None,
                     showlegend=axis == 0,
                 )
             )
+
         return self
 
     def _add_camera_center(
@@ -381,6 +516,229 @@ class SnippetPlotBuilder:
                 name="Camera center",
             )
         )
+        return self
+
+    def add_candidate_frusta(
+        self,
+        *,
+        cam: CameraTW | Sequence[CameraTW],
+        poses: Sequence[PoseTW] | PoseTW | torch.Tensor,
+        scale: float = 1.0,
+        color: str = "crimson",
+        name: str = "Frustum",
+        max_frustums: int | None = None,
+        include_axes: bool = False,
+        include_center: bool = False,
+        apply_roll: bool = False,
+    ) -> "SnippetPlotBuilder":
+        """Overlay frusta for arbitrary poses using a provided camera model."""
+
+        pose_list = self._pose_list_from_input(poses)
+        if apply_roll:
+            pose_list = [rotate_yaw_cw90(p) for p in pose_list]
+
+        cam_seq = cam if isinstance(cam, Sequence) else [cam]
+        cams = list(cam_seq)
+        if not cams:
+            raise ValueError("cam must not be empty")
+        return self._add_frusta_for_poses(
+            cams=cams,
+            poses=pose_list,
+            scale=scale,
+            color=color,
+            name=name,
+            max_frustums=max_frustums,
+            include_axes=include_axes,
+            include_center=include_center,
+        )
+
+    def add_sampling_shell(
+        self,
+        *,
+        center: np.ndarray | torch.Tensor | PoseTW,
+        min_radius: float,
+        max_radius: float,
+        min_elev_deg: float,
+        max_elev_deg: float,
+        azimuth_full_circle: bool,
+        name: str = "Sampling band",
+        band_color: str = "rgba(80,120,255,0.9)",
+        band_opacity: float = 0.6,
+        samples: torch.Tensor | np.ndarray | None = None,
+        sample_n: int | None = None,
+    ) -> "SnippetPlotBuilder":
+        """Add a spherical cap surface and optional sample points."""
+
+        center_np = self._center_from_input(center)
+        u = np.linspace(0, (2 if azimuth_full_circle else 1) * np.pi, 60)
+        v = np.radians(np.linspace(min_elev_deg, max_elev_deg, 15))
+        uu, vv = np.meshgrid(u, v)
+        r_mid = (min_radius + max_radius) * 0.5
+        xs = center_np[0] + r_mid * np.cos(uu) * np.cos(vv)
+        ys = center_np[1] + r_mid * np.sin(uu) * np.cos(vv)
+        zs = center_np[2] + r_mid * np.sin(vv)
+        grid_pts = np.stack([xs, ys, zs], axis=-1).reshape(-1, 3)
+        self._update_scene_ranges(grid_pts)
+
+        self.fig.add_trace(
+            go.Surface(
+                x=xs,
+                y=ys,
+                z=zs,
+                showscale=False,
+                opacity=band_opacity,
+                surfacecolor=np.zeros_like(xs),
+                name=name,
+                colorscale=[[0, band_color], [1, band_color]],
+                contours={
+                    "x": {"show": True, "color": band_color, "width": 2, "highlightwidth": 4},
+                    "y": {"show": True, "color": band_color, "width": 2, "highlightwidth": 4},
+                    "z": {"show": True, "color": band_color, "width": 2, "highlightwidth": 4},
+                },
+                hoverinfo="skip",
+            )
+        )
+
+        self.add_points(center_np.reshape(1, 3), name="last pose", color="black", size=6, opacity=1.0)
+
+        if samples is not None:
+            pts = _pose_positions(samples) if isinstance(samples, torch.Tensor) else np.asarray(samples)
+            if pts.ndim == 1:
+                pts = pts.reshape(1, -1)
+            if sample_n is not None and pts.shape[0] > sample_n:
+                idx = np.linspace(0, pts.shape[0] - 1, num=sample_n, dtype=int)
+                pts = pts[idx]
+            if pts.size > 0:
+                self.add_points(pts, name="Shell samples", color="royalblue", size=3, opacity=0.5)
+        return self
+
+    def _pose_list_from_input(self, poses: Sequence[PoseTW] | PoseTW | torch.Tensor) -> list[PoseTW]:
+        if isinstance(poses, PoseTW):
+            mat = poses.matrix3x4
+            if mat.dim() == 3:
+                return [PoseTW.from_matrix3x4(m) for m in mat]
+            return [poses]
+        if isinstance(poses, torch.Tensor):
+            tensor = poses
+            if tensor.dim() == 2 and tensor.shape[1] == 12:
+                tensor = tensor.view(-1, 3, 4)
+            if tensor.dim() == 2 and tensor.shape == torch.Size([3, 4]):
+                tensor = tensor.unsqueeze(0)
+            if tensor.dim() == 3 and tensor.shape[1:] == (3, 4):
+                return [PoseTW.from_matrix3x4(t) for t in tensor]
+            if tensor.dim() == 2 and tensor.shape[1] == 3:
+                return [PoseTW.from_Rt(torch.eye(3, device=tensor.device, dtype=tensor.dtype), tensor)]
+            raise ValueError(f"Unsupported pose tensor shape: {tuple(tensor.shape)}")
+        if isinstance(poses, Sequence):
+            pose_list: list[PoseTW] = []
+            for item in poses:
+                if isinstance(item, PoseTW):
+                    pose_list.append(item)
+                elif isinstance(item, torch.Tensor):
+                    pose_list.append(PoseTW.from_matrix3x4(item))
+                else:
+                    raise TypeError(f"Unsupported pose element type: {type(item)!r}")
+            return pose_list
+        raise TypeError(f"Unsupported poses input type: {type(poses)!r}")
+
+    def _select_frame_indices(
+        self, cam_view: EfmCameraView, frame_indices: list[int] | None, *, default_last: bool
+    ) -> torch.Tensor:
+        n_cam = cam_view.time_ns.shape[0]
+        if n_cam == 0:
+            return torch.tensor([], device=cam_view.time_ns.device, dtype=torch.long)
+        if frame_indices is None or len(frame_indices) == 0:
+            if default_last and n_cam > 1:
+                frame_indices = [0, n_cam - 1]
+            else:
+                frame_indices = [0]
+        idx = torch.as_tensor(frame_indices, device=cam_view.time_ns.device, dtype=torch.long)
+        return idx.clamp(0, n_cam - 1)
+
+    @staticmethod
+    def _nearest_traj_indices(traj_ts: torch.Tensor, cam_ts: torch.Tensor) -> torch.Tensor:
+        """Return traj indices nearest to each cam timestamp (vectorised)."""
+
+        if traj_ts.numel() == 0 or cam_ts.numel() == 0:
+            return torch.tensor([], device=cam_ts.device, dtype=torch.long)
+        dt = (traj_ts.unsqueeze(1) - cam_ts.unsqueeze(0)).abs()  # (F_traj, K)
+        return torch.argmin(dt, dim=0)
+
+    def _center_from_input(self, center: np.ndarray | torch.Tensor | PoseTW) -> np.ndarray:
+        if isinstance(center, PoseTW):
+            return center.t.detach().cpu().numpy()
+        if isinstance(center, torch.Tensor):
+            arr = center.detach().cpu().numpy()
+            return arr.reshape(-1, 3)[0]
+        arr_np = np.asarray(center)
+        return arr_np.reshape(-1, 3)[0]
+
+    def _add_frusta_for_poses(
+        self,
+        *,
+        cams: Sequence[CameraTW] | CameraTW | torch.Tensor,
+        poses: Sequence[PoseTW] | PoseTW | torch.Tensor,
+        scale: float,
+        color: str,
+        name: str,
+        max_frustums: int | None,
+        include_axes: bool,
+        include_center: bool,
+    ) -> "SnippetPlotBuilder":
+        pose_list = self._pose_list_from_input(poses)
+        if max_frustums is not None and len(pose_list) > max_frustums:
+            ids = np.linspace(0, len(pose_list) - 1, num=max_frustums, dtype=int)
+            pose_list = [pose_list[int(i)] for i in ids]
+
+        if isinstance(cams, CameraTW):
+            cam_len = cams.shape[0] if cams.ndim > 1 else 1
+            if cam_len > 1:
+                cam_list = [cams[i] for i in range(cam_len)]
+            else:
+                cam_list = [cams] * len(pose_list)
+        elif isinstance(cams, Sequence):
+            cam_list = list(cams)
+        elif isinstance(cams, torch.Tensor):
+            cam_list = [CameraTW(cams[i]) for i in range(cams.shape[0])]
+        else:
+            raise TypeError(f"Unsupported cams input type: {type(cams)!r}")
+        seg_points_all: list[np.ndarray] = []
+        seg_traces: list[np.ndarray] = []
+        for idx, pose in enumerate(pose_list):
+            cam_for_pose = cam_list[min(idx, len(cam_list) - 1)]
+            frustum_segments = get_frustum_segments(cam_for_pose, pose, scale=scale)
+            seg_points = np.vstack(frustum_segments)
+            seg_points_all.append(seg_points)
+
+            seg_with_breaks = np.concatenate(
+                [np.vstack([seg, np.full((1, 3), np.nan, dtype=float)]) for seg in frustum_segments],
+                axis=0,
+            )
+            seg_traces.append(seg_with_breaks)
+
+        if seg_traces:
+            all_segments = np.concatenate(seg_traces, axis=0)
+            self._update_scene_ranges(np.vstack(seg_points_all))
+            self.fig.add_trace(
+                go.Scatter3d(
+                    x=all_segments[:, 0],
+                    y=all_segments[:, 1],
+                    z=all_segments[:, 2],
+                    mode="lines",
+                    line={"color": color, "width": 4},
+                    name=name,
+                    showlegend=True,
+                )
+            )
+
+        if include_axes or include_center:
+            cam_centers = np.stack([p.t.detach().cpu().numpy() for p in pose_list], axis=0)
+            cam_axes = np.stack([p.R.detach().cpu().numpy().T for p in pose_list], axis=0)
+            if include_axes:
+                self._add_camera_axes(cam_centers, cam_axes)
+            if include_center and cam_centers.size > 0:
+                self._add_camera_center(cam_centers[0], color=color)
+            self._update_scene_ranges(cam_centers)
         return self
 
     def add_bounds_box(
@@ -403,19 +761,20 @@ class SnippetPlotBuilder:
         else:
             min_pt, max_pt = aabb
 
-        for idx, seg in enumerate(bbox_edges(min_pt, max_pt)):
-            self.fig.add_trace(
-                go.Scatter3d(
-                    x=seg[:, 0],
-                    y=seg[:, 1],
-                    z=seg[:, 2],
-                    mode="lines",
-                    line={"color": color, "width": width, "dash": dash},
-                    name=name if idx == 0 else None,
-                    showlegend=idx == 0,
-                    hoverinfo="skip",
-                )
+        edges = bbox_edges(min_pt, max_pt)
+        x, y, z = _flatten_edges_for_plotly(edges)
+        self.fig.add_trace(
+            go.Scatter3d(
+                x=x,
+                y=y,
+                z=z,
+                mode="lines",
+                line={"color": color, "width": width, "dash": dash},
+                name=name,
+                showlegend=True,
+                hoverinfo="skip",
             )
+        )
         return self
 
     def add_gt_obbs(
@@ -451,53 +810,78 @@ class SnippetPlotBuilder:
         if ts_world_object.size == 0 or object_dimensions.size == 0:
             return self
 
-        def _obb_corners(rot: np.ndarray, t: np.ndarray, dims: np.ndarray) -> np.ndarray:
-            half = dims / 2.0
-            signs = np.array(
-                [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]]
-            )
-            local = signs * half
-            return (rot @ local.T).T + t
+        signs = np.array(
+            [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]],
+            dtype=float,
+        )
+        half_dims = object_dimensions / 2.0  # (K, 3)
+        local = half_dims[:, None, :] * signs[None, :, :]  # (K, 8, 3)
+        corners = np.einsum("kij,kmj->kmi", ts_world_object[:, :3, :3], local) + ts_world_object[:, None, :3, 3]
+        corners_flat = corners.reshape(-1, 3)
+        self._update_scene_ranges(corners_flat)
 
-        for corners in (
-            _obb_corners(ts[:3, :3], ts[:3, 3], dims)
-            for ts, dims in zip(ts_world_object, object_dimensions, strict=False)
-        ):
-            edges_idx = [
-                (0, 1),
-                (1, 2),
-                (2, 3),
-                (3, 0),
-                (4, 5),
-                (5, 6),
-                (6, 7),
-                (7, 4),
-                (0, 4),
-                (1, 5),
-                (2, 6),
-                (3, 7),
-            ]
-            for idx, (i0, i1) in enumerate(edges_idx):
-                seg = np.vstack([corners[i0], corners[i1]])
-                self.fig.add_trace(
-                    go.Scatter3d(
-                        x=seg[:, 0],
-                        y=seg[:, 1],
-                        z=seg[:, 2],
-                        mode="lines",
-                        line={"color": color, "width": 3},
-                        name=name if idx == 0 else None,
-                        showlegend=idx == 0,
-                        opacity=opacity,
-                    )
+        cat_ids = np.asarray(cam_gt.category_ids.detach().cpu().numpy()) if hasattr(cam_gt, "category_ids") else None
+        cat_names = np.asarray(cam_gt.category_names) if hasattr(cam_gt, "category_names") else None
+
+        if cat_ids is None or cat_ids.size == 0:
+            edges = corners[:, BBOX_EDGE_IDX]  # (K, 12, 2, 3)
+            x, y, z = _flatten_edges_for_plotly(edges.reshape(-1, 2, 3))
+            self.fig.add_trace(
+                go.Scatter3d(
+                    x=x,
+                    y=y,
+                    z=z,
+                    mode="lines",
+                    line={"color": color, "width": 3},
+                    name=name,
+                    showlegend=True,
+                    opacity=opacity,
                 )
+            )
+            return self
+
+        unique_ids, inv = np.unique(cat_ids, return_inverse=True)
+
+        def _rgb_to_hex(rgb: tuple[float, float, float]) -> str:
+            return plotly_colors.label_rgb(tuple(int(255 * c) for c in rgb))
+
+        palette = colormaps.get_cmap("tab20")
+        id_to_color = {
+            uid: _rgb_to_hex(palette(idx / max(1, len(unique_ids) - 1))[:3]) for idx, uid in enumerate(unique_ids)
+        }
+
+        edges = corners[:, BBOX_EDGE_IDX]  # (K, 12, 2, 3)
+        for cls_idx, uid in enumerate(unique_ids):
+            mask = inv == cls_idx
+            edges_cls = edges[mask]
+            if edges_cls.size == 0:
+                continue
+            x, y, z = _flatten_edges_for_plotly(edges_cls.reshape(-1, 2, 3))
+            label = None
+            if cat_names is not None and cat_names.size > 0:
+                first_idx = np.flatnonzero(mask)[0]
+                label = f"{name} ({cat_names[first_idx]})"
+            else:
+                label = f"{name} (class {int(uid)})"
+            self.fig.add_trace(
+                go.Scatter3d(
+                    x=x,
+                    y=y,
+                    z=z,
+                    mode="lines",
+                    line={"color": id_to_color[uid], "width": 3},
+                    name=label,
+                    showlegend=True,
+                    opacity=opacity,
+                )
+            )
         return self
 
     def finalize(self) -> go.Figure:
         self.fig.update_layout(title=self.title, scene=dict(aspectmode="data", **self.scene_ranges), height=self.height)
         return self.fig
 
-    def _camera_by_name(self, camera: str) -> EfmCameraView:
+    def _camera_by_name(self, camera: Literal["rgb", "slam-l", "slam-r"]) -> EfmCameraView:
         cam_map = {
             "rgb": self.snippet.camera_rgb,
             "slam-l": self.snippet.camera_slam_left,
@@ -632,13 +1016,17 @@ def project_pointcloud_on_frame(
 ) -> go.Figure:
     """Project 3D points into image plane and overlay on the frame."""
 
+    target_device = cam.device
+    cam = cam.to(target_device)
+    pose_world_cam = pose_world_cam.to(device=target_device)
+
     if points_world.numel() == 0:
         return go.Figure()
 
     img_np = _to_uint8_image(img)
     h, w = img_np.shape[:2]
 
-    pts = points_world
+    pts = points_world.to(target_device)
     if pts.ndim == 3:
         pts = pts.reshape(-1, pts.shape[-1])
     finite = torch.isfinite(pts).all(dim=-1)
@@ -734,7 +1122,7 @@ def plot_first_last_frames(sample: EfmSnippetView) -> go.Figure:
 
 def plot_trajectory(
     sample: EfmSnippetView,
-    camera: str = "rgb",
+    camera: Literal["rgb", "slam-l", "slam-r"] = "rgb",
     show_semidense: bool = True,
     max_sem_points: int | None = 20000,
     pc_from_last_only: bool = True,
@@ -806,50 +1194,25 @@ def plot_crop_box(sample: EfmSnippetView, margin: float = 0.0, color: str = "ora
         f"crop box from semidense frame {frame_idx}: n={pts_np.shape[0]}, lo={lo_np}, hi={hi_np}, margin={margin}"
     )
 
-    def _edges(a: np.ndarray, b: np.ndarray) -> list[np.ndarray]:
-        corners = np.array(
-            [
-                [a[0], a[1], a[2]],
-                [b[0], a[1], a[2]],
-                [b[0], b[1], a[2]],
-                [a[0], b[1], a[2]],
-                [a[0], a[1], b[2]],
-                [b[0], a[1], b[2]],
-                [b[0], b[1], b[2]],
-                [a[0], b[1], b[2]],
-            ]
-        )
-        edges_idx = [
-            (0, 1),
-            (1, 2),
-            (2, 3),
-            (3, 0),
-            (4, 5),
-            (5, 6),
-            (6, 7),
-            (7, 4),
-            (0, 4),
-            (1, 5),
-            (2, 6),
-            (3, 7),
-        ]
-        return [corners[list(pair)] for pair in edges_idx]
-
-    edges = _edges(lo_np, hi_np)
+    edges = bbox_edges(lo_np, hi_np)
     fig = go.Figure()
 
-    for idx, seg in enumerate(edges):
+    def _add_edges(edge_group: np.ndarray, *, width: int, name: str | None = None) -> None:
+        x, y, z = _flatten_edges_for_plotly(edge_group)
         fig.add_trace(
             go.Scatter3d(
-                x=seg[:, 0],
-                y=seg[:, 1],
-                z=seg[:, 2],
+                x=x,
+                y=y,
+                z=z,
                 mode="lines",
-                line={"color": color, "width": 6 if idx < 4 else 3},
-                name="Crop AABB" if idx == 0 else None,
-                showlegend=idx == 0,
+                line={"color": color, "width": width},
+                name=name,
+                showlegend=name is not None,
             )
         )
+
+    _add_edges(edges[:4], width=6, name="Crop AABB")
+    _add_edges(edges[4:], width=3)
 
     if sample.mesh is not None:
         fig.add_trace(

@@ -8,6 +8,8 @@ pytest.importorskip("efm3d")
 import torch
 import trimesh
 from efm3d.aria import PoseTW
+from pytorch3d.ops import sample_points_from_meshes
+from pytorch3d.structures import Meshes
 
 from oracle_rri.data import AseEfmDatasetConfig
 from oracle_rri.pose_generation import (
@@ -187,6 +189,116 @@ def test_path_collision_rule_blocks_intersecting_ray():
     out = rule(ctx)
     # First ray hits the box; second (to y-axis) is free.
     assert torch.equal(out["mask"], torch.tensor([False, True]))
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required for P3D backend")
+def test_path_collision_rule_gpu_matches_cpu():
+    """GPU P3D backend should match CPU TRIMESH behaviour on a simple scene."""
+
+    mesh = trimesh.creation.box(extents=(0.5, 0.5, 0.5))
+    mesh.apply_translation([0.5, 0.0, 0.0])
+
+    poses = PoseTW.from_Rt(
+        torch.eye(3).repeat(2, 1, 1),
+        torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+    )
+    last_pose_cpu = _identity_pose()
+    last_pose_gpu = _identity_pose(device="cuda")
+
+    verts = torch.from_numpy(mesh.vertices).float().cuda()
+    faces = torch.from_numpy(mesh.faces).long().cuda()
+    mesh_p3d = Meshes(verts=[verts], faces=[faces])
+    mesh_samples = sample_points_from_meshes(mesh_p3d, 4000)
+
+    cfg_gpu = CandidateViewGeneratorConfig(
+        ensure_free_space=False,
+        min_distance_to_mesh=0.0,
+        collision_backend=CollisionBackend.P3D,
+        ray_subsample=16,
+        step_clearance=0.02,
+        verbose=False,
+        is_debug=True,
+    )
+    cfg_cpu = CandidateViewGeneratorConfig(
+        ensure_free_space=False,
+        min_distance_to_mesh=0.0,
+        collision_backend=CollisionBackend.TRIMESH,
+        verbose=False,
+        is_debug=True,
+    )
+    ctx_gpu: CandidateContext = {
+        "last_pose": last_pose_gpu,
+        "gt_mesh": mesh,
+        "mesh_p3d": mesh_p3d,
+        "mesh_samples": mesh_samples,
+        "mesh_verts": verts,
+        "mesh_faces": faces,
+        "occupancy_extent": None,
+        "device": torch.device("cuda"),
+        "poses": poses.to("cuda"),
+        "mask": torch.ones(2, dtype=torch.bool, device="cuda"),
+    }
+    ctx_cpu: CandidateContext = {
+        "last_pose": last_pose_cpu,
+        "gt_mesh": mesh,
+        "mesh_p3d": None,
+        "mesh_samples": None,
+        "mesh_verts": None,
+        "mesh_faces": None,
+        "occupancy_extent": None,
+        "device": torch.device("cpu"),
+        "poses": poses,
+        "mask": torch.ones(2, dtype=torch.bool),
+    }
+
+    mask_cpu = PathCollisionRule(cfg_cpu)(ctx_cpu)["mask"]
+    mask_gpu = PathCollisionRule(cfg_gpu)(ctx_gpu)["mask"].cpu()
+    assert torch.equal(mask_cpu, mask_gpu)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required for P3D backend")
+def test_min_distance_rule_gpu_p3d():
+    """P3D backend for min-distance should reject near-mesh candidates."""
+
+    mesh = trimesh.creation.box(extents=(0.4, 0.4, 0.4))
+    cfg_gpu = CandidateViewGeneratorConfig(
+        min_distance_to_mesh=0.25,
+        min_radius=0.1,
+        max_radius=0.1,
+        ensure_collision_free=False,
+        ensure_free_space=False,
+        collision_backend=CollisionBackend.P3D,
+        mesh_samples=3000,
+        verbose=False,
+        is_debug=True,
+    )
+    rule_gpu = MinDistanceToMeshRule(cfg_gpu)
+
+    poses = PoseTW.from_Rt(
+        torch.eye(3).repeat(2, 1, 1),
+        torch.tensor([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
+    )
+
+    verts = torch.from_numpy(mesh.vertices).float().cuda()
+    faces = torch.from_numpy(mesh.faces).long().cuda()
+    mesh_p3d = Meshes(verts=[verts], faces=[faces])
+    mesh_samples = sample_points_from_meshes(mesh_p3d, cfg_gpu.mesh_samples)
+
+    ctx_gpu: CandidateContext = {
+        "last_pose": _identity_pose(device="cuda"),
+        "gt_mesh": mesh,
+        "mesh_p3d": mesh_p3d,
+        "mesh_samples": mesh_samples,
+        "mesh_verts": verts,
+        "mesh_faces": faces,
+        "occupancy_extent": None,
+        "device": torch.device("cuda"),
+        "poses": poses.to("cuda"),
+        "mask": torch.ones(2, dtype=torch.bool, device="cuda"),
+    }
+
+    out = rule_gpu(ctx_gpu)
+    assert torch.equal(out["mask"].cpu(), torch.tensor([False, True]))
 
 
 def test_free_space_rule_bounds_candidates():

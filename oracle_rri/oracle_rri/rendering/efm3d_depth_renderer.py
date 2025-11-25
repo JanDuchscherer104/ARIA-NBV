@@ -15,15 +15,15 @@ Key features:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
 import trimesh
-from pydantic import Field
+from pydantic import AliasChoices, Field, field_validator
 from trimesh import Trimesh
 
-from ..utils import BaseConfig, Console, select_device
+from ..utils import BaseConfig, Console, Verbosity, select_device
 
 if TYPE_CHECKING:
     from efm3d.aria import CameraTW, PoseTW
@@ -62,11 +62,20 @@ class Efm3dDepthRendererConfig(BaseConfig["Efm3dDepthRenderer"]):
     """Ray backend: ``'auto'`` (pyembree if available else native),
     ``'pyembree'`` or ``'trimesh'``."""
 
-    verbose: bool = False
+    verbosity: Verbosity = Field(
+        default=Verbosity.NORMAL,
+        validation_alias=AliasChoices("verbosity", "verbose"),
+        description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
+    )
     """Enable structured logging."""
 
     is_debug: bool = False
     """Enable extra debug logging."""
+
+    @field_validator("verbosity", mode="before")
+    @classmethod
+    def _coerce_verbosity(cls, value: Any) -> Verbosity:
+        return Verbosity.from_any(value)
 
 
 class Efm3dDepthRenderer:
@@ -76,7 +85,7 @@ class Efm3dDepthRenderer:
         self.config = config
         self.console = (
             Console.with_prefix(self.__class__.__name__)
-            .set_verbose(self.config.verbose)
+            .set_verbosity(self.config.verbosity)
             .set_debug(self.config.is_debug)
         )
         self._device = select_device(self.config.device, component=self.__class__.__name__)

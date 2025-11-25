@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-if TYPE_CHECKING:  # pragma: no cover - for typing only
+if TYPE_CHECKING:
     from oracle_rri.rendering.candidate_depth_renderer import RendererConfig
 
 
@@ -115,8 +115,16 @@ def select_device(
     requested: torch.device | None
     if isinstance(preferred, torch.device):
         requested = preferred
-    elif isinstance(preferred, str) and preferred and preferred.lower() != "auto":
-        requested = torch.device(preferred)
+    elif isinstance(preferred, str):
+        pref = preferred.strip().lower()
+        if pref in {"auto", ""}:
+            requested = None
+        elif pref in {"gpu", "cuda"}:
+            requested = torch.device("cuda")
+        elif pref == "cpu":
+            requested = torch.device("cpu")
+        else:
+            requested = torch.device(pref)
     else:
         requested = None
 
@@ -149,15 +157,10 @@ def select_device(
 def pick_fast_depth_renderer(renderer: "RendererConfig") -> "RendererConfig":
     """Upgrade a depth-renderer config to the fastest available backend.
 
-    - When GPU is preferred and available, ensure we use the PyTorch3D renderer
-      and set its device to CUDA.
+    - When GPU is preferred *or available* and CPU is not forced, ensure we use
+      the PyTorch3D renderer on CUDA.
     - When CPU is forced, leave the config unchanged.
-    - When AUTO, return the input config unchanged.
     """
-
-    # Only upgrade backends when GPU mode is explicitly requested.
-    if get_performance_mode() != PerformanceMode.GPU:
-        return renderer
 
     try:
         from oracle_rri.rendering.efm3d_depth_renderer import Efm3dDepthRendererConfig
@@ -165,13 +168,19 @@ def pick_fast_depth_renderer(renderer: "RendererConfig") -> "RendererConfig":
     except Exception:
         return renderer
 
-    if isinstance(renderer, Pytorch3DDepthRendererConfig):
-        dev = select_device(getattr(renderer, "device", "cuda"), component="Pytorch3DDepthRenderer")
-        return renderer.model_copy(update={"device": str(dev)})
+    # If CPU is forced, keep as is.
+    if prefer_cpu():
+        return renderer
 
-    if isinstance(renderer, Efm3dDepthRendererConfig):
-        dev = select_device("cuda", component="CandidateDepthRenderer")
-        return Pytorch3DDepthRendererConfig(zfar=renderer.zfar, device=str(dev))
+    gpu_ok = torch.cuda.is_available() and (prefer_gpu() or get_performance_mode() in {PerformanceMode.AUTO})
+
+    if gpu_ok:
+        if isinstance(renderer, Pytorch3DDepthRendererConfig):
+            dev = select_device(getattr(renderer, "device", "cuda"), component="Pytorch3DDepthRenderer")
+            return renderer.model_copy(update={"device": str(dev)})
+        if isinstance(renderer, Efm3dDepthRendererConfig):
+            dev = select_device("cuda", component="CandidateDepthRenderer")
+            return Pytorch3DDepthRendererConfig(zfar=renderer.zfar, device=str(dev))
 
     return renderer
 

@@ -1,10 +1,27 @@
 from typing import Any
 
 import torch
-from efm3d.aria.camera import CameraTW
-from efm3d.aria.obb import ObbTW
-from efm3d.aria.pose import PoseTW
-from efm3d.aria.tensor_wrapper import TensorWrapper
+
+# Ensure vendored efm3d is importable when not installed as a package.
+try:  # pragma: no cover - environment dependent
+    from efm3d.aria.camera import CameraTW
+    from efm3d.aria.obb import ObbTW
+    from efm3d.aria.pose import PoseTW
+    from efm3d.aria.tensor_wrapper import TensorWrapper
+except ModuleNotFoundError:  # pragma: no cover - fallback for dev installs
+    import sys
+    from pathlib import Path
+
+    vendor = Path(__file__).resolve().parents[2] / "external" / "efm3d"
+    if vendor.exists():
+        sys.path.append(str(vendor))
+        from efm3d.aria.camera import CameraTW
+        from efm3d.aria.obb import ObbTW
+        from efm3d.aria.pose import PoseTW
+        from efm3d.aria.tensor_wrapper import TensorWrapper
+    else:
+        raise
+
 from torch import Tensor
 
 

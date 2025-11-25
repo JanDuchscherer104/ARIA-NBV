@@ -21,7 +21,7 @@ from pydantic_settings import (
 from tqdm import tqdm
 
 from ..configs import PathConfig
-from ..utils import BaseConfig, Console
+from ..utils import BaseConfig, Console, Verbosity
 from .metadata import ASEMetadata, SceneMetadata
 
 
@@ -59,11 +59,14 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
     )
 
     # Core configuration
-    verbose: bool = Field(default=True)
-    """Enable verbose logging."""
+    verbosity: Verbosity = Field(
+        default=Verbosity.NORMAL,
+        validation_alias=AliasChoices("verbosity", "verbose"),
+        description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
+    )
 
     is_debug: bool = Field(default=True)
-    """Enable debug logging (forces verbose)."""
+    """Enable debug logging (forces max verbosity)."""
 
     prefer_scenes_with_max_snippets: bool = True
     """Prefer scenes with maximum snippets when limiting number of scenes."""
@@ -160,7 +163,7 @@ class ASEDownloader:
     def __init__(self, config: ASEDownloaderConfig):
         self.config = config
         self.console = (
-            Console.with_prefix(self.__class__.__name__).set_verbose(config.verbose).set_debug(config.is_debug)
+            Console.with_prefix(self.__class__.__name__).set_verbosity(config.verbosity).set_debug(config.is_debug)
         )
 
         # Parse metadata from JSONs
@@ -239,7 +242,11 @@ class ASEDownloader:
         )
 
         # Download each mesh
-        for scene in tqdm(scenes_to_download, desc="Downloading meshes", disable=not self.config.verbose):
+        for scene in tqdm(
+            scenes_to_download,
+            desc="Downloading meshes",
+            disable=self.config.verbosity <= Verbosity.QUIET,
+        ):
             zip_filename = f"scene_ply_{scene.scene_id}.zip"
             ply_filename = f"scene_ply_{scene.scene_id}.ply"
 
@@ -389,7 +396,7 @@ def cli_download(config: ASEDownloaderConfig | None = None) -> None:
         python -m oracle_rri.data.downloader download --ns=10 --skip_meshes
     """
     config = config or ASEDownloaderConfig()
-    console = Console.with_prefix("DownloaderCLI").set_verbose(config.verbose).set_debug(config.is_debug)
+    console = Console.with_prefix("DownloaderCLI").set_verbosity(config.verbosity).set_debug(config.is_debug)
     downloader = config.setup_target()
 
     # Get scenes
@@ -459,7 +466,7 @@ def cli_list(config: ASEDownloaderConfig, n: int | None = None) -> None:
         python -m oracle_rri.data.downloader list
         python -m oracle_rri.data.downloader list --n=10
     """
-    console = Console.with_prefix("DownloaderCLI").set_verbose(config.verbose).set_debug(config.is_debug)
+    console = Console.with_prefix("DownloaderCLI").set_verbosity(config.verbosity).set_debug(config.is_debug)
     downloader = config.setup_target()
 
     scenes = downloader.metadata.get_scenes_with_meshes()
@@ -482,7 +489,7 @@ def main() -> None:
     """Main CLI entry point with mode-based dispatching."""
 
     config = ASEDownloaderConfig.from_cli()
-    console = Console.with_prefix("DownloaderCLI").set_verbose(config.verbose)
+    console = Console.with_prefix("DownloaderCLI").set_verbosity(config.verbosity)
 
     match config.mode:
         case "list":

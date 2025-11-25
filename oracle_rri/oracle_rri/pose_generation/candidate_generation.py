@@ -28,15 +28,17 @@ points from the camera frame into the VIO world frame.
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 import torch
 import trimesh
 from efm3d.aria import PoseTW
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
+from pytorch3d.ops import sample_points_from_meshes  # type: ignore[import-untyped]
+from pytorch3d.structures import Meshes  # type: ignore[import-untyped]
 
 from ..data.efm_views import EfmSnippetView
-from ..utils import BaseConfig, Console, select_device
+from ..utils import BaseConfig, Console, Verbosity, select_device
 from .candidate_generation_rules import (
     FreeSpaceRule,
     MinDistanceToMeshRule,
@@ -47,7 +49,6 @@ from .candidate_generation_rules import (
 from .types import CandidateContext, CandidateSamplingResult, CollisionBackend, SamplingStrategy
 
 
-# TODO we want to be able to display the space of potential candidate views as well as actually drawn candidate views!
 class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Config for candidate generation.
 
@@ -79,10 +80,6 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
             :class:`MinDistanceToMeshRule`.
         ensure_free_space: Enable voxel-extent filtering via
             :class:`FreeSpaceRule`.
-        occupancy_extent: Optional tensor of shape ``[6]`` encoding
-            ``[xmin, xmax, ymin, ymax, zmin, zmax]`` bounds in the VIO
-            world frame. If provided, overrides any bounds inferred from
-            the sample.
         ray_subsample: Number of ray samples / subdivisions when evaluating
             path collisions (currently unused but reserved for finer
             segment-based checks).
@@ -122,14 +119,16 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
 
     When True, `_rule_path_collision` casts a ray from the last camera pose
     to each candidate viewpoint and rejects candidates whose path intersects
-    the GT mehs.
+    the GT meshs.
     """
 
-    collision_backend: CollisionBackend = CollisionBackend.PYEMBREE
+    collision_backend: CollisionBackend = CollisionBackend.P3D
     """Backend for ray/mesh intersection tests.
 
     `PYEMBREE` uses `RayMeshIntersector` (if installed) for fast queries;
     `TRIMESH` falls back to the pure-Python trimesh ray engine.
+    `P3D` uses a CUDA path built on PyTorch3D (sampled surface + KNN).
+    `EFM3D` uses torch-only geometry utilities from efm3d (CUDA-capable).
     """
 
     min_distance_to_mesh: float = 0.0
@@ -157,12 +156,20 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Number of ray samples / subdivisions when evaluating path collisions."""
     step_clearance: float = 0.05
     """Step size (m) for distance checks along paths when required."""
+    mesh_samples: int = 20000
+    """Number of surface samples used for PyTorch3D collision/distance (ignored otherwise)."""
+    cache_mesh_samples: bool = True
+    """If True, cache per-mesh PyTorch3D structures and sampled points for reuse within a process."""
     device: torch.device = Field(  # type: ignore[assignment]
         default_factory=lambda: select_device("auto", component="CandidateViewGenerator")
     )
     """Preferred torch device for vectorised operations (auto-resolves to CUDA when available)."""
 
-    verbose: bool = True
+    verbosity: Verbosity = Field(
+        default=Verbosity.NORMAL,
+        validation_alias=AliasChoices("verbosity", "verbose"),
+        description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
+    )
 
     is_debug: bool = False
     """If True, enable debug logging and set device to 'cpu'."""
@@ -172,12 +179,17 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     def _resolve_device(cls, v: str | torch.device) -> torch.device:
         return select_device(v, component="CandidateViewGenerator")
 
+    @field_validator("verbosity", mode="before")
+    @classmethod
+    def _coerce_verbosity(cls, value: Any) -> Verbosity:
+        return Verbosity.from_any(value)
+
     @model_validator(mode="after")
     def set_debug(self) -> Self:
         if self.is_debug:
             object.__setattr__(self, "device", torch.device("cpu"))
-            object.__setattr__(self, "verbose", True)
-            Console.with_prefix(self.__class__.__name__, "set_debug").set_verbose(True).log(
+            object.__setattr__(self, "verbosity", Verbosity.VERBOSE)
+            Console.with_prefix(self.__class__.__name__, "set_debug").set_verbosity(Verbosity.VERBOSE).log(
                 "Debug mode enabled: forcing device to 'cpu' and verbose logging."
             )
         return self
@@ -200,13 +212,25 @@ class CandidateViewGenerator:
     The result is a batch of candidate :math:`T_\\text{world,cam}` poses
     expressed in the VIO world frame, ready for oracle RRI evaluation or
     backbone feature extraction.
+
+    Background:
+        - NBV formulation and RRI scoring: ``docs/contents/theory/nbv_background.qmd``,
+          ``docs/contents/impl/rri_computation.qmd``.
+        - Pose math follows the Aria LUF convention as implemented in
+          :mod:`efm3d.aria.pose`; rotations are assembled via
+          :func:`oracle_rri.utils.frames.view_axes_from_points`.
+        - Collision backends:
+            * CPU: trimesh / pyembree rays.
+            * GPU: PyTorch3D distance kernel (see
+              [PyTorch3D :: point_mesh_face_distance](https://pytorch3d.readthedocs.io/en/latest/modules/loss.html#pytorch3d.loss.point_mesh_face_distance))
+              or efm3d torch geometry utilities.
     """
 
     def __init__(self, config: CandidateViewGeneratorConfig):
         self.config = config
         self.console = (
             Console.with_prefix(self.__class__.__name__)
-            .set_verbose(self.config.verbose)
+            .set_verbosity(self.config.verbosity)
             .set_debug(self.config.is_debug)
         )
         self.rules: list[Rule] = []
@@ -224,7 +248,8 @@ class CandidateViewGenerator:
 
     def generate_from_typed_sample(self, sample: EfmSnippetView) -> CandidateSamplingResult:
         """Generate candidate poses using data from an :class:`EfmSnippetView`."""
-        occupancy_extent = self._occupancy_extent_from_sample(sample)
+        device = torch.device(self.config.device)
+        occupancy_extent = sample.get_occupancy_extend().to(device=device, dtype=torch.float32)
         gt_mesh = sample.mesh
         # NOTE: respect configured camera_index by converting rig pose -> camera pose.
         cam_map = {
@@ -234,11 +259,18 @@ class CandidateViewGenerator:
             "slam_r": sample.camera_slam_right,
         }
         cam_view = cam_map.get(self.config.camera_index, sample.camera_rgb)
-        t_cam_rig = cam_view.calib.T_camera_rig[0]
-        last_pose_rig = sample.trajectory.final_pose
-        last_pose = last_pose_rig @ t_cam_rig.inverse()
+
+        fov = cam_view.get_fov().to(device=device)  # F, 2
+
+        last_pose = sample.trajectory.final_pose.to(device=device)
         self.console.log(
             f"generate_from_typed_sample scene={sample.scene_id} snippet={sample.snippet_id} mesh={gt_mesh is not None}"
+        )
+        self.console.log(
+            "config: "
+            f"sampling_strategy={self.config.sampling_strategy.name}, "
+            f"collision_backend={self.config.collision_backend.name}, "
+            f"device={self.config.device}"
         )
         if occupancy_extent is not None:
             self.console.log_summary("occupancy_extent", occupancy_extent)
@@ -250,27 +282,15 @@ class CandidateViewGenerator:
             last_pose=last_pose,
             gt_mesh=gt_mesh,
             occupancy_extent=occupancy_extent,
+            camera_fov=fov,
         )
 
-    def _occupancy_extent_from_sample(self, sample: EfmSnippetView) -> torch.Tensor | None:
-        """Return ``[xmin, xmax, ymin, ymax, zmin, zmax]`` AABB in world frame."""
-        if sample.has_mesh and sample.mesh is not None and sample.mesh.vertices.size > 0:
-            bounds = torch.tensor(sample.mesh.bounds, device=self.config.device, dtype=torch.float32)
-            vmin, vmax = bounds[0], bounds[1]
-            return torch.stack([vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]], dim=0)
-        sem = sample.semidense
-        if sem.volume_min is not None and sem.volume_max is not None:
-            vmin = sem.volume_min.to(device=self.config.device, dtype=torch.float32)
-            vmax = sem.volume_max.to(device=self.config.device, dtype=torch.float32)
-            return torch.stack([vmin[0], vmax[0], vmin[1], vmax[1], vmin[2], vmax[2]], dim=0)
-        return None
-
-    # TODO: sampling must be done from the pose belonging to the camera_index specified in the config and also consider the cameras intrinsics to do correct sampling!
     def generate(
         self,
         last_pose: PoseTW,
         gt_mesh: trimesh.Trimesh | None = None,
         occupancy_extent: torch.Tensor | None = None,
+        camera_fov: torch.Tensor | None = None,
     ) -> CandidateSamplingResult:
         """Sample candidate poses around ``last_pose`` and apply pruning rules.
 
@@ -290,6 +310,9 @@ class CandidateViewGenerator:
             gt_mesh: Optional GT mesh for collision and distance checks.
             occupancy_extent: Optional explicit ``[6]`` bounds overriding
                 :attr:`CandidateViewGeneratorConfig.occupancy_extent`.
+            camera_fov: Optional ``Tensor[F,2]`` (fov_x, fov_y in degrees) for
+                the active camera. When provided, it clamps elevation/azimuth
+                sampling to the actual optics of the selected camera.
 
         Returns:
             CandidateSamplingResult dictionary with:
@@ -304,13 +327,51 @@ class CandidateViewGenerator:
         """
 
         device = self.config.device
+        mesh_p3d = None
+        mesh_samples = None
+        mesh_verts = None
+        mesh_faces = None
+        effective_backend = self.config.collision_backend
+        if gt_mesh is not None:
+            mesh_verts = torch.as_tensor(gt_mesh.vertices, device=device, dtype=torch.float32)
+            mesh_faces = torch.as_tensor(gt_mesh.faces, device=device, dtype=torch.int64)
+            mesh_p3d, mesh_samples = self._mesh_structures(mesh_verts, mesh_faces, cache_key=id(gt_mesh))
+
+            if device.type == "cpu" and self.config.collision_backend == CollisionBackend.P3D:
+                self.console.warn("P3D collision backend requested on CPU; This is very slow!")
+
+        # Derive per-call sampling limits from camera FOV if available to keep
+        # sampling consistent with the selected camera optics.
+        min_elev_deg = self.config.min_elev_deg
+        max_elev_deg = self.config.max_elev_deg
+        az_half_range_deg: float | None = None
+        if camera_fov is not None and camera_fov.numel() > 0:
+            fov_flat = camera_fov.reshape(-1, 2)
+            valid = torch.isfinite(fov_flat).all(dim=1)
+            if valid.any():
+                fov_vals = fov_flat[valid][0]
+                fov_x_deg = float(fov_vals[0].item())
+                fov_y_deg = float(fov_vals[1].item())
+                half_v = fov_y_deg / 2.0
+                min_elev_deg = max(min_elev_deg, -half_v)
+                max_elev_deg = min(max_elev_deg, half_v)
+                az_half_range_deg = fov_x_deg / 2.0
+
         ctx: CandidateContext = {
             "last_pose": last_pose.to(device),
             "gt_mesh": gt_mesh,
+            "mesh_p3d": mesh_p3d,
+            "mesh_samples": mesh_samples,
+            "mesh_verts": mesh_verts,
+            "mesh_faces": mesh_faces,
             "occupancy_extent": occupancy_extent if occupancy_extent is not None else self.config.occupancy_extent,
             "device": device,
             "poses": torch.empty(0, 12, device=device),
             "mask": torch.empty(0, dtype=torch.bool, device=device),
+            "min_elev_deg": min_elev_deg,
+            "max_elev_deg": max_elev_deg,
+            "azimuth_half_range_deg": az_half_range_deg,
+            "collision_backend": effective_backend,
         }
         if ctx["occupancy_extent"] is not None:
             self.console.dbg_summary("ctx.occupancy_extent", ctx["occupancy_extent"])
@@ -393,6 +454,32 @@ class CandidateViewGenerator:
         }
 
     # ------------------------------------------------------------------ rules
+
+    def _mesh_structures(
+        self, mesh_verts: torch.Tensor, mesh_faces: torch.Tensor, cache_key: int
+    ) -> tuple[Meshes | None, torch.Tensor | None]:
+        """Return (Meshes, sampled_points) for PyTorch3D backend with caching."""
+        if self.config.collision_backend != CollisionBackend.P3D:
+            return None, None
+
+        if self.config.cache_mesh_samples:
+            cache = getattr(self, "_mesh_cache", None)
+            if cache is None:
+                cache = {}
+                self._mesh_cache = cache
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return cached
+
+        mesh_p3d = Meshes(verts=[mesh_verts], faces=[mesh_faces])
+        mesh_samples = (
+            sample_points_from_meshes(mesh_p3d, self.config.mesh_samples) if self.config.mesh_samples > 0 else None
+        )
+
+        if self.config.cache_mesh_samples:
+            self._mesh_cache[cache_key] = (mesh_p3d, mesh_samples)
+        return mesh_p3d, mesh_samples
+
     def _seed(self, ctx: CandidateContext, n: int) -> CandidateContext:
         """Initialise pose tensor placeholders for a fresh sampling round.
 

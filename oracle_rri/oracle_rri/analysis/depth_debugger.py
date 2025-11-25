@@ -13,7 +13,7 @@ import torch
 import trimesh
 from atek.data_loaders.atek_wds_dataloader import load_atek_wds_dataset
 from atek.data_preprocess.atek_data_sample import create_atek_data_sample_from_flatten_dict
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 
 try:  # Prefer installed efm3d, otherwise fall back to vendored source.
     from efm3d.aria import CameraTW, PoseTW
@@ -24,7 +24,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised in CI fallback
     from efm3d.aria import CameraTW, PoseTW
     from efm3d.utils.ray import ray_grid, transform_rays
 
-from ..utils import BaseConfig, Console, select_device
+from ..utils import BaseConfig, Console, Verbosity, select_device
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +44,7 @@ class DepthDebugger:
 
     def __init__(self, config: DepthDebuggerConfig):
         self.config = config
-        self.console = Console.with_prefix(self.__class__.__name__).set_verbose(config.verbose)
+        self.console = Console.with_prefix(self.__class__.__name__).set_verbosity(config.verbosity)
 
     def _load_sample(self) -> tuple[dict[str, Any], trimesh.Trimesh]:
         tar_paths = sorted(Path().glob(self.config.tar_glob))
@@ -193,12 +193,21 @@ class DepthDebuggerConfig(BaseConfig[DepthDebugger]):
     max_points: int = 1000
     mesh_vertex_cap: int | None = 5000
     device: torch.device = Field(default_factory=lambda: select_device("auto", component="DepthDebugger"))
-    verbose: bool = True
+    verbosity: Verbosity = Field(
+        default=Verbosity.NORMAL,
+        validation_alias=AliasChoices("verbosity", "verbose"),
+        description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
+    )
 
     @field_validator("device", mode="before")
     @classmethod
     def _resolve_device(cls, value: str | torch.device) -> torch.device:
         return select_device(value, component="DepthDebugger")
+
+    @field_validator("verbosity", mode="before")
+    @classmethod
+    def _coerce_verbosity(cls, value: Any) -> Verbosity:
+        return Verbosity.from_any(value)
 
     def setup_target(self) -> DepthDebugger:  # type: ignore[override]
         return DepthDebugger(self)

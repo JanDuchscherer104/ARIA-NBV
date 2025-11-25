@@ -9,19 +9,19 @@ intermediate numpy copies.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import torch
-import trimesh
-from pydantic import Field
-from pytorch3d.renderer import MeshRasterizer, RasterizationSettings
-from pytorch3d.renderer.cameras import PerspectiveCameras
-from pytorch3d.structures import Meshes
+import trimesh  # type: ignore[import-untyped]
+from pydantic import AliasChoices, Field, field_validator
+from pytorch3d.renderer import MeshRasterizer, RasterizationSettings  # type: ignore[import-untyped]
+from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
+from pytorch3d.structures import Meshes  # type: ignore[import-untyped]
 from torch import Tensor
 from trimesh import Trimesh
 
-from ..utils import BaseConfig, Console, select_device
+from ..utils import BaseConfig, Console, Verbosity, select_device
 
 if TYPE_CHECKING:
     from efm3d.aria import CameraTW, PoseTW
@@ -49,7 +49,7 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     faces_per_pixel: int = 1
     """Number of faces stored per pixel; 1 = closest triangle only."""
 
-    cull_backfaces: bool = False
+    cull_backfaces: bool = True
     """If ``True`` drop triangles with normals pointing away from the camera.
 
     NBV cameras are typically *inside* closed meshes (rooms); backface culling
@@ -69,7 +69,7 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     two_sided: bool = True
     """If ``True`` duplicate faces with reversed winding so interior walls remain visible."""
 
-    add_proxy_walls: bool = True
+    add_proxy_walls: bool = False
     """If ``True`` add a thin bounding box shell when large wall areas are missing."""
 
     proxy_wall_area_threshold: float = 0.2
@@ -78,11 +78,23 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     proxy_eps: float = 0.05
     """Epsilon (m) for detecting faces near scene bounds."""
 
-    verbose: bool = False
+    dtype: Literal["float32", "float16", "bfloat16"] = "float32"
+    """Computation dtype; use float16/bfloat16 on CUDA for speed (may reduce z precision)."""
+
+    verbosity: Verbosity = Field(
+        default=Verbosity.NORMAL,
+        validation_alias=AliasChoices("verbosity", "verbose"),
+        description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
+    )
     """Enable :class:`Console` logging."""
 
     is_debug: bool = False
     """Force CPU rendering and enable debug logging."""
+
+    @field_validator("verbosity", mode="before")
+    @classmethod
+    def _coerce_verbosity(cls, value: Any) -> Verbosity:
+        return Verbosity.from_any(value)
 
 
 class Pytorch3DDepthRenderer:
@@ -92,7 +104,7 @@ class Pytorch3DDepthRenderer:
         self.config = config
         self.console = (
             Console.with_prefix(self.__class__.__name__)
-            .set_verbose(self.config.verbose)
+            .set_verbosity(self.config.verbosity)
             .set_debug(self.config.is_debug)
         )
         preferred = "cpu" if self.config.is_debug else self.config.device
@@ -114,6 +126,7 @@ class Pytorch3DDepthRenderer:
         camera: CameraTW,
         *,
         frame_index: int | None = None,
+        occupancy_extent: torch.Tensor | None = None,
     ) -> Tensor:
         """Render a depth map for a single candidate pose.
 
@@ -132,6 +145,7 @@ class Pytorch3DDepthRenderer:
             mesh=mesh,
             camera=camera,
             frame_index=frame_index,
+            occupancy_extent=occupancy_extent,
         )
         return batched[0]
 
@@ -151,12 +165,19 @@ class Pytorch3DDepthRenderer:
         rotations, translations = self._pose_to_r_t(poses)
         rotations = rotations.to(self.device)
         translations = translations.to(self.device)
+        dtype = {
+            "float32": torch.float32,
+            "float16": torch.float16,
+            "bfloat16": torch.bfloat16,
+        }[self.config.dtype]
 
         mesh_struct = self._mesh_to_struct(
             mesh,
             batch_size=rotations.shape[0],
             occupancy_extent=occupancy_extent,
         )
+        if dtype != torch.float32:
+            mesh_struct = mesh_struct.to(dtype=dtype)
         focal, principal = self._perspective_params(camera, width, height)
         cameras = PerspectiveCameras(
             device=self.device,
@@ -176,8 +197,10 @@ class Pytorch3DDepthRenderer:
             max_faces_per_bin=self.config.max_faces_per_bin,
         )
         rasterizer = MeshRasterizer(cameras=cameras, raster_settings=raster_settings)
-        fragments = rasterizer(mesh_struct)
-        depth = fragments.zbuf[..., 0]
+        autocast_enable = dtype != torch.float32 and self.device.type == "cuda"
+        with torch.autocast(device_type=self.device.type, dtype=dtype, enabled=autocast_enable):
+            fragments = rasterizer(mesh_struct)
+            depth = fragments.zbuf[..., 0]
         far = torch.full_like(depth, self.config.zfar)
         depth = torch.where(torch.isfinite(depth), depth, far)
         depth = torch.where(depth <= 0, far, depth)
@@ -257,6 +280,7 @@ class Pytorch3DDepthRenderer:
         """Convert ``trimesh`` mesh to a PyTorch3D ``Meshes`` batch."""
 
         mesh_use = self._maybe_with_proxy_walls(mesh, occupancy_extent=occupancy_extent)
+        # mesh_use = mesh
         verts = torch.as_tensor(mesh_use.vertices, dtype=torch.float32, device=self.device)
         faces = torch.as_tensor(mesh_use.faces, dtype=torch.int64, device=self.device)
         if self.config.two_sided:
@@ -349,9 +373,9 @@ class Pytorch3DDepthRenderer:
     def _pose_to_r_t(self, poses: PoseTW) -> tuple[Tensor, Tensor]:
         """Convert ``T_world_camera`` into PyTorch3D view matrices."""
 
-        pose_tensor = poses.to(self.device).matrix
-        rot_wc = pose_tensor[..., :3, :3]
-        t_wc = pose_tensor[..., :3, 3]
+        poses = poses.to(self.device)
+        rot_wc = poses.R
+        t_wc = poses.t
         rot_cw = rot_wc.transpose(-1, -2)
         t_cw = -(rot_cw @ t_wc.unsqueeze(-1)).squeeze(-1)
         if rot_cw.ndim == 2:

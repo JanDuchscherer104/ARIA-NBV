@@ -7,6 +7,7 @@ import torch
 # Make vendored efm3d importable
 sys.path.append(str(Path(__file__).resolve().parents[2] / "external" / "efm3d"))
 
+from oracle_rri.configs import PathConfig  # noqa: E402
 from oracle_rri.data import (  # noqa: E402
     AseEfmDatasetConfig,
     EfmCameraView,
@@ -14,7 +15,7 @@ from oracle_rri.data import (  # noqa: E402
     EfmSnippetView,
     EfmTrajectoryView,
 )
-from oracle_rri.configs import PathConfig  # noqa: E402
+from oracle_rri.utils import Verbosity
 
 
 def _skip_if_missing_data():
@@ -45,7 +46,7 @@ def efm_config(path_cfg):
         paths=path_cfg,
         scene_ids=["81283"],
         batch_size=None,
-        verbose=False,
+        verbosity=Verbosity.QUIET,
         load_meshes=True,
         require_mesh=False,
         mesh_simplify_ratio=None,
@@ -68,27 +69,27 @@ def test_sample_types(efm_sample):
 
 def test_shapes_and_ranges(efm_sample, efm_config):
     cam = efm_sample.camera_rgb
-    F = int(efm_config.freq_hz * efm_config.snippet_length_s)
-    assert cam.images.shape[0] == F
+    num_frames = int(efm_config.freq_hz * efm_config.snippet_length_s)
+    assert cam.images.shape[0] == num_frames
     assert cam.images.shape[1] in (1, 3)
     assert cam.images.ndim == 4
     assert cam.images.dtype == torch.float32
     assert cam.images.max() <= 1.05 and cam.images.min() >= -0.01  # normalized
 
     # CameraTW is padded to F frames
-    assert cam.calib.tensor().shape[0] == F
+    assert cam.calib.tensor().shape[0] == num_frames
 
     traj = efm_sample.trajectory
     tmat = traj.t_world_rig.matrix3x4
     assert tmat.shape[-2:] == (3, 4)
-    assert traj.time_ns.shape[0] == F
+    assert traj.time_ns.shape[0] == num_frames
 
     pts = efm_sample.semidense
-    assert pts.points_world.shape[:2] == (F, efm_config.semidense_points_pad)
+    assert pts.points_world.shape[:2] == (num_frames, efm_config.semidense_points_pad)
     assert pts.points_world.shape[-1] == 3
     assert pts.volume_min.shape == (3,)
     assert pts.volume_max.shape == (3,)
-    assert pts.lengths.shape[0] == F
+    assert pts.lengths.shape[0] == num_frames
 
 
 def test_gt_and_obbs_present(efm_sample):
@@ -111,7 +112,13 @@ def test_to_preserves_shapes(efm_sample):
 
 
 def test_config_resolves_default_paths(path_cfg):
-    cfg = AseEfmDatasetConfig(scene_ids=["81283"], paths=path_cfg, verbose=False, load_meshes=True, mesh_simplify_ratio=None)
+    cfg = AseEfmDatasetConfig(
+        scene_ids=["81283"],
+        paths=path_cfg,
+        verbosity=Verbosity.QUIET,
+        load_meshes=True,
+        mesh_simplify_ratio=None,
+    )
     ds = cfg.setup_target()
     assert cfg.tar_urls, "tar_urls should be auto-populated from PathConfig"
     first = next(iter(ds))

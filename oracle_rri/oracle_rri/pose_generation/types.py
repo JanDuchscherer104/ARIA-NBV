@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from efm3d.aria import PoseTW
+    from pytorch3d.structures import Meshes
     from torch import Tensor, device
     from trimesh import Trimesh
 
@@ -31,8 +32,6 @@ class SamplingStrategy(StrEnum):
 
     For background on sphere sampling see, e.g.,
     `Sphere point picking <https://mathworld.wolfram.com/SpherePointPicking.html>`_
-    or the discussion in
-    `Ray Tracing: The Rest of Your Life <https://raytracing.github.io/books/RayTracingTheRestOfYourLife.html>`_.
     """
 
     SHELL_UNIFORM = "shell_uniform"
@@ -61,6 +60,12 @@ class CollisionBackend(StrEnum):
     :class:`oracle_rri.pose_generation.candidate_generation_rules.PathCollisionRule`.
     """
 
+    P3D = "pytorch3d"
+    """GPU backend using PyTorch3D sampling + KNN distance queries."""
+
+    EFM3D = "efm3d"
+    """GPU backend using efm3d torch geometry utilities."""
+
     PYEMBREE = "pyembree"
     """Use :class:`trimesh.ray.ray_pyembree.RayMeshIntersector` for fast
     ray-mesh tests when available.
@@ -78,10 +83,18 @@ class CandidateContext(TypedDict):
 
     last_pose: PoseTW
     gt_mesh: Trimesh | None
+    mesh_p3d: "Meshes | None"
+    mesh_samples: Tensor | None
+    mesh_verts: Tensor | None
+    mesh_faces: Tensor | None
     occupancy_extent: Tensor | None
     device: device
     poses: Tensor
     mask: Tensor
+    min_elev_deg: float
+    max_elev_deg: float
+    azimuth_half_range_deg: float | None
+    collision_backend: CollisionBackend
 
 
 class CandidateSamplingResult(TypedDict):

@@ -43,14 +43,14 @@ class Rule(Protocol):
 
 
 class ShellSamplingRule:
-    """Sample candidate poses on a spherical shell around the last pose.
+    """Sample candidate camera poses on a spherical shell around the last pose.
 
-    The rule operates in three stages:
+    Conceptually, this rule proposes a cloud of viewpoints in three steps:
 
     1. Sample radii :math:`r \\sim \\mathcal{U}(r_{\\min}, r_{\\max})` and
-       directions on a spherical cap defined by
-       ``min_elev_deg`` / ``max_elev_deg`` and ``azimuth_full_circle``.
-       Directions are parameterised as
+       directions on a spherical *cap* defined by ``min_elev_deg``,
+       ``max_elev_deg``, and ``azimuth_full_circle``. Directions are
+       parameterised as
 
        .. math::
 
@@ -58,16 +58,20 @@ class ShellSamplingRule:
            y &= \\sin(\\text{elev}), \\\\
            z &= \\cos(\\text{elev}) \\sin(\\text{az}).
 
-       For :attr:`.SamplingStrategy.SHELL_UNIFORM` the elevation distribution is
-       chosen so the induced density on the sphere is area-uniform over the
-       cap - see [Wolfram Mathworld :: Sphere point picking](https://mathworld.wolfram.com/SpherePointPicking.html).
+       For :attr:`.SamplingStrategy.SHELL_UNIFORM` the elevation distribution
+       is chosen such that the induced density on the cap is approximately
+       area-uniform (see `Sphere point picking`_).
 
-    2. Transform the sampled offsets from the rig frame of ``last_pose`` into
-       the VIO world frame using :class:`efm3d.aria.PoseTW`.
+    2. Transform the sampled offsets from the last-pose rig frame into the VIO
+       world frame using :class:`efm3d.aria.PoseTW`.
 
-    3. Use :func:`oracle_rri.utils.frames.view_axes_from_points` to construct
-       an LUF camera rotation for each sampled centre, with the camera
-       looking back at ``last_pose``.
+    3. Use :func:`oracle_rri.utils.frames.view_axes_from_points` to orient
+       each candidate so the LUF camera frame looks back at ``last_pose``.
+
+    This yields candidate :math:`T_{\\text{world,cam}}` poses that are easy to
+    constrain via later rules (collision, distance to mesh, free space).
+
+    .. _Sphere point picking: https://mathworld.wolfram.com/SpherePointPicking.html
     """
 
     def __init__(self, config: CandidateViewGeneratorConfig):
@@ -77,26 +81,35 @@ class ShellSamplingRule:
         """Populate ``ctx['poses']`` with shell-sampled candidate poses.
 
         Args:
-            ctx: CandidateContext with at least ``last_pose`` and ``device``
-                fields initialised.
+            ctx: Mutable :class:`.CandidateContext` with at least
+                ``last_pose`` (``PoseTW``), ``device`` (``torch.device``) and
+                a preallocated ``poses`` tensor-like container of length ``N``.
 
         Returns:
-            Updated context with:
+            CandidateContext: Updated context with:
 
-            * ``poses``: :class:`efm3d.aria.PoseTW` of shape ``(N,)`` giving
-              :math:`T_\\text{world,cam}` for each candidate.
-            * ``mask``: all-True boolean mask of length ``N``; pruning rules
-              will refine this further.
+            * ``poses``: :class:`efm3d.aria.PoseTW` of shape ``(N,)`` holding
+              :math:`T_{\\text{world,cam}}` for each candidate.
+            * ``mask``: Boolean tensor of shape ``(N,)`` initialised to all
+              ``True``; follow-up rules refine this mask in-place.
         """
         cfg = self.config
         n = ctx["poses"].shape[0]
         dev = ctx["device"]
         # 1) Sample radii r ~ U[min_radius, max_radius].
         r = torch.rand(n, device=dev) * (cfg.max_radius - cfg.min_radius) + cfg.min_radius
-        # 2) Sample azimuth angles, either full circle or half-sphere.
-        az = torch.rand(n, device=dev) * (2 * torch.pi if cfg.azimuth_full_circle else torch.pi)
-        # 3) Convert (elev, az) to unit directions on the spherical cap.
-        pos_local = self._sample_directions(n, az, dev)
+        # 2) Sample azimuth angles, optionally clamped by camera FOV.
+        az_half_deg = ctx.get("azimuth_half_range_deg")
+        if az_half_deg is not None:
+            half_rad = torch.deg2rad(torch.tensor(az_half_deg, device=dev))
+            az_center = torch.pi / 2  # forward axis (z) in LUF frame
+            az = az_center + (torch.rand(n, device=dev) - 0.5) * 2 * half_rad
+        else:
+            az = torch.rand(n, device=dev) * (2 * torch.pi if cfg.azimuth_full_circle else torch.pi)
+        # 3) Convert (elev, az) to unit directions on the spherical cap using per-call overrides.
+        min_elev_deg = ctx.get("min_elev_deg", cfg.min_elev_deg)
+        max_elev_deg = ctx.get("max_elev_deg", cfg.max_elev_deg)
+        pos_local = self._sample_directions(n, az, dev, min_elev_deg=min_elev_deg, max_elev_deg=max_elev_deg)
         # 4) Scale by radius to obtain offsets in the last-pose rig frame.
         pos_local = pos_local * r.unsqueeze(1)
 
@@ -113,29 +126,42 @@ class ShellSamplingRule:
         ctx["mask"] = torch.ones(n, dtype=torch.bool, device=dev)
         return ctx
 
-    def _sample_directions(self, n: int, az: torch.Tensor, device: torch.device) -> torch.Tensor:
-        """Sample unit directions on a spherical cap.
+    def _sample_directions(
+        self,
+        n: int,
+        az: torch.Tensor,
+        device: torch.device,
+        *,
+        min_elev_deg: float | torch.Tensor | None = None,
+        max_elev_deg: float | torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Sample unit directions on a spherical cap in the rig frame.
 
-        This helper samples elevation :math:`\\theta` and azimuth :math:`\\phi`
-        according to :class:`.SamplingStrategy`:
+        Elevation :math:`\\theta` and azimuth :math:`\\phi` are drawn according
+        to :class:`.SamplingStrategy`:
 
         * ``SHELL_UNIFORM`` draws :math:`u \\sim \\mathcal{U}(\\sin\\theta_{\\min},
-          \\sin\\theta_{\\max})` and sets :math:`\\theta = \\arcsin u`, which is
-          equivalent to sampling uniformly over surface area on the cap.
-        * ``FORWARD_GAUSSIAN`` draws :math:`\\theta` from a truncated normal
-          within the elevation band, biasing views towards the forward axis.
+          \\sin\\theta_{\\max})` and sets :math:`\\theta = \\arcsin u`, which
+          induces an approximately uniform density over surface area on the
+          cap.
+        * ``FORWARD_GAUSSIAN`` samples :math:`\\theta` from a truncated normal
+          within the elevation band, biasing samples towards the band centre.
 
         Args:
             n: Number of directions to sample.
             az: Tensor of shape ``(n,)`` with azimuth angles in radians.
-            device: Torch device for the returned tensor.
+            device: Torch device on which to allocate the result.
 
         Returns:
-            Tensor of shape ``(n, 3)`` with unit direction vectors in the
-            last-pose rig frame.
+            Tensor: Float tensor of shape ``(n, 3)`` with unit direction
+            vectors in the last-pose rig frame (LUF convention).
         """
-        min_elev = torch.deg2rad(torch.tensor(self.config.min_elev_deg, device=device))
-        max_elev = torch.deg2rad(torch.tensor(self.config.max_elev_deg, device=device))
+        min_elev = torch.deg2rad(
+            torch.tensor(self.config.min_elev_deg if min_elev_deg is None else min_elev_deg, device=device)
+        )
+        max_elev = torch.deg2rad(
+            torch.tensor(self.config.max_elev_deg if max_elev_deg is None else max_elev_deg, device=device)
+        )
 
         match self.config.sampling_strategy:
             case SamplingStrategy.FORWARD_GAUSSIAN:
@@ -154,34 +180,62 @@ class ShellSamplingRule:
 
 
 class MinDistanceToMeshRule:
-    """Reject candidates that are too close to the GT mesh.
+    """Reject candidates whose camera centres are too close to the GT mesh.
 
-    This rule queries the signed distance from each candidate camera centre
-    to the mesh surface using
-    [:class:`trimesh.proximity.ProximityQuery`](https://trimesh.org/trimesh.proximity.html#trimesh.proximity.ProximityQuery.signed_distance)
-    and enforces a minimum clearance ``min_distance_to_mesh``.
+    For each candidate camera centre :math:`p_i`, this rule queries the signed
+    distance to the mesh surface and enforces a minimum clearance
+    ``min_distance_to_mesh`` in world coordinates.
 
-    Note:
-        According to the trimesh documentation, signed distances are
-        positive inside or near the surface and negative outside the mesh.
-        We simply require ``dist > min_distance_to_mesh`` to mark a
-        candidate as clear; this behaviour may be tuned in the future if
-        tighter control over near-surface points is needed.
+    * CPU path: uses :class:`trimesh.proximity.ProximityQuery.signed_distance`
+      on the full :class:`trimesh.Trimesh`.
+    * GPU path: when ``collision_backend`` is ``P3D`` or ``EFM3D`` and a
+      vertex/face representation is available in the context, distances are
+      computed on-device via :func:`_point_mesh_distance_efm3d` to avoid
+      host-device transfers.
+
+    Distances are interpreted following the trimesh convention (positive near
+    or inside the surface, negative outside). Candidates with
+    ``dist > min_distance_to_mesh`` are marked as clear; others are masked out.
     """
 
     def __init__(self, config: CandidateViewGeneratorConfig):
         self.config = config
 
     def __call__(self, ctx: CandidateContext) -> CandidateContext:
-        """Apply minimum-distance filtering to the current candidates."""
+        """Apply minimum-distance filtering to the current candidates.
+
+        Args:
+            ctx: Mutable :class:`.CandidateContext` with fields:
+                ``poses`` (``PoseTW`` of shape ``(N,)``), ``mask`` (``(N,)``),
+                and either ``gt_mesh`` (``trimesh.Trimesh``) or mesh vertices
+                and faces (``mesh_verts``, ``mesh_faces``) for the GPU path.
+
+        Returns:
+            CandidateContext: Same mapping with ``mask`` updated to keep only
+            candidates whose distance to the mesh exceeds the configured
+            clearance.
+        """
         mask = ctx["mask"]
         mesh: trimesh.Trimesh | None = ctx.get("gt_mesh")
         if mesh is None or self.config.min_distance_to_mesh <= 0:
             ctx["mask"] = mask
             return ctx
 
+        backend = ctx.get("collision_backend", self.config.collision_backend)
+        positions = ctx["poses"].t  # (N,3)
+
+        if backend in (CollisionBackend.P3D, CollisionBackend.EFM3D) and ctx.get("mesh_verts") is not None:
+            verts = ctx["mesh_verts"]
+            faces = ctx["mesh_faces"]
+            dists = point_mesh_distance(
+                positions,
+                verts,
+                faces,
+            )
+            ctx["mask"] = mask & (dists > self.config.min_distance_to_mesh)
+            return ctx
+
         # Evaluate signed distance at each candidate camera centre.
-        positions = ctx["poses"].t  # PoseTW.t -> (N,3)
         query = trimesh.proximity.ProximityQuery(mesh)
         dist = query.signed_distance(positions.detach().cpu().numpy())
         # Keep only candidates with distance strictly larger than the configured
@@ -192,32 +246,54 @@ class MinDistanceToMeshRule:
 
 
 class PathCollisionRule:
-    """Reject candidates whose straight-line path intersects the mesh.
+    """Reject candidates whose straight-line path from the last pose hits the mesh.
 
-    For each candidate camera centre :math:`p_i` and the last pose origin :math:`o`, we construct a ray
+    For each candidate centre :math:`p_i` and last-pose origin :math:`o`, we
+    consider the ray segment
 
     .. math::
 
         r_i(t) = o + t \\hat{d}_i, \\qquad
         \\hat{d}_i = \\frac{p_i - o}{\\lVert p_i - o \\rVert_2},
 
-    and query for intersections up to ``max_distance = ||p_i - o||`` using
-    either the generic [:mod:`trimesh.ray`](https://trimesh.org/ray.html) interface or
-    [:class:`trimesh.ray.ray_pyembree.RayMeshIntersector`](https://trimesh.org/trimesh.ray.ray_pyembree.html#trimesh.ray.ray_pyembree.RayMeshIntersector).
+    and test for intersections up to ``max_distance = ||p_i - o||``.
 
-    Candidates for which [:meth:`intersects_any`](https://trimesh.org/trimesh.ray.ray_triangle.html#trimesh.ray.ray_triangle.RayMeshIntersector.intersects_any) reports a hit are marked as colliding and removed from the mask.
+    * CPU path: uses the generic :mod:`trimesh.ray` interface or an optional
+      :class:`trimesh.ray.ray_pyembree.RayMeshIntersector` backend and checks
+      whether :meth:`intersects_any` reports a hit.
+    * GPU path: for ``collision_backend`` in {``P3D``, ``EFM3D``} and when
+      ``mesh_verts`` / ``mesh_faces`` are present, the ray segment is
+      discretised into a small number of samples. Each sample is tested
+      against the triangle mesh via :func:`_point_mesh_distance_efm3d`, and
+      candidates with points closer than ``step_clearance`` are rejected.
+
+    This rule ensures the straight-line motion from the current pose to a
+    candidate pose does not pass through solid geometry.
     """
 
     def __init__(self, config: CandidateViewGeneratorConfig):
         self.config = config
 
     def __call__(self, ctx: CandidateContext) -> CandidateContext:
-        """Apply path-collision filtering between last pose and candidates."""
+        """Apply path-collision filtering between last pose and candidates.
+
+        Args:
+            ctx: Mutable :class:`.CandidateContext` with fields:
+                ``last_pose`` (``PoseTW``), ``poses`` (``PoseTW`` of shape
+                ``(N,)``), ``mask`` (``(N,)``), and either ``gt_mesh``
+                (``trimesh.Trimesh``) or ``mesh_verts`` / ``mesh_faces`` for
+                the GPU path.
+
+        Returns:
+            CandidateContext: Same mapping with ``mask`` updated to exclude
+            candidates whose path from ``last_pose`` intersects the mesh.
+        """
         mask = ctx["mask"]
         mesh: trimesh.Trimesh | None = ctx.get("gt_mesh")
         if mesh is None:
             ctx["mask"] = mask
             return ctx
+        backend = ctx.get("collision_backend", self.config.collision_backend)
         # Build a ray segment from the last pose origin to each candidate
         # camera centre.
         origin = ctx["last_pose"].t.view(1, 3)
@@ -227,7 +303,25 @@ class PathCollisionRule:
         dists = torch.linalg.norm(dirs, dim=1).clamp(min=1e-6)
         dirs_norm = dirs / dists.unsqueeze(1)
 
-        # Convert batched rays to numpy arrays for trimesh / PyEmbree.
+        if backend in (CollisionBackend.P3D, CollisionBackend.EFM3D) and ctx.get("mesh_verts") is not None:
+            verts = ctx["mesh_verts"]
+            faces = ctx["mesh_faces"]
+            steps = max(2, int(self.config.ray_subsample))
+            start = max(self.config.step_clearance / dists.max().item(), 1e-3)
+            start = min(start, 1.0)
+            t_vals = torch.linspace(start, 1.0, steps, device=targets.device)
+            pts = origin.view(1, 1, 3) + dirs_norm.unsqueeze(1) * (t_vals.view(1, -1, 1) * dists.view(-1, 1, 1))
+            pts_flat = pts.reshape(-1, 3)
+            dists_pts = point_mesh_distance(
+                pts_flat,
+                verts,
+                faces,
+            ).view(targets.shape[0], steps)
+            collide = (dists_pts < self.config.step_clearance).any(dim=1)
+            ctx["mask"] = mask & (~collide)
+            return ctx
+
+        # Convert batched rays to numpy arrays for trimesh / PyEmbree (CPU fallback).
         origins_np = origin.expand_as(targets).detach().cpu().numpy()
         dirs_np = dirs_norm.detach().cpu().numpy()
         max_dist = dists.detach().cpu().numpy()
@@ -254,18 +348,35 @@ class PathCollisionRule:
 
 
 class FreeSpaceRule:
-    """Restrict candidates to a world-space axis-aligned bounding box.
+    """Restrict candidate camera centres to a world-space axis-aligned box.
 
-    The rule assumes ``occupancy_extent`` encodes a 3D AABB in the VIO world
-    frame as ``[xmin, xmax, ymin, ymax, zmin, zmax]`` and keeps only those
-    candidate camera centres whose translations satisfy these bounds.
+    The rule assumes ``occupancy_extent`` encodes a 3D axis-aligned bounding
+    box (AABB) in the VIO world frame as
+    ``[xmin, xmax, ymin, ymax, zmin, zmax]`` and keeps only those candidate
+    camera centres whose translations satisfy these bounds.
+
+    In practice, these bounds are typically derived from semi-dense SLAM
+    volume metadata or GT mesh bounds (see
+    :func:`CandidateViewGenerator._occupancy_extent_from_sample` and the data
+    pipeline docs in ``docs/contents/impl/data_pipeline_overview.qmd``).
     """
 
     def __init__(self, config: CandidateViewGeneratorConfig):
         self.config = config
 
     def __call__(self, ctx: CandidateContext) -> CandidateContext:
-        """Apply AABB-based free-space filtering to current candidates."""
+        """Apply AABB-based free-space filtering to current candidates.
+
+        Args:
+            ctx: Mutable :class:`.CandidateContext` with fields:
+                ``poses`` (``PoseTW`` of shape ``(N,)``), ``mask`` (``(N,)``),
+                and ``occupancy_extent`` (tensor-like of shape ``(6,)`` with
+                bounds ``[xmin, xmax, ymin, ymax, zmin, zmax]``) if available.
+
+        Returns:
+            CandidateContext: Same mapping with ``mask`` updated to only keep
+            candidates whose world-space positions lie inside the AABB.
+        """
         mask = ctx["mask"]
         extent = ctx.get("occupancy_extent")
         if extent is None:
@@ -285,6 +396,49 @@ class FreeSpaceRule:
         )
         ctx["mask"] = mask & in_box
         return ctx
+
+
+def point_mesh_distance(
+    points: torch.Tensor,
+    verts: torch.Tensor,
+    faces: torch.Tensor,
+) -> torch.Tensor:
+    """Compute point-to-mesh distances using PyTorch3D.
+
+    Args:
+        points: Tensor of shape ``(N, 3)`` with candidate query points in
+            world coordinates.
+        verts: Tensor of shape ``(V, 3)`` with mesh vertices.
+        faces: Tensor of shape ``(F, 3)`` with long integer vertex indices.
+
+    Returns:
+        Tensor: Float tensor of shape ``(N,)`` with the minimal distance from
+        each query point to the triangle mesh.
+    """
+
+    # Lazily import to avoid PyTorch3D dependency when the GPU path is unused.
+    from pytorch3d.loss.point_mesh_distance import _DEFAULT_MIN_TRIANGLE_AREA, point_face_distance
+
+    device = points.device
+    points = points.to(device)
+    verts = verts.to(device)
+    faces = faces.to(device)
+
+    # Build packed triangle tensor expected by PyTorch3D kernels.
+    tris = verts[faces]  # (F, 3, 3)
+    points_first_idx = torch.zeros(1, device=device, dtype=torch.int64)
+    tris_first_idx = torch.zeros(1, device=device, dtype=torch.int64)
+    max_points = points.shape[0]
+
+    dist_sq = point_face_distance(
+        points,
+        points_first_idx,
+        tris,
+        tris_first_idx,
+        max_points,
+        _DEFAULT_MIN_TRIANGLE_AREA,
+    )
+    return torch.sqrt(dist_sq)
 
 
 __all__ = [

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields, replace
 from pprint import pformat
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 import numpy as np
 import torch
@@ -81,7 +81,7 @@ class EfmGtCameraObbView:
 
 CamerasDict = TypedDict(
     "CamerasDict",
-    {"camera-rgb": EfmGtCameraObbView, "camera-slam-left": EfmGtCameraObbView, "camera-slam-right": EfmGtCameraObbView},
+    {"rgb": EfmGtCameraObbView, "slam-left": EfmGtCameraObbView, "slam-right": EfmGtCameraObbView},
 )
 
 
@@ -185,6 +185,23 @@ class EfmCameraView:
             distance_m=None if self.distance_m is None else self.distance_m.to(device=target_device, dtype=dtype),
             distance_time_ns=None if self.distance_time_ns is None else self.distance_time_ns.to(target_device),
         )
+
+    def get_fov(self) -> Tensor:
+        """Tensor["F 2", float32] FOV in degrees (fov_x, fov_y) per frame."""
+        size = self.calib.size  # (..., 2) = (F,2)
+        focals = self.calib.f  # (..., 2)
+        width = size[..., 0].to(dtype=torch.float32)
+        height = size[..., 1].to(dtype=torch.float32)
+        fx = focals[..., 0].to(dtype=torch.float32)
+        fy = focals[..., 1].to(dtype=torch.float32)
+
+        valid = (width > 0) & (height > 0) & (fx > 0) & (fy > 0)
+        fov_x = torch.full_like(width, float("nan"))
+        fov_y = torch.full_like(height, float("nan"))
+        fov_x = torch.where(valid, torch.rad2deg(2 * torch.atan(width / (2 * fx))), fov_x)
+        fov_y = torch.where(valid, torch.rad2deg(2 * torch.atan(height / (2 * fy))), fov_y)
+
+        return torch.stack([fov_x, fov_y], dim=-1)
 
     def __repr__(self) -> str:  # pragma: no cover - formatting only
         return _repr(self)
@@ -358,11 +375,13 @@ class EfmSnippetView:
     """Snippet/shard identifier (e.g., ``shards-0000``)."""
     mesh: Trimesh | None = None
     """Optional GT mesh paired with this sample."""
+    crop_bounds: tuple[torch.Tensor, torch.Tensor] | None = None
+    """Optional `(min, max)` world-space AABB used for mesh cropping / occupancy."""
 
     # ------------------------------------------------------------------
     # Cameras
     # ------------------------------------------------------------------
-    def _camera(self, prefix: str) -> EfmCameraView:
+    def get_camera(self, prefix: Literal["rgb", "slaml", "slamr"]) -> EfmCameraView:
         idx = {"rgb": 0, "slaml": 1, "slamr": 2}[prefix]
         img_key = ARIA_IMG[idx]
         calib_key = ARIA_CALIB[idx]
@@ -391,19 +410,19 @@ class EfmSnippetView:
     def camera_rgb(self) -> EfmCameraView:
         """RGB stream (fisheye624, 240x240 in ASE preprocessing)."""
 
-        return self._camera("rgb")
+        return self.get_camera("rgb")
 
     @property
     def camera_slam_left(self) -> EfmCameraView:
         """Left SLAM mono stream (fisheye624, ~320x240)."""
 
-        return self._camera("slaml")
+        return self.get_camera("slaml")
 
     @property
     def camera_slam_right(self) -> EfmCameraView:
         """Right SLAM mono stream (fisheye624, ~320x240)."""
 
-        return self._camera("slamr")
+        return self.get_camera("slamr")
 
     # ------------------------------------------------------------------
     # Trajectory and semidense points
@@ -472,6 +491,15 @@ class EfmSnippetView:
     def has_mesh(self) -> bool:
         return self.mesh is not None
 
+    def get_occupancy_extend(self) -> torch.Tensor:
+        """Return ``[xmin, xmax, ymin, ymax, zmin, zmax]`` AABB in world frame."""
+        if self.crop_bounds is None:
+            raise ValueError("EfmSnippetView.crop_bounds is missing; dataset should always populate it.")
+        bounds_min, bounds_max = self.crop_bounds
+        return torch.stack(
+            [bounds_min[0], bounds_max[0], bounds_min[1], bounds_max[1], bounds_min[2], bounds_max[2]], dim=0
+        )
+
     def to(self, device: str | torch.device, *, dtype: torch.dtype | None = None) -> "EfmSnippetView":
         """Shallow device move for heavy tensors."""
 
@@ -493,7 +521,10 @@ class EfmSnippetView:
                 moved[k] = v.to(device=target_device)  # type: ignore[arg-type]
             else:
                 moved[k] = v
-        return replace(self, efm=moved, mesh=self.mesh)
+        cb = self.crop_bounds
+        if cb is not None:
+            cb = (cb[0].to(target_device), cb[1].to(target_device))
+        return replace(self, efm=moved, mesh=self.mesh, crop_bounds=cb)
 
     def __repr__(self) -> str:  # pragma: no cover
         base = {
@@ -508,6 +539,7 @@ class EfmSnippetView:
             "semidense": summarize(self.efm.get(ARIA_POINTS_WORLD)),
             "obbs": summarize(self.efm.get(ARIA_OBB_PADDED)),
             "mesh": str(self.mesh) if self.mesh is not None else None,
+            "crop_bounds": summarize(self.crop_bounds),
         }
         return pformat(base, indent=2, width=120, compact=False)
 
