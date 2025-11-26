@@ -11,8 +11,8 @@ from pydantic import AliasChoices, Field, field_validator, model_validator
 from ..data.efm_views import EfmCameraView, EfmSnippetView
 from ..pose_generation.types import CandidateSamplingResult
 from ..utils import BaseConfig, Console, Verbosity, pick_fast_depth_renderer
-from .efm3d_depth_renderer import Efm3dDepthRendererConfig
-from .pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig
+from .efm3d_depth_renderer import Efm3dDepthRenderer, Efm3dDepthRendererConfig
+from .pytorch3d_depth_renderer import Pytorch3DDepthRenderer, Pytorch3DDepthRendererConfig
 
 CameraStream = Literal["rgb", "slaml", "slamr"]
 FrameSelection = Literal["first", "last"]
@@ -116,7 +116,7 @@ class CandidateDepthRenderer:
         self.console.log(f"Mesh stats verts={sample.mesh.vertices.shape[0]:,} faces={sample.mesh.faces.shape[0]:,}")
         pose_batch, mask_valid, candidate_indices = self._filter_candidates(candidates)
         self.console.log(f"Attempting renders for {pose_batch.tensor().shape[0]} candidates (GUI slice).")
-        self.console.log_summary("candidate_indices", candidate_indices)
+        self.console.dbg_summary("candidate_indices", candidate_indices)
 
         camera_view = sample.get_camera(self.config.camera_stream)
         if self.config.resolution_scale is not None:
@@ -124,28 +124,30 @@ class CandidateDepthRenderer:
             camera_view = self._downscale_camera_view(camera_view, scale=self.config.resolution_scale)
         frame_idx = 0 if self.config.frame_selection == "first" else -1
         frame_calib = self._frame_calib(camera_view.calib, frame_idx)
-        self.console.log_summary("camera_calib_frame", frame_calib.tensor())
-        self.console.dbg_summary("pose_batch_tensor", pose_batch.tensor())
-        if hasattr(self.renderer, "render_batch"):
-            depths = self.renderer.render_batch(
-                poses=pose_batch,
-                mesh=sample.mesh,
-                camera=frame_calib,
-                frame_index=frame_idx,
-            )
+        self.console.dbg_summary("camera_calib_frame", frame_calib)
+        self.console.dbg_summary("pose_batch_tensor", pose_batch)
+        is_pytorch3d = isinstance(self.renderer, Pytorch3DDepthRenderer)
+        mesh_input: Any
+        if is_pytorch3d and sample.mesh_verts is not None and sample.mesh_faces is not None:
+            mesh_input = (sample.mesh_verts, sample.mesh_faces)
         else:
-            depth_list = []
-            for pose in pose_batch:  # type: ignore[attr-defined]
-                depth_i = self.renderer.render_depth(
-                    pose_world_cam=pose,
-                    mesh=sample.mesh,
-                    camera=camera_view.calib,
-                    frame_index=frame_idx,
-                )
-                depth_list.append(depth_i)
-            depths = torch.stack(depth_list, dim=0)
+            mesh_input = sample.mesh
+
+        if isinstance(self.renderer, Efm3dDepthRenderer):
+            raise NotImplementedError("Efm3dDepthRenderer is not supported in CandidateDepthRenderer.")
+        if not isinstance(self.renderer, Pytorch3DDepthRenderer):
+            raise TypeError(f"Unsupported renderer type: {self.renderer.__class__.__name__}")
+
+        depths = self.renderer.render_batch(
+            poses=pose_batch,
+            mesh=mesh_input,
+            camera=frame_calib,
+            frame_index=frame_idx,
+            mesh_cache_key=sample.mesh_cache_key,
+        )
+
         hit_ratio = float((depths < self.renderer.config.zfar).float().mean().item())
-        self.console.log_summary("depth_batch_stats", {"hit_ratio": hit_ratio, "zfar": self.renderer.config.zfar})
+        self.console.dbg_summary("depth_batch_stats", {"hit_ratio": hit_ratio, "zfar": self.renderer.config.zfar})
         if hit_ratio == 0.0:
             self.console.warn(
                 "All candidate depth pixels are at zfar; check camera poses, mesh normals, or backface culling."
@@ -167,17 +169,7 @@ class CandidateDepthRenderer:
         if tensor.ndim == 1:
             return calib
         frame = tensor[frame_idx].unsqueeze(0)
-        cam = CameraTW(frame)
-        # TODO: Potential error here!
-
-        # Candidate poses already encode world←camera; avoid double-applying dataset extrinsics
-        cam.set_T_camera_rig(
-            PoseTW.from_Rt(
-                torch.eye(3, device=cam.device, dtype=cam.dtype), torch.zeros(3, device=cam.device, dtype=cam.dtype)
-            )
-        )
-
-        return cam
+        return CameraTW(frame)
 
     def _downscale_camera_view(
         self,
@@ -221,9 +213,7 @@ class CandidateDepthRenderer:
         if self.config.max_candidates is not None:
             valid_idx = valid_idx[: self.config.max_candidates]
 
-        pose_tensor = poses.tensor()[valid_idx]
-        pose_batch = PoseTW(pose_tensor)
-        return pose_batch, mask_valid, valid_idx
+        return poses[valid_idx], mask_valid, valid_idx
 
 
 __all__ = [

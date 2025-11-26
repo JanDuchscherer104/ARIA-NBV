@@ -188,9 +188,9 @@ class Console(RichConsole):
         if self._pl_logger is not None:
             self._log_to_lightning("info", message)
 
-    def log_summary(self, label: str, value: Any) -> None:
+    def log_summary(self, label: str, value: Any, *, include_stats: bool = False) -> None:
         """Log a structured summary built from :func:`summarize`."""
-        summary = summarize(value)
+        summary = summarize(value, include_stats=include_stats)
         self.log(f"{label}: {summary}")
 
     def warn(self, message: str) -> None:
@@ -233,10 +233,10 @@ class Console(RichConsole):
             if self._pl_logger is not None:
                 self._log_to_lightning("debug", message)
 
-    def dbg_summary(self, label: str, value: Any) -> None:
+    def dbg_summary(self, label: str, value: Any, *, include_stats: bool = False) -> None:
         """Debug-level structured summary."""
         if self.is_debug:
-            summary = summarize(value)
+            summary = summarize(value, include_stats=include_stats)
             self.dbg(f"{label}: {summary}")
 
     def set_verbosity(self, level: Verbosity | int | bool) -> "Console":

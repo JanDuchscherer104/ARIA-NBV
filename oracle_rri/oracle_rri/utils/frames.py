@@ -1,3 +1,12 @@
+"""Coordinate frame utilities for Aria/EFM3D.
+
+Add a PoseTW-aware look-at helper that guarantees zero roll by aligning the
+camera up-axis with the world-up vector. This preserves the LUF convention
+(X-left, Y-up, Z-forward) while avoiding arbitrary yaw/roll about world Z.
+"""
+
+from __future__ import annotations
+
 import torch
 import torch.nn.functional as F  # noqa: N812
 from efm3d.aria.camera import CameraTW
@@ -11,22 +20,16 @@ def world_up_tensor(
     device: torch.device | None = None,
     dtype: torch.dtype | None = None,
 ) -> torch.Tensor:
-    """Return world up vector as tensor. Default world-up: +Z (gravity up in EFM3D; gravity is [0, 0, -1]).
+    """Return world up vector as tensor.
 
-    Args:
-        device: Desired device of the returned tensor.
-        dtype: Desired data type of the returned tensor.
-    Returns:
-        (3,) world up vector tensor.
+    In the EFM3D VIO convention gravity points to ``[0, 0, -1]``; world-up is
+    therefore ``+Z``. This helper keeps that logic in one place.
     """
-    return torch.tensor(
-        -GRAVITY_DIRECTION_VIO,
-        device=device,
-        dtype=dtype,
-    )
+
+    return torch.tensor(-GRAVITY_DIRECTION_VIO, device=device, dtype=dtype)
 
 
-def view_axes_from_points(
+def _view_axes_from_positions(
     cam_pos: torch.Tensor,
     look_at: torch.Tensor,
     world_up: torch.Tensor | None = None,
@@ -34,23 +37,11 @@ def view_axes_from_points(
 ) -> torch.Tensor:
     """Return camera axes (batch) for the Aria LUF camera frame.
 
-    Args:
-        cam_pos: (..., 3) camera origin in world.
-        look_at: (..., 3) target point (defines forward).
-        world_up: (..., 3) approximate up direction in world coordinates.
-            Defaults to +Z (opposite of gravity in EFM3D's VIO convention).
-        eps: Small value to avoid degeneracy when forward is close to up.
-
-    Returns:
-        (..., 3, 3) R_world_cam in SO(3) with columns:
-            - [:, 0] = left    (+X_l, aligned with Aria LUF)
-            - [:, 1] = up      (+Y_l, approximately aligned with world_up)
-            - [:, 2] = forward (+Z_l, points from camera to look_at)
-
-    NOTE: We build a proper right-handed rotation by enforcing left×up = forward.
-    Display code may still apply a LUF→display tweak for viewers, but stored poses
-    now follow the documented LUF convention directly.
+    This is the tensor-level implementation. Use
+    :func:`view_axes_from_poses` when you already operate on ``PoseTW``
+    instances.
     """
+
     # Forward (camera z-axis) from camera to target.
     fwd = F.normalize(look_at - cam_pos, dim=-1)
 
@@ -61,8 +52,8 @@ def view_axes_from_points(
     while world_up.ndim < fwd.ndim:
         world_up = world_up.unsqueeze(0)
 
-    # If forward is nearly parallel to world_up, fall back to a secondary up
-    # direction (world +Y) to avoid degeneracies.
+    # Choose an auxiliary up that is least aligned with forward to avoid
+    # degeneracy when looking near ±Z. Fallback to world +Y when forward‖world_up.
     dot = (fwd * world_up).sum(dim=-1, keepdim=True).abs()
     alt_up = torch.tensor([0.0, 1.0, 0.0], device=cam_pos.device, dtype=cam_pos.dtype)
     while alt_up.ndim < fwd.ndim:
@@ -71,15 +62,40 @@ def view_axes_from_points(
     up_hint = torch.where(dot > 1.0 - 1e-3, alt_up, world_up)
     up_hint = F.normalize(up_hint + eps, dim=-1)
 
-    # Left axis: world_up × forward (negated right) to follow LUF naming.
+    # Left axis: up × forward (LUF naming; negated right).
     left = torch.cross(up_hint, fwd, dim=-1)
     left = F.normalize(left + eps, dim=-1)
 
-    # Re-orthogonalized up to ensure left×up = forward (right-handed, LUF-named).
+    # Re-orthogonalize up to ensure left×up = forward (right-handed, LUF).
     up = torch.cross(fwd, left, dim=-1)
     up = F.normalize(up + eps, dim=-1)
 
     return torch.stack([left, up, fwd], dim=-1)
+
+
+def view_axes_from_points(
+    from_pose: PoseTW | torch.Tensor,
+    look_at: PoseTW | torch.Tensor,
+    world_up: torch.Tensor | None = None,
+    eps: float = 1e-6,
+) -> torch.Tensor:
+    """PoseTW-aware look-at helper for LUF cameras.
+
+    Args:
+        from_pose: Camera pose (or centre tensor) in world coordinates.
+        look_at: Target point (or pose whose translation is the target).
+        world_up: Optional world up vector; defaults to ``+Z``.
+        eps: Numerical stability term.
+
+    Returns:
+        Rotation matrices ``R_world_cam`` with shape ``(..., 3, 3)`` following
+        the LUF convention (columns = left, up, forward).
+    """
+
+    cam_origin = from_pose.t if isinstance(from_pose, PoseTW) else from_pose
+    target = look_at.t if isinstance(look_at, PoseTW) else look_at
+
+    return _view_axes_from_positions(cam_pos=cam_origin, look_at=target, world_up=world_up, eps=eps)
 
 
 def world_from_camera(t_world_rig: PoseTW, cam: CameraTW, frame_idx: int) -> PoseTW:

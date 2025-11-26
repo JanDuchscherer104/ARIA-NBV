@@ -1,59 +1,44 @@
 from typing import Any
 
 import torch
-
-# Ensure vendored efm3d is importable when not installed as a package.
-try:  # pragma: no cover - environment dependent
-    from efm3d.aria.camera import CameraTW
-    from efm3d.aria.obb import ObbTW
-    from efm3d.aria.pose import PoseTW
-    from efm3d.aria.tensor_wrapper import TensorWrapper
-except ModuleNotFoundError:  # pragma: no cover - fallback for dev installs
-    import sys
-    from pathlib import Path
-
-    vendor = Path(__file__).resolve().parents[2] / "external" / "efm3d"
-    if vendor.exists():
-        sys.path.append(str(vendor))
-        from efm3d.aria.camera import CameraTW
-        from efm3d.aria.obb import ObbTW
-        from efm3d.aria.pose import PoseTW
-        from efm3d.aria.tensor_wrapper import TensorWrapper
-    else:
-        raise
-
+from efm3d.aria.camera import CameraTW
+from efm3d.aria.obb import ObbTW
+from efm3d.aria.pose import PoseTW
+from efm3d.aria.tensor_wrapper import TensorWrapper
 from torch import Tensor
 
 
-def summarize(val: Tensor | CameraTW | PoseTW | ObbTW | TensorWrapper | list | Any) -> Any:
+def summarize(
+    val: Tensor | CameraTW | PoseTW | ObbTW | TensorWrapper | list | Any, *, include_stats: bool = False
+) -> Any:
     """Small helper for succinct repr output."""
     if val is None:
         return None
     if isinstance(val, Tensor):
-        return _tensor_summary(val)
+        return _tensor_summary(val, include_stats=include_stats)
     if isinstance(val, TensorWrapper):
         data = val.tensor() if callable(getattr(val, "tensor", None)) else val.tensor  # type: ignore[operator]
-        return _tensor_summary(data)
+        return _tensor_summary(data, include_stats=include_stats)
     if isinstance(val, PoseTW):
-        return _tensor_summary(val.matrix)
+        return _tensor_summary(val.matrix, include_stats=include_stats)
     if isinstance(val, CameraTW):
         data = val.tensor() if callable(getattr(val, "tensor", None)) else val.tensor  # type: ignore[operator]
-        return _tensor_summary(data)
+        return _tensor_summary(data, include_stats=include_stats)
     if isinstance(val, ObbTW):
         data = val.tensor() if callable(getattr(val, "tensor", None)) else val.tensor  # type: ignore[operator]
-        return _tensor_summary(data)
+        return _tensor_summary(data, include_stats=include_stats)
     if isinstance(val, list):
         return {"len": len(val)}
     return val
 
 
-def _tensor_summary(tensor: Tensor) -> dict[str, Any]:
+def _tensor_summary(tensor: Tensor, *, include_stats: bool = False) -> dict[str, Any]:
     summary: dict[str, Any] = {
         "shape": tuple(tensor.shape),
         "dtype": str(tensor.dtype),
         "device": str(tensor.device),
     }
-    if tensor.numel() and torch.is_floating_point(tensor):
+    if tensor.numel() and torch.is_floating_point(tensor) and include_stats:
         finite = tensor[torch.isfinite(tensor)]
         if finite.numel():
             summary["min"] = float(finite.min())

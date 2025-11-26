@@ -193,47 +193,8 @@ def test_backface_culling_blocks_interior_walls():
 
 
 def test_proxy_walls_expand_to_occupancy_bounds():
-    """Proxy walls should use semidense AABB even when mesh is tiny."""
-
-    # Single floor quad; no walls.
-    mesh = trimesh.Trimesh(
-        vertices=np.array(
-            [
-                [-0.5, -0.5, 0.0],
-                [0.5, -0.5, 0.0],
-                [0.5, 0.5, 0.0],
-                [-0.5, 0.5, 0.0],
-            ],
-            dtype=np.float32,
-        ),
-        faces=np.array([[0, 1, 2], [0, 2, 3]]),
-        process=False,
-    )
-    cfg = Pytorch3DDepthRendererConfig(device="cpu", verbose=False)
-    renderer = cfg.setup_target()
-    occ_extent = torch.tensor([-2.0, 2.0, -3.0, 3.0, -4.0, 4.0])
-
-    merged = renderer._maybe_with_proxy_walls(mesh, occupancy_extent=occ_extent)
-    vmin, vmax = merged.bounds
-    assert np.allclose(vmin, [-2.0, -3.0, -4.0], atol=1e-4)
-    assert np.allclose(vmax, [2.0, 3.0, 4.0], atol=1e-4)
-    assert merged.faces.shape[0] > mesh.faces.shape[0]
+    pytest.skip("Proxy wall logic removed; test obsolete.")
 
 
 def test_candidate_renderer_builds_ordered_occupancy_extent():
-    mesh = _make_mesh()
-    cam = _make_camera()
-    volume_min = torch.tensor([-4.0, -2.0, -1.0])
-    volume_max = torch.tensor([5.0, 3.0, 7.0])
-    sample = _make_snippet(mesh, cam, volume_min=volume_min, volume_max=volume_max)
-
-    cfg = CandidateDepthRendererConfig(
-        camera_stream="rgb",
-        renderer=Pytorch3DDepthRendererConfig(device="cpu", verbose=False, add_proxy_walls=False),
-    )
-    renderer = cfg.setup_target()
-
-    occ_extent = renderer._occupancy_extent(sample, device=torch.device("cpu"))
-    assert occ_extent is not None
-    expected = torch.tensor([-4.0, 5.0, -2.0, 3.0, -1.0, 7.0])
-    assert torch.allclose(occ_extent.cpu(), expected)
+    pytest.skip("Occupancy extent helper removed; test obsolete.")

@@ -2281,6 +2281,7 @@ dependencies = [
     { name = "opencv-python" },
     { name = "pandas" },
     { name = "plotly" },
+    { name = "power-spherical" },
     { name = "projectaria-atek" },
     { name = "projectaria-tools" },
     { name = "pydantic" },
@@ -2351,6 +2352,7 @@ requires-dist = [
     { name = "opencv-python", specifier = "==4.10.0.84" },
     { name = "pandas", specifier = "==2.2.2" },
     { name = "plotly", specifier = ">=6.4.0" },
+    { name = "power-spherical", specifier = ">=0.8.1" },
     { name = "projectaria-atek", specifier = "==1.0.0" },
     { name = "projectaria-tools", specifier = "==2.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
@@ -2599,6 +2601,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5e/77/65b857a69ed876e1951e88aaba60f5ce6120c33703f7cb61a3c894b8c1b6/portalocker-3.2.0.tar.gz", hash = "sha256:1f3002956a54a8c3730586c5c77bf18fae4149e07eaf1c29fc3faf4d5a3f89ac", size = 95644, upload-time = "2025-06-14T13:20:40.03Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4b/a6/38c8e2f318bf67d338f4d629e93b0b4b9af331f455f0390ea8ce4a099b26/portalocker-3.2.0-py3-none-any.whl", hash = "sha256:3cdc5f565312224bc570c49337bd21428bba0ef363bbcf58b9ef4a9f11779968", size = 22424, upload-time = "2025-06-14T13:20:38.083Z" },
+]
+
+[[package]]
+name = "power-spherical"
+version = "0.8.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b6/44/2fe941d76e8b13ff96122fc2e529e2ca93690a0b34f991989743ed269628/power_spherical-0.8.1.tar.gz", hash = "sha256:72dbe2a8436b5a693b4f6fdd0f60e37f9509218531f623bd57ea9fec155cf4ae", size = 7627, upload-time = "2024-05-18T07:40:37.61Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d6/ee/bd0e02b9fc8a8a2b5afef00c257f7235ecc11e0003caab11fde13df2fcfc/power_spherical-0.8.1-py3-none-any.whl", hash = "sha256:ebd793c0213babe2acc11d8971b314e51c1f14c1c2f84902cf1c9d60080023b6", size = 9414, upload-time = "2024-05-18T07:40:36.016Z" },
 ]
 
 [[package]]

@@ -17,10 +17,21 @@ from ...data.plotting import (
     project_pointcloud_on_frame,
 )
 from ...pose_generation import CandidateViewGeneratorConfig
-from ...pose_generation.plotting import plot_candidate_frusta, plot_candidates, plot_sampling_shell
+from ...pose_generation.plotting import (
+    plot_candidate_axes,
+    plot_candidate_frusta,
+    plot_candidates,
+    plot_direction_polar,
+    plot_direction_sphere,
+    plot_position_polar,
+    plot_position_sphere,
+    plot_rule_masks,
+    plot_sampling_shell,
+)
 from ...pose_generation.types import CandidateSamplingResult
 from ...rendering.candidate_depth_renderer import CandidateDepthBatch
-from ...rendering.plotting import depth_grid
+from ...rendering.plotting import RenderingPlotBuilder, depth_grid, depth_histogram, hit_ratio_bar
+from .state import STATE_KEYS, get
 
 
 def pose_world_cam(sample: EfmSnippetView, cam_view: EfmCameraView, frame_idx: int):
@@ -43,7 +54,9 @@ def semidense_points_for_frame(sample: EfmSnippetView, frame_idx: int | None, *,
     if all_frames:
         if lengths is not None:
             max_len = pts.shape[1]
-            mask_valid = torch.arange(max_len, device=pts.device).unsqueeze(0) < lengths.clamp_max(max_len).unsqueeze(-1)
+            mask_valid = torch.arange(max_len, device=pts.device).unsqueeze(0) < lengths.clamp_max(max_len).unsqueeze(
+                -1
+            )
             pts = torch.where(mask_valid.unsqueeze(-1), pts, torch.nan)
         pts = pts.reshape(-1, 3)
     else:
@@ -108,7 +121,11 @@ def render_data_page(sample: EfmSnippetView, *, crop_margin: float | None = None
     last_pose = sample.trajectory.t_world_rig[-1]
 
     def _pose_summary(pose: torch.Tensor | PoseTW):
-        pt = pose if isinstance(pose, PoseTW) else PoseTW.from_matrix3x4(pose.view(3, 4) if pose.shape[-1] == 12 else pose)
+        pt = (
+            pose
+            if isinstance(pose, PoseTW)
+            else PoseTW.from_matrix3x4(pose.view(3, 4) if pose.shape[-1] == 12 else pose)
+        )
         r, p, y = pt.to_ypr(rad=True)
         rpy = torch.rad2deg(torch.stack([r, p, y])).tolist()
         euler = torch.rad2deg(pt.to_euler(rad=True)).tolist()
@@ -154,7 +171,11 @@ def render_data_page(sample: EfmSnippetView, *, crop_margin: float | None = None
         points_world = semidense_points_for_frame(sample, overlay_frame, all_frames=False)
     else:
         lengths = sample.semidense.lengths if sample.semidense is not None else None
-        last_idx = int(torch.nonzero(lengths > 0, as_tuple=False).max().item()) if lengths is not None and torch.any(lengths > 0) else 0
+        last_idx = (
+            int(torch.nonzero(lengths > 0, as_tuple=False).max().item())
+            if lengths is not None and torch.any(lengths > 0)
+            else 0
+        )
         points_world = semidense_points_for_frame(sample, last_idx, all_frames=False)
 
     if points_world is None or points_world.numel() == 0:
@@ -239,7 +260,9 @@ def render_candidates_page(
 
     st.header("Candidate Poses")
     with st.status("Building candidate plots...", expanded=False):
-        cand_fig = plot_candidates(snippet=sample, poses=candidates["poses"], title="Candidate positions", center=last_center)
+        cand_fig = plot_candidates(
+            snippet=sample, poses=candidates["poses"], title="Candidate positions", center=last_center
+        )
         shell_fig = plot_sampling_shell(
             snippet=sample,
             shell_poses=candidates["shell_poses"],
@@ -252,6 +275,45 @@ def render_candidates_page(
         )
     st.plotly_chart(cand_fig, width="stretch")
     st.plotly_chart(shell_fig, width="stretch")
+
+    # Direction distributions
+    shell_positions = candidates.get("shell_poses")
+    if shell_positions is not None and shell_positions.numel() > 0:
+        from ...data.plotting import rotate_yaw_cw90
+
+        shell_positions = rotate_yaw_cw90(PoseTW(shell_positions)).tensor()
+        shell_pts = shell_positions[:, 9:12]
+        # Directions expressed in last_pose (rig) frame
+        dirs_world = shell_pts - torch.as_tensor(last_center, device=shell_pts.device, dtype=shell_pts.dtype)
+        r_wr = last_pose_rig.R.to(dirs_world.device)  # world←rig
+        dirs = dirs_world @ r_wr.transpose(-1, -2)
+        dirs = dirs / (dirs.norm(dim=1, keepdim=True) + 1e-8)
+        offsets_rig = dirs_world @ r_wr.transpose(-1, -2)
+        with st.expander("Sampling distributions", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.plotly_chart(plot_direction_polar(dirs), width="stretch")
+            with col2:
+                st.plotly_chart(plot_direction_sphere(dirs, show_axes=True), width="stretch")
+        with st.expander("Position distributions (rig frame)", expanded=False):
+            colp1, colp2 = st.columns(2)
+            with colp1:
+                st.plotly_chart(plot_position_polar(shell_positions), width="stretch")
+            with colp2:
+                st.plotly_chart(plot_position_sphere(shell_positions, show_axes=True), width="stretch")
+
+    # Rule masks overlay
+    masks = candidates.get("masks")
+    if masks is not None and masks.numel() > 0:
+        with st.expander("Rule-wise pruning", expanded=False):
+            mask_fig = plot_rule_masks(
+                snippet=sample,
+                shell_poses=candidates["shell_poses"],
+                masks=masks,
+                rule_names=candidates.get("rule_names", []),
+            )
+            st.plotly_chart(mask_fig, width="stretch")
+
     if candidates["mask_valid"].sum() == 0:
         st.warning("All candidates were rejected; frustum plot omitted.")
     else:
@@ -279,12 +341,67 @@ def render_candidates_page(
                 )
             st.plotly_chart(rej_fig, width="stretch")
 
+    # Axes sanity check
+    with st.expander("Candidate axes (roll/yaw check)", expanded=False):
+        st.plotly_chart(
+            plot_candidate_axes(snippet=sample, poses=candidates["poses"], max_axes=30),
+            width="stretch",
+        )
+
 
 def render_depth_page(depth_batch: CandidateDepthBatch) -> None:
     st.header("Candidate Renders")
-    with st.status("Building depth grid...", expanded=False):
-        depths = depth_batch["depths"]
-        indices = depth_batch["candidate_indices"].tolist()
-        titles = [f"Candidate {i}" for i in indices]
-        fig = depth_grid(depths, titles=titles, zmax=float(depths.max().item()))
-    st.plotly_chart(fig, width="stretch")
+
+    depths = depth_batch["depths"]
+    indices = depth_batch["candidate_indices"].tolist()
+    titles = [f"Candidate {i}" for i in indices]
+    # Best-effort zfar for stats; fall back to depth max if missing.
+    cam = depth_batch["camera"]
+    if hasattr(cam, "valid_radius") and cam.valid_radius.numel() > 0:
+        zfar_stat = float(cam.valid_radius.max().item())
+    else:
+        zfar_stat = float(depths.max().item()) * 1.05
+
+    with st.expander("Depth grid", expanded=True):
+        with st.status("Building depth grid...", expanded=False):
+            fig = depth_grid(depths, titles=titles, zmax=float(depths.max().item()))
+        st.plotly_chart(fig, width="stretch")
+
+    with st.expander("Depth histograms", expanded=False):
+        fig_hist = depth_histogram(depths, bins=50, zfar=zfar_stat)
+        st.plotly_chart(fig_hist, width="stretch")
+
+    with st.expander("Hit-ratio bars", expanded=False):
+        fig_hits = hit_ratio_bar(depths, zfar=zfar_stat)
+        st.plotly_chart(fig_hits, width="stretch")
+
+    sample = get(STATE_KEYS["sample"])
+    with st.expander("Frusta + image planes (3D)", expanded=False):
+        if sample is None:
+            st.info("Load data first to plot frusta.")
+        else:
+            plane_dist = st.slider("Image plane distance (m)", 0.2, 3.0, 1.0, step=0.1, key="plane_dist_slider")
+            builder = RenderingPlotBuilder.from_snippet(sample, title="Rendered frusta with image planes")
+            num_frustums = int(depth_batch["poses"].tensor().shape[0])
+            builder.add_frusta_with_image_plane(
+                poses=depth_batch["poses"],
+                camera=depth_batch["camera"],
+                plane_dist=float(plane_dist),
+                max_frustums=min(16, num_frustums),
+            )
+            st.plotly_chart(builder.finalize(), width="stretch")
+
+    with st.expander("Depth hit point cloud (3D)", expanded=False):
+        if sample is None:
+            st.info("Load data first to back-project depth hits.")
+        else:
+            stride = st.slider("Depth hit stride", 1, 32, 8, step=1, key="depth_hit_stride")
+            builder_hits = RenderingPlotBuilder.from_snippet(sample, title="Depth hit back-projection")
+            builder_hits.add_depth_hits(
+                depths=depth_batch["depths"],
+                poses=depth_batch["poses"],
+                camera=depth_batch["camera"],
+                stride=int(stride),
+                max_points=20000,
+            )
+            st.plotly_chart(builder_hits.finalize(), width="stretch")

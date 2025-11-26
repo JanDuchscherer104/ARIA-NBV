@@ -17,8 +17,9 @@ from pytorch3d.renderer import MeshRasterizer, RasterizationSettings  # type: ig
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from pytorch3d.structures import Meshes  # type: ignore[import-untyped]
 from torch import Tensor
-from trimesh import Trimesh
+from trimesh import Trimesh  # type: ignore[import-untyped]
 
+from ..data.mesh_cache import get_pytorch3d_mesh
 from ..utils import BaseConfig, Console, Verbosity, select_device
 
 if TYPE_CHECKING:
@@ -38,16 +39,13 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     device: str = "cuda"
     """Torch device to run rasterisation on (falls back to CPU if unavailable)."""
 
-    znear: float = 0.01
-    """Near clipping plane (metres)."""
-
     zfar: float = 20.0
     """Far clipping plane (metres); also used to fill miss pixels."""
 
     faces_per_pixel: int = 1
     """Number of faces stored per pixel; 1 = closest triangle only."""
 
-    cull_backfaces: bool = True
+    cull_backfaces: bool = False
     """If ``True`` drop triangles with normals pointing away from the camera.
 
     NBV cameras are typically *inside* closed meshes (rooms); backface culling
@@ -63,18 +61,6 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
 
     max_faces_per_bin: int | None = None
     """Performance knob mirroring ``RasterizationSettings.max_faces_per_bin``."""
-
-    two_sided: bool = True
-    """If ``True`` duplicate faces with reversed winding so interior walls remain visible."""
-
-    add_proxy_walls: bool = False
-    """If ``True`` add a thin bounding box shell when large wall areas are missing."""
-
-    proxy_wall_area_threshold: float = 0.2
-    """If existing faces cover < this fraction of the expected wall area, add proxy walls."""
-
-    proxy_eps: float = 0.05
-    """Epsilon (m) for detecting faces near scene bounds."""
 
     dtype: Literal["float32", "float16", "bfloat16"] = "float32"
     """Computation dtype; use float16/bfloat16 on CUDA for speed (may reduce z precision)."""
@@ -120,10 +106,11 @@ class Pytorch3DDepthRenderer:
     def render_depth(
         self,
         pose_world_cam: PoseTW,
-        mesh: Trimesh,
+        mesh: Trimesh | tuple[torch.Tensor, torch.Tensor],
         camera: CameraTW,
         *,
         frame_index: int | None = None,
+        mesh_cache_key: str | None = None,
     ) -> Tensor:
         """Render a depth map for a single candidate pose.
 
@@ -142,45 +129,62 @@ class Pytorch3DDepthRenderer:
             mesh=mesh,
             camera=camera,
             frame_index=frame_index,
+            mesh_cache_key=mesh_cache_key,
         )
         return batched[0]
 
     def render_batch(
         self,
         poses: PoseTW,
-        mesh: Trimesh,
+        mesh: Trimesh | tuple[torch.Tensor, torch.Tensor],
         camera: CameraTW,
         *,
         frame_index: int | None = None,
+        mesh_cache_key: str | None = None,
     ) -> Tensor:
         """Render depth for a batch of poses."""
 
-        cam_single = self._slice_camera(camera, frame_index)
-        width, height, fx, fy = self._camera_parameters(cam_single)
-        rotations, translations = self._pose_to_r_t(poses)
-        rotations = rotations.to(self.device)
-        translations = translations.to(self.device)
         dtype = {
             "float32": torch.float32,
             "float16": torch.float16,
             "bfloat16": torch.bfloat16,
         }[self.config.dtype]
 
-        mesh_struct = self._mesh_to_struct(
-            mesh,
-            batch_size=rotations.shape[0],
+        cam_single = self._slice_camera(camera, frame_index)
+        width, height, focal_length, principal_point, image_size = self._camera_intrinsics(cam_single, dtype=dtype)
+
+        poses_cw = poses.inverse().to(self.device)
+        self.console.dbg_summary("poses_cw", poses_cw)
+        rotations, translations = poses_cw.R, poses_cw.t
+        batch_size = rotations.shape[0]
+        focal_length = focal_length.expand(batch_size, -1)
+        principal_point = principal_point.expand(batch_size, -1)
+        image_size = image_size.expand(batch_size, -1)
+
+        # Build (and cache) PyTorch3D mesh structure
+        if isinstance(mesh, tuple):
+            verts_t, faces_t = mesh
+        else:
+            verts_t = torch.as_tensor(mesh.vertices, dtype=torch.float32, device=self.device)
+            faces_t = torch.as_tensor(mesh.faces, dtype=torch.int64, device=self.device)
+        mesh_struct_single = get_pytorch3d_mesh(
+            verts_t,
+            faces_t,
+            cache_key=mesh_cache_key or "p3d_mesh_cache",
+            device=self.device,
         )
+        mesh_struct = mesh_struct_single.extend(rotations.shape[0])
         if dtype != torch.float32:
             mesh_struct = mesh_struct.to(dtype=dtype)
-        focal, principal = self._perspective_params(camera, width, height)
+
         cameras = PerspectiveCameras(
             device=self.device,
             R=rotations,
             T=translations,
-            focal_length=focal,
-            principal_point=principal,
-            image_size=torch.tensor([[height, width]], device=self.device),
-            in_ndc=True,
+            focal_length=focal_length,
+            principal_point=principal_point,
+            image_size=image_size,
+            in_ndc=False,
         )
         raster_settings = RasterizationSettings(
             image_size=(int(height), int(width)),
@@ -232,63 +236,48 @@ class Pytorch3DDepthRenderer:
         idx = max(-data.shape[0], min(data.shape[0] - 1, idx))
         return camera[idx]
 
-    def _camera_parameters(self, camera: CameraTW) -> tuple[float, float, float, float]:
-        """Extract width, height, fx, fy as floats."""
-
-        size = camera.size.squeeze(0)
-        focals = camera.f.squeeze(0)
-        width = float(size[0].item())
-        height = float(size[1].item())
-        fx = float(focals[0].item())
-        fy = float(focals[1].item())
-        return width, height, fx, fy
-
-    def _perspective_params(
+    def _camera_intrinsics(
         self,
         camera: CameraTW,
-        width: float,
-        height: float,
-    ) -> tuple[Tensor, Tensor]:
-        """Convert CameraTW intrinsics to PyTorch3D-normalised parameters."""
+        *,
+        dtype: torch.dtype,
+    ) -> tuple[int, int, Tensor, Tensor, Tensor]:
+        """Return intrinsics ready for ``PerspectiveCameras``.
 
-        focal_vals = camera.f.reshape(-1, 2)
-        center_vals = camera.c.reshape(-1, 2)
-        fx = float(focal_vals[0, 0].item())
-        fy = float(focal_vals[0, 1].item())
-        cx = float(center_vals[0, 0].item())
-        cy = float(center_vals[0, 1].item())
-        fx_ndc = 2.0 * fx / width
-        fy_ndc = 2.0 * fy / height
-        px_ndc = -2.0 * (cx - width / 2.0) / width
-        py_ndc = 2.0 * (cy - height / 2.0) / height
-        focal = torch.tensor([[fx_ndc, fy_ndc]], device=self.device)
-        principal = torch.tensor([[px_ndc, py_ndc]], device=self.device)
-        return focal, principal
+        Args:
+            camera: Single-frame ``CameraTW`` on the target device.
+            dtype: Torch dtype to use for focal/principal/image_size tensors.
+
+        Returns:
+            Tuple of ``(width_px, height_px, focal_length, principal_point, image_size)`` where
+            the last three items are shaped ``(1, 2)`` on ``self.device`` with the provided dtype.
+        """
+
+        size = camera.size.reshape(-1, 2)[0].to(device=self.device)
+        width = int(size[0].item())
+        height = int(size[1].item())
+
+        focal_length = camera.f.reshape(-1, 2)[0].to(device=self.device, dtype=dtype).unsqueeze(0)
+        principal_point = camera.c.reshape(-1, 2)[0].to(device=self.device, dtype=dtype).unsqueeze(0)
+        image_size = torch.stack((size[1], size[0])).unsqueeze(0).to(dtype=dtype)
+
+        return width, height, focal_length, principal_point, image_size
 
     def _mesh_to_struct(
         self,
         mesh: Trimesh,
         batch_size: int,
+        *,
+        mesh_cache_key: str | None = None,
     ) -> Meshes:
-        """Convert ``trimesh`` mesh to a PyTorch3D ``Meshes`` batch."""
+        """Convert ``trimesh`` mesh to a cached PyTorch3D ``Meshes`` batch."""
 
         verts = torch.as_tensor(mesh.vertices, dtype=torch.float32, device=self.device)
         faces = torch.as_tensor(mesh.faces, dtype=torch.int64, device=self.device)
-        if self.config.two_sided:
-            faces_rev = faces[:, [0, 2, 1]]
-            faces = torch.cat([faces, faces_rev], dim=0)
-        mesh_struct = Meshes(verts=[verts], faces=[faces]).extend(batch_size)
-        return mesh_struct
-
-    def _pose_to_r_t(self, poses: PoseTW) -> tuple[Tensor, Tensor]:
-        """Convert ``T_world_camera`` into PyTorch3D view matrices."""
-
-        poses = poses.to(self.device)
-        rot_wc = poses.R
-        t_wc = poses.t
-        rot_cw = rot_wc.transpose(-1, -2)
-        t_cw = -(rot_cw @ t_wc.unsqueeze(-1)).squeeze(-1)
-        if rot_cw.ndim == 2:
-            rot_cw = rot_cw.unsqueeze(0)
-            t_cw = t_cw.unsqueeze(0)
-        return rot_cw, t_cw
+        mesh_struct = get_pytorch3d_mesh(
+            verts,
+            faces,
+            cache_key=mesh_cache_key or "p3d_mesh_cache",
+            device=self.device,
+        )
+        return mesh_struct.extend(batch_size)

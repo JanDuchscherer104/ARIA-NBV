@@ -50,6 +50,7 @@ dependencies = [
     "fast-simplification>=0.1.12",
     "rtree>=1.4.1",
     "pyembree>=0.1.12",
+    "power-spherical>=0.8.1",
 ]
 
     [project.scripts]

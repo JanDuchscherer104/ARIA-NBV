@@ -80,7 +80,6 @@ class CandidateContext(TypedDict):
 
     last_pose: PoseTW
     gt_mesh: Trimesh | None
-    mesh_p3d: "Meshes | None"
     mesh_verts: Tensor
     mesh_faces: Tensor
     occupancy_extent: Tensor | None

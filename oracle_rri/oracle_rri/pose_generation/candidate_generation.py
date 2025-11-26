@@ -6,9 +6,10 @@ planning in ASE scenes:
 1. Sample candidate camera centres on a spherical shell around the latest
    pose, using either area-uniform or forward-biased distributions in
    spherical coordinates.
-2. Orient each candidate to look back at the most recent pose using
+2. Orient each candidate to look *away* from the most recent pose using
    :func:`oracle_rri.utils.frames.view_axes_from_points`, consistent with the
-   EFM3D LUF camera convention (X-left, Y-up, Z-forward).
+   EFM3D LUF camera convention (X-left, Y-up, Z-forward) and zero roll via
+   ``world_up``.
 3. Apply a sequence of rules (see :mod:`oracle_rri.pose_generation.candidate_generation_rules`)
    that remove candidates which violate geometric constraints (too close to
    the mesh, path collisions, outside occupancy bounds, ...).
@@ -28,23 +29,22 @@ points from the camera frame into the VIO world frame.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Literal, Self
 
 import torch
 import trimesh
 from efm3d.aria import PoseTW
+from power_spherical import HypersphericalUniform
 from pydantic import AliasChoices, Field, field_validator, model_validator
-from pytorch3d.structures import Meshes  # type: ignore[import-untyped]
+from torch.nn import functional as F  # noqa: N812
 
+from ..configs.path_config import PathConfig
 from ..data.efm_views import EfmSnippetView
+from ..data.mesh_cache import MeshProcessSpec, ProcessedMesh, load_or_process_mesh
 from ..utils import BaseConfig, Console, Verbosity, select_device
-from .candidate_generation_rules import (
-    FreeSpaceRule,
-    MinDistanceToMeshRule,
-    PathCollisionRule,
-    Rule,
-    ShellSamplingRule,
-)
+from ..utils.frames import view_axes_from_points, world_up_tensor
+from .candidate_generation_rules import FreeSpaceRule, MinDistanceToMeshRule, PathCollisionRule, Rule
 from .types import CandidateContext, CandidateSamplingResult, CollisionBackend, SamplingStrategy
 
 
@@ -97,9 +97,13 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Camera index to use for candidate generation."""
 
     num_samples: int = 512
-    """Number of candidate poses to sample per `generate` call."""
+    """Number of candidate poses to return per `generate` call."""
+
+    oversample_factor: float = 2.0
+    """Oversampling multiplier before pruning (guards against rejections)."""
+
     max_resamples: int = 3
-    """Maximum rounds of resampling to replace invalid candidates."""
+    """Deprecated: kept for config compatibility; oversampling is preferred."""
     min_radius: float = 0.4
     """Minimum radius (m) for spherical-shell sampling around `last_pose`."""
     max_radius: float = 1.6
@@ -110,8 +114,18 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Maximum elevation angle (degrees) for sampled view directions."""
     azimuth_full_circle: bool = True
     """If True sample full 360deg azimuth; otherwise sample a half-sphere about forward axis."""
+
+    delta_azimuth_deg: float = 360.0
+    """Explicit azimuth span (degrees) centred on rig-forward.
+
+    Example: 360 → full sphere, 180 → half-sphere, 90 → ±45° about forward.
+    Takes precedence over ``azimuth_full_circle`` when < 360.
+    """
     sampling_strategy: SamplingStrategy = SamplingStrategy.SHELL_UNIFORM
     """Distribution strategy for yaw/pitch sampling (area-uniform or forward-biased)."""
+
+    kappa: float = 4.0
+    """Concentration for PowerSpherical forward sampling (higher = tighter)."""
 
     ensure_collision_free: bool = True
     """Enable straight-line path collision filtering.
@@ -127,7 +141,6 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     `PYEMBREE` uses `RayMeshIntersector` (if installed) for fast queries;
     `TRIMESH` falls back to the pure-Python trimesh ray engine.
     `P3D` uses a CUDA path built on PyTorch3D (sampled surface + KNN).
-    `EFM3D` uses torch-only geometry utilities from efm3d (CUDA-capable).
     """
 
     min_distance_to_mesh: float = 0.0
@@ -156,15 +169,16 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     step_clearance: float = 0.05
     """Step size (m) for distance checks along paths when required."""
 
-    cache_meshes: bool = True
-    """If True, cache per-mesh PyTorch3D structures for reuse within a process."""
+    world_up: torch.Tensor = Field(default_factory=lambda: world_up_tensor())
+    """World up direction (defaults to +Z in VIO coordinates)."""
+
     device: torch.device = Field(  # type: ignore[assignment]
         default_factory=lambda: select_device("auto", component="CandidateViewGenerator")
     )
     """Preferred torch device for vectorised operations (auto-resolves to CUDA when available)."""
 
     verbosity: Verbosity = Field(
-        default=Verbosity.NORMAL,
+        default=Verbosity.VERBOSE,
         validation_alias=AliasChoices("verbosity", "verbose"),
         description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
     )
@@ -236,7 +250,7 @@ class CandidateViewGenerator:
 
     def _build_default_rules(self) -> None:
         """Construct the default rule sequence based on the config."""
-        self.rules = [ShellSamplingRule(self.config)]
+        # Sampling happens centrally; rules only prune.
         if self.config.min_distance_to_mesh > 0:
             self.rules.append(MinDistanceToMeshRule(self.config))
         if self.config.ensure_collision_free:
@@ -247,12 +261,45 @@ class CandidateViewGenerator:
     def generate_from_typed_sample(self, sample: EfmSnippetView) -> CandidateSamplingResult:
         """Generate candidate poses using data from an :class:`EfmSnippetView`."""
         device = torch.device(self.config.device)
-        occupancy_extent = sample.get_occupancy_extend().to(device=device, dtype=torch.float32)
+        occ = sample.get_occupancy_extend()
+        occupancy_extent = occ.to(device=device, dtype=torch.float32) if occ is not None else None
         gt_mesh = sample.mesh
+        mesh_verts = sample.mesh_verts
+        mesh_faces = sample.mesh_faces
+
+        # Reuse processed mesh cache when possible.
+        if gt_mesh is not None:
+            bounds_min = (
+                occupancy_extent[[0, 2, 4]] if occupancy_extent is not None else torch.as_tensor(gt_mesh.bounds[0])
+            )
+            bounds_max = (
+                occupancy_extent[[1, 3, 5]] if occupancy_extent is not None else torch.as_tensor(gt_mesh.bounds[1])
+            )
+            spec = MeshProcessSpec(
+                scene_id=sample.scene_id,
+                snippet_id=sample.snippet_id,
+                bounds_min=bounds_min.tolist(),
+                bounds_max=bounds_max.tolist(),
+                margin_m=0.2,
+                simplify_ratio=None,
+                max_faces=None,
+                crop_min_keep_ratio=0.05,
+            )
+            proc: ProcessedMesh = load_or_process_mesh(
+                gt_mesh,
+                spec=spec,
+                paths=PathConfig(),
+                console=self.console,
+            )
+            gt_mesh = proc.mesh
+            mesh_verts = proc.verts.to(device=device)
+            mesh_faces = proc.faces.to(device=device)
 
         cam_view = sample.get_camera(self.config.camera_index)
 
         fov = cam_view.get_fov().to(device=device)  # F, 2
+        self.console.dbg_summary("camera_fov", fov)
+        self.console.plog({"fov": fov})
 
         last_pose = sample.trajectory.final_pose.to(device=device)
         self.console.log(
@@ -272,6 +319,8 @@ class CandidateViewGenerator:
         return self.generate(
             last_pose=last_pose,
             gt_mesh=gt_mesh,
+            mesh_verts=mesh_verts,
+            mesh_faces=mesh_faces,
             occupancy_extent=occupancy_extent,
             camera_fov=fov,
         )
@@ -280,6 +329,8 @@ class CandidateViewGenerator:
         self,
         last_pose: PoseTW,
         gt_mesh: trimesh.Trimesh | None = None,
+        mesh_verts: torch.Tensor | None = None,
+        mesh_faces: torch.Tensor | None = None,
         occupancy_extent: torch.Tensor | None = None,
         camera_fov: torch.Tensor | None = None,
     ) -> CandidateSamplingResult:
@@ -316,17 +367,18 @@ class CandidateViewGenerator:
             * ``shell_poses`` - Raw shell-sampled poses before masking,
               useful for visualisation.
         """
-
         device = self.config.device
-        mesh_p3d = None
-
-        mesh_verts = None
-        mesh_faces = None
         effective_backend = self.config.collision_backend
+
         if gt_mesh is not None:
-            mesh_verts = torch.as_tensor(gt_mesh.vertices, device=device, dtype=torch.float32)
-            mesh_faces = torch.as_tensor(gt_mesh.faces, device=device, dtype=torch.int64)
-            mesh_p3d = self._mesh_structures(mesh_verts, mesh_faces, cache_key=id(gt_mesh))
+            if mesh_verts is None:
+                mesh_verts = torch.as_tensor(gt_mesh.vertices, device=device, dtype=torch.float32)
+            else:
+                mesh_verts = mesh_verts.to(device=device, dtype=torch.float32)
+            if mesh_faces is None:
+                mesh_faces = torch.as_tensor(gt_mesh.faces, device=device, dtype=torch.int64)
+            else:
+                mesh_faces = mesh_faces.to(device=device, dtype=torch.int64)
 
             if device.type == "cpu" and self.config.collision_backend == CollisionBackend.P3D:
                 self.console.warn("P3D collision backend requested on CPU; This is very slow!")
@@ -348,137 +400,186 @@ class CandidateViewGenerator:
                 max_elev_deg = min(max_elev_deg, half_v)
                 az_half_range_deg = fov_x_deg / 2.0
 
+        # Apply explicit azimuth delta if set (<360)
+        if self.config.delta_azimuth_deg < 360:
+            az_cfg_half = self.config.delta_azimuth_deg / 2.0
+            az_half_range_deg = az_cfg_half if az_half_range_deg is None else min(az_half_range_deg, az_cfg_half)
+        elif not self.config.azimuth_full_circle:
+            az_half_range_deg = math.degrees(math.pi / 2) if az_half_range_deg is None else az_half_range_deg
+
+        # ------------------------------------------------------------------ sampling (positions unbiased)
+        n_seed = int(math.ceil(self.config.num_samples * self.config.oversample_factor))
+        self.console.log(f"Sampling {n_seed} raw candidates (target {self.config.num_samples}) on {device}")
+        poses_raw = self._sample_candidates(
+            last_pose=last_pose.to(device),
+            n=n_seed,
+            min_elev_deg=min_elev_deg,
+            max_elev_deg=max_elev_deg,
+            azimuth_half_range_deg=az_half_range_deg,
+        )
+
+        # ------------------------------------------------------------------ filtering
         ctx: CandidateContext = {
             "last_pose": last_pose.to(device),
             "gt_mesh": gt_mesh,
-            "mesh_p3d": mesh_p3d,
             "mesh_verts": mesh_verts,
             "mesh_faces": mesh_faces,
             "occupancy_extent": occupancy_extent if occupancy_extent is not None else self.config.occupancy_extent,
             "device": device,
-            "poses": torch.empty(0, 12, device=device),
-            "mask": torch.empty(0, dtype=torch.bool, device=device),
+            "poses": poses_raw,
+            "mask": torch.ones(len(poses_raw), dtype=torch.bool, device=device),
+            "collision_backend": effective_backend,
             "min_elev_deg": min_elev_deg,
             "max_elev_deg": max_elev_deg,
             "azimuth_half_range_deg": az_half_range_deg,
-            "collision_backend": effective_backend,
         }
 
-        poses_accum: list[torch.Tensor] = []
-        masks_accum: list[torch.Tensor] = []  # NOTE: store per-round stacked masks for debugging
-        shell_accum: list[PoseTW] = []
-        remaining = self.config.num_samples
-        attempts = 0
-        self.console.log(
-            f"Sampling {self.config.num_samples} candidates (max_resamples={self.config.max_resamples}) on {device}"
-        )
+        masks: list[torch.Tensor] = []
+        for rule in self.rules:
+            ctx = rule(ctx)
+            masks.append(ctx["mask"])
 
-        # Iteratively sample until we either collect ``num_samples`` valid
-        # candidates or exhaust the resampling budget.
-        while remaining > 0 and attempts < self.config.max_resamples:
-            # Seed a fresh batch of candidate pose slots and full mask.
-            ctx_batch = self._seed(ctx, remaining)
-            masks: list[torch.Tensor] = []
-            # Apply each rule in sequence; rules update ``poses`` and
-            # refine ``ctx['mask']`` in-place.
-            for rule in self.rules:
-                ctx_batch = rule(ctx_batch)
-                survivors = int(ctx_batch["mask"].sum().item())
-                self.console.dbg(
-                    f"Rule {rule.__class__.__name__}: {survivors}/{ctx_batch['mask'].numel()} candidates remain"
-                )
-                if survivors == 0:
-                    self.console.warn(
-                        f"Rule {rule.__class__.__name__} rejected all candidates in this round "
-                        f"(attempt {attempts + 1}/{self.config.max_resamples})."
-                    )
-                masks.append(ctx_batch["mask"])
-            # Preserve the raw sampled poses (before masking) for
-            # visualisation of the full candidate space.
-            shell_accum.append(ctx_batch["poses"].clone())
-            mask_valid = (
-                torch.stack(masks, dim=0).all(dim=0)
-                if masks
-                else torch.ones(ctx_batch["poses"].shape[0], dtype=torch.bool, device=device)
-            )
-            if mask_valid.any():
-                poses_accum.append(ctx_batch["poses"][mask_valid])
-            masks_accum.append(torch.stack(masks, dim=0))  # shape (num_rules, batch)
-            # Update the remaining quota and round counter.
-            remaining = self.config.num_samples - sum(p.shape[0] for p in poses_accum)
-            attempts += 1
-            self.console.dbg(f"Sampling attempt {attempts} complete; remaining quota {remaining}")
-
-        if poses_accum:
-            # `poses_accum` may contain `PoseTW` TensorWrappers; extract raw tensors
-            # before concatenation to avoid passing TensorWrapper objects into
-            # `PoseTW` again.
-            pose_tensors = [
-                p._data if isinstance(p, PoseTW) else p  # noqa: SLF001 - accessing protected attr for unwrap
-                for p in poses_accum
-            ]
-            poses_cat = torch.cat(pose_tensors, dim=0)[: self.config.num_samples]
-            mask_valid_out = torch.ones(poses_cat.shape[0], dtype=torch.bool, device=device)
-        else:
-            poses_cat = torch.zeros(self.config.num_samples, 12, device=device)
-            mask_valid_out = torch.zeros(self.config.num_samples, dtype=torch.bool, device=device)
-        poses_valid = PoseTW(poses_cat if isinstance(poses_cat, torch.Tensor) else poses_cat._data)  # type: ignore[arg-type]  # noqa: SLF001
-        shell_poses = (
-            torch.cat([p._data for p in shell_accum], dim=0) if shell_accum else torch.zeros(0, 12, device=device)
+        masks_stacked = (
+            torch.stack(masks, dim=0) if masks else torch.ones(1, len(poses_raw), device=device, dtype=torch.bool)
         )
-        # NOTE: make per-rule masks align with shell_poses for debugging which rule killed which sample.
-        masks_stacked = torch.cat(masks_accum, dim=1) if masks_accum else torch.zeros(len(self.rules), 0, device=device)
-        survivor_count = int(mask_valid_out.sum().item())
-        if survivor_count == 0:
+        mask_valid = masks_stacked.all(dim=0)
+        kept_idx = torch.where(mask_valid)[0][: self.config.num_samples]
+
+        if kept_idx.numel() == 0:
             self.console.warn("All candidate poses were rejected; returning zero-padded PoseTW batch.")
+            poses_valid = PoseTW(torch.zeros(self.config.num_samples, 12, device=device))
+            mask_valid_out = torch.zeros(self.config.num_samples, dtype=torch.bool, device=device)
+            masks_out = masks_stacked[:, :0]
         else:
-            self.console.log(f"Generated {survivor_count} valid candidates.")
-            self.console.dbg_summary("valid_pose_tensor", poses_cat[:survivor_count])
+            pose_tensors = poses_raw._data if isinstance(poses_raw, PoseTW) else poses_raw
+            pose_sel = pose_tensors[kept_idx]
+            poses_valid = PoseTW(pose_sel)
+            n_valid = pose_sel.shape[0]
+            self.console.dbg_summary("poses_valid", poses_valid)
+            mask_valid_out = torch.ones(n_valid, dtype=torch.bool, device=device)
+            masks_out = masks_stacked[:, kept_idx]
+            self.console.log(f"Generated {n_valid} valid candidates.")
+
+        shell_poses = poses_raw._data if isinstance(poses_raw, PoseTW) else poses_raw
+
         return {
             "poses": poses_valid,
             "mask_valid": mask_valid_out,
-            "masks": masks_stacked,
+            "masks": masks_out,
             "rule_names": [r.__class__.__name__ for r in self.rules],
             "shell_poses": shell_poses,
         }
 
-    # ------------------------------------------------------------------ rules
+    # ------------------------------------------------------------------ sampling helpers
 
-    def _mesh_structures(
-        self, mesh_verts: torch.Tensor, mesh_faces: torch.Tensor, cache_key: int
-    ) -> tuple[Meshes | None, torch.Tensor | None]:
-        """Return (Meshes, sampled_points) for PyTorch3D backend with caching."""
-        # TODO: should be handeled by sample so that we don't have to convert it multiple times
-        if self.config.collision_backend != CollisionBackend.P3D:
-            return None, None
+    def _sample_candidates(
+        self,
+        *,
+        last_pose: PoseTW,
+        n: int,
+        min_elev_deg: float,
+        max_elev_deg: float,
+        azimuth_half_range_deg: float | None,
+    ) -> PoseTW:
+        """Sample positions + orientations around ``last_pose``.
 
-        if self.config.cache_meshes:
-            cache = getattr(self, "_mesh_cache", None)
-            if cache is None:
-                cache = {}
-                self._mesh_cache = cache
-            cached = cache.get(cache_key)
-            if cached is not None:
-                return cached
-
-        mesh_p3d = Meshes(verts=[mesh_verts], faces=[mesh_faces])
-
-        if self.config.cache_meshes:
-            self._mesh_cache[cache_key] = mesh_p3d
-
-        return mesh_p3d
-
-    def _seed(self, ctx: CandidateContext, n: int) -> CandidateContext:
-        """Initialise pose tensor placeholders for a fresh sampling round.
-
-        This resets ``ctx['poses']`` to a zero tensor of shape ``(n, 12)``,
-        representing flattened :math:`[R \\mid t]` pose blocks, and sets
-        ``ctx['mask']`` to an all-True mask. Subsequent rules will fill
-        the pose tensor and progressively refine the mask.
+        Directions are drawn with `HypersphericalUniform` (uniform) or
+        `PowerSpherical` (forward-biased) and then rejected if they fall
+        outside the configured elevation/azimuth band. Each candidate is
+        oriented to look *away* from ``last_pose`` with roll fixed by
+        ``world_up``.
         """
-        ctx["poses"] = torch.zeros(n, 12, device=ctx["device"])
-        ctx["mask"] = torch.ones(n, dtype=torch.bool, device=ctx["device"])
-        return ctx
+
+        device = last_pose.device
+        dirs = self._sample_directions(
+            n=n,
+            device=device,
+            min_elev_deg=min_elev_deg,
+            max_elev_deg=max_elev_deg,
+            azimuth_half_range_deg=azimuth_half_range_deg,
+        )
+
+        # Radii (positions unbiased on shell)
+        r = (
+            torch.rand(len(dirs), device=device) * (self.config.max_radius - self.config.min_radius)
+            + self.config.min_radius
+        )
+        offsets_rig = dirs * r.unsqueeze(1)
+
+        # Transform to world frame
+        pos_world = last_pose.transform(offsets_rig)
+
+        # Orient to look away from last pose while keeping roll zero w.r.t world_up.
+        # Optionally apply a PowerSpherical bias to orientation (not positions).
+        view_dir = pos_world - last_pose.t.expand_as(pos_world)
+        view_dir = F.normalize(view_dir, dim=1)
+
+        if self.config.sampling_strategy == SamplingStrategy.FORWARD_GAUSSIAN and self.config.kappa > 0:
+            dist = HypersphericalUniform(dim=3, device=device) if self.config.kappa == 0 else None
+            # Draw biased directions around the outward vector using PowerSpherical.
+            from power_spherical import PowerSpherical  # local import to avoid unused when not used
+
+            dist = PowerSpherical(
+                loc=view_dir,
+                scale=torch.tensor(self.config.kappa, device=device, dtype=pos_world.dtype),
+            )
+            view_dir = dist.rsample()  # (N,3)
+            view_dir = F.normalize(view_dir, dim=1)
+
+        look_at = pos_world + view_dir
+        r_wc = view_axes_from_points(
+            from_pose=pos_world,
+            look_at=look_at,
+            world_up=self.config.world_up.to(device=device, dtype=pos_world.dtype),
+        )
+
+        poses_tw = PoseTW.from_Rt(r_wc, pos_world)
+        return poses_tw
+
+    def _sample_directions(
+        self,
+        *,
+        n: int,
+        device: torch.device,
+        min_elev_deg: float,
+        max_elev_deg: float,
+        azimuth_half_range_deg: float | None,
+        max_trials: int = 6,
+    ) -> torch.Tensor:
+        """Sample unit directions in rig frame using power_spherical distributions."""
+
+        collected: list[torch.Tensor] = []
+        min_elev = torch.deg2rad(torch.tensor(min_elev_deg, device=device))
+        max_elev = torch.deg2rad(torch.tensor(max_elev_deg, device=device))
+        az_half = math.pi if azimuth_half_range_deg is None else math.radians(azimuth_half_range_deg)
+
+        dist = HypersphericalUniform(dim=3, device=device)
+
+        for _ in range(max_trials):
+            batch = max(n - sum(t.shape[0] for t in collected), 0)
+            if batch <= 0:
+                break
+            # oversample within trial to counter rejection
+            batch = int(batch * 1.5) + 4
+            samples = dist.rsample((batch,))
+
+            elev = torch.asin(samples[:, 1])
+            az = torch.atan2(samples[:, 0], samples[:, 2])
+            mask = (elev >= min_elev) & (elev <= max_elev)
+            if az_half < math.pi:
+                mask &= az.abs() <= az_half
+
+            accepted = samples[mask]
+            if accepted.numel():
+                collected.append(accepted)
+            if sum(t.shape[0] for t in collected) >= n:
+                break
+
+        if not collected:
+            raise RuntimeError("Directional sampling failed to produce any candidates; relax elevation/azimuth bounds.")
+
+        dirs = torch.cat(collected, dim=0)[:n]
+        return dirs
 
 
 __all__ = [

@@ -23,6 +23,7 @@ from torch.utils.data import IterableDataset
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console, Verbosity
 from .efm_views import EfmSnippetView
+from .mesh_cache import MeshProcessSpec, load_or_process_mesh
 
 
 def _infer_ids(efm_dict: Mapping[str, Any], sequence_name: str | None = None) -> tuple[str, str]:
@@ -266,53 +267,6 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
             self._mesh_cache[scene_id] = mesh
         return mesh
 
-    def _prepare_mesh(
-        self,
-        mesh: trimesh.Trimesh,
-        bounds: tuple[torch.Tensor, torch.Tensor] | None,
-    ) -> tuple[trimesh.Trimesh, tuple[torch.Tensor, torch.Tensor] | None]:
-        """Crop (if bounds provided) then simplify once. Returns mesh + crop bounds."""
-
-        mesh_use = mesh.copy()
-        crop_bounds: tuple[torch.Tensor, torch.Tensor] | None = None
-
-        if bounds is not None:
-            margin = float(self.config.mesh_crop_margin_m or 0.0)
-            crop_bounds = (bounds[0] - margin, bounds[1] + margin)
-            if self.config.mesh_crop_margin_m is not None:
-                mesh_use = crop_mesh_with_bounds(
-                    mesh_use,
-                    bounds,
-                    self.config.mesh_crop_margin_m,
-                    max_faces=None,  # simplification handled below
-                    min_keep_ratio=self.config.mesh_crop_min_keep_ratio,
-                    console=self.console,
-                )
-
-        faces_before = mesh_use.faces.shape[0]
-        target_faces = faces_before
-
-        if self.config.mesh_simplify_ratio not in (None, 0):
-            target_faces = min(target_faces, int(faces_before * self.config.mesh_simplify_ratio))
-
-        if self.config.mesh_max_faces is not None:
-            target_faces = min(target_faces, int(self.config.mesh_max_faces))
-
-        if target_faces < mesh_use.faces.shape[0]:
-            mesh_use = mesh_use.simplify_quadric_decimation(face_count=target_faces)
-            self.console.dbg(
-                f"Simplified mesh from {faces_before} to {mesh_use.faces.shape[0]} faces (target={target_faces})."
-            )
-
-        if crop_bounds is None:
-            mesh_min, mesh_max = mesh_use.bounds
-            crop_bounds = (
-                torch.as_tensor(mesh_min, dtype=torch.float32),
-                torch.as_tensor(mesh_max, dtype=torch.float32),
-            )
-
-        return mesh_use, crop_bounds
-
     def _iter_efm_samples(self) -> Iterator[dict[str, Any]]:
         """Yield per-snippet EFM dicts from the WebDataset loader.
 
@@ -342,24 +296,50 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
             mesh_base = self._load_mesh(scene_id) if self.config.load_meshes else None
             mesh = mesh_base
             crop_bounds = None
+            mesh_verts = None
+            mesh_faces = None
+
+            bounds = infer_semidense_bounds(efm_dict) or _trajectory_bounds(efm_dict)
+
             if mesh_base is not None:
-                bounds = infer_semidense_bounds(efm_dict)
                 if bounds is None:
-                    bounds = _trajectory_bounds(efm_dict)
-                mesh, crop_bounds = self._prepare_mesh(mesh_base, bounds)
+                    raise ValueError(
+                        f"Unable to infer crop bounds for snippet {snippet_id} (scene {scene_id}) with mesh present."
+                    )
+
+                spec = MeshProcessSpec(
+                    scene_id=scene_id,
+                    snippet_id=str(snippet_id),
+                    bounds_min=bounds[0].tolist(),
+                    bounds_max=bounds[1].tolist(),
+                    margin_m=float(self.config.mesh_crop_margin_m or 0.0),
+                    simplify_ratio=self.config.mesh_simplify_ratio,
+                    max_faces=self.config.mesh_max_faces,
+                    crop_min_keep_ratio=self.config.mesh_crop_min_keep_ratio,
+                )
+
+                processed = load_or_process_mesh(mesh_base, spec, self.config.paths, console=self.console)
+                mesh = processed.mesh
+                crop_bounds = processed.bounds
+                mesh_verts = processed.verts
+                mesh_faces = processed.faces
+                mesh_cache_key = processed.spec_hash
             else:
-                bounds = infer_semidense_bounds(efm_dict) or _trajectory_bounds(efm_dict)
-                if bounds is not None:
-                    margin = float(self.config.mesh_crop_margin_m or 0.0)
-                    crop_bounds = (bounds[0] - margin, bounds[1] + margin)
-            if crop_bounds is None:
-                raise ValueError(f"Unable to infer crop bounds for snippet {snippet_id} (scene {scene_id}).")
+                if bounds is None:
+                    raise ValueError(f"Unable to infer crop bounds for snippet {snippet_id} (scene {scene_id}).")
+                margin = float(self.config.mesh_crop_margin_m or 0.0)
+                crop_bounds = (bounds[0] - margin, bounds[1] + margin)
+                mesh_cache_key = None
+
             sample = EfmSnippetView(
                 efm=efm_dict,
                 scene_id=scene_id,
                 snippet_id=snippet_id,
                 mesh=mesh,
                 crop_bounds=crop_bounds,
+                mesh_verts=mesh_verts,
+                mesh_faces=mesh_faces,
+                mesh_cache_key=mesh_cache_key,
             )
 
             yield sample

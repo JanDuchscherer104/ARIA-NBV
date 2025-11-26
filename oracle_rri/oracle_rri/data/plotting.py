@@ -469,7 +469,7 @@ class SnippetPlotBuilder:
 
         t_world_rig = traj.t_world_rig[traj_idx]  # PoseTW[K]
         t_cam_rig = cam_view.calib.T_camera_rig[idx]  # PoseTW[K]
-        t_world_cam = t_world_rig @ t_cam_rig.inverse()
+        t_world_cam = rotate_yaw_cw90(t_world_rig @ t_cam_rig.inverse())
 
         cam_centers = t_world_cam.t.detach().cpu().numpy()
         cam_axes = t_world_cam.R.transpose(-1, -2).detach().cpu().numpy()  # (K, 3, 3)

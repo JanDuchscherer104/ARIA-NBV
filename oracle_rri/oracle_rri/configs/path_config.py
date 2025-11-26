@@ -37,6 +37,9 @@ class PathConfig(SingletonConfig):
     ase_meshes: Path = Field(default_factory=lambda: Path(".data") / "ase_meshes")
     """Directory for downloaded ASE ground truth meshes."""
 
+    processed_meshes: Path = Field(default_factory=lambda: Path(".data") / "ase_meshes_processed")
+    """Directory for cropped/simplified meshes persisted for reuse."""
+
     external_dir: Path = Field(default=Path("external"))
 
     @classmethod
@@ -62,7 +65,16 @@ class PathConfig(SingletonConfig):
             raise ValueError(f"Configured project root '{path}' does not exist.")
         return path
 
-    @field_validator("checkpoints", "data_root", "configs_dir", "url_dir", "ase_meshes", "external_dir", mode="before")
+    @field_validator(
+        "checkpoints",
+        "data_root",
+        "configs_dir",
+        "url_dir",
+        "ase_meshes",
+        "processed_meshes",
+        "external_dir",
+        mode="before",
+    )
     @classmethod
     def _resolve_dirs(cls, value: str | Path, info: ValidationInfo) -> Path:
         path = cls._resolve_path(value, info)
@@ -115,6 +127,22 @@ class PathConfig(SingletonConfig):
             Path to mesh file (may not exist yet)
         """
         return self.ase_meshes / f"scene_ply_{scene_id}.ply"
+
+    def resolve_processed_mesh_path(self, scene_id: str, snippet_id: str | None, spec_hash: str) -> Path:
+        """Resolve path for a processed (cropped/simplified) mesh artifact.
+
+        Args:
+            scene_id: ASE scene identifier.
+            snippet_id: Optional snippet/shard identifier for disambiguation.
+            spec_hash: Short hash of the processing specification.
+
+        Returns:
+            Destination path where the processed mesh should be stored.
+        """
+
+        snippet = snippet_id.replace("/", "_") if snippet_id else "scene"
+        filename = f"scene_{scene_id}_{snippet}_{spec_hash}.ply"
+        return self.processed_meshes / filename
 
     def resolve_atek_data_dir(self, config_name: str = "efm") -> Path:
         """Resolve path to ATEK data directory for a config.

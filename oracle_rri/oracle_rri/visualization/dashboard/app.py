@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import traceback
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, cast
@@ -27,6 +28,24 @@ class DashboardApp:
     config: DashboardConfig
 
     def run(self) -> None:  # pragma: no cover - UI code
+        """Render the Streamlit dashboard with fail-soft error handling.
+
+        Any uncaught exception is surfaced inline with a full traceback rather
+        than crashing the app, so the session remains usable for debugging.
+        """
+        console = Console.with_prefix("streamlit_app")
+        try:
+            self._render_body(console)
+        except Exception as exc:  # pragma: no cover
+            trace = traceback.format_exc()
+            console.error(trace)
+            st.error("Unexpected error encountered. The session stays alive; see full traceback below.")
+            st.exception(exc)
+            with st.expander("Full traceback", expanded=True):
+                st.code(trace, language="text")
+            st.stop()
+
+    def _render_body(self, console: Console) -> None:  # pragma: no cover - UI code
         st.set_page_config(page_title="NBV Explorer", layout="wide")
         init_task_state()
         super_fast = st.sidebar.checkbox(
@@ -41,6 +60,7 @@ class DashboardApp:
             format_func=lambda v: v.name.title(),
             index=2,  # Default to VERBOSE
         )
+        console = console.set_verbosity(global_verbosity)
         perf_mode = st.sidebar.selectbox(
             "Performance mode (global)",
             ["auto", "gpu", "cpu"],
@@ -48,7 +68,6 @@ class DashboardApp:
             help="Controls default device preference across pages.",
         )
         set_performance_mode(perf_mode)
-        console = Console.with_prefix("streamlit_app").set_verbosity(global_verbosity)
 
         page = st.radio(
             "Select view",

@@ -5,7 +5,7 @@ This module contains *local* rules that operate on a shared
 populate candidate poses or prune them:
 
 * :class:`ShellSamplingRule` - draws candidate camera centres on a spherical
-  shell around the last pose and orients them to look back at the trajectory.
+  shell around the last pose and orients them to look away from the last pose.
 * :class:`MinDistanceToMeshRule` - enforces a minimum Euclidean distance
   between the camera centre and the GT mesh using
   [:class:`trimesh.proximity.ProximityQuery`](https://trimesh.org/trimesh.proximity.html#trimesh.proximity.ProximityQuery.signed_distance).
@@ -25,7 +25,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol
 
 import torch
-import trimesh
+import trimesh  # type: ignore[import-untyped]
 from efm3d.aria import PoseTW
 
 from oracle_rri.utils.frames import view_axes_from_points
@@ -98,14 +98,17 @@ class ShellSamplingRule:
         dev = ctx["device"]
         # 1) Sample radii r ~ U[min_radius, max_radius].
         r = torch.rand(n, device=dev) * (cfg.max_radius - cfg.min_radius) + cfg.min_radius
-        # 2) Sample azimuth angles, optionally clamped by camera FOV.
+        # 2) Sample azimuth angles around the rig forward axis (+Z in LUF).
+        #    Always centre at pi/2 so 0 rad points to -X, pi/2 to +Z (forward),
+        #    and pi to +X. Clamp span either by camera FOV (if provided) or by
+        #    config (full vs half sphere).
+        az_center = torch.pi / 2
         az_half_deg = ctx.get("azimuth_half_range_deg")
         if az_half_deg is not None:
             half_rad = torch.deg2rad(torch.tensor(az_half_deg, device=dev))
-            az_center = torch.pi / 2  # forward axis (z) in LUF frame
-            az = az_center + (torch.rand(n, device=dev) - 0.5) * 2 * half_rad
         else:
-            az = torch.rand(n, device=dev) * (2 * torch.pi if cfg.azimuth_full_circle else torch.pi)
+            half_rad = torch.pi if cfg.azimuth_full_circle else (torch.pi / 2)
+        az = az_center + (torch.rand(n, device=dev) - 0.5) * 2 * half_rad
         # 3) Convert (elev, az) to unit directions on the spherical cap using per-call overrides.
         min_elev_deg = ctx.get("min_elev_deg", cfg.min_elev_deg)
         max_elev_deg = ctx.get("max_elev_deg", cfg.max_elev_deg)
@@ -117,10 +120,11 @@ class ShellSamplingRule:
         # 5) Map local offsets into the VIO world frame.
         pos_world = pose_last.transform(pos_local)
 
-        # 6) Orient each candidate camera to look back at the last pose using
-        #    the shared LUF / VIO-aligned helper.
-        look_at = pose_last.t.expand_as(pos_world)
-        r_cam = view_axes_from_points(cam_pos=pos_world, look_at=look_at)
+        # 6) Orient each candidate camera to look along its sampled direction
+        #    (outwards from the last pose), not back at the last pose.
+        dir_world = pos_world - pose_last.t.expand_as(pos_world)
+        look_at = pos_world + dir_world
+        r_cam = view_axes_from_points(from_pose=pos_world, look_at=look_at)
         poses_tw = PoseTW.from_Rt(r_cam, pos_world)
         ctx["poses"] = poses_tw
         ctx["mask"] = torch.ones(n, dtype=torch.bool, device=dev)
@@ -188,7 +192,7 @@ class MinDistanceToMeshRule:
 
     * CPU path: uses :class:`trimesh.proximity.ProximityQuery.signed_distance`
       on the full :class:`trimesh.Trimesh`.
-    * GPU path: when ``collision_backend`` is ``P3D`` or ``EFM3D`` and a
+    * GPU path: when ``collision_backend`` is ``P3D`` and a
       vertex/face representation is available in the context, distances are
       computed on-device via :func:`_point_mesh_distance_efm3d` to avoid
       host-device transfers.
@@ -224,7 +228,7 @@ class MinDistanceToMeshRule:
         backend = ctx.get("collision_backend", self.config.collision_backend)
         positions = ctx["poses"].t  # (N,3)
 
-        if backend in (CollisionBackend.P3D, CollisionBackend.EFM3D) and ctx.get("mesh_verts") is not None:
+        if backend == CollisionBackend.P3D and ctx.get("mesh_verts") is not None:
             verts = ctx["mesh_verts"]
             faces = ctx["mesh_faces"]
             dists = point_mesh_distance(
@@ -236,11 +240,17 @@ class MinDistanceToMeshRule:
             return ctx
 
         # Evaluate signed distance at each candidate camera centre.
-        query = trimesh.proximity.ProximityQuery(mesh)
-        dist = query.signed_distance(positions.detach().cpu().numpy())
-        # Keep only candidates with distance strictly larger than the configured
-        # clearance threshold.
-        clear = torch.from_numpy(dist).to(mask.device) > self.config.min_distance_to_mesh
+        try:
+            query = trimesh.proximity.ProximityQuery(mesh)
+            dist = query.signed_distance(positions.detach().cpu().numpy())
+            clear = torch.from_numpy(dist).to(mask.device) > self.config.min_distance_to_mesh
+        except ModuleNotFoundError:
+            # rtree missing; fall back to unsigned point-mesh distance to avoid crashing
+            verts = torch.as_tensor(mesh.vertices, device=positions.device, dtype=torch.float32)
+            faces = torch.as_tensor(mesh.faces, device=positions.device, dtype=torch.int64)
+            dist = point_mesh_distance(positions, verts, faces)
+            clear = dist > self.config.min_distance_to_mesh
+
         ctx["mask"] = mask & clear
         return ctx
 
@@ -303,13 +313,11 @@ class PathCollisionRule:
         dists = torch.linalg.norm(dirs, dim=1).clamp(min=1e-6)
         dirs_norm = dirs / dists.unsqueeze(1)
 
-        if backend in (CollisionBackend.P3D) and ctx.get("mesh_verts") is not None:
+        if backend == CollisionBackend.P3D and ctx.get("mesh_verts") is not None:
             verts = ctx["mesh_verts"]
             faces = ctx["mesh_faces"]
             steps = max(2, int(self.config.ray_subsample))
-            start = max(self.config.step_clearance / dists.max().item(), 1e-3)
-            start = min(start, 1.0)
-            t_vals = torch.linspace(start, 1.0, steps, device=targets.device)
+            t_vals = torch.linspace(0.0, 1.0, steps, device=targets.device)
             pts = origin.view(1, 1, 3) + dirs_norm.unsqueeze(1) * (t_vals.view(1, -1, 1) * dists.view(-1, 1, 1))
             pts_flat = pts.reshape(-1, 3)
             dists_pts = point_mesh_distance(

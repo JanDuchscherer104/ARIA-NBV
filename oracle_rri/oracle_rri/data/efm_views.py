@@ -378,6 +378,13 @@ class EfmSnippetView:
     crop_bounds: tuple[torch.Tensor, torch.Tensor] | None = None
     """Optional `(min, max)` world-space AABB used for mesh cropping / occupancy."""
 
+    mesh_verts: torch.Tensor | None = None
+    """Optional cached mesh vertices tensor (float32, device-agnostic)."""
+    mesh_faces: torch.Tensor | None = None
+    """Optional cached mesh faces tensor (int64)."""
+    mesh_cache_key: str | None = None
+    """Stable key (spec hash) for shared mesh caches across components."""
+
     # ------------------------------------------------------------------
     # Cameras
     # ------------------------------------------------------------------
@@ -524,7 +531,21 @@ class EfmSnippetView:
         cb = self.crop_bounds
         if cb is not None:
             cb = (cb[0].to(target_device), cb[1].to(target_device))
-        return replace(self, efm=moved, mesh=self.mesh, crop_bounds=cb)
+        mv = self.mesh_verts
+        mf = self.mesh_faces
+        if mv is not None:
+            mv = mv.to(target_device)
+        if mf is not None:
+            mf = mf.to(target_device)
+        return replace(
+            self,
+            efm=moved,
+            mesh=self.mesh,
+            crop_bounds=cb,
+            mesh_verts=mv,
+            mesh_faces=mf,
+            mesh_cache_key=self.mesh_cache_key,
+        )
 
     def __repr__(self) -> str:  # pragma: no cover
         base = {

@@ -8,7 +8,7 @@ import torch
 from ...data import AseEfmDatasetConfig
 from ...pose_generation import CandidateViewGeneratorConfig
 from ...pose_generation.types import CollisionBackend, SamplingStrategy
-from ...rendering import CandidateDepthRendererConfig, Efm3dDepthRendererConfig, Pytorch3DDepthRendererConfig
+from ...rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
 from ...utils import Verbosity
 
 
@@ -93,10 +93,21 @@ def candidate_config_ui(
     )
 
     num_samples = ui.slider("num_samples", 2, 512, num_samples_default, step=2)
+    oversample = ui.slider("oversample_factor", 1.0, 4.0, float(default.oversample_factor), step=0.25)
     min_radius = ui.slider("min_radius (m)", 0.1, 2.0, float(default.min_radius), step=0.05)
     max_radius = ui.slider("max_radius (m)", 0.2, 3.0, float(default.max_radius), step=0.05)
-    min_elev = ui.slider("min_elev_deg", -45.0, 0.0, float(default.min_elev_deg), step=1.0)
-    max_elev = ui.slider("max_elev_deg", 0.0, 75.0, float(default.max_elev_deg), step=1.0)
+    min_elev = ui.slider("min_elev_deg", -90.0, 0.0, float(default.min_elev_deg), step=1.0)
+    max_elev = ui.slider("max_elev_deg", 0.0, 90.0, float(default.max_elev_deg), step=1.0)
+    az_full = ui.checkbox("azimuth_full_circle", value=default.azimuth_full_circle)
+    delta_az = ui.slider(
+        "delta_azimuth_deg",
+        min_value=30.0,
+        max_value=360.0,
+        value=float(default.delta_azimuth_deg),
+        step=5.0,
+        help="Angular span around forward; 360=full sphere, 90=±45°.",
+    )
+    kappa = ui.slider("orientation kappa (PowerSpherical)", 0.0, 16.0, float(default.kappa), step=0.5)
     ensure_collision_free = ui.checkbox("ensure_collision_free", value=default.ensure_collision_free)
 
     ensure_free_space = ui.checkbox("ensure_free_space", value=default.ensure_free_space)
@@ -111,11 +122,15 @@ def candidate_config_ui(
     updated = default.model_copy(
         update={
             "num_samples": int(num_samples),
+            "oversample_factor": float(oversample),
             "min_radius": float(min_radius),
             "max_radius": float(max_radius),
             "min_elev_deg": float(min_elev),
             "max_elev_deg": float(max_elev),
+            "azimuth_full_circle": bool(az_full),
+            "delta_azimuth_deg": float(delta_az),
             "sampling_strategy": sampling_choice,
+            "kappa": float(kappa),
             "min_distance_to_mesh": float(min_distance),
             "ensure_collision_free": ensure_collision_free,
             "collision_backend": collision_choice,
@@ -139,12 +154,19 @@ def renderer_config_ui(
     perf_mode: str = "auto",
 ) -> CandidateDepthRendererConfig:
     ui.subheader("Depth Renderer")
-    backend_options = ["PyTorch3D (raster)", "cpu (trimesh rays)"]
-    default_backend_idx = 0 if isinstance(default.renderer, Pytorch3DDepthRendererConfig) else 1
-    backend_choice = ui.selectbox("backend", backend_options, index=default_backend_idx)
+    ui.text(str(type(ui)))
+    backend_options = ["PyTorch3D (raster)"]
+    ui.selectbox("backend", backend_options, index=0)
     max_candidates_default = 2 if super_fast else (default.max_candidates if default.max_candidates is not None else 4)
     max_candidates = ui.slider("max_candidates", 1, 16, max_candidates_default)
-    res_scale = ui.slider("Render resolution scale", 0.1, 1.0, 0.25 if super_fast else 1.0, step=0.05)
+    res_scale = ui.slider(
+        "Render resolution scale (×H, ×W)",
+        0.1,
+        4.0,
+        0.5 if super_fast else 1.0,
+        step=0.05,
+        help="Scales both height and width before rendering; >1 upsamples, <1 downsamples.",
+    )
     renderer_device_options = ["global (perf mode)", "cpu", "cuda"]
     default_device = str(getattr(default.renderer, "device", "cuda" if torch.cuda.is_available() else "cpu"))
     if default_device not in ("cpu", "cuda"):
@@ -160,25 +182,17 @@ def renderer_config_ui(
         renderer_device = perf_mode
     zfar = ui.slider("zfar (m)", 5.0, 50.0, default.renderer.zfar, step=1.0)
     debug_flag = ui.checkbox("Debug (renderer)", value=is_debug)
-    if backend_choice.startswith("pytorch3d"):
-        faces_default = (
-            default.renderer.faces_per_pixel if isinstance(default.renderer, Pytorch3DDepthRendererConfig) else 1
-        )
-        faces_pp = ui.slider("faces_per_pixel", 1, 4, faces_default)
-        renderer_cfg = Pytorch3DDepthRendererConfig(
-            device=renderer_device,
-            zfar=float(zfar),
-            faces_per_pixel=int(faces_pp),
-            is_debug=debug_flag,
-        )
-    else:
-        chunk_rays = ui.slider("chunk_rays", 50_000, 500_000, 200_000, step=50_000)
-        renderer_cfg = Efm3dDepthRendererConfig(
-            device=renderer_device,
-            zfar=float(zfar),
-            chunk_rays=int(chunk_rays),
-            is_debug=debug_flag,
-        )
+    faces_default = (
+        default.renderer.faces_per_pixel if isinstance(default.renderer, Pytorch3DDepthRendererConfig) else 1
+    )
+    faces_pp = ui.slider("faces_per_pixel", 1, 4, faces_default)
+    renderer_cfg = Pytorch3DDepthRendererConfig(
+        device=renderer_device,
+        zfar=float(zfar),
+        faces_per_pixel=int(faces_pp),
+        is_debug=debug_flag,
+        verbosity=verbosity,
+    )
     return default.model_copy(
         update={
             "max_candidates": int(max_candidates),

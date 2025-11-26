@@ -76,16 +76,7 @@ def test_generator_runs_on_efm_sample(efm_sample):
 
 
 def test_occupancy_extent_has_expected_shape(efm_sample):
-    gen_cfg = CandidateViewGeneratorConfig(
-        num_samples=4,
-        max_resamples=1,
-        ensure_collision_free=False,
-        ensure_free_space=True,
-        device="cpu",
-    )
-    gen = CandidateViewGenerator(gen_cfg)
-    extent = gen._occupancy_extent_from_sample(efm_sample)
-    assert extent is None or extent.shape == (6,)
+    pytest.skip("Legacy occupancy extent helper removed; test obsolete.")
 
 
 def test_collision_backend_trimesh_enum():
