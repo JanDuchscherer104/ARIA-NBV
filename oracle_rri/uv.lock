@@ -2313,6 +2313,7 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "debugpy" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -2332,6 +2333,7 @@ pytorch3d = [
 
 [package.metadata]
 requires-dist = [
+    { name = "debugpy", marker = "extra == 'dev'", specifier = ">=1.8.17" },
     { name = "devtools", specifier = ">=0.12.2" },
     { name = "efm3d", editable = "../external/efm3d" },
     { name = "einops", specifier = "==0.8.0" },

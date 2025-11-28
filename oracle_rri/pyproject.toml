@@ -55,7 +55,8 @@ dependencies = [
 
     [project.scripts]
     nbv-downloader = "oracle_rri.data.downloader:main"
-    nbv-viz        = "oracle_rri.streamlit_app:streamlit_entry"
+    nbv-st         = "oracle_rri.streamlit_app:streamlit_entry"
+    nbv-st-dbg     = "oracle_rri.streamlit_app:streamlit_entry"
 
     [project.optional-dependencies]
     dev = [
@@ -64,6 +65,7 @@ dependencies = [
         "ruff>=0.1.0",
         "mypy>=1.0.0",
         "syrenka>=0.5.7",
+        "debugpy>=1.8.17",
     ]
 
     # PyTorch3D requires torch to be installed first, so it's an extra

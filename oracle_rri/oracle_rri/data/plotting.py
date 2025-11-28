@@ -558,66 +558,6 @@ class SnippetPlotBuilder:
             include_center=include_center,
         )
 
-    def add_sampling_shell(
-        self,
-        *,
-        center: np.ndarray | torch.Tensor | PoseTW,
-        min_radius: float,
-        max_radius: float,
-        min_elev_deg: float,
-        max_elev_deg: float,
-        azimuth_full_circle: bool,
-        name: str = "Sampling band",
-        band_color: str = "rgba(80,120,255,0.9)",
-        band_opacity: float = 0.6,
-        samples: torch.Tensor | np.ndarray | None = None,
-        sample_n: int | None = None,
-    ) -> "SnippetPlotBuilder":
-        """Add a spherical cap surface and optional sample points."""
-
-        center_np = self._center_from_input(center)
-        u = np.linspace(0, (2 if azimuth_full_circle else 1) * np.pi, 60)
-        v = np.radians(np.linspace(min_elev_deg, max_elev_deg, 15))
-        uu, vv = np.meshgrid(u, v)
-        r_mid = (min_radius + max_radius) * 0.5
-        xs = center_np[0] + r_mid * np.cos(uu) * np.cos(vv)
-        ys = center_np[1] + r_mid * np.sin(uu) * np.cos(vv)
-        zs = center_np[2] + r_mid * np.sin(vv)
-        grid_pts = np.stack([xs, ys, zs], axis=-1).reshape(-1, 3)
-        self._update_scene_ranges(grid_pts)
-
-        self.fig.add_trace(
-            go.Surface(
-                x=xs,
-                y=ys,
-                z=zs,
-                showscale=False,
-                opacity=band_opacity,
-                surfacecolor=np.zeros_like(xs),
-                name=name,
-                colorscale=[[0, band_color], [1, band_color]],
-                contours={
-                    "x": {"show": True, "color": band_color, "width": 2, "highlightwidth": 4},
-                    "y": {"show": True, "color": band_color, "width": 2, "highlightwidth": 4},
-                    "z": {"show": True, "color": band_color, "width": 2, "highlightwidth": 4},
-                },
-                hoverinfo="skip",
-            )
-        )
-
-        self.add_points(center_np.reshape(1, 3), name="last pose", color="black", size=6, opacity=1.0)
-
-        if samples is not None:
-            pts = _pose_positions(samples) if isinstance(samples, torch.Tensor) else np.asarray(samples)
-            if pts.ndim == 1:
-                pts = pts.reshape(1, -1)
-            if sample_n is not None and pts.shape[0] > sample_n:
-                idx = np.linspace(0, pts.shape[0] - 1, num=sample_n, dtype=int)
-                pts = pts[idx]
-            if pts.size > 0:
-                self.add_points(pts, name="Shell samples", color="royalblue", size=3, opacity=0.5)
-        return self
-
     def _pose_list_from_input(self, poses: Sequence[PoseTW] | PoseTW | torch.Tensor) -> list[PoseTW]:
         if isinstance(poses, PoseTW):
             mat = poses.matrix3x4

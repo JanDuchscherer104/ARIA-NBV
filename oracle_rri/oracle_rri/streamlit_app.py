@@ -13,7 +13,7 @@ def main() -> None:  # pragma: no cover - Streamlit runner
 
 
 def streamlit_entry() -> None:  # pragma: no cover - console script
-    """Launch via `nbv-viz` console entry."""
+    """Launch via `nbv-st` console entry."""
 
     import sys
     from pathlib import Path

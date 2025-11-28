@@ -301,6 +301,7 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
 
             bounds = infer_semidense_bounds(efm_dict) or _trajectory_bounds(efm_dict)
 
+            mesh_specs = None
             if mesh_base is not None:
                 if bounds is None:
                     raise ValueError(
@@ -324,6 +325,7 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
                 mesh_verts = processed.verts
                 mesh_faces = processed.faces
                 mesh_cache_key = processed.spec_hash
+                mesh_specs = spec
             else:
                 if bounds is None:
                     raise ValueError(f"Unable to infer crop bounds for snippet {snippet_id} (scene {scene_id}).")
@@ -340,6 +342,7 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
                 mesh_verts=mesh_verts,
                 mesh_faces=mesh_faces,
                 mesh_cache_key=mesh_cache_key,
+                mesh_specs=mesh_specs,
             )
 
             yield sample

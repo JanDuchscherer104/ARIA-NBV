@@ -26,12 +26,33 @@ from ...pose_generation.plotting import (
     plot_position_polar,
     plot_position_sphere,
     plot_rule_masks,
-    plot_sampling_shell,
 )
 from ...pose_generation.types import CandidateSamplingResult
 from ...rendering.candidate_depth_renderer import CandidateDepthBatch
 from ...rendering.plotting import RenderingPlotBuilder, depth_grid, depth_histogram, hit_ratio_bar
 from .state import STATE_KEYS, get
+
+
+def _cand_attr(candidates, name: str, default=None):
+    if hasattr(candidates, name):
+        return getattr(candidates, name)
+    return candidates.get(name, default)
+
+
+def _cand_poses(candidates):
+    return _cand_attr(candidates, "poses")
+
+
+def _cand_shell(candidates):
+    return _cand_attr(candidates, "shell_poses")
+
+
+def _cand_masks(candidates):
+    return _cand_attr(candidates, "masks", {})
+
+
+def _cand_mask_valid(candidates):
+    return _cand_attr(candidates, "mask_valid")
 
 
 def pose_world_cam(sample: EfmSnippetView, cam_view: EfmCameraView, frame_idx: int):
@@ -234,17 +255,26 @@ def render_data_page(sample: EfmSnippetView, *, crop_margin: float | None = None
 
 
 def rejected_pose_tensor(candidates: CandidateSamplingResult) -> torch.Tensor | None:
-    masks = candidates.get("masks")
-    shell_poses = candidates.get("shell_poses")
-    if masks is None or shell_poses is None or masks.numel() == 0 or shell_poses.numel() == 0:
+    masks = _cand_masks(candidates)
+    shell_poses = _cand_shell(candidates)
+    if masks is None or shell_poses is None:
         return None
-    mask_valid_shell = masks.all(dim=0)
-    if mask_valid_shell.shape[0] != shell_poses.shape[0]:
+    if isinstance(masks, dict):
+        if len(masks) == 0:
+            return None
+        masks_tensor = torch.stack(list(masks.values()))
+    else:
+        masks_tensor = masks
+    shell_tensor = shell_poses.tensor() if hasattr(shell_poses, "tensor") else shell_poses
+    if masks_tensor.numel() == 0 or shell_tensor.numel() == 0:
+        return None
+    mask_valid_shell = masks_tensor.all(dim=0)
+    if mask_valid_shell.shape[0] != shell_tensor.shape[0]:
         return None
     rejected_mask = ~mask_valid_shell
     if not rejected_mask.any():
         return None
-    return shell_poses[rejected_mask]
+    return shell_tensor[rejected_mask]
 
 
 def render_candidates_page(
@@ -258,69 +288,61 @@ def render_candidates_page(
     last_pose_rig = sample.trajectory.final_pose
     last_center = last_pose_rig.t.detach().cpu().numpy()
 
+    poses = _cand_poses(candidates)
+    shell_poses = _cand_shell(candidates)
+
     st.header("Candidate Poses")
     with st.status("Building candidate plots...", expanded=False):
-        cand_fig = plot_candidates(
-            snippet=sample, poses=candidates["poses"], title="Candidate positions", center=last_center
-        )
-        shell_fig = plot_sampling_shell(
-            snippet=sample,
-            shell_poses=candidates["shell_poses"],
-            last_pose=last_pose_rig,
-            min_radius=float(cand_cfg.min_radius),
-            max_radius=float(cand_cfg.max_radius),
-            min_elev_deg=float(cand_cfg.min_elev_deg),
-            max_elev_deg=float(cand_cfg.max_elev_deg),
-            azimuth_full_circle=bool(cand_cfg.azimuth_full_circle),
-        )
+        cand_fig = plot_candidates(snippet=sample, poses=poses, title="Candidate positions", center=last_center)
     st.plotly_chart(cand_fig, width="stretch")
-    st.plotly_chart(shell_fig, width="stretch")
 
     # Direction distributions
-    shell_positions = candidates.get("shell_poses")
+    shell_positions = shell_poses.tensor() if hasattr(shell_poses, "tensor") else shell_poses
     if shell_positions is not None and shell_positions.numel() > 0:
-        from ...data.plotting import rotate_yaw_cw90
+        shell_pts_world = shell_positions[:, 9:12]
+        last_center_t = torch.as_tensor(last_center, device=shell_pts_world.device, dtype=shell_pts_world.dtype)
+        offsets_world = shell_pts_world - last_center_t
 
-        shell_positions = rotate_yaw_cw90(PoseTW(shell_positions)).tensor()
-        shell_pts = shell_positions[:, 9:12]
-        # Directions expressed in last_pose (rig) frame
-        dirs_world = shell_pts - torch.as_tensor(last_center, device=shell_pts.device, dtype=shell_pts.dtype)
-        r_wr = last_pose_rig.R.to(dirs_world.device)  # world←rig
-        dirs = dirs_world @ r_wr.transpose(-1, -2)
-        dirs = dirs / (dirs.norm(dim=1, keepdim=True) + 1e-8)
-        offsets_rig = dirs_world @ r_wr.transpose(-1, -2)
+        r_wr = last_pose_rig.R.to(offsets_world.device)
+        if r_wr.ndim == 3:
+            r_wr = r_wr[0]
+        offsets_rig = offsets_world @ r_wr  # world -> rig
+        dirs_rig = offsets_rig / (offsets_rig.norm(dim=1, keepdim=True) + 1e-8)
+
         with st.expander("Sampling distributions", expanded=False):
             col1, col2 = st.columns(2)
             with col1:
-                st.plotly_chart(plot_direction_polar(dirs), width="stretch")
+                st.plotly_chart(plot_direction_polar(dirs_rig), width="stretch")
             with col2:
-                st.plotly_chart(plot_direction_sphere(dirs, show_axes=True), width="stretch")
+                st.plotly_chart(plot_direction_sphere(dirs_rig, show_axes=True), width="stretch")
         with st.expander("Position distributions (rig frame)", expanded=False):
             colp1, colp2 = st.columns(2)
             with colp1:
-                st.plotly_chart(plot_position_polar(shell_positions), width="stretch")
+                st.plotly_chart(plot_position_polar(offsets_rig), width="stretch")
             with colp2:
-                st.plotly_chart(plot_position_sphere(shell_positions, show_axes=True), width="stretch")
+                st.plotly_chart(plot_position_sphere(offsets_rig, show_axes=True), width="stretch")
 
     # Rule masks overlay
-    masks = candidates.get("masks")
-    if masks is not None and masks.numel() > 0:
+    masks = _cand_masks(candidates)
+    if masks is not None and ((isinstance(masks, dict) and len(masks) > 0) or getattr(masks, "numel", lambda: 0)() > 0):
         with st.expander("Rule-wise pruning", expanded=False):
+            masks_tensor = torch.stack(list(masks.values())) if isinstance(masks, dict) else masks
             mask_fig = plot_rule_masks(
                 snippet=sample,
-                shell_poses=candidates["shell_poses"],
-                masks=masks,
-                rule_names=candidates.get("rule_names", []),
+                shell_poses=shell_positions,
+                masks=masks_tensor,
+                rule_names=list(masks.keys()) if isinstance(masks, dict) else [],
             )
             st.plotly_chart(mask_fig, width="stretch")
 
-    if candidates["mask_valid"].sum() == 0:
+    mask_valid = _cand_mask_valid(candidates)
+    if mask_valid is None or mask_valid.sum() == 0:
         st.warning("All candidates were rejected; frustum plot omitted.")
     else:
         with st.status("Rendering frustums...", expanded=False):
             frust_fig = plot_candidate_frusta(
                 snippet=sample,
-                poses=candidates["poses"],
+                poses=poses,
                 camera_view=sample.camera_rgb,
                 frustum_scale=frustum_scale,
                 max_frustums=max_frustums,
@@ -344,7 +366,7 @@ def render_candidates_page(
     # Axes sanity check
     with st.expander("Candidate axes (roll/yaw check)", expanded=False):
         st.plotly_chart(
-            plot_candidate_axes(snippet=sample, poses=candidates["poses"], max_axes=30),
+            plot_candidate_axes(snippet=sample, poses=poses, max_axes=30),
             width="stretch",
         )
 

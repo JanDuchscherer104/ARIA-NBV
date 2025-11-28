@@ -19,6 +19,9 @@ import trimesh  # type: ignore[import-untyped]
 from ..configs.path_config import PathConfig
 from ..utils import Console
 
+if False:  # pragma: no cover - import guard for type checking without runtime dep
+    from .efm_views import EfmSnippetView
+
 
 @dataclass(slots=True)
 class MeshProcessSpec:
@@ -226,4 +229,126 @@ def get_pytorch3d_mesh(
     return mesh_struct
 
 
-__all__ = ["MeshProcessSpec", "ProcessedMesh", "load_or_process_mesh", "get_pytorch3d_mesh"]
+# ---------------------------------------------------------------------------
+# Snippet-centric helpers
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class MeshArtifact:
+    """Bundle linking spec, processed mesh, and optional PyTorch3D struct."""
+
+    spec: MeshProcessSpec
+    processed: ProcessedMesh
+    p3d: Any | None = None
+
+
+def mesh_from_snippet(
+    sample: "EfmSnippetView",
+    *,
+    paths: PathConfig | None = None,
+    device: torch.device | None = None,
+    want_p3d: bool = False,
+    meshes_cls: Any | None = None,
+    console: Console | None = None,
+) -> MeshArtifact:
+    """Materialise mesh assets for a snippet using its cached spec.
+
+    - Prefers existing ``sample.mesh_verts/faces`` tensors.
+    - Falls back to loading the processed mesh from disk using the snippet's
+      ``mesh_cache_key``.
+    - As a last resort, re-processes ``sample.mesh`` with the stored spec.
+
+    Args:
+        sample: Snippet view containing mesh metadata.
+        paths: Optional :class:`PathConfig` override; defaults to singleton.
+        device: Optional target device for returned tensors / PyTorch3D struct.
+        want_p3d: Build and return a PyTorch3D ``Meshes`` instance.
+        meshes_cls: Optional override for the ``Meshes`` class (testing).
+        console: Optional logger.
+
+    Returns:
+        MeshArtifact with processed mesh, spec, and optional PyTorch3D struct.
+    """
+
+    if sample.mesh_specs is None:
+        raise ValueError("EfmSnippetView.mesh_specs is required to load meshes.")
+
+    paths = paths or PathConfig()
+    spec = sample.mesh_specs
+    cache_key = sample.mesh_cache_key or spec.hash()
+
+    verts: torch.Tensor | None = sample.mesh_verts
+    faces: torch.Tensor | None = sample.mesh_faces
+    mesh_obj = sample.mesh
+
+    if verts is None or faces is None:
+        proc_path = paths.resolve_processed_mesh_path(spec.scene_id, spec.snippet_id, cache_key)
+        if proc_path.exists():
+            mesh_obj = trimesh.load(proc_path, process=False)
+            assert isinstance(mesh_obj, trimesh.Trimesh)
+            verts = torch.as_tensor(mesh_obj.vertices, dtype=torch.float32)
+            faces = torch.as_tensor(mesh_obj.faces, dtype=torch.int64)
+            processed = ProcessedMesh(
+                mesh=mesh_obj,
+                bounds=(
+                    torch.as_tensor(spec.bounds_min, dtype=torch.float32),
+                    torch.as_tensor(spec.bounds_max, dtype=torch.float32),
+                ),
+                verts=verts,
+                faces=faces,
+                cache_hit=True,
+                path=proc_path,
+                spec_hash=cache_key,
+            )
+        else:
+            if mesh_obj is None:
+                raise ValueError("Snippet has no mesh attached and no cached processed mesh on disk.")
+            processed = load_or_process_mesh(mesh_obj, spec=spec, paths=paths, console=console)
+            mesh_obj = processed.mesh
+            verts = processed.verts
+            faces = processed.faces
+    else:
+        processed = ProcessedMesh(
+            mesh=mesh_obj if mesh_obj is not None else trimesh.Trimesh(vertices=verts, faces=faces),
+            bounds=(
+                torch.as_tensor(spec.bounds_min, dtype=torch.float32),
+                torch.as_tensor(spec.bounds_max, dtype=torch.float32),
+            ),
+            verts=verts,
+            faces=faces,
+            cache_hit=True,
+            path=paths.resolve_processed_mesh_path(spec.scene_id, spec.snippet_id, cache_key),
+            spec_hash=cache_key,
+        )
+
+    if device is not None:
+        verts = verts.to(device=device)
+        faces = faces.to(device=device)
+        processed = ProcessedMesh(
+            mesh=processed.mesh,
+            bounds=processed.bounds,
+            verts=verts,
+            faces=faces,
+            cache_hit=processed.cache_hit,
+            path=processed.path,
+            spec_hash=processed.spec_hash,
+        )
+
+    p3d_struct = None
+    if want_p3d:
+        p3d_struct = get_pytorch3d_mesh(
+            verts=verts, faces=faces, cache_key=cache_key, device=device, meshes_cls=meshes_cls
+        )
+
+    return MeshArtifact(spec=spec, processed=processed, p3d=p3d_struct)
+
+
+__all__ = [
+    "MeshProcessSpec",
+    "ProcessedMesh",
+    "MeshArtifact",
+    "load_or_process_mesh",
+    "get_pytorch3d_mesh",
+    "mesh_from_snippet",
+]

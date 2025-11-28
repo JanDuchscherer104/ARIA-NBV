@@ -7,7 +7,7 @@ import torch
 
 from ...data import AseEfmDatasetConfig
 from ...pose_generation import CandidateViewGeneratorConfig
-from ...pose_generation.types import CollisionBackend, SamplingStrategy
+from ...pose_generation.types import CollisionBackend, SamplingStrategy, ViewDirectionMode
 from ...rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
 from ...utils import Verbosity
 
@@ -98,16 +98,68 @@ def candidate_config_ui(
     max_radius = ui.slider("max_radius (m)", 0.2, 3.0, float(default.max_radius), step=0.05)
     min_elev = ui.slider("min_elev_deg", -90.0, 0.0, float(default.min_elev_deg), step=1.0)
     max_elev = ui.slider("max_elev_deg", 0.0, 90.0, float(default.max_elev_deg), step=1.0)
-    az_full = ui.checkbox("azimuth_full_circle", value=default.azimuth_full_circle)
     delta_az = ui.slider(
         "delta_azimuth_deg",
-        min_value=30.0,
+        min_value=0.0,
         max_value=360.0,
         value=float(default.delta_azimuth_deg),
         step=5.0,
-        help="Angular span around forward; 360=full sphere, 90=±45°.",
+        help="Yaw span around the last forward direction; 360=full sphere, 90=±45°, 0=planar slice.",
     )
     kappa = ui.slider("orientation kappa (PowerSpherical)", 0.0, 16.0, float(default.kappa), step=0.5)
+
+    # View orientation controls
+    view_mode = ui.selectbox(
+        "view_direction_mode",
+        options=list(ViewDirectionMode),
+        index=list(ViewDirectionMode).index(default.view_direction_mode),
+        format_func=lambda m: m.value,
+        help="Base orientation: rig-forward, radial away/towards, or target point.",
+    )
+
+    view_sampling_opts = [None] + list(SamplingStrategy)
+    view_sampling_choice = ui.selectbox(
+        "view_sampling_strategy",
+        options=view_sampling_opts,
+        index=view_sampling_opts.index(default.view_sampling_strategy),
+        format_func=lambda s: "none" if s is None else s.value,
+        help="View-direction jitter in camera frame; None disables jitter.",
+    )
+
+    view_kappa = ui.slider(
+        "view_kappa (PowerSpherical)",
+        0.0,
+        16.0,
+        float(default.view_kappa if default.view_kappa is not None else default.kappa),
+        step=0.5,
+    )
+
+    view_max_angle = ui.slider(
+        "view_max_angle_deg",
+        0.0,
+        180.0,
+        float(default.view_max_angle_deg),
+        step=5.0,
+        help="Hard cone cap for view-direction jitter; 0 disables capping.",
+    )
+
+    view_roll = ui.slider(
+        "view_roll_jitter_deg",
+        0.0,
+        45.0,
+        float(default.view_roll_jitter_deg),
+        step=1.0,
+        help="Random roll around sampled forward; 0 disables roll jitter.",
+    )
+
+    target_point_world = default.view_target_point_world
+    if view_mode is ViewDirectionMode.TARGET_POINT:
+        tp_x = ui.number_input("target_point_world.x", value=float(target_point_world[0]) if target_point_world is not None else 0.0)
+        tp_y = ui.number_input("target_point_world.y", value=float(target_point_world[1]) if target_point_world is not None else 0.0)
+        tp_z = ui.number_input("target_point_world.z", value=float(target_point_world[2]) if target_point_world is not None else 0.0)
+        target_point_world = torch.tensor([tp_x, tp_y, tp_z], dtype=torch.float32)
+    else:
+        target_point_world = None
     ensure_collision_free = ui.checkbox("ensure_collision_free", value=default.ensure_collision_free)
 
     ensure_free_space = ui.checkbox("ensure_free_space", value=default.ensure_free_space)
@@ -127,10 +179,16 @@ def candidate_config_ui(
             "max_radius": float(max_radius),
             "min_elev_deg": float(min_elev),
             "max_elev_deg": float(max_elev),
-            "azimuth_full_circle": bool(az_full),
             "delta_azimuth_deg": float(delta_az),
+            "azimuth_full_circle": bool(delta_az >= 360.0),
             "sampling_strategy": sampling_choice,
             "kappa": float(kappa),
+            "view_direction_mode": view_mode,
+            "view_sampling_strategy": view_sampling_choice,
+            "view_kappa": float(view_kappa),
+            "view_max_angle_deg": float(view_max_angle),
+            "view_roll_jitter_deg": float(view_roll),
+            "view_target_point_world": target_point_world,
             "min_distance_to_mesh": float(min_distance),
             "ensure_collision_free": ensure_collision_free,
             "collision_backend": collision_choice,

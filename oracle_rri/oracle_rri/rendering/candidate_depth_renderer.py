@@ -9,6 +9,7 @@ from efm3d.aria import CameraTW, PoseTW
 from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ..data.efm_views import EfmCameraView, EfmSnippetView
+from ..data.mesh_cache import mesh_from_snippet
 from ..pose_generation.types import CandidateSamplingResult
 from ..utils import BaseConfig, Console, Verbosity, pick_fast_depth_renderer
 from .efm3d_depth_renderer import Efm3dDepthRenderer, Efm3dDepthRendererConfig
@@ -106,12 +107,13 @@ class CandidateDepthRenderer:
     ) -> CandidateDepthBatch:
         """Render depth maps for valid candidate poses within a snippet."""
 
+        candidates = self._coerce_candidates(candidates)
         if not sample.has_mesh or sample.mesh is None:
             msg = "CandidateDepthRenderer requires snippets with attached meshes."
             self.console.error(msg)
             raise ValueError(msg)
         self.console.log(
-            f"Rendering depths: candidates={candidates['poses'].tensor().shape[0]} stream={self.config.camera_stream} on '{self.renderer.__class__.__name__}'"
+            f"Rendering depths: candidates={candidates.poses.tensor().shape[0]} stream={self.config.camera_stream} on '{self.renderer.__class__.__name__}'"
         )
         self.console.log(f"Mesh stats verts={sample.mesh.vertices.shape[0]:,} faces={sample.mesh.faces.shape[0]:,}")
         pose_batch, mask_valid, candidate_indices = self._filter_candidates(candidates)
@@ -130,6 +132,9 @@ class CandidateDepthRenderer:
         mesh_input: Any
         if is_pytorch3d and sample.mesh_verts is not None and sample.mesh_faces is not None:
             mesh_input = (sample.mesh_verts, sample.mesh_faces)
+        elif is_pytorch3d:
+            art = mesh_from_snippet(sample, device=pose_batch.device, console=self.console)
+            mesh_input = (art.processed.verts, art.processed.faces)
         else:
             mesh_input = sample.mesh
 
@@ -202,8 +207,8 @@ class CandidateDepthRenderer:
         self,
         candidates: CandidateSamplingResult,
     ) -> tuple["PoseTW", torch.Tensor, torch.Tensor]:
-        poses = candidates["poses"]
-        mask_valid = candidates.get("mask_valid")
+        poses = candidates.poses
+        mask_valid = candidates.mask_valid
         if mask_valid is None:
             mask_valid = torch.ones(len(poses), dtype=torch.bool, device=poses.tensor().device)
         valid_idx = torch.nonzero(mask_valid, as_tuple=False).squeeze(-1)
@@ -214,6 +219,17 @@ class CandidateDepthRenderer:
             valid_idx = valid_idx[: self.config.max_candidates]
 
         return poses[valid_idx], mask_valid, valid_idx
+
+    def _coerce_candidates(self, candidates: CandidateSamplingResult | dict) -> CandidateSamplingResult:
+        if isinstance(candidates, dict):
+            return CandidateSamplingResult(
+                poses=candidates["poses"],
+                mask_valid=candidates.get("mask_valid", torch.ones(len(candidates["poses"]), dtype=torch.bool)),
+                masks=candidates.get("masks", {}),
+                shell_poses=candidates.get("shell_poses", candidates["poses"]),
+                extras=candidates.get("extras", {}),
+            )
+        return candidates
 
 
 __all__ = [

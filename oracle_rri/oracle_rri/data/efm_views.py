@@ -40,6 +40,8 @@ from efm3d.utils.pointcloud import collapse_pointcloud_time
 from torch import Tensor
 from trimesh import Trimesh
 
+from oracle_rri.data.mesh_cache import MeshProcessSpec, mesh_from_snippet
+
 from ..utils import summarize
 
 
@@ -385,6 +387,28 @@ class EfmSnippetView:
     mesh_cache_key: str | None = None
     """Stable key (spec hash) for shared mesh caches across components."""
 
+    mesh_specs: MeshProcessSpec | None = None
+
+    # ------------------------------------------------------------------
+    # Mesh accessors
+    # ------------------------------------------------------------------
+    def mesh_tensors(self, *, device: torch.device | str | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return ``(verts, faces)`` tensors, loading from cache if needed."""
+
+        art = mesh_from_snippet(self, device=torch.device(device) if device is not None else None)
+        return art.processed.verts, art.processed.faces
+
+    def mesh_p3d(self, *, device: torch.device | str | None = None, meshes_cls: Any | None = None) -> Any:
+        """Return PyTorch3D ``Meshes`` for this snippet, cached by spec hash."""
+
+        art = mesh_from_snippet(
+            self,
+            device=torch.device(device) if device is not None else None,
+            want_p3d=True,
+            meshes_cls=meshes_cls,
+        )
+        return art.p3d
+
     # ------------------------------------------------------------------
     # Cameras
     # ------------------------------------------------------------------
@@ -545,6 +569,7 @@ class EfmSnippetView:
             mesh_verts=mv,
             mesh_faces=mf,
             mesh_cache_key=self.mesh_cache_key,
+            mesh_specs=self.mesh_specs,
         )
 
     def __repr__(self) -> str:  # pragma: no cover

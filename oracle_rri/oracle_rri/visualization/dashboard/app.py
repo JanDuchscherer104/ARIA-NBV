@@ -188,7 +188,7 @@ class DashboardApp:
                 if allow_ui:
                     st.error(f"Candidate generation failed: {exc}")
                 console.error(str(exc))
-                return None
+                raise exc
 
         def _run_depth_stage(
             cfg: CandidateDepthRendererConfig | None, render_depths: bool = True, *, allow_ui: bool = True

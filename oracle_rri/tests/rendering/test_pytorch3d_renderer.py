@@ -126,13 +126,12 @@ def _make_snippet(
 def _make_candidates(num: int = 1, z: float = 2.0) -> CandidateSamplingResult:
     poses = _make_pose(z=z).repeat(num, 1)
     mask = torch.ones(num, dtype=torch.bool)
-    shell = poses.tensor()
-    return {
-        "poses": poses,
-        "mask_valid": mask,
-        "masks": [mask],
-        "shell_poses": shell,
-    }
+    return CandidateSamplingResult(
+        poses=poses,
+        mask_valid=mask,
+        masks={},
+        shell_poses=poses,
+    )
 
 
 def test_pytorch3d_renderer_produces_depth():
@@ -156,7 +155,7 @@ def test_candidate_depth_renderer_respects_mask():
     cam = _make_camera()
     sample = _make_snippet(mesh, cam)
     candidates = _make_candidates(num=2, z=2.0)
-    candidates["mask_valid"][0] = False
+    candidates.mask_valid[0] = False
 
     cfg = CandidateDepthRendererConfig(
         camera_stream="rgb",
@@ -169,7 +168,7 @@ def test_candidate_depth_renderer_respects_mask():
     assert batch["depths"].shape[0] == 1
     assert batch["candidate_indices"].shape[0] == 1
     assert batch["candidate_indices"][0].item() == 1
-    assert torch.equal(batch["mask_valid"], candidates["mask_valid"])
+    assert torch.equal(batch["mask_valid"], candidates.mask_valid)
 
 
 def test_backface_culling_blocks_interior_walls():

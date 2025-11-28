@@ -6,6 +6,7 @@ import numpy as np
 import plotly.graph_objects as go  # type: ignore[import]
 import torch
 from efm3d.aria.pose import PoseTW
+from plotly.subplots import make_subplots  # type: ignore[import]
 
 from oracle_rri.data import AseEfmDatasetConfig, EfmCameraView, EfmSnippetView
 from oracle_rri.data.plotting import SnippetPlotBuilder
@@ -72,37 +73,6 @@ def plot_candidates(
         )
 
     return builder.finalize()
-
-
-def plot_sampling_shell(
-    *,
-    snippet: EfmSnippetView,
-    shell_poses: torch.Tensor,
-    last_pose: PoseTW,
-    min_radius: float,
-    max_radius: float,
-    min_elev_deg: float,
-    max_elev_deg: float,
-    azimuth_full_circle: bool,
-    sample_n: int = 200,
-) -> go.Figure:
-    """Visualise the spherical sampling band and a subset of raw shell samples."""
-
-    return (
-        SnippetPlotBuilder.from_snippet(snippet, title="Sampling shell (r_min/r_max + elev cap)")
-        .add_mesh()
-        .add_sampling_shell(
-            center=last_pose.t.detach().cpu().numpy(),
-            min_radius=min_radius,
-            max_radius=max_radius,
-            min_elev_deg=min_elev_deg,
-            max_elev_deg=max_elev_deg,
-            azimuth_full_circle=azimuth_full_circle,
-            samples=None,
-            sample_n=sample_n,
-    )
-        .add_points(shell_poses, name="Shell samples", color="green", size=2, opacity=0.5)
-    ).finalize()
 
 
 def plot_direction_polar(
@@ -211,6 +181,20 @@ def plot_position_sphere(
 
     dirs = offsets / (offsets.norm(dim=1, keepdim=True) + 1e-8)
     return plot_direction_sphere(dirs, title=title, sample_n=sample_n, show_axes=show_axes)
+
+
+def plot_direction_marginals(dirs: torch.Tensor, bins: int = 60) -> go.Figure:
+    d = dirs.detach().cpu().numpy()
+    d = d / (np.linalg.norm(d, axis=1, keepdims=True) + 1e-8)
+    elev = np.arcsin(d[:, 1])
+    az = np.arctan2(d[:, 0], d[:, 2])
+
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("Azimuth", "Elevation"))
+    fig.add_histogram(x=np.degrees(az), nbinsx=bins, row=1, col=1)
+    fig.add_histogram(x=np.degrees(elev), nbinsx=bins, row=1, col=2)
+    fig.update_xaxes(title="deg", row=1, col=1)
+    fig.update_xaxes(title="deg", row=1, col=2)
+    return fig
 
 
 def plot_rule_masks(
