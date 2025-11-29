@@ -73,7 +73,7 @@ class PathCollisionRule:
         if ctx.gt_mesh is None or ctx.centers_world is None or ctx.mask_valid is None:
             return
 
-        origin = ctx.last_pose.t.view(1, 3)
+        origin = ctx.reference_pose.t.view(1, 3)
         targets = ctx.centers_world
         dirs = targets - origin
         dists = dirs.norm(dim=1).clamp_min(1e-6)
@@ -88,6 +88,8 @@ class PathCollisionRule:
             pts_flat = pts.reshape(-1, 3)
             dists_pts = point_mesh_distance(pts_flat, ctx.mesh_verts, ctx.mesh_faces).view(targets.shape[0], steps)
             collide = (dists_pts < self.config.step_clearance).any(dim=1)
+            if ctx.cfg.collect_debug_stats:
+                ctx.debug["path_collision_mask"] = collide
             ctx.mask_valid = ctx.mask_valid & (~collide)
             return
 
@@ -104,7 +106,10 @@ class PathCollisionRule:
                 pass
 
         intersects = ray_engine.intersects_any(origins_np, dirs_np, multiple_hits=False, max_distance=max_dist)
-        free = torch.from_numpy(~intersects).to(ctx.mask_valid.device)
+        collide = torch.from_numpy(intersects).to(ctx.mask_valid.device)
+        if ctx.cfg.collect_debug_stats:
+            ctx.debug["path_collision_mask"] = collide
+        free = ~collide
         ctx.mask_valid = ctx.mask_valid & free
 
 

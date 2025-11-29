@@ -127,7 +127,8 @@ def _make_candidates(num: int = 1, z: float = 2.0) -> CandidateSamplingResult:
     poses = _make_pose(z=z).repeat(num, 1)
     mask = torch.ones(num, dtype=torch.bool)
     return CandidateSamplingResult(
-        poses=poses,
+        views=poses,
+        reference_pose=_make_pose(),
         mask_valid=mask,
         masks={},
         shell_poses=poses,

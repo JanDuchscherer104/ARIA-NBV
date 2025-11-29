@@ -113,7 +113,7 @@ class CandidateDepthRenderer:
             self.console.error(msg)
             raise ValueError(msg)
         self.console.log(
-            f"Rendering depths: candidates={candidates.poses.tensor().shape[0]} stream={self.config.camera_stream} on '{self.renderer.__class__.__name__}'"
+            f"Rendering depths: candidates={candidates.views.tensor().shape[0]} stream={self.config.camera_stream} on '{self.renderer.__class__.__name__}'"
         )
         self.console.log(f"Mesh stats verts={sample.mesh.vertices.shape[0]:,} faces={sample.mesh.faces.shape[0]:,}")
         pose_batch, mask_valid, candidate_indices = self._filter_candidates(candidates)
@@ -207,7 +207,7 @@ class CandidateDepthRenderer:
         self,
         candidates: CandidateSamplingResult,
     ) -> tuple["PoseTW", torch.Tensor, torch.Tensor]:
-        poses = candidates.poses
+        poses = candidates.views
         mask_valid = candidates.mask_valid
         if mask_valid is None:
             mask_valid = torch.ones(len(poses), dtype=torch.bool, device=poses.tensor().device)
@@ -222,11 +222,15 @@ class CandidateDepthRenderer:
 
     def _coerce_candidates(self, candidates: CandidateSamplingResult | dict) -> CandidateSamplingResult:
         if isinstance(candidates, dict):
+            if "reference_pose" not in candidates:
+                raise ValueError("reference_pose required in candidate dict input.")
             return CandidateSamplingResult(
-                poses=candidates["poses"],
+                views=candidates["poses"],
+                reference_pose=candidates["reference_pose"],
                 mask_valid=candidates.get("mask_valid", torch.ones(len(candidates["poses"]), dtype=torch.bool)),
                 masks=candidates.get("masks", {}),
                 shell_poses=candidates.get("shell_poses", candidates["poses"]),
+                shell_offsets_ref=candidates.get("shell_offsets_ref"),
                 extras=candidates.get("extras", {}),
             )
         return candidates

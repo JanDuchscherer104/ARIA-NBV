@@ -81,4 +81,4 @@ def test_generate_from_typed_sample_uses_existing_mesh_tensors(monkeypatch):
 
     result = gen.generate_from_typed_sample(sample)
 
-    assert result.poses.tensor().shape[0] == cfg.num_samples
+    assert result.views.tensor().shape[0] == cfg.num_samples

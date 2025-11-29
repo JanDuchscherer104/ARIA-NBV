@@ -5,11 +5,11 @@ from __future__ import annotations
 import streamlit as st
 import torch
 
-from ...data import AseEfmDatasetConfig
-from ...pose_generation import CandidateViewGeneratorConfig
-from ...pose_generation.types import CollisionBackend, SamplingStrategy, ViewDirectionMode
-from ...rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
-from ...utils import Verbosity
+from ..data import AseEfmDatasetConfig
+from ..pose_generation import CandidateViewGeneratorConfig
+from ..pose_generation.types import CollisionBackend, SamplingStrategy, ViewDirectionMode
+from ..rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
+from ..utils import Verbosity
 
 
 def dataset_config_ui(
@@ -152,11 +152,29 @@ def candidate_config_ui(
         help="Random roll around sampled forward; 0 disables roll jitter.",
     )
 
+    ref_frame_default = default.reference_frame_index if default.reference_frame_index is not None else -1
+    ref_frame_idx_input = ui.number_input(
+        "reference_frame_index (camera frame; -1 = final)",
+        value=int(ref_frame_default),
+        step=1,
+        format="%d",
+        help="Optional camera frame index used as reference pose; -1 uses the final pose.",
+    )
+    reference_frame_index = int(ref_frame_idx_input)
+    if reference_frame_index < 0:
+        reference_frame_index = None
+
     target_point_world = default.view_target_point_world
     if view_mode is ViewDirectionMode.TARGET_POINT:
-        tp_x = ui.number_input("target_point_world.x", value=float(target_point_world[0]) if target_point_world is not None else 0.0)
-        tp_y = ui.number_input("target_point_world.y", value=float(target_point_world[1]) if target_point_world is not None else 0.0)
-        tp_z = ui.number_input("target_point_world.z", value=float(target_point_world[2]) if target_point_world is not None else 0.0)
+        tp_x = ui.number_input(
+            "target_point_world.x", value=float(target_point_world[0]) if target_point_world is not None else 0.0
+        )
+        tp_y = ui.number_input(
+            "target_point_world.y", value=float(target_point_world[1]) if target_point_world is not None else 0.0
+        )
+        tp_z = ui.number_input(
+            "target_point_world.z", value=float(target_point_world[2]) if target_point_world is not None else 0.0
+        )
         target_point_world = torch.tensor([tp_x, tp_y, tp_z], dtype=torch.float32)
     else:
         target_point_world = None
@@ -164,6 +182,9 @@ def candidate_config_ui(
 
     ensure_free_space = ui.checkbox("ensure_free_space", value=default.ensure_free_space)
     min_distance = ui.slider("min_distance_to_mesh (m)", 0.0, 0.5, float(default.min_distance_to_mesh), step=0.01)
+
+    collect_rule_masks = ui.checkbox("collect_rule_masks", value=default.collect_rule_masks)
+    collect_debug_stats = ui.checkbox("collect_debug_stats", value=default.collect_debug_stats)
 
     if device_mode == "cpu":
         device_val = "cpu"
@@ -180,7 +201,6 @@ def candidate_config_ui(
             "min_elev_deg": float(min_elev),
             "max_elev_deg": float(max_elev),
             "delta_azimuth_deg": float(delta_az),
-            "azimuth_full_circle": bool(delta_az >= 360.0),
             "sampling_strategy": sampling_choice,
             "kappa": float(kappa),
             "view_direction_mode": view_mode,
@@ -196,6 +216,9 @@ def candidate_config_ui(
             "device": device_val,
             "is_debug": debug_flag,
             "verbosity": verbosity,
+            "reference_frame_index": reference_frame_index,
+            "collect_rule_masks": collect_rule_masks,
+            "collect_debug_stats": collect_debug_stats,
         }
     )
     # Re-validate to ensure device etc. are normalised

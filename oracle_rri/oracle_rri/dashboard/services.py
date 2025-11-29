@@ -8,7 +8,7 @@ from functools import lru_cache
 
 import streamlit as st
 
-from ...data import AseEfmDatasetConfig
+from ..data import AseEfmDatasetConfig
 
 
 @st.cache_resource(

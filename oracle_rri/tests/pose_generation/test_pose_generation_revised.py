@@ -65,7 +65,7 @@ def test_delta_azimuth_zero_yields_planar_yaw():
         ensure_collision_free=False,
         ensure_free_space=False,
         min_distance_to_mesh=0.0,
-        sampling_strategy=SamplingStrategy.SHELL_UNIFORM,
+        sampling_strategy=SamplingStrategy.UNIFORM_SPHERE,
         oversample_factor=4.0,
         max_resamples=5,
         is_debug=True,
@@ -97,8 +97,10 @@ def test_power_spherical_biases_forward_vs_uniform():
         "is_debug": True,
     }
 
-    cfg_uniform = CandidateViewGeneratorConfig(sampling_strategy=SamplingStrategy.SHELL_UNIFORM, **base_cfg)
-    cfg_power = CandidateViewGeneratorConfig(sampling_strategy=SamplingStrategy.FORWARD_GAUSSIAN, kappa=8.0, **base_cfg)
+    cfg_uniform = CandidateViewGeneratorConfig(sampling_strategy=SamplingStrategy.UNIFORM_SPHERE, **base_cfg)
+    cfg_power = CandidateViewGeneratorConfig(
+        sampling_strategy=SamplingStrategy.FORWARD_POWERSPHERICAL, kappa=8.0, **base_cfg
+    )
 
     mean_dot = []
     for cfg in (cfg_uniform, cfg_power):

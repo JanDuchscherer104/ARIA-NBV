@@ -3,8 +3,7 @@
 Conventions (efm3d / ATEK):
 - Camera frame is **LUF** (x left, y up, z forward) per Project Aria docs; world is Z-up (gravity = [0,0,-g]).
 - Pose: T_world_cam = T_world_rig @ T_camera_rig.inverse() (matches efm3d.render_frustum).
-- Frustum geometry is built directly in world+LUF (no display-frame tweaks); Plotly merely visualises it.
-- Images are rotated -90° for display, but the underlying 3D poses stay in LUF.
+- Images are rotated -90° for display using rotate_yaw_cw90.
 """
 
 from __future__ import annotations
@@ -191,7 +190,7 @@ def _aligned_pose_world_cam(cam: EfmCameraView, traj: EfmTrajectoryView, frame_i
 
 
 def rotate_yaw_cw90(pose_world_cam: PoseTW) -> PoseTW:
-    """Roll the pose about its +Z (forward) axis for alignment."""
+    """Yaw the pose by 90° clockwise about its +Z (forward) axis for alignment with Aria conventions."""
     c, s = np.cos(np.pi / 2), np.sin(np.pi / 2)
     r_roll = torch.tensor(
         [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
@@ -413,22 +412,16 @@ class SnippetPlotBuilder:
     ) -> "SnippetPlotBuilder":
         cam_view = self._camera_by_name(camera)
         traj = self.snippet.trajectory
-        idx = self._select_frame_indices(cam_view, frame_indices, default_last=False)
-        if idx.numel() == 0 or traj.time_ns.numel() == 0:
+        cam_idx, traj_idx = cam_view.nearest_traj_indices(traj.time_ns, frame_indices, default_last=False)
+        if cam_idx.numel() == 0 or traj_idx.numel() == 0:
             return self
 
-        cam_ts = cam_view.time_ns.to(idx.device)
-        traj_ts = traj.time_ns.to(idx.device)
-
-        sel_cam_ts = cam_ts[idx]  # (K,)
-        traj_idx = self._nearest_traj_indices(traj_ts, sel_cam_ts)
-
         t_world_rig = traj.t_world_rig[traj_idx]
-        t_cam_rig = cam_view.calib.T_camera_rig[idx]
+        t_cam_rig = cam_view.calib.T_camera_rig[cam_idx]
         t_world_cam = rotate_yaw_cw90(t_world_rig @ t_cam_rig.inverse())
 
         pose_list = self._pose_list_from_input(t_world_cam)
-        cam_list = cam_view.calib[idx]
+        cam_list = cam_view.calib[cam_idx]
 
         self._add_frusta_for_poses(
             cams=cam_list,
@@ -442,6 +435,55 @@ class SnippetPlotBuilder:
         )
         return self
 
+    def add_frame_axes(
+        self,
+        *,
+        frame: Literal["rgb", "slam-l", "slam-r", "rig"] = "rgb",
+        frame_indices: list[int] | None = None,
+        title: str = "Frame axes",
+    ) -> "SnippetPlotBuilder":
+        """Add axes for a camera stream or the rig itself."""
+
+        traj = self.snippet.trajectory
+        if traj.time_ns.shape.numel() == 0:
+            console.warn("No trajectory data; cannot add frame axes.")
+            return self
+
+        if frame == "rig":
+            # Anchor rig axes to camera timestamps for consistent indexing/alignment.
+            cam_view = self._camera_by_name("rgb")
+            if cam_view is None:
+                console.warn("No camera stream available; cannot add rig axes.")
+                return self
+
+            cam_idx, traj_idx = cam_view.nearest_traj_indices(traj.time_ns, frame_indices, default_last=True)
+            if cam_idx.numel() == 0 or traj_idx.numel() == 0:
+                console.warn("No valid frame indices for rig axes.")
+                return self
+
+            t_world_frame = traj.t_world_rig[traj_idx]
+        else:
+            cam_view = self._camera_by_name(frame)
+            n_cam = cam_view.num_frames
+            if n_cam == 0:
+                return self
+            cam_idx, traj_idx = cam_view.nearest_traj_indices(traj.time_ns, frame_indices, default_last=True)
+            if cam_idx.numel() == 0 or traj_idx.numel() == 0:
+                return self
+
+            t_world_rig = traj.t_world_rig[traj_idx]  # PoseTW[K]
+            t_cam_rig = cam_view.calib.T_camera_rig[cam_idx]  # PoseTW[K]
+            t_world_frame = rotate_yaw_cw90(t_world_rig @ t_cam_rig.inverse())
+
+        centers = t_world_frame.t.detach().cpu().numpy()
+        axes = t_world_frame.R.transpose(-1, -2).detach().cpu().numpy()  # (K, 3, 3)
+
+        self._update_scene_ranges(centers)
+        self._add_camera_axes(centers, axes, title)
+
+        return self
+
+    # Backwards compatibility shim
     def add_camera_axes(
         self,
         *,
@@ -449,35 +491,7 @@ class SnippetPlotBuilder:
         frame_indices: list[int] | None = None,
         title: str = "Camera axes",
     ) -> "SnippetPlotBuilder":
-        cam_view = self._camera_by_name(camera)
-        traj = self.snippet.trajectory
-
-        n_cam = cam_view.time_ns.shape[0]
-        n_traj = traj.time_ns.shape[0]
-        if n_cam == 0 or n_traj == 0:
-            return self
-
-        idx = self._select_frame_indices(cam_view, frame_indices, default_last=True)
-        if idx.numel() == 0:
-            return self
-
-        cam_ts = cam_view.time_ns.to(idx.device)
-        traj_ts = traj.time_ns.to(idx.device)
-
-        cam_sel_ts = cam_ts[idx]
-        traj_idx = self._nearest_traj_indices(traj_ts, cam_sel_ts)
-
-        t_world_rig = traj.t_world_rig[traj_idx]  # PoseTW[K]
-        t_cam_rig = cam_view.calib.T_camera_rig[idx]  # PoseTW[K]
-        t_world_cam = rotate_yaw_cw90(t_world_rig @ t_cam_rig.inverse())
-
-        cam_centers = t_world_cam.t.detach().cpu().numpy()
-        cam_axes = t_world_cam.R.transpose(-1, -2).detach().cpu().numpy()  # (K, 3, 3)
-
-        self._update_scene_ranges(cam_centers)
-        self._add_camera_axes(cam_centers, cam_axes, title)
-
-        return self
+        return self.add_frame_axes(frame=camera, frame_indices=frame_indices, title=title)
 
     def _add_camera_axes(
         self, cam_centers: np.ndarray, cam_axes: np.ndarray, title: str = "Camera axes"
@@ -524,40 +538,6 @@ class SnippetPlotBuilder:
         )
         return self
 
-    def add_candidate_frusta(
-        self,
-        *,
-        cam: CameraTW | Sequence[CameraTW],
-        poses: Sequence[PoseTW] | PoseTW | torch.Tensor,
-        scale: float = 1.0,
-        color: str = "crimson",
-        name: str = "Frustum",
-        max_frustums: int | None = None,
-        include_axes: bool = False,
-        include_center: bool = False,
-        apply_roll: bool = False,
-    ) -> "SnippetPlotBuilder":
-        """Overlay frusta for arbitrary poses using a provided camera model."""
-
-        pose_list = self._pose_list_from_input(poses)
-        if apply_roll:
-            pose_list = [rotate_yaw_cw90(p) for p in pose_list]
-
-        cam_seq = cam if isinstance(cam, Sequence) else [cam]
-        cams = list(cam_seq)
-        if not cams:
-            raise ValueError("cam must not be empty")
-        return self._add_frusta_for_poses(
-            cams=cams,
-            poses=pose_list,
-            scale=scale,
-            color=color,
-            name=name,
-            max_frustums=max_frustums,
-            include_axes=include_axes,
-            include_center=include_center,
-        )
-
     def _pose_list_from_input(self, poses: Sequence[PoseTW] | PoseTW | torch.Tensor) -> list[PoseTW]:
         if isinstance(poses, PoseTW):
             mat = poses.matrix3x4
@@ -587,29 +567,6 @@ class SnippetPlotBuilder:
             return pose_list
         raise TypeError(f"Unsupported poses input type: {type(poses)!r}")
 
-    def _select_frame_indices(
-        self, cam_view: EfmCameraView, frame_indices: list[int] | None, *, default_last: bool
-    ) -> torch.Tensor:
-        n_cam = cam_view.time_ns.shape[0]
-        if n_cam == 0:
-            return torch.tensor([], device=cam_view.time_ns.device, dtype=torch.long)
-        if frame_indices is None or len(frame_indices) == 0:
-            if default_last and n_cam > 1:
-                frame_indices = [0, n_cam - 1]
-            else:
-                frame_indices = [0]
-        idx = torch.as_tensor(frame_indices, device=cam_view.time_ns.device, dtype=torch.long)
-        return idx.clamp(0, n_cam - 1)
-
-    @staticmethod
-    def _nearest_traj_indices(traj_ts: torch.Tensor, cam_ts: torch.Tensor) -> torch.Tensor:
-        """Return traj indices nearest to each cam timestamp (vectorised)."""
-
-        if traj_ts.numel() == 0 or cam_ts.numel() == 0:
-            return torch.tensor([], device=cam_ts.device, dtype=torch.long)
-        dt = (traj_ts.unsqueeze(1) - cam_ts.unsqueeze(0)).abs()  # (F_traj, K)
-        return torch.argmin(dt, dim=0)
-
     def _center_from_input(self, center: np.ndarray | torch.Tensor | PoseTW) -> np.ndarray:
         if isinstance(center, PoseTW):
             return center.t.detach().cpu().numpy()
@@ -622,8 +579,8 @@ class SnippetPlotBuilder:
     def _add_frusta_for_poses(
         self,
         *,
-        cams: Sequence[CameraTW] | CameraTW | torch.Tensor,
-        poses: Sequence[PoseTW] | PoseTW | torch.Tensor,
+        cams: CameraTW | Sequence[CameraTW],
+        poses: Sequence[PoseTW] | PoseTW,
         scale: float,
         color: str,
         name: str,
@@ -641,13 +598,15 @@ class SnippetPlotBuilder:
             if cam_len > 1:
                 cam_list = [cams[i] for i in range(cam_len)]
             else:
-                cam_list = [cams] * len(pose_list)
+                cam_list = [cams]
         elif isinstance(cams, Sequence):
             cam_list = list(cams)
-        elif isinstance(cams, torch.Tensor):
-            cam_list = [CameraTW(cams[i]) for i in range(cams.shape[0])]
         else:
             raise TypeError(f"Unsupported cams input type: {type(cams)!r}")
+
+        if len(cam_list) == 1 and len(pose_list) > 1:
+            cam_list = cam_list * len(pose_list)
+
         seg_points_all: list[np.ndarray] = []
         seg_traces: list[np.ndarray] = []
         for idx, pose in enumerate(pose_list):

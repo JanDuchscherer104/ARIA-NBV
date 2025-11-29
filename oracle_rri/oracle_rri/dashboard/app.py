@@ -10,12 +10,12 @@ from typing import Any, cast
 import streamlit as st
 import torch
 
-from ...data import AseEfmDatasetConfig, EfmSnippetView
-from ...pose_generation import CandidateViewGeneratorConfig
-from ...pose_generation.types import CandidateSamplingResult, CollisionBackend, SamplingStrategy
-from ...rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
-from ...rendering.candidate_depth_renderer import CandidateDepthBatch
-from ...utils import Console, Verbosity, get_performance_mode, set_performance_mode
+from ..data import AseEfmDatasetConfig, EfmSnippetView
+from ..pose_generation import CandidateViewGeneratorConfig
+from ..pose_generation.types import CandidateSamplingResult, CollisionBackend, SamplingStrategy
+from ..rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
+from ..rendering.candidate_depth_renderer import CandidateDepthBatch
+from ..utils import Console, Verbosity, get_performance_mode, set_performance_mode
 from .config import DashboardConfig
 from .panels import render_candidates_page, render_data_page, render_depth_page
 from .services import get_executor, load_dataset

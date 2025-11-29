@@ -73,7 +73,13 @@ def _single_candidate(sample):
     poses = pose.unsqueeze(0)
     mask = torch.ones(1, dtype=torch.bool)
     shell = poses.tensor()
-    return CandidateSamplingResult(poses=poses, mask_valid=mask, masks=[mask], shell_poses=shell)
+    return CandidateSamplingResult(
+        views=poses,
+        reference_pose=sample.trajectory.t_world_rig[-1],
+        mask_valid=mask,
+        masks=[mask],
+        shell_poses=shell,
+    )
 
 
 @pytest.mark.skipif(not PYTORCH3D_AVAILABLE, reason="PyTorch3D required for this backend")

@@ -205,6 +205,47 @@ class EfmCameraView:
 
         return torch.stack([fov_x, fov_y], dim=-1)
 
+    @property
+    def num_frames(self) -> int:
+        return self.images.shape[0]
+
+    def select_frame_indices(self, frame_indices: list[int] | None, *, default_last: bool) -> torch.Tensor:
+        """Resolve user-provided frame indices, supporting negatives and defaults."""
+
+        n_cam = self.num_frames
+        if n_cam == 0:
+            return torch.tensor([], device=self.time_ns.device, dtype=torch.long)
+        if frame_indices is None or len(frame_indices) == 0:
+            frame_indices = [0, n_cam - 1] if default_last and n_cam > 1 else [0]
+        idx = torch.as_tensor(frame_indices, device=self.time_ns.device, dtype=torch.long)
+        idx = torch.where(idx < 0, idx + n_cam, idx)
+        return idx.clamp(0, n_cam - 1)
+
+    def nearest_traj_indices(
+        self,
+        traj_ts_ns: torch.Tensor,
+        frame_indices: list[int] | torch.Tensor | None = None,
+        *,
+        default_last: bool = True,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return selected camera indices and nearest trajectory indices."""
+
+        cam_idx = (
+            frame_indices
+            if isinstance(frame_indices, torch.Tensor)
+            else self.select_frame_indices(frame_indices, default_last=default_last)
+        )
+        if cam_idx.numel() == 0 or traj_ts_ns.numel() == 0:
+            empty = torch.tensor([], device=self.time_ns.device, dtype=torch.long)
+            return cam_idx, empty
+
+        cam_ts = self.time_ns.to(cam_idx.device)
+        traj_ts = traj_ts_ns.to(cam_idx.device)
+        cam_sel_ts = cam_ts[cam_idx]
+        dt = (traj_ts.unsqueeze(1) - cam_sel_ts.unsqueeze(0)).abs()
+        traj_idx = torch.argmin(dt, dim=0)
+        return cam_idx, traj_idx
+
     def __repr__(self) -> str:  # pragma: no cover - formatting only
         return _repr(self)
 

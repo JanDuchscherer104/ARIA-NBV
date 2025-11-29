@@ -38,9 +38,7 @@ from .types import (
     ViewDirectionMode,
 )
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
+DEVICE_FWD = [0.0, 0.0, 1.0]
 
 
 class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
@@ -97,7 +95,7 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
 
     target: type["CandidateViewGenerator"] = Field(default_factory=lambda: CandidateViewGenerator, exclude=True)
 
-    camera_index: Literal["rgb", "slaml", "slamr"] = "rgb"
+    camera_label: Literal["rgb", "slaml", "slamr"] = "rgb"
     """Camera index to use for candidate generation."""
 
     num_samples: int = 512
@@ -110,9 +108,8 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     min_elev_deg: float = -15.0
     max_elev_deg: float = 45.0
     delta_azimuth_deg: float = 360.0
-    azimuth_full_circle: bool = True
 
-    sampling_strategy: SamplingStrategy = SamplingStrategy.SHELL_UNIFORM
+    sampling_strategy: SamplingStrategy = SamplingStrategy.UNIFORM_SPHERE
     kappa: float = 4.0
 
     min_distance_to_mesh: float = 0.0
@@ -135,6 +132,9 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
 
     collect_rule_masks: bool = False
     collect_debug_stats: bool = False
+
+    reference_frame_index: int | None = None
+    """Optional camera frame index to use as reference pose; None defaults to the final pose."""
 
     # View orientation controls
     view_direction_mode: ViewDirectionMode = ViewDirectionMode.RADIAL_AWAY
@@ -170,7 +170,6 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
         if self.is_debug:
             object.__setattr__(self, "device", torch.device("cpu"))
             object.__setattr__(self, "verbosity", Verbosity.VERBOSE)
-        object.__setattr__(self, "azimuth_full_circle", bool(self.delta_azimuth_deg >= 360.0))
         if self.view_kappa is None:
             object.__setattr__(self, "view_kappa", self.kappa)
         return self
@@ -203,15 +202,15 @@ class ForwardPowerSphericalSampler(DirectionSampler):
     name = "forward_power_spherical"
 
     def sample(self, cfg: CandidateViewGeneratorConfig, num: int, device: torch.device) -> torch.Tensor:
-        mu = torch.tensor([0.0, 0.0, 1.0], device=device)
+        mu = torch.tensor(DEVICE_FWD, device=device)
         dist = PowerSpherical(mu, torch.tensor(cfg.kappa, device=device))
         dirs = dist.sample((num,))
         return dirs / dirs.norm(dim=-1, keepdim=True)
 
 
 _DIRECTION_SAMPLERS: dict[SamplingStrategy, DirectionSampler] = {
-    SamplingStrategy.SHELL_UNIFORM: UniformDirectionSampler(),
-    SamplingStrategy.FORWARD_GAUSSIAN: ForwardPowerSphericalSampler(),
+    SamplingStrategy.UNIFORM_SPHERE: UniformDirectionSampler(),
+    SamplingStrategy.FORWARD_POWERSPHERICAL: ForwardPowerSphericalSampler(),
 }
 
 
@@ -220,11 +219,11 @@ _DIRECTION_SAMPLERS: dict[SamplingStrategy, DirectionSampler] = {
 # ---------------------------------------------------------------------------
 
 
-def _forward_world(last_pose: PoseTW) -> torch.Tensor:
-    """World-frame forward direction (+z_cam) of the last pose."""
+def _forward_world(reference_pose: PoseTW) -> torch.Tensor:
+    """World-frame forward direction (+z_cam) of the reference pose."""
 
-    f_cam = torch.tensor([0.0, 0.0, 1.0], device=last_pose.device, dtype=last_pose.dtype)
-    return last_pose.rotate(f_cam.unsqueeze(0))[0]
+    f_cam = torch.tensor(DEVICE_FWD, device=reference_pose.device, dtype=reference_pose.dtype)
+    return reference_pose.rotate(f_cam.unsqueeze(0))[0]
 
 
 def _ensure_unbatched_pose(pose: PoseTW) -> PoseTW:
@@ -270,7 +269,7 @@ def _filter_directions_world(
     cos_yaw = (dirs_h * fwd_h).sum(dim=-1)
     yaw = torch.atan2(sin_yaw, cos_yaw)
 
-    if cfg.delta_azimuth_deg >= 360.0 - 1e-3:
+    if cfg.delta_azimuth_deg >= 360.0 - 1e-1:
         mask_yaw = torch.ones_like(mask_elev)
     else:
         half_delta = 0.5 * torch.deg2rad(torch.tensor(cfg.delta_azimuth_deg, device=device, dtype=dirs_world.dtype))
@@ -280,21 +279,21 @@ def _filter_directions_world(
 
 
 def _sample_candidate_positions(
-    last_pose: PoseTW,
+    reference_pose: PoseTW,
     cfg: CandidateViewGeneratorConfig,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Sample candidate centres around the last pose.
 
     Returns:
         centers_world: (N, 3) camera centres in world frame.
-        offsets_rig: (N, 3) sampled directions in rig frame (before radius).
+        offsets_ref: (N, 3) sampled directions in reference frame (before radius).
     """
 
-    device = torch.device(cfg.device)
+    device = cfg.device
     sampler = _DIRECTION_SAMPLERS[cfg.sampling_strategy]
 
-    last_pose_dev = _ensure_unbatched_pose(last_pose.to(device))
-    fwd_world = _forward_world(last_pose_dev)
+    reference_pose_dev = _ensure_unbatched_pose(reference_pose.to(device))
+    fwd_world = _forward_world(reference_pose_dev)
 
     dirs_world_list: list[torch.Tensor] = []
     offsets_rig_list: list[torch.Tensor] = []
@@ -307,7 +306,7 @@ def _sample_candidate_positions(
         n_draw = ceil(cfg.oversample_factor * remaining)
 
         dirs_rig = sampler.sample(cfg, n_draw, device=device)
-        dirs_world = last_pose_dev.rotate(dirs_rig)
+        dirs_world = reference_pose_dev.rotate(dirs_rig)
         mask = _filter_directions_world(dirs_world, fwd_world, cfg).view(-1)
 
         if mask.any():
@@ -332,7 +331,7 @@ def _sample_candidate_positions(
         cfg.min_radius, cfg.max_radius
     )
     offsets_rig_all = offsets_rig_all * radii[:, None]
-    centers_world = last_pose_dev.transform(offsets_rig_all)
+    centers_world = reference_pose_dev.transform(offsets_rig_all)
     return centers_world, offsets_rig_all
 
 
@@ -346,13 +345,13 @@ def _sample_view_dirs_cam(
 
     strat = cfg.view_sampling_strategy
     if strat is None:
-        v = torch.tensor([0.0, 0.0, 1.0], device=device, dtype=dtype)
+        v = torch.tensor(DEVICE_FWD, device=device, dtype=dtype)
         return v.view(1, 3).expand(num, 3)
 
-    if strat == SamplingStrategy.SHELL_UNIFORM:
+    if strat == SamplingStrategy.UNIFORM_SPHERE:
         dist = HypersphericalUniform(dim=3, device=device, dtype=dtype)
-    elif strat == SamplingStrategy.FORWARD_GAUSSIAN:
-        mu = torch.tensor([0.0, 0.0, 1.0], device=device, dtype=dtype)
+    elif strat == SamplingStrategy.FORWARD_POWERSPHERICAL:
+        mu = torch.tensor(DEVICE_FWD, device=device, dtype=dtype)
         scale = torch.tensor(cfg.view_kappa, device=device, dtype=dtype)
         dist = PowerSpherical(mu, scale)
     else:
@@ -362,7 +361,7 @@ def _sample_view_dirs_cam(
     dirs = dirs / dirs.norm(dim=-1, keepdim=True).clamp_min(1e-6)
 
     if cfg.view_max_angle_deg > 0.0:
-        mu = torch.tensor([0.0, 0.0, 1.0], device=device, dtype=dtype)
+        mu = torch.tensor(DEVICE_FWD, device=device, dtype=dtype)
         cos_max = torch.cos(
             torch.tensor(torch.deg2rad(torch.tensor(cfg.view_max_angle_deg)), device=device, dtype=dtype)
         )
@@ -380,7 +379,7 @@ def _sample_view_dirs_cam(
 
 
 def _build_candidate_orientations(
-    last_pose: PoseTW,
+    reference_pose: PoseTW,
     centers_world: torch.Tensor,
     cfg: CandidateViewGeneratorConfig,
 ) -> PoseTW:
@@ -390,11 +389,11 @@ def _build_candidate_orientations(
     dtype = centers_world.dtype
     n = centers_world.shape[0]
 
-    last_pose_dev = _ensure_unbatched_pose(last_pose.to(device))
+    reference_pose_dev = _ensure_unbatched_pose(reference_pose.to(device))
 
     # Base orientations
     if cfg.view_direction_mode is ViewDirectionMode.FORWARD_RIG:
-        r_last = last_pose_dev.R
+        r_last = reference_pose_dev.R
         if r_last.ndim == 3:
             r_last = r_last[0]
         r_base = r_last.unsqueeze(0).expand(n, 3, 3)
@@ -404,7 +403,7 @@ def _build_candidate_orientations(
         eye = torch.eye(3, device=device, dtype=dtype).expand(n, 3, 3)
         centers_pose = PoseTW.from_Rt(eye, centers_world)
         base_poses = view_axes_from_poses(
-            from_pose=last_pose_dev,
+            from_pose=reference_pose_dev,
             to_pose=centers_pose,
             look_away=(cfg.view_direction_mode is ViewDirectionMode.RADIAL_AWAY),
         )
@@ -455,11 +454,6 @@ def _build_candidate_orientations(
     return base_poses.compose(delta_poses)
 
 
-# ---------------------------------------------------------------------------
-# Generator
-# ---------------------------------------------------------------------------
-
-
 class CandidateViewGenerator:
     """Generate candidate :class:`PoseTW` around the latest pose using rules."""
 
@@ -473,8 +467,16 @@ class CandidateViewGenerator:
         self._rules: list[Rule] = self._build_default_rules(config)
 
     # ------------------------------------------------------------------ public
-    def generate_from_typed_sample(self, sample: EfmSnippetView) -> CandidateSamplingResult:
-        """Generate candidates using an :class:`EfmSnippetView` sample."""
+    def generate_from_typed_sample(
+        self, sample: EfmSnippetView, frame_index: int | None = None
+    ) -> CandidateSamplingResult:
+        """Generate candidates using an :class:`EfmSnippetView` sample.
+
+        Args:
+            sample: Snippet view with trajectory and mesh.
+            frame_index: Optional frame index to extract the reference pose instead of using the final pose.
+                0 <= frame_index < F where is the number of frames in the snippet; F = sample.get_camera(self.config.camera_label).num_frames.
+        """
 
         device = torch.device(self.config.device)
         occ = sample.get_occupancy_extend()
@@ -488,51 +490,66 @@ class CandidateViewGenerator:
             mesh_verts = artifact.processed.verts
             mesh_faces = artifact.processed.faces
 
-        cam_view = sample.get_camera(self.config.camera_index)
+        cam_view = sample.get_camera(self.config.camera_label)
         fov = cam_view.get_fov().to(device=device)
 
-        last_pose = sample.trajectory.final_pose.to(device=device)
+        if frame_index is None:
+            frame_index = self.config.reference_frame_index
+
+        if frame_index is None:
+            reference_pose = sample.trajectory.final_pose.to(device=device)
+        else:
+            cam_idx, traj_idx = cam_view.nearest_traj_indices(
+                sample.trajectory.time_ns, [frame_index], default_last=True
+            )
+            if traj_idx.numel() == 0:
+                reference_pose = sample.trajectory.final_pose.to(device=device)
+            else:
+                reference_pose = sample.trajectory.t_world_rig[traj_idx].to(device=device)
 
         return self.generate(
-            last_pose=last_pose,
+            reference_pose=reference_pose,
             gt_mesh=gt_mesh,
             mesh_verts=mesh_verts,
             mesh_faces=mesh_faces,
             occupancy_extent=occupancy_extent,
             camera_fov=fov,
+            camera_calib_template=cam_view.calib,
         )
 
     def generate(
         self,
         *,
-        last_pose: PoseTW,
+        reference_pose: PoseTW,
         gt_mesh: trimesh.Trimesh | None = None,
         mesh_verts: torch.Tensor | None = None,
         mesh_faces: torch.Tensor | None = None,
         occupancy_extent: torch.Tensor | None = None,
         camera_fov: torch.Tensor | None = None,
+        camera_calib_template=None,
     ) -> CandidateSamplingResult:
-        """Sample candidate poses around ``last_pose`` and apply pruning rules."""
+        """Sample candidate poses around ``reference_pose`` and apply pruning rules."""
 
         cfg = self.config
         device = torch.device(cfg.device)
 
         occ_extent = occupancy_extent if occupancy_extent is not None else cfg.occupancy_extent
 
-        centers_world, offsets_rig = _sample_candidate_positions(last_pose, cfg)
-        shell_poses = _build_candidate_orientations(last_pose, centers_world, cfg)
+        centers_world, offsets_ref = _sample_candidate_positions(reference_pose, cfg)
+        shell_poses = _build_candidate_orientations(reference_pose, centers_world, cfg)
 
         ctx = CandidateContext(
             cfg=cfg,
-            last_pose=last_pose.to(device),
+            reference_pose=reference_pose.to(device),
             gt_mesh=gt_mesh,
             mesh_verts=mesh_verts.to(device) if mesh_verts is not None else None,
             mesh_faces=mesh_faces.to(device) if mesh_faces is not None else None,
             occupancy_extent=occ_extent.to(device) if occ_extent is not None else None,
             camera_fov=camera_fov,
+            camera_calib_template=camera_calib_template,
             shell_poses=shell_poses,
             centers_world=centers_world,
-            shell_offsets_rig=offsets_rig,
+            shell_offsets_ref=offsets_ref,
             mask_valid=torch.ones(centers_world.shape[0], dtype=torch.bool, device=device),
         )
 
@@ -562,14 +579,38 @@ class CandidateViewGenerator:
         shell_poses = ctx.shell_poses
         assert shell_poses is not None
 
-        poses_tensor = shell_poses._data[mask_valid]
-        poses = PoseTW(poses_tensor)
+        assert shell_poses._data is not None
+        poses_world_valid = PoseTW(shell_poses._data[mask_valid])
+        reference_pose = ctx.reference_pose
+        ref_inv = reference_pose.inverse()
+        poses_ref_valid = ref_inv.compose(poses_world_valid)
+
+        template = ctx.camera_calib_template
+        if template is None:
+            from efm3d.aria.camera import CameraTW
+
+            template_data = CameraTW.from_parameters()._data.to(poses_ref_valid._data.device).view(1, -1)
+        else:
+            template_data = template._data
+            if template_data.ndim == 1:
+                template_data = template_data.view(1, -1)
+            template_data = template_data.to(poses_ref_valid._data.device)
+
+        n = poses_ref_valid._data.shape[0]
+        template_data = template_data[0].unsqueeze(0).expand(n, -1).clone()
+        template_data[:, 10:22] = poses_ref_valid._data
+
+        from efm3d.aria.camera import CameraTW
+
+        poses_cam = CameraTW(template_data)
 
         return CandidateSamplingResult(
-            poses=poses,
+            views=poses_cam,
+            reference_pose=reference_pose,
             mask_valid=mask_valid,
             masks=ctx.rule_masks if ctx.cfg.collect_rule_masks else {},
             shell_poses=shell_poses,
+            shell_offsets_ref=ctx.shell_offsets_ref,
             extras=ctx.debug if ctx.cfg.collect_debug_stats else {},
         )
 

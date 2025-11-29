@@ -45,7 +45,7 @@ def test_sampling_orients_away_and_zero_roll():
         ensure_collision_free=False,
         ensure_free_space=False,
         min_distance_to_mesh=0.0,
-        sampling_strategy=SamplingStrategy.SHELL_UNIFORM,
+        sampling_strategy=SamplingStrategy.UNIFORM_SPHERE,
         verbose=False,
         is_debug=True,
     )
@@ -71,7 +71,7 @@ def test_sampling_orients_away_and_zero_roll():
 
 
 def test_shell_sampling_uniform_area():
-    """Elevation sampling for SHELL_UNIFORM should be area-uniform on the cap."""
+    """Elevation sampling for UNIFORM_SPHERE  should be area-uniform on the cap."""
 
     cfg = CandidateViewGeneratorConfig(
         num_samples=4096,
@@ -79,7 +79,7 @@ def test_shell_sampling_uniform_area():
         max_radius=1.0,
         min_elev_deg=-30,
         max_elev_deg=30,
-        sampling_strategy=SamplingStrategy.SHELL_UNIFORM,
+        sampling_strategy=SamplingStrategy.UNIFORM_SPHERE,
         ensure_collision_free=False,
         ensure_free_space=False,
         verbose=False,
@@ -319,7 +319,7 @@ def test_candidate_generator_pipeline_synthetic():
     gen = CandidateViewGenerator(cfg)
     result = gen.generate(last_pose=_identity_pose())
 
-    assert result.poses._data.shape[0] == cfg.num_samples
+    assert result.views._data.shape[0] == cfg.num_samples
     assert result.mask_valid.shape[0] == cfg.num_samples
     assert torch.all(result.mask_valid)
 
@@ -344,7 +344,7 @@ def test_candidate_generator_with_real_dataset_sample():
         ensure_collision_free=False,  # relax pruning to ensure some survive
         ensure_free_space=False,
         min_distance_to_mesh=0.0,
-        sampling_strategy=SamplingStrategy.SHELL_UNIFORM,
+        sampling_strategy=SamplingStrategy.UNIFORM_SPHERE,
         verbose=False,
         is_debug=True,
     )
@@ -352,7 +352,7 @@ def test_candidate_generator_with_real_dataset_sample():
     result = gen.generate_from_typed_sample(sample)
 
     # At least one valid candidate should remain after pruning.
-    assert result.poses._data.shape[0] == cfg.num_samples
+    assert result.views._data.shape[0] == cfg.num_samples
     assert result.mask_valid.any()
 
 
@@ -379,7 +379,7 @@ def test_candidate_generator_real_orientation_and_extent():
     gen = CandidateViewGenerator(cfg)
     result = gen.generate_from_typed_sample(sample)
 
-    poses = result.poses
+    poses = result.views
     mask = result.mask_valid
     assert mask.any(), "All candidates were filtered out unexpectedly."
 

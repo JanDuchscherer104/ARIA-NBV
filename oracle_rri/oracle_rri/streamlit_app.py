@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from oracle_rri.visualization.dashboard.app import DashboardApp
-from oracle_rri.visualization.dashboard.config import DashboardConfig
+from oracle_rri.dashboard.app import DashboardApp
+from oracle_rri.dashboard.config import DashboardConfig
 
 __all__ = ["DashboardApp", "DashboardConfig", "main", "streamlit_entry"]
 

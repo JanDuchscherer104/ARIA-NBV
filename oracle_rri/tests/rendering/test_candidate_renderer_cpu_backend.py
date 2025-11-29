@@ -100,6 +100,7 @@ def _make_candidates(num: int = 1, z: float = 1.0) -> CandidateSamplingResult:
     shell = poses.tensor()
     return {
         "poses": poses,
+        "reference_pose": _make_pose(),
         "mask_valid": mask,
         "masks": [mask],
         "shell_poses": shell,

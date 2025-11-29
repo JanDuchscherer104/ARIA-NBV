@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from ...data import AseEfmDatasetConfig
-from ...pose_generation import CandidateViewGeneratorConfig
-from ...rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
-from ...utils import BaseConfig
+from ..data import AseEfmDatasetConfig
+from ..pose_generation import CandidateViewGeneratorConfig
+from ..rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
+from ..utils import BaseConfig
 
 if TYPE_CHECKING:
     from .app import DashboardApp
