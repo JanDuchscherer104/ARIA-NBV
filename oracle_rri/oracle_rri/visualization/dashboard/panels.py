@@ -18,13 +18,14 @@ from ...data.plotting import (
 )
 from ...pose_generation import CandidateViewGeneratorConfig
 from ...pose_generation.plotting import (
-    plot_candidate_axes,
     plot_candidate_frusta,
     plot_candidates,
+    plot_direction_marginals,
     plot_direction_polar,
     plot_direction_sphere,
     plot_position_polar,
     plot_position_sphere,
+    plot_radius_hist,
     plot_rule_masks,
 )
 from ...pose_generation.types import CandidateSamplingResult
@@ -289,38 +290,88 @@ def render_candidates_page(
     last_center = last_pose_rig.t.detach().cpu().numpy()
 
     poses = _cand_poses(candidates)
+    poses_tw = poses.T_camera_rig if hasattr(poses, "T_camera_rig") else poses
     shell_poses = _cand_shell(candidates)
 
     st.header("Candidate Poses")
     with st.status("Building candidate plots...", expanded=False):
-        cand_fig = plot_candidates(snippet=sample, poses=poses, title="Candidate positions", center=last_center)
+        cand_fig = plot_candidates(snippet=sample, poses=poses_tw, title="Candidate positions", center=last_center)
     st.plotly_chart(cand_fig, width="stretch")
 
-    # Direction distributions
+    # # Direction distributions
     shell_positions = shell_poses.tensor() if hasattr(shell_poses, "tensor") else shell_poses
-    if shell_positions is not None and shell_positions.numel() > 0:
-        shell_pts_world = shell_positions[:, 9:12]
-        last_center_t = torch.as_tensor(last_center, device=shell_pts_world.device, dtype=shell_pts_world.dtype)
-        offsets_world = shell_pts_world - last_center_t
+    # if shell_positions is not None and shell_positions.numel() > 0:
+    #     shell_pts_world = shell_positions[:, 9:12]
+    #     last_center_t = torch.as_tensor(last_center, device=shell_pts_world.device, dtype=shell_pts_world.dtype)
+    #     offsets_world = shell_pts_world - last_center_t
 
-        r_wr = last_pose_rig.R.to(offsets_world.device)
-        if r_wr.ndim == 3:
-            r_wr = r_wr[0]
-        offsets_rig = offsets_world @ r_wr  # world -> rig
-        dirs_rig = offsets_rig / (offsets_rig.norm(dim=1, keepdim=True) + 1e-8)
+    #     r_wr = last_pose_rig.R.to(offsets_world.device)
+    #     if r_wr.ndim == 3:
+    #         r_wr = r_wr[0]
+    #     offsets_rig = offsets_world @ r_wr  # world -> rig
+    #     dirs_rig = offsets_rig / (offsets_rig.norm(dim=1, keepdim=True) + 1e-8)
 
-        with st.expander("Sampling distributions", expanded=False):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.plotly_chart(plot_direction_polar(dirs_rig), width="stretch")
-            with col2:
-                st.plotly_chart(plot_direction_sphere(dirs_rig, show_axes=True), width="stretch")
-        with st.expander("Position distributions (rig frame)", expanded=False):
-            colp1, colp2 = st.columns(2)
-            with colp1:
-                st.plotly_chart(plot_position_polar(offsets_rig), width="stretch")
-            with colp2:
-                st.plotly_chart(plot_position_sphere(offsets_rig, show_axes=True), width="stretch")
+    #     with st.expander("Sampling distributions", expanded=False):
+    #         col1, col2 = st.columns(2)
+    #         with col1:
+    #             st.plotly_chart(plot_direction_polar(dirs_rig), width="stretch")
+    #         with col2:
+    #             st.plotly_chart(plot_direction_sphere(dirs_rig, show_axes=True), width="stretch")
+    #     with st.expander("Position distributions (rig frame)", expanded=False):
+    #         colp1, colp2 = st.columns(2)
+    #         with colp1:
+    #             st.plotly_chart(plot_position_polar(offsets_rig), width="stretch")
+    #         with colp2:
+    #             st.plotly_chart(plot_position_sphere(offsets_rig, show_axes=True), width="stretch")
+    shell_tw = shell_poses if isinstance(shell_poses, PoseTW) else PoseTW(shell_poses)
+    shell_centers_world = shell_tw.t  # (N, 3)
+
+    last_pose_rig = sample.trajectory.final_pose.to(shell_centers_world.device)
+    last_center_world = last_pose_rig.t
+    if last_center_world.ndim == 2:
+        last_center_world = last_center_world[0]
+
+    # --- position offsets in rig frame ---
+    offsets_world = shell_centers_world - last_center_world
+    r_wr = last_pose_rig.R
+    if r_wr.ndim == 3:
+        r_wr = r_wr[0]
+    offsets_rig = offsets_world @ r_wr.transpose(-1, -2)  # (N,3)
+
+    # --- view directions in rig frame (z_cam axes) ---
+    r_wc = shell_tw.R  # (N,3,3), world←cam
+    z_cam = torch.tensor([0.0, 0.0, 1.0], device=r_wc.device, dtype=r_wc.dtype)
+    z_world = r_wc @ z_cam  # (N,3)
+    dirs_rig_view = z_world @ r_wr.transpose(-1, -2)
+    dirs_rig_view = dirs_rig_view / (dirs_rig_view.norm(dim=1, keepdim=True) + 1e-8)
+
+    with st.expander("Sampling distributions", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.plotly_chart(
+                plot_direction_polar(dirs_rig_view, title="View directions (rig frame)"),
+                width="stretch",
+            )
+        with col2:
+            st.plotly_chart(
+                plot_direction_sphere(dirs_rig_view, title="View dirs on unit sphere", show_axes=True),
+                width="stretch",
+            )
+        st.plotly_chart(plot_direction_marginals(dirs_rig_view), width="stretch")
+
+    with st.expander("Position distributions (rig frame)", expanded=False):
+        colp1, colp2 = st.columns(2)
+        with colp1:
+            st.plotly_chart(
+                plot_position_polar(offsets_rig, title="Offsets from last pose (az/elev)"),
+                width="stretch",
+            )
+        with colp2:
+            st.plotly_chart(
+                plot_position_sphere(offsets_rig, title="Offsets on unit sphere", show_axes=True),
+                width="stretch",
+            )
+        st.plotly_chart(plot_radius_hist(offsets_rig), width="stretch")
 
     # Rule masks overlay
     masks = _cand_masks(candidates)
@@ -339,15 +390,16 @@ def render_candidates_page(
     if mask_valid is None or mask_valid.sum() == 0:
         st.warning("All candidates were rejected; frustum plot omitted.")
     else:
-        with st.status("Rendering frustums...", expanded=False):
+        cand_cams = poses if hasattr(poses, "T_camera_rig") else None
+        with st.status("Candidate Frusta", expanded=False):
             frust_fig = plot_candidate_frusta(
                 snippet=sample,
-                poses=poses,
-                camera_view=sample.camera_rgb,
+                poses=poses_tw,
                 frustum_scale=frustum_scale,
                 max_frustums=max_frustums,
+                candidate_cams=cand_cams,
             )
-        st.plotly_chart(frust_fig, width="stretch")
+            st.plotly_chart(frust_fig, width="stretch")
 
     rejected_poses = rejected_pose_tensor(candidates)
     if plot_rejected_only:
@@ -362,13 +414,6 @@ def render_candidates_page(
                     center=last_center,
                 )
             st.plotly_chart(rej_fig, width="stretch")
-
-    # Axes sanity check
-    with st.expander("Candidate axes (roll/yaw check)", expanded=False):
-        st.plotly_chart(
-            plot_candidate_axes(snippet=sample, poses=poses, max_axes=30),
-            width="stretch",
-        )
 
 
 def render_depth_page(depth_batch: CandidateDepthBatch) -> None:
