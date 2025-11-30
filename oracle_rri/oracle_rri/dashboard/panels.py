@@ -377,11 +377,11 @@ def render_candidates_page(
 def render_depth_page(depth_batch: CandidateDepthBatch) -> None:
     st.header("Candidate Renders")
 
-    depths = depth_batch["depths"]
-    indices = depth_batch["candidate_indices"].tolist()
+    depths = depth_batch.depths
+    indices = depth_batch.candidate_indices.tolist()
     titles = [f"Candidate {i}" for i in indices]
     # Best-effort zfar for stats; fall back to depth max if missing.
-    cam = depth_batch["camera"]
+    cam = depth_batch.camera
     if hasattr(cam, "valid_radius") and cam.valid_radius.numel() > 0:
         zfar_stat = float(cam.valid_radius.max().item())
     else:
@@ -407,10 +407,10 @@ def render_depth_page(depth_batch: CandidateDepthBatch) -> None:
         else:
             plane_dist = st.slider("Image plane distance (m)", 0.2, 3.0, 1.0, step=0.1, key="plane_dist_slider")
             builder = RenderingPlotBuilder.from_snippet(sample, title="Rendered frusta with image planes")
-            num_frustums = int(depth_batch["poses"].tensor().shape[0])
+            num_frustums = int(depth_batch.poses.tensor().shape[0])
             builder.add_frusta_with_image_plane(
-                poses=depth_batch["poses"],
-                camera=depth_batch["camera"],
+                poses=depth_batch.poses,
+                camera=depth_batch.camera,
                 plane_dist=float(plane_dist),
                 max_frustums=min(16, num_frustums),
             )
@@ -423,9 +423,9 @@ def render_depth_page(depth_batch: CandidateDepthBatch) -> None:
             stride = st.slider("Depth hit stride", 1, 32, 8, step=1, key="depth_hit_stride")
             builder_hits = RenderingPlotBuilder.from_snippet(sample, title="Depth hit back-projection")
             builder_hits.add_depth_hits(
-                depths=depth_batch["depths"],
-                poses=depth_batch["poses"],
-                camera=depth_batch["camera"],
+                depths=depth_batch.depths,
+                poses=depth_batch.poses,
+                camera=depth_batch.camera,
                 stride=int(stride),
                 max_points=20000,
             )

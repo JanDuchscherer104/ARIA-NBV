@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from dataclasses import dataclass
+from typing import Any
 
 import torch
 from efm3d.aria import CameraTW, PoseTW
@@ -12,17 +13,17 @@ from ..data.efm_views import EfmSnippetView
 from ..data.mesh_cache import mesh_from_snippet
 from ..pose_generation.types import CandidateSamplingResult
 from ..utils import BaseConfig, Console, Verbosity, pick_fast_depth_renderer
-from .efm3d_depth_renderer import Efm3dDepthRenderer, Efm3dDepthRendererConfig
 from .pytorch3d_depth_renderer import Pytorch3DDepthRenderer, Pytorch3DDepthRendererConfig
 
 
-class CandidateDepthBatch(TypedDict):
+@dataclass(slots=True)
+class CandidateDepthBatch:
     """Typed result for candidate depth rendering."""
 
     depths: torch.Tensor
     """Tensor['N', 'H', 'W'] with per-candidate depth maps in metres."""
 
-    poses: "PoseTW"
+    poses: PoseTW
     """PoseTW (world←camera) for the rendered subset."""
 
     mask_valid: torch.Tensor
@@ -31,11 +32,8 @@ class CandidateDepthBatch(TypedDict):
     candidate_indices: torch.Tensor
     """Indices (long) into the original candidate array corresponding to ``depths``."""
 
-    camera: "CameraTW"
+    camera: CameraTW
     """Camera calibration (and ref←cam extrinsics) for the rendered subset, same order as ``depths``."""
-
-
-RendererConfig = Pytorch3DDepthRendererConfig | Efm3dDepthRendererConfig
 
 
 class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
@@ -47,7 +45,7 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
     )
     """Factory target for :meth:`BaseConfig.setup_target`."""
 
-    renderer: RendererConfig = Field(default_factory=Pytorch3DDepthRendererConfig)
+    renderer: Pytorch3DDepthRendererConfig = Field(default_factory=Pytorch3DDepthRendererConfig)
     """Nested config describing the underlying renderer (PyTorch3D or CPU)."""
 
     max_candidates: int | None = None
@@ -98,7 +96,6 @@ class CandidateDepthRenderer:
     ) -> CandidateDepthBatch:
         """Render depth maps for valid candidate poses within a snippet."""
 
-        candidates = self._coerce_candidates(candidates)
         if not sample.has_mesh or sample.mesh is None:
             msg = "CandidateDepthRenderer requires snippets with attached meshes."
             self.console.error(msg)
@@ -136,12 +133,10 @@ class CandidateDepthRenderer:
         else:
             mesh_input = sample.mesh
 
-        if isinstance(self.renderer, Efm3dDepthRenderer):
-            raise NotImplementedError("Efm3dDepthRenderer is not supported in CandidateDepthRenderer.")
         if not isinstance(self.renderer, Pytorch3DDepthRenderer):
             raise TypeError(f"Unsupported renderer type: {self.renderer.__class__.__name__}")
 
-        depths = self.renderer.render_batch(
+        depths = self.renderer.render(
             poses=pose_batch,
             mesh=mesh_input,
             camera=camera_calib,
@@ -155,18 +150,14 @@ class CandidateDepthRenderer:
             self.console.warn(
                 "All candidate depth pixels are at zfar; check camera poses, mesh normals, or backface culling."
             )
-        mask_valid_subset = (
-            candidates.mask_valid.to(device=pose_batch.device)[candidate_indices]
-            if candidates.mask_valid is not None
-            else torch.ones_like(candidate_indices, dtype=torch.bool, device=pose_batch.device)
+        mask_valid_subset = candidates.mask_valid.to(device=pose_batch.device)[candidate_indices]
+        return CandidateDepthBatch(
+            depths=depths,
+            poses=pose_batch,
+            mask_valid=mask_valid_subset,
+            candidate_indices=candidate_indices,
+            camera=camera_calib,
         )
-        return {
-            "depths": depths,
-            "poses": pose_batch,
-            "mask_valid": mask_valid_subset,
-            "candidate_indices": candidate_indices,
-            "camera": camera_calib,
-        }
 
     # ------------------------------------------------------------------
     # Helpers
@@ -195,24 +186,6 @@ class CandidateDepthRenderer:
         poses_world_cam = t_world_ref @ t_ref_cam  # world ← camera
 
         return poses_world_cam, selected_views, candidate_idx
-
-    def _coerce_candidates(self, candidates: CandidateSamplingResult | dict) -> CandidateSamplingResult:
-        if isinstance(candidates, dict):
-            if "reference_pose" not in candidates:
-                raise ValueError("reference_pose required in candidate dict input.")
-            return CandidateSamplingResult(
-                views=candidates["views"],
-                reference_pose=candidates["reference_pose"],
-                mask_valid=candidates.get(
-                    "mask_valid",
-                    torch.ones(len(candidates["views"]), dtype=torch.bool),
-                ),
-                masks=candidates.get("masks", {}),
-                shell_poses=candidates.get("shell_poses", candidates["views"]),
-                shell_offsets_ref=candidates.get("shell_offsets_ref"),
-                extras=candidates.get("extras", {}),
-            )
-        return candidates
 
 
 __all__ = [

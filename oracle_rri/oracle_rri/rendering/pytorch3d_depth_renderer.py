@@ -104,7 +104,27 @@ class Pytorch3DDepthRenderer:
     # Public API
     # ------------------------------------------------------------------
 
-    def render_batch(
+    def render_depth(
+        self,
+        pose_world_cam: PoseTW,
+        mesh: Trimesh | tuple[torch.Tensor, torch.Tensor],
+        camera: CameraTW,
+        *,
+        frame_index: int | None = None,
+        mesh_cache_key: str | None = None,
+    ) -> Tensor:
+        """Render a single depth map."""
+
+        batched = self.render(
+            poses=pose_world_cam,
+            mesh=mesh,
+            camera=camera,
+            frame_index=frame_index,
+            mesh_cache_key=mesh_cache_key,
+        )
+        return batched[0]
+
+    def render(
         self,
         poses: PoseTW,
         mesh: Trimesh | tuple[torch.Tensor, torch.Tensor],
@@ -175,25 +195,59 @@ class Pytorch3DDepthRenderer:
         )
         rasterizer = MeshRasterizer(cameras=cameras, raster_settings=raster_settings)
         autocast_enable = dtype != torch.float32 and self.device.type == "cuda"
+        # with torch.autocast(device_type=self.device.type, dtype=dtype, enabled=autocast_enable):
+        #     fragments = rasterizer(mesh_struct)
+        #     depth = fragments.zbuf[..., 0]
+        # far = torch.full_like(depth, self.config.zfar)
+
         with torch.autocast(device_type=self.device.type, dtype=dtype, enabled=autocast_enable):
             fragments = rasterizer(mesh_struct)
-            depth = fragments.zbuf[..., 0]
-        far = torch.full_like(depth, self.config.zfar)
+            # <Latest change: not sure if correct!>, trying to fix `Metric depth bug: fragments.zbuf is a post‑projection z-buffer, not guaranteed to be Euclidean meters. We currently treat it as metric depth. Fix by reconstructing the hit point with barycentrics and re‑projecting to camera z`
+            pix_to_face = fragments.pix_to_face[..., 0]  # (B, H, W)
+            bary = fragments.bary_coords[..., 0, :]  # (B, H, W, 3)
+
+        # Prepare metric depth buffer.
+        depth = torch.full_like(pix_to_face, self.config.zfar, dtype=dtype, device=self.device)
+        far = depth.clone()
+
+        # Mapping from batch index to face offsets produced by Meshes.extend.
+        face_offset = mesh_struct.mesh_to_faces_packed_first_idx()  # (B + 1,)
+        verts_single = mesh_struct_single.verts_packed().to(dtype=dtype, device=self.device)  # (Fv, 3)
+        faces_single = mesh_struct_single.faces_packed()  # (Ff, 3)
+
+        for b in range(rotations.shape[0]):
+            mask = pix_to_face[b] >= 0
+            if not mask.any():
+                continue
+            fids = pix_to_face[b][mask] - face_offset[b]
+            tri = faces_single[fids]
+            v0 = verts_single[tri[:, 0]]
+            v1 = verts_single[tri[:, 1]]
+            v2 = verts_single[tri[:, 2]]
+            bcoords = bary[b][mask]
+            pts_world = bcoords[:, 0:1] * v0 + bcoords[:, 1:2] * v1 + bcoords[:, 2:3] * v2
+            R_cw = rotations[b]
+            t_cw = translations[b]
+            pts_cam = pts_world @ R_cw.transpose(-1, -2) + t_cw  # world → cam
+            depth_b = pts_cam[:, 2]
+            depth[b][mask] = depth_b
+        # </Latest change: not sure if correct!>
+
         depth = torch.where(torch.isfinite(depth), depth, far)
         depth = torch.where(depth <= 0, far, depth)
         hit_mask = depth < self.config.zfar
         hit_ratio = float(hit_mask.float().mean().item())
-        if self.console.is_debug:
-            self.console.dbg_summary(
-                "depth_stats",
-                {
-                    "hits_ratio": hit_ratio,
-                    "min": float(depth.min().item()),
-                    "max": float(depth.max().item()),
-                    "zfar": float(self.config.zfar),
-                    "cull_backfaces": self.config.cull_backfaces,
-                },
-            )
+
+        self.console.dbg_summary(
+            "depth_stats",
+            {
+                "hits_ratio": hit_ratio,
+                "min": float(depth.min().item()),
+                "max": float(depth.max().item()),
+                "zfar": float(self.config.zfar),
+                "cull_backfaces": self.config.cull_backfaces,
+            },
+        )
         if hit_ratio == 0.0 and self.config.cull_backfaces:
             self.console.warn(
                 "No depth hits recorded (all pixels at zfar). Consider disabling backface culling "
