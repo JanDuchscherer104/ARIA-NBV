@@ -66,7 +66,7 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     """Computation dtype; use float16/bfloat16 on CUDA for speed (may reduce z precision)."""
 
     verbosity: Verbosity = Field(
-        default=Verbosity.NORMAL,
+        default=Verbosity.VERBOSE,
         validation_alias=AliasChoices("verbosity", "verbose"),
         description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
     )
@@ -144,6 +144,15 @@ class Pytorch3DDepthRenderer:
         cam_single = self._slice_camera(camera, frame_index)
         width, height, focal_length, principal_point, image_size = self._camera_intrinsics(
             cam_single, dtype=dtype, batch_size=poses.shape[0]
+        )
+        self.console.plog(
+            {
+                "image_size": image_size,
+                "focal_length": focal_length,
+                "principal_point": principal_point,
+                "width": width,
+                "height": height,
+            }
         )
 
         poses_cw = poses.inverse().to(self.device)

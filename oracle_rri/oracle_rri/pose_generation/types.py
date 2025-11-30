@@ -47,17 +47,16 @@ class CandidateContext:
     cfg: "CandidateViewGeneratorConfig"
     reference_pose: PoseTW
 
-    gt_mesh: "Trimesh | None" = None
-    mesh_verts: torch.Tensor | None = None
-    mesh_faces: torch.Tensor | None = None
-    occupancy_extent: torch.Tensor | None = None
-    camera_fov: torch.Tensor | None = None
-    camera_calib_template: "CameraTW | None" = None
+    gt_mesh: Trimesh
+    mesh_verts: torch.Tensor
+    mesh_faces: torch.Tensor
+    occupancy_extent: torch.Tensor
+    camera_calib_template: CameraTW
 
-    shell_poses: PoseTW | None = None
-    centers_world: torch.Tensor | None = None
-    shell_offsets_ref: torch.Tensor | None = None
-    mask_valid: torch.Tensor | None = None
+    shell_poses: PoseTW
+    centers_world: torch.Tensor
+    shell_offsets_ref: torch.Tensor
+    mask_valid: torch.Tensor
 
     rule_masks: dict[str, torch.Tensor] = field(default_factory=dict)
     debug: dict[str, Any] = field(default_factory=dict)
@@ -68,7 +67,7 @@ class CandidateSamplingResult:
     """Immutable result of candidate sampling + rule-based pruning."""
 
     views: CameraTW
-    """views.T_camera_rig are reference_pose <- candidate_camera views for valid candidates (intrinsics as per CandidateGenerationConfig :: camera_label)."""
+    """views.T_camera_rig are candidate_camera <- reference_pose (camera pose in reference frame; intrinsics as per CandidateGenerationConfig :: camera_label)."""
     reference_pose: PoseTW
     """World <- reference_pose around which candidates are defined."""
     mask_valid: torch.Tensor

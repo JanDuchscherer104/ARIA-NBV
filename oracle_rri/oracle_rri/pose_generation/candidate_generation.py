@@ -21,6 +21,7 @@ from typing import Literal
 
 import torch
 import trimesh
+from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 from power_spherical import HypersphericalUniform, PowerSpherical
 from pydantic import AliasChoices, Field, field_validator, model_validator
@@ -119,12 +120,11 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     ray_subsample: int = 128
     step_clearance: float = 0.05
 
-    occupancy_extent: torch.Tensor | None = None
     mesh_samples: int | None = None
 
     device: torch.device = Field(default_factory=lambda: select_device("auto", component="CandidateViewGenerator"))
     verbosity: Verbosity = Field(
-        default=Verbosity.NORMAL,
+        default=Verbosity.VERBOSE,
         validation_alias=AliasChoices("verbosity", "verbose"),
         description="Verbosity level for logging.",
     )
@@ -480,7 +480,8 @@ class CandidateViewGenerator:
 
         device = torch.device(self.config.device)
         occ = sample.get_occupancy_extend()
-        occupancy_extent = occ.to(device=device, dtype=torch.float32) if occ is not None else None
+        self.console.dbg(f"Using occupancy extent: [xmin, xmax, ymin, ymax, zmin, zmax] = {occ}")
+        occupancy_extent = occ.to(device=device, dtype=torch.float32)
         gt_mesh = sample.mesh
         mesh_verts = sample.mesh_verts
         mesh_faces = sample.mesh_faces
@@ -490,8 +491,9 @@ class CandidateViewGenerator:
             mesh_verts = artifact.processed.verts
             mesh_faces = artifact.processed.faces
 
+        assert mesh_verts is not None and mesh_faces is not None, "Mesh vertices and faces must be provided."
+
         cam_view = sample.get_camera(self.config.camera_label)
-        fov = cam_view.get_fov().to(device=device)
 
         if frame_index is None:
             frame_index = self.config.reference_frame_index
@@ -512,28 +514,24 @@ class CandidateViewGenerator:
             gt_mesh=gt_mesh,
             mesh_verts=mesh_verts,
             mesh_faces=mesh_faces,
-            occupancy_extent=occupancy_extent,
-            camera_fov=fov,
             camera_calib_template=cam_view.calib,
+            occupancy_extent=occupancy_extent,
         )
 
     def generate(
         self,
         *,
         reference_pose: PoseTW,
-        gt_mesh: trimesh.Trimesh | None = None,
-        mesh_verts: torch.Tensor | None = None,
-        mesh_faces: torch.Tensor | None = None,
-        occupancy_extent: torch.Tensor | None = None,
-        camera_fov: torch.Tensor | None = None,
-        camera_calib_template=None,
+        gt_mesh: trimesh.Trimesh,
+        mesh_verts: torch.Tensor,
+        mesh_faces: torch.Tensor,
+        camera_calib_template: CameraTW,
+        occupancy_extent: torch.Tensor,
     ) -> CandidateSamplingResult:
         """Sample candidate poses around ``reference_pose`` and apply pruning rules."""
 
         cfg = self.config
         device = torch.device(cfg.device)
-
-        occ_extent = occupancy_extent if occupancy_extent is not None else cfg.occupancy_extent
 
         centers_world, offsets_ref = _sample_candidate_positions(reference_pose, cfg)
         shell_poses = _build_candidate_orientations(reference_pose, centers_world, cfg)
@@ -542,11 +540,10 @@ class CandidateViewGenerator:
             cfg=cfg,
             reference_pose=reference_pose.to(device),
             gt_mesh=gt_mesh,
-            mesh_verts=mesh_verts.to(device) if mesh_verts is not None else None,
-            mesh_faces=mesh_faces.to(device) if mesh_faces is not None else None,
-            occupancy_extent=occ_extent.to(device) if occ_extent is not None else None,
-            camera_fov=camera_fov,
-            camera_calib_template=camera_calib_template,
+            mesh_verts=mesh_verts.to(device),
+            mesh_faces=mesh_faces.to(device),
+            occupancy_extent=occupancy_extent.to(device),
+            camera_calib_template=camera_calib_template.to(device),
             shell_poses=shell_poses,
             centers_world=centers_world,
             shell_offsets_ref=offsets_ref,
@@ -560,12 +557,12 @@ class CandidateViewGenerator:
     # ------------------------------------------------------------------ internals
     def _build_default_rules(self, cfg: CandidateViewGeneratorConfig) -> list[Rule]:
         rules: list[Rule] = []
+        if cfg.ensure_free_space:
+            rules.append(FreeSpaceRule(cfg))
         if cfg.min_distance_to_mesh > 0:
             rules.append(MinDistanceToMeshRule(cfg))
         if cfg.ensure_collision_free:
             rules.append(PathCollisionRule(cfg))
-        if cfg.ensure_free_space:
-            rules.append(FreeSpaceRule(cfg))
         return rules
 
     def _apply_rules(self, ctx: CandidateContext) -> None:
@@ -587,8 +584,6 @@ class CandidateViewGenerator:
 
         template = ctx.camera_calib_template
         if template is None:
-            from efm3d.aria.camera import CameraTW
-
             template_data = CameraTW.from_parameters()._data.to(poses_ref_valid._data.device).view(1, -1)
         else:
             template_data = template._data
@@ -598,9 +593,9 @@ class CandidateViewGenerator:
 
         n = poses_ref_valid._data.shape[0]
         template_data = template_data[0].unsqueeze(0).expand(n, -1).clone()
-        template_data[:, 10:22] = poses_ref_valid._data
-
-        from efm3d.aria.camera import CameraTW
+        # Store camera pose in the reference frame as camera<-reference (EFM convention).
+        poses_cam_ref = poses_ref_valid.inverse()
+        template_data[:, 10:22] = poses_cam_ref._data
 
         poses_cam = CameraTW(template_data)
 

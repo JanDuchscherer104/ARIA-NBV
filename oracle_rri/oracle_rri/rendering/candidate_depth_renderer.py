@@ -180,10 +180,10 @@ class CandidateDepthRenderer:
             candidate_idx = torch.arange(num_candidates, device=device, dtype=torch.long)
 
         selected_views = cam_views[candidate_idx]
-        # CandidateSamplingResult convention: T_camera_rig is reference<-camera.
-        t_ref_cam = selected_views.T_camera_rig.to(device=device)  # reference ← camera
+        # CandidateSamplingResult convention: T_camera_rig is camera<-reference.
+        t_cam_ref = selected_views.T_camera_rig.to(device=device)  # camera ← reference
         t_world_ref = candidates.reference_pose.to(device=device)  # world ← reference
-        poses_world_cam = t_world_ref @ t_ref_cam  # world ← camera
+        poses_world_cam = t_world_ref @ t_cam_ref.inverse()  # world ← camera
 
         return poses_world_cam, selected_views, candidate_idx
 

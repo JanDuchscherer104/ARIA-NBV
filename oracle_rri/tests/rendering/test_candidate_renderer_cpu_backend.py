@@ -154,6 +154,6 @@ def test_candidate_renderer_cpu_backend_runs():
     renderer = cfg.setup_target()
 
     batch = renderer.render(sample=sample, candidates=candidates)
-    assert batch["depths"].shape[0] == 2
-    assert batch["depths"].shape[1:] == (16, 16)
-    assert torch.isfinite(batch["depths"]).all()
+    assert batch.depths.shape[0] == 2
+    assert batch.depths.shape[1:] == (16, 16)
+    assert torch.isfinite(batch.depths).all()

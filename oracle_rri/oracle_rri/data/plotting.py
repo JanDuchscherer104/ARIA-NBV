@@ -9,7 +9,7 @@ Conventions (efm3d / ATEK):
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Literal
+from typing import Literal, Self
 
 import numpy as np
 import plotly.graph_objects as go  # type: ignore[import-untyped]
@@ -233,7 +233,7 @@ class SnippetPlotBuilder:
         self.scene_ranges = self._build_scene_ranges(*self._bounds)
 
     @classmethod
-    def from_snippet(cls, snippet: EfmSnippetView, *, title: str, height: int = 900) -> "SnippetPlotBuilder":
+    def from_snippet(cls, snippet: EfmSnippetView, *, title: str, height: int = 900) -> Self:
         return cls(snippet, title=title, height=height)
 
     def _default_scene_ranges(self) -> dict:
@@ -273,18 +273,23 @@ class SnippetPlotBuilder:
         }
 
     def _update_scene_ranges(self, pts: np.ndarray) -> None:
-        finite = np.isfinite(pts).all(axis=1)
+        pts_np = np.asarray(pts)
+        pts_np = np.atleast_2d(pts_np)
+        if pts_np.shape[1] != 3:
+            pts_np = pts_np.reshape(-1, 3)
+
+        finite = np.isfinite(pts_np).all(axis=1)
         if not finite.any():
             return
         vmin, vmax = self._bounds
-        pts_min = pts[finite].min(axis=0)
-        pts_max = pts[finite].max(axis=0)
+        pts_min = pts_np[finite].min(axis=0)
+        pts_max = pts_np[finite].max(axis=0)
         vmin = np.minimum(vmin, pts_min)
         vmax = np.maximum(vmax, pts_max)
         self._bounds = (vmin, vmax)
         self.scene_ranges = self._build_scene_ranges(vmin, vmax)
 
-    def add_mesh(self, *, color: str = "lightgray", opacity: float = 0.35) -> "SnippetPlotBuilder":
+    def add_mesh(self, *, color: str = "lightgray", opacity: float = 0.35) -> Self:
         mesh = self.snippet.mesh
         if mesh is None:
             return self
@@ -300,7 +305,7 @@ class SnippetPlotBuilder:
         max_points: int | None = 20000,
         last_frame_only: bool = True,
         color: str = "Viridis",
-    ) -> "SnippetPlotBuilder":
+    ) -> Self:
         sem = self.snippet.semidense
         if sem is None:
             return self
@@ -328,7 +333,7 @@ class SnippetPlotBuilder:
         size: int = 4,
         opacity: float = 0.7,
         symbol: str = "circle",
-    ) -> "SnippetPlotBuilder":
+    ) -> Self:
         """Scatter arbitrary 3D points onto the figure and update bounds."""
 
         pts_np = _pose_positions(points) if isinstance(points, (PoseTW, torch.Tensor)) else np.asarray(points)
@@ -358,7 +363,7 @@ class SnippetPlotBuilder:
         first_color: str = "green",
         last_color: str = "red",
         show: bool = True,
-    ) -> "SnippetPlotBuilder":
+    ) -> Self:
         if not show:
             return self
         traj_positions = self.snippet.trajectory.t_world_rig.t.detach().cpu().numpy()
@@ -403,14 +408,14 @@ class SnippetPlotBuilder:
     def add_frusta(
         self,
         *,
-        camera: Literal["rgb", "slam-l", "slam-r"] = "rgb",
+        camera: Literal["rgb", "slaml", "slamr"] = "rgb",
         frame_indices: list[int] | None = None,
         scale: float = 1.0,
         include_axes: bool = True,
         include_center: bool = True,
         name: str = "Frustum",
-    ) -> "SnippetPlotBuilder":
-        cam_view = self._camera_by_name(camera)
+    ) -> Self:
+        cam_view = self.snippet.get_camera(camera)
         traj = self.snippet.trajectory
         cam_idx, traj_idx = cam_view.nearest_traj_indices(traj.time_ns, frame_indices, default_last=False)
         if cam_idx.numel() == 0 or traj_idx.numel() == 0:
@@ -438,43 +443,52 @@ class SnippetPlotBuilder:
     def add_frame_axes(
         self,
         *,
-        frame: Literal["rgb", "slam-l", "slam-r", "rig"] = "rgb",
+        frame: Literal["rgb", "slaml", "slamr", "rig"] | PoseTW = "rgb",
         frame_indices: list[int] | None = None,
         title: str = "Frame axes",
-    ) -> "SnippetPlotBuilder":
-        """Add axes for a camera stream or the rig itself."""
+    ) -> Self:
+        """Add axes for a camera stream or the rig itself.
 
-        traj = self.snippet.trajectory
-        if traj.time_ns.shape.numel() == 0:
-            console.warn("No trajectory data; cannot add frame axes.")
-            return self
+        Args:
+            frame: Camera label, "rig" for the rig frame to retrieve the poses form `sample.trajectory`, or a custom PoseTW.
+            If frame is a PoseTW it must be
+        """
 
-        if frame == "rig":
-            # Anchor rig axes to camera timestamps for consistent indexing/alignment.
-            cam_view = self._camera_by_name("rgb")
-            if cam_view is None:
-                console.warn("No camera stream available; cannot add rig axes.")
-                return self
-
-            cam_idx, traj_idx = cam_view.nearest_traj_indices(traj.time_ns, frame_indices, default_last=True)
-            if cam_idx.numel() == 0 or traj_idx.numel() == 0:
-                console.warn("No valid frame indices for rig axes.")
-                return self
-
-            t_world_frame = traj.t_world_rig[traj_idx]
+        if isinstance(frame, PoseTW):
+            t_world_frame = frame
         else:
-            cam_view = self._camera_by_name(frame)
-            n_cam = cam_view.num_frames
-            if n_cam == 0:
-                return self
-            cam_idx, traj_idx = cam_view.nearest_traj_indices(traj.time_ns, frame_indices, default_last=True)
-            if cam_idx.numel() == 0 or traj_idx.numel() == 0:
+            traj = self.snippet.trajectory
+            if traj.time_ns.shape.numel() == 0:
+                console.warn("No trajectory data; cannot add frame axes.")
                 return self
 
-            t_world_rig = traj.t_world_rig[traj_idx]  # PoseTW[K]
-            t_cam_rig = cam_view.calib.T_camera_rig[cam_idx]  # PoseTW[K]
-            t_world_frame = rotate_yaw_cw90(t_world_rig @ t_cam_rig.inverse())
+            if frame == "rig":
+                # Anchor rig axes to camera timestamps for consistent indexing/alignment.
+                cam_view = self.snippet.get_camera("rgb")
+                if cam_view is None:
+                    console.warn("No camera stream available; cannot add rig axes.")
+                    return self
 
+                cam_idx, traj_idx = cam_view.nearest_traj_indices(traj.time_ns, frame_indices, default_last=True)
+                if cam_idx.numel() == 0 or traj_idx.numel() == 0:
+                    console.warn("No valid frame indices for rig axes.")
+                    return self
+
+                t_world_frame = traj.t_world_rig[traj_idx]
+            else:
+                cam_view = self.snippet.get_camera(frame)
+                n_cam = cam_view.num_frames
+                if n_cam == 0:
+                    return self
+                cam_idx, traj_idx = cam_view.nearest_traj_indices(traj.time_ns, frame_indices, default_last=True)
+                if cam_idx.numel() == 0 or traj_idx.numel() == 0:
+                    return self
+
+                t_world_rig = traj.t_world_rig[traj_idx]  # PoseTW[K]
+                t_cam_rig = cam_view.calib.T_camera_rig[cam_idx]  # PoseTW[K]
+                t_world_frame = t_world_rig @ t_cam_rig.inverse()
+
+        t_world_frame = rotate_yaw_cw90(t_world_frame)
         centers = t_world_frame.t.detach().cpu().numpy()
         axes = t_world_frame.R.transpose(-1, -2).detach().cpu().numpy()  # (K, 3, 3)
 
@@ -487,15 +501,13 @@ class SnippetPlotBuilder:
     def add_camera_axes(
         self,
         *,
-        camera: Literal["rgb", "slam-l", "slam-r"] = "rgb",
+        camera: Literal["rgb", "slam-l", "slamr"] = "rgb",
         frame_indices: list[int] | None = None,
         title: str = "Camera axes",
-    ) -> "SnippetPlotBuilder":
+    ) -> Self:
         return self.add_frame_axes(frame=camera, frame_indices=frame_indices, title=title)
 
-    def _add_camera_axes(
-        self, cam_centers: np.ndarray, cam_axes: np.ndarray, title: str = "Camera axes"
-    ) -> "SnippetPlotBuilder":
+    def _add_camera_axes(self, cam_centers: np.ndarray, cam_axes: np.ndarray, title: str = "Camera axes") -> Self:
         """Add LUF axes for multiple cameras in one go."""
 
         if cam_centers.ndim == 1:
@@ -523,9 +535,7 @@ class SnippetPlotBuilder:
 
         return self
 
-    def _add_camera_center(
-        self, cam_center: np.ndarray, *, color: str = "red", symbol: str = "diamond"
-    ) -> "SnippetPlotBuilder":
+    def _add_camera_center(self, cam_center: np.ndarray, *, color: str = "red", symbol: str = "diamond") -> Self:
         self.fig.add_trace(
             go.Scatter3d(
                 x=[cam_center[0]],
@@ -587,7 +597,7 @@ class SnippetPlotBuilder:
         max_frustums: int | None,
         include_axes: bool,
         include_center: bool,
-    ) -> "SnippetPlotBuilder":
+    ) -> Self:
         pose_list = self._pose_list_from_input(poses)
         if max_frustums is not None and len(pose_list) > max_frustums:
             ids = np.linspace(0, len(pose_list) - 1, num=max_frustums, dtype=int)
@@ -654,7 +664,7 @@ class SnippetPlotBuilder:
         dash: str = "dash",
         width: int = 2,
         aabb: tuple[np.ndarray, np.ndarray] | None = None,
-    ) -> "SnippetPlotBuilder":
+    ) -> Self:
         if aabb is None:
             sem = self.snippet.semidense
             if sem is not None and hasattr(sem, "volume_min") and hasattr(sem, "volume_max"):
@@ -690,7 +700,7 @@ class SnippetPlotBuilder:
         color: str = "purple",
         name: str = "GT OBBs",
         opacity: float = 0.35,
-    ) -> "SnippetPlotBuilder":
+    ) -> Self:
         """Add oriented boxes defined by world←object poses and dimensions."""
 
         if self.snippet.gt is None:
@@ -704,7 +714,7 @@ class SnippetPlotBuilder:
         if ts_key is None:
             return self
 
-        cam_id_map = {"rgb": "camera-rgb", "slam-l": "camera-slam-left", "slam-r": "camera-slam-right"}
+        cam_id_map = {"rgb": "camera-rgb", "slam-l": "camera-slam-left", "slamr": "camera-slamright"}
         try:
             cam_gt = self.snippet.gt.cameras_at(ts_key)[cam_id_map.get(camera, "camera-rgb")]
         except KeyError:
@@ -786,14 +796,6 @@ class SnippetPlotBuilder:
         self.fig.update_layout(title=self.title, scene=dict(aspectmode="data", **self.scene_ranges), height=self.height)
         return self.fig
 
-    def _camera_by_name(self, camera: Literal["rgb", "slam-l", "slam-r"]) -> EfmCameraView:
-        cam_map = {
-            "rgb": self.snippet.camera_rgb,
-            "slam-l": self.snippet.camera_slam_left,
-            "slam-r": self.snippet.camera_slam_right,
-        }
-        return cam_map.get(camera, self.snippet.camera_rgb)
-
 
 def _to_uint8_image(img: torch.Tensor) -> np.ndarray:
     """Convert tensor image (C,H,W or H,W) to uint8 HWC."""
@@ -858,7 +860,7 @@ def collect_frame_modalities(
     cams: list[tuple[str, EfmCameraView]] = [
         ("RGB", sample.camera_rgb),
         ("SLAM-L", sample.camera_slam_left),
-        ("SLAM-R", sample.camera_slam_right),
+        ("slamr", sample.camera_slam_right),
     ]
 
     for name, cam in cams:
@@ -1027,7 +1029,7 @@ def plot_first_last_frames(sample: EfmSnippetView) -> go.Figure:
 
 def plot_trajectory(
     sample: EfmSnippetView,
-    camera: Literal["rgb", "slam-l", "slam-r"] = "rgb",
+    camera: Literal["rgb", "slam-l", "slamr"] = "rgb",
     show_semidense: bool = True,
     max_sem_points: int | None = 20000,
     pc_from_last_only: bool = True,

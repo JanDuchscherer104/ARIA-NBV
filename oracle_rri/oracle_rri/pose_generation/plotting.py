@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Literal
+from typing import TYPE_CHECKING, Self
 
 import numpy as np
 import plotly.graph_objects as go  # type: ignore[import]
@@ -15,25 +14,40 @@ from oracle_rri.data import EfmSnippetView
 from oracle_rri.data.plotting import SnippetPlotBuilder
 from oracle_rri.utils import Console
 
-from .types import CandidateSamplingResult
+if TYPE_CHECKING:
+    from .candidate_generation import CandidateViewGeneratorConfig
+    from .types import CandidateSamplingResult
 
 console = Console.with_prefix("pose_plotting")
 
 
 class CandidatePlotBuilder(SnippetPlotBuilder):
     candidate_results: CandidateSamplingResult | None = None
-    candidate_cfg = None
+    candidate_cfg: CandidateViewGeneratorConfig | None = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.candidate_results = None
+        self.candidate_cfg = None
+        self._centers_valid: np.ndarray | None = None
+        self._centers_all: np.ndarray | None = None
+        self._ref_center: np.ndarray | None = None
 
-    def attach_candidate_results(self, results: CandidateSamplingResult) -> CandidatePlotBuilder:
+    @classmethod
+    def from_candidates(
+        cls, snippet: EfmSnippetView, candidates: CandidateSamplingResult, *, title: str, height: int = 900
+    ) -> Self:
+        return cls.from_snippet(snippet, title=title, height=height).attach_candidate_results(candidates)
+
+    def attach_candidate_results(self, results: CandidateSamplingResult) -> Self:
         """Attach candidate sampling results for plotting."""
         self.candidate_results = results
+        self._centers_all = None
+        self._centers_valid = None
+        self._ref_center = None
         return self
 
-    def attach_candidate_cfg(self, cfg) -> CandidatePlotBuilder:
+    def attach_candidate_cfg(self, cfg: CandidateViewGeneratorConfig) -> Self:
         """Attach candidate config for metadata-aware plotting."""
         self.candidate_cfg = cfg
         return self
@@ -42,29 +56,54 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
     def _world_positions(self, use_valid: bool = True) -> np.ndarray:
         if self.candidate_results is None:
             raise ValueError("Candidate results missing; call attach_candidate_results() first.")
-        shell = self.candidate_results.shell_poses
-        mask = self.candidate_results.mask_valid if use_valid else None
-        if mask is not None:
-            shell = PoseTW(shell._data[mask])
-        return shell.t.detach().cpu().numpy()
+        if use_valid:
+            if self._centers_valid is None:
+                shell = PoseTW(self.candidate_results.shell_poses._data[self.candidate_results.mask_valid])
+                self._centers_valid = shell.t.detach().cpu().numpy()
+            return self._centers_valid
+        if self._centers_all is None:
+            self._centers_all = self.candidate_results.shell_poses.t.detach().cpu().numpy()
+        return self._centers_all
+
+    def _mask_valid_np(self) -> np.ndarray:
+        if self.candidate_results is None:
+            raise ValueError("Candidate results missing; call attach_candidate_results() first.")
+        return self.candidate_results.mask_valid.detach().cpu().numpy()
+
+    def _ref_center_np(self) -> np.ndarray:
+        if self.candidate_results is None:
+            raise ValueError("Candidate results missing; call attach_candidate_results() first.")
+        if self._ref_center is None:
+            self._ref_center = self.candidate_results.reference_pose.t.detach().cpu().numpy()
+        return self._ref_center
+
+    def add_reference_axes(self, *, title: str = "Reference frame") -> Self:
+        if self.candidate_results is None:
+            return self
+        return self.add_frame_axes(frame=self.candidate_results.reference_pose, title=title)
 
     def add_candidate_points(
         self,
         *,
         use_valid: bool = True,
-        color: np.ndarray | None = None,
+        color: np.ndarray | str | None = None,
         colorbar_title: str | None = None,
         name: str = "Candidates",
         size: int = 3,
         opacity: float = 0.7,
         hovertext: list[str] | None = None,
-    ) -> "CandidatePlotBuilder":
+        mark_reference: bool = False,
+        reference_symbol: str = "diamond",
+    ) -> Self:
         pts = self._world_positions(use_valid=use_valid)
         marker = {"size": size, "opacity": opacity}
         if color is not None:
-            marker.update({"color": color, "colorscale": "Viridis"})
-            if colorbar_title:
-                marker["colorbar"] = {"title": colorbar_title}
+            if isinstance(color, np.ndarray):
+                marker.update({"color": color, "colorscale": "Viridis"})
+                if colorbar_title:
+                    marker["colorbar"] = {"title": colorbar_title}
+            else:
+                marker.update({"color": color})
         self.fig.add_trace(
             go.Scatter3d(
                 x=pts[:, 0],
@@ -77,11 +116,58 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
                 hoverinfo="text" if hovertext else "name",
             )
         )
+        if mark_reference and self.candidate_results is not None:
+            ref = self.candidate_results.reference_pose.t.detach().cpu().numpy()
+            self.fig.add_trace(
+                go.Scatter3d(
+                    x=[ref[0]],
+                    y=[ref[1]],
+                    z=[ref[2]],
+                    mode="markers",
+                    marker={"color": "black", "size": 6, "symbol": reference_symbol},
+                    name="Reference pose",
+                )
+            )
         return self
 
-    def add_min_distance_overlay(self, distances: torch.Tensor, *, use_valid: bool = False) -> "CandidatePlotBuilder":
+    def add_candidate_cloud(
+        self,
+        *,
+        use_valid: bool = True,
+        color: str | np.ndarray | None = "royalblue",
+        name: str = "Candidates",
+        size: int = 4,
+        opacity: float = 0.7,
+        mark_reference: bool = True,
+    ) -> Self:
+        return self.add_candidate_points(
+            use_valid=use_valid,
+            color=color,
+            name=name,
+            size=size,
+            opacity=opacity,
+            mark_reference=mark_reference,
+        )
+
+    def add_rejected_cloud(
+        self,
+        *,
+        color: str = "crimson",
+        name: str = "Rejected",
+        size: int = 4,
+        opacity: float = 0.8,
+    ) -> Self:
+        if self.candidate_results is None:
+            return self
+        mask = self._mask_valid_np()
+        if mask.size == 0 or mask.all():
+            return self
+        pts = self._world_positions(use_valid=False)[~mask]
+        return self.add_points(pts, name=name, color=color, size=size, opacity=opacity)
+
+    def add_min_distance_overlay(self, distances: torch.Tensor, *, use_valid: bool = False) -> Self:
         dist_np = distances.detach().cpu().numpy().reshape(-1)
-        mask = self.candidate_results.mask_valid.detach().cpu().numpy()
+        mask = self._mask_valid_np()
         hover = [f"dist={d:.3f} m<br>valid={bool(v)}" for d, v in zip(dist_np.tolist(), mask.tolist(), strict=False)]
         return self.add_candidate_points(
             use_valid=use_valid,
@@ -91,11 +177,12 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
             hovertext=hover,
             opacity=0.8,
             size=4,
+            mark_reference=True,
         )
 
-    def add_path_collision_segments(self, collision_mask: torch.Tensor) -> "CandidatePlotBuilder":
-        ref = self.candidate_results.reference_pose.t.detach().cpu().numpy()
-        centers = self.candidate_results.shell_poses.t.detach().cpu().numpy()
+    def add_path_collision_segments(self, collision_mask: torch.Tensor) -> Self:
+        ref = self._ref_center_np()
+        centers = self._world_positions(use_valid=False)
         mask_np = collision_mask.detach().cpu().numpy().astype(bool)
         rej_centers = centers[mask_np]
         if rej_centers.size > 0:
@@ -178,78 +265,20 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
         )
 
 
-def plot_candidate_frusta(
-    *,
-    snippet: EfmSnippetView,
-    candidates: CandidateSamplingResult,
-    frustum_scale: float,
-    max_frustums: int,
-) -> go.Figure:
-    """Plot mesh, candidate centres, and frustums using the shared builder."""
-
-    return (
-        CandidatePlotBuilder.from_snippet(snippet, title="Candidates with frustums")
-        .attach_candidate_results(candidates)
-        .add_mesh()
-        .add_candidate_points(use_valid=True, name="Candidates", opacity=0.35, size=3, color="royalblue")
-        .add_candidate_frusta(
-            scale=frustum_scale,
-            color="crimson",
-            name="Frustum",
-            max_frustums=max_frustums,
-            include_axes=False,
-            include_center=False,
-        )
-        .add_frame_axes(frame="rgb", title="Final Camera")
-    ).finalize()
-
-
-def plot_candidates(
-    *,
-    snippet: EfmSnippetView,
-    poses: PoseTW,
-    title: str = "Candidate positions",
-    center: np.ndarray | None = None,
-    camera: Literal["rgb", "slaml", "slamr"] = "rgb",
-    camera_frame_indices: Sequence[int] | None = None,
-) -> go.Figure:
-    """Plot candidate camera centres with optional mesh overlay."""
-    builder = (
-        SnippetPlotBuilder.from_snippet(snippet, title=title)
-        .add_mesh()
-        .add_points(poses, name="Candidates", color="royalblue", size=4, opacity=0.7)
-    )
-
-    if camera_frame_indices is not None:
-        builder = builder.add_frame_axes(frame=camera, frame_indices=list(camera_frame_indices), title="Final Camera")
-    else:
-        builder = builder.add_frame_axes(frame=camera, title="Final Camera", frame_indices=camera_frame_indices)
-
-    if center is not None:
-        builder = builder.add_points(
-            np.asarray(center).reshape(1, 3),
-            name="sampling center",
-            color="red",
-            size=1,
-            symbol="x",
-            opacity=1.0,
-        )
-
-    return builder.finalize()
-
-
 def candidate_offsets_and_dirs_ref(
     candidates: CandidateSamplingResult,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Offsets and forward directions in reference frame for **valid** candidates."""
 
-    poses_ref = candidates.views.T_camera_rig  # reference←cam for valid mask
-    offsets = poses_ref.t
+    poses_ref = candidates.views.T_camera_rig  # camera←reference
+    offsets = poses_ref.inverse().t  # reference←camera -> offset in reference frame
     offsets = offsets.view(-1, 3)
     z_cam = (
         torch.tensor([0.0, 0.0, 1.0], device=offsets.device, dtype=offsets.dtype).view(1, 3).expand(offsets.shape[0], 3)
     )
-    dirs = poses_ref.rotate(z_cam).view(-1, 3)
+    # Forward in reference frame: transform camera +z into reference using reference←camera.
+    poses_ref_refcam = poses_ref.inverse()
+    dirs = poses_ref_refcam.rotate(z_cam).view(-1, 3)
     dirs = dirs / (dirs.norm(dim=1, keepdim=True) + 1e-8)
     return offsets, dirs
 
@@ -485,7 +514,7 @@ def plot_min_distance_to_mesh(
             size=4,
             hovertext=hover,
         )
-        .add_frame_axes(frame="rig", title="Reference frame")
+        .add_reference_axes()
     )
     return builder.finalize()
 
@@ -511,8 +540,10 @@ def plot_path_collision_segments(
         builder.add_path_collision_segments(collision_mask)
 
     builder.add_candidate_points(use_valid=False, color=np.array(colors), name="Candidates", opacity=1.0, size=4)
-    builder.add_frame_axes(frame="rig", title="Reference frame")
+    builder.add_reference_axes()
     return builder.finalize()
+
+
 def plot_rule_rejection_bar(candidates: CandidateSamplingResult) -> go.Figure:
     """Bar chart of rejection counts per rule using cumulative masks."""
 

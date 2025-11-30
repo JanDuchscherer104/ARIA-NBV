@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import torch
 import trimesh  # type: ignore[import-untyped]
-from git import TYPE_CHECKING
 
 from ..utils import Console
 from .types import CandidateContext, CollisionBackend

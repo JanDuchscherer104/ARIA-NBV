@@ -97,7 +97,7 @@ def test_integration_pytorch3d_backend(efm_sample):
     )
     renderer = cfg.setup_target()
     batch = renderer.render(sample=efm_sample, candidates=candidates)
-    depths = batch["depths"]
+    depths = batch.depths
     hit_ratio = float((depths < renderer.renderer.config.zfar).float().mean().item())
     assert depths.shape[0] == 1
     assert hit_ratio > 0.1  # should see some geometry in real scene
@@ -142,7 +142,7 @@ def test_integration_cpu_backend(efm_sample):
     )
     renderer = cfg.setup_target()
     batch = renderer.render(sample=sample_cpu, candidates=candidates)
-    depths = batch["depths"]
+    depths = batch.depths
     hit_ratio = float((depths < renderer.renderer.config.zfar).float().mean().item())
     assert depths.shape[0] == 1
     assert hit_ratio > 0.1

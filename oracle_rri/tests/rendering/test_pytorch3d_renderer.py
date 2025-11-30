@@ -201,10 +201,10 @@ def test_candidate_depth_renderer_ignores_mask_and_respects_cap():
     renderer = cfg.setup_target()
 
     batch = renderer.render(sample=sample, candidates=candidates)
-    assert batch["depths"].shape[0] == 2
-    assert torch.equal(batch["candidate_indices"], torch.tensor([0, 1]))
-    assert batch["mask_valid"].shape[0] == 2
-    assert torch.equal(batch["mask_valid"], candidates.mask_valid[:2])
+    assert batch.depths.shape[0] == 2
+    assert torch.equal(batch.candidate_indices, torch.tensor([0, 1]))
+    assert batch.mask_valid.shape[0] == 2
+    assert torch.equal(batch.mask_valid, candidates.mask_valid[:2])
 
 
 @pytest.mark.xfail(reason="PyTorch3D backface culling keeps inward-facing quads when camera is inside the mesh.")

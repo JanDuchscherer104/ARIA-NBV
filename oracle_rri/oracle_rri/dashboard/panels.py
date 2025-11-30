@@ -18,9 +18,8 @@ from ..data.plotting import (
 )
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..pose_generation.plotting import (
+    CandidatePlotBuilder,
     candidate_offsets_and_dirs_ref,
-    plot_candidate_frusta,
-    plot_candidates,
     plot_direction_marginals,
     plot_direction_polar,
     plot_direction_sphere,
@@ -259,27 +258,19 @@ def render_candidates_page(
     max_frustums: int,
     plot_rejected_only: bool,
 ) -> None:
-    ref_pose = candidates.reference_pose
-    ref_center = ref_pose.t.detach().cpu().numpy()
-
     shell_poses = candidates.shell_poses
     mask_valid = candidates.mask_valid
-    poses_world = PoseTW(shell_poses._data[mask_valid])
 
     st.header("Candidate Poses")
     with st.status("Building candidate plots...", expanded=False):
-        cam_view = sample.get_camera(cand_cfg.camera_label)
-        last_idx = max(0, int(cam_view.time_ns.shape[0]) - 1)
-        cam_name = cand_cfg.camera_label
-
-        cand_fig = plot_candidates(
-            snippet=sample,
-            poses=poses_world,
-            title="Candidate positions",
-            center=ref_center,
-            camera=cand_cfg.camera_label,
-            camera_frame_indices=[last_idx],
-        )
+        cand_fig = (
+            CandidatePlotBuilder.from_candidates(
+                sample, candidates, title=f"Candidate positions ({cand_cfg.camera_label})"
+            )
+            .add_mesh()
+            .add_candidate_cloud(use_valid=True, color="royalblue", size=4, opacity=0.7)
+            .add_reference_axes()
+        ).finalize()
     st.plotly_chart(cand_fig, width="stretch")
 
     offsets_ref, dirs_ref = candidate_offsets_and_dirs_ref(candidates)
@@ -344,17 +335,26 @@ def render_candidates_page(
     with st.expander("Rejections per rule", expanded=False):
         st.plotly_chart(plot_rule_rejection_bar(candidates), width="stretch")
 
-    mask_valid = candidates.mask_valid
     if mask_valid is None or mask_valid.sum() == 0:
         st.warning("All candidates were rejected; frustum plot omitted.")
     else:
         with st.status("Candidate Frusta", expanded=False):
-            frust_fig = plot_candidate_frusta(
-                snippet=sample,
-                candidates=candidates,
-                frustum_scale=frustum_scale,
-                max_frustums=max_frustums,
-            )
+            frust_fig = (
+                CandidatePlotBuilder.from_candidates(
+                    sample, candidates, title=f"Candidate frusta ({cand_cfg.camera_label})"
+                )
+                .add_mesh()
+                .add_candidate_cloud(use_valid=True, color="royalblue", size=3, opacity=0.35)
+                .add_candidate_frusta(
+                    scale=frustum_scale,
+                    color="crimson",
+                    name="Frustum",
+                    max_frustums=max_frustums,
+                    include_axes=False,
+                    include_center=False,
+                )
+                .add_reference_axes()
+            ).finalize()
             st.plotly_chart(frust_fig, width="stretch")
 
     rejected_poses = rejected_pose_tensor(candidates)
@@ -363,14 +363,14 @@ def render_candidates_page(
             st.info("No rejected poses to plot; all sampled candidates survived rule filtering.")
         else:
             with st.status("Rendering rejected candidates plot...", expanded=False):
-                rej_fig = plot_candidates(
-                    snippet=sample,
-                    poses=rejected_poses,
-                    title=f"Rejected candidate positions ({rejected_poses.shape[0]})",
-                    center=ref_center,
-                    camera=cam_name,
-                    camera_frame_indices=[last_idx],
-                )
+                rej_fig = (
+                    CandidatePlotBuilder.from_candidates(
+                        sample, candidates, title=f"Rejected candidate positions ({rejected_poses.shape[0]})"
+                    )
+                    .add_mesh()
+                    .add_rejected_cloud()
+                    .add_reference_axes()
+                ).finalize()
             st.plotly_chart(rej_fig, width="stretch")
 
 
