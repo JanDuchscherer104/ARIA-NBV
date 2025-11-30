@@ -1029,7 +1029,7 @@ def plot_first_last_frames(sample: EfmSnippetView) -> go.Figure:
 
 def plot_trajectory(
     sample: EfmSnippetView,
-    camera: Literal["rgb", "slam-l", "slamr"] = "rgb",
+    camera: Literal["rgb", "slaml", "slamr"] = "rgb",
     show_semidense: bool = True,
     max_sem_points: int | None = 20000,
     pc_from_last_only: bool = True,
@@ -1078,136 +1078,6 @@ def plot_trajectory(
     return builder.finalize()
 
 
-def plot_crop_box(sample: EfmSnippetView, margin: float = 0.0, color: str = "orange") -> go.Figure:
-    """Visualize the semidense AABB (with optional margin) and mesh/trajectory context."""
-
-    # Prefer computing bounds from finite semidense points to avoid oversized volumes.
-    sem = sample.semidense
-    if sem is None or not hasattr(sem, "points_world"):
-        return go.Figure()
-    lengths = sem.lengths
-    frame_idx = int(torch.argmax(lengths).item())
-    n_valid = int(lengths[frame_idx].item())
-    points = sem.points_world[frame_idx, :n_valid]
-    finite = torch.isfinite(points).all(dim=-1)
-    points = points[finite]
-    if points.shape[0] == 0:
-        return go.Figure()
-    pts_np = points.detach().cpu().numpy()
-    # Outlier-robust bounds (1st-99th percentile) to avoid a few stray points inflating the box.
-    lo_np = np.nanpercentile(pts_np, 1, axis=0) - margin
-    hi_np = np.nanpercentile(pts_np, 99, axis=0) + margin
-    console.dbg(
-        f"crop box from semidense frame {frame_idx}: n={pts_np.shape[0]}, lo={lo_np}, hi={hi_np}, margin={margin}"
-    )
-
-    edges = bbox_edges(lo_np, hi_np)
-    fig = go.Figure()
-
-    def _add_edges(edge_group: np.ndarray, *, width: int, name: str | None = None) -> None:
-        x, y, z = _flatten_edges_for_plotly(edge_group)
-        fig.add_trace(
-            go.Scatter3d(
-                x=x,
-                y=y,
-                z=z,
-                mode="lines",
-                line={"color": color, "width": width},
-                name=name,
-                showlegend=name is not None,
-            )
-        )
-
-    _add_edges(edges[:4], width=6, name="Crop AABB")
-    _add_edges(edges[4:], width=3)
-
-    if sample.mesh is not None:
-        fig.add_trace(
-            go.Mesh3d(
-                x=sample.mesh.vertices[:, 0],
-                y=sample.mesh.vertices[:, 1],
-                z=sample.mesh.vertices[:, 2],
-                i=sample.mesh.faces[:, 0],
-                j=sample.mesh.faces[:, 1],
-                k=sample.mesh.faces[:, 2],
-                color="lightgray",
-                opacity=0.2,
-                name="Mesh",
-                hoverinfo="skip",
-                showlegend=False,
-            )
-        )
-
-    traj_positions = sample.trajectory.t_world_rig.matrix3x4[..., :3, 3].detach().cpu().numpy()
-    fig.add_trace(
-        go.Scatter3d(
-            x=traj_positions[:, 0],
-            y=traj_positions[:, 1],
-            z=traj_positions[:, 2],
-            mode="lines+markers",
-            marker={"size": 3, "color": "black"},
-            line={"color": "black", "width": 3},
-            name="Trajectory",
-        )
-    )
-
-    pts = sample.semidense.points_world
-    n_valid = int(sample.semidense.lengths[0].item()) if hasattr(sample.semidense, "lengths") else 0
-    if n_valid > 0:
-        pts = pts[0, :n_valid]
-        finite = torch.isfinite(pts).all(dim=-1)
-        pts = pts[finite]
-        if pts.shape[0] > 5000:
-            pts = pts[torch.randperm(pts.shape[0])[:5000]]
-        pts_np = pts.detach().cpu().numpy()
-        fig.add_trace(
-            go.Scatter3d(
-                x=pts_np[:, 0],
-                y=pts_np[:, 1],
-                z=pts_np[:, 2],
-                mode="markers",
-                marker={"size": 2, "opacity": 0.5, "color": "purple"},
-                name="Semidense (sampled)",
-            )
-        )
-
-    ranges = {
-        "xaxis": {"title": "X (m)", "range": [lo_np[0], hi_np[0]]},
-        "yaxis": {"title": "Y (m)", "range": [lo_np[1], hi_np[1]]},
-        "zaxis": {"title": "Z (m)", "range": [lo_np[2], hi_np[2]]},
-    }
-    fig.update_layout(
-        title=f"Crop AABB (margin={margin:.2f} m)",
-        scene=dict(aspectmode="data", **ranges),
-        height=700,
-    )
-    return fig
-
-
-def crop_aabb_from_semidense(sample: EfmSnippetView, margin: float = 0.0) -> tuple[np.ndarray, np.ndarray] | None:
-    """Return (lo, hi) crop bounds from semidense points; robust to outliers."""
-
-    sem = sample.semidense
-    if sem is None or not hasattr(sem, "points_world"):
-        return None
-    lengths = sem.lengths
-    if lengths.numel() == 0:
-        return None
-    frame_idx = int(torch.argmax(lengths).item())
-    n_valid = int(lengths[frame_idx].item())
-    if n_valid == 0:
-        return None
-    points = sem.points_world[frame_idx, :n_valid]
-    finite = torch.isfinite(points).all(dim=-1)
-    points = points[finite]
-    if points.shape[0] == 0:
-        return None
-    pts_np = points.detach().cpu().numpy()
-    lo_np = np.nanpercentile(pts_np, 1, axis=0) - margin
-    hi_np = np.nanpercentile(pts_np, 99, axis=0) + margin
-    return lo_np, hi_np
-
-
 if __name__ == "__main__":
     from oracle_rri.data import AseEfmDatasetConfig
     from oracle_rri.utils import Console
@@ -1228,4 +1098,3 @@ if __name__ == "__main__":
     sample = next(iter(dataset))
 
     plot_trajectory(sample, pc_from_last_only=False).show()
-    plot_crop_box(sample, margin=0.2).show()

@@ -16,21 +16,21 @@ frame (LUF camera convention: x=left, y=up, z=forward).
 
 from __future__ import annotations
 
-from math import ceil
+from math import radians
 from typing import Literal
 
 import torch
 import trimesh
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
-from power_spherical import HypersphericalUniform, PowerSpherical
 from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ..data.efm_views import EfmSnippetView
 from ..data.mesh_cache import mesh_from_snippet
 from ..utils import BaseConfig, Console, Verbosity, select_device
-from ..utils.frames import view_axes_from_poses, world_up_tensor
 from .candidate_generation_rules import FreeSpaceRule, MinDistanceToMeshRule, PathCollisionRule, Rule
+from .orientations import OrientationBuilder
+from .samplers import PositionSampler
 from .types import (
     CandidateContext,
     CandidateSamplingResult,
@@ -38,8 +38,6 @@ from .types import (
     SamplingStrategy,
     ViewDirectionMode,
 )
-
-DEVICE_FWD = [0.0, 0.0, 1.0]
 
 
 class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
@@ -72,14 +70,14 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     Rules
     -----
     min_distance_to_mesh:
-        Clearance enforced between camera centre and mesh (metres).
+        Clearance enforced between camera center and mesh (metres).
     ensure_collision_free:
         Enable straight-line path collision filtering.
     ensure_free_space:
         Enable AABB workspace filtering.
     collision_backend:
-        Backend for collision / distance checks (``P3D``, ``PYEMBREE``, or
-        ``TRIMESH``).
+        Backend for collision / distance checks (`P3D`, `PYEMBREE`, or
+        `TRIMESH`).
     ray_subsample:
         Number of samples along a ray when using discretised collision tests.
     step_clearance:
@@ -91,7 +89,7 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
         When True, store per-rule boolean masks in the result for analysis.
     collect_debug_stats:
         When True, allow rules to emit extra tensors (e.g., distances to
-        mesh) in ``CandidateSamplingResult.extras``.
+        mesh) in `CandidateSamplingResult.extras`.
     """
 
     target: type["CandidateViewGenerator"] = Field(default_factory=lambda: CandidateViewGenerator, exclude=True)
@@ -144,7 +142,7 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """View-direction sampling in base camera frame; None disables view jitter."""
 
     view_kappa: float | None = None
-    """Concentration for PowerSpherical view sampler; defaults to positional ``kappa`` when None."""
+    """Concentration for PowerSpherical view sampler; defaults to positional `kappa` when None."""
 
     view_max_angle_deg: float = 0.0
     """Optional cap on angular deviation (deg) from forward in the base camera frame."""
@@ -174,56 +172,17 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
             object.__setattr__(self, "view_kappa", self.kappa)
         return self
 
+    @property
+    def min_elev_rad(self) -> float:
+        return radians(self.min_elev_deg)
 
-# ---------------------------------------------------------------------------
-# Direction samplers
-# ---------------------------------------------------------------------------
+    @property
+    def max_elev_rad(self) -> float:
+        return radians(self.max_elev_deg)
 
-
-class DirectionSampler:
-    """Abstract base class for unit direction sampling in rig (LUF) frame."""
-
-    name: str = "base"
-
-    def sample(self, cfg: CandidateViewGeneratorConfig, num: int, device: torch.device) -> torch.Tensor:
-        raise NotImplementedError
-
-
-class UniformDirectionSampler(DirectionSampler):
-    name = "uniform"
-
-    def sample(self, cfg: CandidateViewGeneratorConfig, num: int, device: torch.device) -> torch.Tensor:
-        dist = HypersphericalUniform(dim=3, device=device)
-        dirs = dist.sample((num,))
-        return dirs / dirs.norm(dim=-1, keepdim=True)
-
-
-class ForwardPowerSphericalSampler(DirectionSampler):
-    name = "forward_power_spherical"
-
-    def sample(self, cfg: CandidateViewGeneratorConfig, num: int, device: torch.device) -> torch.Tensor:
-        mu = torch.tensor(DEVICE_FWD, device=device)
-        dist = PowerSpherical(mu, torch.tensor(cfg.kappa, device=device))
-        dirs = dist.sample((num,))
-        return dirs / dirs.norm(dim=-1, keepdim=True)
-
-
-_DIRECTION_SAMPLERS: dict[SamplingStrategy, DirectionSampler] = {
-    SamplingStrategy.UNIFORM_SPHERE: UniformDirectionSampler(),
-    SamplingStrategy.FORWARD_POWERSPHERICAL: ForwardPowerSphericalSampler(),
-}
-
-
-# ---------------------------------------------------------------------------
-# Helper geometry
-# ---------------------------------------------------------------------------
-
-
-def _forward_world(reference_pose: PoseTW) -> torch.Tensor:
-    """World-frame forward direction (+z_cam) of the reference pose."""
-
-    f_cam = torch.tensor(DEVICE_FWD, device=reference_pose.device, dtype=reference_pose.dtype)
-    return reference_pose.rotate(f_cam.unsqueeze(0))[0]
+    @property
+    def delta_azimuth_rad(self) -> float:
+        return radians(self.delta_azimuth_deg)
 
 
 def _ensure_unbatched_pose(pose: PoseTW) -> PoseTW:
@@ -234,228 +193,16 @@ def _ensure_unbatched_pose(pose: PoseTW) -> PoseTW:
     return pose
 
 
-def _filter_directions_world(
-    dirs_world: torch.Tensor,
-    last_forward_world: torch.Tensor,
-    cfg: CandidateViewGeneratorConfig,
-) -> torch.Tensor:
-    """Filter directions by elevation and delta-azimuth in world frame.
-
-    Returns a boolean mask of shape ``(N,)``.
-    """
-
-    device = dirs_world.device
-    wup = world_up_tensor(device=device, dtype=dirs_world.dtype)
-
-    # Elevation relative to horizontal plane
-    dot_up = (dirs_world * wup).sum(dim=-1)
-    elev = torch.asin(dot_up.clamp(-1.0, 1.0))
-
-    min_elev = torch.deg2rad(torch.tensor(cfg.min_elev_deg, device=device, dtype=dirs_world.dtype))
-    max_elev = torch.deg2rad(torch.tensor(cfg.max_elev_deg, device=device, dtype=dirs_world.dtype))
-    mask_elev = (elev >= min_elev) & (elev <= max_elev)
-
-    # Yaw around world-up relative to last forward
-    def _project_horizontal(v: torch.Tensor) -> torch.Tensor:
-        dot = (v * wup).sum(dim=-1, keepdim=True)
-        v_h = v - dot * wup
-        return v_h / v_h.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-
-    dirs_h = _project_horizontal(dirs_world)
-    fwd_h = _project_horizontal(last_forward_world.view(1, 3)).expand_as(dirs_h)
-
-    cross = torch.cross(fwd_h, dirs_h, dim=-1)
-    sin_yaw = (cross * wup).sum(dim=-1)
-    cos_yaw = (dirs_h * fwd_h).sum(dim=-1)
-    yaw = torch.atan2(sin_yaw, cos_yaw)
-
-    if cfg.delta_azimuth_deg >= 360.0 - 1e-1:
-        mask_yaw = torch.ones_like(mask_elev)
-    else:
-        half_delta = 0.5 * torch.deg2rad(torch.tensor(cfg.delta_azimuth_deg, device=device, dtype=dirs_world.dtype))
-        mask_yaw = (yaw >= -half_delta) & (yaw <= half_delta)
-
-    return mask_elev & mask_yaw
-
-
-def _sample_candidate_positions(
-    reference_pose: PoseTW,
-    cfg: CandidateViewGeneratorConfig,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Sample candidate centres around the last pose.
-
-    Returns:
-        centers_world: (N, 3) camera centres in world frame.
-        offsets_ref: (N, 3) sampled directions in reference frame (before radius).
-    """
-
-    device = cfg.device
-    sampler = _DIRECTION_SAMPLERS[cfg.sampling_strategy]
-
-    reference_pose_dev = _ensure_unbatched_pose(reference_pose.to(device))
-    fwd_world = _forward_world(reference_pose_dev)
-
-    dirs_world_list: list[torch.Tensor] = []
-    offsets_rig_list: list[torch.Tensor] = []
-
-    remaining = cfg.num_samples
-    rounds = 0
-
-    while remaining > 0 and rounds < cfg.max_resamples:
-        rounds += 1
-        n_draw = ceil(cfg.oversample_factor * remaining)
-
-        dirs_rig = sampler.sample(cfg, n_draw, device=device)
-        dirs_world = reference_pose_dev.rotate(dirs_rig)
-        mask = _filter_directions_world(dirs_world, fwd_world, cfg).view(-1)
-
-        if mask.any():
-            dirs_world_list.append(dirs_world[mask])
-            offsets_rig_list.append(dirs_rig[mask])
-            remaining = cfg.num_samples - sum(d.shape[0] for d in dirs_world_list)
-
-    if not dirs_world_list:
-        raise RuntimeError("Directional sampling failed; relax elevation/azimuth constraints.")
-    dirs_world_all = torch.cat(dirs_world_list, dim=0).view(-1, 3)
-    offsets_rig_all = torch.cat(offsets_rig_list, dim=0).view(-1, 3)
-
-    if dirs_world_all.shape[0] < cfg.num_samples:
-        deficit = cfg.num_samples - dirs_world_all.shape[0]
-        dirs_world_all = torch.cat([dirs_world_all, dirs_world_all[:deficit]], dim=0)
-        offsets_rig_all = torch.cat([offsets_rig_all, offsets_rig_all[:deficit]], dim=0)
-
-    dirs_world_all = dirs_world_all[: cfg.num_samples]
-    offsets_rig_all = offsets_rig_all[: cfg.num_samples]
-
-    radii = torch.empty(dirs_world_all.shape[0], device=device, dtype=dirs_world_all.dtype).uniform_(
-        cfg.min_radius, cfg.max_radius
-    )
-    offsets_rig_all = offsets_rig_all * radii[:, None]
-    centers_world = reference_pose_dev.transform(offsets_rig_all)
-    return centers_world, offsets_rig_all
-
-
-def _sample_view_dirs_cam(
-    cfg: CandidateViewGeneratorConfig,
-    num: int,
-    device: torch.device,
-    dtype: torch.dtype,
-) -> torch.Tensor:
-    """Sample view directions on S² in the base camera frame."""
-
-    strat = cfg.view_sampling_strategy
-    if strat is None:
-        v = torch.tensor(DEVICE_FWD, device=device, dtype=dtype)
-        return v.view(1, 3).expand(num, 3)
-
-    if strat == SamplingStrategy.UNIFORM_SPHERE:
-        dist = HypersphericalUniform(dim=3, device=device, dtype=dtype)
-    elif strat == SamplingStrategy.FORWARD_POWERSPHERICAL:
-        mu = torch.tensor(DEVICE_FWD, device=device, dtype=dtype)
-        scale = torch.tensor(cfg.view_kappa, device=device, dtype=dtype)
-        dist = PowerSpherical(mu, scale)
-    else:
-        raise ValueError(f"Unsupported view_sampling_strategy: {strat}")
-
-    dirs = dist.rsample((num,))
-    dirs = dirs / dirs.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-
-    if cfg.view_max_angle_deg > 0.0:
-        mu = torch.tensor(DEVICE_FWD, device=device, dtype=dtype)
-        cos_max = torch.cos(
-            torch.tensor(torch.deg2rad(torch.tensor(cfg.view_max_angle_deg)), device=device, dtype=dtype)
-        )
-        mask = (dirs * mu).sum(dim=-1) < cos_max
-        tries = 0
-        while mask.any() and tries < 8:
-            tries += 1
-            resample_n = int(mask.sum().item())
-            new_dirs = dist.rsample((resample_n,))
-            new_dirs = new_dirs / new_dirs.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-            dirs[mask] = new_dirs
-            mask = (dirs * mu).sum(dim=-1) < cos_max
-
-    return dirs
-
-
-def _build_candidate_orientations(
-    reference_pose: PoseTW,
-    centers_world: torch.Tensor,
-    cfg: CandidateViewGeneratorConfig,
-) -> PoseTW:
-    """Construct candidate orientations from centres and view settings."""
-
-    device = centers_world.device
-    dtype = centers_world.dtype
-    n = centers_world.shape[0]
-
-    reference_pose_dev = _ensure_unbatched_pose(reference_pose.to(device))
-
-    # Base orientations
-    if cfg.view_direction_mode is ViewDirectionMode.FORWARD_RIG:
-        r_last = reference_pose_dev.R
-        if r_last.ndim == 3:
-            r_last = r_last[0]
-        r_base = r_last.unsqueeze(0).expand(n, 3, 3)
-        base_poses = PoseTW.from_Rt(r_base, centers_world)
-
-    elif cfg.view_direction_mode in (ViewDirectionMode.RADIAL_AWAY, ViewDirectionMode.RADIAL_TOWARDS):
-        eye = torch.eye(3, device=device, dtype=dtype).expand(n, 3, 3)
-        centers_pose = PoseTW.from_Rt(eye, centers_world)
-        base_poses = view_axes_from_poses(
-            from_pose=reference_pose_dev,
-            to_pose=centers_pose,
-            look_away=(cfg.view_direction_mode is ViewDirectionMode.RADIAL_AWAY),
-        )
-
-    elif cfg.view_direction_mode is ViewDirectionMode.TARGET_POINT:
-        if cfg.view_target_point_world is None:
-            raise ValueError("TARGET_POINT mode requires `view_target_point_world` to be set.")
-        target = cfg.view_target_point_world.to(device=device, dtype=dtype).view(1, 3)
-        wup = world_up_tensor(device=device, dtype=dtype)
-        v = target - centers_world
-        z_world = v / v.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-        dot_up = (z_world * wup.view(1, 3)).sum(dim=-1, keepdim=True)
-        y_world = wup.view(1, 3) - dot_up * z_world
-        y_world = y_world / y_world.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-        x_world = torch.cross(y_world, z_world, dim=-1)
-        r_base = torch.stack([x_world, y_world, z_world], dim=-1)
-        base_poses = PoseTW.from_Rt(r_base, centers_world)
-
-    else:
-        raise ValueError(f"Unsupported view_direction_mode: {cfg.view_direction_mode}")
-
-    if cfg.view_sampling_strategy is None and cfg.view_roll_jitter_deg == 0.0:
-        return base_poses
-
-    dirs_cam = _sample_view_dirs_cam(cfg, n, device=device, dtype=dtype)
-    z_new = dirs_cam / dirs_cam.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-    up_cam = torch.tensor([0.0, 1.0, 0.0], device=device, dtype=dtype).view(1, 3).expand_as(z_new)
-    x_new = torch.cross(up_cam, z_new, dim=-1)
-    x_new = x_new / x_new.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-    y_new = torch.cross(z_new, x_new, dim=-1)
-    y_new = y_new / y_new.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-    r_delta = torch.stack([x_new, y_new, z_new], dim=-1)
-
-    if cfg.view_roll_jitter_deg > 0.0:
-        roll = (2.0 * torch.rand(n, device=device, dtype=dtype) - 1.0) * torch.deg2rad(
-            torch.tensor(cfg.view_roll_jitter_deg, device=device, dtype=dtype)
-        )
-        cr, sr = torch.cos(roll), torch.sin(roll)
-        r_roll = torch.zeros(n, 3, 3, device=device, dtype=dtype)
-        r_roll[:, 0, 0] = cr
-        r_roll[:, 0, 1] = -sr
-        r_roll[:, 1, 0] = sr
-        r_roll[:, 1, 1] = cr
-        r_roll[:, 2, 2] = 1.0
-        r_delta = torch.matmul(r_delta, r_roll)
-
-    delta_poses = PoseTW.from_Rt(r_delta, torch.zeros_like(centers_world))
-    return base_poses.compose(delta_poses)
-
-
 class CandidateViewGenerator:
-    """Generate candidate :class:`PoseTW` around the latest pose using rules."""
+    """Generate candidate :class:`PoseTW` around a reference rig pose using composeable and modular rules.
+
+    This class orchestrates the full candidate generation process:
+
+    * positional sampling via :class:`PositionSampler`,
+    * orientation construction via :class:`OrientationBuilder`, and
+    * rule-based pruning via :class:`FreeSpaceRule`, :class:`MinDistanceToMeshRule` and :class:`PathCollisionRule`.
+
+    """
 
     def __init__(self, config: CandidateViewGeneratorConfig):
         self.config = config
@@ -528,17 +275,42 @@ class CandidateViewGenerator:
         camera_calib_template: CameraTW,
         occupancy_extent: torch.Tensor,
     ) -> CandidateSamplingResult:
-        """Sample candidate poses around ``reference_pose`` and apply pruning rules."""
+        """Sample candidate poses around `reference_pose` and apply pruning rules.
 
+        Samples candidate positions and orientations, wraps them in a :class:`CandidateContext`, runs all configured
+        rules, and returns :class:`CandidateSamplingResult`.
+
+        Args:
+            reference_pose:
+                reference2world :class:`PoseTW` that defines the sampling origin and local rig frame.
+            gt_mesh:
+                Ground-truth :class:`trimesh.Trimesh` in the world frame for pruning.
+            mesh_verts:
+                `Tensor['V, 3']` mesh vertices aligned with :attr:`gt_mesh`.
+            mesh_faces:
+                `Tensor['F, 3']` integer vertex indices defining mesh faces.
+            camera_calib_template:
+                :class:`CameraTW` whose intrinsics/metadata are cloned for each candidate; its pose block is
+                overwritten with candidate extrinsics.
+            occupancy_extent:
+                `Tensor['6']` world-space AABB used by :class:`FreeSpaceRule`.
+
+        Returns:
+            :class:`CandidateSamplingResult` holding the valid candidate :class:`CameraTW`, reference pose, shell
+            poses, masks and optional debug statistics.
+        """
         cfg = self.config
         device = torch.device(cfg.device)
 
-        centers_world, offsets_ref = _sample_candidate_positions(reference_pose, cfg)
-        shell_poses = _build_candidate_orientations(reference_pose, centers_world, cfg)
+        with torch.no_grad():
+            reference_pose = _ensure_unbatched_pose(reference_pose.to(device))
+            sampler = PositionSampler(cfg)
+            centers_world, offsets_ref = sampler.sample(reference_pose)
+            shell_poses = OrientationBuilder(cfg).build(reference_pose, centers_world)
 
         ctx = CandidateContext(
             cfg=cfg,
-            reference_pose=reference_pose.to(device),
+            reference_pose=reference_pose,
             gt_mesh=gt_mesh,
             mesh_verts=mesh_verts.to(device),
             mesh_faces=mesh_faces.to(device),
@@ -554,7 +326,6 @@ class CandidateViewGenerator:
 
         return self._finalise(ctx)
 
-    # ------------------------------------------------------------------ internals
     def _build_default_rules(self, cfg: CandidateViewGeneratorConfig) -> list[Rule]:
         rules: list[Rule] = []
         if cfg.ensure_free_space:
@@ -569,7 +340,7 @@ class CandidateViewGenerator:
         for rule in self._rules:
             rule(ctx)
             if ctx.cfg.collect_rule_masks:
-                ctx.rule_masks[rule.__class__.__name__] = ctx.mask_valid.clone()
+                ctx.record_mask(rule.__class__.__name__, ctx.mask_valid)
 
     def _finalise(self, ctx: CandidateContext) -> CandidateSamplingResult:
         mask_valid = ctx.mask_valid
@@ -582,17 +353,9 @@ class CandidateViewGenerator:
         ref_inv = reference_pose.inverse()
         poses_ref_valid = ref_inv.compose(poses_world_valid)
 
-        template = ctx.camera_calib_template
-        if template is None:
-            template_data = CameraTW.from_parameters()._data.to(poses_ref_valid._data.device).view(1, -1)
-        else:
-            template_data = template._data
-            if template_data.ndim == 1:
-                template_data = template_data.view(1, -1)
-            template_data = template_data.to(poses_ref_valid._data.device)
-
-        n = poses_ref_valid._data.shape[0]
-        template_data = template_data[0].unsqueeze(0).expand(n, -1).clone()
+        template_data = _clone_camera_template(
+            ctx.camera_calib_template, poses_ref_valid._data.shape[0], poses_ref_valid._data.device
+        )
         # Store camera pose in the reference frame as camera<-reference (EFM convention).
         poses_cam_ref = poses_ref_valid.inverse()
         template_data[:, 10:22] = poses_cam_ref._data
@@ -608,6 +371,19 @@ class CandidateViewGenerator:
             shell_offsets_ref=ctx.shell_offsets_ref,
             extras=ctx.debug if ctx.cfg.collect_debug_stats else {},
         )
+
+
+def _clone_camera_template(template: CameraTW, n: int, device: torch.device) -> torch.Tensor:
+    """Broadcast a camera template to `n` candidates on the target device."""
+
+    if template is None:
+        data = CameraTW.from_parameters()._data
+    else:
+        data = template._data
+
+    if data.ndim == 1:
+        data = data.view(1, -1)
+    return data.to(device)[0].unsqueeze(0).expand(n, -1).clone()
 
 
 __all__ = [

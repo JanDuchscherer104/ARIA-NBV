@@ -24,7 +24,7 @@ class CandidateDepthBatch:
     """Tensor['N', 'H', 'W'] with per-candidate depth maps in metres."""
 
     poses: PoseTW
-    """PoseTW (world←camera) for the rendered subset."""
+    """PoseTW (cam2world) for the rendered subset."""
 
     mask_valid: torch.Tensor
     """Boolean mask aligned with ``candidate_indices`` (subset of original mask_valid)."""
@@ -166,7 +166,7 @@ class CandidateDepthRenderer:
     def _select_candidates(
         self,
         candidates: CandidateSamplingResult,
-    ) -> tuple["PoseTW", CameraTW, torch.Tensor]:
+    ) -> tuple[PoseTW, CameraTW, torch.Tensor]:
         device = self.renderer.device
         cam_views = candidates.views.to(device)
         num_candidates = cam_views.tensor().shape[0]
@@ -180,10 +180,18 @@ class CandidateDepthRenderer:
             candidate_idx = torch.arange(num_candidates, device=device, dtype=torch.long)
 
         selected_views = cam_views[candidate_idx]
-        # CandidateSamplingResult convention: T_camera_rig is camera<-reference.
+
+        # CandidateSamplingResult convention: T_camera_rig is camera ← reference.
         t_cam_ref = selected_views.T_camera_rig.to(device=device)  # camera ← reference
         t_world_ref = candidates.reference_pose.to(device=device)  # world ← reference
-        poses_world_cam = t_world_ref @ t_cam_ref.inverse()  # world ← camera
+
+        # Compose to world ← camera
+        poses_world_cam = t_world_ref @ t_cam_ref.inverse()
+
+        shell = candidates.shell_poses.to(device)
+        if shell._data.shape[0] >= candidate_idx[-1].item() + 1:
+            diff = (poses_world_cam._data - shell._data[candidate_idx]).abs().max()
+            self.console.dbg(f"pose_diff_vs_shell: {float(diff)}")
 
         return poses_world_cam, selected_views, candidate_idx
 

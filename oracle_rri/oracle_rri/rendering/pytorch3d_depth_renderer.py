@@ -147,9 +147,9 @@ class Pytorch3DDepthRenderer:
         )
         self.console.plog(
             {
-                "image_size": image_size,
-                "focal_length": focal_length,
-                "principal_point": principal_point,
+                "image_size": image_size[0, :],
+                "focal_length": focal_length[0, :],
+                "principal_point": principal_point[0, :],
                 "width": width,
                 "height": height,
             }

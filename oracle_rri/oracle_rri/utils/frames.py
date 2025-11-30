@@ -71,7 +71,7 @@ def view_axes_from_poses(
 
     Args:
         from_pose: Pose of the reference point (typically the last pose).
-        to_pose: Pose whose translations define the camera centres.
+        to_pose: Pose whose translations define the camera centers.
         look_away: If True, cameras look away from ``from_pose`` towards
             ``to_pose``; otherwise they look back.
         eps: Numerical stability guard.
@@ -167,7 +167,7 @@ def view_axes_from_points(
     """PoseTW-aware look-at helper for LUF cameras.
 
     Args:
-        from_pose: Camera pose (or centre tensor) in world coordinates.
+        from_pose: Camera pose (or center tensor) in world coordinates.
         look_at: Target point (or pose whose translation is the target).
         world_up: Optional world up vector; defaults to ``+Z``.
         eps: Numerical stability term.

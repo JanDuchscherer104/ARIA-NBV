@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable
+from typing import Self
 
+import numpy as np
 import plotly.graph_objects as go  # type: ignore[import-untyped]
 import torch
 from efm3d.aria import CameraTW, PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 from torch import Tensor
 
-from ..data.plotting import SnippetPlotBuilder
+from ..data.plotting import FrameGridBuilder, _depth_to_color, rotate_yaw_cw90
+from ..pose_generation.plotting import CandidatePlotBuilder
 
 
 def depth_grid(
@@ -22,52 +25,34 @@ def depth_grid(
     zmax: float | None = None,
     zfar: float | None = None,
 ) -> go.Figure:
-    """Visualise a batch of depth maps as a Plotly heatmap grid.
-
-    Args:
-        depths: Tensor of shape ``(N, H, W)`` in metres.
-        titles: Optional iterable of per-depth titles; trimmed/padded to ``N``.
-        max_cols: Maximum number of columns in the subplot grid.
-        zmax: Optional upper colour limit; defaults to ``depths.max()``.
-        zfar: Optional renderer far plane to annotate hit ratio.
-    """
+    """Visualise depth maps using the shared image grid utilities."""
 
     if depths.ndim != 3:
         raise ValueError(f"depth_grid expects (N,H,W) tensor, got shape {tuple(depths.shape)}")
 
-    depth_np = depths.detach().cpu().numpy()
-    num = depth_np.shape[0]
+    num = depths.shape[0]
     cols = max(1, min(max_cols, num))
     rows = int(math.ceil(num / cols))
     provided_titles = list(titles) if titles is not None else []
     subplot_titles = [provided_titles[i] if i < len(provided_titles) else f"Candidate {i}" for i in range(num)]
-    vmax = float(depth_np.max()) if zmax is None else zmax
 
-    fig = make_subplots(rows=rows, cols=cols, subplot_titles=subplot_titles)
+    builder = FrameGridBuilder(
+        rows=rows, cols=cols, titles=subplot_titles, height=320 * rows, width=360 * cols, title=""
+    )
+
+    vmax = float(depths.max().item()) if zmax is None else zmax
     for idx in range(num):
         r = idx // cols + 1
         c = idx % cols + 1
-        fig.add_trace(
-            go.Heatmap(
-                z=depth_np[idx],
-                colorscale="Inferno",
-                zmin=0.0,
-                zmax=vmax,
-                showscale=(idx == num - 1),
-                colorbar={"title": "Depth (m)"},
-            ),
-            row=r,
-            col=c,
-        )
+        depth = depths[idx]
+        rgb = _depth_to_color(depth, percentile=99.5)
+        rgb = np.rot90(rgb, k=1)
+        builder.add_image(rgb, row=r, col=c)
 
-    threshold = zfar if zfar is not None else float(depth_np.max() + 1e-6)
-    depths_f = depths.float()
-    hit_ratio = float(((depths_f < threshold).float().mean()).item())
-    fig.update_layout(
-        height=400 * rows,
-        width=500 * cols,
-        title=f"Candidate depth renders (hit_ratio={hit_ratio:.3f})",
-    )
+    threshold = zfar if zfar is not None else vmax + 1e-6
+    hit_ratio = float(((depths.float() < threshold).float().mean()).item())
+    fig = builder.finalize()
+    fig.update_layout(title=f"Candidate depth renders (hit_ratio={hit_ratio:.3f})")
     return fig
 
 
@@ -103,8 +88,13 @@ def hit_ratio_bar(depths: Tensor, *, zfar: float) -> go.Figure:
     return fig
 
 
-class RenderingPlotBuilder(SnippetPlotBuilder):
-    """Rendering-focused extensions on top of :class:`SnippetPlotBuilder`."""
+class RenderingPlotBuilder(CandidatePlotBuilder):
+    """Rendering-focused extensions on top of :class:`CandidatePlotBuilder`.
+
+    This keeps a single builder hierarchy: SnippetPlotBuilder -> CandidatePlotBuilder -> RenderingPlotBuilder.
+    Rendering methods operate on explicit pose/camera/depth inputs and remain usable even when no
+    candidate_results are attached.
+    """
 
     def add_frusta_with_image_plane(
         self,
@@ -116,22 +106,49 @@ class RenderingPlotBuilder(SnippetPlotBuilder):
         opacity: float = 0.4,
         max_frustums: int = 16,
         name: str = "Rendered frusta",
-    ) -> "RenderingPlotBuilder":
+        display_yaw_cw90: bool = False,
+        candidate_indices: list[int] | None = None,
+    ) -> Self:
         """Add camera frusta and their image-plane rectangles to the 3D scene."""
 
-        pose_tensor = poses.tensor() if isinstance(poses, PoseTW) else poses
-        if pose_tensor.ndim == 2:
-            pose_tensor = pose_tensor.unsqueeze(0)
-        count = min(pose_tensor.shape[0], max_frustums)
-        w, h, fx, fy, cx, cy = self._camera_scalar_intrinsics(camera)
+        pose_full = self._pose_list_from_input(poses)
+        idxs = candidate_indices if candidate_indices is not None else list(range(len(pose_full)))
+        pose_list = [pose_full[i] for i in idxs]
+        if display_yaw_cw90:
+            pose_list = [rotate_yaw_cw90(p) for p in pose_list]
+
+        # Align cameras to poses: accept per-candidate CameraTW or broadcast single.
+        if isinstance(camera, CameraTW) and camera.tensor().ndim == 2 and camera.shape[0] > 1:
+            cam_full = [camera[i] for i in range(camera.shape[0])]
+        else:
+            cam_full = [camera]
+        if len(cam_full) == 1 and len(pose_full) > 1:
+            cam_full = cam_full * len(pose_full)
+        cam_list = [cam_full[min(i, len(cam_full) - 1)] for i in idxs]
+
+        # Reuse existing frusta edges from SnippetPlotBuilder for geometry.
+        self._add_frusta_for_poses(
+            cams=cam_list,
+            poses=pose_list,
+            scale=1.0,
+            color=color,
+            name=name,
+            max_frustums=max_frustums,
+            include_axes=False,
+            include_center=False,
+        )
+
+        # Add image planes using per-pose intrinsics when available.
+        count = min(len(pose_list), max_frustums)
         for idx in range(count):
-            pose_i = self._pose_from_any(pose_tensor[idx])
+            cam_i = cam_list[min(idx, len(cam_list) - 1)]
+            w, h, fx, fy, cx, cy = self._camera_scalar_intrinsics(cam_i)
+            pose_i = pose_list[idx]
             corners_world = self._image_plane_corners_world(
                 pose_i, w=w, h=h, fx=fx, fy=fy, cx=cx, cy=cy, dist=plane_dist
             )
             corners_np = corners_world.detach().cpu().numpy()
             center_np = pose_i.t.detach().cpu().numpy()
-            # Plane rectangle
             self.fig.add_trace(
                 go.Scatter3d(
                     x=corners_np[[0, 1, 2, 3, 0], 0],
@@ -140,11 +157,10 @@ class RenderingPlotBuilder(SnippetPlotBuilder):
                     mode="lines",
                     line={"color": color, "width": 2},
                     opacity=opacity,
-                    name=f"{name} plane {idx}",
-                    showlegend=False,
+                    name=f"{name} {idx}",
+                    showlegend=True if idx == 0 else False,
                 )
             )
-            # Frustum edges to plane corners
             for corner in corners_np:
                 self.fig.add_trace(
                     go.Scatter3d(
@@ -154,10 +170,23 @@ class RenderingPlotBuilder(SnippetPlotBuilder):
                         mode="lines",
                         line={"color": color, "width": 1},
                         opacity=opacity,
-                        name=f"{name} frustum {idx}",
+                        name=f"{name} {idx}",
                         showlegend=False,
                     )
                 )
+            # Label camera center
+            self.fig.add_trace(
+                go.Scatter3d(
+                    x=[center_np[0]],
+                    y=[center_np[1]],
+                    z=[center_np[2]],
+                    mode="markers",
+                    marker={"size": 3, "color": color, "opacity": 0.8, "symbol": "diamond"},
+                    name=f"{name} {idx}",
+                    showlegend=False,
+                    hovertext=f"{name} {idx}",
+                )
+            )
         return self
 
     def add_depth_hits(
@@ -170,39 +199,50 @@ class RenderingPlotBuilder(SnippetPlotBuilder):
         max_points: int = 20_000,
         color: str = "teal",
         name: str = "Depth hits",
-    ) -> "RenderingPlotBuilder":
+        display_yaw_cw90: bool = False,
+        zfar: float | None = None,
+        candidate_indices: list[int] | None = None,
+    ) -> Self:
         """Scatter hit points back-projected from rendered depth maps."""
 
         if depths.ndim != 3:
             raise ValueError(f"depths must be (N,H,W), got {tuple(depths.shape)}")
         pose_tensor = poses.tensor() if isinstance(poses, PoseTW) else poses
-        if pose_tensor.ndim == 2:
+        if pose_tensor.ndim == 1:  # (12,)
             pose_tensor = pose_tensor.unsqueeze(0)
-        num = min(depths.shape[0], pose_tensor.shape[0])
+        if pose_tensor.ndim == 2 and pose_tensor.shape[-1] == 12 and pose_tensor.shape[0] > 1:
+            pose_tensor = pose_tensor.view(-1, 3, 4)
+        all_indices = list(range(min(depths.shape[0], pose_tensor.shape[0])))
+        use_indices = candidate_indices if candidate_indices is not None else all_indices
         pts_world = []
-        for i in range(num):
+        for i in use_indices:
             pose_i = self._pose_from_any(pose_tensor[i])
+            if display_yaw_cw90:
+                pose_i = rotate_yaw_cw90(pose_i)
+            cam_i: CameraTW
+            if isinstance(camera, CameraTW) and camera.tensor().ndim == 2 and camera.shape[0] > 1:
+                cam_i = camera[i]
+            else:
+                cam_i = camera
             pts_world.append(
                 self._backproject_depth(
                     depth=depths[i],
                     pose=pose_i,
-                    camera=camera,
+                    camera=cam_i,
                     stride=stride,
+                    zfar=zfar,
                 )
             )
         pts_world_t = torch.cat(pts_world, dim=0)
         if pts_world_t.shape[0] > max_points:
             idx = torch.randperm(pts_world_t.shape[0], device=pts_world_t.device)[:max_points]
             pts_world_t = pts_world_t[idx]
-        self.fig.add_trace(
-            go.Scatter3d(
-                x=pts_world_t[:, 0].cpu(),
-                y=pts_world_t[:, 1].cpu(),
-                z=pts_world_t[:, 2].cpu(),
-                mode="markers",
-                marker={"size": 2, "color": color, "opacity": 0.6},
-                name=name,
-            )
+        self.add_points(
+            pts_world_t,
+            name=name,
+            color=color,
+            size=2,
+            opacity=0.6,
         )
         return self
 
@@ -256,6 +296,7 @@ class RenderingPlotBuilder(SnippetPlotBuilder):
         camera: CameraTW,
         *,
         stride: int,
+        zfar: float | None = None,
     ) -> torch.Tensor:
         """Back-project a depth map into world points on a strided grid."""
 
@@ -264,23 +305,29 @@ class RenderingPlotBuilder(SnippetPlotBuilder):
         grid_x = torch.arange(0, w, stride, device=depth.device, dtype=depth.dtype)
         yy, xx = torch.meshgrid(grid_y, grid_x, indexing="ij")
         depth_s = depth[yy.long(), xx.long()].reshape(-1)
-        # Filter out zfar / empty pixels by using a relative threshold close to the max depth.
         depth_max = torch.max(depth)
-        mask = torch.isfinite(depth_s) & (depth_s < depth_max * 0.999)
+        threshold = depth_max if zfar is None else min(float(zfar), float(depth_max))
+        mask = torch.isfinite(depth_s) & (depth_s < threshold * 0.95)
         depth_s = depth_s[mask]
         xx = xx.reshape(-1)[mask]
         yy = yy.reshape(-1)[mask]
 
-        _, _, fx, fy, cx, cy = self._camera_scalar_intrinsics(camera)
+        # If nothing valid remains, return empty point set.
+        if depth_s.numel() == 0:
+            return torch.empty(0, 3, device=depth.device, dtype=depth.dtype)
+
+        # Use the pinhole model matching the PyTorch3D render (intrinsics only; extrinsics via pose).
+        cam_single = camera if camera.tensor().ndim == 1 else camera[0]
+        _, _, fx, fy, cx, cy = self._camera_scalar_intrinsics(cam_single)
         fx_t = torch.tensor(fx, device=depth.device, dtype=depth.dtype)
         fy_t = torch.tensor(fy, device=depth.device, dtype=depth.dtype)
         cx_t = torch.tensor(cx, device=depth.device, dtype=depth.dtype)
         cy_t = torch.tensor(cy, device=depth.device, dtype=depth.dtype)
 
-        x = (xx - cx_t) / fx_t * depth_s
-        y = (yy - cy_t) / fy_t * depth_s
-        z = depth_s
-        pts_cam = torch.stack([x, y, z], dim=1)
+        x_cam = (xx - cx_t) / fx_t * depth_s
+        y_cam = (yy - cy_t) / fy_t * depth_s
+        z_cam = depth_s
+        pts_cam = torch.stack([x_cam, y_cam, z_cam], dim=1)
         return pose.transform(pts_cam)
 
     @staticmethod

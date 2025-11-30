@@ -12,7 +12,6 @@ from ..data.efm_views import EfmCameraView
 from ..data.plotting import (
     SnippetPlotBuilder,
     collect_frame_modalities,
-    crop_aabb_from_semidense,
     plot_first_last_frames,
     project_pointcloud_on_frame,
 )
@@ -184,8 +183,7 @@ def render_data_page(sample: EfmSnippetView, *, crop_margin: float | None = None
     if points_world is None or points_world.numel() == 0:
         st.info("No points available for overlay with current selection.")
     else:
-        cam_map = {"rgb": sample.camera_rgb, "slam-l": sample.camera_slam_left, "slam-r": sample.camera_slam_right}
-        cam_view = cam_map[overlay_cam]
+        cam_view = sample.get_camera(overlay_cam.replace("-", ""))
         pose_wc, cam_tw = pose_world_cam(sample, cam_view, overlay_frame)
         fig_overlay = project_pointcloud_on_frame(
             img=cam_view.images[overlay_frame],
@@ -200,11 +198,6 @@ def render_data_page(sample: EfmSnippetView, *, crop_margin: float | None = None
     cam_choice = st.sidebar.selectbox("Camera for frustum", ["rgb", "slam-l", "slam-r"], index=0, key="frustum_cam")
     plot_opts = plot_options_from_ui(sample)
     crop_bounds = None
-    if plot_opts["show_crop_bounds"] and crop_margin is not None:
-        crop_bounds = crop_aabb_from_semidense(sample, margin=float(crop_margin))
-        if crop_bounds is None and sample.mesh is not None:
-            mesh_min, mesh_max = sample.mesh.bounds
-            crop_bounds = (mesh_min, mesh_max)
 
     builder = (
         SnippetPlotBuilder.from_snippet(sample, title="Mesh + semidense + trajectory + camera frustum")
@@ -405,14 +398,25 @@ def render_depth_page(depth_batch: CandidateDepthBatch) -> None:
         if sample is None:
             st.info("Load data first to plot frusta.")
         else:
+            cand_options_frusta = depth_batch.candidate_indices.tolist()
+            selected_frusta_global = st.multiselect(
+                "Select candidates to display (frusta)",
+                options=cand_options_frusta,
+                default=cand_options_frusta,
+                key="frusta_cands",
+            )
+            # map global candidate ids to local batch indices
+            cand_to_local = {int(g): idx for idx, g in enumerate(depth_batch.candidate_indices.tolist())}
+            selected_frusta = [cand_to_local[g] for g in selected_frusta_global if g in cand_to_local]
             plane_dist = st.slider("Image plane distance (m)", 0.2, 3.0, 1.0, step=0.1, key="plane_dist_slider")
-            builder = RenderingPlotBuilder.from_snippet(sample, title="Rendered frusta with image planes")
+            builder = RenderingPlotBuilder.from_snippet(sample, title="Rendered frusta with image planes").add_mesh()
             num_frustums = int(depth_batch.poses.tensor().shape[0])
             builder.add_frusta_with_image_plane(
                 poses=depth_batch.poses,
                 camera=depth_batch.camera,
                 plane_dist=float(plane_dist),
                 max_frustums=min(16, num_frustums),
+                candidate_indices=selected_frusta,
             )
             st.plotly_chart(builder.finalize(), width="stretch")
 
@@ -421,12 +425,20 @@ def render_depth_page(depth_batch: CandidateDepthBatch) -> None:
             st.info("Load data first to back-project depth hits.")
         else:
             stride = st.slider("Depth hit stride", 1, 32, 8, step=1, key="depth_hit_stride")
-            builder_hits = RenderingPlotBuilder.from_snippet(sample, title="Depth hit back-projection")
+            builder_hits = RenderingPlotBuilder.from_snippet(sample, title="Depth hit back-projection").add_mesh()
+            cand_options = depth_batch.candidate_indices.tolist()
+            selected_global = st.multiselect(
+                "Select candidates to back-project", options=cand_options, default=cand_options, key="depth_hit_cands"
+            )
+            cand_to_local = {int(g): idx for idx, g in enumerate(depth_batch.candidate_indices.tolist())}
+            selected = [cand_to_local[g] for g in selected_global if g in cand_to_local]
             builder_hits.add_depth_hits(
                 depths=depth_batch.depths,
                 poses=depth_batch.poses,
                 camera=depth_batch.camera,
                 stride=int(stride),
+                candidate_indices=selected,
+                zfar=float(depth_batch.depths.max().item()),
                 max_points=20000,
             )
             st.plotly_chart(builder_hits.finalize(), width="stretch")
