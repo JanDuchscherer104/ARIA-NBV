@@ -269,7 +269,7 @@ class EfmTrajectoryView:
 
     @property
     def final_pose(self) -> PoseTW:
-        """Final rig pose in snippet."""
+        """Final rig pose in snippet. world ← rig."""
 
         return PoseTW.from_matrix3x4(self.t_world_rig.matrix3x4[-1])
 

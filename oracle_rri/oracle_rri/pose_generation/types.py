@@ -10,7 +10,7 @@ import torch
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 
-if TYPE_CHECKING:  # pragma: no cover - import for typing only
+if TYPE_CHECKING:
     from trimesh import Trimesh  # type: ignore[import-untyped]
 
     from .candidate_generation import CandidateViewGeneratorConfig
@@ -68,7 +68,7 @@ class CandidateSamplingResult:
     """Immutable result of candidate sampling + rule-based pruning."""
 
     views: CameraTW
-    """views.T_camera_rig are reference_pos <- candidate_camera views for valid candidates (intrinsics as per CandidateGenerationConfig :: camera_label)."""
+    """views.T_camera_rig are reference_pose <- candidate_camera views for valid candidates (intrinsics as per CandidateGenerationConfig :: camera_label)."""
     reference_pose: PoseTW
     """World <- reference_pose around which candidates are defined."""
     mask_valid: torch.Tensor

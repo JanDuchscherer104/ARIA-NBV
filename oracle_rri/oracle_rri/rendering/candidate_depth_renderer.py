@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypedDict
+from typing import Any, TypedDict
 
 import torch
 from efm3d.aria import CameraTW, PoseTW
 from pydantic import AliasChoices, Field, field_validator, model_validator
 
-from ..data.efm_views import EfmCameraView, EfmSnippetView
+from ..data.efm_views import EfmSnippetView
 from ..data.mesh_cache import mesh_from_snippet
 from ..pose_generation.types import CandidateSamplingResult
 from ..utils import BaseConfig, Console, Verbosity, pick_fast_depth_renderer
 from .efm3d_depth_renderer import Efm3dDepthRenderer, Efm3dDepthRendererConfig
 from .pytorch3d_depth_renderer import Pytorch3DDepthRenderer, Pytorch3DDepthRendererConfig
-
-CameraStream = Literal["rgb", "slaml", "slamr"]
-FrameSelection = Literal["first", "last"]
 
 
 class CandidateDepthBatch(TypedDict):
@@ -26,16 +23,16 @@ class CandidateDepthBatch(TypedDict):
     """Tensor['N', 'H', 'W'] with per-candidate depth maps in metres."""
 
     poses: "PoseTW"
-    """PoseTW with the subset of candidates that were rendered."""
+    """PoseTW (world←camera) for the rendered subset."""
 
     mask_valid: torch.Tensor
-    """Boolean mask from :class:`CandidateSamplingResult` (unchanged, 1-D)."""
+    """Boolean mask aligned with ``candidate_indices`` (subset of original mask_valid)."""
 
     candidate_indices: torch.Tensor
     """Indices (long) into the original candidate array corresponding to ``depths``."""
 
     camera: "CameraTW"
-    """Camera calibration used for rendering (single frame)."""
+    """Camera calibration (and ref←cam extrinsics) for the rendered subset, same order as ``depths``."""
 
 
 RendererConfig = Pytorch3DDepthRendererConfig | Efm3dDepthRendererConfig
@@ -52,12 +49,6 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
 
     renderer: RendererConfig = Field(default_factory=Pytorch3DDepthRendererConfig)
     """Nested config describing the underlying renderer (PyTorch3D or CPU)."""
-
-    camera_stream: CameraStream = "rgb"
-    """Which camera stream to pull calibration from."""
-
-    frame_selection: FrameSelection = "last"
-    """Which frame from the snippet to use for intrinsics/extrinsics (first/last)."""
 
     max_candidates: int | None = None
     """Optional cap on number of valid candidates rendered per call."""
@@ -113,25 +104,32 @@ class CandidateDepthRenderer:
             self.console.error(msg)
             raise ValueError(msg)
         self.console.log(
-            f"Rendering depths: candidates={candidates.views.tensor().shape[0]} stream={self.config.camera_stream} on '{self.renderer.__class__.__name__}'"
+            f"Rendering depths: candidates={candidates.views.tensor().shape[0]} on '{self.renderer.__class__.__name__}'"
         )
         self.console.log(f"Mesh stats verts={sample.mesh.vertices.shape[0]:,} faces={sample.mesh.faces.shape[0]:,}")
-        pose_batch, mask_valid, candidate_indices = self._filter_candidates(candidates)
+        pose_batch, camera_batch, candidate_indices = self._select_candidates(candidates)
         self.console.log(f"Attempting renders for {pose_batch.tensor().shape[0]} candidates (GUI slice).")
         self.console.dbg_summary("candidate_indices", candidate_indices)
 
-        camera_view = sample.get_camera(self.config.camera_stream)
+        camera_calib = camera_batch
         if self.config.resolution_scale is not None:
-            self.console.log(f"Downscaling camera view by scale {self.config.resolution_scale}")
-            camera_view = self._downscale_camera_view(camera_view, scale=self.config.resolution_scale)
-        frame_idx = 0 if self.config.frame_selection == "first" else -1
-        frame_calib = self._frame_calib(camera_view.calib, frame_idx)
-        self.console.dbg_summary("camera_calib_frame", frame_calib)
+            scale = float(self.config.resolution_scale)
+            self.console.log(f"Scaling candidate camera intrinsics by {scale}")
+            base_size = camera_calib.size[0]
+            new_size = (int(base_size[0].item() * scale), int(base_size[1].item() * scale))
+            camera_calib = camera_calib.scale_to_size(new_size)
+
+        self.console.dbg_summary("camera_calib_batch", camera_calib)
         self.console.dbg_summary("pose_batch_tensor", pose_batch)
         is_pytorch3d = isinstance(self.renderer, Pytorch3DDepthRenderer)
         mesh_input: Any
         if is_pytorch3d and sample.mesh_verts is not None and sample.mesh_faces is not None:
             mesh_input = (sample.mesh_verts, sample.mesh_faces)
+        elif is_pytorch3d and sample.mesh is not None:
+            mesh_input = (
+                torch.as_tensor(sample.mesh.vertices, device=pose_batch.device, dtype=torch.float32),
+                torch.as_tensor(sample.mesh.faces, device=pose_batch.device, dtype=torch.int64),
+            )
         elif is_pytorch3d:
             art = mesh_from_snippet(sample, device=pose_batch.device, console=self.console)
             mesh_input = (art.processed.verts, art.processed.faces)
@@ -146,8 +144,8 @@ class CandidateDepthRenderer:
         depths = self.renderer.render_batch(
             poses=pose_batch,
             mesh=mesh_input,
-            camera=frame_calib,
-            frame_index=frame_idx,
+            camera=camera_calib,
+            frame_index=None,
             mesh_cache_key=sample.mesh_cache_key,
         )
 
@@ -157,79 +155,60 @@ class CandidateDepthRenderer:
             self.console.warn(
                 "All candidate depth pixels are at zfar; check camera poses, mesh normals, or backface culling."
             )
+        mask_valid_subset = (
+            candidates.mask_valid.to(device=pose_batch.device)[candidate_indices]
+            if candidates.mask_valid is not None
+            else torch.ones_like(candidate_indices, dtype=torch.bool, device=pose_batch.device)
+        )
         return {
             "depths": depths,
             "poses": pose_batch,
-            "mask_valid": mask_valid,
+            "mask_valid": mask_valid_subset,
             "candidate_indices": candidate_indices,
-            "camera": frame_calib,
+            "camera": camera_calib,
         }
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
-    def _frame_calib(self, calib: CameraTW, frame_idx: int) -> CameraTW:
-        tensor = calib.tensor()
-        if tensor.ndim == 1:
-            return calib
-        frame = tensor[frame_idx].unsqueeze(0)
-        return CameraTW(frame)
-
-    def _downscale_camera_view(
-        self,
-        view: EfmCameraView,
-        *,
-        scale: float | None = None,
-    ) -> EfmCameraView:
-        """Downscale images and intrinsics for faster rendering."""
-
-        _, _, h, w = view.images.shape
-        if scale is not None and scale != 1.0:
-            new_w = max(64, int(w * scale))
-            new_h = max(64, int(h * scale))
-        else:
-            return view
-
-        with torch.no_grad():
-            images_small = torch.nn.functional.interpolate(
-                view.images, size=(new_h, new_w), mode="bilinear", align_corners=False
-            )
-
-        return EfmCameraView(
-            images=images_small,
-            calib=view.calib.scale_to_size((new_w, new_h)),  # type: ignore
-            time_ns=view.time_ns,
-            frame_ids=view.frame_ids,
-        )
-
-    def _filter_candidates(
+    def _select_candidates(
         self,
         candidates: CandidateSamplingResult,
-    ) -> tuple["PoseTW", torch.Tensor, torch.Tensor]:
-        poses = candidates.views
-        mask_valid = candidates.mask_valid
-        if mask_valid is None:
-            mask_valid = torch.ones(len(poses), dtype=torch.bool, device=poses.tensor().device)
-        valid_idx = torch.nonzero(mask_valid, as_tuple=False).squeeze(-1)
-        if valid_idx.numel() == 0:
-            self.console.warn("No valid candidates available for rendering.")
-            raise ValueError("No valid candidates to render.")
-        if self.config.max_candidates is not None:
-            valid_idx = valid_idx[: self.config.max_candidates]
+    ) -> tuple["PoseTW", CameraTW, torch.Tensor]:
+        device = self.renderer.device
+        cam_views = candidates.views.to(device)
+        num_candidates = cam_views.tensor().shape[0]
+        if num_candidates == 0:
+            raise ValueError("No candidates provided for rendering.")
 
-        return poses[valid_idx], mask_valid, valid_idx
+        if self.config.max_candidates is not None:
+            k = min(num_candidates, self.config.max_candidates)
+            candidate_idx = torch.arange(k, device=device, dtype=torch.long)
+        else:
+            candidate_idx = torch.arange(num_candidates, device=device, dtype=torch.long)
+
+        selected_views = cam_views[candidate_idx]
+        # CandidateSamplingResult convention: T_camera_rig is reference<-camera.
+        t_ref_cam = selected_views.T_camera_rig.to(device=device)  # reference ← camera
+        t_world_ref = candidates.reference_pose.to(device=device)  # world ← reference
+        poses_world_cam = t_world_ref @ t_ref_cam  # world ← camera
+
+        return poses_world_cam, selected_views, candidate_idx
 
     def _coerce_candidates(self, candidates: CandidateSamplingResult | dict) -> CandidateSamplingResult:
         if isinstance(candidates, dict):
             if "reference_pose" not in candidates:
                 raise ValueError("reference_pose required in candidate dict input.")
             return CandidateSamplingResult(
-                views=candidates["poses"],
+                views=candidates["views"],
                 reference_pose=candidates["reference_pose"],
-                mask_valid=candidates.get("mask_valid", torch.ones(len(candidates["poses"]), dtype=torch.bool)),
+                mask_valid=candidates.get(
+                    "mask_valid",
+                    torch.ones(len(candidates["views"]), dtype=torch.bool),
+                ),
                 masks=candidates.get("masks", {}),
-                shell_poses=candidates.get("shell_poses", candidates["poses"]),
+                shell_poses=candidates.get("shell_poses", candidates["views"]),
                 shell_offsets_ref=candidates.get("shell_offsets_ref"),
                 extras=candidates.get("extras", {}),
             )

@@ -168,6 +168,11 @@ def pick_fast_depth_renderer(renderer: "RendererConfig") -> "RendererConfig":
     except Exception:
         return renderer
 
+    # Respect explicit CPU ray-tracer requests.
+    if isinstance(renderer, Efm3dDepthRendererConfig):
+        if getattr(renderer, "device", "").lower() == "cpu":
+            return renderer
+
     # If CPU is forced, keep as is.
     if prefer_cpu():
         return renderer

@@ -14,6 +14,7 @@ except Exception:  # pragma: no cover - availability guard
 else:  # pragma: no cover - availability guard
     PYTORCH3D_AVAILABLE = True
 
+from efm3d.aria import CameraTW, PoseTW  # noqa: E402
 from efm3d.aria.aria_constants import ARIA_CALIB, ARIA_IMG  # noqa: E402
 
 from oracle_rri.configs import PathConfig  # noqa: E402
@@ -69,16 +70,21 @@ def efm_sample(efm_config):
 
 
 def _single_candidate(sample):
-    pose = sample.trajectory.t_world_rig[-1]
-    poses = pose.unsqueeze(0)
-    mask = torch.ones(1, dtype=torch.bool)
-    shell = poses.tensor()
+    # Use the SLAM-left intrinsics of the last frame; set ref←cam to identity so world pose = reference_pose.
+    base_cam = sample.camera_slam_left.calib
+    calib_last = base_cam[-1] if base_cam.tensor().ndim > 1 else base_cam
+    t_ref_cam = PoseTW.from_matrix3x4(torch.eye(3, 4).unsqueeze(0))
+    cam_data = torch.cat(
+        [calib_last.tensor()[..., :10], t_ref_cam.tensor(), calib_last.dist],
+        dim=-1,
+    )
+    cam = CameraTW(cam_data)
     return CandidateSamplingResult(
-        views=poses,
+        views=cam,
         reference_pose=sample.trajectory.t_world_rig[-1],
-        mask_valid=mask,
-        masks=[mask],
-        shell_poses=shell,
+        mask_valid=torch.ones(1, dtype=torch.bool),
+        masks={},
+        shell_poses=t_ref_cam,
     )
 
 
@@ -86,8 +92,6 @@ def _single_candidate(sample):
 def test_integration_pytorch3d_backend(efm_sample):
     candidates = _single_candidate(efm_sample)
     cfg = CandidateDepthRendererConfig(
-        camera_stream="slam_left",
-        frame_selection="last",
         max_candidates=1,
         renderer=Pytorch3DDepthRendererConfig(device="cpu", faces_per_pixel=1, verbose=False),
     )
@@ -133,8 +137,6 @@ def test_integration_cpu_backend(efm_sample):
 
     candidates = _single_candidate(sample_cpu)
     cfg = CandidateDepthRendererConfig(
-        camera_stream="slam_left",
-        frame_selection="last",
         max_candidates=1,
         renderer=Efm3dDepthRendererConfig(device="cpu", add_proxy_walls=True, chunk_rays=150_000),
     )

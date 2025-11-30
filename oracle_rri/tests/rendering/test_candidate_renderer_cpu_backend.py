@@ -1,5 +1,19 @@
+# ruff: noqa: E402
+
+import sys
+import types
+from pathlib import Path
+
 import torch
 import trimesh
+
+# Make vendored efm3d importable
+sys.path.append(str(Path(__file__).resolve().parents[3] / "external" / "efm3d"))
+# Stub out optional dependency used in pose_generation __init__.
+power_spherical_stub = types.ModuleType("power_spherical")
+power_spherical_stub.HypersphericalUniform = object
+power_spherical_stub.PowerSpherical = object
+sys.modules.setdefault("power_spherical", power_spherical_stub)
 from efm3d.aria import CameraTW, PoseTW
 from efm3d.aria.aria_constants import (
     ARIA_CALIB,
@@ -18,8 +32,7 @@ from efm3d.aria.aria_constants import (
 
 from oracle_rri.data.efm_views import EfmSnippetView
 from oracle_rri.pose_generation.types import CandidateSamplingResult
-from oracle_rri.rendering import CandidateDepthRendererConfig
-from oracle_rri.rendering.efm3d_depth_renderer import Efm3dDepthRendererConfig
+from oracle_rri.rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
 
 
 def _make_camera(width: int = 16, height: int = 16) -> CameraTW:
@@ -95,16 +108,37 @@ def _make_snippet(mesh: trimesh.Trimesh, camera: CameraTW) -> EfmSnippetView:
 
 
 def _make_candidates(num: int = 1, z: float = 1.0) -> CandidateSamplingResult:
-    poses = _make_pose(z=z).repeat(num, 1)
-    mask = torch.ones(num, dtype=torch.bool)
-    shell = poses.tensor()
-    return {
-        "poses": poses,
-        "reference_pose": _make_pose(),
-        "mask_valid": mask,
-        "masks": [mask],
-        "shell_poses": shell,
-    }
+    cam_single = _make_camera()
+    width = cam_single.size[0].item()
+    height = cam_single.size[1].item()
+    f_vals = cam_single.f.reshape(-1, 2)[0]
+    c_vals = cam_single.c.reshape(-1, 2)[0]
+    device = f_vals.device
+    t_ref_cam = PoseTW.from_Rt(
+        torch.eye(3, device=device).unsqueeze(0).repeat(num, 1, 1),
+        torch.tensor([[0.0, 0.0, z]], device=device).repeat(num, 1),
+    )
+    cam = CameraTW.from_parameters(
+        width=torch.full((num, 1), float(width), device=device),
+        height=torch.full((num, 1), float(height), device=device),
+        fx=torch.full((num, 1), f_vals[0].item(), device=device),
+        fy=torch.full((num, 1), f_vals[1].item(), device=device),
+        cx=torch.full((num, 1), c_vals[0].item(), device=device),
+        cy=torch.full((num, 1), c_vals[1].item(), device=device),
+        gain=torch.zeros((num, 1), device=device),
+        exposure_s=torch.zeros((num, 1), device=device),
+        valid_radiusx=torch.full((num, 1), max(width, height), device=device),
+        valid_radiusy=torch.full((num, 1), max(width, height), device=device),
+        T_camera_rig=t_ref_cam,
+        dist_params=cam_single.dist.expand(num, -1),
+    )
+    return CandidateSamplingResult(
+        views=cam,
+        reference_pose=_make_pose(),
+        mask_valid=torch.ones(num, dtype=torch.bool),
+        masks={},
+        shell_poses=t_ref_cam,
+    )
 
 
 def test_candidate_renderer_cpu_backend_runs():
@@ -114,8 +148,7 @@ def test_candidate_renderer_cpu_backend_runs():
     candidates = _make_candidates(num=2, z=1.0)
 
     cfg = CandidateDepthRendererConfig(
-        camera_stream="rgb",
-        renderer=Efm3dDepthRendererConfig(device="cpu", add_proxy_walls=False),
+        renderer=Pytorch3DDepthRendererConfig(device="cpu", verbose=False),
         max_candidates=2,
     )
     renderer = cfg.setup_target()

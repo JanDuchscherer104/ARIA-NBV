@@ -103,35 +103,6 @@ class Pytorch3DDepthRenderer:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def render_depth(
-        self,
-        pose_world_cam: PoseTW,
-        mesh: Trimesh | tuple[torch.Tensor, torch.Tensor],
-        camera: CameraTW,
-        *,
-        frame_index: int | None = None,
-        mesh_cache_key: str | None = None,
-    ) -> Tensor:
-        """Render a depth map for a single candidate pose.
-
-        Args:
-            pose_world_cam: ``T_world_camera`` pose to render from.
-            mesh: Trimesh instance in world coordinates.
-            camera: Camera intrinsics (``CameraTW``) describing the RGB or SLAM stream.
-            frame_index: Optional frame index for the calib tensor. Defaults to the last frame.
-
-        Returns:
-            Tensor[H, W] float32 depth values filled with ``config.zfar`` where no hit occurs.
-        """
-
-        batched = self.render_batch(
-            poses=pose_world_cam,
-            mesh=mesh,
-            camera=camera,
-            frame_index=frame_index,
-            mesh_cache_key=mesh_cache_key,
-        )
-        return batched[0]
 
     def render_batch(
         self,
@@ -151,15 +122,18 @@ class Pytorch3DDepthRenderer:
         }[self.config.dtype]
 
         cam_single = self._slice_camera(camera, frame_index)
-        width, height, focal_length, principal_point, image_size = self._camera_intrinsics(cam_single, dtype=dtype)
+        width, height, focal_length, principal_point, image_size = self._camera_intrinsics(
+            cam_single, dtype=dtype, batch_size=poses.shape[0]
+        )
 
         poses_cw = poses.inverse().to(self.device)
         self.console.dbg_summary("poses_cw", poses_cw)
         rotations, translations = poses_cw.R, poses_cw.t
         batch_size = rotations.shape[0]
-        focal_length = focal_length.expand(batch_size, -1)
-        principal_point = principal_point.expand(batch_size, -1)
-        image_size = image_size.expand(batch_size, -1)
+        if focal_length.shape[0] == 1 and batch_size > 1:
+            focal_length = focal_length.expand(batch_size, -1)
+            principal_point = principal_point.expand(batch_size, -1)
+            image_size = image_size.expand(batch_size, -1)
 
         # Build (and cache) PyTorch3D mesh structure
         if isinstance(mesh, tuple):
@@ -170,9 +144,14 @@ class Pytorch3DDepthRenderer:
         mesh_struct_single = get_pytorch3d_mesh(
             verts_t,
             faces_t,
-            cache_key=mesh_cache_key or "p3d_mesh_cache",
+            cache_key=f"{mesh_cache_key or 'p3d_mesh_cache'}_{self.device.type}",
             device=self.device,
         )
+        if self.console.is_debug and rotations.shape[0] > 0:
+            verts_world = mesh_struct_single.verts_packed()
+            verts_cam = verts_world @ rotations[0].transpose(-1, -2) + translations[0]
+            min_z = float(verts_cam[:, 2].min().item())
+            self.console.dbg_summary("verts_cam_min_z", {"min_z": min_z})
         mesh_struct = mesh_struct_single.extend(rotations.shape[0])
         if dtype != torch.float32:
             mesh_struct = mesh_struct.to(dtype=dtype)
@@ -226,11 +205,14 @@ class Pytorch3DDepthRenderer:
     # Helpers
     # ------------------------------------------------------------------
     def _slice_camera(self, camera: CameraTW, frame_index: int | None) -> CameraTW:
-        """Return a single-frame ``CameraTW`` entry."""
+        """Return a per-candidate or single-frame ``CameraTW`` entry."""
 
         camera = camera.to(self.device)
         data = camera.tensor()
         if data.ndim == 1:
+            return camera
+        if frame_index is None:
+            # Already per-candidate intrinsics.
             return camera
         idx = data.shape[0] - 1 if frame_index is None else frame_index
         idx = max(-data.shape[0], min(data.shape[0] - 1, idx))
@@ -241,6 +223,7 @@ class Pytorch3DDepthRenderer:
         camera: CameraTW,
         *,
         dtype: torch.dtype,
+        batch_size: int,
     ) -> tuple[int, int, Tensor, Tensor, Tensor]:
         """Return intrinsics ready for ``PerspectiveCameras``.
 
@@ -250,18 +233,31 @@ class Pytorch3DDepthRenderer:
 
         Returns:
             Tuple of ``(width_px, height_px, focal_length, principal_point, image_size)`` where
-            the last three items are shaped ``(1, 2)`` on ``self.device`` with the provided dtype.
+            the last three items are shaped ``(B, 2)`` on ``self.device`` with the provided dtype.
         """
 
-        size = camera.size.reshape(-1, 2)[0].to(device=self.device)
-        width = int(size[0].item())
-        height = int(size[1].item())
+        size_all = camera.size.reshape(-1, 2).to(device=self.device, dtype=torch.float32)
+        if size_all.shape[0] not in (1, batch_size):
+            raise ValueError(f"Camera size batch {size_all.shape[0]} does not match poses batch {batch_size}")
+        size_base = size_all[0]
+        if not torch.allclose(size_all, size_base):
+            raise ValueError("Per-candidate varying image sizes are not supported.")
+        width = int(size_base[0].item())
+        height = int(size_base[1].item())
 
-        focal_length = camera.f.reshape(-1, 2)[0].to(device=self.device, dtype=dtype).unsqueeze(0)
-        principal_point = camera.c.reshape(-1, 2)[0].to(device=self.device, dtype=dtype).unsqueeze(0)
-        image_size = torch.stack((size[1], size[0])).unsqueeze(0).to(dtype=dtype)
+        focal_all = camera.f.reshape(-1, 2).to(device=self.device, dtype=dtype)
+        principal_all = camera.c.reshape(-1, 2).to(device=self.device, dtype=dtype)
 
-        return width, height, focal_length, principal_point, image_size
+        if focal_all.shape[0] == 1 and batch_size > 1:
+            focal_all = focal_all.expand(batch_size, -1)
+            principal_all = principal_all.expand(batch_size, -1)
+            size_all = size_all.expand(batch_size, -1)
+        elif focal_all.shape[0] != batch_size:
+            raise ValueError(f"Camera focal batch {focal_all.shape[0]} does not match poses batch {batch_size}")
+
+        image_size = torch.stack((size_all[:, 1], size_all[:, 0]), dim=-1).to(dtype=dtype)
+
+        return width, height, focal_all, principal_all, image_size
 
     def _mesh_to_struct(
         self,
