@@ -8,6 +8,7 @@ from typing import Any
 import torch
 from efm3d.aria import CameraTW, PoseTW
 from pydantic import AliasChoices, Field, field_validator, model_validator
+from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 
 from ..data.efm_views import EfmSnippetView
 from ..data.mesh_cache import mesh_from_snippet
@@ -17,7 +18,7 @@ from .pytorch3d_depth_renderer import Pytorch3DDepthRenderer, Pytorch3DDepthRend
 
 
 @dataclass(slots=True)
-class CandidateDepthBatch:
+class CandidateDepths:
     """Typed result for candidate depth rendering."""
 
     depths: torch.Tensor
@@ -26,14 +27,22 @@ class CandidateDepthBatch:
     poses: PoseTW
     """PoseTW (cam2world) for the rendered subset."""
 
+    reference_pose: PoseTW
+    """PoseTW (ref2world) for the reference frame corresponding to candidates."""
+
     mask_valid: torch.Tensor
     """Boolean mask aligned with ``candidate_indices`` (subset of original mask_valid)."""
 
     candidate_indices: torch.Tensor
     """Indices (long) into the original candidate array corresponding to ``depths``."""
 
+    valid_counts: torch.Tensor
+    """Tensor['N', int] with per-candidate valid depth pixel counts."""
+
     camera: CameraTW
-    """Camera calibration (and ref←cam extrinsics) for the rendered subset, same order as ``depths``."""
+    """Camera calibration (and ref2camera extrinsics) for the rendered subset, same order as ``depths``."""
+
+    p3d_cameras: PerspectiveCameras
 
 
 class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
@@ -93,7 +102,7 @@ class CandidateDepthRenderer:
         self,
         sample: EfmSnippetView,
         candidates: CandidateSamplingResult,
-    ) -> CandidateDepthBatch:
+    ) -> CandidateDepths:
         """Render depth maps for valid candidate poses within a snippet."""
 
         if not sample.has_mesh or sample.mesh is None:
@@ -104,7 +113,7 @@ class CandidateDepthRenderer:
             f"Rendering depths: candidates={candidates.views.tensor().shape[0]} on '{self.renderer.__class__.__name__}'"
         )
         self.console.log(f"Mesh stats verts={sample.mesh.vertices.shape[0]:,} faces={sample.mesh.faces.shape[0]:,}")
-        pose_batch, camera_batch, candidate_indices = self._select_candidates(candidates)
+        pose_batch, camera_batch, candidate_indices = self._select_candidate_views(candidates)
         self.console.log(f"Attempting renders for {pose_batch.tensor().shape[0]} candidates (GUI slice).")
         self.console.dbg_summary("candidate_indices", candidate_indices)
 
@@ -136,12 +145,22 @@ class CandidateDepthRenderer:
         if not isinstance(self.renderer, Pytorch3DDepthRenderer):
             raise TypeError(f"Unsupported renderer type: {self.renderer.__class__.__name__}")
 
-        depths = self.renderer.render(
+        depths, cameras = self.renderer.render(
             poses=pose_batch,
             mesh=mesh_input,
             camera=camera_calib,
             frame_index=None,
             mesh_cache_key=sample.mesh_cache_key,
+        )
+        # Rank candidates by valid-hit count (descending) to surface the most informative renders first.
+        valid_counts, rank_idx = self._filter_rendered_depths(depths)
+        depths = depths  # [rank_idx]
+        pose_batch = pose_batch  # [rank_idx]
+        candidate_indices = candidate_indices  # [rank_idx]
+        camera_calib = (
+            camera_calib  # [rank_idx]
+            if isinstance(camera_calib, CameraTW) and camera_calib.tensor().ndim > 1
+            else camera_calib
         )
 
         hit_ratio = float((depths < self.renderer.config.zfar).float().mean().item())
@@ -151,22 +170,33 @@ class CandidateDepthRenderer:
                 "All candidate depth pixels are at zfar; check camera poses, mesh normals, or backface culling."
             )
         mask_valid_subset = candidates.mask_valid.to(device=pose_batch.device)[candidate_indices]
-        return CandidateDepthBatch(
+        return CandidateDepths(
             depths=depths,
             poses=pose_batch,
+            reference_pose=candidates.reference_pose.to(device=pose_batch.device),
             mask_valid=mask_valid_subset,
             candidate_indices=candidate_indices,
+            valid_counts=valid_counts,
             camera=camera_calib,
+            p3d_cameras=cameras,
         )
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
-    def _select_candidates(
+    def _select_candidate_views(
         self,
         candidates: CandidateSamplingResult,
     ) -> tuple[PoseTW, CameraTW, torch.Tensor]:
+        """
+        Select a subset of candidate poses for rendering, based on config.
+
+        Returns:
+            - PoseTW: Selected candidate poses (world2cam).
+            - CameraTW: Selected candidate cameras (extrinsics are ref2cam).
+            - Tensor['K',]: Indices into original candidate array.
+        """
         device = self.renderer.device
         cam_views = candidates.views.to(device)
         num_candidates = cam_views.tensor().shape[0]
@@ -181,23 +211,43 @@ class CandidateDepthRenderer:
 
         selected_views = cam_views[candidate_idx]
 
-        # CandidateSamplingResult convention: T_camera_rig is camera ← reference.
-        t_cam_ref = selected_views.T_camera_rig.to(device=device)  # camera ← reference
-        t_world_ref = candidates.reference_pose.to(device=device)  # world ← reference
+        # CandidateSamplingResult convention: T_camera_rig is camera <- reference.
+        t_cam_ref = selected_views.T_camera_rig.to(device=device)  # camera <- reference
+        t_world_ref = candidates.reference_pose.to(device=device)  # world <- reference
 
-        # Compose to world ← camera
+        # Compose to world2camera
         poses_world_cam = t_world_ref @ t_cam_ref.inverse()
 
         shell = candidates.shell_poses.to(device)
         if shell._data.shape[0] >= candidate_idx[-1].item() + 1:
             diff = (poses_world_cam._data - shell._data[candidate_idx]).abs().max()
+            # NOTE: diff is very close to zero - so `t_world_ref @ t_cam_ref.inverse()` matches the shell poses as world2cam!
             self.console.dbg(f"pose_diff_vs_shell: {float(diff)}")
 
         return poses_world_cam, selected_views, candidate_idx
 
+    def _filter_rendered_depths(self, depths: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return indices representing a ranking of rendered depths.
+
+        The ranking is based on the number of valid depth pixels (finite, >0, and
+        optionally < zfar). Higher counts are ranked first.
+
+        Args:
+            depths: Tensor['N', 'H', 'W'] with per-candidate depth maps.
+
+        Returns:
+            Tuple[Tensor['N'], Tensor['N']] containing:
+                - Valid-hit counts per candidate.
+                - Indices sorted by descending valid-hit count.
+        """
+        threshold = torch.tensor(self.renderer.config.zfar, device=depths.device, dtype=depths.dtype)
+        valid = torch.isfinite(depths) & (depths > 0) & (depths < threshold)
+        counts = valid.sum(dim=(1, 2))
+        return counts, torch.argsort(counts, descending=True)
+
 
 __all__ = [
-    "CandidateDepthBatch",
+    "CandidateDepths",
     "CandidateDepthRenderer",
     "CandidateDepthRendererConfig",
 ]

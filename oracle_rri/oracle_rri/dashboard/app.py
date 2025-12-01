@@ -14,7 +14,7 @@ from ..data import AseEfmDatasetConfig, EfmSnippetView
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..pose_generation.types import CandidateSamplingResult, CollisionBackend, SamplingStrategy
 from ..rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
-from ..rendering.candidate_depth_renderer import CandidateDepthBatch
+from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..utils import Console, Verbosity, get_performance_mode, set_performance_mode
 from .config import DashboardConfig
 from .panels import render_candidates_page, render_data_page, render_depth_page
@@ -78,7 +78,7 @@ class DashboardApp:
 
         sample = cast(EfmSnippetView | None, get(STATE_KEYS["sample"]))
         candidates = cast(CandidateSamplingResult | None, get(STATE_KEYS["candidates"]))
-        depth_batch = cast(CandidateDepthBatch | None, get(STATE_KEYS["depth"]))
+        depth_batch = cast(CandidateDepths | None, get(STATE_KEYS["depth"]))
 
         cfg_changed = {"sample": False, "cand": False, "depth": False}
         pipeline_order: tuple[str, ...] = ("data", "candidates", "depth")
@@ -109,7 +109,7 @@ class DashboardApp:
             nonlocal sample, candidates, depth_batch
             sample = cast(EfmSnippetView | None, get(STATE_KEYS["sample"]))
             candidates = cast(CandidateSamplingResult | None, get(STATE_KEYS["candidates"]))
-            depth_batch = cast(CandidateDepthBatch | None, get(STATE_KEYS["depth"]))
+            depth_batch = cast(CandidateDepths | None, get(STATE_KEYS["depth"]))
 
         def _run_data_stage(cfg: AseEfmDatasetConfig | None, sample_idx: int, *, allow_ui: bool = True):
             if cfg is None:
@@ -211,7 +211,7 @@ class DashboardApp:
                 if allow_ui:
                     st.warning("Need data and candidates. Run previous stages before rendering.")
                 return None
-            cached = cast(CandidateDepthBatch | None, get(STATE_KEYS["depth"]))
+            cached = cast(CandidateDepths | None, get(STATE_KEYS["depth"]))
             if cached is not None and get(STATE_KEYS["depth_cfg"]) == _cfg_to_dict(cfg):
                 console.log("Using cached depth renders")
                 return cached
@@ -353,7 +353,7 @@ class DashboardApp:
             st.markdown(
                 """
 **Renderer choices**
-- *PyTorch3D* (GPU/CPU): rasterization; tunable `faces_per_pixel`, `bin_size`, `max_faces_per_bin`, `dtype` (fp16/bf16/fp32).
+- *PyTorch3D* (GPU/CPU): rasterization; `bin_size`, `max_faces_per_bin`, `dtype` (fp16/bf16/fp32).
 - *CPU (trimesh rays)*: slower but minimal dependencies; uses chunked rays.
 
 **Candidate generation backends**
@@ -366,7 +366,6 @@ class DashboardApp:
 
 **Quick tips**
 - Use GPU + fp16 for fastest renders; if z precision issues appear on thin geometry, switch to fp32.
-- Lower `faces_per_pixel` and enable coarse-to-fine binning (`bin_size`/`max_faces_per_bin`) to reduce VRAM.
 - For candidate collision, reduce `ray_subsample` or `mesh_samples` for speed; increase for stricter safety.
                 """
             )
@@ -434,14 +433,6 @@ class DashboardApp:
                             else "float32"
                         ),
                     )
-                    faces_pp = st.slider(
-                        "faces_per_pixel",
-                        1,
-                        8,
-                        int(getattr(rend_cfg.renderer, "faces_per_pixel", 1))
-                        if isinstance(rend_cfg.renderer, Pytorch3DDepthRendererConfig)
-                        else 1,
-                    )
                     bin_size = st.number_input(
                         "bin_size (None=auto)",
                         min_value=0,
@@ -476,7 +467,6 @@ class DashboardApp:
                         new_renderer = base.model_copy(
                             update={
                                 "dtype": dtype,
-                                "faces_per_pixel": int(faces_pp),
                                 "bin_size": None if bin_size == 0 else int(bin_size),
                                 "max_faces_per_bin": None if max_faces_bin == 0 else int(max_faces_bin),
                                 "two_sided": bool(two_sided),
@@ -496,7 +486,7 @@ class DashboardApp:
             depth_cfg_prev = (
                 _cfg_from_state_optional(STATE_KEYS["depth_cfg"], CandidateDepthRendererConfig) or self.config.renderer
             )
-            depth_cached = cast(CandidateDepthBatch | None, get(STATE_KEYS["depth"]))
+            depth_cached = cast(CandidateDepths | None, get(STATE_KEYS["depth"]))
             renderer_cfg = renderer_config_ui(
                 depth_cfg_prev,
                 st.sidebar,

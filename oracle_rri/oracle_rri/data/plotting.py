@@ -21,9 +21,8 @@ from matplotlib import colormaps
 from plotly import colors as plotly_colors
 from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 
-from oracle_rri.data import EfmCameraView, EfmSnippetView, EfmTrajectoryView
+from oracle_rri.data import EfmCameraView, EfmSnippetView
 from oracle_rri.utils import Console
-from oracle_rri.utils.frames import world_from_camera
 
 console = Console.with_prefix("plotting")
 ROTATE_90_CW = -1
@@ -176,19 +175,6 @@ def mesh_to_plotly(
     )
 
 
-def _aligned_pose_world_cam(cam: EfmCameraView, traj: EfmTrajectoryView, frame_idx: int) -> PoseTW:
-    """Nearest rig-aligned camera pose in **world+LUF**."""
-
-    cam_ts = cam.time_ns.cpu().numpy()
-    traj_ts = traj.time_ns.cpu().numpy()
-    if cam_ts.size == 0 or traj_ts.size == 0:
-        return PoseTW.from_Rt(torch.eye(3), torch.zeros(3))
-    traj_idx = int(np.argmin(np.abs(traj_ts - cam_ts[frame_idx])))
-
-    # Keep the physical pose in LUF; Plotly should render the true sensor frame.
-    return world_from_camera(traj.t_world_rig[traj_idx], cam.calib, frame_idx)
-
-
 def rotate_yaw_cw90(pose_world_cam: PoseTW) -> PoseTW:
     """Yaw the pose by 90° clockwise about its +Z (forward) axis for alignment with Aria conventions."""
     c, s = np.cos(np.pi / 2), np.sin(np.pi / 2)
@@ -203,7 +189,7 @@ def rotate_yaw_cw90(pose_world_cam: PoseTW) -> PoseTW:
 def _pose_positions(poses: PoseTW | torch.Tensor) -> np.ndarray:
     """Return positions (...,3) as numpy from PoseTW or compatible tensor shapes."""
 
-    arr = poses.matrix3x4 if isinstance(poses, PoseTW) else poses
+    arr = poses.t if isinstance(poses, PoseTW) else poses
 
     if arr.dim() == 2 and arr.shape == torch.Size([3, 4]):
         pos = arr[:3, 3].unsqueeze(0)
@@ -446,6 +432,7 @@ class SnippetPlotBuilder:
         frame: Literal["rgb", "slaml", "slamr", "rig"] | PoseTW = "rgb",
         frame_indices: list[int] | None = None,
         title: str = "Frame axes",
+        is_rotate_yaw_cw90: bool = True,
     ) -> Self:
         """Add axes for a camera stream or the rig itself.
 
@@ -488,7 +475,8 @@ class SnippetPlotBuilder:
                 t_cam_rig = cam_view.calib.T_camera_rig[cam_idx]  # PoseTW[K]
                 t_world_frame = t_world_rig @ t_cam_rig.inverse()
 
-        t_world_frame = rotate_yaw_cw90(t_world_frame)
+        if is_rotate_yaw_cw90:
+            t_world_frame = rotate_yaw_cw90(t_world_frame)
         centers = t_world_frame.t.detach().cpu().numpy()
         axes = t_world_frame.R.transpose(-1, -2).detach().cpu().numpy()  # (K, 3, 3)
 

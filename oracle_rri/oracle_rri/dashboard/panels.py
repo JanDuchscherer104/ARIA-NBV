@@ -6,6 +6,7 @@ import numpy as np
 import streamlit as st
 import torch
 from efm3d.aria.pose import PoseTW
+from plotly import graph_objects as go
 
 from ..data import EfmSnippetView
 from ..data.efm_views import EfmCameraView
@@ -31,7 +32,7 @@ from ..pose_generation.plotting import (
     plot_rule_rejection_bar,
 )
 from ..pose_generation.types import CandidateSamplingResult
-from ..rendering.candidate_depth_renderer import CandidateDepthBatch
+from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rendering.plotting import RenderingPlotBuilder, depth_grid, depth_histogram, hit_ratio_bar
 from .state import STATE_KEYS, get
 
@@ -367,7 +368,7 @@ def render_candidates_page(
             st.plotly_chart(rej_fig, width="stretch")
 
 
-def render_depth_page(depth_batch: CandidateDepthBatch) -> None:
+def render_depth_page(depth_batch: CandidateDepths) -> None:
     st.header("Candidate Renders")
 
     depths = depth_batch.depths
@@ -392,6 +393,24 @@ def render_depth_page(depth_batch: CandidateDepthBatch) -> None:
     with st.expander("Hit-ratio bars", expanded=False):
         fig_hits = hit_ratio_bar(depths, zfar=zfar_stat)
         st.plotly_chart(fig_hits, width="stretch")
+
+    with st.expander("Valid-pixel counts (ranked)", expanded=False):
+        counts = depth_batch.valid_counts.detach().cpu()
+        fig_counts = go.Figure(
+            go.Bar(
+                x=list(range(counts.numel())),
+                y=counts.tolist(),
+                text=[str(int(c)) for c in counts],
+                textposition="auto",
+            )
+        )
+        fig_counts.update_layout(
+            title="Valid depth pixels per candidate (after ranking)",
+            yaxis_title="valid pixels",
+            xaxis_title="candidate rank",
+            height=280,
+        )
+        st.plotly_chart(fig_counts, width="stretch")
 
     sample = get(STATE_KEYS["sample"])
     with st.expander("Frusta + image planes (3D)", expanded=False):
@@ -435,10 +454,10 @@ def render_depth_page(depth_batch: CandidateDepthBatch) -> None:
             builder_hits.add_depth_hits(
                 depths=depth_batch.depths,
                 poses=depth_batch.poses,
-                camera=depth_batch.camera,
+                camera=depth_batch.p3d_cameras,
                 stride=int(stride),
-                candidate_indices=selected,
                 zfar=float(depth_batch.depths.max().item()),
                 max_points=20000,
+                candidate_indices=selected,
             )
             st.plotly_chart(builder_hits.finalize(), width="stretch")

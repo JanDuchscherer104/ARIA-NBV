@@ -11,10 +11,12 @@ import plotly.graph_objects as go  # type: ignore[import-untyped]
 import torch
 from efm3d.aria import CameraTW, PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import-untyped]
+from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from torch import Tensor
 
 from ..data.plotting import FrameGridBuilder, _depth_to_color, rotate_yaw_cw90
 from ..pose_generation.plotting import CandidatePlotBuilder
+from .unproject import backproject_depth_with_p3d
 
 
 def depth_grid(
@@ -193,7 +195,7 @@ class RenderingPlotBuilder(CandidatePlotBuilder):
         self,
         depths: Tensor,
         poses: PoseTW,
-        camera: CameraTW,
+        camera: PerspectiveCameras,
         *,
         stride: int = 8,
         max_points: int = 20_000,
@@ -207,33 +209,43 @@ class RenderingPlotBuilder(CandidatePlotBuilder):
 
         if depths.ndim != 3:
             raise ValueError(f"depths must be (N,H,W), got {tuple(depths.shape)}")
-        pose_tensor = poses.tensor() if isinstance(poses, PoseTW) else poses
-        if pose_tensor.ndim == 1:  # (12,)
-            pose_tensor = pose_tensor.unsqueeze(0)
-        if pose_tensor.ndim == 2 and pose_tensor.shape[-1] == 12 and pose_tensor.shape[0] > 1:
-            pose_tensor = pose_tensor.view(-1, 3, 4)
-        all_indices = list(range(min(depths.shape[0], pose_tensor.shape[0])))
+
+        all_indices = list(range(min(depths.shape[0], poses.shape[0])))
         use_indices = candidate_indices if candidate_indices is not None else all_indices
-        pts_world = []
+        pts_all: list[torch.Tensor] = []
         for i in use_indices:
-            pose_i = self._pose_from_any(pose_tensor[i])
-            if display_yaw_cw90:
-                pose_i = rotate_yaw_cw90(pose_i)
-            cam_i: CameraTW
-            if isinstance(camera, CameraTW) and camera.tensor().ndim == 2 and camera.shape[0] > 1:
-                cam_i = camera[i]
-            else:
-                cam_i = camera
-            pts_world.append(
-                self._backproject_depth(
-                    depth=depths[i],
-                    pose=pose_i,
-                    camera=cam_i,
-                    stride=stride,
-                    zfar=zfar,
-                )
+            pose_i = poses[i]
+
+            # if isinstance(camera, CameraTW) and camera.tensor().ndim == 2 and camera.shape[0] > 1:
+            #     cam_i = camera[i]
+            # else:
+            #     cam_i = camera
+            # pts = backproject_depth(
+            #     depth=depths[i],
+            #     pose_world_cam=pose_i,
+            #     camera=cam_i,
+            #     stride=stride,
+            #     zfar=zfar_i,
+            #     max_points=None,
+            # )
+            pts = backproject_depth_with_p3d(
+                depth=depths[i],
+                cameras=camera[i],
+                stride=stride,
+                zfar=zfar,
+                max_points=max_points,
             )
-        pts_world_t = torch.cat(pts_world, dim=0)
+            if pts.numel() > 0:
+                pts_all.append(pts)
+                self.add_frame_axes(
+                    frame=pose_i,
+                    title=f"Cam {i}",
+                    is_rotate_yaw_cw90=False,
+                )
+        if not pts_all:
+            return self
+
+        pts_world_t = torch.cat(pts_all, dim=0)
         if pts_world_t.shape[0] > max_points:
             idx = torch.randperm(pts_world_t.shape[0], device=pts_world_t.device)[:max_points]
             pts_world_t = pts_world_t[idx]
@@ -241,8 +253,8 @@ class RenderingPlotBuilder(CandidatePlotBuilder):
             pts_world_t,
             name=name,
             color=color,
-            size=2,
-            opacity=0.6,
+            size=3,
+            opacity=0.8,
         )
         return self
 
@@ -329,25 +341,6 @@ class RenderingPlotBuilder(CandidatePlotBuilder):
         z_cam = depth_s
         pts_cam = torch.stack([x_cam, y_cam, z_cam], dim=1)
         return pose.transform(pts_cam)
-
-    @staticmethod
-    def _pose_from_any(pose_item: torch.Tensor | PoseTW) -> PoseTW:
-        """Coerce a PoseTW or tensor slice into PoseTW with shape (3,4)."""
-
-        if isinstance(pose_item, PoseTW):
-            return pose_item
-        tensor = pose_item
-        if tensor.ndim == 1 and tensor.shape[0] == 12:
-            tensor = tensor.view(3, 4)
-        elif tensor.ndim == 2 and tensor.shape[1] == 12:
-            tensor = tensor.view(-1, 3, 4)[0]
-        elif tensor.ndim == 3 and tensor.shape[-2:] == (3, 4):
-            tensor = tensor
-        elif tensor.ndim == 2 and tensor.shape == (3, 4):
-            tensor = tensor
-        else:
-            raise ValueError(f"Unexpected pose shape {tuple(tensor.shape)}")
-        return PoseTW.from_matrix3x4(tensor)
 
 
 __all__ = [

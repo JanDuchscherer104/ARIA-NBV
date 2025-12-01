@@ -241,7 +241,7 @@ def renderer_config_ui(
     max_candidates_default = 2 if super_fast else (default.max_candidates if default.max_candidates is not None else 4)
     max_candidates = ui.slider("max_candidates", 1, 16, max_candidates_default)
     res_scale = ui.slider(
-        "Render resolution scale (×H, ×W)",
+        "Render resolution scale (xH, xW)",
         0.1,
         4.0,
         0.5 if super_fast else 1.0,
@@ -263,14 +263,9 @@ def renderer_config_ui(
         renderer_device = perf_mode
     zfar = ui.slider("zfar (m)", 5.0, 50.0, default.renderer.zfar, step=1.0)
     debug_flag = ui.checkbox("Debug (renderer)", value=is_debug)
-    faces_default = (
-        default.renderer.faces_per_pixel if isinstance(default.renderer, Pytorch3DDepthRendererConfig) else 1
-    )
-    faces_pp = ui.slider("faces_per_pixel", 1, 4, faces_default)
     renderer_cfg = Pytorch3DDepthRendererConfig(
         device=renderer_device,
         zfar=float(zfar),
-        faces_per_pixel=int(faces_pp),
         is_debug=debug_flag,
         verbosity=verbosity,
     )
