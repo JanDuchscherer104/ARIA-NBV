@@ -275,8 +275,8 @@ namespace views.candidate_rendering{
 namespace pose_generation.types{
     class SamplingStrategy{
         <<enumeration>>
-        SHELL_UNIFORM
-        FORWARD_GAUSSIAN
+        UNIFORM_SPHERE
+        FORWARD_POWERSPHERICAL
 
     }
     class CollisionBackend{

@@ -66,7 +66,7 @@ The tables below list every constant, its structure, dtype/shape, and what it re
 | `ARIA_POSE_SNIPPET_TIME_S` | `torch.float32` `[B, T]` | Snippet-relative timestamps for rig poses. |
 | `ARIA_POSE_TIME_NS` | `torch.long` `[B, T]` | Sequence timestamps for rig poses. |
 | `ARIA_POSE_T_SNIPPET_RIG` | `PoseTW` `[B, T, 12]` | Transform rig→snippet. |
-| `ARIA_POSE_T_WORLD_RIG` | `PoseTW` `[B, T, 12]` | Transform rig→world. |
+| `ARIA_POSE_T_WORLD_RIG` | `PoseTW` `[B, T, 12]` | Transform rig2world. |
 | `ARIA_POSE_FREQUENCY_HZ` | `torch.float32` `[B]` | Pose sampling frequency. |
 
 ## Points & depth

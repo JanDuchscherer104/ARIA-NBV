@@ -13,3 +13,33 @@ format: html
 
 - TODO: candidate pose generation: only within free space and within confines of the room (based on SSL for training); based on predicted occupancy from EFM3D for eval
 - Only allow query points that are reachable from last known pose (direct movement from this pose to candidate pose doesn't intersect witht the mesh)
+
+## App Screenshots
+
+Quick reference of all visuals currently in `docs/figures/app`.
+
+![App options and controls](../../figures/app/app_options.png)
+
+![Candidate set oriented away from trajectory](../../figures/app/cand_away.png)
+
+![Candidate distribution over full circle](../../figures/app/candidates_full_circ.png)
+
+![Collision checking overlay](../../figures/app/collision.png)
+
+![Direction and distance coverage over full circle](../../figures/app/dir_dist_full_circ.png)
+
+![First vs final frames comparison](../../figures/app/first_final_frames.png)
+
+![Frusta pointing away from reference](../../figures/app/frusta_away.png)
+
+![Ground-truth OBBs overlay](../../figures/app/gt_obbs.png)
+
+![Miscellaneous app view](../../figures/app/image.png)
+
+![Direction jitter investigation](../../figures/app/jitter_dir_issue.png)
+
+![Direction–distance plot (updated)](../../figures/app/newplot.png)
+
+![Semi-dense point cloud overlay](../../figures/app/semidense.png)
+
+![Trajectory overview](../../figures/app/traj.png)

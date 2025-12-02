@@ -17,6 +17,7 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 - **Sparse SLAM PC**: Non-GT point clouds are semi-dense; need a strategy to compare candidate-view point clouds against provided SLAM PCs.
 - **Action space**: Start with discrete candidate selection (VIN-NBV style). Later: continuous pose generation (GenNBV) with collision-free sampling using free-space voxels.
   - Future work: learn to generate continuous poses directly, whose fitness can than be quantified using the RRI predictor; here we can also consider the free space voxels that are used in EFM3D to avoid collisions.
+  - Rendering tech debt: PyTorch3D path currently returns NDC z-buffer; needs metric depth conversion (or switch to non-NDC rasterisation with znear/zfar) before we can rely on hit-ratio diagnostics.
 
 # Highest Priority
 

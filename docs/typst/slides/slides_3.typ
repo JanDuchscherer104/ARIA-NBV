@@ -597,7 +597,7 @@
   ]
   #color-block(title: [Pruning Rules])[
     - `MinDistanceToMeshRule`: signed-distance clearance from GT mesh.
-    - `PathCollisionRule`: trimesh/PyEmbree ray tests from last pose to candidate centre.
+    - `PathCollisionRule`: trimesh/PyEmbree ray tests from last pose to candidate center.
     - `FreeSpaceRule`: workspace AABB from mesh bounds or semi-dense `volume_min/max`.
   ]
   #color-block(title: [Outputs])[
@@ -623,7 +623,7 @@
     ],
     [
       #color-block(title: [Intuition])[
-        - Sample camera centres on a spherical band around last pose.\
+        - Sample camera centers on a spherical band around last pose.\
         - Optional forward bias; elevations limited to $theta_{min..max}$.\
         - Orient each candidate back to last rig pose (ego-aligned).
       ]
@@ -633,7 +633,7 @@
     ],
     [
       #color-block(title: [Intuition])[
-        - Sample camera centres on a spherical band around last pose.
+        - Sample camera centers on a spherical band around last pose.
         - Bias optionally forward; elevations clipped to $\\theta_{min..max}$.
         - Orient candidates back to the last rig pose to stay ego-aligned.
       ]
