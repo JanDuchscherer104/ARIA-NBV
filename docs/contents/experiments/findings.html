@@ -592,8 +592,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </nav>
 <div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#app-screenshots" id="toc-app-screenshots" class="nav-link active" data-scroll-target="#app-screenshots"><span class="header-section-number">1</span> App Screenshots</a></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
@@ -646,10 +652,110 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>TODO: candidate pose generation: only within free space and within confines of the room (based on SSL for training); based on predicted occupancy from EFM3D for eval</li>
 <li>Only allow query points that are reachable from last known pose (direct movement from this pose to candidate pose doesn’t intersect witht the mesh)</li>
 </ul>
+<section id="app-screenshots" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="app-screenshots"><span class="header-section-number">1</span> App Screenshots</h2>
+<p>Quick reference of all visuals currently in <code>docs/figures/app</code>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/app_options.png" class="lightbox" data-gallery="quarto-lightbox-gallery-5" title="App options and controls"><img src="../../figures/app/app_options.png" class="img-fluid figure-img" alt="App options and controls"></a></p>
+<figcaption>App options and controls</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/backproj_pc.png" class="lightbox" data-gallery="quarto-lightbox-gallery-6" title="Back-projected point cloud sanity check"><img src="../../figures/app/backproj_pc.png" class="img-fluid figure-img" alt="Back-projected point cloud sanity check"></a></p>
+<figcaption>Back-projected point cloud sanity check</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/cand_away.png" class="lightbox" data-gallery="quarto-lightbox-gallery-7" title="Candidate set oriented away from trajectory"><img src="../../figures/app/cand_away.png" class="img-fluid figure-img" alt="Candidate set oriented away from trajectory"></a></p>
+<figcaption>Candidate set oriented away from trajectory</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/candidate_renders.png" class="lightbox" data-gallery="quarto-lightbox-gallery-8" title="Candidate renders for sampled poses"><img src="../../figures/app/candidate_renders.png" class="img-fluid figure-img" alt="Candidate renders for sampled poses"></a></p>
+<figcaption>Candidate renders for sampled poses</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/candidates_full_circ.png" class="lightbox" data-gallery="quarto-lightbox-gallery-9" title="Candidate distribution over full circle"><img src="../../figures/app/candidates_full_circ.png" class="img-fluid figure-img" alt="Candidate distribution over full circle"></a></p>
+<figcaption>Candidate distribution over full circle</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/collision.png" class="lightbox" data-gallery="quarto-lightbox-gallery-10" title="Collision checking overlay"><img src="../../figures/app/collision.png" class="img-fluid figure-img" alt="Collision checking overlay"></a></p>
+<figcaption>Collision checking overlay</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/depth_hist.png" class="lightbox" data-gallery="quarto-lightbox-gallery-11" title="Depth histogram diagnostics"><img src="../../figures/app/depth_hist.png" class="img-fluid figure-img" alt="Depth histogram diagnostics"></a></p>
+<figcaption>Depth histogram diagnostics</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/dir_dist_full_circ.png" class="lightbox" data-gallery="quarto-lightbox-gallery-12" title="Direction and distance coverage over full circle"><img src="../../figures/app/dir_dist_full_circ.png" class="img-fluid figure-img" alt="Direction and distance coverage over full circle"></a></p>
+<figcaption>Direction and distance coverage over full circle</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/first_final_frames.png" class="lightbox" data-gallery="quarto-lightbox-gallery-13" title="First vs final frames comparison"><img src="../../figures/app/first_final_frames.png" class="img-fluid figure-img" alt="First vs final frames comparison"></a></p>
+<figcaption>First vs final frames comparison</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/frusta_away.png" class="lightbox" data-gallery="quarto-lightbox-gallery-14" title="Frusta pointing away from reference"><img src="../../figures/app/frusta_away.png" class="img-fluid figure-img" alt="Frusta pointing away from reference"></a></p>
+<figcaption>Frusta pointing away from reference</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/gt_obbs.png" class="lightbox" data-gallery="quarto-lightbox-gallery-15" title="Ground-truth OBBs overlay"><img src="../../figures/app/gt_obbs.png" class="img-fluid figure-img" alt="Ground-truth OBBs overlay"></a></p>
+<figcaption>Ground-truth OBBs overlay</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/jitter_dir_issue.png" class="lightbox" data-gallery="quarto-lightbox-gallery-16" title="Direction jitter investigation"><img src="../../figures/app/jitter_dir_issue.png" class="img-fluid figure-img" alt="Direction jitter investigation"></a></p>
+<figcaption>Direction jitter investigation</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/newplot.png" class="lightbox" data-gallery="quarto-lightbox-gallery-17" title="Direction–distance plot (updated)"><img src="../../figures/app/newplot.png" class="img-fluid figure-img" alt="Direction–distance plot (updated)"></a></p>
+<figcaption>Direction–distance plot (updated)</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/render_frusta.png" class="lightbox" data-gallery="quarto-lightbox-gallery-18" title="Rendered frusta with depth overlay"><img src="../../figures/app/render_frusta.png" class="img-fluid figure-img" alt="Rendered frusta with depth overlay"></a></p>
+<figcaption>Rendered frusta with depth overlay</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/semidense.png" class="lightbox" data-gallery="quarto-lightbox-gallery-19" title="Semi-dense point cloud overlay"><img src="../../figures/app/semidense.png" class="img-fluid figure-img" alt="Semi-dense point cloud overlay"></a></p>
+<figcaption>Semi-dense point cloud overlay</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../../figures/app/traj.png" class="lightbox" data-gallery="quarto-lightbox-gallery-20" title="Trajectory overview"><img src="../../figures/app/traj.png" class="img-fluid figure-img" alt="Trajectory overview"></a></p>
+<figcaption>Trajectory overview</figcaption>
+</figure>
+</div>
 
 
 <!-- -->
 
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
@@ -1135,7 +1241,43 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="al">![Candidate Pose Sampling Visualization](../../figures/candidate_pose2.png)</span></span>
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>TODO: candidate pose generation: only within free space and within confines of the room (based on SSL for training); based on predicted occupancy from EFM3D for eval</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Only allow query points that are reachable from last known pose (direct movement from this pose to candidate pose doesn't intersect witht the mesh)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Only allow query points that are reachable from last known pose (direct movement from this pose to candidate pose doesn't intersect witht the mesh)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="fu">## App Screenshots</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>Quick reference of all visuals currently in <span class="in">`docs/figures/app`</span>.</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="al">![App options and controls](../../figures/app/app_options.png)</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="al">![Back-projected point cloud sanity check](../../figures/app/backproj_pc.png)</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="al">![Candidate set oriented away from trajectory](../../figures/app/cand_away.png)</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="al">![Candidate renders for sampled poses](../../figures/app/candidate_renders.png)</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="al">![Candidate distribution over full circle](../../figures/app/candidates_full_circ.png)</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="al">![Collision checking overlay](../../figures/app/collision.png)</span></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a><span class="al">![Depth histogram diagnostics](../../figures/app/depth_hist.png)</span></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="al">![Direction and distance coverage over full circle](../../figures/app/dir_dist_full_circ.png)</span></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="al">![First vs final frames comparison](../../figures/app/first_final_frames.png)</span></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="al">![Frusta pointing away from reference](../../figures/app/frusta_away.png)</span></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="al">![Ground-truth OBBs overlay](../../figures/app/gt_obbs.png)</span></span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="al">![Direction jitter investigation](../../figures/app/jitter_dir_issue.png)</span></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a><span class="al">![Direction–distance plot (updated)](../../figures/app/newplot.png)</span></span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a><span class="al">![Rendered frusta with depth overlay](../../figures/app/render_frusta.png)</span></span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a><span class="al">![Semi-dense point cloud overlay](../../figures/app/semidense.png)</span></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a><span class="al">![Trajectory overview](../../figures/app/traj.png)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

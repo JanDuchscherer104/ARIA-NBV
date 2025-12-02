@@ -2563,7 +2563,7 @@
     "href": "contents/experiments/findings.html",
     "title": "Experimental Findings",
     "section": "",
-    "text": "ASE Semi-Dense Point Cloud Visualization\n\n\n\n\n\nASE GT Mesh Sample\n\n\n\n\n\nCandidate Pose Sampling Visualization\n\n\n\n\n\nCandidate Pose Sampling Visualization\n\n\n\nTODO: candidate pose generation: only within free space and within confines of the room (based on SSL for training); based on predicted occupancy from EFM3D for eval\nOnly allow query points that are reachable from last known pose (direct movement from this pose to candidate pose doesn’t intersect witht the mesh)"
+    "text": "ASE Semi-Dense Point Cloud Visualization"
   },
   {
     "objectID": "contents/theory/surface_metrics.html#point-to-mesh-distances",
@@ -3108,8 +3108,8 @@
     "objectID": "contents/setup.html#pytorch3d-setup",
     "href": "contents/setup.html#pytorch3d-setup",
     "title": "Setup Instructions",
-    "section": "2.1 PyTorch3D Setup",
-    "text": "2.1 PyTorch3D Setup\nhttps://github.com/facebookresearch/pytorch3d/blob/main/INSTALL.md\n╰─ conda install pytorch3d -c pytorch3d"
+    "section": "2.3 PyTorch3D Setup",
+    "text": "2.3 PyTorch3D Setup\nhttps://github.com/facebookresearch/pytorch3d/blob/main/INSTALL.md\n╰─ conda install pytorch3d -c pytorch3d"
   },
   {
     "objectID": "contents/impl/aria_nbv_package.html",
@@ -3769,5 +3769,26 @@
       "External Implementations",
       "ProjectAria Tools: Complete Reference"
     ]
+  },
+  {
+    "objectID": "contents/experiments/findings.html#app-screenshots",
+    "href": "contents/experiments/findings.html#app-screenshots",
+    "title": "Experimental Findings",
+    "section": "1 App Screenshots",
+    "text": "1 App Screenshots\nQuick reference of all visuals currently in docs/figures/app.\n\n\n\nApp options and controls\n\n\n\n\n\nBack-projected point cloud sanity check\n\n\n\n\n\nCandidate set oriented away from trajectory\n\n\n\n\n\nCandidate renders for sampled poses\n\n\n\n\n\nCandidate distribution over full circle\n\n\n\n\n\nCollision checking overlay\n\n\n\n\n\nDepth histogram diagnostics\n\n\n\n\n\nDirection and distance coverage over full circle\n\n\n\n\n\nFirst vs final frames comparison\n\n\n\n\n\nFrusta pointing away from reference\n\n\n\n\n\nGround-truth OBBs overlay\n\n\n\n\n\nDirection jitter investigation\n\n\n\n\n\nDirection–distance plot (updated)\n\n\n\n\n\nRendered frusta with depth overlay\n\n\n\n\n\nSemi-dense point cloud overlay\n\n\n\n\n\nTrajectory overview"
+  },
+  {
+    "objectID": "contents/setup.html#installation-via-separate-uv-envirnoment",
+    "href": "contents/setup.html#installation-via-separate-uv-envirnoment",
+    "title": "Setup Instructions",
+    "section": "2.1 Installation via separate uv envirnoment",
+    "text": "2.1 Installation via separate uv envirnoment\ncd oracle_rri\nconda create -f environment.yml\nconda activate aria-nbv\n\nuv sync --extra dev --extra notebook --extra pytorch3d\nThis will install all dependencies and create a new python environment in oracle_rri/.venv."
+  },
+  {
+    "objectID": "contents/setup.html#direct-installation-into-the-conda-environment",
+    "href": "contents/setup.html#direct-installation-into-the-conda-environment",
+    "title": "Setup Instructions",
+    "section": "2.2 Direct Installation into the Conda Environment",
+    "text": "2.2 Direct Installation into the Conda Environment\ncd oracle_rri\nconda env create -f environment.yml\nconda activate aria-nbv\n\nuv pip install --python \"$(which python)\" -e \".[dev, notebook]\"\nuv pip install --python \"$(which python)\" -e \".[pytorch3d]\"\nuv pip install --python \"$(which python)\" -e ../external/efm3d\n\necho \"Verifying installation...\"\npython -c \"import efm3d; import oracle_rri; print('All packages installed successfully')\"\necho \"Setup complete! Activate with: conda activate aria-nbv\""
   }
 ]
