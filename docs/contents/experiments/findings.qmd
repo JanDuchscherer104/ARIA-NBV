@@ -30,7 +30,6 @@ Quick reference of all visuals currently in `docs/figures/app`.
 
 ![App options and controls](../../figures/app/app_options.png)
 
-
 ![Candidate set oriented away from trajectory](../../figures/app/cand_away.png)
 ![Frusta pointing away from reference](../../figures/app/frusta_away.png)
 ![Direction and distance coverage over full circle](../../figures/app/dir_dist_full_circ.png)

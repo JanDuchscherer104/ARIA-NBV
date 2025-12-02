@@ -3790,5 +3790,19 @@
     "title": "Setup Instructions",
     "section": "2.2 Direct Installation into the Conda Environment",
     "text": "2.2 Direct Installation into the Conda Environment\ncd oracle_rri\nconda env create -f environment.yml\nconda activate aria-nbv\n\nuv pip install --python \"$(which python)\" -e \".[dev, notebook]\"\nuv pip install --python \"$(which python)\" -e \".[pytorch3d]\"\nuv pip install --python \"$(which python)\" -e ../external/efm3d\n\necho \"Verifying installation...\"\npython -c \"import efm3d; import oracle_rri; print('All packages installed successfully')\"\necho \"Setup complete! Activate with: conda activate aria-nbv\""
+  },
+  {
+    "objectID": "contents/experiments/findings.html#efm-snippet-visualizations",
+    "href": "contents/experiments/findings.html#efm-snippet-visualizations",
+    "title": "Experimental Findings",
+    "section": "0.1 EFM Snippet Visualizations",
+    "text": "0.1 EFM Snippet Visualizations\nQuick reference of all visuals currently in docs/figures/app.\n\n\n\nSemi-dense point cloud overlay\n\n\n\n\n\nTrajectory overview\n\n\n\n\n\nGround-truth OBBs\n\n\n\n\n\nFirst vs final frames comparison"
+  },
+  {
+    "objectID": "contents/experiments/findings.html#rendering",
+    "href": "contents/experiments/findings.html#rendering",
+    "title": "Experimental Findings",
+    "section": "1.1 Rendering",
+    "text": "1.1 Rendering\n  \n\n\n\nBack-projected point cloud"
   }
 ]
