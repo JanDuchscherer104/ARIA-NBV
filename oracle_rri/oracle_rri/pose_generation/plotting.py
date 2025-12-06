@@ -11,7 +11,7 @@ from efm3d.aria.pose import PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import]
 
 from oracle_rri.data import EfmSnippetView
-from oracle_rri.data.plotting import SnippetPlotBuilder
+from oracle_rri.data.plotting import SnippetPlotBuilder, rotate_yaw_cw90
 from oracle_rri.utils import Console
 
 if TYPE_CHECKING:
@@ -250,6 +250,7 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
             raise ValueError("Candidate results missing; call attach_candidate_results() first.")
 
         cams = cand_results.views
+        assert cand_results.shell_poses._data is not None
         poses_world_valid = PoseTW(cand_results.shell_poses._data[cand_results.mask_valid])
         pose_list = self._pose_list_from_input(poses_world_valid)
 
@@ -270,8 +271,10 @@ def candidate_offsets_and_dirs_ref(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Offsets and forward directions in reference frame for **valid** candidates."""
 
-    poses_ref = candidates.views.T_camera_rig  # camera←reference
-    offsets = poses_ref.inverse().t  # reference←camera -> offset in reference frame
+    poses_ref = rotate_yaw_cw90(
+        candidates.views.T_camera_rig
+    )  # reference2candidate_cam, account for cw90 of reference frame
+    offsets = poses_ref.inverse().t  # camera2reference -> offset in reference frame
     offsets = offsets.view(-1, 3)
     z_cam = (
         torch.tensor([0.0, 0.0, 1.0], device=offsets.device, dtype=offsets.dtype).view(1, 3).expand(offsets.shape[0], 3)
@@ -281,26 +284,6 @@ def candidate_offsets_and_dirs_ref(
     dirs = poses_ref_refcam.rotate(z_cam).view(-1, 3)
     dirs = dirs / (dirs.norm(dim=1, keepdim=True) + 1e-8)
     return offsets, dirs
-
-
-def shell_offsets_and_dirs_ref(
-    candidates: CandidateSamplingResult,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Offsets and forward directions in reference frame for the full shell (pre-pruning)."""
-
-    ref = candidates.reference_pose
-    ref_inv = ref.inverse()
-    shell = candidates.shell_poses
-    centers_world = shell.t
-    offsets_ref = ref_inv.transform(centers_world).view(-1, 3)
-
-    z_cam = (
-        torch.tensor([0.0, 0.0, 1.0], device=shell.R.device, dtype=shell.R.dtype).view(1, 3).expand(shell.R.shape[0], 3)
-    )
-    dirs_world = shell.rotate(z_cam)
-    dirs_ref = ref_inv.rotate(dirs_world).view(-1, 3)
-    dirs_ref = dirs_ref / (dirs_ref.norm(dim=1, keepdim=True) + 1e-8)
-    return offsets_ref, dirs_ref
 
 
 def plot_direction_polar(
@@ -361,52 +344,27 @@ def plot_direction_sphere(
             name="dirs",
         )
     ]
+    fig = go.Figure(data=traces)
 
     if show_axes:
-        axes = np.eye(3)
-        labels = ["X (left)", "Y (up)", "Z (fwd)"]
-        colors = ["red", "green", "blue"]
-        for i in range(3):
-            traces.append(
-                go.Scatter3d(
-                    x=[0, axes[i, 0]],
-                    y=[0, axes[i, 1]],
-                    z=[0, axes[i, 2]],
-                    mode="lines+markers",
-                    line={"color": colors[i], "width": 6},
-                    marker={"size": 3, "color": colors[i]},
-                    name=labels[i],
-                    showlegend=True,
-                )
-            )
+        fig = SnippetPlotBuilder.add_frame_axes_to_fig(
+            fig=fig, cam_centers=np.zeros((1, 3)), cam_axes=np.eye(3), scale=0.4
+        )
 
-    fig = go.Figure(data=traces)
     fig.update_layout(title=title, scene={"xaxis_title": "X (left)", "yaxis_title": "Y (up)", "zaxis_title": "Z (fwd)"})
     return fig
 
 
 def plot_position_polar(
-    offsets: torch.Tensor,
-    *,
-    title: str = "Position distribution (radius vs elev)",
-    bins: int = 40,
+    offsets: torch.Tensor, *, title: str = "Offsets from reference pose (az/elev)", bins: int = 72
 ) -> go.Figure:
-    """Heatmap of radius vs elevation for position offsets."""
-
     off = offsets.detach().cpu().numpy()
-    r = np.linalg.norm(off, axis=1)
-    elev = np.degrees(np.arcsin(off[:, 1] / (r + 1e-8)))
-    h, xedges, yedges = np.histogram2d(r, elev, bins=bins)
-    fig = go.Figure(
-        data=go.Heatmap(
-            x=xedges[:-1],
-            y=yedges[:-1],
-            z=h.T,
-            colorscale="Viridis",
-            colorbar_title="count",
-        )
-    )
-    fig.update_layout(title=title, xaxis_title="radius (m)", yaxis_title="elev (deg)")
+    # LUF: x=left, y=up, z=forward
+    az = np.degrees(np.arctan2(off[:, 0], off[:, 2]))  # atan2(x, z)
+    el = np.degrees(np.arctan2(off[:, 1], np.linalg.norm(off[:, [0, 2]], axis=1) + 1e-8))
+    h, xedges, yedges = np.histogram2d(az, el, bins=bins)
+    fig = go.Figure(go.Heatmap(x=xedges[:-1], y=yedges[:-1], z=h.T, colorscale="Viridis", colorbar_title="count"))
+    fig.update_layout(title=title, xaxis_title="azimuth (deg)", yaxis_title="elevation (deg)")
     return fig
 
 
@@ -424,8 +382,9 @@ def plot_position_sphere(
         idx = torch.linspace(0, pts.shape[0] - 1, steps=sample_n, dtype=torch.long)
         pts = pts[idx]
     pn = pts.numpy()
-    traces = [
-        go.Scatter3d(
+
+    fig = go.Figure(
+        data=go.Scatter3d(
             x=pn[:, 0],
             y=pn[:, 1],
             z=pn[:, 2],
@@ -433,25 +392,11 @@ def plot_position_sphere(
             marker={"size": 2, "color": pn[:, 1], "colorscale": "Turbo", "opacity": 0.7},
             name="positions",
         )
-    ]
+    )
     if show_axes:
-        axes = np.eye(3)
-        labels = ["X (left)", "Y (up)", "Z (fwd)"]
-        colors = ["red", "green", "blue"]
-        for i in range(3):
-            traces.append(
-                go.Scatter3d(
-                    x=[0, axes[i, 0]],
-                    y=[0, axes[i, 1]],
-                    z=[0, axes[i, 2]],
-                    mode="lines+markers",
-                    line={"color": colors[i], "width": 6},
-                    marker={"size": 3, "color": colors[i]},
-                    name=labels[i],
-                    showlegend=True,
-                )
-            )
-    fig = go.Figure(data=traces)
+        fig = SnippetPlotBuilder.add_frame_axes_to_fig(
+            fig=fig, cam_centers=np.zeros((1, 3)), cam_axes=np.eye(3), scale=0.4
+        )
     fig.update_layout(
         title=title,
         scene={"xaxis_title": "X (left)", "yaxis_title": "Y (up)", "zaxis_title": "Z (fwd)"},
