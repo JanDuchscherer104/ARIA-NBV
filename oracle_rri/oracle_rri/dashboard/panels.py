@@ -6,7 +6,6 @@ import numpy as np
 import streamlit as st
 import torch
 from efm3d.aria.pose import PoseTW
-from plotly import graph_objects as go
 
 from ..data import EfmSnippetView
 from ..data.efm_views import EfmCameraView
@@ -18,11 +17,13 @@ from ..data.plotting import (
 )
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..pose_generation.plotting import (
+    # CandidateDistributionPlotBuilder,
     CandidatePlotBuilder,
-    candidate_offsets_and_dirs_ref,
     plot_direction_marginals,
     plot_direction_polar,
     plot_direction_sphere,
+    plot_euler_reference,
+    plot_euler_world,
     plot_min_distance_to_mesh,
     plot_path_collision_segments,
     plot_position_polar,
@@ -32,8 +33,17 @@ from ..pose_generation.plotting import (
     plot_rule_rejection_bar,
 )
 from ..pose_generation.types import CandidateSamplingResult
+from ..pose_generation.utils import (
+    stats_to_markdown_table,
+    summarise_dirs_ref,
+    summarise_offsets_ref,
+)
 from ..rendering.candidate_depth_renderer import CandidateDepths
-from ..rendering.plotting import RenderingPlotBuilder, depth_grid, depth_histogram, hit_ratio_bar
+from ..rendering.plotting import (
+    RenderingPlotBuilder,
+    depth_grid,
+    depth_histogram,
+)
 from .state import STATE_KEYS, get
 
 
@@ -267,23 +277,11 @@ def render_candidates_page(
         ).finalize()
     st.plotly_chart(cand_fig, width="stretch")
 
-    offsets_ref, dirs_ref = candidate_offsets_and_dirs_ref(candidates)
-
-    with st.expander("Sampling distributions", expanded=False):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.plotly_chart(
-                plot_direction_polar(dirs_ref, title="View directions (reference frame)"),
-                width="stretch",
-            )
-        with col2:
-            st.plotly_chart(
-                plot_direction_sphere(dirs_ref, title="View dirs on unit sphere", show_axes=True),
-                width="stretch",
-            )
-        st.plotly_chart(plot_direction_marginals(dirs_ref), width="stretch")
+    offsets_ref, dirs_ref = candidates.get_offsets_and_dirs_ref()
 
     with st.expander("Position distributions (reference frame)", expanded=False):
+        st.markdown(stats_to_markdown_table(summarise_offsets_ref(offsets_ref), header=None))
+        offsets_ref = offsets_ref.cpu().numpy()
         colp1, colp2 = st.columns(2)
         with colp1:
             st.plotly_chart(
@@ -296,6 +294,47 @@ def render_candidates_page(
                 width="stretch",
             )
         st.plotly_chart(plot_radius_hist(offsets_ref), width="stretch")
+
+    with st.expander("Directional distributions (reference frame)", expanded=False):
+        st.markdown(stats_to_markdown_table(summarise_dirs_ref(dirs_ref), header=None))
+        dirs_ref = dirs_ref.cpu().numpy()
+        col1, col2 = st.columns(2)
+        with col1:
+            st.plotly_chart(
+                plot_direction_polar(dirs_ref, title="View directions (reference frame)"),
+                width="stretch",
+            )
+        with col2:
+            st.plotly_chart(
+                plot_direction_sphere(dirs_ref, title="View dirs on unit sphere", show_axes=True),
+                width="stretch",
+            )
+        st.plotly_chart(plot_direction_marginals(dirs_ref), width="stretch")
+        st.plotly_chart(plot_euler_world(candidates), width="stretch")
+        st.plotly_chart(plot_euler_reference(candidates), width="stretch")
+
+    # Frusta plot
+    if mask_valid is None or mask_valid.sum() == 0:
+        st.warning("All candidates were rejected; frustum plot omitted.")
+    else:
+        with st.status("Candidate Frusta", expanded=False):
+            frust_fig = (
+                CandidatePlotBuilder.from_candidates(
+                    sample, candidates, title=f"Candidate frusta ({cand_cfg.camera_label})"
+                )
+                .add_mesh()
+                .add_candidate_cloud(use_valid=True, color="royalblue", size=3, opacity=0.35)
+                .add_candidate_frusta(
+                    scale=frustum_scale,
+                    color="crimson",
+                    name="Frustum",
+                    max_frustums=max_frustums,
+                    include_axes=False,
+                    include_center=False,
+                )
+                .add_reference_axes()
+            ).finalize()
+            st.plotly_chart(frust_fig, width="stretch")
 
     # Rule masks overlay
     masks = candidates.masks
@@ -326,30 +365,9 @@ def render_candidates_page(
                 plot_path_collision_segments(snippet=sample, candidates=candidates, collision_mask=path_collide),
                 width="stretch",
             )
+
     with st.expander("Rejections per rule", expanded=False):
         st.plotly_chart(plot_rule_rejection_bar(candidates), width="stretch")
-
-    if mask_valid is None or mask_valid.sum() == 0:
-        st.warning("All candidates were rejected; frustum plot omitted.")
-    else:
-        with st.status("Candidate Frusta", expanded=False):
-            frust_fig = (
-                CandidatePlotBuilder.from_candidates(
-                    sample, candidates, title=f"Candidate frusta ({cand_cfg.camera_label})"
-                )
-                .add_mesh()
-                .add_candidate_cloud(use_valid=True, color="royalblue", size=3, opacity=0.35)
-                .add_candidate_frusta(
-                    scale=frustum_scale,
-                    color="crimson",
-                    name="Frustum",
-                    max_frustums=max_frustums,
-                    include_axes=False,
-                    include_center=False,
-                )
-                .add_reference_axes()
-            ).finalize()
-            st.plotly_chart(frust_fig, width="stretch")
 
     rejected_poses = rejected_pose_tensor(candidates)
     if plot_rejected_only:
@@ -390,28 +408,6 @@ def render_depth_page(depth_batch: CandidateDepths) -> None:
         fig_hist = depth_histogram(depths, bins=50, zfar=zfar_stat)
         st.plotly_chart(fig_hist, width="stretch")
 
-    with st.expander("Hit-ratio bars", expanded=False):
-        fig_hits = hit_ratio_bar(depths, zfar=zfar_stat)
-        st.plotly_chart(fig_hits, width="stretch")
-
-    with st.expander("Valid-pixel counts (ranked)", expanded=False):
-        counts = depth_batch.valid_counts.detach().cpu()
-        fig_counts = go.Figure(
-            go.Bar(
-                x=list(range(counts.numel())),
-                y=counts.tolist(),
-                text=[str(int(c)) for c in counts],
-                textposition="auto",
-            )
-        )
-        fig_counts.update_layout(
-            title="Valid depth pixels per candidate (after ranking)",
-            yaxis_title="valid pixels",
-            xaxis_title="candidate rank",
-            height=280,
-        )
-        st.plotly_chart(fig_counts, width="stretch")
-
     sample = get(STATE_KEYS["sample"])
     with st.expander("Frusta + image planes (3D)", expanded=False):
         if sample is None:
@@ -444,20 +440,26 @@ def render_depth_page(depth_batch: CandidateDepths) -> None:
             st.info("Load data first to back-project depth hits.")
         else:
             stride = st.slider("Depth hit stride", 1, 32, 8, step=1, key="depth_hit_stride")
-            builder_hits = RenderingPlotBuilder.from_snippet(sample, title="Depth hit back-projection").add_mesh()
+
             cand_options = depth_batch.candidate_indices.tolist()
             selected_global = st.multiselect(
                 "Select candidates to back-project", options=cand_options, default=cand_options, key="depth_hit_cands"
             )
             cand_to_local = {int(g): idx for idx, g in enumerate(depth_batch.candidate_indices.tolist())}
             selected = [cand_to_local[g] for g in selected_global if g in cand_to_local]
-            builder_hits.add_depth_hits(
-                depths=depth_batch.depths,
-                poses=depth_batch.poses,
-                camera=depth_batch.p3d_cameras,
-                stride=int(stride),
-                zfar=float(depth_batch.depths.max().item()),
-                max_points=20000,
-                candidate_indices=selected,
+
+            st.plotly_chart(
+                RenderingPlotBuilder.from_snippet(sample, title="Depth hit back-projection")
+                .add_mesh()
+                .add_depth_hits(
+                    depths=depth_batch.depths,
+                    poses=depth_batch.poses,
+                    camera=depth_batch.p3d_cameras,
+                    stride=int(stride),
+                    zfar=float(depth_batch.depths.max().item()),
+                    max_points=20000,
+                    candidate_indices=selected,
+                )
+                .finalize(),
+                width="stretch",
             )
-            st.plotly_chart(builder_hits.finalize(), width="stretch")

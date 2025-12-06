@@ -261,11 +261,9 @@ def renderer_config_ui(
         renderer_device = "cuda"
     else:
         renderer_device = perf_mode
-    zfar = ui.slider("zfar (m)", 5.0, 50.0, default.renderer.zfar, step=1.0)
     debug_flag = ui.checkbox("Debug (renderer)", value=is_debug)
     renderer_cfg = Pytorch3DDepthRendererConfig(
         device=renderer_device,
-        zfar=float(zfar),
         is_debug=debug_flag,
         verbosity=verbosity,
     )

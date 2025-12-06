@@ -366,7 +366,6 @@ class DashboardApp:
 
 **Quick tips**
 - Use GPU + fp16 for fastest renders; if z precision issues appear on thin geometry, switch to fp32.
-- For candidate collision, reduce `ray_subsample` or `mesh_samples` for speed; increase for stricter safety.
                 """
             )
             # Load current configs
@@ -477,9 +476,9 @@ class DashboardApp:
                     else:
                         new_renderer = base
                     new_rend_cfg = rend_cfg.model_copy(update={"renderer": new_renderer})
-                    store(STATE_KEYS["depth_cfg"], _cfg_to_dict(new_rend_cfg))
+                    store(STATE_KEYS["depth_cfg"], (new_rend_cfg))
                     store(STATE_KEYS["depth"], None)
-                    st.success("Saved renderer performance settings. Rerun renders to apply.")
+                    st.success("Saved renderer performance settings. renders to apply.")
             return
 
         with st.sidebar.form("depth_form"):
