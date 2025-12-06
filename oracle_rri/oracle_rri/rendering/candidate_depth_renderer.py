@@ -36,9 +36,6 @@ class CandidateDepths:
     candidate_indices: torch.Tensor
     """Indices (long) into the original candidate array corresponding to ``depths``."""
 
-    valid_counts: torch.Tensor
-    """Tensor['N', int] with per-candidate valid depth pixel counts."""
-
     camera: CameraTW
     """Camera calibration (and ref2camera extrinsics) for the rendered subset, same order as ``depths``."""
 
@@ -153,7 +150,6 @@ class CandidateDepthRenderer:
             mesh_cache_key=sample.mesh_cache_key,
         )
         # Rank candidates by valid-hit count (descending) to surface the most informative renders first.
-        valid_counts, rank_idx = self._filter_rendered_depths(depths)
         depths = depths  # [rank_idx]
         pose_batch = pose_batch  # [rank_idx]
         candidate_indices = candidate_indices  # [rank_idx]
@@ -176,7 +172,6 @@ class CandidateDepthRenderer:
             reference_pose=candidates.reference_pose.to(device=pose_batch.device),
             mask_valid=mask_valid_subset,
             candidate_indices=candidate_indices,
-            valid_counts=valid_counts,
             camera=camera_calib,
             p3d_cameras=cameras,
         )
@@ -210,40 +205,9 @@ class CandidateDepthRenderer:
             candidate_idx = torch.arange(num_candidates, device=device, dtype=torch.long)
 
         selected_views = cam_views[candidate_idx]
-
-        # CandidateSamplingResult convention: T_camera_rig is camera <- reference.
-        t_cam_ref = selected_views.T_camera_rig.to(device=device)  # camera <- reference
-        t_world_ref = candidates.reference_pose.to(device=device)  # world <- reference
-
-        # Compose to world2camera
-        poses_world_cam = t_world_ref @ t_cam_ref.inverse()
-
-        shell = candidates.shell_poses.to(device)
-        if shell._data.shape[0] >= candidate_idx[-1].item() + 1:
-            diff = (poses_world_cam._data - shell._data[candidate_idx]).abs().max()
-            # NOTE: diff is very close to zero - so `t_world_ref @ t_cam_ref.inverse()` matches the shell poses as world2cam!
-            self.console.dbg(f"pose_diff_vs_shell: {float(diff)}")
+        poses_world_cam = candidates.poses_world_cam(device=device)[candidate_idx]
 
         return poses_world_cam, selected_views, candidate_idx
-
-    def _filter_rendered_depths(self, depths: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Return indices representing a ranking of rendered depths.
-
-        The ranking is based on the number of valid depth pixels (finite, >0, and
-        optionally < zfar). Higher counts are ranked first.
-
-        Args:
-            depths: Tensor['N', 'H', 'W'] with per-candidate depth maps.
-
-        Returns:
-            Tuple[Tensor['N'], Tensor['N']] containing:
-                - Valid-hit counts per candidate.
-                - Indices sorted by descending valid-hit count.
-        """
-        threshold = torch.tensor(self.renderer.config.zfar, device=depths.device, dtype=depths.dtype)
-        valid = torch.isfinite(depths) & (depths > 0) & (depths < threshold)
-        counts = valid.sum(dim=(1, 2))
-        return counts, torch.argsort(counts, descending=True)
 
 
 __all__ = [

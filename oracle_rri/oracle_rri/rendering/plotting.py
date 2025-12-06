@@ -77,19 +77,6 @@ def depth_histogram(depths: Tensor, *, bins: int = 50, zfar: float | None = None
     return fig
 
 
-def hit_ratio_bar(depths: Tensor, *, zfar: float) -> go.Figure:
-    """Bar chart of per-candidate hit ratios."""
-
-    if depths.ndim != 3:
-        raise ValueError(f"hit_ratio_bar expects (N,H,W) tensor, got {tuple(depths.shape)}")
-    hits = (depths < zfar).float().mean(dim=(1, 2)).detach().cpu()
-    fig = go.Figure(
-        go.Bar(x=list(range(hits.numel())), y=hits.tolist(), text=[f"{h:.2f}" for h in hits], textposition="auto")
-    )
-    fig.update_layout(title=f"Hit ratio per candidate (zfar={zfar})", yaxis_title="hit ratio")
-    return fig
-
-
 class RenderingPlotBuilder(CandidatePlotBuilder):
     """Rendering-focused extensions on top of :class:`CandidatePlotBuilder`.
 
@@ -216,18 +203,6 @@ class RenderingPlotBuilder(CandidatePlotBuilder):
         for i in use_indices:
             pose_i = poses[i]
 
-            # if isinstance(camera, CameraTW) and camera.tensor().ndim == 2 and camera.shape[0] > 1:
-            #     cam_i = camera[i]
-            # else:
-            #     cam_i = camera
-            # pts = backproject_depth(
-            #     depth=depths[i],
-            #     pose_world_cam=pose_i,
-            #     camera=cam_i,
-            #     stride=stride,
-            #     zfar=zfar_i,
-            #     max_points=None,
-            # )
             pts = backproject_depth_with_p3d(
                 depth=depths[i],
                 cameras=camera[i],

@@ -42,6 +42,9 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     zfar: float = 20.0
     """Far clipping plane (metres); also used to fill miss pixels."""
 
+    z_clip_value: float = 1e-3
+    """Near clipping plane (metres); triangles closer than this are clipped."""
+
     cull_backfaces: bool = False
     """If ``True`` drop triangles with normals pointing away from the camera.
 
@@ -53,7 +56,7 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     blur_radius: float = 0.0
     """Soft rasterizer blur radius; keep ``0`` for hard z-buffer."""
 
-    bin_size: int | None = None
+    bin_size: int | None = 0
     """Rasterisation bin size; ``None`` lets PyTorch3D pick heuristics."""
 
     max_faces_per_bin: int | None = None
@@ -100,26 +103,6 @@ class Pytorch3DDepthRenderer:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-
-    def render_depth(
-        self,
-        pose_world_cam: PoseTW,
-        mesh: Trimesh | tuple[torch.Tensor, torch.Tensor],
-        camera: CameraTW,
-        *,
-        frame_index: int | None = None,
-        mesh_cache_key: str | None = None,
-    ) -> Tensor:
-        """Render a single depth map."""
-
-        batched = self.render(
-            poses=pose_world_cam,
-            mesh=mesh,
-            camera=camera,
-            frame_index=frame_index,
-            mesh_cache_key=mesh_cache_key,
-        )
-        return batched[0]
 
     def render(
         self,
@@ -173,11 +156,7 @@ class Pytorch3DDepthRenderer:
             cache_key=f"{mesh_cache_key or 'p3d_mesh_cache'}_{self.device.type}",
             device=self.device,
         )
-        if self.console.is_debug and rotations.shape[0] > 0:
-            verts_world = mesh_struct_single.verts_packed()
-            verts_cam = verts_world @ rotations[0].transpose(-1, -2) + translations[0]
-            min_z = float(verts_cam[:, 2].min().item())
-            self.console.dbg_summary("verts_cam_min_z", {"min_z": min_z})
+
         mesh_struct = mesh_struct_single.extend(rotations.shape[0])
 
         cameras = PerspectiveCameras(
@@ -193,41 +172,20 @@ class Pytorch3DDepthRenderer:
             image_size=(int(height), int(width)),
             blur_radius=self.config.blur_radius,
             faces_per_pixel=1,  # Closest simplex only
-            cull_backfaces=self.config.cull_backfaces,
+            cull_backfaces=False,
             bin_size=self.config.bin_size,
             max_faces_per_bin=self.config.max_faces_per_bin,
+            cull_to_frustum=False,
+            z_clip_value=self.config.z_clip_value,
         )
         rasterizer = MeshRasterizer(cameras=cameras, raster_settings=raster_settings)
         autocast_enable = dtype != torch.float32 and self.device.type == "cuda"
         with torch.autocast(device_type=self.device.type, dtype=dtype, enabled=autocast_enable):
-            fragments = rasterizer.forward(mesh_struct)
-
-        # Directly use z-buffer from rasterizer: metric z in view space (in_ndc=False).
-        pix_to_face = fragments.pix_to_face.squeeze(-1)  # (B, H, W)
-        depth = fragments.zbuf.squeeze(-1)  # (B, H, W) -> (B, H, W)
+            depth = rasterizer.forward(mesh_struct).zbuf.squeeze(-1)  # (B, H, W)
 
         far = torch.full_like(depth, self.config.zfar)
-        depth = torch.where(pix_to_face >= 0, depth, far)
         depth = torch.where(torch.isfinite(depth), depth, far)
-        depth = torch.where(depth <= 0, far, depth)
-        hit_mask = depth < self.config.zfar
-        hit_ratio = float(hit_mask.float().mean().item())
 
-        self.console.dbg_summary(
-            "depth_stats",
-            {
-                "hits_ratio": hit_ratio,
-                "min": float(depth.min().item()),
-                "max": float(depth.max().item()),
-                "zfar": float(self.config.zfar),
-                "cull_backfaces": self.config.cull_backfaces,
-            },
-        )
-        if hit_ratio == 0.0 and self.config.cull_backfaces:
-            self.console.warn(
-                "No depth hits recorded (all pixels at zfar). Consider disabling backface culling "
-                "for interior viewpoints."
-            )
         return depth, cameras
 
     # ------------------------------------------------------------------
