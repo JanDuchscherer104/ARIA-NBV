@@ -66,6 +66,12 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
         (:class:`SamplingStrategy`).
     kappa:
         Concentration for the forward-biased PowerSpherical sampler.
+    view_max_angle_deg / view_max_azimuth_deg / view_max_elevation_deg:
+        Maximum deviation (deg) allowed for camera-frame forward jitter around
+        the deterministic base view. Set to 0 to keep orientations
+        deterministic even when `view_sampling_strategy` is provided.
+    view_roll_jitter_deg:
+        Symmetric roll jitter (deg) applied around the camera forward axis.
 
     Rules
     -----
@@ -145,7 +151,13 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Concentration for PowerSpherical view sampler; defaults to positional `kappa` when None."""
 
     view_max_angle_deg: float = 0.0
-    """Optional cap on angular deviation (deg) from forward in the base camera frame."""
+    """ Seed both azimuth and elev if they're None - Cap on  angular deviation (deg) from the forward axis."""
+
+    view_max_azimuth_deg: float | None = None
+    """Maximum horizontal deviation (deg, ±) from the base forward axis in camera frame."""
+
+    view_max_elevation_deg: float | None = None
+    """Maximum vertical deviation (deg, ±) from the base forward axis in camera frame."""
 
     view_roll_jitter_deg: float = 0.0
     """Symmetric roll jitter (deg) around the sampled forward axis in camera frame."""
@@ -163,6 +175,18 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     def _coerce_verbosity(cls, value: Verbosity | int | str) -> Verbosity:
         return Verbosity.from_any(value)
 
+    @field_validator(
+        "view_max_angle_deg",
+        "view_max_azimuth_deg",
+        "view_max_elevation_deg",
+        "view_roll_jitter_deg",
+    )
+    @classmethod
+    def _non_negative_angles(cls, value: float | None) -> float | None:
+        if value is not None and value < 0:
+            raise ValueError("Angular jitter caps must be non-negative.")
+        return value
+
     @model_validator(mode="after")
     def set_debug(self) -> "CandidateViewGeneratorConfig":
         if self.is_debug:
@@ -170,6 +194,10 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
             object.__setattr__(self, "verbosity", Verbosity.VERBOSE)
         if self.view_kappa is None:
             object.__setattr__(self, "view_kappa", self.kappa)
+        if self.view_max_azimuth_deg is None:
+            object.__setattr__(self, "view_max_azimuth_deg", self.view_max_angle_deg)
+        if self.view_max_elevation_deg is None:
+            object.__setattr__(self, "view_max_elevation_deg", self.view_max_angle_deg)
         return self
 
     @property
@@ -376,10 +404,8 @@ class CandidateViewGenerator:
 def _clone_camera_template(template: CameraTW, n: int, device: torch.device) -> torch.Tensor:
     """Broadcast a camera template to `n` candidates on the target device."""
 
-    if template is None:
-        data = CameraTW.from_parameters()._data
-    else:
-        data = template._data
+    data = template._data
+    assert data is not None
 
     if data.ndim == 1:
         data = data.view(1, -1)

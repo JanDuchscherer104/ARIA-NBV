@@ -11,7 +11,7 @@ from efm3d.aria.pose import PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import]
 
 from oracle_rri.data import EfmSnippetView
-from oracle_rri.data.plotting import SnippetPlotBuilder, rotate_yaw_cw90
+from oracle_rri.data.plotting import SnippetPlotBuilder
 from oracle_rri.utils import Console
 
 if TYPE_CHECKING:
@@ -249,13 +249,10 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
         if cand_results is None:
             raise ValueError("Candidate results missing; call attach_candidate_results() first.")
 
-        cams = cand_results.views
-        assert cand_results.shell_poses._data is not None
-        poses_world_valid = PoseTW(cand_results.shell_poses._data[cand_results.mask_valid])
-        pose_list = self._pose_list_from_input(poses_world_valid)
+        pose_list = self._pose_list_from_input(cand_results.poses_world_cam())
 
         return self._add_frusta_for_poses(
-            cams=cams,
+            cams=cand_results.views,
             poses=pose_list,
             scale=scale,
             color=color,
@@ -266,38 +263,15 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
         )
 
 
-def candidate_offsets_and_dirs_ref(
-    candidates: CandidateSamplingResult,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Offsets and forward directions in reference frame for **valid** candidates."""
-
-    poses_ref = rotate_yaw_cw90(
-        candidates.views.T_camera_rig
-    )  # reference2candidate_cam, account for cw90 of reference frame
-    offsets = poses_ref.inverse().t  # camera2reference -> offset in reference frame
-    offsets = offsets.view(-1, 3)
-    z_cam = (
-        torch.tensor([0.0, 0.0, 1.0], device=offsets.device, dtype=offsets.dtype).view(1, 3).expand(offsets.shape[0], 3)
-    )
-    # Forward in reference frame: transform camera +z into reference using reference←camera.
-    poses_ref_refcam = poses_ref.inverse()
-    dirs = poses_ref_refcam.rotate(z_cam).view(-1, 3)
-    dirs = dirs / (dirs.norm(dim=1, keepdim=True) + 1e-8)
-    return offsets, dirs
-
-
 def plot_direction_polar(
-    dirs: torch.Tensor,
+    dirs: np.ndarray,
     *,
     title: str = "Direction distribution (az/elev)",
     bins: int = 40,
 ) -> go.Figure:
     """Plot azimuth/elevation density of direction vectors."""
-
-    d = dirs.detach().cpu().numpy()
-    d = d / (np.linalg.norm(d, axis=1, keepdims=True) + 1e-8)
-    elev = np.arcsin(d[:, 1])  # y is up in LUF
-    az = np.arctan2(d[:, 0], d[:, 2])  # atan2(x, z) per our sampling
+    elev = np.arcsin(dirs[:, 1])  # y is up in LUF
+    az = np.arctan2(dirs[:, 0], dirs[:, 2])  # atan2(x, z) per our sampling
     elev_deg = np.degrees(elev)
     az_deg = np.degrees(az)
     h, xedges, yedges = np.histogram2d(az_deg, elev_deg, bins=bins)
@@ -320,27 +294,19 @@ def plot_direction_polar(
 
 
 def plot_direction_sphere(
-    dirs: torch.Tensor,
+    dirs: np.ndarray,
     *,
     title: str = "Directions on unit sphere",
-    sample_n: int = 2000,
     show_axes: bool = False,
 ) -> go.Figure:
     """3D scatter of directions on the unit sphere."""
-
-    d = dirs.detach().cpu()
-    if d.shape[0] > sample_n:
-        idx = torch.linspace(0, d.shape[0] - 1, steps=sample_n, dtype=torch.long)
-        d = d[idx]
-    d = d / (d.norm(dim=1, keepdim=True) + 1e-8)
-    dn = d.numpy()
     traces = [
         go.Scatter3d(
-            x=dn[:, 0],
-            y=dn[:, 1],
-            z=dn[:, 2],
+            x=dirs[:, 0],
+            y=dirs[:, 1],
+            z=dirs[:, 2],
             mode="markers",
-            marker={"size": 2, "color": dn[:, 1], "colorscale": "Turbo", "opacity": 0.7},
+            marker={"size": 2, "color": dirs[:, 1], "colorscale": "Turbo", "opacity": 0.7},
             name="dirs",
         )
     ]
@@ -348,7 +314,7 @@ def plot_direction_sphere(
 
     if show_axes:
         fig = SnippetPlotBuilder.add_frame_axes_to_fig(
-            fig=fig, cam_centers=np.zeros((1, 3)), cam_axes=np.eye(3), scale=0.4
+            fig=fig, cam_centers=np.zeros((1, 3)), cam_axes=np.eye(3), title="ref. frame"
         )
 
     fig.update_layout(title=title, scene={"xaxis_title": "X (left)", "yaxis_title": "Y (up)", "zaxis_title": "Z (fwd)"})
@@ -356,12 +322,11 @@ def plot_direction_sphere(
 
 
 def plot_position_polar(
-    offsets: torch.Tensor, *, title: str = "Offsets from reference pose (az/elev)", bins: int = 72
+    offsets: np.ndarray, *, title: str = "Offsets from reference pose (az/elev)", bins: int = 72
 ) -> go.Figure:
-    off = offsets.detach().cpu().numpy()
     # LUF: x=left, y=up, z=forward
-    az = np.degrees(np.arctan2(off[:, 0], off[:, 2]))  # atan2(x, z)
-    el = np.degrees(np.arctan2(off[:, 1], np.linalg.norm(off[:, [0, 2]], axis=1) + 1e-8))
+    az = np.degrees(np.arctan2(offsets[:, 0], offsets[:, 2]))  # atan2(x, z)
+    el = np.degrees(np.arctan2(offsets[:, 1], np.linalg.norm(offsets[:, [0, 2]], axis=1) + 1e-8))
     h, xedges, yedges = np.histogram2d(az, el, bins=bins)
     fig = go.Figure(go.Heatmap(x=xedges[:-1], y=yedges[:-1], z=h.T, colorscale="Viridis", colorbar_title="count"))
     fig.update_layout(title=title, xaxis_title="azimuth (deg)", yaxis_title="elevation (deg)")
@@ -369,27 +334,19 @@ def plot_position_polar(
 
 
 def plot_position_sphere(
-    offsets: torch.Tensor,
+    offsets: np.ndarray,
     *,
     title: str = "Positions in rig frame",
-    sample_n: int = 2000,
-    show_axes: bool = False,
+    show_axes: bool = True,
 ) -> go.Figure:
-    """3D scatter of position offsets (not normalised)."""
-
-    pts = offsets.detach().cpu()
-    if pts.shape[0] > sample_n:
-        idx = torch.linspace(0, pts.shape[0] - 1, steps=sample_n, dtype=torch.long)
-        pts = pts[idx]
-    pn = pts.numpy()
-
+    """3D scatter of position offsets."""
     fig = go.Figure(
         data=go.Scatter3d(
-            x=pn[:, 0],
-            y=pn[:, 1],
-            z=pn[:, 2],
+            x=offsets[:, 0],
+            y=offsets[:, 1],
+            z=offsets[:, 2],
             mode="markers",
-            marker={"size": 2, "color": pn[:, 1], "colorscale": "Turbo", "opacity": 0.7},
+            marker={"size": 2, "color": offsets[:, 1], "colorscale": "Turbo", "opacity": 0.7},
             name="positions",
         )
     )
@@ -405,10 +362,8 @@ def plot_position_sphere(
 
 
 def plot_direction_marginals(dirs: torch.Tensor, bins: int = 60) -> go.Figure:
-    d = dirs.detach().cpu().numpy()
-    d = d / (np.linalg.norm(d, axis=1, keepdims=True) + 1e-8)
-    elev = np.arcsin(d[:, 1])
-    az = np.arctan2(d[:, 0], d[:, 2])
+    elev = np.arcsin(dirs[:, 1])
+    az = np.arctan2(dirs[:, 0], dirs[:, 2])
 
     fig = make_subplots(rows=1, cols=2, subplot_titles=("Azimuth", "Elevation"))
     fig.add_histogram(x=np.degrees(az), nbinsx=bins, row=1, col=1)
@@ -419,18 +374,66 @@ def plot_direction_marginals(dirs: torch.Tensor, bins: int = 60) -> go.Figure:
 
 
 def plot_radius_hist(
-    offsets: torch.Tensor,
+    offsets: np.ndarray,
     *,
     title: str = "Radius distribution",
     bins: int = 40,
 ) -> go.Figure:
-    r = offsets.norm(dim=1).detach().cpu().numpy()
+    r = np.linalg.norm(offsets, axis=1)
     fig = go.Figure(go.Histogram(x=r, nbinsx=bins))
     fig.update_layout(
         title=title,
         xaxis_title="radius (m)",
         yaxis_title="count",
     )
+    return fig
+
+
+def plot_euler_world(candidates: CandidateSamplingResult, *, use_valid: bool = True, bins: int = 72) -> go.Figure:
+    """Yaw/pitch/roll histograms in world frame for candidate cam poses."""
+
+    poses = candidates.shell_poses
+    if poses is None or poses._data is None:
+        return go.Figure()
+    mask = candidates.mask_valid if use_valid else torch.ones_like(candidates.mask_valid, dtype=torch.bool)
+    poses_masked = PoseTW(poses._data[mask])
+    yaw, pitch, roll = poses_masked.to_ypr(rad=False)
+    return _euler_histogram(yaw, pitch, roll, bins=bins, title="Euler angles (world frame, deg)")
+
+
+def plot_euler_reference(
+    candidates: CandidateSamplingResult, *, use_valid: bool = True, bins: int = 72
+) -> go.Figure:
+    """Yaw/pitch/roll of candidate cameras expressed in the reference rig frame."""
+
+    mask = candidates.mask_valid if use_valid else torch.ones_like(candidates.mask_valid, dtype=torch.bool)
+    ref = candidates.reference_pose
+    r_wr = ref.R
+    if r_wr.ndim == 3:
+        r_wr = r_wr[0]
+    r_rw = r_wr.transpose(0, 1)
+
+    r_wc = candidates.shell_poses.R[mask]
+    r_rc = torch.einsum("ij,njk->nik", r_rw, r_wc)
+    poses_ref = PoseTW.from_Rt(r_rc, torch.zeros(r_rc.shape[0], 3, device=r_rc.device, dtype=r_rc.dtype))
+    yaw, pitch, roll = poses_ref.to_ypr(rad=False)
+    return _euler_histogram(yaw, pitch, roll, bins=bins, title="Euler angles (reference frame, deg)")
+
+
+def _euler_histogram(yaw_deg: torch.Tensor, pitch_deg: torch.Tensor, roll_deg: torch.Tensor, *, bins: int, title: str) -> go.Figure:
+    yaw_np = yaw_deg.detach().cpu().numpy().reshape(-1)
+    pitch_np = pitch_deg.detach().cpu().numpy().reshape(-1)
+    roll_np = roll_deg.detach().cpu().numpy().reshape(-1)
+
+    fig = make_subplots(rows=1, cols=3, subplot_titles=("Yaw", "Pitch", "Roll"), horizontal_spacing=0.08)
+    fig.add_histogram(x=yaw_np, nbinsx=bins, row=1, col=1)
+    fig.add_histogram(x=pitch_np, nbinsx=bins, row=1, col=2)
+    fig.add_histogram(x=roll_np, nbinsx=bins, row=1, col=3)
+    fig.update_xaxes(title_text="deg", row=1, col=1)
+    fig.update_xaxes(title_text="deg", row=1, col=2)
+    fig.update_xaxes(title_text="deg", row=1, col=3)
+    fig.update_yaxes(title_text="count", row=1, col=1)
+    fig.update_layout(title=title, height=320, margin={"l": 30, "r": 20, "t": 60, "b": 30}, showlegend=False)
     return fig
 
 

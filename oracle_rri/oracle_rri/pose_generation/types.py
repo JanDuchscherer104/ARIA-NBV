@@ -108,6 +108,37 @@ class CandidateSamplingResult:
     """Sampled offsets in reference frame for the full shell (pre-pruning)."""
     extras: dict[str, Any] = field(default_factory=dict)
 
+    def poses_world_cam(self, *, device: torch.device | None = None) -> PoseTW:
+        """World <- camera poses for **valid** candidates."""
+        t_cam_ref = self.views.T_camera_rig.to(device=device)  # camera <- reference
+        t_world_ref = self.reference_pose.to(t_cam_ref.device)  # world <- reference
+
+        # Compose to world2camera
+        return t_world_ref @ t_cam_ref.inverse()
+
+    def get_offsets_and_dirs_ref(
+        self,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Offsets and forward directions in reference frame for **valid** candidates."""
+
+        from oracle_rri.data.plotting import rotate_yaw_cw90
+
+        poses_ref = rotate_yaw_cw90(
+            self.views.T_camera_rig
+        )  # reference2candidate_cam, account for cw90 of reference frame
+        offsets = poses_ref.inverse().t  # camera2reference -> offset in reference frame
+        offsets = offsets.view(-1, 3)
+        z_cam = (
+            torch.tensor([0.0, 0.0, 1.0], device=offsets.device, dtype=offsets.dtype)
+            .view(1, 3)
+            .expand(offsets.shape[0], 3)
+        )
+        # Forward in reference frame: transform camera +z into reference using referenc<-camera.
+        poses_ref_refcam = poses_ref.inverse()
+        dirs = poses_ref_refcam.rotate(z_cam).view(-1, 3)
+        dirs = dirs / (dirs.norm(dim=1, keepdim=True) + 1e-8)
+        return offsets, dirs
+
 
 __all__ = [
     "SamplingStrategy",

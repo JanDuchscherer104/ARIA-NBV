@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 from efm3d.aria.pose import PoseTW
-from power_spherical import HypersphericalUniform, PowerSpherical
+from power_spherical import HypersphericalUniform, PowerSpherical  # type: ignore[import-untyped]
 
 from ..utils.frames import view_axes_from_poses, world_up_tensor
 from .geometry import DEVICE_FWD
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from .candidate_generation import CandidateViewGeneratorConfig
 
 
+# TODO: if cfg.
 class OrientationBuilder:
     """Construct candidate camera orientations from centers and view settings."""
 
@@ -35,7 +36,12 @@ class OrientationBuilder:
         """
         cfg = self.cfg
         strat = cfg.view_sampling_strategy
-        if strat is None:
+        # Early exit: jitter disabled regardless of strategy
+
+        az_limit = torch.deg2rad(torch.tensor(cfg.view_max_azimuth_deg, device=device, dtype=dtype))
+        el_limit = torch.deg2rad(torch.tensor(cfg.view_max_elevation_deg, device=device, dtype=dtype))
+
+        if az_limit <= 0 and el_limit <= 0:
             v = torch.tensor(DEVICE_FWD, device=device, dtype=dtype)
             return v.view(1, 3).expand(num, 3)
 
@@ -44,27 +50,51 @@ class OrientationBuilder:
         elif strat == SamplingStrategy.FORWARD_POWERSPHERICAL:
             mu = torch.tensor(DEVICE_FWD, device=device, dtype=dtype)
             scale = torch.tensor(cfg.view_kappa, device=device, dtype=dtype)
-            dist = PowerSpherical(mu, scale)
+            dist = PowerSpherical(loc=mu, scale=scale)
         else:
             raise ValueError(f"Unsupported view_sampling_strategy: {strat}")
 
-        dirs = dist.rsample((num,))
-        dirs = dirs / dirs.norm(dim=-1, keepdim=True).clamp_min(1e-6)
+        def _normalise(v: torch.Tensor) -> torch.Tensor:
+            return v / v.norm(dim=-1, keepdim=True).clamp_min(torch.finfo(v.dtype).eps)
 
-        if cfg.view_max_angle_deg > 0.0:
-            mu = torch.tensor(DEVICE_FWD, device=device, dtype=dtype)
-            cos_max = torch.cos(
-                torch.tensor(torch.deg2rad(torch.tensor(cfg.view_max_angle_deg)), device=device, dtype=dtype)
-            )
-            mask = (dirs * mu).sum(dim=-1) < cos_max
-            tries = 0
-            while mask.any() and tries < 8:
-                tries += 1
-                resample_n = int(mask.sum().item())
-                new_dirs = dist.rsample((resample_n,))
-                new_dirs = new_dirs / new_dirs.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-                dirs[mask] = new_dirs
-                mask = (dirs * mu).sum(dim=-1) < cos_max
+        def _angles(v: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+            az = torch.atan2(v[..., 0], v[..., 2])
+            el = torch.asin(v[..., 1].clamp(-1.0, 1.0))
+            return az, el
+
+        def _dirs_from_angles(az: torch.Tensor, el: torch.Tensor) -> torch.Tensor:
+            cos_el = torch.cos(el)
+            return torch.stack([torch.sin(az) * cos_el, torch.sin(el), torch.cos(az) * cos_el], dim=-1)
+
+        dirs = _normalise(dist.rsample((num,)))
+
+        def _is_out_of_bounds(v: torch.Tensor) -> torch.Tensor:
+            az, el = _angles(v)
+            mask = torch.zeros_like(az, dtype=torch.bool, device=device)
+            if az_limit > 0:
+                mask |= az.abs() > az_limit
+            if el_limit > 0:
+                mask |= el.abs() > el_limit
+            return mask
+
+        mask = _is_out_of_bounds(dirs)
+        tries = 0
+        max_resamples = 16
+        while mask.any() and tries < max_resamples:
+            tries += 1
+            resample_n = int(mask.sum().item())
+            new_dirs = _normalise(dist.rsample((resample_n,)))
+            dirs[mask] = new_dirs
+            mask = _is_out_of_bounds(dirs)
+
+        if mask.any():
+            # Clamp the remaining outliers to the nearest allowed azimuth/elevation boundary.
+            az, el = _angles(dirs[mask])
+            if az_limit > 0:
+                az = az.clamp(min=-az_limit, max=az_limit)
+            if el_limit > 0:
+                el = el.clamp(min=-el_limit, max=el_limit)
+            dirs[mask] = _dirs_from_angles(az, el)
 
         return dirs
 
@@ -144,7 +174,12 @@ class OrientationBuilder:
         if cfg.view_sampling_strategy is None and cfg.view_roll_jitter_deg == 0.0:
             return base_poses
 
-        dirs_cam = self._sample_view_dirs_cam(n, device=device, dtype=dtype)
+        if cfg.view_sampling_strategy is None:
+            # No directional azimuth/elevation jitter!
+            dirs_cam = torch.tensor(DEVICE_FWD, device=device, dtype=dtype).view(1, 3).expand(n, 3)
+        else:
+            dirs_cam = self._sample_view_dirs_cam(n, device=device, dtype=dtype)
+
         z_new = dirs_cam / dirs_cam.norm(dim=-1, keepdim=True).clamp_min(1e-6)
         up_cam = torch.tensor([0.0, 1.0, 0.0], device=device, dtype=dtype).view(1, 3).expand_as(z_new)
         x_new = torch.cross(up_cam, z_new, dim=-1)
@@ -154,6 +189,7 @@ class OrientationBuilder:
         r_delta = torch.stack([x_new, y_new, z_new], dim=-1)
 
         if cfg.view_roll_jitter_deg > 0.0:
+            # Jitter is applied as a rotation matrix about the forward axis so the basis stays orthonormal. Adding Gaussian noise to direction vectors would skew/scale them unless you re‑orthogonalise anyway (which is what this code guarantees).
             roll = (2.0 * torch.rand(n, device=device, dtype=dtype) - 1.0) * torch.deg2rad(
                 torch.tensor(cfg.view_roll_jitter_deg, device=device, dtype=dtype)
             )
