@@ -188,7 +188,6 @@ class RenderingPlotBuilder(CandidatePlotBuilder):
         max_points: int = 20_000,
         color: str = "teal",
         name: str = "Depth hits",
-        display_yaw_cw90: bool = False,
         zfar: float | None = None,
         candidate_indices: list[int] | None = None,
     ) -> Self:

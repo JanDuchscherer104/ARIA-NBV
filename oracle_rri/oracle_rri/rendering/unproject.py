@@ -24,71 +24,70 @@ from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import
 
 from .candidate_depth_renderer import CandidateDepths
 
+# def backproject_depth(
+#     depth: torch.Tensor,
+#     pose_world_cam: PoseTW,
+#     camera: PerspectiveCameras,
+#     *,
+#     stride: int = 1,
+#     zfar: float | None = None,
+#     max_points: int | None = None,
+# ) -> torch.Tensor:
+#     """Back-project a single depth map into world-frame 3D points.
 
-def backproject_depth(
-    depth: torch.Tensor,
-    pose_world_cam: PoseTW,
-    camera: PerspectiveCameras,
-    *,
-    stride: int = 1,
-    zfar: float | None = None,
-    max_points: int | None = None,
-) -> torch.Tensor:
-    """Back-project a single depth map into world-frame 3D points.
+#     Args:
+#         depth: ``Tensor["H", "W"]`` metric z-depth in metres.
+#         pose_world_cam: ``PoseTW`` (world ← cam) matching ``depth``.
+#         camera: ``CameraTW`` (single entry) whose intrinsics were used for
+#             rendering this depth map.
+#         stride: Optional subsampling stride in pixel space to thin points.
+#         zfar: Optional max depth; values >= ``zfar`` are discarded.
+#         max_points: Optional cap on returned points (random subset).
 
-    Args:
-        depth: ``Tensor["H", "W"]`` metric z-depth in metres.
-        pose_world_cam: ``PoseTW`` (world ← cam) matching ``depth``.
-        camera: ``CameraTW`` (single entry) whose intrinsics were used for
-            rendering this depth map.
-        stride: Optional subsampling stride in pixel space to thin points.
-        zfar: Optional max depth; values >= ``zfar`` are discarded.
-        max_points: Optional cap on returned points (random subset).
+#     Returns:
+#         ``Tensor["N", 3"]`` of 3D points in world coordinates. ``N`` may be
+#         zero if no valid hits remain.
+#     """
 
-    Returns:
-        ``Tensor["N", 3"]`` of 3D points in world coordinates. ``N`` may be
-        zero if no valid hits remain.
-    """
+#     if depth.ndim != 2:
+#         raise ValueError(f"Expected (H,W) depth, got {tuple(depth.shape)}")
+#     if stride < 1:
+#         raise ValueError(f"stride must be >=1, got {stride}")
 
-    if depth.ndim != 2:
-        raise ValueError(f"Expected (H,W) depth, got {tuple(depth.shape)}")
-    if stride < 1:
-        raise ValueError(f"stride must be >=1, got {stride}")
+#     h, w = depth.shape
+#     yy = torch.arange(0, h, stride, device=depth.device, dtype=depth.dtype)
+#     xx = torch.arange(0, w, stride, device=depth.device, dtype=depth.dtype)
+#     gy, gx = torch.meshgrid(yy, xx, indexing="ij")
 
-    h, w = depth.shape
-    yy = torch.arange(0, h, stride, device=depth.device, dtype=depth.dtype)
-    xx = torch.arange(0, w, stride, device=depth.device, dtype=depth.dtype)
-    gy, gx = torch.meshgrid(yy, xx, indexing="ij")
+#     depth_samples = depth[gy.long(), gx.long()].reshape(-1)
+#     coords = torch.stack([gx.reshape(-1), gy.reshape(-1)], dim=-1)
 
-    depth_samples = depth[gy.long(), gx.long()].reshape(-1)
-    coords = torch.stack([gx.reshape(-1), gy.reshape(-1)], dim=-1)
+#     finite_mask = torch.isfinite(depth_samples)
+#     if zfar is not None:
+#         finite_mask &= depth_samples < float(zfar) * 0.99
+#     depth_samples = depth_samples[finite_mask]
+#     coords = coords[finite_mask]
 
-    finite_mask = torch.isfinite(depth_samples)
-    if zfar is not None:
-        finite_mask &= depth_samples < float(zfar) * 0.99
-    depth_samples = depth_samples[finite_mask]
-    coords = coords[finite_mask]
+#     if depth_samples.numel() == 0:
+#         return torch.empty(0, 3, device=depth.device, dtype=depth.dtype)
 
-    if depth_samples.numel() == 0:
-        return torch.empty(0, 3, device=depth.device, dtype=depth.dtype)
+#     # Use pinhole intrinsics (matching PyTorch3D render path; distortion ignored).
+#     cam_single = camera if camera.tensor().ndim == 1 else camera[0]
+#     fx, fy, cx, cy = _scalar_intrinsics(cam_single)
+#     print(f"fx: {fx}, fy: {fy}, cx: {cx}, cy: {cy}")
+#     fx_t = torch.tensor(fx, device=depth.device, dtype=depth.dtype)
+#     fy_t = torch.tensor(fy, device=depth.device, dtype=depth.dtype)
+#     cx_t = torch.tensor(cx, device=depth.device, dtype=depth.dtype)
+#     cy_t = torch.tensor(cy, device=depth.device, dtype=depth.dtype)
 
-    # Use pinhole intrinsics (matching PyTorch3D render path; distortion ignored).
-    cam_single = camera if camera.tensor().ndim == 1 else camera[0]
-    fx, fy, cx, cy = _scalar_intrinsics(cam_single)
-    print(f"fx: {fx}, fy: {fy}, cx: {cx}, cy: {cy}")
-    fx_t = torch.tensor(fx, device=depth.device, dtype=depth.dtype)
-    fy_t = torch.tensor(fy, device=depth.device, dtype=depth.dtype)
-    cx_t = torch.tensor(cx, device=depth.device, dtype=depth.dtype)
-    cy_t = torch.tensor(cy, device=depth.device, dtype=depth.dtype)
+#     x_cam = -(coords[:, 0] - cx_t + 0.5) / fx_t * depth_samples
+#     y_cam = -(coords[:, 1] - cy_t + 0.5) / fy_t * depth_samples
+#     z_cam = depth_samples
+#     pts_cam = torch.stack([x_cam, y_cam, z_cam], dim=1)
 
-    x_cam = -(coords[:, 0] - cx_t + 0.5) / fx_t * depth_samples
-    y_cam = -(coords[:, 1] - cy_t + 0.5) / fy_t * depth_samples
-    z_cam = depth_samples
-    pts_cam = torch.stack([x_cam, y_cam, z_cam], dim=1)
+#     pts_world = pose_world_cam.transform(pts_cam)
 
-    pts_world = pose_world_cam.transform(pts_cam)
-
-    return pts_world
+#     return pts_world
 
 
 def backproject_depth_with_p3d(
@@ -97,7 +96,9 @@ def backproject_depth_with_p3d(
     *,
     stride: int = 1,
     zfar: float | None = None,
+    zclose: float | None = None,
     max_points: int | None = None,
+    valid_mask: torch.Tensor | None = None,
 ) -> torch.Tensor:
     # depth: (H, W) metric z from MeshRasterizer (in_ndc=False)
     H, W = depth.shape
@@ -108,8 +109,12 @@ def backproject_depth_with_p3d(
 
     depth_sub = depth[gy.long(), gx.long()]
     mask = torch.isfinite(depth_sub)
+    if valid_mask is not None:
+        mask &= valid_mask[gy.long(), gx.long()]
     if zfar is not None:
         mask &= depth_sub < float(zfar) * 0.99
+    if zclose is not None:
+        mask &= depth_sub > float(zclose)
 
     flat_mask = mask.reshape(-1)
     if not flat_mask.any():

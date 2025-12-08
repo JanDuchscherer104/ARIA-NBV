@@ -97,10 +97,7 @@ def _crop_mesh(
     keep_ratio = cropped.faces.shape[0] / float(mesh.faces.shape[0])
     if keep_ratio < crop_min_keep_ratio:
         if console:
-            console.warn(
-                f"Cropping would drop too many faces (keep_ratio={keep_ratio:.3f} < {crop_min_keep_ratio}); skipping crop."
-            )
-        return mesh
+            console.warn(f"Cropping dropped too many faces (keep_ratio={keep_ratio:.3f} < {crop_min_keep_ratio}).")
 
     return cropped
 

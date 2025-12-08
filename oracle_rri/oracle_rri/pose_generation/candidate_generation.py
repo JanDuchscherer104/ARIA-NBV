@@ -30,7 +30,7 @@ from ..data.mesh_cache import mesh_from_snippet
 from ..utils import BaseConfig, Console, Verbosity, select_device
 from .candidate_generation_rules import FreeSpaceRule, MinDistanceToMeshRule, PathCollisionRule, Rule
 from .orientations import OrientationBuilder
-from .samplers import PositionSampler
+from .positional_sampling import PositionSampler
 from .types import (
     CandidateContext,
     CandidateSamplingResult,
@@ -41,101 +41,73 @@ from .types import (
 
 
 class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
-    """Config for candidate generation around the latest pose.
+    """Configuration for sampling and pruning candidate camera poses around a reference frame.
 
-    Sampling
-    --------
-    num_samples:
-        Number of candidate poses requested *after* pruning.
-    oversample_factor:
-        Factor for initial oversampling before pruning to offset rule
-        rejections.
-    max_resamples:
-        Maximum number of oversampling rounds if pruning removes too many
-        candidates.
-    min_radius / max_radius:
-        Inner and outer radii (metres) of the sampling shell around the last
-        pose.
-    min_elev_deg / max_elev_deg:
-        Elevation band in degrees relative to the world horizontal plane.
-    delta_azimuth_deg:
-        Horizontal yaw band in degrees around the last forward direction.
-        360 → unrestricted, 90 → ±45° about forward.
-    sampling_strategy:
-        Distribution for direction sampling in rig frame
-        (:class:`SamplingStrategy`).
-    kappa:
-        Concentration for the forward-biased PowerSpherical sampler.
-    view_max_angle_deg / view_max_azimuth_deg / view_max_elevation_deg:
-        Maximum deviation (deg) allowed for camera-frame forward jitter around
-        the deterministic base view. Set to 0 to keep orientations
-        deterministic even when `view_sampling_strategy` is provided.
-    view_roll_jitter_deg:
-        Symmetric roll jitter (deg) applied around the camera forward axis.
-
-    Rules
-    -----
-    min_distance_to_mesh:
-        Clearance enforced between camera center and mesh (metres).
-    ensure_collision_free:
-        Enable straight-line path collision filtering.
-    ensure_free_space:
-        Enable AABB workspace filtering.
-    collision_backend:
-        Backend for collision / distance checks (`P3D`, `PYEMBREE`, or
-        `TRIMESH`).
-    ray_subsample:
-        Number of samples along a ray when using discretised collision tests.
-    step_clearance:
-        Distance threshold (metres) for discretised collision rejection.
-
-    Diagnostics
-    -----------
-    collect_rule_masks:
-        When True, store per-rule boolean masks in the result for analysis.
-    collect_debug_stats:
-        When True, allow rules to emit extra tensors (e.g., distances to
-        mesh) in `CandidateSamplingResult.extras`.
+    Encapsulates the radii/angle sampling envelope, orientation jitter options, collision and free-space
+    filtering, and logging/debug controls used by :class:`CandidateViewGenerator`.
     """
 
     target: type["CandidateViewGenerator"] = Field(default_factory=lambda: CandidateViewGenerator, exclude=True)
+    """Factory target for :meth:`BaseConfig.setup_target`."""
 
     camera_label: Literal["rgb", "slaml", "slamr"] = "rgb"
     """Camera index to use for candidate generation."""
 
     num_samples: int = 512
+    """Number of candidate poses requested after pruning."""
     oversample_factor: float = 2.0
+    """Multiplicative oversampling factor applied before pruning to offset rejections."""
     max_resamples: int = 4
+    """Maximum oversampling rounds if pruning removes too many candidates."""
 
     min_radius: float = 0.4
+    """Inner radius (metres) of the sampling shell around the reference pose."""
     max_radius: float = 1.6
+    """Outer radius (metres) of the sampling shell around the reference pose."""
 
     min_elev_deg: float = -15.0
+    """Minimum elevation angle (deg) relative to the world horizontal plane."""
     max_elev_deg: float = 45.0
+    """Maximum elevation angle (deg) relative to the world horizontal plane."""
     delta_azimuth_deg: float = 360.0
+    """Total azimuth spread (deg) around the reference forward direction; 360 unlocks full sphere."""
 
     sampling_strategy: SamplingStrategy = SamplingStrategy.UNIFORM_SPHERE
+    """Distribution used to draw direction samples in the rig frame."""
     kappa: float = 4.0
+    """Concentration parameter for the forward-biased PowerSpherical sampler."""
 
     min_distance_to_mesh: float = 0.0
+    """Minimum clearance (metres) between candidate center and mesh surface."""
     ensure_collision_free: bool = True
+    """Reject candidates whose straight path from the reference intersects the mesh."""
     ensure_free_space: bool = True
+    """Constrain candidates to lie inside the snippet occupancy AABB."""
     collision_backend: CollisionBackend = CollisionBackend.P3D
+    """Backend to use for collision and distance checks."""
     ray_subsample: int = 128
+    """Number of samples per ray when using discretised collision checks."""
     step_clearance: float = 0.05
+    """Distance threshold (metres) below which discretised collision samples are rejected."""
 
     mesh_samples: int | None = None
+    """Optional number of mesh samples used by mesh-distance rules when applicable."""
 
     device: torch.device = Field(default_factory=lambda: select_device("auto", component="CandidateViewGenerator"))
+    """Torch device on which sampling and rule evaluation run."""
     verbosity: Verbosity = Field(
         default=Verbosity.VERBOSE,
         validation_alias=AliasChoices("verbosity", "verbose"),
         description="Verbosity level for logging.",
     )
+    """Verbosity level for logging (0=quiet, 1=normal, 2=verbose)."""
     is_debug: bool = False
+    """Enable debug logging and force verbose output when True."""
 
     collect_rule_masks: bool = False
+    """Store per-rule boolean masks in the sampling result for diagnostics."""
     collect_debug_stats: bool = False
+    """Allow rules to emit extra tensors (e.g., distances) in ``CandidateSamplingResult.extras``."""
 
     reference_frame_index: int | None = None
     """Optional camera frame index to use as reference pose; None defaults to the final pose."""
@@ -151,13 +123,13 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Concentration for PowerSpherical view sampler; defaults to positional `kappa` when None."""
 
     view_max_angle_deg: float = 0.0
-    """ Seed both azimuth and elev if they're None - Cap on  angular deviation (deg) from the forward axis."""
+    """Fallback cap (deg) applied to both azimuth and elevation jitter when per-axis caps are unset."""
 
     view_max_azimuth_deg: float | None = None
-    """Maximum horizontal deviation (deg, ±) from the base forward axis in camera frame."""
+    """Maximum horizontal deviation (deg, +/-) from the base direction."""
 
     view_max_elevation_deg: float | None = None
-    """Maximum vertical deviation (deg, ±) from the base forward axis in camera frame."""
+    """Maximum vertical deviation (deg, +/-) from the base direction."""
 
     view_roll_jitter_deg: float = 0.0
     """Symmetric roll jitter (deg) around the sampled forward axis in camera frame."""
@@ -190,7 +162,6 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     @model_validator(mode="after")
     def set_debug(self) -> "CandidateViewGeneratorConfig":
         if self.is_debug:
-            object.__setattr__(self, "device", torch.device("cpu"))
             object.__setattr__(self, "verbosity", Verbosity.VERBOSE)
         if self.view_kappa is None:
             object.__setattr__(self, "view_kappa", self.kappa)
@@ -255,7 +226,7 @@ class CandidateViewGenerator:
 
         device = torch.device(self.config.device)
         occ = sample.get_occupancy_extend()
-        self.console.dbg(f"Using occupancy extent: [xmin, xmax, ymin, ymax, zmin, zmax] = {occ}")
+        self.console.dbg(f"Using occupancy extent: (xmin, xmax, ymin, ymax, zmin, zmax) = {occ}")
         occupancy_extent = occ.to(device=device, dtype=torch.float32)
         gt_mesh = sample.mesh
         mesh_verts = sample.mesh_verts
@@ -331,9 +302,8 @@ class CandidateViewGenerator:
         device = cfg.device
 
         reference_pose = _ensure_unbatched_pose(reference_pose.to(device))
-        sampler = PositionSampler(cfg)
-        centers_world, offsets_ref = sampler.sample(reference_pose)
-        shell_poses = OrientationBuilder(cfg).build(reference_pose, centers_world)
+        centers_world, offsets_ref = PositionSampler(cfg).sample(reference_pose)
+        shell_poses, view_dirs_delta = OrientationBuilder(cfg).build(reference_pose, centers_world)
 
         ctx = CandidateContext(
             cfg=cfg,
@@ -347,6 +317,7 @@ class CandidateViewGenerator:
             centers_world=centers_world,
             shell_offsets_ref=offsets_ref,
             mask_valid=torch.ones(centers_world.shape[0], dtype=torch.bool, device=device),
+            debug={"view_dirs_delta": view_dirs_delta} if view_dirs_delta is not None else {},
         )
 
         self._apply_rules(ctx)

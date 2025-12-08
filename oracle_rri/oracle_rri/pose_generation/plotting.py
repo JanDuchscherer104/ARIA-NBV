@@ -301,10 +301,21 @@ def plot_direction_sphere(
     dirs: np.ndarray,
     *,
     title: str = "Directions on unit sphere",
-    show_axes: bool = False,
+    show_axes: bool = True,
 ) -> go.Figure:
     """3D scatter of directions on the unit sphere."""
-    traces = [
+    fig = go.Figure()
+
+    if show_axes:
+        fig = SnippetPlotBuilder.add_frame_axes_to_fig(
+            fig=fig,
+            cam_centers=np.zeros((1, 3)),
+            cam_axes=np.eye(3),
+            title="ref. frame",
+            scale=1.0,
+        )
+
+    fig.add_trace(
         go.Scatter3d(
             x=dirs[:, 0],
             y=dirs[:, 1],
@@ -313,15 +324,20 @@ def plot_direction_sphere(
             marker={"size": 2, "color": dirs[:, 1], "colorscale": "Turbo", "opacity": 0.7},
             name="dirs",
         )
-    ]
-    fig = go.Figure(data=traces)
+    )
 
-    if show_axes:
-        fig = SnippetPlotBuilder.add_frame_axes_to_fig(
-            fig=fig, cam_centers=np.zeros((1, 3)), cam_axes=np.eye(3), title="ref. frame"
-        )
-
-    fig.update_layout(title=title, scene={"xaxis_title": "X (left)", "yaxis_title": "Y (up)", "zaxis_title": "Z (fwd)"})
+    fig.update_layout(
+        title=title,
+        scene={
+            "xaxis_title": "X (left)",
+            "yaxis_title": "Y (up)",
+            "zaxis_title": "Z (fwd)",
+            "xaxis": {"range": [-1.1, 1.1]},
+            "yaxis": {"range": [-1.1, 1.1]},
+            "zaxis": {"range": [-1.1, 1.1]},
+            "aspectmode": "cube",
+        },
+    )
     return fig
 
 
@@ -330,7 +346,7 @@ def plot_position_polar(
     *,
     title: str = "Offsets from reference pose (az/elev)",
     bins: int = 72,
-    fixed_ranges: bool = False,
+    fixed_ranges: bool = True,
 ) -> go.Figure:
     # LUF: x=left, y=up, z=forward
     az = np.degrees(np.arctan2(offsets[:, 0], offsets[:, 2]))  # atan2(x, z)
@@ -363,7 +379,7 @@ def plot_position_sphere(
     )
     if show_axes:
         fig = SnippetPlotBuilder.add_frame_axes_to_fig(
-            fig=fig, cam_centers=np.zeros((1, 3)), cam_axes=np.eye(3), scale=0.4
+            fig=fig, cam_centers=np.zeros((1, 3)), cam_axes=np.eye(3)[None, ...], scale=0.4
         )
     fig.update_layout(
         title=title,
@@ -435,7 +451,7 @@ def plot_euler_reference(
     if r_wr.ndim == 3:
         r_wr = r_wr[0]
     r_rw = r_wr.transpose(0, 1)
-    r_wc = candidates.shell_poses.R[mask]  # final cam->world rotations
+    r_wc = rotate_yaw_cw90(candidates.shell_poses[mask]).R  # final cam->world rotations
     r_rc = torch.einsum("ij,njk->nik", r_rw, r_wc)  # cam->reference
     poses_ref = PoseTW.from_Rt(r_rc, torch.zeros(r_rc.shape[0], 3, device=r_rc.device))
     yaw, pitch, roll = [rad.rad2deg() for rad in poses_ref.to_ypr(rad=True)]

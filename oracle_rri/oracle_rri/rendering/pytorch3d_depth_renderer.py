@@ -42,7 +42,7 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     zfar: float = 20.0
     """Far clipping plane (metres); also used to fill miss pixels."""
 
-    z_clip_value: float = 1e-3
+    zclose: float = 1e-3
     """Near clipping plane (metres); triangles closer than this are clipped."""
 
     cull_backfaces: bool = False
@@ -176,7 +176,7 @@ class Pytorch3DDepthRenderer:
             bin_size=self.config.bin_size,
             max_faces_per_bin=self.config.max_faces_per_bin,
             cull_to_frustum=False,
-            z_clip_value=self.config.z_clip_value,
+            z_clip_value=self.config.zclose,
         )
         rasterizer = MeshRasterizer(cameras=cameras, raster_settings=raster_settings)
         autocast_enable = dtype != torch.float32 and self.device.type == "cuda"

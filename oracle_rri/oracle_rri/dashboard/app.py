@@ -17,7 +17,7 @@ from ..rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConf
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..utils import Console, Verbosity, get_performance_mode, set_performance_mode
 from .config import DashboardConfig
-from .panels import render_candidates_page, render_data_page, render_depth_page
+from .panels import render_candidates_page, render_data_page, render_depth_page, render_rri_page
 from .services import get_executor, load_dataset
 from .state import STATE_KEYS, get, init_task_state, safe_rerun, store
 from .ui import candidate_config_ui, dataset_config_ui, renderer_config_ui
@@ -71,9 +71,9 @@ class DashboardApp:
 
         page = st.radio(
             "Select view",
-            ("Data", "Candidate Poses", "Candidate Renders", "Performance"),
+            ("Data", "Candidate Poses", "Candidate Renders", "RRI"),
             horizontal=True,
-            help="Switch between data inspection, candidate poses, and render results.",
+            help="Switch between data inspection, candidate poses, render results, and RRI preview.",
         )
 
         sample = cast(EfmSnippetView | None, get(STATE_KEYS["sample"]))
@@ -257,7 +257,7 @@ class DashboardApp:
         if page == "Candidate Poses" and (sample is None or candidates is None):
             _run_previous_stages("candidates", allow_ui=False)
             _refresh_stage_vars()
-        if page == "Candidate Renders" and depth_batch is None:
+        if page in ("Candidate Renders", "RRI") and depth_batch is None:
             _run_previous_stages("depth", allow_ui=False)
             _refresh_stage_vars()
 
@@ -530,7 +530,10 @@ class DashboardApp:
             else:
                 st.info("Click 'Run / refresh renders' to compute depth maps.")
         else:
-            render_depth_page(depth_batch)
+            if page == "RRI":
+                render_rri_page(sample, depth_batch)
+            else:
+                render_depth_page(depth_batch)
 
         stale_parts = [name for name, changed in cfg_changed.items() if changed]
         if stale_parts:

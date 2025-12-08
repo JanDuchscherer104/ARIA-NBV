@@ -226,7 +226,7 @@ class Console(RichConsole):
 
     def dbg(self, message: str) -> None:
         """Emit a debug message when debug mode is enabled."""
-        if self.is_debug:
+        if self.is_debug or self.verbosity >= Verbosity.VERBOSE:
             formatted = f"[bold magenta]Debug:[/bold magenta] {self._format_message(message)}"
             self.print(formatted)
             self._emit_sink(formatted)
@@ -235,7 +235,7 @@ class Console(RichConsole):
 
     def dbg_summary(self, label: str, value: Any, *, include_stats: bool = False) -> None:
         """Debug-level structured summary."""
-        if self.is_debug:
+        if self.is_debug or self.verbosity >= Verbosity.VERBOSE:
             summary = summarize(value, include_stats=include_stats)
             self.dbg(f"{label}: {summary}")
 

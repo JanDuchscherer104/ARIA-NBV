@@ -295,7 +295,9 @@ class SnippetPlotBuilder:
         sem = self.snippet.semidense
         if sem is None:
             return self
-        pts_np = sem.last_frame_points_np(max_points) if last_frame_only else sem.collapse_points_np(max_points)
+        pts_np = (
+            sem.last_frame_points_np(max_points) if last_frame_only else sem.collapse_points(max_points).cpu().numpy()
+        )
         if pts_np.size == 0:
             return self
         self.fig.add_trace(
@@ -495,7 +497,10 @@ class SnippetPlotBuilder:
     ) -> Self:
         return self.add_frame_axes(frame=camera, frame_indices=frame_indices, title=title)
 
-    def _add_camera_axes(self, cam_centers: np.ndarray, cam_axes: np.ndarray, title: str = "Camera axes") -> Self:
+    @staticmethod
+    def add_frame_axes_to_fig(
+        fig: go.Figure, cam_centers: np.ndarray, cam_axes: np.ndarray, title: str = "Camera axes", scale: float = 1.0
+    ) -> go.Figure:
         """Add LUF axes for multiple cameras in one go."""
 
         if cam_centers.ndim == 1:
@@ -506,10 +511,10 @@ class SnippetPlotBuilder:
         axis_colors = ["red", "green", "blue"]
         for axis, color in enumerate(axis_colors):
             axis_start = cam_centers
-            axis_end = cam_centers + cam_axes[:, axis] * 0.4
+            axis_end = cam_centers + cam_axes[:, axis] * scale
             seg = np.stack([axis_start, axis_end], axis=1)  # (K, 2, 3)
             seg = np.concatenate([seg, np.full((seg.shape[0], 1, 3), np.nan, dtype=float)], axis=1).reshape(-1, 3)
-            self.fig.add_trace(
+            fig.add_trace(
                 go.Scatter3d(
                     x=seg[:, 0],
                     y=seg[:, 1],
@@ -520,6 +525,13 @@ class SnippetPlotBuilder:
                     showlegend=axis == 0,
                 )
             )
+
+        return fig
+
+    def _add_camera_axes(self, cam_centers: np.ndarray, cam_axes: np.ndarray, title: str = "Camera axes") -> Self:
+        """Add LUF axes for multiple cameras in one go."""
+
+        self.fig = self.add_frame_axes_to_fig(self.fig, cam_centers, cam_axes, title=title, scale=0.4)
 
         return self
 

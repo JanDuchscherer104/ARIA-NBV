@@ -24,14 +24,14 @@ class CandidateDepths:
     depths: torch.Tensor
     """Tensor['N', 'H', 'W'] with per-candidate depth maps in metres."""
 
+    depths_valid_mask: torch.Tensor
+    """Tensor['N', 'H', 'W'] boolean mask indicating valid depth pixels."""
+
     poses: PoseTW
     """PoseTW (cam2world) for the rendered subset."""
 
     reference_pose: PoseTW
     """PoseTW (ref2world) for the reference frame corresponding to candidates."""
-
-    mask_valid: torch.Tensor
-    """Boolean mask aligned with ``candidate_indices`` (subset of original mask_valid)."""
 
     candidate_indices: torch.Tensor
     """Indices (long) into the original candidate array corresponding to ``depths``."""
@@ -40,6 +40,7 @@ class CandidateDepths:
     """Camera calibration (and ref2camera extrinsics) for the rendered subset, same order as ``depths``."""
 
     p3d_cameras: PerspectiveCameras
+    """PyTorch3D PerspectiveCameras used for rendering. Same externals as ``camera``."""
 
 
 class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
@@ -61,7 +62,7 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
     """Optional uniform scale (0<scale<=1) applied to H,W for rendering. Ignored if ``low_res`` is True."""
 
     verbosity: Verbosity = Field(
-        default=Verbosity.NORMAL,
+        default=Verbosity.VERBOSE,
         validation_alias=AliasChoices("verbosity", "verbose"),
         description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
     )
@@ -110,11 +111,10 @@ class CandidateDepthRenderer:
             f"Rendering depths: candidates={candidates.views.tensor().shape[0]} on '{self.renderer.__class__.__name__}'"
         )
         self.console.log(f"Mesh stats verts={sample.mesh.vertices.shape[0]:,} faces={sample.mesh.faces.shape[0]:,}")
-        pose_batch, camera_batch, candidate_indices = self._select_candidate_views(candidates)
+        pose_batch, camera_calib, candidate_indices = self._select_candidate_views(candidates)
         self.console.log(f"Attempting renders for {pose_batch.tensor().shape[0]} candidates (GUI slice).")
         self.console.dbg_summary("candidate_indices", candidate_indices)
 
-        camera_calib = camera_batch
         if self.config.resolution_scale is not None:
             scale = float(self.config.resolution_scale)
             self.console.log(f"Scaling candidate camera intrinsics by {scale}")
@@ -126,7 +126,7 @@ class CandidateDepthRenderer:
         self.console.dbg_summary("pose_batch_tensor", pose_batch)
         is_pytorch3d = isinstance(self.renderer, Pytorch3DDepthRenderer)
         mesh_input: Any
-        if is_pytorch3d and sample.mesh_verts is not None and sample.mesh_faces is not None:
+        if sample.mesh_verts is not None and sample.mesh_faces is not None:
             mesh_input = (sample.mesh_verts, sample.mesh_faces)
         elif is_pytorch3d and sample.mesh is not None:
             mesh_input = (
@@ -149,28 +149,13 @@ class CandidateDepthRenderer:
             frame_index=None,
             mesh_cache_key=sample.mesh_cache_key,
         )
-        # Rank candidates by valid-hit count (descending) to surface the most informative renders first.
-        depths = depths  # [rank_idx]
-        pose_batch = pose_batch  # [rank_idx]
-        candidate_indices = candidate_indices  # [rank_idx]
-        camera_calib = (
-            camera_calib  # [rank_idx]
-            if isinstance(camera_calib, CameraTW) and camera_calib.tensor().ndim > 1
-            else camera_calib
-        )
+        depths_valid_mask = (depths > self.renderer.config.zclose * 1.01) & (depths < self.renderer.config.zfar * 0.99)
 
-        hit_ratio = float((depths < self.renderer.config.zfar).float().mean().item())
-        self.console.dbg_summary("depth_batch_stats", {"hit_ratio": hit_ratio, "zfar": self.renderer.config.zfar})
-        if hit_ratio == 0.0:
-            self.console.warn(
-                "All candidate depth pixels are at zfar; check camera poses, mesh normals, or backface culling."
-            )
-        mask_valid_subset = candidates.mask_valid.to(device=pose_batch.device)[candidate_indices]
         return CandidateDepths(
             depths=depths,
+            depths_valid_mask=depths_valid_mask,
             poses=pose_batch,
             reference_pose=candidates.reference_pose.to(device=pose_batch.device),
-            mask_valid=mask_valid_subset,
             candidate_indices=candidate_indices,
             camera=camera_calib,
             p3d_cameras=cameras,

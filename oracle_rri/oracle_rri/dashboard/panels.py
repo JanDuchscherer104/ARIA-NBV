@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 import torch
 from efm3d.aria.pose import PoseTW
@@ -14,11 +16,13 @@ from ..data.plotting import (
     collect_frame_modalities,
     plot_first_last_frames,
     project_pointcloud_on_frame,
+    rotate_yaw_cw90,
 )
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..pose_generation.plotting import (
     # CandidateDistributionPlotBuilder,
     CandidatePlotBuilder,
+    _euler_histogram,
     plot_direction_marginals,
     plot_direction_polar,
     plot_direction_sphere,
@@ -38,12 +42,14 @@ from ..pose_generation.utils import (
     summarise_dirs_ref,
     summarise_offsets_ref,
 )
+from ..rendering import build_candidate_pointclouds
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rendering.plotting import (
     RenderingPlotBuilder,
     depth_grid,
     depth_histogram,
 )
+from ..rri_metrics.oracle_rri import OracleRRIConfig
 from .state import STATE_KEYS, get
 
 
@@ -208,7 +214,6 @@ def render_data_page(sample: EfmSnippetView, *, crop_margin: float | None = None
 
     cam_choice = st.sidebar.selectbox("Camera for frustum", ["rgb", "slam-l", "slam-r"], index=0, key="frustum_cam")
     plot_opts = plot_options_from_ui(sample)
-    crop_bounds = None
 
     builder = (
         SnippetPlotBuilder.from_snippet(sample, title="Mesh + semidense + trajectory + camera frustum")
@@ -234,8 +239,9 @@ def render_data_page(sample: EfmSnippetView, *, crop_margin: float | None = None
     if plot_opts["show_gt_obbs"]:
         builder.add_gt_obbs(camera=cam_choice, timestamp=plot_opts["gt_timestamp"])
 
-    if crop_bounds is not None:
-        builder.add_bounds_box(name="Crop bounds", color="orange", dash="solid", width=3, aabb=crop_bounds)
+    if plot_opts["show_crop_bounds"]:
+        crop_aabb = tuple(b.detach().cpu().numpy() for b in sample.crop_bounds)
+        builder.add_bounds_box(name="Crop bounds", color="orange", dash="solid", width=3, aabb=crop_aabb)
 
     st.plotly_chart(builder.finalize(), width="stretch")
 
@@ -279,13 +285,19 @@ def render_candidates_page(
 
     offsets_ref, dirs_ref = candidates.get_offsets_and_dirs_ref()
 
+    fixed_ranges = st.checkbox("Clamp axes to standard ranges", value=True, key="angles_fixed_ranges")
+
     with st.expander("Position distributions (reference frame)", expanded=False):
         st.markdown(stats_to_markdown_table(summarise_offsets_ref(offsets_ref), header=None))
         offsets_ref = offsets_ref.cpu().numpy()
         colp1, colp2 = st.columns(2)
         with colp1:
             st.plotly_chart(
-                plot_position_polar(offsets_ref, title="Offsets from reference pose (az/elev)"),
+                plot_position_polar(
+                    offsets_ref,
+                    title="Offsets from reference pose (az/elev)",
+                    fixed_ranges=fixed_ranges,
+                ),
                 width="stretch",
             )
         with colp2:
@@ -298,20 +310,74 @@ def render_candidates_page(
     with st.expander("Directional distributions (reference frame)", expanded=False):
         st.markdown(stats_to_markdown_table(summarise_dirs_ref(dirs_ref), header=None))
         dirs_ref = dirs_ref.cpu().numpy()
+
         col1, col2 = st.columns(2)
         with col1:
             st.plotly_chart(
-                plot_direction_polar(dirs_ref, title="View directions (reference frame)"),
+                plot_direction_polar(
+                    dirs_ref,
+                    title="View directions (reference frame)",
+                    fixed_ranges=fixed_ranges,
+                ),
                 width="stretch",
             )
         with col2:
             st.plotly_chart(
-                plot_direction_sphere(dirs_ref, title="View dirs on unit sphere", show_axes=True),
+                plot_direction_sphere(
+                    dirs_ref,
+                    title="View dirs on unit sphere",
+                    show_axes=True,
+                ),
                 width="stretch",
             )
-        st.plotly_chart(plot_direction_marginals(dirs_ref), width="stretch")
-        st.plotly_chart(plot_euler_world(candidates), width="stretch")
-        st.plotly_chart(plot_euler_reference(candidates), width="stretch")
+        st.plotly_chart(
+            plot_direction_marginals(torch.as_tensor(dirs_ref), fixed_ranges=fixed_ranges),
+            width="stretch",
+        )
+
+        yaw, pitch, roll = rotate_yaw_cw90(candidates.reference_pose).to_euler(rad=False).cpu().numpy().tolist()
+        st.markdown(f"Reference Pose: Y={yaw:.2f}, P={pitch:.2f}, R={roll:.2f}  (ZYX Euler, cw90-adjusted)")
+        st.plotly_chart(plot_euler_world(candidates, fixed_ranges=fixed_ranges), width="stretch")
+        st.plotly_chart(plot_euler_reference(candidates, fixed_ranges=fixed_ranges), width="stretch")
+        delta = candidates.extras.get("view_dirs_delta") if hasattr(candidates, "extras") else None
+        if delta is not None:
+            yaw_d, pitch_d, roll_d = [rad.rad2deg().cpu() for rad in delta.to_ypr(rad=True)]
+            st.markdown(
+                stats_to_markdown_table(
+                    {
+                        "yaw_delta_deg": {
+                            "min": float(yaw_d.min()),
+                            "max": float(yaw_d.max()),
+                            "mean": float(yaw_d.mean()),
+                            "std": float(yaw_d.std(unbiased=False)),
+                        },
+                        "pitch_delta_deg": {
+                            "min": float(pitch_d.min()),
+                            "max": float(pitch_d.max()),
+                            "mean": float(pitch_d.mean()),
+                            "std": float(pitch_d.std(unbiased=False)),
+                        },
+                        "roll_delta_deg": {
+                            "min": float(roll_d.min()),
+                            "max": float(roll_d.max()),
+                            "mean": float(roll_d.mean()),
+                            "std": float(roll_d.std(unbiased=False)),
+                        },
+                    },
+                    header="Orientation jitter stats (delta)",
+                )
+            )
+            st.plotly_chart(
+                _euler_histogram(
+                    yaw_d,
+                    pitch_d,
+                    roll_d,
+                    bins=90,
+                    title="Orientation jitter (delta, deg)",
+                    fixed_ranges=fixed_ranges,
+                ),
+                width="stretch",
+            )
 
     # Frusta plot
     if mask_valid is None or mask_valid.sum() == 0:
@@ -463,3 +529,142 @@ def render_depth_page(depth_batch: CandidateDepths) -> None:
                 .finalize(),
                 width="stretch",
             )
+
+
+def render_rri_page(sample: EfmSnippetView | None, depth_batch: CandidateDepths | None) -> None:
+    """Plot mesh, semi-dense PC, and candidate PCs with index-wise selection."""
+
+    st.header("RRI Preview: Point Clouds vs Mesh")
+
+    if sample is None:
+        st.info("Load data first on the Data page.")
+        return
+    if depth_batch is None:
+        st.info("Render candidates first on the Candidate Renders page.")
+        return
+
+    stride = st.slider("Backprojection stride", 1, 32, 8, step=1, key="rri_stride")
+
+    max_sem_pts = st.number_input(
+        "Max semi-dense points",
+        min_value=1000,
+        max_value=200000,
+        value=50000,
+        step=1000,
+        key="rri_max_sem_pts",
+    )
+
+    with st.status("Back-projecting candidates...", expanded=False):
+        pcs = build_candidate_pointclouds(
+            sample,
+            depth_batch,
+            stride=int(stride),
+        )
+
+    candidate_ids = depth_batch.candidate_indices.cpu().tolist()
+    if len(candidate_ids) == 0:
+        st.warning("No candidate renders available for RRI scoring.")
+        return
+
+    default_selection = candidate_ids[: min(6, len(candidate_ids))]
+    selected_ids = st.multiselect(
+        "Candidates to display",
+        options=candidate_ids,
+        default=default_selection,
+        key="rri_cands",
+    )
+
+    oracle = OracleRRIConfig().setup_target()
+    device = pcs.points.device
+
+    losses = oracle.score(
+        points_t=torch.as_tensor(pcs.semidense_points, device=device, dtype=pcs.points.dtype),
+        points_q=pcs.points,
+        lengths_q=pcs.lengths,
+        gt_verts=sample.mesh_verts.to(device=device),
+        gt_faces=sample.mesh_faces.to(device=device),
+        extend=pcs.occupancy_bounds.to(device=device),
+    ).to(device="cpu")
+    labels = [str(int(cid)) for cid in candidate_ids]
+
+    qualitative = px.colors.qualitative.Plotly
+    bar_color_map = {label: qualitative[i % len(qualitative)] for i, label in enumerate(labels)}
+
+    st.plotly_chart(
+        go.Figure(
+            data=go.Bar(x=labels, y=losses.rri, marker_color=[bar_color_map[label] for label in labels]),
+            layout_title_text="Oracle RRI per candidate",
+        ),
+        use_container_width=True,
+    )
+
+    st.plotly_chart(
+        go.Figure(
+            data=[
+                go.Bar(x=labels, y=losses.pm_dist_before, name="before", marker_color="lightgray"),
+                go.Bar(
+                    x=labels,
+                    y=losses.pm_dist_after,
+                    name="after",
+                    marker_color=[bar_color_map[label] for label in labels],
+                ),
+            ],
+            layout_title_text="Chamfer-like (bidirectional)",
+        ),
+        use_container_width=True,
+    )
+
+    st.plotly_chart(
+        go.Figure(
+            data=[
+                go.Bar(x=labels, y=losses.pm_acc_before, name="point→mesh (before)", marker_color="lightgray"),
+                go.Bar(
+                    x=labels,
+                    y=losses.pm_acc_after,
+                    name="point→mesh (after)",
+                    marker_color=[bar_color_map[label] for label in labels],
+                ),
+            ],
+            layout_title_text="Point→Mesh (accuracy)",
+        ),
+        use_container_width=True,
+    )
+
+    st.plotly_chart(
+        go.Figure(
+            data=[
+                go.Bar(x=labels, y=losses.pm_comp_before, name="mesh→point (before)", marker_color="lightgray"),
+                go.Bar(
+                    x=labels,
+                    y=losses.pm_comp_after,
+                    name="mesh→point (after)",
+                    marker_color=[bar_color_map[label] for label in labels],
+                ),
+            ],
+            layout_title_text="Mesh→Point (completeness)",
+        ),
+        use_container_width=True,
+    )
+
+    builder = (
+        SnippetPlotBuilder.from_snippet(sample, title="Mesh + Semi-dense + Candidate PCs")
+        .add_mesh()
+        .add_semidense(last_frame_only=False, max_points=max_sem_pts)
+    )
+
+    for idx_i, cid_int in enumerate(candidate_ids):
+        if cid_int not in selected_ids:
+            continue
+        pts = pcs.points[idx_i, : int(pcs.lengths[idx_i].item())]
+        builder.add_points(
+            pts,
+            name=f"Candidate {cid_int}",
+            color=bar_color_map.get(
+                str(cid_int),
+                px.colors.qualitative.Plotly[idx_i % len(px.colors.qualitative.Plotly)],
+            ),
+            size=3,
+            opacity=0.7,
+        )
+
+    st.plotly_chart(builder.finalize(), width="stretch")

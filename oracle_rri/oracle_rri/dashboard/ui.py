@@ -134,13 +134,25 @@ def candidate_config_ui(
         step=0.5,
     )
 
-    view_max_angle = ui.slider(
-        "view_max_angle_deg",
+    view_max_azimuth_deg = ui.slider(
+        "view_max_azimuth_deg",
         0.0,
-        180.0,
-        float(default.view_max_angle_deg),
+        90.0,
+        float(default.view_max_azimuth_deg)
+        if default.view_max_azimuth_deg is not None
+        else float(default.view_max_angle_deg),
         step=5.0,
-        help="Hard cone cap for view-direction jitter; 0 disables capping.",
+        help="Horizontal cap for view-direction jitter",
+    )
+    view_max_elevation_deg = ui.slider(
+        "view_max_elevation_deg",
+        0.0,
+        45.0,
+        float(default.view_max_elevation_deg)
+        if default.view_max_elevation_deg is not None
+        else float(default.view_max_angle_deg),
+        step=5.0,
+        help="Vertical cap for view-direction jitter",
     )
 
     view_roll = ui.slider(
@@ -206,7 +218,8 @@ def candidate_config_ui(
             "view_direction_mode": view_mode,
             "view_sampling_strategy": view_sampling_choice,
             "view_kappa": float(view_kappa),
-            "view_max_angle_deg": float(view_max_angle),
+            "view_max_azimuth_deg": float(view_max_azimuth_deg),
+            "view_max_elevation_deg": float(view_max_elevation_deg),
             "view_roll_jitter_deg": float(view_roll),
             "view_target_point_world": target_point_world,
             "min_distance_to_mesh": float(min_distance),
@@ -235,9 +248,7 @@ def renderer_config_ui(
     perf_mode: str = "auto",
 ) -> CandidateDepthRendererConfig:
     ui.subheader("Depth Renderer")
-    ui.text(str(type(ui)))
-    backend_options = ["PyTorch3D (raster)"]
-    ui.selectbox("backend", backend_options, index=0)
+
     max_candidates_default = 2 if super_fast else (default.max_candidates if default.max_candidates is not None else 4)
     max_candidates = ui.slider("max_candidates", 1, 16, max_candidates_default)
     res_scale = ui.slider(

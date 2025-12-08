@@ -291,7 +291,6 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
 
     def __iter__(self) -> Iterator[EfmSnippetView]:
         for efm_dict in self._iter_efm_samples():
-            # second inspection here. efm_dict is corrupted. i.e. efm_dict["points/p3s_world"].shape gives torch.Size([50000, 3])
             scene_id, snippet_id = _infer_ids(efm_dict, efm_dict.get("sequence_name", ""))
             mesh_base = self._load_mesh(scene_id) if self.config.load_meshes else None
             mesh = mesh_base

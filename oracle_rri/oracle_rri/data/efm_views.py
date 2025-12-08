@@ -56,26 +56,18 @@ def _repr(obj: Any) -> str:
 
 @dataclass(slots=True)
 class EfmGtCameraObbView:
-    """Per-camera OBB ground truth for a single timestamp.
-
-    Attributes:
-        category_names: list[str]
-            Human-readable labels (EFM43 class set; see efm3d.qmd and glossary).
-        category_ids: Tensor["K", int64]
-            Semantic ids aligned with `category_names`.
-        instance_ids: Tensor["K", int64]
-            Instance ids consistent across cameras at this timestamp.
-        object_dimensions: Tensor["K 3", float32]
-            Box side lengths (x, y, z) in metres.
-        ts_world_object: Tensor["K 3 4", float32]
-            Pose matrices (world←object) per instance.
-    """
+    """Per-camera oriented bounding boxes for a single timestamp (EFM schema)."""
 
     category_names: list[str]
+    """Human-readable class labels (EFM43 set; see efm3d.qmd and glossary)."""
     category_ids: Tensor
+    """Tensor['K'] semantic ids aligned with ``category_names``."""
     instance_ids: Tensor
+    """Tensor['K'] instance ids consistent across cameras at this timestamp."""
     object_dimensions: Tensor
+    """Tensor['K 3'] box side lengths (x, y, z) in metres."""
     ts_world_object: Tensor
+    """Tensor['K 3 4'] world←object pose matrices per instance."""
 
     def __repr__(self) -> str:  # pragma: no cover
         return _repr(self)
@@ -146,20 +138,7 @@ class EfmGTView:
 
 @dataclass(slots=True)
 class EfmCameraView:
-    """Camera stream in EFM schema.
-
-    Attributes:
-        images: ``Tensor["F C H W", float32]``
-            - RGB or mono images normalised to ``[0, 1]``.
-            - ``F`` frames at the fixed snippet length (usually 20 for 2 s @10 Hz).
-        calib: :class:`CameraTW`
-            - Batched intrinsics/extrinsics (fisheye624 params, valid radius, exposure, gain).
-            - ``CameraTW.tensor`` shape ``(F, 34)`` storing projection params and pose.
-        time_ns: ``Tensor["F", int64]`` capture timestamps (device clock).
-        frame_ids: ``Tensor["F", float32|int64]`` per-frame ids.
-        distance_m: Optional ``Tensor["F 1 H W", float32]`` ray distances (metric depth).
-        distance_time_ns: Optional ``Tensor["F", int64]`` timestamps aligned to ``distance_m``.
-    """
+    """Zero-copy camera stream view in EFM schema (images, calibration, timing, optional depth)."""
 
     images: Tensor
     """``Tensor["F C H W", float32]`` normalized camera images in Aria LUF frame."""
@@ -252,13 +231,7 @@ class EfmCameraView:
 
 @dataclass(slots=True)
 class EfmTrajectoryView:
-    """Rig trajectory in world frame.
-
-    Attributes:
-        t_world_rig: ``PoseTW`` (internally ``Tensor["F 3 4", float32]``) world←rig per frame.
-        time_ns: ``Tensor["F", int64]`` timestamps matching poses.
-        gravity_in_world: ``Tensor["3", float32]`` gravity vector aligned to EFM convention ``[0, 0, -9.81]``.
-    """
+    """World-frame rig trajectory aligned to snippet frames."""
 
     t_world_rig: PoseTW
     """Rig SE(3) poses per frame (world←rig)."""
@@ -290,18 +263,7 @@ class EfmTrajectoryView:
 
 @dataclass(slots=True)
 class EfmPointsView:
-    """Semi-dense SLAM points (padded).
-
-    Attributes:
-        points_world: ``Tensor["F N 3", float32]``
-            - World-frame points padded to ``N=semidense_points_pad (default 50000)``.
-        dist_std: ``Tensor["F N", float32]`` distance standard deviation per point.
-        inv_dist_std: ``Tensor["F N", float32]`` inverse distance std per point.
-        time_ns: ``Tensor["F", int64]`` timestamps aligned to frames.
-        volume_min: ``Tensor["3", float32]`` world AABB minimum for the snippet.
-        volume_max: ``Tensor["3", float32]`` world AABB maximum for the snippet.
-        lengths: ``Tensor["F", int64]`` true point counts before padding.
-    """
+    """Padded semi-dense SLAM point cloud view with per-frame metadata."""
 
     points_world: Tensor
     """``Tensor["F N 3", float32]`` padded world-frame SLAM points (meters)."""
@@ -333,25 +295,25 @@ class EfmPointsView:
             lengths=self.lengths.to(target_device),
         )
 
-    def collapse_points_np(self, max_points: int | None = None) -> np.ndarray:
-        """Collapse points across time and optionally subsample for plotting."""
+    def collapse_points(self, max_points: int | None = None) -> Tensor:
+        """Collapse points across time and optionally subsample to a Tensor["K 3", float32], where K << N*F."""
 
         points = self.points_world
         if points.numel() == 0:
-            return np.zeros((0, 3), dtype=np.float32)
+            return torch.zeros((0, 3), dtype=points.dtype, device=points.device)
 
         lengths = self.lengths.to(device=points.device)
         max_len = points.shape[1]
         valid_mask = torch.arange(max_len, device=points.device).unsqueeze(0) < lengths.clamp_max(max_len).unsqueeze(-1)
         points_collapsed = collapse_pointcloud_time(torch.where(valid_mask.unsqueeze(-1), points, torch.nan))
         if points_collapsed.numel() == 0:
-            return np.zeros((0, 3), dtype=np.float32)
+            return torch.zeros((0, 3), dtype=points.dtype, device=points.device)
 
         if max_points is not None and points_collapsed.shape[0] > max_points:
             idx = torch.randperm(points_collapsed.shape[0], device=points_collapsed.device)[:max_points]
             points_collapsed = points_collapsed[idx]
 
-        return points_collapsed.detach().cpu().numpy()
+        return points_collapsed
 
     def last_frame_points_np(self, max_points: int | None = None) -> np.ndarray:
         """Return points from the latest frame with valid points, subsampled if needed."""
@@ -388,14 +350,7 @@ class EfmPointsView:
 
 @dataclass(slots=True)
 class EfmObbView:
-    """Snippet-level oriented bounding boxes (OBB) in snippet frame.
-
-    Attributes:
-        obbs: :class:`ObbTW`
-            - Padded OBB tensor in snippet coordinates (internally ``Tensor["K_pad 14", float32]``).
-            - Contains center, sizes, rotation, class ids as per EFM3D.
-        hz: ``Tensor["1", int32]`` capture frequency metadata when present.
-    """
+    """Snippet-level oriented bounding boxes (OBB) in snippet frame."""
 
     obbs: ObbTW
     """Padded oriented boxes in snippet frame (center, size, yaw, sem-id)."""
