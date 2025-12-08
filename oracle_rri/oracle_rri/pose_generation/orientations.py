@@ -36,7 +36,6 @@ class OrientationBuilder:
         """
         cfg = self.cfg
         strat = cfg.view_sampling_strategy
-        # Early exit: jitter disabled regardless of strategy
 
         az_limit = torch.deg2rad(torch.tensor(cfg.view_max_azimuth_deg, device=device, dtype=dtype))
         el_limit = torch.deg2rad(torch.tensor(cfg.view_max_elevation_deg, device=device, dtype=dtype))
@@ -54,30 +53,9 @@ class OrientationBuilder:
         else:
             raise ValueError(f"Unsupported view_sampling_strategy: {strat}")
 
-        def _normalise(v: torch.Tensor) -> torch.Tensor:
-            return v / v.norm(dim=-1, keepdim=True).clamp_min(torch.finfo(v.dtype).eps)
-
-        def _angles(v: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-            az = torch.atan2(v[..., 0], v[..., 2])
-            el = torch.asin(v[..., 1].clamp(-1.0, 1.0))
-            return az, el
-
-        def _dirs_from_angles(az: torch.Tensor, el: torch.Tensor) -> torch.Tensor:
-            cos_el = torch.cos(el)
-            return torch.stack([torch.sin(az) * cos_el, torch.sin(el), torch.cos(az) * cos_el], dim=-1)
-
         dirs = _normalise(dist.rsample((num,)))
 
-        def _is_out_of_bounds(v: torch.Tensor) -> torch.Tensor:
-            az, el = _angles(v)
-            mask = torch.zeros_like(az, dtype=torch.bool, device=device)
-            if az_limit > 0:
-                mask |= az.abs() > az_limit
-            if el_limit > 0:
-                mask |= el.abs() > el_limit
-            return mask
-
-        mask = _is_out_of_bounds(dirs)
+        mask = _is_out_of_bounds(dirs, az_limit, el_limit, device)
         tries = 0
         max_resamples = 16
         while mask.any() and tries < max_resamples:
@@ -85,7 +63,7 @@ class OrientationBuilder:
             resample_n = int(mask.sum().item())
             new_dirs = _normalise(dist.rsample((resample_n,)))
             dirs[mask] = new_dirs
-            mask = _is_out_of_bounds(dirs)
+            mask = _is_out_of_bounds(dirs, az_limit, el_limit, device)
 
         if mask.any():
             # Clamp the remaining outliers to the nearest allowed azimuth/elevation boundary.
@@ -204,6 +182,31 @@ class OrientationBuilder:
 
         delta_poses = PoseTW.from_Rt(r_delta, torch.zeros_like(centers_world))
         return base_poses.compose(delta_poses)
+
+
+def _is_out_of_bounds(v: torch.Tensor, az_limit: float, el_limit: float, device: torch.device) -> torch.Tensor:
+    az, el = _angles(v)
+    mask = torch.zeros_like(az, dtype=torch.bool, device=device)
+    if az_limit > 0:
+        mask |= az.abs() > az_limit
+    if el_limit > 0:
+        mask |= el.abs() > el_limit
+    return mask
+
+
+def _normalise(v: torch.Tensor) -> torch.Tensor:
+    return v / v.norm(dim=-1, keepdim=True).clamp_min(torch.finfo(v.dtype).eps)
+
+
+def _angles(v: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    az = torch.atan2(v[..., 0], v[..., 2])
+    el = torch.asin(v[..., 1].clamp(-1.0, 1.0))
+    return az, el
+
+
+def _dirs_from_angles(az: torch.Tensor, el: torch.Tensor) -> torch.Tensor:
+    cos_el = torch.cos(el)
+    return torch.stack([torch.sin(az) * cos_el, torch.sin(el), torch.cos(az) * cos_el], dim=-1)
 
 
 __all__ = ["OrientationBuilder"]

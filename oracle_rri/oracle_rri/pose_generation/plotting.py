@@ -11,7 +11,7 @@ from efm3d.aria.pose import PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import]
 
 from oracle_rri.data import EfmSnippetView
-from oracle_rri.data.plotting import SnippetPlotBuilder
+from oracle_rri.data.plotting import SnippetPlotBuilder, rotate_yaw_cw90
 from oracle_rri.utils import Console
 
 if TYPE_CHECKING:
@@ -268,6 +268,7 @@ def plot_direction_polar(
     *,
     title: str = "Direction distribution (az/elev)",
     bins: int = 40,
+    fixed_ranges: bool = False,
 ) -> go.Figure:
     """Plot azimuth/elevation density of direction vectors."""
     elev = np.arcsin(dirs[:, 1])  # y is up in LUF
@@ -290,6 +291,9 @@ def plot_direction_polar(
         yaxis_title="Elevation (deg)",
         yaxis={"scaleanchor": None},
     )
+    if fixed_ranges:
+        fig.update_xaxes(range=[-180, 180])
+        fig.update_yaxes(range=[-90, 90])
     return fig
 
 
@@ -322,7 +326,11 @@ def plot_direction_sphere(
 
 
 def plot_position_polar(
-    offsets: np.ndarray, *, title: str = "Offsets from reference pose (az/elev)", bins: int = 72
+    offsets: np.ndarray,
+    *,
+    title: str = "Offsets from reference pose (az/elev)",
+    bins: int = 72,
+    fixed_ranges: bool = False,
 ) -> go.Figure:
     # LUF: x=left, y=up, z=forward
     az = np.degrees(np.arctan2(offsets[:, 0], offsets[:, 2]))  # atan2(x, z)
@@ -330,6 +338,9 @@ def plot_position_polar(
     h, xedges, yedges = np.histogram2d(az, el, bins=bins)
     fig = go.Figure(go.Heatmap(x=xedges[:-1], y=yedges[:-1], z=h.T, colorscale="Viridis", colorbar_title="count"))
     fig.update_layout(title=title, xaxis_title="azimuth (deg)", yaxis_title="elevation (deg)")
+    if fixed_ranges:
+        fig.update_xaxes(range=[-180, 180])
+        fig.update_yaxes(range=[-90, 90])
     return fig
 
 
@@ -361,7 +372,7 @@ def plot_position_sphere(
     return fig
 
 
-def plot_direction_marginals(dirs: torch.Tensor, bins: int = 60) -> go.Figure:
+def plot_direction_marginals(dirs: torch.Tensor, bins: int = 60, *, fixed_ranges: bool = False) -> go.Figure:
     elev = np.arcsin(dirs[:, 1])
     az = np.arctan2(dirs[:, 0], dirs[:, 2])
 
@@ -370,6 +381,9 @@ def plot_direction_marginals(dirs: torch.Tensor, bins: int = 60) -> go.Figure:
     fig.add_histogram(x=np.degrees(elev), nbinsx=bins, row=1, col=2)
     fig.update_xaxes(title="deg", row=1, col=1)
     fig.update_xaxes(title="deg", row=1, col=2)
+    if fixed_ranges:
+        fig.update_xaxes(range=[-180, 180], row=1, col=1)
+        fig.update_xaxes(range=[-90, 90], row=1, col=2)
     return fig
 
 
@@ -389,38 +403,62 @@ def plot_radius_hist(
     return fig
 
 
-def plot_euler_world(candidates: CandidateSamplingResult, *, use_valid: bool = True, bins: int = 72) -> go.Figure:
+def plot_euler_world(
+    candidates: CandidateSamplingResult, *, use_valid: bool = True, bins: int = 90, fixed_ranges: bool = True
+) -> go.Figure:
     """Yaw/pitch/roll histograms in world frame for candidate cam poses."""
 
     poses = candidates.shell_poses
     if poses is None or poses._data is None:
         return go.Figure()
     mask = candidates.mask_valid if use_valid else torch.ones_like(candidates.mask_valid, dtype=torch.bool)
-    poses_masked = PoseTW(poses._data[mask])
-    yaw, pitch, roll = poses_masked.to_ypr(rad=False)
-    return _euler_histogram(yaw, pitch, roll, bins=bins, title="Euler angles (world frame, deg)")
+    poses_masked = rotate_yaw_cw90(PoseTW(poses._data[mask]))
+    yaw, pitch, roll = [rad.rad2deg() for rad in poses_masked.to_ypr(rad=True)]
+
+    return _euler_histogram(
+        yaw,
+        pitch,
+        roll,
+        bins=bins,
+        title="Euler angles (world frame, deg)",
+        fixed_ranges=fixed_ranges,
+    )
 
 
 def plot_euler_reference(
-    candidates: CandidateSamplingResult, *, use_valid: bool = True, bins: int = 72
+    candidates: CandidateSamplingResult, *, use_valid: bool = True, bins: int = 90, fixed_ranges: bool = True
 ) -> go.Figure:
     """Yaw/pitch/roll of candidate cameras expressed in the reference rig frame."""
-
+    # use shell_poses (cam<-world), then express in reference frame
     mask = candidates.mask_valid if use_valid else torch.ones_like(candidates.mask_valid, dtype=torch.bool)
-    ref = candidates.reference_pose
-    r_wr = ref.R
+    r_wr = rotate_yaw_cw90(candidates.reference_pose).R
     if r_wr.ndim == 3:
         r_wr = r_wr[0]
     r_rw = r_wr.transpose(0, 1)
+    r_wc = candidates.shell_poses.R[mask]  # final cam->world rotations
+    r_rc = torch.einsum("ij,njk->nik", r_rw, r_wc)  # cam->reference
+    poses_ref = PoseTW.from_Rt(r_rc, torch.zeros(r_rc.shape[0], 3, device=r_rc.device))
+    yaw, pitch, roll = [rad.rad2deg() for rad in poses_ref.to_ypr(rad=True)]
 
-    r_wc = candidates.shell_poses.R[mask]
-    r_rc = torch.einsum("ij,njk->nik", r_rw, r_wc)
-    poses_ref = PoseTW.from_Rt(r_rc, torch.zeros(r_rc.shape[0], 3, device=r_rc.device, dtype=r_rc.dtype))
-    yaw, pitch, roll = poses_ref.to_ypr(rad=False)
-    return _euler_histogram(yaw, pitch, roll, bins=bins, title="Euler angles (reference frame, deg)")
+    return _euler_histogram(
+        yaw,
+        pitch,
+        roll,
+        bins=bins,
+        title="Euler angles (reference frame, deg)",
+        fixed_ranges=fixed_ranges,
+    )
 
 
-def _euler_histogram(yaw_deg: torch.Tensor, pitch_deg: torch.Tensor, roll_deg: torch.Tensor, *, bins: int, title: str) -> go.Figure:
+def _euler_histogram(
+    yaw_deg: torch.Tensor,
+    pitch_deg: torch.Tensor,
+    roll_deg: torch.Tensor,
+    *,
+    bins: int,
+    title: str,
+    fixed_ranges: bool,
+) -> go.Figure:
     yaw_np = yaw_deg.detach().cpu().numpy().reshape(-1)
     pitch_np = pitch_deg.detach().cpu().numpy().reshape(-1)
     roll_np = roll_deg.detach().cpu().numpy().reshape(-1)
@@ -429,9 +467,14 @@ def _euler_histogram(yaw_deg: torch.Tensor, pitch_deg: torch.Tensor, roll_deg: t
     fig.add_histogram(x=yaw_np, nbinsx=bins, row=1, col=1)
     fig.add_histogram(x=pitch_np, nbinsx=bins, row=1, col=2)
     fig.add_histogram(x=roll_np, nbinsx=bins, row=1, col=3)
-    fig.update_xaxes(title_text="deg", row=1, col=1)
-    fig.update_xaxes(title_text="deg", row=1, col=2)
-    fig.update_xaxes(title_text="deg", row=1, col=3)
+    if fixed_ranges:
+        fig.update_xaxes(title_text="deg", range=[-180, 180], row=1, col=1)
+        fig.update_xaxes(title_text="deg", range=[-90, 90], row=1, col=2)
+        fig.update_xaxes(title_text="deg", range=[-180, 180], row=1, col=3)
+    else:
+        fig.update_xaxes(title_text="deg", row=1, col=1)
+        fig.update_xaxes(title_text="deg", row=1, col=2)
+        fig.update_xaxes(title_text="deg", row=1, col=3)
     fig.update_yaxes(title_text="count", row=1, col=1)
     fig.update_layout(title=title, height=320, margin={"l": 30, "r": 20, "t": 60, "b": 30}, showlegend=False)
     return fig

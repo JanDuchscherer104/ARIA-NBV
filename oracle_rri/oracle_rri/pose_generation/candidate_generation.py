@@ -20,7 +20,7 @@ from math import radians
 from typing import Literal
 
 import torch
-import trimesh
+import trimesh  # type: ignore[import-untyped]
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 from pydantic import AliasChoices, Field, field_validator, model_validator
@@ -328,13 +328,12 @@ class CandidateViewGenerator:
             poses, masks and optional debug statistics.
         """
         cfg = self.config
-        device = torch.device(cfg.device)
+        device = cfg.device
 
-        with torch.no_grad():
-            reference_pose = _ensure_unbatched_pose(reference_pose.to(device))
-            sampler = PositionSampler(cfg)
-            centers_world, offsets_ref = sampler.sample(reference_pose)
-            shell_poses = OrientationBuilder(cfg).build(reference_pose, centers_world)
+        reference_pose = _ensure_unbatched_pose(reference_pose.to(device))
+        sampler = PositionSampler(cfg)
+        centers_world, offsets_ref = sampler.sample(reference_pose)
+        shell_poses = OrientationBuilder(cfg).build(reference_pose, centers_world)
 
         ctx = CandidateContext(
             cfg=cfg,

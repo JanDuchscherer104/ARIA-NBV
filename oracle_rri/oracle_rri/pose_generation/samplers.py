@@ -67,13 +67,8 @@ class PositionSampler:
         max_elev = torch.tensor(cfg.max_elev_rad, device=device, dtype=dirs_world.dtype)
         mask_elev = (elev >= min_elev) & (elev <= max_elev)
 
-        def _project_horizontal(v: torch.Tensor) -> torch.Tensor:
-            dot = (v * wup).sum(dim=-1, keepdim=True)
-            v_h = v - dot * wup
-            return v_h / v_h.norm(dim=-1, keepdim=True).clamp_min(1e-6)
-
-        dirs_h = _project_horizontal(dirs_world)
-        fwd_h = _project_horizontal(last_forward_world.view(1, 3)).expand_as(dirs_h)
+        dirs_h = _project_horizontal(dirs_world, wup)
+        fwd_h = _project_horizontal(last_forward_world.view(1, 3), wup).expand_as(dirs_h)
 
         cross = torch.cross(fwd_h, dirs_h, dim=-1)
         sin_yaw = (cross * wup).sum(dim=-1)
@@ -130,6 +125,12 @@ class PositionSampler:
         offsets_rig = offsets_rig * radii[:, None]
         centers_world = reference_pose_dev.transform(offsets_rig)
         return centers_world, offsets_rig
+
+
+def _project_horizontal(v: torch.Tensor, wup: torch.Tensor) -> torch.Tensor:
+    dot = (v * wup).sum(dim=-1, keepdim=True)
+    v_h = v - dot * wup
+    return v_h / v_h.norm(dim=-1, keepdim=True).clamp_min(1e-6)
 
 
 __all__ = [
