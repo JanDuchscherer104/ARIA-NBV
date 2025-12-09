@@ -49,7 +49,7 @@ from ..rendering.plotting import (
     depth_histogram,
 )
 from ..rri_metrics.oracle_rri import OracleRRIConfig
-from .state import STATE_KEYS, get
+from .state import STATE_KEYS, get, store
 
 
 def pose_world_cam(sample: EfmSnippetView, cam_view: EfmCameraView, frame_idx: int):
@@ -504,6 +504,14 @@ def render_depth_page(depth_batch: CandidateDepths) -> None:
             st.info("Load data first to back-project depth hits.")
         else:
             stride = st.slider("Depth hit stride", 1, 32, 8, step=1, key="depth_hit_stride")
+            max_points = st.number_input(
+                "Max points to display",
+                min_value=1,
+                max_value=200000,
+                value=20000,
+                step=1000,
+                key="depth_hit_max_points",
+            )
 
             cand_options = depth_batch.candidate_indices.tolist()
             selected_global = st.multiselect(
@@ -512,27 +520,38 @@ def render_depth_page(depth_batch: CandidateDepths) -> None:
             cand_to_local = {int(g): idx for idx, g in enumerate(depth_batch.candidate_indices.tolist())}
             selected = [cand_to_local[g] for g in selected_global if g in cand_to_local]
             num_frustums = int(depth_batch.poses.tensor().shape[0])
-            st.plotly_chart(
-                RenderingPlotBuilder.from_snippet(sample, title="Depth hit back-projection")
-                .add_mesh()
-                .add_depth_hits(
-                    depths=depth_batch.depths,
-                    poses=depth_batch.poses,
-                    camera=depth_batch.p3d_cameras,
-                    valid_masks=depth_batch.depths_valid_mask,
-                    stride=int(stride),
-                    max_points=20000,
-                    candidate_indices=selected,
+
+            with st.status("Back-projecting depth hits via CandidatePointClouds...", expanded=False):
+                pcs = _get_candidate_pointclouds_cached(sample, depth_batch, stride=int(stride))
+
+            points_selected = []
+            for idx in selected:
+                n_valid = int(pcs.lengths[idx].item())
+                if n_valid == 0:
+                    continue
+                pts = pcs.points[idx, :n_valid]
+                points_selected.append(pts)
+
+            if points_selected:
+                pts_cat = torch.cat(points_selected, dim=0)
+                if pts_cat.shape[0] > max_points:
+                    rand_idx = torch.randperm(pts_cat.shape[0], device=pts_cat.device)[: int(max_points)]
+                    pts_cat = pts_cat[rand_idx]
+
+                builder = (
+                    RenderingPlotBuilder.from_snippet(sample, title="Depth hit back-projection")
+                    .add_mesh()
+                    .add_points(pts_cat, name="Depth hits", color="teal", size=3, opacity=0.8)
+                    .add_frusta_selection(
+                        poses=depth_batch.poses,
+                        camera=depth_batch.camera,
+                        max_frustums=min(16, num_frustums),
+                        candidate_indices=selected,
+                    )
                 )
-                .add_frusta_selection(
-                    poses=depth_batch.poses,
-                    camera=depth_batch.camera,
-                    max_frustums=min(16, num_frustums),
-                    candidate_indices=selected,
-                )
-                .finalize(),
-                width="stretch",
-            )
+                st.plotly_chart(builder.finalize(), width="stretch")
+            else:
+                st.info("No valid depth hits to display for the selected candidates.")
 
 
 def render_rri_page(sample: EfmSnippetView | None, depth_batch: CandidateDepths | None) -> None:
@@ -561,11 +580,7 @@ def render_rri_page(sample: EfmSnippetView | None, depth_batch: CandidateDepths 
         stride = st.slider("Backprojection stride", 1, 32, 8, step=1, key="rri_stride")
 
     with st.status("Back-projecting candidates...", expanded=False):
-        pcs = build_candidate_pointclouds(
-            sample,
-            depth_batch,
-            stride=int(stride),
-        )
+        pcs = _get_candidate_pointclouds_cached(sample, depth_batch, stride=int(stride))
 
     candidate_ids = depth_batch.candidate_indices.cpu().tolist()
     if len(candidate_ids) == 0:
@@ -685,3 +700,24 @@ def render_rri_page(sample: EfmSnippetView | None, depth_batch: CandidateDepths 
         )
 
     st.plotly_chart(builder.finalize(), width="stretch")
+
+
+def _get_candidate_pointclouds_cached(
+    sample: EfmSnippetView,
+    depth_batch: CandidateDepths,
+    *,
+    stride: int,
+):
+    """Cache candidate point clouds per depth batch and stride in session state."""
+
+    cache_key = "nbv_candidate_pcs"
+    cache = get(cache_key) or {}
+    depth_id = id(depth_batch)
+    cache_entry = cache.get(depth_id, {})
+    if stride not in cache_entry:
+        cache_entry = dict(cache_entry)  # shallow copy to avoid mutating other views
+        cache_entry[stride] = build_candidate_pointclouds(sample, depth_batch, stride=stride)
+        cache = dict(cache)
+        cache[depth_id] = cache_entry
+        store(cache_key, cache)
+    return cache_entry[stride]

@@ -12,7 +12,7 @@ import torch
 
 from ..data import AseEfmDatasetConfig, EfmSnippetView
 from ..pose_generation import CandidateViewGeneratorConfig
-from ..pose_generation.types import CandidateSamplingResult, CollisionBackend, SamplingStrategy
+from ..pose_generation.types import CandidateSamplingResult
 from ..rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..utils import Console, Verbosity
@@ -133,6 +133,7 @@ class DashboardApp:
                 store(STATE_KEYS["cand_cfg"], None)
                 store(STATE_KEYS["depth"], None)
                 store(STATE_KEYS["depth_cfg"], None)
+                st.session_state.pop("nbv_candidate_pcs", None)
                 cfg_changed["sample"] = False
                 if allow_ui:
                     safe_rerun()
@@ -166,6 +167,7 @@ class DashboardApp:
                 store(STATE_KEYS["cand_cfg"], _cfg_to_dict(cfg))
                 store(STATE_KEYS["depth"], None)
                 store(STATE_KEYS["depth_cfg"], None)
+                st.session_state.pop("nbv_candidate_pcs", None)
                 cfg_changed["cand"] = False
                 if allow_ui:
                     safe_rerun()
@@ -209,6 +211,7 @@ class DashboardApp:
                     depth_local = future.result()
                 store(STATE_KEYS["depth"], depth_local)
                 store(STATE_KEYS["depth_cfg"], _cfg_to_dict(cfg))
+                st.session_state.pop("nbv_candidate_pcs", None)
                 cfg_changed["depth"] = False
                 if allow_ui:
                     safe_rerun()
@@ -329,139 +332,6 @@ class DashboardApp:
                 )
             if cfg_changed["cand"]:
                 st.info("Candidate settings changed; rerun to refresh results.")
-            return
-
-        if page == "Performance":
-            st.subheader("Performance overview")
-            st.markdown(
-                """
-**Renderer choices**
-- *PyTorch3D* (GPU/CPU): rasterization; `bin_size`, `max_faces_per_bin`, `dtype` (fp16/bf16/fp32).
-- *CPU (trimesh rays)*: slower but minimal dependencies; uses chunked rays.
-
-**Candidate generation backends**
-- *P3D* (GPU): on-device point-triangle distance + sampled ray checks; set `collision_backend` in candidate config.
-- *pyembree/trimesh* (CPU): legacy ray intersection.
-
-**Quick tips**
-- Use GPU + fp16 for fastest renders; if z precision issues appear on thin geometry, switch to fp32.
-                """
-            )
-            # Load current configs
-            cand_cfg = (
-                _cfg_from_state_optional(STATE_KEYS["cand_cfg"], CandidateViewGeneratorConfig)
-                or CandidateViewGeneratorConfig()
-            )
-            rend_cfg = (
-                _cfg_from_state_optional(STATE_KEYS["depth_cfg"], CandidateDepthRendererConfig) or self.config.renderer
-            )
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("**Candidate generation (advanced)**")
-                with st.form("perf_cand_form"):
-                    backend = st.selectbox(
-                        "Collision backend",
-                        [b.value for b in CollisionBackend],
-                        index=[b.value for b in CollisionBackend].index(cand_cfg.collision_backend.value),
-                    )
-
-                    cache_mesh = st.checkbox("cache mesh samples", value=cand_cfg.cache_meshes)
-                    ray_sub = st.slider("ray_subsample", 1, 64, cand_cfg.ray_subsample)
-                    step_clear = st.slider("step_clearance (m)", 0.005, 0.2, float(cand_cfg.step_clearance), step=0.005)
-                    sampling = st.selectbox(
-                        "sampling_strategy",
-                        [s.value for s in SamplingStrategy],
-                        index=[s.value for s in SamplingStrategy].index(cand_cfg.sampling_strategy.value),
-                    )
-                    device_mode = st.selectbox(
-                        "device",
-                        ["cpu", "cuda"],
-                        index=1 if torch.cuda.is_available() else 0,
-                        help="Device for candidate generation.",
-                    )
-                    cand_submit = st.form_submit_button("Save candidate performance")
-                if cand_submit:
-                    device_val = device_mode
-                    new_cand = cand_cfg.model_copy(
-                        update={
-                            "collision_backend": CollisionBackend(backend),
-                            "cache_meshes": cache_mesh,
-                            "ray_subsample": int(ray_sub),
-                            "step_clearance": float(step_clear),
-                            "sampling_strategy": SamplingStrategy(sampling),
-                            "device": device_val,
-                        }
-                    )
-                    new_cand = CandidateViewGeneratorConfig.model_validate(new_cand.model_dump())
-                    store(STATE_KEYS["cand_cfg"], _cfg_to_dict(new_cand))
-                    store(STATE_KEYS["candidates"], None)
-                    store(STATE_KEYS["depth"], None)
-                    st.success("Saved candidate performance settings. Rerun candidates/renders to apply.")
-
-            with col2:
-                st.markdown("**Renderer (PyTorch3D) advanced**")
-                with st.form("perf_rend_form"):
-                    dtype = st.selectbox(
-                        "dtype",
-                        ["float16", "bfloat16", "float32"],
-                        index=["float16", "bfloat16", "float32"].index(
-                            getattr(rend_cfg.renderer, "dtype", "float32")
-                            if isinstance(rend_cfg.renderer, Pytorch3DDepthRendererConfig)
-                            else "float32"
-                        ),
-                    )
-                    bin_size = st.number_input(
-                        "bin_size (None=auto)",
-                        min_value=0,
-                        max_value=4096,
-                        value=int(getattr(rend_cfg.renderer, "bin_size", 0) or 0),
-                        help="0 means None/auto.",
-                    )
-                    max_faces_bin = st.number_input(
-                        "max_faces_per_bin (0=None)",
-                        min_value=0,
-                        max_value=200000,
-                        value=int(getattr(rend_cfg.renderer, "max_faces_per_bin", 0) or 0),
-                    )
-                    two_sided = st.checkbox(
-                        "two_sided",
-                        value=getattr(rend_cfg.renderer, "two_sided", True)
-                        if isinstance(rend_cfg.renderer, Pytorch3DDepthRendererConfig)
-                        else True,
-                    )
-                    proxy = st.checkbox(
-                        "add_proxy_walls",
-                        value=getattr(rend_cfg.renderer, "add_proxy_walls", True)
-                        if isinstance(rend_cfg.renderer, Pytorch3DDepthRendererConfig)
-                        else True,
-                    )
-                    renderer_device_sel = st.selectbox(
-                        "renderer device",
-                        ["cpu", "cuda"],
-                        index=1 if torch.cuda.is_available() else 0,
-                    )
-                    rend_submit = st.form_submit_button("Save renderer performance")
-                if rend_submit:
-                    device_val = renderer_device_sel
-                    base = rend_cfg.renderer
-                    if isinstance(base, Pytorch3DDepthRendererConfig):
-                        new_renderer = base.model_copy(
-                            update={
-                                "dtype": dtype,
-                                "bin_size": None if bin_size == 0 else int(bin_size),
-                                "max_faces_per_bin": None if max_faces_bin == 0 else int(max_faces_bin),
-                                "two_sided": bool(two_sided),
-                                "add_proxy_walls": bool(proxy),
-                                "device": device_val,
-                            }
-                        )
-                    else:
-                        new_renderer = base
-                    new_rend_cfg = rend_cfg.model_copy(update={"renderer": new_renderer})
-                    store(STATE_KEYS["depth_cfg"], (new_rend_cfg))
-                    store(STATE_KEYS["depth"], None)
-                    st.success("Saved renderer performance settings. renders to apply.")
             return
 
         with st.sidebar.form("depth_form"):

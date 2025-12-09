@@ -16,15 +16,8 @@ def dataset_config_ui(
     ui: st.delta_generator.DeltaGenerator, *, verbosity: Verbosity, is_debug: bool
 ) -> AseEfmDatasetConfig:
     ui.subheader("Dataset")
-    mesh_ratio = ui.slider("mesh decimation ratio", 0.0, 1.0, 0.02, step=0.02)
-    mesh_max_faces = ui.number_input(
-        "max mesh faces (cap after decimation)",
-        min_value=1_000,
-        max_value=2_000_000,
-        value=300_000,
-        step=10_000,
-    )
-    crop_enable = ui.checkbox("crop mesh", value=True)
+    mesh_ratio = ui.slider("mesh decimation ratio", 0.0, 1.0, 0.1, step=0.02)
+    crop_enable = ui.checkbox("crop mesh", value=False)
     mesh_crop_margin = ui.slider("crop margin (m)", 0.0, 2.0, 0.5, step=0.05) if crop_enable else None
     mesh_keep_ratio = ui.slider("min keep ratio (after crop)", 0.0, 1.0, 0.7, step=0.05)
     require_mesh = ui.checkbox("require mesh", value=True)
@@ -41,9 +34,9 @@ def dataset_config_ui(
     return AseEfmDatasetConfig(
         atek_variant="efm",
         mesh_simplify_ratio=mesh_ratio if mesh_ratio > 0 else None,
+        crop_mesh=crop_enable,
         mesh_crop_margin_m=mesh_crop_margin,
         mesh_crop_min_keep_ratio=mesh_keep_ratio,
-        mesh_max_faces=int(mesh_max_faces),
         require_mesh=require_mesh,
         batch_size=None,
         verbosity=verbosity,
