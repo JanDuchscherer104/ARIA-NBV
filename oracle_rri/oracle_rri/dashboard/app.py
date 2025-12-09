@@ -15,7 +15,7 @@ from ..pose_generation import CandidateViewGeneratorConfig
 from ..pose_generation.types import CandidateSamplingResult, CollisionBackend, SamplingStrategy
 from ..rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
 from ..rendering.candidate_depth_renderer import CandidateDepths
-from ..utils import Console, Verbosity, get_performance_mode, set_performance_mode
+from ..utils import Console, Verbosity
 from .config import DashboardConfig
 from .panels import render_candidates_page, render_data_page, render_depth_page, render_rri_page
 from .services import get_executor, load_dataset
@@ -48,12 +48,6 @@ class DashboardApp:
     def _render_body(self, console: Console) -> None:  # pragma: no cover - UI code
         st.set_page_config(page_title="NBV Explorer", layout="wide")
         init_task_state()
-        super_fast = st.sidebar.checkbox(
-            "Super-fast debug mode",
-            value=self.config.super_fast,
-            help="Use tiny meshes, 2 candidates, low-res renders.",
-        )
-
         global_verbosity = st.sidebar.selectbox(
             "Verbosity (global)",
             options=[Verbosity.QUIET, Verbosity.NORMAL, Verbosity.VERBOSE],
@@ -61,14 +55,6 @@ class DashboardApp:
             index=2,  # Default to VERBOSE
         )
         console = console.set_verbosity(global_verbosity)
-        perf_mode = st.sidebar.selectbox(
-            "Performance mode (global)",
-            ["auto", "gpu", "cpu"],
-            index=["auto", "gpu", "cpu"].index(get_performance_mode().value),
-            help="Controls default device preference across pages.",
-        )
-        set_performance_mode(perf_mode)
-
         page = st.radio(
             "Select view",
             ("Data", "Candidate Poses", "Candidate Renders", "RRI"),
@@ -269,7 +255,6 @@ class DashboardApp:
             with st.sidebar.form("data_form"):
                 dataset_cfg = dataset_config_ui(
                     st.sidebar,
-                    super_fast=super_fast,
                     verbosity=global_verbosity,
                     is_debug=dataset_cfg_prev.is_debug,
                 )
@@ -312,10 +297,8 @@ class DashboardApp:
                 candidate_cfg = candidate_config_ui(
                     cand_cfg_prev,
                     st.sidebar,
-                    super_fast=super_fast,
                     is_debug=cand_cfg_prev.is_debug,
                     verbosity=global_verbosity,
-                    perf_mode=perf_mode,
                 )
                 st.sidebar.subheader("Candidate plot options")
                 frustum_scale = st.sidebar.slider("Frustum scale", 0.1, 1.0, 0.5, step=0.05)
@@ -360,10 +343,6 @@ class DashboardApp:
 - *P3D* (GPU): on-device point-triangle distance + sampled ray checks; set `collision_backend` in candidate config.
 - *pyembree/trimesh* (CPU): legacy ray intersection.
 
-**Global vs per-page**
-- Global *Performance mode* sets default device preference (auto/gpu/cpu).
-- Per-page device selectors override the global setting for generator and renderer.
-
 **Quick tips**
 - Use GPU + fp16 for fastest renders; if z precision issues appear on thin geometry, switch to fp32.
                 """
@@ -397,13 +376,13 @@ class DashboardApp:
                     )
                     device_mode = st.selectbox(
                         "device",
-                        ["global", "cpu", "cuda"],
-                        index=0,
-                        help="Global uses sidebar Performance mode; override if needed.",
+                        ["cpu", "cuda"],
+                        index=1 if torch.cuda.is_available() else 0,
+                        help="Device for candidate generation.",
                     )
                     cand_submit = st.form_submit_button("Save candidate performance")
                 if cand_submit:
-                    device_val = perf_mode if device_mode == "global" else device_mode
+                    device_val = device_mode
                     new_cand = cand_cfg.model_copy(
                         update={
                             "collision_backend": CollisionBackend(backend),
@@ -457,10 +436,14 @@ class DashboardApp:
                         if isinstance(rend_cfg.renderer, Pytorch3DDepthRendererConfig)
                         else True,
                     )
-                    renderer_device_sel = st.selectbox("renderer device", ["global", "cpu", "cuda"], index=0)
+                    renderer_device_sel = st.selectbox(
+                        "renderer device",
+                        ["cpu", "cuda"],
+                        index=1 if torch.cuda.is_available() else 0,
+                    )
                     rend_submit = st.form_submit_button("Save renderer performance")
                 if rend_submit:
-                    device_val = perf_mode if renderer_device_sel == "global" else renderer_device_sel
+                    device_val = renderer_device_sel
                     base = rend_cfg.renderer
                     if isinstance(base, Pytorch3DDepthRendererConfig):
                         new_renderer = base.model_copy(
@@ -489,10 +472,8 @@ class DashboardApp:
             renderer_cfg = renderer_config_ui(
                 depth_cfg_prev,
                 st.sidebar,
-                super_fast=super_fast,
                 is_debug=depth_cfg_prev.is_debug,
                 verbosity=global_verbosity,
-                perf_mode=perf_mode,
             )
             # Auto-upgrade UI result to PyTorch3D on CUDA (default) unless user explicitly picked cpu
             if torch.cuda.is_available() and not isinstance(renderer_cfg.renderer, Pytorch3DDepthRendererConfig):

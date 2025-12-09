@@ -9,10 +9,10 @@ intermediate numpy copies.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 import torch
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import Field
 from pytorch3d.renderer import MeshRasterizer, RasterizationSettings  # type: ignore[import-untyped]
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from pytorch3d.structures import Meshes  # type: ignore[import-untyped]
@@ -20,7 +20,7 @@ from torch import Tensor
 from trimesh import Trimesh  # type: ignore[import-untyped]
 
 from ..data.mesh_cache import get_pytorch3d_mesh
-from ..utils import BaseConfig, Console, Verbosity, select_device
+from ..utils import BaseConfig, Console, Verbosity
 
 if TYPE_CHECKING:
     from efm3d.aria import CameraTW, PoseTW
@@ -34,7 +34,6 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
         default_factory=lambda: Pytorch3DDepthRenderer,
         exclude=True,
     )
-    """Factory target for :meth:`BaseConfig.setup_target` (auto-populated)."""
 
     device: str = "cuda"
     """Torch device to run rasterisation on (falls back to CPU if unavailable)."""
@@ -42,10 +41,10 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     zfar: float = 20.0
     """Far clipping plane (metres); also used to fill miss pixels."""
 
-    zclose: float = 1e-2
+    znear: float = 1e-3
     """Near clipping plane (metres); triangles closer than this are clipped."""
 
-    cull_backfaces: bool = False
+    cull_backfaces: bool = True
     """If ``True`` drop triangles with normals pointing away from the camera.
 
     NBV cameras are typically *inside* closed meshes (rooms); backface culling
@@ -56,29 +55,20 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     blur_radius: float = 0.0
     """Soft rasterizer blur radius; keep ``0`` for hard z-buffer."""
 
-    bin_size: int | None = 0
+    bin_size: int | None = None
     """Rasterisation bin size; ``None`` lets PyTorch3D pick heuristics."""
 
     max_faces_per_bin: int | None = None
     """Performance knob mirroring ``RasterizationSettings.max_faces_per_bin``."""
 
     dtype: Literal["float32", "float16", "bfloat16"] = "float32"
-    """Computation dtype; use float16/bfloat16 on CUDA for speed (may reduce z precision)."""
+    """Computation dtype; use float16/bfloat16 on CUDA for speed"""
 
     verbosity: Verbosity = Field(
         default=Verbosity.VERBOSE,
-        validation_alias=AliasChoices("verbosity", "verbose"),
         description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
     )
     """Enable :class:`Console` logging."""
-
-    is_debug: bool = False
-    """Force CPU rendering and enable debug logging."""
-
-    @field_validator("verbosity", mode="before")
-    @classmethod
-    def _coerce_verbosity(cls, value: Any) -> Verbosity:
-        return Verbosity.from_any(value)
 
 
 class Pytorch3DDepthRenderer:
@@ -86,23 +76,21 @@ class Pytorch3DDepthRenderer:
 
     def __init__(self, config: Pytorch3DDepthRendererConfig) -> None:
         self.config = config
-        self.console = (
-            Console.with_prefix(self.__class__.__name__)
-            .set_verbosity(self.config.verbosity)
-            .set_debug(self.config.is_debug)
-        )
-        preferred = "cpu" if self.config.is_debug else self.config.device
-        self._device = select_device(preferred, component=self.__class__.__name__)
+        self.console = Console.with_prefix(self.__class__.__name__).set_verbosity(self.config.verbosity)
 
-    @property
-    def device(self) -> torch.device:
-        """Torch device used for rendering."""
-
-        return self._device
+        self.device = self._resolve_device(self.config.device)
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _resolve_device(value: str | torch.device) -> torch.device:
+        if isinstance(value, torch.device):
+            return value
+        if value is None or str(value).lower() == "auto":
+            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return torch.device(value)
 
     def render(
         self,
@@ -112,7 +100,7 @@ class Pytorch3DDepthRenderer:
         *,
         frame_index: int | None = None,
         mesh_cache_key: str | None = None,
-    ) -> tuple[Tensor, PerspectiveCameras]:
+    ) -> tuple[Tensor, Tensor, PerspectiveCameras]:
         """Render depth for a batch of poses."""
 
         dtype = {
@@ -176,17 +164,21 @@ class Pytorch3DDepthRenderer:
             bin_size=self.config.bin_size,
             max_faces_per_bin=self.config.max_faces_per_bin,
             cull_to_frustum=False,
-            z_clip_value=self.config.zclose,
+            z_clip_value=self.config.znear,
         )
         rasterizer = MeshRasterizer(cameras=cameras, raster_settings=raster_settings)
         autocast_enable = dtype != torch.float32 and self.device.type == "cuda"
         with torch.autocast(device_type=self.device.type, dtype=dtype, enabled=autocast_enable):
-            depth = rasterizer.forward(mesh_struct).zbuf.squeeze(-1)  # (B, H, W)
+            fragments = rasterizer.forward(mesh_struct)
 
-        far = torch.full_like(depth, self.config.zfar)
-        depth = torch.where(torch.isfinite(depth), depth, far)
+            depth = fragments.zbuf.squeeze(-1)  # (B, H, W)
+            pix_to_face = fragments.pix_to_face.squeeze(-1)  # (B, H, W)
 
-        return depth, cameras
+        return (
+            depth,
+            pix_to_face,
+            cameras,
+        )
 
     # ------------------------------------------------------------------
     # Helpers

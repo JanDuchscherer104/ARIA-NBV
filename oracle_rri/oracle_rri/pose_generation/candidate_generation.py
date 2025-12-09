@@ -27,7 +27,7 @@ from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ..data.efm_views import EfmSnippetView
 from ..data.mesh_cache import mesh_from_snippet
-from ..utils import BaseConfig, Console, Verbosity, rotate_yaw_cw90, select_device
+from ..utils import BaseConfig, Console, Verbosity, rotate_yaw_cw90
 from .candidate_generation_rules import FreeSpaceRule, MinDistanceToMeshRule, PathCollisionRule, Rule
 from .orientations import OrientationBuilder
 from .positional_sampling import PositionSampler
@@ -53,21 +53,21 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     camera_label: Literal["rgb", "slaml", "slamr"] = "rgb"
     """Camera index to use for candidate generation."""
 
-    num_samples: int = 512
+    num_samples: int = 128
     """Number of candidate poses requested after pruning."""
-    oversample_factor: float = 2.0
+    oversample_factor: float = 1.5
     """Multiplicative oversampling factor applied before pruning to offset rejections."""
-    max_resamples: int = 4
+    max_resamples: int = 2
     """Maximum oversampling rounds if pruning removes too many candidates."""
 
-    min_radius: float = 0.4
+    min_radius: float = 0.6
     """Inner radius (metres) of the sampling shell around the reference pose."""
-    max_radius: float = 1.6
+    max_radius: float = 1.8
     """Outer radius (metres) of the sampling shell around the reference pose."""
 
     min_elev_deg: float = -15.0
     """Minimum elevation angle (deg) relative to the world horizontal plane."""
-    max_elev_deg: float = 45.0
+    max_elev_deg: float = 25.0
     """Maximum elevation angle (deg) relative to the world horizontal plane."""
     delta_azimuth_deg: float = 360.0
     """Total azimuth spread (deg) around the reference forward direction; 360 unlocks full sphere."""
@@ -77,7 +77,7 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     kappa: float = 4.0
     """Concentration parameter for the forward-biased PowerSpherical sampler."""
 
-    min_distance_to_mesh: float = 0.0
+    min_distance_to_mesh: float = 1.0
     """Minimum clearance (metres) between candidate center and mesh surface."""
     ensure_collision_free: bool = True
     """Reject candidates whose straight path from the reference intersects the mesh."""
@@ -87,14 +87,14 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Backend to use for collision and distance checks."""
     ray_subsample: int = 128
     """Number of samples per ray when using discretised collision checks."""
-    step_clearance: float = 0.05
+    step_clearance: float = 0.1
     """Distance threshold (metres) below which discretised collision samples are rejected."""
 
     mesh_samples: int | None = None
     """Optional number of mesh samples used by mesh-distance rules when applicable."""
 
-    device: torch.device = Field(default_factory=lambda: select_device("auto", component="CandidateViewGenerator"))
-    """Torch device on which sampling and rule evaluation run."""
+    device: torch.device = Field(default_factory=lambda: torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    """Torch device on which sampling and rule evaluation run (auto-select CUDA if available)."""
     verbosity: Verbosity = Field(
         default=Verbosity.VERBOSE,
         validation_alias=AliasChoices("verbosity", "verbose"),
@@ -140,7 +140,11 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     @field_validator("device", mode="before")
     @classmethod
     def _resolve_device(cls, value: str | torch.device) -> torch.device:
-        return select_device(value, component="CandidateViewGenerator")
+        if isinstance(value, torch.device):
+            return value
+        if value is None or str(value).lower() == "auto":
+            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return torch.device(value)
 
     @field_validator("verbosity", mode="before")
     @classmethod

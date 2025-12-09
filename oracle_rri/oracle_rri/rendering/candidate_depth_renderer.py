@@ -7,13 +7,13 @@ from typing import Any
 
 import torch
 from efm3d.aria import CameraTW, PoseTW
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 
 from ..data.efm_views import EfmSnippetView
 from ..data.mesh_cache import mesh_from_snippet
 from ..pose_generation.types import CandidateSamplingResult
-from ..utils import BaseConfig, Console, Verbosity, pick_fast_depth_renderer
+from ..utils import BaseConfig, Console, Verbosity
 from .pytorch3d_depth_renderer import Pytorch3DDepthRenderer, Pytorch3DDepthRendererConfig
 
 
@@ -70,12 +70,6 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
 
     is_debug: bool = False
     """Enable detailed debug logging."""
-
-    @model_validator(mode="after")
-    def _apply_performance_mode(self) -> "CandidateDepthRendererConfig":
-        upgraded = pick_fast_depth_renderer(self.renderer)
-        object.__setattr__(self, "renderer", upgraded)
-        return self
 
     @field_validator("verbosity", mode="before")
     @classmethod
@@ -142,14 +136,18 @@ class CandidateDepthRenderer:
         if not isinstance(self.renderer, Pytorch3DDepthRenderer):
             raise TypeError(f"Unsupported renderer type: {self.renderer.__class__.__name__}")
 
-        depths, cameras = self.renderer.render(
+        depths, pix_to_face, cameras = self.renderer.render(
             poses=pose_batch,
             mesh=mesh_input,
             camera=camera_calib,
             frame_index=None,
             mesh_cache_key=sample.mesh_cache_key,
         )
-        depths_valid_mask = (depths > self.renderer.config.zclose * 1.01) & (depths < self.renderer.config.zfar * 0.99)
+        depths_valid_mask = (
+            (pix_to_face >= 0)
+            & (depths > self.renderer.config.znear * 1.01)
+            & (depths < self.renderer.config.zfar * 0.99)
+        )
 
         return CandidateDepths(
             depths=depths,

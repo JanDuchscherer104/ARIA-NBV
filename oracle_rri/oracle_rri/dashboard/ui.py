@@ -13,26 +13,24 @@ from ..utils import Verbosity
 
 
 def dataset_config_ui(
-    ui: st.delta_generator.DeltaGenerator, *, super_fast: bool, verbosity: Verbosity, is_debug: bool
+    ui: st.delta_generator.DeltaGenerator, *, verbosity: Verbosity, is_debug: bool
 ) -> AseEfmDatasetConfig:
     ui.subheader("Dataset")
-    mesh_ratio = ui.slider("mesh decimation ratio", 0.0, 1.0, 0.02 if super_fast else 0.02, step=0.02)
+    mesh_ratio = ui.slider("mesh decimation ratio", 0.0, 1.0, 0.02, step=0.02)
     mesh_max_faces = ui.number_input(
         "max mesh faces (cap after decimation)",
         min_value=1_000,
         max_value=2_000_000,
-        value=100_000 if super_fast else 300_000,
+        value=300_000,
         step=10_000,
     )
     crop_enable = ui.checkbox("crop mesh", value=True)
-    mesh_crop_margin = (
-        ui.slider("crop margin (m)", 0.0, 2.0, 0.2 if super_fast else 0.5, step=0.05) if crop_enable else None
-    )
-    mesh_keep_ratio = ui.slider("min keep ratio (after crop)", 0.0, 1.0, 0.9 if super_fast else 0.7, step=0.05)
+    mesh_crop_margin = ui.slider("crop margin (m)", 0.0, 2.0, 0.5, step=0.05) if crop_enable else None
+    mesh_keep_ratio = ui.slider("min keep ratio (after crop)", 0.0, 1.0, 0.7, step=0.05)
     require_mesh = ui.checkbox("require mesh", value=True)
     debug_flag = ui.checkbox("Debug (data)", value=is_debug)
     device_opts = ["cpu", "cuda"]
-    default_device_idx = 1 if torch.cuda.is_available() and not super_fast else 0
+    default_device_idx = 1 if torch.cuda.is_available() else 0
     device_choice = ui.selectbox(
         "Dataset device",
         device_opts,
@@ -58,20 +56,18 @@ def candidate_config_ui(
     default: CandidateViewGeneratorConfig,
     ui: st.delta_generator.DeltaGenerator,
     *,
-    super_fast: bool = False,
     is_debug: bool = False,
     verbosity: Verbosity,
-    perf_mode: str = "auto",
 ) -> CandidateViewGeneratorConfig:
     ui.subheader("Candidate Generator")
-    num_samples_default = 2 if super_fast else default.num_samples
+    num_samples_default = default.num_samples
     debug_flag = ui.checkbox("Debug (candidates)", value=is_debug)
 
     device_mode = ui.selectbox(
         "Generator device",
-        ["global (perf mode)", "cpu", "cuda"],
-        index=0,
-        help="Global follows PerformanceMode (auto/gpu/cpu); override per-page if needed.",
+        ["cpu", "cuda"],
+        index=1 if torch.cuda.is_available() else 0,
+        help="Device to run candidate sampling on.",
     )
 
     # Configure backends
@@ -193,17 +189,12 @@ def candidate_config_ui(
     ensure_collision_free = ui.checkbox("ensure_collision_free", value=default.ensure_collision_free)
 
     ensure_free_space = ui.checkbox("ensure_free_space", value=default.ensure_free_space)
-    min_distance = ui.slider("min_distance_to_mesh (m)", 0.0, 0.5, float(default.min_distance_to_mesh), step=0.01)
+    min_distance = ui.slider("min_distance_to_mesh (m)", 0.2, 0.7, float(default.min_distance_to_mesh), step=0.01)
 
     collect_rule_masks = ui.checkbox("collect_rule_masks", value=default.collect_rule_masks)
     collect_debug_stats = ui.checkbox("collect_debug_stats", value=default.collect_debug_stats)
 
-    if device_mode == "cpu":
-        device_val = "cpu"
-    elif device_mode == "cuda":
-        device_val = "cuda"
-    else:
-        device_val = perf_mode
+    device_val = device_mode
     updated = default.model_copy(
         update={
             "num_samples": int(num_samples),
@@ -242,37 +233,27 @@ def renderer_config_ui(
     default: CandidateDepthRendererConfig,
     ui: st.delta_generator.DeltaGenerator,
     *,
-    super_fast: bool = False,
     is_debug: bool = False,
     verbosity: Verbosity,
-    perf_mode: str = "auto",
 ) -> CandidateDepthRendererConfig:
     ui.subheader("Depth Renderer")
 
-    max_candidates_default = 2 if super_fast else (default.max_candidates if default.max_candidates is not None else 4)
+    max_candidates_default = default.max_candidates if default.max_candidates is not None else 4
     max_candidates = ui.slider("max_candidates", 1, 48, max_candidates_default)
     res_scale = ui.slider(
         "Render resolution scale (xH, xW)",
         0.1,
         4.0,
-        0.5 if super_fast else 1.0,
+        1.0,
         step=0.05,
         help="Scales both height and width before rendering; >1 upsamples, <1 downsamples.",
     )
     # znear = ui.number_input("znear (m)", min_value=1e-3, max_value=1.0, value=float(default.znear), step=0.01)
-    renderer_device_options = ["global (perf mode)", "cpu", "cuda"]
+    renderer_device_options = ["cpu", "cuda"]
     default_device = str(getattr(default.renderer, "device", "cuda" if torch.cuda.is_available() else "cpu"))
-    if default_device not in ("cpu", "cuda"):
-        default_device_idx = 0
-    else:
-        default_device_idx = renderer_device_options.index(default_device if torch.cuda.is_available() else "cpu")
+    default_device_idx = renderer_device_options.index(default_device if default_device in ("cpu", "cuda") else "cuda")
     renderer_device_sel = ui.selectbox("renderer device", renderer_device_options, index=default_device_idx)
-    if renderer_device_sel == "cpu":
-        renderer_device = "cpu"
-    elif renderer_device_sel == "cuda":
-        renderer_device = "cuda"
-    else:
-        renderer_device = perf_mode
+    renderer_device = renderer_device_sel
     debug_flag = ui.checkbox("Debug (renderer)", value=is_debug)
     renderer_cfg = Pytorch3DDepthRendererConfig(
         device=renderer_device,

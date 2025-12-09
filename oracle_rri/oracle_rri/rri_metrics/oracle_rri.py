@@ -81,7 +81,8 @@ class OracleRRI:
             ``RriResult`` containing scalar RRI and distance breakdowns.
         """
 
-        gt_verts_crop, gt_faces_crop = _crop_mesh_to_aabb(gt_verts, gt_faces, extend)
+        # gt_verts_crop, gt_faces_crop = _crop_mesh_to_aabb(gt_verts, gt_faces, extend)
+        gt_verts_crop, gt_faces_crop = gt_verts, gt_faces
         lengths_q = lengths_q.to(device=points_q.device)
 
         dist_before = chamfer_point_mesh(points_t, gt_verts_crop, gt_faces_crop)

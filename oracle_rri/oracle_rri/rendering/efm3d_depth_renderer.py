@@ -23,7 +23,7 @@ import trimesh
 from pydantic import AliasChoices, Field, field_validator
 from trimesh import Trimesh
 
-from ..utils import BaseConfig, Console, Verbosity, select_device
+from ..utils import BaseConfig, Console, Verbosity
 
 if TYPE_CHECKING:
     from efm3d.aria import CameraTW, PoseTW
@@ -88,13 +88,21 @@ class Efm3dDepthRenderer:
             .set_verbosity(self.config.verbosity)
             .set_debug(self.config.is_debug)
         )
-        self._device = select_device(self.config.device, component=self.__class__.__name__)
+        self._device = self._resolve_device(self.config.device)
 
     @property
     def device(self) -> torch.device:
         """Torch device used for outputs."""
 
         return self._device
+
+    @staticmethod
+    def _resolve_device(value: str | torch.device) -> torch.device:
+        if isinstance(value, torch.device):
+            return value
+        if value is None or str(value).lower() == "auto":
+            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return torch.device(value)
 
     # ------------------------------------------------------------------ #
     # Public API

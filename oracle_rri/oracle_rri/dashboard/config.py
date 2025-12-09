@@ -35,7 +35,6 @@ class DashboardConfig(BaseConfig["DashboardApp"]):
         default_factory=lambda: CandidateDepthRendererConfig(renderer=Pytorch3DDepthRendererConfig(device="cuda"))
     )
 
-    super_fast: bool = False
     debug: bool = True
 
 

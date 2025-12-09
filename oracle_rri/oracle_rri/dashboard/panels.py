@@ -475,31 +475,29 @@ def render_depth_page(depth_batch: CandidateDepths) -> None:
         st.plotly_chart(fig_hist, width="stretch")
 
     sample = get(STATE_KEYS["sample"])
-    with st.expander("Frusta + image planes (3D)", expanded=False):
-        if sample is None:
-            st.info("Load data first to plot frusta.")
-        else:
-            cand_options_frusta = depth_batch.candidate_indices.tolist()
-            selected_frusta_global = st.multiselect(
-                "Select candidates to display (frusta)",
-                options=cand_options_frusta,
-                default=cand_options_frusta,
-                key="frusta_cands",
-            )
-            # map global candidate ids to local batch indices
-            cand_to_local = {int(g): idx for idx, g in enumerate(depth_batch.candidate_indices.tolist())}
-            selected_frusta = [cand_to_local[g] for g in selected_frusta_global if g in cand_to_local]
-            plane_dist = st.slider("Image plane distance (m)", 0.2, 3.0, 1.0, step=0.1, key="plane_dist_slider")
-            builder = RenderingPlotBuilder.from_snippet(sample, title="Rendered frusta with image planes").add_mesh()
-            num_frustums = int(depth_batch.poses.tensor().shape[0])
-            builder.add_frusta_selection(
-                poses=depth_batch.poses,
-                camera=depth_batch.camera,
-                plane_dist=float(plane_dist),
-                max_frustums=min(16, num_frustums),
-                candidate_indices=selected_frusta,
-            )
-            st.plotly_chart(builder.finalize(), width="stretch")
+    # with st.expander("Frusta + image planes (3D)", expanded=False):
+    #     if sample is None:
+    #         st.info("Load data first to plot frusta.")
+    #     else:
+    #         cand_options_frusta = depth_batch.candidate_indices.tolist()
+    #         selected_frusta_global = st.multiselect(
+    #             "Select candidates to display (frusta)",
+    #             options=cand_options_frusta,
+    #             default=cand_options_frusta,
+    #             key="frusta_cands",
+    #         )
+    #         # map global candidate ids to local batch indices
+    #         cand_to_local = {int(g): idx for idx, g in enumerate(depth_batch.candidate_indices.tolist())}
+    #         selected_frusta = [cand_to_local[g] for g in selected_frusta_global if g in cand_to_local]
+    #         builder = RenderingPlotBuilder.from_snippet(sample, title="Rendered frusta with image planes").add_mesh()
+    #         num_frustums = int(depth_batch.poses.tensor().shape[0])
+    #         builder.add_frusta_selection(
+    #             poses=depth_batch.poses,
+    #             camera=depth_batch.camera,
+    #             max_frustums=min(16, num_frustums),
+    #             candidate_indices=selected_frusta,
+    #         )
+    #         st.plotly_chart(builder.finalize(), width="stretch")
 
     with st.expander("Depth hit point cloud (3D)", expanded=False):
         if sample is None:
@@ -513,7 +511,7 @@ def render_depth_page(depth_batch: CandidateDepths) -> None:
             )
             cand_to_local = {int(g): idx for idx, g in enumerate(depth_batch.candidate_indices.tolist())}
             selected = [cand_to_local[g] for g in selected_global if g in cand_to_local]
-
+            num_frustums = int(depth_batch.poses.tensor().shape[0])
             st.plotly_chart(
                 RenderingPlotBuilder.from_snippet(sample, title="Depth hit back-projection")
                 .add_mesh()
@@ -524,6 +522,12 @@ def render_depth_page(depth_batch: CandidateDepths) -> None:
                     valid_masks=depth_batch.depths_valid_mask,
                     stride=int(stride),
                     max_points=20000,
+                    candidate_indices=selected,
+                )
+                .add_frusta_selection(
+                    poses=depth_batch.poses,
+                    camera=depth_batch.camera,
+                    max_frustums=min(16, num_frustums),
                     candidate_indices=selected,
                 )
                 .finalize(),

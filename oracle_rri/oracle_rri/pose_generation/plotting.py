@@ -447,7 +447,7 @@ def plot_euler_reference(
     """Yaw/pitch/roll of candidate cameras expressed in the reference rig frame."""
     # use shell_poses (cam<-world), then express in reference frame
     mask = candidates.mask_valid if use_valid else torch.ones_like(candidates.mask_valid, dtype=torch.bool)
-    r_wr = candidates.reference_pose.R
+    r_wr = candidates.reference_pose.R  # world <- reference
     if r_wr.ndim == 3:
         r_wr = r_wr[0]
     r_rw = r_wr.transpose(0, 1)

@@ -129,54 +129,54 @@ class RenderingPlotBuilder(CandidatePlotBuilder):
         )
 
         # Add image planes using per-pose intrinsics when available.
-        count = min(len(pose_list), max_frustums)
-        for idx in range(count):
-            pose_i = pose_list[idx]
-            center_np = pose_i.t.detach().cpu().numpy()
-            # cam_i = cam_list[min(idx, len(cam_list) - 1)]
-            # w, h, fx, fy, cx, cy = self._camera_scalar_intrinsics(cam_i)
-            # corners_world = self._image_plane_corners_world(
-            #     pose_i, w=w, h=h, fx=fx, fy=fy, cx=cx, cy=cy, dist=plane_dist
-            # )
-            # corners_np = corners_world.detach().cpu().numpy()
-            # self.fig.add_trace(
-            #     go.Scatter3d(
-            #         x=corners_np[[0, 1, 2, 3, 0], 0],
-            #         y=corners_np[[0, 1, 2, 3, 0], 1],
-            #         z=corners_np[[0, 1, 2, 3, 0], 2],
-            #         mode="lines",
-            #         line={"color": color, "width": 2},
-            #         opacity=opacity,
-            #         name=f"{name} {idx}",
-            #         showlegend=True if idx == 0 else False,
-            #     )
-            # )
-            # for corner in corners_np:
-            #     self.fig.add_trace(
-            #         go.Scatter3d(
-            #             x=[center_np[0], corner[0]],
-            #             y=[center_np[1], corner[1]],
-            #             z=[center_np[2], corner[2]],
-            #             mode="lines",
-            #             line={"color": color, "width": 1},
-            #             opacity=opacity,
-            #             name=f"{name} {idx}",
-            #             showlegend=False,
-            #         )
-            #     )
-            # Label camera center
-            self.fig.add_trace(
-                go.Scatter3d(
-                    x=[center_np[0]],
-                    y=[center_np[1]],
-                    z=[center_np[2]],
-                    mode="markers",
-                    marker={"size": 3, "color": color, "opacity": 0.8, "symbol": "diamond"},
-                    name=f"{name} {idx}",
-                    showlegend=False,
-                    hovertext=f"{name} {idx}",
-                )
-            )
+        # count = min(len(pose_list), max_frustums)
+        # for idx in range(count):
+        #     pose_i = pose_list[idx]
+        #     center_np = pose_i.t.detach().cpu().numpy()
+        #     cam_i = cam_list[min(idx, len(cam_list) - 1)]
+        #     w, h, fx, fy, cx, cy = self._camera_scalar_intrinsics(cam_i)
+        #     corners_world = self._image_plane_corners_world(
+        #         pose_i, w=w, h=h, fx=fx, fy=fy, cx=cx, cy=cy, dist=plane_dist
+        #     )
+        #     corners_np = corners_world.detach().cpu().numpy()
+        #     self.fig.add_trace(
+        #         go.Scatter3d(
+        #             x=corners_np[[0, 1, 2, 3, 0], 0],
+        #             y=corners_np[[0, 1, 2, 3, 0], 1],
+        #             z=corners_np[[0, 1, 2, 3, 0], 2],
+        #             mode="lines",
+        #             line={"color": color, "width": 2},
+        #             opacity=opacity,
+        #             name=f"{name} {idx}",
+        #             showlegend=True if idx == 0 else False,
+        #         )
+        #     )
+        #     for corner in corners_np:
+        #         self.fig.add_trace(
+        #             go.Scatter3d(
+        #                 x=[center_np[0], corner[0]],
+        #                 y=[center_np[1], corner[1]],
+        #                 z=[center_np[2], corner[2]],
+        #                 mode="lines",
+        #                 line={"color": color, "width": 1},
+        #                 opacity=opacity,
+        #                 name=f"{name} {idx}",
+        #                 showlegend=False,
+        #             )
+        #         )
+        #     # Label camera center
+        #     self.fig.add_trace(
+        #         go.Scatter3d(
+        #             x=[center_np[0]],
+        #             y=[center_np[1]],
+        #             z=[center_np[2]],
+        #             mode="markers",
+        #             marker={"size": 3, "color": color, "opacity": 0.8, "symbol": "diamond"},
+        #             name=f"{name} {idx}",
+        #             showlegend=False,
+        #             hovertext=f"{name} {idx}",
+        #         )
+        #     )
         return self
 
     def add_depth_hits(
@@ -202,8 +202,6 @@ class RenderingPlotBuilder(CandidatePlotBuilder):
         use_indices = candidate_indices if candidate_indices is not None else all_indices
         pts_all: list[torch.Tensor] = []
         for i in use_indices:
-            pose_i = poses[i]
-
             pts = backproject_depth_with_p3d(
                 depth=depths[i],
                 cameras=camera[i],
@@ -213,11 +211,7 @@ class RenderingPlotBuilder(CandidatePlotBuilder):
             )
             if pts.numel() > 0:
                 pts_all.append(pts)
-                self.add_frame_axes(
-                    frame=pose_i,
-                    title=f"Cam {i}",
-                    is_rotate_yaw_cw90=False,
-                )
+
         if not pts_all:
             return self
 
