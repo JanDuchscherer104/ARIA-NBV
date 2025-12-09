@@ -27,7 +27,7 @@ from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ..data.efm_views import EfmSnippetView
 from ..data.mesh_cache import mesh_from_snippet
-from ..utils import BaseConfig, Console, Verbosity, select_device
+from ..utils import BaseConfig, Console, Verbosity, rotate_yaw_cw90, select_device
 from .candidate_generation_rules import FreeSpaceRule, MinDistanceToMeshRule, PathCollisionRule, Rule
 from .orientations import OrientationBuilder
 from .positional_sampling import PositionSampler
@@ -298,15 +298,15 @@ class CandidateViewGenerator:
             :class:`CandidateSamplingResult` holding the valid candidate :class:`CameraTW`, reference pose, shell
             poses, masks and optional debug statistics.
         """
-        cfg = self.config
-        device = cfg.device
+        device = self.config.device
 
-        reference_pose = _ensure_unbatched_pose(reference_pose.to(device))
-        centers_world, offsets_ref = PositionSampler(cfg).sample(reference_pose)
-        shell_poses, view_dirs_delta = OrientationBuilder(cfg).build(reference_pose, centers_world)
+        reference_pose = rotate_yaw_cw90(_ensure_unbatched_pose(reference_pose.to(device)))
+
+        centers_world, offsets_ref = PositionSampler(self.config).sample(reference_pose)
+        shell_poses, view_dirs_delta = OrientationBuilder(self.config).build(reference_pose, centers_world)
 
         ctx = CandidateContext(
-            cfg=cfg,
+            cfg=self.config,
             reference_pose=reference_pose,
             gt_mesh=gt_mesh,
             mesh_verts=mesh_verts.to(device),
@@ -344,19 +344,19 @@ class CandidateViewGenerator:
         mask_valid = ctx.mask_valid
         shell_poses = ctx.shell_poses
         assert shell_poses is not None
-
         assert shell_poses._data is not None
-        poses_world_valid = PoseTW(shell_poses._data[mask_valid])
-        reference_pose = ctx.reference_pose
-        ref_inv = reference_pose.inverse()
-        poses_ref_valid = ref_inv.compose(poses_world_valid)
+
+        poses_world_valid = PoseTW(shell_poses._data[mask_valid])  # world <- cam
+        reference_pose = ctx.reference_pose  # world <- ref
+        ref_inv = reference_pose.inverse()  # ref <- world
+        poses_ref_valid = ref_inv.compose(poses_world_valid)  # ref <- cam
 
         template_data = _clone_camera_template(
             ctx.camera_calib_template, poses_ref_valid._data.shape[0], poses_ref_valid._data.device
         )
-        # Store camera pose in the reference frame as camera<-reference (EFM convention).
+        # Store camera pose in the reference frame as cam<-ref.
         poses_cam_ref = poses_ref_valid.inverse()
-        template_data[:, 10:22] = poses_cam_ref._data
+        template_data[:, CameraTW.T_CAM_RIG_IND] = poses_cam_ref._data
 
         poses_cam = CameraTW(template_data)
 

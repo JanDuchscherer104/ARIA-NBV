@@ -55,7 +55,7 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
     renderer: Pytorch3DDepthRendererConfig = Field(default_factory=Pytorch3DDepthRendererConfig)
     """Nested config describing the underlying renderer (PyTorch3D or CPU)."""
 
-    max_candidates: int | None = None
+    max_candidates: int | None = 32
     """Optional cap on number of valid candidates rendered per call."""
 
     resolution_scale: float | None = None

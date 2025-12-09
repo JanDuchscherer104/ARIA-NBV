@@ -22,7 +22,7 @@ from plotly import colors as plotly_colors
 from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 
 from oracle_rri.data import EfmCameraView, EfmSnippetView
-from oracle_rri.utils import Console
+from oracle_rri.utils import Console, rotate_yaw_cw90
 
 console = Console.with_prefix("plotting")
 ROTATE_90_CW = -1
@@ -173,17 +173,6 @@ def mesh_to_plotly(
         name="GT Mesh",
         hoverinfo="skip",
     )
-
-
-def rotate_yaw_cw90(pose_world_cam: PoseTW) -> PoseTW:
-    """Yaw the pose by 90° clockwise about its +Z (forward) axis for alignment with Aria conventions."""
-    c, s = np.cos(np.pi / 2), np.sin(np.pi / 2)
-    r_roll = torch.tensor(
-        [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
-        device=pose_world_cam.R.device,
-        dtype=pose_world_cam.R.dtype,
-    )
-    return PoseTW.from_Rt(pose_world_cam.R @ r_roll, pose_world_cam.t)
 
 
 def _pose_positions(poses: PoseTW | torch.Tensor) -> np.ndarray:
@@ -491,7 +480,7 @@ class SnippetPlotBuilder:
     def add_camera_axes(
         self,
         *,
-        camera: Literal["rgb", "slam-l", "slamr"] = "rgb",
+        camera: Literal["rgb", "slaml", "slamr"] = "rgb",
         frame_indices: list[int] | None = None,
         title: str = "Camera axes",
     ) -> Self:

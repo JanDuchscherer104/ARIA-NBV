@@ -7,6 +7,7 @@ camera up-axis with the world-up vector. This preserves the LUF convention
 
 from __future__ import annotations
 
+import numpy as np
 import torch
 import torch.nn.functional as F  # noqa: N812
 from efm3d.aria.camera import CameraTW
@@ -186,6 +187,22 @@ def view_axes_from_points(
 def world_from_camera(t_world_rig: PoseTW, cam: CameraTW, frame_idx: int) -> PoseTW:
     """Compute T_world_cam from rig pose and CameraTW extrinsics."""
     return t_world_rig @ cam.T_camera_rig[frame_idx].inverse()
+
+
+def rotate_yaw_cw90(pose_world_cam: PoseTW) -> PoseTW:
+    """Visual-only 90° clockwise yaw about +Z to match Aria UI convention.
+
+    Use this **only for plotting/rendering to screen** (e.g. Plotly axes, image
+    overlays). Keep core geometry, sampling, and rendering in the physical Aria
+    LUF frame without this rotation.
+    """
+    c, s = np.cos(np.pi / 2), np.sin(np.pi / 2)
+    r_roll = torch.tensor(
+        [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
+        device=pose_world_cam.R.device,
+        dtype=pose_world_cam.R.dtype,
+    )
+    return PoseTW.from_Rt(pose_world_cam.R @ r_roll, pose_world_cam.t)
 
 
 if __name__ == "__main__":

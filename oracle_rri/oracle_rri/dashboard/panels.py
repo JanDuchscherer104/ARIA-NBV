@@ -16,7 +16,6 @@ from ..data.plotting import (
     collect_frame_modalities,
     plot_first_last_frames,
     project_pointcloud_on_frame,
-    rotate_yaw_cw90,
 )
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..pose_generation.plotting import (
@@ -283,7 +282,8 @@ def render_candidates_page(
         ).finalize()
     st.plotly_chart(cand_fig, width="stretch")
 
-    offsets_ref, dirs_ref = candidates.get_offsets_and_dirs_ref()
+    # Apply display rotation here (UI only) to keep geometry in physical frame elsewhere.
+    offsets_ref, dirs_ref = candidates.get_offsets_and_dirs_ref(display_rotate=False)
 
     fixed_ranges = st.checkbox("Clamp axes to standard ranges", value=True, key="angles_fixed_ranges")
 
@@ -302,7 +302,7 @@ def render_candidates_page(
             )
         with colp2:
             st.plotly_chart(
-                plot_position_sphere(offsets_ref, title="Offsets on unit sphere", show_axes=True),
+                plot_position_sphere(offsets_ref, show_axes=True),
                 width="stretch",
             )
         st.plotly_chart(plot_radius_hist(offsets_ref), width="stretch")
@@ -335,7 +335,7 @@ def render_candidates_page(
             width="stretch",
         )
 
-        yaw, pitch, roll = rotate_yaw_cw90(candidates.reference_pose).to_euler(rad=False).cpu().numpy().tolist()
+        yaw, pitch, roll = candidates.reference_pose.to_euler(rad=False).cpu().numpy().tolist()
         st.markdown(f"Reference Pose: Y={yaw:.2f}, P={pitch:.2f}, R={roll:.2f}  (ZYX Euler, cw90-adjusted)")
         st.plotly_chart(plot_euler_world(candidates, fixed_ranges=fixed_ranges), width="stretch")
         st.plotly_chart(plot_euler_reference(candidates, fixed_ranges=fixed_ranges), width="stretch")
@@ -492,7 +492,7 @@ def render_depth_page(depth_batch: CandidateDepths) -> None:
             plane_dist = st.slider("Image plane distance (m)", 0.2, 3.0, 1.0, step=0.1, key="plane_dist_slider")
             builder = RenderingPlotBuilder.from_snippet(sample, title="Rendered frusta with image planes").add_mesh()
             num_frustums = int(depth_batch.poses.tensor().shape[0])
-            builder.add_frusta_with_image_plane(
+            builder.add_frusta_selection(
                 poses=depth_batch.poses,
                 camera=depth_batch.camera,
                 plane_dist=float(plane_dist),
@@ -521,8 +521,8 @@ def render_depth_page(depth_batch: CandidateDepths) -> None:
                     depths=depth_batch.depths,
                     poses=depth_batch.poses,
                     camera=depth_batch.p3d_cameras,
+                    valid_masks=depth_batch.depths_valid_mask,
                     stride=int(stride),
-                    zfar=float(depth_batch.depths.max().item()),
                     max_points=20000,
                     candidate_indices=selected,
                 )
@@ -543,16 +543,18 @@ def render_rri_page(sample: EfmSnippetView | None, depth_batch: CandidateDepths 
         st.info("Render candidates first on the Candidate Renders page.")
         return
 
-    stride = st.slider("Backprojection stride", 1, 32, 8, step=1, key="rri_stride")
-
-    max_sem_pts = st.number_input(
-        "Max semi-dense points",
-        min_value=1000,
-        max_value=200000,
-        value=50000,
-        step=1000,
-        key="rri_max_sem_pts",
-    )
+    col1, col2 = st.columns(2)
+    with col1:
+        max_sem_pts = st.number_input(
+            "Max semi-dense points",
+            min_value=1000,
+            max_value=200000,
+            value=50000,
+            step=1000,
+            key="rri_max_sem_pts",
+        )
+    with col2:
+        stride = st.slider("Backprojection stride", 1, 32, 8, step=1, key="rri_stride")
 
     with st.status("Back-projecting candidates...", expanded=False):
         pcs = build_candidate_pointclouds(
@@ -565,14 +567,6 @@ def render_rri_page(sample: EfmSnippetView | None, depth_batch: CandidateDepths 
     if len(candidate_ids) == 0:
         st.warning("No candidate renders available for RRI scoring.")
         return
-
-    default_selection = candidate_ids[: min(6, len(candidate_ids))]
-    selected_ids = st.multiselect(
-        "Candidates to display",
-        options=candidate_ids,
-        default=default_selection,
-        key="rri_cands",
-    )
 
     oracle = OracleRRIConfig().setup_target()
     device = pcs.points.device
@@ -646,11 +640,30 @@ def render_rri_page(sample: EfmSnippetView | None, depth_batch: CandidateDepths 
         use_container_width=True,
     )
 
+    col1, col2 = st.columns(2)
+    with col1:
+        default_selection = candidate_ids[: min(6, len(candidate_ids))]
+        selected_ids = st.multiselect(
+            "Candidates to display",
+            options=candidate_ids,
+            default=default_selection,
+            key="rri_cands",
+        )
+    with col2:
+        show_frusta = st.checkbox("Show frusta", value=True, key="rri_show_frusta")
+
     builder = (
-        SnippetPlotBuilder.from_snippet(sample, title="Mesh + Semi-dense + Candidate PCs")
+        RenderingPlotBuilder.from_snippet(sample, title="Mesh + Semi-dense + Candidate PCs")
         .add_mesh()
         .add_semidense(last_frame_only=False, max_points=max_sem_pts)
     )
+    if show_frusta:
+        builder.add_frusta_selection(
+            poses=depth_batch.poses,
+            camera=depth_batch.camera,
+            max_frustums=min(16, len(selected_ids)),
+            candidate_indices=selected_ids,
+        )
 
     for idx_i, cid_int in enumerate(candidate_ids):
         if cid_int not in selected_ids:

@@ -250,7 +250,7 @@ def renderer_config_ui(
     ui.subheader("Depth Renderer")
 
     max_candidates_default = 2 if super_fast else (default.max_candidates if default.max_candidates is not None else 4)
-    max_candidates = ui.slider("max_candidates", 1, 16, max_candidates_default)
+    max_candidates = ui.slider("max_candidates", 1, 48, max_candidates_default)
     res_scale = ui.slider(
         "Render resolution scale (xH, xW)",
         0.1,
@@ -259,6 +259,7 @@ def renderer_config_ui(
         step=0.05,
         help="Scales both height and width before rendering; >1 upsamples, <1 downsamples.",
     )
+    # znear = ui.number_input("znear (m)", min_value=1e-3, max_value=1.0, value=float(default.znear), step=0.01)
     renderer_device_options = ["global (perf mode)", "cpu", "cuda"]
     default_device = str(getattr(default.renderer, "device", "cuda" if torch.cuda.is_available() else "cpu"))
     if default_device not in ("cpu", "cuda"):

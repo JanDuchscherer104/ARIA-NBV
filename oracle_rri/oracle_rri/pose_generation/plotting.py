@@ -11,7 +11,7 @@ from efm3d.aria.pose import PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import]
 
 from oracle_rri.data import EfmSnippetView
-from oracle_rri.data.plotting import SnippetPlotBuilder, rotate_yaw_cw90
+from oracle_rri.data.plotting import SnippetPlotBuilder
 from oracle_rri.utils import Console
 
 if TYPE_CHECKING:
@@ -80,7 +80,7 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
     def add_reference_axes(self, *, title: str = "Reference frame") -> Self:
         if self.candidate_results is None:
             return self
-        return self.add_frame_axes(frame=self.candidate_results.reference_pose, title=title)
+        return self.add_frame_axes(frame=self.candidate_results.reference_pose, title=title, is_rotate_yaw_cw90=False)
 
     def add_candidate_points(
         self,
@@ -428,7 +428,7 @@ def plot_euler_world(
     if poses is None or poses._data is None:
         return go.Figure()
     mask = candidates.mask_valid if use_valid else torch.ones_like(candidates.mask_valid, dtype=torch.bool)
-    poses_masked = rotate_yaw_cw90(PoseTW(poses._data[mask]))
+    poses_masked = PoseTW(poses._data[mask])
     yaw, pitch, roll = [rad.rad2deg() for rad in poses_masked.to_ypr(rad=True)]
 
     return _euler_histogram(
@@ -447,11 +447,11 @@ def plot_euler_reference(
     """Yaw/pitch/roll of candidate cameras expressed in the reference rig frame."""
     # use shell_poses (cam<-world), then express in reference frame
     mask = candidates.mask_valid if use_valid else torch.ones_like(candidates.mask_valid, dtype=torch.bool)
-    r_wr = rotate_yaw_cw90(candidates.reference_pose).R
+    r_wr = candidates.reference_pose.R
     if r_wr.ndim == 3:
         r_wr = r_wr[0]
     r_rw = r_wr.transpose(0, 1)
-    r_wc = rotate_yaw_cw90(candidates.shell_poses[mask]).R  # final cam->world rotations
+    r_wc = candidates.shell_poses[mask].R  # final cam->world rotations
     r_rc = torch.einsum("ij,njk->nik", r_rw, r_wc)  # cam->reference
     poses_ref = PoseTW.from_Rt(r_rc, torch.zeros(r_rc.shape[0], 3, device=r_rc.device))
     yaw, pitch, roll = [rad.rad2deg() for rad in poses_ref.to_ypr(rad=True)]

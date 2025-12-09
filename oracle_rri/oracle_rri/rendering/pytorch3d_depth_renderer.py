@@ -42,7 +42,7 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     zfar: float = 20.0
     """Far clipping plane (metres); also used to fill miss pixels."""
 
-    zclose: float = 1e-3
+    zclose: float = 1e-2
     """Near clipping plane (metres); triangles closer than this are clipped."""
 
     cull_backfaces: bool = False

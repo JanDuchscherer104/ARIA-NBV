@@ -118,24 +118,33 @@ class CandidateSamplingResult:
 
     def get_offsets_and_dirs_ref(
         self,
+        *,
+        display_rotate: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Offsets and forward directions in reference frame for **valid** candidates."""
+        """Offsets and forward directions in the **physical reference frame**.
 
-        from oracle_rri.data.plotting import rotate_yaw_cw90
+        Args:
+            display_rotate: If ``True``, apply the visual 90° CW yaw rotation
+                (``rotate_yaw_cw90``) to match UI plots. Defaults to ``False`` so
+                downstream geometry keeps physical Aria frames.
 
-        poses_ref = rotate_yaw_cw90(
-            self.views.T_camera_rig
-        )  # reference2candidate_cam, account for cw90 of reference frame
-        offsets = poses_ref.inverse().t  # camera2reference -> offset in reference frame
-        offsets = offsets.view(-1, 3)
+        Returns:
+            Tuple ``(offsets, dirs)`` with shapes ``(N,3)`` each.
+        """
+
+        poses_ref = self.views.T_camera_rig  # reference<-camera
+        if display_rotate:
+            from oracle_rri.utils import rotate_yaw_cw90
+
+            poses_ref = rotate_yaw_cw90(poses_ref)
+
+        offsets = poses_ref.inverse().t.view(-1, 3)  # camera->reference
         z_cam = (
             torch.tensor([0.0, 0.0, 1.0], device=offsets.device, dtype=offsets.dtype)
             .view(1, 3)
             .expand(offsets.shape[0], 3)
         )
-        # Forward in reference frame: transform camera +z into reference using referenc<-camera.
-        poses_ref_refcam = poses_ref.inverse()
-        dirs = poses_ref_refcam.rotate(z_cam).view(-1, 3)
+        dirs = poses_ref.inverse().rotate(z_cam).view(-1, 3)
         dirs = dirs / (dirs.norm(dim=1, keepdim=True) + 1e-8)
         return offsets, dirs
 

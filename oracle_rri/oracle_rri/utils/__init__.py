@@ -2,6 +2,7 @@
 
 from .base_config import BaseConfig, NoTarget, SingletonConfig
 from .console import Console, Verbosity
+from .frames import rotate_yaw_cw90
 from .performance import (
     ENV_VAR as PERFORMANCE_ENV_VAR,
 )
@@ -37,4 +38,5 @@ __all__ = [
     "summarize",
     "extract_scene_id_from_sequence_name",
     "validate_scene_data",
+    "rotate_yaw_cw90",
 ]

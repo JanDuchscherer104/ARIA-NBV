@@ -130,47 +130,6 @@ def _backproject_depths_p3d_batch(
     return padded, lengths
 
 
-def _fuse_with_semidense(
-    padded: Tensor,
-    lengths: Tensor,
-    semidense: Tensor,
-) -> tuple[Tensor, Tensor]:
-    """Concatenate semi-dense cloud with each candidate and pad (vectorised)."""
-
-    bsz = padded.shape[0]
-    sem_len = semidense.shape[0]
-    max_len = padded.shape[1]
-
-    if sem_len == 0 and max_len == 0:
-        return torch.empty(bsz, 0, 3, device=padded.device, dtype=padded.dtype), lengths.clone()
-
-    sem_block = (
-        semidense.unsqueeze(0).expand(bsz, sem_len, 3)
-        if sem_len > 0
-        else torch.empty(bsz, 0, 3, device=padded.device, dtype=padded.dtype)
-    )
-    fused = torch.cat([sem_block, padded], dim=1)  # (B, sem_len+max_len, 3)
-
-    pad_mask = torch.arange(max_len, device=padded.device).unsqueeze(0) < lengths.unsqueeze(1)
-    sem_mask = (
-        torch.ones((bsz, sem_len), device=padded.device, dtype=torch.bool)
-        if sem_len > 0
-        else torch.empty(bsz, 0, dtype=torch.bool, device=padded.device)
-    )
-    fused_mask = torch.cat([sem_mask, pad_mask], dim=1)
-
-    fused_lengths = fused_mask.sum(dim=1)
-    max_fused = int(fused_lengths.max().item()) if fused_lengths.numel() > 0 else 0
-    if max_fused == 0:
-        return torch.empty(bsz, 0, 3, device=padded.device, dtype=padded.dtype), fused_lengths
-
-    sort_idx = torch.argsort(~fused_mask.to(torch.int64), dim=1)
-    fused_sorted = torch.gather(fused, 1, sort_idx.unsqueeze(-1).expand_as(fused))
-    fused_padded = fused_sorted[:, :max_fused]
-
-    return fused_padded, fused_lengths
-
-
 def _compute_bounds(
     snippet_bounds: Tensor,
     padded: Tensor,

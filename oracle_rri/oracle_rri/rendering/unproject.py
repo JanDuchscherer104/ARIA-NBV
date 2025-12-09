@@ -19,7 +19,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import torch
-from efm3d.aria import CameraTW, PoseTW
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 
 from .candidate_depth_renderer import CandidateDepths
@@ -93,28 +92,44 @@ from .candidate_depth_renderer import CandidateDepths
 def backproject_depth_with_p3d(
     depth: torch.Tensor,
     cameras: PerspectiveCameras,
+    valid_mask: torch.Tensor,
     *,
     stride: int = 1,
-    zfar: float | None = None,
-    zclose: float | None = None,
     max_points: int | None = None,
-    valid_mask: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    # depth: (H, W) metric z from MeshRasterizer (in_ndc=False)
-    H, W = depth.shape
+    """Back-project a single depth map using PyTorch3D cameras and a validity mask.
 
-    yy = torch.arange(0, H, stride, device=depth.device)
-    xx = torch.arange(0, W, stride, device=depth.device)
+    Args:
+        depth: ``Tensor["H", "W"]`` metric depth (metres) in the camera frame.
+        cameras: Matching :class:`~pytorch3d.renderer.PerspectiveCameras`.
+        valid_mask: ``Tensor["H", "W"]`` boolean mask for usable pixels
+            (e.g. zclose/zfar filtering from :class:`CandidateDepths`).
+        stride: Optional subsampling stride in pixel space.
+        max_points: Optional cap on returned points (random subset when exceeded).
+
+    Returns:
+        ``Tensor["N", 3"]`` of world-frame points for valid pixels only.
+    """
+    # depth: (H, W) metric z from MeshRasterizer (in_ndc=False)
+    if depth.ndim != 2:
+        raise ValueError(f"Expected (H,W) depth, got {tuple(depth.shape)}")
+    if valid_mask.shape != depth.shape:
+        raise ValueError(f"valid_mask shape {tuple(valid_mask.shape)} must match depth {tuple(depth.shape)}")
+    if stride < 1:
+        raise ValueError(f"stride must be >=1, got {stride}")
+
+    h, w = depth.shape
+
+    yy = torch.arange(0, h, stride, device=depth.device)
+    xx = torch.arange(0, w, stride, device=depth.device)
     gy, gx = torch.meshgrid(yy, xx, indexing="ij")
 
     depth_sub = depth[gy.long(), gx.long()]
-    mask = torch.isfinite(depth_sub)
-    if valid_mask is not None:
-        mask &= valid_mask[gy.long(), gx.long()]
-    if zfar is not None:
-        mask &= depth_sub < float(zfar) * 0.99
-    if zclose is not None:
-        mask &= depth_sub > float(zclose)
+    mask = torch.isfinite(depth_sub) & valid_mask[gy.long(), gx.long()]
+    # if zfar is not None:
+    #     mask &= depth_sub < float(zfar) * 0.99
+    # if zclose is not None:
+    #     mask &= depth_sub > float(zclose)
 
     flat_mask = mask.reshape(-1)
     if not flat_mask.any():
@@ -125,8 +140,8 @@ def backproject_depth_with_p3d(
     coords_y = gy.reshape(-1)[flat_mask]
     depth_samples = depth_flat[flat_mask]
 
-    coords_x = (W - 1) - coords_x
-    coords_y = (H - 1) - coords_y
+    coords_x = (w - 1) - coords_x
+    coords_y = (h - 1) - coords_y
 
     pixels = torch.stack([coords_x, coords_y, depth_samples], dim=1)  # (N,3)
     pts_world = cameras.unproject_points(pixels, world_coordinates=True, from_ndc=False)
@@ -146,7 +161,7 @@ def backproject_batch(
     max_points: int | None = None,
     candidate_indices: Sequence[int] | None = None,
 ) -> torch.Tensor:
-    """Back-project a :class:`CandidateDepthBatch` into a merged world point cloud.
+    """Back-project a :class:`CandidateDepths` batch into a merged world point cloud.
 
     Args:
         batch: Rendered candidate depths + poses.
@@ -160,11 +175,13 @@ def backproject_batch(
     """
 
     depths = batch.depths
-    poses = batch.poses
-    camera = batch.camera
+    valid_masks = batch.depths_valid_mask
+    cameras = batch.p3d_cameras
 
     if depths.ndim != 3:
         raise ValueError(f"Expected (B,H,W) depths, got {tuple(depths.shape)}")
+    if cameras is None:
+        raise ValueError("CandidateDepths.p3d_cameras is required for backprojection.")
 
     num = depths.shape[0]
     use_idxs = list(candidate_indices) if candidate_indices is not None else list(range(num))
@@ -172,20 +189,15 @@ def backproject_batch(
     pts_all: list[torch.Tensor] = []
     for i in use_idxs:
         depth_i = depths[i]
-        pose_i = poses[i] if isinstance(poses, PoseTW) else PoseTW(poses[i])
+        valid_i = valid_masks[i]
+        if zfar is not None:
+            valid_i = valid_i & (depth_i < float(zfar))
 
-        if isinstance(camera, CameraTW) and camera.tensor().ndim == 2 and camera.shape[0] > 1:
-            cam_i = camera[i]
-        else:
-            cam_i = camera if isinstance(camera, CameraTW) else CameraTW(camera[i])
-
-        zfar_i = zfar if zfar is not None else float(depth_i.max().item())
-        pts_world = backproject_depth(
+        pts_world = backproject_depth_with_p3d(
             depth=depth_i,
-            pose_world_cam=pose_i,
-            camera=cam_i,
+            cameras=cameras[i],
+            valid_mask=valid_i,
             stride=stride,
-            zfar=zfar_i,
             max_points=max_points,
         )
         if pts_world.numel() > 0:
@@ -202,18 +214,4 @@ def backproject_batch(
     return pts_concat
 
 
-def _scalar_intrinsics(camera: CameraTW) -> tuple[float, float, float, float]:
-    """Return fx, fy, cx, cy as Python floats from a CameraTW (single entry)."""
-
-    size = camera.size.reshape(-1, 2)[0].float()  # noqa: F841 - size not used but kept for clarity
-    focals = camera.f.reshape(-1, 2)[0].float()
-    centers = camera.c.reshape(-1, 2)[0].float()
-    return (
-        float(focals[0].item()),
-        float(focals[1].item()),
-        float(centers[0].item()),
-        float(centers[1].item()),
-    )
-
-
-__all__ = ["backproject_depth", "backproject_batch"]
+__all__ = ["backproject_depth_with_p3d", "backproject_batch"]

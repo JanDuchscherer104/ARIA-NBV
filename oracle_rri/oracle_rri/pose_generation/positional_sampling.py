@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 import torch
 from power_spherical import HypersphericalUniform, PowerSpherical  # type: ignore[import-untyped]
 
-from ..data.plotting import rotate_yaw_cw90
 from .geometry import DEVICE_FWD
 from .types import SamplingStrategy
 
@@ -83,8 +82,6 @@ class PositionSampler:
             Tuple of ``(centers_world, offsets_ref)`` where both are ``Tensor[N, 3]`` with
             ``N = cfg.num_samples * cfg.oversample_factor``. Offsets are in the reference frame before rotation into world.
         """
-        reference_pose_cor = rotate_yaw_cw90(reference_pose)
-
         n_draw = ceil(self.cfg.num_samples * self.cfg.oversample_factor)
 
         match self.cfg.sampling_strategy:
@@ -105,7 +102,7 @@ class PositionSampler:
             self.cfg.min_radius, self.cfg.max_radius
         )
         offsets_rig = offsets_rig * radii[:, None]
-        centers_world = reference_pose_cor.transform(offsets_rig)
+        centers_world = reference_pose.transform(offsets_rig)
         return centers_world, offsets_rig
 
 
