@@ -1,15 +1,18 @@
-"""Streamlit entrypoint (thin wrapper around modular dashboard app)."""
+"""Streamlit entrypoint (refactored app).
+
+This is the default entrypoint used by the `nbv-st` console script.
+The legacy dashboard remains available via `oracle_rri.streamlit_app_old`.
+"""
 
 from __future__ import annotations
 
-from oracle_rri.dashboard.app import DashboardApp
-from oracle_rri.dashboard.config import DashboardConfig
+from oracle_rri.app import NbvStreamlitApp, NbvStreamlitAppConfig
 
-__all__ = ["DashboardApp", "DashboardConfig", "main", "streamlit_entry"]
+__all__ = ["NbvStreamlitApp", "NbvStreamlitAppConfig", "main", "streamlit_entry"]
 
 
 def main() -> None:  # pragma: no cover - Streamlit runner
-    DashboardConfig().setup_target().run()
+    NbvStreamlitAppConfig().setup_target().run()
 
 
 def streamlit_entry() -> None:  # pragma: no cover - console script

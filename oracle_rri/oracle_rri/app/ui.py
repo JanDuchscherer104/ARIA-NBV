@@ -1,4 +1,4 @@
-"""Sidebar UI helpers for configuring dataset, candidates, and rendering."""
+"""Sidebar UI helpers for the refactored Streamlit app."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from ..data import AseEfmDatasetConfig
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..pose_generation.types import CollisionBackend, SamplingStrategy, ViewDirectionMode
 from ..rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
+from ..rri_metrics.oracle_rri import OracleRRIConfig
 from ..utils import Verbosity
 
 
@@ -56,6 +57,23 @@ def candidate_config_ui(
     num_samples_default = default.num_samples
     debug_flag = ui.checkbox("Debug (candidates)", value=is_debug)
 
+    seed_enabled_default = default.seed is not None
+    seed_enabled = ui.checkbox(
+        "Deterministic seed",
+        value=seed_enabled_default,
+        help="When enabled, candidate sampling is reproducible across reruns. Disable for stochastic sampling.",
+    )
+    seed_value_default = int(default.seed) if default.seed is not None else 0
+    seed_value = ui.number_input(
+        "seed",
+        min_value=0,
+        value=int(seed_value_default),
+        step=1,
+        disabled=not seed_enabled,
+        help="Seed used for candidate sampling and view-direction jitter.",
+    )
+    seed = int(seed_value) if seed_enabled else None
+
     device_mode = ui.selectbox(
         "Generator device",
         ["cpu", "cuda"],
@@ -63,7 +81,6 @@ def candidate_config_ui(
         help="Device to run candidate sampling on.",
     )
 
-    # Configure backends
     sampling_opts = list(SamplingStrategy)
     sampling_choice = ui.selectbox(
         "sampling_strategy",
@@ -96,8 +113,12 @@ def candidate_config_ui(
         help="Yaw span around the last forward direction; 360=full sphere, 90=±45°, 0=planar slice.",
     )
     kappa = ui.slider("orientation kappa (PowerSpherical)", 0.0, 16.0, float(default.kappa), step=0.5)
+    align_to_gravity = ui.checkbox(
+        "align_to_gravity",
+        value=bool(default.align_to_gravity),
+        help="Sample in a gravity-aligned reference frame (drops pitch/roll, keeps yaw) to avoid tilted shells.",
+    )
 
-    # View orientation controls
     view_mode = ui.selectbox(
         "view_direction_mode",
         options=list(ViewDirectionMode),
@@ -130,24 +151,21 @@ def candidate_config_ui(
         float(default.view_max_azimuth_deg)
         if default.view_max_azimuth_deg is not None
         else float(default.view_max_angle_deg),
-        step=5.0,
-        help="Horizontal cap for view-direction jitter",
+        step=1.0,
     )
     view_max_elevation_deg = ui.slider(
         "view_max_elevation_deg",
         0.0,
-        45.0,
+        90.0,
         float(default.view_max_elevation_deg)
         if default.view_max_elevation_deg is not None
         else float(default.view_max_angle_deg),
-        step=5.0,
-        help="Vertical cap for view-direction jitter",
+        step=1.0,
     )
-
     view_roll = ui.slider(
         "view_roll_jitter_deg",
         0.0,
-        45.0,
+        90.0,
         float(default.view_roll_jitter_deg),
         step=1.0,
         help="Random roll around sampled forward; 0 disables roll jitter.",
@@ -179,19 +197,20 @@ def candidate_config_ui(
         target_point_world = torch.tensor([tp_x, tp_y, tp_z], dtype=torch.float32)
     else:
         target_point_world = None
-    ensure_collision_free = ui.checkbox("ensure_collision_free", value=default.ensure_collision_free)
 
+    ensure_collision_free = ui.checkbox("ensure_collision_free", value=default.ensure_collision_free)
     ensure_free_space = ui.checkbox("ensure_free_space", value=default.ensure_free_space)
-    min_distance = ui.slider("min_distance_to_mesh (m)", 0.2, 0.7, float(default.min_distance_to_mesh), step=0.01)
+    min_distance = ui.slider("min_distance_to_mesh (m)", 0.0, 2.0, float(default.min_distance_to_mesh), step=0.01)
 
     collect_rule_masks = ui.checkbox("collect_rule_masks", value=default.collect_rule_masks)
     collect_debug_stats = ui.checkbox("collect_debug_stats", value=default.collect_debug_stats)
 
-    device_val = device_mode
     updated = default.model_copy(
         update={
+            "seed": seed,
             "num_samples": int(num_samples),
             "oversample_factor": float(oversample),
+            "align_to_gravity": bool(align_to_gravity),
             "min_radius": float(min_radius),
             "max_radius": float(max_radius),
             "min_elev_deg": float(min_elev),
@@ -210,7 +229,7 @@ def candidate_config_ui(
             "ensure_collision_free": ensure_collision_free,
             "collision_backend": collision_choice,
             "ensure_free_space": ensure_free_space,
-            "device": device_val,
+            "device": device_mode,
             "is_debug": debug_flag,
             "verbosity": verbosity,
             "reference_frame_index": reference_frame_index,
@@ -218,7 +237,6 @@ def candidate_config_ui(
             "collect_debug_stats": collect_debug_stats,
         }
     )
-    # Re-validate to ensure device etc. are normalised
     return CandidateViewGeneratorConfig.model_validate(updated.model_dump())
 
 
@@ -231,7 +249,7 @@ def renderer_config_ui(
 ) -> CandidateDepthRendererConfig:
     ui.subheader("Depth Renderer")
 
-    max_candidates_default = default.max_candidates if default.max_candidates is not None else 4
+    max_candidates_default = default.max_candidates_final if default.max_candidates_final is not None else 4
     max_candidates = ui.slider("max_candidates", 1, 48, max_candidates_default)
     res_scale = ui.slider(
         "Render resolution scale (xH, xW)",
@@ -241,24 +259,43 @@ def renderer_config_ui(
         step=0.05,
         help="Scales both height and width before rendering; >1 upsamples, <1 downsamples.",
     )
-    # znear = ui.number_input("znear (m)", min_value=1e-3, max_value=1.0, value=float(default.znear), step=0.01)
     renderer_device_options = ["cpu", "cuda"]
     default_device = str(getattr(default.renderer, "device", "cuda" if torch.cuda.is_available() else "cpu"))
     default_device_idx = renderer_device_options.index(default_device if default_device in ("cpu", "cuda") else "cuda")
     renderer_device_sel = ui.selectbox("renderer device", renderer_device_options, index=default_device_idx)
-    renderer_device = renderer_device_sel
     debug_flag = ui.checkbox("Debug (renderer)", value=is_debug)
     renderer_cfg = Pytorch3DDepthRendererConfig(
-        device=renderer_device,
+        device=renderer_device_sel,
         is_debug=debug_flag,
         verbosity=verbosity,
     )
     return default.model_copy(
         update={
-            "max_candidates": int(max_candidates),
+            "max_candidates_final": int(max_candidates),
             "renderer": renderer_cfg,
             "is_debug": debug_flag,
             "resolution_scale": float(res_scale),
             "verbosity": verbosity,
         }
     )
+
+
+def oracle_config_ui(default: OracleRRIConfig, ui: st.delta_generator.DeltaGenerator) -> OracleRRIConfig:
+    ui.subheader("Oracle RRI")
+    chunk = ui.number_input(
+        "candidate_chunk_size (0 = disabled)",
+        min_value=0,
+        max_value=512,
+        value=int(default.candidate_chunk_size or 0),
+        step=1,
+        help="Lower this to reduce peak GPU memory when scoring many candidates.",
+    )
+    return default.model_copy(update={"candidate_chunk_size": None if int(chunk) <= 0 else int(chunk)})
+
+
+__all__ = [
+    "candidate_config_ui",
+    "dataset_config_ui",
+    "oracle_config_ui",
+    "renderer_config_ui",
+]
