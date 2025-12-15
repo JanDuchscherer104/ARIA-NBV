@@ -77,10 +77,14 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
             self._ref_center = self.candidate_results.reference_pose.t.detach().cpu().numpy()
         return self._ref_center
 
-    def add_reference_axes(self, *, title: str = "Reference frame") -> Self:
+    def add_reference_axes(self, *, title: str = "Reference frame", display_rotate: bool = True) -> Self:
         if self.candidate_results is None:
             return self
-        return self.add_frame_axes(frame=self.candidate_results.reference_pose, title=title, is_rotate_yaw_cw90=False)
+        return self.add_frame_axes(
+            frame=self.candidate_results.reference_pose,
+            title=title,
+            is_rotate_yaw_cw90=display_rotate,
+        )
 
     def add_candidate_points(
         self,
@@ -242,6 +246,7 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
         max_frustums: int | None = None,
         include_axes: bool = False,
         include_center: bool = False,
+        display_rotate: bool = True,
     ) -> "SnippetPlotBuilder":
         """Overlay frusta using the attached candidate results."""
 
@@ -249,7 +254,13 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
         if cand_results is None:
             raise ValueError("Candidate results missing; call attach_candidate_results() first.")
 
-        pose_list = self._pose_list_from_input(cand_results.poses_world_cam())
+        poses_world_cam = cand_results.poses_world_cam()
+        if display_rotate:
+            from oracle_rri.utils import rotate_yaw_cw90
+
+            poses_world_cam = rotate_yaw_cw90(poses_world_cam)
+
+        pose_list = self._pose_list_from_input(poses_world_cam)
 
         return self._add_frusta_for_poses(
             cams=cand_results.views,

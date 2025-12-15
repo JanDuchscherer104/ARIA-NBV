@@ -29,7 +29,7 @@ from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ..data.efm_views import EfmSnippetView
 from ..utils import BaseConfig, Console, Verbosity
-from ..utils.frames import world_up_tensor
+from ..utils.frames import rotate_yaw_cw90, world_up_tensor
 from .candidate_generation_rules import FreeSpaceRule, MinDistanceToMeshRule, PathCollisionRule, Rule
 from .orientations import OrientationBuilder
 from .positional_sampling import PositionSampler
@@ -406,7 +406,7 @@ class CandidateViewGenerator:
         """
         device = self.config.device
 
-        reference_pose = _ensure_unbatched_pose(reference_pose.to(device))
+        reference_pose = rotate_yaw_cw90(_ensure_unbatched_pose(reference_pose.to(device)))
         sampling_pose = _gravity_align_pose(reference_pose) if self.config.align_to_gravity else reference_pose
 
         with _maybe_seed(self.config.seed, device=torch.device(device)):
