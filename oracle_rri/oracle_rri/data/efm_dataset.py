@@ -4,20 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from pathlib import Path
-from typing import Any, ClassVar, Literal, Self
+from typing import Any, Literal
 
-import numpy as np
 import torch
 import trimesh
-from efm3d.aria import PoseTW
 from efm3d.aria.aria_constants import (
     ARIA_POINTS_VOL_MAX,
     ARIA_POINTS_VOL_MIN,
     ARIA_POINTS_WORLD,
-    ARIA_POSE_T_WORLD_RIG,
 )
 from efm3d.dataset.efm_model_adaptor import load_atek_wds_dataset_as_efm
-from pydantic import AliasChoices, Field, ValidationInfo, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from torch.utils.data import IterableDataset
 
 from ..configs import PathConfig
@@ -46,65 +43,6 @@ def _tensor3(value: Any) -> torch.Tensor | None:
     if isinstance(value, torch.Tensor) and value.numel() == 3:
         return value
     return None
-
-
-def _gt_bounds_from_efm(efm_dict: Mapping[str, Any]) -> tuple[torch.Tensor, torch.Tensor] | None:
-    """Axis-aligned bounds covering all GT OBBs in the snippet (world frame)."""
-
-    efm_gt = efm_dict.get("efm_gt")
-    if not isinstance(efm_gt, Mapping) or len(efm_gt) == 0:
-        return None
-
-    signs_cache: dict[torch.device, torch.Tensor] = {}
-    lo_global: torch.Tensor | None = None
-    hi_global: torch.Tensor | None = None
-
-    for cams in efm_gt.values():
-        if not isinstance(cams, Mapping):
-            continue
-        for cam_entry in cams.values():
-            if not isinstance(cam_entry, Mapping):
-                continue
-            ts_world_object = cam_entry.get("ts_world_object")
-            object_dimensions = cam_entry.get("object_dimensions")
-            if not (isinstance(ts_world_object, torch.Tensor) and isinstance(object_dimensions, torch.Tensor)):
-                continue
-            if ts_world_object.numel() == 0 or object_dimensions.numel() == 0:
-                continue
-
-            device = ts_world_object.device
-            dtype = ts_world_object.dtype
-            signs = signs_cache.get(device)
-            if signs is None:
-                signs = torch.tensor(
-                    [
-                        [-1.0, -1.0, -1.0],
-                        [1.0, -1.0, -1.0],
-                        [1.0, 1.0, -1.0],
-                        [-1.0, 1.0, -1.0],
-                        [-1.0, -1.0, 1.0],
-                        [1.0, -1.0, 1.0],
-                        [1.0, 1.0, 1.0],
-                        [-1.0, 1.0, 1.0],
-                    ],
-                    device=device,
-                    dtype=dtype,
-                )
-                signs_cache[device] = signs
-
-            half_dims = object_dimensions / 2.0  # (K, 3)
-            local = half_dims.unsqueeze(1) * signs  # (K, 8, 3)
-            corners = torch.einsum("kij,kmj->kmi", ts_world_object[:, :3, :3], local) + ts_world_object[:, None, :3, 3]
-            corners_flat = corners.reshape(-1, 3)
-            lo = corners_flat.min(dim=0).values
-            hi = corners_flat.max(dim=0).values
-
-            lo_global = lo if lo_global is None else torch.minimum(lo_global, lo)
-            hi_global = hi if hi_global is None else torch.maximum(hi_global, hi)
-
-    if lo_global is None or hi_global is None:
-        return None
-    return lo_global.detach().cpu(), hi_global.detach().cpu()
 
 
 def infer_semidense_bounds(efm_dict: Mapping[str, Any]) -> tuple[torch.Tensor, torch.Tensor] | None:
@@ -161,74 +99,7 @@ def infer_semidense_bounds(efm_dict: Mapping[str, Any]) -> tuple[torch.Tensor, t
         point_volume = torch.prod(point_extent)
         base_bounds = point_bounds if point_volume < vol_volume else vol_bounds
 
-    gt_bounds = _gt_bounds_from_efm(efm_dict)
-    if gt_bounds is None:
-        return base_bounds
-
-    if base_bounds is None:
-        return gt_bounds
-
-    lo = torch.minimum(base_bounds[0], gt_bounds[0])
-    hi = torch.maximum(base_bounds[1], gt_bounds[1])
-    return lo, hi
-
-
-def _trajectory_bounds(efm_dict: Mapping[str, Any]) -> tuple[torch.Tensor, torch.Tensor] | None:
-    """Fallback AABB from rig trajectory translations when other cues are missing."""
-
-    traj = efm_dict.get(ARIA_POSE_T_WORLD_RIG)
-    if not isinstance(traj, PoseTW):
-        return None
-    mat = traj.matrix3x4
-    if mat.numel() == 0:
-        return None
-    t = mat[..., :3, 3]
-    t = t.reshape(-1, 3)
-    if t.numel() == 0:
-        return None
-    return t.min(dim=0).values.detach().cpu(), t.max(dim=0).values.detach().cpu()
-
-
-def crop_mesh_with_bounds(
-    mesh: trimesh.Trimesh,
-    bounds: tuple[torch.Tensor, torch.Tensor],
-    margin_m: float,
-    *,
-    max_faces: int | None = None,
-    min_keep_ratio: float = 0.1,
-    console: Console | None = None,
-) -> trimesh.Trimesh:
-    """Return a copy of ``mesh`` cropped to an AABB with optional margin."""
-
-    bounds_min, bounds_max = bounds
-    margin = float(margin_m)
-    lo = (bounds_min - margin).numpy()
-    hi = (bounds_max + margin).numpy()
-
-    verts = mesh.vertices
-    in_bounds = np.logical_and(verts >= lo, verts <= hi).all(axis=1)
-    if not np.any(in_bounds):
-        if console:
-            console.warn("Mesh cropping skipped: no vertices inside snippet bounds.")
-        return mesh
-
-    face_mask = np.any(in_bounds[mesh.faces], axis=1)
-    if not np.any(face_mask):
-        if console:
-            console.warn("Mesh cropping skipped: no faces intersect snippet bounds.")
-        return mesh
-
-    cropped = mesh.submesh([face_mask], append=True)
-    assert isinstance(cropped, trimesh.Trimesh)
-
-    keep_ratio = cropped.faces.shape[0] / float(mesh.faces.shape[0])
-
-    if max_faces is not None and cropped.faces.shape[0] > max_faces:
-        cropped = cropped.simplify_quadric_decimation(face_count=max_faces)
-        if console:
-            console.info(f"Simplified cropped mesh to {cropped.faces.shape[0]} faces (keep_ratio={keep_ratio:.3f}).")
-
-    return cropped
+    return base_bounds
 
 
 class AseEfmDataset(IterableDataset[EfmSnippetView]):
@@ -298,7 +169,7 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
             mesh_verts = None
             mesh_faces = None
 
-            bounds = infer_semidense_bounds(efm_dict) or _trajectory_bounds(efm_dict)
+            bounds = infer_semidense_bounds(efm_dict)
 
             mesh_specs = None
             if mesh_base is not None:
@@ -309,12 +180,11 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
 
                 spec = MeshProcessSpec(
                     scene_id=scene_id,
-                    snippet_id=str(snippet_id),
+                    crop=self.config.crop_mesh,
                     bounds_min=bounds[0].tolist(),
                     bounds_max=bounds[1].tolist(),
                     margin_m=float(self.config.mesh_crop_margin_m or 0.0),
                     simplify_ratio=self.config.mesh_simplify_ratio,
-                    max_faces=self.config.mesh_max_faces,
                     crop_min_keep_ratio=self.config.mesh_crop_min_keep_ratio,
                 )
 
@@ -354,12 +224,6 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
     # `AseEfmDatasetConfig.DEBUG_DEFAULTS` in Streamlit raised AttributeError.
     # We keep it as a ClassVar constant so it stays accessible while being
     # excluded from model fields.
-    DEBUG_DEFAULTS: ClassVar[dict[str, Any]] = {
-        "batch_size": 1,
-        "mesh_simplify_ratio": 0.1,
-        "verbosity": Verbosity.VERBOSE,
-        "device": "cpu",
-    }
 
     target: type[AseEfmDataset] = Field(default=AseEfmDataset, exclude=True)
     paths: PathConfig = Field(default_factory=PathConfig)
@@ -378,8 +242,8 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
     require_mesh: bool = Field(default=False)
     mesh_simplify_ratio: float | None = Field(default=0.1, ge=0.0, le=1.0)
     """Fraction of faces to keep when simplifying meshes. ``None`` disables."""
-    mesh_max_faces: int | None = Field(default=None, gt=0)
-    """Absolute face cap after simplification; applied once per scene mesh."""
+    crop_mesh: bool = False
+    """If ``True``, crop meshes to snippet bounds before simplification."""
     mesh_crop_margin_m: float | None = Field(default=0.5, ge=0.0)
     """Margin added to semidense bounds when cropping meshes. ``None`` disables cropping."""
     cache_meshes: bool = Field(default=True)
@@ -396,7 +260,6 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
 
     verbosity: Verbosity = Field(
         default=Verbosity.VERBOSE,
-        validation_alias=AliasChoices("verbosity", "verbose"),
         description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
     )
     is_debug: bool = Field(default=False)
@@ -502,18 +365,6 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
         )
         return self
 
-    @model_validator(mode="after")
-    def _set_debug(self) -> Self:
-        if self.is_debug:
-            console = Console.with_prefix(self.__class__.__name__, "config").set_debug(True)
-            console.log("Debug mode enabled in config. Setting debug defaults.")
-            console.plog(self.DEBUG_DEFAULTS)
-
-            for key, value in self.DEBUG_DEFAULTS.items():
-                object.__setattr__(self, key, value)
-
-        return self
-
     def setup_target(self) -> AseEfmDataset:  # type: ignore[override]
         console = Console.with_prefix(self.__class__.__name__, "setup_target").set_verbosity(self.verbosity)
         expanded_urls = [
@@ -528,4 +379,4 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
         return self.target(self)
 
 
-__all__ = ["AseEfmDataset", "AseEfmDatasetConfig", "infer_semidense_bounds", "crop_mesh_with_bounds"]
+__all__ = ["AseEfmDataset", "AseEfmDatasetConfig", "infer_semidense_bounds"]
