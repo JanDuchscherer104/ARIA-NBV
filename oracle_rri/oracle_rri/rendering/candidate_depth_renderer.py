@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import ceil
 from typing import Any
 
 import torch
 from efm3d.aria import CameraTW, PoseTW
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import Field, field_validator
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 
 from ..data.efm_views import EfmSnippetView
-from ..data.mesh_cache import mesh_from_snippet
 from ..pose_generation.types import CandidateSamplingResult
 from ..utils import BaseConfig, Console, Verbosity
 from .pytorch3d_depth_renderer import Pytorch3DDepthRenderer, Pytorch3DDepthRendererConfig
@@ -34,7 +34,7 @@ class CandidateDepths:
     """PoseTW (ref2world) for the reference frame corresponding to candidates."""
 
     candidate_indices: torch.Tensor
-    """Indices (long) into the original candidate array corresponding to ``depths``."""
+    """Indices (long) into the **full** candidate array (pre-render filtering)."""
 
     camera: CameraTW
     """Camera calibration (and ref2camera extrinsics) for the rendered subset, same order as ``depths``."""
@@ -44,27 +44,24 @@ class CandidateDepths:
 
 
 class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
-    """Config-as-factory wrapper for :class:`CandidateDepthRenderer`."""
-
     target: type["CandidateDepthRenderer"] = Field(
         default_factory=lambda: CandidateDepthRenderer,
         exclude=True,
     )
-    """Factory target for :meth:`BaseConfig.setup_target`."""
 
     renderer: Pytorch3DDepthRendererConfig = Field(default_factory=Pytorch3DDepthRendererConfig)
     """Nested config describing the underlying renderer (PyTorch3D or CPU)."""
 
-    max_candidates: int | None = 32
-    """Optional cap on number of valid candidates rendered per call."""
+    max_candidates_final: int = 16
+    """Number of valid candidates after oversampling and filtering."""
+
+    oversample_factor: float = 2.0
 
     resolution_scale: float | None = None
     """Optional uniform scale (0<scale<=1) applied to H,W for rendering. Ignored if ``low_res`` is True."""
 
     verbosity: Verbosity = Field(
         default=Verbosity.VERBOSE,
-        validation_alias=AliasChoices("verbosity", "verbose"),
-        description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
     )
     """Verbosity level for logging."""
 
@@ -118,36 +115,43 @@ class CandidateDepthRenderer:
 
         self.console.dbg_summary("camera_calib_batch", camera_calib)
         self.console.dbg_summary("pose_batch_tensor", pose_batch)
-        is_pytorch3d = isinstance(self.renderer, Pytorch3DDepthRenderer)
-        mesh_input: Any
-        if sample.mesh_verts is not None and sample.mesh_faces is not None:
-            mesh_input = (sample.mesh_verts, sample.mesh_faces)
-        elif is_pytorch3d and sample.mesh is not None:
-            mesh_input = (
-                torch.as_tensor(sample.mesh.vertices, device=pose_batch.device, dtype=torch.float32),
-                torch.as_tensor(sample.mesh.faces, device=pose_batch.device, dtype=torch.int64),
-            )
-        elif is_pytorch3d:
-            art = mesh_from_snippet(sample, device=pose_batch.device, console=self.console)
-            mesh_input = (art.processed.verts, art.processed.faces)
-        else:
-            mesh_input = sample.mesh
-
         if not isinstance(self.renderer, Pytorch3DDepthRenderer):
             raise TypeError(f"Unsupported renderer type: {self.renderer.__class__.__name__}")
 
         depths, pix_to_face, cameras = self.renderer.render(
             poses=pose_batch,
-            mesh=mesh_input,
+            mesh=(sample.mesh_verts, sample.mesh_faces),
             camera=camera_calib,
             frame_index=None,
-            mesh_cache_key=sample.mesh_cache_key,
         )
+
+        self.console.dbg(
+            f"Rendered {depths.shape[0]} candidates | depth shape {tuple(depths.shape)} | "
+            f"pix_to_face min {int(pix_to_face.min().item())} max {int(pix_to_face.max().item())}"
+        )
+
         depths_valid_mask = (
             (pix_to_face >= 0)
             & (depths > self.renderer.config.znear * 1.01)
             & (depths < self.renderer.config.zfar * 0.99)
         )
+
+        # (
+        #     depths,
+        #     depths_valid_mask,
+        #     pose_batch,
+        #     camera_calib,
+        #     cameras,
+        #     candidate_indices,
+        # ) = self._filter_valid_candidates(
+        #     depths=depths,
+        #     depths_valid_mask=depths_valid_mask,
+        #     pix_to_face=pix_to_face,
+        #     pose_batch=pose_batch,
+        #     camera_calib=camera_calib,
+        #     cameras=cameras,
+        #     candidate_indices=candidate_indices,
+        # )
 
         return CandidateDepths(
             depths=depths,
@@ -178,19 +182,92 @@ class CandidateDepthRenderer:
         device = self.renderer.device
         cam_views = candidates.views.to(device)
         num_candidates = cam_views.tensor().shape[0]
+        # Map rendered subset back to the original (pre-pruning) candidate order so that
+        # dashboard indices stay aligned with sampling diagnostics.
+        if candidates.mask_valid is None or candidates.shell_poses is None:
+            valid_global_idx = torch.arange(num_candidates, device=device, dtype=torch.long)
+        else:
+            valid_mask = candidates.mask_valid.to(device)
+            valid_global_idx = torch.nonzero(valid_mask, as_tuple=False).squeeze(-1)
+            if valid_global_idx.numel() != num_candidates:
+                # Fallback to sequential if something went wrong; keeps ordering stable.
+                valid_global_idx = torch.arange(num_candidates, device=device, dtype=torch.long)
         if num_candidates == 0:
             raise ValueError("No candidates provided for rendering.")
 
-        if self.config.max_candidates is not None:
-            k = min(num_candidates, self.config.max_candidates)
-            candidate_idx = torch.arange(k, device=device, dtype=torch.long)
-        else:
-            candidate_idx = torch.arange(num_candidates, device=device, dtype=torch.long)
+        num_render = min(
+            num_candidates,
+            max(1, ceil(self.config.oversample_factor * self.config.max_candidates_final)),
+        )
+
+        candidate_idx = torch.arange(num_render, device=device, dtype=torch.long)
 
         selected_views = cam_views[candidate_idx]
         poses_world_cam = candidates.poses_world_cam(device=device)[candidate_idx]
 
-        return poses_world_cam, selected_views, candidate_idx
+        return poses_world_cam, selected_views, valid_global_idx[candidate_idx]
+
+    def _filter_valid_candidates(
+        self,
+        *,
+        depths: torch.Tensor,
+        depths_valid_mask: torch.Tensor,
+        pix_to_face: torch.Tensor,
+        pose_batch: PoseTW,
+        camera_calib: CameraTW,
+        cameras: PerspectiveCameras,
+        candidate_indices: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, PoseTW, CameraTW, PerspectiveCameras, torch.Tensor]:
+        """Keep only renders whose pix-to-face map has no misses and cap output size.
+
+        A candidate render is considered valid only if *all* pixels hit a mesh
+        triangle, i.e. its ``pix_to_face`` slice contains no negative entries.
+        Oversampling in :meth:`_select_candidate_views` ensures we can still
+        return up to ``max_candidates_final`` valid renders after filtering.
+        """
+
+        candidate_valid = self._candidate_hit_mask(pix_to_face)
+        num_valid = int(candidate_valid.sum().item())
+        num_total = candidate_valid.numel()
+
+        self.console.dbg(f"Candidate validity (no misses): {num_valid}/{num_total}")
+
+        if num_valid == 0:
+            msg = "No valid candidate renders: all pix_to_face maps contain misses."
+            self.console.error(msg)
+            raise ValueError(msg)
+
+        keep_idx = torch.nonzero(candidate_valid, as_tuple=False).squeeze(-1)
+        if keep_idx.numel() > self.config.max_candidates_final:
+            discarded_valid = keep_idx.numel() - self.config.max_candidates_final
+            keep_idx = keep_idx[: self.config.max_candidates_final]
+            self.console.dbg(
+                f"Discarding {discarded_valid} valid renders after capping to max_candidates_final="
+                f"{self.config.max_candidates_final}"
+            )
+
+        if keep_idx.numel() < self.config.max_candidates_final:
+            self.console.warn(
+                f"Only {keep_idx.numel()} valid renders out of {num_total}; requested max {self.config.max_candidates_final}."
+            )
+        elif num_valid > keep_idx.numel():
+            self.console.log(f"Filtered {num_valid - keep_idx.numel()} renders after oversampling ({num_total} total).")
+
+        return (
+            depths[keep_idx],
+            depths_valid_mask[keep_idx],
+            pose_batch[keep_idx],
+            camera_calib[keep_idx],
+            cameras[keep_idx],
+            candidate_indices[keep_idx],
+        )
+
+    @staticmethod
+    def _candidate_hit_mask(pix_to_face: torch.Tensor) -> torch.Tensor:
+        """True for candidates whose pix_to_face has no negative entries."""
+
+        flat = pix_to_face.view(pix_to_face.shape[0], -1)
+        return flat.min(dim=1).values >= 0
 
 
 __all__ = [

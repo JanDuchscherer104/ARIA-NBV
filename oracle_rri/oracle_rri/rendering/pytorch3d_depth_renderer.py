@@ -17,14 +17,11 @@ from pytorch3d.renderer import MeshRasterizer, RasterizationSettings  # type: ig
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from pytorch3d.structures import Meshes  # type: ignore[import-untyped]
 from torch import Tensor
-from trimesh import Trimesh  # type: ignore[import-untyped]
 
-from ..data.mesh_cache import get_pytorch3d_mesh
 from ..utils import BaseConfig, Console, Verbosity
 
 if TYPE_CHECKING:
     from efm3d.aria import CameraTW, PoseTW
-    from trimesh import Trimesh
 
 
 class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
@@ -95,11 +92,10 @@ class Pytorch3DDepthRenderer:
     def render(
         self,
         poses: PoseTW,
-        mesh: Trimesh | tuple[torch.Tensor, torch.Tensor],
+        mesh: tuple[torch.Tensor, torch.Tensor],
         camera: CameraTW,
         *,
         frame_index: int | None = None,
-        mesh_cache_key: str | None = None,
     ) -> tuple[Tensor, Tensor, PerspectiveCameras]:
         """Render depth for a batch of poses."""
 
@@ -126,6 +122,26 @@ class Pytorch3DDepthRenderer:
         poses_cw = poses.inverse().to(self.device)
         self.console.dbg_summary("poses_cw", poses_cw)
         rotations, translations = poses_cw.R, poses_cw.t
+
+        # TODO: NOT SURE ABOUT THE PART BELOW
+        # ------------------------------------------------------------------
+        # Coordinate conventions
+        #
+        # EFM3D/Aria camera intrinsics (CameraTW) follow the OpenCV camera frame
+        # (+X right, +Y down, +Z forward). PyTorch3D's PerspectiveCameras uses
+        # (+X left, +Y up, +Z forward). To keep the rendered depth aligned with
+        # CameraTW.unproject() and downstream frustum/point-cloud plots, we
+        # flip the camera X/Y axes when constructing the PyTorch3D cameras.
+        #
+        # This is equivalent to pre-multiplying the world→camera transform by:
+        #   F = diag([-1, -1, 1])
+        # which flips the first two rows of R and the first two components of T.
+        # ------------------------------------------------------------------
+        rotations = rotations.clone()
+        translations = translations.clone()
+        rotations[..., :2, :] *= -1.0
+        translations[..., :2] *= -1.0
+        # TODO: NOT SURE ABOUT THE PART ABOVE
         batch_size = rotations.shape[0]
         if focal_length.shape[0] == 1 and batch_size > 1:
             focal_length = focal_length.expand(batch_size, -1)
@@ -133,18 +149,9 @@ class Pytorch3DDepthRenderer:
             image_size = image_size.expand(batch_size, -1)
 
         # Build (and cache) PyTorch3D mesh structure
-        if isinstance(mesh, tuple):
-            verts_t, faces_t = mesh
-        else:
-            verts_t = torch.as_tensor(mesh.vertices, dtype=torch.float32, device=self.device)
-            faces_t = torch.as_tensor(mesh.faces, dtype=torch.int64, device=self.device)
-        mesh_struct_single = get_pytorch3d_mesh(
-            verts_t,
-            faces_t,
-            cache_key=f"{mesh_cache_key or 'p3d_mesh_cache'}_{self.device.type}",
-            device=self.device,
-        )
+        verts_t, faces_t = mesh
 
+        mesh_struct_single = Meshes(verts=[verts_t.to(self.device)], faces=[faces_t.to(self.device)])
         mesh_struct = mesh_struct_single.extend(rotations.shape[0])
 
         cameras = PerspectiveCameras(
@@ -237,22 +244,3 @@ class Pytorch3DDepthRenderer:
         image_size = torch.stack((size_all[:, 1], size_all[:, 0]), dim=-1).to(dtype=dtype)
 
         return width, height, focal_all, principal_all, image_size
-
-    def _mesh_to_struct(
-        self,
-        mesh: Trimesh,
-        batch_size: int,
-        *,
-        mesh_cache_key: str | None = None,
-    ) -> Meshes:
-        """Convert ``trimesh`` mesh to a cached PyTorch3D ``Meshes`` batch."""
-
-        verts = torch.as_tensor(mesh.vertices, dtype=torch.float32, device=self.device)
-        faces = torch.as_tensor(mesh.faces, dtype=torch.int64, device=self.device)
-        mesh_struct = get_pytorch3d_mesh(
-            verts,
-            faces,
-            cache_key=mesh_cache_key or "p3d_mesh_cache",
-            device=self.device,
-        )
-        return mesh_struct.extend(batch_size)
