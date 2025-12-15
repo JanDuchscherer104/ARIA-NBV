@@ -73,10 +73,6 @@ class MinDistanceToMeshRule(RuleBase):
         if backend == CollisionBackend.P3D and ctx.mesh_verts is not None and ctx.mesh_faces is not None:
             dist_t = point_mesh_distance(positions, ctx.mesh_verts, ctx.mesh_faces)
         else:
-            if backend == CollisionBackend.P3D and (ctx.mesh_verts is None or ctx.mesh_faces is None):
-                self.warn_once(
-                    "P3D backend selected but mesh vertices/faces are missing; falling back to trimesh proximity."
-                )
             try:
                 query = trimesh.proximity.ProximityQuery(ctx.gt_mesh)
                 dist_np = query.signed_distance(positions.detach().cpu().numpy())

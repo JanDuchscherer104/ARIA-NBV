@@ -26,8 +26,7 @@ from efm3d.aria.pose import PoseTW
 from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ..data.efm_views import EfmSnippetView
-from ..data.mesh_cache import mesh_from_snippet
-from ..utils import BaseConfig, Console, Verbosity, rotate_yaw_cw90
+from ..utils import BaseConfig, Console, Verbosity
 from .candidate_generation_rules import FreeSpaceRule, MinDistanceToMeshRule, PathCollisionRule, Rule
 from .orientations import OrientationBuilder
 from .positional_sampling import PositionSampler
@@ -235,11 +234,6 @@ class CandidateViewGenerator:
         gt_mesh = sample.mesh
         mesh_verts = sample.mesh_verts
         mesh_faces = sample.mesh_faces
-        if gt_mesh is not None and (mesh_verts is None or mesh_faces is None):
-            artifact = mesh_from_snippet(sample, device=device, console=self.console)
-            gt_mesh = artifact.processed.mesh
-            mesh_verts = artifact.processed.verts
-            mesh_faces = artifact.processed.faces
 
         assert mesh_verts is not None and mesh_faces is not None, "Mesh vertices and faces must be provided."
 
@@ -304,7 +298,7 @@ class CandidateViewGenerator:
         """
         device = self.config.device
 
-        reference_pose = rotate_yaw_cw90(_ensure_unbatched_pose(reference_pose.to(device)))
+        reference_pose = _ensure_unbatched_pose(reference_pose.to(device))
 
         centers_world, offsets_ref = PositionSampler(self.config).sample(reference_pose)
         shell_poses, view_dirs_delta = OrientationBuilder(self.config).build(reference_pose, centers_world)
