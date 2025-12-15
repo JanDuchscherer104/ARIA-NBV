@@ -141,8 +141,17 @@ def backproject_depth_with_p3d(
     depth_samples = depth_flat[flat_mask]
     coords_x = coords_x.to(dtype=depth.dtype)
     coords_y = coords_y.to(dtype=depth.dtype)
-    pixels = torch.stack([coords_x, coords_y, depth_samples], dim=1)  # (N,3)
-    pts_world = cameras.unproject_points(pixels, world_coordinates=True, from_ndc=False)
+
+    # Convert pixel centers to PyTorch3D NDC coordinates (+X left, +Y up) before
+    # calling ``unproject_points``. See also `_backproject_depths_p3d_batch`.
+    u = coords_x + 0.5
+    v = coords_y + 0.5
+    scale = float(min(h, w))
+    x_ndc = -(u - (w * 0.5)) * (2.0 / scale)
+    y_ndc = -(v - (h * 0.5)) * (2.0 / scale)
+
+    xy_depth = torch.stack([x_ndc, y_ndc, depth_samples], dim=1)  # (N, 3)
+    pts_world = cameras.unproject_points(xy_depth, world_coordinates=True, from_ndc=True)
 
     if max_points is not None and pts_world.shape[0] > max_points:
         idx = torch.randperm(pts_world.shape[0], device=pts_world.device)[:max_points]

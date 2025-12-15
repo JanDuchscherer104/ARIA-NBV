@@ -8,7 +8,7 @@ from typing import Any
 
 import torch
 from efm3d.aria import CameraTW, PoseTW
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 
 from ..data.efm_views import EfmSnippetView
@@ -52,7 +52,10 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
     renderer: Pytorch3DDepthRendererConfig = Field(default_factory=Pytorch3DDepthRendererConfig)
     """Nested config describing the underlying renderer (PyTorch3D or CPU)."""
 
-    max_candidates_final: int = 16
+    max_candidates_final: int = Field(
+        default=16,
+        validation_alias=AliasChoices("max_candidates_final", "max_candidates"),
+    )
     """Number of valid candidates after oversampling and filtering."""
 
     oversample_factor: float = 2.0
@@ -136,22 +139,21 @@ class CandidateDepthRenderer:
             & (depths < self.renderer.config.zfar * 0.99)
         )
 
-        # (
-        #     depths,
-        #     depths_valid_mask,
-        #     pose_batch,
-        #     camera_calib,
-        #     cameras,
-        #     candidate_indices,
-        # ) = self._filter_valid_candidates(
-        #     depths=depths,
-        #     depths_valid_mask=depths_valid_mask,
-        #     pix_to_face=pix_to_face,
-        #     pose_batch=pose_batch,
-        #     camera_calib=camera_calib,
-        #     cameras=cameras,
-        #     candidate_indices=candidate_indices,
-        # )
+        (
+            depths,
+            depths_valid_mask,
+            pose_batch,
+            camera_calib,
+            cameras,
+            candidate_indices,
+        ) = self._filter_valid_candidates(
+            depths=depths,
+            depths_valid_mask=depths_valid_mask,
+            pose_batch=pose_batch,
+            camera_calib=camera_calib,
+            cameras=cameras,
+            candidate_indices=candidate_indices,
+        )
 
         return CandidateDepths(
             depths=depths,
@@ -212,46 +214,58 @@ class CandidateDepthRenderer:
         *,
         depths: torch.Tensor,
         depths_valid_mask: torch.Tensor,
-        pix_to_face: torch.Tensor,
         pose_batch: PoseTW,
         camera_calib: CameraTW,
         cameras: PerspectiveCameras,
         candidate_indices: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, PoseTW, CameraTW, PerspectiveCameras, torch.Tensor]:
-        """Keep only renders whose pix-to-face map has no misses and cap output size.
+        """Filter/cap rendered candidates using valid depth pixel counts.
 
-        A candidate render is considered valid only if *all* pixels hit a mesh
-        triangle, i.e. its ``pix_to_face`` slice contains no negative entries.
-        Oversampling in :meth:`_select_candidate_views` ensures we can still
-        return up to ``max_candidates_final`` valid renders after filtering.
+        We render an oversampled candidate batch, then keep the top
+        ``max_candidates_final`` candidates ranked by the number of valid depth
+        pixels. This avoids returning more candidates than requested while
+        preferring renders that see more geometry.
         """
 
-        candidate_valid = self._candidate_hit_mask(pix_to_face)
-        num_valid = int(candidate_valid.sum().item())
-        num_total = candidate_valid.numel()
-
-        self.console.dbg(f"Candidate validity (no misses): {num_valid}/{num_total}")
-
-        if num_valid == 0:
-            msg = "No valid candidate renders: all pix_to_face maps contain misses."
+        num_total = int(depths.shape[0])
+        max_final = min(int(self.config.max_candidates_final), num_total)
+        valid_pixels = depths_valid_mask.view(num_total, -1).sum(dim=1).to(dtype=torch.int64)
+        invalid_mask = valid_pixels <= 0
+        num_invalid_total = int(invalid_mask.sum().item())
+        if int(valid_pixels.max().item()) <= 0:
+            msg = (
+                "No valid candidate renders: discarded "
+                f"{num_total}/{num_total} candidates because all have zero valid depth pixels."
+            )
             self.console.error(msg)
             raise ValueError(msg)
 
-        keep_idx = torch.nonzero(candidate_valid, as_tuple=False).squeeze(-1)
-        if keep_idx.numel() > self.config.max_candidates_final:
-            discarded_valid = keep_idx.numel() - self.config.max_candidates_final
-            keep_idx = keep_idx[: self.config.max_candidates_final]
-            self.console.dbg(
-                f"Discarding {discarded_valid} valid renders after capping to max_candidates_final="
-                f"{self.config.max_candidates_final}"
+        if num_total <= max_final:
+            self.console.log(
+                f"Discarded 0 candidates (kept {num_total}/{num_total}; invalid_zero_hit={num_invalid_total})."
             )
+            return depths, depths_valid_mask, pose_batch, camera_calib, cameras, candidate_indices
 
-        if keep_idx.numel() < self.config.max_candidates_final:
+        # Sort by (valid_pixels desc, candidate_indices asc) for deterministic output.
+        scale = int(candidate_indices.max().item()) + 1 if candidate_indices.numel() else num_total
+        score = valid_pixels * scale + (scale - 1 - candidate_indices.to(dtype=torch.int64))
+        keep_idx = torch.argsort(score, descending=True)[:max_final]
+
+        num_kept = int(keep_idx.numel())
+        num_discarded = num_total - num_kept
+        kept_mask = torch.zeros(num_total, device=keep_idx.device, dtype=torch.bool)
+        kept_mask[keep_idx] = True
+        num_invalid_discarded = int((invalid_mask & (~kept_mask)).sum().item())
+        num_capped_discarded = num_discarded - num_invalid_discarded
+        if keep_idx.numel() < int(self.config.max_candidates_final):
             self.console.warn(
-                f"Only {keep_idx.numel()} valid renders out of {num_total}; requested max {self.config.max_candidates_final}."
+                f"Only {int(keep_idx.numel())} renders available; requested max_candidates_final={self.config.max_candidates_final}."
             )
-        elif num_valid > keep_idx.numel():
-            self.console.log(f"Filtered {num_valid - keep_idx.numel()} renders after oversampling ({num_total} total).")
+        self.console.log(
+            f"Discarded {num_discarded} candidates (invalid_zero_hit={num_invalid_discarded}, "
+            f"capped={num_capped_discarded} due to max_candidates_final={self.config.max_candidates_final}; "
+            f"kept {num_kept}/{num_total})."
+        )
 
         return (
             depths[keep_idx],
@@ -261,13 +275,6 @@ class CandidateDepthRenderer:
             cameras[keep_idx],
             candidate_indices[keep_idx],
         )
-
-    @staticmethod
-    def _candidate_hit_mask(pix_to_face: torch.Tensor) -> torch.Tensor:
-        """True for candidates whose pix_to_face has no negative entries."""
-
-        flat = pix_to_face.view(pix_to_face.shape[0], -1)
-        return flat.min(dim=1).values >= 0
 
 
 __all__ = [

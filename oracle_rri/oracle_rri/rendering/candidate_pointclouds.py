@@ -102,18 +102,24 @@ def _backproject_depths_p3d_batch(
 
     depth_filtered = torch.where(mask, depth_sub, torch.zeros_like(depth_sub))
 
-    gx_flat = gx.reshape(-1)
-    gy_flat = gy.reshape(-1)
-    pixels = torch.stack(
-        [
-            gx_flat.unsqueeze(0).expand(bsz, -1),
-            gy_flat.unsqueeze(0).expand(bsz, -1),
-            depth_filtered,
-        ],
-        dim=-1,
-    ).to(depths.dtype)  # (B, P, 3)
+    # Convert pixel centers to PyTorch3D NDC coordinates (+X left, +Y up) and
+    # unproject in that space. This matches the convention used by the
+    # PyTorch3D rasterizer for ``in_ndc=False`` cameras with non-square images.
+    #
+    # Using pixel coordinates directly (``from_ndc=False``) produces points in a
+    # different screen convention and does *not* match the rasterizer, which
+    # leads to backprojected points that do not lie on the rendered mesh.
+    gx_flat = gx.reshape(-1).to(depths.dtype) + 0.5
+    gy_flat = gy.reshape(-1).to(depths.dtype) + 0.5
+    scale = float(min(h, w))
+    x_ndc = -(gx_flat - (w * 0.5)) * (2.0 / scale)
+    y_ndc = -(gy_flat - (h * 0.5)) * (2.0 / scale)
 
-    pts_world = cameras.unproject_points(pixels, world_coordinates=True, from_ndc=False)  # (B, P, 3)
+    x_ndc = x_ndc.unsqueeze(0).expand(bsz, -1)
+    y_ndc = y_ndc.unsqueeze(0).expand(bsz, -1)
+
+    xy_depth = torch.stack([x_ndc, y_ndc, depth_filtered.to(depths.dtype)], dim=-1)  # (B, P, 3)
+    pts_world = cameras.unproject_points(xy_depth, world_coordinates=True, from_ndc=True)  # (B, P, 3)
 
     lengths = mask.sum(dim=1)
     max_len = int(lengths.max().item()) if lengths.numel() > 0 else 0
