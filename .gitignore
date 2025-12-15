@@ -212,3 +212,11 @@ _site
 # Large download manifests (keep out of git)
 .data/aria_download_urls/
 .data
+.codex
+
+# Literature review - ignore non-documentation files
+literature/**
+!literature/**/*.md
+!literature/**/*.tex
+!literature/**/*.bib
+!literature/**/
