@@ -16,6 +16,8 @@ frame (LUF camera convention: x=left, y=up, z=forward).
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from math import radians
 from typing import Literal
 
@@ -27,6 +29,7 @@ from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ..data.efm_views import EfmSnippetView
 from ..utils import BaseConfig, Console, Verbosity
+from ..utils.frames import world_up_tensor
 from .candidate_generation_rules import FreeSpaceRule, MinDistanceToMeshRule, PathCollisionRule, Rule
 from .orientations import OrientationBuilder
 from .positional_sampling import PositionSampler
@@ -58,6 +61,14 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Multiplicative oversampling factor applied before pruning to offset rejections."""
     max_resamples: int = 2
     """Maximum oversampling rounds if pruning removes too many candidates."""
+
+    align_to_gravity: bool = False
+    """If True, use a gravity-aligned copy of the reference pose for sampling.
+
+    This removes pitch/roll from the sampling frame while keeping the reference yaw (forward direction projected
+    onto the horizontal plane). It stabilises the sampling shell when the reference pose is strongly tilted
+    (e.g., high roll angles).
+    """
 
     min_radius: float = 0.6
     """Inner radius (metres) of the sampling shell around the reference pose."""
@@ -136,6 +147,12 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     view_target_point_world: torch.Tensor | None = None
     """Optional world-space target for TARGET_POINT mode (shape (3,))."""
 
+    seed: int | None = 0
+    """Optional deterministic seed for candidate sampling.
+
+    Set to ``None`` to keep the current global RNG state (non-deterministic).
+    """
+
     @field_validator("device", mode="before")
     @classmethod
     def _resolve_device(cls, value: str | torch.device) -> torch.device:
@@ -149,6 +166,13 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     @classmethod
     def _coerce_verbosity(cls, value: Verbosity | int | str) -> Verbosity:
         return Verbosity.from_any(value)
+
+    @field_validator("seed")
+    @classmethod
+    def _non_negative_seed(cls, value: int | None) -> int | None:
+        if value is not None and int(value) < 0:
+            raise ValueError("seed must be >= 0 or None.")
+        return value
 
     @field_validator(
         "view_max_angle_deg",
@@ -193,6 +217,90 @@ def _ensure_unbatched_pose(pose: PoseTW) -> PoseTW:
     if pose._data.ndim == 2 and pose._data.shape[0] == 1:
         return PoseTW(pose._data.squeeze(0))
     return pose
+
+
+def _gravity_align_pose(reference_pose: PoseTW, *, eps: float = 1e-6) -> PoseTW:
+    """Return a gravity-aligned variant of ``reference_pose`` with identical translation.
+
+    The aligned pose uses the VIO world-up axis (see :func:`oracle_rri.utils.frames.world_up_tensor`) and keeps
+    the reference yaw by projecting the original forward axis onto the horizontal plane. This effectively removes
+    pitch and roll so azimuth/elevation sampling caps behave as intended even when the reference camera is tilted.
+
+    Args:
+        reference_pose: ``PoseTW`` with shape ``(12,)`` or ``(1,12)`` (world<-reference).
+        eps: Numerical stability guard for near-degenerate projections.
+
+    Returns:
+        ``PoseTW`` world<-reference pose with gravity-aligned rotation and unchanged translation.
+    """
+
+    reference_pose = _ensure_unbatched_pose(reference_pose)
+    r_wr = reference_pose.R  # (..., 3, 3)
+    t_w = reference_pose.t  # (..., 3)
+    device = r_wr.device
+    dtype = r_wr.dtype
+
+    wup = world_up_tensor(device=device, dtype=dtype)  # (3,)
+
+    fwd_w = r_wr[..., :, 2]  # (..., 3)
+    fwd_h = fwd_w - (fwd_w * wup).sum(dim=-1, keepdim=True) * wup
+    fwd_norm = fwd_h.norm(dim=-1, keepdim=True)
+
+    left_w = r_wr[..., :, 0]  # (..., 3)
+    left_h = left_w - (left_w * wup).sum(dim=-1, keepdim=True) * wup
+    left_norm = left_h.norm(dim=-1, keepdim=True)
+
+    # Expand world-up to match batch dimensions of the pose axes.
+    wup_exp = wup
+    while wup_exp.ndim < fwd_h.ndim:
+        wup_exp = wup_exp.unsqueeze(0)
+    wup_exp = wup_exp.expand_as(fwd_h)
+
+    # Fallback when forward is near-parallel to gravity: derive forward from left×up.
+    left_unit = left_h / left_norm.clamp_min(eps)
+    fwd_from_left = torch.cross(left_unit, wup_exp, dim=-1)
+    fwd_from_left = fwd_from_left / fwd_from_left.norm(dim=-1, keepdim=True).clamp_min(eps)
+
+    use_fallback = fwd_norm < eps
+    fwd_unit = fwd_h / fwd_norm.clamp_min(eps)
+    z_w = torch.where(use_fallback, fwd_from_left, fwd_unit)
+
+    # Final fallback when both forward/left projections are degenerate.
+    degenerate = z_w.norm(dim=-1, keepdim=True) < eps
+    if degenerate.any():
+        alt = torch.tensor([1.0, 0.0, 0.0], device=device, dtype=dtype)
+        alt = alt - (alt * wup).sum() * wup
+        alt = alt / alt.norm().clamp_min(eps)
+        alt_exp = alt
+        while alt_exp.ndim < z_w.ndim:
+            alt_exp = alt_exp.unsqueeze(0)
+        alt_exp = alt_exp.expand_as(z_w)
+        z_w = torch.where(degenerate, alt_exp, z_w)
+
+    x_w = torch.cross(wup_exp, z_w, dim=-1)
+    x_w = x_w / x_w.norm(dim=-1, keepdim=True).clamp_min(eps)
+    y_w = torch.cross(z_w, x_w, dim=-1)
+
+    r_new = torch.stack([x_w, y_w, z_w], dim=-1)
+    return PoseTW.from_Rt(r_new, t_w)
+
+
+@contextmanager
+def _maybe_seed(seed: int | None, *, device: torch.device) -> Iterator[None]:
+    if seed is None:
+        yield
+        return
+
+    cuda_devices: list[int] | None = None
+    if device.type == "cuda" and torch.cuda.is_available():
+        idx = device.index if device.index is not None else torch.cuda.current_device()
+        cuda_devices = [int(idx)]
+
+    with torch.random.fork_rng(devices=cuda_devices, enabled=True):
+        torch.manual_seed(int(seed))
+        if cuda_devices is not None:
+            torch.cuda.manual_seed_all(int(seed))
+        yield
 
 
 class CandidateViewGenerator:
@@ -299,9 +407,11 @@ class CandidateViewGenerator:
         device = self.config.device
 
         reference_pose = _ensure_unbatched_pose(reference_pose.to(device))
+        sampling_pose = _gravity_align_pose(reference_pose) if self.config.align_to_gravity else reference_pose
 
-        centers_world, offsets_ref = PositionSampler(self.config).sample(reference_pose)
-        shell_poses, view_dirs_delta = OrientationBuilder(self.config).build(reference_pose, centers_world)
+        with _maybe_seed(self.config.seed, device=torch.device(device)):
+            centers_world, offsets_ref = PositionSampler(self.config).sample(sampling_pose)
+            shell_poses, view_dirs_delta = OrientationBuilder(self.config).build(sampling_pose, centers_world)
 
         ctx = CandidateContext(
             cfg=self.config,
