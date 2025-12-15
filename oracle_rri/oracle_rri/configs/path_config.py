@@ -128,7 +128,7 @@ class PathConfig(SingletonConfig):
         """
         return self.ase_meshes / f"scene_ply_{scene_id}.ply"
 
-    def resolve_processed_mesh_path(self, scene_id: str, snippet_id: str | None, spec_hash: str) -> Path:
+    def resolve_processed_mesh_path(self, scene_id: str, spec_hash: str) -> Path:
         """Resolve path for a processed (cropped/simplified) mesh artifact.
 
         Args:
@@ -140,8 +140,7 @@ class PathConfig(SingletonConfig):
             Destination path where the processed mesh should be stored.
         """
 
-        snippet = snippet_id.replace("/", "_") if snippet_id else "scene"
-        filename = f"scene_{scene_id}_{snippet}_{spec_hash}.ply"
+        filename = f"scene_{scene_id}_{spec_hash}.ply"
         return self.processed_meshes / filename
 
     def resolve_atek_data_dir(self, config_name: str = "efm") -> Path:
