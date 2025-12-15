@@ -541,7 +541,7 @@ def render_depth_page(
 
         with tab_hist:
             bins = st.slider("Histogram bins", 10, 200, 50, step=10, key="depth_hist_bins")
-            fig_hist = depth_histogram(depths, titles=titles, bins=int(bins), zfar=zfar_stat)
+            fig_hist = depth_histogram(depths, bins=int(bins), zfar=zfar_stat)
             st.plotly_chart(fig_hist, width="stretch")
 
         with tab_hits:
