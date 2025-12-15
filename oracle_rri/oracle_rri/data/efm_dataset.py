@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any, Literal
@@ -106,6 +107,12 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
     """Iterable dataset yielding :class:`EfmSnippetView` with optional GT mesh."""
 
     def __init__(self, config: "AseEfmDatasetConfig"):
+        warnings.filterwarnings(
+            "ignore",
+            message=r"You are using `torch\.load` with `weights_only=False`.*",
+            category=FutureWarning,
+        )
+
         super().__init__()
         self.config = config
         self.console = Console.with_prefix(self.__class__.__name__).set_verbosity(config.verbosity)
@@ -358,11 +365,6 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
         object.__setattr__(self, "scene_ids", scene_ids)
         object.__setattr__(self, "scene_to_mesh", scene_to_mesh)
 
-        Console.with_prefix(self.__class__.__name__, "config").set_verbosity(self.verbosity).log(
-            f"Resolved {len(self.tar_urls)} tar shards"
-            + (f" for scenes {self.scene_ids}" if self.scene_ids else "")
-            + f" | taxonomy={self.taxonomy_csv.name}"
-        )
         return self
 
     def setup_target(self) -> AseEfmDataset:  # type: ignore[override]
@@ -375,7 +377,11 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
         if not expanded_urls:
             raise FileNotFoundError("No tar files matched derived tar_urls")
         self.tar_urls = expanded_urls
-        console.log(f"Preparing AseEfmDataset (tar URLs: {len(self.tar_urls)}, scenes: {len(self.scene_to_mesh)})")
+        taxonomy = self.taxonomy_csv.name
+        console.log(
+            f"Preparing AseEfmDataset (tar URLs: {len(self.tar_urls)}, scenes: {len(self.scene_ids)}) | "
+            f"taxonomy={taxonomy}"
+        )
         return self.target(self)
 
 

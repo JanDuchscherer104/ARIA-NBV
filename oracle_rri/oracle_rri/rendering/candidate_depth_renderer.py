@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import ceil
-from typing import Any
 
 import torch
 from efm3d.aria import CameraTW, PoseTW
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import Field
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 
 from ..data.efm_views import EfmSnippetView
@@ -52,13 +51,10 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
     renderer: Pytorch3DDepthRendererConfig = Field(default_factory=Pytorch3DDepthRendererConfig)
     """Nested config describing the underlying renderer (PyTorch3D or CPU)."""
 
-    max_candidates_final: int = Field(
-        default=16,
-        validation_alias=AliasChoices("max_candidates_final", "max_candidates"),
-    )
+    max_candidates_final: int = 16
     """Number of valid candidates after oversampling and filtering."""
 
-    oversample_factor: float = 2.0
+    oversample_factor: float = 1.0
 
     resolution_scale: float | None = None
     """Optional uniform scale (0<scale<=1) applied to H,W for rendering. Ignored if ``low_res`` is True."""
@@ -70,11 +66,6 @@ class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
 
     is_debug: bool = False
     """Enable detailed debug logging."""
-
-    @field_validator("verbosity", mode="before")
-    @classmethod
-    def _coerce_verbosity(cls, value: Any) -> Verbosity:
-        return Verbosity.from_any(value)
 
 
 class CandidateDepthRenderer:
@@ -114,7 +105,7 @@ class CandidateDepthRenderer:
             self.console.log(f"Scaling candidate camera intrinsics by {scale}")
             base_size = camera_calib.size[0]
             new_size = (int(base_size[0].item() * scale), int(base_size[1].item() * scale))
-            camera_calib = camera_calib.scale_to_size(new_size)
+            camera_calib = camera_calib.scale_to_size(new_size)  # type: ignore[arg-type]
 
         self.console.dbg_summary("camera_calib_batch", camera_calib)
         self.console.dbg_summary("pose_batch_tensor", pose_batch)
@@ -123,20 +114,20 @@ class CandidateDepthRenderer:
 
         depths, pix_to_face, cameras = self.renderer.render(
             poses=pose_batch,
-            mesh=(sample.mesh_verts, sample.mesh_faces),
+            mesh=(sample.mesh_verts, sample.mesh_faces),  # type: ignore[arg-type]
             camera=camera_calib,
             frame_index=None,
-        )
-
-        self.console.dbg(
-            f"Rendered {depths.shape[0]} candidates | depth shape {tuple(depths.shape)} | "
-            f"pix_to_face min {int(pix_to_face.min().item())} max {int(pix_to_face.max().item())}"
         )
 
         depths_valid_mask = (
             (pix_to_face >= 0)
             & (depths > self.renderer.config.znear * 1.01)
             & (depths < self.renderer.config.zfar * 0.99)
+        )
+
+        self.console.dbg(
+            f"Rendered {depths.shape[0]} candidates | depth shape {tuple(depths.shape)} | "
+            f"invalid pixels: {(~depths_valid_mask).sum().item():,}"
         )
 
         (
@@ -275,6 +266,13 @@ class CandidateDepthRenderer:
             cameras[keep_idx],
             candidate_indices[keep_idx],
         )
+
+    @staticmethod
+    def _candidate_hit_mask(pix_to_face: torch.Tensor) -> torch.Tensor:
+        """True for candidates whose pix_to_face has no negative entries."""
+
+        flat = pix_to_face.view(pix_to_face.shape[0], -1)
+        return flat.min(dim=1).values >= 0
 
 
 __all__ = [
