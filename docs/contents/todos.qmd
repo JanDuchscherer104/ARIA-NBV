@@ -27,13 +27,15 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
   - Consider mesh-to-distance-field acceleration and room-level cropping to avoid unrelated geometry.
 
     > **Done**: Just crop the mesh to a bounding box that contains both the semi-dense SLAM PC and all candidate PCs with some margin.
+
   - How can we consider only relevant (observable parts) of the scene, such that we don't have to consider the entire mesh (e.g. there might be different rooms that cannot be considered)?
     **Answer**: Crop the mesh to a bounding box with maximum extends from both the candidate PCs and the semi-dense SLAM PC.
+
   - Must be a full torch / pytorch3d implementation.
 - [ ] Provide theory and conceptual brakedown of `oracle_rri/oracle_rri/rri_metrics/metrics.py`::`chamfer_point_mesh_batched` in `docs/typst/slides/slides_3.typ`. The current contents of the file serves as a template - it was copied from `slides_2.typ` which was our second presentation. Maintain the general style. And use `get-library-docs "/websites/typst_app"` to retrieve typst documentation for the different commands that you might need.
   - [ ] Provide formulas for the different loss components that we use in ``oracle_rri/oracle_rri/rri_metrics/metrics.py``::`chamfer_point_mesh_batched`.
 
-## Candidate View Generation & Sampling - DONE
+# Candidate View Generation & Sampling - DONE
 
 **Remaining Issues:**
 
@@ -42,9 +44,19 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 
 ![Candidate Poses with torus tilted](../figures/app/candidate_poses_torus_tilt.png)
 
-- [x] The generated candidate torus should be symmetric to the forward axis of the reference frame in terms of the azimuth dimension, while its elevation band stays gravity aligned. Implemented via `align_to_gravity=True` in `CandidateViewGeneratorConfig` (sampling uses yaw-only, gravity-aligned reference).
+- [x] The generated candidate torus should be symmetric to the forward axis of the reference frame in terms of the azimuth dimension, while its elevation band stays gravity aligned.
+  > Implemented via `align_to_gravity=True` in `CandidateViewGeneratorConfig` (sampling uses yaw-only, gravity-aligned reference).
+- [ ] The current options to apply jitter to the view directions, wich are determined by the view `view_max_azimuth_deg, view_max_elevation_deg, view_roll_jitter_deg` are rather intransparent and hard to control.
+- [ ] Euler angles (world frame, deg) show a pitch of zero for all poses. Does this make senese? We wanted the x-axis to gravity aligned without adding any jitter to the view-directions. The world up vector is along +Z.
 
-- The current options to apply jitter to the view directions, wich are determined by the view
+![Candidate Directions without Jitter](../figures/app/dir_dists_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away_no_jitter.png)
+
+- [ ] Plot of the candidate positions in the 3D plot around the reference pose in world-coordinates shows candidate poses living in a y-z torus around the x axis of the reference pose. This is related to `rotate_yaw_cw90`. The displayed reference axes are correctly rotated for visualization, but the candidate points are not! When plotted in the reference frame they look correct and build a torus around the y axis (for `delta_azimuth_deg=360`)
+
+![Candidate Positions in world frame - torus around x axis](../figures/app/cand_poses_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away.png)
+![Candidate Positions in reference frame - torus around y axis](../figures/app/cand_pose_dists_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away.png)
+
+
 
 **Previous Considerations:**
 
@@ -52,7 +64,6 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
   - Strategies: uniform over half-sphere with min/max radius & elevation, free-space only, room-bounded (SSL for train, occupancy for eval).
   - Collision check: segment from last pose to candidate must not intersect mesh/voxels.
   - Modular strategy selection via enums/config that allows easy extension and combination of strategies / sampling rules.
-
 - The view direction generation in our pose_generation currently doesn't work as expected when we select a view_sampling_strategy (i.e. `uniform_spere` or `forward_powerspherical`). The view_direction_mode-based generation, however works and we can reliably generate view directions that point away from or towards the reference_pose.
   - We want to be able to generate random deviations form the deterministic view directions by adding random jitter to them. This should be configurable via view_max_angle_deg or even better view_max_azimuth_deg and view_max_elevation_deg to define the maximum deviation for each view axis separately.
   - We also want to be able to be able to add a bit of randomness to the yaw angle to allow minimal deviations from a perfectly horizontal x-axis of the candidate camera frames this should be controllable via view_roll_jitter_deg.
@@ -64,24 +75,34 @@ The PositionalSampling now works as expected and I tried fixing the directional 
 - the pitch histogram in the world-frame doesn't make sense to me - should't it be covering pretty much the entire range as we have a torus around the reference pose?
 - always keep in mind that the project aria frames have to be transofmed using `rotate_yaw_cw90` when being displayed!
 
-
-
 ### Rasterized Rendering to Generate Candidate Point Clouds - DONE
 
-- Implement `CandidatePointCloudGenerator` and all necessary auxiliary modules in : for each candidate pose, cast rays to GT  to render depth map using existing GPU implementations from `efm3d`.
-  - Input: candidate `PoseTW`, GT mesh.
-  - Output: Depth map.
-- Questions:
-  - Which camera params should we use for rendering candidate views / projections? RGB camera intrinsics and extrinsics from ASE (see @oracle_rri/oracle_rri/data/views.py)?
-  - In which coordinate frame? ego camera for now!
-  - Should we use the rendering utilities from EFM3D or some other gpu based renderer (e.g. pyrender, pytorch3d)?
-This should be implemented in `oracle_rri/oracle_rri/rendering`.
-Consider that we have already tried implementing the entire pipeline in a single script. extract the relevant parts and criticise them!
+- We now implement candidate rendering + backprojection fully in `oracle_rri/oracle_rri/rendering`:
+  - `CandidateDepthRenderer` (PyTorch3D rasteriser) renders metric z-depth maps from the GT mesh for candidate poses.
+  - `build_candidate_pointclouds` (`CandidatePointClouds`) backprojects depths into world-frame point clouds and fuses them with the semi-dense SLAM point cloud.
 
-The CandidateDepthRenderer yields:
+The `CandidateDepthRenderer.render(...)` yields a `CandidateDepths` dataclass:
 
+- `depths`: `Tensor['C','H','W']` metric z-depth (metres) in the camera frame (+Z forward).
+  - PyTorch3D returns `z=-1` for miss pixels (no face hit).
+- `depths_valid_mask`: `Tensor['C','H','W']` boolean validity mask:
+  - `pix_to_face >= 0` and `znear < depth < zfar` (see `CandidateDepthRenderer`).
+- `poses`: `PoseTW` world←camera extrinsics for each rendered candidate.
+- `reference_pose`: `PoseTW` world←reference (rig) pose around which candidates are defined.
+- `candidate_indices`: indices into the *full* candidate list (keeps UI ordering stable after filtering).
+- `camera`: `CameraTW` intrinsics used for rendering (optionally downscaled via `resolution_scale`).
+- `p3d_cameras`: matching `PerspectiveCameras` used for rendering and unprojection.
 
-**Remaining Issues:**:
+#### Action Items
+
+- [x] Candidate PCs now align with the GT mesh (PoseTW↔PyTorch3D extrinsics fixed).
+- [x] Candidate PCs now match the rendered frusta (pixel-center→NDC backprojection fixed).
+- [x] Depth histograms no longer mislead (miss pixels are masked via `depths_valid_mask`).
+- [x] Reference axes in the frusta plot match the Aria UI convention (`rotate_yaw_cw90` applied for display only).
+- [x] Implement `DepthToPointCloud` module: for each candidate pose's depth map, backproject to point cloud $\mathcal{P}_{\mathbf{q}}$ in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC $\mathcal{P}_t$ with candidate-view PC $\mathcal{P}_{\mathbf{q}}$ → $\mathcal{P}_{t \cup \mathbf{q}}$.
+- [x] Backprojection implementation: `oracle_rri/oracle_rri/rendering/candidate_pointclouds.py`::{`build_candidate_pointclouds`, `_backproject_depths_p3d_batch`} and `oracle_rri/oracle_rri/rendering/unproject.py`::`backproject_depth_with_p3d`.
+
+#### Previously observed issues
 
    - Cameras solely looking at a blank wall will have high RRI, as semi-dense point clouds will not have many points in these areas. However, this does not make sense as these views should receive a high mesh to point cloud distance - completeness. Also, these views sometimes manage to "look through" the walls and render points that are behind the wall.
    - Some poses looking towards walls, that are quite close to the candidate pose, will yield dpeth maps and point clouds that don't correspond to what would be expected from the GT mesh and the given pose.
@@ -127,7 +148,6 @@ The following backprojection stems from a candidate pose that was looking in the
 
 ![Candidate Depth Map looking in similar direction as reference pose](../figures/app/backproj_missmatch_pose_pose_in_right_direction.png)
 
-
 While poses 26 and 27 seem to have valid depth maps and backprojected point clouds, their depth-histograms also show a significant amount of -1 depth values, indicating no hits for many pixels which is unexpected given the valid looking depth maps. This might imply that the order of our candidate poses, depth maps or backprojected pointclouds is mismatched somewhere in the pipeline.
 
 ![Depth Maps - Candidate Poses 26 and 27 looking in similar direction as reference pose](../figures/app/pose_26_27_good_depth.png)
@@ -139,22 +159,118 @@ While poses 26 and 27 seem to have valid depth maps and backprojected point clou
 ![Pose 27](../figures/app/pose_27_depth_hist.png)
 :::
 
+**Resolution (what was wrong, and what we changed):**
 
-- Implement `DepthToPointCloud` module: for each candidate pose's depth map, backproject to point cloud $\mathcal{P}_{\mathbf{q}}$ in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC $\mathcal{P}_t$ with candidate-view PC $\mathcal{P}_{\mathbf{q}}$ → $\mathcal{P}_{t \cup \mathbf{q}}$.
-- The backprojection is currently implemented in `oracle_rri/oracle_rri/rendering/candidate_pointclouds.py`::{`build_candidate_pointclouds`, `_backproject_depths_p3d_batch`}
+- The "frusta vs. backprojected points don’t match" symptom was caused by two coordinate-convention bugs:
+  - **PoseTW ↔ PyTorch3D extrinsics mismatch**: `PoseTW` uses a column-vector convention; PyTorch3D camera transforms use row vectors.
+    - **Fix**: construct `PerspectiveCameras(R=poses.inverse().R.transpose(-1,-2), T=poses.inverse().t)` so the renderer/unprojection uses the same world→camera mapping as `PoseTW`.
+  - **Wrong unprojection coordinate space**: we were feeding raster pixel indices directly to `unproject_points(..., from_ndc=False)`.
+    - **Fix**: convert pixel centers `(x+0.5, y+0.5)` to PyTorch3D NDC using min-side scaling and call `unproject_points(..., from_ndc=True)`.
+- The "large spike at depth=-1" in histograms is expected for miss pixels in PyTorch3D’s z-buffer.
+  - **Fix**: always use `depths_valid_mask` when computing hit ratios / histograms and when backprojecting.
+- The "look-through-walls / points behind walls" artefact was a consequence of the same projection/backprojection convention mismatch above, not a mesh/raycasting bug.
+  - **Fix**: after the extrinsics + NDC-unprojection fixes, candidate PCs align with the GT mesh.
+- The "blank wall has high RRI" observation is not (necessarily) a rendering bug.
+  - **Status**: still an open *oracle/metric design* question if we want the oracle to reflect semi-dense SLAM failure modes on low-texture surfaces. With GT depth, newly observed wall surfaces can legitimately reduce mesh distances even if real semi-dense reconstruction would not add points there.
+- `rotate_yaw_cw90` is **visual-only** and must not be applied to the physical geometry used for rendering/backprojection.
+  - **Fix**: keep all rendering/backprojection in the physical Aria LUF frame; apply `rotate_yaw_cw90` only in plotting (e.g. reference axes in the frusta plot).
 
 ## Visualization (Streamlit)
 
-- Interactive app to visualize candidate sampling, PC–mesh distances, and RRI.
-- Efficient caching; quick scene/trajectory switching.
-- should allow for easy adaptation of config (i.e. which scene and snippet to use)
-- all streamlit variables must be fully typed
-- should allow display of the different pipeline stages in different tabs:
-  - candidate view sampling (display candidate poses around current camera pose)
-  - candidate depth rendering (display rendered depth maps from GT mesh for each candidate pose)
-  - candidate point cloud fusion (display fused point clouds for each candidate pose)
-  - RRI scoring (display RRI scores for each candidate pose)
-- should have debug print tab where we can easily see the repr prints of the different data structures and logs!
+The Streamlit app is our “glass box” for validating the oracle RRI pipeline end-to-end (data → candidates → renders →
+candidate point clouds → RRI) and for debugging caching / coordinate-frame issues.
+
+**Current implementation (refactored app):**
+
+- Entrypoint: `uv run nbv-st` → `oracle_rri/oracle_rri/streamlit_app.py`
+- Package: `oracle_rri/oracle_rri/app/`
+  - `app.py`: page wiring + run/refresh controls + navigation
+  - `state.py`: typed `AppState` stored in `st.session_state`
+  - `controller.py`: stage orchestration + typed caches (no `st.cache_*`)
+  - `ui.py`: layout + widget helpers
+  - `panels.py`: plotting-only page renderers (UI + plots only)
+- Shared compute pipeline: `OracleRriLabeler` (`oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`) used by the RRI
+  page and reusable for training/CLI.
+
+### Non-issues / Requirements Checklist
+
+- [x] Interactive visualization of: candidates → depth renders → backprojected candidate PCs → oracle RRI.
+- [x] Unified pages for pipeline stages: `Data`, `Candidate Poses`, `Candidate Renders`, `RRI`.
+- [x] Efficient caching with correct refresh semantics (no stale stage reuse when configs or sample index changes).
+- [x] Strong typing for cached results (single `AppState`; no untyped `st.cache_*` blobs).
+- [x] Candidate selection reproducible via a deterministic sampling seed (`CandidateViewGeneratorConfig.seed`).
+- [x] Plot options live directly above the plots they affect (not in the sidebar).
+- [x] Per-page `Diagnostics` expander with tabs (no nested expanders/status blocks).
+- [ ] Add a dedicated “Logs / repr” page: show `Console` logs + `repr()` of `EfmSnippetView`, `CandidateDepths`,
+  `CandidatePointClouds`, `RriResult` for fast debugging.
+
+### Issues & Resolutions (historical)
+
+#### Issue: Dashboard was opaque and hard to reuse for training/CLI
+
+- **What was wrong:** The legacy app in `oracle_rri/oracle_rri/dashboard/` mixed UI, caching, and compute; this made the
+  data-flow hard to reason about and prevented reusing the exact same code path for online label generation.
+- **Fix:** Rebuilt the app in `oracle_rri/oracle_rri/app/` with explicit separation of concerns:
+  - orchestration in `PipelineController`,
+  - compute in `OracleRriLabeler` (`oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`),
+  - plotting-only page functions in `panels.py`,
+  - typed session state (`AppState`) instead of “untyped cache blobs”.
+
+#### Issue: “Run ALL” / “Run / refresh …” didn’t actually recompute (cached results reused)
+
+- **What was wrong:** “Refresh” UI controls were not correctly invalidating downstream stages, so reruns reused stale
+  results (especially when switching configs or sample indices).
+- **Fix:** Added explicit, typed stage caches keyed by `(cfg_sig, sample_key, ...)` and a `force=True` path for refresh
+  buttons in `PipelineController` (`oracle_rri/oracle_rri/app/controller.py`).
+
+#### Issue: Candidate Renders showed the wrong number of candidates
+
+- **What was wrong:** The depth renderer oversampled candidates for robustness and the UI displayed the oversampled
+  batch instead of the requested `max_candidates`.
+- **Fix:** `CandidateDepthRenderer` now caps the final batch to `max_candidates_final` and keeps indices stable via
+  `CandidateDepths.candidate_indices` (render subset indices into the full candidate list).
+
+#### Issue: Candidate Renders still asked to build CandidatePointClouds (even after running the RRI page)
+
+- **What was wrong:** Depth rendering and depth-hit point cloud construction were treated as two unrelated “stages” in
+  the UI, so running RRI didn’t guarantee the Candidate Renders page had the `CandidatePointClouds` ready.
+- **Fix:** The app now treats the “renders” stage as `(depth_batch + candidate_pcs)`:
+  - `PipelineController.get_renders()` computes and caches both in one stage,
+  - the RRI page uses the same pipeline (`OracleRriLabeler`) so the computed PCs are shared.
+
+#### Issue: Page switching UI was clunky (checkbox-style)
+
+- **What was wrong:** Page selection was implemented in a way that felt like “one of many checkboxes” instead of a page
+  router.
+- **Fix:** Switched to Streamlit’s `st.navigation(..., position="top")` for page routing.
+
+#### Issue: UI clutter / nested expanders / nested status blocks
+
+- **What was wrong:** Nested containers made it hard to find the relevant controls and also led to confusing “where am I
+  in the pipeline?” moments.
+- **Fix:** Each page now has a single `Diagnostics` expander with tabs (no nested expanders) and plot options live
+  directly above the plots they affect.
+
+#### Issue: Rendering/backprojection mismatches were hard to debug (frusta ≠ depth-hit PCs)
+
+- **What was wrong:** Candidate frusta, rendered depth maps, and backprojected point clouds did not align due to pose and
+  pixel/NDC convention mismatches.
+- **Fix:** Corrected PoseTW↔PyTorch3D extrinsics handling + NDC unprojection and ensured `depths_valid_mask` is respected.
+  The full symptom screenshots + fixes are documented above in “Candidate View Generation & Sampling - DONE”.
+
+#### Issue: Startup noise (duplicate config logs + Streamlit/WebDataset warnings)
+
+- **What was wrong:** Noisy logs and warnings obscured actionable debugging output:
+  - `AseEfmDatasetConfig` printed shard-resolution logs multiple times (Pydantic validators run repeatedly in Streamlit).
+  - Streamlit warned about `use_container_width` deprecation.
+  - WebDataset emitted a `torch.load(weights_only=...)` FutureWarning.
+  - `uv run ...` warned about `extra-build-dependencies` being experimental.
+- **Fix:**
+  - moved dataset “resolved shards” logging from validators → `AseEfmDatasetConfig.setup_target()`,
+  - replaced `use_container_width=True` with `width="stretch"` in `st.plotly_chart(...)`,
+  - filtered the WebDataset `torch.load` warning in `AseEfmDataset.__init__`,
+  - enabled `tool.uv.preview = true` in `oracle_rri/pyproject.toml`.
+
 
 ## Data Handling
 
@@ -176,7 +292,7 @@ While poses 26 and 27 seem to have valid depth maps and backprojected point clou
   - the candidate poses should be relative to the reference poses rig position and orientation.
   - loss and training objective same as in [VIN-NBV](../contents/literature/vin_nbv.qmd)
   - start with an implementation proposal of the model architecture and training procedure in `docs/contents/impl/vin_nbv.qmd`.
-  - For this do a comprehensive review of the EVL architecture to understand how to best integrate the view scorer head on top of it. Consider that we have a [simple script to ifer the EVL](oracle_rri/scripts/run_efm3d_on_ase.py). Another good starting point is our [EFM3D symbol index](../contents/ext-impl/efm3d_symbol_index.qmd) and [EFM3D implementation overview](../contents/ext-impl/efm3d_implementation.qmd).
+  - For this do a comprehensive review of the EVL architecture to understand how to best integrate the view scorer head on top of it. Consider that we have a [simple script to infer EVL](../../oracle_rri/scripts/run_efm3d_on_ase.py). Another good starting point is our [EFM3D symbol index](../contents/ext-impl/efm3d_symbol_index.qmd) and [EFM3D implementation overview](../contents/ext-impl/efm3d_implementation.qmd).
 
 # Medium Priority
 
@@ -204,7 +320,6 @@ While poses 26 and 27 seem to have valid depth maps and backprojected point clou
 ## Misc
 
 - Extend candidate generation to continuous policy conditioned on fused occupancy / OBB priors.
-
 
 # Notes on Implementation Approach
 
