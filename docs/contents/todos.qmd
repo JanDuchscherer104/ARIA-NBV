@@ -23,18 +23,50 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 
 ## Metrics
 
-- Implement `OracleRRI` with point-cloud–to–mesh distance (Chamfer components).
-- Consider mesh-to-distance-field acceleration and room-level cropping to avoid unrelated geometry - How can we consider only relevant (observable parts) of the scene, such that we don't have to consider the entire mesh (e.g. there might be different rooms that cannot be considered)?
-- Later: deliver as `TorchMetric`.
+- [x] Implement `OracleRRI` with point-cloud–to–mesh distance (Chamfer components).
+  - Consider mesh-to-distance-field acceleration and room-level cropping to avoid unrelated geometry.
 
-## Candidate View Generation & Sampling
+    > **Done**: Just crop the mesh to a bounding box that contains both the semi-dense SLAM PC and all candidate PCs with some margin.
+  - How can we consider only relevant (observable parts) of the scene, such that we don't have to consider the entire mesh (e.g. there might be different rooms that cannot be considered)?
+    **Answer**: Crop the mesh to a bounding box with maximum extends from both the candidate PCs and the semi-dense SLAM PC.
+  - Must be a full torch / pytorch3d implementation.
+- [ ] Provide theory and conceptual brakedown of `oracle_rri/oracle_rri/rri_metrics/metrics.py`::`chamfer_point_mesh_batched` in `docs/typst/slides/slides_3.typ`. The current contents of the file serves as a template - it was copied from `slides_2.typ` which was our second presentation. Maintain the general style. And use `get-library-docs "/websites/typst_app"` to retrieve typst documentation for the different commands that you might need.
+  - [ ] Provide formulas for the different loss components that we use in ``oracle_rri/oracle_rri/rri_metrics/metrics.py``::`chamfer_point_mesh_batched`.
+
+## Candidate View Generation & Sampling - DONE
+
+**Remaining Issues:**
+
+- Apply azimuth / elevantion / roll jitter correctly to the deterministic view directions.
+- Shell being symmetric to the reference pose is problematic when the reference pose has high roll angles -> this will yield a strongly skewed torus that is tilted strongly (i.e. it's main component lies in the x-z plane!)
+
+![Candidate Poses with torus tilted](../figures/app/candidate_poses_torus_tilt.png)
+
+- [x] The generated candidate torus should be symmetric to the forward axis of the reference frame in terms of the azimuth dimension, while its elevation band stays gravity aligned. Implemented via `align_to_gravity=True` in `CandidateViewGeneratorConfig` (sampling uses yaw-only, gravity-aligned reference).
+
+- The current options to apply jitter to the view directions, wich are determined by the view
+
+**Previous Considerations:**
 
 - implement `CandidateViewGenerator` and auxiliary mdoules in `oracle_rri/oracle_rri/pose_generation`, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type `PoseTW` (`external/efm3d/efm3d/aria/pose.py`)
   - Strategies: uniform over half-sphere with min/max radius & elevation, free-space only, room-bounded (SSL for train, occupancy for eval).
   - Collision check: segment from last pose to candidate must not intersect mesh/voxels.
   - Modular strategy selection via enums/config that allows easy extension and combination of strategies / sampling rules.
 
-### Raycasting to Generate Candidate Point Clouds-
+- The view direction generation in our pose_generation currently doesn't work as expected when we select a view_sampling_strategy (i.e. `uniform_spere` or `forward_powerspherical`). The view_direction_mode-based generation, however works and we can reliably generate view directions that point away from or towards the reference_pose.
+  - We want to be able to generate random deviations form the deterministic view directions by adding random jitter to them. This should be configurable via view_max_angle_deg or even better view_max_azimuth_deg and view_max_elevation_deg to define the maximum deviation for each view axis separately.
+  - We also want to be able to be able to add a bit of randomness to the yaw angle to allow minimal deviations from a perfectly horizontal x-axis of the candidate camera frames this should be controllable via view_roll_jitter_deg.
+
+The PositionalSampling now works as expected and I tried fixing the directional sampling, but I'm still having some issues here!
+
+- In our current version, we don't get any points or even the frame axes in ` plot_position_sphere(offsets_ref, title="Offsets on unit sphere", show_axes=True)`. This worked in our previous version! What is causing this? Why did it work previously but, not anymore?
+- provide interpretations of the roll, pitch, yaw diagrams in the differen frames!
+- the pitch histogram in the world-frame doesn't make sense to me - should't it be covering pretty much the entire range as we have a torus around the reference pose?
+- always keep in mind that the project aria frames have to be transofmed using `rotate_yaw_cw90` when being displayed!
+
+
+
+### Rasterized Rendering to Generate Candidate Point Clouds - DONE
 
 - Implement `CandidatePointCloudGenerator` and all necessary auxiliary modules in : for each candidate pose, cast rays to GT  to render depth map using existing GPU implementations from `efm3d`.
   - Input: candidate `PoseTW`, GT mesh.
@@ -45,11 +77,71 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
   - Should we use the rendering utilities from EFM3D or some other gpu based renderer (e.g. pyrender, pytorch3d)?
 This should be implemented in `oracle_rri/oracle_rri/rendering`.
 Consider that we have already tried implementing the entire pipeline in a single script. extract the relevant parts and criticise them!
-*panda3d*.
 
-### Point Cloud Fusion
+The CandidateDepthRenderer yields:
 
-- Implement `DepthToPointCloud` module: for each candidate pose's depth map, backproject to point cloud `$\mathcal{P}_{\mathbf{q}}$ in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC $\mathcal{P}_t$ with candidate-view PC $\mathcal{P}_{\mathbf{q}}$ → $\mathcal{P}_{t \cup \mathbf{q}}$.
+
+**Remaining Issues:**:
+
+   - Cameras solely looking at a blank wall will have high RRI, as semi-dense point clouds will not have many points in these areas. However, this does not make sense as these views should receive a high mesh to point cloud distance - completeness. Also, these views sometimes manage to "look through" the walls and render points that are behind the wall.
+   - Some poses looking towards walls, that are quite close to the candidate pose, will yield dpeth maps and point clouds that don't correspond to what would be expected from the GT mesh and the given pose.
+   - All backprojected points seem to lie on one side of the refernece pose - in front of it. All candidate views that look in another direction yield rendered dpeth maps that are either invalid or backproject into the same area in front of the reference pose, even though their pose doesn't correspond to that area. Candidates that naturally look in the direction of the reference pose seem to work fine.
+
+  > A potential reason for this issue might be that Project Aria while using LUF, has a contention that relies on a cw 90 degree rotation about the z-axis of the camera frame before displaying or rendering objects in any camera frame. We previously applied `rotate_yaw_cw90` [^1] during visualization only. But lately incorporated it into the candidate generation - i.e. applied it to the reference pose before generating candidate poses around it.
+
+[^1]:
+```py
+def rotate_yaw_cw90(pose_world_cam: PoseTW) -> PoseTW:
+    """Visual-only 90° clockwise yaw about +Z to match Aria UI convention.
+
+    Use this **only for plotting/rendering to screen** (e.g. Plotly axes, image
+    overlays). Keep core geometry, sampling, and rendering in the physical Aria
+    LUF frame without this rotation.
+    """
+    c, s = np.cos(np.pi / 2), np.sin(np.pi / 2)
+    r_roll = torch.tensor(
+        [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
+        device=pose_world_cam.R.device,
+        dtype=pose_world_cam.R.dtype,
+    )
+    return PoseTW.from_Rt(pose_world_cam.R @ r_roll, pose_world_cam.t)
+```
+
+The following image illustrates how all candidate poses' backprojected point clouds lie in front of the reference pose - also in front of generally all poses in the trajectory. Eventhough, some of the candidate frusta should look in the opposite direction (approx. negative y world) the backprojected points still lie in front of the reference pose.
+
+![Candidate Poses and their backprojected point clouds](../figures/app/backproj_missmatch_all_pc_same_general_dir_as_semidense.png)
+
+The backprojected point cloud doesn't correspond to the visualized candidate pose frustum! The following two figures illustate the same candidate pose that looks to the right of the reference pose - away from it - towards the wall, being relatively close to it.
+
+![Candidate Depth Map looking in opposite direction of reference pose](../figures/app/backproj_missmatch_pose_pc_depth.png)
+
+![Corresponding backprojected point cloud](../figures/app/backproj_missmatch_pose_pc.png)
+
+Another candidate pose that is looking up and away from the general view direction of the reference pose, backprojects points that lie in front of the reference pose - similar to all other candidate poses, and also backprojects points that lie on the other side of the wall. The depth histograms of these invalid poses often show a peak at depth = -1, indicating no hits! Futhermore, while it rendered the floor, ceiling and one wall, it did not render the objects in the room.
+
+![Candidate Pose looking up and away (neg y, x, pos x world)](../figures/app/backproj_missmatch_up_away_look_through_walls.png)
+
+![Depth Histogram - Candidate Pose looking up and away (neg y, x, pos x world)](../figures/app/backproj_missmatch_up_away_look_through_walls_depth_hist.png)
+
+The following backprojection stems from a candidate pose that was looking in the same approximate direction as the reference pose - towards postivie y world. Here the backprojected point cloud seems to correpsond to the displayed candidate pose frustum.
+
+![Candidate Depth Map looking in similar direction as reference pose](../figures/app/backproj_missmatch_pose_pose_in_right_direction.png)
+
+
+While poses 26 and 27 seem to have valid depth maps and backprojected point clouds, their depth-histograms also show a significant amount of -1 depth values, indicating no hits for many pixels which is unexpected given the valid looking depth maps. This might imply that the order of our candidate poses, depth maps or backprojected pointclouds is mismatched somewhere in the pipeline.
+
+![Depth Maps - Candidate Poses 26 and 27 looking in similar direction as reference pose](../figures/app/pose_26_27_good_depth.png)
+
+::: {#fig-depth-hsits layout-ncol=2}
+
+![Pose 26](../figures/app/pose_26_depth_hist.png)
+
+![Pose 27](../figures/app/pose_27_depth_hist.png)
+:::
+
+
+- Implement `DepthToPointCloud` module: for each candidate pose's depth map, backproject to point cloud $\mathcal{P}_{\mathbf{q}}$ in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC $\mathcal{P}_t$ with candidate-view PC $\mathcal{P}_{\mathbf{q}}$ → $\mathcal{P}_{t \cup \mathbf{q}}$.
+- The backprojection is currently implemented in `oracle_rri/oracle_rri/rendering/candidate_pointclouds.py`::{`build_candidate_pointclouds`, `_backproject_depths_p3d_batch`}
 
 ## Visualization (Streamlit)
 
@@ -73,6 +165,18 @@ Consider that we have already tried implementing the entire pipeline in a single
   - download of metadata without full payload,
   - selection of ATEK snippets based on available GT meshes (`ase_mesh_download_urls.json`).
 - Download all dataset variants (ATEK, raw ASE, meshes) for scenes with GT.
+
+## ViewIntrospectionNetwork
+
+- [ ] Implement a VIN model (RRI predictor) in `oracle_rri/oracle_rri/vin` on top of the EFM3D ([EFM3D](../contents/literature/efm3d.qmd)) / EVL backbone (frozen).
+- Input:
+  - raw `efm_snippet_view.efm: efm: dict[str, Any]` as input to EVL backbone
+  - candidate poses `PoseTW` (N candidates) as input to the view scorer head together with scene features from EVL as well as other potential candidate features.
+  - choose suitable positional encoding for the candidate poses - i.e. learnable spherical harmonics encoding or learnable fourier features.
+  - the candidate poses should be relative to the reference poses rig position and orientation.
+  - loss and training objective same as in [VIN-NBV](../contents/literature/vin_nbv.qmd)
+  - start with an implementation proposal of the model architecture and training procedure in `docs/contents/impl/vin_nbv.qmd`.
+  - For this do a comprehensive review of the EVL architecture to understand how to best integrate the view scorer head on top of it. Consider that we have a [simple script to ifer the EVL](oracle_rri/scripts/run_efm3d_on_ase.py). Another good starting point is our [EFM3D symbol index](../contents/ext-impl/efm3d_symbol_index.qmd) and [EFM3D implementation overview](../contents/ext-impl/efm3d_implementation.qmd).
 
 # Medium Priority
 
@@ -101,79 +205,6 @@ Consider that we have already tried implementing the entire pipeline in a single
 
 - Extend candidate generation to continuous policy conditioned on fused occupancy / OBB priors.
 
-# References & Pointers
-
-## ATEK tools (external/ATEK/tools)
-```
-ase_mesh_downloader.py
-atek_wds_data_downloader.py
-benchmarking_static_object_detection.py
-benchmarking_surface_reconstruction.py
-infer_cubercnn.py
-train_cubercnn.py
-```
-
-## ASE download helpers (projectaria_tools)
-`external/projectaria_tools/projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py`
-Example:
-```bash
-python3 projects/AriaSyntheticEnvironment/aria_synthetic_environments_downloader.py \
-  --set train --scene-ids 560-569 \
-  --cdn-file aria_synthetic_environments_dataset_download_urls.json \
-  --output-dir $HOME/projectaria_tools_ase_data --unzip True
-```
-
-## Data manifests (.data/aria_download_urls)
-```
-AriaSyntheticEnvironment_ATEK_download_urls.json
-aria_synthetic_environments_dataset_download_urls.json
-ase_mesh_download_urls.json    # 100 GT meshes: scene_ply_<scene_id>.ply
-```
-
-## ATEK WDS format (shapes/dtypes excerpt)
-```json
-{
-  "atek_wds_shapes": {
-    "mfcd#camera-rgb+capture_timestamps_ns": "1",
-    "mfcd#camera-rgb+exposure_durations_s": "1",
-    "mfcd#camera-rgb+frame_ids": "1",
-    "mfcd#camera-rgb+gains": "1",
-    "mfcd#camera-rgb+projection_params": "4",
-    "mfcd#camera-rgb+t_device_camera": "3, 4",
-    "mtd#capture_timestamps_ns": "1",
-    "mtd#gravity_in_world": "3",
-    "mtd#ts_world_device": "1, 3, 4",
-    "mfcd#camera-rgb+images": "1, 3, 704, 704"
-  },
-  "atek_wds_dtypes": {
-    "gt_data": "dict",
-    "mfcd#camera-rgb+camera_label": "str",
-    "mfcd#camera-rgb+camera_model_name": "str",
-    "mfcd#camera-rgb+capture_timestamps_ns": "torch.int64",
-    "mfcd#camera-rgb+exposure_durations_s": "torch.float32",
-    "mfcd#camera-rgb+frame_ids": "torch.int64",
-    "mfcd#camera-rgb+gains": "torch.float32",
-    "mfcd#camera-rgb+origin_camera_label": "str",
-    "mfcd#camera-rgb+projection_params": "torch.float32",
-    "mfcd#camera-rgb+t_device_camera": "torch.float32",
-    "mtd#capture_timestamps_ns": "torch.int64",
-    "mtd#gravity_in_world": "torch.float32",
-    "mtd#ts_world_device": "torch.float32",
-    "sequence_name": "str",
-    "mfcd#camera-rgb+images": "torch.uint8"
-  }
-}
-```
-
-## WDS file URLs (excerpt)
-```
-81048:
-  shards-0000_tar:
-    filename: AriaSyntheticEnvironment_1_0_ATEK_cubercnn_81048_shards-0000.tar
-    sha1sum: 05840565afd9702f985e1c483170f5d6e8825f07
-    file_size_bytes: 8570880
-    download_url: https://scontent.xx.fbcdn.net/m1/v/t6/An9oQjW...
-```
 
 # Notes on Implementation Approach
 

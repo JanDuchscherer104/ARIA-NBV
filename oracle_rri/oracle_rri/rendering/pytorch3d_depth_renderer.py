@@ -121,27 +121,11 @@ class Pytorch3DDepthRenderer:
 
         poses_cw = poses.inverse().to(self.device)
         self.console.dbg_summary("poses_cw", poses_cw)
-        rotations, translations = poses_cw.R, poses_cw.t
-
-        # TODO: NOT SURE ABOUT THE PART BELOW
-        # ------------------------------------------------------------------
-        # Coordinate conventions
-        #
-        # EFM3D/Aria camera intrinsics (CameraTW) follow the OpenCV camera frame
-        # (+X right, +Y down, +Z forward). PyTorch3D's PerspectiveCameras uses
-        # (+X left, +Y up, +Z forward). To keep the rendered depth aligned with
-        # CameraTW.unproject() and downstream frustum/point-cloud plots, we
-        # flip the camera X/Y axes when constructing the PyTorch3D cameras.
-        #
-        # This is equivalent to pre-multiplying the world→camera transform by:
-        #   F = diag([-1, -1, 1])
-        # which flips the first two rows of R and the first two components of T.
-        # ------------------------------------------------------------------
-        rotations = rotations.clone()
-        translations = translations.clone()
-        rotations[..., :2, :] *= -1.0
-        translations[..., :2] *= -1.0
-        # TODO: NOT SURE ABOUT THE PART ABOVE
+        # PoseTW stores rotations in the standard (column-vector) convention.
+        # PyTorch3D's world→view transform uses row-vectors: X_cam = X_world R + T.
+        # Therefore we pass R^T here so the induced mapping matches PoseTW.
+        rotations = poses_cw.R.transpose(-1, -2).contiguous()
+        translations = poses_cw.t
         batch_size = rotations.shape[0]
         if focal_length.shape[0] == 1 and batch_size > 1:
             focal_length = focal_length.expand(batch_size, -1)

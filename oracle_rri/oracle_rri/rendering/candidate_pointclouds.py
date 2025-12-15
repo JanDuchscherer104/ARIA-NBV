@@ -106,8 +106,8 @@ def _backproject_depths_p3d_batch(
     gy_flat = gy.reshape(-1)
     pixels = torch.stack(
         [
-            (w - 1) - gx_flat.unsqueeze(0).expand(bsz, -1),
-            (h - 1) - gy_flat.unsqueeze(0).expand(bsz, -1),
+            gx_flat.unsqueeze(0).expand(bsz, -1),
+            gy_flat.unsqueeze(0).expand(bsz, -1),
             depth_filtered,
         ],
         dim=-1,

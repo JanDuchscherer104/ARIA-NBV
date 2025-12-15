@@ -139,10 +139,8 @@ def backproject_depth_with_p3d(
     coords_x = gx.reshape(-1)[flat_mask]
     coords_y = gy.reshape(-1)[flat_mask]
     depth_samples = depth_flat[flat_mask]
-
-    coords_x = (w - 1) - coords_x
-    coords_y = (h - 1) - coords_y
-
+    coords_x = coords_x.to(dtype=depth.dtype)
+    coords_y = coords_y.to(dtype=depth.dtype)
     pixels = torch.stack([coords_x, coords_y, depth_samples], dim=1)  # (N,3)
     pts_world = cameras.unproject_points(pixels, world_coordinates=True, from_ndc=False)
 
