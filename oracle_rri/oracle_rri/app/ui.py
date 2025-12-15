@@ -282,15 +282,15 @@ def renderer_config_ui(
 
 def oracle_config_ui(default: OracleRRIConfig, ui: st.delta_generator.DeltaGenerator) -> OracleRRIConfig:
     ui.subheader("Oracle RRI")
-    chunk = ui.number_input(
-        "candidate_chunk_size (0 = disabled)",
-        min_value=0,
-        max_value=512,
-        value=int(default.candidate_chunk_size or 0),
-        step=1,
-        help="Lower this to reduce peak GPU memory when scoring many candidates.",
-    )
-    return default.model_copy(update={"candidate_chunk_size": None if int(chunk) <= 0 else int(chunk)})
+    # chunk = ui.number_input(
+    #     "candidate_chunk_size (0 = disabled)",
+    #     min_value=0,
+    #     max_value=512,
+    #     value=int(default.candidate_chunk_size or 0),
+    #     step=1,
+    #     help="Lower this to reduce peak GPU memory when scoring many candidates.",
+    # )
+    return default
 
 
 __all__ = [

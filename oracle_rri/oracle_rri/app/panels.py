@@ -616,6 +616,7 @@ def render_rri_page(
         return
 
     labels = [str(int(cid)) for cid in candidate_ids]
+    baseline_label = "-1"
 
     qualitative = px.colors.qualitative.Plotly
     bar_color_map = {label: qualitative[i % len(qualitative)] for i, label in enumerate(labels)}
@@ -628,53 +629,69 @@ def render_rri_page(
         width="stretch",
     )
 
-    st.plotly_chart(
-        go.Figure(
-            data=[
-                go.Bar(x=labels, y=rri.pm_dist_before, name="before", marker_color="lightgray"),
-                go.Bar(
-                    x=labels,
-                    y=rri.pm_dist_after,
-                    name="after",
-                    marker_color=[bar_color_map[label] for label in labels],
-                ),
-            ],
-            layout_title_text="Chamfer-like (bidirectional)",
-        ),
-        width="stretch",
+    baseline_pm_dist = float(rri.pm_dist_before[0].item())
+    fig_pm_dist = go.Figure(
+        data=[
+            go.Bar(x=[baseline_label], y=[baseline_pm_dist], name="before (semi-dense, -1)", marker_color="lightgray"),
+            go.Bar(
+                x=labels,
+                y=rri.pm_dist_after,
+                name="after",
+                marker_color=[bar_color_map[label] for label in labels],
+            ),
+        ],
     )
+    fig_pm_dist.update_layout(
+        title_text="Chamfer-like (bidirectional)",
+        xaxis={"categoryorder": "array", "categoryarray": [baseline_label, *labels]},
+    )
+    st.plotly_chart(fig_pm_dist, width="stretch")
 
-    st.plotly_chart(
-        go.Figure(
-            data=[
-                go.Bar(x=labels, y=rri.pm_acc_before, name="point→mesh (before)", marker_color="lightgray"),
-                go.Bar(
-                    x=labels,
-                    y=rri.pm_acc_after,
-                    name="point→mesh (after)",
-                    marker_color=[bar_color_map[label] for label in labels],
-                ),
-            ],
-            layout_title_text="Point→Mesh (accuracy)",
-        ),
-        width="stretch",
+    baseline_pm_acc = float(rri.pm_acc_before[0].item())
+    fig_pm_acc = go.Figure(
+        data=[
+            go.Bar(
+                x=[baseline_label],
+                y=[baseline_pm_acc],
+                name="point→mesh (before, -1)",
+                marker_color="lightgray",
+            ),
+            go.Bar(
+                x=labels,
+                y=rri.pm_acc_after,
+                name="point→mesh (after)",
+                marker_color=[bar_color_map[label] for label in labels],
+            ),
+        ],
     )
+    fig_pm_acc.update_layout(
+        title_text="Point→Mesh (accuracy)",
+        xaxis={"categoryorder": "array", "categoryarray": [baseline_label, *labels]},
+    )
+    st.plotly_chart(fig_pm_acc, width="stretch")
 
-    st.plotly_chart(
-        go.Figure(
-            data=[
-                go.Bar(x=labels, y=rri.pm_comp_before, name="mesh→point (before)", marker_color="lightgray"),
-                go.Bar(
-                    x=labels,
-                    y=rri.pm_comp_after,
-                    name="mesh→point (after)",
-                    marker_color=[bar_color_map[label] for label in labels],
-                ),
-            ],
-            layout_title_text="Mesh→Point (completeness)",
-        ),
-        width="stretch",
+    baseline_pm_comp = float(rri.pm_comp_before[0].item())
+    fig_pm_comp = go.Figure(
+        data=[
+            go.Bar(
+                x=[baseline_label],
+                y=[baseline_pm_comp],
+                name="mesh→point (before, -1)",
+                marker_color="lightgray",
+            ),
+            go.Bar(
+                x=labels,
+                y=rri.pm_comp_after,
+                name="mesh→point (after)",
+                marker_color=[bar_color_map[label] for label in labels],
+            ),
+        ],
     )
+    fig_pm_comp.update_layout(
+        title_text="Mesh→Point (completeness)",
+        xaxis={"categoryorder": "array", "categoryarray": [baseline_label, *labels]},
+    )
+    st.plotly_chart(fig_pm_comp, width="stretch")
 
     col1, col2 = st.columns(2)
     with col1:
