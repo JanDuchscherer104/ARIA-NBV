@@ -701,7 +701,7 @@
       #color-block(title: [Decision rule])[
         Select the predicted best next view:
         $
-          hat(q) = "argmax"_i hat(s)_i approx "argmax"_i "RRI"(q_i).
+          hat(bold(q)) = "argmax"_i hat(s)_i approx "argmax"_i "RRI"(bold(q)_i).
         $
         where $hat(s)_i$ is the normalized expected ordinal value derived from CORAL logits.
       ]
@@ -755,19 +755,19 @@
 
         We derive the descriptor from:
         $
-          T_"rig"<-"cam" = (T_"cam"<-"rig")^-1.
+          bold(T)_("rig"<-"cam") = (bold(T)_("cam"<-"rig"))^-1.
         $
       ]
       #color-block(title: [Shell descriptor])[
-        Let $T_"rig"<-"cam" = (R, t)$, with $z_"cam" = (0,0,1)$ (LUF forward). Compute:
+        Let $bold(T)_("rig"<-"cam") = (bold(R), bold(t))$, with $bold(z)_("cam") = (0,0,1)$ (LUF forward). Compute:
         $
-          r = ||t||, \
-          u = t/(r + epsilon) in bb(S)^2, \
-          f = R z_"cam" in bb(S)^2.
+          r = ||bold(t)||, \
+          bold(u) = bold(t)/(r + epsilon) in bb(S)^2, \
+          bold(f) = bold(R) bold(z)_("cam") in bb(S)^2.
         $
         Cheap scalar inductive bias (example):
         $
-          s = <f, -u>.
+          s = <bold(f), -bold(u)>.
         $
       ]
     ],
@@ -775,6 +775,13 @@
       #quote-block(color: rgb("#285f82"))[
         Why shell-aware? Candidate generation is a spherical (or biased-spherical) sampling process. Encoding directions
         on the sphere explicitly matches that prior.
+      ]
+      #color-block(title: [Interpretation (intuition)])[
+        - $bold(t)$: candidate camera center in reference rig frame.
+        - $r$: how far we move (translation budget).
+        - $bold(u)$: *where* we move on the shell (direction).
+        - $bold(f)$: *where we look* (candidate optical axis).
+        - $s=<bold(f),-bold(u)>$: “look back at reference” score ($s≈1$ means looking toward the reference).
       ]
       #color-block(title: [No so3log])[
         We avoid $log("SO"(3))$ / `so3log` mappings for the default VIN path. The descriptor uses *directions* and a
@@ -790,7 +797,7 @@
     gutter: 1cm,
     [
       #color-block(title: [Spherical harmonics for $u,f in bb(S)^2$])[
-        - Encode $u$ and $f$ with *real* spherical harmonics up to degree $L$.
+        - Encode $bold(u)$ and $bold(f)$ with *real* spherical harmonics up to degree $L$.
         - SH feature dim: $(L+1)^2$ (per direction).
         - Project each SH vector to a learnable embedding (small MLP).
 
@@ -801,7 +808,7 @@
         SH is defined on directions, not on the scalar radius. We encode
         $r$ via 1D Fourier features (default on $log(r+epsilon)$):
         $
-          phi(s) = [sin(2 pi B s), cos(2 pi B s)],
+          phi(s) = [sin(2 pi bold(B) s), cos(2 pi bold(B) s)],
           s = log(r + epsilon).
         $
         then project to a learnable radius embedding and concatenate.
@@ -810,18 +817,45 @@
     [
       #color-block(title: [Baseline: Learnable Fourier Features (LFF)])[
         Optional baseline encoding (no SH):
-        - build a 6D pose vector $x = [t, f] in bb(R)^6$
+        - build a 6D pose vector $bold(x) = [bold(t), bold(f)] in bb(R)^6$
         - learn a projection + sinusoidal features + MLP (LFF)
 
         Code: `oracle_rri/oracle_rri/vin/pose_encoding.py` (based on
         #link("https://github.com/JHLew/Learnable-Fourier-Features")[Learnable-Fourier-Features]).
       ]
       #color-block(title: [Which features get which encoding?])[
-        - SH: $u$ (position direction), $f$ (forward direction)
+        - SH: $bold(u)$ (position direction), $bold(f)$ (forward direction)
         - 1D Fourier: $log(r+epsilon)$
-        - Scalar MLP: $s = <f,-u>$ (and optional extras later)
-        - LFF baseline: $[t,f]$ (6D), *not* `so3log(R)`
+        - Scalar MLP: $s = <bold(f),-bold(u)>$ (and optional extras later)
+        - LFF baseline: $[bold(t),bold(f)]$ (6D), *not* `so3log(R)`
       ]
+    ],
+  )
+]
+
+#slide(title: [Radius Encoding: $r$ vs $log(r+epsilon)$])[
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 0.9cm,
+    [
+      #color-block(title: [Does $log(r)$ help for $r in [0.6, 1.8]$ m?])[
+        For our current shell radii $r in [0.6, 1.8]$ m (a narrow range), $log(r)$ mainly:
+        - compresses the upper tail slightly,
+        - changes the effective frequency content of 1D Fourier features.
+
+        It is *not* essential here; using $r$ directly is a valid alternative.
+      ]
+      #color-block(title: [Recommendation])[
+        - Keep a config switch: encode either $r$ or $log(r+epsilon)$.
+        - Prefer $r$ when the radius range is narrow and fixed.
+        - Prefer $log(r+epsilon)$ when candidate radii vary strongly across scenes / policies.
+      ]
+    ],
+    [
+      #figure(
+        image(fig_path + "impl/vin/vin_radius_fourier_features.png", width: 98%),
+        caption: [Fourier feature curves differ significantly between linear and log input.],
+      )
     ],
   )
 ]
@@ -861,6 +895,144 @@
   )
 ]
 
+#slide(title: [VIN: Input Features (real snippet, shapes)])[
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 1cm,
+    [
+      #color-block(title: [EFM snippet inputs (key tensors)])[
+        Generated via `oracle_rri/scripts/summarize_vin.py` on scene `81283` (device: `cuda`, $N=4$ candidates).
+        - `rgb/img`: `Tensor(20, 3, 240, 240)`
+        - `slaml/img`: `Tensor(20, 1, 240, 320)`
+        - `slamr/img`: `Tensor(20, 1, 240, 320)`
+        - `pose/t_world_rig`: `PoseTW(20, 12)`
+        - `points/p3s_world`: `Tensor(20, 50000, 3)`
+        - `points/dist_std`: `Tensor(20, 50000)`
+        - `pose/gravity_in_world`: `Tensor(3,)`
+      ]
+      #color-block(title: [Pose descriptor + VIN concat])[
+        Derived descriptor in reference frame:
+        - $bold(t)$: `(1, 4, 3)`, $r=||bold(t)||$: `(1, 4, 1)`
+        - $bold(u)$: `(1, 4, 3)`, $bold(f)$: `(1, 4, 3)`
+        - $s = <bold(f),-bold(u)>$: `(1, 4, 1)`
+
+        VIN head input features:
+        - `E_pose`: `(1, 4, 128)`
+        - `E_global`: `(1, 4, 256)`
+        - `E_local`: `(1, 4, 128)`
+        - concat: `(1, 4, 512)`
+      ]
+    ],
+    [
+      #color-block(title: [EVL feature contract])[
+        - `occ_feat`: `(1, 64, 48, 48, 48)`
+        - `obb_feat`: `(1, 64, 48, 48, 48)`
+        - `T_world_voxel`: `PoseTW(1, 12)`
+        - `voxel_extent`: `(6,)`
+      ]
+      #quote-block[
+        EVL is frozen; only the VIN pose encoder + scorer head are trained.
+      ]
+    ],
+  )
+]
+
+#slide(title: [VIN: Shell Descriptor (concept + statistics)])[
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 0.8cm,
+    [
+      #figure(
+        image(fig_path + "impl/vin/vin_shell_descriptor_concept.png", width: 98%),
+        caption: [Conceptual descriptor for one candidate: $bold(t)$, $r=||bold(t)||$, $bold(u)$, $bold(f)$.],
+      )
+    ],
+    [
+      #figure(
+        image(fig_path + "impl/vin/vin_pose_descriptor.png", width: 98%),
+        caption: [Empirical stats (one snippet): $r$, $s=<bold(f),-bold(u)>$, and az/el of $bold(u)$ vs $bold(f)$.],
+      )
+    ],
+  )
+]
+
+#slide(title: [VIN: Encoding Visualizations (SH + radius Fourier)])[
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 0.8cm,
+    [
+      #figure(
+        image(fig_path + "impl/vin/vin_sh_components.png", width: 98%),
+        caption: [Real spherical harmonics components over directions on $bb(S)^2$ ($L=1$ shown).],
+      )
+    ],
+    [
+      #figure(
+        image(fig_path + "impl/vin/vin_radius_fourier_features.png", width: 98%),
+        caption: [1D Fourier features for radius: compare $r$ vs $log(r+epsilon)$ as input.],
+      )
+    ],
+  )
+]
+
+#slide(title: [VIN: EVL Neck Feature Diagnostics (frozen backbone)])[
+  #figure(
+    image(fig_path + "impl/vin/vin_evl_features.png", width: 94%),
+    caption: [Mean absolute feature magnitude for `neck/occ_feat` and `neck/obb_feat` (mid-slice + histogram).],
+  )
+]
+
+#slide(title: [VIN: torchsummary (ShellShPoseEncoder)])[
+  #color-block(title: [ShellShPoseEncoder (SH + 1D Fourier radius)])[
+    #text(size: 12pt)[
+      ```text
+      Layer (type:depth-idx)                   Output Shape              Param #
+      ├─Sequential: 1-1                        [-1, 4, 32]               --
+      │    ├─Linear: 2-1                       [-1, 4, 32]               544
+      │    ├─GELU: 2-2                         [-1, 4, 32]               --
+      │    └─Linear: 2-3                       [-1, 4, 32]               1,056
+      ├─Sequential: 1-2                        [-1, 4, 32]               --
+      │    ├─Linear: 2-4                       [-1, 4, 32]               544
+      │    ├─GELU: 2-5                         [-1, 4, 32]               --
+      │    └─Linear: 2-6                       [-1, 4, 32]               1,056
+      ├─FourierFeatures: 1-3                   [-1, 4, 17]               8
+      ├─Sequential: 1-4                        [-1, 4, 32]               --
+      │    ├─Linear: 2-7                       [-1, 4, 32]               576
+      │    ├─GELU: 2-8                         [-1, 4, 32]               --
+      │    └─Linear: 2-9                       [-1, 4, 32]               1,056
+      ├─Sequential: 1-5                        [-1, 4, 32]               --
+      │    ├─Linear: 2-10                      [-1, 4, 64]               128
+      │    ├─GELU: 2-11                        [-1, 4, 64]               --
+      │    └─Linear: 2-12                      [-1, 4, 32]               2,080
+
+      Total params: 7,048
+      Trainable params: 7,048
+      ```
+    ]
+  ]
+]
+
+#slide(title: [VIN: torchsummary (VinScorerHead)])[
+  #color-block(title: [VinScorerHead (MLP + CORAL)])[
+    #text(size: 12pt)[
+      ```text
+      Layer (type:depth-idx)                   Output Shape              Param #
+      ├─Sequential: 1-1                        [-1, 256]                 --
+      │    ├─Linear: 2-1                       [-1, 256]                 131,328
+      │    ├─GELU: 2-2                         [-1, 256]                 --
+      │    ├─Linear: 2-3                       [-1, 256]                 65,792
+      │    └─GELU: 2-4                         [-1, 256]                 --
+      ├─CoralLayer: 1-2                        [-1, 14]                  --
+      │    └─CoralLayer: 2-5                   [-1, 14]                  --
+      │         └─Linear: 3-1                  [-1, 1]                   256
+
+      Total params: 197,376
+      Trainable params: 197,376
+      ```
+    ]
+  ]
+]
+
 #slide(title: [Ordinal Binning: Thresholds for K classes])[
   #grid(
     columns: (1fr, 1fr),
@@ -892,6 +1064,36 @@
         - `oracle_rri/oracle_rri/vin/rri_binning.py`
         - used in `oracle_rri/scripts/train_vin.py`
       ]
+    ],
+  )
+]
+
+#slide(title: [Ordinal Binning: Example fit on oracle labels])[
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 0.9cm,
+    [
+      #color-block(title: [What the thresholds represent])[
+        We fit a single global set of edges $bold(e) in bb(R)^{K-1}$ in clipped z-score space:
+        $
+          z = ("rri" - mu_s) / (sigma_s + epsilon), \
+          z_"clip" = tanh(z / tau), \
+          y = sum_(j=1)^(K-1) bb(1)_(z_"clip" > e_j).
+        $
+
+        Quantile fitting makes bins approximately balanced (good for CORAL training stability).
+      ]
+      #color-block(title: [Why not “rank within a candidate set”?])[
+        We need *absolute* labels so scores are comparable across snippets:
+        - per-set ranks destroy cross-scene calibration,
+        - selection uses $hat(s)$ across candidates, not across batches.
+      ]
+    ],
+    [
+      #figure(
+        image(fig_path + "impl/vin/vin_rri_binning.png", width: 98%),
+        caption: [Example: raw RRI, clipped z distribution with quantile edges, and resulting label histogram.],
+      )
     ],
   )
 ]
@@ -983,8 +1185,8 @@
   ]
   #color-block(title: [Pose encoding])[
     - SH degree $L$ (2 vs 3) and normalization choice; include camera *up* direction?
-    - Radius encoding: $r$ vs $log(r+epsilon)$; number of Fourier frequencies; learnable vs fixed $B$.
-    - Which scalar terms help most: $<f,-u>$, height, gravity alignment, etc.?
+    - Radius encoding: $r$ vs $log(r+epsilon)$; number of Fourier frequencies; learnable vs fixed $bold(B)$.
+    - Which scalar terms help most: $<bold(f),-bold(u)>$, height, gravity alignment, etc.?
   ]
   #color-block(title: [Ordinal setup + training])[
     - $K$ bins (15 default): does more resolution help or just add label noise?
