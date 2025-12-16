@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal
 
 import torch
 from efm3d.aria.aria_constants import ARIA_POSE_T_WORLD_RIG
-from efm3d.aria.pose import PoseTW, so3log_map
+from efm3d.aria.pose import PoseTW
 from efm3d.utils.voxel_sampling import pc_to_vox, sample_voxels
 from pydantic import Field
 from torch import nn
@@ -16,6 +16,7 @@ from ..utils import BaseConfig
 from .backbone_evl import EvlBackboneConfig
 from .coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
 from .pose_encoding import LearnableFourierFeaturesConfig
+from .spherical_encoding import ShellShPoseEncoderConfig
 from .types import VinPrediction
 
 Tensor = torch.Tensor
@@ -111,6 +112,12 @@ def _vin_target() -> type["VinModel"]:
     return VinModel
 
 
+def _first_key(key: str | Sequence[str]) -> str:
+    if isinstance(key, (list, tuple)):
+        return str(key[0])
+    return str(key)
+
+
 class VinModelConfig(BaseConfig["VinModel"]):
     """Configuration for :class:`VinModel`."""
 
@@ -120,8 +127,18 @@ class VinModelConfig(BaseConfig["VinModel"]):
     backbone: EvlBackboneConfig = Field(default_factory=EvlBackboneConfig)
     """Frozen EVL backbone configuration."""
 
+    pose_encoding_mode: Literal["shell_sh", "lff6d"] = "shell_sh"
+    """Pose encoding mode.
+
+    - ``shell_sh``: shell descriptor + spherical harmonics ($u,f$) and 1D Fourier features (radius).
+    - ``lff6d``: learnable Fourier features baseline on a 6D descriptor ``[t, f]``.
+    """
+
+    pose_encoder_sh: ShellShPoseEncoderConfig = Field(default_factory=ShellShPoseEncoderConfig)
+    """Spherical harmonics pose encoding configuration (shell descriptor)."""
+
     pose_encoder: LearnableFourierFeaturesConfig = Field(default_factory=LearnableFourierFeaturesConfig)
-    """Learnable Fourier pose encoding configuration (candidate poses relative to reference)."""
+    """Learnable Fourier features configuration (baseline for 6D pose descriptor)."""
 
     head: VinScorerHeadConfig = Field(default_factory=VinScorerHeadConfig)
     """Scoring head configuration."""
@@ -147,7 +164,8 @@ class VinModel(nn.Module):
         self.config = config
 
         self.backbone = self.config.backbone.setup_target()
-        self.pose_encoder = self.config.pose_encoder.setup_target()
+        self.pose_encoder_lff = self.config.pose_encoder.setup_target()
+        self.pose_encoder_sh = self.config.pose_encoder_sh.setup_target()
 
         # Head input dim is data-dependent (feature channel count depends on EVL cfg).
         self.head = self.config.head.setup_target(in_dim=None)
@@ -156,7 +174,7 @@ class VinModel(nn.Module):
         self.to(self.backbone.device)
 
     def _get_reference_pose_world_rig(self, efm: Mapping[str, Any]) -> PoseTW:
-        pose_tw = efm.get(ARIA_POSE_T_WORLD_RIG)
+        pose_tw = efm.get(_first_key(ARIA_POSE_T_WORLD_RIG))
         if not isinstance(pose_tw, PoseTW):
             raise KeyError(f"Missing {ARIA_POSE_T_WORLD_RIG} PoseTW in efm snippet.")
         return PoseTW.from_matrix3x4(pose_tw.matrix3x4[..., -1, :, :])
@@ -173,6 +191,7 @@ class VinModel(nn.Module):
         candidate_poses_world_cam: PoseTW,
         *,
         reference_pose_world_rig: PoseTW | None = None,
+        candidate_poses_camera_rig: PoseTW | None = None,
     ) -> VinPrediction:
         """Score candidate poses for one snippet.
 
@@ -182,6 +201,10 @@ class VinModel(nn.Module):
                 Shape can be ``(N,12)`` or ``(B,N,12)``.
             reference_pose_world_rig: Optional override for reference rig pose (world←rig).
                 If omitted, uses the last pose in ``pose/t_world_rig`` from the snippet.
+            candidate_poses_camera_rig: Optional candidate poses in the **reference rig frame**
+                as camera←rig. If provided, pose descriptors are derived from this tensor
+                (recommended for training when available, e.g. from
+                ``OracleRriLabelBatch.depths.camera.T_camera_rig``).
 
         Returns:
             :class:`VinPrediction` with CORAL logits and expected scores.
@@ -194,27 +217,53 @@ class VinModel(nn.Module):
         cand_w_c = self._ensure_candidate_batch(candidate_poses_world_cam).to(device=device)  # type: ignore[arg-type]
         b, n = cand_w_c.shape[0], cand_w_c.shape[1]
 
-        if reference_pose_world_rig is None:
-            ref_w_r = self._get_reference_pose_world_rig(efm).to(device=device)  # type: ignore[arg-type]
+        if candidate_poses_camera_rig is not None:
+            cand_cam_r = self._ensure_candidate_batch(candidate_poses_camera_rig).to(device=device)  # type: ignore[arg-type]
+            if cand_cam_r.shape[1] != n:
+                raise ValueError(
+                    "candidate_poses_camera_rig must have the same number of candidates as candidate_poses_world_cam."
+                )
+            if cand_cam_r.shape[0] == 1 and b > 1:
+                cand_cam_r = PoseTW(cand_cam_r._data.expand(b, n, 12))
+            elif cand_cam_r.shape[0] != b:
+                raise ValueError(
+                    "candidate_poses_camera_rig must have matching batch size, or batch size 1 for broadcasting."
+                )
+            t_r_c = cand_cam_r.inverse()
         else:
-            ref_w_r = reference_pose_world_rig.to(device=device)  # type: ignore[arg-type]
-        if ref_w_r.ndim == 1:
-            ref_w_r = PoseTW(ref_w_r._data.unsqueeze(0))
-        if ref_w_r.shape[0] != b:
-            ref_w_r = PoseTW(ref_w_r._data.expand(b, 12))
+            if reference_pose_world_rig is None:
+                ref_w_r = self._get_reference_pose_world_rig(efm).to(device=device)  # type: ignore[arg-type]
+            else:
+                ref_w_r = reference_pose_world_rig.to(device=device)  # type: ignore[arg-type]
+            if ref_w_r.ndim == 1:
+                ref_w_r = PoseTW(ref_w_r._data.unsqueeze(0))
+            if ref_w_r.shape[0] != b:
+                ref_w_r = PoseTW(ref_w_r._data.expand(b, 12))
 
-        # ------------------------------------------------------------------ pose encoding (rig <- camera)
-        t_r_w = ref_w_r.inverse()[:, None]  # B x 1 x 12
-        t_r_c = t_r_w @ cand_w_c  # B x N x 12
+            # ------------------------------------------------------------------ relative pose (rig <- camera)
+            t_r_w = ref_w_r.inverse()[:, None]  # B x 1 x 12
+            t_r_c = t_r_w @ cand_w_c  # B x N x 12
 
-        pose_vec = torch.cat(
-            [
-                t_r_c.t.to(dtype=torch.float32),
-                so3log_map(t_r_c.R).to(dtype=torch.float32),
-            ],
-            dim=-1,
-        )  # B N 6
-        pose_enc = self.pose_encoder(pose_vec)  # B N E
+        # ------------------------------------------------------------------ pose encoding (shell descriptor)
+        t = t_r_c.t.to(dtype=torch.float32)  # B N 3 (camera center in rig coords)
+        r = torch.linalg.vector_norm(t, dim=-1, keepdim=True)  # B N 1
+        u = t / (r + 1e-8)
+
+        z_cam = torch.tensor([0.0, 0.0, 1.0], device=device, dtype=torch.float32)
+        f = torch.einsum("...ij,j->...i", t_r_c.R.to(dtype=torch.float32), z_cam)
+        f = f / (torch.linalg.vector_norm(f, dim=-1, keepdim=True) + 1e-8)
+
+        dot_f_neg_u = (f * (-u)).sum(dim=-1, keepdim=True)
+
+        pose_encoding_mode = str(self.config.pose_encoding_mode)
+        match pose_encoding_mode:
+            case "shell_sh":
+                pose_enc = self.pose_encoder_sh(u, f, r=r, scalars=dot_f_neg_u)
+            case "lff6d":
+                pose_vec = torch.cat([t, f], dim=-1)
+                pose_enc = self.pose_encoder_lff(pose_vec)
+            case other:
+                raise ValueError(f"Unsupported pose_encoding_mode: {other}")
 
         # ------------------------------------------------------------------ voxel feature queries
         parts: list[Tensor] = [pose_enc.to(device=device, dtype=dtype)]
@@ -225,34 +274,47 @@ class VinModel(nn.Module):
         if not self.config.use_occ_feat and not self.config.use_obb_feat:
             raise ValueError("At least one of use_occ_feat/use_obb_feat must be True.")
 
+        feat_ref = occ_feat if occ_feat is not None else obb_feat
+        if feat_ref is None:
+            raise AssertionError("Unexpected: no voxel features selected.")
+
         if self.config.use_global_pool:
             pooled: list[Tensor] = []
             if occ_feat is not None:
                 pooled.append(occ_feat.mean(dim=(-3, -2, -1)))
+                pooled.append(occ_feat.amax(dim=(-3, -2, -1)))
             if obb_feat is not None:
                 pooled.append(obb_feat.mean(dim=(-3, -2, -1)))
+                pooled.append(obb_feat.amax(dim=(-3, -2, -1)))
             global_feat = torch.cat(pooled, dim=-1).unsqueeze(1).expand(b, n, -1)
             parts.append(global_feat)
 
-        if self.config.use_local_sample:
-            if occ_feat is None and obb_feat is None:
-                raise AssertionError("Unexpected: local sample enabled but no features selected.")
+        # Candidate validity is defined by whether the candidate camera center lies inside the EVL voxel grid.
+        d, h, w = feat_ref.shape[-3:]
+        t_v_w = backbone_out.t_world_voxel.inverse()
+        cand_centers_world = cand_w_c.t.to(dtype=dtype)
+        cand_centers_voxel = t_v_w * cand_centers_world  # B N 3 in voxel frame (meters)
+        voxel_extent = backbone_out.voxel_extent.to(device=device, dtype=torch.float32)
+        if voxel_extent.ndim == 1:
+            voxel_extent = voxel_extent.view(1, 6).expand(b, 6)
 
-            d, h, w = backbone_out.occ_feat.shape[-3:]
-            t_v_w = backbone_out.t_world_voxel.inverse()
-            cand_centers_world = cand_w_c.t.to(dtype=dtype)
-            cand_centers_voxel = t_v_w * cand_centers_world  # B N 3 in voxel frame (meters)
-            voxel_extent = backbone_out.voxel_extent.to(device=device, dtype=torch.float32)
-            if voxel_extent.ndim == 1:
-                voxel_extent = voxel_extent.view(1, 6).expand(b, 6)
-            cand_voxel_ids, valid = pc_to_vox(
-                cand_centers_voxel,
-                vW=int(w),
-                vH=int(h),
-                vD=int(d),
-                voxel_extent=voxel_extent,
-            )
-            valid = valid & torch.isfinite(cand_voxel_ids).all(dim=-1)
+        cand_centers_voxel_f32 = cand_centers_voxel.to(dtype=torch.float32)
+        cand_voxel_ids, _ = pc_to_vox(
+            cand_centers_voxel_f32,
+            vW=int(w),
+            vH=int(h),
+            vD=int(d),
+            voxel_extent=voxel_extent,
+        )
+        vox_min = voxel_extent[..., 0::2].view(b, 1, 3)
+        vox_max = voxel_extent[..., 1::2].view(b, 1, 3)
+        valid = torch.isfinite(cand_centers_voxel_f32).all(dim=-1)
+        valid = (
+            valid & (cand_centers_voxel_f32 >= vox_min).all(dim=-1) & (cand_centers_voxel_f32 <= vox_max).all(dim=-1)
+        )
+        cand_voxel_ids = torch.nan_to_num(cand_voxel_ids, nan=0.0, posinf=0.0, neginf=0.0)
+
+        if self.config.use_local_sample:
             local_parts: list[Tensor] = []
             if occ_feat is not None:
                 occ_samp, _ = sample_voxels(occ_feat, cand_voxel_ids, differentiable=False)
@@ -262,10 +324,9 @@ class VinModel(nn.Module):
                 local_parts.append(obb_samp.transpose(1, 2))
             local_feat = torch.cat(local_parts, dim=-1)
             parts.append(local_feat)
-        else:
-            valid = torch.ones((b, n), device=device, dtype=torch.bool)
 
         feats = torch.cat(parts, dim=-1)
+        feats = feats * valid.to(dtype=feats.dtype).unsqueeze(-1)
         logits = self.head(feats.reshape(b * n, -1)).reshape(b, n, -1)
 
         prob = coral_logits_to_prob(logits)

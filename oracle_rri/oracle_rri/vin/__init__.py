@@ -14,6 +14,7 @@ from .pose_encoding import (
     LearnableFourierFeaturesConfig,
 )
 from .rri_binning import RriOrdinalBinner
+from .spherical_encoding import ShellShPoseEncoder, ShellShPoseEncoderConfig
 from .types import EvlBackboneOutput, VinPrediction
 
 __all__ = [
@@ -25,6 +26,8 @@ __all__ = [
     "FourierFeaturesConfig",
     "LearnableFourierFeatures",
     "LearnableFourierFeaturesConfig",
+    "ShellShPoseEncoder",
+    "ShellShPoseEncoderConfig",
     "VinModel",
     "VinModelConfig",
     "VinPrediction",
