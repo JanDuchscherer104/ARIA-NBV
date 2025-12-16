@@ -24,6 +24,9 @@ class PathConfig(SingletonConfig):
     checkpoints: Path = Field(default_factory=lambda: Path(".logs") / "checkpoints")
     """Directory used by Lightning checkpoints."""
 
+    wandb: Path = Field(default_factory=lambda: Path(".logs") / "wandb")
+    """Directory used by Weights & Biases for local run artifacts."""
+
     configs_dir: Path = Field(default_factory=lambda: Path(".configs"))
     """Directory containing exported experiment/configuration files (TOML, etc.)."""
 
@@ -67,6 +70,7 @@ class PathConfig(SingletonConfig):
 
     @field_validator(
         "checkpoints",
+        "wandb",
         "data_root",
         "configs_dir",
         "url_dir",
