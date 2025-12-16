@@ -213,6 +213,7 @@ _site
 .data/aria_download_urls/
 .data
 .codex
+!.codex/AGENTS.md
 
 # Literature review - ignore non-documentation files
 literature/**
