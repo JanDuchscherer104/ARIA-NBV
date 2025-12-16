@@ -118,6 +118,237 @@ Check out [EVL Training Format](#atek-wds-format) for more info.
 - `occ_pr`, `cent_pr`, `bbox_pr`, `clas_pr`: Raw head outputs prior to thresholding/NMS.
 - `obbs_pr_nms`, `cent_pr_nms`: Post-processed detection outputs (sparse OBBs and filtered centerness).
 
+You’re looking at **one mixed “debug dictionary”** that EVL returns: it contains **(i)** 2D backbone artifacts, **(ii)** the lifted voxel grid + observation masks, **(iii)** the refined 3D *neck* features, and **(iv)** the task heads (occupancy + 3D OBB detection). The keys are set mostly in **`Lifter.forward()`** (voxel/rgb stuff) and **`EVL.forward()` + `EVL.post_process()`** (neck + heads + decoded boxes). ([GitHub][1])
+
+Below I explain **each entry you printed** and give a **use / don’t-use** recommendation for a VIN-style RRI scorer.
+
+---
+
+## The short, skeptical answer to “should we use head outputs instead of neck features?”
+
+**Yes — for a *minimal* VIN, it’s reasonable to start with head outputs**, because:
+
+* `occ_pr` is already an explicit **surface/occupancy reconstruction** signal (bounded, low‑dimensional). ([GitHub][2])
+* The lifter provides explicit **observation evidence** (`voxel/counts`, `voxel/occ_input` + free-space mask inside `voxel/feat`) that’s *highly aligned with NBV/RRI intuition*: *choose views that cover unknown or weakly observed regions*. ([GitHub][1])
+
+But: **don’t throw away neck features permanently**. Neck features are the “pre-decision” representation that heads compress into very few channels. If performance stalls, re‑introduce neck features via a 1×1×1 compression. ([GitHub][2])
+
+---
+
+## Key-by-key explanation and “should VIN use it?”
+
+I’ll group them by function. Shapes refer to your printout (they depend on config/checkpoint).
+
+### A) Core voxel geometry / coordinate contract
+
+#### `voxel/T_world_voxel` — `PoseTW` (B, 12)
+
+**What it is:** The pose of the voxel grid in world coordinates (**world←voxel**). The voxel grid is anchored to the **last frame** of the snippet and gravity-aligned (roll/pitch ≈ 0; yaw-only). ([GitHub][1])
+**Use for VIN?** **Must-use.** You need it to map candidate-frustum 3D sample points (world) into voxel coordinates for trilinear sampling.
+
+#### `voxel_extent` — `(6,)`
+
+**What it is:** `[x_min, x_max, y_min, y_max, z_min, z_max]` defining the voxel grid’s metric bounds **in the voxel frame** (meters). EVL passes this around explicitly. ([GitHub][2])
+**Use for VIN?** **Must-use.** Required to normalize voxel coordinates and implement valid masks for sampling.
+
+#### `voxel/pts_world` — `(B, D*H*W, 3)` (here 110592 = 48³)
+
+**What it is:** The world coordinates of every voxel center (a flattened voxel grid). It’s generated from `voxel_extent` and `T_world_voxel`. ([GitHub][1])
+**Use for VIN?** **Usually no.** It’s redundant (you can generate the same points on demand). Only useful for debugging/visualization or if you want a one-time precomputed voxel-center point cloud.
+
+#### `voxel/selectT` — `(B,)` int
+
+**What it is:** The selected time index used to anchor the voxel grid (by default `T-1`). ([GitHub][1])
+**Use for VIN?** **No (training), yes (debug).** You typically only need `T_world_voxel` directly.
+
+---
+
+### B) Observation evidence injected into 3D (high value for NBV/RRI)
+
+#### `voxel/counts` — `(B, D, H, W)` int64
+
+**What it is:** For each voxel, how many snippet frames/streams produced a **valid projection** into the image during lifting. It is computed as a sum over valid projection masks. ([GitHub][1])
+**Use for VIN?** **Yes (strongly recommended).** This is a direct proxy for *coverage / observation density* inside EVL’s voxel volume.
+
+**Practical note:** Normalize it to `[0,1]` by dividing by the maximum possible count (≈ `T * #streams_used`), converted to float.
+
+#### `voxel/counts_m` — `(B, D, H, W)` int64
+
+**What it is:** A “masked/debug” variant of the counts (EVL explicitly says it’s passed for debugging). ([GitHub][1])
+**Use for VIN?** **No for learning**, unless you’ve verified it’s identical to what you want. Prefer `voxel/counts` + explicit masking logic in your VIN.
+
+#### `voxel/occ_input` — `(B, 1, D, H, W)` float (mask)
+
+**What it is:** A binary occupancy mask derived from the input 3D points (semi-dense/GT points in the batch): EVL voxelizes the point cloud and turns voxels with any points into `1.0`. ([GitHub][1])
+**Use for VIN?** **Yes.** This is extremely aligned with the oracle’s “current reconstruction” (semi-dense points), and it helps predict where RRI can still improve.
+
+#### `voxel/feat` — `(B, F, D, H, W)` (here F=34)
+
+**What it is:** The raw lifted voxel feature volume **before** the neck. It is:
+
+* lifted + aggregated 2D features (here 32 channels),
+* concatenated with `point_masks` and `free_masks` (2 extra channels). ([GitHub][1])
+
+**Use for VIN?**
+
+* **Not as-is**, unless you compress it. It’s a fat tensor that’s less refined than the neck, and you’ll pay for sampling it.
+* **But**: the **last channel is the free-space mask** (from ray samples up to observed points), which is valuable and otherwise not exposed as its own key in your printout. ([GitHub][1])
+
+**Actionable recommendation:** For a head-centric VIN, extract just:
+
+* `occ_input = voxel/occ_input` (occupied evidence),
+* `free_input = voxel/feat[:, -1:]` (free-space evidence),
+* `counts = voxel/counts` (coverage),
+  and optionally ignore the rest of `voxel/feat`.
+
+---
+
+### C) 3D neck features (rich, but heavier)
+
+#### `neck/occ_feat` — `(B, 64, D, H, W)`
+
+**What it is:** The refined 3D feature volume right before the occupancy head. EVL stores it explicitly. ([GitHub][2])
+**Use for VIN?** **Optional.** If you want “maximum information” from EVL, this is the most stable attachment point. But it’s heavier than head outputs.
+
+If you use it: **compress channels** with a 1×1×1 conv (e.g., 64 → 16/32) before any pooling/sampling.
+
+#### `neck/obb_feat` — `(B, 64, D, H, W)`
+
+**What it is:** Refined 3D features right before the OBB detection head. ([GitHub][2])
+**Use for VIN?** **Optional / future entity-aware.** For pure geometry-RRI, you can omit it initially.
+
+---
+
+### D) Occupancy head output (surface reconstruction head)
+
+#### `occ_pr` — `(B, 1, D, H, W)` float32
+
+**What it is:** The **occupancy prediction** after sigmoid: `occ_pr = sigmoid(occ_logits)`. ([GitHub][2])
+**Use for VIN?** **Yes.** This is the single most sensible “head output” for an RRI predictor.
+
+How to use:
+
+* Global pooling (mean/max) for a snippet descriptor.
+* Candidate-conditioned **frustum sampling** (sample voxels along candidate view rays) to estimate how much *unknown/occupied* structure lies ahead.
+
+---
+
+### E) OBB detection head raw grids (dense, per-voxel predictions)
+
+These are the “dense detection maps” before decoding into box lists.
+
+#### `cent_pr` — `(B, 1, D, H, W)`
+
+**What it is:** Center probability map after sigmoid: `cent_pr = sigmoid(cent_logits)`. ([GitHub][2])
+**Use for VIN?** **Maybe.** It encodes “objectness / box centers.”
+
+* If your RRI is purely geometric, it’s optional.
+* If you want an **object-biased NBV** later, it’s a nice dense cue.
+
+#### `bbox_pr` — `(B, 7, D, H, W)`
+
+**What it is:** Per-voxel bounding box parameters (EVL comment: `height, width, depth, offset_h, offset_w, offset_d, yaw`). It is post-processed with bounded transforms: sizes from sigmoid into `[bbox_min, bbox_max]`, offsets with tanh scaled by `offset_max`, yaw with tanh scaled by `yaw_max`. ([GitHub][2])
+**Use for VIN?** **No for v0.1.** It’s harder to use correctly and tends to overcomplicate a minimal scorer. Keep it for entity-aware extensions if needed.
+
+#### `clas_pr` — `(B, 29, D, H, W)`
+
+**What it is:** Per-voxel semantic class probabilities via softmax over classes. ([GitHub][2])
+**Use for VIN?** **No for geometry-only v0.1.**
+For entity-aware NBV, you could use it, but you’ll likely prefer the decoded OBB list + class probs instead of this dense map.
+
+---
+
+### F) Decoded OBB outputs (post-process + NMS; token-like)
+
+#### `obbs_pr_nms` — `ObbTW (B, K, 34)` (here K=128)
+
+**What it is:** Top-K decoded predicted boxes (after NMS) in **voxel coordinates** (this is the output right after `voxel2obb(...); simple_nms3d(...)`). ([GitHub][2])
+**Use for VIN?** **Future (entity-aware).** Useful if you want candidate scoring based on predicted objects, but not required for basic RRI prediction.
+
+#### `cent_pr_nms` — `(B, 1, D, H, W)`
+
+**What it is:** The center map after applying 3D NMS suppression. ([GitHub][2])
+**Use for VIN?** **No.** Keep for debugging.
+
+#### `obbs/pred` — `ObbTW (B, K, 34)`
+
+**What it is:** Predicted OBBs transformed into **snippet coordinates** (EVL computes `T_snippet←voxel` and transforms the NMS boxes). ([GitHub][2])
+**Use for VIN?** **Future (entity-aware).** This is the version you’d want if you need consistency with your snippet/rig reference frames.
+
+#### `obbs/pred_viz` — `ObbTW (B, K, 34)`
+
+**What it is:** A visualization-friendly variant (typically same boxes but potentially adjusted for plotting conventions). ([GitHub][2])
+**Use for VIN?** **No.**
+
+#### `obbs/pred/probs_full` — list length B of `Tensor`
+
+**What it is:** Per-box full class probability vectors corresponding to decoded boxes (EVL stores them as a Python list per batch element). ([GitHub][2])
+**Use for VIN?** **Future.** If you treat boxes as tokens, you’ll use these for semantic weighting.
+
+#### `obbs/pred/sem_id_to_name` — dict
+
+**What it is:** Class-id to name mapping for visualization/debug. ([GitHub][2])
+**Use for VIN?** **No (not a feature).**
+
+*(Your `probs_ful_viz` key looks like a typo in the printout; EVL stores a `probs_full` list — verify naming on your side.)* ([GitHub][2])
+
+---
+
+### G) 2D backbone artifacts (almost always “don’t use” for VIN)
+
+#### `rgb/feat2d_upsampled` — `(B, T, C, H, W)` (here 1×20×32×288×288)
+
+**What it is:** The upsampled 2D features used for lifting into voxels. EVL also returns these for visualization/debug. ([GitHub][1])
+**Use for VIN?** **No.** Too heavy and breaks the “VIN purely on 3D voxel repr” principle.
+
+#### `rgb/token2d` — list of tensors
+
+**What it is:** Debug/visualization copies of 2D backbone outputs; EVL may detach and move these to CPU when needed (especially multi-layer features). ([GitHub][1])
+**Use for VIN?** **No.** Risk of device mismatches + unnecessary memory.
+
+---
+
+## Concrete “what to use” recommendation for VIN v0.1 (head-centric, RRI-focused)
+
+If you want a **minimal but inductive-bias-aligned** feature set:
+
+### Use these voxel-aligned volumes (all sampleable in candidate frusta)
+
+* `occ_pr` (1ch): predicted occupancy probability. ([GitHub][2])
+* `voxel/occ_input` (1ch): observed occupied evidence from semi-dense points. ([GitHub][1])
+* `free_input = voxel/feat[:, -1:]` (1ch): observed free-space evidence (ray sampled). ([GitHub][1])
+* `counts = voxel/counts` normalized to [0,1]: observation coverage. ([GitHub][1])
+
+Optional:
+
+* `cent_pr` (1ch): objectness density cue. ([GitHub][2])
+
+### Plus the required coordinate contract
+
+* `voxel/T_world_voxel`, `voxel_extent`. ([GitHub][1])
+
+### Skip for now
+
+* `bbox_pr`, `clas_pr`, decoded OBBs (unless you explicitly do entity-aware NBV). ([GitHub][2])
+* all `rgb/*` artifacts. ([GitHub][1])
+
+This gives you a **4–5 channel 48³ grid** — extremely manageable — that still captures the things RRI cares about: *occupied vs free vs unknown + how well it’s been observed*.
+
+---
+
+## Why this aligns with RRI and your oracle pipeline
+
+Your oracle RRI is ultimately measuring change in point↔mesh distances after adding candidate-view points. The EVL outputs above provide:
+
+* **What’s already reconstructed**: `occ_input` (points) + `free_input` (observed empty space). ([GitHub][1])
+* **What EVL believes exists / surfaces**: `occ_pr`. ([GitHub][2])
+* **Where the model had coverage**: `counts`. ([GitHub][1])
+
+And all of these are in the same **gravity-aligned voxel frame**, so frustum sampling is straightforward and cheap. ([GitHub][1])
+
+---
+
+
 ### EVL Architecture
 
 - **Frozen 2D foundation encoder**: `VideoBackboneDinov2` upsamples DinoV2.5 tokens to full resolution per stream, handling RGB and SLAM cameras with optional vignette correction ([efm3d/model/video_backbone.py:132](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/video_backbone.py#L132)).
@@ -156,3 +387,7 @@ Check out [EVL Training Format](#atek-wds-format) for more info.
 - [efm3d/utils/reconstruction.py:27](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/reconstruction.py#L27) — volumetric sampling utilities used by fusion and loss computation when converting between voxel and mesh domains.
 
 These components give us a ready-made scene encoder whose volumetric features, semantic predictions, and ray utilities map cleanly onto our NBV pipeline: EVL provides the shared backbone, VIN supplies the lightweight RRI head, and ASE meshes deliver oracle supervision for training.
+
+
+[1]: https://github.com/facebookresearch/efm3d/raw/main/efm3d/model/lifter.py "raw.githubusercontent.com"
+[2]: https://github.com/facebookresearch/efm3d/raw/main/efm3d/model/evl.py "raw.githubusercontent.com"

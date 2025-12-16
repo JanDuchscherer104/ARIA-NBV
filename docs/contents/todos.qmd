@@ -88,7 +88,11 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
   > **Done**: Applied `rotate_yaw_cw90` to the reference pose before generating candidate poses around it.
 
 
-- [ ] When setting `view_dir_jitter` to a non-zero value, the candidate frusta and reference pose in the `Candidate Frusta` in `render_candidates_page` (panels.py) shows the frusta and reference pose without with wrong rotation about the z-axes - i.e. as if `rotate_yaw_cw90` was *not* applied! However, later stages e.g. candidate depth renders and backprojected pointclouds seem to be correct.
+- [x] When setting `view_dir_jitter` (roll jitter) to a non-zero value, the candidate frusta plot looked “incorrectly rotated” (often perceived as an azimuth/elevation swap).
+
+  **Root cause**: After we made `rotate_yaw_cw90(reference_pose)` part of the *physical* candidate-generation pipeline (rig-basis correction), the candidate frusta plot still applied `rotate_yaw_cw90` again for display. Since `rotate_yaw_cw90` is a **90° twist about the local +Z/forward axis** (i.e. a roll), this adds a constant extra roll offset on top of the random roll jitter, making the “up” axis cue swap with “left” once jitter is enabled.
+
+  > **Done**: Candidate plots now default to `display_rotate=False` and `render_candidates_page` explicitly disables the extra display rotation for frusta + reference axes, so the plotted frusta match the physical pipeline.
 
 ::: {#fig-rpy-hists layout-ncol=2}
 
@@ -97,11 +101,11 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 ![RPY without any jitter](../figures/app/dir_dists_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away_no_jitter_fixed.png)
 :::
 
-The candidate frusta diagram is incorrect:
+The candidate frusta diagram is now consistent with the physical pipeline (no extra display twist on top of the already-corrected reference pose):
 
 ![Candidate Frusta with 17° roll jitter](../figures/app/candidate_frusta_view_dir_jitter_non_zero_bug.png)
 
-  > **To be resolved**: Investigate why the candidate frusta plot shows incorrect rotations when jitter is enabled.
+  > **Done**: The mismatch was a plotting-only double-application of `rotate_yaw_cw90`.
 
 
 

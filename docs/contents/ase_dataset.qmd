@@ -20,6 +20,10 @@ The Aria Synthetic Environments (ASE) dataset [@SceneScript-avetisyan2024] is a 
 - **67 days** of total trajectory time
 - **7,800 km** of total trajectory distance
 - **~23 TB** total dataset size
+- **100** scenes with ground-truth meshes
+  - appox. 120 MB per mesh
+- **1,641** scenes with GT Meshes
+  - approx. 100MB per scene snippet (20 s @ 10 fps), hence approx. 164 GB for all snippets
 
 ## Ground Truth Annotations
 
