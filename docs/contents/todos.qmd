@@ -29,6 +29,13 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
   - Future work: learn to generate continuous poses directly, whose fitness can than be quantified using the RRI predictor; here we can also consider the free space voxels that are used in EFM3D to avoid collisions.
   - Rendering tech debt: PyTorch3D path currently returns NDC z-buffer; needs metric depth conversion (or switch to non-NDC rasterisation with znear/zfar) before we can rely on hit-ratio diagnostics.
 
+- *Candidate Generation*:
+
+  - Does it make sense to filter out all invalid candidates (i.e. those that collide with the mesh, are to close to it or don't have a straight line of sight from the reference pose)? Wouldn't it make more sense to include them with strong penalties in the loss function?
+  - Allow directions in the opposite direction of the reference pose - which are likely to see completly new areas of the scene, and thus yield a high RRI; but this movement is less likely in a real-world scenario as the user would have to turn around completely to look in that direction.
+  - Should we allow any roll angle for now (i.e. one less feature to encode for the VIN)?
+  -
+
 # Highest Priority
 
 ## Metrics
@@ -45,7 +52,7 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 - [ ] Provide theory and conceptual brakedown of `oracle_rri/oracle_rri/rri_metrics/metrics.py`::`chamfer_point_mesh_batched` in `docs/typst/slides/slides_3.typ`. The current contents of the file serves as a template - it was copied from `slides_2.typ` which was our second presentation. Maintain the general style. And use `get-library-docs "/websites/typst_app"` to retrieve typst documentation for the different commands that you might need.
   - [ ] Provide formulas for the different loss components that we use in ``oracle_rri/oracle_rri/rri_metrics/metrics.py``::`chamfer_point_mesh_batched`.
 
-# Candidate View Generation & Sampling - DONE
+# Candidate View Generation & Sampling
 
 **Remaining Issues:**
 
@@ -87,7 +94,7 @@ The PositionalSampling now works as expected and I tried fixing the directional 
 - the pitch histogram in the world-frame doesn't make sense to me - should't it be covering pretty much the entire range as we have a torus around the reference pose?
 - always keep in mind that the project aria frames have to be transofmed using `rotate_yaw_cw90` when being displayed!
 
-### Rasterized Rendering to Generate Candidate Point Clouds - DONE
+# Rasterized Rendering to Generate Candidate Point Clouds
 
 - We now implement candidate rendering + backprojection fully in `oracle_rri/oracle_rri/rendering`:
   - `CandidateDepthRenderer` (PyTorch3D rasteriser) renders metric z-depth maps from the GT mesh for candidate poses.
@@ -105,7 +112,7 @@ The `CandidateDepthRenderer.render(...)` yields a `CandidateDepths` dataclass:
 - `camera`: `CameraTW` intrinsics used for rendering (optionally downscaled via `resolution_scale`).
 - `p3d_cameras`: matching `PerspectiveCameras` used for rendering and unprojection.
 
-#### Action Items
+## Action Items
 
 - [x] Candidate PCs now align with the GT mesh (PoseTW↔PyTorch3D extrinsics fixed).
 - [x] Candidate PCs now match the rendered frusta (pixel-center→NDC backprojection fixed).
@@ -114,7 +121,7 @@ The `CandidateDepthRenderer.render(...)` yields a `CandidateDepths` dataclass:
 - [x] Implement `DepthToPointCloud` module: for each candidate pose's depth map, backproject to point cloud $\mathcal{P}_{\mathbf{q}}$ in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC $\mathcal{P}_t$ with candidate-view PC $\mathcal{P}_{\mathbf{q}}$ → $\mathcal{P}_{t \cup \mathbf{q}}$.
 - [x] Backprojection implementation: `oracle_rri/oracle_rri/rendering/candidate_pointclouds.py`::{`build_candidate_pointclouds`, `_backproject_depths_p3d_batch`} and `oracle_rri/oracle_rri/rendering/unproject.py`::`backproject_depth_with_p3d`.
 
-#### Previously observed issues
+## Previously observed issues
 
    - Cameras solely looking at a blank wall will have high RRI, as semi-dense point clouds will not have many points in these areas. However, this does not make sense as these views should receive a high mesh to point cloud distance - completeness. Also, these views sometimes manage to "look through" the walls and render points that are behind the wall.
    - Some poses looking towards walls, that are quite close to the candidate pose, will yield dpeth maps and point clouds that don't correspond to what would be expected from the GT mesh and the given pose.
@@ -250,12 +257,6 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
   - `PipelineController.get_renders()` computes and caches both in one stage,
   - the RRI page uses the same pipeline (`OracleRriLabeler`) so the computed PCs are shared.
 
-#### Issue: Page switching UI was clunky (checkbox-style)
-
-- **What was wrong:** Page selection was implemented in a way that felt like “one of many checkboxes” instead of a page
-  router.
-- **Fix:** Switched to Streamlit’s `st.navigation(..., position="top")` for page routing.
-
 #### Issue: UI clutter / nested expanders / nested status blocks
 
 - **What was wrong:** Nested containers made it hard to find the relevant controls and also led to confusing “where am I
@@ -305,6 +306,185 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
   - loss and training objective same as in [VIN-NBV](../contents/literature/vin_nbv.qmd)
   - start with an implementation proposal of the model architecture and training procedure in `docs/contents/impl/vin_nbv.qmd`.
   - For this do a comprehensive review of the EVL architecture to understand how to best integrate the view scorer head on top of it. Consider that we have a [simple script to infer EVL](../../oracle_rri/scripts/run_efm3d_on_ase.py). Another good starting point is our [EFM3D symbol index](../contents/ext-impl/efm3d_symbol_index.qmd) and [EFM3D implementation overview](../contents/ext-impl/efm3d_implementation.qmd).
+
+
+## ViewIntrospectionNetwork
+
+Goal: Learn a **View Introspection Network (VIN)** that predicts per-candidate **RRI** from (i) frozen **EVL** scene features and (ii) a **shell-aware pose descriptor** computed in the **reference frame**. VIN is trained standalone using oracle labels from `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`.
+
+### External References (implementation sources)
+
+- EFM3D / EVL codebase: [facebookresearch/efm3d](https://github.com/facebookresearch/efm3d)
+- VIN-NBV paper (objective + ordinal setup): [VIN-NBV arXiv](https://arxiv.org/abs/2505.06219)
+- e3nn spherical harmonics (use this for pose encoding): [e3nn documentation](https://docs.e3nn.org/) and [e3nn GitHub](https://github.com/e3nn/e3nn)
+- CORAL ordinal regression:
+  - [coral-pytorch](https://github.com/Raschka-research-group/coral-pytorch)
+  - CORAL paper (background): [arXiv:1901.07884](https://arxiv.org/abs/1901.07884)
+- (Optional) volumetric sampling primitive: `torch.nn.functional.grid_sample` (3D) — use for voxel/frustum querying
+
+Internal references:
+
+- EVL/EFM3D overview: `docs/contents/literature/efm3d.qmd`
+- VIN-NBV notes: `docs/contents/literature/vin_nbv.qmd`
+- EFM3D symbol index: `docs/contents/ext-impl/efm3d_symbol_index.qmd`
+- EFM3D impl overview: `docs/contents/ext-impl/efm3d_implementation.qmd`
+- Oracle pipeline + metric design: `docs/contents/impl/rri_computation.qmd`
+- Label pipeline implementation: `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`
+
+### Feature Inventory (what VIN consumes)
+
+#### EVL Features (frozen backbone outputs)
+
+Use EVL as a frozen feature extractor on the raw `efm: dict[str, Any]`. Extract (at minimum):
+
+- `neck/occ_feat` (primary geometry/context volume; B×C×D×H×W)
+- `neck/obb_feat` (optional semantic/context volume; B×C×D×H×W)
+- `voxel/T_world_voxel` (PoseTW) + `voxel_extent` (bounds) for mapping 3D points to voxels
+
+Processing strategy:
+
+- **Channel compression**: apply `1×1×1 Conv3D` (or `LazyLinear` after pooling) to reduce channels (e.g. C→64)
+- **Global pooling**: per volume compute `mean(DHW)` and `max(DHW)` and concatenate
+- **Candidate-conditioned query** (required): query the compressed voxel volume at sparse points that approximate the candidate frustum:
+  - Recommended: sample **K points along the candidate principal ray + cone ring** at depths `[0.5, 1, 2, 3] m`, then aggregate (mean+max)
+  - Do NOT use PyTorch3D mesh rasterizer for voxel features; instead sample voxels via EFM3D utilities (`pc_to_vox` + `sample_voxels`) or via `grid_sample` in 3D
+
+#### Candidate Pose Descriptors (computed in reference frame)
+
+**Source of truth (must use):**
+
+- `oracle_rri_label_batch.candidates.views.T_camera_rig` where each candidate pose is
+  `T_camera_rig = (candidate_camera ← reference_pose)` in the **reference frame**.
+
+Descriptor construction (no `so3log`):
+
+1. Invert to get camera center in rig/reference coordinates:
+   - `T_rig_camera = inverse(T_camera_rig)`
+   - `t = T_rig_camera.t ∈ R^3` (camera center in reference frame)
+2. Shell parameters:
+   - radius `r = ||t||`
+   - position direction `u = t / (r + eps) ∈ S^2`
+3. View direction parameters (camera forward in reference frame):
+   - choose camera-forward axis `z_cam = (0,0,1)` (Aria depth convention is +Z forward)
+   - `f = normalize(T_rig_camera.R @ z_cam) ∈ S^2`
+4. Minimal scalar inductive biases:
+   - `log(r + eps)`
+   - `dot(f, -u)`  (looking back towards reference center)
+   - optionally `dot(f, u)` (looking outward)
+
+Encoding (must use e3nn):
+
+- `Y_u = SH_L(u)` and `Y_f = SH_L(f)` via `e3nn.o3.spherical_harmonics` with small degree `L ∈ {2,3}`
+- Pose embedding:
+  - `E_dir = Linear([Y_u || Y_f])`
+  - `E_scal = MLP([log r, r, dot(f,-u), ...])`
+  - `E_pose = Linear([E_dir || E_scal])`
+
+### Action Items (from scratch, end-to-end)
+
+#### 1 EVL feature extractor wrapper (frozen, VIN-facing)
+
+- [ ] Implement `oracle_rri/oracle_rri/vin/backbone_evl.py` as a clean adapter:
+  - load EVL via Hydra YAML + checkpoint
+  - run `torch.no_grad()` + `eval()`
+  - robust `batchify` handling (incl. TensorWrapper images)
+  - output a typed dataclass (e.g. `EvlBackboneOutput`) with `occ_feat`, `obb_feat`, `t_world_voxel`, `voxel_extent`
+- [ ] Add config knobs for checkpoint formats (`strict_load`, `state_dict_key` fallback, `weights_only` fallback)
+
+Acceptance criteria:
+
+- EVL forward runs on `EfmSnippetView.efm` produced by `AseEfmDataset` without manual preprocessing.
+
+#### 2 VIN feature processing (voxel compression + global + candidate query)
+
+- [ ] Implement voxel channel compression:
+  - `VoxelCompressor = LazyConv3d(1×1×1) + GroupNorm + GELU`
+- [ ] Implement global context descriptor:
+  - `global = [mean(DHW), max(DHW)]` per enabled volume
+- [ ] Implement candidate-conditioned query descriptor:
+  - build K camera-frame query points (principal ray + cone ring) at multiple depths
+  - map candidate points to world using `T_world_cam` (computed below)
+  - map world points to voxel frame using `T_voxel_world = inverse(T_world_voxel)`
+  - sample voxel features at these points and pool (mean+max)
+- [ ] Ensure strict validity masking:
+  - invalid query points do not contribute to pooling
+  - candidates with no valid samples are masked out
+
+#### 3 Candidate pose descriptor module (shell-aware, SH encoded)
+
+- [ ] Implement `oracle_rri/oracle_rri/vin/shell_pose_descriptor.py`:
+  - consumes `T_camera_rig` (PoseTW) and computes `r, u, f, scalars`
+- [ ] Implement `oracle_rri/oracle_rri/vin/pose_encoder_sh.py`:
+  - uses `e3nn.o3.spherical_harmonics` for `u` and `f`
+  - no `so3log`
+  - outputs `E_pose` per candidate
+
+#### 4 VIN scorer head architecture (minimal MLP + CORAL)
+
+- [ ] Implement `VinModel` (frozen EVL + trainable head):
+  - inputs:
+    - `efm: dict[str, Any]`
+    - `oracle_rri_label_batch.candidates.views.T_camera_rig` (aligned subset; see training step)
+    - `reference_pose_world_rig` (from labeler outputs)
+  - internal:
+    - compute `T_world_cam = T_world_rig @ inverse(T_camera_rig)`
+    - extract EVL features once per snippet
+    - compute per-candidate: `E_pose`, `E_global`, `E_query`
+    - final MLP (2 layers, e.g. 256 hidden) → CORAL logits (K-1)
+  - outputs:
+    - logits, expected score (normalized), candidate_valid mask
+- [ ] Implement `VinPrediction` dataclass (logits, scores, masks)
+
+#### 5 Training data generation (must use OracleRriLabeler)
+
+- [ ] Implement a VIN training dataset wrapper (outside `vin/`, e.g. `oracle_rri/oracle_rri/vin_training/`):
+  - iterate `AseEfmDataset`
+  - run `OracleRriLabeler.run(sample)` to get `OracleRriLabelBatch`
+  - align candidate subset:
+    - oracle RRI labels correspond to `oracle_rri_label_batch.depths.candidate_indices`
+    - gather the matching `T_camera_rig` from `oracle_rri_label_batch.candidates.views.T_camera_rig` using those indices
+  - output training item:
+    - `efm`, `T_camera_rig_subset`, `reference_pose_world_rig`, `rri`, validity masks
+- [ ] Add scripts:
+  - `scripts/fit_vin_binner.py` (collect RRIs, fit bin thresholds, save JSON)
+  - `scripts/train_vin.py` (train head only; EVL frozen)
+  - `scripts/eval_vin.py` (rank correlation + top-k recall)
+
+#### 6 CORAL loss + bin thresholds (stable + easy)
+
+- [ ] Implement RRI→ordinal binning:
+  - Fit bin thresholds **globally** on training RRIs (stage_id=0 initially)
+  - Use **quantile edges** so bins have ~equal mass
+  - Save thresholds to JSON keyed by (candidate generator config hash, EVL ckpt id, num_bins)
+- [ ] Apply CORAL:
+  - `logits: (N, K-1)`
+  - `labels: (N,)` integer ordinal class
+  - mask invalid candidates (`depth_valid` ∧ `candidate_valid` ∧ `finite(rri)`)
+- [ ] Log metrics:
+  - Spearman rank correlation between predicted score and oracle RRI
+  - top-1 / top-k recall of best oracle view
+
+#### 7 Tests (must be real-data integration, not mocks)
+
+- [ ] Unit tests:
+  - pose descriptor correctness from `T_camera_rig` (r>0, ||u||≈1, ||f||≈1, finite SH)
+  - SH output dimension = (L+1)^2 for chosen L
+  - voxel query pooling shapes + masking behavior
+- [ ] Integration test:
+  - run `OracleRriLabeler` on a real sample
+  - run VIN forward on the same subset candidates
+  - compute CORAL loss and backprop (head params update; EVL params frozen)
+
+#### 8 Documentation (implementation proposal)
+
+- [ ] Write `docs/contents/impl/vin_nbv.qmd`:
+  - clear I/O contract and tensor shapes
+  - EVL feature taps to use
+  - exact pose descriptor formulas (r,u,f, scalars) and SH encoding (e3nn)
+  - candidate voxel-frustum query method (K points + pooling)
+  - CORAL loss + how thresholds are fitted/saved/versioned
+  - minimal ablations (occ only vs occ+obb; L=2 vs L=3; query depth/rays)
+
 
 # Medium Priority
 
