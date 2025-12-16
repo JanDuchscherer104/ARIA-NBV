@@ -514,6 +514,18 @@ wheels = [
 ]
 
 [[package]]
+name = "coral-pytorch"
+version = "1.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "setuptools" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c2/8a/a361d6338f845441b97d59df37510d19ce2125dffebe2f6fe59738ed2588/coral_pytorch-1.4.0.tar.gz", hash = "sha256:212e94deeee17dc582aaba0c121fc1ef2a4324fa6c4a2a44aec148a783a7554b", size = 7505, upload-time = "2022-07-18T00:30:12.95Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/37/16/abebcfe69a8d7b526770ee23832fd6fed7a12afd469611c459f6dd500f81/coral_pytorch-1.4.0-py2.py3-none-any.whl", hash = "sha256:79912119327d1f341fe01e1753b11c34c1b81ca8fff747884f3e9edd4c9653cd", size = 7282, upload-time = "2022-07-18T00:30:10.074Z" },
+]
+
+[[package]]
 name = "coverage"
 version = "7.12.0"
 source = { registry = "https://pypi.org/simple" }
@@ -713,6 +725,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/84/75/b78198620640d394bc435c17bb49db18419afdd6cfa3ed8bcfe14034ec80/devtools-0.12.2.tar.gz", hash = "sha256:efceab184cb35e3a11fa8e602cc4fadacaa2e859e920fc6f87bf130b69885507", size = 75005, upload-time = "2023-09-03T16:57:00.679Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d1/ae/afb1487556e2dc827a17097aac8158a25b433a345386f0e249f6d2694ccb/devtools-0.12.2-py3-none-any.whl", hash = "sha256:c366e3de1df4cdd635f1ad8cbcd3af01a384d7abda71900e68d43b04eb6aaca7", size = 19411, upload-time = "2023-09-03T16:56:59.049Z" },
+]
+
+[[package]]
+name = "e3nn"
+version = "0.5.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opt-einsum-fx" },
+    { name = "scipy" },
+    { name = "sympy" },
+    { name = "torch", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torch", version = "2.4.1+cu121", source = { registry = "https://download.pytorch.org/whl/cu121" }, marker = "sys_platform == 'linux'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a1/e5/fd5a05004fa4367511bc05b573773fe59031e20d7eb1a21743fda3eb5db5/e3nn-0.5.1.tar.gz", hash = "sha256:a2a09aee2ab18e1300e1f42c23808915f9fae79bacc8e2cf5d4e53c7d27b4265", size = 94988, upload-time = "2022-12-12T21:42:26.209Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f4/fe/f5b98193b0d02ccc909679ae36a0ad2d242bf7ee220a526358cf00ee2a1e/e3nn-0.5.1-py3-none-any.whl", hash = "sha256:ae064f69604f2d9f0fa07d49da02af52cb95dbea3a72869c41686d0f59a4001a", size = 118906, upload-time = "2022-12-12T21:42:23.941Z" },
 ]
 
 [[package]]
@@ -2263,11 +2291,37 @@ wheels = [
 ]
 
 [[package]]
+name = "opt-einsum"
+version = "3.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8c/b9/2ac072041e899a52f20cf9510850ff58295003aa75525e58343591b0cbfb/opt_einsum-3.4.0.tar.gz", hash = "sha256:96ca72f1b886d148241348783498194c577fa30a8faac108586b14f1ba4473ac", size = 63004, upload-time = "2024-09-26T14:33:24.483Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl", hash = "sha256:69bb92469f86a1565195ece4ac0323943e83477171b91d24c35afe028a90d7cd", size = 71932, upload-time = "2024-09-26T14:33:23.039Z" },
+]
+
+[[package]]
+name = "opt-einsum-fx"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opt-einsum" },
+    { name = "packaging" },
+    { name = "torch", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torch", version = "2.4.1+cu121", source = { registry = "https://download.pytorch.org/whl/cu121" }, marker = "sys_platform == 'linux'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/93/de/856dab99be0360c7275fee075eb0450a2ec82a54c4c33689606f62e9615b/opt_einsum_fx-0.1.4.tar.gz", hash = "sha256:7eeb7f91ecb70be65e6179c106ea7f64fc1db6319e3d1289a4518b384f81e74f", size = 12969, upload-time = "2021-11-07T20:49:33.811Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/4c/e0370709aaf9d7ceb68f975cac559751e75954429a77e83202e680606560/opt_einsum_fx-0.1.4-py3-none-any.whl", hash = "sha256:85f489f4c7c31fd88d5faf9669c09e61ec37a30098809fdcfe2a08a9e42f23c9", size = 13213, upload-time = "2021-11-07T20:49:32.395Z" },
+]
+
+[[package]]
 name = "oracle-rri"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "coral-pytorch" },
     { name = "devtools" },
+    { name = "e3nn" },
     { name = "efm3d" },
     { name = "einops" },
     { name = "fast-simplification" },
@@ -2333,8 +2387,10 @@ pytorch3d = [
 
 [package.metadata]
 requires-dist = [
+    { name = "coral-pytorch", specifier = "==1.4.0" },
     { name = "debugpy", marker = "extra == 'dev'", specifier = ">=1.8.17" },
     { name = "devtools", specifier = ">=0.12.2" },
+    { name = "e3nn", specifier = "==0.5.1" },
     { name = "efm3d", editable = "../external/efm3d" },
     { name = "einops", specifier = "==0.8.0" },
     { name = "fast-simplification", specifier = ">=0.1.12" },
