@@ -323,7 +323,6 @@ this same LUF convention and then express them in the Z-up VIO world frame
 above, so the axes are consistent between ASE, ATEK, EFM3D and our oracle/NBV
 code.
 
-
 ### Using ATEK for ML Workflows
 
 For training and evaluation, use ATEK's preprocessed datasets and tools:

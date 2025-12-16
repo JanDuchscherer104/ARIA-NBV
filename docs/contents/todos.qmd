@@ -28,13 +28,12 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 - **Action space**: Start with discrete candidate selection (VIN-NBV style). Later: continuous pose generation (GenNBV) with collision-free sampling using free-space voxels.
   - Future work: learn to generate continuous poses directly, whose fitness can than be quantified using the RRI predictor; here we can also consider the free space voxels that are used in EFM3D to avoid collisions.
   - Rendering tech debt: PyTorch3D path currently returns NDC z-buffer; needs metric depth conversion (or switch to non-NDC rasterisation with znear/zfar) before we can rely on hit-ratio diagnostics.
-
 - *Candidate Generation*:
-
   - Does it make sense to filter out all invalid candidates (i.e. those that collide with the mesh, are to close to it or don't have a straight line of sight from the reference pose)? Wouldn't it make more sense to include them with strong penalties in the loss function?
   - Allow directions in the opposite direction of the reference pose - which are likely to see completly new areas of the scene, and thus yield a high RRI; but this movement is less likely in a real-world scenario as the user would have to turn around completely to look in that direction.
   - Should we allow any roll angle for now (i.e. one less feature to encode for the VIN)?
-  -
+- *CORAL*:
+  - The ordinal tresholds need to be known apriori and depend upon the distribution of RRI values in the training data and hence our CanidateGeneration settings.
 
 # Highest Priority
 
@@ -54,17 +53,30 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 
 # Candidate View Generation & Sampling
 
-**Remaining Issues:**
+## Current status
 
-- Apply azimuth / elevantion / roll jitter correctly to the deterministic view directions.
-- Shell being symmetric to the reference pose is problematic when the reference pose has high roll angles -> this will yield a strongly skewed torus that is tilted strongly (i.e. it's main component lies in the x-z plane!)
+- Candidate center sampling (azimuth/elevation/radius caps) and rule-based pruning are implemented in `oracle_rri/oracle_rri/pose_generation/`.
+- `align_to_gravity=True` stabilises the sampling shell when the reference pose has strong roll/pitch.
+
+  > **Done**: `CandidateViewGeneratorConfig.align_to_gravity` uses a gravity-aligned sampling pose (yaw preserved, pitch/roll removed).
+
+## Remaining issues (candidate poses)
+
+- [x] Make view-direction jitter (azimuth/elevation/roll) transparent and correctly interpretable in diagnostics.
+  > **Done**: Streamlit diagnostics now report jitter deltas in the same LUF yaw/pitch/roll convention used for sampling.
+
+- [x] Avoid mixed-frame debugging: `rotate_yaw_cw90` stays **visual-only** (plotting), never in the physical sampling/rendering pipeline.
+  > **Done**: Removed `rotate_yaw_cw90` from candidate pose generation; apply display rotation only in plotting.
 
 ![Candidate Poses with torus tilted](../figures/app/candidate_poses_torus_tilt.png)
 
-- [x] The generated candidate torus should be symmetric to the forward axis of the reference frame in terms of the azimuth dimension, while its elevation band stays gravity aligned.
-  > Implemented via `align_to_gravity=True` in `CandidateViewGeneratorConfig` (sampling uses yaw-only, gravity-aligned reference).
-- [ ] The current options to apply jitter to the view directions, wich are determined by the view `view_max_azimuth_deg, view_max_elevation_deg, view_roll_jitter_deg` are rather intransparent and hard to control.
-- [ ] Euler angles (world frame, deg) show a pitch of zero for all poses. Does this make senese? We wanted the x-axis to gravity aligned without adding any jitter to the view-directions. The world up vector is along +Z. Without any jitter, the x-axes of the camera frusta are horizontal and thuse they should have a roll of zero?
+- [x] Make view-direction jitter controls interpretable:
+  - `view_max_azimuth_deg` / `view_max_elevation_deg` should be reported as *local* yaw/pitch about the candidate camera’s +Y/+X axes (LUF).
+  - `view_roll_jitter_deg` should be reported as twist around the sampled forward axis (LUF +Z).
+  - The Streamlit diagnostics should plot these **same** quantities for `view_dirs_delta` (not `PoseTW.to_ypr`, which uses a different axis convention).
+- [x] Euler diagnostics are currently easy to misinterpret:
+  - ZYX Euler / `PoseTW.to_ypr` components do **not** correspond 1:1 to our *view azimuth/elevation/roll* knobs.
+  - Some components can become identically ~0 for roll-free poses (by construction), which can look like “a bug” when it is really a decomposition choice.
 
 ![Candidate Directions without Jitter](../figures/app/dir_dists_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away_no_jitter.png)
 
@@ -76,16 +88,33 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
   > **Done**: Applied `rotate_yaw_cw90` to the reference pose before generating candidate poses around it.
 
 
+- [ ] When setting `view_dir_jitter` to a non-zero value, the candidate frusta and reference pose in the `Candidate Frusta` in `render_candidates_page` (panels.py) shows the frusta and reference pose without with wrong rotation about the z-axes - i.e. as if `rotate_yaw_cw90` was *not* applied! However, later stages e.g. candidate depth renders and backprojected pointclouds seem to be correct.
+
+::: {#fig-rpy-hists layout-ncol=2}
+
+![RPY with 17° roll jitter](../figures/app/dir_dists_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away_17_roll_jitter.png)
+
+![RPY without any jitter](../figures/app/dir_dists_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away_no_jitter_fixed.png)
+:::
+
+The candidate frusta diagram is incorrect:
+
+![Candidate Frusta with 17° roll jitter](../figures/app/candidate_frusta_view_dir_jitter_non_zero_bug.png)
+
+  > **To be resolved**: Investigate why the candidate frusta plot shows incorrect rotations when jitter is enabled.
+
+
 
 **Previous Considerations:**
 
-- implement `CandidateViewGenerator` and auxiliary mdoules in `oracle_rri/oracle_rri/pose_generation`, that generated N candidate SE(3) poses (roll = 0) around the latest camera position in the trajectory. Must generate poses of type `PoseTW` (`external/efm3d/efm3d/aria/pose.py`)
+- Implement `CandidateViewGenerator` and auxiliary modules in `oracle_rri/oracle_rri/pose_generation` that generate `N` candidate SE(3) poses (roll-free base orientation) around the latest camera position in the trajectory. Must generate poses of type `PoseTW` (`external/efm3d/efm3d/aria/pose.py`).
   - Strategies: uniform over half-sphere with min/max radius & elevation, free-space only, room-bounded (SSL for train, occupancy for eval).
   - Collision check: segment from last pose to candidate must not intersect mesh/voxels.
   - Modular strategy selection via enums/config that allows easy extension and combination of strategies / sampling rules.
-- The view direction generation in our pose_generation currently doesn't work as expected when we select a view_sampling_strategy (i.e. `uniform_spere` or `forward_powerspherical`). The view_direction_mode-based generation, however works and we can reliably generate view directions that point away from or towards the reference_pose.
-  - We want to be able to generate random deviations form the deterministic view directions by adding random jitter to them. This should be configurable via view_max_angle_deg or even better view_max_azimuth_deg and view_max_elevation_deg to define the maximum deviation for each view axis separately.
-  - We also want to be able to be able to add a bit of randomness to the yaw angle to allow minimal deviations from a perfectly horizontal x-axis of the candidate camera frames this should be controllable via view_roll_jitter_deg.
+- The view direction generation in our pose_generation did not work as expected when selecting a `view_sampling_strategy` (e.g. `uniform_sphere` or `forward_powerspherical`). The `view_direction_mode`-based deterministic generation, however, worked (reliably pointing away/towards the reference).
+  - We want to generate random deviations from deterministic view directions by adding *bounded* jitter.
+  - This should be configurable via `view_max_azimuth_deg` and `view_max_elevation_deg` (preferred over a single `view_max_angle_deg`).
+  - We also want minimal deviations from a perfectly roll-free base frame, controlled via `view_roll_jitter_deg`.
 
 The PositionalSampling now works as expected and I tried fixing the directional sampling, but I'm still having some issues here!
 
@@ -229,6 +258,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
 
 - **What was wrong:** The legacy app in `oracle_rri/oracle_rri/dashboard/` mixed UI, caching, and compute; this made the
   data-flow hard to reason about and prevented reusing the exact same code path for online label generation.
+
 - **Fix:** Rebuilt the app in `oracle_rri/oracle_rri/app/` with explicit separation of concerns:
   - orchestration in `PipelineController`,
   - compute in `OracleRriLabeler` (`oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`),
@@ -239,6 +269,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
 
 - **What was wrong:** “Refresh” UI controls were not correctly invalidating downstream stages, so reruns reused stale
   results (especially when switching configs or sample indices).
+
 - **Fix:** Added explicit, typed stage caches keyed by `(cfg_sig, sample_key, ...)` and a `force=True` path for refresh
   buttons in `PipelineController` (`oracle_rri/oracle_rri/app/controller.py`).
 
@@ -246,6 +277,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
 
 - **What was wrong:** The depth renderer oversampled candidates for robustness and the UI displayed the oversampled
   batch instead of the requested `max_candidates`.
+
 - **Fix:** `CandidateDepthRenderer` now caps the final batch to `max_candidates_final` and keeps indices stable via
   `CandidateDepths.candidate_indices` (render subset indices into the full candidate list).
 
@@ -253,6 +285,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
 
 - **What was wrong:** Depth rendering and depth-hit point cloud construction were treated as two unrelated “stages” in
   the UI, so running RRI didn’t guarantee the Candidate Renders page had the `CandidatePointClouds` ready.
+
 - **Fix:** The app now treats the “renders” stage as `(depth_batch + candidate_pcs)`:
   - `PipelineController.get_renders()` computes and caches both in one stage,
   - the RRI page uses the same pipeline (`OracleRriLabeler`) so the computed PCs are shared.
@@ -261,6 +294,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
 
 - **What was wrong:** Nested containers made it hard to find the relevant controls and also led to confusing “where am I
   in the pipeline?” moments.
+
 - **Fix:** Each page now has a single `Diagnostics` expander with tabs (no nested expanders) and plot options live
   directly above the plots they affect.
 
@@ -268,6 +302,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
 
 - **What was wrong:** Candidate frusta, rendered depth maps, and backprojected point clouds did not align due to pose and
   pixel/NDC convention mismatches.
+
 - **Fix:** Corrected PoseTW↔PyTorch3D extrinsics handling + NDC unprojection and ensured `depths_valid_mask` is respected.
   The full symptom screenshots + fixes are documented above in “Candidate View Generation & Sampling - DONE”.
 
@@ -284,7 +319,6 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
   - filtered the WebDataset `torch.load` warning in `AseEfmDataset.__init__`,
   - enabled `tool.uv.preview = true` in `oracle_rri/pyproject.toml`.
 
-
 ## Data Handling
 
 - Link ASE ATEK shards and GT meshes to raw ASE; resolve scene_id/snippet_id mapping.
@@ -294,19 +328,6 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
   - download of metadata without full payload,
   - selection of ATEK snippets based on available GT meshes (`ase_mesh_download_urls.json`).
 - Download all dataset variants (ATEK, raw ASE, meshes) for scenes with GT.
-
-## ViewIntrospectionNetwork
-
-- [ ] Implement a VIN model (RRI predictor) in `oracle_rri/oracle_rri/vin` on top of the EFM3D ([EFM3D](../contents/literature/efm3d.qmd)) / EVL backbone (frozen).
-- Input:
-  - raw `efm_snippet_view.efm: efm: dict[str, Any]` as input to EVL backbone
-  - candidate poses `PoseTW` (N candidates) as input to the view scorer head together with scene features from EVL as well as other potential candidate features.
-  - choose suitable positional encoding for the candidate poses - i.e. learnable spherical harmonics encoding or learnable fourier features.
-  - the candidate poses should be relative to the reference poses rig position and orientation.
-  - loss and training objective same as in [VIN-NBV](../contents/literature/vin_nbv.qmd)
-  - start with an implementation proposal of the model architecture and training procedure in `docs/contents/impl/vin_nbv.qmd`.
-  - For this do a comprehensive review of the EVL architecture to understand how to best integrate the view scorer head on top of it. Consider that we have a [simple script to infer EVL](../../oracle_rri/scripts/run_efm3d_on_ase.py). Another good starting point is our [EFM3D symbol index](../contents/ext-impl/efm3d_symbol_index.qmd) and [EFM3D implementation overview](../contents/ext-impl/efm3d_implementation.qmd).
-
 
 ## ViewIntrospectionNetwork
 
@@ -330,6 +351,20 @@ Internal references:
 - EFM3D impl overview: `docs/contents/ext-impl/efm3d_implementation.qmd`
 - Oracle pipeline + metric design: `docs/contents/impl/rri_computation.qmd`
 - Label pipeline implementation: `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`
+
+### Action Items (summary checklist)
+
+- [x] Implement a VIN model (RRI predictor) in `oracle_rri/oracle_rri/vin` on top of the EFM3D ([EFM3D](../contents/literature/efm3d.qmd)) / EVL backbone (frozen).
+  - Input:
+    - raw `efm_snippet_view.efm: efm: dict[str, Any]` as input to EVL backbone
+    - candidate poses `PoseTW` (N candidates) as input to the view scorer head together with scene features from EVL as well as other potential candidate features.
+    - choose suitable positional encoding for the candidate poses - i.e. learnable spherical harmonics encoding or learnable fourier features.
+    - the candidate poses should be relative to the reference poses rig position and orientation.
+    - loss and training objective same as in [VIN-NBV](../contents/literature/vin_nbv.qmd)
+    - start with an implementation proposal of the model architecture and training procedure in `docs/contents/impl/vin_nbv.qmd`.
+    - For this do a comprehensive review of the EVL architecture to understand how to best integrate the view scorer head on top of it. Consider that we have a [simple script to infer EVL](../../oracle_rri/scripts/run_efm3d_on_ase.py). Another good starting point is our [EFM3D symbol index](../contents/ext-impl/efm3d_symbol_index.qmd) and [EFM3D implementation overview](../contents/ext-impl/efm3d_implementation.qmd).
+
+    > **Done**: Implemented VIN package code in `oracle_rri/oracle_rri/vin/` (frozen EVL + CORAL head), shell+SH pose encoding via `e3nn` **plus 1D Fourier features for the radius**, and a minimal end-to-end training script `oracle_rri/scripts/train_vin.py` that uses `OracleRriLabeler`. Documented the architecture + training procedure in `docs/contents/impl/vin_nbv.qmd`.
 
 ### Feature Inventory (what VIN consumes)
 
@@ -412,16 +447,21 @@ Acceptance criteria:
 
 #### 3 Candidate pose descriptor module (shell-aware, SH encoded)
 
-- [ ] Implement `oracle_rri/oracle_rri/vin/shell_pose_descriptor.py`:
+- [x] Implement `oracle_rri/oracle_rri/vin/shell_pose_descriptor.py`:
   - consumes `T_camera_rig` (PoseTW) and computes `r, u, f, scalars`
-- [ ] Implement `oracle_rri/oracle_rri/vin/pose_encoder_sh.py`:
+
+  > **Done**: Implemented the descriptor in `oracle_rri/oracle_rri/vin/model.py` by consuming `candidate_poses_camera_rig` (camera←rig) and computing $(r, u, f, \mathrm{scalars})$ in the reference frame.
+
+- [x] Implement `oracle_rri/oracle_rri/vin/pose_encoder_sh.py`:
   - uses `e3nn.o3.spherical_harmonics` for `u` and `f`
   - no `so3log`
   - outputs `E_pose` per candidate
 
+  > **Done**: Implemented as `oracle_rri/oracle_rri/vin/spherical_encoding.py` (`ShellShPoseEncoder` + config) using `e3nn.o3.spherical_harmonics`, with **1D Fourier features** (on $\log(r+\varepsilon)$) for the radius.
+
 #### 4 VIN scorer head architecture (minimal MLP + CORAL)
 
-- [ ] Implement `VinModel` (frozen EVL + trainable head):
+- [x] Implement `VinModel` (frozen EVL + trainable head):
   - inputs:
     - `efm: dict[str, Any]`
     - `oracle_rri_label_batch.candidates.views.T_camera_rig` (aligned subset; see training step)
@@ -433,7 +473,12 @@ Acceptance criteria:
     - final MLP (2 layers, e.g. 256 hidden) → CORAL logits (K-1)
   - outputs:
     - logits, expected score (normalized), candidate_valid mask
-- [ ] Implement `VinPrediction` dataclass (logits, scores, masks)
+
+  > **Done**: Implemented in `oracle_rri/oracle_rri/vin/model.py` with shell+SH pose encoding (`pose_encoding_mode="shell_sh"`), global mean+max pooled voxel features, local voxel sampling at candidate centers, and CORAL logits/expected score outputs. The model also supports passing `candidate_poses_camera_rig` directly (for pose descriptors) alongside `candidate_poses_world_cam` (for voxel querying).
+
+- [x] Implement `VinPrediction` dataclass (logits, scores, masks)
+
+  > **Done**: Implemented in `oracle_rri/oracle_rri/vin/types.py`.
 
 #### 5 Training data generation (must use OracleRriLabeler)
 
@@ -446,20 +491,29 @@ Acceptance criteria:
   - output training item:
     - `efm`, `T_camera_rig_subset`, `reference_pose_world_rig`, `rri`, validity masks
 - [ ] Add scripts:
-  - `scripts/fit_vin_binner.py` (collect RRIs, fit bin thresholds, save JSON)
-  - `scripts/train_vin.py` (train head only; EVL frozen)
-  - `scripts/eval_vin.py` (rank correlation + top-k recall)
+  - [ ] `scripts/fit_vin_binner.py` (collect RRIs, fit bin thresholds, save JSON)
+  - [x] `scripts/train_vin.py` (train head only; EVL frozen)
+
+    > **Done**: Implemented as `oracle_rri/scripts/train_vin.py` (fits a binner, then trains head-only with online oracle labels via `OracleRriLabeler`, using `depths.camera.T_camera_rig` for the shell descriptor).
+
+  - [ ] `scripts/eval_vin.py` (rank correlation + top-k recall)
 
 #### 6 CORAL loss + bin thresholds (stable + easy)
 
-- [ ] Implement RRI→ordinal binning:
+- [x] Implement RRI→ordinal binning:
   - Fit bin thresholds **globally** on training RRIs (stage_id=0 initially)
   - Use **quantile edges** so bins have ~equal mass
   - Save thresholds to JSON keyed by (candidate generator config hash, EVL ckpt id, num_bins)
-- [ ] Apply CORAL:
+
+  > **Done**: Implemented `oracle_rri/oracle_rri/vin/rri_binning.py` (`RriOrdinalBinner.fit/transform`) and used it in `oracle_rri/scripts/train_vin.py` (stage_id=0 baseline). The script saves `rri_binner.json` into the run output directory.
+
+- [x] Apply CORAL:
   - `logits: (N, K-1)`
   - `labels: (N,)` integer ordinal class
   - mask invalid candidates (`depth_valid` ∧ `candidate_valid` ∧ `finite(rri)`)
+
+  > **Done**: Implemented `oracle_rri/oracle_rri/vin/coral.py` using `coral-pytorch` and trained with `coral_loss` in `oracle_rri/scripts/train_vin.py` using a validity mask (`candidate_valid` ∧ `finite(rri)`).
+
 - [ ] Log metrics:
   - Spearman rank correlation between predicted score and oracle RRI
   - top-1 / top-k recall of best oracle view
@@ -471,20 +525,24 @@ Acceptance criteria:
   - SH output dimension = (L+1)^2 for chosen L
   - voxel query pooling shapes + masking behavior
 - [ ] Integration test:
-  - run `OracleRriLabeler` on a real sample
-  - run VIN forward on the same subset candidates
-  - compute CORAL loss and backprop (head params update; EVL params frozen)
+  - [ ] run `OracleRriLabeler` on a real sample
+  - [x] run VIN forward on a real snippet (smoke test)
+
+    > **Done**: Added `oracle_rri/tests/integration/test_vin_real_data.py` (real-data VIN forward + candidate validity check).
+
+  - [ ] compute CORAL loss and backprop (head params update; EVL params frozen)
 
 #### 8 Documentation (implementation proposal)
 
 - [ ] Write `docs/contents/impl/vin_nbv.qmd`:
-  - clear I/O contract and tensor shapes
-  - EVL feature taps to use
-  - exact pose descriptor formulas (r,u,f, scalars) and SH encoding (e3nn)
-  - candidate voxel-frustum query method (K points + pooling)
-  - CORAL loss + how thresholds are fitted/saved/versioned
-  - minimal ablations (occ only vs occ+obb; L=2 vs L=3; query depth/rays)
+  - [x] clear I/O contract and tensor shapes
+  - [x] EVL feature taps to use
+  - [x] exact pose descriptor formulas $(r,u,f,\mathrm{scalars})$ and SH encoding (`e3nn`)
+  - [ ] candidate voxel-frustum query method (K points + pooling)
+  - [ ] CORAL loss + how thresholds are fitted/saved/versioned
+  - [ ] minimal ablations (occ only vs occ+obb; L=2 vs L=3; query depth/rays)
 
+  > **Done**: Wrote the initial proposal and implementation notes in `docs/contents/impl/vin_nbv.qmd` (EVL interface, shell+SH descriptor, CORAL objective, and a minimal training loop example). Remaining doc items are the frustum query method + threshold versioning + ablations.
 
 # Medium Priority
 

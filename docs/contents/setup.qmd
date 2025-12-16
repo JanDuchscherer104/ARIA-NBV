@@ -23,7 +23,6 @@ uv sync --extra dev --extra notebook --extra pytorch3d
 
 This will install all dependencies and create a new python environment in `oracle_rri/.venv`.
 
-
 ## Direct Installation into the Conda Environment
 
 ```bash

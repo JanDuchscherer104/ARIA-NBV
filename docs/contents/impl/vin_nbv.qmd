@@ -1,0 +1,178 @@
+---
+title: "View Introspection Network (VIN) on EVL"
+format: html
+---
+
+# Scope
+
+This page proposes (and documents) the initial **VIN** implementation for our project: a lightweight **RRI predictor head** trained on top of a **frozen EVL backbone** (EFM3D). It replaces expensive oracle computations at inference time by predicting **Relative Reconstruction Improvement (RRI)** for a set of candidate poses.
+
+References:
+
+- Paper summary: [VIN-NBV](../literature/vin_nbv.qmd)
+- EFM3D/EVL implementation map: [EFM3D Implementation Index](../ext-impl/efm3d_implementation.qmd)
+- External EVL docs: [Project Aria Tools — EVL](https://facebookresearch.github.io/projectaria_tools/docs/open_models/evl)
+- External code: [facebookresearch/efm3d](https://github.com/facebookresearch/efm3d)
+- CORAL ordinal regression (implementation): [coral-pytorch](https://raschka-research-group.github.io/coral-pytorch/) ([GitHub](https://github.com/Raschka-research-group/coral-pytorch))
+- Oracle label pipeline: [RRI computation](rri_computation.qmd) and `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`
+
+# Problem statement
+
+Given:
+
+- the current state encoded as a raw EFM snippet dict `efm: dict[str, Any]` (see `oracle_rri.data.EfmSnippetView.efm`), and
+- a set of candidate next viewpoints as poses $T_{\mathrm{world}\leftarrow\mathrm{cam}_i}$ (`PoseTW`, **world←camera**) with $N$ candidates,
+
+predict per-candidate scores $\widehat{\mathrm{RRI}}(q_i)$ such that selecting $\arg\max_i \widehat{\mathrm{RRI}}(q_i)$ approximates selecting $\arg\max_i \mathrm{RRI}(q_i)$ computed by the oracle.
+
+# EVL backbone recap (what we tap into)
+
+EVL (Egocentric Voxel Lifting) processes the snippet and produces a **voxel-aligned 3D representation**. Architecturally (simplified), it follows:
+
+```{mermaid}
+flowchart LR
+    A["EFM snippet dict<br/>(images, poses, calib, semidense)"]
+    A --> B["2D backbone<br/>(DinoV2 / video backbone)"]
+    B --> C["Lifter<br/>(voxel feats + T_world_voxel)"]
+    C --> D["3D neck<br/>(feature refinement)"]
+    D --> E["Heads<br/>(occupancy + OBB detection)"]
+    D --> F["VIN head<br/>(ours)"]
+    F --> G["CORAL logits<br/>(ordinal RRI bins)"]
+```
+
+For VIN we want a compact, information-rich scene embedding that is (a) available for every snippet, (b) stable across training/inference, and (c) cheap to query for many candidates. This makes the **3D neck feature volumes** the best attachment point.
+
+In `external/efm3d/efm3d/model/evl.py`, these are created right before the occupancy / OBB heads:
+
+- `out["neck/occ_feat"] = neck_feats1`
+- `out["neck/obb_feat"] = neck_feats2`
+
+Our stable “feature contract” is implemented by `oracle_rri/oracle_rri/vin/backbone_evl.py` (`EvlBackbone`) and currently returns:
+
+- `neck/occ_feat`: `Tensor["B Cocc D H W"]`
+- `neck/obb_feat`: `Tensor["B Cobb D H W"]` (optional)
+- `voxel/T_world_voxel`: `PoseTW["B 12"]` (world←voxel grid)
+- `voxel_extent`: `Tensor["B 6"]` with `[$x_\min$,$x_\max$,$y_\min$,$y_\max$,$z_\min$,$z_\max$]` in voxel frame (metres)
+
+# Candidate pose parameterization (shell-aware descriptor in reference frame)
+
+VIN-NBV conditions the score on the candidate viewpoint **relative to the current state**. For ASE/EFM snippets, we define:
+
+- reference pose: $T_{\mathrm{world}\leftarrow\mathrm{rig}_\mathrm{ref}}$ (last rig pose in the snippet),
+- candidate pose: $T_{\mathrm{world}\leftarrow\mathrm{cam}_i}$ for candidate $i$.
+
+The relative pose in the reference rig frame is:
+
+$$
+T_{\mathrm{rig}_\mathrm{ref}\leftarrow\mathrm{cam}_i}
+=
+T_{\mathrm{world}\leftarrow\mathrm{rig}_\mathrm{ref}}^{-1}\;
+T_{\mathrm{world}\leftarrow\mathrm{cam}_i}.
+$$
+
+## Training-time alignment with `OracleRriLabeler` (preferred)
+
+When training from oracle labels, we do **not** need to reconstruct the relative pose from world poses. The label pipeline already provides candidate poses in the reference frame:
+
+- `oracle_rri_label_batch.depths.camera.T_camera_rig`: $T_{\mathrm{cam}\leftarrow\mathrm{rig}_\mathrm{ref}}$ (camera←rig, PoseTW)
+
+We compute the descriptor from:
+
+$$
+T_{\mathrm{rig}_\mathrm{ref}\leftarrow\mathrm{cam}} = T_{\mathrm{cam}\leftarrow\mathrm{rig}_\mathrm{ref}}^{-1}.
+$$
+
+## Shell descriptor $(r,u,f,\text{scalars})$
+
+Let $T_{\mathrm{rig}\leftarrow\mathrm{cam}} = (R_{\mathrm{rig}\leftarrow\mathrm{cam}}, t_{\mathrm{rig}\leftarrow\mathrm{cam}})$. We define:
+
+- radius: $r = \lVert t \rVert$,
+- position direction: $u = t / (r + \varepsilon) \in \mathbb{S}^2$,
+- forward direction: $f = R_{\mathrm{rig}\leftarrow\mathrm{cam}}\;z_{\mathrm{cam}} \in \mathbb{S}^2$, with $z_{\mathrm{cam}}=(0,0,1)$ (LUF camera convention),
+- simple scalar terms, e.g. $\langle f, -u \rangle$ (“looks back towards reference center”).
+
+This descriptor matches our candidate sampling prior (shell around a reference pose), and avoids using $\log(\mathrm{SO}(3))$ or any `so3log` mapping.
+
+# Pose encoding: spherical harmonics (directions) + 1D Fourier (radius)
+
+We encode the two unit vectors $u,f \in \mathbb{S}^2$ using **real spherical harmonics** up to degree $L$ computed with **e3nn**.
+
+- Feature dimension of the SH basis is $(L+1)^2$.
+- Implementation: `oracle_rri/oracle_rri/vin/spherical_encoding.py` (`ShellShPoseEncoder`) via `e3nn.o3.spherical_harmonics`.
+
+For the radius, **SH is not the right basis** (it is a basis on $\mathbb{S}^2$, not on $\mathbb{R}$). We therefore use **1D Fourier features** for $r$:
+
+- encode either $r$ or $\log(r+\varepsilon)$ (default: $\log(r+\varepsilon)$),
+- apply learnable Fourier features (sin/cos) and project to a learnable embedding.
+
+Concretely, for a scalar input $s \in \mathbb{R}$ we use:
+
+$$
+\phi(s) = \big[s,\;\sin(2\pi B s),\;\cos(2\pi B s)\big], \quad B \in \mathbb{R}^{F\times 1}.
+$$
+
+# VIN head (current baseline + planned v0.2 upgrade)
+
+`oracle_rri/oracle_rri/vin/model.py` (`VinModel`) implements a lightweight scorer head on top of frozen EVL:
+
+1. Run frozen EVL once on the snippet to get voxel features + voxel grid pose.
+2. For each candidate:
+   - pose embedding: shell descriptor encoded via SH($u,f$) + 1D Fourier ($r$),
+   - local voxel embedding: sample EVL neck features at the candidate camera center,
+   - global voxel embedding: global mean+max pooling of EVL neck features.
+3. Concatenate embeddings and predict ordinal logits (CORAL) via an MLP + `CoralLayer`.
+
+## Candidate-conditioned voxel query (TODO)
+
+Sampling features only at the camera center is a weak view descriptor. The planned upgrade is a **frustum point query**:
+
+- sample $K$ points in front of the camera along a small set of rays and depths,
+- transform points to world via $T_{\mathrm{world}\leftarrow\mathrm{cam}}$,
+- map to voxel coordinates via $T_{\mathrm{voxel}\leftarrow\mathrm{world}} = T_{\mathrm{world}\leftarrow\mathrm{voxel}}^{-1}$,
+- sample voxel features at those points and pool (mean+max), masking invalid points.
+
+# Training objective (VIN-NBV style): CORAL ordinal regression
+
+VIN-NBV reports that directly regressing RRI is difficult; it discretizes RRI into ordinal bins and trains with CORAL.
+
+We follow the same structure:
+
+1. **Oracle labels**: for each snippet, generate candidates and compute oracle RRI using `OracleRriLabeler` (candidate → render depth → backproject PCs → mesh distance → RRI).
+2. **Binning**: convert RRI to ordinal labels $y\in\{0,\dots,K-1\}$ using `oracle_rri/oracle_rri/vin/rri_binning.py` (`RriOrdinalBinner`). The current baseline uses a single stage id (0) and quantile edges after optional $\tanh$ clipping.
+3. **Loss**: CORAL loss (sum of BCEs over ordinal thresholds) using `oracle_rri/oracle_rri/vin/coral.py` (wraps `coral-pytorch`).
+
+At inference time we use the expected ordinal value (normalized to $[0,1]$) as the candidate score.
+
+# Minimal training script
+
+A minimal end-to-end training smoke test is provided at `oracle_rri/scripts/train_vin.py`. It does:
+
+- load a real ASE snippet (local ATEK shards + meshes),
+- run `OracleRriLabeler` online to produce labels,
+- fit a binner (few snippets),
+- train the head (EVL frozen) for a small number of steps.
+
+Example:
+
+```bash
+cd oracle_rri
+uv run python scripts/train_vin.py --max-steps 5 --fit-snippets 2 --max-candidates 8 --device auto
+```
+
+# Implementation map
+
+VIN code lives in `oracle_rri/oracle_rri/vin/`:
+
+- `backbone_evl.py`: `EvlBackbone` wrapper that consumes raw EFM dicts and returns `neck/*` volumes + voxel pose/extent.
+- `spherical_encoding.py`: `ShellShPoseEncoder` (e3nn SH for $u,f$ + 1D Fourier features for radius).
+- `pose_encoding.py`: Learnable Fourier features baseline modules (as per Learnable Fourier Features, NeurIPS 2021).
+- `model.py`: `VinModel` (pose encoding + voxel querying + MLP + CORAL).
+- `coral.py`: CORAL layer + loss and probability utilities (via `coral-pytorch`).
+- `rri_binning.py`: RRI→ordinal binning (`RriOrdinalBinner`).
+
+# Known gaps / next steps (tracked in `todos.qmd`)
+
+- implement candidate frustum query + strict point-level validity masking,
+- add ranking metrics (Spearman, top-$k$ recall) to the training loop,
+- version bin thresholds by candidate generator config + EVL ckpt id,
+- run ablations: occ-only vs occ+obb, $L=2$ vs $L=3$, query depths/rays.

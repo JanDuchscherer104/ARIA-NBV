@@ -11,7 +11,6 @@ format: html
 
 ![Candidate Pose Sampling Visualization](../../figures/candidate_pose2.png)
 
-
 ## EFM Snippet Visualizations
 
 Quick reference of all visuals currently in `docs/figures/app`.
@@ -47,7 +46,3 @@ Quick reference of all visuals currently in `docs/figures/app`.
 ![Depth histogram diagnostics](../../figures/app/depth_hist.png)
 
 ![Back-projected point cloud](../../figures/app/backproj_pc.png)
-
-
-
-
