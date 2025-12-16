@@ -2,7 +2,17 @@
 title: "Action Items & TODOs"
 format: html
 ---
-<!-- Agent Instructions: Always work in a test-driven manner. -->
+<!-- All TODO points must be listed as `- [ ]` or `- [x]`. If an issue has been resolved, it should be marked as `- [x]` followed with *how* it was resolved on the next line. i.e:
+```
+- [x] Implement `OracleRRI` with point-cloud–to–mesh distance (Chamfer components).
+  - Consider mesh-to-distance-field acceleration and room-level cropping to avoid unrelated geometry.
+
+    > **Done**: Just crop the mesh to a bounding box that contains both the semi-dense SLAM PC and all candidate PCs with some margin.
+```
+
+Initial considerations and conceptual notes should be the first section of each grouping, followed by the action items and issues together with the elaborations on how they manifested and how they were resolved. Don't remove any items or notes, just reorder and refactor for clarity.
+
+-->
 
 # Overview
 
@@ -47,14 +57,16 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 - [x] The generated candidate torus should be symmetric to the forward axis of the reference frame in terms of the azimuth dimension, while its elevation band stays gravity aligned.
   > Implemented via `align_to_gravity=True` in `CandidateViewGeneratorConfig` (sampling uses yaw-only, gravity-aligned reference).
 - [ ] The current options to apply jitter to the view directions, wich are determined by the view `view_max_azimuth_deg, view_max_elevation_deg, view_roll_jitter_deg` are rather intransparent and hard to control.
-- [ ] Euler angles (world frame, deg) show a pitch of zero for all poses. Does this make senese? We wanted the x-axis to gravity aligned without adding any jitter to the view-directions. The world up vector is along +Z.
+- [ ] Euler angles (world frame, deg) show a pitch of zero for all poses. Does this make senese? We wanted the x-axis to gravity aligned without adding any jitter to the view-directions. The world up vector is along +Z. Without any jitter, the x-axes of the camera frusta are horizontal and thuse they should have a roll of zero?
 
 ![Candidate Directions without Jitter](../figures/app/dir_dists_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away_no_jitter.png)
 
-- [ ] Plot of the candidate positions in the 3D plot around the reference pose in world-coordinates shows candidate poses living in a y-z torus around the x axis of the reference pose. This is related to `rotate_yaw_cw90`. The displayed reference axes are correctly rotated for visualization, but the candidate points are not! When plotted in the reference frame they look correct and build a torus around the y axis (for `delta_azimuth_deg=360`)
+- [x] Plot of the candidate positions in the 3D plot around the reference pose in world-coordinates shows candidate poses living in a y-z torus around the x axis of the reference pose. This is related to `rotate_yaw_cw90`. The displayed reference axes are correctly rotated for visualization, but the candidate points are not! When plotted in the reference frame they look correct and build a torus around the y axis (for `delta_azimuth_deg=360`)
 
 ![Candidate Positions in world frame - torus around x axis](../figures/app/cand_poses_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away.png)
 ![Candidate Positions in reference frame - torus around y axis](../figures/app/cand_pose_dists_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away.png)
+
+  > **Done**: Applied `rotate_yaw_cw90` to the reference pose before generating candidate poses around it.
 
 
 
