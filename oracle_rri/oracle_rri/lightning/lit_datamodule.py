@@ -12,12 +12,12 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any
 
 import pytorch_lightning as pl
 import torch
 from efm3d.aria.pose import PoseTW
-from pydantic import Field, model_validator
+from pydantic import Field
 from torch.utils.data import DataLoader, IterableDataset
 
 from ..data import AseEfmDatasetConfig, EfmSnippetView
@@ -34,10 +34,15 @@ class VinOracleBatch:
     Attributes:
         efm: Raw EFM snippet dict (zero-copy view over the underlying WebDataset sample).
         candidate_poses_world_cam: ``PoseTW["N 12"]`` candidate poses as world←camera for the rendered subset.
-        reference_pose_world_rig: ``PoseTW["12"]`` reference pose as world←rig for the snippet.
-        candidate_poses_camera_rig: ``PoseTW["N 12"]`` candidate poses as camera←rig_ref (preferred for training).
+        reference_pose_world_rig: ``PoseTW["12"]`` reference pose as world←rig_reference for the snippet.
+        candidate_poses_camera_rig: ``PoseTW["N 12"]`` candidate poses as camera←rig_reference frame (preferred for training).
         rri: ``Tensor["N", float32]`` oracle RRI per candidate (same ordering as candidates).
-        stage: ``Tensor["N", int64]`` capture stage ids (VIN-NBV uses stage-aware normalization; baseline uses 0).
+        pm_dist_before: ``Tensor["N", float32]`` Chamfer-style point↔mesh distance before (broadcasted).
+        pm_dist_after: ``Tensor["N", float32]`` Chamfer-style point↔mesh distance after (per-candidate).
+        pm_acc_before: ``Tensor["N", float32]`` point→mesh accuracy distance before (broadcasted).
+        pm_comp_before: ``Tensor["N", float32]`` mesh→point completeness distance before (broadcasted).
+        pm_acc_after: ``Tensor["N", float32]`` point→mesh accuracy distance after (per-candidate).
+        pm_comp_after: ``Tensor["N", float32]`` mesh→point completeness distance after (per-candidate).
         scene_id: ASE scene id for diagnostics.
         snippet_id: Snippet id (tar key/url stem) for diagnostics.
     """
@@ -47,7 +52,12 @@ class VinOracleBatch:
     reference_pose_world_rig: PoseTW
     candidate_poses_camera_rig: PoseTW
     rri: Tensor
-    stage: Tensor
+    pm_dist_before: Tensor
+    pm_dist_after: Tensor
+    pm_acc_before: Tensor
+    pm_comp_before: Tensor
+    pm_acc_after: Tensor
+    pm_comp_after: Tensor
     scene_id: str
     snippet_id: str
 
@@ -60,14 +70,12 @@ class VinOracleIterableDataset(IterableDataset[VinOracleBatch]):
         *,
         base: IterableDataset[EfmSnippetView],
         labeler: OracleRriLabeler,
-        stage_id: int,
         max_attempts_per_batch: int,
         verbosity: Verbosity,
     ) -> None:
         super().__init__()
         self._base = base
         self._labeler = labeler
-        self._stage_id = int(stage_id)
         self._max_attempts = int(max_attempts_per_batch)
         self._console = Console.with_prefix(self.__class__.__name__).set_verbosity(verbosity)
 
@@ -93,22 +101,28 @@ class VinOracleIterableDataset(IterableDataset[VinOracleBatch]):
                 self._console.warn(f"skip: empty/non-finite rri scene={sample.scene_id} snip={sample.snippet_id}")
                 continue
 
-            stage = torch.full_like(oracle_rri, fill_value=self._stage_id, dtype=torch.int64)
-            yield _vin_oracle_batch_from_label(label_batch, stage=stage)
+            yield _vin_oracle_batch_from_label(label_batch)
 
 
-def _vin_oracle_batch_from_label(label_batch: OracleRriLabelBatch, *, stage: Tensor) -> VinOracleBatch:
+def _vin_oracle_batch_from_label(label_batch: OracleRriLabelBatch) -> VinOracleBatch:
     camera_rig = label_batch.depths.camera.T_camera_rig
     if not isinstance(camera_rig, PoseTW):
         raise TypeError(f"Expected PoseTW for camera.T_camera_rig, got {type(camera_rig)}")
+
+    rri = label_batch.rri
 
     return VinOracleBatch(
         efm=label_batch.sample.efm,
         candidate_poses_world_cam=label_batch.depths.poses,
         reference_pose_world_rig=label_batch.depths.reference_pose,
         candidate_poses_camera_rig=camera_rig,
-        rri=label_batch.rri.rri,
-        stage=stage,
+        rri=rri.rri,
+        pm_dist_before=rri.pm_dist_before,
+        pm_dist_after=rri.pm_dist_after,
+        pm_acc_before=rri.pm_acc_before,
+        pm_comp_before=rri.pm_comp_before,
+        pm_acc_after=rri.pm_acc_after,
+        pm_comp_after=rri.pm_comp_after,
         scene_id=label_batch.sample.scene_id,
         snippet_id=label_batch.sample.snippet_id,
     )
@@ -121,6 +135,7 @@ def _default_train_ds() -> AseEfmDatasetConfig:
         batch_size=1,
         verbosity=Verbosity.QUIET,
         is_debug=False,
+        wds_shuffle=True,
     )
 
 
@@ -148,9 +163,6 @@ class VinDataModuleConfig(BaseConfig["VinDataModule"]):
     labeler: OracleRriLabelerConfig = Field(default_factory=OracleRriLabelerConfig)
     """Oracle labeler configuration (candidates, rendering, RRI)."""
 
-    stage_id: int = 0
-    """Capture stage id used for VIN-NBV style normalization (baseline uses 0)."""
-
     max_attempts_per_batch: int = 50
     """Maximum oracle attempts before raising (guards against overly strict sampling rules)."""
 
@@ -165,13 +177,6 @@ class VinDataModuleConfig(BaseConfig["VinDataModule"]):
 
     is_debug: bool = False
     """Enable debug defaults (forces num_workers=0, lowers verbosity)."""
-
-    @model_validator(mode="after")
-    def _debug_defaults(self) -> Self:
-        if self.is_debug:
-            object.__setattr__(self, "num_workers", 0)
-            object.__setattr__(self, "verbosity", Verbosity.QUIET)
-        return self
 
 
 class VinDataModule(pl.LightningDataModule):
@@ -207,15 +212,14 @@ class VinDataModule(pl.LightningDataModule):
         ds = VinOracleIterableDataset(
             base=self._train_base,
             labeler=self._require_labeler(),
-            stage_id=int(self.config.stage_id),
-            max_attempts_per_batch=int(self.config.max_attempts_per_batch),
+            max_attempts_per_batch=self.config.max_attempts_per_batch,
             verbosity=self.config.verbosity,
         )
         return DataLoader(
             ds,
             batch_size=None,
-            num_workers=int(self.config.num_workers),
-            persistent_workers=bool(self.config.persistent_workers) if self.config.num_workers > 0 else False,
+            num_workers=self.config.num_workers,
+            persistent_workers=self.config.persistent_workers if self.config.num_workers > 0 else False,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -224,15 +228,14 @@ class VinDataModule(pl.LightningDataModule):
         ds = VinOracleIterableDataset(
             base=self._val_base,
             labeler=self._require_labeler(),
-            stage_id=int(self.config.stage_id),
-            max_attempts_per_batch=int(self.config.max_attempts_per_batch),
+            max_attempts_per_batch=self.config.max_attempts_per_batch,
             verbosity=self.config.verbosity,
         )
         return DataLoader(
             ds,
             batch_size=None,
-            num_workers=int(self.config.num_workers),
-            persistent_workers=bool(self.config.persistent_workers) if self.config.num_workers > 0 else False,
+            num_workers=self.config.num_workers,
+            persistent_workers=self.config.persistent_workers if self.config.num_workers > 0 else False,
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -248,8 +251,7 @@ class VinDataModule(pl.LightningDataModule):
         ds = VinOracleIterableDataset(
             base=base,
             labeler=self._require_labeler(),
-            stage_id=int(self.config.stage_id),
-            max_attempts_per_batch=int(self.config.max_attempts_per_batch),
+            max_attempts_per_batch=self.config.max_attempts_per_batch,
             verbosity=self.config.verbosity,
         )
         return iter(ds)

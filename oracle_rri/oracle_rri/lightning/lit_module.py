@@ -101,11 +101,11 @@ class VinLightningModule(pl.LightningModule):
         self._binner: RriOrdinalBinner | None = None
 
     # --------------------------------------------------------------------- lifecycle
-    def on_fit_start(self) -> None:
+    def setup(self, stage: str) -> None:  # noqa: A003
+        super().setup(stage)
         self._integrate_console()
         if self._binner is None:
-            self._binner = self._fit_binner_from_datamodule()
-            self._maybe_save_binner()
+            self._binner = self._load_binner_from_config()
 
     def on_save_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         if self._binner is not None:
@@ -139,7 +139,10 @@ class VinLightningModule(pl.LightningModule):
         Console.update_global_step(int(self.global_step))
 
         if self._binner is None:
-            raise RuntimeError("RRI binner not initialized. Run trainer.fit() first or load from checkpoint.")
+            raise RuntimeError(
+                "RRI binner not initialized. Provide `VinLightningModuleConfig.binner_path` (a fitted .json), "
+                "or resume from a checkpoint that contains `rri_binner`."
+            )
 
         pred = self.vin.forward(
             batch.efm,
@@ -257,71 +260,22 @@ class VinLightningModule(pl.LightningModule):
         )
         return loss
 
-    def _fit_binner_from_datamodule(self) -> RriOrdinalBinner:
-        """Fit the ordinal binner on-the-fly using the trainer datamodule.
-
-        Returns:
-            Fitted :class:`~oracle_rri.vin.rri_binning.RriOrdinalBinner`.
-        """
-
-        from .lit_datamodule import VinDataModule
-
-        dm = getattr(self.trainer, "datamodule", None)
-        if not isinstance(dm, VinDataModule):
-            raise TypeError(f"VinLightningModule expects VinDataModule for binner fitting (got {type(dm).__name__}).")
-
-        fit_snippets = int(self.config.binner_fit_snippets)
-        if fit_snippets <= 0:
-            raise ValueError("binner_fit_snippets must be > 0 when no binner is loaded from checkpoint.")
-
-        max_skips = int(self.config.binner_max_attempts)
-        console = Console.with_prefix(self.__class__.__name__, "binner_fit")
-        console.log(f"Fitting RRI ordinal binner on {fit_snippets} snippets.")
-
-        def _iter_rri():
-            for batch in dm.iter_oracle_batches(stage=Stage.TRAIN):
-                rri = batch.rri.detach().reshape(-1).to(device="cpu", dtype=torch.float32)
-                meta = {"scene_id": batch.scene_id, "snippet_id": batch.snippet_id}
-                yield rri, meta
-
-        def _on_progress(successes: int, skipped: int, rri: torch.Tensor | None, meta: object | None) -> None:
-            if rri is None:
-                return
-            if not isinstance(meta, dict):
-                return
-            console.log(
-                f"  fit[{successes:02d}/{fit_snippets:02d}] scene={meta.get('scene_id', 'unknown')} "
-                f"snip={meta.get('snippet_id', 'unknown')} C={int(rri.numel())} "
-                f"rri_mean={float(rri.mean().item()):.4f} rri_std={float(rri.std().item()):.4f}"
+    def _load_binner_from_config(self) -> RriOrdinalBinner:
+        if self.config.binner_path is None:
+            raise RuntimeError(
+                "Missing `VinLightningModuleConfig.binner_path`. Fit a binner first (e.g. via `nbv-fit-binner`) "
+                "and point this config field to the resulting `rri_binner.json`, or resume from a checkpoint."
             )
 
-        binner = RriOrdinalBinner.fit_from_iterable(
-            _iter_rri(),
-            num_classes=int(self.config.num_classes),
-            target_items=fit_snippets,
-            max_skips=max_skips,
-            on_progress=_on_progress,
+        resolved = PathConfig().resolve_artifact_path(
+            self.config.binner_path, expected_suffix=".json", create_parent=False
         )
-        console.log("Binner fitted.")
-        return binner
-
-    def _maybe_save_binner(self) -> None:
-        if not self.config.save_binner or self._binner is None:
-            return
-        path = self._resolve_binner_path()
-        saved_path = self._binner.save(path)
-        self.console.log(f"Saved binner to {saved_path}")
-
-    def _resolve_binner_path(self) -> Path:
-        paths = PathConfig()
-        if self.config.binner_path is not None:
-            return paths.resolve_artifact_path(self.config.binner_path, expected_suffix=".json")
-
-        root_dir = getattr(self.trainer, "default_root_dir", None)
-        if root_dir:
-            return paths.resolve_artifact_path(Path(root_dir) / "rri_binner.json", expected_suffix=".json")
-
-        return paths.resolve_artifact_path(Path(".logs") / "rri_binner.json", expected_suffix=".json")
+        if not resolved.exists():
+            raise FileNotFoundError(
+                f"RRI binner not found at {resolved}. Run `nbv-fit-binner --out-dir <run_dir>` to create it "
+                "or set `VinLightningModuleConfig.binner_path` to an existing fitted binner JSON."
+            )
+        return RriOrdinalBinner.load(resolved)
 
     def _integrate_console(self) -> None:
         logger = getattr(self, "logger", None)
