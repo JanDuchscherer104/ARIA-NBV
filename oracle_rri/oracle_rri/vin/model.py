@@ -166,12 +166,28 @@ class VinModel(nn.Module):
         self.backbone = self.config.backbone.setup_target()
         self.pose_encoder_lff = self.config.pose_encoder.setup_target()
         self.pose_encoder_sh = self.config.pose_encoder_sh.setup_target()
+        self._freeze_inactive_pose_encoder()
 
         # Head input dim is data-dependent (feature channel count depends on EVL cfg).
         self.head = self.config.head.setup_target(in_dim=None)
         # Keep the trainable head modules on the same device as the frozen backbone.
         # (EvlBackbone is not an nn.Module, so nn.Module.to() won't affect it.)
         self.to(self.backbone.device)
+
+    def _freeze_inactive_pose_encoder(self) -> None:
+        """Disable gradients for the pose encoder not used by `pose_encoding_mode`."""
+
+        match str(self.config.pose_encoding_mode):
+            case "shell_sh":
+                self.pose_encoder_lff.eval()
+                for param in self.pose_encoder_lff.parameters():
+                    param.requires_grad = False
+            case "lff6d":
+                self.pose_encoder_sh.eval()
+                for param in self.pose_encoder_sh.parameters():
+                    param.requires_grad = False
+            case other:
+                raise ValueError(f"Unsupported pose_encoding_mode: {other}")
 
     def _get_reference_pose_world_rig(self, efm: Mapping[str, Any]) -> PoseTW:
         pose_tw = efm.get(_first_key(ARIA_POSE_T_WORLD_RIG))

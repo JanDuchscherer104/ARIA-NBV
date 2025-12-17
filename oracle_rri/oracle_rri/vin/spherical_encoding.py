@@ -34,7 +34,7 @@ class ShellShPoseEncoder(nn.Module):
 
     The encoder computes real spherical harmonics up to degree ``lmax`` for $u$ and $f$ and projects
     them into a learnable embedding space. The radius is encoded via **1D Fourier features** (on
-    $\\log(r+\\varepsilon)$ by default) and projected to a learnable embedding.
+    $r$ by default) and projected to a learnable embedding.
 
     Args:
         lmax: Maximum spherical harmonics degree.
@@ -214,8 +214,8 @@ class ShellShPoseEncoderConfig(BaseConfig[ShellShPoseEncoder]):
     radius_init_scale: float = 1.0
     """Stddev used to initialize the radius Fourier frequency matrix."""
 
-    radius_log_input: bool = True
-    """Encode $\\log(r+\\varepsilon)$ when True, else encode $r$ directly."""
+    radius_log_input: bool = False
+    """Encode $r$ directly by default; set to ``True`` to encode $\\log(r+\\varepsilon)`` instead."""
 
     include_radius: bool = True
     """Include radius features in the embedding when True."""
