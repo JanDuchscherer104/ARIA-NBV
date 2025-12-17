@@ -9,12 +9,13 @@ from typing import Any, Literal
 
 import torch
 import trimesh
+from atek.data_loaders.atek_wds_dataloader import load_atek_wds_dataset
 from efm3d.aria.aria_constants import (
     ARIA_POINTS_VOL_MAX,
     ARIA_POINTS_VOL_MIN,
     ARIA_POINTS_WORLD,
 )
-from efm3d.dataset.efm_model_adaptor import load_atek_wds_dataset_as_efm
+from efm3d.dataset.efm_model_adaptor import EfmModelAdaptor, pipelinefilter
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 from torch.utils.data import IterableDataset
 
@@ -118,17 +119,32 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
         self.console = Console.with_prefix(self.__class__.__name__).set_verbosity(config.verbosity)
 
         self.console.log(f"Loading EFM-formatted ATEK WDS from {len(config.tar_urls)} shards")
-        self._efm_wds = load_atek_wds_dataset_as_efm(
-            urls=config.tar_urls,
-            freq=config.freq_hz,
-            snippet_length_s=config.snippet_length_s,
-            semidense_points_pad_to_num=config.semidense_points_pad,
-            atek_to_efm_taxonomy_mapping_file=config.taxonomy_csv.as_posix() if config.taxonomy_csv else None,
-            batch_size=config.batch_size,
-            collation_fn=None,
-        )
+
+        self._efm_wds = self._load_atek_wds_dataset_as_efm()
         self._mesh_cache: dict[str, trimesh.Trimesh] = {}
         self.console.log("EFM loader ready")
+
+    def _load_atek_wds_dataset_as_efm(self):
+        return load_atek_wds_dataset(
+            urls=self.config.tar_urls,
+            dict_key_mapping=EfmModelAdaptor.get_dict_key_mapping_all(),
+            data_transform_fn=pipelinefilter(
+                EfmModelAdaptor(
+                    freq=self.config.freq_hz,
+                    snippet_length_s=self.config.snippet_length_s,
+                    semidense_points_pad_to_num=self.config.semidense_points_pad,
+                    atek_to_efm_taxonomy_mapping_file=self.config.taxonomy_csv.as_posix()
+                    if self.config.taxonomy_csv
+                    else None,
+                ).atek_to_efm
+            )(
+                train=False,
+            ),
+            batch_size=self.config.batch_size,
+            collation_fn=None,
+            repeat_flag=self.config.wds_repeat,
+            shuffle_flag=self.config.wds_shuffle,
+        )
 
     def _load_mesh(self, scene_id: str) -> trimesh.Trimesh | None:
         if scene_id in self._mesh_cache:
@@ -227,11 +243,6 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
 class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
     """Configuration for :class:`AseEfmDataset`."""
 
-    # NOTE: Previously defined via Field, making it a Pydantic field; accessing
-    # `AseEfmDatasetConfig.DEBUG_DEFAULTS` in Streamlit raised AttributeError.
-    # We keep it as a ClassVar constant so it stays accessible while being
-    # excluded from model fields.
-
     target: type[AseEfmDataset] = Field(default=AseEfmDataset, exclude=True)
     paths: PathConfig = Field(default_factory=PathConfig)
     atek_variant: Literal["efm", "efm_eval", "cubercnn", "cubercnn_eval"] = Field(default="efm")
@@ -241,6 +252,17 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
 
     taxonomy_csv_filename: str = Field(default="atek_to_efm.csv")
     batch_size: int | None = Field(default=2)
+    wds_shuffle: bool = Field(default=False)
+    """Enable shuffled sampling in the underlying WebDataset pipeline.
+
+    This is forwarded to `efm3d.dataset.efm_model_adaptor.load_atek_wds_dataset_as_efm(..., shuffle_flag=...)`.
+    """
+
+    wds_repeat: bool = Field(default=False)
+    """Repeat the underlying WebDataset stream (infinite iterator).
+
+    This is forwarded to `efm3d.dataset.efm_model_adaptor.load_atek_wds_dataset_as_efm(..., repeat_flag=...)`.
+    """
     snippet_length_s: float = Field(default=2.0, gt=0)
     freq_hz: int = Field(default=10, gt=0)
     semidense_points_pad: int = Field(default=50000, gt=0)
