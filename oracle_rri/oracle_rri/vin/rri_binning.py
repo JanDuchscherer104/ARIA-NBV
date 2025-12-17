@@ -1,26 +1,33 @@
-"""RRI → ordinal label binning (VIN-NBV style).
+"""RRI → ordinal label binning for CORAL training.
 
-We discretize oracle RRI values into ordinal bins:
+VIN trains an ordinal regressor (CORAL) rather than directly regressing oracle
+RRI values. We therefore map continuous RRIs to ordinal labels via *empirical
+quantile edges* (equal-mass bins):
 
-1) z-normalize within a *stage*,
-2) soft-clip z via ``tanh``, and
-3) fit global equal-mass quantile edges.
+- fit $K-1$ quantiles on observed oracle RRIs,
+- label = number of edges below the value (``torch.bucketize``).
 
-The binner can optionally store (and save) the raw fit data on CPU so you can
-refit edges for different ``K`` without rerunning the oracle.
+Design goals:
+    - Accumulate fit data on CPU.
+    - Persist fit data to resume after Ctrl-C / crashes.
+    - Avoid overwriting JSON outputs by default.
+
+File formats:
+    - Fit data: ``.pt`` (torch.save state with ``rri_chunks``)
+    - Fitted binner: ``.json`` (num_classes + edges)
 """
 
 from __future__ import annotations
 
+import json
 import os
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import torch
-
-Tensor = torch.Tensor
+from torch import Tensor
 
 
 def _unique_path(path: Path, *, overwrite: bool) -> Path:
@@ -29,6 +36,7 @@ def _unique_path(path: Path, *, overwrite: bool) -> Path:
     path = Path(path)
     if overwrite or not path.exists():
         return path
+
     idx = 1
     while True:  # pragma: no cover - should terminate quickly
         candidate = path.with_name(f"{path.stem}-{idx}{path.suffix}")
@@ -43,67 +51,63 @@ def _atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> Non
     os.replace(tmp, path)
 
 
+def _atomic_torch_save(path: Path, state: dict[str, Any]) -> None:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    torch.save(state, tmp)
+    os.replace(tmp, path)
+
+
 @dataclass(slots=True)
 class RriOrdinalBinner:
-    """Stage-aware RRI → ordinal label mapping.
-
-    Attributes:
-        num_classes: Number of ordinal classes ``K``.
-        tanh_scale: Scale applied before tanh clipping (z / tanh_scale).
-        stage_mean: Mean RRI per stage id.
-        stage_std: Stddev RRI per stage id (clamped to ``>= eps``).
-        edges: ``Tensor["K-1", float32]`` monotonically increasing bin edges in
-            clipped z-score space.
-    """
+    """RRI → ordinal label mapping (CORAL-compatible)."""
 
     num_classes: int = 0
-    tanh_scale: float = 1.0
-    stage_mean: dict[int, float] = field(default_factory=dict)
-    stage_std: dict[int, float] = field(default_factory=dict)
-    edges: Tensor = field(default_factory=lambda: torch.empty((0,), dtype=torch.float32))
+    """Number of ordinal classes $K$."""
 
-    eps: float = 1e-6
-    """Lower bound for per-stage stddev (also used during fitting)."""
+    edges: Tensor = field(default_factory=lambda: torch.empty((0,), dtype=torch.float32))
+    """Quantile edges. Shape ``(K-1,)``."""
 
     _rri_chunks: list[Tensor] = field(default_factory=list, repr=False)
-    _stage_chunks: list[Tensor] = field(default_factory=list, repr=False)
 
-    # --------------------------------------------------------------------- validation / IO
-    @staticmethod
-    def _validate_inputs(rri: Tensor, stage: Tensor) -> tuple[Tensor, Tensor]:
-        if rri.ndim != 1:
-            rri = rri.reshape(-1)
-        if stage.ndim != 1:
-            stage = stage.reshape(-1)
-        if rri.numel() != stage.numel():
-            raise ValueError(f"rri and stage must have same numel, got {rri.numel()} and {stage.numel()}.")
-        if stage.dtype not in (torch.int32, torch.int64):
-            raise TypeError(f"stage must be integer dtype, got {stage.dtype}.")
-        return rri.to(dtype=torch.float32), stage.to(dtype=torch.int64)
+    @property
+    def is_fitted(self) -> bool:
+        return int(self.num_classes) >= 2 and int(self.edges.numel()) == int(self.num_classes) - 1
 
+    def transform(self, rri: Tensor) -> Tensor:
+        """Convert oracle RRI values to ordinal labels.
+
+        Args:
+            rri: Oracle RRI values. Shape ``(...,)``.
+
+        Returns:
+            ``Tensor["...", int64]`` labels in ``[0, K-1]``.
+        """
+
+        if not self.is_fitted:
+            raise RuntimeError("Binner not fitted. Call fit_from_iterable(...) or load a fitted JSON binner.")
+
+        rri_f = rri.reshape(-1).to(dtype=torch.float32)
+        labels = torch.bucketize(rri_f, self.edges.to(device=rri_f.device), right=False)
+        return labels.to(dtype=torch.int64)
+
+    # --------------------------------------------------------------------- JSON (checkpoint + artifact)
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "num_classes": int(self.num_classes),
-            "tanh_scale": float(self.tanh_scale),
-            "stage_mean": dict(self.stage_mean),
-            "stage_std": dict(self.stage_std),
-            "edges": self.edges.detach().cpu().tolist(),
-        }
+        if not self.is_fitted:
+            raise RuntimeError("Binner not fitted; only fitted binners can be serialized.")
+        return {"num_classes": int(self.num_classes), "edges": self.edges.detach().cpu().tolist()}
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> RriOrdinalBinner:
+    def from_dict(cls, data: dict[str, Any]) -> "RriOrdinalBinner":
         return cls(
             num_classes=int(data["num_classes"]),
-            tanh_scale=float(data.get("tanh_scale", 1.0)),
-            stage_mean={int(k): float(v) for k, v in dict(data["stage_mean"]).items()},
-            stage_std={int(k): float(v) for k, v in dict(data["stage_std"]).items()},
             edges=torch.tensor(data["edges"], dtype=torch.float32),
         )
 
     def save(self, path: str | Path, *, overwrite: bool = False) -> Path:
-        """Save fitted binner to JSON (non-overwriting by default)."""
+        """Save a fitted binner as JSON."""
 
-        import json
+        if not self.is_fitted:
+            raise RuntimeError("Binner not fitted; call fit_from_iterable(...) before save().")
 
         out_path = _unique_path(Path(path), overwrite=overwrite)
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -111,174 +115,114 @@ class RriOrdinalBinner:
         return out_path
 
     @classmethod
-    def load(cls, path: str | Path) -> RriOrdinalBinner:
-        """Load fitted binner from JSON (no fit data)."""
-
-        import json
+    def load(cls, path: str | Path) -> "RriOrdinalBinner":
+        """Load a fitted binner from JSON."""
 
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         return cls.from_dict(data)
 
-    def save_fit_data(self, path: str | Path, *, overwrite: bool = False) -> Path:
-        """Save accumulated fit data (CPU tensors) as a torch file."""
-
-        out_path = _unique_path(Path(path), overwrite=overwrite)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        rri, stage = self._fit_tensors()
-        state = {"tanh_scale": float(self.tanh_scale), "eps": float(self.eps), "rri": rri, "stage": stage}
-        tmp = out_path.with_suffix(out_path.suffix + ".tmp")
-        torch.save(state, tmp)
-        os.replace(tmp, out_path)
-        return out_path
-
+    # --------------------------------------------------------------------- fitting (single entry point)
     @classmethod
-    def load_fit_data(cls, path: str | Path) -> RriOrdinalBinner:
-        """Load fit data (CPU tensors) and return an *unfitted* binner."""
+    def fit_from_iterable(
+        cls,
+        iterable: Iterable[Tensor | tuple[Tensor, Any]],
+        *,
+        num_classes: int = 15,
+        target_items: int | None = None,
+        max_skips: int = 0,
+        fit_data_path: str | Path | None = None,
+        resume: bool = False,
+        save_every: int = 1,
+        on_progress: Callable[[int, int, Tensor | None, Any | None], None] | None = None,
+    ) -> "RriOrdinalBinner":
+        """Fit a binner from a stream of RRIs, optionally resumable via ``fit_data_path``.
 
-        load_path = Path(path)
+        Notes:
+            - All fit data is stored on CPU.
+            - Fit data is saved on Ctrl-C / exceptions when ``fit_data_path`` is provided.
+            - The iterable may yield either ``rri`` tensors or ``(rri, meta)`` tuples.
+        """
+
+        path = Path(fit_data_path) if fit_data_path is not None else None
+        if path is not None and path.suffix != ".pt":
+            raise ValueError(f"fit_data_path must end with .pt, got {path}")
+
+        binner = cls()
+        if path is not None and path.exists():
+            if not resume:
+                raise FileExistsError(f"Fit data already exists at {path}. Delete it or pass resume=True.")
+            state = torch.load(path, map_location="cpu", weights_only=True)
+            binner._rri_chunks = [t.reshape(-1).to(dtype=torch.float32) for t in state["rri_chunks"]]  # noqa: SLF001
+
+        successes = len(binner._rri_chunks)  # noqa: SLF001
+        skipped = 0
+
+        def _save_fit_data() -> None:
+            if path is None:
+                return
+            path.parent.mkdir(parents=True, exist_ok=True)
+            state = {"rri_chunks": [t.detach().to(device="cpu", dtype=torch.float32) for t in binner._rri_chunks]}  # noqa: SLF001
+            _atomic_torch_save(path, state)
+
         try:
-            state = torch.load(load_path, map_location="cpu", weights_only=True)
-        except TypeError:  # pragma: no cover - older torch
-            state = torch.load(load_path, map_location="cpu")
-        if not isinstance(state, dict):  # pragma: no cover - defensive
-            raise TypeError(f"Expected dict state for fit data, got {type(state)}.")
-        binner = cls(tanh_scale=float(state.get("tanh_scale", 1.0)), eps=float(state.get("eps", 1e-6)))
-        binner.append(state["rri"], state["stage"])
-        return binner
+            for item in iterable:
+                if target_items is not None and successes >= int(target_items):
+                    break
 
-    # --------------------------------------------------------------------- fit data (CPU)
-    def append(self, rri: Tensor, stage: Tensor) -> None:
-        """Append new fit samples (stored on CPU)."""
+                if isinstance(item, tuple):
+                    rri_raw, meta = item
+                else:
+                    rri_raw, meta = item, None
 
-        rri_f, stage_i = self._validate_inputs(rri, stage)
-        self._rri_chunks.append(rri_f.detach().to(device="cpu"))
-        self._stage_chunks.append(stage_i.detach().to(device="cpu"))
+                rri_f = rri_raw.reshape(-1).to(dtype=torch.float32)
+                rri_f = rri_f[torch.isfinite(rri_f)]
+                if rri_f.numel() == 0:
+                    skipped += 1
+                    if on_progress is not None:
+                        on_progress(successes, skipped, None, meta)
+                    if int(max_skips) > 0 and skipped >= int(max_skips):
+                        raise RuntimeError(
+                            f"Unable to fit binner: only {successes}/{target_items or '∞'} items after {skipped} skips."
+                        )
+                    continue
 
-    def _fit_tensors(self) -> tuple[Tensor, Tensor]:
-        if not self._rri_chunks:
-            return torch.empty((0,), dtype=torch.float32), torch.empty((0,), dtype=torch.int64)
-        return torch.cat(self._rri_chunks, dim=0), torch.cat(self._stage_chunks, dim=0)
+                binner._rri_chunks.append(rri_f.detach().cpu())  # noqa: SLF001
+                successes = len(binner._rri_chunks)  # noqa: SLF001
 
-    # --------------------------------------------------------------------- fitting / refitting
-    def fit_edges(self, *, num_classes: int) -> RriOrdinalBinner:
-        """Fit stage stats + quantile edges from the accumulated fit data."""
+                if on_progress is not None:
+                    on_progress(successes, skipped, rri_f.detach(), meta)
 
+                if path is not None and int(save_every) > 0 and (successes % int(save_every) == 0):
+                    _save_fit_data()
+        except (KeyboardInterrupt, Exception):
+            _save_fit_data()
+            raise
+
+        if target_items is not None and successes < int(target_items):
+            raise RuntimeError(
+                f"Dataset exhausted while fitting binner ({successes}/{int(target_items)} successful items collected)."
+            )
+
+        _save_fit_data()
+        return binner._finalize(num_classes=int(num_classes))  # noqa: SLF001
+
+    # --------------------------------------------------------------------- internals
+    def _finalize(self, *, num_classes: int) -> "RriOrdinalBinner":
         if int(num_classes) < 2:
             raise ValueError("num_classes must be >= 2.")
-        if float(self.tanh_scale) <= 0:
-            raise ValueError("tanh_scale must be > 0.")
+        if not self._rri_chunks:
+            raise ValueError("No fit data available.")
 
-        rri, stage = self._fit_tensors()
-        if rri.numel() == 0:
-            raise ValueError("No fit data available. Call append(...) or load_fit_data(...) first.")
-
-        unique = torch.unique(stage)
-
-        stage_mean: dict[int, float] = {}
-        stage_std: dict[int, float] = {}
-        z_all: list[Tensor] = []
-
-        for sid in unique.tolist():
-            mask = stage == int(sid)
-            vals = rri[mask]
-            mean = vals.mean()
-            std = vals.std(unbiased=False).clamp_min(float(self.eps))
-            stage_mean[int(sid)] = float(mean.item())
-            stage_std[int(sid)] = float(std.item())
-            z_all.append((vals - mean) / std)
-
-        z = torch.cat(z_all, dim=0)
-        z_clip = torch.tanh(z / float(self.tanh_scale))
-
+        rri = torch.cat(self._rri_chunks, dim=0).to(dtype=torch.float32)
         qs = torch.linspace(
             1.0 / float(num_classes),
             float(num_classes - 1) / float(num_classes),
             steps=int(num_classes) - 1,
-            device=z_clip.device,
+            device=rri.device,
         )
-        edges = torch.quantile(z_clip, qs).to(dtype=torch.float32)
-
         self.num_classes = int(num_classes)
-        self.stage_mean = stage_mean
-        self.stage_std = stage_std
-        self.edges = edges
+        self.edges = torch.quantile(rri, qs).to(dtype=torch.float32).detach().cpu()
         return self
-
-    def refit_edges(self, *, num_classes: int) -> RriOrdinalBinner:
-        """Recompute edges for a different ``K`` using the stored fit data."""
-
-        return self.fit_edges(num_classes=int(num_classes))
-
-    @classmethod
-    def fit(
-        cls,
-        rri: Tensor,
-        stage: Tensor,
-        *,
-        num_classes: int = 15,
-        tanh_scale: float = 1.0,
-        eps: float = 1e-6,
-    ) -> RriOrdinalBinner:
-        """Fit binner from tensors (fit data is stored on CPU for refitting)."""
-
-        binner = cls(tanh_scale=float(tanh_scale), eps=float(eps))
-        binner.append(rri, stage)
-        return binner.fit_edges(num_classes=int(num_classes))
-
-    @classmethod
-    def fit_from_iterable(
-        cls,
-        iterable: Iterable[tuple[Tensor, Tensor]],
-        *,
-        num_classes: int = 15,
-        tanh_scale: float = 1.0,
-        eps: float = 1e-6,
-        save_fit_data_path: str | Path | None = None,
-        overwrite: bool = False,
-    ) -> RriOrdinalBinner:
-        """Fit binner from an iterable, saving partial fit data on errors/Ctrl-C."""
-
-        binner = cls(tanh_scale=float(tanh_scale), eps=float(eps))
-        try:
-            for rri, stage in iterable:
-                binner.append(rri, stage)
-        except (KeyboardInterrupt, Exception):
-            if save_fit_data_path is not None:
-                binner.save_fit_data(save_fit_data_path, overwrite=overwrite)
-            raise
-        return binner.fit_edges(num_classes=int(num_classes))
-
-    # --------------------------------------------------------------------- label mapping
-    def transform(self, rri: Tensor, stage: Tensor) -> Tensor:
-        """Convert RRI values to ordinal labels.
-
-        Args:
-            rri: Oracle RRI values. Shape ``(...,)``.
-            stage: Capture stage ids. Shape ``(...,)``.
-
-        Returns:
-            ``Tensor["...", int64]`` labels in ``[0, K-1]``.
-        """
-
-        if int(self.num_classes) < 2 or self.edges.numel() != int(self.num_classes) - 1:
-            raise RuntimeError("Binner not fitted. Call fit(...) or fit_edges(...) first.")
-
-        rri_f, stage_i = self._validate_inputs(rri, stage)
-        unique = torch.unique(stage_i).tolist()
-        missing = [int(s) for s in unique if int(s) not in self.stage_mean]
-        if missing:
-            raise ValueError(f"Stage ids missing from binner stats: {missing}.")
-
-        z = torch.empty_like(rri_f)
-        for sid in unique:
-            mask = stage_i == int(sid)
-            mean = float(self.stage_mean[int(sid)])
-            std = float(self.stage_std[int(sid)])
-            z[mask] = (rri_f[mask] - mean) / max(std, float(self.eps))
-        z_clip = torch.tanh(z / float(self.tanh_scale))
-
-        labels = torch.bucketize(z_clip, self.edges.to(device=z_clip.device), right=False)
-        return labels.to(dtype=torch.int64)
 
 
 __all__ = ["RriOrdinalBinner"]

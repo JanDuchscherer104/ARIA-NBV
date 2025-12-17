@@ -19,21 +19,14 @@ import torch
 from pydantic import Field
 
 from oracle_rri.utils.base_config import BaseConfig
-from oracle_rri.utils.console import Console
 
 from .metrics import chamfer_point_mesh, chamfer_point_mesh_batched
-from .types import DistanceAggregation, RriResult
+from .types import RriResult
 
 
 class OracleRRIConfig(BaseConfig["OracleRRI"]):
     """Config-as-factory wrapper for oracle RRI computation."""
 
-    voxel_size_m: float | None = None
-    """Optional voxel size (metres) to equalise density between ``P_t`` and ``P_{t∪q}``; ``None`` expects balanced """
-    num_gt_samples: int = 20000
-    """Number of points to sample from the GT mesh when computing Chamfer distances."""
-    reduction: DistanceAggregation = DistanceAggregation.MEAN
-    """Aggregation applied to directional distance terms."""
     target: type["OracleRRI"] = Field(
         default_factory=lambda: OracleRRI,
         exclude=True,
@@ -57,7 +50,6 @@ class OracleRRI:
 
     def __init__(self, config: OracleRRIConfig) -> None:
         self.config = config
-        self.console = Console.with_prefix(self.__class__.__name__)
 
     def score(
         self,
@@ -81,8 +73,7 @@ class OracleRRI:
             ``RriResult`` containing scalar RRI and distance breakdowns.
         """
 
-        # gt_verts_crop, gt_faces_crop = _crop_mesh_to_aabb(gt_verts, gt_faces, extend)
-        gt_verts_crop, gt_faces_crop = gt_verts, gt_faces
+        gt_verts_crop, gt_faces_crop = _crop_mesh_to_aabb(gt_verts, gt_faces, extend)
         lengths_q = lengths_q.to(device=points_q.device)
 
         dist_before = chamfer_point_mesh(points_t, gt_verts_crop, gt_faces_crop)
@@ -148,8 +139,8 @@ def _crop_mesh_to_aabb(
         & (verts[:, 2] <= zmax)
     )
 
-    # Faces with all vertices inside
-    fmask = vmask[faces].all(dim=1)
+    # Keep faces that intersect the AABB (coarse test via any-vertex-inside).
+    fmask = vmask[faces].any(dim=1)
     faces_kept = faces[fmask]
     if faces_kept.numel() == 0:
         return verts, faces  # fallback to full mesh
