@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import hydra
 import omegaconf
@@ -49,6 +49,14 @@ class EvlBackboneConfig(BaseConfig["EvlBackbone"]):
 
     freeze: bool = True
     """Disable gradients for all EVL parameters when True."""
+
+    features_mode: Literal["heads", "neck", "both"] = "heads"
+    """Which EVL features to expose.
+
+    - ``heads``: expose low-dimensional head/evidence tensors (occ_pr, occ_input, counts, free_input).
+    - ``neck``: expose high-dimensional neck features (neck/occ_feat, neck/obb_feat).
+    - ``both``: expose both sets for ablations.
+    """
 
     @field_validator("model_cfg", "model_ckpt", mode="before")
     @classmethod
@@ -126,18 +134,54 @@ class EvlBackbone:
         with torch.no_grad():
             out = self.model(batch)
 
-        occ_feat = out["neck/occ_feat"]
-        obb_feat = out["neck/obb_feat"]
+        features_mode = str(self.config.features_mode)
+        occ_feat: Tensor | None = None
+        obb_feat: Tensor | None = None
+        occ_pr: Tensor | None = None
+        occ_input: Tensor | None = None
+        free_input: Tensor | None = None
+        counts: Tensor | None = None
+        counts_m: Tensor | None = None
+
+        if features_mode in ("neck", "both"):
+            occ_feat = out["neck/occ_feat"]
+            obb_feat = out["neck/obb_feat"]
+
+        if features_mode in ("heads", "both"):
+            occ_pr = out.get("occ_pr")
+            occ_input = out.get("voxel/occ_input")
+            counts = out.get("voxel/counts")
+            counts_m = out.get("voxel/counts_m")
+            voxel_feat = out.get("voxel/feat")
+            if isinstance(voxel_feat, torch.Tensor) and voxel_feat.ndim == 5:
+                # voxel/feat is (B, F, D, H, W); last channel is free-space evidence.
+                free_input = voxel_feat[:, -1:, ...]
+
+        ref_tensor: Tensor | None = None
+        for candidate in (occ_feat, obb_feat, occ_pr, occ_input, free_input):
+            if isinstance(candidate, torch.Tensor):
+                ref_tensor = candidate
+                break
+        if ref_tensor is None:
+            raise RuntimeError(
+                f"Invalid EvlBackboneConfig.features_mode={features_mode!r}: no feature tensors were produced."
+            )
+
         t_world_voxel = out["voxel/T_world_voxel"]
         voxel_extent = out.get("voxel_extent")
         if voxel_extent is None:
-            voxel_extent = self.voxel_extent.to(device=occ_feat.device, dtype=occ_feat.dtype)
+            voxel_extent = self.voxel_extent.to(device=ref_tensor.device, dtype=ref_tensor.dtype)
         if not isinstance(voxel_extent, torch.Tensor):
             raise TypeError(f"Expected voxel_extent Tensor, got {type(voxel_extent)}")
 
         return EvlBackboneOutput(
             occ_feat=occ_feat,
             obb_feat=obb_feat,
+            occ_pr=occ_pr,
+            occ_input=occ_input,
+            free_input=free_input,
+            counts=counts,
+            counts_m=counts_m,
             t_world_voxel=t_world_voxel,
             voxel_extent=voxel_extent,
         )

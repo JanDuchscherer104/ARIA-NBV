@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
@@ -10,16 +11,212 @@ from efm3d.aria.aria_constants import ARIA_POSE_T_WORLD_RIG
 from efm3d.aria.pose import PoseTW
 from efm3d.utils.voxel_sampling import pc_to_vox, sample_voxels
 from pydantic import Field
-from torch import nn
+from torch import Tensor, nn
 
 from ..utils import BaseConfig
 from .backbone_evl import EvlBackboneConfig
 from .coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
 from .pose_encoding import LearnableFourierFeaturesConfig
 from .spherical_encoding import ShellShPoseEncoderConfig
-from .types import VinPrediction
+from .types import EvlBackboneOutput, VinPrediction
 
-Tensor = torch.Tensor
+
+def _first_key(key: str | Sequence[str]) -> str:
+    if isinstance(key, (list, tuple)):
+        return str(key[0])
+    return str(key)
+
+
+def _largest_divisor_leq(n: int, max_divisor: int) -> int:
+    g = min(int(max_divisor), int(n))
+    while g > 1 and (n % g) != 0:
+        g -= 1
+    return max(1, g)
+
+
+def _build_frustum_points_cam(
+    *,
+    grid_size: int,
+    depths_m: list[float],
+    fov_deg: float,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> Tensor:
+    if grid_size <= 0:
+        raise ValueError("grid_size must be > 0.")
+    if not depths_m:
+        raise ValueError("depths_m must not be empty.")
+    if fov_deg <= 0:
+        raise ValueError("fov_deg must be > 0.")
+
+    # NOTE: For v0.1 we use a simple pinhole-style directional grid defined by a single
+    # symmetric FOV prior. This intentionally ignores per-snippet intrinsics; replace with
+    # intrinsics-aware unprojection if needed later.
+    s = math.tan(math.radians(float(fov_deg)) / 2.0)
+    xy = torch.linspace(-s, s, steps=int(grid_size), device=device, dtype=dtype)
+    yy, xx = torch.meshgrid(xy, xy, indexing="ij")
+
+    dirs = torch.stack([xx, yy, torch.ones_like(xx)], dim=-1).reshape(-1, 3)  # G 3
+    dirs = dirs / (dirs.norm(dim=-1, keepdim=True) + 1e-8)
+
+    depths = torch.tensor(depths_m, device=device, dtype=dtype).reshape(-1, 1)  # D 1
+    points = (dirs.unsqueeze(0) * depths.unsqueeze(1)).reshape(-1, 3)  # (D*G) 3
+    return points
+
+
+def _make_token_positions(size: int, *, device: torch.device | None = None) -> Tensor:
+    coords = torch.linspace(-1.0, 1.0, steps=int(size), device=device)
+    zz, yy, xx = torch.meshgrid(coords, coords, coords, indexing="ij")
+    pos = torch.stack([xx, yy, zz], dim=-1)  # D H W 3
+    return pos.reshape(-1, 3)
+
+
+def _build_scene_field(
+    out: EvlBackboneOutput,
+    *,
+    use_channels: list[str],
+    occ_input_threshold: float,
+    counts_norm_mode: Literal["log1p", "linear"],
+    occ_pr_is_logits: bool,
+) -> Tensor:
+    """Build a low-dimensional scene field from EVL head outputs.
+
+    Args:
+        out: Backbone output bundle (must include head/evidence tensors).
+        use_channels: Ordered list of channels to include.
+        occ_input_threshold: Threshold used when deriving fallback free-space evidence.
+        counts_norm_mode: Normalization mode for counts.
+        occ_pr_is_logits: Whether `occ_pr` are logits (apply sigmoid) rather than probabilities.
+
+    Returns:
+        Tensor["B C D H W", float32] scene field.
+    """
+
+    if not use_channels:
+        raise ValueError("use_channels must not be empty.")
+
+    def _require(name: str) -> Tensor:
+        value = getattr(out, name)
+        if not isinstance(value, torch.Tensor):
+            raise KeyError(
+                f"Missing backbone output '{name}'. Ensure EvlBackboneConfig.features_mode includes 'heads'."
+            )
+        return value
+
+    parts: dict[str, Tensor] = {}
+
+    if "occ_pr" in use_channels or "new_surface_prior" in use_channels:
+        occ_pr = _require("occ_pr").to(dtype=torch.float32)
+        if occ_pr_is_logits:
+            occ_pr = torch.sigmoid(occ_pr)
+        parts["occ_pr"] = occ_pr
+
+    if "occ_input" in use_channels or "free_input" in use_channels:
+        parts["occ_input"] = _require("occ_input").to(dtype=torch.float32)
+
+    if "free_input" in use_channels:
+        if isinstance(out.free_input, torch.Tensor):
+            parts["free_input"] = out.free_input.to(dtype=torch.float32)
+        else:
+            # Fallback: derive a weak free-space proxy from (counts, occ_input).
+            counts = _require("counts")
+            observed = (counts > 0).to(dtype=torch.float32).unsqueeze(1)
+            occ_evidence = (parts["occ_input"] > float(occ_input_threshold)).to(dtype=torch.float32)
+            parts["free_input"] = observed * (1.0 - occ_evidence)
+
+    if (
+        "counts_norm" in use_channels
+        or "observed" in use_channels
+        or "unknown" in use_channels
+        or "new_surface_prior" in use_channels
+    ):
+        counts = _require("counts").to(dtype=torch.float32)
+        observed = (counts > 0).to(dtype=torch.float32)
+        parts["observed"] = observed.unsqueeze(1)
+        parts["unknown"] = (1.0 - observed).unsqueeze(1)
+
+        max_counts = counts.amax(dim=(-3, -2, -1), keepdim=True).clamp_min(1.0)
+        match str(counts_norm_mode):
+            case "log1p":
+                parts["counts_norm"] = torch.log1p(counts).unsqueeze(1) / torch.log1p(max_counts).unsqueeze(1)
+            case "linear":
+                parts["counts_norm"] = (counts / max_counts).unsqueeze(1)
+            case other:  # pragma: no cover - defensive
+                raise ValueError(f"Unsupported counts_norm_mode: {other}")
+
+    if "new_surface_prior" in use_channels:
+        parts["new_surface_prior"] = parts["unknown"] * parts["occ_pr"]
+
+    field_parts: list[Tensor] = []
+    for name in use_channels:
+        if name not in parts:
+            raise KeyError(f"Unknown/unsupported scene-field channel: {name!r}")
+        field_parts.append(parts[name])
+    return torch.cat(field_parts, dim=1)
+
+
+def _sample_voxel_field(
+    field: Tensor,
+    *,
+    points_world: Tensor,
+    t_world_voxel: PoseTW,
+    voxel_extent: Tensor,
+) -> tuple[Tensor, Tensor]:
+    """Sample a voxel-aligned field at world points.
+
+    Returns:
+        - tokens: ``Tensor["B N K C", float32]``
+        - valid: ``Tensor["B N K", bool]``
+    """
+
+    if field.ndim != 5:
+        raise ValueError(f"Expected field shape (B,C,D,H,W), got {tuple(field.shape)}.")
+    if points_world.ndim != 4:
+        raise ValueError(f"Expected points_world shape (B,N,K,3), got {tuple(points_world.shape)}.")
+    if int(points_world.shape[-1]) != 3:
+        raise ValueError(f"Expected points_world[..., 3], got {tuple(points_world.shape)}.")
+
+    b, c, d, h, w = field.shape
+    _, n, k, _ = points_world.shape
+
+    t_world_voxel_b = t_world_voxel
+    if t_world_voxel_b.ndim == 1:
+        t_world_voxel_b = PoseTW(t_world_voxel_b._data.unsqueeze(0))
+    if int(t_world_voxel_b.shape[0]) != int(b):
+        if int(t_world_voxel_b.shape[0]) == 1:
+            t_world_voxel_b = PoseTW(t_world_voxel_b._data.expand(b, 12))
+        else:
+            raise ValueError("t_world_voxel must have batch size 1 or match field batch size.")
+
+    vox_extent = voxel_extent.to(device=field.device, dtype=torch.float32)
+    if vox_extent.ndim == 1:
+        vox_extent = vox_extent.view(1, 6).expand(b, 6)
+    if vox_extent.shape != (b, 6):
+        raise ValueError(f"Expected voxel_extent shape (B,6), got {tuple(vox_extent.shape)}.")
+
+    pts_world = points_world.to(device=field.device, dtype=field.dtype).reshape(b, n * k, 3)
+
+    # NOTE: EVL's voxel field is defined in the *voxel frame* (metres), but our candidates/frustum points are in WORLD.
+    # EVL provides `voxel/T_world_voxel` (world←voxel). We invert it to get voxel←world and map points into voxel coords.
+    # FIXME: If you ever swap EVL conventions or change the voxel-grid anchoring, this is the one transform you must
+    # re-verify (sanity check: voxelized points should be stable under small candidate translations).
+    t_voxel_world = t_world_voxel_b.inverse()  # voxel<-world
+    pts_voxel_m = t_voxel_world * pts_world  # B (N*K) 3 in voxel frame (metres)
+
+    pts_vox_id, valid_extent = pc_to_vox(
+        pts_voxel_m.to(dtype=torch.float32),
+        vW=int(w),
+        vH=int(h),
+        vD=int(d),
+        voxel_extent=vox_extent,
+    )
+    # sample_voxels does not support NaNs; replace invalid coords with 0 and rely on validity masks below.
+    pts_vox_id = torch.nan_to_num(pts_vox_id, nan=0.0, posinf=0.0, neginf=0.0)
+
+    samp, valid_grid = sample_voxels(field, pts_vox_id, differentiable=False)  # B C (N*K), B (N*K)
+    valid = (valid_extent & valid_grid).reshape(b, n, k)
+    tokens = samp.transpose(1, 2).reshape(b, n, k, c)
+    return tokens, valid
 
 
 class VinScorerHead(nn.Module):
@@ -112,12 +309,6 @@ def _vin_target() -> type["VinModel"]:
     return VinModel
 
 
-def _first_key(key: str | Sequence[str]) -> str:
-    if isinstance(key, (list, tuple)):
-        return str(key[0])
-    return str(key)
-
-
 class VinModelConfig(BaseConfig["VinModel"]):
     """Configuration for :class:`VinModel`."""
 
@@ -143,17 +334,58 @@ class VinModelConfig(BaseConfig["VinModel"]):
     head: VinScorerHeadConfig = Field(default_factory=VinScorerHeadConfig)
     """Scoring head configuration."""
 
-    use_occ_feat: bool = True
-    """Use EVL occupancy neck features."""
+    scene_field_channels: list[str] = Field(
+        default_factory=lambda: ["occ_pr", "occ_input", "free_input", "counts_norm", "unknown", "new_surface_prior"]
+    )
+    """Ordered channels used to build the low-dimensional scene field."""
 
-    use_obb_feat: bool = True
-    """Use EVL OBB neck features."""
+    occ_input_threshold: float = 0.5
+    """Threshold used when deriving fallback free-space evidence from `occ_input`."""
+
+    counts_norm_mode: Literal["log1p", "linear"] = "log1p"
+    """How to normalize voxel `counts` into [0, 1]."""
+
+    occ_pr_is_logits: bool = False
+    """Whether `occ_pr` is logits (apply sigmoid) rather than a probability volume."""
+
+    field_dim: int = 32
+    """Channel dimension d0 of the compressed scene field."""
+
+    field_gn_groups: int = 8
+    """Requested GroupNorm groups for the field projection (clamped to a divisor of `field_dim`)."""
+
+    global_token_grid_size: int = 6
+    """Coarse global token grid size (default: 6 → 216 tokens)."""
+
+    global_num_queries: int = 2
+    """Number of learnable query tokens for global attention pooling."""
+
+    global_num_heads: int = 4
+    """Multi-head attention heads for global pooling."""
+
+    global_attn_dropout: float = 0.0
+    """Attention dropout probability for global pooling."""
+
+    global_use_positional_encoding: bool = True
+    """Add a lightweight 3D positional embedding to global tokens when True."""
+
+    frustum_grid_size: int = 4
+    """Grid size on the image plane for candidate frustum sampling (grid_size² directions)."""
+
+    frustum_depths_m: list[float] = Field(default_factory=lambda: [0.5, 1.0, 2.0, 3.0])
+    """Depth values (metres) along each frustum direction."""
+
+    frustum_fov_deg: float = 90.0
+    """Approximate symmetric FOV used for the candidate frustum sampling grid."""
+
+    candidate_num_heads: int = 4
+    """Multi-head attention heads for candidate cross-attention pooling."""
+
+    candidate_attn_dropout: float = 0.0
+    """Attention dropout probability for candidate pooling."""
 
     use_global_pool: bool = True
-    """Concatenate global pooled voxel features."""
-
-    use_local_sample: bool = True
-    """Concatenate voxel features sampled at the candidate camera center."""
+    """Whether to concatenate the global pooled embedding to per-candidate features."""
 
 
 class VinModel(nn.Module):
@@ -167,6 +399,63 @@ class VinModel(nn.Module):
         self.pose_encoder_lff = self.config.pose_encoder.setup_target()
         self.pose_encoder_sh = self.config.pose_encoder_sh.setup_target()
         self._freeze_inactive_pose_encoder()
+
+        field_dim = int(self.config.field_dim)
+        if field_dim <= 0:
+            raise ValueError("field_dim must be > 0.")
+        gn_groups = _largest_divisor_leq(field_dim, int(self.config.field_gn_groups))
+
+        self.field_proj = nn.Sequential(
+            nn.LazyConv3d(field_dim, kernel_size=1, bias=False),
+            nn.GroupNorm(num_groups=int(gn_groups), num_channels=int(field_dim)),
+            nn.GELU(),
+        )
+
+        if field_dim % int(self.config.candidate_num_heads) != 0:
+            raise ValueError("field_dim must be divisible by candidate_num_heads.")
+        self.cand_pose_to_query = nn.LazyLinear(field_dim)
+        self.cand_attn = nn.MultiheadAttention(
+            embed_dim=int(field_dim),
+            num_heads=int(self.config.candidate_num_heads),
+            dropout=float(self.config.candidate_attn_dropout),
+            batch_first=True,
+        )
+
+        self.global_token_grid_size = int(self.config.global_token_grid_size)
+        self.global_use_positional_encoding = bool(self.config.global_use_positional_encoding)
+        self.global_num_queries = int(self.config.global_num_queries)
+
+        if self.config.use_global_pool:
+            if field_dim % int(self.config.global_num_heads) != 0:
+                raise ValueError("field_dim must be divisible by global_num_heads.")
+            self.global_attn = nn.MultiheadAttention(
+                embed_dim=int(field_dim),
+                num_heads=int(self.config.global_num_heads),
+                dropout=float(self.config.global_attn_dropout),
+                batch_first=True,
+            )
+            self.global_query = nn.Parameter(torch.randn((self.global_num_queries, field_dim)) * 0.02)
+            if self.global_use_positional_encoding:
+                pos = _make_token_positions(self.global_token_grid_size)
+                self.register_buffer("_global_token_pos", pos, persistent=False)
+                self.global_pos_mlp = nn.Linear(3, int(field_dim), bias=False)
+            else:
+                self.register_buffer("_global_token_pos", torch.empty((0, 3)), persistent=False)
+                self.global_pos_mlp = None
+        else:
+            self.global_attn = None
+            self.global_query = None
+            self.register_buffer("_global_token_pos", torch.empty((0, 3)), persistent=False)
+            self.global_pos_mlp = None
+
+        frustum_points_cam = _build_frustum_points_cam(
+            grid_size=int(self.config.frustum_grid_size),
+            depths_m=list(self.config.frustum_depths_m),
+            fov_deg=float(self.config.frustum_fov_deg),
+            device=torch.device("cpu"),
+            dtype=torch.float32,
+        )
+        self.register_buffer("_frustum_points_cam", frustum_points_cam, persistent=False)
 
         # Head input dim is data-dependent (feature channel count depends on EVL cfg).
         self.head = self.config.head.setup_target(in_dim=None)
@@ -189,6 +478,71 @@ class VinModel(nn.Module):
             case other:
                 raise ValueError(f"Unsupported pose_encoding_mode: {other}")
 
+    def _pool_global(self, field: Tensor) -> Tensor:
+        """Pool global context from a voxel field (coarse tokens + attention pooling)."""
+
+        if self.global_attn is None or self.global_query is None:
+            raise RuntimeError("Global pooling requested but global attention modules were not initialized.")
+
+        b = int(field.shape[0])
+        grid = int(self.global_token_grid_size)
+
+        token_grid = torch.nn.functional.adaptive_avg_pool3d(field, output_size=(grid, grid, grid))
+        tokens = token_grid.flatten(2).transpose(1, 2)  # B T C
+
+        if (
+            self.global_use_positional_encoding
+            and self.global_pos_mlp is not None
+            and self._global_token_pos.numel() > 0
+        ):
+            pos = self._global_token_pos.to(device=tokens.device, dtype=tokens.dtype)
+            tokens = tokens + self.global_pos_mlp(pos).unsqueeze(0)  # 1 T C
+
+        q = self.global_query.unsqueeze(0).expand(b, -1, -1)  # B Q C
+        pooled, _ = self.global_attn(q, tokens, tokens)
+        return pooled.flatten(1)
+
+    def _frustum_points_world(self, poses_world_cam: PoseTW) -> Tensor:
+        """Generate frustum sample points in world coordinates for each candidate."""
+
+        poses = poses_world_cam
+        if poses.ndim == 2:
+            poses = PoseTW(poses._data.unsqueeze(0))
+        pts_cam = self._frustum_points_cam.to(device=poses.t.device, dtype=torch.float32)  # K 3
+
+        # NOTE: Coordinate convention assumes a camera frame with +Z forward.
+        # This matches our pose-encoding choice z_cam=(0,0,1) in `VinModel`.
+        r = poses.R.to(dtype=torch.float32)  # B N 3 3
+        t = poses.t.to(dtype=torch.float32)  # B N 3
+        return torch.einsum("bnij,kj->bnki", r, pts_cam) + t.unsqueeze(2)
+
+    def _pool_candidates(self, *, tokens: Tensor, valid: Tensor, pose_embed: Tensor) -> Tensor:
+        """Cross-attention pooling over candidate-local frustum samples."""
+
+        if tokens.ndim != 4:
+            raise ValueError(f"Expected tokens shape (B,N,K,C), got {tuple(tokens.shape)}.")
+        if valid.shape != tokens.shape[:3]:
+            raise ValueError(f"Expected valid shape {tuple(tokens.shape[:3])}, got {tuple(valid.shape)}.")
+
+        b, n, k, c = tokens.shape
+        bn = int(b) * int(n)
+
+        q = self.cand_pose_to_query(pose_embed).reshape(bn, 1, c)
+        kv = tokens.reshape(bn, k, c)
+        key_padding_mask = (~valid).reshape(bn, k)  # True = ignore token
+
+        # NOTE: torch MultiheadAttention produces NaNs when *all* keys are masked for an item.
+        # We disable masking for all-invalid candidates and rely on kv being zeros. We also
+        # zero the output again afterwards.
+        any_valid = (~key_padding_mask).any(dim=-1, keepdim=True)  # (B*N,1)
+        key_padding_mask_safe = torch.where(any_valid, key_padding_mask, torch.zeros_like(key_padding_mask))
+
+        kv = kv * (~key_padding_mask).to(dtype=kv.dtype).unsqueeze(-1)
+        pooled, _ = self.cand_attn(q, kv, kv, key_padding_mask=key_padding_mask_safe)
+        pooled = pooled.squeeze(1)
+        pooled = pooled * any_valid.to(dtype=pooled.dtype)
+        return pooled.reshape(b, n, c)
+
     def _get_reference_pose_world_rig(self, efm: Mapping[str, Any]) -> PoseTW:
         pose_tw = efm.get(_first_key(ARIA_POSE_T_WORLD_RIG))
         if not isinstance(pose_tw, PoseTW):
@@ -204,7 +558,7 @@ class VinModel(nn.Module):
     def forward(
         self,
         efm: Mapping[str, Any],
-        candidate_poses_world_cam: PoseTW,
+        candidate_poses_world_cam: PoseTW | None = None,
         *,
         reference_pose_world_rig: PoseTW | None = None,
         candidate_poses_camera_rig: PoseTW | None = None,
@@ -213,8 +567,9 @@ class VinModel(nn.Module):
 
         Args:
             efm: Raw EFM snippet dict.
-            candidate_poses_world_cam: Candidate camera poses as world←camera.
-                Shape can be ``(N,12)`` or ``(B,N,12)``.
+            candidate_poses_world_cam: Optional candidate camera poses as world←camera.
+                Shape can be ``(N,12)`` or ``(B,N,12)``. If omitted, the poses are
+                constructed from `candidate_poses_camera_rig` and `reference_pose_world_rig`.
             reference_pose_world_rig: Optional override for reference rig pose (world←rig).
                 If omitted, uses the last pose in ``pose/t_world_rig`` from the snippet.
             candidate_poses_camera_rig: Optional candidate poses in the **reference rig frame**
@@ -227,34 +582,39 @@ class VinModel(nn.Module):
         """
 
         backbone_out = self.backbone.forward(efm)
-        device = backbone_out.occ_feat.device
-        dtype = backbone_out.occ_feat.dtype
+        device = backbone_out.voxel_extent.device
 
-        cand_w_c = self._ensure_candidate_batch(candidate_poses_world_cam).to(device=device)  # type: ignore[arg-type]
-        b, n = cand_w_c.shape[0], cand_w_c.shape[1]
+        if reference_pose_world_rig is None:
+            ref_w_r = self._get_reference_pose_world_rig(efm).to(device=device)  # type: ignore[arg-type]
+        else:
+            ref_w_r = reference_pose_world_rig.to(device=device)  # type: ignore[arg-type]
+        if ref_w_r.ndim == 1:
+            ref_w_r = PoseTW(ref_w_r._data.unsqueeze(0))
 
         if candidate_poses_camera_rig is not None:
             cand_cam_r = self._ensure_candidate_batch(candidate_poses_camera_rig).to(device=device)  # type: ignore[arg-type]
-            if cand_cam_r.shape[1] != n:
-                raise ValueError(
-                    "candidate_poses_camera_rig must have the same number of candidates as candidate_poses_world_cam."
-                )
-            if cand_cam_r.shape[0] == 1 and b > 1:
-                cand_cam_r = PoseTW(cand_cam_r._data.expand(b, n, 12))
-            elif cand_cam_r.shape[0] != b:
-                raise ValueError(
-                    "candidate_poses_camera_rig must have matching batch size, or batch size 1 for broadcasting."
-                )
-            t_r_c = cand_cam_r.inverse()
-        else:
-            if reference_pose_world_rig is None:
-                ref_w_r = self._get_reference_pose_world_rig(efm).to(device=device)  # type: ignore[arg-type]
-            else:
-                ref_w_r = reference_pose_world_rig.to(device=device)  # type: ignore[arg-type]
-            if ref_w_r.ndim == 1:
-                ref_w_r = PoseTW(ref_w_r._data.unsqueeze(0))
-            if ref_w_r.shape[0] != b:
+            b, n = int(cand_cam_r.shape[0]), int(cand_cam_r.shape[1])
+
+            if ref_w_r.shape[0] == 1 and b > 1:
                 ref_w_r = PoseTW(ref_w_r._data.expand(b, 12))
+            elif ref_w_r.shape[0] != b:
+                raise ValueError("reference_pose_world_rig must have batch size 1 or match candidate batch size.")
+
+            # rig <- cam
+            t_r_c = cand_cam_r.inverse()
+            # world <- cam (required for frustum point queries)
+            cand_w_c = ref_w_r[:, None] @ t_r_c
+        else:
+            if candidate_poses_world_cam is None:
+                raise ValueError("candidate_poses_world_cam must be provided when candidate_poses_camera_rig is None.")
+
+            cand_w_c = self._ensure_candidate_batch(candidate_poses_world_cam).to(device=device)  # type: ignore[arg-type]
+            b, n = int(cand_w_c.shape[0]), int(cand_w_c.shape[1])
+
+            if ref_w_r.shape[0] == 1 and b > 1:
+                ref_w_r = PoseTW(ref_w_r._data.expand(b, 12))
+            elif ref_w_r.shape[0] != b:
+                raise ValueError("reference_pose_world_rig must have batch size 1 or match candidate batch size.")
 
             # ------------------------------------------------------------------ relative pose (rig <- camera)
             t_r_w = ref_w_r.inverse()[:, None]  # B x 1 x 12
@@ -281,68 +641,44 @@ class VinModel(nn.Module):
             case other:
                 raise ValueError(f"Unsupported pose_encoding_mode: {other}")
 
-        # ------------------------------------------------------------------ voxel feature queries
-        parts: list[Tensor] = [pose_enc.to(device=device, dtype=dtype)]
+        # ------------------------------------------------------------------ build voxel-aligned scene field
+        field = _build_scene_field(
+            backbone_out,
+            use_channels=list(self.config.scene_field_channels),
+            occ_input_threshold=float(self.config.occ_input_threshold),
+            counts_norm_mode=self.config.counts_norm_mode,
+            occ_pr_is_logits=bool(self.config.occ_pr_is_logits),
+        ).to(device=device)
+        field = self.field_proj(field)
 
-        occ_feat = backbone_out.occ_feat if self.config.use_occ_feat else None
-        obb_feat = backbone_out.obb_feat if self.config.use_obb_feat else None
-
-        if not self.config.use_occ_feat and not self.config.use_obb_feat:
-            raise ValueError("At least one of use_occ_feat/use_obb_feat must be True.")
-
-        feat_ref = occ_feat if occ_feat is not None else obb_feat
-        if feat_ref is None:
-            raise AssertionError("Unexpected: no voxel features selected.")
-
+        # ------------------------------------------------------------------ global pooling (coarse tokens)
+        parts: list[Tensor] = [pose_enc.to(device=device, dtype=field.dtype)]
         if self.config.use_global_pool:
-            pooled: list[Tensor] = []
-            if occ_feat is not None:
-                pooled.append(occ_feat.mean(dim=(-3, -2, -1)))
-                pooled.append(occ_feat.amax(dim=(-3, -2, -1)))
-            if obb_feat is not None:
-                pooled.append(obb_feat.mean(dim=(-3, -2, -1)))
-                pooled.append(obb_feat.amax(dim=(-3, -2, -1)))
-            global_feat = torch.cat(pooled, dim=-1).unsqueeze(1).expand(b, n, -1)
-            parts.append(global_feat)
+            global_embed = self._pool_global(field)
+            parts.append(global_embed.unsqueeze(1).expand(b, n, -1))
 
-        # Candidate validity is defined by whether the candidate camera center lies inside the EVL voxel grid.
-        d, h, w = feat_ref.shape[-3:]
-        t_v_w = backbone_out.t_world_voxel.inverse()
-        cand_centers_world = cand_w_c.t.to(dtype=dtype)
-        cand_centers_voxel = t_v_w * cand_centers_world  # B N 3 in voxel frame (meters)
-        voxel_extent = backbone_out.voxel_extent.to(device=device, dtype=torch.float32)
-        if voxel_extent.ndim == 1:
-            voxel_extent = voxel_extent.view(1, 6).expand(b, 6)
-
-        cand_centers_voxel_f32 = cand_centers_voxel.to(dtype=torch.float32)
-        cand_voxel_ids, _ = pc_to_vox(
-            cand_centers_voxel_f32,
-            vW=int(w),
-            vH=int(h),
-            vD=int(d),
-            voxel_extent=voxel_extent,
+        # ------------------------------------------------------------------ candidate-conditioned frustum query
+        points_world = self._frustum_points_world(cand_w_c)
+        tokens, token_valid = _sample_voxel_field(
+            field,
+            points_world=points_world,
+            t_world_voxel=backbone_out.t_world_voxel,
+            voxel_extent=backbone_out.voxel_extent,
         )
-        vox_min = voxel_extent[..., 0::2].view(b, 1, 3)
-        vox_max = voxel_extent[..., 1::2].view(b, 1, 3)
-        valid = torch.isfinite(cand_centers_voxel_f32).all(dim=-1)
-        valid = (
-            valid & (cand_centers_voxel_f32 >= vox_min).all(dim=-1) & (cand_centers_voxel_f32 <= vox_max).all(dim=-1)
+        cand_embed = self._pool_candidates(
+            tokens=tokens, valid=token_valid, pose_embed=pose_enc.to(dtype=torch.float32)
         )
-        cand_voxel_ids = torch.nan_to_num(cand_voxel_ids, nan=0.0, posinf=0.0, neginf=0.0)
+        parts.append(cand_embed.to(dtype=field.dtype))
 
-        if self.config.use_local_sample:
-            local_parts: list[Tensor] = []
-            if occ_feat is not None:
-                occ_samp, _ = sample_voxels(occ_feat, cand_voxel_ids, differentiable=False)
-                local_parts.append(occ_samp.transpose(1, 2))
-            if obb_feat is not None:
-                obb_samp, _ = sample_voxels(obb_feat, cand_voxel_ids, differentiable=False)
-                local_parts.append(obb_samp.transpose(1, 2))
-            local_feat = torch.cat(local_parts, dim=-1)
-            parts.append(local_feat)
+        # NOTE: Candidate validity is currently defined by whether *any frustum sample point* falls inside the EVL
+        # voxel grid (after mapping WORLD→VOXEL using `voxel/T_world_voxel`).
+        # TODO: Consider additionally AND-ing with "camera center inside voxel grid" validity if you want to keep the
+        # baseline semantics and avoid edge cases where the center is outside but shallow frustum samples still land
+        # inside the grid.
+        candidate_valid = token_valid.any(dim=-1)
 
         feats = torch.cat(parts, dim=-1)
-        feats = feats * valid.to(dtype=feats.dtype).unsqueeze(-1)
+        feats = feats * candidate_valid.to(dtype=feats.dtype).unsqueeze(-1)
         logits = self.head(feats.reshape(b * n, -1)).reshape(b, n, -1)
 
         prob = coral_logits_to_prob(logits)
@@ -353,5 +689,5 @@ class VinModel(nn.Module):
             prob=prob,
             expected=expected,
             expected_normalized=expected_norm,
-            candidate_valid=valid,
+            candidate_valid=candidate_valid,
         )

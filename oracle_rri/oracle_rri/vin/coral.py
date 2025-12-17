@@ -12,16 +12,9 @@ from __future__ import annotations
 from typing import Literal
 
 import torch
+from coral_pytorch.layers import CoralLayer as _CoralLayer
+from coral_pytorch.losses import coral_loss as _coral_loss
 from torch import nn
-
-try:  # Prefer the upstream reference implementation.
-    from coral_pytorch.layers import CoralLayer as _CoralLayer
-    from coral_pytorch.losses import coral_loss as _coral_loss
-except ModuleNotFoundError as exc:  # pragma: no cover - environment dependent
-    raise ModuleNotFoundError(
-        "Missing optional dependency 'coral-pytorch'. Install it via `uv sync --extra dev` "
-        "or add it to your environment."
-    ) from exc
 
 Tensor = torch.Tensor
 

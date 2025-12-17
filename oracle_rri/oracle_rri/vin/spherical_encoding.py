@@ -89,7 +89,7 @@ class ShellShPoseEncoder(nn.Module):
         if scalar_hidden_dim <= 0:
             raise ValueError("scalar_hidden_dim must be > 0.")
 
-        self.lmax = int(lmax)
+        self.lmax = lmax
         self.normalization = str(normalization)
         self.include_scalars = bool(include_scalars)
         self.include_radius = bool(include_radius)

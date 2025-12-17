@@ -15,17 +15,27 @@ class EvlBackboneOutput:
     """EVL backbone features used by VIN.
 
     Attributes:
-        occ_feat: ``Tensor["B C D H W", float32]`` neck features for occupancy.
-        obb_feat: ``Tensor["B C D H W", float32]`` neck features for OBB detection.
+        occ_feat: Optional ``Tensor["B C D H W", float32]`` neck features for occupancy.
+        obb_feat: Optional ``Tensor["B C D H W", float32]`` neck features for OBB detection.
+        occ_pr: Optional ``Tensor["B 1 D H W", float32]`` EVL occupancy probability.
+        occ_input: Optional ``Tensor["B 1 D H W", float32]`` voxelized occupied evidence from input points.
+        free_input: Optional ``Tensor["B 1 D H W", float32]`` voxelized free-space evidence (ray samples).
+        counts: Optional ``Tensor["B D H W", int64]`` per-voxel observation counts.
+        counts_m: Optional ``Tensor["B D H W", int64]`` masked/debug variant of counts.
         t_world_voxel: ``PoseTW["B 12"]`` world←voxel pose for the voxel grid.
         voxel_extent: ``Tensor["6", float32]`` voxel grid extent in voxel frame
             ``[x_min,x_max,y_min,y_max,z_min,z_max]`` (meters).
     """
 
-    occ_feat: Tensor
-    obb_feat: Tensor
     t_world_voxel: PoseTW
     voxel_extent: Tensor
+    occ_feat: Tensor | None = None
+    obb_feat: Tensor | None = None
+    occ_pr: Tensor | None = None
+    occ_input: Tensor | None = None
+    free_input: Tensor | None = None
+    counts: Tensor | None = None
+    counts_m: Tensor | None = None
 
 
 @dataclass(slots=True)

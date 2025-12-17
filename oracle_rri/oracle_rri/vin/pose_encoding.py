@@ -128,7 +128,7 @@ class LearnableFourierFeatures(nn.Module):
         self.include_input = bool(include_input)
 
         half = self.fourier_dim // 2
-        self.Wr = nn.Parameter(torch.randn((half, self.input_dim)) * float(gamma**2))
+        self.Wr = nn.Parameter(torch.randn((half, self.input_dim)) * float(gamma))
         self.mlp = nn.Sequential(
             nn.Linear(self.fourier_dim, self.hidden_dim),
             nn.GELU(),
