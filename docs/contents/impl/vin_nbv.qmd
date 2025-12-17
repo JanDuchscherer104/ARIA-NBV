@@ -374,25 +374,27 @@ $$
 \phi(s) = \big[s,\;\sin(2\pi B s),\;\cos(2\pi B s)\big], \quad B \in \mathbb{R}^{F\times 1}.
 $$
 
-# VIN head (current baseline + planned v0.2 upgrade)
+# VIN head (v0.1 architecture)
 
 `oracle_rri/oracle_rri/vin/model.py` (`VinModel`) implements a lightweight scorer head on top of frozen EVL:
 
-1. Run frozen EVL once on the snippet to get voxel features + voxel grid pose.
-2. For each candidate:
+1. Run frozen EVL once on the snippet to get low-dimensional head outputs + voxel grid pose.
+2. Build a **small voxel-aligned scene field** (default channels: `occ_pr`, `occ_input`, `free_input`, `counts_norm`, `unknown`, `new_surface_prior`) inside `VinModel`.
+3. Compress channels with a 1×1×1 `Conv3d` + `GroupNorm` + GELU (default: 6→32 channels).
+4. Compute a **global embedding** from coarse 6³ tokens using a small learnable-query `nn.MultiheadAttention` pool.
+5. For each candidate:
    - pose embedding: shell descriptor encoded via SH($u,f$) + 1D Fourier ($r$),
-   - local voxel embedding: sample EVL neck features at the candidate camera center,
-   - global voxel embedding: global mean+max pooling of EVL neck features.
-3. Concatenate embeddings and predict ordinal logits (CORAL) via an MLP + `CoralLayer`.
+   - candidate embedding: sample **K=64 frustum points** (fixed rays×depths) and **cross-attend** (query=pose embedding) over the sampled voxel tokens (again with `nn.MultiheadAttention`).
+6. Concatenate embeddings and predict ordinal logits (CORAL) via an MLP + `CoralLayer`.
 
-## Candidate-conditioned voxel query (TODO)
+## Candidate-conditioned voxel query (implemented)
 
-Sampling features only at the camera center is a weak view descriptor. The planned upgrade is a **frustum point query**:
+We implement a **frustum point query**:
 
 - sample $K$ points in front of the camera along a small set of rays and depths,
 - transform points to world via $T_{\mathrm{world}\leftarrow\mathrm{cam}}$,
 - map to voxel coordinates via $T_{\mathrm{voxel}\leftarrow\mathrm{world}} = T_{\mathrm{world}\leftarrow\mathrm{voxel}}^{-1}$,
-- sample voxel features at those points and pool (mean+max), masking invalid points.
+- sample voxel features at those points, apply strict inside-grid validity masks, and pool with **pose-conditioned cross-attention**.
 
 # Training objective (VIN-NBV style): CORAL ordinal regression
 
@@ -435,16 +437,16 @@ uv run python scripts/train_vin_lightning.py --stage train --max-steps 5 --fit-s
 
 VIN code lives in `oracle_rri/oracle_rri/vin/`:
 
-- `backbone_evl.py`: `EvlBackbone` wrapper that consumes raw EFM dicts and returns `neck/*` volumes + voxel pose/extent.
+- `backbone_evl.py`: `EvlBackbone` wrapper that consumes raw EFM dicts and returns a small typed `EvlBackboneOutput` (head outputs by default; optional neck outputs for ablations).
 - `spherical_encoding.py`: `ShellShPoseEncoder` (e3nn SH for $u,f$ + 1D Fourier features for radius).
 - `pose_encoding.py`: Learnable Fourier features baseline modules (as per Learnable Fourier Features, NeurIPS 2021).
-- `model.py`: `VinModel` (pose encoding + voxel querying + MLP + CORAL).
+- `model.py`: `VinModel` (pose encoding + scene-field querying + global pooling + frustum sampling + cross-attention + CORAL).
 - `coral.py`: CORAL layer + loss and probability utilities (via `coral-pytorch`).
 - `rri_binning.py`: RRI→ordinal binning (`RriOrdinalBinner`).
 
 # Known gaps / next steps (tracked in `todos.qmd`)
 
-- implement candidate frustum query + strict point-level validity masking,
+- replace fixed-FOV frustum sampling with intrinsics-aware sampling (optional),
 - add ranking metrics (Spearman, top-$k$ recall) to the training loop,
 - version bin thresholds by candidate generator config + EVL ckpt id,
 - run ablations: occ-only vs occ+obb, $L=2$ vs $L=3$, query depths/rays.
