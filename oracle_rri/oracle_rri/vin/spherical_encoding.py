@@ -193,16 +193,16 @@ class ShellShPoseEncoderConfig(BaseConfig[ShellShPoseEncoder]):
 
     target: type[ShellShPoseEncoder] = Field(default=ShellShPoseEncoder, exclude=True)
 
-    lmax: int = 3
+    lmax: int = 2
     """Maximum spherical harmonics degree."""
 
-    sh_out_dim: int = 32
+    sh_out_dim: int = 16
     """Projection dimension for each SH vector (for $u$ and $f$)."""
 
-    radius_num_frequencies: int = 8
+    radius_num_frequencies: int = 6
     """Number of Fourier frequencies for the 1D radius encoding."""
 
-    radius_out_dim: int = 32
+    radius_out_dim: int = 16
     """Projection dimension for the encoded radius."""
 
     radius_include_input: bool = True
@@ -223,10 +223,10 @@ class ShellShPoseEncoderConfig(BaseConfig[ShellShPoseEncoder]):
     scalar_in_dim: int = 1
     """Number of additional scalar pose features (e.g. $\\langle f, -u \\rangle$)."""
 
-    scalar_out_dim: int = 32
+    scalar_out_dim: int = 16
     """Output dimension of the scalar MLP."""
 
-    scalar_hidden_dim: int = 64
+    scalar_hidden_dim: int = 32
     """Hidden dimension of the scalar MLP."""
 
     normalization: Literal["component", "norm"] = "component"

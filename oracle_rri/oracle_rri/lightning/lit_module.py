@@ -19,7 +19,7 @@ from torch.optim import AdamW, Optimizer
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console, Stage
 from ..vin import RriOrdinalBinner, VinModelConfig, coral_loss
-from .lit_datamodule import VinDataModule, VinOracleBatch
+from .lit_datamodule import VinOracleBatch
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -43,7 +43,7 @@ class AdamWConfig(BaseConfig[Optimizer]):
     target: type[Optimizer] = Field(default_factory=lambda: AdamW, exclude=True)
     """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
 
-    learning_rate: float = 1e-3
+    learning_rate: float = 1e-4
     """Learning rate for AdamW."""
 
     weight_decay: float = 1e-2
@@ -67,14 +67,11 @@ class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
     num_classes: int = 15
     """Number of ordinal classes (must match `vin.head.num_classes`)."""
 
-    binner_fit_snippets: int = 2
+    binner_fit_snippets: int = 512
     """Number of oracle-labelled snippets used to fit the ordinal binner."""
 
-    binner_tanh_scale: float = 1.0
-    """Scale applied before tanh clipping (VIN-NBV style)."""
-
-    binner_max_attempts: int = 25
-    """Maximum attempts while fitting the binner (guards against bad oracle settings)."""
+    binner_max_attempts: int = 64
+    """Maximum number of skipped oracle batches while fitting the binner (guards against bad oracle settings)."""
 
     save_binner: bool = True
     """Persist `rri_binner.json` into the run directory on fit start."""
@@ -144,7 +141,7 @@ class VinLightningModule(pl.LightningModule):
         if self._binner is None:
             raise RuntimeError("RRI binner not initialized. Run trainer.fit() first or load from checkpoint.")
 
-        pred = self.vin(
+        pred = self.vin.forward(
             batch.efm,
             batch.candidate_poses_world_cam,
             reference_pose_world_rig=batch.reference_pose_world_rig,
@@ -154,12 +151,11 @@ class VinLightningModule(pl.LightningModule):
         valid = pred.candidate_valid.squeeze(0)  # N
 
         rri = batch.rri.to(device=logits.device)
-        stage_ids = batch.stage.to(device=logits.device)
-        labels = self._binner.transform(rri.reshape(-1), stage_ids.reshape(-1))
+        labels = self._binner.transform(rri.reshape(-1))
 
         mask = valid & torch.isfinite(rri)
         if not mask.any():
-            self.log(f"{stage}/skip_no_valid", 1.0, on_step=True, prog_bar=False)
+            self.log(f"{stage}/skip_no_valid", 1.0, on_step=True, prog_bar=False, batch_size=1)
             return None
 
         loss = coral_loss(
@@ -170,22 +166,23 @@ class VinLightningModule(pl.LightningModule):
         )
 
         prefix = f"{stage}"
-        self.log(f"{prefix}/loss", loss, on_step=True, on_epoch=True, prog_bar=(stage is Stage.TRAIN))
-        # Filename-friendly alias (avoid '/' in checkpoint monitor keys).
-        self.log(f"{prefix}_loss", loss, on_step=True, on_epoch=True, prog_bar=False)
         self.log(
-            f"{prefix}/num_candidates",
-            float(mask.numel()),
+            f"{prefix}/loss",
+            loss,
             on_step=True,
             on_epoch=True,
-            prog_bar=False,
+            prog_bar=(stage is Stage.TRAIN),
+            batch_size=1,
         )
+        # Filename-friendly alias (avoid '/' in checkpoint monitor keys).
+        self.log(f"{prefix}_loss", loss, on_step=True, on_epoch=True, prog_bar=False, batch_size=1)
         self.log(
-            f"{prefix}/num_valid",
-            float(mask.sum().item()),
+            f"{prefix}/voxel_valid_fraction",
+            float(mask.sum().item()) / float(mask.numel()),
             on_step=True,
             on_epoch=True,
             prog_bar=False,
+            batch_size=1,
         )
         self.log(
             f"{prefix}/rri_mean",
@@ -193,6 +190,7 @@ class VinLightningModule(pl.LightningModule):
             on_step=True,
             on_epoch=True,
             prog_bar=False,
+            batch_size=1,
         )
         self.log(
             f"{prefix}/pred_mean",
@@ -200,55 +198,110 @@ class VinLightningModule(pl.LightningModule):
             on_step=True,
             on_epoch=True,
             prog_bar=False,
+            batch_size=1,
+        )
+        pm_dist_before = batch.pm_dist_before.to(device=logits.device)
+        pm_dist_after = batch.pm_dist_after.to(device=logits.device)
+        pm_acc_before = batch.pm_acc_before.to(device=logits.device)
+        pm_comp_before = batch.pm_comp_before.to(device=logits.device)
+        pm_acc_after = batch.pm_acc_after.to(device=logits.device)
+        pm_comp_after = batch.pm_comp_after.to(device=logits.device)
+
+        self.log(
+            f"{prefix}/pm_dist_before_mean",
+            pm_dist_before[mask].mean(),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=1,
+        )
+        self.log(
+            f"{prefix}/pm_dist_after_mean",
+            pm_dist_after[mask].mean(),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=1,
+        )
+        self.log(
+            f"{prefix}/pm_acc_before_mean",
+            pm_acc_before[mask].mean(),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=1,
+        )
+        self.log(
+            f"{prefix}/pm_comp_before_mean",
+            pm_comp_before[mask].mean(),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=1,
+        )
+        self.log(
+            f"{prefix}/pm_acc_after_mean",
+            pm_acc_after[mask].mean(),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=1,
+        )
+        self.log(
+            f"{prefix}/pm_comp_after_mean",
+            pm_comp_after[mask].mean(),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=1,
         )
         return loss
 
     def _fit_binner_from_datamodule(self) -> RriOrdinalBinner:
+        """Fit the ordinal binner on-the-fly using the trainer datamodule.
+
+        Returns:
+            Fitted :class:`~oracle_rri.vin.rri_binning.RriOrdinalBinner`.
+        """
+
+        from .lit_datamodule import VinDataModule
+
         dm = getattr(self.trainer, "datamodule", None)
         if not isinstance(dm, VinDataModule):
-            raise TypeError("VinLightningModule expects VinDataModule for binner fitting.")
+            raise TypeError(f"VinLightningModule expects VinDataModule for binner fitting (got {type(dm).__name__}).")
 
         fit_snippets = int(self.config.binner_fit_snippets)
         if fit_snippets <= 0:
             raise ValueError("binner_fit_snippets must be > 0 when no binner is loaded from checkpoint.")
 
-        rri_all: list[Tensor] = []
-        stage_all: list[Tensor] = []
-
+        max_skips = int(self.config.binner_max_attempts)
         console = Console.with_prefix(self.__class__.__name__, "binner_fit")
         console.log(f"Fitting RRI ordinal binner on {fit_snippets} snippets.")
 
-        it = dm.iter_oracle_batches(stage=Stage.TRAIN)
-        successes = 0
-        attempts = 0
-        while successes < fit_snippets:
-            if attempts >= int(self.config.binner_max_attempts):
-                raise RuntimeError(
-                    f"Unable to fit binner: only {successes}/{fit_snippets} snippets after {attempts} attempts."
-                )
-            attempts += 1
+        def _iter_rri():
+            for batch in dm.iter_oracle_batches(stage=Stage.TRAIN):
+                rri = batch.rri.detach().reshape(-1).to(device="cpu", dtype=torch.float32)
+                meta = {"scene_id": batch.scene_id, "snippet_id": batch.snippet_id}
+                yield rri, meta
 
-            batch = next(it)
-            rri = batch.rri.detach().reshape(-1).to(dtype=torch.float32)
-            stage = batch.stage.detach().reshape(-1).to(dtype=torch.int64)
-            if rri.numel() == 0 or not torch.isfinite(rri).any():
-                continue
-
-            rri_all.append(rri)
-            stage_all.append(stage)
-            successes += 1
+        def _on_progress(successes: int, skipped: int, rri: torch.Tensor | None, meta: object | None) -> None:
+            if rri is None:
+                return
+            if not isinstance(meta, dict):
+                return
             console.log(
-                f"  fit[{successes:02d}/{fit_snippets:02d}] scene={batch.scene_id} snip={batch.snippet_id} "
-                f"C={int(rri.numel())} rri_mean={float(rri.mean().item()):.4f} rri_std={float(rri.std().item()):.4f}"
+                f"  fit[{successes:02d}/{fit_snippets:02d}] scene={meta.get('scene_id', 'unknown')} "
+                f"snip={meta.get('snippet_id', 'unknown')} C={int(rri.numel())} "
+                f"rri_mean={float(rri.mean().item()):.4f} rri_std={float(rri.std().item()):.4f}"
             )
 
-        binner = RriOrdinalBinner.fit(
-            torch.cat(rri_all, dim=0),
-            torch.cat(stage_all, dim=0),
+        binner = RriOrdinalBinner.fit_from_iterable(
+            _iter_rri(),
             num_classes=int(self.config.num_classes),
-            tanh_scale=float(self.config.binner_tanh_scale),
+            target_items=fit_snippets,
+            max_skips=max_skips,
+            on_progress=_on_progress,
         )
-        binner.edges = binner.edges.detach().cpu()
         console.log("Binner fitted.")
         return binner
 
@@ -256,21 +309,19 @@ class VinLightningModule(pl.LightningModule):
         if not self.config.save_binner or self._binner is None:
             return
         path = self._resolve_binner_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self._binner.save(path)
-        self.console.log(f"Saved binner to {path}")
+        saved_path = self._binner.save(path)
+        self.console.log(f"Saved binner to {saved_path}")
 
     def _resolve_binner_path(self) -> Path:
+        paths = PathConfig()
         if self.config.binner_path is not None:
-            path = Path(self.config.binner_path)
-            if not path.is_absolute():
-                path = (PathConfig().root / path).resolve()
-            return path
+            return paths.resolve_artifact_path(self.config.binner_path, expected_suffix=".json")
 
         root_dir = getattr(self.trainer, "default_root_dir", None)
         if root_dir:
-            return (Path(root_dir) / "rri_binner.json").resolve()
-        return (PathConfig().root / ".logs" / "rri_binner.json").resolve()
+            return paths.resolve_artifact_path(Path(root_dir) / "rri_binner.json", expected_suffix=".json")
+
+        return paths.resolve_artifact_path(Path(".logs") / "rri_binner.json", expected_suffix=".json")
 
     def _integrate_console(self) -> None:
         logger = getattr(self, "logger", None)

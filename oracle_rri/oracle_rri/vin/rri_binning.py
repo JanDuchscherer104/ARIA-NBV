@@ -29,6 +29,8 @@ from typing import Any
 import torch
 from torch import Tensor
 
+from ..configs import PathConfig
+
 
 def _unique_path(path: Path, *, overwrite: bool) -> Path:
     """Return a non-overwriting path by appending ``-<n>`` before the suffix."""
@@ -109,7 +111,8 @@ class RriOrdinalBinner:
         if not self.is_fitted:
             raise RuntimeError("Binner not fitted; call fit_from_iterable(...) before save().")
 
-        out_path = _unique_path(Path(path), overwrite=overwrite)
+        out_path = PathConfig().resolve_artifact_path(path, expected_suffix=".json")
+        out_path = _unique_path(out_path, overwrite=overwrite)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         _atomic_write_text(out_path, json.dumps(self.to_dict(), indent=2, sort_keys=True))
         return out_path
@@ -118,7 +121,8 @@ class RriOrdinalBinner:
     def load(cls, path: str | Path) -> "RriOrdinalBinner":
         """Load a fitted binner from JSON."""
 
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        in_path = PathConfig().resolve_artifact_path(path, expected_suffix=".json", create_parent=False)
+        data = json.loads(in_path.read_text(encoding="utf-8"))
         return cls.from_dict(data)
 
     # --------------------------------------------------------------------- fitting (single entry point)
@@ -143,9 +147,9 @@ class RriOrdinalBinner:
             - The iterable may yield either ``rri`` tensors or ``(rri, meta)`` tuples.
         """
 
-        path = Path(fit_data_path) if fit_data_path is not None else None
-        if path is not None and path.suffix != ".pt":
-            raise ValueError(f"fit_data_path must end with .pt, got {path}")
+        path = None
+        if fit_data_path is not None:
+            path = PathConfig().resolve_artifact_path(fit_data_path, expected_suffix=".pt")
 
         binner = cls()
         if path is not None and path.exists():
