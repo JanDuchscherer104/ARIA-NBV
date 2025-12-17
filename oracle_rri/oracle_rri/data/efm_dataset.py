@@ -314,12 +314,15 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
 
         base = paths.resolve_atek_data_dir(atek_variant)
 
-        resolved_tar_urls: list[str] = []
+        resolved: list[Path] = []
         if scene_ids:
             for scene in scene_ids:
-                resolved_tar_urls.extend(str(p) for p in sorted((base / scene).glob("*.tar")))
+                resolved.extend(sorted((base / scene).glob("*.tar")))
         else:
-            resolved_tar_urls = [str(p) for p in sorted(base.glob("**/*.tar"))]
+            resolved = sorted(base.glob("**/*.tar"))
+
+        # Be defensive: ignore empty placeholder shards (e.g. `dummy.tar`) and non-files.
+        resolved_tar_urls = [str(p) for p in resolved if p.is_file() and p.stat().st_size > 0]
 
         if not resolved_tar_urls:
             raise ValueError(f"No tar files found under {base}.")
@@ -355,6 +358,13 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
             tar_urls = [str(p) for scene in self.scene_ids for p in sorted((base / scene).glob("*.tar"))]
             if not tar_urls:
                 raise ValueError(f"No tar files found under {base} for scenes: {self.scene_ids}")
+
+        if self.wds_shuffle and len(tar_urls) > 1:
+            # Shuffle shard order so short runs (e.g., binner fitting on a handful of snippets)
+            # see multiple scenes early. The underlying ATEK loader only shuffles *samples*
+            # within a fixed buffer and otherwise reads shards sequentially.
+            perm = torch.randperm(len(tar_urls)).tolist()
+            tar_urls = [tar_urls[i] for i in perm]
 
         scene_ids = list(self.scene_ids)
         if not scene_ids:

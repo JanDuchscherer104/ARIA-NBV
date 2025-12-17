@@ -41,12 +41,14 @@ class MeshProcessSpec:
         payload: dict[str, Any] = {
             "scene_id": self.scene_id,
             "crop": self.crop,
-            "bounds_min": [round(x, 4) for x in self.bounds_min],
-            "bounds_max": [round(x, 4) for x in self.bounds_max],
             "margin_m": round(self.margin_m, 4),
             "simplify_ratio": None if self.simplify_ratio is None else round(self.simplify_ratio, 4),
-            "crop_min_keep_ratio": round(self.crop_min_keep_ratio, 4),
         }
+        if self.crop:
+            payload["bounds_min"] = [round(x, 4) for x in self.bounds_min]
+            payload["bounds_max"] = [round(x, 4) for x in self.bounds_max]
+            payload["crop_min_keep_ratio"] = round(self.crop_min_keep_ratio, 4)
+
         spec_json = json.dumps(payload, sort_keys=True)
         return hashlib.sha1(spec_json.encode("utf-8")).hexdigest()[:12]
 
@@ -120,7 +122,9 @@ def load_or_process_mesh(
     """
 
     spec_hash = spec.hash()
-    out_path = paths.resolve_processed_mesh_path(spec.scene_id, spec_hash)
+    out_path = paths.resolve_processed_mesh_path(
+        spec.scene_id, simplification_ratio=spec.simplify_ratio, is_crop=spec.crop, spec_hash=spec_hash
+    )
 
     if out_path.exists():
         mesh_proc = trimesh.load(out_path, process=False)

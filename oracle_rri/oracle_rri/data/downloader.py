@@ -83,7 +83,7 @@ class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
 
     # Download selection
     n_scenes: int = Field(
-        default=5,
+        default=100,
         ge=0,
         validation_alias=AliasChoices("n_scenes", "ns"),
     )
@@ -469,19 +469,25 @@ def cli_list(config: ASEDownloaderConfig, n: int | None = None) -> None:
     console = Console.with_prefix("DownloaderCLI").set_verbosity(config.verbosity).set_debug(config.is_debug)
     downloader = config.setup_target()
 
-    scenes = downloader.metadata.get_scenes_with_meshes()
+    all_scenes = downloader.metadata.get_scenes_with_meshes()
+    total_snippets = sum(scene.snippet_count for scene in all_scenes)
+    scenes = all_scenes
     if config.prefer_scenes_with_max_snippets:
         scenes = sorted(scenes, key=lambda s: (-s.snippet_count, s.scene_id))
     if n:
         scenes = scenes[:n]
+    shown_snippets = sum(scene.snippet_count for scene in scenes)
 
     console.log("=" * 60)
     console.log("ASE Dataset - Available Scenes")
     console.log("=" * 60)
-    console.log(f"Total scenes with GT meshes: {len(downloader.metadata.get_scenes_with_meshes())}")
+    console.log(f"Total scenes with GT meshes: {len(all_scenes)}")
     console.log(f"\nShowing {len(scenes)} scenes:")
     for scene in scenes:
         console.log(f"  Scene {scene.scene_id}: {len(scene.snippet_ids)} snippets")
+    console.log(f"\nTotal snippets (all GT-mesh scenes): {total_snippets}")
+    if n is not None and len(scenes) != len(all_scenes):
+        console.log(f"Total snippets (shown scenes): {shown_snippets}")
     console.log("=" * 60)
 
 
