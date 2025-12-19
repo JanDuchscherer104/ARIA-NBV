@@ -53,7 +53,7 @@ class EvlBackboneConfig(BaseConfig["EvlBackbone"]):
     features_mode: Literal["heads", "neck", "both"] = "heads"
     """Which EVL features to expose.
 
-    - ``heads``: expose low-dimensional head/evidence tensors (occ_pr, occ_input, counts, free_input).
+    - ``heads``: expose low-dimensional head/evidence tensors (occ_pr, occ_input, counts).
     - ``neck``: expose high-dimensional neck features (neck/occ_feat, neck/obb_feat).
     - ``both``: expose both sets for ablations.
     """
@@ -152,13 +152,9 @@ class EvlBackbone:
             occ_input = out.get("voxel/occ_input")
             counts = out.get("voxel/counts")
             counts_m = out.get("voxel/counts_m")
-            voxel_feat = out.get("voxel/feat")
-            if isinstance(voxel_feat, torch.Tensor) and voxel_feat.ndim == 5:
-                # voxel/feat is (B, F, D, H, W); last channel is free-space evidence.
-                free_input = voxel_feat[:, -1:, ...]
 
         ref_tensor: Tensor | None = None
-        for candidate in (occ_feat, obb_feat, occ_pr, occ_input, free_input):
+        for candidate in (occ_feat, obb_feat, occ_pr, occ_input, counts):
             if isinstance(candidate, torch.Tensor):
                 ref_tensor = candidate
                 break

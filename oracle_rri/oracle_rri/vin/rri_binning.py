@@ -218,6 +218,9 @@ class RriOrdinalBinner:
             raise ValueError("No fit data available.")
 
         rri = torch.cat(self._rri_chunks, dim=0).to(dtype=torch.float32)
+        rri = rri[torch.isfinite(rri)]
+        if rri.numel() == 0:
+            raise RuntimeError("No finite RRI samples available to fit binner.")
         qs = torch.linspace(
             1.0 / float(num_classes),
             float(num_classes - 1) / float(num_classes),
@@ -225,7 +228,21 @@ class RriOrdinalBinner:
             device=rri.device,
         )
         self.num_classes = int(num_classes)
-        self.edges = torch.quantile(rri, qs).to(dtype=torch.float32).detach().cpu()
+        edges = torch.quantile(rri, qs).to(dtype=torch.float32)
+        edges = torch.unique_consecutive(edges)
+        if edges.numel() < int(num_classes) - 1:
+            lo = float(rri.min().item())
+            hi = float(rri.max().item())
+            if not torch.isfinite(torch.tensor([lo, hi])).all() or abs(hi - lo) < 1e-6:
+                lo, hi = -1.0, 1.0
+            edges = torch.linspace(
+                lo,
+                hi,
+                steps=int(num_classes) + 1,
+                device=rri.device,
+                dtype=torch.float32,
+            )[1:-1]
+        self.edges = edges.detach().cpu()
         return self
 
 
