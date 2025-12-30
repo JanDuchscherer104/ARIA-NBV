@@ -18,6 +18,7 @@ import pytorch_lightning as pl
 import torch
 from efm3d.aria.pose import PoseTW
 from pydantic import Field
+from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from torch.utils.data import DataLoader, IterableDataset
 
 from ..data import AseEfmDatasetConfig, EfmSnippetView
@@ -35,7 +36,6 @@ class VinOracleBatch:
         efm: Raw EFM snippet dict (zero-copy view over the underlying WebDataset sample).
         candidate_poses_world_cam: ``PoseTW["N 12"]`` candidate poses as world←camera for the rendered subset.
         reference_pose_world_rig: ``PoseTW["12"]`` reference pose as world←rig_reference for the snippet.
-        candidate_poses_camera_rig: ``PoseTW["N 12"]`` candidate poses as camera←rig_reference frame (preferred for training).
         rri: ``Tensor["N", float32]`` oracle RRI per candidate (same ordering as candidates).
         pm_dist_before: ``Tensor["N", float32]`` Chamfer-style point↔mesh distance before (broadcasted).
         pm_dist_after: ``Tensor["N", float32]`` Chamfer-style point↔mesh distance after (per-candidate).
@@ -43,14 +43,15 @@ class VinOracleBatch:
         pm_comp_before: ``Tensor["N", float32]`` mesh→point completeness distance before (broadcasted).
         pm_acc_after: ``Tensor["N", float32]`` point→mesh accuracy distance after (per-candidate).
         pm_comp_after: ``Tensor["N", float32]`` mesh→point completeness distance after (per-candidate).
+        p3d_cameras: PyTorch3D cameras used for depth rendering/unprojection (same ordering as candidates).
         scene_id: ASE scene id for diagnostics.
         snippet_id: Snippet id (tar key/url stem) for diagnostics.
     """
 
     efm: Mapping[str, Any]
+    efm_snippet_view: EfmSnippetView
     candidate_poses_world_cam: PoseTW
     reference_pose_world_rig: PoseTW
-    candidate_poses_camera_rig: PoseTW
     rri: Tensor
     pm_dist_before: Tensor
     pm_dist_after: Tensor
@@ -58,6 +59,7 @@ class VinOracleBatch:
     pm_comp_before: Tensor
     pm_acc_after: Tensor
     pm_comp_after: Tensor
+    p3d_cameras: PerspectiveCameras
     scene_id: str
     snippet_id: str
 
@@ -105,17 +107,13 @@ class VinOracleIterableDataset(IterableDataset[VinOracleBatch]):
 
 
 def _vin_oracle_batch_from_label(label_batch: OracleRriLabelBatch) -> VinOracleBatch:
-    camera_rig = label_batch.depths.camera.T_camera_rig
-    if not isinstance(camera_rig, PoseTW):
-        raise TypeError(f"Expected PoseTW for camera.T_camera_rig, got {type(camera_rig)}")
-
     rri = label_batch.rri
 
     return VinOracleBatch(
         efm=label_batch.sample.efm,
+        efm_snippet_view=label_batch.sample,
         candidate_poses_world_cam=label_batch.depths.poses,
         reference_pose_world_rig=label_batch.depths.reference_pose,
-        candidate_poses_camera_rig=camera_rig,
         rri=rri.rri,
         pm_dist_before=rri.pm_dist_before,
         pm_dist_after=rri.pm_dist_after,
@@ -123,6 +121,7 @@ def _vin_oracle_batch_from_label(label_batch: OracleRriLabelBatch) -> VinOracleB
         pm_comp_before=rri.pm_comp_before,
         pm_acc_after=rri.pm_acc_after,
         pm_comp_after=rri.pm_comp_after,
+        p3d_cameras=label_batch.depths.p3d_cameras,
         scene_id=label_batch.sample.scene_id,
         snippet_id=label_batch.sample.snippet_id,
     )
