@@ -1,0 +1,13 @@
+NBV project – distilled notes (Nov 22, 2025)
+--------------------------------------------
+- Mission: active NBV for indoor ASE scenes; oracle RRI labels from GT meshes + semidense points; RRI head atop frozen EFM3D/EVL backbone.
+- Stack: Python 3.11, conda env `aria-nbv`; heavy deps (pytorch3d, trimesh, efm3d, atek, projectaria_tools). Use `PoseTW`, `CameraTW`, ARIA constants; keep configs as factories with `setup_target`.
+- Required orientation files already read: `docs/index.qmd`, `docs/contents/todos.qmd`; run `make context` first.
+- Streamlit app (oracle_rri/streamlit_app.py):
+  - Pages: Data → load AseEfmDataset sample; Candidate Poses → generate candidates via CandidateViewGenerator; Candidate Renders → depth render via CandidateDepthRenderer/Pytorch3D backend.
+  - UI inputs wrapped in forms; no rerun until submit. Background tasks run in threads with ScriptRunContext; page auto-reruns on completion.
+  - Console sink captures all `oracle_rri.utils.Console` logs into an inline log panel per page; includes optional Python scratchpad; log buffer capped at 500 lines.
+- Typing: session_state typed via TypedDict (`TaskState`, `SessionVars`). Prefer torch devices resolved via config validators.
+- Style/quality: Google docstrings with shapes, type hints everywhere, enums for categories, pathlib for paths, Console for logging. Tests: `ruff format` → `ruff check` → `pytest` on touched files.
+- Data defaults: requires meshes; mesh crop margin/decimation sliders in Data form.
+- Background pipeline: data → candidates → depth; “Run previous” buttons trigger upstream stages; can switch tabs while tasks run.

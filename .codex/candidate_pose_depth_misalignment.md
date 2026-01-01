@@ -1,0 +1,9 @@
+## Candidate render poses leave the scene (PyTorch3D path)
+
+- **Where the drift starts**: `CandidateDepthRenderer._frame_calib` overwrites `T_camera_rig` with identity (commented “TODO: Potential error here!”). The renderer then feeds the candidate poses (sampled in the *rig* frame) to PyTorch3D using RGB intrinsics. Because the per-camera extrinsics are zeroed, the optical frame is assumed to coincide with the rig. For SLAM-L/R (and even RGB) this shifts the virtual camera center/axes by the rig–camera baseline, so rays originate outside the valid scene and look in the wrong direction.
+- **Propagation**: `Pytorch3DDepthRenderer._pose_to_r_t` expects `T_world_cam`. With the extrinsics dropped, it effectively receives `T_world_rig`; the derived `R,T` therefore move the mesh relative to a mis-framed camera, producing the “outside the room” depth renders (large yellow areas, objects in corners).
+- **Fix sketch**:
+  1) Keep the real extrinsics: drop the identity override and compute `cam_pose = world_from_camera(candidate_pose, frame_calib, frame_idx)` (or `candidate_pose @ frame_calib.T_camera_rig[frame_idx].inverse()`) before calling the renderer.
+  2) In the renderer, derive view matrices via `pose_cam = cam_pose.inverse(); R = pose_cam.R; T = pose_cam.t` to avoid row/column mix-ups.
+  3) Minor: in `_perspective_params`, flip the y principal-point sign (`py_ndc = -2*(cy - h/2)/h`) to match PyTorch3D’s NDC convention and keep the scene centerd vertically.
+- **Acceptance**: With the extrinsics preserved, rendered candidates should stay within mesh AABBs; hit-ratio should remain high but geometry should occupy the frame center instead of distant corners. Consider adding a regression that renders one RGB frame using `world_from_camera` and checks that the median depth falls inside the snippet’s crop bounds.
