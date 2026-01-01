@@ -9,10 +9,10 @@ intermediate numpy copies.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import torch
-from pydantic import Field
+from pydantic import Field, field_validator
 from pytorch3d.renderer import MeshRasterizer, RasterizationSettings  # type: ignore[import-untyped]
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from pytorch3d.structures import Meshes  # type: ignore[import-untyped]
@@ -32,7 +32,7 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
         exclude=True,
     )
 
-    device: str = "cuda"
+    device: Annotated[torch.device, Field(default="auto")]
     """Torch device to run rasterisation on (falls back to CPU if unavailable)."""
 
     zfar: float = 20.0
@@ -52,8 +52,12 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     blur_radius: float = 0.0
     """Soft rasterizer blur radius; keep ``0`` for hard z-buffer."""
 
-    bin_size: int | None = None
-    """Rasterisation bin size; ``None`` lets PyTorch3D pick heuristics."""
+    bin_size: int | None = 0
+    """Rasterisation bin size in pixels.
+
+    Set to ``0`` to force naive rasterisation (avoids bin overflow warnings on dense meshes).
+    Set to ``None`` to let PyTorch3D choose heuristics.
+    """
 
     max_faces_per_bin: int | None = None
     """Performance knob mirroring ``RasterizationSettings.max_faces_per_bin``."""
@@ -67,6 +71,11 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     )
     """Enable :class:`Console` logging."""
 
+    @field_validator("device", mode="before")
+    @classmethod
+    def _resolve_device(cls, value: str | torch.device) -> torch.device:
+        return super()._resolve_device(value)
+
 
 class Pytorch3DDepthRenderer:
     """Depth rendering backend based on PyTorch3D."""
@@ -75,20 +84,11 @@ class Pytorch3DDepthRenderer:
         self.config = config
         self.console = Console.with_prefix(self.__class__.__name__).set_verbosity(self.config.verbosity)
 
-        self.device = self._resolve_device(self.config.device)
+        self.device = self.config.device
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _resolve_device(value: str | torch.device) -> torch.device:
-        if isinstance(value, torch.device):
-            return value
-        if value is None or str(value).lower() == "auto":
-            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        return torch.device(value)
-
     def render(
         self,
         poses: PoseTW,

@@ -13,6 +13,14 @@ from .efm_views import (  # noqa: E402
     EfmTrajectoryView,
 )
 from .metadata import ASEMetadata, SceneMetadata
+from .offline_cache import (
+    OracleRriCacheAppender,
+    OracleRriCacheAppenderConfig,
+    OracleRriCacheDataset,
+    OracleRriCacheDatasetConfig,
+    OracleRriCacheWriter,
+    OracleRriCacheWriterConfig,
+)
 
 __all__ = [
     "ASEMetadata",
@@ -21,6 +29,12 @@ __all__ = [
     "ASEDownloaderConfig",
     "AseEfmDataset",
     "AseEfmDatasetConfig",
+    "OracleRriCacheAppender",
+    "OracleRriCacheAppenderConfig",
+    "OracleRriCacheDataset",
+    "OracleRriCacheDatasetConfig",
+    "OracleRriCacheWriter",
+    "OracleRriCacheWriterConfig",
     "EfmCameraView",
     "EfmTrajectoryView",
     "EfmPointsView",

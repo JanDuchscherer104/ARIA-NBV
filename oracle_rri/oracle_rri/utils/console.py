@@ -11,7 +11,7 @@ from devtools import pformat
 from rich.console import Console as RichConsole
 from rich.theme import Theme
 
-from .summary import summarize
+from .rich_summary import summarize
 
 if TYPE_CHECKING:
     from lightning.pytorch.loggers.logger import Logger

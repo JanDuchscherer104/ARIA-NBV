@@ -11,7 +11,7 @@ configuration surface small while supporting:
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import pytorch_lightning as pl
 import torch
@@ -20,6 +20,11 @@ from pydantic import Field, model_validator
 from ..configs.wandb_config import WandbConfig
 from ..utils import BaseConfig, Console
 from .lit_trainer_callbacks import TrainerCallbacksConfig
+
+if TYPE_CHECKING:
+    from optuna import Trial
+
+    from ..configs.optuna_config import OptunaConfig
 
 
 class TrainerFactoryConfig(BaseConfig):
@@ -41,7 +46,7 @@ class TrainerFactoryConfig(BaseConfig):
     precision: str | int = "32"
 
     tf32_matmul_precision: str | None = "medium"
-    gradient_clip_val: float | None = None
+    gradient_clip_val: float | None = 1.0
     accumulate_grad_batches: int = 1
     log_every_n_steps: int = 1
     deterministic: bool | str | None = None
@@ -49,6 +54,10 @@ class TrainerFactoryConfig(BaseConfig):
     limit_train_batches: int | float | None = None
     limit_val_batches: int | float | None = None
     check_val_every_n_epoch: int = 1
+    num_sanity_val_steps: int = 2
+    """Sanity check runs n validation batches before starting the training routine. Set it to -1 to run all batches in all validation dataloaders. Default: 2."""
+    enable_validation: bool = False
+    """Whether to run validation loops at all."""
 
     enable_model_summary: bool = True
     """Enable Lightning's default model summary callback.
@@ -78,23 +87,39 @@ class TrainerFactoryConfig(BaseConfig):
             torch.autograd.set_detect_anomaly(True)
             console.log(
                 "Debug settings: fast_dev_run=True, accelerator=cpu, devices=1, checkpointing disabled, "
-                "anomaly detection enabled"
+                "anomaly detection enabled",
             )
 
         if self.fast_dev_run:
             Console.with_prefix(self.__class__.__name__).log(
                 "Fast dev run enabled; trainer will use a single batch per split.",
             )
+        if not self.enable_validation:
+            object.__setattr__(self, "limit_val_batches", 0)
+            object.__setattr__(self, "check_val_every_n_epoch", 0)
+            console.log("Validation disabled: limit_val_batches=0, check_val_every_n_epoch=0, num_sanity_val_steps=0.")
         return self
 
-    def setup_target(self, experiment: Any | None = None) -> pl.Trainer:  # type: ignore[override]
+    def setup_target(  # type: ignore[override]
+        self,
+        experiment: Any | None = None,
+        *,
+        trial: "Trial | None" = None,
+        optuna_config: "OptunaConfig | None" = None,
+    ) -> pl.Trainer:
         """Instantiate the configured trainer."""
         console = Console.with_prefix(self.__class__.__name__, "setup_target")
+
+        resolved_optuna = optuna_config
+        if resolved_optuna is None and experiment is not None:
+            resolved_optuna = getattr(experiment, "optuna_config", None)
 
         if self.tf32_matmul_precision is not None:
             try:
                 torch.set_float32_matmul_precision(str(self.tf32_matmul_precision))
-                console.log(f"Set TF32 matmul precision to '{self.tf32_matmul_precision}'")
+                console.log(
+                    f"Set TF32 matmul precision to '{self.tf32_matmul_precision}'",
+                )
             except Exception as exc:  # pragma: no cover - hardware dependent
                 console.warn(f"Failed to set TF32 matmul precision: {exc}")
 
@@ -108,7 +133,12 @@ class TrainerFactoryConfig(BaseConfig):
         else:
             console.log("No logger configured")
 
-        callbacks = self.callbacks.setup_target(model_name=None, has_logger=logger is not None)
+        callbacks = self.callbacks.setup_target(
+            model_name=None,
+            has_logger=logger is not None,
+            trial=trial,
+            optuna_config=resolved_optuna,
+        )
         console.log(f"Configured {len(callbacks)} callbacks.")
 
         return pl.Trainer(
@@ -128,6 +158,7 @@ class TrainerFactoryConfig(BaseConfig):
             enable_model_summary=bool(self.enable_model_summary),
             callbacks=callbacks,
             logger=logger,
+            num_sanity_val_steps=self.num_sanity_val_steps,
         )
 
 

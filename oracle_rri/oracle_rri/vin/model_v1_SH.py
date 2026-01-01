@@ -21,7 +21,7 @@ Coordinate frames and transforms follow the EFM3D/ATEK conventions:
 
 Key ingredients implemented here:
 
-1. **Learnable Fourier pose encoding** (candidate pose in reference frame)
+1. **Shell pose encoding** (candidate pose in reference frame)
 
    Given the relative pose:
 
@@ -35,16 +35,8 @@ Key ingredients implemented here:
        f = R_rig_ref_cam * z_cam               (camera forward direction),
        s = <f, -u>                             (view alignment scalar).
 
-   These are concatenated into a single pose vector
-
-       x = [u, f, r, s] ∈ R^8,
-
-   and encoded by ``LearnableFourierFeatures`` (LFF). Alternatively, VIN can
-   use a simplified translation + 6D rotation encoding:
-
-       x = [t, R_{6d}] ∈ R^9,
-
-   with learned per-group scaling for translation vs rotation.
+   These are encoded by ``ShellShPoseEncoder`` using real spherical harmonics for
+   ``u`` and ``f`` plus Fourier features for ``r`` and an MLP for ``s``.
 
 2. **Scene field construction**
 
@@ -80,11 +72,7 @@ Key ingredients implemented here:
 
    The per-candidate features are:
 
-       [pose_enc, global_feat?, voxel_pose_enc?, local_frustum_feat, valid_frac?],
-
-   where ``global_feat`` can be pose-conditioned via attention pooling, and
-   ``valid_frac`` summarizes frustum coverage (low coverage can still signal
-   high RRI due to unknown space).
+       [pose_enc, global_field_mean?, voxel_pose_enc?, local_frustum_feat].
 
    The head outputs CORAL logits ``l_k`` for thresholds ``k=0..K-2``:
 
@@ -98,31 +86,21 @@ context to an ordinal NBV score that correlates with oracle RRI.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+import math
+from typing import Any, Literal
 
 import torch
 from efm3d.aria.pose import PoseTW
 from efm3d.utils.voxel_sampling import pc_to_vox, sample_voxels
-from pydantic import Field, field_validator, model_validator
-from pytorch3d.renderer.cameras import (
-    PerspectiveCameras,  # type: ignore[import-untyped]
-)
-from pytorch3d.transforms import matrix_to_rotation_6d  # type: ignore[import-untyped]
+from pydantic import Field, field_validator
+from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from torch import Tensor, nn
-from torch.nn import functional as functional
 
-from ..rri_metrics.coral import (
-    CoralLayer,
-    coral_expected_from_logits,
-    coral_logits_to_prob,
-)
 from ..utils import BaseConfig
 from .backbone_evl import EvlBackboneConfig
-from .pose_encoding import LearnableFourierFeaturesConfig
+from .coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
+from .spherical_encoding import ShellShPoseEncoderConfig
 from .types import EvlBackboneOutput, VinForwardDiagnostics, VinPrediction
-
-if TYPE_CHECKING:
-    from ..lightning.lit_datamodule import VinOracleBatch
 
 
 def _largest_divisor_leq(n: int, max_divisor: int) -> int:
@@ -141,6 +119,7 @@ def _largest_divisor_leq(n: int, max_divisor: int) -> int:
     Returns:
         Largest valid group count (>=1).
     """
+
     g = min(max_divisor, n)
     while g > 1 and (n % g) != 0:
         g -= 1
@@ -191,6 +170,7 @@ def _build_frustum_points_world_p3d(
         ``Tensor["B (grid_size^2 * len(depths_m)) 3", float32]`` world points
         for each camera in the batch.
     """
+
     num_cams = int(cameras.R.shape[0])
     device = cameras.R.device
 
@@ -213,14 +193,8 @@ def _build_frustum_points_world_p3d(
     # principal point is not exactly at the image center) while clamping to valid pixel
     # *centers* in [0.5, W-0.5]×[0.5, H-0.5].
     half = 0.95 * 0.5 * scale
-    half_x = torch.minimum(
-        half,
-        torch.minimum(principal_point[:, 0] - 0.5, (w - 0.5) - principal_point[:, 0]),
-    )
-    half_y = torch.minimum(
-        half,
-        torch.minimum(principal_point[:, 1] - 0.5, (h - 0.5) - principal_point[:, 1]),
-    )
+    half_x = torch.minimum(half, torch.minimum(principal_point[:, 0] - 0.5, (w - 0.5) - principal_point[:, 0]))
+    half_y = torch.minimum(half, torch.minimum(principal_point[:, 1] - 0.5, (h - 0.5) - principal_point[:, 1]))
     half_x = torch.clamp(half_x, min=0.0)
     half_y = torch.clamp(half_y, min=0.0)
 
@@ -281,7 +255,6 @@ def _build_scene_field(
     - ``observed``: 1[counts > 0]
     - ``unknown``: 1 - observed
     - ``new_surface_prior``: unknown * occ_pr
-    - ``cent_pr``: EVL centerness probability (if provided by the backbone)
     - ``free_input``: explicit free-space evidence if available; otherwise a
       weak proxy:
 
@@ -304,7 +277,7 @@ def _build_scene_field(
         value = getattr(out, name)
         if not isinstance(value, torch.Tensor):
             raise KeyError(
-                f"Missing backbone output '{name}'. Ensure EvlBackboneConfig.features_mode includes 'heads'.",
+                f"Missing backbone output '{name}'. Ensure EvlBackboneConfig.features_mode includes 'heads'."
             )
         return value
 
@@ -319,9 +292,6 @@ def _build_scene_field(
     if "occ_input" in use_channels or "free_input" in use_channels:
         parts["occ_input"] = _require("occ_input").to(dtype=torch.float32)
 
-    if "cent_pr" in use_channels:
-        parts["cent_pr"] = _require("cent_pr").to(dtype=torch.float32)
-
     if "free_input" in use_channels:
         if isinstance(out.free_input, torch.Tensor):
             parts["free_input"] = out.free_input.to(dtype=torch.float32)
@@ -329,9 +299,7 @@ def _build_scene_field(
             # Fallback: derive a weak free-space proxy from (counts, occ_input).
             counts = _require("counts")
             observed = (counts > 0).to(dtype=torch.float32).unsqueeze(1)
-            occ_evidence = (parts["occ_input"] > occ_input_threshold).to(
-                dtype=torch.float32,
-            )
+            occ_evidence = (parts["occ_input"] > occ_input_threshold).to(dtype=torch.float32)
             parts["free_input"] = observed * (1.0 - occ_evidence)
 
     if (
@@ -347,9 +315,7 @@ def _build_scene_field(
 
         max_counts = counts.amax(dim=(-3, -2, -1), keepdim=True).clamp_min(1.0)
         if counts_norm_mode == "log1p":
-            parts["counts_norm"] = torch.log1p(counts).unsqueeze(1) / torch.log1p(
-                max_counts,
-            ).unsqueeze(1)
+            parts["counts_norm"] = torch.log1p(counts).unsqueeze(1) / torch.log1p(max_counts).unsqueeze(1)
         else:  # "linear"
             parts["counts_norm"] = (counts / max_counts).unsqueeze(1)
 
@@ -401,16 +367,13 @@ def _sample_voxel_field(
             - valid: ``Tensor["B N K", bool]`` mask of in-bounds samples
               (extent AND grid validity).
     """
+
     if field.ndim != 5:
         raise ValueError(f"Expected field shape (B,C,D,H,W), got {tuple(field.shape)}.")
     if points_world.ndim != 4:
-        raise ValueError(
-            f"Expected points_world shape (B,N,K,3), got {tuple(points_world.shape)}.",
-        )
+        raise ValueError(f"Expected points_world shape (B,N,K,3), got {tuple(points_world.shape)}.")
     if int(points_world.shape[-1]) != 3:
-        raise ValueError(
-            f"Expected points_world[..., 3], got {tuple(points_world.shape)}.",
-        )
+        raise ValueError(f"Expected points_world[..., 3], got {tuple(points_world.shape)}.")
 
     batch_size, field_channels, grid_d, grid_h, grid_w = field.shape
     _, num_candidates, num_points, _ = points_world.shape
@@ -422,22 +385,16 @@ def _sample_voxel_field(
         if int(t_world_voxel_b.shape[0]) == 1:
             t_world_voxel_b = PoseTW(t_world_voxel_b._data.expand(batch_size, 12))
         else:
-            raise ValueError(
-                "t_world_voxel must have batch size 1 or match field batch size.",
-            )
+            raise ValueError("t_world_voxel must have batch size 1 or match field batch size.")
 
     vox_extent = voxel_extent.to(device=field.device, dtype=torch.float32)
     if vox_extent.ndim == 1:
         vox_extent = vox_extent.view(1, 6).expand(batch_size, 6)
     if vox_extent.shape != (batch_size, 6):
-        raise ValueError(
-            f"Expected voxel_extent shape (B,6), got {tuple(vox_extent.shape)}.",
-        )
+        raise ValueError(f"Expected voxel_extent shape (B,6), got {tuple(vox_extent.shape)}.")
 
     world_points_flat = points_world.to(device=field.device, dtype=field.dtype).reshape(
-        batch_size,
-        num_candidates * num_points,
-        3,
+        batch_size, num_candidates * num_points, 3
     )
 
     # NOTE: EVL's voxel field is defined in the *voxel frame* (metres), but our candidates/frustum points are in WORLD.
@@ -445,9 +402,7 @@ def _sample_voxel_field(
     # NOTE: If you ever swap EVL conventions or change voxel-grid anchoring, re-verify this transform (sanity check:
     # voxelized points should be stable under small candidate translations).
     t_voxel_world = t_world_voxel_b.inverse()  # voxel<-world
-    voxel_points_m = (
-        t_voxel_world * world_points_flat
-    )  # B (N*K) 3 in voxel frame (metres)
+    voxel_points_m = t_voxel_world * world_points_flat  # B (N*K) 3 in voxel frame (metres)
 
     pts_vox_id, valid_extent = pc_to_vox(
         voxel_points_m.to(dtype=torch.float32),
@@ -459,26 +414,13 @@ def _sample_voxel_field(
     # sample_voxels does not support NaNs; replace invalid coords with 0 and rely on validity masks below.
     pts_vox_id = torch.nan_to_num(pts_vox_id, nan=0.0, posinf=0.0, neginf=0.0)
 
-    samp, valid_grid = sample_voxels(
-        field,
-        pts_vox_id,
-        differentiable=False,
-    )  # B C (N*K), B (N*K)
+    samp, valid_grid = sample_voxels(field, pts_vox_id, differentiable=False)  # B C (N*K), B (N*K)
     valid = (valid_extent & valid_grid).reshape(batch_size, num_candidates, num_points)
-    tokens = samp.transpose(1, 2).reshape(
-        batch_size,
-        num_candidates,
-        num_points,
-        field_channels,
-    )
+    tokens = samp.transpose(1, 2).reshape(batch_size, num_candidates, num_points, field_channels)
     return tokens, valid
 
 
-def _candidate_valid_from_token(
-    token_valid: Tensor,
-    *,
-    min_valid_frac: float,
-) -> Tensor:
+def _candidate_valid_from_token(token_valid: Tensor, *, min_valid_frac: float) -> Tensor:
     """Convert per-token validity into a per-candidate mask.
 
     For each candidate we compute the fraction of in-bounds samples:
@@ -496,85 +438,11 @@ def _candidate_valid_from_token(
     Returns:
         ``Tensor["B N", bool]`` candidate validity mask.
     """
+
     if token_valid.ndim < 1:
-        raise ValueError(
-            f"Expected token_valid with ndim>=1, got {tuple(token_valid.shape)}.",
-        )
+        raise ValueError(f"Expected token_valid with ndim>=1, got {tuple(token_valid.shape)}.")
     valid_frac = token_valid.float().mean(dim=-1)
     return valid_frac >= min_valid_frac
-
-
-class PoseConditionedGlobalPool(nn.Module):
-    """Pose-conditioned attention pooling over a coarse voxel grid.
-
-    This module downsamples the voxel field to a coarse grid, flattens it into
-    tokens, and applies multi-head attention with the candidate pose embeddings
-    as queries. The result is a global context token per candidate that
-    preserves spatial structure while remaining lightweight.
-    """
-
-    def __init__(
-        self,
-        *,
-        field_dim: int,
-        pose_dim: int,
-        pool_size: int,
-        attn_dim: int,
-        num_heads: int,
-        dropout: float,
-    ) -> None:
-        super().__init__()
-        if attn_dim % num_heads != 0:
-            raise ValueError(
-                f"attn_dim ({attn_dim}) must be divisible by num_heads ({num_heads}).",
-            )
-        if pool_size <= 0:
-            raise ValueError("pool_size must be > 0.")
-        self.pool_size = int(pool_size)
-        self.attn_dim = int(attn_dim)
-        self.pool = nn.AdaptiveAvgPool3d(
-            (self.pool_size, self.pool_size, self.pool_size),
-        )
-        self.kv_proj = nn.Linear(field_dim, self.attn_dim)
-        self.q_proj = nn.Linear(pose_dim, self.attn_dim)
-        self.attn = nn.MultiheadAttention(
-            embed_dim=self.attn_dim,
-            num_heads=num_heads,
-            dropout=dropout,
-            batch_first=True,
-        )
-
-    def forward(self, field: Tensor, pose_enc: Tensor) -> Tensor:
-        """Return pose-conditioned global tokens.
-
-        Args:
-            field: ``Tensor["B C D H W", float32]`` voxel field.
-            pose_enc: ``Tensor["B N E_pose", float32]`` pose embeddings.
-
-        Returns:
-            ``Tensor["B N E_attn", float32]`` global tokens.
-        """
-        if field.ndim != 5:
-            raise ValueError(
-                f"Expected field shape (B,C,D,H,W), got {tuple(field.shape)}.",
-            )
-        if pose_enc.ndim != 3:
-            raise ValueError(
-                f"Expected pose_enc shape (B,N,E), got {tuple(pose_enc.shape)}.",
-            )
-
-        grid = min(
-            self.pool_size,
-            int(field.shape[-3]),
-            int(field.shape[-2]),
-            int(field.shape[-1]),
-        )
-        field_ds = functional.adaptive_avg_pool3d(field, output_size=(grid, grid, grid))
-        tokens = field_ds.flatten(2).transpose(1, 2)  # B T C
-        keys = self.kv_proj(tokens)
-        queries = self.q_proj(pose_enc.to(dtype=keys.dtype))
-        attn_out, _ = self.attn(queries, keys, keys, need_weights=False)
-        return attn_out
 
 
 class VinScorerHead(nn.Module):
@@ -594,12 +462,7 @@ class VinScorerHead(nn.Module):
     RRI values.
     """
 
-    def __init__(
-        self,
-        config: VinScorerHeadConfig,
-        *,
-        in_dim: int | None = None,
-    ) -> None:
+    def __init__(self, config: "VinScorerHeadConfig", *, in_dim: int | None = None) -> None:
         super().__init__()
         self.config = config
 
@@ -650,10 +513,7 @@ class VinScorerHeadConfig(BaseConfig[VinScorerHead]):
     reduces parameter count compared to a full K-way classifier.
     """
 
-    target: type[VinScorerHead] = Field(
-        default_factory=lambda: VinScorerHead,
-        exclude=True,
-    )
+    target: type[VinScorerHead] = Field(default_factory=lambda: VinScorerHead, exclude=True)
     """Factory target for :meth:`BaseConfig.setup_target`."""
 
     hidden_dim: int = Field(default=128, gt=0)
@@ -684,55 +544,30 @@ class VinModelConfig(BaseConfig["VinModel"]):
 
         score = f( pose_enc(u,f,r,s),
                    voxel_pose_enc?,
-                   global_feat?,
-                   local_frustum_feat,
-                   valid_frac? ),
+                   global_field_mean?,
+                   local_frustum_feat ),
 
-    where ``pose_enc`` and ``voxel_pose_enc`` are LFF-based shell encodings,
-    ``global_feat`` summarizes the voxel field (optionally pose-conditioned),
-    and ``local_frustum_feat`` samples the voxel field along a candidate frustum.
+    where ``pose_enc`` and ``voxel_pose_enc`` are SH-based shell encodings,
+    ``global_field_mean`` summarizes the voxel field, and ``local_frustum_feat``
+    samples the voxel field along a candidate frustum.
     """
 
-    target: type[VinModel] = Field(default_factory=lambda: VinModel, exclude=True)
+    target: type["VinModel"] = Field(default_factory=lambda: VinModel, exclude=True)
     """Factory target for :meth:`BaseConfig.setup_target`."""
 
-    backbone: EvlBackboneConfig | None = Field(default_factory=EvlBackboneConfig)
-    """Optional frozen EVL backbone configuration."""
+    backbone: EvlBackboneConfig = Field(default_factory=EvlBackboneConfig)
+    """Frozen EVL backbone configuration."""
 
-    pose_encoder_lff: LearnableFourierFeaturesConfig = Field(
-        default_factory=lambda: LearnableFourierFeaturesConfig(input_dim=9),
-        validation_alias="pose_encoder_sh",
-    )
-    """Learnable Fourier Features pose encoding configuration (per pose vector)."""
-
-    pose_encoding_mode: Literal["shell_lff", "t_r6d_lff"] = "t_r6d_lff"
-    """Pose vector used for LFF: shell descriptor or translation + rotation-6D."""
-
-    pose_scale_init: tuple[float, float] = (1.0, 1.0)
-    """Initial per-group scale (translation, rotation-6D) applied before LFF."""
-
-    pose_scale_learnable: bool = True
-    """Whether pose scaling parameters are learned."""
-
-    pose_scale_eps: float = Field(default=1e-6, gt=0.0)
-    """Numerical floor for pose scaling (softplus + eps)."""
+    pose_encoder_sh: ShellShPoseEncoderConfig = Field(default_factory=ShellShPoseEncoderConfig)
+    """Spherical harmonics pose encoding configuration (shell descriptor)."""
 
     head: VinScorerHeadConfig = Field(default_factory=VinScorerHeadConfig)
     """Scoring head configuration."""
 
-    scene_field_channels: list[
-        Literal[
-            "occ_pr",
-            "occ_input",
-            "counts_norm",
-            "observed",
-            "unknown",
-            "new_surface_prior",
-            "free_input",
-            "cent_pr",
-        ]
+    scene_field_channels: Literal[
+        "occ_pr", "occ_input", "counts_norm", "observed", "unknown", "new_surface_prior", "free_input"
     ] = Field(
-        default_factory=lambda: ["occ_pr"],
+        default_factory=lambda: ["occ_pr", "occ_input", "counts_norm"],
         min_length=1,
     )
     """Ordered channels used to build the low-dimensional scene field."""
@@ -762,31 +597,10 @@ class VinModelConfig(BaseConfig["VinModel"]):
     """Depth values (metres) along each frustum direction."""
 
     use_global_pool: bool = True
-    """Whether to concatenate a global context token to per-candidate features."""
-
-    global_pool_mode: Literal["mean", "mean_max", "attn"] = "attn"
-    """Global pooling mode: mean, mean+max, or pose-conditioned attention."""
-
-    global_pool_grid_size: int = Field(default=8, gt=0)
-    """Target grid size for attention pooling (downsampled voxel resolution)."""
-
-    global_pool_dim: int | None = None
-    """Attention embedding dimension (defaults to `field_dim` when None)."""
-
-    global_pool_heads: int = Field(default=4, gt=0)
-    """Number of attention heads for pose-conditioned pooling."""
-
-    global_pool_dropout: float = Field(default=0.0, ge=0.0, lt=1.0)
-    """Dropout rate for attention pooling."""
+    """Whether to concatenate the global mean-pooled embedding to per-candidate features."""
 
     use_voxel_pose_encoding: bool = True
-    """Whether to append a LFF-encoded voxel-grid pose (voxel/T_world_voxel) in the reference frame."""
-
-    use_unknown_token: bool = True
-    """Whether to replace invalid frustum samples with a learned unknown token."""
-
-    use_valid_frac_feature: bool = True
-    """Whether to append (valid_frac, 1-valid_frac) as scalar features."""
+    """Whether to append a SH-encoded voxel-grid pose (voxel/T_world_voxel) in the reference frame."""
 
     candidate_min_valid_frac: float = Field(default=0.2, ge=0.0, le=1.0)
     """Minimum fraction of valid frustum samples required to keep a candidate."""
@@ -808,7 +622,6 @@ class VinModelConfig(BaseConfig["VinModel"]):
             "unknown",
             "new_surface_prior",
             "free_input",
-            "cent_pr",
         }
         unknown = [name for name in value if name not in allowed]
         if unknown:
@@ -817,46 +630,18 @@ class VinModelConfig(BaseConfig["VinModel"]):
             raise ValueError("scene_field_channels must not contain duplicates.")
         return value
 
-    @field_validator("pose_encoder_lff")
+    @field_validator("frustum_depths_m")
     @classmethod
-    def _validate_pose_encoder_lff(
-        cls,
-        value: LearnableFourierFeaturesConfig,
-    ) -> LearnableFourierFeaturesConfig:
-        """Ensure the LFF input dimensionality matches the pose vector definition."""
-        if value.input_dim not in (8, 9):
-            raise ValueError(
-                "pose_encoder_lff.input_dim must be 8 (shell) or 9 (t+R6d).",
-            )
-        return value
+    def _validate_frustum_depths_m(cls, value: list[float]) -> list[float]:
+        """Validate frustum depths.
 
-    @field_validator("global_pool_dim")
-    @classmethod
-    def _validate_global_pool_dim(cls, value: int | None) -> int | None:
-        """Validate attention embedding dimension when provided."""
-        if value is not None and value <= 0:
-            raise ValueError("global_pool_dim must be > 0 when provided.")
+        Depths are used as *metric z* in camera space before unprojection, so
+        they must be finite and strictly positive.
+        """
+        bad = [d for d in value if (not math.isfinite(d)) or d <= 0.0]
+        if bad:
+            raise ValueError(f"frustum_depths_m must contain finite values > 0, got {bad}")
         return value
-
-    @field_validator("pose_scale_init")
-    @classmethod
-    def _validate_pose_scale_init(
-        cls,
-        value: tuple[float, float],
-    ) -> tuple[float, float]:
-        if len(value) != 2:
-            raise ValueError("pose_scale_init must be a (translation, rotation) tuple.")
-        return value
-
-    @model_validator(mode="after")
-    def _validate_pose_encoding_mode(self) -> VinModelConfig:
-        expected = 8 if self.pose_encoding_mode == "shell_lff" else 9
-        if self.pose_encoder_lff.input_dim != expected:
-            raise ValueError(
-                "pose_encoder_lff.input_dim must match pose_encoding_mode "
-                f"({self.pose_encoding_mode} expects {expected}).",
-            )
-        return self
 
 
 class VinModel(nn.Module):
@@ -865,18 +650,17 @@ class VinModel(nn.Module):
     VIN is a light-weight head that queries frozen EVL voxel features to score
     candidate camera poses. The architecture is deliberately simple:
 
-    - **Pose encoding** via learnable Fourier features over either the shell
-      descriptor ``[u, f, r, s]`` or the simplified ``[t, R6d]`` vector.
+    - **Pose encoding** via real spherical harmonics (direction) and Fourier
+      features (radius) to represent candidate shells.
     - **Scene field** built from EVL evidence volumes and projected with a
       1x1x1 Conv3d to a small feature dimension.
     - **Local query**: sample the scene field at frustum points and pool.
-    - **Global tokens**: optional pose-conditioned attention pooling (or mean/mean+max)
-      plus optional voxel-pose token.
+    - **Global tokens**: optional mean-pooled field + optional voxel-pose token.
     - **CORAL head** to produce ordinal scores.
 
     The overall score is computed as:
 
-        z = concat(pose_enc, global_feat?, voxel_pose_enc?, local_feat, valid_frac?)
+        z = concat(pose_enc, global_field_mean?, voxel_pose_enc?, local_feat)
         logits = CORAL(MLP(z))
         score = E[y]/(K-1) = (1/(K-1)) * sum_k sigmoid(logit_k)
     """
@@ -884,8 +668,9 @@ class VinModel(nn.Module):
     def __init__(self, config: VinModelConfig) -> None:
         super().__init__()
         self.config = config
-        self.backbone = None
-        self.pose_encoder_lff = self.config.pose_encoder_lff.setup_target()
+
+        self.backbone = self.config.backbone.setup_target()
+        self.pose_encoder_sh = self.config.pose_encoder_sh.setup_target()
 
         field_dim = self.config.field_dim
         gn_groups = _largest_divisor_leq(field_dim, self.config.field_gn_groups)
@@ -898,112 +683,32 @@ class VinModel(nn.Module):
         )
 
         self.use_global_pool = self.config.use_global_pool
-        self.global_pool_mode = self.config.global_pool_mode
-        self.use_unknown_token = self.config.use_unknown_token
-        self.use_valid_frac_feature = self.config.use_valid_frac_feature
         self.use_voxel_pose_encoding = self.config.use_voxel_pose_encoding
-        self.pose_encoding_mode = self.config.pose_encoding_mode
-        self.pose_scale_eps = float(self.config.pose_scale_eps)
 
         # Head input dim is data-dependent (feature channel count depends on EVL cfg).
-        pose_dim = int(self.pose_encoder_lff.out_dim)
+        pose_dim = int(self.pose_encoder_sh.out_dim)
         head_in_dim = pose_dim + field_dim
-
-        self.global_pooler: PoseConditionedGlobalPool | None = None
-        self.global_pool_dim = field_dim
         if self.use_global_pool:
-            if self.global_pool_mode == "attn":
-                attn_dim = self.config.global_pool_dim or field_dim
-                if attn_dim % int(self.config.global_pool_heads) != 0:
-                    raise ValueError(
-                        "global_pool_dim must be divisible by global_pool_heads.",
-                    )
-                self.global_pool_dim = int(attn_dim)
-                self.global_pooler = PoseConditionedGlobalPool(
-                    field_dim=field_dim,
-                    pose_dim=pose_dim,
-                    pool_size=int(self.config.global_pool_grid_size),
-                    attn_dim=int(attn_dim),
-                    num_heads=int(self.config.global_pool_heads),
-                    dropout=float(self.config.global_pool_dropout),
-                )
-            elif self.global_pool_mode == "mean_max":
-                self.global_pool_dim = 2 * field_dim
-            elif self.global_pool_mode == "mean":
-                self.global_pool_dim = field_dim
-            else:
-                raise ValueError(f"Unknown global_pool_mode '{self.global_pool_mode}'.")
-            head_in_dim += self.global_pool_dim
+            head_in_dim += field_dim
         if self.use_voxel_pose_encoding:
             head_in_dim += pose_dim
-        if self.use_valid_frac_feature:
-            head_in_dim += 2
-
-        self.unknown_token: nn.Parameter | None = None
-        if self.use_unknown_token:
-            self.unknown_token = nn.Parameter(torch.zeros(1, 1, 1, field_dim))
-
-        scale_init = torch.tensor(self.config.pose_scale_init, dtype=torch.float32)
-        if self.config.pose_scale_learnable:
-            self.pose_scale_log = nn.Parameter(torch.log(scale_init))
-        else:
-            self.register_buffer(
-                "pose_scale_log",
-                torch.log(scale_init),
-                persistent=False,
-            )
         self.head = self.config.head.setup_target(in_dim=head_in_dim)
-        device = (
-            self.backbone.device if self.backbone is not None else torch.device("cpu")
-        )
-        self.to(device)
+        self.to(self.backbone.device)
 
-    def _pose_scales(self) -> Tensor:
-        """Return positive per-group scales for translation and rotation."""
-        scales = functional.softplus(self.pose_scale_log) + self.pose_scale_eps
-        return scales.to(dtype=torch.float32)
+    def _pool_global(self, field: Tensor) -> Tensor:
+        """Mean-pool global context from a voxel field.
 
-    def _pool_global(self, field: Tensor, pose_enc: Tensor) -> Tensor:
-        """Pool a global context token from a voxel field.
+        This produces a scene-level token:
 
-        Modes:
-            - ``mean``: global mean over the voxel grid.
-            - ``mean_max``: concatenated mean + max.
-            - ``attn``: pose-conditioned attention over a coarse voxel grid.
+            global_feat = mean_{x,y,z} F(x,y,z).
 
-        Args:
-            field: ``Tensor["B C D H W", float32]`` projected scene field.
-            pose_enc: ``Tensor["B N E_pose", float32]`` pose embeddings.
-
-        Returns:
-            ``Tensor["B N C_global", float32]`` global tokens.
+        The global token provides coarse context such as overall occupancy
+        density and semantic bias across the snippet.
         """
-        batch_size, num_candidates = int(pose_enc.shape[0]), int(pose_enc.shape[1])
 
-        match self.global_pool_mode:
-            case "mean":
-                pooled = field.mean(dim=(-3, -2, -1))
-                return pooled.unsqueeze(1).expand(batch_size, num_candidates, -1)
-            case "mean_max":
-                mean = field.mean(dim=(-3, -2, -1))
-                maxv = field.amax(dim=(-3, -2, -1))
-                pooled = torch.cat([mean, maxv], dim=-1)
-                return pooled.unsqueeze(1).expand(batch_size, num_candidates, -1)
-            case "attn":
-                if self.global_pooler is None:
-                    raise RuntimeError(
-                        "global_pooler not initialized for attention pooling.",
-                    )
-                return self.global_pooler(field, pose_enc)
-            case _:
-                raise ValueError(f"Unknown global_pool_mode '{self.global_pool_mode}'.")
+        return field.mean(dim=(-3, -2, -1))
 
-    def _frustum_points_world(
-        self,
-        poses_world_cam: PoseTW,
-        *,
-        p3d_cameras: PerspectiveCameras,
-    ) -> Tensor:
+    def _frustum_points_world(self, poses_world_cam: PoseTW, *, p3d_cameras: PerspectiveCameras) -> Tensor:
         """Generate frustum sample points in world coordinates for each candidate.
 
         This is a thin wrapper around ``_build_frustum_points_world_p3d`` that
@@ -1016,10 +721,11 @@ class VinModel(nn.Module):
         Returns:
             ``Tensor["B N K 3"]`` world points (K = grid_size^2 * len(depths_m)).
         """
+
         poses = poses_world_cam
         if poses.ndim != 3:
             raise ValueError(
-                "poses_world_cam must have shape (B,N,12). Use `_ensure_candidate_batch` before calling this helper.",
+                "poses_world_cam must have shape (B,N,12). Use `_ensure_candidate_batch` before calling this helper."
             )
         batch_size = int(poses.t.shape[0])
         num_candidates = int(poses.t.shape[1])
@@ -1037,52 +743,29 @@ class VinModel(nn.Module):
             return pts_world_flat.view(batch_size, num_candidates, -1, 3)
         raise ValueError(
             "p3d_cameras batch size must be N (when B=1) or B*N; "
-            f"got {num_cams} for B={batch_size}, N={num_candidates}.",
+            f"got {num_cams} for B={batch_size}, N={num_candidates}."
         )
 
-    @staticmethod
-    def _pool_candidates(
-        *,
-        tokens: Tensor,
-        valid: Tensor,
-        unknown_token: Tensor | None = None,
-    ) -> Tensor:
-        """Pool candidate-local frustum samples.
+    def _pool_candidates(self, *, tokens: Tensor, valid: Tensor) -> Tensor:
+        """Mean-pool candidate-local frustum samples.
 
-        If ``unknown_token`` is provided, invalid samples are replaced with a
-        learnable embedding and a simple mean over K is used:
-
-            local_feat = mean_k token_k (invalid samples → unknown_token).
-
-        Otherwise we compute a masked mean:
+        For each candidate, we compute a masked mean over K frustum samples:
 
             local_feat = sum_k (valid_k * token_k) / (sum_k valid_k + eps).
 
-        Args:
-            tokens: ``Tensor["B N K C", float32]`` sampled features.
-            valid: ``Tensor["B N K", bool]`` validity mask.
-            unknown_token: Optional ``Tensor["1 1 1 C", float32]`` learnable token.
-
-        Returns:
-            ``Tensor["B N C", float32]`` pooled local features.
+        This aggregates the local voxel evidence along the candidate frustum
+        while ignoring samples that fall outside the voxel grid.
         """
-        if tokens.ndim != 4:
-            raise ValueError(
-                f"Expected tokens shape (B,N,K,C), got {tuple(tokens.shape)}.",
-            )
-        if valid.shape != tokens.shape[:3]:
-            raise ValueError(
-                f"Expected valid shape {tuple(tokens.shape[:3])}, got {tuple(valid.shape)}.",
-            )
 
-        if unknown_token is not None:
-            unk = unknown_token.to(device=tokens.device, dtype=tokens.dtype)
-            tokens_filled = torch.where(valid.unsqueeze(-1), tokens, unk)
-            return tokens_filled.mean(dim=-2)
+        if tokens.ndim != 4:
+            raise ValueError(f"Expected tokens shape (B,N,K,C), got {tuple(tokens.shape)}.")
+        if valid.shape != tokens.shape[:3]:
+            raise ValueError(f"Expected valid shape {tuple(tokens.shape[:3])}, got {tuple(valid.shape)}.")
 
         mask = valid.to(dtype=tokens.dtype).unsqueeze(-1)
         denom = mask.sum(dim=-2).clamp_min(1.0)
-        return (tokens * mask).sum(dim=-2) / denom
+        pooled = (tokens * mask).sum(dim=-2) / denom
+        return pooled
 
     @staticmethod
     def _ensure_candidate_batch(candidate_poses_world_cam: PoseTW) -> PoseTW:
@@ -1128,18 +811,17 @@ class VinModel(nn.Module):
                s = <f, -u>.
 
         3) **Pose encoding**
-           The tuple (u, f, r, s) is concatenated into ``x = [u, f, r, s]`` and
-           encoded with ``LearnableFourierFeatures`` into a fixed-size embedding
-           ``pose_enc``.
+           The tuple (u, f, r, s) is encoded with ``ShellShPoseEncoder`` into a
+           fixed-size embedding ``pose_enc``.
 
         4) **Voxel pose encoding (optional)**
            The EVL voxel grid pose is also expressed in the reference rig frame:
 
                T_rig_ref_voxel = T_world_rig_ref^{-1} * T_world_voxel,
 
-           and encoded with the same LFF pose encoder. This provides a global
-           token indicating how the voxel grid is positioned/oriented relative
-           to the reference rig.
+           and encoded with the same shell encoder. This provides a global token
+           indicating how the voxel grid is positioned/oriented relative to the
+           reference rig.
 
         5) **Scene field + global token**
            Build the compact voxel field ``F`` from EVL head outputs and project
@@ -1152,19 +834,13 @@ class VinModel(nn.Module):
            len(depths_m)) in world coordinates, map to voxel coordinates, and
            sample ``F`` to obtain ``tokens``. Pool them with a validity mask:
 
-               local_feat = mean_k token_k,
+               local_feat = sum_k (valid_k * token_k) / (sum_k valid_k + eps).
 
-           where invalid samples can be replaced by a learned ``unknown_token``
-           (otherwise a masked mean is used).
-
-        7) **Candidate validity + coverage features**
+        7) **Candidate validity**
            A candidate is kept if a sufficient fraction of its frustum samples
            lie inside the voxel grid:
 
                valid_frac = mean_k 1[valid_k],  keep if valid_frac >= min_valid_frac.
-
-           We also optionally concatenate ``valid_frac`` and ``1 - valid_frac``
-           to expose coverage to the head (low coverage can still imply high RRI).
 
         8) **Scoring with CORAL**
            Concatenate all tokens and score with the CORAL head. The expected
@@ -1185,96 +861,47 @@ class VinModel(nn.Module):
             Tuple of ``(VinPrediction, VinForwardDiagnostics | None)``.
         """
         if backbone_out is None:
-            if self.backbone is None:
-                raise RuntimeError(
-                    "backbone_out is required when the VIN backbone is disabled.",
-                )
             backbone_out = self.backbone.forward(efm)
         device = backbone_out.voxel_extent.device
-        if next(self.parameters()).device != device:
-            self.to(device)
-        p3d_cameras = p3d_cameras.to(device)
 
-        pose_world_cam = self._ensure_candidate_batch(candidate_poses_world_cam).to(
-            device=device,
-        )  # type: ignore[arg-type]
-        batch_size, num_candidates = (
-            int(pose_world_cam.shape[0]),
-            int(pose_world_cam.shape[1]),
-        )
+        pose_world_cam = self._ensure_candidate_batch(candidate_poses_world_cam).to(device=device)  # type: ignore[arg-type]
+        batch_size, num_candidates = int(pose_world_cam.shape[0]), int(pose_world_cam.shape[1])
 
         pose_world_rig_ref = reference_pose_world_rig.to(device=device)  # type: ignore[arg-type]
         if pose_world_rig_ref.ndim == 1:
             pose_world_rig_ref = PoseTW(pose_world_rig_ref._data.unsqueeze(0))
         elif pose_world_rig_ref.ndim != 2:
-            raise ValueError(
-                f"reference_pose_world_rig must have shape (12,) or (B,12), got {pose_world_rig_ref.ndim}",
-            )
+            raise ValueError(f"reference_pose_world_rig must have shape (12,) or (B,12), got {pose_world_rig_ref.ndim}")
 
         if pose_world_rig_ref.shape[0] == 1 and batch_size > 1:
             pose_world_rig_ref = PoseTW(pose_world_rig_ref._data.expand(batch_size, 12))
         elif pose_world_rig_ref.shape[0] != batch_size:
-            raise ValueError(
-                "reference_pose_world_rig must have batch size 1 or match candidate batch size.",
-            )
+            raise ValueError("reference_pose_world_rig must have batch size 1 or match candidate batch size.")
 
         # ------------------------------------------------------------------ relative pose (candidate in reference rig frame)
-        pose_rig_cam = (
-            pose_world_rig_ref.inverse()[:, None] @ pose_world_cam
-        )  # rig_ref <- cam
+        pose_rig_cam = pose_world_rig_ref.inverse()[:, None] @ pose_world_cam  # rig_ref <- cam
 
-        # ------------------------------------------------------------------ pose encoding (shell descriptor + optional R6D)
+        # ------------------------------------------------------------------ pose encoding (shell descriptor)
         candidate_center_rig_m = pose_rig_cam.t.to(dtype=torch.float32)  # B N 3
-        candidate_radius_m = torch.linalg.vector_norm(
-            candidate_center_rig_m,
-            dim=-1,
-            keepdim=True,
-        )  # B N 1
+        candidate_radius_m = torch.linalg.vector_norm(candidate_center_rig_m, dim=-1, keepdim=True)  # B N 1
         candidate_center_dir_rig = candidate_center_rig_m / (candidate_radius_m + 1e-8)
 
-        cam_forward_axis_cam = torch.tensor(
-            [0.0, 0.0, 1.0],
-            device=device,
-            dtype=torch.float32,
-        )
+        cam_forward_axis_cam = torch.tensor([0.0, 0.0, 1.0], device=device, dtype=torch.float32)
         candidate_forward_dir_rig = torch.einsum(
-            "...ij,j->...i",
-            pose_rig_cam.R.to(dtype=torch.float32),
-            cam_forward_axis_cam,
+            "...ij,j->...i", pose_rig_cam.R.to(dtype=torch.float32), cam_forward_axis_cam
         )
         candidate_forward_dir_rig = candidate_forward_dir_rig / (
-            torch.linalg.vector_norm(candidate_forward_dir_rig, dim=-1, keepdim=True)
-            + 1e-8
+            torch.linalg.vector_norm(candidate_forward_dir_rig, dim=-1, keepdim=True) + 1e-8
         )
 
-        view_alignment = (candidate_forward_dir_rig * (-candidate_center_dir_rig)).sum(
-            dim=-1,
-            keepdim=True,
+        view_alignment = (candidate_forward_dir_rig * (-candidate_center_dir_rig)).sum(dim=-1, keepdim=True)
+
+        pose_enc = self.pose_encoder_sh(
+            candidate_center_dir_rig,
+            candidate_forward_dir_rig,
+            r=candidate_radius_m,
+            scalars=view_alignment,
         )
-        pose_vec: Tensor
-        if self.pose_encoding_mode == "t_r6d_lff":
-            candidate_rot_r6d = matrix_to_rotation_6d(
-                pose_rig_cam.R.to(dtype=torch.float32),
-            )
-            scales = self._pose_scales()
-            pose_vec = torch.cat(
-                [
-                    candidate_center_rig_m * scales[0],
-                    candidate_rot_r6d * scales[1],
-                ],
-                dim=-1,
-            )
-        else:
-            pose_vec = torch.cat(
-                [
-                    candidate_center_dir_rig,
-                    candidate_forward_dir_rig,
-                    candidate_radius_m,
-                    view_alignment,
-                ],
-                dim=-1,
-            )
-        pose_enc = self.pose_encoder_lff(pose_vec)
 
         # ------------------------------------------------------------------ voxel pose encoding (reference rig frame)
         voxel_pose_enc: Tensor | None = None
@@ -1290,57 +917,25 @@ class VinModel(nn.Module):
         if t_world_voxel.shape[0] == 1 and batch_size > 1:
             t_world_voxel = PoseTW(t_world_voxel._data.expand(batch_size, 12))
         elif t_world_voxel.shape[0] != batch_size:
-            raise ValueError(
-                "voxel/T_world_voxel must have batch size 1 or match candidate batch size.",
-            )
+            raise ValueError("voxel/T_world_voxel must have batch size 1 or match candidate batch size.")
 
-        pose_rig_voxel = (
-            pose_world_rig_ref.inverse() @ t_world_voxel
-        )  # rig_ref <- voxel
+        pose_rig_voxel = pose_world_rig_ref.inverse() @ t_world_voxel  # rig_ref <- voxel
         voxel_center_rig_m = pose_rig_voxel.t.to(dtype=torch.float32)  # B 3
-        voxel_radius_m = torch.linalg.vector_norm(
-            voxel_center_rig_m,
-            dim=-1,
-            keepdim=True,
-        )  # B 1
+        voxel_radius_m = torch.linalg.vector_norm(voxel_center_rig_m, dim=-1, keepdim=True)  # B 1
         voxel_center_dir_rig = voxel_center_rig_m / (voxel_radius_m + 1e-8)
         voxel_forward_dir_rig = torch.einsum(
-            "bij,j->bi",
-            pose_rig_voxel.R.to(dtype=torch.float32),
-            cam_forward_axis_cam,
+            "bij,j->bi", pose_rig_voxel.R.to(dtype=torch.float32), cam_forward_axis_cam
         )
         voxel_forward_dir_rig = voxel_forward_dir_rig / (
             torch.linalg.vector_norm(voxel_forward_dir_rig, dim=-1, keepdim=True) + 1e-8
         )
-        voxel_view_alignment = (voxel_forward_dir_rig * (-voxel_center_dir_rig)).sum(
-            dim=-1,
-            keepdim=True,
+        voxel_view_alignment = (voxel_forward_dir_rig * (-voxel_center_dir_rig)).sum(dim=-1, keepdim=True)
+        voxel_pose_enc = self.pose_encoder_sh.forward(
+            voxel_center_dir_rig,
+            voxel_forward_dir_rig,
+            r=voxel_radius_m,
+            scalars=voxel_view_alignment,
         )
-        voxel_pose_vec: Tensor | None = None
-        voxel_rot_r6d: Tensor | None = None
-        if self.pose_encoding_mode == "t_r6d_lff":
-            voxel_rot_r6d = matrix_to_rotation_6d(
-                pose_rig_voxel.R.to(dtype=torch.float32),
-            )
-            scales = self._pose_scales()
-            voxel_pose_vec = torch.cat(
-                [
-                    voxel_center_rig_m * scales[0],
-                    voxel_rot_r6d * scales[1],
-                ],
-                dim=-1,
-            )
-        else:
-            voxel_pose_vec = torch.cat(
-                [
-                    voxel_center_dir_rig,
-                    voxel_forward_dir_rig,
-                    voxel_radius_m,
-                    voxel_view_alignment,
-                ],
-                dim=-1,
-            )
-        voxel_pose_enc = self.pose_encoder_lff.forward(voxel_pose_vec)
 
         # ------------------------------------------------------------------ build voxel-aligned scene field
         field_in = _build_scene_field(
@@ -1356,12 +951,10 @@ class VinModel(nn.Module):
         parts: list[Tensor] = [pose_enc.to(device=device, dtype=field.dtype)]
         global_feat: Tensor | None = None
         if self.use_global_pool:
-            global_feat = self._pool_global(field, pose_enc).to(dtype=field.dtype)
+            global_feat = self._pool_global(field).unsqueeze(1).expand(batch_size, num_candidates, -1)
             parts.append(global_feat)
         if self.use_voxel_pose_encoding and voxel_pose_enc is not None:
-            voxel_feat = voxel_pose_enc.to(device=device, dtype=field.dtype).unsqueeze(
-                1,
-            )
+            voxel_feat = voxel_pose_enc.to(device=device, dtype=field.dtype).unsqueeze(1)
             parts.append(voxel_feat.expand(batch_size, num_candidates, -1))
 
         # ------------------------------------------------------------------ candidate-conditioned frustum query
@@ -1375,33 +968,20 @@ class VinModel(nn.Module):
             t_world_voxel=backbone_out.t_world_voxel,
             voxel_extent=backbone_out.voxel_extent,
         )
-        valid_frac = token_valid.float().mean(dim=-1, keepdim=True)
-        local_feat = self._pool_candidates(
-            tokens=tokens,
-            valid=token_valid,
-            unknown_token=self.unknown_token if self.use_unknown_token else None,
-        )
+        local_feat = self._pool_candidates(tokens=tokens, valid=token_valid)
         parts.append(local_feat.to(dtype=field.dtype))
-        if self.use_valid_frac_feature:
-            parts.append(valid_frac.to(dtype=field.dtype))
-            parts.append((1.0 - valid_frac).to(dtype=field.dtype))
 
         # NOTE: Candidate validity is based on the fraction of frustum samples that fall inside the EVL voxel grid
-        # (after mapping WORLD→VOXEL using `voxel/T_world_voxel`). We keep this mask for diagnostics and downstream
-        # filtering, but do not hard-mask features so low-coverage candidates can still receive high scores.
-
+        # (after mapping WORLD→VOXEL using `voxel/T_world_voxel`). This avoids admitting candidates with only a
+        # handful of in-bounds samples.
         candidate_valid = _candidate_valid_from_token(
             token_valid,
             min_valid_frac=self.config.candidate_min_valid_frac,
         )
 
         feats = torch.cat(parts, dim=-1)
-        # feats = feats * candidate_valid.to(dtype=feats.dtype).unsqueeze(-1)
-        logits = self.head(feats.reshape(batch_size * num_candidates, -1)).reshape(
-            batch_size,
-            num_candidates,
-            -1,
-        )
+        feats = feats * candidate_valid.to(dtype=feats.dtype).unsqueeze(-1)
+        logits = self.head(feats.reshape(batch_size * num_candidates, -1)).reshape(batch_size, num_candidates, -1)
 
         prob = coral_logits_to_prob(logits)
         expected, expected_norm = coral_expected_from_logits(logits)
@@ -1412,7 +992,6 @@ class VinModel(nn.Module):
             expected=expected,
             expected_normalized=expected_norm,
             candidate_valid=candidate_valid,
-            valid_frac=valid_frac.squeeze(-1),
         )
 
         if not return_debug:
@@ -1426,14 +1005,12 @@ class VinModel(nn.Module):
             candidate_forward_dir_rig=candidate_forward_dir_rig,
             view_alignment=view_alignment,
             pose_enc=pose_enc,
-            pose_vec=pose_vec,
             voxel_center_rig_m=voxel_center_rig_m,
             voxel_radius_m=voxel_radius_m,
             voxel_center_dir_rig=voxel_center_dir_rig,
             voxel_forward_dir_rig=voxel_forward_dir_rig,
             voxel_view_alignment=voxel_view_alignment,
             voxel_pose_enc=voxel_pose_enc,
-            voxel_pose_vec=voxel_pose_vec,
             field_in=field_in,
             field=field,
             global_feat=global_feat,
@@ -1441,7 +1018,6 @@ class VinModel(nn.Module):
             tokens=tokens,
             token_valid=token_valid,
             candidate_valid=candidate_valid,
-            valid_frac=valid_frac,
             feats=feats,
         )
         return pred, debug
@@ -1476,6 +1052,7 @@ class VinModel(nn.Module):
         Returns:
             :class:`VinPrediction` with CORAL logits, probabilities, and expected scores.
         """
+
         pred, _ = self._forward_impl(
             efm,
             candidate_poses_world_cam=candidate_poses_world_cam,
@@ -1511,6 +1088,7 @@ class VinModel(nn.Module):
         Returns:
             Tuple of (:class:`VinPrediction`, :class:`VinForwardDiagnostics`).
         """
+
         pred, debug = self._forward_impl(
             efm,
             candidate_poses_world_cam=candidate_poses_world_cam,
@@ -1522,217 +1100,3 @@ class VinModel(nn.Module):
         if debug is None:
             raise RuntimeError("Expected VinForwardDiagnostics when return_debug=True.")
         return pred, debug
-
-    def summarize_vin(
-        self,
-        batch: VinOracleBatch,
-        *,
-        include_torchsummary: bool = True,
-        torchsummary_depth: int = 3,
-    ) -> str:
-        """Summarize VIN v1 inputs/outputs for a single oracle-labeled batch."""
-        from efm3d.aria.aria_constants import (
-            ARIA_CALIB,
-            ARIA_IMG,
-            ARIA_POSE_T_WORLD_RIG,
-        )
-
-        from oracle_rri.utils import Console
-        from oracle_rri.utils.rich_summary import rich_summary, summarize
-
-        def _capture_tree(tree) -> str:
-            console = Console()
-            with console.capture() as capture:
-                console.print(
-                    tree,
-                    soft_wrap=False,
-                    highlight=True,
-                    markup=True,
-                    emoji=False,
-                )
-            return capture.get().rstrip()
-
-        if batch.efm_snippet_view is None:
-            raise RuntimeError(
-                "VIN summary requires efm inputs; cached batches omit raw EFM data.",
-            )
-
-        was_training = self.training
-        self.eval()
-        with torch.no_grad():
-            pred, debug = self.forward_with_debug(
-                batch.efm_snippet_view.efm,
-                candidate_poses_world_cam=batch.candidate_poses_world_cam,
-                reference_pose_world_rig=batch.reference_pose_world_rig,
-                p3d_cameras=batch.p3d_cameras,
-                backbone_out=batch.backbone_out,
-            )
-        if was_training:
-            self.train()
-
-        efm = batch.efm_snippet_view.efm
-        backbone_out = debug.backbone_out
-        summary_dict: dict[str, Any] = {
-            "meta": {
-                "scene_id": batch.scene_id,
-                "snippet_id": batch.snippet_id,
-                "device": str(debug.candidate_center_rig_m.device),
-                "candidates": summarize(batch.candidate_poses_world_cam),
-            },
-            "efm": {
-                **{key: summarize(efm.get(key)) for key in ARIA_IMG},
-                **{key: summarize(efm.get(key)) for key in ARIA_CALIB},
-                ARIA_POSE_T_WORLD_RIG: summarize(efm.get(ARIA_POSE_T_WORLD_RIG)),
-            },
-            "backbone": {
-                "occ_pr": summarize(backbone_out.occ_pr),
-                "occ_input": summarize(backbone_out.occ_input),
-                "counts": summarize(backbone_out.counts),
-                "cent_pr": summarize(backbone_out.cent_pr),
-                "voxel/pts_world": summarize(backbone_out.pts_world),
-                "T_world_voxel": summarize(backbone_out.t_world_voxel),
-                "voxel_extent": summarize(backbone_out.voxel_extent),
-            },
-            "pose": {
-                "candidate_center_rig_m": summarize(
-                    debug.candidate_center_rig_m,
-                    include_stats=True,
-                ),
-                "candidate_radius_m": summarize(
-                    debug.candidate_radius_m,
-                    include_stats=True,
-                ),
-                "candidate_center_dir_rig": summarize(
-                    debug.candidate_center_dir_rig,
-                    include_stats=True,
-                ),
-                "candidate_forward_dir_rig": summarize(
-                    debug.candidate_forward_dir_rig,
-                    include_stats=True,
-                ),
-                "view_alignment": summarize(debug.view_alignment, include_stats=True),
-                "pose_vec": summarize(debug.pose_vec, include_stats=True),
-                "pose_enc": summarize(debug.pose_enc),
-            },
-            "features": {
-                "field_in": summarize(debug.field_in),
-                "field": summarize(debug.field),
-                "global_feat": summarize(debug.global_feat),
-                "local_feat": summarize(debug.local_feat),
-                "tokens": summarize(debug.tokens),
-                "token_valid": summarize(debug.token_valid),
-                "concat_feats": summarize(debug.feats),
-            },
-            "validity": {
-                "candidate_valid": summarize(debug.candidate_valid),
-                "valid_frac": summarize(pred.valid_frac, include_stats=True),
-            },
-            "outputs": {
-                "logits": summarize(pred.logits),
-                "prob": summarize(pred.prob),
-                "expected": summarize(pred.expected, include_stats=True),
-                "expected_normalized": summarize(
-                    pred.expected_normalized,
-                    include_stats=True,
-                ),
-            },
-        }
-        for key in ["points/p3s_world", "points/dist_std", "pose/gravity_in_world"]:
-            if key in efm:
-                summary_dict.setdefault("efm", {})[key] = summarize(efm.get(key))
-
-        voxel_pose = {
-            "voxel_center_rig_m": summarize(
-                debug.voxel_center_rig_m,
-                include_stats=True,
-            ),
-            "voxel_radius_m": summarize(debug.voxel_radius_m, include_stats=True),
-            "voxel_center_dir_rig": summarize(
-                debug.voxel_center_dir_rig,
-                include_stats=True,
-            ),
-            "voxel_forward_dir_rig": summarize(
-                debug.voxel_forward_dir_rig,
-                include_stats=True,
-            ),
-            "voxel_view_alignment": summarize(
-                debug.voxel_view_alignment,
-                include_stats=True,
-            ),
-            "voxel_pose_vec": summarize(debug.voxel_pose_vec, include_stats=True),
-            "voxel_pose_enc": summarize(debug.voxel_pose_enc),
-        }
-        if any(value is not None for value in voxel_pose.values()):
-            summary_dict["voxel_pose"] = voxel_pose
-
-        tree = rich_summary(
-            tree_dict=summary_dict,
-            root_label="VIN v1 summary (oracle batch)",
-            with_shape=True,
-            is_print=False,
-        )
-        lines: list[str] = [_capture_tree(tree), ""]
-
-        trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
-        total_params = sum(p.numel() for p in self.parameters())
-        lines.append(
-            f"Trainable VIN params: {trainable_params:,} (vin total params: {total_params:,}; EVL frozen not counted)",
-        )
-        lines.append("")
-
-        if include_torchsummary:
-            from torchsummary import summary as torch_summary
-
-            pose_vec = debug.pose_vec
-            feats_2d = debug.feats.reshape(
-                debug.feats.shape[0] * debug.feats.shape[1],
-                -1,
-            )
-
-            if pose_vec is not None:
-                pose_vec_2d = pose_vec.reshape(
-                    pose_vec.shape[0] * pose_vec.shape[1],
-                    -1,
-                )
-                lines.append("torchsummary: pose_encoder_lff (trainable)")
-                lines.append(
-                    str(
-                        torch_summary(
-                            self.pose_encoder_lff,
-                            input_data=pose_vec_2d,
-                            verbose=0,
-                            depth=torchsummary_depth,
-                            device=debug.candidate_center_rig_m.device,
-                        ),
-                    ),
-                )
-                lines.append("")
-
-            lines.append("torchsummary: field_proj (trainable)")
-            lines.append(
-                str(
-                    torch_summary(
-                        self.field_proj,
-                        input_data=debug.field_in,
-                        verbose=0,
-                        depth=torchsummary_depth,
-                        device=debug.candidate_center_rig_m.device,
-                    ),
-                ),
-            )
-            lines.append("")
-
-            lines.append("torchsummary: VinScorerHead (trainable)")
-            lines.append(
-                str(
-                    torch_summary(
-                        self.head,
-                        input_data=feats_2d,
-                        verbose=0,
-                        depth=torchsummary_depth,
-                        device=debug.candidate_center_rig_m.device,
-                    ),
-                ),
-            )
-
-        return "\n".join(lines)

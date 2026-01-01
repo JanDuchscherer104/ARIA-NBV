@@ -189,14 +189,28 @@ def world_from_camera(t_world_rig: PoseTW, cam: CameraTW, frame_idx: int) -> Pos
     return t_world_rig @ cam.T_camera_rig[frame_idx].inverse()
 
 
-def rotate_yaw_cw90(pose_world_cam: PoseTW) -> PoseTW:
-    """Visual-only 90° clockwise yaw about +Z to match Aria UI convention.
+def rotate_yaw_cw90(pose_world_cam: PoseTW, undo: bool = False) -> PoseTW:
+    """Rotate a pose by 90° clockwise about its **local +Z axis**.
 
-    Use this **only for plotting/rendering to screen** (e.g. Plotly axes, image
-    overlays). Keep core geometry, sampling, and rendering in the physical Aria
-    LUF frame without this rotation.
+    Important:
+        Despite the historical name, this is a *local-frame* rotation (right-multiplication)
+        about the pose's +Z axis. In the Aria LUF convention (+Z = forward), this is a
+        **roll/twist** that swaps the local +X/+Y axes.
+
+    Why this exists:
+        - Project Aria tooling/visualisations sometimes apply a fixed 90° twist for display.
+        - In our candidate generation pipeline we also apply this to the **reference pose**
+          as a rig-basis correction so that sampling assumptions (LUF: x=left, y=up, z=fwd)
+          match the incoming `t_world_rig` basis (otherwise azimuth/elevation look swapped).
+
+    Caution:
+        Apply this conversion **at most once** in any given path; applying it again in
+        plotting will look like an azimuth/elevation swap once roll jitter is enabled.
     """
-    c, s = np.cos(np.pi / 2), np.sin(np.pi / 2)
+    if undo:
+        c, s = np.cos(-np.pi / 2), np.sin(-np.pi / 2)
+    else:
+        c, s = np.cos(np.pi / 2), np.sin(np.pi / 2)
     r_roll = torch.tensor(
         [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
         device=pose_world_cam.R.device,

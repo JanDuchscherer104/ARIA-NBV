@@ -10,9 +10,9 @@ import torch
 from efm3d.aria.pose import PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import]
 
-from oracle_rri.data import EfmSnippetView
-from oracle_rri.data.plotting import SnippetPlotBuilder
-from oracle_rri.utils import Console
+from ..data.efm_views import EfmSnippetView
+from ..data.plotting import SnippetPlotBuilder
+from ..utils import Console
 
 if TYPE_CHECKING:
     from .candidate_generation import CandidateViewGeneratorConfig
@@ -77,7 +77,16 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
             self._ref_center = self.candidate_results.reference_pose.t.detach().cpu().numpy()
         return self._ref_center
 
-    def add_reference_axes(self, *, title: str = "Reference frame", display_rotate: bool = True) -> Self:
+    def add_reference_axes(self, *, title: str = "Reference frame", display_rotate: bool = False) -> Self:
+        """Add the candidate reference frame axes to the figure.
+
+        Notes:
+            Candidate generation applies the Aria rig→LUF convention fix (a 90° rotation
+            about the local +Z/forward axis) to the **reference pose** before sampling.
+            Applying the same correction again in plotting would double-rotate the
+            reference axes. Therefore, ``display_rotate`` defaults to ``False`` for
+            candidate plots.
+        """
         if self.candidate_results is None:
             return self
         return self.add_frame_axes(
@@ -246,9 +255,17 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
         max_frustums: int | None = None,
         include_axes: bool = False,
         include_center: bool = False,
-        display_rotate: bool = True,
+        display_rotate: bool = False,
     ) -> "SnippetPlotBuilder":
-        """Overlay frusta using the attached candidate results."""
+        """Overlay frusta using the attached candidate results.
+
+        Notes:
+            ``display_rotate`` is a legacy plotting option that applies the same Aria
+            UI-style 90° local +Z rotation (``rotate_yaw_cw90``). Because candidate
+            generation already applies this convention fix to the reference pose, the
+            default is ``False`` to avoid a second roll offset (which becomes very
+            apparent once roll jitter is enabled).
+        """
 
         cand_results = self.candidate_results
         if cand_results is None:
@@ -430,24 +447,104 @@ def plot_radius_hist(
     return fig
 
 
+def _normalise(v: torch.Tensor, *, eps: float = 1e-6) -> torch.Tensor:
+    return v / v.norm(dim=-1, keepdim=True).clamp_min(eps)
+
+
+def _roll_about_forward(
+    *,
+    forward: torch.Tensor,
+    up_cam: torch.Tensor,
+    up_ref: torch.Tensor,
+    eps: float = 1e-6,
+) -> torch.Tensor:
+    """Compute signed roll (rad) of `up_cam` around `forward` relative to `up_ref`.
+
+    The roll is defined by the "zero-roll" frame constructed from `(up_ref, forward)`:
+    `left0 = normalize(up_ref × forward)` and `up0 = forward × left0`.
+
+    Args:
+        forward: ``Tensor["N 3"]`` unit (or unnormalised) forward vectors.
+        up_cam: ``Tensor["N 3"]`` unit (or unnormalised) camera up vectors.
+        up_ref: ``Tensor["3"]`` or ``Tensor["N 3"]`` reference up vector defining roll=0.
+        eps: Stability constant for near-degenerate cross products.
+
+    Returns:
+        ``Tensor["N"]`` roll angles in radians in the range ``[-pi, pi]``.
+    """
+
+    forward = _normalise(forward, eps=eps)
+    up_cam = _normalise(up_cam, eps=eps)
+
+    if up_ref.ndim == 1:
+        up_ref = up_ref.view(1, 3).expand_as(forward)
+    else:
+        while up_ref.ndim < forward.ndim:
+            up_ref = up_ref.unsqueeze(0)
+        up_ref = up_ref.expand_as(forward)
+    up_ref = _normalise(up_ref, eps=eps)
+
+    left0 = torch.cross(up_ref, forward, dim=-1)
+    left0_norm = left0.norm(dim=-1, keepdim=True)
+    degenerate = left0_norm.squeeze(-1) < eps
+    if degenerate.any():
+        alt = torch.tensor([1.0, 0.0, 0.0], device=forward.device, dtype=forward.dtype)
+        alt = alt.view(1, 3).expand_as(forward)
+        alt = alt - (alt * forward).sum(dim=-1, keepdim=True) * forward
+        alt_norm = alt.norm(dim=-1, keepdim=True)
+        second = alt_norm.squeeze(-1) < eps
+        if second.any():
+            alt2 = torch.tensor([0.0, 1.0, 0.0], device=forward.device, dtype=forward.dtype)
+            alt2 = alt2.view(1, 3).expand_as(forward)
+            alt2 = alt2 - (alt2 * forward).sum(dim=-1, keepdim=True) * forward
+            alt[second] = alt2[second]
+            alt_norm = alt.norm(dim=-1, keepdim=True)
+        left0[degenerate] = alt[degenerate]
+        left0_norm = left0.norm(dim=-1, keepdim=True)
+
+    left0 = left0 / left0_norm.clamp_min(eps)
+    up0 = _normalise(torch.cross(forward, left0, dim=-1), eps=eps)
+
+    sin_term = (forward * torch.cross(up0, up_cam, dim=-1)).sum(dim=-1)
+    cos_term = (up0 * up_cam).sum(dim=-1)
+    return torch.atan2(sin_term, cos_term)
+
+
 def plot_euler_world(
     candidates: CandidateSamplingResult, *, use_valid: bool = True, bins: int = 90, fixed_ranges: bool = True
 ) -> go.Figure:
-    """Yaw/pitch/roll histograms in world frame for candidate cam poses."""
+    """Yaw/pitch/roll histograms in world frame for candidate cam poses.
+
+    Notes:
+        These angles are derived from the camera forward/up axes:
+        - yaw: azimuth around world-up (world +Z), computed as ``atan2(fwd_x, fwd_y)`` (0 along +Y),
+        - pitch: elevation above the world horizontal plane, computed as ``asin(fwd_z)``,
+        - roll: twist around the forward axis relative to the roll-free frame induced by world-up.
+    """
 
     poses = candidates.shell_poses
     if poses is None or poses._data is None:
         return go.Figure()
     mask = candidates.mask_valid if use_valid else torch.ones_like(candidates.mask_valid, dtype=torch.bool)
     poses_masked = PoseTW(poses._data[mask])
-    yaw, pitch, roll = [rad.rad2deg() for rad in poses_masked.to_ypr(rad=True)]
+    r_wc = poses_masked.R
+    fwd_w = r_wc[:, :, 2]
+    up_w = r_wc[:, :, 1]
+    yaw = torch.atan2(fwd_w[:, 0], fwd_w[:, 1])
+    pitch = torch.asin(_normalise(fwd_w)[:, 2].clamp(-1.0, 1.0))
+    from oracle_rri.utils.frames import world_up_tensor
+
+    roll = _roll_about_forward(
+        forward=fwd_w, up_cam=up_w, up_ref=world_up_tensor(device=fwd_w.device, dtype=fwd_w.dtype)
+    )
+    yaw, pitch, roll = [rad.rad2deg() for rad in (yaw, pitch, roll)]
 
     return _euler_histogram(
         yaw,
         pitch,
         roll,
         bins=bins,
-        title="Euler angles (world frame, deg)",
+        title="View yaw/pitch/roll (world frame, deg)",
         fixed_ranges=fixed_ranges,
     )
 
@@ -455,24 +552,31 @@ def plot_euler_world(
 def plot_euler_reference(
     candidates: CandidateSamplingResult, *, use_valid: bool = True, bins: int = 90, fixed_ranges: bool = True
 ) -> go.Figure:
-    """Yaw/pitch/roll of candidate cameras expressed in the reference rig frame."""
-    # use shell_poses (cam<-world), then express in reference frame
+    """Yaw/pitch/roll of candidate cameras expressed in the reference rig frame.
+
+    The reference frame is treated as LUF (x=left, y=up, z=fwd), matching the
+    azimuth/elevation plots shown elsewhere in the diagnostics.
+    """
+
     mask = candidates.mask_valid if use_valid else torch.ones_like(candidates.mask_valid, dtype=torch.bool)
-    r_wr = candidates.reference_pose.R  # world <- reference
-    if r_wr.ndim == 3:
-        r_wr = r_wr[0]
-    r_rw = r_wr.transpose(0, 1)
-    r_wc = candidates.shell_poses[mask].R  # final cam->world rotations
-    r_rc = torch.einsum("ij,njk->nik", r_rw, r_wc)  # cam->reference
-    poses_ref = PoseTW.from_Rt(r_rc, torch.zeros(r_rc.shape[0], 3, device=r_rc.device))
-    yaw, pitch, roll = [rad.rad2deg() for rad in poses_ref.to_ypr(rad=True)]
+    poses_world_cam = candidates.shell_poses[mask]
+    poses_ref_cam = candidates.reference_pose.inverse().compose(poses_world_cam)
+    r_rc = poses_ref_cam.R
+
+    fwd_r = r_rc[:, :, 2]
+    up_r = r_rc[:, :, 1]
+    yaw = torch.atan2(fwd_r[:, 0], fwd_r[:, 2])
+    pitch = torch.asin(_normalise(fwd_r)[:, 1].clamp(-1.0, 1.0))
+    up_ref = torch.tensor([0.0, 1.0, 0.0], device=fwd_r.device, dtype=fwd_r.dtype)
+    roll = _roll_about_forward(forward=fwd_r, up_cam=up_r, up_ref=up_ref)
+    yaw, pitch, roll = [rad.rad2deg() for rad in (yaw, pitch, roll)]
 
     return _euler_histogram(
         yaw,
         pitch,
         roll,
         bins=bins,
-        title="Euler angles (reference frame, deg)",
+        title="View yaw/pitch/roll (reference frame, deg)",
         fixed_ranges=fixed_ranges,
     )
 
@@ -532,7 +636,7 @@ def plot_min_distance_to_mesh(
             size=4,
             hovertext=hover,
         )
-        .add_reference_axes()
+        .add_reference_axes(display_rotate=False)
     )
     return builder.finalize()
 
@@ -558,7 +662,7 @@ def plot_path_collision_segments(
         builder.add_path_collision_segments(collision_mask)
 
     builder.add_candidate_points(use_valid=False, color=np.array(colors), name="Candidates", opacity=1.0, size=4)
-    builder.add_reference_axes()
+    builder.add_reference_axes(display_rotate=False)
     return builder.finalize()
 
 

@@ -29,7 +29,7 @@ class OrientationBuilder:
         """Sample camera-forward directions in the base camera frame without rejection.
 
         Sampling rules (priority order):
-        1) If both az/el caps are zero → deterministic forward.
+        1) If both az/el caps are zero and ``view_sampling_strategy`` is ``None`` → deterministic forward.
         2) If any cap is set → box-uniform in yaw/pitch: yaw ~ U(-az, az), pitch ~ U(-el, el).
            This is cheap, unbiased inside the box, and matches the intent of "small jitter".
         3) Else if a sampling_strategy is set → draw from the chosen distribution (legacy path).

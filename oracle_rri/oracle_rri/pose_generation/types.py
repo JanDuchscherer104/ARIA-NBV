@@ -132,19 +132,19 @@ class CandidateSamplingResult:
             Tuple ``(offsets, dirs)`` with shapes ``(N,3)`` each.
         """
 
-        poses_ref = self.views.T_camera_rig  # reference<-camera
+        poses_cam_ref = self.views.T_camera_rig  # camera<-reference
         if display_rotate:
             from oracle_rri.utils import rotate_yaw_cw90
 
-            poses_ref = rotate_yaw_cw90(poses_ref)
+            poses_cam_ref = rotate_yaw_cw90(poses_cam_ref)
 
-        offsets = poses_ref.inverse().t.view(-1, 3)  # camera->reference
+        offsets = poses_cam_ref.inverse().t.view(-1, 3)  # camera->reference
         z_cam = (
             torch.tensor([0.0, 0.0, 1.0], device=offsets.device, dtype=offsets.dtype)
             .view(1, 3)
             .expand(offsets.shape[0], 3)
         )
-        dirs = poses_ref.inverse().rotate(z_cam).view(-1, 3)
+        dirs = poses_cam_ref.inverse().rotate(z_cam).view(-1, 3)
         dirs = dirs / (dirs.norm(dim=1, keepdim=True) + 1e-8)
         return offsets, dirs
 

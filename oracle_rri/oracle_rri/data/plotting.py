@@ -21,8 +21,9 @@ from matplotlib import colormaps
 from plotly import colors as plotly_colors
 from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 
-from oracle_rri.data import EfmCameraView, EfmSnippetView
 from oracle_rri.utils import Console, rotate_yaw_cw90
+
+from .efm_views import EfmCameraView, EfmSnippetView
 
 console = Console.with_prefix("plotting")
 ROTATE_90_CW = -1

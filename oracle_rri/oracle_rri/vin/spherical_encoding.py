@@ -19,7 +19,7 @@ from pydantic import Field
 from torch import Tensor, nn
 
 from ..utils import BaseConfig
-from .pose_encoding import FourierFeatures
+from .pose_encoding import FourierFeaturesConfig
 
 
 class ShellShPoseEncoder(nn.Module):
@@ -31,6 +31,9 @@ class ShellShPoseEncoder(nn.Module):
     - $f$: candidate forward direction in the reference frame,
 
     plus a radius $r=\\lVert t\\rVert$ and optional scalar pose terms (e.g. $\\langle f, -u \\rangle$).
+    This representation uses only the forward direction and therefore does **not**
+    encode roll about the forward axis. This is acceptable when roll jitter is small;
+    use a full SO(3) encoding (e.g. R6D + LFF) when roll sensitivity is required.
 
     The encoder computes real spherical harmonics up to degree ``lmax`` for $u$ and $f$ and projects
     them into a learnable embedding space. The radius is encoded via **1D Fourier features** (on
@@ -53,80 +56,49 @@ class ShellShPoseEncoder(nn.Module):
         include_scalars: If ``True``, include the scalar MLP output in the embedding.
     """
 
-    def __init__(
-        self,
-        *,
-        lmax: int,
-        sh_out_dim: int,
-        radius_num_frequencies: int,
-        radius_out_dim: int,
-        radius_include_input: bool,
-        radius_learnable: bool,
-        radius_init_scale: float,
-        radius_log_input: bool,
-        include_radius: bool,
-        scalar_in_dim: int,
-        scalar_out_dim: int,
-        scalar_hidden_dim: int,
-        normalization: Literal["component", "norm"] = "component",
-        include_scalars: bool = True,
-    ) -> None:
+    def __init__(self, config: "ShellShPoseEncoderConfig") -> None:
         super().__init__()
-        if lmax < 0:
-            raise ValueError("lmax must be >= 0.")
-        if sh_out_dim <= 0:
-            raise ValueError("sh_out_dim must be > 0.")
-        if radius_num_frequencies <= 0:
-            raise ValueError("radius_num_frequencies must be > 0.")
-        if radius_out_dim <= 0:
-            raise ValueError("radius_out_dim must be > 0.")
-        if radius_init_scale <= 0:
-            raise ValueError("radius_init_scale must be > 0.")
-        if scalar_in_dim <= 0:
-            raise ValueError("scalar_in_dim must be > 0.")
-        if scalar_out_dim <= 0:
-            raise ValueError("scalar_out_dim must be > 0.")
-        if scalar_hidden_dim <= 0:
-            raise ValueError("scalar_hidden_dim must be > 0.")
+        self.config = config
 
-        self.lmax = lmax
-        self.normalization = str(normalization)
-        self.include_scalars = bool(include_scalars)
-        self.include_radius = bool(include_radius)
-        self.radius_log_input = bool(radius_log_input)
+        self.lmax = self.config.lmax
+        self.normalization = self.config.normalization
+        self.include_scalars = self.config.include_scalars
+        self.include_radius = self.config.include_radius
+        self.radius_log_input = self.config.radius_log_input
 
         irreps_sh = o3.Irreps.spherical_harmonics(self.lmax)
-        sh_in_dim = int(irreps_sh.dim)
+        sh_in_dim = irreps_sh.dim
 
         def _proj(in_dim: int, out_dim: int) -> nn.Sequential:
             return nn.Sequential(
-                nn.Linear(int(in_dim), int(out_dim)),
+                nn.Linear(in_dim, out_dim),
                 nn.GELU(),
-                nn.Linear(int(out_dim), int(out_dim)),
+                nn.Linear(out_dim, out_dim),
             )
 
         self._irreps_sh = irreps_sh
-        self._proj_u = _proj(sh_in_dim, sh_out_dim)
-        self._proj_f = _proj(sh_in_dim, sh_out_dim)
+        self._proj_u = _proj(sh_in_dim, self.config.sh_out_dim)
+        self._proj_f = _proj(sh_in_dim, self.config.sh_out_dim)
 
-        self._radius_ff = FourierFeatures(
+        radius_ff_cfg = FourierFeaturesConfig(
             input_dim=1,
-            num_frequencies=int(radius_num_frequencies),
-            include_input=bool(radius_include_input),
-            learnable=bool(radius_learnable),
-            init_scale=float(radius_init_scale),
+            num_frequencies=self.config.radius_num_frequencies,
+            include_input=self.config.radius_include_input,
+            learnable=self.config.radius_learnable,
+            init_scale=self.config.radius_init_scale,
         )
-        self._proj_r = _proj(self._radius_ff.output_dim, radius_out_dim)
+        self._radius_ff = radius_ff_cfg.setup_target()
+        self._proj_r = _proj(self._radius_ff.output_dim, self.config.radius_out_dim)
 
         self._scalar_mlp = nn.Sequential(
-            nn.Linear(int(scalar_in_dim), int(scalar_hidden_dim)),
+            nn.Linear(self.config.scalar_in_dim, self.config.scalar_hidden_dim),
             nn.GELU(),
-            nn.Linear(int(scalar_hidden_dim), int(scalar_out_dim)),
+            nn.Linear(self.config.scalar_hidden_dim, self.config.scalar_out_dim),
         )
 
-        self._sh_out_dim = int(sh_out_dim)
-        self._radius_out_dim = int(radius_out_dim)
-        self._scalar_out_dim = int(scalar_out_dim)
+        self._sh_out_dim = self.config.sh_out_dim
+        self._radius_out_dim = self.config.radius_out_dim
+        self._scalar_out_dim = self.config.scalar_out_dim
 
     @property
     def out_dim(self) -> int:
@@ -150,6 +122,8 @@ class ShellShPoseEncoder(nn.Module):
 
         Returns:
             ``Tensor["... out_dim", float32]`` pose embedding.
+
+        TODO: ensure same signature as other pose encoders - i.e. LearnableFourierFeatures.forward (derive both from a common base class!)
         """
 
         if u.shape[-1] != 3 or f.shape[-1] != 3:
@@ -193,16 +167,19 @@ class ShellShPoseEncoderConfig(BaseConfig[ShellShPoseEncoder]):
 
     target: type[ShellShPoseEncoder] = Field(default=ShellShPoseEncoder, exclude=True)
 
-    lmax: int = 2
+    kind: Literal["shell_sh"] = "shell_sh"
+    """Discriminator for pose-encoder selection."""
+
+    lmax: int = Field(default=2, ge=0)
     """Maximum spherical harmonics degree."""
 
-    sh_out_dim: int = 16
+    sh_out_dim: int = Field(default=16, gt=0)
     """Projection dimension for each SH vector (for $u$ and $f$)."""
 
-    radius_num_frequencies: int = 6
+    radius_num_frequencies: int = Field(default=6, gt=0)
     """Number of Fourier frequencies for the 1D radius encoding."""
 
-    radius_out_dim: int = 16
+    radius_out_dim: int = Field(default=16, gt=0)
     """Projection dimension for the encoded radius."""
 
     radius_include_input: bool = True
@@ -211,7 +188,7 @@ class ShellShPoseEncoderConfig(BaseConfig[ShellShPoseEncoder]):
     radius_learnable: bool = True
     """Make the radius Fourier frequency matrix learnable when True."""
 
-    radius_init_scale: float = 1.0
+    radius_init_scale: float = Field(default=1.0, gt=0.0)
     """Stddev used to initialize the radius Fourier frequency matrix."""
 
     radius_log_input: bool = False
@@ -220,13 +197,13 @@ class ShellShPoseEncoderConfig(BaseConfig[ShellShPoseEncoder]):
     include_radius: bool = True
     """Include radius features in the embedding when True."""
 
-    scalar_in_dim: int = 1
+    scalar_in_dim: int = Field(default=1, gt=0)
     """Number of additional scalar pose features (e.g. $\\langle f, -u \\rangle$)."""
 
-    scalar_out_dim: int = 16
+    scalar_out_dim: int = Field(default=16, gt=0)
     """Output dimension of the scalar MLP."""
 
-    scalar_hidden_dim: int = 32
+    scalar_hidden_dim: int = Field(default=32, gt=0)
     """Hidden dimension of the scalar MLP."""
 
     normalization: Literal["component", "norm"] = "component"
@@ -234,24 +211,6 @@ class ShellShPoseEncoderConfig(BaseConfig[ShellShPoseEncoder]):
 
     include_scalars: bool = True
     """Include scalar features in the embedding when True."""
-
-    def setup_target(self) -> ShellShPoseEncoder:  # type: ignore[override]
-        return self.target(
-            lmax=int(self.lmax),
-            sh_out_dim=int(self.sh_out_dim),
-            radius_num_frequencies=int(self.radius_num_frequencies),
-            radius_out_dim=int(self.radius_out_dim),
-            radius_include_input=bool(self.radius_include_input),
-            radius_learnable=bool(self.radius_learnable),
-            radius_init_scale=float(self.radius_init_scale),
-            radius_log_input=bool(self.radius_log_input),
-            include_radius=bool(self.include_radius),
-            scalar_in_dim=int(self.scalar_in_dim),
-            scalar_out_dim=int(self.scalar_out_dim),
-            scalar_hidden_dim=int(self.scalar_hidden_dim),
-            normalization=str(self.normalization),
-            include_scalars=bool(self.include_scalars),
-        )
 
 
 __all__ = [

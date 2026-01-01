@@ -13,14 +13,22 @@ local to the compute code (chunk sizes, backprojection stride, etc.).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Annotated
 
 import torch
-from pydantic import Field
+from pydantic import Field, field_validator
+
+from oracle_rri.utils.console import Verbosity
 
 from ..data.efm_views import EfmSnippetView
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..pose_generation.types import CandidateSamplingResult
-from ..rendering import CandidateDepthRendererConfig, CandidateDepths, CandidatePointClouds, build_candidate_pointclouds
+from ..rendering import (
+    CandidateDepthRendererConfig,
+    CandidateDepths,
+    CandidatePointClouds,
+    build_candidate_pointclouds,
+)
 from ..rri_metrics.oracle_rri import OracleRRIConfig
 from ..rri_metrics.types import RriResult
 from ..utils import BaseConfig, Console
@@ -28,16 +36,6 @@ from ..utils import BaseConfig, Console
 
 @dataclass(slots=True)
 class OracleRriLabelBatch:
-    """Outputs of the oracle label pipeline for one snippet.
-
-    Attributes:
-        sample: The input snippet.
-        candidates: Candidate poses (and per-rule diagnostics if enabled).
-        depths: Rendered depth maps for a subset (or all) candidates.
-        candidate_pcs: Backprojected candidate point clouds + collapsed semi-dense points.
-        rri: Oracle RRI per rendered candidate.
-    """
-
     sample: EfmSnippetView
     candidates: CandidateSamplingResult
     depths: CandidateDepths
@@ -56,26 +54,32 @@ class OracleRriLabelerConfig(BaseConfig["OracleRriLabeler"]):
     scoring) and adds a small number of pipeline-level knobs.
     """
 
-    target: type["OracleRriLabeler"] = Field(default_factory=_target_cls, exclude=True)
+    target: type[OracleRriLabeler] = Field(default_factory=_target_cls, exclude=True)
 
-    generator: CandidateViewGeneratorConfig = Field(default_factory=CandidateViewGeneratorConfig)
+    device: Annotated[torch.device, Field(default="auto")]
+
+    generator: CandidateViewGeneratorConfig = Field(
+        default_factory=CandidateViewGeneratorConfig,
+    )
     """Candidate generation configuration."""
 
-    depth: CandidateDepthRendererConfig = Field(default_factory=CandidateDepthRendererConfig)
+    depth: CandidateDepthRendererConfig = Field(
+        default_factory=CandidateDepthRendererConfig,
+    )
     """Depth rendering configuration."""
 
     oracle: OracleRRIConfig = Field(default_factory=OracleRRIConfig)
     """Oracle RRI scoring configuration."""
 
-    backprojection_stride: int = 8
+    backprojection_stride: int = 1
     """Pixel stride used when backprojecting depth maps to point clouds."""
 
-    output_device: str | None = None
-    """Optional device to move the :class:`~oracle_rri.rri_metrics.types.RriResult` to.
+    verbosity: Verbosity = Verbosity.QUIET
 
-    Set to ``"cpu"`` for dashboard-style plotting, or leave as ``None`` to keep
-    results on the compute device (useful for training-time label generation).
-    """
+    @field_validator("device", mode="before")
+    @classmethod
+    def _resolve_device(cls, value: str | torch.device) -> torch.device:
+        return super()._resolve_device(value)
 
 
 class OracleRriLabeler:
@@ -99,26 +103,45 @@ class OracleRriLabeler:
             A batch containing candidates, renders, backprojected point clouds,
             and oracle RRI values.
         """
-
         if sample.mesh_verts is None or sample.mesh_faces is None:
-            raise ValueError("OracleRriLabeler requires mesh_verts/mesh_faces on the sample (enable load_meshes).")
+            raise ValueError(
+                "OracleRriLabeler requires mesh_verts/mesh_faces on the sample (enable load_meshes).",
+            )
 
-        self.console.log(f"Running label pipeline for scene={sample.scene_id} snippet={sample.snippet_id}")
+        self.console.log(
+            f"Running label pipeline for scene={sample.scene_id} snippet={sample.snippet_id}",
+        )
 
         candidates = self._generator.generate_from_typed_sample(sample)
-        self.console.log(f"Generated {int(candidates.views.tensor().shape[0])} valid candidates.")
+        num_candidates = int(candidates.views.tensor().shape[0])
+        if num_candidates == 0:
+            msg = (
+                "Candidate generation produced 0 candidates. This usually means the sampling/pruning rules are too "
+                "strict for the current snippet. Try reducing `CandidateViewGeneratorConfig.min_distance_to_mesh`, "
+                "disabling collision/free-space checks, or increasing `num_samples`/`oversample_factor`."
+            )
+            self.console.error(msg)
+            raise ValueError(msg)
+
+        self.console.log(f"Generated {num_candidates} valid candidates.")
 
         depths = self._depth_renderer.render(sample=sample, candidates=candidates)
-        self.console.log(f"Rendered depths for {int(depths.depths.shape[0])} candidates.")
+        self.console.log(
+            f"Rendered depths for {int(depths.depths.shape[0])} candidates.",
+        )
 
-        candidate_pcs = build_candidate_pointclouds(sample, depths, stride=int(self.config.backprojection_stride))
+        candidate_pcs = build_candidate_pointclouds(
+            sample,
+            depths,
+            stride=int(self.config.backprojection_stride),
+        )
         device = candidate_pcs.points.device
         dtype = candidate_pcs.points.dtype
 
         self.console.log(
             "Backprojected candidate PCs: "
-            f"C={int(candidate_pcs.points.shape[0])} Pmax={int(candidate_pcs.points.shape[1])} "
-            f"| semidense={int(candidate_pcs.semidense_points.shape[0])}"
+            f"C={int(candidate_pcs.points.shape[0])} #Pcand={int(candidate_pcs.points.shape[1])} "
+            f"| #Psemi={int(candidate_pcs.semidense_points.shape[0])}",
         )
 
         rri = self._oracle.score(
@@ -129,8 +152,6 @@ class OracleRriLabeler:
             gt_faces=sample.mesh_faces.to(device=device),
             extend=candidate_pcs.occupancy_bounds.to(device=device, dtype=dtype),
         )
-        if self.config.output_device is not None:
-            rri = rri.to(device=torch.device(self.config.output_device))
 
         return OracleRriLabelBatch(
             sample=sample,

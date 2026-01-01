@@ -13,7 +13,6 @@ from atek.data_download.atek_data_store_download import download_atek_wds_sequen
 from pydantic import AliasChoices, Field
 from pydantic_settings import (
     CLI_SUPPRESS,
-    BaseSettings,
     CliSettingsSource,
     CliSuppress,
     SettingsConfigDict,
@@ -25,7 +24,7 @@ from ..utils import BaseConfig, Console, Verbosity
 from .metadata import ASEMetadata, SceneMetadata
 
 
-class ASEDownloaderConfig(BaseSettings, BaseConfig["ASEDownloader"]):
+class ASEDownloaderConfig(BaseConfig["ASEDownloader"]):
     """Configuration for ASE downloader with CLI support.
 
     Supports two CLI modes (explicitly selected via positional `mode`):

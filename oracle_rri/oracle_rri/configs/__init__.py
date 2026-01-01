@@ -4,14 +4,12 @@ This module provides centralized configuration classes for managing
 paths, datasets, and other project-wide settings.
 """
 
+from .optuna_config import OptunaConfig
 from .path_config import PathConfig
-
-try:  # Optional dependency (training-only).
-    from .wandb_config import WandbConfig
-except ModuleNotFoundError:  # pragma: no cover
-    WandbConfig = None  # type: ignore[assignment]
+from .wandb_config import WandbConfig
 
 __all__ = [
+    "OptunaConfig",
     "PathConfig",
     "WandbConfig",
 ]

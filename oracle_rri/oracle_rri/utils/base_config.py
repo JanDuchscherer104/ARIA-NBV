@@ -10,8 +10,9 @@ from typing import (
     TypeVar,
 )
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-from pydantic_settings import CLI_SUPPRESS
+import torch
+from pydantic import ConfigDict, Field, model_validator
+from pydantic_settings import CLI_SUPPRESS, BaseSettings, SettingsConfigDict
 from rich.text import Text
 from rich.tree import Tree
 from tomlkit import TOMLDocument, aot, array, comment, document, dumps, string, table
@@ -28,7 +29,13 @@ class NoTarget:
         return None
 
 
-class BaseConfig(BaseModel, Generic[TargetType]):
+class BaseConfig(BaseSettings, Generic[TargetType]):
+    cache_exclude_fields: ClassVar[set[str]] = set()
+    """Field names to exclude from cache snapshots."""
+
+    cache_exclude_extra_key: ClassVar[str] = "cache_exclude"
+    """json_schema_extra key for marking fields excluded from cache snapshots."""
+
     target: type[TargetType] = Field(  # type: ignore
         default_factory=lambda: NoTarget,
         exclude=True,
@@ -38,18 +45,30 @@ class BaseConfig(BaseModel, Generic[TargetType]):
         },
     )
 
-    model_config = ConfigDict(
+    model_config = SettingsConfigDict(
         arbitrary_types_allowed=True,
         validate_default=True,
         validate_assignment=True,
         protected_namespaces=(),
+        cli_parse_args=False,
+        cli_avoid_json=True,
+        cli_kebab_case=True,
     )
 
     propagated_fields: dict[str, Any] = Field(
         default_factory=dict,
         exclude=True,
+        # TODO: figure out how to CLI_SUPPRESS should be used correctly - get-library-docs pydantic
         description=CLI_SUPPRESS,
     )
+
+    @staticmethod
+    def _resolve_device(value: str | torch.device) -> torch.device:
+        if isinstance(value, torch.device):
+            return value
+        if value is None or str(value).lower() == "auto":
+            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return torch.device(value)
 
     def setup_target(self, **kwargs: Any) -> TargetType:
         if not callable(factory := getattr(self.target, "setup_target", self.target)):
@@ -61,6 +80,83 @@ class BaseConfig(BaseModel, Generic[TargetType]):
             )
 
         return factory(self, **kwargs)  # type: ignore
+
+    # ------------------------------------------------------------------ JSON-friendly dumps
+    def model_dump_jsonable(self, **kwargs: Any) -> dict[str, Any]:
+        """Return a JSON-serializable dump suitable for logging/checkpoint metadata."""
+        return self.to_jsonable(self.model_dump(**kwargs))
+
+    def model_dump_cache(
+        self,
+        *,
+        exclude: set[str] | None = None,
+        exclude_none: bool = True,
+    ) -> dict[str, Any]:
+        """Return a cache-friendly dump with per-field cache exclusions.
+
+        Args:
+            exclude: Additional field names to exclude from the snapshot.
+            exclude_none: Skip fields with value ``None`` when True.
+        """
+        resolved_exclude = set(exclude or set())
+        resolved_exclude.update(self._cache_exclude_fields())
+        payload: dict[str, Any] = {}
+        for field_name, field in self.__class__.model_fields.items():
+            if field_name in resolved_exclude or field.exclude:
+                continue
+            value = getattr(self, field_name)
+            if exclude_none and value is None:
+                continue
+            payload[field_name] = self._cache_jsonable(value, exclude_none=exclude_none)
+        return payload
+
+    @classmethod
+    def _cache_jsonable(cls, value: Any, *, exclude_none: bool) -> Any:
+        if isinstance(value, BaseConfig):
+            return value.model_dump_cache(exclude_none=exclude_none)
+        if isinstance(value, dict):
+            payload: dict[str, Any] = {}
+            for key, item in value.items():
+                if exclude_none and item is None:
+                    continue
+                payload[str(key)] = cls._cache_jsonable(item, exclude_none=exclude_none)
+            return payload
+        if isinstance(value, (list, tuple, set)):
+            items = [cls._cache_jsonable(item, exclude_none=exclude_none) for item in value]
+            return [item for item in items if not (exclude_none and item is None)]
+        return cls.to_jsonable(value)
+
+    @classmethod
+    def _cache_exclude_fields(cls) -> set[str]:
+        excludes = set(getattr(cls, "cache_exclude_fields", set()))
+        for field_name, field in cls.model_fields.items():
+            extra = field.json_schema_extra
+            if isinstance(extra, dict) and extra.get(cls.cache_exclude_extra_key, False):
+                excludes.add(field_name)
+        return excludes
+
+    @classmethod
+    def to_jsonable(cls, value: Any) -> Any:
+        """Convert nested configs and common types into JSON-friendly primitives."""
+        if isinstance(value, BaseConfig):
+            return value.model_dump_jsonable()
+        if isinstance(value, dict):
+            return {k: cls.to_jsonable(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [cls.to_jsonable(v) for v in value]
+        if isinstance(value, Path):
+            return value.as_posix()
+        if isinstance(value, torch.device):
+            return str(value)
+        if isinstance(value, torch.dtype):
+            return str(value)
+        if isinstance(value, torch.Tensor):
+            return value.detach().cpu().tolist()
+        if isinstance(value, Enum):
+            return value.value if hasattr(value, "value") else str(value)
+        if isinstance(value, type):
+            return value.__name__
+        return value
 
     # --------------------------------------------------------------------- TOML IO
     def to_toml(
@@ -463,6 +559,13 @@ class BaseConfig(BaseModel, Generic[TargetType]):
         return self._normalise_scalar(value)
 
     def _normalise_scalar(self, value: Any) -> Any:
+        try:
+            import torch
+        except ModuleNotFoundError:  # pragma: no cover
+            torch = None
+
+        if torch is not None and isinstance(value, torch.device):
+            return string(str(value))
         if isinstance(value, Path):
             return string(str(value))
         if isinstance(value, Enum):

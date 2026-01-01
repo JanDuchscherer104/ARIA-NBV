@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from pathlib import Path
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 from pydantic import Field, model_validator
 from pytorch_lightning.callbacks import (
@@ -21,6 +21,11 @@ from pytorch_lightning.callbacks import (
 
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console
+
+if TYPE_CHECKING:
+    from optuna import Trial
+
+    from ..configs.optuna_config import OptunaConfig
 
 
 class CustomTQDMProgressBar(TQDMProgressBar):
@@ -48,18 +53,28 @@ class TrainerCallbacksConfig(BaseConfig[list]):
     """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
 
     use_model_checkpoint: bool = True
-    checkpoint_monitor: str = "val_loss"
+    checkpoint_monitor: str = "train/loss"
     """Metric to monitor for model checkpointing."""
     checkpoint_mode: str = "min"
     """Mode for checkpoint monitor ("min" or "max")."""
     checkpoint_dir: Path | None = None
     """Directory to save checkpoints. If None, uses `PathConfig().checkpoints`."""
-    checkpoint_filename: str = "epoch={epoch}-step={step}-val_loss={val_loss:.4f}"
-    """Filename template for checkpoints. Prefer metric keys without '/' to keep templates simple."""
+    checkpoint_filename: str = "epoch={epoch}-step={step}-train-loss={train/loss:.4f}"
+    """Filename template for checkpoints."""
     checkpoint_save_top_k: int = 1
     """Number of best models to save."""
     checkpoint_auto_insert_metric_name: bool = False
     """Whether Lightning should auto-prefix metric names in the filename."""
+    checkpoint_save_last: bool | None = None
+    """Whether to always save a `last.ckpt` checkpoint."""
+    checkpoint_every_n_train_steps: int | None = None
+    """Optionally checkpoint every N training steps (useful for very long epochs)."""
+    checkpoint_train_time_interval: dict[str, int] | None = None
+    """Optional wall-clock checkpoint cadence passed to `timedelta(**...)`."""
+    checkpoint_every_n_epochs: int | None = None
+    """Optionally checkpoint every N epochs."""
+    checkpoint_save_on_train_epoch_end: bool | None = None
+    """Override Lightning's save-on-train-epoch-end behavior."""
 
     use_early_stopping: bool = False
     early_stopping_monitor: str = "val_loss"
@@ -67,7 +82,10 @@ class TrainerCallbacksConfig(BaseConfig[list]):
     early_stopping_patience: int = 5
 
     use_lr_monitor: bool = True
-    lr_logging_interval: str = "epoch"
+    lr_logging_interval: str = "step"
+
+    use_optuna_pruning: bool = False
+    """Enable Optuna pruning callback for hyperparameter optimisation runs."""
 
     use_rich_progress_bar: bool = False
     """Enable Rich progress bar for enhanced terminal output (mutually exclusive with TQDM)."""
@@ -76,7 +94,7 @@ class TrainerCallbacksConfig(BaseConfig[list]):
     tqdm_refresh_rate: int = 1
 
     use_rich_model_summary: bool = True
-    rich_summary_max_depth: int = 1
+    rich_summary_max_depth: int = 4
 
     use_backbone_finetuning: bool = False
     backbone_unfreeze_at_epoch: int = 10
@@ -93,9 +111,54 @@ class TrainerCallbacksConfig(BaseConfig[list]):
             raise ValueError("use_rich_progress_bar and use_tqdm_progress_bar are mutually exclusive. Enable only one.")
         return self
 
-    def setup_target(self, model_name: str | None = None, *, has_logger: bool = True) -> list[Callback]:  # type: ignore[override]
+    @model_validator(mode="after")
+    def _validate_checkpoint_schedule(self) -> Self:
+        schedule_fields = {
+            "checkpoint_every_n_train_steps": self.checkpoint_every_n_train_steps,
+            "checkpoint_train_time_interval": self.checkpoint_train_time_interval,
+            "checkpoint_every_n_epochs": self.checkpoint_every_n_epochs,
+        }
+        enabled = [name for name, value in schedule_fields.items() if value is not None]
+        if len(enabled) > 1:
+            raise ValueError(
+                f"ModelCheckpoint schedule params are mutually exclusive; set only one of {', '.join(enabled)}."
+            )
+
+        if self.checkpoint_every_n_train_steps is not None and int(self.checkpoint_every_n_train_steps) <= 0:
+            raise ValueError("checkpoint_every_n_train_steps must be > 0 when set.")
+        if self.checkpoint_every_n_epochs is not None and int(self.checkpoint_every_n_epochs) <= 0:
+            raise ValueError("checkpoint_every_n_epochs must be > 0 when set.")
+        if self.checkpoint_train_time_interval is not None:
+            try:
+                interval = timedelta(**self.checkpoint_train_time_interval)
+            except Exception as exc:  # noqa: BLE001
+                raise ValueError(
+                    f"Invalid checkpoint_train_time_interval={self.checkpoint_train_time_interval}. "
+                    "Expected a dict accepted by `datetime.timedelta`."
+                ) from exc
+            if interval.total_seconds() <= 0:
+                raise ValueError("checkpoint_train_time_interval must be > 0 seconds when set.")
+        return self
+
+    def setup_target(  # type: ignore[override]
+        self,
+        model_name: str | None = None,
+        *,
+        has_logger: bool = True,
+        trial: "Trial | None" = None,
+        optuna_config: "OptunaConfig | None" = None,
+    ) -> list[Callback]:
         console = Console.with_prefix(self.__class__.__name__, "setup_target")
         callbacks: list[Callback] = []
+
+        if trial is not None:
+            object.__setattr__(self, "use_model_checkpoint", False)
+            object.__setattr__(self, "use_early_stopping", False)
+            if self.use_optuna_pruning is False:
+                console.warn(
+                    "Optuna trial provided but use_optuna_pruning is False. Enabling use_optuna_pruning.",
+                )
+                object.__setattr__(self, "use_optuna_pruning", True)
 
         if self.use_model_checkpoint:
             dirpath = self.checkpoint_dir if self.checkpoint_dir is not None else PathConfig().checkpoints
@@ -104,45 +167,60 @@ class TrainerCallbacksConfig(BaseConfig[list]):
             ckpt_fn = f"{model_name}-{self.checkpoint_filename}" if model_name else self.checkpoint_filename
             callbacks.append(
                 ModelCheckpoint(
-                    monitor=str(self.checkpoint_monitor),
-                    mode=str(self.checkpoint_mode),
-                    save_top_k=int(self.checkpoint_save_top_k),
-                    filename=str(ckpt_fn),
-                    auto_insert_metric_name=bool(self.checkpoint_auto_insert_metric_name),
+                    monitor=self.checkpoint_monitor,
+                    mode=self.checkpoint_mode,
+                    save_top_k=self.checkpoint_save_top_k,
+                    filename=ckpt_fn,
+                    auto_insert_metric_name=self.checkpoint_auto_insert_metric_name,
+                    save_last=self.checkpoint_save_last,
+                    every_n_train_steps=self.checkpoint_every_n_train_steps,
+                    train_time_interval=(
+                        timedelta(**self.checkpoint_train_time_interval)
+                        if self.checkpoint_train_time_interval is not None
+                        else None
+                    ),
+                    every_n_epochs=self.checkpoint_every_n_epochs,
+                    save_on_train_epoch_end=self.checkpoint_save_on_train_epoch_end,
                     dirpath=dirpath.as_posix(),
                 ),
             )
-            console.log(f"ModelCheckpoint active: monitor={self.checkpoint_monitor} dir={dirpath} template={ckpt_fn}")
+            console.log(
+                "ModelCheckpoint active: "
+                f"monitor={self.checkpoint_monitor} dir={dirpath} template={ckpt_fn} "
+                f"every_n_train_steps={self.checkpoint_every_n_train_steps} "
+                f"train_time_interval={self.checkpoint_train_time_interval} "
+                f"every_n_epochs={self.checkpoint_every_n_epochs}"
+            )
 
         if self.use_early_stopping:
             callbacks.append(
                 EarlyStopping(
-                    monitor=str(self.early_stopping_monitor),
-                    mode=str(self.early_stopping_mode),
-                    patience=int(self.early_stopping_patience),
+                    monitor=self.early_stopping_monitor,
+                    mode=self.early_stopping_mode,
+                    patience=self.early_stopping_patience,
                 ),
             )
 
         if self.use_lr_monitor and has_logger:
-            callbacks.append(LearningRateMonitor(logging_interval=str(self.lr_logging_interval)))
+            callbacks.append(LearningRateMonitor(logging_interval=self.lr_logging_interval))
 
         if self.use_rich_progress_bar:
             callbacks.append(CustomRichProgressBar())
 
         if self.use_tqdm_progress_bar:
-            callbacks.append(CustomTQDMProgressBar(refresh_rate=int(self.tqdm_refresh_rate)))
+            callbacks.append(CustomTQDMProgressBar(refresh_rate=self.tqdm_refresh_rate))
 
         if self.use_rich_model_summary:
-            callbacks.append(RichModelSummary(max_depth=int(self.rich_summary_max_depth)))
+            callbacks.append(RichModelSummary(max_depth=self.rich_summary_max_depth))
 
         if self.use_backbone_finetuning:
             callbacks.append(
                 BackboneFinetuning(
-                    unfreeze_backbone_at_epoch=int(self.backbone_unfreeze_at_epoch),
+                    unfreeze_backbone_at_epoch=self.backbone_unfreeze_at_epoch,
                     lambda_func=eval(self.backbone_lambda_func) if self.backbone_lambda_func else None,
                     backbone_initial_ratio_lr=0.1,
                     should_align=True,
-                    train_bn=bool(self.backbone_train_bn),
+                    train_bn=self.backbone_train_bn,
                 ),
             )
 
@@ -150,9 +228,17 @@ class TrainerCallbacksConfig(BaseConfig[list]):
             callbacks.append(
                 Timer(
                     duration=timedelta(**self.timer_duration) if self.timer_duration else None,
-                    interval=str(self.timer_interval),
+                    interval=self.timer_interval,
                 ),
             )
+
+        if self.use_optuna_pruning:
+            if optuna_config is None:
+                raise ValueError("optuna_config is required when use_optuna_pruning is True.")
+            if trial is None:
+                raise ValueError("trial is required when use_optuna_pruning is True.")
+            callbacks.append(optuna_config.get_pruning_callback(trial))
+            console.log(f"Optuna pruning active (monitor={optuna_config.monitor})")
 
         return callbacks
 

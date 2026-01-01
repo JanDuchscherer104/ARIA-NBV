@@ -16,11 +16,17 @@ from typing import Any
 import torch
 
 from ..data import AseEfmDatasetConfig, EfmSnippetView
+from ..lightning.aria_nbv_experiment import AriaNBVExperimentConfig
+from ..lightning.lit_datamodule import VinOracleBatch
 from ..pipelines import OracleRriLabelerConfig
 from ..pose_generation.types import CandidateSamplingResult
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..rri_metrics.types import RriResult
+from ..vin import (
+    VinForwardDiagnostics,
+    VinPrediction,
+)
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -53,7 +59,6 @@ def _to_jsonable(value: Any) -> Any:
 
 def config_signature(cfg: Any) -> str:
     """Return a stable JSON signature for a pydantic config object."""
-
     if hasattr(cfg, "model_dump"):
         payload = cfg.model_dump(mode="python", round_trip=True)  # type: ignore[call-arg]
     else:
@@ -99,6 +104,30 @@ class RriCache:
 
 
 @dataclass(slots=True)
+class VinDiagnosticsState:
+    """Session-scoped cache for VIN diagnostics."""
+
+    cfg_sig: str | None = None
+    experiment: AriaNBVExperimentConfig | None = None
+    module: Any | None = None
+    datamodule: Any | None = None
+    offline_cache_sig: str | None = None
+    offline_cache: Any | None = None
+    offline_cache_len: int | None = None
+    offline_cache_idx: int = 0
+    offline_snippet_key: str | None = None
+    offline_snippet: EfmSnippetView | None = None
+    offline_snippet_error: str | None = None
+    batch: VinOracleBatch | None = None
+    pred: VinPrediction | None = None
+    debug: VinForwardDiagnostics | None = None
+    error: str | None = None
+    summary_key: str | None = None
+    summary_text: str | None = None
+    summary_error: str | None = None
+
+
+@dataclass(slots=True)
 class AppState:
     """All persistent app state (Streamlit-serialisable container)."""
 
@@ -119,7 +148,6 @@ def sample_key(sample: EfmSnippetView) -> str:
 
 def candidates_key(candidates: CandidateSamplingResult) -> str:
     """Return an in-session identity key for the current candidate set."""
-
     n = int(candidates.views.tensor().shape[0])
     ref = candidates.reference_pose.tensor().detach().cpu().numpy().tobytes()
     return f"n={n}:ref={hash(ref)}"
@@ -127,14 +155,12 @@ def candidates_key(candidates: CandidateSamplingResult) -> str:
 
 def depths_key(depths: CandidateDepths) -> str:
     """Return an in-session identity key for the rendered depth subset."""
-
     idx = tuple(int(i) for i in depths.candidate_indices.detach().cpu().tolist())
     return f"n={len(idx)}:idx={hash(idx)}"
 
 
 def pcs_key(pcs: CandidatePointClouds) -> str:
     """Return an in-session identity key for backprojected candidate point clouds."""
-
     lengths = pcs.lengths.detach().cpu().tolist()
     return f"C={int(pcs.points.shape[0])}:P={int(pcs.points.shape[1])}:len={hash(tuple(int(x) for x in lengths))}"
 

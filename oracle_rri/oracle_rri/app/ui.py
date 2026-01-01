@@ -133,7 +133,11 @@ def candidate_config_ui(
         options=view_sampling_opts,
         index=view_sampling_opts.index(default.view_sampling_strategy),
         format_func=lambda s: "none" if s is None else s.value,
-        help="View-direction jitter in camera frame; None disables jitter.",
+        help=(
+            "Optional legacy view-direction sampler. If view_max_azimuth_deg/view_max_elevation_deg > 0, we use "
+            "bounded box jitter regardless of this setting; if both caps are 0, this controls whether view "
+            "directions are random (uniform sphere / PowerSpherical) or deterministic (none)."
+        ),
     )
 
     view_kappa = ui.slider(

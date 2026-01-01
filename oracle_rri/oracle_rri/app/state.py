@@ -20,6 +20,7 @@ from .state_types import (
     DepthCache,
     PointCloudCache,
     RriCache,
+    VinDiagnosticsState,
     candidates_key,
     config_signature,
     depths_key,
@@ -28,6 +29,7 @@ from .state_types import (
 )
 
 STATE_KEY = "nbv_app_state_v2"
+VIN_DIAG_STATE_KEY = "vin_diag_state_v1"
 
 
 def get_state(default_dataset: AseEfmDatasetConfig, default_labeler: OracleRriLabelerConfig) -> AppState:
@@ -38,6 +40,25 @@ def get_state(default_dataset: AseEfmDatasetConfig, default_labeler: OracleRriLa
         return raw
     state = AppState(dataset_cfg=default_dataset, labeler_cfg=default_labeler, sample_idx=0)
     st.session_state[STATE_KEY] = state
+    return state
+
+
+def get_vin_state() -> VinDiagnosticsState:
+    raw = st.session_state.get(VIN_DIAG_STATE_KEY)
+    if isinstance(raw, VinDiagnosticsState):
+        return raw
+    state = VinDiagnosticsState()
+    if raw is not None:
+        fields = VinDiagnosticsState.__dataclass_fields__.keys()
+        if isinstance(raw, dict):
+            for name in fields:
+                if name in raw:
+                    setattr(state, name, raw[name])
+        else:
+            for name in fields:
+                if hasattr(raw, name):
+                    setattr(state, name, getattr(raw, name))
+    st.session_state[VIN_DIAG_STATE_KEY] = state
     return state
 
 

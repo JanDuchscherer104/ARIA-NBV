@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from math import radians
-from typing import Literal
+from typing import Annotated, Literal
 
 import torch
 import trimesh  # type: ignore[import-untyped]
@@ -30,7 +30,12 @@ from pydantic import AliasChoices, Field, field_validator, model_validator
 from ..data.efm_views import EfmSnippetView
 from ..utils import BaseConfig, Console, Verbosity
 from ..utils.frames import rotate_yaw_cw90, world_up_tensor
-from .candidate_generation_rules import FreeSpaceRule, MinDistanceToMeshRule, PathCollisionRule, Rule
+from .candidate_generation_rules import (
+    FreeSpaceRule,
+    MinDistanceToMeshRule,
+    PathCollisionRule,
+    Rule,
+)
 from .orientations import OrientationBuilder
 from .positional_sampling import PositionSampler
 from .types import (
@@ -49,20 +54,23 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     filtering, and logging/debug controls used by :class:`CandidateViewGenerator`.
     """
 
-    target: type["CandidateViewGenerator"] = Field(default_factory=lambda: CandidateViewGenerator, exclude=True)
+    target: type[CandidateViewGenerator] = Field(
+        default_factory=lambda: CandidateViewGenerator,
+        exclude=True,
+    )
     """Factory target for :meth:`BaseConfig.setup_target`."""
 
     camera_label: Literal["rgb", "slaml", "slamr"] = "rgb"
     """Camera index to use for candidate generation."""
 
-    num_samples: int = 128
+    num_samples: int = 60
     """Number of candidate poses requested after pruning."""
-    oversample_factor: float = 1.5
+    oversample_factor: float = 2.0
     """Multiplicative oversampling factor applied before pruning to offset rejections."""
     max_resamples: int = 2
     """Maximum oversampling rounds if pruning removes too many candidates."""
 
-    align_to_gravity: bool = False
+    align_to_gravity: bool = True
     """If True, use a gravity-aligned copy of the reference pose for sampling.
 
     This removes pitch/roll from the sampling frame while keeping the reference yaw (forward direction projected
@@ -70,16 +78,16 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     (e.g., high roll angles).
     """
 
-    min_radius: float = 0.6
+    min_radius: float = 0.5
     """Inner radius (metres) of the sampling shell around the reference pose."""
     max_radius: float = 1.8
     """Outer radius (metres) of the sampling shell around the reference pose."""
 
-    min_elev_deg: float = -15.0
+    min_elev_deg: float = -20.0
     """Minimum elevation angle (deg) relative to the world horizontal plane."""
     max_elev_deg: float = 25.0
     """Maximum elevation angle (deg) relative to the world horizontal plane."""
-    delta_azimuth_deg: float = 360.0
+    delta_azimuth_deg: float = 170.0
     """Total azimuth spread (deg) around the reference forward direction; 360 unlocks full sphere."""
 
     sampling_strategy: SamplingStrategy = SamplingStrategy.UNIFORM_SPHERE
@@ -87,7 +95,7 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     kappa: float = 4.0
     """Concentration parameter for the forward-biased PowerSpherical sampler."""
 
-    min_distance_to_mesh: float = 1.0
+    min_distance_to_mesh: float = 0.2
     """Minimum clearance (metres) between candidate center and mesh surface."""
     ensure_collision_free: bool = True
     """Reject candidates whose straight path from the reference intersects the mesh."""
@@ -95,7 +103,7 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Constrain candidates to lie inside the snippet occupancy AABB."""
     collision_backend: CollisionBackend = CollisionBackend.P3D
     """Backend to use for collision and distance checks."""
-    ray_subsample: int = 128
+    ray_subsample: int = 32
     """Number of samples per ray when using discretised collision checks."""
     step_clearance: float = 0.1
     """Distance threshold (metres) below which discretised collision samples are rejected."""
@@ -103,7 +111,7 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     mesh_samples: int | None = None
     """Optional number of mesh samples used by mesh-distance rules when applicable."""
 
-    device: torch.device = Field(default_factory=lambda: torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    device: Annotated[torch.device, Field(default="auto")]
     """Torch device on which sampling and rule evaluation run (auto-select CUDA if available)."""
     verbosity: Verbosity = Field(
         default=Verbosity.VERBOSE,
@@ -127,7 +135,14 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     """Base orientation strategy for candidates."""
 
     view_sampling_strategy: SamplingStrategy | None = None
-    """View-direction sampling in base camera frame; None disables view jitter."""
+    """Optional view-direction sampler in the base camera frame (legacy path).
+
+    Behaviour:
+        - If either ``view_max_azimuth_deg`` or ``view_max_elevation_deg`` is > 0, view jitter is sampled as a
+          bounded box in local yaw/pitch regardless of ``view_sampling_strategy``.
+        - If both caps are 0, this field controls whether view directions are drawn from a distribution
+          (PowerSpherical / uniform sphere) or kept deterministic (``None``).
+    """
 
     view_kappa: float | None = None
     """Concentration for PowerSpherical view sampler; defaults to positional `kappa` when None."""
@@ -135,10 +150,10 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     view_max_angle_deg: float = 0.0
     """Fallback cap (deg) applied to both azimuth and elevation jitter when per-axis caps are unset."""
 
-    view_max_azimuth_deg: float | None = None
+    view_max_azimuth_deg: float | None = 60.0
     """Maximum horizontal deviation (deg, +/-) from the base direction."""
 
-    view_max_elevation_deg: float | None = None
+    view_max_elevation_deg: float | None = 30.0
     """Maximum vertical deviation (deg, +/-) from the base direction."""
 
     view_roll_jitter_deg: float = 0.0
@@ -156,11 +171,7 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     @field_validator("device", mode="before")
     @classmethod
     def _resolve_device(cls, value: str | torch.device) -> torch.device:
-        if isinstance(value, torch.device):
-            return value
-        if value is None or str(value).lower() == "auto":
-            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        return torch.device(value)
+        return super()._resolve_device(value)
 
     @field_validator("verbosity", mode="before")
     @classmethod
@@ -187,7 +198,7 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
         return value
 
     @model_validator(mode="after")
-    def set_debug(self) -> "CandidateViewGeneratorConfig":
+    def set_debug(self) -> CandidateViewGeneratorConfig:
         if self.is_debug:
             object.__setattr__(self, "verbosity", Verbosity.VERBOSE)
         if self.view_kappa is None:
@@ -213,7 +224,6 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
 
 def _ensure_unbatched_pose(pose: PoseTW) -> PoseTW:
     """Ensure PoseTW has shape (12,) instead of (1,12) when singleton batch."""
-
     if pose._data.ndim == 2 and pose._data.shape[0] == 1:
         return PoseTW(pose._data.squeeze(0))
     return pose
@@ -233,7 +243,6 @@ def _gravity_align_pose(reference_pose: PoseTW, *, eps: float = 1e-6) -> PoseTW:
     Returns:
         ``PoseTW`` world<-reference pose with gravity-aligned rotation and unchanged translation.
     """
-
     reference_pose = _ensure_unbatched_pose(reference_pose)
     r_wr = reference_pose.R  # (..., 3, 3)
     t_w = reference_pose.t  # (..., 3)
@@ -259,7 +268,9 @@ def _gravity_align_pose(reference_pose: PoseTW, *, eps: float = 1e-6) -> PoseTW:
     # Fallback when forward is near-parallel to gravity: derive forward from left×up.
     left_unit = left_h / left_norm.clamp_min(eps)
     fwd_from_left = torch.cross(left_unit, wup_exp, dim=-1)
-    fwd_from_left = fwd_from_left / fwd_from_left.norm(dim=-1, keepdim=True).clamp_min(eps)
+    fwd_from_left = fwd_from_left / fwd_from_left.norm(dim=-1, keepdim=True).clamp_min(
+        eps,
+    )
 
     use_fallback = fwd_norm < eps
     fwd_unit = fwd_h / fwd_norm.clamp_min(eps)
@@ -325,7 +336,9 @@ class CandidateViewGenerator:
 
     # ------------------------------------------------------------------ public
     def generate_from_typed_sample(
-        self, sample: EfmSnippetView, frame_index: int | None = None
+        self,
+        sample: EfmSnippetView,
+        frame_index: int | None = None,
     ) -> CandidateSamplingResult:
         """Generate candidates using an :class:`EfmSnippetView` sample.
 
@@ -334,16 +347,19 @@ class CandidateViewGenerator:
             frame_index: Optional frame index to extract the reference pose instead of using the final pose.
                 0 <= frame_index < F where is the number of frames in the snippet; F = sample.get_camera(self.config.camera_label).num_frames.
         """
-
         device = torch.device(self.config.device)
         occ = sample.get_occupancy_extend()
-        self.console.dbg(f"Using occupancy extent: (xmin, xmax, ymin, ymax, zmin, zmax) = {occ}")
+        self.console.dbg(
+            f"Using occupancy extent: (xmin, xmax, ymin, ymax, zmin, zmax) = {occ}",
+        )
         occupancy_extent = occ.to(device=device, dtype=torch.float32)
         gt_mesh = sample.mesh
         mesh_verts = sample.mesh_verts
         mesh_faces = sample.mesh_faces
 
-        assert mesh_verts is not None and mesh_faces is not None, "Mesh vertices and faces must be provided."
+        assert mesh_verts is not None and mesh_faces is not None, (
+            "Mesh vertices and faces must be provided."
+        )
 
         cam_view = sample.get_camera(self.config.camera_label)
 
@@ -354,12 +370,16 @@ class CandidateViewGenerator:
             reference_pose = sample.trajectory.final_pose.to(device=device)
         else:
             cam_idx, traj_idx = cam_view.nearest_traj_indices(
-                sample.trajectory.time_ns, [frame_index], default_last=True
+                sample.trajectory.time_ns,
+                [frame_index],
+                default_last=True,
             )
             if traj_idx.numel() == 0:
                 reference_pose = sample.trajectory.final_pose.to(device=device)
             else:
-                reference_pose = sample.trajectory.t_world_rig[traj_idx].to(device=device)
+                reference_pose = sample.trajectory.t_world_rig[traj_idx].to(
+                    device=device,
+                )
 
         return self.generate(
             reference_pose=reference_pose,
@@ -406,12 +426,23 @@ class CandidateViewGenerator:
         """
         device = self.config.device
 
-        reference_pose = rotate_yaw_cw90(_ensure_unbatched_pose(reference_pose.to(device)))
-        sampling_pose = _gravity_align_pose(reference_pose) if self.config.align_to_gravity else reference_pose
+        reference_pose = rotate_yaw_cw90(
+            _ensure_unbatched_pose(reference_pose.to(device)),
+        )
+        sampling_pose = (
+            _gravity_align_pose(reference_pose)
+            if self.config.align_to_gravity
+            else reference_pose
+        )
 
         with _maybe_seed(self.config.seed, device=torch.device(device)):
-            centers_world, offsets_ref = PositionSampler(self.config).sample(sampling_pose)
-            shell_poses, view_dirs_delta = OrientationBuilder(self.config).build(sampling_pose, centers_world)
+            centers_world, offsets_ref = PositionSampler(self.config).sample(
+                sampling_pose,
+            )
+            shell_poses, view_dirs_delta = OrientationBuilder(self.config).build(
+                sampling_pose,
+                centers_world,
+            )
 
         ctx = CandidateContext(
             cfg=self.config,
@@ -424,8 +455,14 @@ class CandidateViewGenerator:
             shell_poses=shell_poses,
             centers_world=centers_world,
             shell_offsets_ref=offsets_ref,
-            mask_valid=torch.ones(centers_world.shape[0], dtype=torch.bool, device=device),
-            debug={"view_dirs_delta": view_dirs_delta} if view_dirs_delta is not None else {},
+            mask_valid=torch.ones(
+                centers_world.shape[0],
+                dtype=torch.bool,
+                device=device,
+            ),
+            debug={"view_dirs_delta": view_dirs_delta}
+            if view_dirs_delta is not None
+            else {},
         )
 
         self._apply_rules(ctx)
@@ -460,7 +497,9 @@ class CandidateViewGenerator:
         poses_ref_valid = ref_inv.compose(poses_world_valid)  # ref <- cam
 
         template_data = _clone_camera_template(
-            ctx.camera_calib_template, poses_ref_valid._data.shape[0], poses_ref_valid._data.device
+            ctx.camera_calib_template,
+            poses_ref_valid._data.shape[0],
+            poses_ref_valid._data.device,
         )
         # Store camera pose in the reference frame as cam<-ref.
         poses_cam_ref = poses_ref_valid.inverse()
@@ -479,9 +518,12 @@ class CandidateViewGenerator:
         )
 
 
-def _clone_camera_template(template: CameraTW, n: int, device: torch.device) -> torch.Tensor:
+def _clone_camera_template(
+    template: CameraTW,
+    n: int,
+    device: torch.device,
+) -> torch.Tensor:
     """Broadcast a camera template to `n` candidates on the target device."""
-
     data = template._data
     assert data is not None
 
@@ -493,6 +535,6 @@ def _clone_camera_template(template: CameraTW, n: int, device: torch.device) -> 
 __all__ = [
     "CandidateViewGenerator",
     "CandidateViewGeneratorConfig",
-    "SamplingStrategy",
     "CollisionBackend",
+    "SamplingStrategy",
 ]

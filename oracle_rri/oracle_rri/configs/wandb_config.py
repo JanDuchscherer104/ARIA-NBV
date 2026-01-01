@@ -21,11 +21,11 @@ class WandbConfig(BaseConfig):
     target: type[WandbLogger] = Field(default_factory=lambda: WandbLogger, exclude=True)
 
     name: str | None = Field(default=None, description="Display name for the run.")
-    project: str = Field(default="oracle-rri", description="W&B project name.")
+    project: str = Field(default="aria-nbv", description="W&B project name.")
     entity: str | None = None
     offline: bool = Field(False, description="Enable offline logging.")
     log_model: bool | str = Field(
-        default="all",
+        default=False,
         description="Forward Lightning checkpoints to W&B artefacts.",
     )
     checkpoint_name: str | None = Field(default=None, description="Checkpoint artefact name.")
