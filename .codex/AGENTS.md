@@ -53,7 +53,7 @@ We are building an **active Next-Best-View planning system** for complex indoor 
 - Training/validation from cache uses `OracleRriCacheDatasetConfig.train_val_split` + `split="train"/"val"`; `VinDataModule` will auto-derive `val_cache` when split is active.
 
 - **On Initialization**:
-  - **Always** run `make context` (it uses the uv `.venv` automatically and prints which interpreter is used; if `.venv` is missing, run the sync command above first) to generate an up-to-date class diagram of the `oracle_rri` package.
+  - **Always** run `make context` (it uses the uv `.venv` automatically and prints which interpreter is used; if `.venv` is missing, run the sync command above first) to generate an up-to-date class diagram of the `oracle_rri` package. *Note*, an offline snapshot is stored in `.codex/codex_make_context.md`.
   - **Always** run `make context-dir-tree` right after `make context` to get the current oracle_rri directory tree snapshot.
   - **Always** read: `index.qmd`, `todos.qmd`
   - **Always** start with defining and clarifying the task at hand, deciding wether to compress your context and wether to gather additional context from relevant files or external libraries (git-library-docs MCP tool) before proceeding.

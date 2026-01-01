@@ -1,0 +1,10 @@
+# .configs/offline_only.toml
+run_mode = "fit_binner"
+
+[datamodule_config]
+train_cache_new_samples_per_epoch = 0
+num_workers                       = 16
+
+    [datamodule_config.train_cache]
+    load_backbone = false
+    map_location  = "cpu"

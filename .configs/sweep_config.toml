@@ -1,0 +1,30 @@
+run_mode = "optuna"
+
+[datamodule_config]
+num_workers                       = 15
+train_cache_new_samples_per_epoch = 0
+val_cache_new_samples_per_epoch   = 0
+
+    [datamodule_config.train_cache]
+    load_backbone = true
+    map_location  = "cpu"
+
+[optuna_config]
+study_name = "vin-v2-sweep"
+# minimize train/loss by default
+monitor  = "train/loss"
+n_trials = 20
+sampler  = "tpe"
+pruner   = "median"
+
+[trainer_config]
+use_wandb         = true
+enable_validation = false
+
+    [trainer_config.callbacks]
+    use_optuna_pruning   = true
+    use_early_stopping   = false
+    use_model_checkpoint = false
+
+[module_config]
+log_interval_steps = false
