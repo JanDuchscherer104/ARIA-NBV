@@ -55,7 +55,7 @@ website:
             href: contents/questions.qmd
           - text: Findings
             href: contents/experiments/findings.qmd
-      - text: Ressources
+      - text: Resources
         menu:
         - text: Resources (External Links, Repos, Docs, etc.)
           href: contents/resources.qmd
@@ -75,17 +75,27 @@ website:
     search: true
     collapse-level: 2
     contents:
+      - text: Home
+        file: index.qmd
       - section: "Literature"
         contents:
+          - contents/literature/index.qmd
           - contents/literature/vin_nbv.qmd
           - contents/literature/gen_nbv.qmd
           - contents/literature/scene_script.qmd
           - contents/literature/efm3d.qmd
       - section: "Project State"
         contents:
+          - contents/experiments/findings.qmd
           - contents/questions.qmd
           - contents/roadmap.qmd
           - contents/todos.qmd
+      - section: "Resources"
+        contents:
+          - contents/setup.qmd
+          - contents/resources.qmd
+          - contents/ase_dataset.qmd
+          - contents/glossary.qmd
       - section: Theory
         contents:
           - contents/theory/nbv_background.qmd
@@ -96,8 +106,13 @@ website:
         contents:
           - contents/impl/overview.qmd
           - contents/impl/aria_nbv_overview.qmd
+          - contents/impl/aria_nbv_package.qmd
           - contents/impl/data_pipeline_overview.qmd
+          - contents/impl/oracle_rri_impl.qmd
           - contents/impl/rri_computation.qmd
+          - contents/impl/coral_intergarion.qmd
+          - contents/impl/vin_nbv.qmd
+          - contents/impl/vin_v2_feature_proposals.qmd
       - section: "External Implementations"
         contents:
           - contents/ext-impl/atek_implementation.qmd

@@ -1,0 +1,303 @@
+---
+title: "VIN v2 Feature + Encoding Proposals"
+format: html
+---
+
+# Scope
+
+This document summarizes concrete feature sets and encoding schemas to explore for **VinModelV2**, with a focus on mitigating EVL's local voxel grid limits and improving RRI prediction quality. It is intended as an implementation-oriented checklist for ablations and incremental upgrades.
+
+Related context:
+
+- Implementation overview: [VIN on EVL](vin_nbv.qmd)
+- EFM3D/EVL background: [EFM3D](../literature/efm3d.qmd)
+- VIN-NBV paper summary: [VIN-NBV](../literature/vin_nbv.qmd) [@VIN-NBV-frahm2025]
+
+# Context and constraints
+
+- EVL exposes a **local, fixed-size voxel grid** (default ~4x4x4 m) aligned to the last pose and anchored in a gravity-aligned frame. This local extent is expected but means many candidates can be partially or fully out-of-bounds. [@EFM3D-straub2024]
+- VinModelV2 currently uses **pose R6D + translation**, **scene field channels** from EVL heads/evidence, and **pose-conditioned global pooling**. See `oracle_rri/oracle_rri/vin/model_v2.py`.
+- VIN predicts RRI as an **ordinal regression** problem via CORAL [@CORAL-cao2019]. [Wikipedia :: Ordinal regression](https://en.wikipedia.org/wiki/Ordinal_regression)
+
+# Design goals
+
+- Provide **high-signal scene cues** for RRI without over-reliance on heavy neck features.
+- Remain robust when candidates **fall outside the EVL voxel extent**.
+- Preserve **interpretability** (feature channels map to clear geometry/evidence semantics).
+- Keep additions incremental and ablation-friendly.
+
+# Proposed feature bundles
+
+The bundles below are additive. Start with P0/P1; add P2/P3 only if needed; P4 can be always-on, and P5 is optional when appearance priors are desired.
+
+## P0: Coverage + occupancy core (baseline++)
+
+**Inputs** (from `EvlBackboneOutput`):
+
+- `occ_pr`, `occ_input`, `free_input`, `counts_norm`, `unknown`, `new_surface_prior`
+
+**Candidate-level scalars**:
+
+- `valid_frac` (fraction of in-bounds samples),
+- `center_in_bounds` (center validity),
+- signed distance to voxel bounds (x/y/z).
+
+**Motivation**: Explicitly communicates *what is known* vs. *unknown* in the local grid, and when the voxel context is unreliable.
+
+## P1: Boundary + uncertainty cues (derived channels)
+
+**Derived channels**:
+
+- `surface_boundary = occ_pr * free_input`
+- `uncertainty = occ_pr * (1 - occ_pr)`
+
+**Motivation**: Lightweight proxies for surface complexity and model uncertainty, without adding neck features.
+
+## P2: Compressed neck features
+
+**Inputs**:
+
+- `occ_feat` (and optionally `obb_feat`) with 1x1x1 Conv compression (e.g., 64 -> 8/16 channels).
+
+**Motivation**: Adds richer 3D semantics while keeping compute in check. Use only if P0/P1 saturate.
+
+## P3: Entity-aware cues (OBB-aware VIN)
+
+**Inputs**:
+
+- `obb_pred`, `obb_pred_probs_full` (decoded OBBs + class probs).
+
+**Candidate-level scalars**:
+
+- distance to nearest OBB center,
+- view alignment to OBB axes,
+- fraction of the candidate view frustum intersecting top-k OBBs [Wikipedia :: View frustum](https://en.wikipedia.org/wiki/View_frustum),
+- top-k semantic class probabilities.
+
+**Motivation**: Supports entity-aware NBV objectives and task-specific weighting.
+
+## P4: Semidense projection features (always-on, voxel-independent)
+
+**Inputs**:
+
+- `points/p3s_world` (semi-dense SLAM points, i.e. a **point cloud** [Wikipedia :: Point cloud](https://en.wikipedia.org/wiki/Point_cloud)) plus camera intrinsics and candidate poses for projection.
+
+**Per-candidate features**:
+
+- projected coverage/empty fraction (`F_empty`),
+- depth statistics (mean/variance/percentiles),
+- visibility density per view (histogram or angular bins).
+
+**Motivation**: These features are **candidate-agnostic to voxel extent** and should help even when the EVL grid is small. They mirror VIN-NBV's view-projection features and can be used for every candidate. [@VIN-NBV-frahm2025]
+
+### Theory: projection-based coverage as an RRI proxy
+
+Given a candidate camera with intrinsics/extrinsics and a point cloud of the current reconstruction, we project 3D points into the candidate image plane using a standard camera model (pinhole or fisheye) [Wikipedia :: Pinhole camera model](https://en.wikipedia.org/wiki/Pinhole_camera_model). Let `I` be the image grid, and `M(q)` the set of pixels hit by at least one projected 3D point for candidate `q`. A simple coverage proxy is:
+
+$$
+F_{\\text{empty}}(q) = 1 - \\frac{|M(q)|}{|I|}
+$$
+
+Low coverage (high `F_empty`) indicates that large parts of the candidate image would reveal **new** geometry, which correlates with potential reconstruction improvement. This is the core intuition behind VIN-NBV's coverage feature and remains useful even when voxel features are unreliable.
+
+### Suggested injection point (VinModelV2)
+
+Treat semidense projection features as **per-candidate scalars** and concatenate them alongside `pose_enc` and `global_feat` before the MLP head:
+
+```python
+# VinModelV2.__init__
+self.semiden_mlp = nn.Sequential(
+    nn.Linear(sd_in_dim, sd_hidden_dim),
+    nn.GELU(),
+    nn.Linear(sd_hidden_dim, sd_out_dim),
+)
+
+# VinModelV2._forward_impl
+semiden_feat = self._semidense_features(
+    semidense_points_world=semidense_points_world,
+    candidate_poses_world_cam=pose_world_cam,
+    candidate_cameras=candidate_cameras,
+)
+semiden_feat = self.semiden_mlp(semiden_feat)
+parts.append(semiden_feat)
+```
+
+This keeps the scene field untouched and avoids reintroducing heavy 3D volumes.
+
+### Practical recipe (using EfmPointsView::collapse_points)
+
+Use `EfmPointsView.collapse_points()` to collapse time and subsample the point cloud before projection:
+
+```python
+from efm3d.aria.camera import CameraTW
+from efm3d.aria.pose import PoseTW
+
+def project_semidense_features(
+    points_view: EfmPointsView,
+    candidate_poses_world_cam: PoseTW,   # world <- cam (B, N, 12)
+    candidate_camera: CameraTW,          # intrinsics (per candidate or shared)
+    image_size: tuple[int, int],         # (H, W)
+    max_points: int = 50000,
+) -> Tensor:
+    # 1) Collapse points across time (subsampled)
+    pts_world = points_view.collapse_points(max_points=max_points)  # (K, 3)
+    if pts_world.numel() == 0:
+        return torch.zeros((candidate_poses_world_cam.shape[0],
+                            candidate_poses_world_cam.shape[1],
+                            3), device=pts_world.device)
+
+    # 2) Transform into each candidate camera frame
+    pose_cam_world = candidate_poses_world_cam.inverse()  # cam <- world
+    pts_cam = pose_cam_world[:, :, None] * pts_world      # (B, N, K, 3)
+
+    # 3) Project to pixels + validity mask
+    p2d, valid = candidate_camera.project(pts_cam)        # (B, N, K, 2), (B, N, K)
+
+    # 4) Coverage / empty fraction (sketch)
+    H, W = image_size
+    in_bounds = valid & (p2d[..., 0] >= 0) & (p2d[..., 0] < W) & (p2d[..., 1] >= 0) & (p2d[..., 1] < H)
+    # Convert to integer pixel coords and build a sparse occupancy mask.
+    # Use scatter or bincount for efficiency.
+    # Compute |M(q)| / (H*W) and derive F_empty.
+    # Also collect depth statistics from pts_cam[..., 2] where in_bounds is True.
+    ...
+```
+
+Notes:
+
+- `CameraTW.project` supports both pinhole and fisheye models and returns a validity mask (in-front + in-image + in-radius). This avoids manual distortion handling. See `external/efm3d/efm3d/aria/camera.py` for details.
+- If `candidate_camera` is shared across candidates, broadcast the camera to `(B, N, ...)` or slice per candidate frame index.
+- For performance, compute coverage using `torch.bincount` on `p2d_int = (y * W + x)` with per-candidate batching.
+
+### Optional: PointNeXt-S semidense encoder (global point embedding)
+
+For a stronger geometric prior than simple projection stats, we can encode the
+semi-dense point cloud with **PointNeXt-S** (small, pretrained, robust to
+non-uniform sampling). We subsample to ~3k points (from the padded 50k) and
+encode the point cloud once per snippet, then concatenate the embedding to the
+VIN head input.
+
+Key references:
+
+- PointNeXt paper: [@PointNeXt-qian2022]
+- OpenPoints model zoo (pretrained PointNeXt-S configs/weights): [@OpenPoints-modelzoo]
+
+Implementation notes:
+
+- The encoder is **optional** and only active if `VinModelV2Config.point_encoder` is set.
+- Use `EfmPointsView.collapse_points(max_points=3000)` before encoding.
+- Transform points into the **reference rig frame** for consistent pose alignment.
+
+### Optional: encoder for past ego trajectory (global point embedding)
+
+Use tiny transformer to encode past ego trajectory frames in reference rig frame.
+
+```py
+@dataclass(slots=True)
+class EfmTrajectoryView:
+    """World-frame rig trajectory aligned to snippet frames."""
+
+    t_world_rig: PoseTW
+    """Rig SE(3) poses per frame (world←rig)."""
+    time_ns: Tensor
+    """``Tensor["F", int64]`` pose timestamps."""
+    gravity_in_world: Tensor
+    """``Tensor["3", float32]`` gravity vector in world frame (aligned to [0,0,-9.81])."""
+```
+
+## P5: 2D token reuse (appearance priors)
+
+**Inputs**:
+
+- `feat2d_upsampled` or `token2d` from EVL outputs.
+
+**Mechanism**:
+
+- Project semidense points into current RGB frames, sample 2D features, reproject to candidate view or pool directly per candidate.
+
+**Motivation**: Adds appearance/texture cues without expanding the voxel grid.
+
+# Encoding schemas
+
+## Candidate-relative positional keys
+
+**Idea**: Build `pos_grid` in the **candidate frame** so attention keys and candidate queries share the same spatial basis. This should improve alignment when the candidate is far from the reference frame.
+
+- Implementation anchor: `VinModelV2Config.tf_pos_grid_in_candidate_frame` (TODO in `model_v2.py`).
+
+## Hybrid pose encoding (R6D + shell)
+
+**Idea**: Combine the current R6D+translation encoding with shell features (direction `u`, forward `f`, radius `r`, alignment). This keeps rotation/translation expressivity while adding geometry cues independent of voxel extent.
+
+## Distance-to-voxel features
+
+**Idea**: Add explicit scalars for candidate distance to voxel center and normalized signed distance to bounds (x/y/z). This provides a direct indicator of voxel-context reliability.
+
+## Multi-scale pooling
+
+**Idea**: Pool the voxel field at 2-3 grid sizes and concatenate. This helps when only a subregion of the voxel grid is informative.
+
+## Pose-conditioned attention diagnostics
+
+The global pooling uses multi-head attention [Wikipedia :: Attention (machine learning)](https://en.wikipedia.org/wiki/Attention_(machine_learning)). Exposing attention weights lets us assess whether candidates attend to spatially meaningful voxels and whether out-of-grid candidates produce **diffuse** (uninformative) attention.
+
+### Theory: attention concentration as a diagnostic
+
+Let `A(q)` be the attention matrix for candidate `q` (queries = candidate pose tokens, keys = pooled voxel tokens). If attention is well-aligned, `A(q)` should concentrate on a few spatial tokens. If the candidate is out-of-grid or the positional encoding is misaligned, `A(q)` becomes uniform.
+
+A simple diagnostic is **attention entropy**:
+
+$$
+H(q) = -\\sum_i A_i(q) \\log (A_i(q) + \\varepsilon)
+$$
+
+Low entropy indicates focused attention; high entropy suggests that the attention mechanism has no spatial anchor for that candidate.
+
+### Implementation sketch (PoseConditionedGlobalPool)
+
+`torch.nn.MultiheadAttention` can return per-head attention weights by passing `need_weights=True` and `average_attn_weights=False`:
+
+```python
+# oracle_rri/oracle_rri/vin/model_v2.py
+attn_out, attn_weights = self.attn(
+    queries, keys, keys,
+    need_weights=True,
+    average_attn_weights=False,  # keep per-head weights
+)
+# attn_weights: (B, num_heads, N, T)
+```
+
+From this, compute diagnostics per candidate:
+
+```python
+weights = attn_weights.mean(dim=1)  # (B, N, T) average heads
+entropy = -(weights * (weights + 1e-9).log()).sum(dim=-1)  # (B, N)
+peak = weights.max(dim=-1).values  # (B, N)
+```
+
+Log `entropy` and `peak` alongside `valid_frac` to check whether attention degenerates when coverage is low.
+
+# Out-of-voxel mitigation recipe
+
+A simple gating strategy can prevent over-confident predictions when voxel coverage is low:
+
+1. Compute `valid_frac` and `center_in_bounds`.
+2. If `valid_frac < tau` (e.g., 0.2), blend voxel features with P4/P5 features:
+   - `feat = alpha * voxel_feat + (1 - alpha) * semidense_feat` where `alpha = clamp(valid_frac / tau, 0, 1)`.
+3. Add a binary OOB indicator as input to the head.
+
+# Suggested ablation order
+
+1. P0 baseline++ (coverage + occupancy + explicit OOB scalars).
+2. P1 derived channels.
+3. P2 compressed neck features (if P1 gains plateau).
+4. P4 semidense projection features (always-on).
+5. P3 entity-aware cues.
+6. P5 2D token reuse (heavier pipeline but potentially strong gains).
+
+# Implementation anchors
+
+- Scene field construction: `oracle_rri/oracle_rri/vin/model_v2.py::_build_scene_field_v2`.
+- Global pooling + positional keys: `PoseConditionedGlobalPool` in `model_v2.py`.
+- EVL feature contract: `oracle_rri/oracle_rri/vin/types.py::EvlBackboneOutput`.
+- VIN documentation: [VIN on EVL](vin_nbv.qmd).

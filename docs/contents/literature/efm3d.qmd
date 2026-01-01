@@ -348,7 +348,6 @@ And all of these are in the same **gravity-aligned voxel frame**, so frustum sam
 
 ---
 
-
 ### EVL Architecture
 
 - **Frozen 2D foundation encoder**: `VideoBackboneDinov2` upsamples DinoV2.5 tokens to full resolution per stream, handling RGB and SLAM cameras with optional vignette correction ([efm3d/model/video_backbone.py:132](https://github.com/facebookresearch/efm3d/blob/main/efm3d/model/video_backbone.py#L132)).
@@ -387,7 +386,6 @@ And all of these are in the same **gravity-aligned voxel frame**, so frustum sam
 - [efm3d/utils/reconstruction.py:27](https://github.com/facebookresearch/efm3d/blob/main/efm3d/utils/reconstruction.py#L27) — volumetric sampling utilities used by fusion and loss computation when converting between voxel and mesh domains.
 
 These components give us a ready-made scene encoder whose volumetric features, semantic predictions, and ray utilities map cleanly onto our NBV pipeline: EVL provides the shared backbone, VIN supplies the lightweight RRI head, and ASE meshes deliver oracle supervision for training.
-
 
 [1]: https://github.com/facebookresearch/efm3d/raw/main/efm3d/model/lifter.py "raw.githubusercontent.com"
 [2]: https://github.com/facebookresearch/efm3d/raw/main/efm3d/model/evl.py "raw.githubusercontent.com"

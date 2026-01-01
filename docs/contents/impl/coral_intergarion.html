@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>vin_nbv – Semantic NBV Planning</title>
+<title>Implementing CORAL for Ordinal Regression to Continuous Targets – Semantic NBV Planning</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -80,9 +80,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/bootstrap/bootstrap-74ccc60397116b75c66017aca1c58e3c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
 <link href="../../site_libs/bootstrap/bootstrap-dark-8867f034249725ad380f9d6206564ba2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <link href="../../site_libs/bootstrap/bootstrap-74ccc60397116b75c66017aca1c58e3c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
-<script src="../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
-<link href="../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
-<link href="../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -400,7 +397,7 @@ window.Quarto = {
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/literature/index.html">Literature</a></li><li class="breadcrumb-item"><a href="../../contents/literature/vin_nbv.html">VIN-NBV: A View Introspection Network for Next-Best-View Selection</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/impl/overview.html">Implementations</a></li><li class="breadcrumb-item"><a href="../../contents/impl/coral_intergarion.html">Implementing CORAL for Ordinal Regression to Continuous Targets</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
       <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
@@ -447,7 +444,7 @@ window.Quarto = {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../contents/literature/vin_nbv.html" class="sidebar-item-text sidebar-link active">
+  <a href="../../contents/literature/vin_nbv.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">VIN-NBV: A View Introspection Network for Next-Best-View Selection</span></a>
   </div>
 </li>
@@ -623,7 +620,7 @@ window.Quarto = {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../contents/impl/coral_intergarion.html" class="sidebar-item-text sidebar-link">
+  <a href="../../contents/impl/coral_intergarion.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">Implementing CORAL for Ordinal Regression to Continuous Targets</span></a>
   </div>
 </li>
@@ -709,224 +706,246 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#vin-nbv" id="toc-vin-nbv" class="nav-link active" data-scroll-target="#vin-nbv"><span class="header-section-number">1</span> VIN-NBV: A View Introspection Network for Next-Best-View Selection</a>
+  <li><a href="#correcting-the-probabilistic-mistake-core-insight" id="toc-correcting-the-probabilistic-mistake-core-insight" class="nav-link active" data-scroll-target="#correcting-the-probabilistic-mistake-core-insight"><span class="header-section-number">1</span> 1. Correcting the probabilistic mistake (core insight)</a>
   <ul class="collapse">
-  <li><a href="#local-sources" id="toc-local-sources" class="nav-link" data-scroll-target="#local-sources"><span class="header-section-number">1.1</span> Local Sources</a></li>
-  <li><a href="#key-contributions" id="toc-key-contributions" class="nav-link" data-scroll-target="#key-contributions"><span class="header-section-number">1.2</span> Key Contributions</a></li>
-  <li><a href="#problem-formulation-and-rri-metric" id="toc-problem-formulation-and-rri-metric" class="nav-link" data-scroll-target="#problem-formulation-and-rri-metric"><span class="header-section-number">1.3</span> Problem Formulation and RRI Metric</a></li>
-  <li><a href="#vin-architecture" id="toc-vin-architecture" class="nav-link" data-scroll-target="#vin-architecture"><span class="header-section-number">1.4</span> VIN Architecture</a></li>
-  <li><a href="#vin-nbv-policy-algorithm" id="toc-vin-nbv-policy-algorithm" class="nav-link" data-scroll-target="#vin-nbv-policy-algorithm"><span class="header-section-number">1.5</span> VIN-NBV Policy (Algorithm)</a></li>
-  <li><a href="#training-methodology" id="toc-training-methodology" class="nav-link" data-scroll-target="#training-methodology"><span class="header-section-number">1.6</span> Training Methodology</a></li>
-  <li><a href="#experimental-results" id="toc-experimental-results" class="nav-link" data-scroll-target="#experimental-results"><span class="header-section-number">1.7</span> Experimental Results</a></li>
-  <li><a href="#comparison-to-our-nbv-research" id="toc-comparison-to-our-nbv-research" class="nav-link" data-scroll-target="#comparison-to-our-nbv-research"><span class="header-section-number">1.8</span> Comparison to Our NBV Research</a></li>
-  <li><a href="#limitations" id="toc-limitations" class="nav-link" data-scroll-target="#limitations"><span class="header-section-number">1.9</span> Limitations</a></li>
+  <li><a href="#recovering-marginal-class-probabilities" id="toc-recovering-marginal-class-probabilities" class="nav-link" data-scroll-target="#recovering-marginal-class-probabilities"><span class="header-section-number">1.1</span> Recovering marginal class probabilities</a></li>
+  </ul></li>
+  <li><a href="#correct-computation-of-the-regression-prediction" id="toc-correct-computation-of-the-regression-prediction" class="nav-link" data-scroll-target="#correct-computation-of-the-regression-prediction"><span class="header-section-number">2</span> 2. Correct computation of the regression prediction</a></li>
+  <li><a href="#single-ordinal-head-auxiliary-regression-loss-preferred-design" id="toc-single-ordinal-head-auxiliary-regression-loss-preferred-design" class="nav-link" data-scroll-target="#single-ordinal-head-auxiliary-regression-loss-preferred-design"><span class="header-section-number">3</span> 3. Single ordinal head + auxiliary regression loss (preferred design)</a>
+  <ul class="collapse">
+  <li><a href="#loss" id="toc-loss" class="nav-link" data-scroll-target="#loss"><span class="header-section-number">3.1</span> Loss</a></li>
+  <li><a href="#intuition" id="toc-intuition" class="nav-link" data-scroll-target="#intuition"><span class="header-section-number">3.2</span> Intuition</a></li>
+  </ul></li>
+  <li><a href="#learnable-bin-representatives-u_k" id="toc-learnable-bin-representatives-u_k" class="nav-link" data-scroll-target="#learnable-bin-representatives-u_k"><span class="header-section-number">4</span> 4. Learnable bin representatives <span class="math inline">\(u_k\)</span></a>
+  <ul class="collapse">
+  <li><a href="#why-this-helps" id="toc-why-this-helps" class="nav-link" data-scroll-target="#why-this-helps"><span class="header-section-number">4.1</span> Why this helps</a></li>
+  <li><a href="#regularization-important" id="toc-regularization-important" class="nav-link" data-scroll-target="#regularization-important"><span class="header-section-number">4.2</span> Regularization (important)</a></li>
+  </ul></li>
+  <li><a href="#enforcing-ordinal-ordering-on-u_k" id="toc-enforcing-ordinal-ordering-on-u_k" class="nav-link" data-scroll-target="#enforcing-ordinal-ordering-on-u_k"><span class="header-section-number">5</span> 5. Enforcing ordinal ordering on <span class="math inline">\(u_k\)</span></a>
+  <ul class="collapse">
+  <li><a href="#monotone-parameterization-recommended" id="toc-monotone-parameterization-recommended" class="nav-link" data-scroll-target="#monotone-parameterization-recommended"><span class="header-section-number">5.1</span> Monotone parameterization (recommended)</a></li>
+  </ul></li>
+  <li><a href="#residual-correction-controlled-extra-expressivity" id="toc-residual-correction-controlled-extra-expressivity" class="nav-link" data-scroll-target="#residual-correction-controlled-extra-expressivity"><span class="header-section-number">6</span> 6. Residual correction (controlled extra expressivity)</a>
+  <ul class="collapse">
+  <li><a href="#interpretation" id="toc-interpretation" class="nav-link" data-scroll-target="#interpretation"><span class="header-section-number">6.1</span> Interpretation</a></li>
+  </ul></li>
+  <li><a href="#final-full-objective" id="toc-final-full-objective" class="nav-link" data-scroll-target="#final-full-objective"><span class="header-section-number">7</span> 7. Final full objective</a></li>
+  <li><a href="#conceptual-summary-one-sentence-per-component" id="toc-conceptual-summary-one-sentence-per-component" class="nav-link" data-scroll-target="#conceptual-summary-one-sentence-per-component"><span class="header-section-number">8</span> 8. Conceptual summary (one sentence per component)</a>
+  <ul class="collapse">
+  <li><a href="#bottom-line" id="toc-bottom-line" class="nav-link" data-scroll-target="#bottom-line"><span class="header-section-number">8.1</span> Bottom line</a></li>
+  </ul></li>
+  <li><a href="#implementation-details-nbv-codebase" id="toc-implementation-details-nbv-codebase" class="nav-link" data-scroll-target="#implementation-details-nbv-codebase"><span class="header-section-number">9</span> 9. Implementation details (NBV codebase)</a>
+  <ul class="collapse">
+  <li><a href="#core-utilities-oracle_rrioracle_rrirri_metricscoral.py" id="toc-core-utilities-oracle_rrioracle_rrirri_metricscoral.py" class="nav-link" data-scroll-target="#core-utilities-oracle_rrioracle_rrirri_metricscoral.py"><span class="header-section-number">9.1</span> Core utilities (<code>oracle_rri/oracle_rri/rri_metrics/coral.py</code>)</a></li>
+  <li><a href="#initialization-hook-oracle_rrioracle_rrivinmodel_v2.py" id="toc-initialization-hook-oracle_rrioracle_rrivinmodel_v2.py" class="nav-link" data-scroll-target="#initialization-hook-oracle_rrioracle_rrivinmodel_v2.py"><span class="header-section-number">9.2</span> Initialization hook (<code>oracle_rri/oracle_rri/vin/model_v2.py</code>)</a></li>
+  <li><a href="#fitting-training-integration-oracle_rrioracle_rrilightninglit_module.py" id="toc-fitting-training-integration-oracle_rrioracle_rrilightninglit_module.py" class="nav-link" data-scroll-target="#fitting-training-integration-oracle_rrioracle_rrilightninglit_module.py"><span class="header-section-number">9.3</span> Fitting + training integration (<code>oracle_rri/oracle_rri/lightning/lit_module.py</code>)</a></li>
   </ul></li>
   </ul>
 </nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/literature/index.html">Literature</a></li><li class="breadcrumb-item"><a href="../../contents/literature/vin_nbv.html">VIN-NBV: A View Introspection Network for Next-Best-View Selection</a></li></ol></nav><h1 class="title display-7"></h1></header><div class="quarto-title-block"><div class="quarto-title-tools-only"><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+<main class="content" id="quarto-document-content">
 
 
-
-
-
-<section id="vin-nbv" class="level2" data-number="1">
-<h2 data-number="1" class="anchored" data-anchor-id="vin-nbv"><span class="header-section-number">1</span> VIN-NBV: A View Introspection Network for Next-Best-View Selection</h2>
-<p>VIN-NBV@VIN-NBV-frahm2025 presents a learning-based approach to NBV that directly optimizes for <strong>reconstruction quality</strong> rather than coverage. The key innovation is the View Introspection Network (VIN), which predicts the <strong>Relative Reconstruction Improvement (RRI)</strong> of candidate viewpoints without actually capturing new images.</p>
-<section id="local-sources" class="level3" data-number="1.1">
-<h3 data-number="1.1" class="anchored" data-anchor-id="local-sources"><span class="header-section-number">1.1</span> Local Sources</h3>
-<ul>
-<li><a href="../../literature/tex-src/arXiv-VIN-NBV/main.tex"><code>main.tex</code></a> – complete manuscript (sections live in <code>sec/</code>).</li>
-<li><a href="../../literature/tex-src/arXiv-VIN-NBV/sec/3_methods.tex"><code>sec/3_methods.tex</code></a> – VIN architecture details.</li>
-<li><a href="../../literature/tex-src/arXiv-VIN-NBV/sec/4_experiments.tex"><code>sec/4_experiments.tex</code></a> – NBV benchmarks and Chamfer-distance evaluations.</li>
-<li><a href="../../literature/tex-src/arXiv-VIN-NBV/Figures/VIN-NBV_diagram.png"><code>Figures/VIN-NBV_diagram.png</code></a> – reference architecture figure.</li>
-<li><a href="../../literature/tex-src/arXiv-VIN-NBV/main.bib"><code>main.bib</code></a> – BibTeX entries for cross-referencing in our docs.</li>
-</ul>
-</section>
-<section id="key-contributions" class="level3" data-number="1.2">
-<h3 data-number="1.2" class="anchored" data-anchor-id="key-contributions"><span class="header-section-number">1.2</span> Key Contributions</h3>
-<ol type="1">
-<li><strong>Reconstruction Quality Optimization</strong>: First NBV method to directly maximize reconstruction quality (measured via Chamfer Distance) rather than coverage</li>
-<li><strong>View Introspection Network (VIN)</strong>: Lightweight NN that predicts RRI of candidate views from current reconstruction state</li>
-<li><strong>Imitation Learning Approach</strong>: Trained using pre-computed ground truth RRI values</li>
-<li><strong>Greedy Sequential Policy</strong>: Simple sampling-based strategy that selects best view given n randomly sampled candidates</li>
-<li><strong>Performance</strong>: 30% improvement over coverage-based baseline, 40% improvement over RL methods (GenNBV, ScanRL)</li>
-</ol>
-<div id="fig-vin-arch" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-vin-arch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<a href="../../figures/VIN_arch.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Figure&nbsp;1: VIN-NBV Architecture"><img src="../../figures/VIN_arch.png" class="img-fluid figure-img" style="width:80.0%"></a>
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/impl/overview.html">Implementations</a></li><li class="breadcrumb-item"><a href="../../contents/impl/coral_intergarion.html">Implementing CORAL for Ordinal Regression to Continuous Targets</a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">Implementing CORAL for Ordinal Regression to Continuous Targets</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-vin-arch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: VIN-NBV Architecture
-</figcaption>
-</figure>
-</div>
-</section>
-<section id="problem-formulation-and-rri-metric" class="level3" data-number="1.3">
-<h3 data-number="1.3" class="anchored" data-anchor-id="problem-formulation-and-rri-metric"><span class="header-section-number">1.3</span> Problem Formulation and RRI Metric</h3>
-<p><strong>Input</strong>: Initial base images <span class="math inline">\(I_{base} = \{I_1, ..., I_k\}\)</span> with camera parameters <span class="math inline">\(C_{base}\)</span> and depth maps <span class="math inline">\(D_{base}\)</span></p>
-<p><strong>Objective</strong>: Find next best views <span class="math inline">\(C_{nbv} = \{q_1, ..., q_m\} \subseteq \{c | c \in SE(3) \land c_{\phi} = 0\} ^ m\)</span> that maximize reconstruction quality:</p>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="correcting-the-probabilistic-mistake-core-insight" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="correcting-the-probabilistic-mistake-core-insight"><span class="header-section-number">1</span> 1. Correcting the probabilistic mistake (core insight)</h2>
+<p><strong>CORAL does not output class probabilities.</strong> It outputs <strong>cumulative (ordinal) probabilities</strong>:</p>
 <p><span class="math display">\[
-C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
+p_t ;=; P(y &gt; t), \quad t = 0,\dots,K-2
 \]</span></p>
-<p><strong>Relative Reconstruction Improvement (RRI)</strong>:</p>
-<p>For a query view <span class="math inline">\(q\)</span>, RRI quantifies reconstruction improvement:</p>
+<p>These are <em>threshold</em> probabilities, not marginals. Treating them as <span class="math inline">\(P(y=t)\)</span> leads to systematic overestimation because probability mass is counted multiple times.</p>
+<section id="recovering-marginal-class-probabilities" class="level3" data-number="1.1">
+<h3 data-number="1.1" class="anchored" data-anchor-id="recovering-marginal-class-probabilities"><span class="header-section-number">1.1</span> Recovering marginal class probabilities</h3>
+<p>Define: <span class="math display">\[
+p_{-1}=1,\quad p_{K-1}=0
+\]</span></p>
+<p>Then: <span class="math display">\[
+\pi_k ;=; P(y=k) ;=; p_{k-1} - p_k,\quad k=0,\dots,K-1
+\]</span></p>
+<p>This converts <strong>cumulative → marginal</strong>, which is mandatory before computing expectations.</p>
+<hr>
+</section>
+</section>
+<section id="correct-computation-of-the-regression-prediction" class="level2" data-number="2">
+<h2 data-number="2" class="anchored" data-anchor-id="correct-computation-of-the-regression-prediction"><span class="header-section-number">2</span> 2. Correct computation of the regression prediction</h2>
+<p>Let <span class="math inline">\(r\)</span> be the original continuous regression target (e.g.&nbsp;RRI), discretized into <span class="math inline">\(K\)</span> ordinal bins.</p>
+<p>Let <span class="math inline">\(u_k\)</span> be a representative real value for bin <span class="math inline">\(k\)</span> (initially: empirical mean or bin center).</p>
+<p>The <strong>Bayes-optimal MSE predictor</strong> is the conditional mean:</p>
 <p><span class="math display">\[
-\mathcal{RRI}(q) = \frac{CD(\mathcal{P}_{base}, \mathcal{P}_{GT}) - CD(\mathcal{P}_{base \cup q}, \mathcal{P}_{GT})}{CD(\mathcal{P}_{base}, \mathcal{P}_{GT})}
+\hat r ;=; \mathbb{E}[r \mid x] ;\approx; \sum_{k=0}^{K-1} \pi_k , u_k
 \]</span></p>
-<p><strong>Properties</strong>:</p>
-<ul>
-<li>Range: <span class="math inline">\([0, 1]\)</span> where higher is better</li>
-<li>Normalized by current error $ $ scale/object-independent ??</li>
-<li>Requires ground truth only during training</li>
-<li><span class="math inline">\(CD(\mathcal{P}, \mathcal{P}_{GT})\)</span> is Chamfer Distance between reconstruction <span class="math inline">\(\mathcal{P}\)</span> and ground truth <span class="math inline">\(\mathcal{P}_{GT}\)</span>.</li>
-<li>Candidate poses are sampled randomly around the latest pose; roll is fixed to 0°, such that the cameras optical axis is parallel to the ground plane.</li>
-</ul>
+<p>This is the <strong>only correct way</strong> to derive a scalar regression prediction from CORAL.</p>
+<hr>
 </section>
-<section id="vin-architecture" class="level3" data-number="1.4">
-<h3 data-number="1.4" class="anchored" data-anchor-id="vin-architecture"><span class="header-section-number">1.4</span> VIN Architecture</h3>
-<p><strong>Three-Stage Pipeline</strong>:</p>
-<ol type="1">
-<li><strong>Scene Reconstruction</strong>:
-<ul>
-<li>Backproject RGB-D images to 3D point cloud <span class="math inline">\(\mathcal{P}_{base}\)</span></li>
-<li>Voxel downsample for efficiency</li>
-</ul></li>
-<li><strong>3D-Aware Featurization</strong>:
-<ul>
-<li><strong>Surface Normals</strong>: Variance indicates geometric complexity (high variance = complex surfaces needing more views)</li>
-<li><strong>Visibility Count</strong>: Tracks how many base views observe each point (low count = potentially informative)</li>
-<li><strong>Depth Values</strong>: Distance information for surface consistency</li>
-<li><strong>Coverage Feature <span class="math inline">\(F_{empty}\)</span></strong>: Empty pixel mask when projecting <span class="math inline">\(\mathcal{P}_{base}\)</span> to query view</li>
-</ul></li>
-<li><strong>RRI Prediction</strong>:
-<ul>
-<li><strong>Convolutional Encoder</strong>: 4 layers, hidden dimension 256</li>
-<li>Processes featurized point cloud projected to query view</li>
-<li><strong>Ranking MLP</strong>: 3 layers, hidden dimension 256</li>
-<li><strong>Output</strong>: CORAL layer for ordinal classification (15 bins)</li>
-</ul></li>
-</ol>
-<p><strong>Network Signature</strong>: <span class="math display">\[
-\widehat{\mathcal{RRI}}(q) = \text{VIN}_\theta(\mathcal{P}_{base}, C_{base}, C_q)
+<section id="single-ordinal-head-auxiliary-regression-loss-preferred-design" class="level2" data-number="3">
+<h2 data-number="3" class="anchored" data-anchor-id="single-ordinal-head-auxiliary-regression-loss-preferred-design"><span class="header-section-number">3</span> 3. Single ordinal head + auxiliary regression loss (preferred design)</h2>
+<p>Rather than adding a second regression head, we keep <strong>one CORAL head</strong> and derive <span class="math inline">\(\hat r\)</span> from it.</p>
+<section id="loss" class="level3" data-number="3.1">
+<h3 data-number="3.1" class="anchored" data-anchor-id="loss"><span class="header-section-number">3.1</span> Loss</h3>
+<p><span class="math display">\[
+\mathcal{L}
+;=;
+\mathcal{L}_{\text{CORAL}}
+;+;
+\lambda \, \mathcal{L}_{\text{reg}}(\hat r, r)
 \]</span></p>
-</section>
-<section id="vin-nbv-policy-algorithm" class="level3" data-number="1.5">
-<h3 data-number="1.5" class="anchored" data-anchor-id="vin-nbv-policy-algorithm"><span class="header-section-number">1.5</span> VIN-NBV Policy (Algorithm)</h3>
-<p><strong>Greedy Sequential Strategy</strong>:</p>
-<pre><code>1. Start with k=2 base views (first random, second closest to first)
-2. Repeat until termination criterion:
-   a. Reconstruct R_base from current captures
-   b. Sample n query views around reconstruction
-   c. For each query q:
-      - Featurize reconstruction
-      - Predict RRI(q) using VIN
-   d. Select q* = argmax RRI(q)
-   e. Move to q*, capture image, update base views
-3. Return final reconstruction R_final</code></pre>
-</section>
-<section id="training-methodology" class="level3" data-number="1.6">
-<h3 data-number="1.6" class="anchored" data-anchor-id="training-methodology"><span class="header-section-number">1.6</span> Training Methodology</h3>
-<p><strong>Dataset</strong>:</p>
 <ul>
-<li><strong>Train</strong>: Modified subset of Houses3K</li>
-<li><strong>Test</strong>: House category from OmniObject3D (generalization test)</li>
-<li>120 rendered views per object</li>
-</ul>
-<p><strong>Ground Truth RRI Computation</strong>:</p>
-<ol type="1">
-<li>For each training scene, sample query views</li>
-<li>Explicitly reconstruct scene with query view added</li>
-<li>Compute actual RRI using Chamfer Distance</li>
-<li>Normalize via z-scores within capture stage groups</li>
-<li>Soft-clip with tanh, bin into 15 ordinal classes</li>
-</ol>
-<p><strong>Training Details</strong>:</p>
-<ul>
-<li><strong>Loss</strong>: CORAL loss for ordinal classification</li>
-<li><strong>Optimizer</strong>: AdamW with learning rate 1e-3</li>
-<li><strong>Scheduler</strong>: Cosine annealing</li>
-<li><strong>Epochs</strong>: 60</li>
-<li><strong>Hardware</strong>: 4× A6000 GPUs, ~24 hours</li>
-<li><strong>Batching</strong>: By object (one point cloud per batch projected to all candidate views)</li>
-</ul>
-<p><strong>Key Features</strong>:</p>
-<ul>
-<li><strong>Flexible Constraints</strong>: Can limit by number of captures, time, or distance</li>
-<li><strong>Collision-Free</strong>: Sampling strategy can avoid obstacles</li>
-<li><strong>No Prior Knowledge</strong>: Works without scene CAD models or preliminary scans</li>
-<li><strong>Generalizable</strong>: Trained on houses, tested on unseen categories (dinosaurs, trucks, animals)</li>
+<li><span class="math inline">\(\mathcal{L}_{\text{CORAL}}\)</span>: binary cross-entropy on thresholds</li>
+<li><span class="math inline">\(\mathcal{L}_{\text{reg}}\)</span>: <strong>Huber / Smooth-L1</strong> (preferred over L2 for heavy-tailed RRI)</li>
 </ul>
 </section>
-<section id="experimental-results" class="level3" data-number="1.7">
-<h3 data-number="1.7" class="anchored" data-anchor-id="experimental-results"><span class="header-section-number">1.7</span> Experimental Results</h3>
-<p><strong>Limited Acquisitions (20 captures)</strong>:</p>
+<section id="intuition" class="level3" data-number="3.2">
+<h3 data-number="3.2" class="anchored" data-anchor-id="intuition"><span class="header-section-number">3.2</span> Intuition</h3>
 <ul>
-<li>VIN-NBV: <strong>0.20 cm</strong> Chamfer Distance (houses)</li>
-<li>GenNBV: <strong>0.33 cm</strong> (39% worse)</li>
-<li>ScanRL: <strong>0.37 cm</strong> (41% worse)</li>
-<li>Coverage baseline (Cov-NBV): <strong>~30% worse</strong> than VIN-NBV</li>
+<li>Enforces <strong>distributional correctness</strong> (ordinal structure)</li>
+<li>Enforces <strong>calibration in real units</strong></li>
+<li>Avoids two heads learning the same quantity inconsistently</li>
 </ul>
-<p><strong>Coverage vs Quality</strong>:</p>
+<hr>
+</section>
+</section>
+<section id="learnable-bin-representatives-u_k" class="level2" data-number="4">
+<h2 data-number="4" class="anchored" data-anchor-id="learnable-bin-representatives-u_k"><span class="header-section-number">4</span> 4. Learnable bin representatives <span class="math inline">\(u_k\)</span></h2>
+<p>Instead of fixing <span class="math inline">\(u_k=\mu_k\)</span> (empirical mean), make them <strong>learnable</strong>, initialized from <span class="math inline">\(\mu_k\)</span>.</p>
+<p><span class="math display">\[
+\hat r = \sum_k \pi_k,u_k
+\]</span></p>
+<section id="why-this-helps" class="level3" data-number="4.1">
+<h3 data-number="4.1" class="anchored" data-anchor-id="why-this-helps"><span class="header-section-number">4.1</span> Why this helps</h3>
 <ul>
-<li><p>Cov-NBV baseline uses same greedy strategy but scores views by empty pixel count: <span class="math display">\[Cov(q) = W \times H - \sum_{u,v} \mathbb{1}(C_q(\mathcal{P}_{base})_{u,v})\]</span></p></li>
-<li><p>VIN-NBV achieves largest gains in early capture stages</p></li>
-<li><p>Late stages: both converge (coverage becomes more important)</p></li>
-</ul>
-<p><strong>Ablation - Coverage Feature <span class="math inline">\(F_{empty}\)</span></strong>:</p>
-<ul>
-<li>Removing <span class="math inline">\(F_{empty}\)</span> hurts performance in later stages</li>
-<li>Early stages: RRI dominates</li>
-<li>Late stages: Coverage information becomes helpful</li>
-</ul>
-<p><strong>Generalization</strong> (unseen categories):</p>
-<ul>
-<li>Dinosaurs: Slightly behind GenNBV</li>
-<li>Toy animals: <strong>Significantly outperforms</strong> both baselines</li>
-<li>Toy trucks: <strong>Significantly outperforms</strong> both baselines</li>
+<li>Corrects discretization bias</li>
+<li>Adapts to distribution shift</li>
+<li>Improves calibration without adding a full regression head</li>
 </ul>
 </section>
-<section id="comparison-to-our-nbv-research" class="level3" data-number="1.8">
-<h3 data-number="1.8" class="anchored" data-anchor-id="comparison-to-our-nbv-research"><span class="header-section-number">1.8</span> Comparison to Our NBV Research</h3>
-<p><strong>Similarities</strong>:</p>
-<ul>
-<li>Both use Chamfer Distance for reconstruction quality</li>
-<li>Both require pre-computed ground truth for training</li>
-<li>Both focus on maximizing reconstruction improvement</li>
-</ul>
-<p><strong>Key Differences</strong>:</p>
-<ul>
-<li><strong>VIN-NBV</strong>: Single objects, imitation learning, greedy sampling</li>
-<li><strong>Our Approach</strong>: Multi-entity scenes, entity-aware RRI, SceneScript integration</li>
-<li><strong>VIN-NBV</strong>: Coverage-agnostic (though includes <span class="math inline">\(F_{empty}\)</span> feature)</li>
-<li><strong>Our Approach</strong>: Hybrid visibility + Chamfer Distance, pre-computed occlusions from ASE</li>
-</ul>
-<p><strong>Lessons for Our Work</strong>:</p>
-<ol type="1">
-<li>✅ Direct quality optimization (RRI) beats coverage by ~30%</li>
-<li>✅ Imitation learning is simpler and more effective than RL</li>
-<li>✅ 3D-aware featurization (normals, visibility) is crucial</li>
-<li>✅ Coverage information still helps in later stages</li>
-<li>⚠️ Greedy strategy works well but leaves ~20% gap to oracle</li>
-</ol>
-<p><strong>Integration Strategy</strong>:</p>
-<ul>
-<li>Adopt VIN’s RRI formulation for entity-level metrics</li>
-<li>Use ASE visibility data instead of VIN’s visibility count</li>
-<li>Extend to per-entity RRI: <span class="math inline">\(\mathcal{RRI}_e\)</span> for each entity <span class="math inline">\(e\)</span></li>
-<li>Weighted combination: <span class="math inline">\(\mathcal{RRI}_{total} = \sum_e w_e \cdot \mathcal{RRI}_e\)</span></li>
-</ul>
+<section id="regularization-important" class="level3" data-number="4.2">
+<h3 data-number="4.2" class="anchored" data-anchor-id="regularization-important"><span class="header-section-number">4.2</span> Regularization (important)</h3>
+<p>Prevent <span class="math inline">\(u_k\)</span> from drifting and “absorbing” all error:</p>
+<p>$$ _{u} =</p>
+<p>_{k=0}^{K-1} (u_k - _k)^2 $$</p>
+<p>This keeps them tethered to empirical reality.</p>
+<hr>
 </section>
-<section id="limitations" class="level3" data-number="1.9">
-<h3 data-number="1.9" class="anchored" data-anchor-id="limitations"><span class="header-section-number">1.9</span> Limitations</h3>
+</section>
+<section id="enforcing-ordinal-ordering-on-u_k" class="level2" data-number="5">
+<h2 data-number="5" class="anchored" data-anchor-id="enforcing-ordinal-ordering-on-u_k"><span class="header-section-number">5</span> 5. Enforcing ordinal ordering on <span class="math inline">\(u_k\)</span></h2>
+<p>You usually want: <span class="math display">\[
+u_0 \le u_1 \le \dots \le u_{K-1}
+\]</span></p>
+<section id="monotone-parameterization-recommended" class="level3" data-number="5.1">
+<h3 data-number="5.1" class="anchored" data-anchor-id="monotone-parameterization-recommended"><span class="header-section-number">5.1</span> Monotone parameterization (recommended)</h3>
+<p>Let: <span class="math display">\[
+u_0 \in \mathbb{R},\qquad
+u_k = u_0 + \sum_{j=1}^{k} \text{softplus}(\delta_j)
+\]</span></p>
 <ul>
-<li><strong>Ground truth depth</strong>: Uses noise-free depth maps (not realistic)</li>
-<li><strong>Real-world validation</strong>: Not evaluated on real sensor data</li>
-<li><strong>Single objects</strong>: Not designed for multi-room scenes</li>
-<li><strong>Gap to oracle</strong>: ~20% performance gap in early stages indicates room for improvement</li>
+<li>Guarantees monotonicity</li>
+<li>Differentiable</li>
+<li>Stable under optimization</li>
 </ul>
+<p>This aligns <strong>ordinal meaning ↔︎ numeric meaning</strong>.</p>
+<hr>
+</section>
+</section>
+<section id="residual-correction-controlled-extra-expressivity" class="level2" data-number="6">
+<h2 data-number="6" class="anchored" data-anchor-id="residual-correction-controlled-extra-expressivity"><span class="header-section-number">6</span> 6. Residual correction (controlled extra expressivity)</h2>
+<p>If bins are coarse and you want <strong>within-bin refinement</strong>, add a <strong>small residual head</strong>:</p>
+<p>$$ r =</p>
+<p>_k _k u_k ;+; (x) $$</p>
+<p>Where:</p>
+<ul>
+<li><span class="math inline">\(\delta(x)\)</span>: tiny MLP / linear head</li>
+<li>Regularize strongly: <span class="math display">\[
+\mathcal{L}_{\delta} = \beta |\delta(x)|^2
+\]</span></li>
+</ul>
+<section id="interpretation" class="level3" data-number="6.1">
+<h3 data-number="6.1" class="anchored" data-anchor-id="interpretation"><span class="header-section-number">6.1</span> Interpretation</h3>
+<ul>
+<li>CORAL handles <strong>rank / coarse structure</strong></li>
+<li>Residual handles <strong>local, continuous variation</strong></li>
+<li>Much safer than a full parallel regression head</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="final-full-objective" class="level2" data-number="7">
+<h2 data-number="7" class="anchored" data-anchor-id="final-full-objective"><span class="header-section-number">7</span> 7. Final full objective</h2>
+<p>Putting it all together:</p>
+<p>$$ $$</p>
+<p>(with <span class="math inline">\(\delta(x)=0\)</span> if you skip the residual)</p>
+<hr>
+</section>
+<section id="conceptual-summary-one-sentence-per-component" class="level2" data-number="8">
+<h2 data-number="8" class="anchored" data-anchor-id="conceptual-summary-one-sentence-per-component"><span class="header-section-number">8</span> 8. Conceptual summary (one sentence per component)</h2>
+<ul>
+<li><strong>CORAL head</strong> learns <em>ordinal uncertainty</em> via cumulative probabilities.</li>
+<li><strong>Marginalization</strong> converts ordinal outputs into a proper distribution.</li>
+<li><strong>Expectation over bins</strong> yields the Bayes-optimal regression estimate.</li>
+<li><strong>Learnable <span class="math inline">\(u_k\)</span></strong> correct discretization bias while preserving structure.</li>
+<li><strong>Monotonicity</strong> preserves semantic ordering.</li>
+<li><strong>Residual</strong> adds controlled continuous flexibility.</li>
+</ul>
+<hr>
+<section id="bottom-line" class="level3" data-number="8.1">
+<h3 data-number="8.1" class="anchored" data-anchor-id="bottom-line"><span class="header-section-number">8.1</span> Bottom line</h3>
+<p>This design gives you:</p>
+<ul>
+<li>Ordinal correctness</li>
+<li>Probabilistic consistency</li>
+<li>Real-unit calibration</li>
+<li>Minimal redundancy</li>
+<li>Explicit inductive bias aligned with your problem</li>
+</ul>
+<p>In short: this is a <em>principled ordinal-to-regression bridge</em>, not a hack.</p>
+<hr>
+</section>
+</section>
+<section id="implementation-details-nbv-codebase" class="level2" data-number="9">
+<h2 data-number="9" class="anchored" data-anchor-id="implementation-details-nbv-codebase"><span class="header-section-number">9</span> 9. Implementation details (NBV codebase)</h2>
+<section id="core-utilities-oracle_rrioracle_rrirri_metricscoral.py" class="level3" data-number="9.1">
+<h3 data-number="9.1" class="anchored" data-anchor-id="core-utilities-oracle_rrioracle_rrirri_metricscoral.py"><span class="header-section-number">9.1</span> Core utilities (<code>oracle_rri/oracle_rri/rri_metrics/coral.py</code>)</h3>
+<p>We implement monotone bin representatives in <code>MonotoneBinValues</code> and wire them into <code>CoralLayer</code> so the expected value can be computed <strong>directly</strong> from CORAL marginals:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> oracle_rri.rri_metrics.coral <span class="im">import</span> CoralLayer, coral_logits_to_prob</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>logits <span class="op">=</span> head_coral(feats)               <span class="co"># (..., K-1)</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>probs <span class="op">=</span> coral_logits_to_prob(logits)     <span class="co"># (..., K)</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>pred_rri <span class="op">=</span> head_coral.expected_from_probs(probs)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This uses the learned monotone values <code>u_k</code>, initialized from bin means or midpoints and optionally regularized with:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>u_reg <span class="op">=</span> head_coral.bin_value_regularizer(target_values)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="initialization-hook-oracle_rrioracle_rrivinmodel_v2.py" class="level3" data-number="9.2">
+<h3 data-number="9.2" class="anchored" data-anchor-id="initialization-hook-oracle_rrioracle_rrivinmodel_v2.py"><span class="header-section-number">9.2</span> Initialization hook (<code>oracle_rri/oracle_rri/vin/model_v2.py</code>)</h3>
+<p><code>VinModelV2</code> exposes a lightweight hook to initialize the CORAL bin values:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> VinModelV2(...)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>model.init_bin_values(bin_means)  <span class="co"># Tensor[K]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="fitting-training-integration-oracle_rrioracle_rrilightninglit_module.py" class="level3" data-number="9.3">
+<h3 data-number="9.3" class="anchored" data-anchor-id="fitting-training-integration-oracle_rrioracle_rrilightninglit_module.py"><span class="header-section-number">9.3</span> Fitting + training integration (<code>oracle_rri/oracle_rri/lightning/lit_module.py</code>)</h3>
+<p>After loading the fitted <code>RriOrdinalBinner</code>, the Lightning module calls <code>_maybe_init_bin_values()</code> to seed <code>u_k</code> from <code>bin_means</code> (or midpoints if means are unavailable). During training, the auxiliary regression loss uses these values to compute a <strong>calibrated</strong> scalar prediction:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>probs <span class="op">=</span> pred.prob.squeeze(<span class="dv">0</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>pred_rri <span class="op">=</span> head_coral.expected_from_probs(probs)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>aux_loss <span class="op">=</span> smooth_l1(pred_rri, rri)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This keeps the model <strong>single‑head</strong>, ensures <strong>probabilistic correctness</strong>, and lets the bin representatives adapt while remaining monotone.</p>
 
 
 <!-- -->
@@ -1404,191 +1423,254 @@ C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
     }
   });
   </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">## VIN-NBV: A View Introspection Network for Next-Best-View Selection {#vin-nbv}</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>VIN-NBV@VIN-NBV-frahm2025 presents a learning-based approach to NBV that directly optimizes for **reconstruction quality** rather than coverage. The key innovation is the View Introspection Network (VIN), which predicts the **Relative Reconstruction Improvement (RRI)** of candidate viewpoints without actually capturing new images.</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">### Local \LaTeX{} Sources</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`main.tex`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/main.tex)</span> – complete manuscript (sections live in <span class="in">`sec/`</span>).</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`sec/3_methods.tex`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/sec/3_methods.tex)</span> – VIN architecture details.</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`sec/4_experiments.tex`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/sec/4_experiments.tex)</span> – NBV benchmarks and Chamfer-distance evaluations.</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`Figures/VIN-NBV_diagram.png`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/Figures/VIN-NBV_diagram.png)</span> – reference architecture figure.</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`main.bib`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/main.bib)</span> – BibTeX entries for cross-referencing in our docs.</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="fu">### Key Contributions</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Reconstruction Quality Optimization**: First NBV method to directly maximize reconstruction quality (measured via Chamfer Distance) rather than coverage</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**View Introspection Network (VIN)**: Lightweight NN that predicts RRI of candidate views from current reconstruction state</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Imitation Learning Approach**: Trained using pre-computed ground truth RRI values</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Greedy Sequential Policy**: Simple sampling-based strategy that selects best view given n randomly sampled candidates</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**Performance**: 30% improvement over coverage-based baseline, 40% improvement over RL methods (GenNBV, ScanRL)</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="al">![VIN-NBV Architecture](../../figures/VIN_arch.png)</span>{#fig-vin-arch width=80%}</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="fu">### Problem Formulation and RRI Metric</span></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>**Input**: Initial base images $I_{base} = <span class="sc">\{</span>I_1, ..., I_k<span class="sc">\}</span>$ with camera parameters $C_{base}$ and depth maps $D_{base}$</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>**Objective**: Find next best views $C_{nbv} = <span class="sc">\{</span>q_1, ..., q_m<span class="sc">\}</span> \subseteq <span class="sc">\{</span>c | c \in SE(3) \land c_{\phi} = 0<span class="sc">\}</span> ^ m$ that maximize reconstruction quality:</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>**Relative Reconstruction Improvement (RRI)**:</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>For a query view $q$, RRI quantifies reconstruction improvement:</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>\mathcal{RRI}(q) = \frac{CD(\mathcal{P}_{base}, \mathcal{P}_{GT}) - CD(\mathcal{P}_{base \cup q}, \mathcal{P}_{GT})}{CD(\mathcal{P}_{base}, \mathcal{P}_{GT})}</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>**Properties**:</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Range: $<span class="co">[</span><span class="ot">0, 1</span><span class="co">]</span>$ where higher is better</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Normalized by current error $ \rightarrow $ scale/object-independent ??</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Requires ground truth only during training</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$CD(\mathcal{P}, \mathcal{P}_{GT})$ is Chamfer Distance between reconstruction $\mathcal{P}$ and ground truth $\mathcal{P}_{GT}$.</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Candidate poses are sampled randomly around the latest pose; roll is fixed to 0°, such that the cameras optical axis is parallel to the ground plane.</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a><span class="fu">### VIN Architecture</span></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>**Three-Stage Pipeline**:</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Scene Reconstruction**:</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Backproject RGB-D images to 3D point cloud $\mathcal{P}_{base}$</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Voxel downsample for efficiency</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**3D-Aware Featurization**:</span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Surface Normals**: Variance indicates geometric complexity (high variance = complex surfaces needing more views)</span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Visibility Count**: Tracks how many base views observe each point (low count = potentially informative)</span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Depth Values**: Distance information for surface consistency</span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Coverage Feature $F_{empty}$**: Empty pixel mask when projecting $\mathcal{P}_{base}$ to query view</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**RRI Prediction**:</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Convolutional Encoder**: 4 layers, hidden dimension 256</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Processes featurized point cloud projected to query view</span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Ranking MLP**: 3 layers, hidden dimension 256</span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Output**: CORAL layer for ordinal classification (15 bins)</span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>**Network Signature**:</span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>\widehat{\mathcal{RRI}}(q) = \text{VIN}_\theta(\mathcal{P}_{base}, C_{base}, C_q)</span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a><span class="fu">### VIN-NBV Policy (Algorithm)</span></span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>**Greedy Sequential Strategy**:</span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a><span class="in">1. Start with k=2 base views (first random, second closest to first)</span></span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a><span class="in">2. Repeat until termination criterion:</span></span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a><span class="in">   a. Reconstruct R_base from current captures</span></span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a><span class="in">   b. Sample n query views around reconstruction</span></span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a><span class="in">   c. For each query q:</span></span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a><span class="in">      - Featurize reconstruction</span></span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a><span class="in">      - Predict RRI(q) using VIN</span></span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="in">   d. Select q* = argmax RRI(q)</span></span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a><span class="in">   e. Move to q*, capture image, update base views</span></span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a><span class="in">3. Return final reconstruction R_final</span></span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a><span class="fu">### Training Methodology</span></span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>**Dataset**:</span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Train**: Modified subset of Houses3K</span>
-<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Test**: House category from OmniObject3D (generalization test)</span>
-<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>120 rendered views per object</span>
-<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>**Ground Truth RRI Computation**:</span>
-<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>For each training scene, sample query views</span>
-<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Explicitly reconstruct scene with query view added</span>
-<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Compute actual RRI using Chamfer Distance</span>
-<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Normalize via z-scores within capture stage groups</span>
-<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>Soft-clip with tanh, bin into 15 ordinal classes</span>
-<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a>**Training Details**:</span>
-<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Loss**: CORAL loss for ordinal classification</span>
-<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Optimizer**: AdamW with learning rate 1e-3</span>
-<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Scheduler**: Cosine annealing</span>
-<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Epochs**: 60</span>
-<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Hardware**: 4× A6000 GPUs, ~24 hours</span>
-<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Batching**: By object (one point cloud per batch projected to all candidate views)</span>
-<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a>**Key Features**:</span>
-<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Flexible Constraints**: Can limit by number of captures, time, or distance</span>
-<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Collision-Free**: Sampling strategy can avoid obstacles</span>
-<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**No Prior Knowledge**: Works without scene CAD models or preliminary scans</span>
-<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Generalizable**: Trained on houses, tested on unseen categories (dinosaurs, trucks, animals)</span>
-<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a><span class="fu">### Experimental Results</span></span>
-<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>**Limited Acquisitions (20 captures)**:</span>
-<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>VIN-NBV: **0.20 cm** Chamfer Distance (houses)</span>
-<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>GenNBV: **0.33 cm** (39% worse)</span>
-<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>ScanRL: **0.37 cm** (41% worse)</span>
-<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Coverage baseline (Cov-NBV): **~30% worse** than VIN-NBV</span>
-<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a>**Coverage vs Quality**:</span>
-<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Cov-NBV baseline uses same greedy strategy but scores views by empty pixel count:</span>
-<span id="cb2-133"><a href="#cb2-133" aria-hidden="true" tabindex="-1"></a>  $$Cov(q) = W \times H - \sum_{u,v} \mathbb{1}(C_q(\mathcal{P}_{base})_{u,v})$$</span>
-<span id="cb2-134"><a href="#cb2-134" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>VIN-NBV achieves largest gains in early capture stages</span>
-<span id="cb2-136"><a href="#cb2-136" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Late stages: both converge (coverage becomes more important)</span>
-<span id="cb2-137"><a href="#cb2-137" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a>**Ablation - Coverage Feature $F_{empty}$**:</span>
-<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Removing $F_{empty}$ hurts performance in later stages</span>
-<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Early stages: RRI dominates</span>
-<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Late stages: Coverage information becomes helpful</span>
-<span id="cb2-143"><a href="#cb2-143" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a>**Generalization** (unseen categories):</span>
-<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-146"><a href="#cb2-146" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Dinosaurs: Slightly behind GenNBV</span>
-<span id="cb2-147"><a href="#cb2-147" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Toy animals: **Significantly outperforms** both baselines</span>
-<span id="cb2-148"><a href="#cb2-148" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Toy trucks: **Significantly outperforms** both baselines</span>
-<span id="cb2-149"><a href="#cb2-149" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-150"><a href="#cb2-150" aria-hidden="true" tabindex="-1"></a><span class="fu">### Comparison to Our NBV Research</span></span>
-<span id="cb2-151"><a href="#cb2-151" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-152"><a href="#cb2-152" aria-hidden="true" tabindex="-1"></a>**Similarities**:</span>
-<span id="cb2-153"><a href="#cb2-153" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-154"><a href="#cb2-154" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Both use Chamfer Distance for reconstruction quality</span>
-<span id="cb2-155"><a href="#cb2-155" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Both require pre-computed ground truth for training</span>
-<span id="cb2-156"><a href="#cb2-156" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Both focus on maximizing reconstruction improvement</span>
-<span id="cb2-157"><a href="#cb2-157" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-158"><a href="#cb2-158" aria-hidden="true" tabindex="-1"></a>**Key Differences**:</span>
-<span id="cb2-159"><a href="#cb2-159" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-160"><a href="#cb2-160" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**VIN-NBV**: Single objects, imitation learning, greedy sampling</span>
-<span id="cb2-161"><a href="#cb2-161" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Our Approach**: Multi-entity scenes, entity-aware RRI, SceneScript integration</span>
-<span id="cb2-162"><a href="#cb2-162" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**VIN-NBV**: Coverage-agnostic (though includes $F_{empty}$ feature)</span>
-<span id="cb2-163"><a href="#cb2-163" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Our Approach**: Hybrid visibility + Chamfer Distance, pre-computed occlusions from ASE</span>
-<span id="cb2-164"><a href="#cb2-164" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-165"><a href="#cb2-165" aria-hidden="true" tabindex="-1"></a>**Lessons for Our Work**:</span>
-<span id="cb2-166"><a href="#cb2-166" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-167"><a href="#cb2-167" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>✅ Direct quality optimization (RRI) beats coverage by ~30%</span>
-<span id="cb2-168"><a href="#cb2-168" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>✅ Imitation learning is simpler and more effective than RL</span>
-<span id="cb2-169"><a href="#cb2-169" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>✅ 3D-aware featurization (normals, visibility) is crucial</span>
-<span id="cb2-170"><a href="#cb2-170" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>✅ Coverage information still helps in later stages</span>
-<span id="cb2-171"><a href="#cb2-171" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>⚠️ Greedy strategy works well but leaves ~20% gap to oracle</span>
-<span id="cb2-172"><a href="#cb2-172" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-173"><a href="#cb2-173" aria-hidden="true" tabindex="-1"></a>**Integration Strategy**:</span>
-<span id="cb2-174"><a href="#cb2-174" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-175"><a href="#cb2-175" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Adopt VIN's RRI formulation for entity-level metrics</span>
-<span id="cb2-176"><a href="#cb2-176" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use ASE visibility data instead of VIN's visibility count</span>
-<span id="cb2-177"><a href="#cb2-177" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Extend to per-entity RRI: $\mathcal{RRI}_e$ for each entity $e$</span>
-<span id="cb2-178"><a href="#cb2-178" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Weighted combination: $\mathcal{RRI}_{total} = \sum_e w_e \cdot \mathcal{RRI}_e$</span>
-<span id="cb2-179"><a href="#cb2-179" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-180"><a href="#cb2-180" aria-hidden="true" tabindex="-1"></a><span class="fu">### Limitations</span></span>
-<span id="cb2-181"><a href="#cb2-181" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-182"><a href="#cb2-182" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Ground truth depth**: Uses noise-free depth maps (not realistic)</span>
-<span id="cb2-183"><a href="#cb2-183" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Real-world validation**: Not evaluated on real sensor data</span>
-<span id="cb2-184"><a href="#cb2-184" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Single objects**: Not designed for multi-room scenes</span>
-<span id="cb2-185"><a href="#cb2-185" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Gap to oracle**: ~20% performance gap in early stages indicates room for improvement</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Implementing CORAL for Ordinal Regression to Continuous Targets"</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="fu">## 1. Correcting the probabilistic mistake (core insight)</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>**CORAL does not output class probabilities.**</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>It outputs **cumulative (ordinal) probabilities**:</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>p_t ;=; P(y &gt; t), \quad t = 0,\dots,K-2</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>These are *threshold* probabilities, not marginals. Treating them as $P(y=t)$ leads to systematic overestimation because probability mass is counted multiple times.</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="fu">### Recovering marginal class probabilities</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>Define:</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>p_{-1}=1,\quad p_{K-1}=0</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>Then:</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>\pi_k ;=; P(y=k) ;=; p_{k-1} - p_k,\quad k=0,\dots,K-1</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>This converts **cumulative → marginal**, which is mandatory before computing expectations.</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="fu">## 2. Correct computation of the regression prediction</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>Let $r$ be the original continuous regression target (e.g. RRI), discretized into $K$ ordinal bins.</span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>Let $u_k$ be a representative real value for bin $k$ (initially: empirical mean or bin center).</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>The **Bayes-optimal MSE predictor** is the conditional mean:</span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>\hat r ;=; \mathbb{E}<span class="co">[</span><span class="ot">r \mid x</span><span class="co">]</span> ;\approx; \sum_{k=0}^{K-1} \pi_k , u_k</span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a>This is the **only correct way** to derive a scalar regression prediction from CORAL.</span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a><span class="fu">## 3. Single ordinal head + auxiliary regression loss (preferred design)</span></span>
+<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a>Rather than adding a second regression head, we keep **one CORAL head** and derive $\hat r$ from it.</span>
+<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a><span class="fu">### Loss</span></span>
+<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a>\mathcal{L}</span>
+<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a>;=;</span>
+<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a>\mathcal{L}_{\text{CORAL}}</span>
+<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a>;+;</span>
+<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a>\lambda \, \mathcal{L}_{\text{reg}}(\hat r, r)</span>
+<span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>$\mathcal{L}_{\text{CORAL}}$: binary cross-entropy on thresholds</span>
+<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>$\mathcal{L}_{\text{reg}}$: **Huber / Smooth-L1** (preferred over L2 for heavy-tailed RRI)</span>
+<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-65"><a href="#cb5-65" aria-hidden="true" tabindex="-1"></a><span class="fu">### Intuition</span></span>
+<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Enforces **distributional correctness** (ordinal structure)</span>
+<span id="cb5-68"><a href="#cb5-68" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Enforces **calibration in real units**</span>
+<span id="cb5-69"><a href="#cb5-69" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Avoids two heads learning the same quantity inconsistently</span>
+<span id="cb5-70"><a href="#cb5-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-71"><a href="#cb5-71" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb5-72"><a href="#cb5-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-73"><a href="#cb5-73" aria-hidden="true" tabindex="-1"></a><span class="fu">## 4. Learnable bin representatives $u_k$</span></span>
+<span id="cb5-74"><a href="#cb5-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-75"><a href="#cb5-75" aria-hidden="true" tabindex="-1"></a>Instead of fixing $u_k=\mu_k$ (empirical mean), make them **learnable**, initialized from $\mu_k$.</span>
+<span id="cb5-76"><a href="#cb5-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-77"><a href="#cb5-77" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-78"><a href="#cb5-78" aria-hidden="true" tabindex="-1"></a>\hat r = \sum_k \pi_k,u_k</span>
+<span id="cb5-79"><a href="#cb5-79" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-80"><a href="#cb5-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-81"><a href="#cb5-81" aria-hidden="true" tabindex="-1"></a><span class="fu">### Why this helps</span></span>
+<span id="cb5-82"><a href="#cb5-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-83"><a href="#cb5-83" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Corrects discretization bias</span>
+<span id="cb5-84"><a href="#cb5-84" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Adapts to distribution shift</span>
+<span id="cb5-85"><a href="#cb5-85" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Improves calibration without adding a full regression head</span>
+<span id="cb5-86"><a href="#cb5-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-87"><a href="#cb5-87" aria-hidden="true" tabindex="-1"></a><span class="fu">### Regularization (important)</span></span>
+<span id="cb5-88"><a href="#cb5-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-89"><a href="#cb5-89" aria-hidden="true" tabindex="-1"></a>Prevent $u_k$ from drifting and “absorbing” all error:</span>
+<span id="cb5-90"><a href="#cb5-90" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-91"><a href="#cb5-91" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-92"><a href="#cb5-92" aria-hidden="true" tabindex="-1"></a>\mathcal{L}_{u}</span>
+<span id="cb5-93"><a href="#cb5-93" aria-hidden="true" tabindex="-1"></a>=</span>
+<span id="cb5-94"><a href="#cb5-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-95"><a href="#cb5-95" aria-hidden="true" tabindex="-1"></a>\alpha \sum_{k=0}^{K-1} (u_k - \mu_k)^2</span>
+<span id="cb5-96"><a href="#cb5-96" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-97"><a href="#cb5-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-98"><a href="#cb5-98" aria-hidden="true" tabindex="-1"></a>This keeps them tethered to empirical reality.</span>
+<span id="cb5-99"><a href="#cb5-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-100"><a href="#cb5-100" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb5-101"><a href="#cb5-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-102"><a href="#cb5-102" aria-hidden="true" tabindex="-1"></a><span class="fu">## 5. Enforcing ordinal ordering on $u_k$</span></span>
+<span id="cb5-103"><a href="#cb5-103" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-104"><a href="#cb5-104" aria-hidden="true" tabindex="-1"></a>You usually want:</span>
+<span id="cb5-105"><a href="#cb5-105" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-106"><a href="#cb5-106" aria-hidden="true" tabindex="-1"></a>u_0 \le u_1 \le \dots \le u_{K-1}</span>
+<span id="cb5-107"><a href="#cb5-107" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-108"><a href="#cb5-108" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-109"><a href="#cb5-109" aria-hidden="true" tabindex="-1"></a><span class="fu">### Monotone parameterization (recommended)</span></span>
+<span id="cb5-110"><a href="#cb5-110" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-111"><a href="#cb5-111" aria-hidden="true" tabindex="-1"></a>Let:</span>
+<span id="cb5-112"><a href="#cb5-112" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-113"><a href="#cb5-113" aria-hidden="true" tabindex="-1"></a>u_0 \in \mathbb{R},\qquad</span>
+<span id="cb5-114"><a href="#cb5-114" aria-hidden="true" tabindex="-1"></a>u_k = u_0 + \sum_{j=1}^{k} \text{softplus}(\delta_j)</span>
+<span id="cb5-115"><a href="#cb5-115" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-116"><a href="#cb5-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-117"><a href="#cb5-117" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Guarantees monotonicity</span>
+<span id="cb5-118"><a href="#cb5-118" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Differentiable</span>
+<span id="cb5-119"><a href="#cb5-119" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Stable under optimization</span>
+<span id="cb5-120"><a href="#cb5-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-121"><a href="#cb5-121" aria-hidden="true" tabindex="-1"></a>This aligns **ordinal meaning ↔ numeric meaning**.</span>
+<span id="cb5-122"><a href="#cb5-122" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-123"><a href="#cb5-123" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb5-124"><a href="#cb5-124" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-125"><a href="#cb5-125" aria-hidden="true" tabindex="-1"></a><span class="fu">## 6. Residual correction (controlled extra expressivity)</span></span>
+<span id="cb5-126"><a href="#cb5-126" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-127"><a href="#cb5-127" aria-hidden="true" tabindex="-1"></a>If bins are coarse and you want **within-bin refinement**, add a **small residual head**:</span>
+<span id="cb5-128"><a href="#cb5-128" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-129"><a href="#cb5-129" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-130"><a href="#cb5-130" aria-hidden="true" tabindex="-1"></a>\hat r</span>
+<span id="cb5-131"><a href="#cb5-131" aria-hidden="true" tabindex="-1"></a>=</span>
+<span id="cb5-132"><a href="#cb5-132" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-133"><a href="#cb5-133" aria-hidden="true" tabindex="-1"></a>\sum_k \pi_k u_k</span>
+<span id="cb5-134"><a href="#cb5-134" aria-hidden="true" tabindex="-1"></a>;+;</span>
+<span id="cb5-135"><a href="#cb5-135" aria-hidden="true" tabindex="-1"></a>\delta(x)</span>
+<span id="cb5-136"><a href="#cb5-136" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-137"><a href="#cb5-137" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-138"><a href="#cb5-138" aria-hidden="true" tabindex="-1"></a>Where:</span>
+<span id="cb5-139"><a href="#cb5-139" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-140"><a href="#cb5-140" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>$\delta(x)$: tiny MLP / linear head</span>
+<span id="cb5-141"><a href="#cb5-141" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Regularize strongly:</span>
+<span id="cb5-142"><a href="#cb5-142" aria-hidden="true" tabindex="-1"></a>  $$</span>
+<span id="cb5-143"><a href="#cb5-143" aria-hidden="true" tabindex="-1"></a>  \mathcal{L}_{\delta} = \beta |\delta(x)|^2</span>
+<span id="cb5-144"><a href="#cb5-144" aria-hidden="true" tabindex="-1"></a>  $$</span>
+<span id="cb5-145"><a href="#cb5-145" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-146"><a href="#cb5-146" aria-hidden="true" tabindex="-1"></a><span class="fu">### Interpretation</span></span>
+<span id="cb5-147"><a href="#cb5-147" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-148"><a href="#cb5-148" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>CORAL handles **rank / coarse structure**</span>
+<span id="cb5-149"><a href="#cb5-149" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Residual handles **local, continuous variation**</span>
+<span id="cb5-150"><a href="#cb5-150" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Much safer than a full parallel regression head</span>
+<span id="cb5-151"><a href="#cb5-151" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-152"><a href="#cb5-152" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb5-153"><a href="#cb5-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-154"><a href="#cb5-154" aria-hidden="true" tabindex="-1"></a><span class="fu">## 7. Final full objective</span></span>
+<span id="cb5-155"><a href="#cb5-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-156"><a href="#cb5-156" aria-hidden="true" tabindex="-1"></a>Putting it all together:</span>
+<span id="cb5-157"><a href="#cb5-157" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-158"><a href="#cb5-158" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-159"><a href="#cb5-159" aria-hidden="true" tabindex="-1"></a>\boxed{</span>
+<span id="cb5-160"><a href="#cb5-160" aria-hidden="true" tabindex="-1"></a>\mathcal{L}</span>
+<span id="cb5-161"><a href="#cb5-161" aria-hidden="true" tabindex="-1"></a>=</span>
+<span id="cb5-162"><a href="#cb5-162" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-163"><a href="#cb5-163" aria-hidden="true" tabindex="-1"></a>\mathcal{L}_{\text{CORAL}}</span>
+<span id="cb5-164"><a href="#cb5-164" aria-hidden="true" tabindex="-1"></a>+</span>
+<span id="cb5-165"><a href="#cb5-165" aria-hidden="true" tabindex="-1"></a>\lambda \, \text{Huber}(\hat r, r)</span>
+<span id="cb5-166"><a href="#cb5-166" aria-hidden="true" tabindex="-1"></a>+</span>
+<span id="cb5-167"><a href="#cb5-167" aria-hidden="true" tabindex="-1"></a>\alpha \sum_k (u_k-\mu_k)^2</span>
+<span id="cb5-168"><a href="#cb5-168" aria-hidden="true" tabindex="-1"></a>+</span>
+<span id="cb5-169"><a href="#cb5-169" aria-hidden="true" tabindex="-1"></a>\beta |\delta(x)|^2</span>
+<span id="cb5-170"><a href="#cb5-170" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-171"><a href="#cb5-171" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb5-172"><a href="#cb5-172" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-173"><a href="#cb5-173" aria-hidden="true" tabindex="-1"></a>(with $\delta(x)=0$ if you skip the residual)</span>
+<span id="cb5-174"><a href="#cb5-174" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-175"><a href="#cb5-175" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb5-176"><a href="#cb5-176" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-177"><a href="#cb5-177" aria-hidden="true" tabindex="-1"></a><span class="fu">## 8. Conceptual summary (one sentence per component)</span></span>
+<span id="cb5-178"><a href="#cb5-178" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-179"><a href="#cb5-179" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>**CORAL head** learns *ordinal uncertainty* via cumulative probabilities.</span>
+<span id="cb5-180"><a href="#cb5-180" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>**Marginalization** converts ordinal outputs into a proper distribution.</span>
+<span id="cb5-181"><a href="#cb5-181" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>**Expectation over bins** yields the Bayes-optimal regression estimate.</span>
+<span id="cb5-182"><a href="#cb5-182" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>**Learnable $u_k$** correct discretization bias while preserving structure.</span>
+<span id="cb5-183"><a href="#cb5-183" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>**Monotonicity** preserves semantic ordering.</span>
+<span id="cb5-184"><a href="#cb5-184" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>**Residual** adds controlled continuous flexibility.</span>
+<span id="cb5-185"><a href="#cb5-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-186"><a href="#cb5-186" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb5-187"><a href="#cb5-187" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-188"><a href="#cb5-188" aria-hidden="true" tabindex="-1"></a><span class="fu">### Bottom line</span></span>
+<span id="cb5-189"><a href="#cb5-189" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-190"><a href="#cb5-190" aria-hidden="true" tabindex="-1"></a>This design gives you:</span>
+<span id="cb5-191"><a href="#cb5-191" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-192"><a href="#cb5-192" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Ordinal correctness</span>
+<span id="cb5-193"><a href="#cb5-193" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Probabilistic consistency</span>
+<span id="cb5-194"><a href="#cb5-194" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Real-unit calibration</span>
+<span id="cb5-195"><a href="#cb5-195" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Minimal redundancy</span>
+<span id="cb5-196"><a href="#cb5-196" aria-hidden="true" tabindex="-1"></a><span class="ss">* </span>Explicit inductive bias aligned with your problem</span>
+<span id="cb5-197"><a href="#cb5-197" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-198"><a href="#cb5-198" aria-hidden="true" tabindex="-1"></a>In short: this is a *principled ordinal-to-regression bridge*, not a hack.</span>
+<span id="cb5-199"><a href="#cb5-199" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-200"><a href="#cb5-200" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb5-201"><a href="#cb5-201" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-202"><a href="#cb5-202" aria-hidden="true" tabindex="-1"></a><span class="fu">## 9. Implementation details (NBV codebase)</span></span>
+<span id="cb5-203"><a href="#cb5-203" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-204"><a href="#cb5-204" aria-hidden="true" tabindex="-1"></a><span class="fu">### Core utilities (`oracle_rri/oracle_rri/rri_metrics/coral.py`)</span></span>
+<span id="cb5-205"><a href="#cb5-205" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-206"><a href="#cb5-206" aria-hidden="true" tabindex="-1"></a>We implement monotone bin representatives in <span class="in">`MonotoneBinValues`</span> and wire them</span>
+<span id="cb5-207"><a href="#cb5-207" aria-hidden="true" tabindex="-1"></a>into <span class="in">`CoralLayer`</span> so the expected value can be computed **directly** from CORAL</span>
+<span id="cb5-208"><a href="#cb5-208" aria-hidden="true" tabindex="-1"></a>marginals:</span>
+<span id="cb5-209"><a href="#cb5-209" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-210"><a href="#cb5-210" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb5-211"><a href="#cb5-211" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> oracle_rri.rri_metrics.coral <span class="im">import</span> CoralLayer, coral_logits_to_prob</span>
+<span id="cb5-212"><a href="#cb5-212" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-213"><a href="#cb5-213" aria-hidden="true" tabindex="-1"></a>logits <span class="op">=</span> head_coral(feats)               <span class="co"># (..., K-1)</span></span>
+<span id="cb5-214"><a href="#cb5-214" aria-hidden="true" tabindex="-1"></a>probs <span class="op">=</span> coral_logits_to_prob(logits)     <span class="co"># (..., K)</span></span>
+<span id="cb5-215"><a href="#cb5-215" aria-hidden="true" tabindex="-1"></a>pred_rri <span class="op">=</span> head_coral.expected_from_probs(probs)</span>
+<span id="cb5-216"><a href="#cb5-216" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb5-217"><a href="#cb5-217" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-218"><a href="#cb5-218" aria-hidden="true" tabindex="-1"></a>This uses the learned monotone values <span class="in">`u_k`</span>, initialized from bin means or</span>
+<span id="cb5-219"><a href="#cb5-219" aria-hidden="true" tabindex="-1"></a>midpoints and optionally regularized with:</span>
+<span id="cb5-220"><a href="#cb5-220" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-221"><a href="#cb5-221" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb5-222"><a href="#cb5-222" aria-hidden="true" tabindex="-1"></a>u_reg <span class="op">=</span> head_coral.bin_value_regularizer(target_values)</span>
+<span id="cb5-223"><a href="#cb5-223" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb5-224"><a href="#cb5-224" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-225"><a href="#cb5-225" aria-hidden="true" tabindex="-1"></a><span class="fu">### Initialization hook (`oracle_rri/oracle_rri/vin/model_v2.py`)</span></span>
+<span id="cb5-226"><a href="#cb5-226" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-227"><a href="#cb5-227" aria-hidden="true" tabindex="-1"></a><span class="in">`VinModelV2`</span> exposes a lightweight hook to initialize the CORAL bin values:</span>
+<span id="cb5-228"><a href="#cb5-228" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-229"><a href="#cb5-229" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb5-230"><a href="#cb5-230" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> VinModelV2(...)</span>
+<span id="cb5-231"><a href="#cb5-231" aria-hidden="true" tabindex="-1"></a>model.init_bin_values(bin_means)  <span class="co"># Tensor[K]</span></span>
+<span id="cb5-232"><a href="#cb5-232" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb5-233"><a href="#cb5-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-234"><a href="#cb5-234" aria-hidden="true" tabindex="-1"></a><span class="fu">### Fitting + training integration (`oracle_rri/oracle_rri/lightning/lit_module.py`)</span></span>
+<span id="cb5-235"><a href="#cb5-235" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-236"><a href="#cb5-236" aria-hidden="true" tabindex="-1"></a>After loading the fitted <span class="in">`RriOrdinalBinner`</span>, the Lightning module calls</span>
+<span id="cb5-237"><a href="#cb5-237" aria-hidden="true" tabindex="-1"></a><span class="in">`_maybe_init_bin_values()`</span> to seed <span class="in">`u_k`</span> from <span class="in">`bin_means`</span> (or midpoints if</span>
+<span id="cb5-238"><a href="#cb5-238" aria-hidden="true" tabindex="-1"></a>means are unavailable). During training, the auxiliary regression loss uses</span>
+<span id="cb5-239"><a href="#cb5-239" aria-hidden="true" tabindex="-1"></a>these values to compute a **calibrated** scalar prediction:</span>
+<span id="cb5-240"><a href="#cb5-240" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-241"><a href="#cb5-241" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb5-242"><a href="#cb5-242" aria-hidden="true" tabindex="-1"></a>probs <span class="op">=</span> pred.prob.squeeze(<span class="dv">0</span>)</span>
+<span id="cb5-243"><a href="#cb5-243" aria-hidden="true" tabindex="-1"></a>pred_rri <span class="op">=</span> head_coral.expected_from_probs(probs)</span>
+<span id="cb5-244"><a href="#cb5-244" aria-hidden="true" tabindex="-1"></a>aux_loss <span class="op">=</span> smooth_l1(pred_rri, rri)</span>
+<span id="cb5-245"><a href="#cb5-245" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb5-246"><a href="#cb5-246" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-247"><a href="#cb5-247" aria-hidden="true" tabindex="-1"></a>This keeps the model **single‑head**, ensures **probabilistic correctness**, and</span>
+<span id="cb5-248"><a href="#cb5-248" aria-hidden="true" tabindex="-1"></a>lets the bin representatives adapt while remaining monotone.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">
@@ -1604,38 +1686,6 @@ C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
 </div>
   </div>
 </footer>
-<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
-(function() {
-  let previousOnload = window.onload;
-  window.onload = () => {
-    if (previousOnload) {
-      previousOnload();
-    }
-    lightboxQuarto.on('slide_before_load', (data) => {
-      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
-      const href = trigger.getAttribute('href');
-      if (href !== null) {
-        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
-        if (imgEl !== null) {
-          const srcAttr = imgEl.getAttribute("src");
-          if (srcAttr && srcAttr.startsWith("data:")) {
-            slideConfig.href = srcAttr;
-          }
-        }
-      } 
-    });
-  
-    lightboxQuarto.on('slide_after_load', (data) => {
-      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
-      if (window.Quarto?.typesetMath) {
-        window.Quarto.typesetMath(slideNode);
-      }
-    });
-  
-  };
-  
-})();
-          </script>
 
 
 

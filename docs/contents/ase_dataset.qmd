@@ -25,6 +25,18 @@ The Aria Synthetic Environments (ASE) dataset [@SceneScript-avetisyan2024] is a 
 - **1,641** scenes with GT Meshes
   - approx. 100MB per scene snippet (20 s @ 10 fps), hence approx. 164 GB for all snippets
 
+## Local ATEK shard snapshot (`.data/ase_efm`)
+
+This repo includes a local ASE-ATEK WebDataset snapshot at `.data/ase_efm` (per-scene folders with multiple `shards-*.tar`). To estimate snippet counts, each shard is scanned for `sequence_name.txt` entries (one per snippet), then summed across shards per scene. The histogram below summarizes the per-scene snippet distribution (see [Wikipedia :: Histogram](https://en.wikipedia.org/wiki/Histogram)). A fresh scan on **December 31, 2025** produced:
+
+- **Scenes:** 100
+- **Total snippets:** 4,608
+- **Snippets per scene:** min 8, p10 8,  median 40, mean 46.1, p90 88.8, max 152
+- Using avg file size 18.26 MiB → ~82.17 GiB (not including all efm outputs)
+- Using avg file size of 305 MiB → ~1.37 TiB including all efm outputs
+
+![Histogram of snippets per scene in the local `.data/ase_efm` snapshot.](../figures/ase_efm_snippet_hist.png){width=90%}
+
 ## Ground Truth Annotations
 
 - 6DoF camera trajectory

@@ -1,0 +1,248 @@
+---
+title: "Implementing CORAL for Ordinal Regression to Continuous Targets"
+---
+
+## 1. Correcting the probabilistic mistake (core insight)
+
+**CORAL does not output class probabilities.**
+It outputs **cumulative (ordinal) probabilities**:
+
+$$
+p_t ;=; P(y > t), \quad t = 0,\dots,K-2
+$$
+
+These are *threshold* probabilities, not marginals. Treating them as $P(y=t)$ leads to systematic overestimation because probability mass is counted multiple times.
+
+### Recovering marginal class probabilities
+
+Define:
+$$
+p_{-1}=1,\quad p_{K-1}=0
+$$
+
+Then:
+$$
+\pi_k ;=; P(y=k) ;=; p_{k-1} - p_k,\quad k=0,\dots,K-1
+$$
+
+This converts **cumulative → marginal**, which is mandatory before computing expectations.
+
+---
+
+## 2. Correct computation of the regression prediction
+
+Let $r$ be the original continuous regression target (e.g. RRI), discretized into $K$ ordinal bins.
+
+Let $u_k$ be a representative real value for bin $k$ (initially: empirical mean or bin center).
+
+The **Bayes-optimal MSE predictor** is the conditional mean:
+
+$$
+\hat r ;=; \mathbb{E}[r \mid x] ;\approx; \sum_{k=0}^{K-1} \pi_k , u_k
+$$
+
+This is the **only correct way** to derive a scalar regression prediction from CORAL.
+
+---
+
+## 3. Single ordinal head + auxiliary regression loss (preferred design)
+
+Rather than adding a second regression head, we keep **one CORAL head** and derive $\hat r$ from it.
+
+### Loss
+
+$$
+\mathcal{L}
+;=;
+\mathcal{L}_{\text{CORAL}}
+;+;
+\lambda \, \mathcal{L}_{\text{reg}}(\hat r, r)
+$$
+
+* $\mathcal{L}_{\text{CORAL}}$: binary cross-entropy on thresholds
+* $\mathcal{L}_{\text{reg}}$: **Huber / Smooth-L1** (preferred over L2 for heavy-tailed RRI)
+
+### Intuition
+
+* Enforces **distributional correctness** (ordinal structure)
+* Enforces **calibration in real units**
+* Avoids two heads learning the same quantity inconsistently
+
+---
+
+## 4. Learnable bin representatives $u_k$
+
+Instead of fixing $u_k=\mu_k$ (empirical mean), make them **learnable**, initialized from $\mu_k$.
+
+$$
+\hat r = \sum_k \pi_k,u_k
+$$
+
+### Why this helps
+
+* Corrects discretization bias
+* Adapts to distribution shift
+* Improves calibration without adding a full regression head
+
+### Regularization (important)
+
+Prevent $u_k$ from drifting and “absorbing” all error:
+
+$$
+\mathcal{L}_{u}
+=
+
+\alpha \sum_{k=0}^{K-1} (u_k - \mu_k)^2
+$$
+
+This keeps them tethered to empirical reality.
+
+---
+
+## 5. Enforcing ordinal ordering on $u_k$
+
+You usually want:
+$$
+u_0 \le u_1 \le \dots \le u_{K-1}
+$$
+
+### Monotone parameterization (recommended)
+
+Let:
+$$
+u_0 \in \mathbb{R},\qquad
+u_k = u_0 + \sum_{j=1}^{k} \text{softplus}(\delta_j)
+$$
+
+* Guarantees monotonicity
+* Differentiable
+* Stable under optimization
+
+This aligns **ordinal meaning ↔ numeric meaning**.
+
+---
+
+## 6. Residual correction (controlled extra expressivity)
+
+If bins are coarse and you want **within-bin refinement**, add a **small residual head**:
+
+$$
+\hat r
+=
+
+\sum_k \pi_k u_k
+;+;
+\delta(x)
+$$
+
+Where:
+
+* $\delta(x)$: tiny MLP / linear head
+* Regularize strongly:
+  $$
+  \mathcal{L}_{\delta} = \beta |\delta(x)|^2
+  $$
+
+### Interpretation
+
+* CORAL handles **rank / coarse structure**
+* Residual handles **local, continuous variation**
+* Much safer than a full parallel regression head
+
+---
+
+## 7. Final full objective
+
+Putting it all together:
+
+$$
+\boxed{
+\mathcal{L}
+=
+
+\mathcal{L}_{\text{CORAL}}
++
+\lambda \, \text{Huber}(\hat r, r)
++
+\alpha \sum_k (u_k-\mu_k)^2
++
+\beta |\delta(x)|^2
+}
+$$
+
+(with $\delta(x)=0$ if you skip the residual)
+
+---
+
+## 8. Conceptual summary (one sentence per component)
+
+* **CORAL head** learns *ordinal uncertainty* via cumulative probabilities.
+* **Marginalization** converts ordinal outputs into a proper distribution.
+* **Expectation over bins** yields the Bayes-optimal regression estimate.
+* **Learnable $u_k$** correct discretization bias while preserving structure.
+* **Monotonicity** preserves semantic ordering.
+* **Residual** adds controlled continuous flexibility.
+
+---
+
+### Bottom line
+
+This design gives you:
+
+* Ordinal correctness
+* Probabilistic consistency
+* Real-unit calibration
+* Minimal redundancy
+* Explicit inductive bias aligned with your problem
+
+In short: this is a *principled ordinal-to-regression bridge*, not a hack.
+
+---
+
+## 9. Implementation details (NBV codebase)
+
+### Core utilities (`oracle_rri/oracle_rri/rri_metrics/coral.py`)
+
+We implement monotone bin representatives in `MonotoneBinValues` and wire them
+into `CoralLayer` so the expected value can be computed **directly** from CORAL
+marginals:
+
+```python
+from oracle_rri.rri_metrics.coral import CoralLayer, coral_logits_to_prob
+
+logits = head_coral(feats)               # (..., K-1)
+probs = coral_logits_to_prob(logits)     # (..., K)
+pred_rri = head_coral.expected_from_probs(probs)
+```
+
+This uses the learned monotone values `u_k`, initialized from bin means or
+midpoints and optionally regularized with:
+
+```python
+u_reg = head_coral.bin_value_regularizer(target_values)
+```
+
+### Initialization hook (`oracle_rri/oracle_rri/vin/model_v2.py`)
+
+`VinModelV2` exposes a lightweight hook to initialize the CORAL bin values:
+
+```python
+model = VinModelV2(...)
+model.init_bin_values(bin_means)  # Tensor[K]
+```
+
+### Fitting + training integration (`oracle_rri/oracle_rri/lightning/lit_module.py`)
+
+After loading the fitted `RriOrdinalBinner`, the Lightning module calls
+`_maybe_init_bin_values()` to seed `u_k` from `bin_means` (or midpoints if
+means are unavailable). During training, the auxiliary regression loss uses
+these values to compute a **calibrated** scalar prediction:
+
+```python
+probs = pred.prob.squeeze(0)
+pred_rri = head_coral.expected_from_probs(probs)
+aux_loss = smooth_l1(pred_rri, rri)
+```
+
+This keeps the model **single‑head**, ensures **probabilistic correctness**, and
+lets the bin representatives adapt while remaining monotone.

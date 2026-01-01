@@ -53,13 +53,11 @@
 // ---------------------------------------------------------------------------
 
 #section-slide(
-  title: [oracle_rri: Oracle RRI Labeling Pipeline],
-  subtitle: [Reusable compute path for dashboard, preprocessing, and training],
-)[
-  #text(size: 16pt)[Stage-by-stage conceptual overview of `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`.]
-]
+  title: [Oracle RRI Pipeline],
+  subtitle: [Reusable compute path for dashboard, preprocessing, and training #image(fig_path + "impl/label_batch.png", width: 60%)],
+)
 
-#slide(title: [Pipeline at a Glance])[
+#slide(title: [Oracle RRI Pipeline])[
   #grid(
     columns: (1fr, 1fr),
     gutter: 1cm,
@@ -94,9 +92,8 @@
     ],
   )
 
-  #quote-block(color: rgb("#285f82"))[
-    “Blank wall has high RRI” is not necessarily a rendering bug: with GT depth, newly observed wall surfaces can
-    legitimately reduce point↔mesh distances even if real semi-dense SLAM would add few points on low-texture walls.
+  #quote-block(color: rgb("#ff0000"))[
+    Currently engineered for plotting and debugging in the streamlit app. Results contain too many intermediate tensors for optimal batching per snippet.
   ]
 ]
 
@@ -104,102 +101,102 @@
 // Data handling (download → dataset → typed views → mesh processing)
 // ---------------------------------------------------------------------------
 
-#section-slide(
-  title: [Data Handling],
-  subtitle: [Downloading ASE + streaming ATEK → typed `EfmSnippetView`],
-)[
-  #figure(image(fig_path + "scene-script/ase_modalities.jpg", width: 80%), caption: [@SceneScript-avetisyan2024])
-]
+// #section-slide(
+//   title: [Data Handling],
+//   subtitle: [Downloading ASE + streaming ATEK → typed `EfmSnippetView`],
+// )[
+//   #figure(image(fig_path + "scene-script/ase_modalities.jpg", width: 80%), caption: [@SceneScript-avetisyan2024])
+// ]
 
-#slide(title: [ASE Modalities Used by oracle_rri])[
-  #grid(
-    columns: (1fr, 1fr),
-    gutter: 1.2cm,
-    [
-      #color-block(title: [Core modalities])[
-        - *Trajectory*: `PoseTW` world←rig for each timestamp
-        - *Semi-dense SLAM points*: sparse but informative geometry cues
-        - *GT mesh*: watertight-ish surface geometry (oracle target)
-        - *Camera calibration*: `CameraTW` intrinsics/extrinsics per stream
-      ]
-      #color-block(title: [Why we need all of them])[
-        - Candidate poses must be sampled in a *physically consistent* world frame.
-        - Rendering needs a mesh + camera model.
-        - Backprojection needs rendered depth + the exact camera used to render.
-        - RRI uses point↔mesh distances, so both point sets and mesh must share coordinates.
-      ]
-    ],
-    [
-      #color-block(title: [Typed views])[
-        - `EfmCameraView`: images + `CameraTW` + timestamps
-        - `EfmTrajectoryView`: `t_world_rig` + helpers (`final_pose()`)
-        - `EfmPointsView`: `points_world`, `dist_std`, bounds, `lengths`
-        - `EfmGTView` / `EfmObbView`: GT timestamps and optional entity boxes
-      ]
-      #quote-block[
-        The dataset yields *views* over an EFM dictionary (zero-copy): move tensors with `.to(device)` without cloning.
-      ]
-    ],
-  )
-]
+// #slide(title: [ASE Modalities Used by oracle_rri])[
+//   #grid(
+//     columns: (1fr, 1fr),
+//     gutter: 1.2cm,
+//     [
+//       #color-block(title: [Core modalities])[
+//         - *Trajectory*: `PoseTW` world$<-$rig for each timestamp
+//         - *Semi-dense SLAM points*: sparse but informative geometry cues
+//         - *GT mesh*: watertight-ish surface geometry (oracle target)
+//         - *Camera calibration*: `CameraTW` intrinsics/extrinsics per stream
+//       ]
+//       #color-block(title: [Why we need all of them])[
+//         - Candidate poses must be sampled in a *physically consistent* world frame.
+//         - Rendering needs a mesh + camera model.
+//         - Backprojection needs rendered depth + the exact camera used to render.
+//         - RRI uses point↔mesh distances, so both point sets and mesh must share coordinates.
+//       ]
+//     ],
+//     [
+//       #color-block(title: [Typed views])[
+//         - `EfmCameraView`: images + `CameraTW` + timestamps
+//         - `EfmTrajectoryView`: `t_world_rig` + helpers (`final_pose()`)
+//         - `EfmPointsView`: `points_world`, `dist_std`, bounds, `lengths`
+//         - `EfmGTView` / `EfmObbView`: GT timestamps and optional entity boxes
+//       ]
+//       #quote-block[
+//         The dataset yields *views* over an EFM dictionary (zero-copy): move tensors with `.to(device)` without cloning.
+//       ]
+//     ],
+//   )
+// ]
 
-#slide(title: [Unified ASE Downloader CLI])[
-  #color-block(title: [What it does])[
-    - One entrypoint downloads GT meshes + ATEK shards with consistent filtering.
-    - Mesh download: SHA1 validation + ZIP extraction to `.ply`.
-    - ATEK download: write filtered JSON for `download_atek_wds_sequences`.
-  ]
-  #color-block(title: [Modes])[
-    - `download`: pull meshes and/or ATEK for top-N scenes (cap snippets, prefer richest scenes first).
-    - `list`: show scenes with GT meshes and snippet counts (sorted by snippet density).
-  ]
-  #color-block(title: [Usage])[
-    #text(size: 13pt)[
-      - `python -m oracle_rri.data.downloader list --n=8`
-      - `python -m oracle_rri.data.downloader download --n_scenes=5 --max_snippets=2 --c=efm_eval`
-      - Flags: `--skip_meshes`, `--skip_atek`, `--prefer_scenes_with_max_snippets`, `--output-dir`.
-    ]
-  ]
-]
+// #slide(title: [Unified ASE Downloader CLI])[
+//   #color-block(title: [What it does])[
+//     - One entrypoint downloads GT meshes + ATEK shards with consistent filtering.
+//     - Mesh download: SHA1 validation + ZIP extraction to `.ply`.
+//     - ATEK download: write filtered JSON for `download_atek_wds_sequences`.
+//   ]
+//   #color-block(title: [Modes])[
+//     - `download`: pull meshes and/or ATEK for top-N scenes (cap snippets, prefer richest scenes first).
+//     - `list`: show scenes with GT meshes and snippet counts (sorted by snippet density).
+//   ]
+//   #color-block(title: [Usage])[
+//     #text(size: 13pt)[
+//       - `python -m oracle_rri.data.downloader list --n=8`
+//       - `python -m oracle_rri.data.downloader download --n_scenes=5 --max_snippets=2 --c=efm_eval`
+//       - Flags: `--skip_meshes`, `--skip_atek`, `--prefer_scenes_with_max_snippets`, `--output-dir`.
+//     ]
+//   ]
+// ]
 
-#slide(title: [AseEfmDataset + Mesh Handling])[
-  #grid(
-    columns: (1fr, 1fr),
-    gutter: 1cm,
-    [
-      #color-block(title: [Dataset wrapper])[
-        - `AseEfmDataset` wraps `load_atek_wds_dataset_as_efm` → yields `EfmSnippetView`.
-        - Resolves tar shards from `PathConfig`, infers scene/snippet ids.
-        - Optional mesh loading + simplification + caching (`mesh_cache.py`).
-      ]
-      #color-block(title: [Mesh processing])[
-        - Load `.ply` via `trimesh` (vertices + faces).
-        - Optional quadric simplification for speed.
-        - Optional cropping to occupancy bounds for stability/efficiency.
-      ]
-    ],
-    [
-      #color-block(title: [Typed access in practice])[
-        ```python
-        from oracle_rri.data import AseEfmDatasetConfig
+// #slide(title: [AseEfmDataset + Mesh Handling])[
+//   #grid(
+//     columns: (1fr, 1fr),
+//     gutter: 1cm,
+//     [
+//       #color-block(title: [Dataset wrapper])[
+//         - `AseEfmDataset` wraps `load_atek_wds_dataset_as_efm` → yields `EfmSnippetView`.
+//         - Resolves tar shards from `PathConfig`, infers scene/snippet ids.
+//         - Optional mesh loading + simplification + caching (`mesh_cache.py`).
+//       ]
+//       #color-block(title: [Mesh processing])[
+//         - Load `.ply` via `trimesh` (vertices + faces).
+//         - Optional quadric simplification for speed.
+//         - Optional cropping to occupancy bounds for stability/efficiency.
+//       ]
+//     ],
+//     [
+//       #color-block(title: [Typed access in practice])[
+//         ```python
+//         from oracle_rri.data import AseEfmDatasetConfig
 
-        cfg = AseEfmDatasetConfig(
-            scene_ids=["81048"],
-            atek_variant="efm_eval",
-            load_meshes=True,
-        )
-        ds = cfg.setup_target()
-        sample = next(iter(ds))
+//         cfg = AseEfmDatasetConfig(
+//             scene_ids=["81048"],
+//             atek_variant="efm_eval",
+//             load_meshes=True,
+//         )
+//         ds = cfg.setup_target()
+//         sample = next(iter(ds))
 
-        rgb = sample.camera_rgb
-        traj = sample.trajectory
-        sem = sample.semidense
-        print(sample.has_mesh, sample.mesh is not None)
-        ```
-      ]
-    ],
-  )
-]
+//         rgb = sample.camera_rgb
+//         traj = sample.trajectory
+//         sem = sample.semidense
+//         print(sample.has_mesh, sample.mesh is not None)
+//         ```
+//       ]
+//     ],
+//   )
+// ]
 
 // ---------------------------------------------------------------------------
 // Candidate generation (SE(3) poses around a reference pose)
@@ -209,7 +206,7 @@
   title: [Candidate Generation],
   subtitle: [Generate and prune candidate `PoseTW` around a reference pose],
 )[
-  #text(size: 16pt)[Implemented in `oracle_rri/oracle_rri/pose_generation/`.]
+  #image(fig_path + "app/cand_frusta_kappa4_r06-29.png", width: 100%)
 ]
 
 #slide(title: [CandidateViewGenerator: Overview])[
@@ -219,14 +216,9 @@
     - GT mesh (for clearance + collision pruning).
   ]
   #color-block(title: [Outputs])[
-    - Candidate poses: `PoseTW["C 12"]` (world ← cam)
+    - Candidate poses: `PoseTW["C 12"]` (world $<-$ cam)
     - Diagnostics: per-rule masks + optional debug stats
     - Stable indexing: map back to global candidate indices for UI alignment
-  ]
-  #color-block(title: [Design goals])[
-    - Deterministic sampling via `seed`
-    - Modular pruning rules (`Rule` protocol)
-    - Clear separation: sampling (positions), orientation, pruning
   ]
 ]
 
@@ -283,9 +275,9 @@
           - +x: left, +y: up, +z: forward
         ]
         #color-block(title: [Look-at frame])[
-          For camera center `p` and target `t`:
+          For camera center `p` and target $bold(p)_c$:
           $
-            bold(z) & = (bold(t) - bold(p)) / (||bold(t) - bold(p)||) \
+            bold(z) & = (bold(p)_c - bold(p)) / (||bold(p)_c - bold(p)||) \
             bold(y) & = bold(u)_"world" \
             bold(x) & = (bold(y) times bold(z)) / (||bold(y) times bold(z)||).
           $
@@ -293,18 +285,192 @@
         ]
       ],
       [
-        #color-block(title: [Implementation notes])[
-          - Implemented via `OrientationBuilder` in `orientations.py`.
-          - View jitter is applied as right-multiplicative deltas (keeps bases orthonormal).
-          - `align_to_gravity=True` uses a gravity-aligned reference pose before sampling.
+        #color-block(title: [What defines the *base* view?])[
+          - `view_direction_mode` picks a deterministic base orientation:
+            + `radial_away` / `radial_towards`: look along (candidate ↔ reference) with roll-free world-up.
+            + `forward_rig`: reuse the rig rotation.
+            + `target_point`: look-at a fixed point.
+          - This yields $bold(R)_"base"$.
         ]
         #quote-block(color: rgb("#285f82"))[
-          *Why roll-free?* Roll adds little NBV value but makes collision-free shells and visual debugging harder.
+          *Roll-free?* One less DOF to worry about!
         ]
       ],
     )
   ]
 ]
+
+#slide(title: [View-Direction Randomization])[
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 1cm,
+    [
+      #color-block(title: [View Direction Randomization])[
+        - Jitter is then applied as a *right-multiplicative* delta:
+          $
+            bold(R)_("final") = bold(R)_("base") dot bold(R)_("delta").
+          $
+      ]
+      #quote-block(color: rgb("#285f82"))[
+        This makes jitter “relative to the candidate’s current view direction”: `0°` means “keep the base view”.
+      ]
+    ],
+    [
+      #color-block(title: [Caps vs sampler (priority order)])[
+        *bounded uniform* jitter around the base direction via `view_max_azimuth_deg`,  `view_max_elevation_deg` and `view_roll_jitter_deg`:
+
+        #v(0.2em)
+        Sample angles (caps in radians):
+        $
+          bullet & ~ cal(U)(-bullet_"max" / 2 , +bullet_"max" / 2 ), bullet in {psi, theta, phi}
+        $
+
+        Convert to a valid SO(3) rotation and compose:
+
+        Build a right-multiplicative delta rotation and compose:
+        $
+          bold(R)_"delta" = bold(R)_z(psi) bold(R)_y(theta) bold(R)_x(phi) \
+        $
+
+        // Optional roll jitter:
+        // $
+        //   gamma ~ cal(U)(-gamma_"max", +gamma_"max") \
+        //   bold(R)_"delta" ← bold(R)_"delta" bold(R)_z(gamma).
+        // $
+
+        // #v(0.2em)
+        // (If both caps are 0, `view_sampling_strategy` can instead sample $bold(z)_"delta"$ on $S^2$.)
+      ]
+    ],
+  )
+]
+
+
+
+#slide(title: [Pose-aligned vs Gravity-aligned Sampling])[
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 0.8cm,
+    [
+      #color-block(title: [Pose-aligned (`align_to_gravity=false`)])[
+        #image(fig_path + "app/view_dirs_pose_align.png", width: 100%)
+      ]
+    ],
+    [
+      #color-block(title: [Gravity-aligned (`align_to_gravity=true`)])[
+        #image(fig_path + "app/view_dirs_gravity_align.png", width: 100%)
+      ]
+    ],
+  )
+]
+
+#slide(title: [Pose-aligned vs Gravity-aligned Sampling])[
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 0.8cm,
+    [
+      #color-block(title: [Pose-aligned (`align_to_gravity=false`)])[
+        #image(fig_path + "app/cand_positions_pose_align.png", width: 100%)
+      ]
+    ],
+    [
+      #color-block(title: [Gravity-aligned (`align_to_gravity=true`)])[
+        #image(fig_path + "app/cand_positions_gravity_align.png", width: 100%)
+      ]
+    ],
+  )
+]
+
+#slide(title: [Roll Jitter: What Changes?])[
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 0.8cm,
+    [
+      #color-block(title: [No roll jitter (`view_roll_jitter_deg=0`)])[
+        #image(
+          fig_path + "app/dir_dists_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away_no_jitter_fixed.png",
+          width: 100%,
+        )
+      ]
+    ],
+    [
+      #color-block(title: [With roll jitter (`view_roll_jitter_deg≈17°`)])[
+        #image(
+          fig_path + "app/dir_dists_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away_17_roll_jitter.png",
+          width: 100%,
+        )
+      ]
+    ],
+  )
+  #quote-block(color: rgb("#285f82"))[
+    Roll jitter changes the *twist* about the forward axis (roll histogram spreads), while azimuth/elevation of view
+    directions should not be affected.
+  ]
+]
+
+#slide(title: [Forward Bias: Candidate Center Distributions])[
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 0.8cm,
+    [
+      #color-block(title: [Forward-biased (PowerSpherical, `kappa=4`, `r=0.6..2.9`)])[
+        #image(fig_path + "app/cand_pose_kappa4_r06-29.png", width: 100%)
+      ]
+    ],
+    [
+      #color-block(title: [Narrower azimuth + stronger pruning (`Δaz≈165°`, `min_dist≈1m`)])[
+        #image(fig_path + "app/cand_pose_az165_mindist1_r06-2.4.png", width: 100%)
+      ]
+    ],
+  )
+  #quote-block(color: rgb("#285f82"))[
+    Forward bias (PowerSpherical, `kappa>0`) or (UniformSpherical, with azimuth restriction) concentrates candidate centers near the current forward direction.
+    This matches realistic motion (users rarely turn 180° for the next view), without forward bias, candiates looking in the opposite direciton of the reference will dominate RRI.
+  ]
+]
+
+#slide(title: [Forward-biased Candidates: Frusta in Scene])[
+  #grid(
+    columns: (1.25fr, 0.75fr),
+    gutter: 0.8cm,
+    [
+      #image(fig_path + "app/cand_frusta_kappa4_r06-29.png", width: 100%)
+    ],
+    [
+      #color-block(title: [Reading the plot])[
+        - Blue points: candidate centers after pruning.
+        - Red wireframes: rendered camera frusta (subset).
+        - Axes: reference frame at the sampling origin.
+        - In `radial_away`, the frusta optical axes align with the center direction (up to optional view jitter).
+      ]
+    ],
+  )
+]
+
+#slide(title: [Rule: Free-Space AABB])[
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 1cm,
+    [
+      #color-block(title: [Criterion])[
+        Constrain candidate centers to an occupancy extent:
+        $
+          x_"min" <= x_i <= x_"max", \
+          y_"min" <= y_i <= y_"max", \
+          z_"min" <= z_i <= z_"max".
+        $
+      ]
+    ],
+    [
+      #color-block(title: [Intuition])[
+        - Prevent candidates from leaking outside the local room/scene bounds.
+        - Bounds come from semidense metadata (`volume_min/max`) or mesh crop bounds.
+        - Cheap to evaluate (first pruning stage).
+      ]
+    ],
+  )
+]
+
 
 #slide(title: [Rule: Min Distance to Mesh])[
   #grid(
@@ -314,7 +480,7 @@
       #color-block(title: [Criterion])[
         For candidate center $bold(c)_i$ and mesh $bold(cal(M))$:
         $
-          d_i = min_{bold(x) in bold(cal(M))} ||bold(c)_i - bold(x)||_2.
+          d_i = min_(bold(x) in bold(cal(M))) ||bold(c)_i - bold(x)||_2.
         $
         Keep iff $d_i > d_"min"$.
       ]
@@ -335,9 +501,9 @@
     gutter: 1cm,
     [
       #color-block(title: [Criterion])[
-        Straight-line segment from origin $bold(o)$ to candidate center $bold(p)_i$:
+        Straight-line segment from reference pose $bold(o)$ to candidate center $bold(p)_i$:
         $
-          bold(r)_i(t) = bold(o) + t hat(bold(d)_i),
+          bold(r)_(i)(t) = bold(o) + t hat(bold(d)_i),
           t in [0, ||bold(p)_i - bold(o)||].
         $
         Reject if the segment intersects the mesh (optionally with clearance).
@@ -345,41 +511,16 @@
     ],
     [
       #color-block(title: [Intuition])[
-        - Enforce collision-free translation in a simple, explainable way.
+        - Enforce collision-free translation in a simple
         - Backends:
-          + PyTorch3D distance sampling along the segment
-          + Trimesh / PyEmbree ray intersector (faster when available)
+          + PyTorch3D distance sampling along the segment (GPU)
+          + Trimesh / PyEmbree ray intersector (CPU)
       ]
     ],
   )
 ]
 
-#slide(title: [Rule: Free-Space AABB])[
-  #grid(
-    columns: (1fr, 1fr),
-    gutter: 1cm,
-    [
-      #color-block(title: [Criterion])[
-        Constrain candidate centers to an occupancy extent:
-        $
-          x_"min" <= x_i <= x_"max",
-          y_"min" <= y_i <= y_"max",
-          z_"min" <= z_i <= z_"max".
-        $
-      ]
-    ],
-    [
-      #color-block(title: [Intuition])[
-        - Prevent candidates from leaking outside the local room/scene bounds.
-        - Bounds come from semidense metadata (`volume_min/max`) or mesh crop bounds.
-      ]
-    ],
-  )
-]
 
-#slide(title: [Pose Generation Diagram])[
-  #figure(image("pose_generation_diagram.png", width: 90%), caption: [oracle_rri.pose_generation subpackage])
-]
 
 // ---------------------------------------------------------------------------
 // Depth rendering (simulate candidate observation)
@@ -387,10 +528,10 @@
 
 #section-slide(
   title: [Depth Rendering],
-  subtitle: [Render candidate depth maps from the GT mesh],
-)[
-  #text(size: 16pt)[Implemented in `oracle_rri/oracle_rri/rendering/`.]
-]
+  subtitle: [Render candidate depth maps from the GT mesh
+
+    #image(fig_path + "app/depth_render.png", width: 60%)],
+)
 
 #slide(title: [CandidateDepthRenderer: Responsibilities])[
   #grid(
@@ -400,13 +541,13 @@
       #color-block(title: [Candidate selection])[
         - Render only a subset for performance:
           + oversample `oversample_factor`
+          + filter out invalid renders
           + cap to `max_candidates_final`
-        - Keep stable indices via `candidate_indices` (maps into the full candidate list).
       ]
       #color-block(title: [Outputs])[
         - `depths["C H W"]` in metres (metric z-depth)
         - `depths_valid_mask["C H W"]` (hit + near/far clipping)
-        - `poses` (world ← cam) and `p3d_cameras` for later backprojection
+        - `poses` (world $<-$ cam) and `p3d_cameras` for later backprojection
       ]
     ],
     [
@@ -417,48 +558,46 @@
         - `z < z_far`
         Misses often appear as `pix_to_face=-1` (and may show `z=-1` in histograms).
       ]
-      #quote-block[
-        *Practical tip*: Always plot depth *with* the valid mask applied; otherwise invalid pixels dominate histograms.
-      ]
+
     ],
   )
 ]
 
-#slide(title: [PyTorch3D Rasterization (Conceptual)])[
-  #grid(
-    columns: (1fr, 1fr),
-    gutter: 1cm,
-    [
-      #color-block(title: [Camera model])[
-        We use PyTorch3D `PerspectiveCameras` in *screen space* (`in_ndc=false`):
-        $
-          u = f_x X/Z + c_x,
-          v = f_y Y/Z + c_y.
-        $
-        The renderer internally converts screen coordinates to NDC using
-        $s = min(H, W)$ (important for non-square images).
-      ]
-      #color-block(title: [Rasterization output])[
-        `MeshRasterizer` returns fragments:
-        - `pix_to_face`: face index per pixel (hit/miss)
-        - `zbuf`: per-pixel z-depth (metres when configured consistently)
-        - optional barycentric coordinates (not used for oracle depth)
-      ]
-    ],
-    [
-      #color-block(title: [Coordinate conventions])[
-        - PyTorch3D NDC: +X left, +Y up, right-handed.
-        - We keep all core geometry in the physical Aria LUF world frame.
-        - Extrinsics must be consistent with `PoseTW` conventions when building `PerspectiveCameras(R,T)`.
-      ]
-      #color-block(title: [Why rasterization?])[
-        - GPU batch rendering for many candidates
-        - Deterministic depth (z-buffer)
-        - Works directly with mesh tensors (`verts`, `faces`)
-      ]
-    ],
-  )
-]
+// #slide(title: [PyTorch3D Rasterization (Conceptual)])[
+//   #grid(
+//     columns: (1fr, 1fr),
+//     gutter: 1cm,
+//     [
+//       #color-block(title: [Camera model])[
+//         We use PyTorch3D `PerspectiveCameras` in *screen space* (`in_ndc=false`):
+//         $
+//           u = f_x X/Z + c_x,
+//           v = f_y Y/Z + c_y.
+//         $
+//         The renderer internally converts screen coordinates to NDC using
+//         $s = min(H, W)$ (important for non-square images).
+//       ]
+//       #color-block(title: [Rasterization output])[
+//         `MeshRasterizer` returns fragments:
+//         - `pix_to_face`: face index per pixel (hit/miss)
+//         - `zbuf`: per-pixel z-depth (metres when configured consistently)
+//         - optional barycentric coordinates (not used for oracle depth)
+//       ]
+//     ],
+//     [
+//       #color-block(title: [Coordinate conventions])[
+//         - PyTorch3D NDC: +X left, +Y up, right-handed.
+//         - We keep all core geometry in the physical Aria LUF world frame.
+//         - Extrinsics must be consistent with `PoseTW` conventions when building `PerspectiveCameras(R,T)`.
+//       ]
+//       #color-block(title: [Why rasterization?])[
+//         - GPU batch rendering for many candidates
+//         - Deterministic depth (z-buffer)
+//         - Works directly with mesh tensors (`verts`, `faces`)
+//       ]
+//     ],
+//   )
+// ]
 
 // ---------------------------------------------------------------------------
 // Backprojection (depth hits → world-frame point clouds)
@@ -467,9 +606,7 @@
 #section-slide(
   title: [Backprojection],
   subtitle: [Depth hits → candidate point clouds (world frame)],
-)[
-  #text(size: 16pt)[Implemented in `unproject.py` and `candidate_pointclouds.py`.]
-]
+)
 
 #slide(title: [Depth → 3D Points (Math)])[
   #grid(
@@ -494,10 +631,6 @@
         PyTorch3D provides:
         - `unproject_points(xy_depth, world_coordinates=true, from_ndc=true)`
         - Output: `p_world` for each valid pixel.
-      ]
-      #color-block(title: [Why NDC here?])[
-        Using NDC consistently matches the internal camera transform used by the rasterizer.
-        This avoids subtle “frustum ≠ points” bugs for non-square images.
       ]
     ],
   )
@@ -680,21 +813,23 @@
   ]
 ]
 
-#slide(title: [VIN: I/O Formulation + Goal])[
+#slide(title: [VIN: I/O + Shapes])[
   #grid(
     columns: (1fr, 1fr),
     gutter: 1cm,
     [
-      #color-block(title: [Inputs])[
-        - *State*: raw EFM snippet dict `efm: dict[str, Any]` (fed to #EVL).
-        - *Candidates*: `PoseTW["N 12"]` world←camera.
-        - *Reference*: last rig pose in snippet (or explicit override).
-        - Training alignment: use `OracleRriLabelBatch.depths.camera.T_camera_rig` (camera←reference).
+      #color-block(title: [Inputs (symbols)])[
+        - Snippet batch size: $B$.
+        - Candidate count per snippet: $N_c$.
+        - EVL input: raw EFM snippet dict `efm: dict[str, Any]`.
+        - Candidate poses: `PoseTW["B N_c 12"]` (world$<-$camera).
+        - Reference pose: `PoseTW["B 12"]` (world$<-$rig).
+        - Training-aligned candidates: `T_camera_rig` (camera$<-$rig) from `OracleRriLabelBatch.depths.camera`.
       ]
       #color-block(title: [Outputs])[
-        - Ordinal logits: `logits["N (K-1)"]` (CORAL thresholds).
-        - Score for selection: expected class $\hat(y)$ (normalized to $[0,1]$).
-        - Validity mask: `candidate_valid["N"]` (inside #EVL voxel bounds).
+        - CORAL logits: `logits["B N_c (K-1)"]` for $K$ ordinal classes.
+        - Candidate score: $hat(s) in [0,1]$ from expected ordinal value.
+        - Validity mask: `candidate_valid["B N_c"]` (inside EVL voxel bounds).
       ]
     ],
     [
@@ -703,17 +838,15 @@
         $
           hat(bold(q)) = "argmax"_i hat(s)_i approx "argmax"_i "RRI"(bold(q)_i).
         $
-        where $hat(s)_i$ is the normalized expected ordinal value derived from CORAL logits.
       ]
       #quote-block(color: rgb("#285f82"))[
-        Key idea: amortize “candidate → render → distance → #RRI” with a learned head that can score many candidates
-        cheaply, while keeping #EVL frozen as a strong scene prior (@EFM3D-straub2024).
+        EVL is frozen. Only pose-encoder + scorer head are trained.
       ]
     ],
   )
 ]
 
-#slide(title: [Frozen EVL Backbone: Feature Contract])[
+#slide(title: [EVL Feature Contract (frozen)])[
   #grid(
     columns: (1fr, 1fr),
     gutter: 1cm,
@@ -724,10 +857,10 @@
         - Efficient to query for many candidates (pool + sampling).
       ]
       #color-block(title: [Feature tensors we use])[
-        - `neck/occ_feat["B Cocc D H W"]` (occupancy neck volume)
-        - `neck/obb_feat["B Cobb D H W"]` (optional semantics / detection neck)
-        - `voxel/T_world_voxel: PoseTW["B 12"]`
-        - `voxel_extent["B 6"]` = $(x_min,x_max,y_min,y_max,z_min,z_max)$ in voxel frame (metres)
+        - `neck/occ_feat["B Cocc D H W"]` (geometry/context)
+        - `neck/obb_feat["B Cobb D H W"]` (optional semantics/context)
+        - `voxel/T_world_voxel: PoseTW["B 12"]` (world$<-$voxel)
+        - `voxel_extent["B 6"]` (voxel-frame AABB in metres)
       ]
     ],
     [
@@ -735,127 +868,52 @@
         - Single adapter: `oracle_rri/oracle_rri/vin/backbone_evl.py`
         - Returns a minimal “feature contract” so VIN stays insulated from upstream #EVL input/output changes.
       ]
-      #quote-block[
-        Practical stability rule: keep all EFM key expectations inside the EVL adapter; patch one place if schema
-        changes.
-      ]
+      #quote-block[Keep all EFM key expectations inside the EVL adapter; patch one place if schema changes.]
     ],
   )
 ]
 
-#slide(title: [Candidate Pose Descriptor (Shell-aware, in reference frame)])[
+#slide(title: [VIN: Descriptor + Encodings (shell_sh)])[
   #grid(
     columns: (1fr, 1fr),
     gutter: 1cm,
     [
-      #color-block(title: [Where it comes from (training)])[
-        Oracle labels are computed for a rendered subset, so VIN must be trained on the *same* candidates:
-        - `label_batch.depths.poses` (world←camera, rendered subset)
-        - `label_batch.depths.camera.T_camera_rig` (camera←reference rig, same subset)
+      #color-block(title: [Descriptor (rig frame) + shapes])[
+        From the training-aligned pose `T_camera_rig` (camera$<-$rig) we invert:
+        $
+          bold(T)_("rig"<-"cam") = (bold(T)_("cam"<-"rig"))^(-1).
+        $
 
-        We derive the descriptor from:
-        $
-          bold(T)_("rig"<-"cam") = (bold(T)_("cam"<-"rig"))^-1.
-        $
-      ]
-      #color-block(title: [Shell descriptor])[
-        Let $bold(T)_("rig"<-"cam") = (bold(R), bold(t))$, with $bold(z)_("cam") = (0,0,1)$ (LUF forward). Compute:
+        Define:
         $
           r = ||bold(t)||, \
-          bold(u) = bold(t)/(r + epsilon) in bb(S)^2, \
-          bold(f) = bold(R) bold(z)_("cam") in bb(S)^2.
+          bold(u) = bold(t)/(r + epsilon), \
+          bold(f) = bold(R) bold(z)_("cam"), \
+          s = <bold(f),-bold(u)>.
         $
-        Cheap scalar inductive bias (example):
+
+        Shapes (symbols):
+        - $bold(t)$: `(B, N_c, 3)`, $r$: `(B, N_c, 1)`
+        - $bold(u)$: `(B, N_c, 3)`, $bold(f)$: `(B, N_c, 3)`, $s$: `(B, N_c, 1)`
+      ]
+      #color-block(title: [Which encoding for which feature?])[
+        Encodings (default):
+        - SH($L$): $bold(u)$ and $bold(f)$ (directions on $bb(S)^2$).
+        - 1D Fourier: $r$ (scalar radius in metres).
+        - Scalar MLP: $s$ (and optional extra scalars).
+
+        Pose embedding:
         $
-          s = <bold(f), -bold(u)>.
+          bold(E)_("pose") = [bold(E)_u, bold(E)_f, bold(E)_r, bold(E)_s] in bb(R)^(B,N_c,d_"pose").
         $
+
+        Note: We do not use $log("SO"(3))$ / `so3log` here.
       ]
     ],
     [
       #quote-block(color: rgb("#285f82"))[
-        Why shell-aware? Candidate generation is a spherical (or biased-spherical) sampling process. Encoding directions
-        on the sphere explicitly matches that prior.
+        If candidates use `view_direction_mode=radial_away`, then $bold(f)$ often aligns with $bold(u)$ (so $s≈-1$).
       ]
-      #color-block(title: [Interpretation (intuition)])[
-        - $bold(t)$: candidate camera center in reference rig frame.
-        - $r$: how far we move (translation budget).
-        - $bold(u)$: *where* we move on the shell (direction).
-        - $bold(f)$: *where we look* (candidate optical axis).
-        - $s=<bold(f),-bold(u)>$: “look back at reference” score ($s≈1$ means looking toward the reference).
-      ]
-      #color-block(title: [No so3log])[
-        We avoid $log("SO"(3))$ / `so3log` mappings for the default VIN path. The descriptor uses *directions* and a
-        small set of scalars instead.
-      ]
-    ],
-  )
-]
-
-#slide(title: [Pose Encodings: SH (directions) + 1D Fourier (radius) + LFF baseline])[
-  #grid(
-    columns: (1fr, 1fr),
-    gutter: 1cm,
-    [
-      #color-block(title: [Spherical harmonics for $u,f in bb(S)^2$])[
-        - Encode $bold(u)$ and $bold(f)$ with *real* spherical harmonics up to degree $L$.
-        - SH feature dim: $(L+1)^2$ (per direction).
-        - Project each SH vector to a learnable embedding (small MLP).
-
-        Implementation: `oracle_rri/oracle_rri/vin/spherical_encoding.py` using
-        #link("https://github.com/e3nn/e3nn")[e3nn].
-      ]
-      #color-block(title: [1D Fourier features for radius])[
-        SH is defined on directions, not on the scalar radius. We encode
-        $r$ via 1D Fourier features (default on $log(r+epsilon)$):
-        $
-          phi(s) = [sin(2 pi bold(B) s), cos(2 pi bold(B) s)],
-          s = log(r + epsilon).
-        $
-        then project to a learnable radius embedding and concatenate.
-      ]
-    ],
-    [
-      #color-block(title: [Baseline: Learnable Fourier Features (LFF)])[
-        Optional baseline encoding (no SH):
-        - build a 6D pose vector $bold(x) = [bold(t), bold(f)] in bb(R)^6$
-        - learn a projection + sinusoidal features + MLP (LFF)
-
-        Code: `oracle_rri/oracle_rri/vin/pose_encoding.py` (based on
-        #link("https://github.com/JHLew/Learnable-Fourier-Features")[Learnable-Fourier-Features]).
-      ]
-      #color-block(title: [Which features get which encoding?])[
-        - SH: $bold(u)$ (position direction), $bold(f)$ (forward direction)
-        - 1D Fourier: $log(r+epsilon)$
-        - Scalar MLP: $s = <bold(f),-bold(u)>$ (and optional extras later)
-        - LFF baseline: $[bold(t),bold(f)]$ (6D), *not* `so3log(R)`
-      ]
-    ],
-  )
-]
-
-#slide(title: [Radius Encoding: $r$ vs $log(r+epsilon)$])[
-  #grid(
-    columns: (1fr, 1fr),
-    gutter: 0.9cm,
-    [
-      #color-block(title: [Does $log(r)$ help for $r in [0.6, 1.8]$ m?])[
-        For our current shell radii $r in [0.6, 1.8]$ m (a narrow range), $log(r)$ mainly:
-        - compresses the upper tail slightly,
-        - changes the effective frequency content of 1D Fourier features.
-
-        It is *not* essential here; using $r$ directly is a valid alternative.
-      ]
-      #color-block(title: [Recommendation])[
-        - Keep a config switch: encode either $r$ or $log(r+epsilon)$.
-        - Prefer $r$ when the radius range is narrow and fixed.
-        - Prefer $log(r+epsilon)$ when candidate radii vary strongly across scenes / policies.
-      ]
-    ],
-    [
-      #figure(
-        image(fig_path + "impl/vin/vin_radius_fourier_features.png", width: 98%),
-        caption: [Fourier feature curves differ significantly between linear and log input.],
-      )
     ],
   )
 ]
@@ -895,48 +953,6 @@
   )
 ]
 
-#slide(title: [VIN: Input Features (real snippet, shapes)])[
-  #grid(
-    columns: (1fr, 1fr),
-    gutter: 1cm,
-    [
-      #color-block(title: [EFM snippet inputs (key tensors)])[
-        Generated via `oracle_rri/scripts/summarize_vin.py` on scene `81283` (device: `cuda`, $N=4$ candidates).
-        - `rgb/img`: `Tensor(20, 3, 240, 240)`
-        - `slaml/img`: `Tensor(20, 1, 240, 320)`
-        - `slamr/img`: `Tensor(20, 1, 240, 320)`
-        - `pose/t_world_rig`: `PoseTW(20, 12)`
-        - `points/p3s_world`: `Tensor(20, 50000, 3)`
-        - `points/dist_std`: `Tensor(20, 50000)`
-        - `pose/gravity_in_world`: `Tensor(3,)`
-      ]
-      #color-block(title: [Pose descriptor + VIN concat])[
-        Derived descriptor in reference frame:
-        - $bold(t)$: `(1, 4, 3)`, $r=||bold(t)||$: `(1, 4, 1)`
-        - $bold(u)$: `(1, 4, 3)`, $bold(f)$: `(1, 4, 3)`
-        - $s = <bold(f),-bold(u)>$: `(1, 4, 1)`
-
-        VIN head input features:
-        - `E_pose`: `(1, 4, 128)`
-        - `E_global`: `(1, 4, 256)`
-        - `E_local`: `(1, 4, 128)`
-        - concat: `(1, 4, 512)`
-      ]
-    ],
-    [
-      #color-block(title: [EVL feature contract])[
-        - `occ_feat`: `(1, 64, 48, 48, 48)`
-        - `obb_feat`: `(1, 64, 48, 48, 48)`
-        - `T_world_voxel`: `PoseTW(1, 12)`
-        - `voxel_extent`: `(6,)`
-      ]
-      #quote-block[
-        EVL is frozen; only the VIN pose encoder + scorer head are trained.
-      ]
-    ],
-  )
-]
-
 #slide(title: [VIN: Shell Descriptor (concept + statistics)])[
   #grid(
     columns: (1fr, 1fr),
@@ -969,7 +985,7 @@
     [
       #figure(
         image(fig_path + "impl/vin/vin_radius_fourier_features.png", width: 98%),
-        caption: [1D Fourier features for radius: compare $r$ vs $log(r+epsilon)$ as input.],
+        caption: [1D Fourier features for radius (linear input): example $sin(2 pi omega r)$ curves.],
       )
     ],
   )
@@ -982,98 +998,19 @@
   )
 ]
 
-#slide(title: [VIN: torchsummary (ShellShPoseEncoder)])[
-  #color-block(title: [ShellShPoseEncoder (SH + 1D Fourier radius)])[
-    #text(size: 12pt)[
-      ```text
-      Layer (type:depth-idx)                   Output Shape              Param #
-      ├─Sequential: 1-1                        [-1, 4, 32]               --
-      │    ├─Linear: 2-1                       [-1, 4, 32]               544
-      │    ├─GELU: 2-2                         [-1, 4, 32]               --
-      │    └─Linear: 2-3                       [-1, 4, 32]               1,056
-      ├─Sequential: 1-2                        [-1, 4, 32]               --
-      │    ├─Linear: 2-4                       [-1, 4, 32]               544
-      │    ├─GELU: 2-5                         [-1, 4, 32]               --
-      │    └─Linear: 2-6                       [-1, 4, 32]               1,056
-      ├─FourierFeatures: 1-3                   [-1, 4, 17]               8
-      ├─Sequential: 1-4                        [-1, 4, 32]               --
-      │    ├─Linear: 2-7                       [-1, 4, 32]               576
-      │    ├─GELU: 2-8                         [-1, 4, 32]               --
-      │    └─Linear: 2-9                       [-1, 4, 32]               1,056
-      ├─Sequential: 1-5                        [-1, 4, 32]               --
-      │    ├─Linear: 2-10                      [-1, 4, 64]               128
-      │    ├─GELU: 2-11                        [-1, 4, 64]               --
-      │    └─Linear: 2-12                      [-1, 4, 32]               2,080
-
-      Total params: 7,048
-      Trainable params: 7,048
-      ```
-    ]
-  ]
-]
-
-#slide(title: [VIN: torchsummary (VinScorerHead)])[
-  #color-block(title: [VinScorerHead (MLP + CORAL)])[
-    #text(size: 12pt)[
-      ```text
-      Layer (type:depth-idx)                   Output Shape              Param #
-      ├─Sequential: 1-1                        [-1, 256]                 --
-      │    ├─Linear: 2-1                       [-1, 256]                 131,328
-      │    ├─GELU: 2-2                         [-1, 256]                 --
-      │    ├─Linear: 2-3                       [-1, 256]                 65,792
-      │    └─GELU: 2-4                         [-1, 256]                 --
-      ├─CoralLayer: 1-2                        [-1, 14]                  --
-      │    └─CoralLayer: 2-5                   [-1, 14]                  --
-      │         └─Linear: 3-1                  [-1, 1]                   256
-
-      Total params: 197,376
-      Trainable params: 197,376
-      ```
-    ]
-  ]
-]
-
-#slide(title: [Ordinal Binning: Thresholds for K classes])[
-  #grid(
-    columns: (1fr, 1fr),
-    gutter: 1cm,
-    [
-      #color-block(title: [Why bin RRI?])[
-        Raw #RRI is noisy and can be hard to regress directly.
-        VIN-NBV discretizes #RRI into ordinal bins and learns with a ranking-aware loss (CORAL).
-      ]
-      #color-block(title: [Binning procedure (RriOrdinalBinner)])[
-        Fit once on a bootstrap set of oracle labels:
-        1. Choose stage ids (baseline: all stage=0).
-        2. Compute per-stage mean/std and z-normalize:
-        $
-          z = ("rri" - mu_s) / (sigma_s + epsilon).
-        $
-        3. Soft-clip: $z_"clip" = tanh(z / tau)$.
-        4. Choose bin edges by quantiles so bins have ~equal mass.
-        5. Save binner (edges + stats) to JSON and reuse during training.
-      ]
-    ],
-    [
-      #color-block(title: [Practical notes])[
-        - Quantile edges reduce class imbalance by construction.
-        - Thresholds are global (not per-candidate-set), so scores stay comparable across snippets.
-        - In the minimal script: binner is fit online and saved as `rri_binner.json`.
-      ]
-      #color-block(title: [Where it lives])[
-        - `oracle_rri/oracle_rri/vin/rri_binning.py`
-        - used in `oracle_rri/scripts/train_vin.py`
-      ]
-    ],
+#slide(title: [VIN: Model Summary (rich)])[
+  #figure(
+    image(fig_path + "impl/vin/vin_rich_summary.png", width: 92%),
+    caption: [Model overview (trainable modules + parameter counts) generated with `oracle_rri.utils.rich_summary`.],
   )
 ]
 
-#slide(title: [Ordinal Binning: Example fit on oracle labels])[
+#slide(title: [Ordinal Binning: Thresholds + Example])[
   #grid(
     columns: (1fr, 1fr),
     gutter: 0.9cm,
     [
-      #color-block(title: [What the thresholds represent])[
+      #color-block(title: [Fit once: map scalar RRI → ordinal label])[
         We fit a single global set of edges $bold(e) in bb(R)^{K-1}$ in clipped z-score space:
         $
           z = ("rri" - mu_s) / (sigma_s + epsilon), \
@@ -1081,12 +1018,12 @@
           y = sum_(j=1)^(K-1) bb(1)_(z_"clip" > e_j).
         $
 
-        Quantile fitting makes bins approximately balanced (good for CORAL training stability).
+        - Choose $bold(e)$ by quantiles of $z_"clip"$ (bins ~balanced).
+        - Thresholds are global (not per-candidate-set) so scores remain comparable across snippets.
       ]
-      #color-block(title: [Why not “rank within a candidate set”?])[
-        We need *absolute* labels so scores are comparable across snippets:
-        - per-set ranks destroy cross-scene calibration,
-        - selection uses $hat(s)$ across candidates, not across batches.
+      #color-block(title: [Where it lives])[
+        - `oracle_rri/oracle_rri/vin/rri_binning.py`
+        - saved once (JSON) and reused during training/inference
       ]
     ],
     [
@@ -1177,20 +1114,17 @@
 #slide(title: [Open Questions (VIN design choices)])[
   #color-block(title: [Backbone features])[
     - Use only `occ_feat` or also `obb_feat` (semantics) for #RRI prediction?
-    - Should we compress voxel channels (1×1×1 conv) before pooling/sampling?
+    - Compress voxel channels (1×1×1 conv) before pooling/sampling?
   ]
   #color-block(title: [Candidate-conditioned query])[
-    - Center sampling vs. frustum point sampling (rays/depths) vs. tiny attention over points?
-    - How strict should validity masking be (depth-hit count, voxel bounds, free-space)?
+    - Center sampling vs. frustum point sampling (rays/depths) vs. tiny CA over points?
   ]
   #color-block(title: [Pose encoding])[
     - SH degree $L$ (2 vs 3) and normalization choice; include camera *up* direction?
-    - Radius encoding: $r$ vs $log(r+epsilon)$; number of Fourier frequencies; learnable vs fixed $bold(B)$.
     - Which scalar terms help most: $<bold(f),-bold(u)>$, height, gravity alignment, etc.?
   ]
   #color-block(title: [Ordinal setup + training])[
     - $K$ bins (15 default): does more resolution help or just add label noise?
-    - Stage definition for stage-aware normalization: how to define “stage” in ASE snippets?
     - Metrics to optimize/report: Spearman rank corr, top-$k$ recall, calibration of predicted scores.
   ]
 ]
@@ -1224,7 +1158,7 @@
     columns: (1fr, 1fr),
     gutter: 1cm,
     [
-      #color-block(title: [Symptoms we observed])[
+      #color-block(title: [Observed Issues])[
         - Backprojected points “all lie in front” of the reference pose.
         - Depth maps invalid for candidates that look away from the reference.
         - Frusta visualization didn’t match the backprojected points.
@@ -1239,8 +1173,10 @@
           + Convert pixel centers `(x+0.5, y+0.5)` to NDC (min-side scaling) and unproject with `from_ndc=true`.
         - *Histogram semantics*:
           + Mask miss pixels (`depths_valid_mask`) when computing hit ratios / histograms / backprojection.
-        - *Aria UI rotation*:
-          + `rotate_yaw_cw90` is visual-only; do not apply it to physical geometry.
+        - *Rig-basis vs display twist*:
+          + `rotate_yaw_cw90` is a fixed 90° twist about the pose-local `+Z` (forward) axis.
+          + Apply it once as a rig-basis correction for candidate generation (otherwise azimuth/elevation look swapped).
+          + Do not apply it again in candidate plotting: double-rotation becomes obvious once roll jitter is enabled.
       ]
     ],
   )

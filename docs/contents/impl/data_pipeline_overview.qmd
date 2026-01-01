@@ -16,6 +16,8 @@ Pages in the app:
 - **Data**: load one `EfmSnippetView` from ASE/ATEK (GT mesh optional).
 - **Candidate Poses**: sample NBV candidates with collision / free-space rules.
 - **Candidate Renders**: render depth for valid candidates via PyTorch3D.
+- **RRI**: compute oracle RRI scores and compare point-cloud distances.
+- **VIN Diagnostics**: run VIN `forward_with_debug` on oracle batches and inspect internal tensors.
 
 The app caches configs + results in `st.session_state`. “Run previous” auto-runs earlier stages with cached settings; background threads keep the UI responsive.
 
