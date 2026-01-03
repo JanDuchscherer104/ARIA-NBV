@@ -10,3 +10,6 @@
 [submodule "external/efm3d"]
 	path = external/efm3d
 	url = https://github.com/facebookresearch/efm3d
+[submodule "external/PointNeXt"]
+	path = external/PointNeXt
+	url = git@github.com:guochengqian/PointNeXt.git

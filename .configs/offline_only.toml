@@ -2,25 +2,37 @@ run_mode = "train"
 
 [datamodule_config]
 # Offline cache usage
-num_workers                       = 16
-persistent_workers                = true
-shuffle                           = true
-use_train_as_val                  = false
+num_workers = 16
+persistent_workers = true
+shuffle = true
+use_train_as_val = false
 train_cache_new_samples_per_epoch = 0
-val_cache_new_samples_per_epoch   = 0
+val_cache_new_samples_per_epoch = 0
+efm_keep_keys = [
+    # EfmTrajectory
+    'pose/t_world_rig',
+    'pose/time_ns',
+    'pose/gravity_in_world',
+    # SemiDense Point Cloud
+    'points/p3s_world',
+    'points/dist_std',
+    'points/inv_dist_std',
+    'points/time_ns',
+    'scene/points/vol_min',
+    'scene/points/vol_max',
+    'points/lengths',
+]
 
     [datamodule_config.train_cache]
     load_backbone       = true
-    map_location        = "cpu"
     split               = "train"
-    include_efm_snippet = false
+    include_efm_snippet = true
     include_gt_mesh     = false
 
     [datamodule_config.val_cache]
     load_backbone       = true
-    map_location        = "cpu"
     split               = "val"
-    include_efm_snippet = false
+    include_efm_snippet = true
     include_gt_mesh     = false
 
 [trainer_config]
@@ -33,7 +45,7 @@ max_epochs              = 50
 accelerator             = "auto"
 devices                 = "auto"
 log_every_n_steps       = 1
-gradient_clip_val       = 3.0
+gradient_clip_val       = 8.0
 use_wandb               = true
 
     [trainer_config.callbacks]
@@ -54,33 +66,49 @@ use_wandb               = true
     rich_summary_max_depth  = 4
 
 [module_config]
-num_classes             = 15
-save_binner             = true
-binner_path             = ".logs/vin/rri_binner.json"
-use_valid_frac_weight   = true
-valid_frac_weight_floor = 0.1
-aux_regression_loss     = "huber"
-log_grad_norms          = true
+num_classes                 = 15
+save_binner                 = true
+binner_path                 = ".logs/vin/rri_binner.json"
+aux_regression_loss         = "huber"
+aux_regression_weight       = 10.0
+aux_regression_weight_gamma = 0.90
+aux_regression_weight_min   = 0.1
+log_grad_norms              = true
+coral_bias_init             = "prior_logits"
+coral_loss_variant          = "coral"
+coral_balance_source        = "binner"
 
     [module_config.optimizer]
     learning_rate = 3e-4
     weight_decay  = 1e-3
 
+    [module_config.lr_scheduler]
+    max_lr           = 1e-3
+    pct_start        = 0.15
+    anneal_strategy  = "cos"
+    div_factor       = 25.0
+    final_div_factor = 1e-4
+
     [module_config.vin]
     # VIN v2 core knobs
-    num_classes                    = 15
-    head_hidden_dim                = 192
-    head_num_layers                = 2
-    head_dropout                   = 0.05
-    head_activation                = "gelu"
-    coral_preinit_bias             = true
-    field_dim                      = 16
-    field_gn_groups                = 4
-    occ_pr_is_logits               = false
-    apply_cw90_correction          = true
-    tf_pos_grid_in_candidate_frame = false
-    global_pool_grid_size          = 6
-    scene_field_channels           = ["occ_pr", "occ_input", "counts_norm", "cent_pr"]
+    num_classes = 15
+    head_hidden_dim = 192
+    head_num_layers = 3
+    head_dropout = 0.05
+    head_activation = "gelu"
+    coral_preinit_bias = true
+    field_dim = 16
+    field_gn_groups = 4
+    apply_cw90_correction = true
+    global_pool_grid_size = 6
+    scene_field_channels = [
+        "occ_pr",
+        "occ_input",
+        "counts_norm",
+        "cent_pr",
+        "free_input",
+        "new_surface_prior",
+    ]
 
         [module_config.vin.backbone]
         model_cfg     = ".configs/evl_inf_desktop.yaml"
@@ -110,3 +138,29 @@ log_grad_norms          = true
         output_dim    = 12
         gamma         = 1.0
         include_input = false
+
+        [module_config.vin.point_encoder]
+        # PointNeXt-S semidense encoder (uses include_inv_dist_std in VinModelV2)
+        cfg_path        = "PointNeXt/cfgs/s3dis/pointnext-s.yaml"
+        checkpoint_path = "s3dis-train-pointnext-s-ngpus1-seed1742-20220525-162639-Gz4ViiL95b6KP9MMH2ytG3_ckpt_best.pth"
+        out_dim         = 128
+        max_points      = 3000
+        freeze          = true
+        strict_load     = false
+
+        [module_config.vin.traj_encoder]
+        pool_mode = "mean"
+
+            [module_config.vin.traj_encoder.pose_encoder]
+            kind                 = "r6d_lff"
+            pose_scale_init      = [1.0, 1.0]
+            pose_scale_learnable = true
+            pose_scale_eps       = 1e-6
+
+                [module_config.vin.traj_encoder.pose_encoder.pose_encoder_lff]
+                input_dim     = 9
+                fourier_dim   = 64
+                hidden_dim    = 128
+                output_dim    = 32
+                gamma         = 1.0
+                include_input = false
