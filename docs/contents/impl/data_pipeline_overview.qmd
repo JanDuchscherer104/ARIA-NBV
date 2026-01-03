@@ -18,6 +18,8 @@ Pages in the app:
 - **Candidate Renders**: render depth for valid candidates via PyTorch3D.
 - **RRI**: compute oracle RRI scores and compare point-cloud distances.
 - **VIN Diagnostics**: run VIN `forward_with_debug` on oracle batches and inspect internal tensors.
+- **W&B Analysis**: compare multiple W&B runs in the project, including train/val dynamics and config-driven performance trends.
+- **Testing & Attribution**: load checkpoints and compute VIN head attributions on cached samples.
 
 The app caches configs + results in `st.session_state`. “Run previous” auto-runs earlier stages with cached settings; background threads keep the UI responsive.
 

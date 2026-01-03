@@ -246,3 +246,138 @@ aux_loss = smooth_l1(pred_rri, rri)
 
 This keeps the model **single‑head**, ensures **probabilistic correctness**, and
 lets the bin representatives adapt while remaining monotone.
+
+---
+
+## 10. Training dynamics, monitoring, and two practical fixes
+
+During offline training runs we repeatedly observed the same signature:
+
+- **Aux regression loss** (Huber/Smooth‑L1 on the CORAL-derived expected value) drops very quickly (often “exponentially” in the first epochs).
+- **CORAL loss** improves more slowly.
+- Early confusion matrices show a **central-band** pattern (many samples predicted into a narrow set of middle bins).
+
+This is expected given the current implementation, and it leads directly to two
+high-impact practical fixes.
+
+### 10.1 Why the auxiliary loss drops so fast
+
+In `oracle_rri/oracle_rri/lightning/lit_module.py`, the combined objective is
+currently implemented as:
+
+```python
+combined_loss = coral_loss_value + aux_loss
+```
+
+This implicitly sets the auxiliary weight to **λ = 1**, even though CORAL loss
+and auxiliary regression loss typically live on very different numeric scales:
+
+- CORAL loss with `K=15` bins starts around ~7–10.
+- Huber on a normalized-ish scalar target can quickly drop to ~1e-2.
+
+So the auxiliary term provides a clean early calibration gradient and then
+rapidly becomes negligible. The “central-band” confusion matrix is consistent
+with the model initially learning a conservative **conditional-mean / median**
+proxy before it has learned sharp ordinal separation.
+
+### 10.2 Fix #1: add an explicit auxiliary weight λ
+
+Make the combined loss explicit:
+
+$$
+\mathcal{L} = \mathcal{L}_{\text{CORAL}} + \lambda_{\text{aux}}\,\mathcal{L}_{\text{aux}}(\hat r, r)
+$$
+
+Even if $\mathcal{L}_{\text{aux}}$ becomes small, $\lambda_{\text{aux}}$ controls
+how much the auxiliary objective shapes representation learning early on.
+
+**Rule of thumb from the observed magnitudes**:
+
+- If CORAL ≈ 8 and aux ≈ 0.03, then values like $\lambda_{\text{aux}}\in[5,50]$
+  make the aux signal meaningful without dominating.
+- Alternatively set $\lambda_{\text{aux}}\approx 0.1$ if aux should be a light
+  calibrator only.
+
+Implementation-wise, this is best exposed as a config field (e.g.
+`aux_regression_weight`) and applied as:
+
+```python
+combined_loss = coral_loss_value + aux_regression_weight * aux_loss
+```
+
+#### Exponential decay schedule (recommended)
+
+Given the training dynamics we observed, make $\lambda_{\text{aux}}$ decay
+exponentially over time while keeping a small nonzero floor:
+
+$$
+\lambda_{\text{aux}}(t) = \max(\lambda_{\min}, \lambda_0 \cdot \gamma^{t})
+$$
+
+where $t$ is either epoch or global step, and $\gamma \in (0, 1]$ controls the
+decay speed. This preserves the early calibration signal but gradually shifts
+focus to ordinal separation.
+
+**Theory intuition.** The combined objective is a weighted sum of two signals
+with very different curvature scales. Early in training, the aux term provides
+a strong gradient toward a reasonable conditional mean, but once it enters the
+quadratic (Huber) regime it quickly becomes small. An exponential schedule
+implements a *smooth continuation* from a calibrated-regression objective to an
+ordinal-ranking objective, without abruptly removing the auxiliary signal. The
+nonzero floor prevents drift of learnable bin values and keeps mild calibration
+pressure late in training.
+
+In code/config:
+
+```toml
+[module_config]
+aux_regression_weight = 10.0
+aux_regression_weight_gamma = 0.98
+aux_regression_weight_min = 0.5
+aux_regression_weight_interval = "epoch" # or "step"
+```
+
+### 10.3 Fix #2: schedule LR on the hard metric, not the easy one
+
+The default `ReduceLrOnPlateauConfig` monitors:
+
+```python
+monitor: str = "train/loss"
+```
+
+But `train/loss` is the **sum** of CORAL and aux. Because aux improves quickly,
+the LR scheduler can keep seeing improvements even when CORAL plateaus.
+
+For CORAL-driven learning, prefer monitoring the validation CORAL loss:
+
+- `monitor = "val/coral_loss"`
+
+In TOML, that looks like:
+
+```toml
+[module_config.lr_scheduler]
+monitor = "val/coral_loss"
+```
+
+### 10.4 Sanity checks for CORAL learning signals
+
+- **Chance-level baseline:** if CORAL loss is the sum over `K-1` binary
+  thresholds, a rough random baseline is $(K-1)\log 2$ (for `K=15` this is
+  $\approx 14\log 2 \approx 9.70$). Our code logs `coral_loss_rel_random` using
+  `coral_random_loss(K)` so you can track progress relative to chance.
+- **Central-band confusion matrices:** often indicate “mean-optimal” predictions
+  early, not necessarily a bug. They should widen over epochs as ordinal
+  separation improves.
+
+### 10.5 Learnable bin representatives: initialization is not enough
+
+We already support **monotone** learnable bin values `u_k` and initialization
+from the fitted binner. If you make `u_k` learnable, consider adding the
+regularizer term to the training objective explicitly:
+
+$$
+\mathcal{L}_{u} = \alpha \sum_{k=0}^{K-1} (u_k - \mu_k)^2
+$$
+
+This prevents the model from “cheating” by shifting bin values instead of
+learning the correct ordinal probabilities.

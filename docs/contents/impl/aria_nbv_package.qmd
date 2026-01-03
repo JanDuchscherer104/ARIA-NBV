@@ -95,9 +95,9 @@ with a small \(\varepsilon\) for stability. Positive values indicate improvement
 
 # Theoretical context (Wikipedia quick refs)
 
-- **Active perception/vision**: NBV is an instance of active perception—moving the sensor to harvest more informative observations; active vision systems explicitly reorient cameras to reduce occlusion and improve depth estimates. citeturn1search12turn1search13
-- **Point clouds as state**: Our reconstruction state \(P_t\) is a point cloud—an unordered set of 3D samples that approximates scene geometry. citeturn1search0
-- **Chamfer vs. Hausdorff**: The Chamfer distance we use for RRI is a smooth, averaged variant of the symmetric Hausdorff distance between two point sets, trading strict worst-case guarantees for robustness to outliers. citeturn0search12
+- **Active perception/vision**: NBV is an instance of active perception—moving the sensor to harvest more informative observations; active vision systems explicitly reorient cameras to reduce occlusion and improve depth estimates. [Wikipedia :: Active perception](https://en.wikipedia.org/wiki/Active_perception)
+- **Point clouds as state**: Our reconstruction state \(P_t\) is a point cloud—an unordered set of 3D samples that approximates scene geometry. [Wikipedia :: Point cloud](https://en.wikipedia.org/wiki/Point_cloud)
+- **Chamfer vs. Hausdorff**: The Chamfer distance we use for RRI is a smooth, averaged variant of the symmetric Hausdorff distance between two point sets, trading strict worst-case guarantees for robustness to outliers. [Wikipedia :: Chamfer distance](https://en.wikipedia.org/wiki/Chamfer_distance); [Wikipedia :: Hausdorff distance](https://en.wikipedia.org/wiki/Hausdorff_distance)
 
 ```{mermaid}
 sequenceDiagram

@@ -35,31 +35,29 @@ cd oracle_rri
 uv sync --extra xformers
 ```
 
-## Direct Installation into the Conda Environment
+## Optional: OpenPoints (Linux only)
 
 ```bash
-cd oracle_rri
-conda env create -f environment.yml
-conda activate aria-nbv
+# OpenPoints is built via the openpoints-shim dependency during uv sync.
+# Ensure the submodule is present (PointNeXt lives in external/PointNeXt).
+git submodule update --init --recursive external/PointNeXt
 
-uv pip install --python "$(which python)" -e ".[dev, notebook]"
-uv pip install --python "$(which python)" -e ".[pytorch3d]"
-uv pip install --python "$(which python)" -e ".[xformers]"
-uv pip install --python "$(which python)" -e ../external/efm3d
+# Default: builds pointnet2_batch + chamfer ops needed by OpenPoints imports.
+uv sync --all-extras
 
-echo "Verifying installation..."
-python -c "import efm3d; import oracle_rri; print('All packages installed successfully')"
-echo "Setup complete! Activate with: conda activate aria-nbv"
+# Optional toggles (re-run uv sync to rebuild):
+OPENPOINTS_BUILD_POINTOPS=1 uv sync --all-extras
+OPENPOINTS_BUILD_SUBSAMPLING=1 uv sync --all-extras
+# Chamfer is enabled by default; override only if you want to skip it:
+OPENPOINTS_BUILD_CHAMFER_DIST=0 uv sync --all-extras
+OPENPOINTS_BUILD_EMD=1 uv sync --all-extras
 ```
 
-<!-- #TODO: Correct -->
-## PyTorch3D Setup
-https://github.com/facebookresearch/pytorch3d/blob/main/INSTALL.md
-```py
-╰─ conda install pytorch3d -c pytorch3d
-```
+The build uses the CUDA toolkit found on `PATH` (aria-nbv provides CUDA 12.1). If `nvcc` is not found, set `CUDA_HOME` or `OPENPOINTS_TORCH_CUDA_ARCH_LIST` explicitly.
 
 # Data Setup
 
 - download the [Dinov2 ViTB14 checkpoint](https://huggingface.co/zgcr654321/pretrained_models/blob/cc2e7aace55d6f06716dcf444c29d97bac0a99da/dinov2_pretrain_official_pytorch_weights/dinov2_vitb14_reg4_pretrain.pth) and place it in `.logs/ckpts/`
--
+- PointNeXt-S checkpoint:
+  - [Google Drive Link](https://drive.google.com/drive/folders/1UG8hh_CrUf-OhrYbcDd0zvDtoInrGP1u) - download, and move `s3dis-train-pointnext-s-ngpus1-seed1742-20220525-162639-Gz4ViiL95b6KP9MMH2ytG3_ckpt_best.pth` to `.logs/ckpts/`
+  - [Model Zoo](https://guochengqian.github.io/PointNeXt/modelzoo/)

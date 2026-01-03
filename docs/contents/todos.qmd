@@ -36,6 +36,33 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 - *CORAL*:
   - The ordinal tresholds need to be known apriori and depend upon the distribution of RRI values in the training data and hence our CanidateGeneration settings.
 
+# VIN v2 architecture alignment (from review)
+
+## Initial considerations
+
+- Semidense projection **is** part of the official VIN v2 architecture; documentation should reflect the per-candidate projection features and where they enter the head.
+- FiLM usage in VIN v2 is now documented as an **optional conditioning** mechanism; keep or remove based on ablations.
+
+## Action items
+
+- [x] **Fix `VinPrediction` field mismatch**: `candidate_valid` / `valid_frac` are passed by v1/v1_SH/pipeline but missing from `vin/types.py::VinPrediction`. Align the dataclass with all call sites and update any dependent docs.
+  - **Done**: Added `candidate_valid` + `valid_frac` to `VinPrediction` and updated `VinModelV2` to populate them.
+- [x] **Validate `scene_field_channels` against constructed aux map** in `VinModelV2._build_field_bundle` so configs that include `observed`, `free_input`, or `new_surface_prior` don’t silently break. Either implement these channels or disallow them with a clear error.
+  - **Done**: Implemented derived channels and raised a `ValueError` for unknown entries.
+- [x] **Fix `counts_norm` normalization clamp** in `VinModelV2._build_field_bundle` so the ratio is clamped to `[0,1]` (currently the denominator is clamped, which can allow values > 1).
+  - **Done**: Clamp is applied to the ratio after `log1p` normalization.
+- [x] **Fix key/value separation in `PoseConditionedGlobalPool`**: positional embeddings should affect **keys only**, not values. Ensure the attention call uses separate `keys` and `values` tensors.
+  - **Done**: Split K/V tensors and added a residual + LN + MLP block for stability.
+- [x] **Doc/code alignment for VIN v2**:
+  - **Done**: Updated `docs/contents/impl/vin_nbv.qmd` to include semidense projection + MHCA frustum features, trajectory context, and current default `scene_field_channels`.
+- [x] **Add tests**:
+  - **Done**: Added unit tests for `counts_norm` range, `scene_field_channels` validation, and K/V separation; added integration checks on a real snippet for semidense projection + frustum features.
+- [ ] **Explore learnable per-channel gates/thresholds** for scene-field channels (e.g., suppress low-confidence `cent_pr`).
+- [ ] **Explore learnable CORAL bin shifts** (e.g., trainable bin centers or offsets).
+- [ ] **Prototype RGB/DINOv2 view-plane features** aligned to candidate poses.
+- [ ] **Candidate-relative positional encoding** for global attention keys (rig → candidate frame).
+- [ ] **Stage-aware features or binning** to reduce early/late reconstruction bias.
+
 # Highest Priority
 
 ## Training
@@ -246,7 +273,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
   - `state.py`: typed `AppState` stored in `st.session_state`
   - `controller.py`: stage orchestration + typed caches (no `st.cache_*`)
   - `ui.py`: layout + widget helpers
-  - `panels.py`: plotting-only page renderers (UI + plots only)
+  - `panels/`: plotting-only page renderers (UI + plots only)
 - Shared compute pipeline: `OracleRriLabeler` (`oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`) used by the RRI
   page and reusable for training/CLI.
 
@@ -270,7 +297,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
 - **Fix:** Rebuilt the app in `oracle_rri/oracle_rri/app/` with explicit separation of concerns:
   - orchestration in `PipelineController`,
   - compute in `OracleRriLabeler` (`oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`),
-  - plotting-only page functions in `panels.py`,
+  - plotting-only page functions in `panels/`,
   - typed session state (`AppState`) instead of “untyped cache blobs”.
 
 #### Issue: “Run ALL” / “Run / refresh …” didn’t actually recompute (cached results reused)

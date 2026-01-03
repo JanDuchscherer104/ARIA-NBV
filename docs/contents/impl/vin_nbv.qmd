@@ -16,6 +16,7 @@ References:
 - CORAL ordinal regression (implementation): [coral-pytorch](https://raschka-research-group.github.io/coral-pytorch/) ([GitHub](https://github.com/Raschka-research-group/coral-pytorch))
 - Oracle label pipeline: [RRI computation](rri_computation.qmd) and `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`
 - VIN implementation: `oracle_rri/oracle_rri/vin/model.py` (`VinModel`), `oracle_rri/oracle_rri/vin/model_v2.py` (`VinModelV2`), and `oracle_rri/oracle_rri/lightning/lit_module.py` (`VinLightningModule.summarize_vin`)
+- Optional trajectory encoder: `oracle_rri/oracle_rri/vin/traj_encoder.py` (`TrajectoryEncoder`) for R6D+LFF encoding of `EfmTrajectoryView.t_world_rig`. In VIN v2, per-frame trajectory encodings are transformed into the reference rig frame and can be cross-attended by candidate pose embeddings.
 
 # Problem statement
 
@@ -336,7 +337,7 @@ And all of these are in the same **gravity-aligned voxel frame**, so frustum sam
 [1]: https://github.com/facebookresearch/efm3d/raw/main/efm3d/model/lifter.py "raw.githubusercontent.com"
 [2]: https://github.com/facebookresearch/efm3d/raw/main/efm3d/model/evl.py "raw.githubusercontent.com"
 [3]: https://github.com/facebookresearch/efm3d/raw/main/efm3d/config/evl_inf_desktop.yaml "raw.githubusercontent.com"
-[3]: https://github.com/facebookresearch/efm3d/raw/main/efm3d/utils/voxel_sampling.py "raw.githubusercontent.com"
+[4]: https://github.com/facebookresearch/efm3d/raw/main/efm3d/utils/voxel_sampling.py "raw.githubusercontent.com"
 
 # Candidate pose parameterization (shell-aware descriptor in reference frame)
 
@@ -570,26 +571,93 @@ architecture toggles while exposing a **configurable pose encoder** via a discri
      [@pytorch3d-transforms]).
    - **Optional (`shell_lff`, `shell_sh`)**: shell descriptors $(u,f,r,s)$ with forward direction only. These ignore
      roll about the forward axis, which is acceptable when roll jitter is small; use `r6d_lff` if roll matters.
-2. **Scene field (fixed channels).**
-   We always use `["occ_pr", "cent_pr", "counts_norm", "occ_input", "free_input", "new_surface_prior"]` to emphasize
-   occupancy, centerness, coverage, and unknown‑but‑occupied voxels. Derived channels use **soft** counts‐based
-   weights (no hard thresholds), then project with `1×1×1 Conv3d + GroupNorm + GELU`.
+2. **Scene field (configurable channels).**
+   The current implementation constructs a compact field from EVL heads/evidence and then projects it with
+   `1×1×1 Conv3d + GroupNorm + GELU`. The **implemented** channels are:
+
+   - `occ_pr`, `cent_pr`, `occ_input`, `counts_norm`,
+   - `observed`, `unknown`, `free_input`, `new_surface_prior`.
+
+   The default `scene_field_channels` list is
+   `["occ_pr", "occ_input", "counts_norm", "cent_pr", "free_input", "new_surface_prior"]`.
 3. **Global context (pose-conditioned attention).**
    A coarse voxel grid is pooled and attended by the pose embeddings. Keys are augmented with an **LFF positional
    encoding over XYZ voxel centers** derived from `voxel/pts_world` (normalized voxel coordinates) before attention.
-4. **No frustum sampling (for now).**
-   The v2 head **does not** query local frustum tokens; it relies on pose + voxel-pose + global context only.
-5. **CORAL head.**
-   We concatenate `[pose_enc, global_feat]` and score with the CORAL head.
-6. **Frame correction (cw90).**
+   The pooler now uses **separate keys and values**, plus a minimal **LayerNorm + residual + MLP** block for stability.
+4. **View-dependent semidense features (official).**
+   For each candidate, we project semidense points into the candidate view and compute lightweight coverage/depth
+   statistics (coverage, empty fraction, valid fraction, depth mean/std). In addition, the same projected points
+   are summarized with **multi-head cross-attention (MHCA)** conditioned on the candidate pose, producing a
+   view‑specific frustum descriptor. Both signals are appended to the head input and provide explicit VIN‑NBV‑style
+   view conditioning.
+5. **Optional semidense point encoder (PointNeXt‑S).**
+   A snippet‑level semidense embedding can be computed once and repeated for all candidates. This is useful as a
+   global scene prior but is not view‑specific; it is therefore treated as an auxiliary signal. When enabled, the
+   embedding can modulate `global_feat` via a FiLM‑style scale/shift
+   (feature‑wise linear modulation [@FiLM-perez2018]) — currently an experimental option.
+6. **Optional trajectory context.**
+   If enabled, a trajectory encoder summarizes the snippet’s rig poses and appends the context to each candidate.
+7. **CORAL head.**
+   We concatenate `[pose_enc, global_feat, semidense_proj, semidense_frustum, semidense_feat?, traj_ctx?]` and
+   score with the CORAL head.
+8. **Frame correction (cw90).**
    If candidates/poses were rotated by `rotate_yaw_cw90` in the labeler, the model **undoes** the rotation on
    the input poses (no camera rebuild is needed in v2).
+
+**Pose conditioning pathways.** In v2, pose information reaches the head along two paths:
+
+- **Direct**: `pose_enc` is concatenated into the final feature vector.
+- **Contextual**: `pose_enc` is also used as the query for pose‑conditioned attention over the voxel field.
+
+This makes the model robust to early attention instability while still enabling view‑aware global context.
+
+## Known issues / improvement targets (VIN v2)
+
+- **Candidate-relative positional encoding**: global attention still uses absolute voxel positions in the
+  reference rig frame. Relative encodings often help in 3D attention; consider switching to candidate‑relative
+  positions (see Point Transformer [@point-transformer-zhao2021]).
+- **Stage effects**: VIN‑NBV uses stage‑normalized binning to handle early vs late reconstruction phases
+  [@VIN-NBV-frahm2025]. Adding a stage proxy scalar (e.g., mean coverage or point count) is a low‑cost improvement.
+
+## Semidense projection features (current)
+
+`VinModelV2` computes per‑candidate projection features from semidense points using the candidate cameras. The
+feature vector is:
+
+- `coverage`: fraction of pixels hit by at least one point,
+- `empty_frac`: `1 - coverage`,
+- `valid_frac`: fraction of projected points that fall inside the image bounds,
+- `depth_mean`, `depth_std`: depth statistics of valid projected points.
+
+These features are concatenated into the head input and act as an explicit view‑conditioning signal, similar in
+spirit to VIN‑NBV’s projection‑based view descriptors.
+
+## Semidense frustum MHCA (current)
+
+`VinModelV2` also summarizes the **projected semidense points** with a lightweight
+multi‑head cross‑attention (MHCA) block, using candidate pose embeddings as queries.
+The token features are built from normalized screen coordinates, depth, and (optionally)
+inverse distance standard deviation. This yields a **view‑specific frustum descriptor**
+that complements the scalar projection statistics and injects a stronger inductive bias
+for “what lies in front of the candidate.”
+This block is optional and gated by `VinModelV2Config.enable_semidense_frustum` (default: `False`).
+
+## Suggested upgrade roadmap (summary)
+
+1. **(Done)** Key/value separation + residual/LN around the pose‑conditioned attention block.
+2. **(Done)** View‑conditioned point features via semidense projection + MHCA frustum summary.
+3. **Add a stage proxy scalar** (e.g., coverage mean, max counts, or point count) to the head input.
+4. **Switch positional encoding to candidate‑relative** coordinates for attention keys.
+5. **Optionally add voxel‑frustum local evidence** (sample a small K‑point frustum and pool).
+6. **Optionally add candidate view‑plane feature grids** (VIN‑NBV‑style projection + CNN head).
 
 ## VIN internal architecture (current, with tensor shapes)
 
 Shapes below match the current `VinLightningModule.summarize_vin()` output for a typical oracle batch with `B=1`,
-`N=32` candidates, EVL voxel grid resolution `48³`, and VIN defaults (`grid_size=4`, `depths_m=[0.5,1,2,3]`).
-When `use_voxel_pose_encoding=True`, the concatenated feature dimension increases by `E_pose` (default +64).
+`N=32` candidates, EVL voxel grid resolution `48³`, and VIN defaults. The v2 head does **not** use voxel‑frustum
+sampling; instead, it includes **semidense projection features** per candidate
+(`SEMIDENSE_PROJ_DIM=5`: coverage, empty fraction, valid fraction, depth mean/std) plus an optional **semidense frustum MHCA**
+summary (`field_dim` channels, when enabled), and optional snippet‑level semidense/trajectory context embeddings.
 
 ```{mermaid}
 flowchart TD
@@ -602,39 +670,40 @@ flowchart TD
 
     subgraph Frozen["Frozen EVL backbone"]
         evl["EvlBackbone.forward(efm)"]
-        out["EvlBackboneOutput<br/>occ_pr: (B,1,48,48,48)<br/>occ_input: (B,1,48,48,48)<br/>counts: (B,48,48,48)<br/>T_world_voxel: PoseTW(B,12)<br/>voxel_extent: (B,6)"]
+        out["EvlBackboneOutput<br/>occ_pr/cent_pr/occ_input/counts<br/>T_world_voxel, voxel_extent, pts_world"]
     end
 
-    subgraph VIN["Trainable VIN head (~14.6k params)"]
-        field_in["scene_field<br/>field_in: (B,C_in,48,48,48)<br/>C_in=len(scene_field_channels)=3"]
-        proj["field_proj<br/>1×1×1 Conv3d + GN + GELU<br/>field: (B,16,48,48,48)"]
-        gpool["global_pool (attn / mean / mean+max)<br/>global_feat: (B,N,C_global)"]
+    subgraph VIN["Trainable VIN v2 head"]
+        field_in["scene_field<br/>field_in: (B,C_in,D,H,W)"]
+        proj["field_proj<br/>1×1×1 Conv3d + GN + GELU"]
+        pos["pos_grid from pts_world<br/>rig frame + LFF"]
+        gpool["pose-conditioned attention<br/>global_feat: (B,N,C)"]
 
         rel["relative pose<br/>T_rig_ref_cam = T_world_rig_ref^{-1} T_world_cam"]
-        posefeat["t: (B,N,3)<br/>r: (B,N,1)<br/>u: (B,N,3)<br/>f: (B,N,3)<br/>s=<f,-u>: (B,N,1)"]
-        poseenc["LearnableFourierFeatures<br/>pose_enc: (B,N,64)"]
+        poseenc["pose_enc (R6D+LFF or shell)<br/>pose_enc: (B,N,E_pose)"]
 
-        frustum["frustum points (world)<br/>grid_size=4, depths=[0.5,1,2,3] m<br/>K=64 points_world: (B,N,K,3)"]
-        sample["sample_voxel_field<br/>tokens: (B,N,K,16)<br/>token_valid: (B,N,K)"]
-        lpool["pool over K<br/>unknown-token mean or masked mean<br/>local_feat: (B,N,16)"]
-        cvalid["candidate_valid<br/>(B,N) from mean(token_valid)"]
+        semproj["semidense projection<br/>coverage/empty/valid/depth stats<br/>semidense_proj: (B,N,5)"]
+        semfrustum["optional semidense frustum MHCA<br/>frustum_feat: (B,N,C)"]
+        semfeat["optional PointNeXt-S<br/>semidense_feat: (B,C_point)"]
+        traj["optional trajectory ctx<br/>traj_ctx: (B,C_traj)"]
+        film["optional FiLM on global_feat"]
 
-        concat["concat feats<br/>[pose_enc, global_feat, local_feat, valid_frac, voxel_pose_enc?]<br/>feats: (B,N,C_feat)"]
-        head["VinScorerHead<br/>MLP(96→128) + CORAL(K=15)<br/>logits: (B,N,14)"]
-        prob["coral_logits_to_prob<br/>prob: (B,N,15)"]
-        exp["expected = Σ σ(logit_k)<br/>expected, expected_norm: (B,N)"]
+        concat["concat feats<br/>[pose_enc, global_feat, semidense_proj,<br/> semidense_frustum?, semidense_feat?, traj_ctx?]"]
+        head["MLP + CORAL<br/>logits: (B,N,K-1)"]
     end
 
     efm --> evl --> out
     out --> field_in --> proj --> gpool --> concat
+    out --> pos --> gpool
     ref --> rel
-    cand --> rel --> posefeat --> poseenc --> concat
-    p3d --> frustum --> sample
-    proj --> sample
-    out --> sample --> lpool --> concat
-    sample --> cvalid --> concat
-    concat --> head --> prob
-    head --> exp
+    cand --> rel --> poseenc --> gpool
+    poseenc --> concat
+    p3d --> semproj --> concat
+    p3d --> semfrustum --> concat
+    semfeat --> film --> gpool
+    semproj --> film
+    traj --> concat
+    concat --> head
 ```
 
 ## Scene field construction (math, current)
@@ -654,6 +723,16 @@ For ablations/variants we also support:
 - `free_input`: EVL free-space evidence if available; otherwise a weak proxy derived from `counts` and `occ_input`.
 
 The field is projected to `field_dim` channels (default `16`) by a 1×1×1 convolution + GroupNorm + GELU.
+
+### Scene field construction in VinModelV2 (current)
+
+`VinModelV2` builds an aux map in `_build_field_bundle` with the following keys:
+
+- `occ_pr`, `cent_pr`, `occ_input`, `counts_norm`,
+- `observed`, `unknown`, `free_input`, `new_surface_prior`.
+
+All of these keys are supported in `scene_field_channels`; invalid entries now raise a
+clear error during field construction.
 
 ## Candidate-conditioned voxel query (implemented)
 
@@ -695,7 +774,7 @@ $$
 with $(\Delta x,\Delta y,\Delta z)=\left(\frac{x_{\max}-x_{\min}}{W},\frac{y_{\max}-y_{\min}}{H},\frac{z_{\max}-z_{\min}}{D}\right)$.
 This corresponds exactly to `efm3d.utils.voxel_sampling.pc_to_vox`. The actual trilinear sampling is delegated to
 `efm3d.utils.voxel_sampling.sample_voxels` (internally `torch.nn.functional.grid_sample`, `align_corners=False`,
-`padding_mode="border"`). ([GitHub][3])
+`padding_mode="border"`). ([GitHub][4])
 
 ### 3) Pooling and candidate validity
 
@@ -742,7 +821,9 @@ We follow the same structure:
    Practical notes:
 
    - Fit data can be saved/resumed (`.pt` state with RRI chunks) and the fitted binner is saved as JSON (`num_classes`,
-     `edges`).
+     `edges`, optional `bin_means`, `bin_stds`, and `bin_counts` for priors).
+   - On training start, if `VinLightningModuleConfig.num_classes` differs from the saved binner JSON, the binner is
+     automatically refit and the JSON is overwritten with the new class count.
    - If quantile edges collapse (degenerate quantiles), we fall back to uniform edges between the observed min/max (or
      `[-1,1]` as a last resort).
 
@@ -781,6 +862,16 @@ We follow the same structure:
    check when interpreting training curves. The Lightning module logs
    `coral_loss_rel_random = coral_loss / ((K-1)\log 2)` alongside the raw loss, plus
    a candidate-level `top3_accuracy` metric for ordinal classification.
+
+   **Optional imbalance mitigation.** Threshold labels are imbalanced by construction (early thresholds have
+   many positives). We therefore support optional reweighting in `VinLightningModuleConfig`:
+
+   - `coral_bias_init="prior_logits"` initializes CORAL threshold biases from empirical priors (`bin_counts`),
+     instead of a generic descending scheme.
+   - `coral_loss_variant="balanced_bce"` applies per-threshold positive-class weighting using
+     $P(y>k)$ (from the fitted binner or the current batch).
+   - `coral_loss_variant="focal"` applies focal weighting to the per-threshold BCE to combat collapse
+     under severe imbalance [@FocalLoss-lin2017].
 
 4. **Binning diagnostics (plots).** The script `oracle_rri/scripts/plot_vin_binning.py`
    generates the RRI histogram with quantile edges and a dedicated edge plot (Seaborn):

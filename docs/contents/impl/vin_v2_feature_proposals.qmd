@@ -102,24 +102,19 @@ Low coverage (high `F_empty`) indicates that large parts of the candidate image 
 
 ### Suggested injection point (VinModelV2)
 
-Treat semidense projection features as **per-candidate scalars** and concatenate them alongside `pose_enc` and `global_feat` before the MLP head:
+Treat semidense projection features as **per-candidate scalars** and inject them in two places:
+
+1. **FiLM-modulate** the pose-conditioned global voxel context (`global_feat`) so the semidense coverage cues can *reweight* voxel features when the EVL grid is sparse or out-of-bounds.
+2. **Concatenate** the raw projection features alongside `pose_enc` and `global_feat` before the MLP head.
+
+The current VinModelV2 implementation uses a lightweight FiLM (linear -> γ/β) plus a direct concat:
 
 ```python
-# VinModelV2.__init__
-self.semiden_mlp = nn.Sequential(
-    nn.Linear(sd_in_dim, sd_hidden_dim),
-    nn.GELU(),
-    nn.Linear(sd_hidden_dim, sd_out_dim),
-)
-
 # VinModelV2._forward_impl
-semiden_feat = self._semidense_features(
-    semidense_points_world=semidense_points_world,
-    candidate_poses_world_cam=pose_world_cam,
-    candidate_cameras=candidate_cameras,
-)
-semiden_feat = self.semiden_mlp(semiden_feat)
-parts.append(semiden_feat)
+sem_proj = self._semidense_projection_features(...)
+gamma, beta = self.sem_proj_film(sem_proj).chunk(2, dim=-1)
+global_feat = global_feat * (1.0 + gamma) + beta
+parts.append(sem_proj)
 ```
 
 This keeps the scene field untouched and avoids reintroducing heavy 3D volumes.
@@ -187,6 +182,57 @@ Implementation notes:
 - The encoder is **optional** and only active if `VinModelV2Config.point_encoder` is set.
 - Use `EfmPointsView.collapse_points(max_points=3000)` before encoding.
 - Transform points into the **reference rig frame** for consistent pose alignment.
+
+### FiLM-style modulation of the global voxel context (recommended injection)
+
+Rather than only late-fusing the PointNeXt embedding, use it to **modulate**
+the voxel-derived global context. This is a feature-wise linear modulation
+(FiLM) style injection [@FiLM-perez2018] that conditions the global context on
+the semidense geometry *without* disrupting the interpretable voxel channels.
+
+**Motivation (conceptual)**:
+
+- The voxel field provides **local occupancy evidence**; the semidense embedding
+  summarizes **global geometry**. We want the global geometry to *shape* how the
+  voxel context is interpreted rather than merely append another vector at the
+  end.
+- FiLM-style modulation implements **content-aware gating**: the point cloud
+  decides which global-context features should be amplified, suppressed, or
+  shifted. This is analogous to conditional normalization, but keeps the base
+  representation intact and interpretable.
+- It is **parameter-efficient** and stable: one linear layer produces scale/shift
+  and can be paired with GroupNorm for controlled statistics.
+
+**Formulation** (per snippet, broadcast to candidates):
+
+Let `g ∈ R^{B×N×C}` be the global voxel context and `p ∈ R^{B×D}` the PointNeXt
+embedding. We compute:
+
+$$
+\\gamma, \\beta = W p, \\quad g' = \\text{GN}( g \\odot (1 + \\gamma) + \\beta )
+$$
+
+where `γ, β ∈ R^{B×C}` are broadcast across candidates and `GN` is GroupNorm.
+
+**Implementation sketch**:
+
+```python
+# VinModelV2.__init__
+self.point_film = nn.Linear(point_dim, 2 * field_dim)
+self.point_film_norm = nn.GroupNorm(num_groups=4, num_channels=field_dim)
+
+# VinModelV2._forward_impl
+gamma, beta = self.point_film(semidense_feat).chunk(2, dim=-1)
+global_feat = global_feat * (1.0 + gamma[:, None, :]) + beta[:, None, :]
+global_feat = self.point_film_norm(global_feat.transpose(1, 2)).transpose(1, 2)
+```
+
+**Why this helps**:
+
+- When the voxel grid misses geometry (out-of-bounds candidates), the point
+  embedding can **down-weight unreliable global features**.
+- When semidense points indicate rich structure, the modulation **amplifies**
+  the relevant global-context channels, improving RRI discrimination.
 
 ### Optional: encoder for past ego trajectory (global point embedding)
 
