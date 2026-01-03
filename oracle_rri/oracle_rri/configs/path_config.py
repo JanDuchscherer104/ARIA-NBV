@@ -29,6 +29,8 @@ class PathConfig(SingletonConfig):
     checkpoints: Path = Field(default_factory=lambda: Path(".logs") / "checkpoints")
     """Directory used by Lightning checkpoints."""
 
+    external_checkpoints: Path | None = Field(default_factory=lambda: Path(".logs") / "ckpts")
+
     wandb: Path = Field(default_factory=lambda: Path(".logs") / "wandb")
     """Directory used by Weights & Biases for local run artifacts."""
 
@@ -86,6 +88,7 @@ class PathConfig(SingletonConfig):
 
     @field_validator(
         "checkpoints",
+        "external_checkpoints",
         "wandb",
         "optuna",
         "data_root",
@@ -157,12 +160,23 @@ class PathConfig(SingletonConfig):
                 f"Checkpoint path '{checkpoint_path}' does not exist.",
             )
 
-        if not checkpoint_path.suffix == ".ckpt":
+        if checkpoint_path.suffix not in (".ckpt", ".pt", ".pth"):
             raise FileNotFoundError(
                 f"Checkpoint path '{checkpoint_path}' is not a .ckpt file.",
             )
 
         return checkpoint_path
+
+    def resolve_external_checkpoint_path(self, path: str) -> Path | None:
+        ckpt_pth = Path(path)
+        if not ckpt_pth.is_absolute():
+            ckpt_pth = self.external_checkpoints / ckpt_pth
+        ckpt_pth = ckpt_pth.expanduser().resolve()
+
+        if not ckpt_pth.exists():
+            raise FileNotFoundError(f"External checkpoint path '{ckpt_pth}' does not exist.")
+
+        return ckpt_pth
 
     def resolve_mesh_path(self, scene_id: str) -> Path:
         """Resolve path to GT mesh for a scene.

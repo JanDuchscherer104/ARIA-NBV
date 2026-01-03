@@ -42,7 +42,7 @@ class TrainerFactoryConfig(BaseConfig):
     devices: int | str | Sequence[int] = "auto"
     strategy: str | None = "auto"
 
-    max_epochs: int | None = 10
+    max_epochs: int | None = 50
     precision: str | int = "32"
 
     tf32_matmul_precision: str | None = "medium"

@@ -15,6 +15,16 @@ from dataclasses import dataclass
 
 import pytorch_lightning as pl
 import torch
+from efm3d.aria.aria_constants import (
+    ARIA_POINTS_DIST_STD,
+    ARIA_POINTS_INV_DIST_STD,
+    ARIA_POINTS_TIME_NS,
+    ARIA_POINTS_VOL_MAX,
+    ARIA_POINTS_VOL_MIN,
+    ARIA_POINTS_WORLD,
+    ARIA_POSE_T_WORLD_RIG,
+    ARIA_POSE_TIME_NS,
+)
 from efm3d.aria.pose import PoseTW
 from pydantic import Field, model_validator
 from pytorch3d.renderer.cameras import (
@@ -82,7 +92,7 @@ class VinOracleBatch:
 
 
 class VinOracleIterableDataset(IterableDataset[VinOracleBatch]):
-    """Iterable dataset yielding :class:`VinOracleBatch` with online oracle RRI labels."""
+    """Iterable dataset yielding :class:`VinOracleBatch` with *online* oracle RRI labels."""
 
     def __init__(
         self,
@@ -91,6 +101,7 @@ class VinOracleIterableDataset(IterableDataset[VinOracleBatch]):
         labeler: OracleRriLabeler,
         max_attempts_per_batch: int,
         verbosity: Verbosity,
+        efm_keep_keys: set[str] | None,
     ) -> None:
         super().__init__()
         self._base = base
@@ -99,6 +110,7 @@ class VinOracleIterableDataset(IterableDataset[VinOracleBatch]):
         self._console = Console.with_prefix(self.__class__.__name__).set_verbosity(
             verbosity,
         )
+        self._efm_keep_keys = efm_keep_keys
 
     def __iter__(self) -> Iterator[VinOracleBatch]:
         base_iter = iter(self._base)
@@ -126,14 +138,24 @@ class VinOracleIterableDataset(IterableDataset[VinOracleBatch]):
                 )
                 continue
 
-            yield _vin_oracle_batch_from_label(label_batch)
+            yield _vin_oracle_batch_from_label(
+                label_batch,
+                efm_keep_keys=self._efm_keep_keys,
+            )
 
 
-def _vin_oracle_batch_from_label(label_batch: OracleRriLabelBatch) -> VinOracleBatch:
+def _vin_oracle_batch_from_label(
+    label_batch: OracleRriLabelBatch,
+    *,
+    efm_keep_keys: set[str] | None,
+) -> VinOracleBatch:
     rri = label_batch.rri
+    sample = label_batch.sample
+    if efm_keep_keys is not None:
+        sample = sample.prune_efm(efm_keep_keys)
 
     return VinOracleBatch(
-        efm_snippet_view=label_batch.sample,
+        efm_snippet_view=sample,
         candidate_poses_world_cam=label_batch.depths.poses,
         reference_pose_world_rig=label_batch.depths.reference_pose,
         rri=rri.rri,
@@ -144,8 +166,8 @@ def _vin_oracle_batch_from_label(label_batch: OracleRriLabelBatch) -> VinOracleB
         pm_acc_after=rri.pm_acc_after,
         pm_comp_after=rri.pm_comp_after,
         p3d_cameras=label_batch.depths.p3d_cameras,
-        scene_id=label_batch.sample.scene_id,
-        snippet_id=label_batch.sample.snippet_id,
+        scene_id=sample.scene_id,
+        snippet_id=sample.snippet_id,
         backbone_out=None,
     )
 
@@ -164,6 +186,7 @@ class VinOracleCacheAppendIterableDataset(IterableDataset[VinOracleBatch]):
         max_new_samples: int,
         max_attempts_per_batch: int,
         verbosity: Verbosity,
+        efm_keep_keys: set[str] | None,
     ) -> None:
         super().__init__()
         self._cache = cache
@@ -176,6 +199,7 @@ class VinOracleCacheAppendIterableDataset(IterableDataset[VinOracleBatch]):
         self._console = Console.with_prefix(self.__class__.__name__).set_verbosity(
             verbosity,
         )
+        self._efm_keep_keys = efm_keep_keys
 
     def __iter__(self) -> Iterator[VinOracleBatch]:
         for idx in range(len(self._cache)):
@@ -221,7 +245,10 @@ class VinOracleCacheAppendIterableDataset(IterableDataset[VinOracleBatch]):
             entry = self._appender.append(label_batch, backbone_out=backbone_out)
             self._cache.append_entry(entry)
 
-            batch = _vin_oracle_batch_from_label(label_batch)
+            batch = _vin_oracle_batch_from_label(
+                label_batch,
+                efm_keep_keys=self._efm_keep_keys,
+            )
             batch.backbone_out = backbone_out
             yield batch
             appended += 1
@@ -276,7 +303,7 @@ class VinDataModuleConfig(BaseConfig["VinDataModule"]):
     val_cache: OracleRriCacheDatasetConfig | None = None
     """Optional offline cache for validation/testing."""
 
-    shuffle: bool = False
+    shuffle: bool = True
     """Whether to shuffle the train dataset at each epoch (only applies to offline caches)."""
 
     cache_backbone: EvlBackboneConfig | None = Field(default_factory=EvlBackboneConfig)
@@ -293,6 +320,25 @@ class VinDataModuleConfig(BaseConfig["VinDataModule"]):
 
     cache_append_create_if_missing: bool = False
     """Create cache metadata/index if missing when appending samples."""
+
+    efm_keep_keys: list[str] | None = Field(
+        default_factory=lambda: [
+            ARIA_POSE_T_WORLD_RIG,
+            ARIA_POSE_TIME_NS,
+            "pose/gravity_in_world",
+            ARIA_POINTS_WORLD,
+            ARIA_POINTS_DIST_STD,
+            ARIA_POINTS_INV_DIST_STD,
+            ARIA_POINTS_TIME_NS,
+            ARIA_POINTS_VOL_MIN,
+            ARIA_POINTS_VOL_MAX,
+            "points/lengths",
+        ]
+    )
+    """Optional allowlist of EFM keys to keep in VIN batches."""
+
+    prune_efm_snippet: bool = True
+    """Whether to prune EFM snippets before returning VIN batches."""
 
     max_attempts_per_batch: int = 50
     """Maximum oracle attempts before raising (guards against overly strict sampling rules)."""
@@ -386,6 +432,7 @@ class VinDataModule(pl.LightningDataModule):
         self._cache_backbone: EvlBackbone | None = None
         self._train_cache_appender: OracleRriCacheAppender | None = None
         self._val_cache_appender: OracleRriCacheAppender | None = None
+        self._efm_keep_keys: set[str] | None = None
 
     def _apply_cache_splits(self, console: Console) -> None:
         train_cache = self.config.train_cache
@@ -434,16 +481,26 @@ class VinDataModule(pl.LightningDataModule):
         cfg = cache_cfg.model_copy(deep=True)
         cfg.simplification = simplification
         cfg.return_format = "vin_batch"
+        if self._efm_keep_keys is not None and cfg.efm_keep_keys is None:
+            cfg.efm_keep_keys = sorted(self._efm_keep_keys)
         return cfg.setup_target()
 
     # --------------------------------------------------------------------- setup
     def setup(self, stage: Stage | str | None = None) -> None:
         console = Console.with_prefix(self.__class__.__name__, "setup")
         self._apply_cache_splits(console)
+        keep_keys_list = None
+        if self.config.prune_efm_snippet and self.config.efm_keep_keys:
+            keep_keys_list = [key for key in self.config.efm_keep_keys if key]
+        self._efm_keep_keys = set(keep_keys_list) if keep_keys_list else None
         if self.config.train_cache is not None:
             self.config.train_cache.return_format = "vin_batch"
+            if self._efm_keep_keys is not None and self.config.train_cache.efm_keep_keys is None:
+                self.config.train_cache.efm_keep_keys = list(keep_keys_list or [])
         if self.config.val_cache is not None:
             self.config.val_cache.return_format = "vin_batch"
+            if self._efm_keep_keys is not None and self.config.val_cache.efm_keep_keys is None:
+                self.config.val_cache.efm_keep_keys = list(keep_keys_list or [])
 
         requested = Stage.from_str(stage) if stage is not None else None
         train_append = self.config.train_cache_new_samples_per_epoch > 0
@@ -477,10 +534,6 @@ class VinDataModule(pl.LightningDataModule):
 
         if requested is None or requested is Stage.TRAIN:
             if self.config.train_cache is not None:
-                # if not self.config.train_cache.load_backbone:
-                #     raise ValueError(
-                #         "train_cache.load_backbone must be True for VIN training.",
-                #     )
                 if self._train_cache is None:
                     self._train_cache = self.config.train_cache.setup_target()
                 if train_append and self._train_base is None:
@@ -550,6 +603,7 @@ class VinDataModule(pl.LightningDataModule):
                     max_new_samples=self.config.train_cache_new_samples_per_epoch,
                     max_attempts_per_batch=self.config.max_attempts_per_batch,
                     verbosity=self.config.verbosity,
+                    efm_keep_keys=self._efm_keep_keys,
                 )
                 console.log(
                     f"Training with cache append: new_samples_per_epoch={self.config.train_cache_new_samples_per_epoch}.",
@@ -565,6 +619,7 @@ class VinDataModule(pl.LightningDataModule):
                 labeler=self._require_labeler(),
                 max_attempts_per_batch=self.config.max_attempts_per_batch,
                 verbosity=self.config.verbosity,
+                efm_keep_keys=self._efm_keep_keys,
             )
             console.log(
                 "Training with online oracle label generation and computation of backbone features.",
@@ -593,6 +648,7 @@ class VinDataModule(pl.LightningDataModule):
                     max_new_samples=self.config.val_cache_new_samples_per_epoch,
                     max_attempts_per_batch=self.config.max_attempts_per_batch,
                     verbosity=self.config.verbosity,
+                    efm_keep_keys=self._efm_keep_keys,
                 )
             else:
                 ds = self._val_cache
@@ -606,6 +662,7 @@ class VinDataModule(pl.LightningDataModule):
                 labeler=self._require_labeler(),
                 max_attempts_per_batch=self.config.max_attempts_per_batch,
                 verbosity=self.config.verbosity,
+                efm_keep_keys=self._efm_keep_keys,
             )
         return DataLoader(
             ds,
@@ -634,6 +691,7 @@ class VinDataModule(pl.LightningDataModule):
                     max_new_samples=self.config.train_cache_new_samples_per_epoch,
                     max_attempts_per_batch=self.config.max_attempts_per_batch,
                     verbosity=self.config.verbosity,
+                    efm_keep_keys=self._efm_keep_keys,
                 )
                 return iter(ds)
             return iter(self._train_cache)
@@ -650,6 +708,7 @@ class VinDataModule(pl.LightningDataModule):
                     max_new_samples=self.config.val_cache_new_samples_per_epoch,
                     max_attempts_per_batch=self.config.max_attempts_per_batch,
                     verbosity=self.config.verbosity,
+                    efm_keep_keys=self._efm_keep_keys,
                 )
                 return iter(ds)
             return iter(self._val_cache)
@@ -664,6 +723,7 @@ class VinDataModule(pl.LightningDataModule):
             labeler=self._require_labeler(),
             max_attempts_per_batch=self.config.max_attempts_per_batch,
             verbosity=self.config.verbosity,
+            efm_keep_keys=self._efm_keep_keys,
         )
         return iter(ds)
 

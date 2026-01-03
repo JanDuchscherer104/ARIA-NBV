@@ -1,0 +1,46 @@
+"""Context container for VIN diagnostics tabs."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ....lightning.aria_nbv_experiment import AriaNBVExperimentConfig
+    from ....lightning.lit_datamodule import VinOracleBatch
+    from ....vin import VinForwardDiagnostics, VinPrediction
+    from ...state_types import VinDiagnosticsState
+
+
+@dataclass(slots=True)
+class VinDiagContext:
+    """Shared context for VIN diagnostic tab renderers.
+
+    Attributes:
+        state: Session-scoped diagnostics state.
+        debug: VIN forward debug outputs.
+        pred: VIN predictions.
+        batch: Oracle batch used for diagnostics.
+        cfg: Experiment configuration used for the run.
+        use_offline_cache: Whether the batch originates from the offline cache.
+        attach_snippet: Whether to load full EFM snippet for geometry plots.
+        include_gt_mesh: Whether to include GT mesh when loading snippets.
+        has_tokens: Whether frustum tokens are available (VIN v1).
+        has_semidense_frustum: Whether semidense frustum diagnostics are available (VIN v2).
+        num_candidates: Number of candidate views in the batch.
+    """
+
+    state: "VinDiagnosticsState"
+    debug: "VinForwardDiagnostics"
+    pred: "VinPrediction"
+    batch: "VinOracleBatch"
+    cfg: "AriaNBVExperimentConfig"
+    use_offline_cache: bool
+    attach_snippet: bool
+    include_gt_mesh: bool
+    has_tokens: bool
+    has_semidense_frustum: bool
+    num_candidates: int
+
+
+__all__ = ["VinDiagContext"]

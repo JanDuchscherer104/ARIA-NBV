@@ -279,6 +279,7 @@ class AriaNBVExperimentConfig(BaseConfig):
         ckpt_input = str(ckpt_path) if ckpt_path is not None else None
         match resolved_stage:
             case Stage.TRAIN:
+                self._ensure_binner_matches_num_classes(datamodule=datamodule)
                 trainer.fit(module, datamodule=datamodule, ckpt_path=ckpt_input)
                 if bool(getattr(trainer, "interrupted", False)):
                     self._save_interrupt_checkpoint(trainer)
@@ -597,8 +598,17 @@ class AriaNBVExperimentConfig(BaseConfig):
         console.log(f"Saved interrupt checkpoint: {checkpoint_path}")
         return checkpoint_path
 
-    def fit_binner_and_save(self) -> Path:
+    def fit_binner_and_save(
+        self,
+        datamodule: VinDataModule | None = None,
+        *,
+        overwrite: bool = False,
+    ) -> Path:
         """Fit `RriOrdinalBinner` from oracle batches and persist it.
+
+        Args:
+            datamodule: Optional pre-built datamodule (avoids re-instantiation).
+            overwrite: Overwrite existing binner JSON when True.
 
         Returns:
             Path to the saved `rri_binner.json`.
@@ -609,7 +619,8 @@ class AriaNBVExperimentConfig(BaseConfig):
         out_dir.mkdir(parents=True, exist_ok=True)
 
         console = Console.with_prefix(self.__class__.__name__, "fit_binner")
-        datamodule: VinDataModule = self.datamodule_config.setup_target()
+        if datamodule is None:
+            datamodule = self.datamodule_config.setup_target()
 
         train_loader = datamodule.train_dataloader()
 
@@ -664,9 +675,41 @@ class AriaNBVExperimentConfig(BaseConfig):
             expected_suffix=".json",
         )
 
-        saved_path = binner.save(binner_path)
+        saved_path = binner.save(binner_path, overwrite=overwrite)
         console.log(f"Saved binner: {saved_path}")
         return saved_path
+
+    def _ensure_binner_matches_num_classes(
+        self,
+        *,
+        datamodule: VinDataModule | None = None,
+    ) -> None:
+        """Refit the ordinal binner if the stored num_classes mismatches the config."""
+        if self.module_config.binner_path is None:
+            return
+
+        resolved = self.paths.resolve_artifact_path(
+            self.module_config.binner_path,
+            expected_suffix=".json",
+            create_parent=False,
+        )
+        if not resolved.exists():
+            return
+
+        from ..rri_metrics.rri_binning import RriOrdinalBinner
+
+        binner = RriOrdinalBinner.load(resolved)
+        expected = int(self.module_config.num_classes)
+        if int(binner.num_classes) == expected:
+            return
+
+        console = Console.with_prefix(self.__class__.__name__, "binner_check")
+        console.warn(
+            f"RRI binner num_classes mismatch (found {int(binner.num_classes)}, expected {expected}); "
+            "refitting with current num_classes.",
+        )
+        saved_path = self.fit_binner_and_save(datamodule=datamodule, overwrite=True)
+        object.__setattr__(self.module_config, "binner_path", saved_path)
 
     def run(self) -> None:
         """Execute the configured action.

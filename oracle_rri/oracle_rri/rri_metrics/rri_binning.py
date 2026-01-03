@@ -105,6 +105,9 @@ class RriOrdinalBinner:
     bin_stds: Tensor | None = None
     """Bin standard deviations. Shape ``(K,)``."""
 
+    bin_counts: Tensor | None = None
+    """Per-class sample counts. Shape ``(K,)``."""
+
     _rri_chunks: list[Tensor] = field(default_factory=list, repr=False)
 
     @property
@@ -166,6 +169,23 @@ class RriOrdinalBinner:
 
         return self.midpoints
 
+    def class_priors(self) -> Tensor:
+        """Return class priors from fitted counts or fall back to uniform."""
+        if not self.is_fitted:
+            raise RuntimeError("Binner not fitted; class priors undefined.")
+        if self.bin_counts is not None and self.bin_counts.numel() == int(self.num_classes):
+            counts = self.bin_counts.to(dtype=torch.float32)
+            total = counts.sum()
+            if total > 0:
+                return counts / total
+        num_classes = int(self.num_classes)
+        return torch.full((num_classes,), 1.0 / float(num_classes), dtype=torch.float32)
+
+    def threshold_priors(self) -> Tensor:
+        """Return cumulative priors ``P(y > k)`` for CORAL thresholds."""
+        priors = self.class_priors()
+        return torch.flip(torch.cumsum(torch.flip(priors, dims=[0]), dim=0), dims=[0])[1:]
+
     def expected_from_probs(self, probs: Tensor) -> Tensor:
         """Compute expected RRI proxy from class probabilities.
 
@@ -195,17 +215,21 @@ class RriOrdinalBinner:
             data["bin_means"] = self.bin_means.detach().cpu().tolist()
         if self.bin_stds is not None:
             data["bin_stds"] = self.bin_stds.detach().cpu().tolist()
+        if self.bin_counts is not None:
+            data["bin_counts"] = self.bin_counts.detach().cpu().tolist()
         return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RriOrdinalBinner:
         bin_means = data.get("bin_means")
         bin_stds = data.get("bin_stds")
+        bin_counts = data.get("bin_counts")
         return cls(
             num_classes=int(data["num_classes"]),
             edges=torch.tensor(data["edges"], dtype=torch.float32),
             bin_means=(torch.tensor(bin_means, dtype=torch.float32) if bin_means is not None else None),
             bin_stds=(torch.tensor(bin_stds, dtype=torch.float32) if bin_stds is not None else None),
+            bin_counts=(torch.tensor(bin_counts, dtype=torch.float32) if bin_counts is not None else None),
         )
 
     def save(self, path: str | Path, *, overwrite: bool = False) -> Path:
@@ -234,6 +258,28 @@ class RriOrdinalBinner:
         )
         data = json.loads(in_path.read_text(encoding="utf-8"))
         return cls.from_dict(data)
+
+    @staticmethod
+    def load_fit_data(path: str | Path) -> Tensor:
+        """Load flattened RRI samples from a saved binner fit-data file.
+
+        Args:
+            path: Path to a ``.pt`` file that stores ``rri_chunks``.
+
+        Returns:
+            ``Tensor["N", float32]`` of finite RRI samples.
+        """
+        fit_path = Path(path).expanduser()
+        state = torch.load(fit_path, map_location="cpu", weights_only=True)
+        chunks = state.get("rri_chunks", [])
+        if not chunks:
+            return torch.empty((0,), dtype=torch.float32)
+        flat = torch.cat(
+            [torch.as_tensor(chunk, dtype=torch.float32).reshape(-1) for chunk in chunks],
+            dim=0,
+        )
+        flat = flat[torch.isfinite(flat)]
+        return flat
 
     # --------------------------------------------------------------------- fitting (single entry point)
     @classmethod
@@ -361,6 +407,7 @@ class RriOrdinalBinner:
         self.edges = edges.detach().cpu()
         midpoints = self.class_midpoints().to(device=rri.device, dtype=rri.dtype)
         labels = torch.bucketize(rri, edges, right=False)
+        counts = torch.bincount(labels, minlength=int(num_classes)).to(dtype=torch.float32)
         means = torch.empty(int(num_classes), device=rri.device, dtype=rri.dtype)
         stds = torch.empty_like(means)
         for idx in range(int(num_classes)):
@@ -373,6 +420,7 @@ class RriOrdinalBinner:
                 stds[idx] = vals.std(unbiased=False)
         self.bin_means = means.detach().cpu()
         self.bin_stds = stds.detach().cpu()
+        self.bin_counts = counts.detach().cpu()
         return self
 
 

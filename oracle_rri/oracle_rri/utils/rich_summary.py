@@ -5,6 +5,7 @@ from rich.text import Text
 from rich.tree import Tree
 from torch import Tensor
 
+
 def summarize(val: Tensor | Any, *, include_stats: bool = False) -> Any:
     """Small helper for succinct repr output."""
     if val is None:
@@ -166,10 +167,10 @@ def _format_tensor_summary(value: dict[str, Any]) -> str:
 
 
 def rich_summary(
+    tree_dict: dict[str, Any],
     *,
-    tree_dict: dict[str, Any] | None = None,
     path_map: dict[tuple[str, ...], str] = {},
-    with_shape: bool = False,
+    with_shape: bool = True,
     show_only_sample: list[str] | None = None,
     root_label: str = "",
     is_print: bool = True,

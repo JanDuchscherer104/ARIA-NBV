@@ -258,6 +258,28 @@ class CoralLayer(nn.Module):
         if overwrite:
             self.bin_values.reset_from_values(values)
 
+    def init_bias_from_priors(self, priors: Tensor, *, overwrite: bool = True) -> None:
+        """Initialize CORAL biases from class priors.
+
+        Args:
+            priors: ``Tensor["K"]`` class priors that sum to 1.
+            overwrite: If True, overwrite the current bias values.
+        """
+        if priors.numel() != int(self._num_classes):
+            raise ValueError(
+                f"Expected {self._num_classes} priors, got {tuple(priors.shape)}.",
+            )
+        if not overwrite:
+            return
+        priors = priors.to(dtype=torch.float32, device=self.layer.coral_bias.device)
+        priors = priors / priors.sum().clamp_min(1e-6)
+        p_gt = torch.flip(torch.cumsum(torch.flip(priors, dims=[0]), dim=0), dims=[0])[1:]
+        eps = torch.finfo(p_gt.dtype).eps
+        p_gt = p_gt.clamp(min=eps, max=1.0 - eps)
+        bias = torch.log(p_gt / (1.0 - p_gt))
+        with torch.no_grad():
+            self.layer.coral_bias.copy_(bias)
+
     def expected_from_probs(self, probs: Tensor) -> Tensor:
         """Compute expected continuous value using learnable bin values."""
         if self.bin_values is None:

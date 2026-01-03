@@ -18,218 +18,26 @@ from pydantic import Field, field_validator, model_validator
 from pytorch_lightning.loggers import WandbLogger
 from torch import Tensor, nn
 from torch.nn import functional as functional
-from torch.optim import AdamW, Optimizer
-from torch.optim.lr_scheduler import OneCycleLR, ReduceLROnPlateau
 
 from ..configs import PathConfig
 from ..rri_metrics import (
+    Loss,
     Metric,
+    RriErrorStats,
     RriOrdinalBinner,
     VinMetricsConfig,
     coral_loss,
     coral_random_loss,
+    loss_key,
+    metric_key,
     topk_accuracy_from_probs,
 )
 from ..rri_metrics.coral import coral_logits_to_label, coral_monotonicity_violation_rate
-from ..utils import BaseConfig, Console, Optimizable, Stage, optimizable_field
+from ..utils import BaseConfig, Console, Stage
 from ..vin import VinModelConfig, VinModelV2Config
 from ..vin.plotting import plot_vin_encodings_from_debug
 from .lit_datamodule import VinOracleBatch
-
-
-class AdamWConfig(BaseConfig[Optimizer]):
-    """AdamW optimizer configuration for VIN."""
-
-    target: type[Optimizer] = Field(default_factory=lambda: AdamW, exclude=True)
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
-
-    learning_rate: float = optimizable_field(
-        default=1e-3,
-        optimizable=Optimizable.continuous(
-            low=1e-5,
-            high=3e-4,
-            log=True,
-            description="AdamW learning rate.",
-        ),
-    )
-    """Learning rate for AdamW."""
-
-    weight_decay: float = optimizable_field(
-        default=1e-3,
-        optimizable=Optimizable.continuous(
-            low=1e-4,
-            high=1e-1,
-            log=True,
-            description="AdamW weight decay.",
-        ),
-    )
-    """Weight decay for AdamW."""
-
-    def setup_target(self, params: list[Tensor]) -> Optimizer:  # type: ignore[override]
-        return AdamW(
-            params=params,
-            lr=self.learning_rate,
-            weight_decay=self.weight_decay,
-        )
-
-
-class ReduceLrOnPlateauConfig(BaseConfig[ReduceLROnPlateau]):
-    """ReduceLROnPlateau scheduler configuration."""
-
-    target: type[ReduceLROnPlateau] = Field(
-        default_factory=lambda: ReduceLROnPlateau,
-        exclude=True,
-    )
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
-
-    patience: int = 2
-    """Number of steps with no improvement before reducing the LR."""
-
-    factor: float = 0.2
-    """Multiplicative factor of LR reduction."""
-
-    monitor: str = "train/loss"
-    """Metric name to monitor for plateau reduction."""
-
-    interval: Literal["step", "epoch"] = "epoch"
-    """Scheduler interval (step or epoch)."""
-
-    frequency: int = 1
-    """Scheduler frequency."""
-
-    def setup_target(  # type: ignore[override]
-        self,
-        optimizer: Optimizer,
-        *,
-        trainer: pl.Trainer | None = None,
-    ) -> ReduceLROnPlateau:
-        del trainer
-        return ReduceLROnPlateau(optimizer, patience=self.patience, factor=self.factor)
-
-    def setup_lightning(
-        self,
-        optimizer: Optimizer,
-        *,
-        trainer: pl.Trainer | None = None,
-    ) -> dict[str, Any]:
-        """Build the Lightning lr_scheduler config for ReduceLROnPlateau.
-
-        Args:
-            optimizer: Optimizer instance to schedule.
-            trainer: Optional Lightning trainer (unused for plateau).
-
-        Returns:
-            Lightning lr_scheduler configuration dictionary.
-        """
-        scheduler = self.setup_target(optimizer, trainer=trainer)
-        return {
-            "scheduler": scheduler,
-            "monitor": self.monitor,
-            "interval": self.interval,
-            "frequency": self.frequency,
-        }
-
-
-class OneCycleSchedulerConfig(BaseConfig[OneCycleLR]):
-    """OneCycle learning-rate scheduler configuration."""
-
-    target: type[OneCycleLR] = Field(default_factory=lambda: OneCycleLR, exclude=True)
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
-
-    max_lr: float | None = None
-    """Maximum learning rate in the cycle (defaults to optimizer LR)."""
-
-    base_momentum: float = 0.85
-    """Lower momentum boundary in the cycle."""
-
-    max_momentum: float = 0.95
-    """Upper momentum boundary in the cycle."""
-
-    div_factor: float = 25.0
-    """Initial learning rate = max_lr / div_factor."""
-
-    final_div_factor: float = 1e4
-    """Final learning rate = max_lr / (div_factor * final_div_factor)."""
-
-    pct_start: float = 0.3
-    """Percentage of cycle spent increasing learning rate."""
-
-    anneal_strategy: Literal["cos", "linear"] = "cos"
-    """Annealing strategy: 'cos' or 'linear'."""
-
-    def setup_target(  # type: ignore[override]
-        self,
-        optimizer: Optimizer,
-        *,
-        total_steps: int | None = None,
-        trainer: pl.Trainer | None = None,
-    ) -> OneCycleLR:
-        if total_steps is None:
-            total_steps = self._resolve_total_steps(trainer)
-        if total_steps <= 0:
-            raise ValueError("OneCycleLR requires total_steps > 0.")
-
-        max_lr = self.max_lr
-        if max_lr is None:
-            max_lr = optimizer.param_groups[0]["lr"]
-
-        return OneCycleLR(
-            optimizer,
-            max_lr=max_lr,
-            total_steps=total_steps,
-            pct_start=self.pct_start,
-            anneal_strategy=self.anneal_strategy,
-            cycle_momentum=True,
-            base_momentum=self.base_momentum,
-            max_momentum=self.max_momentum,
-            div_factor=self.div_factor,
-            final_div_factor=self.final_div_factor,
-        )
-
-    def setup_lightning(
-        self,
-        optimizer: Optimizer,
-        *,
-        total_steps: int | None = None,
-        trainer: pl.Trainer | None = None,
-    ) -> dict[str, Any]:
-        """Build the Lightning lr_scheduler config for OneCycleLR.
-
-        Args:
-            optimizer: Optimizer instance to schedule.
-            total_steps: Optional total step count for the cycle.
-            trainer: Optional Lightning trainer used to infer total_steps.
-
-        Returns:
-            Lightning lr_scheduler configuration dictionary.
-        """
-        scheduler = self.setup_target(
-            optimizer,
-            total_steps=total_steps,
-            trainer=trainer,
-        )
-        return {"scheduler": scheduler, "interval": "step"}
-
-    @staticmethod
-    def _resolve_total_steps(trainer: pl.Trainer | None) -> int:
-        if trainer is None:
-            raise ValueError(
-                "OneCycleLR requires either total_steps or a configured trainer.",
-            )
-
-        total_steps = int(getattr(trainer, "estimated_stepping_batches", 0) or 0)
-        if total_steps > 0:
-            return total_steps
-
-        datamodule = getattr(trainer, "datamodule", None)
-        if datamodule is None:
-            raise ValueError(
-                "Trainer is missing a datamodule; cannot infer total_steps for OneCycleLR.",
-            )
-
-        steps_per_epoch = len(datamodule.train_dataloader())
-        max_epochs = int(getattr(trainer, "max_epochs", 1) or 1)
-        return steps_per_epoch * max_epochs
+from .optimizers import AdamWConfig, OneCycleSchedulerConfig, ReduceLrOnPlateauConfig
 
 
 class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
@@ -250,8 +58,26 @@ class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
     )
     """Learning-rate scheduler configuration (set to ``None`` to disable)."""
 
-    num_classes: int = 15
+    num_classes: int = 8
     """Number of ordinal classes (must match `vin.head.num_classes`)."""
+
+    coral_bias_init: Literal["default", "prior_logits"] = "default"
+    """Bias initialization strategy for CORAL thresholds."""
+
+    coral_loss_variant: Literal["coral", "balanced_bce", "focal"] = "coral"
+    """Loss variant for CORAL thresholds."""
+
+    coral_balance_source: Literal["binner", "batch"] = "binner"
+    """Source for threshold priors when balancing CORAL loss."""
+
+    coral_balance_eps: float = Field(default=1e-6, gt=0.0)
+    """Epsilon for clamping threshold priors away from 0/1."""
+
+    coral_focal_gamma: float = Field(default=2.0, ge=0.0)
+    """Focal gamma for CORAL focal loss."""
+
+    coral_focal_alpha: float | None = Field(default=None, ge=0.0, le=1.0)
+    """Optional focal alpha for CORAL focal loss (None → inferred from priors)."""
 
     binner_fit_snippets: int | None = None
     """Number of oracle-labelled snippets used to fit the ordinal binner. If `` None`` uses all available (offline) or fit until interrupted (online)."""
@@ -265,14 +91,20 @@ class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
     binner_path: Path | None = None
     """Optional explicit path to save `rri_binner.json` (defaults to trainer root dir)."""
 
-    use_valid_frac_weight: bool = True
-    """Whether to weight loss by per-candidate frustum coverage."""
-
-    valid_frac_weight_floor: float = Field(default=0.2, ge=0.0, le=1.0)
-    """Minimum loss weight for candidates with low voxel coverage."""
-
     aux_regression_loss: Literal["mse", "huber"] | None = "huber"
     """Auxiliary regression loss on expected RRI (set to ``None`` to disable)."""
+
+    aux_regression_weight: float = 10.0
+    """Initial weight for the auxiliary regression loss."""
+
+    aux_regression_weight_gamma: float = Field(default=0.99, gt=0.0, le=1.0)
+    """Exponential decay factor for the auxiliary regression weight."""
+
+    aux_regression_weight_min: float = Field(default=0.1, ge=0.0)
+    """Minimum auxiliary regression weight after decay."""
+
+    aux_regression_weight_interval: Literal["epoch", "step"] = "epoch"
+    """Whether to apply aux loss decay per epoch or per global step."""
 
     log_interval_steps: int | None = Field(default=None)
     """Step interval for logging rank/confusion/histogram metrics (train stage only). If ``None`` only log per-epoch metrics."""
@@ -295,6 +127,10 @@ class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
         if self.num_classes != (vin_num_cls := getattr(self.vin, "num_classes", self.num_classes)):
             raise ValueError(
                 f"num_classes={self.num_classes} must match vin.num_classes={vin_num_cls}.",
+            )
+        if self.aux_regression_weight_min > self.aux_regression_weight:
+            raise ValueError(
+                "aux_regression_weight_min must be <= aux_regression_weight.",
             )
 
         return self
@@ -322,6 +158,7 @@ class VinLightningModule(pl.LightningModule):
             },
         )
         self._interval_metrics = metrics_cfg.setup_target()
+        self._rri_error_stats = nn.ModuleDict({f"{Stage.VAL.value}_stage": RriErrorStats()})
 
     # --------------------------------------------------------------------- lifecycle
     def setup(self, stage: str) -> None:
@@ -330,6 +167,7 @@ class VinLightningModule(pl.LightningModule):
         if self._binner is None:
             self._binner = self._load_binner_from_config()
         self._maybe_init_bin_values()
+        self._maybe_init_coral_bias()
 
     def on_save_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         if self._binner is not None:
@@ -357,6 +195,7 @@ class VinLightningModule(pl.LightningModule):
 
     def on_validation_epoch_end(self) -> None:
         self._log_epoch_metrics(Stage.VAL)
+        self._log_rri_error_stats()
 
     def on_test_epoch_end(self) -> None:
         self._log_epoch_metrics(Stage.TEST)
@@ -454,16 +293,10 @@ class VinLightningModule(pl.LightningModule):
         log_batch_size = max(num_candidates, 1)
         log_enabled = not getattr(self.trainer, "sanity_checking", False)
         logits = pred.logits.squeeze(0)  # N x (K-1)
-        valid_frac = pred.valid_frac.squeeze(0)  # N
-
-        rri = batch.rri.to(device=logits.device)
-        labels = self._binner.transform(rri.reshape(-1))
-
-        mask = torch.isfinite(rri)
-        if not mask.any():
+        if not bool(torch.isfinite(logits).all().item()):
             if log_enabled:
                 self.log(
-                    f"{stage}/skip_no_valid",
+                    f"{stage.value}/skip_nonfinite_logits",
                     1.0,
                     on_step=True,
                     prog_bar=False,
@@ -471,31 +304,53 @@ class VinLightningModule(pl.LightningModule):
                 )
             return None
 
-        loss_per = coral_loss(
-            logits[mask],
-            labels[mask],
-            num_classes=int(self._binner.num_classes),
-            reduction="none",
-        )
-        if self.config.use_valid_frac_weight:
-            weights = (
-                self.config.valid_frac_weight_floor + (1.0 - self.config.valid_frac_weight_floor) * valid_frac[mask]
-            )
-            coral_loss_value = (loss_per * weights).sum() / weights.sum().clamp_min(1e-6)
-        else:
-            coral_loss_value = loss_per.mean()
+        rri = batch.rri.to(device=logits.device)
+        rri_flat = rri.reshape(-1)
+        mask = torch.isfinite(rri_flat)
+        if not mask.any():
+            if log_enabled:
+                self.log(
+                    f"{stage.value}/skip_no_valid",
+                    1.0,
+                    on_step=True,
+                    prog_bar=False,
+                    batch_size=log_batch_size,
+                )
+            return None
 
-        probs = pred.prob.squeeze(0)
+        valid_count = int(mask.sum().item())
+        log_batch_size = max(valid_count, 1)
+        rri_valid = rri_flat[mask]
+
+        # Avoid NaNs propagating through label conversion; masked values are ignored downstream.
+        rri_for_labels = torch.nan_to_num(
+            rri_flat,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        )
+        labels = self._binner.transform(rri_for_labels)
+        labels_valid = labels[mask]
+        logits_flat = logits.reshape(-1, logits.shape[-1])
+        logits_valid = logits_flat[mask]
+
+        coral_loss_value = self._coral_loss_variant(
+            logits_valid,
+            labels_valid,
+            num_classes=int(self._binner.num_classes),
+        ).mean()
+
+        probs = pred.prob.squeeze(0).reshape(-1, pred.prob.shape[-1])
+        probs_valid = probs[mask]
         pred_rri_proxy = None
+        pred_rri_proxy_valid = None
         aux_loss = None
         if self.config.aux_regression_loss is not None or log_enabled:
-            head_coral = getattr(self.vin, "head_coral", None)
-            if head_coral is not None and getattr(head_coral, "has_bin_values", False):
-                pred_rri_proxy = head_coral.expected_from_probs(probs)
-            else:
-                pred_rri_proxy = self._binner.expected_from_probs(probs)
+            pred_rri_proxy = self.vin.head_coral.expected_from_probs(probs)
+            pred_rri_proxy_valid = pred_rri_proxy.reshape(-1)[mask]
 
         combined_loss = coral_loss_value
+        aux_weight = None
         if self.config.aux_regression_loss is not None:
             if pred_rri_proxy is None:
                 raise RuntimeError("Expected pred_rri_proxy to be computed.")
@@ -513,20 +368,35 @@ class VinLightningModule(pl.LightningModule):
                 raise ValueError(
                     f"Unknown aux_regression_loss='{self.config.aux_regression_loss}'.",
                 )
-            combined_loss = coral_loss_value + aux_loss
+            aux_weight = self._aux_regression_weight()
+            combined_loss = coral_loss_value + aux_weight * aux_loss
 
         if not log_enabled:
             return combined_loss
 
         on_step = stage is Stage.TRAIN
         random_coral_loss = coral_random_loss(int(self._binner.num_classes))
-        loss_metrics: dict[str, Tensor | float] = {
-            "loss": combined_loss,
-            "coral_loss": coral_loss_value,
-            "coral_loss_rel_random": coral_loss_value / random_coral_loss,
+        loss_metrics: dict[Loss, Tensor | float] = {
+            Loss.LOSS: combined_loss,
+            Loss.CORAL: coral_loss_value,
+            Loss.CORAL_REL_RANDOM: coral_loss_value / random_coral_loss,
         }
+        aux_loss_metrics: dict[Loss, Tensor | float] = {}
+        with torch.no_grad():
+            aux_loss_metrics[Loss.ORD_BALANCED_BCE] = self._coral_loss_variant(
+                logits_valid,
+                labels_valid,
+                num_classes=int(self._binner.num_classes),
+                variant="balanced_bce",
+            ).mean()
+            aux_loss_metrics[Loss.ORD_FOCAL] = self._coral_loss_variant(
+                logits_valid,
+                labels_valid,
+                num_classes=int(self._binner.num_classes),
+                variant="focal",
+            ).mean()
         if aux_loss is not None:
-            loss_metrics["aux_regression_loss"] = aux_loss
+            aux_loss_metrics[Loss.AUX_REGRESSION] = aux_loss
         self._log_loss_scalars(
             loss_metrics,
             stage=stage,
@@ -535,22 +405,30 @@ class VinLightningModule(pl.LightningModule):
             prog_bar=(stage is Stage.TRAIN),
             batch_size=log_batch_size,
         )
+        if aux_loss_metrics:
+            self._log_aux_scalars(
+                aux_loss_metrics,
+                stage=stage,
+                on_step=on_step,
+                on_epoch=True,
+                prog_bar=False,
+                batch_size=log_batch_size,
+            )
 
         self._log_aux_scalars(
             {
-                Metric.RRI_MEAN: rri[mask].mean(),
-                Metric.PRED_RRI_MEAN: pred_rri_proxy[mask].mean()
-                if pred_rri_proxy is not None
+                Metric.RRI_MEAN: rri_valid.mean(),
+                Metric.PRED_RRI_MEAN: pred_rri_proxy_valid.mean()
+                if pred_rri_proxy_valid is not None
                 else torch.tensor(float("nan"), device=combined_loss.device),
-                Metric.VALID_FRAC_MEAN: float(valid_frac.mean().item()),
-                Metric.CANDIDATE_VALID_FRACTION: float(
-                    pred.candidate_valid.float().mean().item(),
-                ),
                 Metric.TOP3_ACCURACY: topk_accuracy_from_probs(
-                    probs[mask],
-                    labels[mask],
+                    probs_valid,
+                    labels_valid,
                     top_k=3,
                 ),
+                Metric.AUX_REGRESSION_WEIGHT: float(aux_weight)
+                if aux_weight is not None
+                else torch.tensor(float("nan"), device=combined_loss.device),
             },
             stage=stage,
             on_step=on_step,
@@ -559,11 +437,11 @@ class VinLightningModule(pl.LightningModule):
             batch_size=log_batch_size,
         )
 
-        pred_class = coral_logits_to_label(logits)
-        monotonicity_rate = coral_monotonicity_violation_rate(logits[mask]).mean()
-        self.log(
-            f"{stage.value}-aux/coral_monotonicity_violation_rate",
-            monotonicity_rate,
+        pred_class = coral_logits_to_label(logits_valid)
+        monotonicity_rate = coral_monotonicity_violation_rate(logits_valid).mean()
+        self._log_aux_scalars(
+            {Metric.CORAL_MONOTONICITY_VIOLATION_RATE: monotonicity_rate},
+            stage=stage,
             on_step=on_step,
             on_epoch=True,
             prog_bar=False,
@@ -571,21 +449,30 @@ class VinLightningModule(pl.LightningModule):
         )
         stage_key = f"{stage.value}_stage"
         self._metrics[stage_key].update(
-            pred_scores=pred.expected_normalized.squeeze(0)[mask].to(
+            pred_scores=pred.expected_normalized.squeeze(0)
+            .reshape(-1)[mask]
+            .to(
                 dtype=torch.float32,
             ),
-            rri=rri[mask].to(dtype=torch.float32),
-            pred_class=pred_class[mask],
-            labels=labels[mask],
+            rri=rri_valid.to(dtype=torch.float32),
+            pred_class=pred_class,
+            labels=labels_valid,
         )
         if stage is Stage.TRAIN:
             self._interval_metrics.update(
-                pred_scores=pred.expected_normalized.squeeze(0)[mask].to(
+                pred_scores=pred.expected_normalized.squeeze(0)
+                .reshape(-1)[mask]
+                .to(
                     dtype=torch.float32,
                 ),
-                rri=rri[mask].to(dtype=torch.float32),
-                pred_class=pred_class[mask],
-                labels=labels[mask],
+                rri=rri_valid.to(dtype=torch.float32),
+                pred_class=pred_class,
+                labels=labels_valid,
+            )
+        if stage is Stage.VAL and pred_rri_proxy_valid is not None:
+            self._rri_error_stats[f"{Stage.VAL.value}_stage"].update(
+                pred_rri_proxy_valid,
+                rri_valid.to(dtype=pred_rri_proxy_valid.dtype),
             )
         self._log_interval_metrics(
             stage,
@@ -594,6 +481,18 @@ class VinLightningModule(pl.LightningModule):
         )
 
         return combined_loss
+
+    def _aux_regression_weight(self) -> float:
+        """Compute the decayed auxiliary regression weight."""
+        weight = float(self.config.aux_regression_weight)
+        gamma = float(self.config.aux_regression_weight_gamma)
+        if gamma < 1.0:
+            if self.config.aux_regression_weight_interval == "step":
+                decay_steps = int(self.global_step)
+            else:
+                decay_steps = int(self.current_epoch)
+            weight *= gamma**decay_steps
+        return max(weight, float(self.config.aux_regression_weight_min))
 
     def _log_epoch_metrics(self, stage: Stage) -> None:
         if getattr(self.trainer, "sanity_checking", False):
@@ -678,6 +577,27 @@ class VinLightningModule(pl.LightningModule):
         )
         self._interval_metrics.reset()
 
+    def _log_rri_error_stats(self) -> None:
+        if getattr(self.trainer, "sanity_checking", False):
+            self._rri_error_stats[f"{Stage.VAL.value}_stage"].reset()
+            return
+        stats = self._rri_error_stats[f"{Stage.VAL.value}_stage"].compute()
+        if not stats:
+            self._rri_error_stats[f"{Stage.VAL.value}_stage"].reset()
+            return
+        self._log_aux_scalars(
+            {
+                Metric.PRED_RRI_BIAS2: stats["bias2"],
+                Metric.PRED_RRI_VARIANCE: stats["variance"],
+            },
+            stage=Stage.VAL,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=1,
+        )
+        self._rri_error_stats[f"{Stage.VAL.value}_stage"].reset()
+
     def _log_confusion_matrix(
         self,
         confusion: Tensor,
@@ -737,7 +657,7 @@ class VinLightningModule(pl.LightningModule):
 
     def _log_loss_scalars(
         self,
-        values: dict[str, Tensor | float],
+        values: dict[Loss, Tensor | float],
         *,
         stage: Stage,
         on_step: bool,
@@ -745,9 +665,8 @@ class VinLightningModule(pl.LightningModule):
         prog_bar: bool,
         batch_size: int,
     ) -> None:
-        prefix = f"{stage.value}/"
         self.log_dict(
-            {f"{prefix}{key}": val for key, val in values.items()},
+            {loss_key(stage, key): val for key, val in values.items()},
             on_step=on_step,
             on_epoch=on_epoch,
             prog_bar=prog_bar,
@@ -756,7 +675,7 @@ class VinLightningModule(pl.LightningModule):
 
     def _log_aux_scalars(
         self,
-        values: dict[Metric | str, Tensor | float],
+        values: dict[Metric | Loss, Tensor | float],
         *,
         stage: Stage,
         on_step: bool,
@@ -764,11 +683,15 @@ class VinLightningModule(pl.LightningModule):
         prog_bar: bool,
         batch_size: int,
     ) -> None:
-        prefix = f"{stage.value}-aux/"
         payload: dict[str, Tensor | float] = {}
         for key, val in values.items():
-            name = key.value if isinstance(key, Metric) else str(key)
-            payload[f"{prefix}{name}"] = val
+            if isinstance(key, Metric):
+                payload[metric_key(stage, key, namespace="aux")] = val
+                continue
+            if isinstance(key, Loss):
+                payload[loss_key(stage, key, namespace="aux")] = val
+                continue
+            payload[f"{stage.value}-aux/{str(key)}"] = val
         self.log_dict(
             payload,
             on_step=on_step,
@@ -793,6 +716,85 @@ class VinLightningModule(pl.LightningModule):
         device = next(self.vin.parameters()).device
         target = target.to(device=device, dtype=torch.float32)
         self.vin.init_bin_values(target, overwrite=False)
+
+    def _maybe_init_coral_bias(self) -> None:
+        """Initialize CORAL biases from fitted class priors (if configured)."""
+        if self._binner is None:
+            return
+        if self.config.coral_bias_init != "prior_logits":
+            return
+        head_coral = getattr(self.vin, "head_coral", None)
+        if head_coral is None or not hasattr(head_coral, "init_bias_from_priors"):
+            return
+
+        priors = self._binner.class_priors()
+        try:
+            head_coral.init_bias_from_priors(priors, overwrite=True)
+        except Exception as exc:  # pragma: no cover - init guard
+            self.console.warn(f"Failed to init CORAL bias from priors: {exc}")
+
+    def _coral_loss_variant(
+        self,
+        logits: Tensor,
+        labels: Tensor,
+        *,
+        num_classes: int,
+        variant: Literal["coral", "balanced_bce", "focal"] | None = None,
+    ) -> Tensor:
+        """Compute the configured CORAL loss variant (per-sample)."""
+        variant = self.config.coral_loss_variant if variant is None else variant
+        if variant == "coral":
+            return coral_loss(
+                logits,
+                labels,
+                num_classes=num_classes,
+                reduction="none",
+            )
+
+        if self._binner is None:
+            raise RuntimeError("Binner not initialized; cannot compute CORAL loss.")
+
+        levels = self._binner.labels_to_levels(labels)
+        eps = float(self.config.coral_balance_eps)
+
+        if self.config.coral_balance_source == "binner":
+            priors = self._binner.threshold_priors().to(
+                device=logits.device,
+                dtype=logits.dtype,
+            )
+        else:
+            priors = levels.to(dtype=logits.dtype).mean(dim=0)
+        priors = priors.clamp(min=eps, max=1.0 - eps)
+
+        if variant == "balanced_bce":
+            pos_weight = (1.0 - priors) / priors
+            loss = functional.binary_cross_entropy_with_logits(
+                logits,
+                levels.to(dtype=logits.dtype),
+                pos_weight=pos_weight,
+                reduction="none",
+            )
+            return loss.mean(dim=-1)
+
+        if variant == "focal":
+            prob = torch.sigmoid(logits)
+            levels_f = levels.to(dtype=logits.dtype)
+            p_t = prob * levels_f + (1.0 - prob) * (1.0 - levels_f)
+            if self.config.coral_focal_alpha is None:
+                alpha = (1.0 - priors).clamp(min=eps, max=1.0 - eps)
+            else:
+                alpha = torch.full_like(priors, float(self.config.coral_focal_alpha))
+            alpha_t = alpha * levels_f + (1.0 - alpha) * (1.0 - levels_f)
+            loss = (
+                -alpha_t
+                * (1.0 - p_t).pow(float(self.config.coral_focal_gamma))
+                * torch.log(
+                    p_t.clamp_min(eps),
+                )
+            )
+            return loss.mean(dim=-1)
+
+        raise ValueError(f"Unknown coral_loss_variant='{variant}'.")
 
     def _load_binner_from_config(self) -> RriOrdinalBinner:
         if self.config.binner_path is None:

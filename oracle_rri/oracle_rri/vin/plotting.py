@@ -23,6 +23,8 @@ from pytorch3d.renderer.cameras import (
     PerspectiveCameras,  # type: ignore[import-untyped]
 )
 
+from oracle_rri.utils.frames import rotate_yaw_cw90
+
 from ..data.efm_views import EfmSnippetView
 from ..data.plotting import SnippetPlotBuilder
 from .model import _build_frustum_points_world_p3d
@@ -128,9 +130,7 @@ class PlottingConfig:
             pio.templates.default = prev_plotly_template
             pio.templates[prev_plotly_template].layout.colorway = prev_plotly_colorway
             if self.plotly_colorway is not None:
-                pio.templates[
-                    self.plotly_template
-                ].layout.colorway = target_plotly_colorway
+                pio.templates[self.plotly_template].layout.colorway = target_plotly_colorway
             mpl.rcParams.update(prev)
             mpl.rcParams["axes.prop_cycle"] = prev_prop_cycle
             mpl.rcParams["font.family"] = prev_font_family
@@ -283,6 +283,43 @@ def _as_pose_tw(pose: PoseTW | torch.Tensor) -> PoseTW:
     raise TypeError(f"Unsupported pose type: {type(pose)!s}")
 
 
+def _as_pose_batch(pose: PoseTW | torch.Tensor) -> PoseTW:
+    """Ensure poses are batched as ``(B, ..., 12)`` for plotting."""
+    pose_tw = _as_pose_tw(pose)
+    if pose_tw.ndim == 1:
+        return PoseTW(pose_tw._data.unsqueeze(0))
+    if pose_tw.ndim == 2 and pose_tw.shape[-1] == 12:
+        return PoseTW(pose_tw._data.unsqueeze(0))
+    return pose_tw
+
+
+def _broadcast_pose_batch(pose: PoseTW, *, batch_size: int, name: str) -> PoseTW:
+    """Broadcast a single pose to ``batch_size`` if needed."""
+    if pose.ndim != 2:
+        raise ValueError(f"{name} must have shape (B, 12), got ndim={pose.ndim}.")
+    if pose.shape[0] == 1 and batch_size > 1:
+        return PoseTW(pose._data.expand(batch_size, 12))
+    if pose.shape[0] != batch_size:
+        raise ValueError(f"{name} must have batch size 1 or match candidates.")
+    return pose
+
+
+def _centers_rig_from_poses(
+    reference_pose_world_rig: PoseTW,
+    candidate_poses_world_cam: PoseTW,
+) -> torch.Tensor:
+    """Compute candidate centers in the reference rig frame."""
+    pose_world_cam = _as_pose_batch(candidate_poses_world_cam)
+    pose_world_rig = _as_pose_batch(reference_pose_world_rig)
+    pose_world_rig = _broadcast_pose_batch(
+        pose_world_rig,
+        batch_size=int(pose_world_cam.shape[0]),
+        name="reference_pose_world_rig",
+    )
+    pose_rig_cam = pose_world_rig.inverse()[:, None] @ pose_world_cam
+    return pose_rig_cam.t
+
+
 def _candidate_valid_fraction(debug: VinForwardDiagnostics) -> torch.Tensor:
     """Return per-candidate validity fraction.
 
@@ -300,40 +337,42 @@ def _candidate_valid_fraction(debug: VinForwardDiagnostics) -> torch.Tensor:
     return torch.ones(centers.shape[:-1], dtype=torch.float32, device=centers.device)
 
 
-def _add_frame_axes_custom(
+def _rotate_points_yaw_cw90(
+    points: np.ndarray | torch.Tensor,
     *,
-    fig: go.Figure,
-    cam_centers: np.ndarray,
-    cam_axes: np.ndarray,
-    title: str,
-    scale: float,
-    axis_colors: list[str],
-) -> None:
-    if cam_centers.ndim == 1:
-        cam_centers = cam_centers.reshape(1, 3)
-    if cam_axes.ndim == 2:
-        cam_axes = cam_axes.reshape(1, 3, 3)
+    pose_world_frame: PoseTW | None = None,
+    undo: bool = False,
+) -> np.ndarray | torch.Tensor:
+    """Rotate world points by the UI roll (+Z twist) used in display plots."""
+    if isinstance(points, np.ndarray):
+        if points.size == 0:
+            return points
+        pts = torch.as_tensor(points, dtype=torch.float32)
+        to_numpy = True
+    else:
+        pts = points
+        to_numpy = False
+    if pts.numel() == 0:
+        return points
 
-    colors = axis_colors or ["red", "green", "blue"]
-    for axis, color in enumerate(colors):
-        axis_start = cam_centers
-        axis_end = cam_centers + cam_axes[:, axis] * scale
-        seg = np.stack([axis_start, axis_end], axis=1)
-        seg = np.concatenate(
-            [seg, np.full((seg.shape[0], 1, 3), np.nan, dtype=float)],
-            axis=1,
-        ).reshape(-1, 3)
-        fig.add_trace(
-            go.Scatter3d(
-                x=seg[:, 0],
-                y=seg[:, 1],
-                z=seg[:, 2],
-                mode="lines",
-                line={"color": color, "width": 8},
-                name=title if axis == 0 else None,
-                showlegend=axis == 0,
-            ),
+    angle = -np.pi / 2 if undo else np.pi / 2
+    c, s = float(np.cos(angle)), float(np.sin(angle))
+    r_roll = torch.tensor(
+        [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
+        device=pts.device,
+        dtype=pts.dtype,
+    )
+    if pose_world_frame is None:
+        rot = PoseTW.from_Rt(
+            r_roll,
+            torch.zeros(3, device=pts.device, dtype=pts.dtype),
         )
+        rotated = rot.transform(pts)
+    else:
+        pose_rot = rotate_yaw_cw90(pose_world_frame, undo=undo)
+        pts_frame = pose_world_frame.inverse().transform(pts)
+        rotated = pose_rot.transform(pts_frame)
+    return rotated.detach().cpu().numpy() if to_numpy else rotated
 
 
 def _collect_backbone_evidence_points(
@@ -673,9 +712,7 @@ def build_pose_grid_slices_figure(
     fig = make_subplots(
         rows=1,
         cols=3,
-        subplot_titles=tuple(
-            _pretty_label(name) for name in ("pos_x", "pos_y", "pos_z")
-        ),
+        subplot_titles=tuple(_pretty_label(name) for name in ("pos_x", "pos_y", "pos_z")),
     )
     for col in range(3):
         fig.add_trace(
@@ -691,9 +728,7 @@ def build_pose_grid_slices_figure(
         fig.update_xaxes(title_text=_pretty_label(x_label), row=1, col=col + 1)
         fig.update_yaxes(title_text=_pretty_label(y_label), row=1, col=col + 1)
 
-    fig.update_layout(
-        title=_pretty_label(f"Position grid slices (axis {axis}, index {idx})")
-    )
+    fig.update_layout(title=_pretty_label(f"Position grid slices (axis {axis}, index {idx})"))
     return fig
 
 
@@ -956,9 +991,7 @@ def build_lff_empirical_figures(
     mlp_np = mlp_out[:, : int(max_features)].detach().cpu().numpy()
 
     fig_fourier_hist = go.Figure()
-    fourier_series = [
-        (f"f{idx}", fourier_np[:, idx]) for idx in range(min(6, fourier_np.shape[1]))
-    ]
+    fourier_series = [(f"f{idx}", fourier_np[:, idx]) for idx in range(min(6, fourier_np.shape[1]))]
     fourier_edges = _histogram_edges(
         [vals for _, vals in fourier_series],
         bins=int(hist_bins),
@@ -1041,52 +1074,15 @@ def build_lff_empirical_figures(
     }
 
 
-def build_candidate_pose_figure(
-    debug: VinForwardDiagnostics,
-    *,
-    max_candidates: int = 256,
-    forward_scale: float = 0.5,
-) -> go.Figure:
-    """Plot candidate centers and forward vectors in the reference rig frame."""
-    centers = debug.candidate_center_rig_m.reshape(-1, 3).detach().cpu().numpy()
-    forwards = debug.candidate_forward_dir_rig.reshape(-1, 3).detach().cpu().numpy()
-    if centers.shape[0] == 0:
-        return go.Figure()
-
-    if centers.shape[0] > max_candidates:
-        idx = np.random.choice(centers.shape[0], size=max_candidates, replace=False)
-        centers = centers[idx]
-        forwards = forwards[idx]
-
-    line_trace = _segment_trace(
-        centers,
-        centers + forwards * float(forward_scale),
-        color="#2a9d8f",
-        name="forward",
-        width=3,
-    )
-    fig = go.Figure()
-    fig.add_trace(_scatter3d(centers, name="centers", color="#fc5555", size=4))
-    fig.add_trace(line_trace)
-    fig.update_layout(
-        title=_pretty_label("Candidate centers + forward directions (rig frame)"),
-        scene={"aspectmode": "data"},
-        margin={"l": 0, "r": 0, "t": 40, "b": 0},
-    )
-    return fig
-
-
 def build_geometry_overview_figure(
     debug: VinForwardDiagnostics,
     *,
     snippet: EfmSnippetView,
     reference_pose_world_rig: PoseTW,
-    max_candidates: int = 512,
-    axis_scale: float = 0.5,
+    max_candidates: int = 64,
     show_reference_axes: bool = True,
     show_voxel_axes: bool = True,
-    reference_axis_colors: list[str] | None = None,
-    voxel_axis_colors: list[str] | None = None,
+    display_rotate_yaw_cw90: bool = False,
     show_scene_bounds: bool = True,
     show_crop_bounds: bool = False,
     show_frustum: bool = False,
@@ -1141,32 +1137,15 @@ def build_geometry_overview_figure(
         builder.add_trajectory(mark_first_last=mark_first_last, show=True)
 
     ref_pose = _pose_first_batch(reference_pose_world_rig)
-    ref_centers = ref_pose.t.detach().cpu().numpy()
-    ref_axes = ref_pose.R.transpose(-1, -2).detach().cpu().numpy()
     if show_reference_axes:
-        _add_frame_axes_custom(
-            fig=builder.fig,
-            cam_centers=ref_centers,
-            cam_axes=ref_axes,
-            title=_pretty_label("reference pose"),
-            scale=axis_scale,
-            axis_colors=reference_axis_colors or ["red", "green", "blue"],
-        )
-        builder._update_scene_ranges(ref_centers)
+        builder.add_frame_axes(frame=ref_pose, is_rotate_yaw_cw90=False)
 
-    voxel_pose = _pose_first_batch(debug.backbone_out.t_world_voxel)
-    voxel_centers = voxel_pose.t.detach().cpu().numpy()
-    voxel_axes = voxel_pose.R.transpose(-1, -2).detach().cpu().numpy()
+    voxel_pose_raw = _pose_first_batch(debug.backbone_out.t_world_voxel)
+    voxel_pose = voxel_pose_raw
+    if display_rotate_yaw_cw90:
+        voxel_pose = rotate_yaw_cw90(voxel_pose_raw)
     if show_voxel_axes:
-        _add_frame_axes_custom(
-            fig=builder.fig,
-            cam_centers=voxel_centers,
-            cam_axes=voxel_axes,
-            title=_pretty_label("voxel axes"),
-            scale=axis_scale,
-            axis_colors=voxel_axis_colors or ["cyan", "magenta", "yellow"],
-        )
-        builder._update_scene_ranges(voxel_centers)
+        builder.add_frame_axes(frame=voxel_pose, is_rotate_yaw_cw90=False)
 
     if semidense_mode != "off":
         builder.add_semidense(
@@ -1233,6 +1212,11 @@ def build_geometry_overview_figure(
             for idx, (name, points_world, values) in enumerate(evidence):
                 if points_world.size == 0:
                     continue
+                if display_rotate_yaw_cw90:
+                    points_world = _rotate_points_yaw_cw90(
+                        points_world,
+                        pose_world_frame=voxel_pose_raw,
+                    )
                 bar_y = max(0.1, bar_start - idx * (bar_len + bar_gap))
                 builder.fig.add_trace(
                     go.Scatter3d(
@@ -1259,6 +1243,14 @@ def build_geometry_overview_figure(
                 builder._update_scene_ranges(points_world)
 
     centers_rig = debug.candidate_center_rig_m.reshape(-1, 3)
+    if candidate_poses_world_cam is not None:
+        try:
+            centers_rig = _centers_rig_from_poses(
+                reference_pose_world_rig,
+                _as_pose_tw(candidate_poses_world_cam),
+            ).reshape(-1, 3)
+        except Exception:  # pragma: no cover - fallback to debug centers
+            centers_rig = debug.candidate_center_rig_m.reshape(-1, 3)
     valid_frac = _candidate_valid_fraction(debug).reshape(-1)
     centers_world: torch.Tensor | None = None
     if candidate_pose_mode == "world_cam" and candidate_poses_world_cam is not None:
@@ -1289,9 +1281,7 @@ def build_geometry_overview_figure(
             color_values = color_values[finite]
 
         if centers_world.shape[0] > max_candidates:
-            idx = torch.randperm(centers_world.shape[0], device=centers_world.device)[
-                :max_candidates
-            ]
+            idx = torch.randperm(centers_world.shape[0], device=centers_world.device)[:max_candidates]
             centers_world = centers_world[idx]
             valid_frac = valid_frac[idx]
             if candidate_color_mode != "solid":
@@ -1306,11 +1296,7 @@ def build_geometry_overview_figure(
             if candidate_color_mode == "solid":
                 marker["color"] = candidate_color
             else:
-                color_np = (
-                    color_values.detach().cpu().numpy()
-                    if torch.is_tensor(color_values)
-                    else valid_np
-                )
+                color_np = color_values.detach().cpu().numpy() if torch.is_tensor(color_values) else valid_np
                 marker.update(
                     {
                         "color": color_np,
@@ -1337,11 +1323,7 @@ def build_geometry_overview_figure(
     if candidate_frusta_indices and candidate_poses_world_cam is not None:
         cam_label = candidate_frusta_camera.replace("-", "")
         cam_view = snippet.get_camera(cam_label)
-        frame_idx = (
-            0
-            if candidate_frusta_frame_index is None
-            else int(candidate_frusta_frame_index)
-        )
+        frame_idx = 0 if candidate_frusta_frame_index is None else int(candidate_frusta_frame_index)
         frame_idx = max(0, min(frame_idx, int(cam_view.calib.shape[0]) - 1))
         cam_calib = cam_view.calib[frame_idx]
         pose_data = candidate_poses_world_cam._data[candidate_frusta_indices]
@@ -1454,6 +1436,87 @@ def build_frustum_samples_figure(
     return fig
 
 
+def build_semidense_projection_figure(
+    points_world: torch.Tensor,
+    *,
+    p3d_cameras: PerspectiveCameras,
+    candidate_index: int,
+    max_points: int = 20000,
+) -> go.Figure:
+    """Plot semidense points colored by whether they project inside the candidate view."""
+    if points_world.ndim == 2:
+        points_world = points_world.unsqueeze(0)
+    if points_world.ndim != 3:
+        return go.Figure()
+
+    if points_world.shape[0] > 1:
+        points_world = points_world[:1]
+
+    cam = p3d_cameras.to(points_world.device)
+    num_cams = int(cam.R.shape[0])
+    if num_cams == 0:
+        return go.Figure()
+    if num_cams > 1:
+        idx = min(int(candidate_index), num_cams - 1)
+        cam = PerspectiveCameras(
+            device=cam.device,
+            R=cam.R[idx : idx + 1],
+            T=cam.T[idx : idx + 1],
+            focal_length=cam.focal_length[idx : idx + 1],
+            principal_point=cam.principal_point[idx : idx + 1],
+            image_size=cam.image_size[idx : idx + 1] if cam.image_size is not None else None,
+            in_ndc=cam.in_ndc,
+        )
+
+    pts_world = points_world[0]
+    if pts_world.shape[-1] > 3:
+        pts_world = pts_world[..., :3]
+
+    if pts_world.shape[0] > max_points:
+        idx = torch.randperm(pts_world.shape[0], device=pts_world.device)[:max_points]
+        pts_world = pts_world[idx]
+
+    pts_screen = cam.transform_points_screen(pts_world.unsqueeze(0))
+    x, y, z = pts_screen.unbind(dim=-1)
+    image_size = cam.image_size
+    if image_size is None or image_size.numel() == 0:
+        return go.Figure()
+    h = image_size[:, 0].unsqueeze(1)
+    w = image_size[:, 1].unsqueeze(1)
+    finite = torch.isfinite(pts_screen).all(dim=-1)
+    valid = finite & (z > 0.0) & (x >= 0.0) & (y >= 0.0) & (x <= (w - 1.0)) & (y <= (h - 1.0))
+    valid = valid.squeeze(0).detach().cpu().numpy()
+    pts_np = pts_world.detach().cpu().numpy()
+
+    fig = go.Figure()
+    if pts_np.shape[0] > 0:
+        fig.add_trace(
+            _scatter3d(
+                pts_np[valid],
+                name="in view",
+                color="#2a9d8f",
+                size=2,
+                opacity=0.8,
+            ),
+        )
+        fig.add_trace(
+            _scatter3d(
+                pts_np[~valid],
+                name="out of view",
+                color="#e76f51",
+                size=2,
+                opacity=0.3,
+            ),
+        )
+
+    fig.update_layout(
+        title=_pretty_label("Semidense points colored by candidate visibility"),
+        scene={"aspectmode": "data"},
+        margin={"l": 0, "r": 0, "t": 40, "b": 0},
+    )
+    return fig
+
+
 def build_alignment_figures(
     debug: VinForwardDiagnostics,
     *,
@@ -1481,10 +1544,7 @@ def build_alignment_figures(
     )
     figs["view_alignment"] = fig_view
 
-    if (
-        debug.voxel_forward_dir_rig is not None
-        and debug.voxel_center_dir_rig is not None
-    ):
+    if debug.voxel_forward_dir_rig is not None and debug.voxel_center_dir_rig is not None:
         voxel_forward = debug.voxel_forward_dir_rig.reshape(1, 3)
         voxel_center = debug.voxel_center_dir_rig.reshape(1, 3)
         dot_forward = (cand_forward * voxel_forward).sum(dim=-1).detach().cpu().numpy()
@@ -1916,9 +1976,7 @@ def build_se3_closure_figure(
     pose_rig_cam = pose_world_rig.inverse()[:, None] @ pose_world_cam
     pose_world_cam_hat = pose_world_rig[:, None] @ pose_rig_cam
 
-    trans_err = (
-        (pose_world_cam_hat.t - pose_world_cam.t).norm(dim=-1).detach().cpu().numpy()
-    )
+    trans_err = (pose_world_cam_hat.t - pose_world_cam.t).norm(dim=-1).detach().cpu().numpy()
     r_err = pose_world_cam_hat.R.transpose(-1, -2) @ pose_world_cam.R
     trace = r_err[..., 0, 0] + r_err[..., 1, 1] + r_err[..., 2, 2]
     cos_angle = torch.clamp((trace - 1.0) * 0.5, -1.0, 1.0)
@@ -1932,10 +1990,7 @@ def build_se3_closure_figure(
     fig = make_subplots(
         rows=1,
         cols=2,
-        subplot_titles=tuple(
-            _pretty_label(name)
-            for name in ("translation residual (m)", "rotation residual (deg)")
-        ),
+        subplot_titles=tuple(_pretty_label(name) for name in ("translation residual (m)", "rotation residual (deg)")),
     )
     fig.add_trace(
         _histogram_bar(
@@ -2009,10 +2064,7 @@ def build_voxel_inbounds_figure(
     fig = make_subplots(
         rows=1,
         cols=2,
-        subplot_titles=tuple(
-            _pretty_label(name)
-            for name in ("in-bounds ratios", "normalized coord distributions")
-        ),
+        subplot_titles=tuple(_pretty_label(name) for name in ("in-bounds ratios", "normalized coord distributions")),
     )
     fig.add_trace(
         go.Bar(x=ratio_labels, y=ratios, marker={"color": "#2a9d8f"}),
@@ -2098,10 +2150,7 @@ def build_pos_grid_linearity_figure(
     fig = make_subplots(
         rows=1,
         cols=2,
-        subplot_titles=tuple(
-            _pretty_label(name)
-            for name in ("linearity R² (rig axes)", "linear map coeffs")
-        ),
+        subplot_titles=tuple(_pretty_label(name) for name in ("linearity R² (rig axes)", "linear map coeffs")),
     )
     fig.add_trace(
         go.Bar(
@@ -2221,9 +2270,7 @@ def _build_radius_fourier_figure(
     fig = make_subplots(
         rows=1,
         cols=2,
-        subplot_titles=tuple(
-            _pretty_label(name) for name in ("radius r (meters)", "sin(2π ω r)")
-        ),
+        subplot_titles=tuple(_pretty_label(name) for name in ("radius r (meters)", "sin(2π ω r)")),
     )
 
     edges = _histogram_edges([r_np], bins=50)
@@ -2266,9 +2313,7 @@ def _build_radius_fourier_figure(
 
     fig.update_xaxes(title_text=_pretty_label("r (m)"), row=1, col=2)
     fig.update_yaxes(title_text=_pretty_label("value"), row=1, col=2)
-    fig.update_layout(
-        title=_pretty_label("1D Fourier features for radius (linear input)")
-    )
+    fig.update_layout(title=_pretty_label("1D Fourier features for radius (linear input)"))
     return fig
 
 
@@ -2497,24 +2542,6 @@ def build_candidate_encoding_figures(
     return figs
 
 
-def save_vin_encoding_figures(
-    figs: dict[str, go.Figure],
-    *,
-    out_dir: Path,
-    file_stem_prefix: str,
-) -> dict[str, Path]:
-    """Persist Plotly figures to HTML files and return their paths."""
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    paths: dict[str, Path] = {}
-    for label, fig in figs.items():
-        path = out_dir / f"{file_stem_prefix}_{label}.html"
-        _save_plotly_fig(fig, path)
-        paths[label] = path
-    return paths
-
-
 def plot_vin_encodings_from_debug(
     debug: VinForwardDiagnostics,
     *,
@@ -2541,18 +2568,13 @@ def plot_vin_encodings_from_debug(
     Returns:
         Mapping of figure labels to saved HTML paths.
     """
-    figs = build_vin_encoding_figures(
+    build_vin_encoding_figures(
         debug,
         lmax=lmax,
         sh_normalization=sh_normalization,
         radius_freqs=radius_freqs,
         pose_encoder_lff=pose_encoder_lff,
         include_legacy_sh=include_legacy_sh,
-    )
-    return save_vin_encoding_figures(
-        figs,
-        out_dir=out_dir,
-        file_stem_prefix=file_stem_prefix,
     )
 
 
@@ -2562,10 +2584,10 @@ __all__ = [
     "build_alignment_figures",
     "build_backbone_evidence_figures",
     "build_candidate_encoding_figures",
-    "build_candidate_pose_figure",
     "build_field_slice_figures",
     "build_field_token_histograms",
     "build_frustum_samples_figure",
+    "build_semidense_projection_figure",
     "build_lff_empirical_figures",
     "build_lff_response_figures",
     "build_pose_enc_pca_figure",
@@ -2582,5 +2604,4 @@ __all__ = [
     "build_voxel_frame_figure",
     "build_voxel_roundtrip_figure",
     "plot_vin_encodings_from_debug",
-    "save_vin_encoding_figures",
 ]

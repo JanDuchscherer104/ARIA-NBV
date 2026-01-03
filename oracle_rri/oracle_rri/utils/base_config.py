@@ -600,11 +600,11 @@ class SingletonConfig(BaseConfig):
         else:
             for key, value in kwargs.items():
                 if hasattr(self, key):
-                    current = getattr(self, key)
-                    if current != value:
-                        Console().log(
-                            f"Updating singleton {self.__class__.__name__} field '{key}' from {current} to {value}"
-                        )
+                    # current = getattr(self, key)
+                    # # if current != value:
+                    # #     Console().log(
+                    # #         f"Updating singleton {self.__class__.__name__} field '{key}' from {current} to {value}"
+                    # #     )
                     setattr(self, key, value)
 
     def __copy__(self) -> "SingletonConfig":

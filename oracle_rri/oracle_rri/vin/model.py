@@ -445,9 +445,7 @@ def _sample_voxel_field(
     # NOTE: If you ever swap EVL conventions or change voxel-grid anchoring, re-verify this transform (sanity check:
     # voxelized points should be stable under small candidate translations).
     t_voxel_world = t_world_voxel_b.inverse()  # voxel<-world
-    voxel_points_m = (
-        t_voxel_world * world_points_flat
-    )  # B (N*K) 3 in voxel frame (metres)
+    voxel_points_m = t_voxel_world * world_points_flat  # B (N*K) 3 in voxel frame (metres)
 
     pts_vox_id, valid_extent = pc_to_vox(
         voxel_points_m.to(dtype=torch.float32),
@@ -953,9 +951,7 @@ class VinModel(nn.Module):
                 persistent=False,
             )
         self.head = self.config.head.setup_target(in_dim=head_in_dim)
-        device = (
-            self.backbone.device if self.backbone is not None else torch.device("cpu")
-        )
+        device = self.backbone.device if self.backbone is not None else torch.device("cpu")
         self.to(device)
 
     def _pose_scales(self) -> Tensor:
@@ -1219,9 +1215,7 @@ class VinModel(nn.Module):
             )
 
         # ------------------------------------------------------------------ relative pose (candidate in reference rig frame)
-        pose_rig_cam = (
-            pose_world_rig_ref.inverse()[:, None] @ pose_world_cam
-        )  # rig_ref <- cam
+        pose_rig_cam = pose_world_rig_ref.inverse()[:, None] @ pose_world_cam  # rig_ref <- cam
 
         # ------------------------------------------------------------------ pose encoding (shell descriptor + optional R6D)
         candidate_center_rig_m = pose_rig_cam.t.to(dtype=torch.float32)  # B N 3
@@ -1243,8 +1237,7 @@ class VinModel(nn.Module):
             cam_forward_axis_cam,
         )
         candidate_forward_dir_rig = candidate_forward_dir_rig / (
-            torch.linalg.vector_norm(candidate_forward_dir_rig, dim=-1, keepdim=True)
-            + 1e-8
+            torch.linalg.vector_norm(candidate_forward_dir_rig, dim=-1, keepdim=True) + 1e-8
         )
 
         view_alignment = (candidate_forward_dir_rig * (-candidate_center_dir_rig)).sum(
@@ -1294,9 +1287,7 @@ class VinModel(nn.Module):
                 "voxel/T_world_voxel must have batch size 1 or match candidate batch size.",
             )
 
-        pose_rig_voxel = (
-            pose_world_rig_ref.inverse() @ t_world_voxel
-        )  # rig_ref <- voxel
+        pose_rig_voxel = pose_world_rig_ref.inverse() @ t_world_voxel  # rig_ref <- voxel
         voxel_center_rig_m = pose_rig_voxel.t.to(dtype=torch.float32)  # B 3
         voxel_radius_m = torch.linalg.vector_norm(
             voxel_center_rig_m,

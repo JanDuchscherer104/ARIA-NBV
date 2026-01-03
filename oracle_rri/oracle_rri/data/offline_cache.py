@@ -240,11 +240,14 @@ class OracleRriCacheDatasetConfig(BaseConfig["OracleRriCacheDataset"]):
     map_location: torch.device = Field(default="cpu")
     """Device string for loading cached tensors (e.g., 'cpu', 'cuda')."""
 
-    include_efm_snippet: bool = False
+    include_efm_snippet: bool = True
     """Wether to include the EFM snippet in the loaded samples."""
 
     include_gt_mesh: bool = False
     """Wether to include the ground truth mesh in the loaded samples. Applies only if ``include_efm_snippet=True``."""
+
+    efm_keep_keys: list[str] | None = None
+    """Optional allowlist of EFM keys to keep when loading snippets."""
 
     return_format: Literal["cache_sample", "vin_batch"] = "cache_sample"
     """Return cached samples or VIN-ready batches."""
@@ -400,6 +403,7 @@ def _load_efm_snippet_for_cache(
     payload["wds_repeat"] = False
     payload["load_meshes"] = bool(include_gt_mesh)
     payload.setdefault("require_mesh", False)
+    payload["verbosity"] = Verbosity.QUIET
     cfg = AseEfmDatasetConfig(**payload)
     dataset = cfg.setup_target()
     return next(iter(dataset))
@@ -467,7 +471,7 @@ class OracleRriCacheWriter:
         """Iterate the dataset and persist cached outputs.
 
         Returns:
-            List of index entries for cached samples.
+            List of index entries for cached samples created in this run.
         """
         cache_dir = self.config.cache.cache_dir
         cache_dir.mkdir(parents=True, exist_ok=True)
@@ -475,11 +479,30 @@ class OracleRriCacheWriter:
         samples_dir.mkdir(parents=True, exist_ok=True)
 
         index_path = self.config.cache.index_path
-        if index_path.exists() and not self.config.overwrite:
-            raise FileExistsError(
-                f"Cache index already exists at {index_path} (set overwrite=True to replace).",
-            )
-        if index_path.exists() and self.config.overwrite:
+        existing_entries: list[OracleRriCacheEntry] = []
+        existing_pairs: set[tuple[str, str]] = set()
+        if index_path.exists():
+            if not self.config.overwrite:
+                raise FileExistsError(
+                    f"Cache index already exists at {index_path} (set overwrite=True to replace).",
+                )
+            existing_entries = _read_cache_index(index_path, allow_missing=True)
+            valid_entries: list[OracleRriCacheEntry] = []
+            for entry in existing_entries:
+                entry_path = self.config.cache.cache_dir / entry.path
+                if entry_path.exists():
+                    valid_entries.append(entry)
+                    existing_pairs.add((entry.scene_id, entry.snippet_id))
+                else:
+                    self.console.warn(
+                        f"Index entry missing sample file; will regenerate if encountered "
+                        f"(scene={entry.scene_id} snippet={entry.snippet_id}).",
+                    )
+            existing_entries = valid_entries
+            if existing_entries:
+                self.console.log(
+                    f"Found {len(existing_entries)} existing cached samples; skipping duplicates by scene/snippet.",
+                )
             index_path.unlink()
 
         meta = build_cache_metadata(
@@ -497,15 +520,27 @@ class OracleRriCacheWriter:
 
         entries: list[OracleRriCacheEntry] = []
         max_samples = self.config.max_samples
-        count = 0
+        count = len(existing_entries)
+        skipped = 0
         fail_count = 0
+        if existing_entries:
+            _write_cache_index(index_path, existing_entries)
+        else:
+            index_path.touch()
         with index_path.open("a", encoding="utf-8") as index_f:
             for sample in self._dataset:
                 try:
+                    if max_samples is not None and count >= max_samples:
+                        break
+                    sample_pair = (sample.scene_id, sample.snippet_id)
+                    if sample_pair in existing_pairs:
+                        skipped += 1
+                        continue
                     cache_entry = self._write_sample(sample, samples_dir)
                     entries.append(cache_entry)
                     index_f.write(json.dumps(asdict(cache_entry)) + "\n")
                     count += 1
+                    existing_pairs.add(sample_pair)
                     if max_samples is not None and count >= max_samples:
                         break
                 except Exception as e:
@@ -520,9 +555,13 @@ class OracleRriCacheWriter:
                             f"Exceeded maximum allowed failures ({self.config.num_failures_allowed}). Aborting cache write.",
                         )
 
+        if skipped:
+            self.console.log(f"Skipped {skipped} duplicate samples already in cache.")
         meta.num_samples = count
         _write_metadata(self.config.cache.metadata_path, meta)
-        self.console.log(f"Wrote {count} cached samples to {cache_dir}")
+        self.console.log(
+            f"Cache now contains {count} samples (added {len(entries)} new) in {cache_dir}",
+        )
         return entries
 
     def _write_sample(
@@ -849,6 +888,8 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
                     self.console.warn(
                         f"GT mesh missing for scene={payload['scene_id']} snippet={payload['snippet_id']}.",
                     )
+                if self.config.efm_keep_keys is not None:
+                    efm_snippet = efm_snippet.prune_efm(set(self.config.efm_keep_keys))
             except Exception as exc:
                 self.console.warn(
                     f"Failed to load EFM snippet for scene={payload['scene_id']} "

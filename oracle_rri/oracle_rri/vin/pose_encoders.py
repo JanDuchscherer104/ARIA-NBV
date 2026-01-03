@@ -308,6 +308,33 @@ class ShellShPoseEncoderAdapterConfig(BaseConfig[ShellShPoseEncoderAdapter]):
     """Spherical-harmonics encoder configuration."""
 
 
+def infer_pose_vec_groups(pose_vec_dim: int) -> list[tuple[str, slice]]:
+    """Infer semantic groups for a pose-encoder input vector.
+
+    Args:
+        pose_vec_dim: Size of the pose vector ``D``.
+
+    Returns:
+        Ordered list of ``(name, slice)`` entries describing how to split the
+        pose vector into semantic groups. Falls back to a single ``pose_vec``
+        group when the dimensionality is unknown.
+    """
+    dim = int(pose_vec_dim)
+    if dim == 9:
+        return [
+            ("translation", slice(0, 3)),
+            ("rotation6d", slice(3, 9)),
+        ]
+    if dim == 8:
+        return [
+            ("center_dir", slice(0, 3)),
+            ("forward_dir", slice(3, 6)),
+            ("radius", slice(6, 7)),
+            ("view_alignment", slice(7, 8)),
+        ]
+    return [("pose_vec", slice(0, dim))]
+
+
 PoseEncoderConfig: TypeAlias = Annotated[
     R6dLffPoseEncoderConfig | ShellLffPoseEncoderConfig | ShellShPoseEncoderAdapterConfig,
     Field(discriminator="kind"),
@@ -324,4 +351,5 @@ __all__ = [
     "ShellLffPoseEncoderConfig",
     "ShellShPoseEncoderAdapter",
     "ShellShPoseEncoderAdapterConfig",
+    "infer_pose_vec_groups",
 ]

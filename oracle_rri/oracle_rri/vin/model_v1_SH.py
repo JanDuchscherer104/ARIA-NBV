@@ -96,9 +96,9 @@ from pydantic import Field, field_validator
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from torch import Tensor, nn
 
+from ..rri_metrics.coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
 from ..utils import BaseConfig
 from .backbone_evl import EvlBackboneConfig
-from .coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
 from .spherical_encoding import ShellShPoseEncoderConfig
 from .types import EvlBackboneOutput, VinForwardDiagnostics, VinPrediction
 
@@ -978,6 +978,7 @@ class VinModel(nn.Module):
             token_valid,
             min_valid_frac=self.config.candidate_min_valid_frac,
         )
+        valid_frac = token_valid.float().mean(dim=-1, keepdim=True)
 
         feats = torch.cat(parts, dim=-1)
         feats = feats * candidate_valid.to(dtype=feats.dtype).unsqueeze(-1)
@@ -992,6 +993,7 @@ class VinModel(nn.Module):
             expected=expected,
             expected_normalized=expected_norm,
             candidate_valid=candidate_valid,
+            valid_frac=valid_frac.squeeze(-1),
         )
 
         if not return_debug:
@@ -1018,6 +1020,7 @@ class VinModel(nn.Module):
             tokens=tokens,
             token_valid=token_valid,
             candidate_valid=candidate_valid,
+            valid_frac=valid_frac,
             feats=feats,
         )
         return pred, debug

@@ -391,6 +391,7 @@ class SnippetPlotBuilder:
         scale: float = 1.0,
         include_axes: bool = True,
         include_center: bool = True,
+        is_rotate_yaw_cw90: bool = True,
         name: str = "Frustum",
     ) -> Self:
         cam_view = self.snippet.get_camera(camera)
@@ -401,7 +402,9 @@ class SnippetPlotBuilder:
 
         t_world_rig = traj.t_world_rig[traj_idx]
         t_cam_rig = cam_view.calib.T_camera_rig[cam_idx]
-        t_world_cam = rotate_yaw_cw90(t_world_rig @ t_cam_rig.inverse())
+        t_world_cam = t_world_rig @ t_cam_rig.inverse()
+        if is_rotate_yaw_cw90:
+            t_world_cam = rotate_yaw_cw90(t_world_cam)
 
         pose_list = self._pose_list_from_input(t_world_cam)
         cam_list = cam_view.calib[cam_idx]

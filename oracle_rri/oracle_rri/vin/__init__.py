@@ -13,7 +13,6 @@ from .plotting import (
     build_scene_field_evidence_figures,
     build_vin_encoding_figures,
     plot_vin_encodings_from_debug,
-    save_vin_encoding_figures,
 )
 from .pose_encoders import (
     PoseEncoder,
@@ -33,10 +32,10 @@ from .pose_encoding import (
     LearnableFourierFeaturesConfig,
 )
 from .spherical_encoding import ShellShPoseEncoder, ShellShPoseEncoderConfig
+from .traj_encoder import TrajectoryEncoder, TrajectoryEncoderConfig, TrajectoryEncodingOutput
 from .types import EvlBackboneOutput, VinForwardDiagnostics, VinPrediction
 
 __all__ = [
-    "CoralLayer",
     "EvlBackbone",
     "EvlBackboneConfig",
     "EvlBackboneOutput",
@@ -61,14 +60,12 @@ __all__ = [
     "VinModelV2Config",
     "VinForwardDiagnostics",
     "VinPrediction",
+    "TrajectoryEncoder",
+    "TrajectoryEncoderConfig",
+    "TrajectoryEncodingOutput",
     "build_candidate_encoding_figures",
     "build_geometry_overview_figure",
     "build_scene_field_evidence_figures",
     "build_vin_encoding_figures",
     "plot_vin_encodings_from_debug",
-    "RriOrdinalBinner",
-    "save_vin_encoding_figures",
-    "coral_expected_from_logits",
-    "coral_logits_to_prob",
-    "coral_loss",
 ]

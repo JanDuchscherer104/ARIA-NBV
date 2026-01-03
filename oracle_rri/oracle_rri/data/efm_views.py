@@ -8,6 +8,7 @@ explicit and safe.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, fields, replace
 from pprint import pformat
 from typing import Any, Literal, TypedDict
@@ -295,8 +296,13 @@ class EfmPointsView:
             lengths=self.lengths.to(target_device),
         )
 
-    def collapse_points(self, max_points: int | None = None) -> Tensor:
-        """Collapse points across time and optionally subsample to a Tensor["K 3", float32], where K << N*F."""
+    def collapse_points(self, max_points: int | None = None, include_inv_dist_std: bool = False) -> Tensor:
+        """Collapse points across time and optionally subsample.
+
+        Returns:
+            ``Tensor["K 3", float32]`` if ``include_inv_dist_std=False``.
+            ``Tensor["K 4", float32]`` if ``include_inv_dist_std=True`` (XYZ + inv_dist_std).
+        """
 
         points = self.points_world
         if points.numel() == 0:
@@ -305,7 +311,27 @@ class EfmPointsView:
         lengths = self.lengths.to(device=points.device)
         max_len = points.shape[1]
         valid_mask = torch.arange(max_len, device=points.device).unsqueeze(0) < lengths.clamp_max(max_len).unsqueeze(-1)
-        points_collapsed = collapse_pointcloud_time(torch.where(valid_mask.unsqueeze(-1), points, torch.nan))
+
+        if include_inv_dist_std:
+            inv_dist_std = self.inv_dist_std.to(device=points.device, dtype=points.dtype)
+            points_masked = torch.where(valid_mask.unsqueeze(-1), points, torch.nan)
+            inv_masked = torch.where(valid_mask, inv_dist_std, torch.nan)
+            points_flat = points_masked.reshape(-1, 3)
+            inv_flat = inv_masked.reshape(-1, 1)
+            finite = torch.isfinite(points_flat).all(dim=-1) & torch.isfinite(inv_flat).all(dim=-1)
+            points_flat = points_flat[finite]
+            inv_flat = inv_flat[finite]
+            if points_flat.numel() == 0:
+                return torch.zeros((0, 4), dtype=points.dtype, device=points.device)
+            if max_points is not None and points_flat.shape[0] > max_points:
+                idx = torch.randperm(points_flat.shape[0], device=points_flat.device)[:max_points]
+                points_flat = points_flat[idx]
+                inv_flat = inv_flat[idx]
+            return torch.cat([points_flat, inv_flat], dim=-1)
+
+        points_collapsed = collapse_pointcloud_time(
+            torch.where(valid_mask.unsqueeze(-1), points, torch.nan),
+        )
         if points_collapsed.numel() == 0:
             return torch.zeros((0, 3), dtype=points.dtype, device=points.device)
 
@@ -384,6 +410,91 @@ class EfmSnippetView:
     """Stable key (spec hash) for shared mesh caches across components."""
 
     mesh_specs: MeshProcessSpec | None = None
+
+    @staticmethod
+    def _parse_key_ids(sample_key: str) -> tuple[str, str]:
+        """Parse scene/snippet identifiers from the cache sample key.
+
+        Args:
+            sample_key: Cache key like ``"AriaSyntheticEnvironment_82832_AtekDataSample_000056"``.
+
+        Returns:
+            Tuple of ``(scene_id, snippet_id)``.
+
+        Raises:
+            ValueError: If the key does not match the expected cache format.
+        """
+        match = re.match(r"^AriaSyntheticEnvironment_(\d+)_AtekDataSample_(\d+)$", sample_key)
+        if not match:
+            raise ValueError(f"Unsupported cache key format: {sample_key}")
+        return match.group(1), match.group(2)
+
+    @staticmethod
+    def _infer_cache_bounds(efm: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor] | None:
+        """Infer AABB bounds for cache samples from stored volume metadata."""
+        vol_min = None
+        for key in (ARIA_POINTS_VOL_MIN, "points/vol_min", "scene/points/vol_min"):
+            value = efm.get(key)
+            if isinstance(value, torch.Tensor):
+                vol_min = value
+                break
+        vol_max = None
+        for key in (ARIA_POINTS_VOL_MAX, "points/vol_max", "scene/points/vol_max"):
+            value = efm.get(key)
+            if isinstance(value, torch.Tensor):
+                vol_max = value
+                break
+        if not isinstance(vol_min, torch.Tensor) or not isinstance(vol_max, torch.Tensor):
+            return None
+        if vol_min.numel() != 3 or vol_max.numel() != 3:
+            return None
+        if not torch.isfinite(vol_min).all() or not torch.isfinite(vol_max).all():
+            return None
+        return vol_min.detach().cpu(), vol_max.detach().cpu()
+
+    @classmethod
+    def from_cache_efm(
+        cls,
+        efm: dict[str, Any],
+        *,
+        mesh: Trimesh | None = None,
+        crop_bounds: tuple[torch.Tensor, torch.Tensor] | None = None,
+        mesh_verts: torch.Tensor | None = None,
+        mesh_faces: torch.Tensor | None = None,
+        mesh_cache_key: str | None = None,
+        mesh_specs: MeshProcessSpec | None = None,
+    ) -> "EfmSnippetView":
+        """Construct a snippet view from an offline-cache EFM dict.
+
+        Args:
+            efm: Raw cache sample dict that includes ``"__key__"``.
+            mesh: Optional GT mesh to attach.
+            crop_bounds: Optional world-space AABB override.
+            mesh_verts: Optional cached mesh vertices.
+            mesh_faces: Optional cached mesh faces.
+            mesh_cache_key: Optional mesh cache key for shared caches.
+            mesh_specs: Optional mesh processing spec.
+
+        Returns:
+            Parsed :class:`EfmSnippetView` instance.
+        """
+        key = efm.get("__key__")
+        if not isinstance(key, str):
+            raise ValueError("Cache sample missing string '__key__'.")
+        scene_id, snippet_id = cls._parse_key_ids(key)
+        if crop_bounds is None:
+            crop_bounds = cls._infer_cache_bounds(efm)
+        return cls(
+            efm=efm,
+            scene_id=scene_id,
+            snippet_id=snippet_id,
+            mesh=mesh,
+            crop_bounds=crop_bounds,
+            mesh_verts=mesh_verts,
+            mesh_faces=mesh_faces,
+            mesh_cache_key=mesh_cache_key,
+            mesh_specs=mesh_specs,
+        )
 
     # ------------------------------------------------------------------
     # Cameras
@@ -547,6 +658,29 @@ class EfmSnippetView:
             mesh_cache_key=self.mesh_cache_key,
             mesh_specs=self.mesh_specs,
         )
+
+    def prune_efm(
+        self,
+        keep_keys: set[str] | None,
+        *,
+        keep_prefixes: tuple[str, ...] = (),
+    ) -> "EfmSnippetView":
+        """Return a view with the EFM dict pruned to the requested keys.
+
+        Args:
+            keep_keys: Exact EFM keys to retain. ``None`` returns ``self`` unchanged.
+            keep_prefixes: Optional prefixes; keys starting with any prefix are retained.
+        """
+        if keep_keys is None and not keep_prefixes:
+            return self
+        if keep_keys is None:
+            keep_keys = set()
+        pruned = {
+            k: v for k, v in self.efm.items() if k in keep_keys or any(k.startswith(prefix) for prefix in keep_prefixes)
+        }
+        if "__key__" in self.efm:
+            pruned["__key__"] = self.efm["__key__"]
+        return replace(self, efm=pruned)
 
     def __repr__(self) -> str:  # pragma: no cover
         base = {

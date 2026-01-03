@@ -17,6 +17,7 @@ from .panels import (
     render_offline_stats_page,
     render_rri_binning_page,
     render_rri_page,
+    render_testing_attribution_page,
     render_vin_diagnostics_page,
     render_wandb_analysis_page,
 )
@@ -219,7 +220,10 @@ class NbvStreamlitApp:
         def _page_wandb() -> None:
             render_wandb_analysis_page()
 
-        selected_page = st.navigation(
+        def _page_testing_attr() -> None:
+            render_testing_attribution_page()
+
+        st.navigation(
             [
                 st.Page(_page_data, title="Data", default=True),
                 st.Page(_page_candidates, title="Candidate Poses"),
@@ -227,12 +231,12 @@ class NbvStreamlitApp:
                 st.Page(_page_rri, title="RRI"),
                 st.Page(_page_vin, title="VIN Diagnostics"),
                 st.Page(_page_wandb, title="W&B Analysis"),
+                st.Page(_page_testing_attr, title="Testing & Attribution"),
                 st.Page(_page_rri_binning, title="RRI Binning"),
                 st.Page(_page_offline_stats, title="Offline Stats"),
             ],
             position="top",
-        )
-        selected_page.run()
+        ).run()
 
 
 # Resolve forward refs now that NbvStreamlitApp is defined

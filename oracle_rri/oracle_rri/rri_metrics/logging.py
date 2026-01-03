@@ -1,8 +1,8 @@
-"""Metric names and torchmetrics bundles for VIN training.
+"""Metric and loss names plus torchmetrics bundles for VIN training.
 
-This module centralizes logging keys (``Metric``) and stateful torchmetrics
-objects used in Lightning. We prefer a single ``Metric`` container that owns
-all sub-metrics because VIN needs *different* inputs per metric
+This module centralizes logging keys (``Metric``/``Loss``) and stateful
+torchmetrics objects used in Lightning. We prefer a single ``Metric`` container
+that owns all sub-metrics because VIN needs *different* inputs per metric
 (``pred_scores`` vs. ``pred_class`` vs. ``labels``), which is awkward to
 represent with a plain ``MetricCollection``. The custom wrapper still follows
 torchmetrics best practices: ``add_state`` for distributed reduction, explicit
@@ -13,6 +13,7 @@ avoid unnecessary synchronization overhead.
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 import torch
 from pydantic import Field
@@ -28,11 +29,15 @@ class Metric(StrEnum):
     """Metric suffixes composed with Stage as ``{stage}/{metric}``."""
 
     LOSS = "loss"
+    """Legacy loss key (prefer :class:`Loss` for losses)."""
+
     RRI_MEAN = "rri_mean"
     PRED_RRI_MEAN = "pred_rri_mean"
-    VALID_FRAC_MEAN = "valid_frac_mean"
-    CANDIDATE_VALID_FRACTION = "candidate_valid_fraction"
+    PRED_RRI_BIAS2 = "pred_rri_bias2"
+    PRED_RRI_VARIANCE = "pred_rri_variance"
     TOP3_ACCURACY = "top3_accuracy"
+    AUX_REGRESSION_WEIGHT = "aux_regression_weight"
+    CORAL_MONOTONICITY_VIOLATION_RATE = "coral_monotonicity_violation_rate"
 
     SPEARMAN = "spearman"
     SPEARMAN_STEP = "spearman_step"
@@ -40,6 +45,20 @@ class Metric(StrEnum):
     CONFUSION_MATRIX_STEP = "confusion_matrix_step"
     LABEL_HISTOGRAM = "label_histogram"
     LABEL_HISTOGRAM_STEP = "label_histogram_step"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class Loss(StrEnum):
+    """Loss suffixes composed with Stage as ``{stage}/{loss}``."""
+
+    LOSS = "loss"
+    CORAL = "coral_loss"
+    CORAL_REL_RANDOM = "coral_loss_rel_random"
+    ORD_BALANCED_BCE = "coral_loss_balanced_bce"
+    ORD_FOCAL = "coral_loss_focal"
+    AUX_REGRESSION = "aux_regression_loss"
 
     def __str__(self) -> str:
         return self.value
@@ -68,6 +87,49 @@ class LabelHistogram(MetricBase):
 
     def compute(self) -> Tensor:
         return self.counts
+
+
+class RriErrorStats(MetricBase):
+    """Accumulate bias/variance statistics for RRI regression errors."""
+
+    full_state_update = False
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.add_state("sum_error", default=torch.zeros((), dtype=torch.float32), dist_reduce_fx="sum")
+        self.add_state("sum_error_sq", default=torch.zeros((), dtype=torch.float32), dist_reduce_fx="sum")
+        self.add_state("count", default=torch.zeros((), dtype=torch.float32), dist_reduce_fx="sum")
+
+    def update(self, pred_rri: Tensor, rri: Tensor) -> None:
+        if pred_rri.numel() == 0 or rri.numel() == 0:
+            return
+        pred_flat = pred_rri.reshape(-1).to(dtype=torch.float32)
+        rri_flat = rri.reshape(-1).to(dtype=torch.float32)
+        if pred_flat.shape != rri_flat.shape:
+            raise ValueError(
+                "Expected pred_rri and rri to have matching shapes, "
+                f"got {tuple(pred_flat.shape)} and {tuple(rri_flat.shape)}.",
+            )
+        error = pred_flat - rri_flat
+        self.sum_error = self.sum_error + error.sum()
+        self.sum_error_sq = self.sum_error_sq + (error * error).sum()
+        self.count = self.count + torch.tensor(float(error.numel()), device=self.count.device)
+
+    def compute(self) -> dict[str, Tensor]:
+        if not bool(self.count.item()):
+            return {}
+        mean_error = self.sum_error / self.count
+        mean_error_sq = self.sum_error_sq / self.count
+        variance = (mean_error_sq - mean_error * mean_error).clamp_min(0.0)
+        return {
+            "bias2": mean_error * mean_error,
+            "variance": variance,
+        }
+
+    def reset(self) -> None:  # type: ignore[override]
+        self.sum_error.zero_()
+        self.sum_error_sq.zero_()
+        self.count.zero_()
 
 
 class VinMetrics(MetricBase):
@@ -126,9 +188,30 @@ class VinMetricsConfig(BaseConfig[VinMetrics]):
         return self.target(num_classes=int(self.num_classes))
 
 
-def metric_key(stage: Stage, metric: Metric) -> str:
+def _namespace_prefix(stage: Stage, *, namespace: Literal["main", "aux"]) -> str:
+    if namespace == "aux":
+        return f"{stage.value}-aux/"
+    return f"{stage.value}/"
+
+
+def metric_key(
+    stage: Stage,
+    metric: Metric,
+    *,
+    namespace: Literal["main", "aux"] = "main",
+) -> str:
     """Compose a logging key using the stage prefix."""
-    return f"{stage.value}/{metric.value}"
+    return f"{_namespace_prefix(stage, namespace=namespace)}{metric.value}"
+
+
+def loss_key(
+    stage: Stage,
+    loss: Loss,
+    *,
+    namespace: Literal["main", "aux"] = "main",
+) -> str:
+    """Compose a logging key using the stage prefix."""
+    return f"{_namespace_prefix(stage, namespace=namespace)}{loss.value}"
 
 
 def topk_accuracy_from_probs(probs: Tensor, labels: Tensor, *, top_k: int) -> Tensor:
@@ -149,8 +232,7 @@ def topk_accuracy_from_probs(probs: Tensor, labels: Tensor, *, top_k: int) -> Te
     labels = labels.reshape(-1)
     if probs.shape[0] != labels.shape[0]:
         raise ValueError(
-            "Expected probs and labels to have matching first dimension, "
-            f"got {probs.shape[0]} and {labels.shape[0]}.",
+            f"Expected probs and labels to have matching first dimension, got {probs.shape[0]} and {labels.shape[0]}.",
         )
     k = min(int(top_k), probs.shape[-1])
     if k < 1:
@@ -162,9 +244,12 @@ def topk_accuracy_from_probs(probs: Tensor, labels: Tensor, *, top_k: int) -> Te
 
 __all__ = [
     "LabelHistogram",
+    "Loss",
     "Metric",
+    "RriErrorStats",
     "VinMetrics",
     "VinMetricsConfig",
+    "loss_key",
     "metric_key",
     "topk_accuracy_from_probs",
 ]

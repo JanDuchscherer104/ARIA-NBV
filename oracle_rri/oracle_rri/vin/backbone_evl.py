@@ -24,12 +24,11 @@ from efm3d.aria.aria_constants import (
 from efm3d.aria.tensor_wrapper import TensorWrapper
 from efm3d.dataset.wds_dataset import batchify
 from pydantic import Field, ValidationInfo, field_validator
+from torch import Tensor
 
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console
-from .types import EvlBackboneOutput
-
-Tensor = torch.Tensor
+from .types import EfmDict, EvlBackboneOutput
 
 
 def _target_cls() -> type["EvlBackbone"]:
@@ -139,7 +138,7 @@ class EvlBackbone:
 
         batch = self._prepare_batch(efm)
         with torch.no_grad():
-            out = self.model(batch)
+            out: EfmDict = self.model(batch)
 
         occ_feat = out.get("neck/occ_feat")
         obb_feat = out.get("neck/obb_feat")
