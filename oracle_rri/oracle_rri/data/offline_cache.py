@@ -22,10 +22,12 @@ from torch.utils.data import Dataset, get_worker_info
 
 from ..configs import PathConfig
 from ..pipelines.oracle_rri_labeler import OracleRriLabelBatch, OracleRriLabelerConfig
+from ..rendering.candidate_depth_renderer import CandidateDepths
+from ..rri_metrics.types import RriResult
 from ..utils import BaseConfig, Console, Verbosity
 from ..vin.backbone_evl import EvlBackboneConfig
 from ..vin.types import EvlBackboneOutput
-from .efm_dataset import AseEfmDatasetConfig
+from .efm_dataset import AseEfmDataset, AseEfmDatasetConfig
 from .efm_views import EfmSnippetView
 from .offline_cache_serialization import (
     decode_backbone,
@@ -237,6 +239,9 @@ class OracleRriCacheDatasetConfig(BaseConfig["OracleRriCacheDataset"]):
     load_backbone: bool = True
     """Whether to load cached EVL backbone outputs."""
 
+    backbone_keep_fields: list[str] | None = None
+    """Optional allowlist of EVL backbone fields to decode from cache."""
+
     map_location: torch.device = Field(default="cpu")
     """Device string for loading cached tensors (e.g., 'cpu', 'cuda')."""
 
@@ -245,6 +250,15 @@ class OracleRriCacheDatasetConfig(BaseConfig["OracleRriCacheDataset"]):
 
     include_gt_mesh: bool = False
     """Wether to include the ground truth mesh in the loaded samples. Applies only if ``include_efm_snippet=True``."""
+
+    load_candidates: bool = True
+    """Whether to decode candidate sampling metadata."""
+
+    load_depths: bool = True
+    """Whether to decode candidate depth maps (needed for VIN training)."""
+
+    load_candidate_pcs: bool = True
+    """Whether to decode candidate point clouds."""
 
     efm_keep_keys: list[str] | None = None
     """Optional allowlist of EFM keys to keep when loading snippets."""
@@ -407,6 +421,51 @@ def _load_efm_snippet_for_cache(
     cfg = AseEfmDatasetConfig(**payload)
     dataset = cfg.setup_target()
     return next(iter(dataset))
+
+
+class _EfmSnippetLoader:
+    """Persistent per-worker loader for on-demand EFM snippets."""
+
+    def __init__(
+        self,
+        *,
+        dataset_payload: dict[str, Any] | None,
+        device: str,
+        paths: PathConfig,
+        include_gt_mesh: bool,
+    ) -> None:
+        self._dataset_payload = dict(dataset_payload or {})
+        self._device = str(device)
+        self._paths = paths
+        self._include_gt_mesh = include_gt_mesh
+        self._datasets: dict[str, AseEfmDataset] = {}
+
+    def load(self, *, scene_id: str, snippet_id: str) -> EfmSnippetView:
+        """Load a snippet view, reusing a cached dataset per scene."""
+        dataset = self._datasets.get(scene_id)
+        if dataset is None:
+            payload = dict(self._dataset_payload)
+            payload["paths"] = payload.get("paths", self._paths)
+            payload["scene_ids"] = [scene_id]
+            payload["snippet_ids"] = []
+            payload["snippet_key_filter"] = []
+            payload["batch_size"] = 1
+            payload["device"] = self._device
+            payload["wds_shuffle"] = False
+            payload["wds_repeat"] = False
+            payload["load_meshes"] = bool(self._include_gt_mesh)
+            payload.setdefault("require_mesh", False)
+            payload["verbosity"] = Verbosity.QUIET
+            cfg = AseEfmDatasetConfig(**payload)
+            dataset = cfg.setup_target()
+            self._datasets[scene_id] = dataset
+
+        dataset._snippet_key_filter = {snippet_id}  # type: ignore[attr-defined]
+        for sample in dataset:
+            return sample
+        raise FileNotFoundError(
+            f"Failed to locate snippet={snippet_id} in scene={scene_id}.",
+        )
 
 
 # ----------------------------------------------------------------------------- Cache IO helpers
@@ -793,6 +852,7 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
         self.metadata = _read_metadata(self.config.cache.metadata_path)
         self._warned_worker_cuda = False
         self._len = self._resolve_len()
+        self._efm_loader_by_device: dict[str, _EfmSnippetLoader] = {}
 
     def _resolve_len(self) -> int:
         base_len = len(self._index)
@@ -807,6 +867,7 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
         state["console"] = None
+        state["_efm_loader_by_device"] = {}
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
@@ -815,6 +876,8 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
             self.console = Console.with_prefix(self.__class__.__name__)
         if self.__dict__.get("_warned_worker_cuda") is None:
             self._warned_worker_cuda = False
+        if self.__dict__.get("_efm_loader_by_device") is None:
+            self._efm_loader_by_device = {}
 
     def _resolve_map_location(self) -> str:
         map_location = str(self.config.map_location)
@@ -837,7 +900,7 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
     def __len__(self) -> int:
         return self._len
 
-    def __getitem__(self, idx: int) -> OracleRriCacheSample | "VinOracleBatch":
+    def __getitem__(self, idx: int) -> OracleRriCacheSample | "VinOracleBatch":  # type: ignore
         """Load and decode a cached sample by index.
 
         Args:
@@ -856,33 +919,69 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
             payload = torch.load(path, map_location=map_location, weights_only=False)
         device = torch.device(map_location)
 
-        candidates = decode_candidates(payload["candidates"])
-        depths = decode_depths(payload["depths"], device=device) if payload.get("depths") is not None else None
-        pcs = (
-            decode_candidate_pcs(payload["candidate_pcs"], device=device)
-            if payload.get("candidate_pcs") is not None
-            else None
-        )
+        require_cache_sample = self.config.return_format == "cache_sample"
+        require_depths = self.config.return_format in {"cache_sample", "vin_batch"}
+        require_candidates = require_cache_sample
+        require_pcs = require_cache_sample
+
+        if require_candidates and not self.config.load_candidates:
+            raise ValueError("load_candidates must be True when return_format='cache_sample'.")
+        if require_depths and not self.config.load_depths:
+            raise ValueError("load_depths must be True when return_format requires depths.")
+        if require_pcs and not self.config.load_candidate_pcs:
+            raise ValueError("load_candidate_pcs must be True when return_format='cache_sample'.")
+
+        candidates = None
+        if self.config.load_candidates:
+            candidates = decode_candidates(payload["candidates"])
+        depths = None
+        if self.config.load_depths and payload.get("depths") is not None:
+            depths = decode_depths(payload["depths"], device=device)
+        pcs = None
+        if self.config.load_candidate_pcs and payload.get("candidate_pcs") is not None:
+            pcs = decode_candidate_pcs(payload["candidate_pcs"], device=device)
         rri = decode_rri(payload["rri"], device=device)
 
-        if depths is None or pcs is None:
-            msg = "Cached sample missing depths or candidate point clouds; re-generate with include_depths/pointclouds."
+        if not self.config.load_candidates:
+            payload.pop("candidates", None)
+        if not self.config.load_candidate_pcs:
+            payload.pop("candidate_pcs", None)
+        if not self.config.load_depths:
+            payload.pop("depths", None)
+
+        if require_depths and depths is None:
+            msg = "Cached sample missing depths; re-generate with include_depths=True."
+            raise ValueError(msg)
+        if require_pcs and pcs is None:
+            msg = "Cached sample missing candidate point clouds; re-generate with include_pointclouds=True."
             raise ValueError(msg)
 
         backbone_out = None
         if self.config.load_backbone and payload.get("backbone") is not None:
-            backbone_out = decode_backbone(payload["backbone"], device=device)
+            keep_fields = None
+            if self.config.backbone_keep_fields:
+                keep_fields = set(self.config.backbone_keep_fields)
+            backbone_out = decode_backbone(
+                payload["backbone"],
+                device=device,
+                include_fields=keep_fields,
+            )
 
         efm_snippet = None
         if self.config.include_efm_snippet:
             try:
-                efm_snippet = _load_efm_snippet_for_cache(
+                loader = self._efm_loader_by_device.get(map_location)
+                if loader is None:
+                    loader = _EfmSnippetLoader(
+                        dataset_payload=self.metadata.dataset_config,
+                        device=map_location,
+                        paths=self.config.paths,
+                        include_gt_mesh=self.config.include_gt_mesh,
+                    )
+                    self._efm_loader_by_device[map_location] = loader
+                efm_snippet = loader.load(
                     scene_id=payload["scene_id"],
                     snippet_id=payload["snippet_id"],
-                    dataset_payload=self.metadata.dataset_config,
-                    device=map_location,
-                    paths=self.config.paths,
-                    include_gt_mesh=self.config.include_gt_mesh,
                 )
                 if self.config.include_gt_mesh and efm_snippet.mesh is None:
                     self.console.warn(
@@ -897,6 +996,20 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
                 )
                 efm_snippet = None
 
+        if self.config.return_format == "vin_batch":
+            if depths is None:
+                raise ValueError(
+                    "VIN batch requires depths to be loaded. Set load_depths=True.",
+                )
+            return self._to_vin_batch_from_parts(
+                efm_snippet=efm_snippet,
+                depths=depths,
+                rri=rri,
+                scene_id=payload["scene_id"],
+                snippet_id=payload["snippet_id"],
+                backbone_out=backbone_out,
+            )
+
         cache_sample = OracleRriCacheSample(
             key=entry.key,
             scene_id=payload["scene_id"],
@@ -908,8 +1021,6 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
             backbone_out=backbone_out,
             efm_snippet_view=efm_snippet,
         )
-        if self.config.return_format == "vin_batch":
-            return self._to_vin_batch(cache_sample)
         return cache_sample
 
     def _to_vin_batch(self, cache_sample: OracleRriCacheSample) -> "VinOracleBatch":
@@ -932,6 +1043,35 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
             scene_id=cache_sample.scene_id,
             snippet_id=cache_sample.snippet_id,
             backbone_out=cache_sample.backbone_out,
+        )
+
+    def _to_vin_batch_from_parts(
+        self,
+        *,
+        efm_snippet: EfmSnippetView | None,
+        depths: CandidateDepths,
+        rri: RriResult,
+        scene_id: str,
+        snippet_id: str,
+        backbone_out: EvlBackboneOutput | None,
+    ) -> "VinOracleBatch":
+        from ..lightning.lit_datamodule import VinOracleBatch
+
+        return VinOracleBatch(
+            efm_snippet_view=efm_snippet,
+            candidate_poses_world_cam=depths.poses,
+            reference_pose_world_rig=depths.reference_pose,
+            rri=rri.rri,
+            pm_dist_before=rri.pm_dist_before,
+            pm_dist_after=rri.pm_dist_after,
+            pm_acc_before=rri.pm_acc_before,
+            pm_comp_before=rri.pm_comp_before,
+            pm_acc_after=rri.pm_acc_after,
+            pm_comp_after=rri.pm_comp_after,
+            p3d_cameras=depths.p3d_cameras,
+            scene_id=scene_id,
+            snippet_id=snippet_id,
+            backbone_out=backbone_out,
         )
 
     def append_entry(self, entry: OracleRriCacheEntry) -> None:

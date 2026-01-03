@@ -172,7 +172,13 @@ def encode_dataclass(obj: Any, *, exclude: set[str] | None = None) -> dict[str, 
     return payload
 
 
-def decode_dataclass(cls: type[Any], payload: dict[str, Any], *, device: torch.device | None) -> Any:
+def decode_dataclass(
+    cls: type[Any],
+    payload: dict[str, Any],
+    *,
+    device: torch.device | None,
+    include_fields: set[str] | None = None,
+) -> Any:
     """Deserialize a dataclass from a payload dict."""
     if not is_dataclass(cls):
         raise TypeError(f"Expected dataclass type, got {cls}")
@@ -190,6 +196,10 @@ def decode_dataclass(cls: type[Any], payload: dict[str, Any], *, device: torch.d
         type_hints = {}
     kwargs: dict[str, Any] = {}
     for field in fields(cls):
+        if include_fields is not None and field.name not in include_fields:
+            if field.default is not MISSING or field.default_factory is not MISSING:
+                continue
+            raise KeyError(f"Missing required field '{field.name}' for {cls.__name__}")
         if field.name not in payload:
             if field.default is not MISSING or field.default_factory is not MISSING:
                 continue
@@ -244,9 +254,19 @@ def encode_backbone(backbone: EvlBackboneOutput) -> dict[str, Any]:
     return encode_dataclass(backbone)
 
 
-def decode_backbone(payload: dict[str, Any], *, device: torch.device) -> EvlBackboneOutput:
+def decode_backbone(
+    payload: dict[str, Any],
+    *,
+    device: torch.device,
+    include_fields: set[str] | None = None,
+) -> EvlBackboneOutput:
     """Deserialize EvlBackboneOutput onto the requested device."""
-    return decode_dataclass(EvlBackboneOutput, payload, device=device)
+    return decode_dataclass(
+        EvlBackboneOutput,
+        payload,
+        device=device,
+        include_fields=include_fields,
+    )
 
 
 __all__ = [

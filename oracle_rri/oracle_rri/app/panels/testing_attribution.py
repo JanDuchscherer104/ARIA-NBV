@@ -24,6 +24,7 @@ from ...rri_metrics.coral import coral_expected_from_logits, coral_logits_to_pro
 from ...vin.pose_encoders import infer_pose_vec_groups
 from ..state import get_vin_state
 from .common import _info_popover
+from .offline_cache_utils import _load_efm_snippet_for_cache
 from .vin_utils import _load_vin_module_from_checkpoint
 
 
@@ -255,7 +256,7 @@ def render_testing_attribution_page() -> None:
     sample_count = 1
     if data_source == "Offline cache":
         cache_ds = attr_state.get("cache_ds")
-        cache_key = (cache_dir, cache_split, cache_map_location, include_snippet)
+        cache_key = (cache_dir, cache_split, cache_map_location)
         cache_len = int(attr_state.get("cache_len", 0) or 0)
         cache_dir_path = Path(cache_dir).expanduser() if cache_dir else None
         if cache_dir_path is not None and cache_dir_path.exists():
@@ -266,7 +267,7 @@ def render_testing_attribution_page() -> None:
                         load_backbone=True,
                         map_location=cache_map_location,
                         split=cache_split,
-                        include_efm_snippet=include_snippet,
+                        include_efm_snippet=False,
                         return_format="vin_batch",
                     )
                     cache_ds = cache_cfg.setup_target()
@@ -435,6 +436,7 @@ def render_testing_attribution_page() -> None:
                     "rel_delta": [],
                 }
                 ablation_groups: list[str] = []
+                snippet_cache: dict[str, object] = {}
 
                 for sample_idx in sample_indices:
                     if data_source == "Offline cache":
@@ -445,8 +447,28 @@ def render_testing_attribution_page() -> None:
                     backbone_out = getattr(cache_sample, "backbone_out", None)
                     if backbone_out is None:
                         raise RuntimeError("Cached sample missing backbone outputs.")
-                    efm = {}
                     use_snippet = include_snippet or data_source == "VIN Diagnostics (last run)"
+                    if use_snippet and cache_sample.efm_snippet_view is None and cache_ds is not None:
+                        snippet_key = f"{cache_sample.scene_id}:{cache_sample.snippet_id}"
+                        if snippet_key in snippet_cache:
+                            cache_sample.efm_snippet_view = snippet_cache[snippet_key]  # type: ignore[assignment]
+                        else:
+                            try:
+                                efm_snippet = _load_efm_snippet_for_cache(
+                                    scene_id=cache_sample.scene_id,
+                                    snippet_id=cache_sample.snippet_id,
+                                    dataset_payload=cache_ds.metadata.dataset_config,
+                                    device=cache_map_location,
+                                    paths=paths,
+                                    include_gt_mesh=False,
+                                )
+                                cache_sample.efm_snippet_view = efm_snippet
+                                snippet_cache[snippet_key] = efm_snippet
+                            except Exception as exc:  # pragma: no cover - IO guard
+                                st.warning(
+                                    f"Failed to load EFM snippet {snippet_key}: {type(exc).__name__}: {exc}",
+                                )
+                    efm = {}
                     if use_snippet and cache_sample.efm_snippet_view is not None:
                         efm = cache_sample.efm_snippet_view.efm
                     backbone_out = backbone_out.to(device)
@@ -607,11 +629,7 @@ def render_testing_attribution_page() -> None:
                             voxel_extent=backbone_out.voxel_extent,
                             grid_shape=(field_in.shape[-3], field_in.shape[-2], field_in.shape[-1]),
                         )
-                        extra_feat = (
-                            extra_vec.unsqueeze(0).unsqueeze(0)
-                            if extra_vec is not None
-                            else None
-                        )
+                        extra_feat = extra_vec.unsqueeze(0).unsqueeze(0) if extra_vec is not None else None
                         attr_head = _VinSceneFieldAttributionHead(
                             field_proj=module.vin.field_proj,
                             global_pooler=module.vin.global_pooler,

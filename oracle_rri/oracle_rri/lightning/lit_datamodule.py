@@ -337,6 +337,20 @@ class VinDataModuleConfig(BaseConfig["VinDataModule"]):
     )
     """Optional allowlist of EFM keys to keep in VIN batches."""
 
+    backbone_keep_fields: list[str] | None = Field(
+        default_factory=lambda: [
+            "t_world_voxel",
+            "voxel_extent",
+            "occ_pr",
+            "occ_input",
+            "counts",
+            "cent_pr",
+            "free_input",
+            "pts_world",
+        ]
+    )
+    """Optional allowlist of EVL backbone fields to keep in VIN batches."""
+
     prune_efm_snippet: bool = True
     """Whether to prune EFM snippets before returning VIN batches."""
 
@@ -433,6 +447,7 @@ class VinDataModule(pl.LightningDataModule):
         self._train_cache_appender: OracleRriCacheAppender | None = None
         self._val_cache_appender: OracleRriCacheAppender | None = None
         self._efm_keep_keys: set[str] | None = None
+        self._backbone_keep_fields: set[str] | None = None
 
     def _apply_cache_splits(self, console: Console) -> None:
         train_cache = self.config.train_cache
@@ -481,8 +496,12 @@ class VinDataModule(pl.LightningDataModule):
         cfg = cache_cfg.model_copy(deep=True)
         cfg.simplification = simplification
         cfg.return_format = "vin_batch"
+        cfg.load_candidates = False
+        cfg.load_candidate_pcs = False
         if self._efm_keep_keys is not None and cfg.efm_keep_keys is None:
             cfg.efm_keep_keys = sorted(self._efm_keep_keys)
+        if self._backbone_keep_fields is not None and cfg.backbone_keep_fields is None:
+            cfg.backbone_keep_fields = sorted(self._backbone_keep_fields)
         return cfg.setup_target()
 
     # --------------------------------------------------------------------- setup
@@ -493,14 +512,26 @@ class VinDataModule(pl.LightningDataModule):
         if self.config.prune_efm_snippet and self.config.efm_keep_keys:
             keep_keys_list = [key for key in self.config.efm_keep_keys if key]
         self._efm_keep_keys = set(keep_keys_list) if keep_keys_list else None
+        backbone_keep_list = None
+        if self.config.backbone_keep_fields:
+            backbone_keep_list = [field for field in self.config.backbone_keep_fields if field]
+        self._backbone_keep_fields = set(backbone_keep_list) if backbone_keep_list else None
         if self.config.train_cache is not None:
             self.config.train_cache.return_format = "vin_batch"
+            self.config.train_cache.load_candidates = False
+            self.config.train_cache.load_candidate_pcs = False
             if self._efm_keep_keys is not None and self.config.train_cache.efm_keep_keys is None:
                 self.config.train_cache.efm_keep_keys = list(keep_keys_list or [])
+            if self._backbone_keep_fields is not None and self.config.train_cache.backbone_keep_fields is None:
+                self.config.train_cache.backbone_keep_fields = list(backbone_keep_list or [])
         if self.config.val_cache is not None:
             self.config.val_cache.return_format = "vin_batch"
+            self.config.val_cache.load_candidates = False
+            self.config.val_cache.load_candidate_pcs = False
             if self._efm_keep_keys is not None and self.config.val_cache.efm_keep_keys is None:
                 self.config.val_cache.efm_keep_keys = list(keep_keys_list or [])
+            if self._backbone_keep_fields is not None and self.config.val_cache.backbone_keep_fields is None:
+                self.config.val_cache.backbone_keep_fields = list(backbone_keep_list or [])
 
         requested = Stage.from_str(stage) if stage is not None else None
         train_append = self.config.train_cache_new_samples_per_epoch > 0
@@ -535,8 +566,10 @@ class VinDataModule(pl.LightningDataModule):
         if requested is None or requested is Stage.TRAIN:
             if self.config.train_cache is not None:
                 if self._train_cache is None:
+                    # Offline Dataset only
                     self._train_cache = self.config.train_cache.setup_target()
                 if train_append and self._train_base is None:
+                    # Online data only
                     self._train_base = self.config.train_dataset.setup_target()
                 if train_append and self._train_cache_appender is None:
                     appender_cfg = OracleRriCacheAppenderConfig(
@@ -609,6 +642,7 @@ class VinDataModule(pl.LightningDataModule):
                     f"Training with cache append: new_samples_per_epoch={self.config.train_cache_new_samples_per_epoch}.",
                 )
             else:
+                # Offline Dataset only - most common case!
                 _offline_ds = True
                 ds = self._train_cache
                 console.log("Training with offline samples only.")

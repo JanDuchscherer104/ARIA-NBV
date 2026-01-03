@@ -53,6 +53,7 @@ def _prepare_offline_cache_dataset(
     include_efm_snippet: bool,
     include_gt_mesh: bool,
 ) -> OracleRriCacheDataset | None:
+    _ = (include_efm_snippet, include_gt_mesh)
     if cache_dir is None:
         return None
     split = "all"
@@ -60,13 +61,15 @@ def _prepare_offline_cache_dataset(
         split = "train"
     elif stage in (Stage.VAL, Stage.TEST):
         split = "val"
+    # Keep cache datasets snippet-free to avoid re-instantiation when toggling
+    # attach-snippet controls; snippets are loaded on demand via helpers below.
     cache_cfg = OracleRriCacheDatasetConfig(
         cache=OracleRriCacheConfig(cache_dir=Path(cache_dir), paths=paths),
         load_backbone=True,
         map_location=map_location,
         split=split,
-        include_efm_snippet=include_efm_snippet,
-        include_gt_mesh=include_gt_mesh,
+        include_efm_snippet=False,
+        include_gt_mesh=False,
     )
     cfg_sig = config_signature(cache_cfg)
     if state.offline_cache_sig != cfg_sig or state.offline_cache is None:
