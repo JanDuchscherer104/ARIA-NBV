@@ -11,6 +11,7 @@ from .efm_views import (  # noqa: E402
     EfmPointsView,
     EfmSnippetView,
     EfmTrajectoryView,
+    VinSnippetView,
 )
 from .metadata import ASEMetadata, SceneMetadata
 from .offline_cache import (
@@ -20,6 +21,13 @@ from .offline_cache import (
     OracleRriCacheDatasetConfig,
     OracleRriCacheWriter,
     OracleRriCacheWriterConfig,
+)
+from .vin_snippet_cache import (
+    VinSnippetCacheConfig,
+    VinSnippetCacheDataset,
+    VinSnippetCacheDatasetConfig,
+    VinSnippetCacheWriter,
+    VinSnippetCacheWriterConfig,
 )
 
 __all__ = [
@@ -35,10 +43,16 @@ __all__ = [
     "OracleRriCacheDatasetConfig",
     "OracleRriCacheWriter",
     "OracleRriCacheWriterConfig",
+    "VinSnippetCacheConfig",
+    "VinSnippetCacheDataset",
+    "VinSnippetCacheDatasetConfig",
+    "VinSnippetCacheWriter",
+    "VinSnippetCacheWriterConfig",
     "EfmCameraView",
     "EfmTrajectoryView",
     "EfmPointsView",
     "EfmObbView",
     "EfmGTView",
     "EfmSnippetView",
+    "VinSnippetView",
 ]

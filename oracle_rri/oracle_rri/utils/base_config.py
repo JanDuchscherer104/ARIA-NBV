@@ -7,6 +7,7 @@ from typing import (
     ClassVar,
     ForwardRef,
     Generic,
+    Self,
     TypeVar,
 )
 
@@ -208,7 +209,7 @@ class BaseConfig(BaseSettings, Generic[TargetType]):
         return target_path
 
     @classmethod
-    def from_toml(cls: type["BaseConfig"], source: str | Path | bytes) -> "BaseConfig":
+    def from_toml(cls: type[Self], source: str | Path | bytes) -> Self:
         """Load a config from a TOML string or file path."""
         if isinstance(source, Path):
             text = source.read_text(encoding="utf-8")

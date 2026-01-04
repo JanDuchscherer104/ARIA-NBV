@@ -9,7 +9,7 @@ import torch
 from efm3d.aria.pose import PoseTW
 from torch import Tensor
 
-from ..data.efm_views import EfmSnippetView
+from ..data.efm_views import EfmSnippetView, VinSnippetView
 
 if TYPE_CHECKING:
     from efm3d.aria.pose import PoseTW as PoseTWT
@@ -37,7 +37,7 @@ class PreparedInputs:
     device: torch.device
     """Device for tensors in the forward pass."""
 
-    snippet: EfmSnippetView | None
+    snippet: EfmSnippetView | VinSnippetView | None
     """Optional snippet view for semidense features."""
 
 
@@ -190,8 +190,9 @@ def pos_grid_from_pts_world(
     span = (maxs - mins).clamp_min(1e-6)
     scale = 0.5 * span
 
-    center_world = t_world_voxel * center_vox
-    center_rig = t_rig_world * center_world
+    center_vox = center_vox[:, None, :]
+    center_world = (t_world_voxel * center_vox).squeeze(1)
+    center_rig = (t_rig_world * center_world[:, None, :]).squeeze(1)
     pts_norm = (pts_rig - center_rig[:, None, :]) / scale[:, None, :]
 
     pts_norm = pts_norm.view(

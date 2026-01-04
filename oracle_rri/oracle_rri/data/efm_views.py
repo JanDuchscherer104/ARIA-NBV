@@ -700,6 +700,29 @@ class EfmSnippetView:
         return pformat(base, indent=2, width=120, compact=False)
 
 
+@dataclass(slots=True)
+class VinSnippetView:
+    """Minimal snippet payload for VIN v2 batching.
+
+    Attributes:
+        points_world: ``Tensor["K 4", float32]`` collapsed semidense points (XYZ + inv_dist_std).
+        t_world_rig: ``PoseTW["F 12"]`` historical world←rig poses.
+    """
+
+    points_world: Tensor
+    """Collapsed semidense point cloud (XYZ + inv_dist_std)."""
+    t_world_rig: PoseTW
+    """Trajectory poses (world←rig)."""
+
+    def to(self, device: str | torch.device, *, dtype: torch.dtype | None = None) -> "VinSnippetView":
+        target_device = torch.device(device)
+        return replace(
+            self,
+            points_world=self.points_world.to(device=target_device, dtype=dtype),
+            t_world_rig=self.t_world_rig.to(device=target_device, dtype=dtype),  # type: ignore[arg-type]
+        )
+
+
 __all__ = [
     "EfmCameraView",
     "EfmTrajectoryView",
@@ -709,4 +732,5 @@ __all__ = [
     "EfmGtTimestampView",
     "EfmGtCameraObbView",
     "EfmSnippetView",
+    "VinSnippetView",
 ]

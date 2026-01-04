@@ -60,7 +60,7 @@ from torch import Tensor, nn
 
 from oracle_rri.utils.frames import rotate_yaw_cw90
 
-from ..data.efm_views import EfmSnippetView
+from ..data.efm_views import EfmSnippetView, VinSnippetView
 from ..rri_metrics.coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
 from ..utils import BaseConfig, Optimizable, optimizable_field
 from .backbone_evl import EvlBackboneConfig
@@ -424,9 +424,12 @@ class VinModelV2(nn.Module):
         """Return the LFF encoder when the pose encoder uses LFF (else ``None``)."""
         return getattr(self.pose_encoder, "pose_encoder_lff", None)
 
-    def _maybe_snippet_view(self, efm: EfmSnippetView | dict[str, Any]) -> EfmSnippetView | None:
+    def _maybe_snippet_view(
+        self,
+        efm: EfmSnippetView | VinSnippetView | dict[str, Any],
+    ) -> EfmSnippetView | VinSnippetView | None:
         """Best-effort conversion of cached EFM dicts into snippet views."""
-        if isinstance(efm, EfmSnippetView):
+        if isinstance(efm, (EfmSnippetView, VinSnippetView)):
             return efm
         if not isinstance(efm, dict):
             return None
@@ -437,7 +440,7 @@ class VinModelV2(nn.Module):
 
     def _prepare_inputs(
         self,
-        efm: EfmSnippetView | dict[str, Any],
+        efm: EfmSnippetView | VinSnippetView | dict[str, Any],
         candidate_poses_world_cam: PoseTW,
         reference_pose_world_rig: PoseTW,
         backbone_out: EvlBackboneOutput,
@@ -588,7 +591,7 @@ class VinModelV2(nn.Module):
 
     def _sample_semidense_points(
         self,
-        snippet: EfmSnippetView | None,
+        snippet: EfmSnippetView | VinSnippetView | None,
         *,
         max_points: int,
         device: torch.device,
@@ -596,6 +599,11 @@ class VinModelV2(nn.Module):
         """Sample semidense points once for shared use."""
         if snippet is None:
             return None
+        if isinstance(snippet, VinSnippetView):
+            points = snippet.points_world
+            if points.numel() == 0:
+                return None
+            return points.to(device=device, dtype=torch.float32)
         try:
             semidense = snippet.semidense
         except Exception:
@@ -678,6 +686,7 @@ class VinModelV2(nn.Module):
             "x": x,
             "y": y,
             "z": z,
+            "finite": finite,
             "valid": valid,
             "weights": weights_cam if weights_cam is not None else torch.empty(0, device=device),
             "image_size": image_size,
@@ -705,6 +714,7 @@ class VinModelV2(nn.Module):
         x = proj_data["x"]
         y = proj_data["y"]
         z = proj_data["z"]
+        finite = proj_data["finite"]
         valid = proj_data["valid"]
         image_size = proj_data["image_size"]
         weights_cam = proj_data["weights"] if proj_data["weights"].numel() > 0 else None
@@ -733,7 +743,7 @@ class VinModelV2(nn.Module):
 
         valid_count = valid_f.sum(dim=1)
         denom = torch.clamp(valid_count, min=1.0)
-        total_points = float(x.shape[1]) if x.shape[1] > 0 else 1.0
+        total_points = finite.to(dtype=counts.dtype).sum(dim=1).clamp_min(1.0)
         valid_frac = valid_count / total_points
 
         if weights_cam is not None:
@@ -873,7 +883,7 @@ class VinModelV2(nn.Module):
 
     def _encode_traj_features(
         self,
-        snippet: EfmSnippetView | None,
+        snippet: EfmSnippetView | VinSnippetView | None,
         *,
         pose_world_rig_ref: PoseTW,
         batch_size: int,
@@ -884,23 +894,23 @@ class VinModelV2(nn.Module):
         if self.traj_encoder is None:
             return None, None, None
 
-        trajectory = None
-        if snippet is not None:
+        traj_world_rig = None
+        if isinstance(snippet, VinSnippetView):
+            traj_world_rig = snippet.t_world_rig
+        elif snippet is not None:
             try:
-                trajectory = snippet.trajectory
+                traj_world_rig = snippet.trajectory.t_world_rig
             except Exception:
-                trajectory = None
+                traj_world_rig = None
 
-        if trajectory is None:
+        if traj_world_rig is None or traj_world_rig.numel() == 0:
             traj_feat = torch.zeros(
                 (batch_size, self.traj_encoder.out_dim),
                 device=device,
                 dtype=dtype,
             )
             return traj_feat, None, None
-
-        traj_view = trajectory.to(device=device, dtype=torch.float32)
-        traj_world_rig = traj_view.t_world_rig
+        traj_world_rig = traj_world_rig.to(device=device, dtype=torch.float32)
         if traj_world_rig.ndim == 2:
             traj_world_rig = PoseTW(traj_world_rig._data.unsqueeze(0))
         elif traj_world_rig.ndim != 3:

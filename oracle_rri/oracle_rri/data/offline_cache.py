@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import torch
+from efm3d.aria.pose import PoseTW
 from pydantic import Field, ValidationInfo, field_validator
 from torch.utils.data import Dataset, get_worker_info
 
@@ -28,7 +29,7 @@ from ..utils import BaseConfig, Console, Verbosity
 from ..vin.backbone_evl import EvlBackboneConfig
 from ..vin.types import EvlBackboneOutput
 from .efm_dataset import AseEfmDataset, AseEfmDatasetConfig
-from .efm_views import EfmSnippetView
+from .efm_views import EfmSnippetView, VinSnippetView
 from .offline_cache_serialization import (
     decode_backbone,
     decode_candidate_pcs,
@@ -57,6 +58,7 @@ from .offline_cache_types import (
     OracleRriCacheMetadata,
     OracleRriCacheSample,
 )
+from .vin_snippet_cache import VinSnippetCacheConfig, VinSnippetCacheDataset, VinSnippetCacheDatasetConfig
 
 if TYPE_CHECKING:
     from ..lightning.lit_datamodule import VinOracleBatch
@@ -262,6 +264,15 @@ class OracleRriCacheDatasetConfig(BaseConfig["OracleRriCacheDataset"]):
 
     efm_keep_keys: list[str] | None = None
     """Optional allowlist of EFM keys to keep when loading snippets."""
+
+    vin_snippet_cache: VinSnippetCacheConfig | None = None
+    """Optional cache for minimal VinSnippetView entries (avoids loading full EFM snippets)."""
+
+    collapse_semidense: bool = True
+    """Whether to collapse semidense points into a single point cloud for VIN batching."""
+
+    semidense_max_points: int | None = None
+    """Optional cap on the number of collapsed semidense points."""
 
     return_format: Literal["cache_sample", "vin_batch"] = "cache_sample"
     """Return cached samples or VIN-ready batches."""
@@ -853,6 +864,9 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
         self._warned_worker_cuda = False
         self._len = self._resolve_len()
         self._efm_loader_by_device: dict[str, _EfmSnippetLoader] = {}
+        self._vin_snippet_cache: VinSnippetCacheDataset | None = None
+        self._vin_snippet_cache_disabled = False
+        self._warned_missing_vin_snippet_cache = False
 
     def _resolve_len(self) -> int:
         base_len = len(self._index)
@@ -868,6 +882,7 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
         state = self.__dict__.copy()
         state["console"] = None
         state["_efm_loader_by_device"] = {}
+        state["_vin_snippet_cache"] = None
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
@@ -878,6 +893,72 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
             self._warned_worker_cuda = False
         if self.__dict__.get("_efm_loader_by_device") is None:
             self._efm_loader_by_device = {}
+        if self.__dict__.get("_vin_snippet_cache") is None:
+            self._vin_snippet_cache = None
+        if self.__dict__.get("_vin_snippet_cache_disabled") is None:
+            self._vin_snippet_cache_disabled = False
+        if self.__dict__.get("_warned_missing_vin_snippet_cache") is None:
+            self._warned_missing_vin_snippet_cache = False
+
+    def _load_vin_snippet_cached(
+        self,
+        *,
+        scene_id: str,
+        snippet_id: str,
+        map_location: str,
+    ) -> VinSnippetView | None:
+        if self.config.vin_snippet_cache is None:
+            return None
+        if self._vin_snippet_cache_disabled:
+            return None
+        if self._vin_snippet_cache is None:
+            try:
+                cache_cfg = VinSnippetCacheDatasetConfig(
+                    cache=self.config.vin_snippet_cache,
+                    map_location=map_location,
+                )
+                self._vin_snippet_cache = cache_cfg.setup_target()
+            except FileNotFoundError as exc:
+                if not self._warned_missing_vin_snippet_cache:
+                    self.console.warn(
+                        f"vin_snippet_cache enabled but missing files at {self.config.vin_snippet_cache.cache_dir}: {exc}. "
+                        "Falling back to EFM snippet loading.",
+                    )
+                    self._warned_missing_vin_snippet_cache = True
+                self._vin_snippet_cache_disabled = True
+                return None
+        return self._vin_snippet_cache.get_by_scene_snippet(
+            scene_id=scene_id,
+            snippet_id=snippet_id,
+            map_location=map_location,
+        )
+
+    def _build_vin_snippet(
+        self,
+        efm_snippet: EfmSnippetView,
+        *,
+        device: torch.device,
+    ) -> VinSnippetView:
+        """Build a minimal VIN snippet view from an EFM snippet."""
+        points_world = torch.zeros((0, 4), dtype=torch.float32, device=device)
+        try:
+            semidense = efm_snippet.semidense
+        except Exception:
+            semidense = None
+        if self.config.collapse_semidense and semidense is not None:
+            points_world = semidense.collapse_points(
+                max_points=self.config.semidense_max_points,
+                include_inv_dist_std=True,
+            ).to(device=device, dtype=torch.float32)
+
+        traj_world_rig = PoseTW(torch.zeros((0, 12), dtype=torch.float32, device=device))
+        try:
+            traj_view = efm_snippet.trajectory.to(device=device, dtype=torch.float32)
+            traj_world_rig = traj_view.t_world_rig
+        except Exception:
+            pass
+
+        return VinSnippetView(points_world=points_world, t_world_rig=traj_world_rig)
 
     def _resolve_map_location(self) -> str:
         map_location = str(self.config.map_location)
@@ -967,8 +1048,19 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
                 include_fields=keep_fields,
             )
 
+        scene_id = payload["scene_id"]
+        snippet_id = payload["snippet_id"]
+
+        vin_snippet = None
+        if self.config.return_format == "vin_batch" and self.config.include_efm_snippet:
+            vin_snippet = self._load_vin_snippet_cached(
+                scene_id=scene_id,
+                snippet_id=snippet_id,
+                map_location=map_location,
+            )
+
         efm_snippet = None
-        if self.config.include_efm_snippet:
+        if self.config.include_efm_snippet and vin_snippet is None:
             try:
                 loader = self._efm_loader_by_device.get(map_location)
                 if loader is None:
@@ -980,21 +1072,30 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
                     )
                     self._efm_loader_by_device[map_location] = loader
                 efm_snippet = loader.load(
-                    scene_id=payload["scene_id"],
-                    snippet_id=payload["snippet_id"],
+                    scene_id=scene_id,
+                    snippet_id=snippet_id,
                 )
                 if self.config.include_gt_mesh and efm_snippet.mesh is None:
                     self.console.warn(
-                        f"GT mesh missing for scene={payload['scene_id']} snippet={payload['snippet_id']}.",
+                        f"GT mesh missing for scene={scene_id} snippet={snippet_id}.",
                     )
                 if self.config.efm_keep_keys is not None:
                     efm_snippet = efm_snippet.prune_efm(set(self.config.efm_keep_keys))
             except Exception as exc:
                 self.console.warn(
-                    f"Failed to load EFM snippet for scene={payload['scene_id']} "
-                    f"snippet={payload['snippet_id']}: {exc}",
+                    f"Failed to load EFM snippet for scene={scene_id} snippet={snippet_id}: {exc}",
                 )
                 efm_snippet = None
+
+        if self.config.return_format == "vin_batch" and self.config.include_efm_snippet:
+            if vin_snippet is None:
+                if efm_snippet is None:
+                    vin_snippet = VinSnippetView(
+                        points_world=torch.zeros((0, 4), dtype=torch.float32, device=device),
+                        t_world_rig=PoseTW(torch.zeros((0, 12), dtype=torch.float32, device=device)),
+                    )
+                else:
+                    vin_snippet = self._build_vin_snippet(efm_snippet, device=device)
 
         if self.config.return_format == "vin_batch":
             if depths is None:
@@ -1002,7 +1103,7 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
                     "VIN batch requires depths to be loaded. Set load_depths=True.",
                 )
             return self._to_vin_batch_from_parts(
-                efm_snippet=efm_snippet,
+                efm_snippet=vin_snippet if vin_snippet is not None else efm_snippet,
                 depths=depths,
                 rri=rri,
                 scene_id=payload["scene_id"],
@@ -1048,7 +1149,7 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
     def _to_vin_batch_from_parts(
         self,
         *,
-        efm_snippet: EfmSnippetView | None,
+        efm_snippet: EfmSnippetView | VinSnippetView | None,
         depths: CandidateDepths,
         rri: RriResult,
         scene_id: str,

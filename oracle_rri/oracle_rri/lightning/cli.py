@@ -10,10 +10,10 @@ from __future__ import annotations
 import sys
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import torch
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic._internal._utils import deep_update
 from pydantic_settings import SettingsConfigDict
 
@@ -25,9 +25,10 @@ from oracle_rri.data.offline_cache import (
     OracleRriCacheWriter,
     OracleRriCacheWriterConfig,
 )
+from oracle_rri.data.vin_snippet_cache import VinSnippetCacheConfig, VinSnippetCacheWriterConfig
 from oracle_rri.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from oracle_rri.rri_metrics import RriOrdinalBinner
-from oracle_rri.utils import Console
+from oracle_rri.utils import BaseConfig, Console, Verbosity
 
 
 def _ensure_run_mode(argv: list[str], run_mode: str) -> list[str]:
@@ -95,6 +96,68 @@ class CLICacheWriterConfig(OracleRriCacheWriterConfig):
         cli_avoid_json=True,
         env_prefix="ARIA_NBV_CACHE_",
     )
+
+
+class CLIVinSnippetCacheBuildConfig(BaseConfig):
+    """CLI config for building VIN snippet caches from an experiment TOML."""
+
+    config_path: Path | None = Field(
+        default=None,
+        validation_alias=AliasChoices("config-path", "config_path"),
+    )
+    """Path to a TOML configuration file (expected to be an AriaNBVExperimentConfig)."""
+
+    split: Literal["all", "train", "val"] = Field(
+        default="all",
+        validation_alias=AliasChoices("split", "cache-split", "cache_split"),
+    )
+    """Which oracle-cache split to scan for snippet IDs."""
+
+    max_samples: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("max-samples", "max_samples", "num-samples", "num_samples", "n"),
+    )
+    """Optional cap on number of snippets to process."""
+
+    semidense_max_points: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("semidense-max-points", "semidense_max_points"),
+    )
+    """Optional cap on the number of collapsed semidense points."""
+
+    map_location: torch.device = Field(
+        default="cpu",
+        validation_alias=AliasChoices("map-location", "map_location"),
+    )
+    """Device string for loading EFM snippet tensors (defaults to CPU)."""
+
+    cache_dir: Path | None = Field(
+        default=None,
+        validation_alias=AliasChoices("cache-dir", "cache_dir", "out-cache-dir", "out_cache_dir"),
+    )
+    """Optional override for the output VIN snippet cache directory."""
+
+    overwrite: bool = False
+    """Allow overwriting an existing VIN snippet cache index."""
+
+    verbosity: Verbosity = Verbosity.NORMAL
+    """Verbosity level for logging progress."""
+
+    model_config = SettingsConfigDict(
+        arbitrary_types_allowed=True,
+        validate_default=True,
+        validate_assignment=True,
+        cli_parse_args=True,
+        cli_kebab_case=True,
+        cli_implicit_flags=True,
+        cli_avoid_json=True,
+        env_prefix="ARIA_NBV_VIN_SNIPPET_CACHE_",
+    )
+
+    @field_validator("map_location", mode="before")
+    @classmethod
+    def _validate_map_location(cls, value: str | torch.device) -> torch.device:
+        return cls._resolve_device(value)
 
 
 # Resolve forward refs now that OracleRriCacheWriter is imported.
@@ -268,11 +331,80 @@ def cache_main(argv: list[str] | None = None) -> None:
         raise SystemExit(130) from None
 
 
+def cache_vin_snippets_main(argv: list[str] | None = None) -> None:
+    """Build a VIN snippet cache from the configured offline oracle cache."""
+
+    argv = list(sys.argv[1:] if argv is None else argv)
+    paths = PathConfig()
+    console = Console.with_prefix("vin-snippet-cache-cli", "main")
+
+    cli_cfg = CLIVinSnippetCacheBuildConfig(_cli_parse_args=argv)
+    config_path = cli_cfg.config_path
+    if config_path is None:
+        default_cfg = paths.configs_dir / "offline_only.toml"
+        if default_cfg.exists():
+            config_path = default_cfg
+            console.log(
+                "No --config-path provided; defaulting to .configs/offline_only.toml "
+                "(override via --config-path <file>.toml).",
+            )
+        else:
+            available = sorted(paths.configs_dir.glob("*.toml"))
+            available_str = "\n".join(f"- {p.name}" for p in available) if available else "(none)"
+            raise ValueError(
+                "Provide --config-path pointing to an AriaNBVExperimentConfig TOML.\n\n"
+                f"Available configs under {paths.configs_dir}:\n{available_str}",
+            )
+    config_path = paths.resolve_config_toml_path(config_path, must_exist=True)
+    exp_cfg = AriaNBVExperimentConfig.from_toml(config_path)
+    if exp_cfg.datamodule_config.train_cache is None:
+        raise ValueError("datamodule_config.train_cache must be set to build a VIN snippet cache.")
+
+    train_cache = exp_cfg.datamodule_config.train_cache
+    source_cache = train_cache.cache
+
+    out_cache = train_cache.vin_snippet_cache
+    if cli_cfg.cache_dir is not None:
+        out_cache = VinSnippetCacheConfig(cache_dir=cli_cfg.cache_dir, paths=exp_cfg.paths)
+    elif out_cache is None:
+        out_cache = VinSnippetCacheConfig(
+            cache_dir=source_cache.cache_dir / "vin_snippet_cache",
+            paths=exp_cfg.paths,
+        )
+        console.warn(
+            f"datamodule_config.train_cache.vin_snippet_cache not set; using {out_cache.cache_dir}",
+        )
+
+    overwrite_set = "overwrite" in cli_cfg.model_fields_set
+    overwrite = bool(cli_cfg.overwrite)
+    if not overwrite_set and not overwrite and out_cache.index_path.exists():
+        console.warn("VIN snippet cache index exists; enabling overwrite=True for this run.")
+        overwrite = True
+
+    semidense_max_points = cli_cfg.semidense_max_points
+    if semidense_max_points is None:
+        semidense_max_points = train_cache.semidense_max_points
+
+    writer_cfg = VinSnippetCacheWriterConfig(
+        paths=exp_cfg.paths,
+        cache=out_cache,
+        source_cache=source_cache,
+        split=cli_cfg.split,
+        max_samples=cli_cfg.max_samples,
+        semidense_max_points=semidense_max_points,
+        map_location=cli_cfg.map_location,
+        overwrite=overwrite,
+        verbosity=cli_cfg.verbosity,
+    )
+    writer_cfg.setup_target().run()
+
+
 if __name__ == "__main__":
     main()
 
 __all__ = [
     "cache_main",
+    "cache_vin_snippets_main",
     "fit_binner_main",
     "main",
     "optuna_main",

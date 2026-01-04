@@ -20,6 +20,7 @@ from torch import Tensor, nn
 from torch.nn import functional as functional
 
 from ..configs import PathConfig
+from ..data import EfmSnippetView, VinSnippetView
 from ..rri_metrics import (
     Loss,
     Metric,
@@ -265,9 +266,14 @@ class VinLightningModule(pl.LightningModule):
             )
 
         efm_snippet_view = batch.efm_snippet_view
-        efm = efm_snippet_view.efm if efm_snippet_view is not None else {}
+        if isinstance(efm_snippet_view, EfmSnippetView):
+            efm = efm_snippet_view.efm
+        elif isinstance(efm_snippet_view, VinSnippetView):
+            efm = efm_snippet_view
+        else:
+            efm = {}
         backbone_out = batch.backbone_out
-        if backbone_out is None and efm_snippet_view is None:
+        if backbone_out is None and not isinstance(efm_snippet_view, EfmSnippetView):
             raise RuntimeError(
                 "VIN batch missing both efm snippet view and cached backbone outputs.",
             )
@@ -290,9 +296,12 @@ class VinLightningModule(pl.LightningModule):
             backbone_out=backbone_out,
         )
         num_candidates = int(batch.candidate_poses_world_cam.shape[-2])
-        log_batch_size = max(num_candidates, 1)
+        batch_dim = int(batch.candidate_poses_world_cam.shape[0]) if batch.candidate_poses_world_cam.ndim == 3 else 1
+        log_batch_size = max(batch_dim * num_candidates, 1)
         log_enabled = not getattr(self.trainer, "sanity_checking", False)
-        logits = pred.logits.squeeze(0)  # N x (K-1)
+        logits = pred.logits
+        if logits.ndim == 2:
+            logits = logits.unsqueeze(0)
         if not bool(torch.isfinite(logits).all().item()):
             if log_enabled:
                 self.log(
@@ -340,7 +349,10 @@ class VinLightningModule(pl.LightningModule):
             num_classes=int(self._binner.num_classes),
         ).mean()
 
-        probs = pred.prob.squeeze(0).reshape(-1, pred.prob.shape[-1])
+        probs = pred.prob
+        if probs.ndim == 2:
+            probs = probs.unsqueeze(0)
+        probs = probs.reshape(-1, probs.shape[-1])
         probs_valid = probs[mask]
         pred_rri_proxy = None
         pred_rri_proxy_valid = None
@@ -355,14 +367,14 @@ class VinLightningModule(pl.LightningModule):
             if pred_rri_proxy is None:
                 raise RuntimeError("Expected pred_rri_proxy to be computed.")
             if self.config.aux_regression_loss == "mse":
-                diff = pred_rri_proxy[mask] - rri[mask].to(
+                diff = pred_rri_proxy_valid - rri_valid.to(
                     dtype=pred_rri_proxy.dtype,
                 )
                 aux_loss = (diff * diff).mean()
             elif self.config.aux_regression_loss == "huber":
                 aux_loss = functional.smooth_l1_loss(
-                    pred_rri_proxy[mask],
-                    rri[mask].to(dtype=pred_rri_proxy.dtype),
+                    pred_rri_proxy_valid,
+                    rri_valid.to(dtype=pred_rri_proxy.dtype),
                 )
             else:
                 raise ValueError(
@@ -449,9 +461,7 @@ class VinLightningModule(pl.LightningModule):
         )
         stage_key = f"{stage.value}_stage"
         self._metrics[stage_key].update(
-            pred_scores=pred.expected_normalized.squeeze(0)
-            .reshape(-1)[mask]
-            .to(
+            pred_scores=pred.expected_normalized.reshape(-1)[mask].to(
                 dtype=torch.float32,
             ),
             rri=rri_valid.to(dtype=torch.float32),
@@ -460,9 +470,7 @@ class VinLightningModule(pl.LightningModule):
         )
         if stage is Stage.TRAIN:
             self._interval_metrics.update(
-                pred_scores=pred.expected_normalized.squeeze(0)
-                .reshape(-1)[mask]
-                .to(
+                pred_scores=pred.expected_normalized.reshape(-1)[mask].to(
                     dtype=torch.float32,
                 ),
                 rri=rri_valid.to(dtype=torch.float32),
