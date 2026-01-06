@@ -20,22 +20,30 @@ using a standard pinhole camera model (implemented with PyTorch3D's
 
 #block[
   #align(center)[
-    $ bold(tau) = (u, v, z, nu) $
+    $ bold(tau) = (u, v, z, nu, c) $
   ]
 ]
 
 where $(u, v)$ are pixel coordinates normalized to $[-1, 1]^2$, $z$ is the
 positive depth in camera space, and $nu$ is an optional per-point
-inverse-distance uncertainty from the SLAM point cloud. A boolean mask marks
-valid projected points (finite, $z>0$, and inside image bounds). We truncate to
-a fixed maximum number of points per candidate for stable compute.
+inverse-distance uncertainty from the SLAM point cloud. The final feature $c$
+is the per-point observation count (track length), i.e., the number of snippet
+trajectory frames that observed the point, normalized with a configurable
+`log1p`/`log1p_norm` scheme.
 
-The fraction of valid projected points provides a view-specific reliability
-score (and is also used as a debugging signal in the diagnostics UI).
+A boolean mask marks valid projected points (finite, $z>0$, and inside image
+bounds). We truncate to a fixed maximum number of points per candidate for
+stable compute. Optionally, we add a learned token-type embedding for valid vs
+invalid projections and optionally mask invalid tokens in attention.
+
+The fraction of valid projected points (`semidense_candidate_vis_frac`)
+provides a view-specific reliability score and is logged as a key diagnostic
+signal.
 
 == Multi-head cross-attention
 
 The sampled tokens are projected to a fixed channel dimension and aggregated
 with a multi-head attention block. Candidate pose embeddings act as queries,
 while token features and normalized pixel coordinates act as keys and values.
-This design provides explicit view dependence while keeping the model small.
+This design provides explicit view dependence while keeping the model small
+@Transformer-vaswani2017.

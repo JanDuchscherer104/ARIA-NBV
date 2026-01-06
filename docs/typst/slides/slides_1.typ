@@ -94,20 +94,20 @@
   #text(size: 10pt)[
     ```
     scene_id/
-    ├── ase_scene_language.txt          # Ground truth scene layout in SSL format
-    ├── object_instances_to_classes.json # Mapping from instance IDs to semantic classes
-    ├── trajectory.csv                   # 6DoF camera poses along the egocentric path
-    ├── semidense_points.csv.gz          # Semi-dense 3D point cloud from MPS SLAM
-    ├── semidense_observations.csv.gz    # Point observations (which images see which points)
-    ├── rgb/                             # RGB image frames
-    │   ├── 000000.png
-    │   └── ...
-    ├── depth/                           # Ground truth depth maps
-    │   ├── 000000.png
-    │   └── ...
-    └── instances/                       # Instance segmentation masks
-        ├── 000000.png
-        └── ...
+    |-- ase_scene_language.txt          # Ground truth scene layout in SSL format
+    |-- object_instances_to_classes.json # Mapping from instance IDs to semantic classes
+    |-- trajectory.csv                   # 6DoF camera poses along the egocentric path
+    |-- semidense_points.csv.gz          # Semi-dense 3D point cloud from MPS SLAM
+    |-- semidense_observations.csv.gz    # Point observations (which images see which points)
+    |-- rgb/                             # RGB image frames
+    |   |-- 000000.png
+    |   |-- ...
+    |-- depth/                           # Ground truth depth maps
+    |   |-- 000000.png
+    |   |-- ...
+    |-- instances/                       # Instance segmentation masks
+        |-- 000000.png
+        |-- ...
     ```
   ]
 ]
@@ -194,7 +194,7 @@
   $
 
   - Range: $[0, 1]$ where higher = better view
-  - Normalized by current error → scale-independent
+  - Normalized by current error #sym.arrow.r scale-independent
   - Chamfer Distance (CD) measures reconstruction quality
 
   *VIN Architecture*

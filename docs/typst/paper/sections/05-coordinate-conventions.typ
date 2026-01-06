@@ -9,7 +9,7 @@ represented as SE(3) transforms using `PoseTW`, and cameras are represented
 with `CameraTW` to preserve intrinsics and extrinsics.
 
 Implementation note: for UI alignment in our diagnostics dashboard, the
-candidate generator applies a fixed 90° rotation about the local +Z axis
+candidate generator applies a fixed 90#sym.degree rotation about the local +Z axis
 (`rotate_yaw_cw90`) to the reference and candidate poses. Since EVL backbone
 outputs follow the canonical EFM3D conventions, `VinModelV2` undoes this
 rotation (`apply_cw90_correction=true`) before computing pose encodings and
@@ -17,14 +17,14 @@ view-conditioned features.
 
 == Transformation notation
 
-We write $T_{A<-B}$ for the transform from frame $B$ to frame $A$. Composing
+We write $T_(A<-B)$ for the transform from frame $B$ to frame $A$. Composing
 poses follows standard SE(3) multiplication, and inversion yields the reverse
 transform. For example, a world point $x$ can be expressed in the camera frame
 via
 
 #block[
   #align(center)[
-    $ bold(x)_{"cam"} = (#sym_T)_{#fr_cam <- #fr_world} bold(x)_{"world"} $
+    $ bold(x)^"cam" = #sym_T _(#fr_cam <- #fr_world) bold(x)^"w" $
   ]
 ]
 

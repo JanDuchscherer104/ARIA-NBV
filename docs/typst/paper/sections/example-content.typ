@@ -23,7 +23,7 @@ $ a + b = gamma $ <eq:gamma>
 #figure(
   placement: none,
   circle(radius: 15pt),
-  caption: [A circle representing the Sun.]
+  caption: [A circle representing the Sun.],
 ) <fig:sun>
 
 In @fig:sun you can see a common representation of the Sun, which is a star that is located at the center of the solar system.
@@ -40,7 +40,7 @@ In @fig:sun you can see a common representation of the Sun, which is a star that
     align: (left, right),
     inset: (x: 8pt, y: 4pt),
     stroke: (x, y) => if y <= 1 { (top: 0.5pt) },
-    fill: (x, y) => if y > 0 and calc.rem(y, 2) == 0  { rgb("#efefef") },
+    fill: (x, y) => if y > 0 and calc.rem(y, 2) == 0 { rgb("#efefef") },
 
     table.header[Planet][Distance (million km)],
     [Mercury], [57.9],
@@ -51,7 +51,7 @@ In @fig:sun you can see a common representation of the Sun, which is a star that
     [Saturn], [1,433.5],
     [Uranus], [2,872.5],
     [Neptune], [4,495.1],
-  )
+  ),
 ) <tab:planets>
 
 In @tab:planets, you see the planets of the solar system and their average distance from the Sun.
@@ -60,23 +60,23 @@ The distances were calculated with @eq:gamma that we presented in @sec:methods.
 #table(
   columns: 3,
   align: (left, center, center),
-  toprule(), // added by this package
-  table.header(
-    [Substance],
-    [Subcritical \ °C],
-    [Supercritical \ °C],
-  ),
-  midrule(), // added by this package
+  toprule(),
+  // added by this package
+  table.header([Substance], [Subcritical \ #sym.degree C], [Supercritical \ #sym.degree C]),
+  midrule(),
+  // added by this package
   [Hydrochloric Acid],
   [12.0],
   [92.1],
   [Potassium Hydroxide],
   table.cell(colspan: 2)[24.7],
-  cmidrule(start: 1, end: -1), // added by this package
+  cmidrule(start: 1, end: -1),
+  // added by this package
   [Sodium Myreth Sulfate],
   [16.6],
   [104],
-  bottomrule() // added by this package
+  bottomrule(),
+  // added by this package
 )
 
 #lorem(240)

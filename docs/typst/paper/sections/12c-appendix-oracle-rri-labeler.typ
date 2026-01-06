@@ -3,6 +3,8 @@
 = Appendix: OracleRriLabeler Pipeline
 
 #import "/typst/shared/macros.typ": *
+#import "@preview/booktabs:0.0.4": *
+#show: booktabs-default-table-style
 
 This appendix provides a detailed, code-faithful overview of the oracle label
 pipeline implemented in `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`.
@@ -15,17 +17,17 @@ training.
 Given an ASE-EFM snippet with mesh supervision, `OracleRriLabeler` executes:
 
 1. *Candidate sampling* (`CandidateViewGenerator`): sample candidate camera
-   centers on a constrained spherical shell and assign orientations, then prune
-   invalid candidates using rule objects.
+  centers on a constrained spherical shell and assign orientations, then prune
+  invalid candidates using rule objects.
 2. *Depth rendering* (`CandidateDepthRenderer` + `Pytorch3DDepthRenderer`):
-   rasterize the GT mesh from each candidate pose to obtain depth maps.
+  rasterize the GT mesh from each candidate pose to obtain depth maps.
 3. *Backprojection* (`build_candidate_pointclouds`): unproject valid depth
-   pixels to obtain per-candidate point clouds in world coordinates and fuse
-   with the semidense reconstruction point set.
+  pixels to obtain per-candidate point clouds in world coordinates and fuse
+  with the semidense reconstruction point set.
 4. *Oracle scoring* (`OracleRRI`): compute Chamfer-based reconstruction quality
-   before/after adding each candidate and report oracle RRI.
+  before/after adding each candidate and report oracle RRI.
 5. *Ordinal binning* (`RriOrdinalBinner`): fit quantile edges and map continuous
-   RRIs to ordinal labels and CORAL level targets.
+  RRIs to ordinal labels and CORAL level targets.
 
 == Candidate center sampling (hyperspherical shell)
 
@@ -45,10 +47,72 @@ transforming the resulting offset into world coordinates:
 
 We draw directions either uniformly on the sphere, or from a forward-biased
 Power Spherical distribution centered at the device forward axis
-$(#sym_dir) ~ cal(PS)(bold(mu), kappa)$ @PowerSpherical-deCao2020. Angular caps
+$(#sym_dir) ~ "PS"(bold(mu), kappa)$ @PowerSpherical-deCao2020. Angular caps
 are enforced *without rejection* by deterministically mapping the raw samples
 into the target azimuth/elevation ranges (see
 `oracle_rri/oracle_rri/pose_generation/positional_sampling.py`).
+
+The candidate center sampling configuration used in our runs is summarized in
+@tab:oracle-cfg-centers.
+
+#figure(
+  kind: "table",
+  supplement: [Table],
+  placement: none,
+  caption: [Oracle candidate center sampling configuration.],
+  text(size: 8.5pt)[
+    #table(
+      columns: (auto, auto),
+      align: (left, left),
+      toprule(),
+      table.header([Parameter], [Value]),
+      midrule(), [camera_label],
+      [rgb], [reference_frame_index],
+      [None (final pose)], [num_samples],
+      [32], [oversample_factor],
+      [1.5], [align_to_gravity],
+      [true], [min_radius],
+      [0.6 m], [max_radius],
+      [3.0 m], [min_elev_deg],
+      [-15#sym.degree], [max_elev_deg],
+      [25#sym.degree], [delta_azimuth_deg],
+      [170#sym.degree], [sampling_strategy],
+      [uniform_sphere], [seed],
+      [0], bottomrule(),
+    )
+  ],
+) <tab:oracle-cfg-centers>
+
+*Azimuth/elevation caps without rejection.* Let
+$tilde((#sym_dir)) = (x, y, z)$ be a raw unit direction. We define
+
+#block[
+  #align(center)[
+    $
+      psi = "atan2"(x, z),
+      quad
+      theta = "atan2"(y, sqrt(x^2 + z^2))
+    $
+  ]
+]
+
+If the azimuth spread is capped to $Delta_"az" < 2 pi$, we scale
+$psi' = psi dot (Delta_"az" / (2 pi))$ and overwrite $(x, z) <- ("sin"(psi'), "cos"(psi'))$.
+To cap elevation, we map $y = "sin"(theta)$ from $[-1, 1]$ into the target band:
+
+#block[
+  #align(center)[
+    $
+      y_"min" = "sin"(theta_"min"), \
+      y_"max" = "sin"(theta_"max"), \
+      y' = y_"min" + (y + 1)(y_"max" - y_"min")/2
+    $
+  ]
+]
+
+and rescale the horizontal components to preserve unit norm:
+$(x, z) <- (x, z) dot sqrt(1 - (y')^2) / sqrt(x^2 + z^2)$, followed by
+renormalization.
 
 == Candidate orientations
 
@@ -57,6 +121,29 @@ orientation according to the configured `ViewDirectionMode`
 (`oracle_rri/oracle_rri/pose_generation/orientations.py`). The most common mode
 is radial "look-away", which points the camera optical axis away from the
 reference position.
+
+The orientation configuration used in our runs is summarized in
+@tab:oracle-cfg-orient.
+
+#figure(
+  kind: "table",
+  supplement: [Table],
+  placement: none,
+  caption: [Oracle candidate orientation configuration.],
+  text(size: 8.5pt)[
+    #table(
+      columns: (auto, auto),
+      align: (left, left),
+      toprule(),
+      table.header([Parameter], [Value]),
+      midrule(), [view_direction_mode],
+      [radial_away], [view_max_azimuth_deg],
+      [60#sym.degree], [view_max_elevation_deg],
+      [30#sym.degree], [view_roll_jitter_deg],
+      [0#sym.degree], bottomrule(),
+    )
+  ],
+) <tab:oracle-cfg-orient>
 
 Let $bold(u)_("wup")$ be the world up vector and $bold(t)_("ref")$ the reference
 translation. Define the forward axis
@@ -85,8 +172,8 @@ and construct a roll-stable orthonormal basis
 ]
 
 The resulting rotation is $bold(R)_i = [bold(x)_i, bold(y)_i, bold(z)_i]$ and
-the candidate pose is $(#sym_T)_{#fr_world <- #fr_cam_i} = (bold(R)_i,
-(#sym_center)_i)$.
+the candidate pose is $(#sym_T)_{#fr_world <- (#fr_cam)_i} = (bold(R)_i,
+  (#sym_center)_i)$.
 
 *View jitter.* After base pose construction, we optionally apply bounded yaw,
 pitch, and roll perturbations in the camera frame. Using yaw about +Y, pitch
@@ -107,7 +194,32 @@ and update $bold(R)_i <- bold(R)_i bold(R)_i^("jitter")$.
 
 Candidates are oversampled and then filtered by modular rule objects
 (`oracle_rri/oracle_rri/pose_generation/candidate_generation_rules.py`).
-Let #sym_mesh be the GT mesh and $\mathcal{B}$ be the snippet occupancy AABB.
+Let #sym_mesh be the GT mesh and $cal(B)$ be the snippet occupancy AABB.
+
+The pruning configuration used in our runs is summarized in
+@tab:oracle-cfg-prune.
+
+#figure(
+  kind: "table",
+  supplement: [Table],
+  placement: none,
+  caption: [Oracle candidate pruning configuration.],
+  text(size: 8.5pt)[
+    #table(
+      columns: (auto, auto),
+      align: (left, left),
+      toprule(),
+      table.header([Parameter], [Value]),
+      midrule(), [min_distance_to_mesh],
+      [0.4 m], [ensure_collision_free],
+      [true], [collision_backend],
+      [pytorch3d], [ray_subsample],
+      [128], [step_clearance],
+      [0.1 m], [ensure_free_space],
+      [true], bottomrule(),
+    )
+  ],
+) <tab:oracle-cfg-prune>
 
 *Mesh clearance.* Reject candidates too close to the mesh:
 
@@ -129,27 +241,59 @@ points along the segment and require a minimum clearance:
   #align(center)[
     $
       bold(s)_(i,k) = bold(t)_("ref") + alpha_k ((#sym_center)_i - bold(t)_("ref")),
-      quad alpha_k in [0, 1],
-      quad
+      quad alpha_k in [0, 1], \
       min_(bold(m) in #sym_mesh) || bold(s)_(i,k) - bold(m) ||_2 > delta
     $
   ]
 ]
 
 *Free space.* Reject candidates outside the occupancy bounds:
-$(#sym_center)_i in \mathcal{B}$.
+$(#sym_center)_i in cal(B)$.
 
 == Depth rendering with PyTorch3D
 
 Depth rendering is implemented in
 `oracle_rri/oracle_rri/rendering/pytorch3d_depth_renderer.py` using PyTorch3D's
 `PerspectiveCameras`, `RasterizationSettings`, and `MeshRasterizer`
-@PyTorch3D-Cameras-2025. Given a candidate pose (#sym_T)_{#fr_world <- #fr_cam}
+@PyTorch3D-Cameras-2025. Given a candidate pose $(#sym_T)_{#fr_world <- #fr_cam}$
 and camera intrinsics (focal length and principal point), we build a batched
 `PerspectiveCameras` instance with `in_ndc=false` and rasterize the GT mesh.
 
-*Pose conventions.* Our poses are stored as world<-camera transforms. PyTorch3D
-expects a world→view mapping using row vectors:
+We use hard z-buffering with `faces_per_pixel=1` and `blur_radius=0`, clip
+triangles closer than `znear`, and expose performance knobs such as
+`bin_size`/`max_faces_per_bin` via the renderer config.
+
+The depth rendering configuration used in our runs is summarized in
+@tab:oracle-cfg-render.
+
+#figure(
+  kind: "table",
+  supplement: [Table],
+  placement: none,
+  caption: [Oracle depth rendering configuration (effective settings).],
+  text(size: 8.5pt)[
+    #table(
+      columns: (14em, auto),
+      align: (left, left),
+      toprule(),
+      table.header([Parameter], [Value]),
+      midrule(), [max_candidates_final],
+      [16], [oversample_factor],
+      [1.0], [resolution_scale],
+      [0.5], [znear],
+      [0.001 m], [zfar],
+      [20.0 m], [faces_per_pixel],
+      [1], [blur_radius],
+      [0.0], [bin_size],
+      [0], [max_faces_per_bin],
+      [None], [cull_backfaces],
+      [false (render both sides)], bottomrule(),
+    )
+  ],
+) <tab:oracle-cfg-render>
+
+*Pose conventions.* Our poses are stored as world #sym.arrow.l camera transforms. PyTorch3D
+expects a world #sym.arrow.r view mapping using row vectors:
 $bold(x)_("cam") = bold(x)_("world") bold(R) + bold(T)$.
 We therefore invert the pose and transpose the rotation before passing it to
 PyTorch3D (see in-code comments in the renderer).
@@ -170,8 +314,7 @@ $s = min(H, W)$:
 #block[
   #align(center)[
     $
-      x_"ndc" = - (u + 1/2 - W/2) (2/s),
-      quad
+      x_"ndc" = - (u + 1/2 - W/2) (2/s), \
       y_"ndc" = - (v + 1/2 - H/2) (2/s)
     $
   ]
@@ -183,7 +326,7 @@ We then unproject in NDC space:
   #align(center)[
     $
       bold(p)_("world") =
-      "unproject"((x_"ndc", y_"ndc", (#sym_depth)_i(u,v)); "from_ndc"=1)
+      "unproject"((x_"ndc", y_"ndc", (#sym_depth)_i(u,v)))
     $
   ]
 ]
@@ -199,6 +342,26 @@ rasterization consistent.
 The per-candidate point set is then
 $(#sym_points)_(q_i) = { bold(p)_("world") : (u,v) "valid" }$, optionally
 subsampled by a stride to control point count.
+
+The backprojection configuration used in our runs is summarized in
+@tab:oracle-cfg-backproj.
+
+#figure(
+  kind: "table",
+  supplement: [Table],
+  placement: none,
+  caption: [Oracle backprojection configuration.],
+  text(size: 8.5pt)[
+    #table(
+      columns: (14em, auto),
+      align: (left, left),
+      toprule(),
+      table.header([Parameter], [Value]),
+      midrule(), [backprojection_stride],
+      [1], bottomrule(),
+    )
+  ],
+) <tab:oracle-cfg-backproj>
 
 == Oracle RRI computation
 
@@ -230,6 +393,31 @@ In our implementation (`oracle_rri/oracle_rri/rri_metrics/oracle_rri.py`), the
 GT mesh is cropped to a combined occupancy AABB covering semidense and
 candidate points to reduce compute. Distances are evaluated with PyTorch3D
 point-mesh primitives on GPU.
+
+The oracle scoring uses fixed aggregation choices (no additional tunable
+hyperparameters). The effective settings are summarized in
+@tab:oracle-cfg-score.
+
+#figure(
+  kind: "table",
+  supplement: [Table],
+  placement: none,
+  caption: [Oracle RRI scoring settings (fixed).],
+  text(size: 8.5pt)[
+    #table(
+      columns: (16em, auto),
+      align: (left, left),
+      toprule(),
+      table.header([Setting], [Value]),
+      midrule(), [mesh crop],
+      [AABB from semidense + candidate bounds], [accuracy (P #sym.arrow.r M)],
+      [mean point #sym.arrow.r triangle distance], [completeness (M #sym.arrow.r P)],
+      [mean triangle #sym.arrow.r point distance], [bidirectional],
+      [accuracy + completeness], [denominator stabilizer],
+      [clamp_min $1e-12$], bottomrule(),
+    )
+  ],
+) <tab:oracle-cfg-score>
 
 == Ordinal binning for CORAL
 
@@ -265,3 +453,25 @@ provides class priors and cumulative threshold priors
 $P(y > k)$, which we use for prior-aligned bias initialization and optional
 balanced threshold losses.
 
+The binning configuration used in our runs is summarized in
+@tab:oracle-cfg-binning.
+
+#figure(
+  kind: "table",
+  supplement: [Table],
+  placement: none,
+  caption: [Ordinal binning configuration for CORAL training.],
+  text(size: 8.5pt)[
+    #table(
+      columns: (14em, auto),
+      align: (left, left),
+      toprule(),
+      table.header([Parameter], [Value]),
+      midrule(), [num_classes $K$],
+      [15], [edge fit],
+      [quantiles at $k/K$, $k=1..K-1$], [`bucketize`],
+      [right=false], [fallback when edges collapse],
+      [uniform linspace between min/max], bottomrule(),
+    )
+  ],
+) <tab:oracle-cfg-binning>

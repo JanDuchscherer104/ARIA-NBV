@@ -28,9 +28,9 @@ completeness and accuracy components of the Chamfer distance to diagnose
 failure modes (e.g., views that look into empty space). The resulting RRI values
 serve as supervised labels for the VIN model.
 
-Implementation note: our point↔mesh distances are computed with PyTorch3D
+Implementation note: our point #sym.arrow.l.r mesh distances are computed with PyTorch3D
 point-to-triangle and triangle-to-point distance operators (averaged over
-points/faces). This yields the same accuracy (P→M) and completeness (M→P)
+points/faces). This yields the same accuracy (P #sym.arrow.r M) and completeness (M #sym.arrow.r P)
 split reported by ATEK-style surface reconstruction evaluation.
 
 == Pipeline wiring (OracleRriLabeler)

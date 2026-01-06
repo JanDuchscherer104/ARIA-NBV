@@ -15,17 +15,18 @@
     Egocentric Voxel Lifting (EVL) backbone from EFM3D, and an oracle RRI pipeline built from
     ground-truth meshes and semi-dense SLAM points. We describe the end-to-end pipeline from
     candidate generation and depth rendering to ordinal regression with CORAL, including
-    semidense view conditioning through projection statistics and frustum-aware attention. The
-    paper consolidates our implementation choices, diagnostics, and open design questions, and
-    provides a reproducible blueprint for future ablations and entity-aware extensions.
+    semidense view conditioning through projection statistics and frustum-aware attention, a
+    trajectory encoder for history context, and voxel-reliability gating via `voxel_valid_frac`.
+    The paper consolidates our implementation choices, diagnostics, and open design questions,
+    and provides a reproducible blueprint for future ablations and entity-aware extensions.
   ],
   authors: (
     (
       name: "Jan Duchscherer",
-      department: [Computer Science & Mathematics],
+      department: [Department of Computer Science & Mathematics],
       organization: [Munich University of Applied Sciences],
       location: [Munich, Germany],
-      email: "duchsche@hm.edu",
+      email: "j.duchscherer@hm.edu",
     ),
   ),
   index-terms: (
@@ -38,9 +39,13 @@
   ),
   bibliography: bibliography("/references.bib"),
   figure-supplement: [Fig.],
+  paper-size: "a4",
 )
 
-#set text(font: "DejaVu Serif")
+
+// #set text(font: "DejaVu Serif")
+#set text(font: "New Computer Modern")
+
 
 #import "/typst/shared/macros.typ": *
 
@@ -64,5 +69,6 @@
 #include "sections/10a-entity-aware.typ"
 #include "sections/11-conclusion.typ"
 #include "sections/12c-appendix-oracle-rri-labeler.typ"
+#include "sections/12d-appendix-vin-v2-details.typ"
 #include "sections/12-appendix-gallery.typ"
 #include "sections/12b-appendix-extra.typ"

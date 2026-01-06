@@ -153,6 +153,8 @@ $
 #let sym_dir = $bold(d)$
 #let sym_center = $bold(c)$
 #let sym_offset = $bold(o)$
+#let sym_acc = $cal(A)$
+#let sym_comp = $cal(C)$
 
 /// Attention and feature symbols (all tensors/vectors; already bold).
 #let sym_pose_emb = $bold(e)$
@@ -169,8 +171,8 @@ $
 /// Linear projection matrix symbol.
 #let sym_W = $bold(W)$
 /// FiLM scale/bias symbols (vectors).
-#let sym_gamma = $bold(γ)$
-#let sym_beta = $bold(β)$
+#let sym_gamma = $bold(gamma)$
+#let sym_beta = $bold(beta)$
 
 // ============================================================================
 // Utility Functions

@@ -100,20 +100,20 @@
   #text(size: 10pt)[
     ```
     scene_id/
-    ├── ase_scene_language.txt          # Ground truth scene layout in SSL format
-    ├── object_instances_to_classes.json # Mapping from instance IDs to semantic classes
-    ├── trajectory.csv                   # 6DoF camera poses along the egocentric path
-    ├── semidense_points.csv.gz          # Semi-dense 3D point cloud from MPS SLAM
-    ├── semidense_observations.csv.gz    # Point observations (which images see which points)
-    ├── rgb/                             # RGB image frames
-    │   ├── 000000.png
-    │   └── ...
-    ├── depth/                           # Ground truth depth maps
-    │   ├── 000000.png
-    │   └── ...
-    └── instances/                       # Instance segmentation masks
-        ├── 000000.png
-        └── ...
+    |-- ase_scene_language.txt          # Ground truth scene layout in SSL format
+    |-- object_instances_to_classes.json # Mapping from instance IDs to semantic classes
+    |-- trajectory.csv                   # 6DoF camera poses along the egocentric path
+    |-- semidense_points.csv.gz          # Semi-dense 3D point cloud from MPS SLAM
+    |-- semidense_observations.csv.gz    # Point observations (which images see which points)
+    |-- rgb/                             # RGB image frames
+    |   |-- 000000.png
+    |   |-- ...
+    |-- depth/                           # Ground truth depth maps
+    |   |-- 000000.png
+    |   |-- ...
+    |-- instances/                       # Instance segmentation masks
+        |-- 000000.png
+        |-- ...
     ```
   ]
 ]
@@ -306,10 +306,10 @@
     gutter: 1cm,
     [
       #color-block(title: [Surface-to-Surface Distance Metrics])[
-        *Accuracy* (Prediction → GT):
+        *Accuracy* (Prediction #sym.arrow.r GT):
         $ "Acc" = (1)/(|cal(P)|) sum_(bold(p) in cal(P)) min_(bold(q) in cal(M)_"GT") ||bold(p) - bold(q)||_2 $
 
-        *Completeness* (GT → Prediction):
+        *Completeness* (GT #sym.arrow.r Prediction):
         $ "Comp" = (1)/(|cal(M)_"GT"|) sum_(bold(q) in cal(M)_"GT") min_(bold(p) in cal(P)) ||bold(p) - bold(q)||_2 $
 
         Where:
@@ -458,7 +458,7 @@
       #color-block(title: [Action Space Design])[
         $ cal(A) = underbrace(bb(R)^3, "position") times underbrace(S O(2), "heading") $
 
-        - Approximately 20m × 20m × 10m position space
+        - Approximately 20m x 20m x 10m position space
         - Omnidirectional heading subspace
         - #emph-it[No hand-crafted constraints] (e.g., hemisphere)
       ]
@@ -471,7 +471,7 @@
         - Three states: #emph-color[occupied], #emph-color[free], #emph-color[unknown]
 
         *Semantic Embedding* $bold(s)_t^S$:
-        - RGB images → grayscale → 2D CNN
+        - RGB images #sym.arrow.r grayscale #sym.arrow.r 2D CNN
         - Helps distinguish holes from incomplete scans
 
         *Action Embedding* $bold(s)_t^A$:
@@ -520,7 +520,7 @@
       #color-block(title: [Proposed Pipeline])[
         1. *Reconstruct*: Build partial mesh from historical trajectory
         2. *Sample*: Generate candidate viewpoints in free space
-        3. *Compute Features*: Extract geometric + semantic embeddings (à la GenNBV)
+        3. *Compute Features*: Extract geometric + semantic embeddings (a la GenNBV)
         4. *Predict*: Use network to predict #RRI per candidate
         5. *Select*: Choose #NBV with highest predicted #RRI
       ]

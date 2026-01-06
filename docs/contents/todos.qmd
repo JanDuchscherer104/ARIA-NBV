@@ -384,7 +384,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
   snippet_id: str
   backbone_out: EvlBackboneOutput # dict of tensors from EVL backbone!
   ```
-  - save the enitre output of the EVL backbone instead of EvlBackboneOutput so that we can avoid recomputation if we decide to use different features anywhere down the line. 
+  - save the enitre output of the EVL backbone instead of EvlBackboneOutput so that we can avoid recomputation if we decide to use different features anywhere down the line.
   -  dict full OracleRriLabeler results to an offline dataset for fast parallel reading to support multiple workers in the dataloader. Carry a full OracleRriLabelerConfig snapshot but exclude large path lists (e.g. tar URLs / mesh maps).
   - the metadata should carry all configuration settings
 
@@ -461,6 +461,10 @@ print(run.history())
 - [ ] Add an explicit **frame-consistency** check for VIN inputs: if candidate generation applies `rotate_yaw_cw90` to the reference pose, ensure the **same** rotated reference pose is passed to VIN along with candidate poses and `p3d_cameras`. `backbone_out` stays in the world frame; only candidate/ref/camera must share the rotated basis.
   - *All* poses coming from the OracleRriLabeler have been rotated by 90 deg cw about their foward axis to allow correct candidate generation in the world frame. However, the poses produced by the EVL do not have this rotation applied.!
   - Poses with cw90 deg yaw: `candidate_poses_world_cam: PoseTW`, `reference_pose_world_rig: PoseTW`, extrinsics in `p3d_cameras: PerspectiveCameras`.
+
+- [ ] Add a different kind of leaned embedding for all points from semi-dence PC depending on their visibility from candidate pose
+- [ ] Add feature to the semi-dense: number of (historic) cameras in the efm snippet that saw this specific point.
+
 
 ### Feature Inventory (what VIN consumes)
 

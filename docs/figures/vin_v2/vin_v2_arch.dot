@@ -1,0 +1,107 @@
+digraph vin_v2_arch {
+  rankdir=LR;
+  graph [splines=true, nodesep=0.35, ranksep=0.55, bgcolor="transparent"];
+  node [shape=box, style="rounded,filled", fillcolor="#ffffff", color="#3b3b3b", fontname="Helvetica", fontsize=10];
+  edge [color="#3b3b3b", arrowsize=0.8, penwidth=1.0];
+
+  subgraph cluster_inputs {
+    label="Inputs";
+    color="#c7c7c7";
+    style="rounded,dashed";
+    fontsize=10;
+    fontname="Helvetica";
+
+    efm [label="EFM snippet\\n(poses, semidense points)"];
+    cands [label="Candidate poses\\nPoseTW (world←cam)"];
+    cams [label="Candidate cameras\\nPerspectiveCameras"];
+    evl [label="EVL backbone out\\n(voxel heads + t_world_voxel)"];
+  }
+
+  subgraph cluster_voxel {
+    label="Voxel / EVL branch";
+    color="#c7c7c7";
+    style="rounded,dashed";
+    fontsize=10;
+    fontname="Helvetica";
+
+    field_in [label="Scene field F_in\\n(occ_pr, occ_input, counts_norm,\\ncent_pr, free_input, new_surface_prior)"];
+    field_proj [label="Field projection\\nConv3d 1×1×1 + GN + GELU"];
+    pool [label="Global tokens\\npool to G×G×G"];
+    pos_enc [label="Positional encoding\\nLFF(x,y,z) in rig_ref"];
+    attn_global [label="Pose-conditioned MHCA\\nQ: pose_emb, KV: voxel tokens"];
+    global_feat [label="global_feat_i"];
+
+    voxel_frac [label="voxel_valid_frac_i\\n(sample counts_norm @ cam center)"];
+    voxel_gate [label="voxel gate\\nMLP(voxel_valid_frac_i)→g_i"];
+  }
+
+  subgraph cluster_semidense {
+    label="Semidense view conditioning";
+    color="#c7c7c7";
+    style="rounded,dashed";
+    fontsize=10;
+    fontname="Helvetica";
+
+    proj [label="Project semidense points\\ninto candidate views"];
+    sem_stats [label="Projection stats s_i^proj\\ncoverage, empty_frac,\\nsemidense_candidate_vis_frac,\\ndepth mean/std"];
+    film [label="FiLM(global_feat, s_i^proj)\\nγ_i, β_i from stats"];
+    sem_tokens [label="Frustum tokens τ_{i,k}\\n(x_norm,y_norm,depth,\\ninv_dist_std, obs_count)"];
+    sem_attn [label="Semidense frustum MHCA\\nQ: pose_emb, KV: tokens"];
+    sem_frustum [label="s_i^frustum"];
+  }
+
+  subgraph cluster_optional {
+    label="Optional context";
+    color="#c7c7c7";
+    style="rounded,dashed";
+    fontsize=10;
+    fontname="Helvetica";
+
+    traj [label="Trajectory encoder\\nrig pose history → z^traj"];
+    pointnext [label="Point encoder (PointNeXt)\\nsemidense points → z^point"];
+  }
+
+  subgraph cluster_head {
+    label="Scoring head";
+    color="#c7c7c7";
+    style="rounded,dashed";
+    fontsize=10;
+    fontname="Helvetica";
+
+    concat [label="Feature fusion\\nh_i = concat(pose_emb_i,\\n global_feat_i, s_i^proj,\\n s_i^frustum, z^traj, z^point,\\n voxel_valid_frac_i)"];
+    mlp [label="MLP"];
+    coral [label="CORAL ordinal head\\n(K−1 logits)"];
+    out [label="Outputs\\nRRI bins + expected RRI"];
+  }
+
+  // Wiring
+  evl -> field_in -> field_proj -> pool -> attn_global -> global_feat;
+  pool -> pos_enc -> attn_global;
+  cands -> attn_global;
+
+  evl -> voxel_frac -> voxel_gate -> global_feat [label="gate", fontsize=9];
+
+  efm -> proj;
+  cams -> proj;
+  proj -> sem_stats;
+  sem_stats -> film;
+  global_feat -> film;
+
+  proj -> sem_tokens;
+  sem_tokens -> sem_attn -> sem_frustum;
+  cands -> sem_attn;
+
+  efm -> traj;
+  efm -> pointnext;
+
+  film -> concat;
+  sem_stats -> concat;
+  sem_frustum -> concat;
+  traj -> concat;
+  pointnext -> concat;
+  voxel_frac -> concat;
+  cands -> concat;
+
+  concat -> mlp -> coral -> out;
+}
+

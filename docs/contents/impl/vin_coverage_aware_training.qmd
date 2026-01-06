@@ -1,0 +1,78 @@
+---
+title: VIN v2 Coverage-Aware Training Notes
+---
+
+# VIN v2 Coverage-Aware Training {#vin-coverage-aware}
+
+This note captures the investigation into VIN v2’s stalled learning dynamics after removing visibility-weighted loss terms, and documents the new coverage-aware (but coverage-independent) strategy. The goal is to **predict oracle RRI for *all* candidates** while still acknowledging that voxel coverage is a strong confidence signal.
+
+## Symptoms Observed
+
+- The CORAL loss slope in recent runs flattens compared to older runs that used coverage-weighted losses.
+- Low-coverage candidates contribute noisy/ambiguous supervision early in training, likely swamping the signal from well-observed candidates.
+- Candidate-conditioned semidense features were added but not explicitly conditioned on visibility; this makes “not observed” indistinguishable from “observed but uninformative.”
+
+## Ranked Likely Causes
+
+1. **Loss dominated by low-evidence candidates.** Removing coverage weighting exposes the model to many candidates with near-zero voxel evidence early on, flattening gradients.
+2. **Candidate visibility not encoded in semidense tokens.** Without a visibility-conditioned embedding, projected semidense points look the same whether they are visible or invalid.
+3. **Low initial LR + OneCycleLR.** Runs with much lower initial LR show slower loss decrease early in training (especially when the schedule ramps slowly).
+
+## Coverage-Aware (but Coverage-Independent) Objective
+
+We use **curriculum-style weighting**: start with mild coverage weighting, then anneal to uniform weights. This keeps training stable early while still learning to predict RRI for all candidates later. See [Wikipedia :: Curriculum learning](https://en.wikipedia.org/wiki/Curriculum_learning).
+
+Let `c_i` be a coverage scalar (e.g., voxel_valid_frac in `[0,1]`). Define:
+
+```
+base_weight = floor + (1 - floor) * c_i^p
+weight      = (1 - alpha_t) * 1 + alpha_t * base_weight
+```
+
+`alpha_t` decays linearly or cosine over a configured number of epochs/steps.
+
+## Coverage Conditioning in the Model
+
+- **Voxel gate**: Use `voxel_valid_frac` to gate the global voxel branch (MoE-style conditioning). See [Wikipedia :: Mixture of experts](https://en.wikipedia.org/wiki/Mixture_of_experts).
+- **Explicit feature**: Append `(voxel_valid_frac, 1 - voxel_valid_frac)` to the head input.
+- **Semidense visibility embedding**: Add a learned token-type embedding (visible vs. invisible) to semidense frustum tokens.
+
+## Implemented Changes (Code)
+
+- **Semidense obs count** added to `EfmPointsView.collapse_points` and threaded through `VinSnippetView`.
+- **Visibility-conditioned semidense embedding** added to frustum tokens.
+- **Renamed validity scalars** to `voxel_valid_frac` and `semidense_valid_frac`.
+- **Coverage-aware loss weighting** added to `VinLightningModule` with configurable annealing.
+- **Expanded diagnostics**: logs coverage stats, candidate validity ratio, and more grad norms.
+
+## Config Knobs for Ablations
+
+### In `VinModelV2Config` (optimizable fields)
+
+- `semidense_obs_count_norm`: `{none, log1p, log1p_norm}`
+- `semidense_visibility_embed`: `{true, false}`
+- `semidense_frustum_mask_invalid`: `{true, false}`
+- `use_voxel_valid_frac_feature`: `{true, false}`
+- `use_voxel_valid_frac_gate`: `{true, false}`
+
+### In `VinLightningModuleConfig`
+
+- `coverage_weight_mode`: `{none, voxel, semidense, min, mean, product}`
+- `coverage_weight_floor`: minimum loss weight for low-coverage candidates
+- `coverage_weight_power`: exponent on coverage fraction
+- `coverage_weight_strength_start` / `coverage_weight_strength_end`
+- `coverage_weight_schedule`: `{linear, cosine}`
+- `coverage_weight_anneal_epochs` / `coverage_weight_anneal_steps`
+- `coverage_weight_apply_aux`: whether aux regression loss is weighted
+
+## Usage Notes
+
+- If using `vin_snippet_cache`, rebuild it after toggling `include_obs_count` (cache hash changes).
+- When `vin_snippet_cache` is partial, set `vin_snippet_cache_allow_subset=true` in the offline cache dataset
+  config to filter training entries to the cached subset.
+- To leverage obs-count features in PointNeXt, make sure the PointNeXt config’s `in_channels` accommodates the extra features.
+
+## References
+
+- [Wikipedia :: Curriculum learning](https://en.wikipedia.org/wiki/Curriculum_learning)
+- [Wikipedia :: Mixture of experts](https://en.wikipedia.org/wiki/Mixture_of_experts)

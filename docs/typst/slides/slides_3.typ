@@ -1,4 +1,4 @@
-// Oracle RRI pipeline slides (ASE → candidates → rendering → backprojection → scoring)
+// Oracle RRI pipeline slides (ASE -> candidates -> rendering -> backprojection -> scoring)
 // Style baseline: docs/typst/slides/slides_2.typ
 
 #import "@preview/definitely-not-isec-slides:1.0.1": *
@@ -17,7 +17,7 @@
   logo: [#image(fig_path + "hm-logo.svg", width: 2cm)],
   config-info(
     title: [Oracle RRI Pipeline in ASE],
-    subtitle: [Data → Candidates → Rendering → Backprojection → Metrics],
+    subtitle: [Data #sym.arrow.r Candidates #sym.arrow.r Rendering #sym.arrow.r Backprojection #sym.arrow.r Metrics],
     authors: [*Jan Duchscherer*],
     extra: [VCML Seminar WS24/25],
     footer: [
@@ -71,7 +71,7 @@
         - `OracleRriLabeler` composes three stage configs:
           + `CandidateViewGeneratorConfig` (pose sampling + pruning)
           + `CandidateDepthRendererConfig` (depth simulation from GT mesh)
-          + `OracleRRIConfig` (point↔mesh distances → #RRI)
+          + `OracleRRIConfig` (point #sym.arrow.l.r mesh distances #sym.arrow.r #RRI)
         - Pipeline knob: `backprojection_stride` (pixel subsampling)
       ]
     ],
@@ -79,7 +79,7 @@
       #color-block(title: [Stages])[
         1. *Candidate Generation*: sample + orient + prune `PoseTW["C 12"]`
         2. *Depth Rendering*: render `depths["C H W"]` (+ valid mask)
-        3. *Backprojection*: depth hits → `CandidatePointClouds`
+        3. *Backprojection*: depth hits #sym.arrow.r `CandidatePointClouds`
         4. *Oracle Scoring*: `RriResult` per candidate
       ]
       #color-block(title: [Outputs])[
@@ -98,12 +98,12 @@
 ]
 
 // ---------------------------------------------------------------------------
-// Data handling (download → dataset → typed views → mesh processing)
+// Data handling (download -> dataset -> typed views -> mesh processing)
 // ---------------------------------------------------------------------------
 
 // #section-slide(
 //   title: [Data Handling],
-//   subtitle: [Downloading ASE + streaming ATEK → typed `EfmSnippetView`],
+//   subtitle: [Downloading ASE + streaming ATEK -> typed `EfmSnippetView`],
 // )[
 //   #figure(image(fig_path + "scene-script/ase_modalities.jpg", width: 80%), caption: [@SceneScript-avetisyan2024])
 // ]
@@ -123,7 +123,7 @@
 //         - Candidate poses must be sampled in a *physically consistent* world frame.
 //         - Rendering needs a mesh + camera model.
 //         - Backprojection needs rendered depth + the exact camera used to render.
-//         - RRI uses point↔mesh distances, so both point sets and mesh must share coordinates.
+//         - RRI uses point<->mesh distances, so both point sets and mesh must share coordinates.
 //       ]
 //     ],
 //     [
@@ -165,7 +165,7 @@
 //     gutter: 1cm,
 //     [
 //       #color-block(title: [Dataset wrapper])[
-//         - `AseEfmDataset` wraps `load_atek_wds_dataset_as_efm` → yields `EfmSnippetView`.
+//         - `AseEfmDataset` wraps `load_atek_wds_dataset_as_efm` -> yields `EfmSnippetView`.
 //         - Resolves tar shards from `PathConfig`, infers scene/snippet ids.
 //         - Optional mesh loading + simplification + caching (`mesh_cache.py`).
 //       ]
@@ -249,13 +249,13 @@
       [
         #color-block(title: [Practical options in code])[
           - *Uniform*: area-uniform band sampling (`UNIFORM_SPHERE`).
-          - *Forward-biased*: PowerSpherical / von-Mises–Fisher concentration (`kappa`) around forward axis.
+          - *Forward-biased*: PowerSpherical / von-Mises-Fisher concentration (`kappa`) around forward axis.
           - *Gravity alignment*: remove pitch/roll in the sampling frame (`align_to_gravity=True`).
 
           #v(0.4em)
           *Intuition*
-          - Explore around the last pose while respecting the rig’s reachable neighborhood.
-          - Limit elevation to remain “human-like” (no ceiling cams).
+          - Explore around the last pose while respecting the rig's reachable neighborhood.
+          - Limit elevation to remain "human-like" (no ceiling cams).
           - Keep a controllable azimuth spread for forward exploration vs. full sweep.
         ]
       ],
@@ -287,7 +287,7 @@
       [
         #color-block(title: [What defines the *base* view?])[
           - `view_direction_mode` picks a deterministic base orientation:
-            + `radial_away` / `radial_towards`: look along (candidate ↔ reference) with roll-free world-up.
+            + `radial_away` / `radial_towards`: look along (candidate #sym.arrow.l.r reference) with roll-free world-up.
             + `forward_rig`: reuse the rig rotation.
             + `target_point`: look-at a fixed point.
           - This yields $bold(R)_"base"$.
@@ -312,7 +312,7 @@
           $
       ]
       #quote-block(color: rgb("#285f82"))[
-        This makes jitter “relative to the candidate’s current view direction”: `0°` means “keep the base view”.
+        This makes jitter \"relative to the candidate's current view direction\": `0deg` means \"keep the base view\".
       ]
     ],
     [
@@ -335,7 +335,7 @@
         // Optional roll jitter:
         // $
         //   gamma ~ cal(U)(-gamma_"max", +gamma_"max") \
-        //   bold(R)_"delta" ← bold(R)_"delta" bold(R)_z(gamma).
+        //   bold(R)_"delta" <- bold(R)_"delta" bold(R)_z(gamma).
         // $
 
         // #v(0.2em)
@@ -394,7 +394,7 @@
       ]
     ],
     [
-      #color-block(title: [With roll jitter (`view_roll_jitter_deg≈17°`)])[
+      #color-block(title: [With roll jitter (`view_roll_jitter_deg~=17deg`)])[
         #image(
           fig_path + "app/dir_dists_full_az_elmin_neg15_elmax_25_unfi_sphere_radial_away_17_roll_jitter.png",
           width: 100%,
@@ -418,14 +418,14 @@
       ]
     ],
     [
-      #color-block(title: [Narrower azimuth + stronger pruning (`Δaz≈165°`, `min_dist≈1m`)])[
+      #color-block(title: [Narrower azimuth + stronger pruning (`delta_az~=165deg`, `min_dist~=1m`)])[
         #image(fig_path + "app/cand_pose_az165_mindist1_r06-2.4.png", width: 100%)
       ]
     ],
   )
   #quote-block(color: rgb("#285f82"))[
     Forward bias (PowerSpherical, `kappa>0`) or (UniformSpherical, with azimuth restriction) concentrates candidate centers near the current forward direction.
-    This matches realistic motion (users rarely turn 180° for the next view), without forward bias, candiates looking in the opposite direciton of the reference will dominate RRI.
+    This matches realistic motion (users rarely turn 180#sym.degree for the next view), without forward bias, candiates looking in the opposite direciton of the reference will dominate RRI.
   ]
 ]
 
@@ -489,7 +489,7 @@
       #color-block(title: [Intuition])[
         - Reject viewpoints that start inside/too close to GT geometry.
         - Prevents unstable renders (near-plane clipping explosions).
-        - Implemented via PyTorch3D point↔mesh distance or trimesh proximity queries.
+        - Implemented via PyTorch3D point #sym.arrow.l.r mesh distance or trimesh proximity queries.
       ]
     ],
   )
@@ -600,20 +600,20 @@
 // ]
 
 // ---------------------------------------------------------------------------
-// Backprojection (depth hits → world-frame point clouds)
+// Backprojection (depth hits -> world-frame point clouds)
 // ---------------------------------------------------------------------------
 
 #section-slide(
   title: [Backprojection],
-  subtitle: [Depth hits → candidate point clouds (world frame)],
+  subtitle: [Depth hits #sym.arrow.r candidate point clouds (world frame)],
 )
 
-#slide(title: [Depth → 3D Points (Math)])[
+#slide(title: [Depth #sym.arrow.r 3D Points (Math)])[
   #grid(
     columns: (1fr, 1fr),
     gutter: 1cm,
     [
-      #color-block(title: [Pixel → NDC mapping (PyTorch3D)])[
+      #color-block(title: [Pixel #sym.arrow.r NDC mapping (PyTorch3D)])[
         For pixel indices `(x,y)` and pixel centers:
         $
           u = x + 0.5,\ v = y + 0.5,\ s = min(H, W).
@@ -661,19 +661,19 @@
           + `occupancy_bounds[6]` = union of snippet AABB + candidate PCs + semidense
       ]
       #quote-block[
-        Stride is a key compute knob: smaller stride = denser candidate PCs, but more GPU work in both unprojection and point↔mesh distances.
+        Stride is a key compute knob: smaller stride = denser candidate PCs, but more GPU work in both unprojection and point #sym.arrow.l.r mesh distances.
       ]
     ],
   )
 ]
 
 // ---------------------------------------------------------------------------
-// Oracle RRI (point↔mesh distances + normalization)
+// Oracle RRI (point<->mesh distances + normalization)
 // ---------------------------------------------------------------------------
 
 #section-slide(
   title: [Oracle RRI Metric],
-  subtitle: [Point↔mesh distances (accuracy + completeness) → normalized improvement],
+  subtitle: [Point #sym.arrow.l.r mesh distances (accuracy + completeness) #sym.arrow.r normalized improvement],
 )[
   #text(size: 16pt)[Implemented in `oracle_rri/oracle_rri/rri_metrics/`.]
 ]
@@ -688,7 +688,7 @@
     $
     - $bold(cal(P))_t$: semi-dense SLAM reconstruction up to time $t$
     - $bold(cal(P))_{t union bold(q)}$: merged reconstruction after backprojecting candidate depth hits
-    - $d(.,.)$: *bidirectional* point↔mesh distance
+    - $d(.,.)$: *bidirectional* point #sym.arrow.l.r mesh distance
   ]
 
   #quote-block(color: rgb("#285f82"))[
@@ -696,29 +696,29 @@
   ]
 ]
 
-#slide(title: [Point↔Mesh Distance: Accuracy + Completeness])[
+#slide(title: [Point #sym.arrow.l.r Mesh Distance: Accuracy + Completeness])[
   #grid(
     columns: (1fr, 1fr),
     gutter: 1cm,
     [
-      #color-block(title: [Accuracy (P → M)])[
+      #color-block(title: [Accuracy (P #sym.arrow.r M)])[
         Average distance from reconstruction points to the GT surface:
         $
           d_{bold(cal(P)) -> bold(cal(M))} =
           1/(|bold(cal(P))|) sum_{bold(p) in bold(cal(P))} min_{bold(x) in bold(cal(M))} ||bold(p) - bold(x)||_2^2.
         $
         - Detects *over-reconstruction* (spurious geometry).
-        - Implemented via PyTorch3D `point_face_distance` (point→triangle).
+        - Implemented via PyTorch3D `point_face_distance` (point #sym.arrow.r triangle).
       ]
     ],
     [
-      #color-block(title: [Completeness (M → P)])[
+      #color-block(title: [Completeness (M #sym.arrow.r P)])[
         Average distance from GT surface elements to the reconstruction:
         $
           d_{bold(cal(M)) -> bold(cal(P))} approx 1/(|bold(cal(F))|) sum_{bold(f) in bold(cal(F))} min_{bold(p) in bold(cal(P))} d(bold(f), bold(p))^2.
         $
         - Detects *under-reconstruction* (missing geometry).
-        - Implemented via PyTorch3D `face_point_distance` (triangle→point).
+        - Implemented via PyTorch3D `face_point_distance` (triangle #sym.arrow.r point).
       ]
     ],
   )
@@ -753,8 +753,8 @@
     [
       #color-block(title: [2) Compute distances])[
         PyTorch3D returns packed distances:
-        - point→face: `(P_tot,)` (each point to nearest triangle)
-        - face→point: `(F_tot,)` (each face to nearest point)
+        - point #sym.arrow.r face: `(P_tot,)` (each point to nearest triangle)
+        - face #sym.arrow.r point: `(F_tot,)` (each face to nearest point)
       ]
       #color-block(title: [3) Reduce per candidate])[
         ```python
@@ -866,7 +866,7 @@
     [
       #color-block(title: [Implementation location])[
         - Single adapter: `oracle_rri/oracle_rri/vin/backbone_evl.py`
-        - Returns a minimal “feature contract” so VIN stays insulated from upstream #EVL input/output changes.
+        - Returns a minimal \"feature contract\" so VIN stays insulated from upstream #EVL input/output changes.
       ]
       #quote-block[Keep all EFM key expectations inside the EVL adapter; patch one place if schema changes.]
     ],
@@ -912,7 +912,7 @@
     ],
     [
       #quote-block(color: rgb("#285f82"))[
-        If candidates use `view_direction_mode=radial_away`, then $bold(f)$ often aligns with $bold(u)$ (so $s≈-1$).
+        If candidates use `view_direction_mode=radial_away`, then $bold(f)$ often aligns with $bold(u)$ (so $s approx -1$).
       ]
     ],
   )
@@ -925,7 +925,7 @@
     [
       #color-block(title: [Scene features from EVL])[
         For each snippet:
-        - Run frozen #EVL once → `occ_feat`, `obb_feat`, `T_world_voxel`, `voxel_extent`.
+        - Run frozen #EVL once #sym.arrow.r `occ_feat`, `obb_feat`, `T_world_voxel`, `voxel_extent`.
         - Global context: mean + max pool over $(D,H,W)$ (occ and optionally obb).
       ]
       #color-block(title: [Candidate-conditioned query (current baseline)])[
@@ -935,7 +935,7 @@
           + `E_pose` (SH + radius FF + scalars)
           + `E_global` (pooled voxel context)
           + `E_local` (sampled voxel features)
-        - MLP → `CoralLayer` → logits.
+        - MLP #sym.arrow.r `CoralLayer` #sym.arrow.r logits.
       ]
     ],
     [
@@ -946,7 +946,7 @@
         - Pool (mean+max) with strict point-level validity masking
       ]
       #quote-block[
-        This approximates “what the candidate would see” without rendering, and stays compatible with EVL’s voxel
+        This approximates \"what the candidate would see\" without rendering, and stays compatible with EVL's voxel
         feature interface.
       ]
     ],
@@ -1010,7 +1010,7 @@
     columns: (1fr, 1fr),
     gutter: 0.9cm,
     [
-      #color-block(title: [Fit once: map scalar RRI → ordinal label])[
+      #color-block(title: [Fit once: map scalar RRI #sym.arrow.r ordinal label])[
         We fit a single global set of edges $bold(e) in bb(R)^{K-1}$ in clipped z-score space:
         $
           z = ("rri" - mu_s) / (sigma_s + epsilon), \
@@ -1075,7 +1075,7 @@
   )
 ]
 
-#slide(title: [Training Step: End-to-end labeler → VIN → loss])[
+#slide(title: [Training Step: End-to-end labeler #sym.arrow.r VIN #sym.arrow.r loss])[
   #grid(
     columns: (1fr, 1fr),
     gutter: 1cm,
@@ -1083,9 +1083,9 @@
       #color-block(title: [Data path (one optimizer step)])[
         1. Sample `EfmSnippetView` from `AseEfmDataset`.
         2. Run `OracleRriLabeler.run(sample)`:
-          + candidates → depth renders → backprojection → oracle #RRI
+          + candidates #sym.arrow.r depth renders #sym.arrow.r backprojection #sym.arrow.r oracle #RRI
         3. Convert #RRI to ordinal labels via fitted binner.
-        4. VIN forward (EVL frozen, head trainable) → CORAL logits.
+        4. VIN forward (EVL frozen, head trainable) #sym.arrow.r CORAL logits.
         5. Backprop CORAL loss over valid candidates only.
       ]
       #quote-block(color: rgb("#fc5555"))[
@@ -1114,7 +1114,7 @@
 #slide(title: [Open Questions (VIN design choices)])[
   #color-block(title: [Backbone features])[
     - Use only `occ_feat` or also `obb_feat` (semantics) for #RRI prediction?
-    - Compress voxel channels (1×1×1 conv) before pooling/sampling?
+    - Compress voxel channels (1x1x1 conv) before pooling/sampling?
   ]
   #color-block(title: [Candidate-conditioned query])[
     - Center sampling vs. frustum point sampling (rays/depths) vs. tiny CA over points?
@@ -1137,7 +1137,7 @@
   title: [Engineering Progress],
   subtitle: [Resolved issues and shipped tooling],
 )[
-  #text(size: 16pt)[Condensed from `docs/contents/todos.qmd` (resolved items + “Previously observed issues”).]
+  #text(size: 16pt)[Condensed from `docs/contents/todos.qmd` (resolved items + \"Previously observed issues\").]
 ]
 
 #slide(title: [Resolved Issues (High Impact)])[
@@ -1147,8 +1147,8 @@
   ]
   #color-block(title: [Correctness + reproducibility])[
     - Stabilized candidate indexing: rendered subset tracked via `CandidateDepths.candidate_indices`.
-    - Candidate PCs align with the GT mesh (PoseTW↔PyTorch3D extrinsics fixed).
-    - Candidate PCs match the rendered frusta (pixel-center→NDC backprojection fixed).
+    - Candidate PCs align with the GT mesh (PoseTW #sym.arrow.l.r PyTorch3D extrinsics fixed).
+    - Candidate PCs match the rendered frusta (pixel-center #sym.arrow.r NDC backprojection fixed).
     - Depth histograms no longer mislead (miss pixels masked via `depths_valid_mask`).
   ]
 ]
@@ -1159,22 +1159,22 @@
     gutter: 1cm,
     [
       #color-block(title: [Observed Issues])[
-        - Backprojected points “all lie in front” of the reference pose.
+        - Backprojected points \"all lie in front\" of the reference pose.
         - Depth maps invalid for candidates that look away from the reference.
-        - Frusta visualization didn’t match the backprojected points.
-        - “Look-through-walls” artefacts (points behind walls).
+        - Frusta visualization didn't match the backprojected points.
+        - \"Look-through-walls\" artefacts (points behind walls).
       ]
     ],
     [
       #color-block(title: [Root causes + fixes])[
-        - *PoseTW ↔ PyTorch3D extrinsics mismatch*:
-          + Fix camera extrinsics so rendering/unprojection uses the same world→camera mapping as `PoseTW`.
+        - *PoseTW #sym.arrow.l.r PyTorch3D extrinsics mismatch*:
+          + Fix camera extrinsics so rendering/unprojection uses the same world #sym.arrow.r camera mapping as `PoseTW`.
         - *Wrong unprojection space*:
           + Convert pixel centers `(x+0.5, y+0.5)` to NDC (min-side scaling) and unproject with `from_ndc=true`.
         - *Histogram semantics*:
           + Mask miss pixels (`depths_valid_mask`) when computing hit ratios / histograms / backprojection.
         - *Rig-basis vs display twist*:
-          + `rotate_yaw_cw90` is a fixed 90° twist about the pose-local `+Z` (forward) axis.
+          + `rotate_yaw_cw90` is a fixed 90#sym.degree twist about the pose-local `+Z` (forward) axis.
           + Apply it once as a rig-basis correction for candidate generation (otherwise azimuth/elevation look swapped).
           + Do not apply it again in candidate plotting: double-rotation becomes obvious once roll jitter is enabled.
       ]

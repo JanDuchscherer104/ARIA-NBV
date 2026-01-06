@@ -12,12 +12,14 @@ probabilities, not class marginals.
 == CORAL loss
 
 Let $r$ be the continuous RRI and $y$ the ordinal bin index. The CORAL targets
-are binary levels $t_k = 1[y > k]$. The per-sample loss is
+are binary levels $t_k = bb(1)[y > k]$. The per-sample loss is
 
 #block[
   #align(center)[
-    $ (#sym_loss)_("coral")(y, bold(p))
-      = - sum_(k=0)^(K-2) (t_k "log"(p_k) + (1 - t_k) "log"(1 - p_k)) $
+    $
+      #sym_loss _("coral")(y, bold(p))
+      = - sum_(k=0)^(K-2) t_k "log"(p_k) + (1 - t_k) "log"(1 - p_k)
+    $
   ]
 ]
 
@@ -26,7 +28,7 @@ marginal class probabilities:
 
 #block[
   #align(center)[
-    $ pi_k = p_{k-1} - p_k, quad p_{-1} = 1, quad p_{K-1} = 0 $
+    $ pi_k = p_(k-1) - p_k, quad p_(-1) = 1, quad p_(K-1) = 0 $
   ]
 ]
 
@@ -52,7 +54,7 @@ improve calibration. The final objective is
 
 #block[
   #align(center)[
-    $ #sym_loss = (#sym_loss)_("coral") + lambda dot (#sym_loss)_("reg") $
+    $ #sym_loss = #sym_loss _"coral" + lambda dot #sym_loss _"reg" $
   ]
 ]
 
