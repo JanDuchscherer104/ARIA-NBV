@@ -12,11 +12,24 @@ import streamlit as st
 import torch
 
 from ...configs import PathConfig
-from ...data import AseEfmDatasetConfig, EfmSnippetView
+from ...data import AseEfmDatasetConfig, EfmSnippetView, VinOracleCacheDatasetConfig
 from ...data.offline_cache import OracleRriCacheConfig, OracleRriCacheDataset, OracleRriCacheDatasetConfig
+from ...data.offline_cache_coverage import read_cache_index_entries
+from ...data.vin_snippet_cache import VinSnippetCacheConfig, VinSnippetCacheDatasetConfig
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...utils import Stage
 from ..state_types import config_signature
+
+BACKBONE_KEEP_FIELDS_FOR_STATS = [
+    "t_world_voxel",
+    "voxel_extent",
+    "occ_pr",
+    "occ_input",
+    "counts",
+    "cent_pr",
+    "free_input",
+    "pts_world",
+]
 
 
 def _load_efm_snippet_for_cache(
@@ -46,7 +59,6 @@ def _load_efm_snippet_for_cache(
 def _prepare_offline_cache_dataset(
     *,
     cache_dir: str | None,
-    map_location: str,
     paths: PathConfig,
     state: Any,
     stage: Stage | None,
@@ -66,7 +78,6 @@ def _prepare_offline_cache_dataset(
     cache_cfg = OracleRriCacheDatasetConfig(
         cache=OracleRriCacheConfig(cache_dir=Path(cache_dir), paths=paths),
         load_backbone=True,
-        map_location=map_location,
         split=split,
         include_efm_snippet=False,
         include_gt_mesh=False,
@@ -89,7 +100,6 @@ def _collect_offline_cache_stats(
     toml_path: str | None,
     stage: Stage,
     cache_dir: str | None,
-    map_location: str,
     max_samples: int | None,
     num_workers: int | None,
     train_val_split: float,
@@ -151,6 +161,43 @@ def _collect_offline_cache_stats(
         sign = torch.sign((left0 * up_cam).sum(dim=-1))
         return angle * sign
 
+    def _broadcast_ref_pose(
+        ref_rot: torch.Tensor,
+        ref_t: torch.Tensor,
+        target_rot: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Broadcast reference pose to match target leading dimensions."""
+        if ref_rot.ndim == 2:
+            ref_rot = ref_rot.unsqueeze(0)
+        if ref_t.ndim == 1:
+            ref_t = ref_t.unsqueeze(0)
+
+        target_shape = target_rot.shape[:-2]
+        ref_shape = ref_rot.shape[:-2]
+
+        if len(ref_shape) < len(target_shape):
+            pad = (1,) * (len(target_shape) - len(ref_shape))
+            ref_rot = ref_rot.reshape(ref_shape + pad + (3, 3))
+            ref_t = ref_t.reshape(ref_t.shape[:-1] + pad + (3,))
+            ref_shape = ref_rot.shape[:-2]
+
+        if len(ref_shape) != len(target_shape):
+            raise ValueError(
+                f"reference_pose_world_rig has incompatible batch dims {ref_shape} for target {target_shape}.",
+            )
+
+        expanded_shape = []
+        for ref_dim, target_dim in zip(ref_shape, target_shape, strict=True):
+            if ref_dim not in (1, target_dim):
+                raise ValueError(
+                    f"reference_pose_world_rig has incompatible batch dims {ref_shape} for target {target_shape}.",
+                )
+            expanded_shape.append(target_dim if ref_dim == 1 else ref_dim)
+
+        ref_rot = ref_rot.expand(*expanded_shape, 3, 3)
+        ref_t = ref_t.expand(*expanded_shape, 3)
+        return ref_rot, ref_t
+
     def _as_tensor(value: Any) -> torch.Tensor | None:
         if torch.is_tensor(value):
             return value
@@ -204,8 +251,6 @@ def _collect_offline_cache_stats(
     cfg.trainer_config.use_wandb = False
 
     dm_cfg = cfg.datamodule_config
-    dm_cfg.train_cache_new_samples_per_epoch = 0
-    dm_cfg.val_cache_new_samples_per_epoch = 0
 
     paths = cfg.paths if isinstance(cfg.paths, PathConfig) else PathConfig()
     cache_root = cache_dir or str(
@@ -214,11 +259,14 @@ def _collect_offline_cache_stats(
     cache_cfg = OracleRriCacheDatasetConfig(
         cache=OracleRriCacheConfig(cache_dir=Path(cache_root), paths=paths),
         load_backbone=True,
-        map_location=map_location,
+        backbone_keep_fields=BACKBONE_KEEP_FIELDS_FOR_STATS,
         train_val_split=train_val_split,
     )
-    dm_cfg.train_cache = cache_cfg.model_copy(deep=True, update={"split": "train"})
-    dm_cfg.val_cache = cache_cfg.model_copy(deep=True, update={"split": "val"})
+    dm_cfg.source = VinOracleCacheDatasetConfig(
+        cache=cache_cfg,
+        train_split="train",
+        val_split="val",
+    )
     dm_cfg.use_train_as_val = False
 
     if num_workers is not None and num_workers > 0:
@@ -246,10 +294,23 @@ def _collect_offline_cache_stats(
     candidate_rot_deg: list[np.ndarray] = []
 
     max_batches = None if max_samples in (None, 0) else int(max_samples)
+    raw_shapes: dict[str, str] | None = None
+    padded_shapes: dict[str, str] | None = None
+    dataset = getattr(dataloader, "dataset", None)
+    if isinstance(dataset, torch.utils.data.Dataset):
+        try:
+            raw_batch = dataset[0]
+        except Exception:
+            raw_batch = None
+        if raw_batch is not None and hasattr(raw_batch, "shape_summary"):
+            raw_shapes = raw_batch.shape_summary()
+
     progress = st.progress(0.0)
     for idx, batch in enumerate(dataloader):
         if max_batches is not None and idx >= max_batches:
             break
+        if idx == 0 and hasattr(batch, "shape_summary"):
+            padded_shapes = batch.shape_summary()
 
         rri = batch.rri.detach().flatten()
         rri_mask = torch.isfinite(rri)
@@ -323,22 +384,24 @@ def _collect_offline_cache_stats(
             t_wc = poses_world_cam.t
             r_wr = ref_pose.R
             t_wr = ref_pose.t
-            if r_wr.ndim == 2:
-                r_wr = r_wr.unsqueeze(0)
-                t_wr = t_wr.unsqueeze(0)
-            if r_wr.shape[0] == 1 and r_wc.shape[0] > 1:
-                r_wr = r_wr.expand(r_wc.shape[0], -1, -1)
-                t_wr = t_wr.expand(r_wc.shape[0], -1)
+            r_wr, t_wr = _broadcast_ref_pose(r_wr, t_wr, r_wc)
 
             r_rw = r_wr.transpose(-1, -2)
             t_rw = -(r_rw @ t_wr.unsqueeze(-1)).squeeze(-1)
             r_rc = r_rw @ r_wc
             t_rc = t_rw + (r_rw @ t_wc.unsqueeze(-1)).squeeze(-1)
 
-            candidate_offsets.append(t_rc.detach().cpu().numpy())
+            if t_rc.ndim > 2:
+                t_rc_flat = t_rc.reshape(-1, 3)
+                r_rc_flat = r_rc.reshape(-1, 3, 3)
+            else:
+                t_rc_flat = t_rc
+                r_rc_flat = r_rc
 
-            fwd = r_rc[:, :, 2]
-            up = r_rc[:, :, 1]
+            candidate_offsets.append(t_rc_flat.detach().cpu().numpy())
+
+            fwd = r_rc_flat[:, :, 2]
+            up = r_rc_flat[:, :, 1]
             yaw = torch.atan2(fwd[:, 0], fwd[:, 2])
             pitch = torch.asin(_normalise(fwd)[:, 1].clamp(-1.0, 1.0))
             up_ref = torch.tensor(
@@ -358,7 +421,7 @@ def _collect_offline_cache_stats(
             candidate_pitch.append(pitch_deg)
             candidate_roll.append(roll_deg)
 
-            trace = r_rc[:, 0, 0] + r_rc[:, 1, 1] + r_rc[:, 2, 2]
+            trace = r_rc_flat[:, 0, 0] + r_rc_flat[:, 1, 1] + r_rc_flat[:, 2, 2]
             cos_angle = ((trace - 1.0) * 0.5).clamp(-1.0, 1.0)
             rot_angle = torch.acos(cos_angle)
             candidate_rot_deg.append(
@@ -403,11 +466,201 @@ def _collect_offline_cache_stats(
         "candidate_rot_deg": np.concatenate(candidate_rot_deg, axis=0)
         if candidate_rot_deg
         else np.zeros((0,), dtype=np.float32),
+        "batch_shapes": {
+            "raw": raw_shapes,
+            "padded": padded_shapes,
+        },
+    }
+
+
+def _collect_vin_snippet_cache_stats(
+    *,
+    cache_dir: str | None,
+    map_location: str,
+    max_samples: int | None,
+    num_workers: int | None,
+) -> dict[str, Any]:
+    """Collect summary stats from a VIN snippet cache."""
+    paths = PathConfig()
+    cache_root = cache_dir or str(
+        (paths.offline_cache_dir or (paths.data_root / "oracle_rri_cache")) / "vin_snippet_cache",
+    )
+    cache_cfg = VinSnippetCacheDatasetConfig(
+        cache=VinSnippetCacheConfig(cache_dir=Path(cache_root), paths=paths),
+        map_location=map_location,
+        limit=None if max_samples in (None, 0) else int(max_samples),
+    )
+    dataset = cache_cfg.setup_target()
+
+    entries = read_cache_index_entries(cache_cfg.cache.index_path)
+    if cache_cfg.limit is not None:
+        entries = entries[: int(cache_cfg.limit)]
+
+    def _collate(items: list[Any]) -> Any:
+        return items[0]
+
+    loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=1,
+        num_workers=int(num_workers or 0),
+        persistent_workers=bool(num_workers),
+        collate_fn=_collate,
+    )
+
+    sample_rows: list[dict[str, Any]] = []
+    points_counts: list[int] = []
+    traj_lengths: list[int] = []
+    inv_std_values: list[float] = []
+    snippet_shapes: dict[str, str] | None = None
+
+    progress = st.progress(0.0)
+    total = len(dataset)
+    for idx, snippet in enumerate(loader):
+        if total:
+            progress.progress(min(1.0, float(idx + 1) / float(total)))
+        points_world = snippet.points_world
+        traj = snippet.t_world_rig
+        if idx == 0 and snippet_shapes is None:
+            snippet_shapes = {
+                "vin_snippet.points_world": str(tuple(points_world.shape)),
+                "vin_snippet.t_world_rig": str(tuple(traj.tensor().shape)),
+            }
+        points_count = int(points_world.shape[0])
+        traj_len = int(traj.shape[0])
+        points_counts.append(points_count)
+        traj_lengths.append(traj_len)
+
+        inv_std_mean = float("nan")
+        if points_count > 0 and points_world.shape[-1] >= 4:
+            inv_std = points_world[:, 3]
+            inv_std = inv_std[torch.isfinite(inv_std)]
+            if inv_std.numel() > 0:
+                inv_std_mean = float(inv_std.mean().item())
+                inv_std_values.append(inv_std_mean)
+
+        scene_id = entries[idx].scene_id if idx < len(entries) else ""
+        snippet_id = entries[idx].snippet_id if idx < len(entries) else ""
+        sample_rows.append(
+            {
+                "scene_id": scene_id,
+                "snippet_id": snippet_id,
+                "points_count": points_count,
+                "traj_len": traj_len,
+                "inv_dist_std_mean": inv_std_mean,
+            },
+        )
+    progress.empty()
+
+    def _safe_mean(values: list[int | float]) -> float:
+        if not values:
+            return float("nan")
+        return float(np.mean(values))
+
+    def _safe_median(values: list[int | float]) -> float:
+        if not values:
+            return float("nan")
+        return float(np.median(values))
+
+    summary = {
+        "samples": len(points_counts),
+        "points_mean": _safe_mean(points_counts),
+        "points_median": _safe_median(points_counts),
+        "traj_len_mean": _safe_mean(traj_lengths),
+        "traj_len_median": _safe_median(traj_lengths),
+        "inv_dist_std_mean": _safe_mean(inv_std_values),
+    }
+
+    return {
+        "summary": summary,
+        "sample_df": pd.DataFrame(sample_rows),
+        "points_counts": points_counts,
+        "traj_lengths": traj_lengths,
+        "inv_dist_std": inv_std_values,
+        "snippet_shapes": snippet_shapes,
+    }
+
+
+def _collect_vin_batch_shape_preview(
+    *,
+    toml_path: str | None,
+    stage: Stage,
+    oracle_cache_dir: str | None,
+    vin_cache_dir: str | None,
+    train_val_split: float,
+    num_workers: int | None,
+) -> dict[str, dict[str, str] | None]:
+    """Collect a lightweight shape preview for VIN batches."""
+    if oracle_cache_dir is None or vin_cache_dir is None:
+        return {"raw": None, "padded": None}
+
+    resolved_toml: Path | None = None
+    if toml_path:
+        try:
+            resolved = PathConfig().resolve_config_toml_path(
+                toml_path,
+                must_exist=False,
+            )
+        except ValueError:
+            resolved = None
+        else:
+            if resolved.exists():
+                resolved_toml = resolved
+
+    cfg = AriaNBVExperimentConfig.from_toml(resolved_toml) if resolved_toml is not None else AriaNBVExperimentConfig()
+    cfg.run_mode = "summarize_vin"
+    cfg.stage = stage
+    cfg.trainer_config.use_wandb = False
+
+    dm_cfg = cfg.datamodule_config
+    dm_cfg.source = VinOracleCacheDatasetConfig(
+        cache=OracleRriCacheDatasetConfig(
+            cache=OracleRriCacheConfig(cache_dir=Path(oracle_cache_dir), paths=cfg.paths),
+            load_backbone=True,
+            backbone_keep_fields=BACKBONE_KEEP_FIELDS_FOR_STATS,
+            train_val_split=train_val_split,
+            vin_snippet_cache=VinSnippetCacheConfig(cache_dir=Path(vin_cache_dir), paths=cfg.paths),
+            vin_snippet_cache_mode="auto",
+        ),
+        train_split="train",
+        val_split="val",
+    )
+    if num_workers is not None and num_workers > 0:
+        dm_cfg.num_workers = int(num_workers)
+    else:
+        dm_cfg.num_workers = 0
+
+    datamodule = dm_cfg.setup_target()
+    dataloader = datamodule.train_dataloader() if stage is Stage.TRAIN else datamodule.val_dataloader()
+
+    raw_shapes: dict[str, str] | None = None
+    padded_shapes: dict[str, str] | None = None
+
+    dataset = getattr(dataloader, "dataset", None)
+    if isinstance(dataset, torch.utils.data.Dataset):
+        try:
+            raw_batch = dataset[0]
+        except Exception:
+            raw_batch = None
+        if raw_batch is not None and hasattr(raw_batch, "shape_summary"):
+            raw_shapes = raw_batch.shape_summary()
+
+    try:
+        batch = next(iter(dataloader))
+    except StopIteration:
+        batch = None
+    if batch is not None and hasattr(batch, "shape_summary"):
+        padded_shapes = batch.shape_summary()
+
+    return {
+        "raw": raw_shapes,
+        "padded": padded_shapes,
     }
 
 
 __all__ = [
     "_collect_offline_cache_stats",
+    "_collect_vin_snippet_cache_stats",
+    "_collect_vin_batch_shape_preview",
     "_load_efm_snippet_for_cache",
     "_prepare_offline_cache_dataset",
 ]

@@ -249,14 +249,13 @@ def render_testing_attribution_page() -> None:
             st.error(f"Failed to load checkpoint: {type(exc).__name__}: {exc}")
             module = None
 
-    cache_map_location = "cpu"
     cache_ds = None
     cache_len = 0
     cache_idx = 0
     sample_count = 1
     if data_source == "Offline cache":
         cache_ds = attr_state.get("cache_ds")
-        cache_key = (cache_dir, cache_split, cache_map_location)
+        cache_key = (cache_dir, cache_split)
         cache_len = int(attr_state.get("cache_len", 0) or 0)
         cache_dir_path = Path(cache_dir).expanduser() if cache_dir else None
         if cache_dir_path is not None and cache_dir_path.exists():
@@ -265,7 +264,6 @@ def render_testing_attribution_page() -> None:
                     cache_cfg = OracleRriCacheDatasetConfig(
                         cache=OracleRriCacheConfig(cache_dir=cache_dir_path, paths=paths),
                         load_backbone=True,
-                        map_location=cache_map_location,
                         split=cache_split,
                         include_efm_snippet=False,
                         return_format="vin_batch",
@@ -458,7 +456,7 @@ def render_testing_attribution_page() -> None:
                                     scene_id=cache_sample.scene_id,
                                     snippet_id=cache_sample.snippet_id,
                                     dataset_payload=cache_ds.metadata.dataset_config,
-                                    device=cache_map_location,
+                                    device="cpu",
                                     paths=paths,
                                     include_gt_mesh=False,
                                 )

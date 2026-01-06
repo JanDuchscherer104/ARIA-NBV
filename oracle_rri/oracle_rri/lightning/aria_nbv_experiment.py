@@ -332,12 +332,24 @@ class AriaNBVExperimentConfig(BaseConfig):
             if trainer is None:
                 return None, None
             monitor_key = str(monitor)
+            suffixes = ("_epoch", "_step")
+
+            candidate_keys: list[str] = [monitor_key]
+            if any(monitor_key.endswith(suffix) for suffix in suffixes):
+                base_key = monitor_key.rsplit("_", 1)[0]
+                candidate_keys.append(base_key)
+            else:
+                candidate_keys.extend([f"{monitor_key}_epoch", f"{monitor_key}_step"])
+
             for source_name in ("callback_metrics", "logged_metrics", "progress_bar_metrics"):
                 metrics = getattr(trainer, source_name, None)
-                if metrics and monitor_key in metrics:
-                    metric_value = _coerce_metric(metrics.get(monitor_key))
-                    if metric_value is not None:
-                        return metric_value, source_name
+                if not metrics:
+                    continue
+                for key in candidate_keys:
+                    if key in metrics:
+                        metric_value = _coerce_metric(metrics.get(key))
+                        if metric_value is not None:
+                            return metric_value, source_name
             ckpt_callback = getattr(trainer, "checkpoint_callback", None)
             if ckpt_callback is not None:
                 metric_value = _coerce_metric(getattr(ckpt_callback, "best_model_score", None))
@@ -358,6 +370,10 @@ class AriaNBVExperimentConfig(BaseConfig):
         if self.trainer_config.use_wandb:
             self.trainer_config.wandb_config.group = "optuna"
             self.trainer_config.wandb_config.job_type = f"Opt:{self.run_name}"
+            tags = list(self.trainer_config.wandb_config.tags or [])
+            if "optuna" not in tags:
+                tags.append("optuna")
+            self.trainer_config.wandb_config.tags = tags
             console.log("W&B configured for Optuna study")
 
         study = self.optuna_config.setup_target()
@@ -394,6 +410,9 @@ class AriaNBVExperimentConfig(BaseConfig):
                 trainer, module, datamodule = experiment_config_copy.setup_target(
                     setup_stage=self.stage,
                     trial=trial,
+                )
+                experiment_config_copy._ensure_binner_matches_num_classes(
+                    datamodule=datamodule,
                 )
                 trainer.fit(module, datamodule=datamodule)
 
@@ -489,7 +508,9 @@ class AriaNBVExperimentConfig(BaseConfig):
         console: Console,
     ) -> None:
         """Enable offline cache for summary runs when available."""
-        if self.datamodule_config.train_cache is not None or self.datamodule_config.val_cache is not None:
+        from ..data.vin_oracle_datasets import VinOracleCacheDatasetConfig
+
+        if isinstance(self.datamodule_config.source, VinOracleCacheDatasetConfig):
             return
 
         cache_cfg = OracleRriCacheConfig(paths=self.paths)
@@ -517,23 +538,14 @@ class AriaNBVExperimentConfig(BaseConfig):
             )
             return
 
-        backbone_cfg = getattr(self.module_config.vin, "backbone", None)
-        if backbone_cfg is not None and getattr(backbone_cfg, "device", None) is not None:
-            map_location = str(backbone_cfg.device)
-        else:
-            map_location = "cpu"
-
         cache_dataset_cfg = OracleRriCacheDatasetConfig(
             cache=cache_cfg,
             load_backbone=True,
-            map_location=map_location,
         )
+        cache_source_cfg = VinOracleCacheDatasetConfig(cache=cache_dataset_cfg)
 
-        object.__setattr__(self.datamodule_config, "train_cache", cache_dataset_cfg)
-        object.__setattr__(self.datamodule_config, "val_cache", cache_dataset_cfg)
-        console.log(
-            f"Using offline oracle cache at {cache_cfg.cache_dir} (map_location={map_location}).",
-        )
+        object.__setattr__(self.datamodule_config, "source", cache_source_cfg)
+        console.log(f"Using offline oracle cache at {cache_cfg.cache_dir} (map_location=cpu).")
 
     def plot_vin_encodings(self) -> None:
         """Generate VIN encoding plots using real oracle batches."""

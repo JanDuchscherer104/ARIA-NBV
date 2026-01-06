@@ -25,6 +25,7 @@ class AdamWConfig(BaseConfig[Optimizer]):
             high=3e-4,
             log=True,
             description="AdamW learning rate.",
+            relies_on={"module_config.lr_scheduler.max_lr": (None,)},
         ),
     )
     """Learning rate for AdamW."""
@@ -108,9 +109,16 @@ class OneCycleSchedulerConfig(BaseConfig[OneCycleLR]):
     """OneCycle learning-rate scheduler configuration."""
 
     target: type[OneCycleLR] = Field(default_factory=lambda: OneCycleLR, exclude=True)
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
 
-    max_lr: float | None = None
+    max_lr: float | None = optimizable_field(
+        default=1e-4,
+        optimizable=Optimizable.continuous(
+            low=1e-5,
+            high=3e-3,
+            log=True,
+            description="OneCycleLR maximum learning rate.",
+        ),
+    )
     """Maximum learning rate in the cycle (defaults to optimizer LR)."""
 
     base_momentum: float = 0.85
@@ -119,13 +127,35 @@ class OneCycleSchedulerConfig(BaseConfig[OneCycleLR]):
     max_momentum: float = 0.95
     """Upper momentum boundary in the cycle."""
 
-    div_factor: float = 25.0
+    div_factor: float = optimizable_field(
+        default=25.0,
+        optimizable=Optimizable.continuous(
+            low=5.0,
+            high=50.0,
+            description="OneCycleLR div_factor (initial lr = max_lr / div_factor).",
+        ),
+    )
     """Initial learning rate = max_lr / div_factor."""
 
-    final_div_factor: float = 1e4
+    final_div_factor: float = optimizable_field(
+        default=1e4,
+        optimizable=Optimizable.continuous(
+            low=1e2,
+            high=1e5,
+            log=True,
+            description="OneCycleLR final_div_factor (final lr = max_lr / (div_factor * final_div_factor)).",
+        ),
+    )
     """Final learning rate = max_lr / (div_factor * final_div_factor)."""
 
-    pct_start: float = 0.3
+    pct_start: float = optimizable_field(
+        default=0.3,
+        optimizable=Optimizable.continuous(
+            low=0.05,
+            high=0.5,
+            description="Percentage of cycle spent increasing learning rate.",
+        ),
+    )
     """Percentage of cycle spent increasing learning rate."""
 
     anneal_strategy: Literal["cos", "linear"] = "cos"

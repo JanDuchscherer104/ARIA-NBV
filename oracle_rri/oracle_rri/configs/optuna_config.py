@@ -105,6 +105,19 @@ class OptunaConfig(BaseConfig):
                     return opt
             return None
 
+        def resolve_path(path: str) -> Any:
+            obj: Any = experiment_config
+            for part in path.split("."):
+                if obj is None:
+                    return None
+                if isinstance(obj, BaseConfig):
+                    obj = getattr(obj, part, None)
+                elif isinstance(obj, dict):
+                    obj = obj.get(part)
+                else:
+                    return None
+            return obj
+
         def visit(
             value: Any,
             *,
@@ -116,7 +129,12 @@ class OptunaConfig(BaseConfig):
             optimizable = _extract_optimizable(field_info, value)
             if optimizable is not None:
                 param_name = path or optimizable.name or "param"
-                suggestion = optimizable.suggest(trial, param_name)
+                suggestion = optimizable.suggest(
+                    trial,
+                    param_name,
+                    current_value=value,
+                    value_lookup=resolve_path,
+                )
                 setter(suggestion)
                 serialized = optimizable.serialize(suggestion)
                 self.suggested_params[param_name] = serialized

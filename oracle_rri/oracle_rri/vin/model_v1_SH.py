@@ -978,7 +978,7 @@ class VinModel(nn.Module):
             token_valid,
             min_valid_frac=self.config.candidate_min_valid_frac,
         )
-        valid_frac = token_valid.float().mean(dim=-1, keepdim=True)
+        voxel_valid_frac = token_valid.float().mean(dim=-1, keepdim=True)
 
         feats = torch.cat(parts, dim=-1)
         feats = feats * candidate_valid.to(dtype=feats.dtype).unsqueeze(-1)
@@ -993,7 +993,8 @@ class VinModel(nn.Module):
             expected=expected,
             expected_normalized=expected_norm,
             candidate_valid=candidate_valid,
-            valid_frac=valid_frac.squeeze(-1),
+            voxel_valid_frac=voxel_valid_frac.squeeze(-1),
+            semidense_valid_frac=None,
         )
 
         if not return_debug:
@@ -1020,7 +1021,7 @@ class VinModel(nn.Module):
             tokens=tokens,
             token_valid=token_valid,
             candidate_valid=candidate_valid,
-            valid_frac=valid_frac,
+            voxel_valid_frac=voxel_valid_frac,
             feats=feats,
         )
         return pred, debug

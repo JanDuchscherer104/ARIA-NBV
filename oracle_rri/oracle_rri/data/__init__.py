@@ -15,13 +15,14 @@ from .efm_views import (  # noqa: E402
 )
 from .metadata import ASEMetadata, SceneMetadata
 from .offline_cache import (
-    OracleRriCacheAppender,
-    OracleRriCacheAppenderConfig,
     OracleRriCacheDataset,
     OracleRriCacheDatasetConfig,
+    OracleRriCacheVinDataset,
     OracleRriCacheWriter,
     OracleRriCacheWriterConfig,
 )
+from .vin_oracle_datasets import VinOracleCacheDatasetConfig, VinOracleDatasetConfig, VinOracleOnlineDatasetConfig
+from .vin_oracle_types import VinOracleBatch
 from .vin_snippet_cache import (
     VinSnippetCacheConfig,
     VinSnippetCacheDataset,
@@ -37,12 +38,15 @@ __all__ = [
     "ASEDownloaderConfig",
     "AseEfmDataset",
     "AseEfmDatasetConfig",
-    "OracleRriCacheAppender",
-    "OracleRriCacheAppenderConfig",
     "OracleRriCacheDataset",
     "OracleRriCacheDatasetConfig",
+    "OracleRriCacheVinDataset",
     "OracleRriCacheWriter",
     "OracleRriCacheWriterConfig",
+    "VinOracleBatch",
+    "VinOracleCacheDatasetConfig",
+    "VinOracleDatasetConfig",
+    "VinOracleOnlineDatasetConfig",
     "VinSnippetCacheConfig",
     "VinSnippetCacheDataset",
     "VinSnippetCacheDatasetConfig",

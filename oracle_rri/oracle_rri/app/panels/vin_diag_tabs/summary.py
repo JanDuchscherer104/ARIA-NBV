@@ -7,6 +7,7 @@ import plotly.express as px
 import streamlit as st
 import torch
 
+from ....data.efm_views import VinSnippetView
 from ....vin.model_v2 import FIELD_CHANNELS_V2
 from ..common import _info_popover, _pretty_label, _strip_ansi
 from ..plot_utils import _histogram_overlay, _parameter_distribution, _to_numpy
@@ -24,6 +25,24 @@ def render_summary_tab(ctx: VinDiagContext) -> None:
     pred = ctx.pred
     batch = ctx.batch
     cfg = ctx.cfg
+
+    cache_label = "online (oracle labeler)"
+    if ctx.use_offline_cache:
+        cache_label = "offline: Oracle RRI cache"
+        if isinstance(batch.efm_snippet_view, VinSnippetView):
+            cache_label = "offline: VIN snippet cache"
+        else:
+            offline_cache = getattr(state, "offline_cache", None)
+            if offline_cache is not None:
+                cache_cfg = getattr(offline_cache, "config", None)
+                if cache_cfg is not None:
+                    has_vin_cache = cache_cfg.vin_snippet_cache is not None
+                    mode = getattr(cache_cfg, "vin_snippet_cache_mode", "auto")
+                    if has_vin_cache and mode != "disabled":
+                        cache_label = "offline: VIN snippet cache"
+        if batch.efm_snippet_view is None:
+            cache_label = f"{cache_label} (snippet detached)"
+    st.caption(f"Data source: {cache_label}")
 
     if batch.rri is not None:
         _info_popover(

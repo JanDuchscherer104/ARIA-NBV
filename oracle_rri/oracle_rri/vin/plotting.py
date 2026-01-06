@@ -16,6 +16,7 @@ import plotly.io as pio
 import seaborn as sns
 import torch
 from e3nn import o3  # type: ignore[import-untyped]
+from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 from plotly import colors as plotly_colors  # type: ignore[import-untyped]
 from plotly.subplots import make_subplots  # type: ignore[import-untyped]
@@ -328,6 +329,10 @@ def _candidate_valid_fraction(debug: VinForwardDiagnostics) -> torch.Tensor:
     token_valid = getattr(debug, "token_valid", None)
     if isinstance(token_valid, torch.Tensor):
         return token_valid.float().mean(dim=-1)
+
+    voxel_valid_frac = getattr(debug, "voxel_valid_frac", None)
+    if isinstance(voxel_valid_frac, torch.Tensor):
+        return voxel_valid_frac.float()
 
     candidate_valid = getattr(debug, "candidate_valid", None)
     if isinstance(candidate_valid, torch.Tensor):
@@ -1399,15 +1404,21 @@ def build_frustum_samples_figure(
     if candidate_index >= token_valid.shape[0]:
         return go.Figure()
 
-    if num_cams == token_valid.shape[0]:
-        points = points_world_flat[candidate_index]
-    else:
-        points = points_world_flat[0]
+    if num_cams == 0:
+        return go.Figure()
+    cam_idx = min(max(int(candidate_index), 0), num_cams - 1)
+    points = points_world_flat[cam_idx]
 
     valid = token_valid[candidate_index].reshape(-1).detach().cpu().numpy()
     points_np = points.detach().cpu().numpy()
 
-    fig = go.Figure()
+    frustum_pose = _pose_from_p3d_camera(p3d_cameras, cam_idx)
+    frustum_cam = _camera_tw_from_p3d(p3d_cameras, cam_idx)
+    builder = _frustum_builder_stub(
+        frustum_pose,
+        title=_pretty_label("Frustum samples (world) colored by token validity"),
+    )
+    fig = builder.fig if builder is not None else go.Figure()
     if points_np.shape[0] > 0:
         fig.add_trace(
             _scatter3d(
@@ -1427,13 +1438,106 @@ def build_frustum_samples_figure(
                 opacity=0.4,
             ),
         )
+        if builder is not None:
+            builder._update_scene_ranges(points_np)
+
+    if builder is not None and frustum_cam is not None and frustum_pose is not None:
+        frustum_scale = float(max(depths_m) if depths_m else 1.0)
+        builder._add_frusta_for_poses(
+            cams=frustum_cam,
+            poses=frustum_pose,
+            scale=frustum_scale,
+            color="#ff4d4d",
+            name="candidate frustum",
+            max_frustums=None,
+            include_axes=False,
+            include_center=True,
+        )
 
     fig.update_layout(
         title=_pretty_label("Frustum samples (world) colored by token validity"),
-        scene={"aspectmode": "data"},
+        scene=dict(aspectmode="data", **(builder.scene_ranges if builder is not None else {})),
         margin={"l": 0, "r": 0, "t": 40, "b": 0},
     )
     return fig
+
+
+@dataclass(slots=True)
+class _FrustumTrajectoryStub:
+    t_world_rig: PoseTW
+
+
+@dataclass(slots=True)
+class _FrustumSnippetStub:
+    trajectory: _FrustumTrajectoryStub
+    mesh: None = None
+    semidense: None = None
+
+
+def _frustum_builder_stub(
+    pose_world_cam: PoseTW | None,
+    *,
+    title: str,
+    height: int = 560,
+) -> SnippetPlotBuilder | None:
+    if pose_world_cam is None:
+        return None
+    snippet_stub = _FrustumSnippetStub(_FrustumTrajectoryStub(t_world_rig=pose_world_cam))
+    return SnippetPlotBuilder.from_snippet(
+        snippet_stub,  # type: ignore[arg-type]
+        title=title,
+        height=height,
+    )
+
+
+def _select_p3d_param(param: torch.Tensor | None, index: int) -> torch.Tensor | None:
+    if param is None:
+        return None
+    if param.ndim == 1:
+        return param
+    if param.shape[0] == 1:
+        return param[0]
+    return param[min(max(index, 0), param.shape[0] - 1)]
+
+
+def _camera_tw_from_p3d(cameras: PerspectiveCameras, index: int) -> CameraTW | None:
+    if int(cameras.R.shape[0]) == 0:
+        return None
+    focal = _select_p3d_param(cameras.focal_length, index)
+    principal = _select_p3d_param(cameras.principal_point, index)
+    image_size = _select_p3d_param(cameras.image_size, index)
+    if focal is None or principal is None or image_size is None:
+        return None
+
+    focal = focal.reshape(-1)
+    principal = principal.reshape(-1)
+    image_size = image_size.reshape(-1)
+    if focal.numel() != 2 or principal.numel() != 2 or image_size.numel() != 2:
+        return None
+
+    height = image_size[0].reshape(1)
+    width = image_size[1].reshape(1)
+    params = torch.stack((focal[0], focal[1], principal[0], principal[1]), dim=0)
+
+    return CameraTW.from_surreal(
+        width=width,
+        height=height,
+        type_str="Pinhole",
+        params=params,
+    )
+
+
+def _pose_from_p3d_camera(cameras: PerspectiveCameras, index: int) -> PoseTW | None:
+    if int(cameras.R.shape[0]) == 0:
+        return None
+    rot = _select_p3d_param(cameras.R, index)
+    trans = _select_p3d_param(cameras.T, index)
+    if rot is None or trans is None:
+        return None
+    rot = rot.reshape(3, 3)
+    trans = trans.reshape(3)
+    t_wc = -(rot @ trans.unsqueeze(-1)).squeeze(-1)
+    return PoseTW.from_Rt(rot, t_wc)
 
 
 def build_semidense_projection_figure(
@@ -1442,6 +1546,9 @@ def build_semidense_projection_figure(
     p3d_cameras: PerspectiveCameras,
     candidate_index: int,
     max_points: int = 20000,
+    show_frustum: bool = False,
+    frustum_scale: float | None = None,
+    frustum_color: str = "#ff4d4d",
 ) -> go.Figure:
     """Plot semidense points colored by whether they project inside the candidate view."""
     if points_world.ndim == 2:
@@ -1456,17 +1563,36 @@ def build_semidense_projection_figure(
     num_cams = int(cam.R.shape[0])
     if num_cams == 0:
         return go.Figure()
-    if num_cams > 1:
+    in_ndc = getattr(cam, "in_ndc", False)
+    if callable(in_ndc):
+        in_ndc = in_ndc()
+    needs_rebuild = not hasattr(cam, "_in_ndc")
+
+    def _ensure_batch(param: torch.Tensor | None) -> torch.Tensor | None:
+        if param is None:
+            return None
+        if param.ndim == 1:
+            return param.unsqueeze(0)
+        return param
+
+    if num_cams > 1 or needs_rebuild:
         idx = min(int(candidate_index), num_cams - 1)
+        rot = cam.R[idx : idx + 1] if num_cams > 1 else cam.R
+        trans = cam.T[idx : idx + 1] if num_cams > 1 else cam.T
         cam = PerspectiveCameras(
             device=cam.device,
-            R=cam.R[idx : idx + 1],
-            T=cam.T[idx : idx + 1],
-            focal_length=cam.focal_length[idx : idx + 1],
-            principal_point=cam.principal_point[idx : idx + 1],
-            image_size=cam.image_size[idx : idx + 1] if cam.image_size is not None else None,
-            in_ndc=cam.in_ndc,
+            R=_ensure_batch(rot),
+            T=_ensure_batch(trans),
+            focal_length=_ensure_batch(cam.focal_length[idx : idx + 1] if num_cams > 1 else cam.focal_length),
+            principal_point=_ensure_batch(
+                cam.principal_point[idx : idx + 1] if num_cams > 1 else cam.principal_point,
+            ),
+            image_size=_ensure_batch(cam.image_size[idx : idx + 1] if num_cams > 1 else cam.image_size)
+            if cam.image_size is not None
+            else None,
+            in_ndc=bool(in_ndc),
         )
+    cam_idx = 0
 
     pts_world = points_world[0]
     if pts_world.shape[-1] > 3:
@@ -1484,11 +1610,19 @@ def build_semidense_projection_figure(
     h = image_size[:, 0].unsqueeze(1)
     w = image_size[:, 1].unsqueeze(1)
     finite = torch.isfinite(pts_screen).all(dim=-1)
-    valid = finite & (z > 0.0) & (x >= 0.0) & (y >= 0.0) & (x <= (w - 1.0)) & (y <= (h - 1.0))
-    valid = valid.squeeze(0).detach().cpu().numpy()
+    valid_mask = finite & (z > 0.0) & (x >= 0.0) & (y >= 0.0) & (x <= (w - 1.0)) & (y <= (h - 1.0))
+    valid = valid_mask.squeeze(0).detach().cpu().numpy()
     pts_np = pts_world.detach().cpu().numpy()
 
-    fig = go.Figure()
+    frustum_pose = _pose_from_p3d_camera(cam, cam_idx) if show_frustum else None
+    frustum_cam = _camera_tw_from_p3d(cam, cam_idx) if show_frustum else None
+    builder = None
+    if show_frustum:
+        builder = _frustum_builder_stub(
+            frustum_pose,
+            title=_pretty_label("Semidense points colored by candidate visibility"),
+        )
+    fig = builder.fig if builder is not None else go.Figure()
     if pts_np.shape[0] > 0:
         fig.add_trace(
             _scatter3d(
@@ -1508,10 +1642,30 @@ def build_semidense_projection_figure(
                 opacity=0.3,
             ),
         )
+        if builder is not None:
+            builder._update_scene_ranges(pts_np)
+
+    if builder is not None and frustum_cam is not None and frustum_pose is not None:
+        scale = float(frustum_scale) if frustum_scale is not None else 1.0
+        if frustum_scale is None and bool(valid_mask.any().item()):
+            z_valid = z[valid_mask]
+            if z_valid.numel() > 0:
+                scale = float(z_valid.mean().item())
+        scale = max(0.1, scale)
+        builder._add_frusta_for_poses(
+            cams=frustum_cam,
+            poses=frustum_pose,
+            scale=scale,
+            color=frustum_color,
+            name="candidate frustum",
+            max_frustums=None,
+            include_axes=False,
+            include_center=True,
+        )
 
     fig.update_layout(
         title=_pretty_label("Semidense points colored by candidate visibility"),
-        scene={"aspectmode": "data"},
+        scene=dict(aspectmode="data", **(builder.scene_ranges if builder is not None else {})),
         margin={"l": 0, "r": 0, "t": 40, "b": 0},
     )
     return fig

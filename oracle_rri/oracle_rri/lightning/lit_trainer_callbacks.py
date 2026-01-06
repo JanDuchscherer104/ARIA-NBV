@@ -159,6 +159,11 @@ class TrainerCallbacksConfig(BaseConfig[list]):
                     "Optuna trial provided but use_optuna_pruning is False. Enabling use_optuna_pruning.",
                 )
                 object.__setattr__(self, "use_optuna_pruning", True)
+        elif self.use_optuna_pruning:
+            console.warn(
+                "use_optuna_pruning=True but no Optuna trial provided; disabling pruning.",
+            )
+            object.__setattr__(self, "use_optuna_pruning", False)
 
         if self.use_model_checkpoint:
             dirpath = self.checkpoint_dir if self.checkpoint_dir is not None else PathConfig().checkpoints

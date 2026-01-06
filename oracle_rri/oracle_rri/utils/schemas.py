@@ -25,11 +25,13 @@ class Stage(StrEnum):
     @classmethod
     def from_str(cls, value: str | Self) -> Self:
         """Map strings (e.g. "fit", "validate") back to Stage members."""
+        value = value.lower().strip() if isinstance(value, str) else value
         if isinstance(value, cls):
             return value
         alias_map: dict[str, Self] = {
             "fit": cls.TRAIN,
             "validate": cls.VAL,
+            "valid": cls.VAL,
         }
         if value in alias_map:
             return alias_map[value]

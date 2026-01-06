@@ -140,6 +140,39 @@ class CLIVinSnippetCacheBuildConfig(BaseConfig):
     overwrite: bool = False
     """Allow overwriting an existing VIN snippet cache index."""
 
+    resume: bool = True
+    """Reuse existing cache entries when the index already exists."""
+
+    num_workers: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("num-workers", "num_workers"),
+    )
+    """Optional DataLoader worker count for building VIN snippets."""
+
+    persistent_workers: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices("persistent-workers", "persistent_workers"),
+    )
+    """Whether to keep DataLoader workers alive between batches."""
+
+    prefetch_factor: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("prefetch-factor", "prefetch_factor"),
+    )
+    """Optional DataLoader prefetch factor when num_workers > 0."""
+
+    use_dataloader: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("use-dataloader", "use_dataloader"),
+    )
+    """Force DataLoader usage even when num_workers=0."""
+
+    skip_missing_snippets: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("skip-missing-snippets", "skip_missing_snippets"),
+    )
+    """Skip missing snippets instead of treating them as hard failures."""
+
     verbosity: Verbosity = Verbosity.NORMAL
     """Verbosity level for logging progress."""
 
@@ -175,12 +208,10 @@ def _iter_cached_rri(
     cache_cfg: OracleRriCacheConfig,
     *,
     limit: int | None,
-    map_location: str,
 ) -> tuple[OracleRriCacheDataset, Iterator[tuple[torch.Tensor, dict[str, str]]]]:
     dataset_cfg = OracleRriCacheDatasetConfig(
         cache=cache_cfg,
         load_backbone=False,
-        map_location=map_location,
         limit=limit,
     )
     dataset = OracleRriCacheDataset(dataset_cfg)
@@ -205,7 +236,6 @@ def _maybe_fit_binner(
     dataset, rri_batches = _iter_cached_rri(
         cache_cfg,
         limit=max_samples,
-        map_location="cpu",
     )
     first = next(rri_batches, None)
     if first is None:
@@ -245,7 +275,7 @@ def main(argv: list[str] | None = None) -> None:
         overrides.pop("config_path", None)
         merged = _merge_with_toml(base_cfg, overrides)
         cfg = AriaNBVExperimentConfig.model_validate(merged)
-    cfg.datamodule_config.labeler.inspect()
+    cfg.datamodule_config.source.inspect()
     cfg.module_config.inspect()
     try:
         cfg.run()
@@ -357,13 +387,15 @@ def cache_vin_snippets_main(argv: list[str] | None = None) -> None:
             )
     config_path = paths.resolve_config_toml_path(config_path, must_exist=True)
     exp_cfg = AriaNBVExperimentConfig.from_toml(config_path)
-    if exp_cfg.datamodule_config.train_cache is None:
-        raise ValueError("datamodule_config.train_cache must be set to build a VIN snippet cache.")
+    from ..data.vin_oracle_datasets import VinOracleCacheDatasetConfig
 
-    train_cache = exp_cfg.datamodule_config.train_cache
-    source_cache = train_cache.cache
+    if not isinstance(exp_cfg.datamodule_config.source, VinOracleCacheDatasetConfig):
+        raise ValueError("datamodule_config.source must be an offline cache to build a VIN snippet cache.")
 
-    out_cache = train_cache.vin_snippet_cache
+    source_cfg = exp_cfg.datamodule_config.source
+    source_cache = source_cfg.cache.cache
+
+    out_cache = source_cfg.cache.vin_snippet_cache
     if cli_cfg.cache_dir is not None:
         out_cache = VinSnippetCacheConfig(cache_dir=cli_cfg.cache_dir, paths=exp_cfg.paths)
     elif out_cache is None:
@@ -372,18 +404,32 @@ def cache_vin_snippets_main(argv: list[str] | None = None) -> None:
             paths=exp_cfg.paths,
         )
         console.warn(
-            f"datamodule_config.train_cache.vin_snippet_cache not set; using {out_cache.cache_dir}",
+            f"datamodule_config.source.cache.vin_snippet_cache not set; using {out_cache.cache_dir}",
         )
 
-    overwrite_set = "overwrite" in cli_cfg.model_fields_set
     overwrite = bool(cli_cfg.overwrite)
-    if not overwrite_set and not overwrite and out_cache.index_path.exists():
-        console.warn("VIN snippet cache index exists; enabling overwrite=True for this run.")
-        overwrite = True
+    resume = bool(cli_cfg.resume)
 
     semidense_max_points = cli_cfg.semidense_max_points
     if semidense_max_points is None:
-        semidense_max_points = train_cache.semidense_max_points
+        semidense_max_points = source_cfg.cache.semidense_max_points
+
+    datamodule_cfg = exp_cfg.datamodule_config
+    num_workers = datamodule_cfg.num_workers
+    if "num_workers" in cli_cfg.model_fields_set and cli_cfg.num_workers is not None:
+        num_workers = cli_cfg.num_workers
+    persistent_workers = datamodule_cfg.persistent_workers
+    if "persistent_workers" in cli_cfg.model_fields_set and cli_cfg.persistent_workers is not None:
+        persistent_workers = cli_cfg.persistent_workers
+    prefetch_factor = None
+    if "prefetch_factor" in cli_cfg.model_fields_set:
+        prefetch_factor = cli_cfg.prefetch_factor
+    use_dataloader = False
+    if "use_dataloader" in cli_cfg.model_fields_set:
+        use_dataloader = bool(cli_cfg.use_dataloader)
+    skip_missing_snippets = True
+    if "skip_missing_snippets" in cli_cfg.model_fields_set:
+        skip_missing_snippets = bool(cli_cfg.skip_missing_snippets)
 
     writer_cfg = VinSnippetCacheWriterConfig(
         paths=exp_cfg.paths,
@@ -392,8 +438,15 @@ def cache_vin_snippets_main(argv: list[str] | None = None) -> None:
         split=cli_cfg.split,
         max_samples=cli_cfg.max_samples,
         semidense_max_points=semidense_max_points,
+        include_obs_count=source_cfg.cache.semidense_include_obs_count,
         map_location=cli_cfg.map_location,
         overwrite=overwrite,
+        resume=resume,
+        use_dataloader=use_dataloader,
+        num_workers=num_workers,
+        persistent_workers=persistent_workers,
+        prefetch_factor=prefetch_factor,
+        skip_missing_snippets=skip_missing_snippets,
         verbosity=cli_cfg.verbosity,
     )
     writer_cfg.setup_target().run()

@@ -63,7 +63,7 @@ def render_tokens_tab(ctx: VinDiagContext) -> None:
         expected_k = grid_size * grid_size * num_depths
         if int(token_norm.numel()) != expected_k:
             st.warning(
-                "Token count does not match grid_size² × num_depths; skipping grid view.",
+                "Token count does not match grid_size² x num_depths; skipping grid view.",
             )
         else:
             token_norm = token_norm.view(num_depths, grid_size, grid_size)
@@ -126,6 +126,7 @@ def render_tokens_tab(ctx: VinDiagContext) -> None:
                         points_world,
                         p3d_cameras=batch.p3d_cameras,
                         candidate_index=int(cand_idx),
+                        show_frustum=True,
                     ),
                     width="stretch",
                 )

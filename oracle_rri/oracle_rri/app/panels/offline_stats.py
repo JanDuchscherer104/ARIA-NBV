@@ -22,13 +22,24 @@ from ...data.offline_cache_coverage import (
     scan_dataset_snippets,
     snippets_by_scene,
 )
+from ...data.offline_cache_store import _extract_snippet_token
+from ...data.offline_cache_store import _read_metadata as _read_cache_metadata
+from ...data.vin_oracle_datasets import (
+    VinOracleCacheDatasetConfig,
+    VinOracleOnlineDatasetConfig,
+)
+from ...data.vin_snippet_cache import read_vin_snippet_cache_metadata
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...pose_generation.plotting import plot_position_polar
 from ...rri_metrics.rri_binning import RriOrdinalBinner
 from ...utils import Stage
 from ...vin.plotting import DEFAULT_PLOT_CFG
 from .common import _info_popover, _pretty_label, _report_exception
-from .offline_cache_utils import _collect_offline_cache_stats
+from .offline_cache_utils import (
+    _collect_offline_cache_stats,
+    _collect_vin_batch_shape_preview,
+    _collect_vin_snippet_cache_stats,
+)
 from .plot_utils import _histogram_overlay, _plot_hist_counts_mpl
 
 matplotlib.use("Agg")
@@ -55,9 +66,25 @@ def render_offline_stats_page() -> None:
 
     with st.sidebar.form("vin_offline_stats_form"):
         st.subheader("Offline stats")
-        toml_path = st.text_input(
+        paths = PathConfig()
+        config_dir = paths.configs_dir
+        config_paths = sorted(
+            config_dir.glob("*.toml"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        toml_options = ["(none)"] + [path.name for path in config_paths]
+        toml_choice = st.selectbox(
             "Experiment config TOML",
-            value=str(Path(".configs") / "offline_only.toml"),
+            options=toml_options,
+            index=0,
+        )
+        toml_path = "" if toml_choice == "(none)" else str(config_dir / toml_choice)
+        cache_kind = st.selectbox(
+            "Cache type",
+            options=["oracle_rri_cache", "vin_snippet_cache"],
+            format_func=lambda k: "Oracle RRI cache" if k == "oracle_rri_cache" else "VIN snippet cache",
+            key="vin_offline_cache_kind",
         )
         stage = st.selectbox(
             "Stage",
@@ -65,16 +92,21 @@ def render_offline_stats_page() -> None:
             format_func=lambda s: s.value,
             key="vin_offline_stage",
         )
-        cache_dir = st.text_input(
-            "Offline cache dir",
-            value=str(PathConfig().offline_cache_dir),
+        cache_dir = (
+            PathConfig().offline_cache_dir
+            if cache_kind == "oracle_rri_cache"
+            else PathConfig().offline_cache_dir / "vin_snippet_cache"
         )
-        map_location = st.selectbox(
-            "Cache map_location",
-            options=["cpu", "cuda"],
-            index=0,
-            key="vin_offline_map_location",
-        )
+        map_location = "cpu"
+        if cache_kind == "vin_snippet_cache":
+            map_location = st.selectbox(
+                "Cache map_location",
+                options=["cpu", "cuda"],
+                index=0,
+                key="vin_offline_map_location",
+            )
+        else:
+            st.caption("Oracle cache loads always use CPU map_location.")
         max_samples = st.number_input(
             "Max samples (0 = all)",
             min_value=0,
@@ -97,6 +129,8 @@ def render_offline_stats_page() -> None:
             step=0.05,
             key="vin_offline_train_val_split",
         )
+        if cache_kind == "vin_snippet_cache":
+            st.caption("Train/val split is ignored for VIN snippet cache stats.")
         run_stats = st.form_submit_button("Compute offline stats")
 
         st.divider()
@@ -124,8 +158,12 @@ def render_offline_stats_page() -> None:
         val_index_path = cache_path / "val_index.jsonl"
         samples_dir = cache_path / "samples"
         index_entries = read_cache_index_entries(index_path)
-        train_entries = read_cache_index_entries(train_index_path)
-        val_entries = read_cache_index_entries(val_index_path)
+        if cache_kind == "oracle_rri_cache":
+            train_entries = read_cache_index_entries(train_index_path)
+            val_entries = read_cache_index_entries(val_index_path)
+        else:
+            train_entries = index_entries
+            val_entries = []
         index_count = len(index_entries)
         train_count = len(train_entries)
         val_count = len(val_entries)
@@ -135,7 +173,7 @@ def render_offline_stats_page() -> None:
             if train_count or val_count:
                 counts_label += f" · Train: {train_count} · Val: {val_count}"
             st.caption(counts_label)
-        if sample_count > index_count:
+        if sample_count > index_count and cache_kind == "oracle_rri_cache":
             st.warning(
                 "Cache index has fewer entries than sample files. "
                 "Offline stats only read index.jsonl; rebuild the index to include all samples.",
@@ -181,6 +219,7 @@ def render_offline_stats_page() -> None:
 
     cfg_key = "|".join(
         [
+            cache_kind,
             toml_path.strip(),
             stage.value,
             cache_dir.strip(),
@@ -193,6 +232,7 @@ def render_offline_stats_page() -> None:
 
     coverage_cfg_key = "|".join(
         [
+            cache_kind,
             toml_path.strip(),
             stage.value,
             cache_dir.strip(),
@@ -258,9 +298,44 @@ def render_offline_stats_page() -> None:
         else:
             try:
                 with st.spinner("Scanning dataset shards + cache indices..."):
-                    cfg, _ = _resolve_experiment_config()
+                    cfg, paths = _resolve_experiment_config()
                     dm_cfg = cfg.datamodule_config
-                    dataset_cfg = dm_cfg.train_dataset if stage is Stage.TRAIN else dm_cfg.val_dataset
+                    source_cfg = dm_cfg.source
+                    split_stage = stage
+                    if stage is not Stage.TRAIN and dm_cfg.use_train_as_val:
+                        split_stage = Stage.TRAIN
+
+                    dataset_cfg = None
+                    if cache_kind == "vin_snippet_cache":
+                        meta_path = cache_path / "metadata.json"
+                        if meta_path.exists():
+                            meta = read_vin_snippet_cache_metadata(meta_path)
+                            if meta.dataset_config is not None:
+                                dataset_cfg = AseEfmDatasetConfig(**meta.dataset_config)
+                                dataset_cfg.paths = paths
+
+                    if dataset_cfg is None and isinstance(source_cfg, VinOracleOnlineDatasetConfig):
+                        dataset_cfg = source_cfg.dataset.model_copy(deep=True)
+                        dataset_cfg.paths = paths
+                        overrides = (
+                            source_cfg.train_overrides if split_stage is Stage.TRAIN else source_cfg.val_overrides
+                        )
+                        if overrides:
+                            dataset_cfg = dataset_cfg.model_copy(deep=True, update=overrides)
+                    elif dataset_cfg is None and isinstance(source_cfg, VinOracleCacheDatasetConfig):
+                        cache_cfg = source_cfg.cache
+                        cache_root = cache_path or cache_cfg.cache.cache_dir
+                        meta_path = cache_root / "metadata.json"
+                        if not meta_path.exists():
+                            raise FileNotFoundError(f"Missing cache metadata: {meta_path}")
+                        meta = _read_cache_metadata(meta_path)
+                        if meta.dataset_config is None:
+                            raise ValueError("Cache metadata does not include dataset_config.")
+                        dataset_cfg = AseEfmDatasetConfig(**meta.dataset_config)
+                        dataset_cfg.paths = paths
+                    elif dataset_cfg is None:
+                        raise TypeError("Unsupported dataset source type in experiment config.")
+
                     dataset_cfg = dataset_cfg.model_copy(
                         deep=True,
                         update={
@@ -271,8 +346,6 @@ def render_offline_stats_page() -> None:
                             "device": "cpu",
                         },
                     )
-                    if not isinstance(dataset_cfg, AseEfmDatasetConfig):
-                        raise TypeError("Experiment config did not provide an AseEfmDatasetConfig.")
 
                     tar_paths = expand_tar_urls(dataset_cfg.tar_urls)
                     if max_tars and int(max_tars) > 0:
@@ -317,15 +390,36 @@ def render_offline_stats_page() -> None:
     if run_stats:
         try:
             with st.spinner("Collecting offline cache statistics..."):
-                stats_cache = _collect_offline_cache_stats(
-                    toml_path=toml_path.strip() or None,
-                    stage=stage,
-                    cache_dir=cache_dir.strip() or None,
-                    map_location=map_location,
-                    max_samples=int(max_samples),
-                    num_workers=int(num_workers) if num_workers > 0 else None,
-                    train_val_split=float(train_val_split),
-                )
+                if cache_kind == "oracle_rri_cache":
+                    stats_cache = _collect_offline_cache_stats(
+                        toml_path=toml_path.strip() or None,
+                        stage=stage,
+                        cache_dir=cache_dir.strip() or None,
+                        max_samples=int(max_samples),
+                        num_workers=int(num_workers) if num_workers > 0 else None,
+                        train_val_split=float(train_val_split),
+                    )
+                else:
+                    stats_cache = _collect_vin_snippet_cache_stats(
+                        cache_dir=cache_dir.strip() or None,
+                        map_location=map_location,
+                        max_samples=int(max_samples),
+                        num_workers=int(num_workers) if num_workers > 0 else None,
+                    )
+                    vin_cache_dir = cache_dir.strip() or None
+                    oracle_cache_dir = None
+                    if vin_cache_dir:
+                        parent = Path(vin_cache_dir).parent
+                        oracle_cache_dir = str(parent) if (parent / "index.jsonl").exists() else None
+                    stats_cache["vin_batch_shapes"] = _collect_vin_batch_shape_preview(
+                        toml_path=toml_path.strip() or None,
+                        stage=stage,
+                        oracle_cache_dir=oracle_cache_dir,
+                        vin_cache_dir=vin_cache_dir,
+                        train_val_split=float(train_val_split),
+                        num_workers=int(num_workers) if num_workers > 0 else None,
+                    )
+                stats_cache["cache_kind"] = cache_kind
             stats_cache["key"] = cfg_key
             st.session_state[stats_key] = stats_cache
         except Exception as exc:  # pragma: no cover - UI guard
@@ -456,6 +550,123 @@ def render_offline_stats_page() -> None:
         st.info("Run the offline stats to load summaries.")
         return
 
+    def _pairs_from_entries(entries: list[object]) -> set[tuple[str, str]]:
+        pairs: set[tuple[str, str]] = set()
+        for entry in entries:
+            scene_id = str(getattr(entry, "scene_id", ""))
+            snippet_id = str(getattr(entry, "snippet_id", ""))
+            if not scene_id:
+                continue
+            pairs.add((scene_id, _extract_snippet_token(snippet_id)))
+        return pairs
+
+    def _render_cache_discrepancies(
+        *,
+        oracle_dir: Path | None,
+        vin_dir: Path | None,
+    ) -> None:
+        if oracle_dir is None or vin_dir is None:
+            st.info("Cache discrepancy check skipped: missing oracle or VIN cache dir.")
+            return
+        oracle_index = oracle_dir / "index.jsonl"
+        vin_index = vin_dir / "index.jsonl"
+        if not oracle_index.exists() or not vin_index.exists():
+            st.info("Cache discrepancy check skipped: missing index.jsonl.")
+            return
+
+        oracle_entries = read_cache_index_entries(oracle_index)
+        vin_entries = read_cache_index_entries(vin_index)
+        oracle_pairs = _pairs_from_entries(oracle_entries)
+        vin_pairs = _pairs_from_entries(vin_entries)
+
+        missing_in_vin = sorted(oracle_pairs - vin_pairs)
+        missing_in_oracle = sorted(vin_pairs - oracle_pairs)
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Oracle cache pairs", len(oracle_pairs))
+        col2.metric("VIN cache pairs", len(vin_pairs))
+        col3.metric("Missing in VIN", len(missing_in_vin))
+        if missing_in_oracle:
+            st.caption(f"Missing in Oracle: {len(missing_in_oracle)}")
+
+        if missing_in_vin:
+            st.subheader("Oracle entries missing in VIN cache")
+            df = pd.DataFrame(missing_in_vin[:200], columns=["scene_id", "snippet_token"])
+            st.dataframe(df, width="stretch", height=220)
+        if missing_in_oracle:
+            st.subheader("VIN entries missing in Oracle cache")
+            df = pd.DataFrame(missing_in_oracle[:200], columns=["scene_id", "snippet_token"])
+            st.dataframe(df, width="stretch", height=220)
+
+    st.subheader("Cache discrepancies")
+    if cache_kind == "oracle_rri_cache":
+        oracle_dir = Path(cache_dir) if cache_dir else None
+        vin_dir = oracle_dir / "vin_snippet_cache" if oracle_dir is not None else None
+    else:
+        vin_dir = Path(cache_dir) if cache_dir else None
+        oracle_dir = vin_dir.parent if vin_dir is not None else None
+    _render_cache_discrepancies(oracle_dir=oracle_dir, vin_dir=vin_dir)
+
+    if stats_cache.get("cache_kind") == "vin_snippet_cache":
+        summary = stats_cache["summary"]
+        sample_df = stats_cache["sample_df"]
+        points_counts = stats_cache["points_counts"]
+        traj_lengths = stats_cache["traj_lengths"]
+        inv_std_values = stats_cache["inv_dist_std"]
+
+        def _fmt(value: float) -> str:
+            return f"{value:.4f}" if np.isfinite(value) else "n/a"
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Samples", summary["samples"])
+        col2.metric("Points mean", _fmt(summary["points_mean"]))
+        col3.metric("Traj len mean", _fmt(summary["traj_len_mean"]))
+        col4, col5, col6 = st.columns(3)
+        col4.metric("Points median", _fmt(summary["points_median"]))
+        col5.metric("Traj len median", _fmt(summary["traj_len_median"]))
+        col6.metric("inv_dist_std mean", _fmt(summary["inv_dist_std_mean"]))
+
+        if not sample_df.empty:
+            st.subheader("Per-snippet summary")
+            st.dataframe(sample_df, width="stretch", height=240)
+
+        with DEFAULT_PLOT_CFG.apply():
+            st.subheader("VIN snippet distributions")
+            if points_counts:
+                _render_hist(
+                    points_counts,
+                    bins=60,
+                    title="Collapsed semidense point count",
+                    xlabel="# points",
+                    log_y=log_y,
+                )
+            if traj_lengths:
+                _render_hist(
+                    traj_lengths,
+                    bins=60,
+                    title="Trajectory length",
+                    xlabel="# poses",
+                    log_y=log_y,
+                )
+            if inv_std_values:
+                _render_hist(
+                    inv_std_values,
+                    bins=60,
+                    title="inv_dist_std mean per snippet",
+                    xlabel="inv_dist_std",
+                    log_y=log_y,
+                )
+        st.subheader("VIN batch tensor shapes")
+        snippet_shapes = stats_cache.get("snippet_shapes")
+        if snippet_shapes:
+            st.caption("Raw VinSnippetView shapes")
+            st.json(snippet_shapes)
+        vin_batch_shapes = stats_cache.get("vin_batch_shapes")
+        if vin_batch_shapes:
+            st.caption("VinOracleBatch shapes (raw vs. padded)")
+            st.json(vin_batch_shapes)
+        return
+
     summary = stats_cache["summary"]
     sample_df = stats_cache["sample_df"]
     backbone_df = stats_cache["backbone_df"]
@@ -463,6 +674,7 @@ def render_offline_stats_page() -> None:
     pm_comp_after_values = stats_cache["pm_comp_after_values"]
     pm_acc_after_values = stats_cache["pm_acc_after_values"]
     num_valid_values = stats_cache["num_valid_values"]
+    batch_shapes = stats_cache.get("batch_shapes")
 
     def _fmt(value: float) -> str:
         return f"{value:.4f}" if np.isfinite(value) else "n/a"
@@ -475,6 +687,10 @@ def render_offline_stats_page() -> None:
     col4.metric("RRI median", _fmt(summary["rri_median"]))
     col5.metric("pm_comp_after mean", _fmt(summary["pm_comp_after_mean"]))
     col6.metric("pm_acc_after mean", _fmt(summary["pm_acc_after_mean"]))
+
+    if batch_shapes:
+        st.subheader("VIN batch tensor shapes")
+        st.json(batch_shapes)
 
     def _apply_log_y(fig: go.Figure) -> None:
         if not log_y:

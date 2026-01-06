@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from ....data.vin_oracle_types import VinOracleBatch
     from ....lightning.aria_nbv_experiment import AriaNBVExperimentConfig
-    from ....lightning.lit_datamodule import VinOracleBatch
     from ....vin import VinForwardDiagnostics, VinPrediction
     from ...state_types import VinDiagnosticsState
 

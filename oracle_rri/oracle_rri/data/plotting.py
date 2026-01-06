@@ -473,7 +473,7 @@ class SnippetPlotBuilder:
         if is_rotate_yaw_cw90:
             t_world_frame = rotate_yaw_cw90(t_world_frame)
         centers = t_world_frame.t.detach().cpu().numpy()
-        axes = t_world_frame.R.transpose(-1, -2).detach().cpu().numpy()  # (K, 3, 3)
+        axes = t_world_frame.R.detach().cpu().numpy()  # (K, 3, 3)
 
         self._update_scene_ranges(centers)
         self._add_camera_axes(centers, axes, title)

@@ -80,10 +80,10 @@ Key ingredients implemented here:
 
    The per-candidate features are:
 
-       [pose_enc, global_feat?, voxel_pose_enc?, local_frustum_feat, valid_frac?],
+       [pose_enc, global_feat?, voxel_pose_enc?, local_frustum_feat, voxel_valid_frac?],
 
    where ``global_feat`` can be pose-conditioned via attention pooling, and
-   ``valid_frac`` summarizes frustum coverage (low coverage can still signal
+   ``voxel_valid_frac`` summarizes frustum coverage (low coverage can still signal
    high RRI due to unknown space).
 
    The head outputs CORAL logits ``l_k`` for thresholds ``k=0..K-2``:
@@ -122,7 +122,7 @@ from .pose_encoding import LearnableFourierFeaturesConfig
 from .types import EvlBackboneOutput, VinForwardDiagnostics, VinPrediction
 
 if TYPE_CHECKING:
-    from ..lightning.lit_datamodule import VinOracleBatch
+    from ..data.vin_oracle_types import VinOracleBatch
 
 
 def _largest_divisor_leq(n: int, max_divisor: int) -> int:
@@ -684,7 +684,7 @@ class VinModelConfig(BaseConfig["VinModel"]):
                    voxel_pose_enc?,
                    global_feat?,
                    local_frustum_feat,
-                   valid_frac? ),
+                   voxel_valid_frac? ),
 
     where ``pose_enc`` and ``voxel_pose_enc`` are LFF-based shell encodings,
     ``global_feat`` summarizes the voxel field (optionally pose-conditioned),
@@ -784,7 +784,7 @@ class VinModelConfig(BaseConfig["VinModel"]):
     """Whether to replace invalid frustum samples with a learned unknown token."""
 
     use_valid_frac_feature: bool = True
-    """Whether to append (valid_frac, 1-valid_frac) as scalar features."""
+    """Whether to append (voxel_valid_frac, 1-voxel_valid_frac) as scalar features."""
 
     candidate_min_valid_frac: float = Field(default=0.2, ge=0.0, le=1.0)
     """Minimum fraction of valid frustum samples required to keep a candidate."""
@@ -874,7 +874,7 @@ class VinModel(nn.Module):
 
     The overall score is computed as:
 
-        z = concat(pose_enc, global_feat?, voxel_pose_enc?, local_feat, valid_frac?)
+        z = concat(pose_enc, global_feat?, voxel_pose_enc?, local_feat, voxel_valid_frac?)
         logits = CORAL(MLP(z))
         score = E[y]/(K-1) = (1/(K-1)) * sum_k sigmoid(logit_k)
     """
@@ -1159,7 +1159,7 @@ class VinModel(nn.Module):
 
                valid_frac = mean_k 1[valid_k],  keep if valid_frac >= min_valid_frac.
 
-           We also optionally concatenate ``valid_frac`` and ``1 - valid_frac``
+           We also optionally concatenate ``voxel_valid_frac`` and ``1 - voxel_valid_frac``
            to expose coverage to the head (low coverage can still imply high RRI).
 
         8) **Scoring with CORAL**
@@ -1366,7 +1366,7 @@ class VinModel(nn.Module):
             t_world_voxel=backbone_out.t_world_voxel,
             voxel_extent=backbone_out.voxel_extent,
         )
-        valid_frac = token_valid.float().mean(dim=-1, keepdim=True)
+        voxel_valid_frac = token_valid.float().mean(dim=-1, keepdim=True)
         local_feat = self._pool_candidates(
             tokens=tokens,
             valid=token_valid,
@@ -1374,8 +1374,8 @@ class VinModel(nn.Module):
         )
         parts.append(local_feat.to(dtype=field.dtype))
         if self.use_valid_frac_feature:
-            parts.append(valid_frac.to(dtype=field.dtype))
-            parts.append((1.0 - valid_frac).to(dtype=field.dtype))
+            parts.append(voxel_valid_frac.to(dtype=field.dtype))
+            parts.append((1.0 - voxel_valid_frac).to(dtype=field.dtype))
 
         # NOTE: Candidate validity is based on the fraction of frustum samples that fall inside the EVL voxel grid
         # (after mapping WORLD→VOXEL using `voxel/T_world_voxel`). We keep this mask for diagnostics and downstream
@@ -1403,7 +1403,8 @@ class VinModel(nn.Module):
             expected=expected,
             expected_normalized=expected_norm,
             candidate_valid=candidate_valid,
-            valid_frac=valid_frac.squeeze(-1),
+            voxel_valid_frac=voxel_valid_frac.squeeze(-1),
+            semidense_valid_frac=None,
         )
 
         if not return_debug:
@@ -1432,7 +1433,7 @@ class VinModel(nn.Module):
             tokens=tokens,
             token_valid=token_valid,
             candidate_valid=candidate_valid,
-            valid_frac=valid_frac,
+            voxel_valid_frac=voxel_valid_frac,
             feats=feats,
         )
         return pred, debug
@@ -1616,7 +1617,7 @@ class VinModel(nn.Module):
             },
             "validity": {
                 "candidate_valid": summarize(debug.candidate_valid),
-                "valid_frac": summarize(pred.valid_frac, include_stats=True),
+                "voxel_valid_frac": summarize(pred.voxel_valid_frac, include_stats=True),
             },
             "outputs": {
                 "logits": summarize(pred.logits),

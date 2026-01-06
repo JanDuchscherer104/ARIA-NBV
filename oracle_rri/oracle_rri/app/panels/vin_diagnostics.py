@@ -84,21 +84,15 @@ def render_vin_diagnostics_page() -> None:
                 st.info(f"No checkpoints found in {ckpt_dir}.")
         data_source = st.selectbox(
             "Data source",
-            options=["online (oracle labeler)", "offline cache"],
+            options=["offline cache", "online (oracle labeler)"],
             index=0,
         )
         use_offline_cache = data_source == "offline cache"
         cache_dir = None
-        map_location = "cpu"
         if use_offline_cache:
             cache_dir = st.text_input(
                 "Offline cache dir",
                 value=str(PathConfig().offline_cache_dir),
-            )
-            map_location = st.selectbox(
-                "Cache map_location",
-                options=["cpu", "cuda"],
-                index=0,
             )
             attach_snippet = st.checkbox(
                 "Attach EFM snippet (geometry plots)",
@@ -127,7 +121,6 @@ def render_vin_diagnostics_page() -> None:
         try:
             cache_ds = _prepare_offline_cache_dataset(
                 cache_dir=cache_dir,
-                map_location=map_location,
                 paths=paths,
                 state=state,
                 stage=stage,
@@ -179,7 +172,6 @@ def render_vin_diagnostics_page() -> None:
                 stage=stage,
                 use_offline_cache=data_source == "offline cache",
                 cache_dir=cache_dir,
-                map_location=map_location,
                 include_efm_snippet=attach_snippet,
                 include_gt_mesh=include_gt_mesh,
             )
@@ -225,7 +217,7 @@ def render_vin_diagnostics_page() -> None:
                                     scene_id=cache_sample.scene_id,
                                     snippet_id=cache_sample.snippet_id,
                                     dataset_payload=cache_ds.metadata.dataset_config,
-                                    device=map_location,
+                                    device="cpu",
                                     paths=paths,
                                     include_gt_mesh=include_gt_mesh,
                                 )
@@ -285,6 +277,9 @@ def render_vin_diagnostics_page() -> None:
     has_semidense_frustum = getattr(debug, "semidense_frustum", None) is not None
     if has_tokens:
         valid_frac = debug.token_valid.float().mean(dim=-1).reshape(-1)
+        mean_valid_frac = f"{float(valid_frac.mean().item()):.3f}"
+    elif getattr(debug, "voxel_valid_frac", None) is not None:
+        valid_frac = debug.voxel_valid_frac.reshape(-1)
         mean_valid_frac = f"{float(valid_frac.mean().item()):.3f}"
     else:
         valid_frac = debug.candidate_valid.float().reshape(-1)

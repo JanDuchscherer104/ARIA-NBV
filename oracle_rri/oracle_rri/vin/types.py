@@ -182,8 +182,14 @@ class VinPrediction:
     candidate_valid: Tensor
     """``Tensor["B N", bool]`` Candidate validity mask."""
 
-    valid_frac: Tensor
-    """``Tensor["B N", float32]`` Per-candidate validity/coverage proxy."""
+    voxel_valid_frac: Tensor | None = None
+    """``Tensor["B N", float32]`` Per-candidate voxel coverage proxy (if available)."""
+
+    semidense_candidate_vis_frac: Tensor | None = None
+    """``Tensor["B N", float32]`` Per-candidate semidense visibility proxy (if available)."""
+
+    semidense_valid_frac: Tensor | None = None
+    """Deprecated alias for ``semidense_candidate_vis_frac``."""
 
 
 @dataclass(slots=True)
@@ -256,8 +262,8 @@ class VinForwardDiagnostics:
     candidate_valid: Tensor
     """``Tensor["B N", bool]`` Candidate validity mask."""
 
-    valid_frac: Tensor
-    """``Tensor["B N 1", float32]`` Fraction of valid frustum samples per candidate."""
+    voxel_valid_frac: Tensor
+    """``Tensor["B N 1", float32]`` Fraction of valid voxel/frustum samples per candidate."""
 
     feats: Tensor
     """``Tensor["B N F", float32]`` Concatenated VIN features after masking."""
@@ -294,8 +300,14 @@ class VinV2ForwardDiagnostics:
     feats: Tensor
     """``Tensor["B N F", float32]`` Concatenated VIN features."""
 
-    valid_frac: Tensor | None = None
-    """``Tensor["B N", float32]`` Per-candidate validity fraction (if computed)."""
+    voxel_valid_frac: Tensor | None = None
+    """``Tensor["B N", float32]`` Per-candidate voxel coverage proxy (if computed)."""
+
+    semidense_candidate_vis_frac: Tensor | None = None
+    """``Tensor["B N", float32]`` Per-candidate semidense visibility proxy (if computed)."""
+
+    semidense_valid_frac: Tensor | None = None
+    """Deprecated alias for ``semidense_candidate_vis_frac``."""
 
     pos_grid: Tensor | None = None
     """``Tensor["B 3 D H W", float32]`` Normalized voxel position grid (if computed)."""

@@ -35,21 +35,26 @@ class Optimizable(BaseModel, Generic[T]):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
-    target: type[Any] | None = Field(
-        default=None,
-        description="Python type of the parameter (int, float, bool, str, Enum).",
-    )
-    low: float | int | None = Field(default=None, description="Lower bound for numeric spaces.")
-    high: float | int | None = Field(default=None, description="Upper bound for numeric spaces.")
-    step: int | None = Field(default=1, description="Step used for discrete integer suggestions.")
-    categories: Sequence[Any] | None = Field(
-        default=None,
-        description="Explicit set of categorical choices (or Enum members).",
-    )
-    log: bool = Field(default=False, description="Use logarithmic sampling for numeric spaces.")
-    name: str | None = Field(default=None, description="Optional override for the Optuna parameter name.")
-    default: T | None = Field(default=None, description="Default value used outside Optuna trials.")
-    description: str | None = Field(default=None, description="Human readable description of the parameter.")
+    target: type[Any] | None = None
+    """Type of the parameter (int, float, bool, str, Enum)."""
+    low: float | int | None = None
+    """Lower bound for numeric spaces."""
+    high: float | int | None = None
+    """Upper bound for numeric spaces."""
+    step: int | None = 1
+    """Step used for discrete integer suggestions."""
+    categories: Sequence[Any] | None = None
+    """Explicit set of categorical choices (or Enum members)."""
+    log: bool = False
+    """Use logarithmic sampling for numeric spaces."""
+    name: str | None = None
+    """Optional override for the Optuna parameter name."""
+    default: T | None = None
+    """Default value used outside Optuna trials."""
+    description: str | None = None
+    """Human readable description of the parameter."""
+    relies_on: dict[str, tuple[Any, ...]] | None = None
+    """Optional dependency map: {param_path: (accepted_values,...)}."""
 
     @classmethod
     def continuous(
@@ -61,6 +66,7 @@ class Optimizable(BaseModel, Generic[T]):
         name: str | None = None,
         default: float | None = None,
         description: str | None = None,
+        relies_on: dict[str, tuple[Any, ...]] | None = None,
     ) -> "Optimizable[float]":
         return cls(
             target=float,
@@ -70,6 +76,7 @@ class Optimizable(BaseModel, Generic[T]):
             name=name,
             default=default,
             description=description,
+            relies_on=relies_on,
         )
 
     @classmethod
@@ -83,6 +90,7 @@ class Optimizable(BaseModel, Generic[T]):
         name: str | None = None,
         default: int | None = None,
         description: str | None = None,
+        relies_on: dict[str, tuple[Any, ...]] | None = None,
     ) -> "Optimizable[int]":
         return cls(
             target=int,
@@ -93,6 +101,7 @@ class Optimizable(BaseModel, Generic[T]):
             name=name,
             default=default,
             description=description,
+            relies_on=relies_on,
         )
 
     @classmethod
@@ -103,15 +112,24 @@ class Optimizable(BaseModel, Generic[T]):
         name: str | None = None,
         default: Any | None = None,
         description: str | None = None,
+        relies_on: dict[str, tuple[Any, ...]] | None = None,
     ) -> "Optimizable[Any]":
         return cls(
             categories=tuple(choices),
             name=name,
             default=default,
             description=description,
+            relies_on=relies_on,
         )
 
-    def suggest(self, trial: "optuna.Trial", path: str) -> T:  # type: ignore[name-defined]
+    def suggest(
+        self,
+        trial: "optuna.Trial",  # type: ignore[name-defined]
+        path: str,
+        *,
+        current_value: Any | None = None,
+        value_lookup: Callable[[str], Any] | None = None,
+    ) -> T:
         """Sample a value from Optuna.
 
         Args:
@@ -121,6 +139,13 @@ class Optimizable(BaseModel, Generic[T]):
         Returns:
             Suggested value coerced into the requested target type.
         """
+        if self.relies_on and value_lookup is not None:
+            if not self._dependencies_satisfied(value_lookup):
+                if current_value is not None:
+                    return self._coerce(current_value)
+                if self.default is not None:
+                    return self._coerce(self.default)
+                return self._coerce(current_value)
         name = self.name or path
         if self._is_categorical():
             choices = list(self._categorical_choices())
@@ -232,6 +257,16 @@ class Optimizable(BaseModel, Generic[T]):
         if all(isinstance(item, (int, float, bool)) for item in choice):
             return ",".join(str(item) for item in choice)
         return "+".join(str(item) for item in choice)
+
+    def _dependencies_satisfied(self, value_lookup: Callable[[str], Any]) -> bool:
+        for key, accepted in (self.relies_on or {}).items():
+            value = value_lookup(key)
+            if isinstance(value, Enum):
+                value = value.value
+            accepted_values = tuple(v.value if isinstance(v, Enum) else v for v in accepted)
+            if value not in accepted_values:
+                return False
+        return True
 
 
 def optimizable_field(

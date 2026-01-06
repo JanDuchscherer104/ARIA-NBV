@@ -12,14 +12,14 @@ from __future__ import annotations
 import json
 import random
 import warnings
+from collections.abc import Iterator
 from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import torch
-from efm3d.aria.pose import PoseTW
 from pydantic import Field, ValidationInfo, field_validator
-from torch.utils.data import Dataset, get_worker_info
+from torch.utils.data import Dataset
 
 from ..configs import PathConfig
 from ..pipelines.oracle_rri_labeler import OracleRriLabelBatch, OracleRriLabelerConfig
@@ -28,7 +28,8 @@ from ..rri_metrics.types import RriResult
 from ..utils import BaseConfig, Console, Verbosity
 from ..vin.backbone_evl import EvlBackboneConfig
 from ..vin.types import EvlBackboneOutput
-from .efm_dataset import AseEfmDataset, AseEfmDatasetConfig
+from .efm_dataset import AseEfmDatasetConfig
+from .efm_snippet_loader import EfmSnippetLoader
 from .efm_views import EfmSnippetView, VinSnippetView
 from .offline_cache_serialization import (
     decode_backbone,
@@ -43,8 +44,6 @@ from .offline_cache_serialization import (
     encode_rri,
 )
 from .offline_cache_store import (
-    _config_signature,
-    _ensure_config_hash,
     _format_sample_key,
     _read_metadata,
     _unique_sample_path,
@@ -58,10 +57,17 @@ from .offline_cache_types import (
     OracleRriCacheMetadata,
     OracleRriCacheSample,
 )
-from .vin_snippet_cache import VinSnippetCacheConfig, VinSnippetCacheDataset, VinSnippetCacheDatasetConfig
+from .vin_snippet_cache import VinSnippetCacheConfig
+from .vin_snippet_provider import (
+    EfmSnippetProvider,
+    VinSnippetCacheProvider,
+    VinSnippetProviderChain,
+    expected_vin_snippet_cache_hash,
+)
+from .vin_snippet_utils import empty_vin_snippet
 
 if TYPE_CHECKING:
-    from ..lightning.lit_datamodule import VinOracleBatch
+    from .vin_oracle_types import VinOracleBatch
 
 CACHE_VERSION = 1
 
@@ -73,10 +79,6 @@ def _target_cache_dataset() -> type[OracleRriCacheDataset]:
 
 def _target_cache_writer() -> type[OracleRriCacheWriter]:
     return OracleRriCacheWriter
-
-
-def _target_cache_appender() -> type[OracleRriCacheAppender]:
-    return OracleRriCacheAppender
 
 
 class OracleRriCacheConfig(BaseConfig):
@@ -182,48 +184,6 @@ class OracleRriCacheWriterConfig(BaseConfig["OracleRriCacheWriter"]):
     """Verbosity level for logging progress."""
 
 
-class OracleRriCacheAppenderConfig(BaseConfig["OracleRriCacheAppender"]):
-    """Configuration for appending cached oracle outputs."""
-
-    target: type[OracleRriCacheAppender] = Field(
-        default_factory=_target_cache_appender,
-        exclude=True,
-    )
-
-    paths: PathConfig = Field(default_factory=PathConfig)
-    """Project path resolver."""
-
-    cache: OracleRriCacheConfig = Field(default_factory=OracleRriCacheConfig)
-    """Cache path configuration."""
-
-    labeler: OracleRriLabelerConfig = Field(default_factory=OracleRriLabelerConfig)
-    """Oracle labeler configuration used for metadata validation."""
-
-    dataset: AseEfmDatasetConfig | None = None
-    """Optional dataset config snapshot used when initializing metadata."""
-
-    backbone: EvlBackboneConfig | None = Field(default_factory=EvlBackboneConfig)
-    """EVL backbone configuration used for metadata validation (optional)."""
-
-    include_backbone: bool = True
-    """Whether appended samples include EVL backbone outputs."""
-
-    include_depths: bool = True
-    """Whether appended samples include depth maps."""
-
-    include_pointclouds: bool = True
-    """Whether appended samples include candidate point clouds."""
-
-    allow_mismatch: bool = False
-    """Allow appending samples that don't match cached config signatures."""
-
-    create_if_missing: bool = False
-    """Create a new cache metadata/index if missing."""
-
-    verbosity: Verbosity = Verbosity.NORMAL
-    """Verbosity level for logging progress."""
-
-
 class OracleRriCacheDatasetConfig(BaseConfig["OracleRriCacheDataset"]):
     """Configuration for loading cached oracle outputs."""
 
@@ -243,9 +203,6 @@ class OracleRriCacheDatasetConfig(BaseConfig["OracleRriCacheDataset"]):
 
     backbone_keep_fields: list[str] | None = None
     """Optional allowlist of EVL backbone fields to decode from cache."""
-
-    map_location: torch.device = Field(default="cpu")
-    """Device string for loading cached tensors (e.g., 'cpu', 'cuda')."""
 
     include_efm_snippet: bool = True
     """Wether to include the EFM snippet in the loaded samples."""
@@ -268,14 +225,20 @@ class OracleRriCacheDatasetConfig(BaseConfig["OracleRriCacheDataset"]):
     vin_snippet_cache: VinSnippetCacheConfig | None = None
     """Optional cache for minimal VinSnippetView entries (avoids loading full EFM snippets)."""
 
-    collapse_semidense: bool = True
-    """Whether to collapse semidense points into a single point cloud for VIN batching."""
-
     semidense_max_points: int | None = None
     """Optional cap on the number of collapsed semidense points."""
 
+    semidense_include_obs_count: bool = False
+    """Whether to append semidense observation counts to collapsed points."""
+
+    vin_snippet_cache_mode: Literal["auto", "required", "disabled"] = "auto"
+    """Whether vin_snippet_cache is required, optional (auto), or disabled."""
+
+    vin_snippet_cache_allow_subset: bool = False
+    """Whether to filter cache entries to those present in vin_snippet_cache (useful for partial caches)."""
+
     return_format: Literal["cache_sample", "vin_batch"] = "cache_sample"
-    """Return cached samples or VIN-ready batches."""
+    """Return cached samples or VIN-ready batches (used by OracleRriCacheDataset only)."""
 
     simplification: float | None = None
     """Optional fraction of cached samples to expose (for quick validation)."""
@@ -288,11 +251,6 @@ class OracleRriCacheDatasetConfig(BaseConfig["OracleRriCacheDataset"]):
 
     limit: int | None = None
     """Optional cap on number of cached samples loaded."""
-
-    @field_validator("map_location", mode="before")
-    @classmethod
-    def _validate_map_location(cls, value: str) -> torch.device:
-        return cls._resolve_device(value)
 
     @field_validator("train_val_split", mode="before")
     @classmethod
@@ -331,6 +289,24 @@ def _read_cache_index(path: Path, *, allow_missing: bool = False) -> list[Oracle
                 path=item["path"],
             ),
         )
+    return entries
+
+
+def _read_vin_snippet_cache_index(
+    path: Path,
+    *,
+    allow_missing: bool = False,
+) -> set[tuple[str, str]]:
+    if not path.exists():
+        if allow_missing:
+            return set()
+        raise FileNotFoundError(f"Missing VIN snippet cache index at {path}")
+    entries: set[tuple[str, str]] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        item = json.loads(line)
+        entries.add((item["scene_id"], item["snippet_id"]))
     return entries
 
 
@@ -407,76 +383,6 @@ def _ensure_train_val_split(
     _write_cache_index_if_changed(train_index_path, train_entries)
     _write_cache_index_if_changed(val_index_path, val_entries)
     return train_entries, val_entries
-
-
-def _load_efm_snippet_for_cache(
-    *,
-    scene_id: str,
-    snippet_id: str,
-    dataset_payload: dict[str, Any] | None,
-    device: str,
-    paths: PathConfig,
-    include_gt_mesh: bool,
-) -> EfmSnippetView:
-    payload = dict(dataset_payload or {})
-    payload["paths"] = payload.get("paths", paths)
-    payload["scene_ids"] = [scene_id]
-    payload["snippet_ids"] = [snippet_id]
-    payload["batch_size"] = 1
-    payload["device"] = device
-    payload["wds_shuffle"] = False
-    payload["wds_repeat"] = False
-    payload["load_meshes"] = bool(include_gt_mesh)
-    payload.setdefault("require_mesh", False)
-    payload["verbosity"] = Verbosity.QUIET
-    cfg = AseEfmDatasetConfig(**payload)
-    dataset = cfg.setup_target()
-    return next(iter(dataset))
-
-
-class _EfmSnippetLoader:
-    """Persistent per-worker loader for on-demand EFM snippets."""
-
-    def __init__(
-        self,
-        *,
-        dataset_payload: dict[str, Any] | None,
-        device: str,
-        paths: PathConfig,
-        include_gt_mesh: bool,
-    ) -> None:
-        self._dataset_payload = dict(dataset_payload or {})
-        self._device = str(device)
-        self._paths = paths
-        self._include_gt_mesh = include_gt_mesh
-        self._datasets: dict[str, AseEfmDataset] = {}
-
-    def load(self, *, scene_id: str, snippet_id: str) -> EfmSnippetView:
-        """Load a snippet view, reusing a cached dataset per scene."""
-        dataset = self._datasets.get(scene_id)
-        if dataset is None:
-            payload = dict(self._dataset_payload)
-            payload["paths"] = payload.get("paths", self._paths)
-            payload["scene_ids"] = [scene_id]
-            payload["snippet_ids"] = []
-            payload["snippet_key_filter"] = []
-            payload["batch_size"] = 1
-            payload["device"] = self._device
-            payload["wds_shuffle"] = False
-            payload["wds_repeat"] = False
-            payload["load_meshes"] = bool(self._include_gt_mesh)
-            payload.setdefault("require_mesh", False)
-            payload["verbosity"] = Verbosity.QUIET
-            cfg = AseEfmDatasetConfig(**payload)
-            dataset = cfg.setup_target()
-            self._datasets[scene_id] = dataset
-
-        dataset._snippet_key_filter = {snippet_id}  # type: ignore[attr-defined]
-        for sample in dataset:
-            return sample
-        raise FileNotFoundError(
-            f"Failed to locate snippet={snippet_id} in scene={scene_id}.",
-        )
 
 
 # ----------------------------------------------------------------------------- Cache IO helpers
@@ -686,167 +592,6 @@ class OracleRriCacheWriter:
         )
 
 
-# ----------------------------------------------------------------------------- Cache appender
-class OracleRriCacheAppender:
-    """Append cached oracle outputs to an existing cache directory."""
-
-    def __init__(self, config: OracleRriCacheAppenderConfig) -> None:
-        self.config = config
-        self.console = Console.with_prefix(self.__class__.__name__).set_verbosity(
-            self.config.verbosity,
-        )
-
-        if self.config.include_backbone and self.config.backbone is None:
-            raise ValueError("include_backbone=True requires a backbone config.")
-
-        self._meta = self._prepare_metadata()
-        self._config_hash = self._meta.config_hash or "unknown"
-        self._index_path = self.config.cache.index_path
-        self._samples_dir = self.config.cache.samples_dir
-        self._num_samples = self._resolve_num_samples()
-
-    def append(
-        self,
-        label_batch: OracleRriLabelBatch,
-        *,
-        backbone_out: EvlBackboneOutput | None,
-    ) -> OracleRriCacheEntry:
-        """Append a single oracle label batch to the cache.
-
-        Args:
-            label_batch: Oracle label batch to cache.
-            backbone_out: Optional EVL backbone outputs (required if include_backbone=True).
-
-        Returns:
-            The cache index entry for the appended sample.
-        """
-        payload = build_cache_payload(
-            label_batch,
-            backbone_out=backbone_out,
-            include_backbone=self.config.include_backbone,
-            include_depths=self.config.include_depths,
-            include_pointclouds=self.config.include_pointclouds,
-        )
-
-        config_hash = self._config_hash or "unknown"
-        base_key = _format_sample_key(
-            label_batch.sample.scene_id,
-            label_batch.sample.snippet_id,
-            config_hash,
-        )
-        sample_key, sample_path = _unique_sample_path(self._samples_dir, base_key)
-        torch.save(payload, sample_path)
-
-        entry = OracleRriCacheEntry(
-            key=sample_key,
-            scene_id=label_batch.sample.scene_id,
-            snippet_id=label_batch.sample.snippet_id,
-            path=str(sample_path.relative_to(self.config.cache.cache_dir)),
-        )
-        with self._index_path.open("a", encoding="utf-8") as index_f:
-            index_f.write(json.dumps(asdict(entry)) + "\n")
-
-        self._num_samples += 1
-        self._meta.num_samples = self._num_samples
-        _write_metadata(self.config.cache.metadata_path, self._meta)
-        self.console.log(
-            f"Appended scene={entry.scene_id} snippet={entry.snippet_id} -> {sample_path.name} (count={self._num_samples})",
-        )
-        return entry
-
-    def _prepare_metadata(self) -> OracleRriCacheMetadata:
-        cache_dir = self.config.cache.cache_dir
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        self.config.cache.samples_dir.mkdir(parents=True, exist_ok=True)
-
-        index_path = self.config.cache.index_path
-        if not index_path.exists():
-            index_path.write_text("", encoding="utf-8")
-
-        meta_path = self.config.cache.metadata_path
-        if meta_path.exists():
-            meta = _read_metadata(meta_path)
-            self._validate_metadata(meta)
-            meta.config_hash = _ensure_config_hash(
-                meta,
-                include_backbone=self.config.include_backbone,
-                include_depths=self.config.include_depths,
-                include_pointclouds=self.config.include_pointclouds,
-            )
-            _write_metadata(meta_path, meta)
-            return meta
-
-        if not self.config.create_if_missing:
-            raise FileNotFoundError(
-                f"Missing cache metadata at {meta_path} (set create_if_missing=True to initialize).",
-            )
-
-        meta = build_cache_metadata(
-            labeler=self.config.labeler,
-            dataset=self.config.dataset,
-            backbone=self.config.backbone,
-            include_backbone=self.config.include_backbone,
-            include_depths=self.config.include_depths,
-            include_pointclouds=self.config.include_pointclouds,
-            version=CACHE_VERSION,
-        )
-        meta.num_samples = 0
-        _write_metadata(meta_path, meta)
-        return meta
-
-    def _resolve_num_samples(self) -> int:
-        if self._meta.num_samples is not None:
-            return int(self._meta.num_samples)
-        index_path = self.config.cache.index_path
-        if not index_path.exists():
-            return 0
-        return sum(1 for line in index_path.read_text(encoding="utf-8").splitlines() if line.strip())
-
-    def _validate_metadata(self, meta: OracleRriCacheMetadata) -> None:
-        labeler_snapshot = snapshot_config(self.config.labeler)
-        labeler_sig = _config_signature(labeler_snapshot)
-        if meta.labeler_signature != labeler_sig:
-            msg = "Labeler config signature mismatch for cache append."
-            if self.config.allow_mismatch:
-                self.console.warn(msg)
-            else:
-                raise ValueError(msg)
-
-        if self.config.include_backbone and self.config.backbone is None:
-            raise ValueError("include_backbone=True requires a backbone config.")
-
-        if meta.include_backbone is not None and meta.include_backbone != self.config.include_backbone:
-            msg = "include_backbone mismatch between cache metadata and append config."
-            if self.config.allow_mismatch:
-                self.console.warn(msg)
-            else:
-                raise ValueError(msg)
-
-        if meta.include_depths is not None and meta.include_depths != self.config.include_depths:
-            msg = "include_depths mismatch between cache metadata and append config."
-            if self.config.allow_mismatch:
-                self.console.warn(msg)
-            else:
-                raise ValueError(msg)
-
-        if meta.include_pointclouds is not None and meta.include_pointclouds != self.config.include_pointclouds:
-            msg = "include_pointclouds mismatch between cache metadata and append config."
-            if self.config.allow_mismatch:
-                self.console.warn(msg)
-            else:
-                raise ValueError(msg)
-
-        if self.config.include_backbone:
-            backbone_snapshot = snapshot_config(self.config.backbone) if self.config.backbone else None
-            backbone_sig = _config_signature(backbone_snapshot) if backbone_snapshot else None
-            if meta.backbone_signature and meta.backbone_signature != backbone_sig:
-                msg = "Backbone config signature mismatch for cache append."
-                if self.config.allow_mismatch:
-                    self.console.warn(msg)
-                else:
-                    raise ValueError(msg)
-
-
 # ----------------------------------------------------------------------------- Cache dataset
 class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
     """Map-style dataset that reads cached oracle outputs."""
@@ -861,12 +606,10 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
             )
         self._index = self._load_index()
         self.metadata = _read_metadata(self.config.cache.metadata_path)
-        self._warned_worker_cuda = False
         self._len = self._resolve_len()
-        self._efm_loader_by_device: dict[str, _EfmSnippetLoader] = {}
-        self._vin_snippet_cache: VinSnippetCacheDataset | None = None
-        self._vin_snippet_cache_disabled = False
-        self._warned_missing_vin_snippet_cache = False
+        self._efm_loader_by_device: dict[str, EfmSnippetLoader] = {}
+        self._vin_snippet_provider: VinSnippetProviderChain | None = None
+        self._vin_snippet_expected_hash = self._compute_vin_snippet_expected_hash()
 
     def _resolve_len(self) -> int:
         base_len = len(self._index)
@@ -882,101 +625,70 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
         state = self.__dict__.copy()
         state["console"] = None
         state["_efm_loader_by_device"] = {}
-        state["_vin_snippet_cache"] = None
+        state["_vin_snippet_provider"] = None
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
         if self.__dict__.get("console") is None:
             self.console = Console.with_prefix(self.__class__.__name__)
-        if self.__dict__.get("_warned_worker_cuda") is None:
-            self._warned_worker_cuda = False
         if self.__dict__.get("_efm_loader_by_device") is None:
             self._efm_loader_by_device = {}
-        if self.__dict__.get("_vin_snippet_cache") is None:
-            self._vin_snippet_cache = None
-        if self.__dict__.get("_vin_snippet_cache_disabled") is None:
-            self._vin_snippet_cache_disabled = False
-        if self.__dict__.get("_warned_missing_vin_snippet_cache") is None:
-            self._warned_missing_vin_snippet_cache = False
+        if self.__dict__.get("_vin_snippet_provider") is None:
+            self._vin_snippet_provider = None
+        if self.__dict__.get("_vin_snippet_expected_hash") is None:
+            self._vin_snippet_expected_hash = self._compute_vin_snippet_expected_hash()
 
-    def _load_vin_snippet_cached(
-        self,
-        *,
-        scene_id: str,
-        snippet_id: str,
-        map_location: str,
-    ) -> VinSnippetView | None:
+    def _compute_vin_snippet_expected_hash(self) -> str | None:
         if self.config.vin_snippet_cache is None:
             return None
-        if self._vin_snippet_cache_disabled:
+        dataset_cfg = self.metadata.dataset_config
+        if dataset_cfg is None:
             return None
-        if self._vin_snippet_cache is None:
-            try:
-                cache_cfg = VinSnippetCacheDatasetConfig(
-                    cache=self.config.vin_snippet_cache,
-                    map_location=map_location,
-                )
-                self._vin_snippet_cache = cache_cfg.setup_target()
-            except FileNotFoundError as exc:
-                if not self._warned_missing_vin_snippet_cache:
-                    self.console.warn(
-                        f"vin_snippet_cache enabled but missing files at {self.config.vin_snippet_cache.cache_dir}: {exc}. "
-                        "Falling back to EFM snippet loading.",
-                    )
-                    self._warned_missing_vin_snippet_cache = True
-                self._vin_snippet_cache_disabled = True
-                return None
-        return self._vin_snippet_cache.get_by_scene_snippet(
-            scene_id=scene_id,
-            snippet_id=snippet_id,
-            map_location=map_location,
+        return expected_vin_snippet_cache_hash(
+            dataset_config=dataset_cfg,
+            include_inv_dist_std=True,
+            include_obs_count=self.config.semidense_include_obs_count,
+            semidense_max_points=self.config.semidense_max_points,
         )
 
-    def _build_vin_snippet(
-        self,
-        efm_snippet: EfmSnippetView,
-        *,
-        device: torch.device,
-    ) -> VinSnippetView:
-        """Build a minimal VIN snippet view from an EFM snippet."""
-        points_world = torch.zeros((0, 4), dtype=torch.float32, device=device)
-        try:
-            semidense = efm_snippet.semidense
-        except Exception:
-            semidense = None
-        if self.config.collapse_semidense and semidense is not None:
-            points_world = semidense.collapse_points(
-                max_points=self.config.semidense_max_points,
+    def _ensure_vin_snippet_provider(self) -> VinSnippetProviderChain | None:
+        if self._vin_snippet_provider is not None:
+            return self._vin_snippet_provider
+        if not self.config.include_efm_snippet:
+            return None
+
+        providers: list[VinSnippetCacheProvider | EfmSnippetProvider] = []
+        mode = self.config.vin_snippet_cache_mode
+        if mode == "required" and self.config.vin_snippet_cache is None:
+            raise ValueError(
+                "vin_snippet_cache_mode='required' requires vin_snippet_cache configuration.",
+            )
+        if self.config.vin_snippet_cache is not None and mode != "disabled":
+            cache_provider = VinSnippetCacheProvider(
+                cache=self.config.vin_snippet_cache,
+                expected_config_hash=self._vin_snippet_expected_hash,
+                mode=mode,
+                console=self.console,
+            )
+            providers.append(cache_provider)
+
+        if mode != "required":
+            efm_provider = EfmSnippetProvider(
+                dataset_payload=self.metadata.dataset_config,
+                paths=self.config.paths,
+                include_gt_mesh=self.config.include_gt_mesh,
+                semidense_max_points=self.config.semidense_max_points,
                 include_inv_dist_std=True,
-            ).to(device=device, dtype=torch.float32)
+                include_obs_count=self.config.semidense_include_obs_count,
+                efm_keep_keys=set(self.config.efm_keep_keys or []) or None,
+            )
+            providers.append(efm_provider)
 
-        traj_world_rig = PoseTW(torch.zeros((0, 12), dtype=torch.float32, device=device))
-        try:
-            traj_view = efm_snippet.trajectory.to(device=device, dtype=torch.float32)
-            traj_world_rig = traj_view.t_world_rig
-        except Exception:
-            pass
-
-        return VinSnippetView(points_world=points_world, t_world_rig=traj_world_rig)
-
-    def _resolve_map_location(self) -> str:
-        map_location = str(self.config.map_location)
-        worker_info = get_worker_info()
-        if worker_info is None:
-            return map_location
-        try:
-            device = torch.device(map_location)
-        except (TypeError, ValueError):
-            return "cpu"
-        if device.type == "cuda":
-            if not self._warned_worker_cuda:
-                self.console.warn(
-                    "Cache DataLoader worker cannot load CUDA tensors; forcing map_location='cpu'.",
-                )
-                self._warned_worker_cuda = True
-            return "cpu"
-        return map_location
+        if not providers:
+            return None
+        self._vin_snippet_provider = VinSnippetProviderChain(providers=providers)
+        return self._vin_snippet_provider
 
     def __len__(self) -> int:
         return self._len
@@ -994,11 +706,11 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
             raise IndexError("Cache index out of range.")
         entry = self._index[idx]
         path = self.config.cache.cache_dir / entry.path
-        map_location = self._resolve_map_location()
+        map_location = "cpu"
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=FutureWarning)
             payload = torch.load(path, map_location=map_location, weights_only=False)
-        device = torch.device(map_location)
+        device = torch.device("cpu")
 
         require_cache_sample = self.config.return_format == "cache_sample"
         require_depths = self.config.return_format in {"cache_sample", "vin_batch"}
@@ -1053,18 +765,37 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
 
         vin_snippet = None
         if self.config.return_format == "vin_batch" and self.config.include_efm_snippet:
-            vin_snippet = self._load_vin_snippet_cached(
-                scene_id=scene_id,
-                snippet_id=snippet_id,
-                map_location=map_location,
-            )
+            provider = self._ensure_vin_snippet_provider()
+            if provider is not None:
+                try:
+                    vin_snippet = provider.get(
+                        scene_id=scene_id,
+                        snippet_id=snippet_id,
+                        map_location=map_location,
+                    )
+                except Exception as exc:
+                    if self.config.vin_snippet_cache_mode == "required":
+                        raise
+                    self.console.warn(
+                        "Failed to load VIN snippet (cache/EFM) for "
+                        f"scene={scene_id} snippet={snippet_id}: {exc}. "
+                        "Using empty snippet; consider rebuilding the VIN snippet cache.",
+                    )
+            if vin_snippet is None:
+                if self.config.vin_snippet_cache_mode == "required":
+                    raise FileNotFoundError(
+                        "vin_snippet_cache_mode='required' but snippet could not be loaded for "
+                        f"scene={scene_id} snippet={snippet_id}.",
+                    )
+                extra_dim = 1 + int(self.config.semidense_include_obs_count)
+                vin_snippet = empty_vin_snippet(device, extra_dim=extra_dim)
 
         efm_snippet = None
-        if self.config.include_efm_snippet and vin_snippet is None:
+        if self.config.include_efm_snippet and self.config.return_format == "cache_sample":
             try:
                 loader = self._efm_loader_by_device.get(map_location)
                 if loader is None:
-                    loader = _EfmSnippetLoader(
+                    loader = EfmSnippetLoader(
                         dataset_payload=self.metadata.dataset_config,
                         device=map_location,
                         paths=self.config.paths,
@@ -1086,16 +817,6 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
                     f"Failed to load EFM snippet for scene={scene_id} snippet={snippet_id}: {exc}",
                 )
                 efm_snippet = None
-
-        if self.config.return_format == "vin_batch" and self.config.include_efm_snippet:
-            if vin_snippet is None:
-                if efm_snippet is None:
-                    vin_snippet = VinSnippetView(
-                        points_world=torch.zeros((0, 4), dtype=torch.float32, device=device),
-                        t_world_rig=PoseTW(torch.zeros((0, 12), dtype=torch.float32, device=device)),
-                    )
-                else:
-                    vin_snippet = self._build_vin_snippet(efm_snippet, device=device)
 
         if self.config.return_format == "vin_batch":
             if depths is None:
@@ -1125,7 +846,7 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
         return cache_sample
 
     def _to_vin_batch(self, cache_sample: OracleRriCacheSample) -> "VinOracleBatch":
-        from ..lightning.lit_datamodule import VinOracleBatch
+        from .vin_oracle_types import VinOracleBatch
 
         rri = cache_sample.rri
         depths = cache_sample.depths
@@ -1156,7 +877,7 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
         snippet_id: str,
         backbone_out: EvlBackboneOutput | None,
     ) -> "VinOracleBatch":
-        from ..lightning.lit_datamodule import VinOracleBatch
+        from .vin_oracle_types import VinOracleBatch
 
         return VinOracleBatch(
             efm_snippet_view=efm_snippet,
@@ -1175,16 +896,45 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
             backbone_out=backbone_out,
         )
 
-    def append_entry(self, entry: OracleRriCacheEntry) -> None:
-        """Update the in-memory index with a newly appended entry."""
-        self._index.append(entry)
-        if self.metadata.num_samples is not None:
-            self.metadata.num_samples = len(self._index)
+    def _filter_index_for_vin_snippet_cache(
+        self,
+        entries: list[OracleRriCacheEntry],
+    ) -> list[OracleRriCacheEntry]:
+        if not self.config.vin_snippet_cache_allow_subset:
+            return entries
+        if self.config.return_format != "vin_batch":
+            return entries
+        if not self.config.include_efm_snippet:
+            return entries
+        if self.config.vin_snippet_cache_mode == "disabled":
+            return entries
+        if self.config.vin_snippet_cache is None:
+            self.console.warn(
+                "vin_snippet_cache_allow_subset=True but vin_snippet_cache is None; skipping VIN snippet filtering.",
+            )
+            return entries
+        available = _read_vin_snippet_cache_index(
+            self.config.vin_snippet_cache.index_path,
+            allow_missing=True,
+        )
+        if not available:
+            self.console.warn(
+                "vin_snippet_cache_allow_subset=True but VIN snippet cache index is empty; "
+                "dataset will be empty until cache entries are created.",
+            )
+            return []
+        filtered = [entry for entry in entries if (entry.scene_id, entry.snippet_id) in available]
+        if len(filtered) != len(entries):
+            self.console.log(
+                f"Filtered cache entries to VIN snippet cache subset: {len(filtered)}/{len(entries)} available.",
+            )
+        return filtered
 
     def _load_index(self) -> list[OracleRriCacheEntry]:
         """Load cache index entries from JSONL."""
         if self.config.split == "all":
-            return _read_cache_index(self.config.cache.index_path)
+            entries = _read_cache_index(self.config.cache.index_path)
+            return self._filter_index_for_vin_snippet_cache(entries)
 
         train_entries, val_entries = _ensure_train_val_split(
             index_path=self.config.cache.index_path,
@@ -1193,7 +943,35 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
             val_fraction=self.config.train_val_split,
             console=self.console,
         )
-        return train_entries if self.config.split == "train" else val_entries
+        entries = train_entries if self.config.split == "train" else val_entries
+        return self._filter_index_for_vin_snippet_cache(entries)
+
+
+class OracleRriCacheVinDataset(Dataset["VinOracleBatch"]):
+    """VIN-focused wrapper over the oracle cache that always yields VinOracleBatch."""
+
+    is_map_style: bool = True
+
+    def __init__(self, config: OracleRriCacheDatasetConfig) -> None:
+        if not config.load_depths:
+            raise ValueError("OracleRriCacheVinDataset requires load_depths=True.")
+        cfg = config.model_copy(deep=True)
+        cfg.return_format = "vin_batch"
+        cfg.load_candidates = False
+        cfg.load_candidate_pcs = False
+        self.config = cfg
+        self._dataset = OracleRriCacheDataset(cfg)
+
+    def __len__(self) -> int:
+        return len(self._dataset)
+
+    def __getitem__(self, idx: int) -> "VinOracleBatch":
+        batch = self._dataset[idx]
+        return batch  # type: ignore[return-value]
+
+    def __iter__(self) -> Iterator["VinOracleBatch"]:
+        for idx in range(len(self)):
+            yield self[idx]
 
 
 def rebuild_cache_index(
@@ -1252,11 +1030,10 @@ def rebuild_cache_index(
 
 __all__ = [
     "CACHE_VERSION",
-    "OracleRriCacheAppender",
-    "OracleRriCacheAppenderConfig",
     "OracleRriCacheConfig",
     "OracleRriCacheDataset",
     "OracleRriCacheDatasetConfig",
+    "OracleRriCacheVinDataset",
     "OracleRriCacheEntry",
     "OracleRriCacheMetadata",
     "OracleRriCacheSample",

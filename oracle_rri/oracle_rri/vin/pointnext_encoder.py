@@ -13,7 +13,7 @@ from torch import Tensor, nn
 
 from oracle_rri.configs.path_config import PathConfig
 
-from ..utils import BaseConfig
+from ..utils import BaseConfig, Optimizable, optimizable_field
 
 
 def _extract_tensor(output: Any) -> Tensor:
@@ -73,10 +73,30 @@ class PointNeXtSEncoderConfig(BaseConfig["PointNeXtSEncoder"]):
     )
     """Optional pretrained checkpoint (PointNeXt/OpenPoints format)."""
 
-    out_dim: int = Field(default=128, gt=0)
+    out_dim: int = optimizable_field(
+        default=128,
+        optimizable=Optimizable.discrete(
+            low=64,
+            high=256,
+            step=64,
+            description="Output embedding dimension for the semidense point encoder.",
+            relies_on={"module_config.vin.use_point_encoder": (True,)},
+        ),
+        gt=0,
+    )
     """Output embedding dimension produced for the semidense point cloud."""
 
-    max_points: int = Field(default=3000, gt=0)
+    max_points: int = optimizable_field(
+        default=3000,
+        optimizable=Optimizable.discrete(
+            low=1000,
+            high=6000,
+            step=500,
+            description="Maximum semidense points to encode per snippet.",
+            relies_on={"module_config.vin.use_point_encoder": (True,)},
+        ),
+        gt=0,
+    )
     """Subsample semidense points to this count before encoding."""
 
     freeze: bool = True

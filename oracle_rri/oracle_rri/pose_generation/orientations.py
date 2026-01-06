@@ -161,41 +161,50 @@ class OrientationBuilder:
         yaw = torch.atan2(z_new[:, 0], z_new[:, 2])  # around +Y (up)
         pitch = torch.asin(z_new[:, 1].clamp(-1.0, 1.0))  # around +X (left)
 
-        cy, sy = torch.cos(yaw), torch.sin(yaw)
-        cp, sp = torch.cos(pitch), torch.sin(pitch)
-
-        ry = torch.zeros(n, 3, 3, device=device, dtype=dtype)
-        ry[:, 0, 0] = cy
-        ry[:, 0, 2] = sy
-        ry[:, 1, 1] = 1.0
-        ry[:, 2, 0] = -sy
-        ry[:, 2, 2] = cy
-
-        rx = torch.zeros_like(ry)
-        rx[:, 0, 0] = 1.0
-        rx[:, 1, 1] = cp
-        rx[:, 1, 2] = sp
-        rx[:, 2, 1] = -sp
-        rx[:, 2, 2] = cp
-
-        r_delta = torch.matmul(ry, rx)
+        r_delta = _yaw_pitch_rotation(yaw, pitch)
 
         if cfg.view_roll_jitter_deg > 0.0:
             # Jitter is applied as a rotation matrix about the forward axis so the basis stays orthonormal. Adding Gaussian noise to direction vectors would skew/scale them unless you re‑orthogonalise anyway (which is what this code guarantees).
             roll = (2.0 * torch.rand(n, device=device, dtype=dtype) - 1.0) * torch.deg2rad(
                 torch.tensor(cfg.view_roll_jitter_deg, device=device, dtype=dtype)
             )
-            cr, sr = torch.cos(roll), torch.sin(roll)
-            r_roll = torch.zeros(n, 3, 3, device=device, dtype=dtype)
-            r_roll[:, 0, 0] = cr
-            r_roll[:, 0, 1] = -sr
-            r_roll[:, 1, 0] = sr
-            r_roll[:, 1, 1] = cr
-            r_roll[:, 2, 2] = 1.0
+            r_roll = _roll_rotation(roll)
             r_delta = torch.matmul(r_delta, r_roll)
 
         delta_poses = PoseTW.from_Rt(r_delta, torch.zeros_like(centers_world))
         return base_poses.compose(delta_poses), delta_poses
+
+
+def _yaw_pitch_rotation(yaw: torch.Tensor, pitch: torch.Tensor) -> torch.Tensor:
+    """Build a roll-free rotation matrix for yaw (about +Y) then pitch (about +X)."""
+    cy, sy = torch.cos(yaw), torch.sin(yaw)
+    cp, sp = torch.cos(pitch), torch.sin(pitch)
+    zeros = torch.zeros_like(cy)
+
+    return torch.stack(
+        [
+            torch.stack([cy, -sy * sp, sy * cp], dim=-1),
+            torch.stack([zeros, cp, sp], dim=-1),
+            torch.stack([-sy, -cy * sp, cy * cp], dim=-1),
+        ],
+        dim=-2,
+    )
+
+
+def _roll_rotation(roll: torch.Tensor) -> torch.Tensor:
+    """Build a rotation matrix for roll about +Z (forward)."""
+    cr, sr = torch.cos(roll), torch.sin(roll)
+    zeros = torch.zeros_like(cr)
+    ones = torch.ones_like(cr)
+
+    return torch.stack(
+        [
+            torch.stack([cr, -sr, zeros], dim=-1),
+            torch.stack([sr, cr, zeros], dim=-1),
+            torch.stack([zeros, zeros, ones], dim=-1),
+        ],
+        dim=-2,
+    )
 
 
 def _normalise(v: torch.Tensor) -> torch.Tensor:

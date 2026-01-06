@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import plotly.graph_objects as go  # type: ignore[import-untyped]
 import streamlit as st
 import torch
 
 from ....configs import PathConfig
+from ....data.efm_views import VinSnippetView
 from ....rri_metrics.coral import coral_loss
-from ....vin.plotting import build_alignment_figures, build_geometry_overview_figure
+from ....vin.plotting import (
+    build_alignment_figures,
+    build_geometry_overview_figure,
+    build_semidense_projection_figure,
+)
 from ..common import _info_popover
 from ..data import scene_plot_options_ui
 from ..offline_cache_utils import _load_efm_snippet_for_cache
@@ -67,6 +73,118 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
         st.info(
             "Geometry plots require raw EFM snippets; enable 'Attach EFM snippet' or use online data.",
         )
+        return
+    if isinstance(snippet_view, VinSnippetView):
+        st.info(
+            "VIN snippet cache provides minimal geometry. Showing semidense-only views "
+            "and candidate visibility instead of the full scene overview.",
+        )
+        points_world = snippet_view.points_world
+        if not torch.is_tensor(points_world) or points_world.numel() == 0:
+            st.info("VIN snippet cache points are empty.")
+        else:
+            batch_idx = 0
+            if points_world.ndim == 3:
+                batch_size = int(points_world.shape[0])
+                batch_idx = int(
+                    st.number_input(
+                        "Batch index",
+                        min_value=0,
+                        max_value=max(0, batch_size - 1),
+                        value=0,
+                        step=1,
+                        key="vin_geom_vin_snippet_batch_idx",
+                    ),
+                )
+                points_world = points_world[batch_idx]
+            points_world = points_world[..., :3]
+            finite = torch.isfinite(points_world).all(dim=-1)
+            points_world = points_world[finite]
+
+            max_points = int(
+                st.slider(
+                    "Max semidense points",
+                    min_value=1000,
+                    max_value=200000,
+                    value=40000,
+                    step=1000,
+                    key="vin_geom_vin_snippet_max_points",
+                ),
+            )
+            if points_world.shape[0] > max_points:
+                idx = torch.randperm(points_world.shape[0], device=points_world.device)[:max_points]
+                points_world = points_world[idx]
+
+            pts_np = points_world.detach().cpu().numpy()
+            fig_points = go.Figure()
+            if pts_np.shape[0] > 0:
+                fig_points.add_trace(
+                    go.Scatter3d(
+                        x=pts_np[:, 0],
+                        y=pts_np[:, 1],
+                        z=pts_np[:, 2],
+                        mode="markers",
+                        marker={"size": 2, "opacity": 0.6, "color": "#4c78a8"},
+                        name="semidense",
+                        showlegend=False,
+                    ),
+                )
+            fig_points.update_layout(
+                title="VIN snippet semidense point cloud",
+                scene={"aspectmode": "data"},
+                margin={"l": 0, "r": 0, "t": 40, "b": 0},
+            )
+            st.plotly_chart(fig_points, width="stretch")
+
+            poses = batch.candidate_poses_world_cam.tensor()
+            if poses.ndim == 3:
+                cand_batch = int(poses.shape[0])
+                num_candidates = int(poses.shape[1])
+            else:
+                cand_batch = 1
+                num_candidates = int(poses.shape[0])
+            if num_candidates > 0:
+                cand_idx = int(
+                    st.slider(
+                        "Candidate index",
+                        min_value=0,
+                        max_value=max(0, num_candidates - 1),
+                        value=0,
+                        step=1,
+                        key="vin_geom_vin_snippet_candidate_idx",
+                    ),
+                )
+                cam_count = int(batch.p3d_cameras.R.shape[0])
+                proj_batch = batch_idx if batch_idx < cand_batch else 0
+                global_idx = cand_idx
+                if cam_count == cand_batch * num_candidates:
+                    global_idx = proj_batch * num_candidates + cand_idx
+                elif cam_count <= global_idx:
+                    global_idx = max(0, cam_count - 1)
+                st.plotly_chart(
+                    build_semidense_projection_figure(
+                        points_world,
+                        p3d_cameras=batch.p3d_cameras,
+                        candidate_index=global_idx,
+                        max_points=max_points,
+                    ),
+                    width="stretch",
+                )
+            else:
+                st.info("No candidates available for projection.")
+
+        if ctx.has_tokens:
+            log1p_align_counts = st.checkbox(
+                "Log1p alignment histogram counts",
+                value=False,
+                key="vin_geom_align_log1p",
+            )
+            alignment_figs = build_alignment_figures(
+                debug,
+                log1p_counts=log1p_align_counts,
+            )
+            for key, fig in alignment_figs.items():
+                st.plotly_chart(fig, width="stretch", key=f"vin_align_{key}")
         return
 
     cam_choice, plot_opts = scene_plot_options_ui(
@@ -254,23 +372,19 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
                 loss_error = f"{type(exc).__name__}: {exc}"
         if loss_error:
             st.info(loss_error)
-    # apply_cw90_correction = False
-    # if state.module is not None and hasattr(state.module, "vin"):
-    #     apply_cw90_correction = bool(
-    #         getattr(getattr(state.module.vin, "config", None), "apply_cw90_correction", False),
-    #     )
+    apply_cw90_correction = False
+    if state.module is not None and hasattr(state.module, "vin"):
+        apply_cw90_correction = bool(
+            getattr(getattr(state.module.vin, "config", None), "apply_cw90_correction", False),
+        )
 
     reference_pose_world_rig = batch.reference_pose_world_rig
     candidate_poses_world_cam = batch.candidate_poses_world_cam
-    # if apply_cw90_correction:
-    #     reference_pose_world_rig = rotate_yaw_cw90(
-    #         reference_pose_world_rig,
-    #     )
-    #     candidate_poses_world_cam = rotate_yaw_cw90(
-    #         candidate_poses_world_cam,
-    #     )
-
-    display_rotate_yaw_cw90 = True
+    display_rotate_yaw_cw90 = False
+    if not apply_cw90_correction:
+        st.caption(
+            "Note: VIN apply_cw90_correction is disabled; geometry plots assume corrected poses.",
+        )
 
     st.plotly_chart(
         build_geometry_overview_figure(

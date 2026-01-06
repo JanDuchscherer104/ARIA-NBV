@@ -8,11 +8,12 @@ from typing import TYPE_CHECKING
 import torch
 
 from ...configs import PathConfig
-from ...data import EfmSnippetView
+from ...data import EfmSnippetView, VinOracleOnlineDatasetConfig
 from ...data.offline_cache import OracleRriCacheConfig, OracleRriCacheDatasetConfig
 from ...data.offline_cache_types import OracleRriCacheSample
+from ...data.vin_oracle_datasets import VinOracleCacheDatasetConfig
+from ...data.vin_oracle_types import VinOracleBatch
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
-from ...lightning.lit_datamodule import VinOracleBatch
 from ...lightning.lit_module import VinLightningModule, VinLightningModuleConfig
 from ...rri_metrics.rri_binning import RriOrdinalBinner
 from ...utils import Stage
@@ -28,7 +29,6 @@ def _build_experiment_config(
     stage: Stage,
     use_offline_cache: bool,
     cache_dir: str | None,
-    map_location: str,
     include_efm_snippet: bool,
     include_gt_mesh: bool,
 ) -> AriaNBVExperimentConfig:
@@ -49,16 +49,14 @@ def _build_experiment_config(
         cache_cfg = OracleRriCacheDatasetConfig(
             cache=OracleRriCacheConfig(cache_dir=Path(cache_root), paths=paths),
             load_backbone=True,
-            map_location=map_location,
             include_efm_snippet=include_efm_snippet,
             include_gt_mesh=include_gt_mesh,
         )
-        cfg.datamodule_config.train_cache = cache_cfg
-        cfg.datamodule_config.val_cache = cache_cfg
+        cache_source = VinOracleCacheDatasetConfig(cache=cache_cfg)
+        cfg.datamodule_config.source = cache_source
     else:
         cfg.datamodule_config.num_workers = 0
-        cfg.datamodule_config.train_cache = None
-        cfg.datamodule_config.val_cache = None
+        cfg.datamodule_config.source = VinOracleOnlineDatasetConfig()
 
     return cfg
 

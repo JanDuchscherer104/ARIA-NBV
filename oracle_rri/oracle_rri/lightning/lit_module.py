@@ -7,6 +7,7 @@ trainer factory.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any, Literal, Self
 
@@ -21,6 +22,7 @@ from torch.nn import functional as functional
 
 from ..configs import PathConfig
 from ..data import EfmSnippetView, VinSnippetView
+from ..data.vin_oracle_types import VinOracleBatch
 from ..rri_metrics import (
     Loss,
     Metric,
@@ -37,7 +39,6 @@ from ..rri_metrics.coral import coral_logits_to_label, coral_monotonicity_violat
 from ..utils import BaseConfig, Console, Stage
 from ..vin import VinModelConfig, VinModelV2Config
 from ..vin.plotting import plot_vin_encodings_from_debug
-from .lit_datamodule import VinOracleBatch
 from .optimizers import AdamWConfig, OneCycleSchedulerConfig, ReduceLrOnPlateauConfig
 
 
@@ -112,6 +113,36 @@ class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
 
     log_grad_norms: bool = True
     """Whether to log gradient norms for key VIN submodules."""
+
+    coverage_weight_mode: Literal["none", "voxel", "semidense", "min", "mean", "product"] = "none"
+    """How to compute coverage-based loss weights from VIN predictions."""
+
+    coverage_weight_floor: float = Field(default=0.2, ge=0.0, le=1.0)
+    """Minimum loss weight for low-coverage candidates."""
+
+    coverage_weight_power: float = Field(default=1.0, ge=0.0)
+    """Exponent applied to coverage fractions before weighting."""
+
+    coverage_weight_strength_start: float = Field(default=0.5, ge=0.0, le=1.0)
+    """Initial blend strength for coverage weighting (0 = uniform, 1 = full weighting)."""
+
+    coverage_weight_strength_end: float = Field(default=0.0, ge=0.0, le=1.0)
+    """Final blend strength after annealing."""
+
+    coverage_weight_schedule: Literal["linear", "cosine"] = "linear"
+    """Schedule used to anneal coverage weighting strength."""
+
+    coverage_weight_interval: Literal["epoch", "step"] = "epoch"
+    """Whether to anneal coverage weighting per epoch or per step."""
+
+    coverage_weight_anneal_epochs: int | None = Field(default=None, ge=1)
+    """Epochs over which to anneal coverage weighting (None keeps constant)."""
+
+    coverage_weight_anneal_steps: int | None = Field(default=None, ge=1)
+    """Steps over which to anneal coverage weighting (None keeps constant)."""
+
+    coverage_weight_apply_aux: bool = True
+    """Whether to apply coverage weights to the auxiliary regression loss."""
 
     @field_validator("log_interval_steps")
     @classmethod
@@ -227,6 +258,15 @@ class VinLightningModule(pl.LightningModule):
             )
 
         _log_grad("pose_encoder_lff", getattr(self.vin, "pose_encoder_lff", None))
+        _log_grad("field_proj", getattr(self.vin, "field_proj", None))
+        _log_grad("global_pooler", getattr(self.vin, "global_pooler", None))
+        _log_grad("point_encoder", getattr(self.vin, "point_encoder", None))
+        _log_grad("point_film", getattr(self.vin, "point_film", None))
+        _log_grad("sem_proj_film", getattr(self.vin, "sem_proj_film", None))
+        _log_grad("sem_frustum_attn", getattr(self.vin, "sem_frustum_attn", None))
+        _log_grad("sem_frustum_proj", getattr(self.vin, "sem_frustum_proj", None))
+        _log_grad("traj_encoder", getattr(self.vin, "traj_encoder", None))
+        _log_grad("traj_attn", getattr(self.vin, "traj_attn", None))
         _log_grad("head_mlp", getattr(self.vin, "head_mlp", None))
         _log_grad("head_coral", getattr(self.vin, "head_coral", None))
 
@@ -302,29 +342,42 @@ class VinLightningModule(pl.LightningModule):
         logits = pred.logits
         if logits.ndim == 2:
             logits = logits.unsqueeze(0)
-        if not bool(torch.isfinite(logits).all().item()):
-            if log_enabled:
-                self.log(
-                    f"{stage.value}/skip_nonfinite_logits",
-                    1.0,
-                    on_step=True,
-                    prog_bar=False,
-                    batch_size=log_batch_size,
-                )
-            return None
+        logits_flat = logits.reshape(-1, logits.shape[-1])
+        logits_finite = torch.isfinite(logits_flat).all(dim=-1)
 
         rri = batch.rri.to(device=logits.device)
         rri_flat = rri.reshape(-1)
-        mask = torch.isfinite(rri_flat)
+        mask_rri = torch.isfinite(rri_flat)
+        mask = mask_rri & logits_finite
+        if log_enabled and (~logits_finite & mask_rri).any():
+            denom = mask_rri.to(dtype=torch.float32).sum().clamp_min(1.0)
+            frac = (~logits_finite & mask_rri).to(dtype=torch.float32).sum() / denom
+            self.log(
+                f"{stage.value}/drop_nonfinite_logits_frac",
+                frac,
+                on_step=True,
+                prog_bar=False,
+                batch_size=log_batch_size,
+            )
+
         if not mask.any():
             if log_enabled:
-                self.log(
-                    f"{stage.value}/skip_no_valid",
-                    1.0,
-                    on_step=True,
-                    prog_bar=False,
-                    batch_size=log_batch_size,
-                )
+                if mask_rri.any():
+                    self.log(
+                        f"{stage.value}/skip_nonfinite_logits",
+                        1.0,
+                        on_step=True,
+                        prog_bar=False,
+                        batch_size=log_batch_size,
+                    )
+                else:
+                    self.log(
+                        f"{stage.value}/skip_no_valid",
+                        1.0,
+                        on_step=True,
+                        prog_bar=False,
+                        batch_size=log_batch_size,
+                    )
             return None
 
         valid_count = int(mask.sum().item())
@@ -340,14 +393,20 @@ class VinLightningModule(pl.LightningModule):
         )
         labels = self._binner.transform(rri_for_labels)
         labels_valid = labels[mask]
-        logits_flat = logits.reshape(-1, logits.shape[-1])
         logits_valid = logits_flat[mask]
 
-        coral_loss_value = self._coral_loss_variant(
+        loss_per = self._coral_loss_variant(
             logits_valid,
             labels_valid,
             num_classes=int(self._binner.num_classes),
-        ).mean()
+        )
+        coverage_weights, _, coverage_strength = self._coverage_weights(pred, mask, stage=stage)
+        if coverage_strength is None and self.config.coverage_weight_mode != "none":
+            coverage_strength = self._coverage_weight_strength()
+        if coverage_weights is not None:
+            coral_loss_value = (loss_per * coverage_weights).sum() / coverage_weights.sum().clamp_min(1e-6)
+        else:
+            coral_loss_value = loss_per.mean()
 
         probs = pred.prob
         if probs.ndim == 2:
@@ -367,26 +426,28 @@ class VinLightningModule(pl.LightningModule):
             if pred_rri_proxy is None:
                 raise RuntimeError("Expected pred_rri_proxy to be computed.")
             if self.config.aux_regression_loss == "mse":
-                diff = pred_rri_proxy_valid - rri_valid.to(
-                    dtype=pred_rri_proxy.dtype,
-                )
-                aux_loss = (diff * diff).mean()
+                diff = pred_rri_proxy_valid - rri_valid.to(dtype=pred_rri_proxy.dtype)
+                aux_loss_per = diff * diff
             elif self.config.aux_regression_loss == "huber":
-                aux_loss = functional.smooth_l1_loss(
+                aux_loss_per = functional.smooth_l1_loss(
                     pred_rri_proxy_valid,
                     rri_valid.to(dtype=pred_rri_proxy.dtype),
+                    reduction="none",
                 )
             else:
                 raise ValueError(
                     f"Unknown aux_regression_loss='{self.config.aux_regression_loss}'.",
                 )
+            if coverage_weights is not None and self.config.coverage_weight_apply_aux:
+                aux_loss = (aux_loss_per * coverage_weights).sum() / coverage_weights.sum().clamp_min(1e-6)
+            else:
+                aux_loss = aux_loss_per.mean()
             aux_weight = self._aux_regression_weight()
             combined_loss = coral_loss_value + aux_weight * aux_loss
 
         if not log_enabled:
             return combined_loss
 
-        on_step = stage is Stage.TRAIN
         random_coral_loss = coral_random_loss(int(self._binner.num_classes))
         loss_metrics: dict[Loss, Tensor | float] = {
             Loss.LOSS: combined_loss,
@@ -412,21 +473,51 @@ class VinLightningModule(pl.LightningModule):
         self._log_loss_scalars(
             loss_metrics,
             stage=stage,
-            on_step=on_step,
-            on_epoch=True,
-            prog_bar=(stage is Stage.TRAIN),
             batch_size=log_batch_size,
         )
         if aux_loss_metrics:
             self._log_aux_scalars(
                 aux_loss_metrics,
                 stage=stage,
-                on_step=on_step,
-                on_epoch=True,
-                prog_bar=False,
                 batch_size=log_batch_size,
             )
 
+        nan_tensor = torch.tensor(float("nan"), device=combined_loss.device)
+        voxel_valid = self._flatten_and_mask(getattr(pred, "voxel_valid_frac", None), mask)
+        semidense_valid_raw = getattr(
+            pred,
+            "semidense_candidate_vis_frac",
+            getattr(pred, "semidense_valid_frac", None),
+        )
+        semidense_valid = self._flatten_and_mask(semidense_valid_raw, mask)
+        candidate_valid = self._flatten_and_mask(getattr(pred, "candidate_valid", None), mask)
+        coverage_payload: dict[Metric, Tensor | float] = {
+            Metric.VOXEL_VALID_FRAC_MEAN: voxel_valid.mean()
+            if voxel_valid is not None and voxel_valid.numel() > 0
+            else nan_tensor,
+            Metric.VOXEL_VALID_FRAC_STD: voxel_valid.std(unbiased=False)
+            if voxel_valid is not None and voxel_valid.numel() > 1
+            else nan_tensor,
+            Metric.SEMIDENSE_CANDIDATE_VIS_FRAC_MEAN: semidense_valid.mean()
+            if semidense_valid is not None and semidense_valid.numel() > 0
+            else nan_tensor,
+            Metric.SEMIDENSE_CANDIDATE_VIS_FRAC_STD: semidense_valid.std(unbiased=False)
+            if semidense_valid is not None and semidense_valid.numel() > 1
+            else nan_tensor,
+            Metric.SEMIDENSE_VALID_FRAC_MEAN: semidense_valid.mean()
+            if semidense_valid is not None and semidense_valid.numel() > 0
+            else nan_tensor,
+            Metric.SEMIDENSE_VALID_FRAC_STD: semidense_valid.std(unbiased=False)
+            if semidense_valid is not None and semidense_valid.numel() > 1
+            else nan_tensor,
+            Metric.CANDIDATE_VALID_FRAC: candidate_valid.to(dtype=torch.float32).mean()
+            if candidate_valid is not None and candidate_valid.numel() > 0
+            else nan_tensor,
+            Metric.COVERAGE_WEIGHT_MEAN: coverage_weights.mean()
+            if coverage_weights is not None and coverage_weights.numel() > 0
+            else nan_tensor,
+            Metric.COVERAGE_WEIGHT_STRENGTH: float(coverage_strength) if coverage_strength is not None else nan_tensor,
+        }
         self._log_aux_scalars(
             {
                 Metric.RRI_MEAN: rri_valid.mean(),
@@ -441,11 +532,9 @@ class VinLightningModule(pl.LightningModule):
                 Metric.AUX_REGRESSION_WEIGHT: float(aux_weight)
                 if aux_weight is not None
                 else torch.tensor(float("nan"), device=combined_loss.device),
+                **coverage_payload,
             },
             stage=stage,
-            on_step=on_step,
-            on_epoch=True,
-            prog_bar=False,
             batch_size=log_batch_size,
         )
 
@@ -454,9 +543,6 @@ class VinLightningModule(pl.LightningModule):
         self._log_aux_scalars(
             {Metric.CORAL_MONOTONICITY_VIOLATION_RATE: monotonicity_rate},
             stage=stage,
-            on_step=on_step,
-            on_epoch=True,
-            prog_bar=False,
             batch_size=log_batch_size,
         )
         stage_key = f"{stage.value}_stage"
@@ -502,6 +588,87 @@ class VinLightningModule(pl.LightningModule):
             weight *= gamma**decay_steps
         return max(weight, float(self.config.aux_regression_weight_min))
 
+    def _coverage_weight_strength(self) -> float:
+        """Compute the current blend strength for coverage weighting."""
+        start = float(self.config.coverage_weight_strength_start)
+        end = float(self.config.coverage_weight_strength_end)
+        if self.config.coverage_weight_interval == "step":
+            total = self.config.coverage_weight_anneal_steps
+            step = int(self.global_step)
+        else:
+            total = self.config.coverage_weight_anneal_epochs
+            step = int(self.current_epoch)
+        if total is None or total <= 0:
+            return start
+        progress = min(max(step / float(total), 0.0), 1.0)
+        if self.config.coverage_weight_schedule == "cosine":
+            return float(end + (start - end) * 0.5 * (1.0 + math.cos(math.pi * progress)))
+        return float(start + (end - start) * progress)
+
+    def _flatten_and_mask(self, values: Tensor | None, mask: Tensor) -> Tensor | None:
+        if values is None:
+            return None
+        flat = values.reshape(-1)
+        if flat.shape[0] != mask.shape[0]:
+            raise ValueError(
+                f"Expected coverage tensor of length {mask.shape[0]}, got {flat.shape[0]}.",
+            )
+        masked = flat[mask]
+        if masked.numel() == 0:
+            return masked
+        if not masked.is_floating_point():
+            return masked
+        return torch.nan_to_num(masked, nan=0.0, posinf=0.0, neginf=0.0)
+
+    def _select_coverage_fraction(self, pred: Any) -> Tensor | None:
+        voxel_frac = getattr(pred, "voxel_valid_frac", None)
+        sem_frac = getattr(pred, "semidense_candidate_vis_frac", None)
+        if sem_frac is None:
+            sem_frac = getattr(pred, "semidense_valid_frac", None)
+        match self.config.coverage_weight_mode:
+            case "none":
+                return None
+            case "voxel":
+                return voxel_frac
+            case "semidense":
+                return sem_frac
+            case "min":
+                if voxel_frac is not None and sem_frac is not None:
+                    return torch.minimum(voxel_frac, sem_frac)
+                return voxel_frac if voxel_frac is not None else sem_frac
+            case "mean":
+                if voxel_frac is not None and sem_frac is not None:
+                    return 0.5 * (voxel_frac + sem_frac)
+                return voxel_frac if voxel_frac is not None else sem_frac
+            case "product":
+                if voxel_frac is not None and sem_frac is not None:
+                    return voxel_frac * sem_frac
+                return voxel_frac if voxel_frac is not None else sem_frac
+        return None
+
+    def _coverage_weights(
+        self,
+        pred: Any,
+        mask: Tensor,
+        *,
+        stage: Stage,
+    ) -> tuple[Tensor | None, Tensor | None, float | None]:
+        if stage is not Stage.TRAIN:
+            return None, None, None
+        if self.config.coverage_weight_mode == "none":
+            return None, None, None
+        coverage = self._select_coverage_fraction(pred)
+        coverage_masked = self._flatten_and_mask(coverage, mask)
+        if coverage_masked is None or coverage_masked.numel() == 0:
+            return None, coverage_masked, None
+        coverage_masked = coverage_masked.clamp(0.0, 1.0)
+        floor = float(self.config.coverage_weight_floor)
+        power = float(self.config.coverage_weight_power)
+        base_weight = floor + (1.0 - floor) * coverage_masked.pow(power)
+        strength = self._coverage_weight_strength()
+        weights = torch.lerp(torch.ones_like(base_weight), base_weight, strength)
+        return weights, coverage_masked, strength
+
     def _log_epoch_metrics(self, stage: Stage) -> None:
         if getattr(self.trainer, "sanity_checking", False):
             stage_key = f"{stage.value}_stage"
@@ -519,9 +686,6 @@ class VinLightningModule(pl.LightningModule):
             self._log_aux_scalars(
                 {Metric.SPEARMAN: spearman},
                 stage=stage,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=False,
                 batch_size=1,
             )
 
@@ -567,9 +731,6 @@ class VinLightningModule(pl.LightningModule):
             self._log_aux_scalars(
                 {Metric.SPEARMAN_STEP: spearman},
                 stage=stage,
-                on_step=True,
-                on_epoch=False,
-                prog_bar=False,
                 batch_size=batch_size,
             )
 
@@ -599,9 +760,6 @@ class VinLightningModule(pl.LightningModule):
                 Metric.PRED_RRI_VARIANCE: stats["variance"],
             },
             stage=Stage.VAL,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=False,
             batch_size=1,
         )
         self._rri_error_stats[f"{Stage.VAL.value}_stage"].reset()
@@ -668,45 +826,57 @@ class VinLightningModule(pl.LightningModule):
         values: dict[Loss, Tensor | float],
         *,
         stage: Stage,
-        on_step: bool,
-        on_epoch: bool,
-        prog_bar: bool,
         batch_size: int,
     ) -> None:
-        self.log_dict(
-            {loss_key(stage, key): val for key, val in values.items()},
-            on_step=on_step,
-            on_epoch=on_epoch,
-            prog_bar=prog_bar,
-            batch_size=batch_size,
-        )
+        payloads: dict[tuple[bool, bool, bool], dict[str, Tensor | float]] = {}
+        for key, val in values.items():
+            spec = key.log_spec(stage)
+            if not spec.enabled:
+                continue
+            payloads.setdefault((spec.on_step, spec.on_epoch, spec.prog_bar), {})[loss_key(stage, key)] = val
+        for (on_step, on_epoch, prog_bar), payload in payloads.items():
+            self.log_dict(
+                payload,
+                on_step=on_step,
+                on_epoch=on_epoch,
+                prog_bar=prog_bar,
+                batch_size=batch_size,
+            )
 
     def _log_aux_scalars(
         self,
         values: dict[Metric | Loss, Tensor | float],
         *,
         stage: Stage,
-        on_step: bool,
-        on_epoch: bool,
-        prog_bar: bool,
         batch_size: int,
     ) -> None:
-        payload: dict[str, Tensor | float] = {}
+        payloads: dict[tuple[bool, bool, bool], dict[str, Tensor | float]] = {}
         for key, val in values.items():
             if isinstance(key, Metric):
-                payload[metric_key(stage, key, namespace="aux")] = val
+                spec = key.log_spec(stage)
+                if not spec.enabled:
+                    continue
+                payloads.setdefault((spec.on_step, spec.on_epoch, spec.prog_bar), {})[
+                    metric_key(stage, key, namespace="aux")
+                ] = val
                 continue
             if isinstance(key, Loss):
-                payload[loss_key(stage, key, namespace="aux")] = val
+                spec = key.log_spec(stage)
+                if not spec.enabled:
+                    continue
+                payloads.setdefault((spec.on_step, spec.on_epoch, spec.prog_bar), {})[
+                    loss_key(stage, key, namespace="aux")
+                ] = val
                 continue
-            payload[f"{stage.value}-aux/{str(key)}"] = val
-        self.log_dict(
-            payload,
-            on_step=on_step,
-            on_epoch=on_epoch,
-            prog_bar=prog_bar,
-            batch_size=batch_size,
-        )
+            payloads.setdefault((False, True, False), {})[f"{stage.value}-aux/{str(key)}"] = val
+        for (on_step, on_epoch, prog_bar), payload in payloads.items():
+            self.log_dict(
+                payload,
+                on_step=on_step,
+                on_epoch=on_epoch,
+                prog_bar=prog_bar,
+                batch_size=batch_size,
+            )
 
     def _maybe_init_bin_values(self) -> None:
         """Initialize learnable CORAL bin values from the fitted binner."""

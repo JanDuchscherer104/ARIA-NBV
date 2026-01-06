@@ -12,6 +12,7 @@ avoid unnecessary synchronization overhead.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
 
@@ -25,7 +26,44 @@ from torchmetrics.regression import SpearmanCorrCoef
 from ..utils import BaseConfig, Stage
 
 
-class Metric(StrEnum):
+@dataclass(frozen=True, slots=True)
+class LogSpec:
+    """Logging policy for a metric/loss.
+
+    Attributes:
+        on_step: Log on step-level updates.
+        on_epoch: Log epoch-level aggregates.
+        prog_bar: Show in Lightning's progress bar.
+        enabled: Whether logging is enabled for the current stage.
+    """
+
+    on_step: bool
+    on_epoch: bool
+    prog_bar: bool
+    enabled: bool = True
+
+
+class Logable(StrEnum):
+    """Base class for loggable metric/loss names."""
+
+    def __str__(self) -> str:
+        return self.value
+
+    def log_spec(self, stage: Stage) -> LogSpec:
+        """Return logging settings for this metric/loss at the given stage."""
+        raise NotImplementedError("Every metric/loss must specify how it should be logged.")
+
+    def on_step(self, stage: Stage) -> bool:
+        return self.log_spec(stage).on_step
+
+    def on_epoch(self, stage: Stage) -> bool:
+        return self.log_spec(stage).on_epoch
+
+    def prog_bar(self, stage: Stage) -> bool:
+        return self.log_spec(stage).prog_bar
+
+
+class Metric(Logable):
     """Metric suffixes composed with Stage as ``{stage}/{metric}``."""
 
     LOSS = "loss"
@@ -38,6 +76,15 @@ class Metric(StrEnum):
     TOP3_ACCURACY = "top3_accuracy"
     AUX_REGRESSION_WEIGHT = "aux_regression_weight"
     CORAL_MONOTONICITY_VIOLATION_RATE = "coral_monotonicity_violation_rate"
+    VOXEL_VALID_FRAC_MEAN = "voxel_valid_frac_mean"
+    VOXEL_VALID_FRAC_STD = "voxel_valid_frac_std"
+    SEMIDENSE_CANDIDATE_VIS_FRAC_MEAN = "semidense_candidate_vis_frac_mean"
+    SEMIDENSE_CANDIDATE_VIS_FRAC_STD = "semidense_candidate_vis_frac_std"
+    SEMIDENSE_VALID_FRAC_MEAN = "semidense_valid_frac_mean"
+    SEMIDENSE_VALID_FRAC_STD = "semidense_valid_frac_std"
+    CANDIDATE_VALID_FRAC = "candidate_valid_frac"
+    COVERAGE_WEIGHT_MEAN = "coverage_weight_mean"
+    COVERAGE_WEIGHT_STRENGTH = "coverage_weight_strength"
 
     SPEARMAN = "spearman"
     SPEARMAN_STEP = "spearman_step"
@@ -46,11 +93,48 @@ class Metric(StrEnum):
     LABEL_HISTOGRAM = "label_histogram"
     LABEL_HISTOGRAM_STEP = "label_histogram_step"
 
-    def __str__(self) -> str:
-        return self.value
+    def log_spec(self, stage: Stage) -> LogSpec:
+        match self:
+            case Metric.LOSS:
+                return LogSpec(on_step=stage is Stage.TRAIN, on_epoch=True, prog_bar=False)
+            case (
+                Metric.RRI_MEAN
+                | Metric.PRED_RRI_MEAN
+                | Metric.TOP3_ACCURACY
+                | Metric.AUX_REGRESSION_WEIGHT
+                | Metric.VOXEL_VALID_FRAC_MEAN
+                | Metric.VOXEL_VALID_FRAC_STD
+                | Metric.SEMIDENSE_CANDIDATE_VIS_FRAC_MEAN
+                | Metric.SEMIDENSE_CANDIDATE_VIS_FRAC_STD
+                | Metric.SEMIDENSE_VALID_FRAC_MEAN
+                | Metric.SEMIDENSE_VALID_FRAC_STD
+                | Metric.CANDIDATE_VALID_FRAC
+                | Metric.COVERAGE_WEIGHT_MEAN
+                | Metric.COVERAGE_WEIGHT_STRENGTH
+            ):
+                return LogSpec(on_step=stage is Stage.TRAIN, on_epoch=True, prog_bar=False)
+            case Metric.CORAL_MONOTONICITY_VIOLATION_RATE:
+                return LogSpec(on_step=stage is Stage.TRAIN, on_epoch=True, prog_bar=False)
+            case Metric.PRED_RRI_BIAS2 | Metric.PRED_RRI_VARIANCE:
+                if stage is not Stage.VAL:
+                    return LogSpec(on_step=False, on_epoch=False, prog_bar=False, enabled=False)
+                return LogSpec(on_step=False, on_epoch=True, prog_bar=False)
+            case Metric.SPEARMAN:
+                return LogSpec(on_step=False, on_epoch=True, prog_bar=False)
+            case Metric.SPEARMAN_STEP:
+                if stage is not Stage.TRAIN:
+                    return LogSpec(on_step=False, on_epoch=False, prog_bar=False, enabled=False)
+                return LogSpec(on_step=True, on_epoch=False, prog_bar=False)
+            case Metric.CONFUSION_MATRIX | Metric.LABEL_HISTOGRAM:
+                return LogSpec(on_step=False, on_epoch=True, prog_bar=False)
+            case Metric.CONFUSION_MATRIX_STEP | Metric.LABEL_HISTOGRAM_STEP:
+                if stage is not Stage.TRAIN:
+                    return LogSpec(on_step=False, on_epoch=False, prog_bar=False, enabled=False)
+                return LogSpec(on_step=True, on_epoch=False, prog_bar=False)
+        raise ValueError(f"Unknown Metric: {self}")
 
 
-class Loss(StrEnum):
+class Loss(Logable):
     """Loss suffixes composed with Stage as ``{stage}/{loss}``."""
 
     LOSS = "loss"
@@ -60,8 +144,23 @@ class Loss(StrEnum):
     ORD_FOCAL = "coral_loss_focal"
     AUX_REGRESSION = "aux_regression_loss"
 
-    def __str__(self) -> str:
-        return self.value
+    def log_spec(self, stage: Stage) -> LogSpec:
+        match self:
+            case Loss.LOSS:
+                return LogSpec(
+                    on_step=stage is Stage.TRAIN,
+                    on_epoch=True,
+                    prog_bar=stage in {Stage.TRAIN, Stage.VAL},
+                )
+            case Loss.CORAL_REL_RANDOM:
+                return LogSpec(
+                    on_step=stage is Stage.TRAIN,
+                    on_epoch=True,
+                    prog_bar=stage in {Stage.TRAIN, Stage.VAL},
+                )
+            case Loss.CORAL | Loss.ORD_BALANCED_BCE | Loss.ORD_FOCAL | Loss.AUX_REGRESSION:
+                return LogSpec(on_step=stage is Stage.TRAIN, on_epoch=True, prog_bar=False)
+        raise ValueError(f"Unknown Loss: {self}")
 
 
 class LabelHistogram(MetricBase):
@@ -245,6 +344,7 @@ def topk_accuracy_from_probs(probs: Tensor, labels: Tensor, *, top_k: int) -> Te
 __all__ = [
     "LabelHistogram",
     "Loss",
+    "LogSpec",
     "Metric",
     "RriErrorStats",
     "VinMetrics",

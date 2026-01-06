@@ -296,21 +296,70 @@ class EfmPointsView:
             lengths=self.lengths.to(target_device),
         )
 
-    def collapse_points(self, max_points: int | None = None, include_inv_dist_std: bool = False) -> Tensor:
+    def collapse_points(
+        self,
+        max_points: int | None = None,
+        include_inv_dist_std: bool = False,
+        include_obs_count: bool = False,
+    ) -> Tensor:
         """Collapse points across time and optionally subsample.
 
+        Args:
+            max_points: Optional cap on the number of returned points.
+            include_inv_dist_std: If True, append inverse depth std per point.
+            include_obs_count: If True, append the number of snippet frames that
+                observed each point (observation count).
+
         Returns:
-            ``Tensor["K 3", float32]`` if ``include_inv_dist_std=False``.
-            ``Tensor["K 4", float32]`` if ``include_inv_dist_std=True`` (XYZ + inv_dist_std).
+            ``Tensor["K 3", float32]`` if no extra features are requested.
+            ``Tensor["K 4", float32]`` if exactly one extra feature is requested
+            (XYZ + inv_dist_std or XYZ + obs_count).
+            ``Tensor["K 5", float32]`` if both extras are requested
+            (XYZ + inv_dist_std + obs_count).
         """
 
         points = self.points_world
         if points.numel() == 0:
-            return torch.zeros((0, 3), dtype=points.dtype, device=points.device)
+            extra_dim = int(include_inv_dist_std) + int(include_obs_count)
+            return torch.zeros((0, 3 + extra_dim), dtype=points.dtype, device=points.device)
 
         lengths = self.lengths.to(device=points.device)
         max_len = points.shape[1]
         valid_mask = torch.arange(max_len, device=points.device).unsqueeze(0) < lengths.clamp_max(max_len).unsqueeze(-1)
+        valid_mask &= torch.isfinite(points).all(dim=-1)
+
+        if include_obs_count:
+            points_flat = points[valid_mask]
+            if points_flat.numel() == 0:
+                extra_dim = int(include_inv_dist_std) + 1
+                return torch.zeros((0, 3 + extra_dim), dtype=points.dtype, device=points.device)
+
+            unique_points, inverse, counts = torch.unique(
+                points_flat,
+                dim=0,
+                return_inverse=True,
+                return_counts=True,
+            )
+            obs_count = counts.to(dtype=points.dtype)
+            extras: list[Tensor] = []
+
+            if include_inv_dist_std:
+                inv_dist_std = self.inv_dist_std.to(device=points.device, dtype=points.dtype)
+                inv_flat = inv_dist_std[valid_mask]
+                inv_sum = torch.zeros(unique_points.shape[0], device=points.device, dtype=points.dtype)
+                inv_sum.scatter_add_(0, inverse, inv_flat)
+                inv_mean = inv_sum / obs_count.clamp_min(1.0)
+                extras.append(inv_mean.unsqueeze(-1))
+
+            extras.append(obs_count.unsqueeze(-1))
+            points_out = unique_points
+            if extras:
+                points_out = torch.cat([points_out] + extras, dim=-1)
+
+            if max_points is not None and points_out.shape[0] > max_points:
+                idx = torch.randperm(points_out.shape[0], device=points_out.device)[:max_points]
+                points_out = points_out[idx]
+            return points_out
 
         if include_inv_dist_std:
             inv_dist_std = self.inv_dist_std.to(device=points.device, dtype=points.dtype)
@@ -705,12 +754,14 @@ class VinSnippetView:
     """Minimal snippet payload for VIN v2 batching.
 
     Attributes:
-        points_world: ``Tensor["K 4", float32]`` collapsed semidense points (XYZ + inv_dist_std).
+        points_world: ``Tensor["K (3+C)", float32]`` collapsed semidense points.
+            Base columns are XYZ; optional extras include inv_dist_std and
+            observation count (number of snippet frames that saw the point).
         t_world_rig: ``PoseTW["F 12"]`` historical world←rig poses.
     """
 
     points_world: Tensor
-    """Collapsed semidense point cloud (XYZ + inv_dist_std)."""
+    """Collapsed semidense point cloud with optional extra features."""
     t_world_rig: PoseTW
     """Trajectory poses (world←rig)."""
 

@@ -560,7 +560,7 @@ class VinPipeline(nn.Module):
             t_world_voxel=backbone_out.t_world_voxel,
             voxel_extent=backbone_out.voxel_extent,
         )
-        valid_frac = token_valid.float().mean(dim=-1)
+        voxel_valid_frac = token_valid.float().mean(dim=-1)
         local_feat = self.frustum_sampler.pool_tokens(tokens=tokens, valid=token_valid)
 
         # Feature assembly.
@@ -595,7 +595,8 @@ class VinPipeline(nn.Module):
             expected=expected,
             expected_normalized=expected_norm,
             candidate_valid=candidate_valid,
-            valid_frac=valid_frac,
+            voxel_valid_frac=voxel_valid_frac,
+            semidense_valid_frac=None,
         )
 
         if not return_debug:
@@ -626,7 +627,7 @@ class VinPipeline(nn.Module):
             tokens=tokens,
             token_valid=token_valid,
             candidate_valid=candidate_valid,
-            valid_frac=valid_frac.unsqueeze(-1),
+            voxel_valid_frac=voxel_valid_frac.unsqueeze(-1),
             feats=feats,
         )
         return pred, debug
