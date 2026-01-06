@@ -40,3 +40,11 @@ improvement is a continuous scalar with heavy-tailed distributions. CORAL
 models ordinal labels via cumulative probabilities and has been used for age
 estimation and related tasks @CORAL-cao2019. We adopt CORAL for RRI binning and
 use a calibrated expectation over bins for auxiliary regression.
+
+== Feature-wise conditioning (FiLM)
+
+Feature-wise Linear Modulation (FiLM) applies a learned per-channel scale and
+shift to condition intermediate features on an auxiliary signal
+@perez2017filmvisualreasoninggeneral. We use FiLM-style conditioning to
+modulate voxel-derived candidate features with view-dependent semidense
+projection statistics, providing a lightweight mechanism for late fusion.

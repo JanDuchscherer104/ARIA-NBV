@@ -30,7 +30,7 @@ image bounds. We define the candidate-conditioned visibility fraction
     $
       v_i^("sem") =
       (1)/(max(1, |#sym_points _t|))
-      sum_(bold(p) in #sym_points _t) 1["valid"_i(bold(p))]
+      sum_(bold(p) in #sym_points _t) bb(1)["valid"_i(bold(p))]
     $
   ]
 ]

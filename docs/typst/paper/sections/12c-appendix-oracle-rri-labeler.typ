@@ -31,16 +31,16 @@ Given an ASE-EFM snippet with mesh supervision, `OracleRriLabeler` executes:
 
 == Candidate center sampling (hyperspherical shell)
 
-Let $(#sym_T)_{#fr_world <- #fr_rig_ref}$ be the reference rig pose (world
+Let $#sym_T _(#fr_world <- #fr_rig_ref)$ be the reference rig pose (world
 coordinates). Candidate centers are sampled by drawing a direction
-$(#sym_dir)_i in bb(S)^2$ and a radius $r_i in [r_"min", r_"max"]$, then
+$#sym_dir _i in bb(S)^2$ and a radius $r_i in [r_"min", r_"max"]$, then
 transforming the resulting offset into world coordinates:
 
 #block[
   #align(center)[
     $
-      (#sym_offset)_i = r_i (#sym_dir)_i,
-      quad (#sym_center)_i = (#sym_T)_{#fr_world <- #fr_rig_ref} (#sym_offset)_i
+      #sym_offset _i = r_i #sym_dir _i,
+      quad #sym_center _i = #sym_T _(#fr_world <- #fr_rig_ref) #sym_offset _i
     $
   ]
 ]
@@ -340,7 +340,7 @@ the same NDC convention used by the rasterizer makes depth unprojection and
 rasterization consistent.
 
 The per-candidate point set is then
-$(#sym_points)_(q_i) = { bold(p)_("world") : (u,v) "valid" }$, optionally
+$#sym_points _(q_i) = { bold(p)_("world") : (u,v) "valid" }$, optionally
 subsampled by a stride to control point count.
 
 The backprojection configuration used in our runs is summarized in
@@ -366,14 +366,14 @@ The backprojection configuration used in our runs is summarized in
 == Oracle RRI computation
 
 Let $#sym_points _t$ be the semidense SLAM reconstruction for the snippet and
-$(#sym_points)_(q_i)$ the candidate point cloud rendered from the GT mesh.
+$#sym_points _(q_i)$ the candidate point cloud rendered from the GT mesh.
 Oracle RRI is computed by comparing the point-to-mesh reconstruction quality
 before and after adding the candidate:
 
 #block[
   #align(center)[
     $
-      (#sym_points)_(t union q_i) = #sym_points _t union (#sym_points)_(q_i)
+      #sym_points _(t union q_i) = #sym_points _t union #sym_points _(q_i)
     $
   ]
 ]
@@ -383,7 +383,7 @@ before and after adding the candidate:
     $
       "RRI"(q_i) =
       ("CD"(#sym_points _t, #sym_mesh)
-      - "CD"((#sym_points)_(t union q_i), #sym_mesh))
+      - "CD"(#sym_points _(t union q_i), #sym_mesh))
       / ("CD"(#sym_points _t, #sym_mesh) + epsilon)
     $
   ]
@@ -441,14 +441,14 @@ The ordinal label is then the number of edges below the value (implemented via
 #block[
   #align(center)[
     $
-      y(r) = sum_(k=1)^(K-1) 1[r > e_k],
+      y(r) = sum_(k=1)^(K-1) bb(1)[r > e_k],
       quad y(r) in {0, dots, K-1}
     $
   ]
 ]
 
 CORAL represents the label $y$ as binary level targets
-$t_k = 1[y > k]$ for $k = 0, dots, K-2$ @CORAL-cao2019. The fitted binner also
+$t_k = bb(1)[y > k]$ for $k = 0, dots, K-2$ @CORAL-cao2019. The fitted binner also
 provides class priors and cumulative threshold priors
 $P(y > k)$, which we use for prior-aligned bias initialization and optional
 balanced threshold losses.
