@@ -193,8 +193,8 @@ and snippet-level signals, e.g.
   #align(center)[
     $
       bold(h)_i =
-      [(#sym_pose_emb)_i ;
-        (#sym_global)_i ;
+      [#sym_pose_emb _i ;
+        #sym_global _i ;
         bold(s)_i^("proj") ;
         bold(s)_i^("frustum") ;
         bold(z)^("traj") ;

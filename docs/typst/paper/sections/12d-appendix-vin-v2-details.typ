@@ -11,7 +11,7 @@ current `VinModelV2` implementation.
 
 == Pose representation and rotation-6D
 
-VIN v2 represents candidate poses as $#sym_T _{#fr_rig_ref <- #fr_cam} in "SE"(3)$.
+VIN v2 represents candidate poses as $#sym_T _(#fr_rig_ref <- #fr_cam) in "SE"(3)$.
 We encode rotation via the continuous 6D representation obtained by taking the
 first two columns of the rotation matrix and flattening them into a 6-vector.
 This avoids discontinuities of Euler angles and improves learning stability
@@ -30,7 +30,7 @@ image bounds. We define the candidate-conditioned visibility fraction
     $
       v_i^("sem") =
       (1)/(max(1, |#sym_points _t|))
-      sum_(bold(p) in #sym_points _t) bb(1)["valid"_i(bold(p))]
+      sum_(bold(p) in #sym_points _t) bb(1)["valid"_(i)(bold(p))]
     $
   ]
 ]
@@ -42,7 +42,7 @@ candidate $i$, even when voxel features are out-of-bounds.
 == Semidense frustum tokens and masking
 
 For the frustum attention block, we form tokens
-$bold(tau)_{i,k} = (u, v, z, nu, c)$ from the projected points, where $(u, v)$
+$bold(tau)_(i,k) = (u, v, z, nu, c)$ from the projected points, where $(u, v)$
 are normalized image coordinates, $z$ is depth, $nu$ is inverse-distance
 uncertainty, and $c$ is per-point observation count (track length). We support
 two candidate-dependent mechanisms:

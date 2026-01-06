@@ -84,7 +84,7 @@ The candidate center sampling configuration used in our runs is summarized in
 ) <tab:oracle-cfg-centers>
 
 *Azimuth/elevation caps without rejection.* Let
-$tilde((#sym_dir)) = (x, y, z)$ be a raw unit direction. We define
+$tilde(#sym_dir) = (x, y, z)$ be a raw unit direction. We define
 
 #block[
   #align(center)[
@@ -111,7 +111,7 @@ To cap elevation, we map $y = "sin"(theta)$ from $[-1, 1]$ into the target band:
 ]
 
 and rescale the horizontal components to preserve unit norm:
-$(x, z) <- (x, z) dot sqrt(1 - (y')^2) / sqrt(x^2 + z^2)$, followed by
+$(x, z) <- (x, z) dot sqrt(1 - y'^2) / sqrt(x^2 + z^2)$, followed by
 renormalization.
 
 == Candidate orientations
@@ -152,7 +152,7 @@ translation. Define the forward axis
   #align(center)[
     $
       bold(z)_i =
-      ( (#sym_center)_i - bold(t)_("ref") ) / (|| (#sym_center)_i - bold(t)_("ref") ||_2 + epsilon)
+      ( #sym_center _i - bold(t)_("ref") ) / (|| #sym_center _i - bold(t)_("ref") ||_2 + epsilon)
     $
   ]
 ]
@@ -226,7 +226,7 @@ The pruning configuration used in our runs is summarized in
 #block[
   #align(center)[
     $
-      d_i = min_(bold(m) in #sym_mesh) || (#sym_center)_i - bold(m) ||_2,
+      d_i = min_(bold(m) in #sym_mesh) || #sym_center _i - bold(m) ||_2,
       quad
       d_i > d_"min"
     $
@@ -240,7 +240,7 @@ points along the segment and require a minimum clearance:
 #block[
   #align(center)[
     $
-      bold(s)_(i,k) = bold(t)_("ref") + alpha_k ((#sym_center)_i - bold(t)_("ref")),
+      bold(s)_(i,k) = bold(t)_("ref") + alpha_k (#sym_center _i - bold(t)_("ref")),
       quad alpha_k in [0, 1], \
       min_(bold(m) in #sym_mesh) || bold(s)_(i,k) - bold(m) ||_2 > delta
     $
@@ -255,7 +255,7 @@ $(#sym_center)_i in cal(B)$.
 Depth rendering is implemented in
 `oracle_rri/oracle_rri/rendering/pytorch3d_depth_renderer.py` using PyTorch3D's
 `PerspectiveCameras`, `RasterizationSettings`, and `MeshRasterizer`
-@PyTorch3D-Cameras-2025. Given a candidate pose $(#sym_T)_{#fr_world <- #fr_cam}$
+@PyTorch3D-Cameras-2025. Given a candidate pose $#sym_T _(#fr_world <- #fr_cam)$
 and camera intrinsics (focal length and principal point), we build a batched
 `PerspectiveCameras` instance with `in_ndc=false` and rasterize the GT mesh.
 
@@ -325,8 +325,8 @@ We then unproject in NDC space:
 #block[
   #align(center)[
     $
-      bold(p)_("world") =
-      "unproject"((x_"ndc", y_"ndc", (#sym_depth)_i(u,v)))
+      bold(p)_"world" =
+      "unproject"(x_"ndc", y_"ndc", #sym_depth _i(u,v))
     $
   ]
 ]
