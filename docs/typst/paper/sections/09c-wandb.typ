@@ -4,8 +4,8 @@
 = WandB Run Analysis (Jan 3, 2026)
 
 We reviewed all WandB runs started on January 3, 2026 with more than 500 logged
-steps (based on the `wandb-summary.json` files). Three runs met this criterion.
-Their key metrics are summarized in @tab:wandb-runs.
+steps (based on the run summary metadata). Three runs met this criterion. Their
+key metrics are summarized in @tab:wandb-runs.
 
 #figure(
   kind: "table",
@@ -17,14 +17,14 @@ Their key metrics are summarized in @tab:wandb-runs.
       columns: (8em, auto),
       align: (left, left),
       toprule(),
-      table.header([Run ID], [Summary]),
+      table.header([Run], [Summary]),
       midrule(),
-      [nn0jcqwr],
-      [Start 01:02:53; global_step 0 (log step 1341). Loss NaN from start; optimizer loop likely never advanced.],
-      [m06auwmr],
-      [Start 01:14:45; global_step 547 (log step 1604). Train/val losses NaN; val spearman 0.004; top3 0.191.],
-      [jejo31ut],
-      [Start 01:45:43; global_step 1506 (log step 4425). Finite losses (train 10.15, val 7.69); val spearman 0.127; top3 0.222.],
+      [Run 1],
+      [Loss NaN from the start; optimizer loop likely never advanced.],
+      [Run 2],
+      [Train/val losses NaN; validation Spearman 0.004; top-3 accuracy 0.191.],
+      [Run 3],
+      [Finite losses (train 10.15, val 7.69); validation Spearman 0.127; top-3 accuracy 0.222.],
       bottomrule(),
     )
   ],
@@ -32,14 +32,13 @@ Their key metrics are summarized in @tab:wandb-runs.
 
 == Observations
 
-- Two runs (nn0jcqwr, m06auwmr) reported NaN losses, indicating numerical
-  instability or invalid labels early in training. In nn0jcqwr, `global_step`
-  stayed at 0 despite >1000 logged steps, suggesting a failure before the
-  optimizer update loop.
-- The most recent run (jejo31ut) produced stable losses and non-zero validation
-  correlation (Spearman 0.127) with a top-3 accuracy of 0.222. Balanced BCE and
-  focal CORAL losses were logged alongside the primary loss, showing that the
-  balanced variants remain well-behaved even when the main CORAL loss is large.
+- Two runs reported NaN losses, indicating numerical instability or invalid
+  labels early in training. In one case, the optimizer update loop likely never
+  executed.
+- The stable run produced non-zero validation correlation (Spearman 0.127) and
+  a top-3 accuracy of 0.222. Balanced and focal threshold losses were logged
+  alongside the primary CORAL loss, suggesting that the imbalance-aware
+  variants remain well-behaved even when the main CORAL loss is large.
 - Monotonicity violation rates were 0 across runs, indicating that the ordinal
   thresholds remained properly ordered when the loss was finite.
 

@@ -5,7 +5,7 @@
 
 = System Pipeline and Implementation
 
-Our NBV system is implemented in the `oracle_rri` package and follows a modular
+Our NBV system follows a modular
 pipeline from data ingestion to candidate scoring. The key stages are
 summarized in @tab:pipeline and visualized in @fig:candidate-poses.
 
@@ -31,8 +31,8 @@ summarized in @tab:pipeline and visualized in @fig:candidate-poses.
       [Outputs],
     ),
     midrule(), [Dataset loader], [ASE shards, mesh],
-    [EfmSnippetView], [Candidate generation], [Rig pose, mesh, bounds],
-    [PoseTW candidates], [Depth rendering], [Candidates, mesh, cameras],
+    [Snippet window (streams, poses, semidense points, mesh)], [Candidate generation], [Rig pose, mesh, bounds],
+    [Candidate poses], [Depth rendering], [Candidates, mesh, cameras],
     [Depth maps, masks], [Oracle RRI], [$#sym_points _t, #sym_points _q, #sym_mesh$],
     [RRI labels], [VIN inference], [EVL features, poses],
     [Ordinal RRI scores], bottomrule(),
@@ -56,7 +56,7 @@ points using EFM3D camera utilities. These points are fused with the
 semi-dense SLAM reconstruction to form the candidate-augmented point cloud. The
 rendering step is expensive but performed offline to generate oracle labels.
 
-We explicitly track valid depth pixels with a `depths_valid_mask`, ensuring
+We explicitly track valid depth pixels with a per-pixel validity mask, ensuring
 that miss pixels or z-buffer failures do not pollute the candidate point cloud.
 This mask is also useful for debugging candidate views that appear to look
 through walls or miss the mesh entirely.

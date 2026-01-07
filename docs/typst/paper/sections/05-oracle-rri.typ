@@ -28,28 +28,23 @@ completeness and accuracy components of the Chamfer distance to diagnose
 failure modes (e.g., views that look into empty space). The resulting RRI values
 serve as supervised labels for the VIN model.
 
-Implementation note: our point #sym.arrow.l.r mesh distances are computed with PyTorch3D
-point-to-triangle and triangle-to-point distance operators (averaged over
-points/faces). This yields the same accuracy (P #sym.arrow.r M) and completeness (M #sym.arrow.r P)
-split reported by ATEK-style surface reconstruction evaluation.
+Implementation note: distances are evaluated with differentiable
+point-to-triangle and triangle-to-point primitives (averaged over points and
+faces). This yields the same accuracy (P #sym.arrow.r M) and completeness (M
+#sym.arrow.r P) split reported by ATEK-style surface reconstruction evaluation.
 
-== Pipeline wiring (OracleRriLabeler)
+== Pipeline structure
 
-The oracle labels are produced by the `OracleRriLabeler` pipeline, which
-explicitly wires the following modules (in order):
+The oracle label computation consists of four stages:
 
-- `CandidateViewGenerator` (candidate_generation.py): samples candidate poses
-  around the reference rig pose, applies gravity alignment if configured,
-  and prunes with collision/free-space rules. Outputs a `CandidateSamplingResult`
-  with candidate cameras in the reference frame and a `mask_valid`.
-- `CandidateDepthRenderer` (candidate_depth_renderer.py): renders depth maps for
-  valid candidates using PyTorch3D, producing `CandidateDepths` with
-  `depths_valid_mask` and the camera intrinsics used for rendering.
-- `build_candidate_pointclouds` (rendering): backprojects depth maps into
-  world points, fuses them with the semi-dense SLAM points, and returns
-  `CandidatePointClouds` with per-candidate lengths.
-- `OracleRRI` (oracle_rri.py): crops the GT mesh to the occupancy AABB and
-  computes RRI using `chamfer_point_mesh` and `chamfer_point_mesh_batched`.
+- sample candidate poses around the current rig pose under collision and
+  free-space constraints,
+- render candidate depth maps from the ground-truth mesh and mask invalid
+  pixels,
+- backproject valid depths into world points, fuse with the semi-dense SLAM
+  reconstruction, and form the candidate-augmented point set,
+- compute Chamfer-based reconstruction quality before/after adding each
+  candidate, yielding per-candidate RRI labels.
 
 This separation ensures that rendering and label computation are decoupled from
 the VIN model. The VIN architecture consumes only the resulting labels and

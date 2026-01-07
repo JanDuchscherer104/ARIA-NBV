@@ -1380,7 +1380,7 @@ Figure&nbsp;1: Actual encoding plots generated with <code>oracle_rri.vin.plottin
 </section>
 <section id="semidense-frustum-mhca-current" class="level2" data-number="7.3">
 <h2 data-number="7.3" class="anchored" data-anchor-id="semidense-frustum-mhca-current"><span class="header-section-number">7.3</span> Semidense frustum MHCA (current)</h2>
-<p><code>VinModelV2</code> also summarizes the <strong>projected semidense points</strong> with a lightweight multi‑head cross‑attention (MHCA) block, using candidate pose embeddings as queries. The token features are built from normalized screen coordinates, depth, and (optionally) inverse distance standard deviation. This yields a <strong>view‑specific frustum descriptor</strong> that complements the scalar projection statistics and injects a stronger inductive bias for “what lies in front of the candidate.”</p>
+<p><code>VinModelV2</code> also summarizes the <strong>projected semidense points</strong> with a lightweight multi‑head cross‑attention (MHCA) block, using candidate pose embeddings as queries. The token features are built from normalized screen coordinates, depth, and (optionally) inverse distance standard deviation. This yields a <strong>view‑specific frustum descriptor</strong> that complements the scalar projection statistics and injects a stronger inductive bias for “what lies in front of the candidate.” This block is optional and gated by <code>VinModelV2Config.enable_semidense_frustum</code> (default: <code>False</code>).</p>
 </section>
 <section id="suggested-upgrade-roadmap-summary" class="level2" data-number="7.4">
 <h2 data-number="7.4" class="anchored" data-anchor-id="suggested-upgrade-roadmap-summary"><span class="header-section-number">7.4</span> Suggested upgrade roadmap (summary)</h2>
@@ -1395,7 +1395,7 @@ Figure&nbsp;1: Actual encoding plots generated with <code>oracle_rri.vin.plottin
 </section>
 <section id="vin-internal-architecture-current-with-tensor-shapes" class="level2" data-number="7.5">
 <h2 data-number="7.5" class="anchored" data-anchor-id="vin-internal-architecture-current-with-tensor-shapes"><span class="header-section-number">7.5</span> VIN internal architecture (current, with tensor shapes)</h2>
-<p>Shapes below match the current <code>VinLightningModule.summarize_vin()</code> output for a typical oracle batch with <code>B=1</code>, <code>N=32</code> candidates, EVL voxel grid resolution <code>48³</code>, and VIN defaults. The v2 head does <strong>not</strong> use voxel‑frustum sampling; instead, it includes <strong>semidense projection features</strong> per candidate (<code>SEMIDENSE_PROJ_DIM=5</code>: coverage, empty fraction, valid fraction, depth mean/std) plus a <strong>semidense frustum MHCA</strong> summary (<code>field_dim</code> channels), and optional snippet‑level semidense/trajectory context embeddings.</p>
+<p>Shapes below match the current <code>VinLightningModule.summarize_vin()</code> output for a typical oracle batch with <code>B=1</code>, <code>N=32</code> candidates, EVL voxel grid resolution <code>48³</code>, and VIN defaults. The v2 head does <strong>not</strong> use voxel‑frustum sampling; instead, it includes <strong>semidense projection features</strong> per candidate (<code>SEMIDENSE_PROJ_DIM=5</code>: coverage, empty fraction, valid fraction, depth mean/std) plus an optional <strong>semidense frustum MHCA</strong> summary (<code>field_dim</code> channels, when enabled), and optional snippet‑level semidense/trajectory context embeddings.</p>
 <div class="cell" data-layout-align="default">
 <details open="" class="code-fold">
 <summary>Code</summary>
@@ -1422,12 +1422,12 @@ Figure&nbsp;1: Actual encoding plots generated with <code>oracle_rri.vin.plottin
 <span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>        poseenc["pose_enc (R6D+LFF or shell)&lt;br/&gt;pose_enc: (B,N,E_pose)"]</span>
 <span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>        semproj["semidense projection&lt;br/&gt;coverage/empty/valid/depth stats&lt;br/&gt;semidense_proj: (B,N,5)"]</span>
-<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>        semfrustum["semidense frustum MHCA&lt;br/&gt;frustum_feat: (B,N,C)"]</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>        semfrustum["optional semidense frustum MHCA&lt;br/&gt;frustum_feat: (B,N,C)"]</span>
 <span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>        semfeat["optional PointNeXt-S&lt;br/&gt;semidense_feat: (B,C_point)"]</span>
 <span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>        traj["optional trajectory ctx&lt;br/&gt;traj_ctx: (B,C_traj)"]</span>
 <span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>        film["optional FiLM on global_feat"]</span>
 <span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>        concat["concat feats&lt;br/&gt;[pose_enc, global_feat, semidense_proj,&lt;br/&gt; semidense_frustum, semidense_feat?, traj_ctx?]"]</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>        concat["concat feats&lt;br/&gt;[pose_enc, global_feat, semidense_proj,&lt;br/&gt; semidense_frustum?, semidense_feat?, traj_ctx?]"]</span>
 <span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>        head["MLP + CORAL&lt;br/&gt;logits: (B,N,K-1)"]</span>
 <span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>    end</span>
 <span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a></span>
@@ -1471,12 +1471,12 @@ Figure&nbsp;1: Actual encoding plots generated with <code>oracle_rri.vin.plottin
         poseenc["pose_enc (R6D+LFF or shell)&lt;br/&gt;pose_enc: (B,N,E_pose)"]
 
         semproj["semidense projection&lt;br/&gt;coverage/empty/valid/depth stats&lt;br/&gt;semidense_proj: (B,N,5)"]
-        semfrustum["semidense frustum MHCA&lt;br/&gt;frustum_feat: (B,N,C)"]
+        semfrustum["optional semidense frustum MHCA&lt;br/&gt;frustum_feat: (B,N,C)"]
         semfeat["optional PointNeXt-S&lt;br/&gt;semidense_feat: (B,C_point)"]
         traj["optional trajectory ctx&lt;br/&gt;traj_ctx: (B,C_traj)"]
         film["optional FiLM on global_feat"]
 
-        concat["concat feats&lt;br/&gt;[pose_enc, global_feat, semidense_proj,&lt;br/&gt; semidense_frustum, semidense_feat?, traj_ctx?]"]
+        concat["concat feats&lt;br/&gt;[pose_enc, global_feat, semidense_proj,&lt;br/&gt; semidense_frustum?, semidense_feat?, traj_ctx?]"]
         head["MLP + CORAL&lt;br/&gt;logits: (B,N,K-1)"]
     end
 
@@ -1583,7 +1583,7 @@ y(r)=\sum_{j=1}^{K-1}\mathbb{1}[r \ge e_j].
 \]</span></p>
 <p>Practical notes:</p>
 <ul>
-<li>Fit data can be saved/resumed (<code>.pt</code> state with RRI chunks) and the fitted binner is saved as JSON (<code>num_classes</code>, <code>edges</code>).</li>
+<li>Fit data can be saved/resumed (<code>.pt</code> state with RRI chunks) and the fitted binner is saved as JSON (<code>num_classes</code>, <code>edges</code>, optional <code>bin_means</code>, <code>bin_stds</code>, and <code>bin_counts</code> for priors).</li>
 <li>On training start, if <code>VinLightningModuleConfig.num_classes</code> differs from the saved binner JSON, the binner is automatically refit and the JSON is overwritten with the new class count.</li>
 <li>If quantile edges collapse (degenerate quantiles), we fall back to uniform edges between the observed min/max (or <code>[-1,1]</code> as a last resort).</li>
 </ul></li>
@@ -1605,7 +1605,13 @@ y(r)=\sum_{j=1}^{K-1}\mathbb{1}[r \ge e_j].
 \mathbb{E}[\mathcal{L}_{\text{CORAL}}]
 =(K-1)\log 2.
 \]</span></p>
-<p>For our default <span class="math inline">\(K=15\)</span>, this gives <span class="math inline">\(14\log 2 \approx 9.70\)</span>, which is a useful sanity check when interpreting training curves. The Lightning module logs <code>coral_loss_rel_random = coral_loss / ((K-1)\log 2)</code> alongside the raw loss, plus a candidate-level <code>top3_accuracy</code> metric for ordinal classification.</p></li>
+<p>For our default <span class="math inline">\(K=15\)</span>, this gives <span class="math inline">\(14\log 2 \approx 9.70\)</span>, which is a useful sanity check when interpreting training curves. The Lightning module logs <code>coral_loss_rel_random = coral_loss / ((K-1)\log 2)</code> alongside the raw loss, plus a candidate-level <code>top3_accuracy</code> metric for ordinal classification.</p>
+<p><strong>Optional imbalance mitigation.</strong> Threshold labels are imbalanced by construction (early thresholds have many positives). We therefore support optional reweighting in <code>VinLightningModuleConfig</code>:</p>
+<ul>
+<li><code>coral_bias_init="prior_logits"</code> initializes CORAL threshold biases from empirical priors (<code>bin_counts</code>), instead of a generic descending scheme.</li>
+<li><code>coral_loss_variant="balanced_bce"</code> applies per-threshold positive-class weighting using <span class="math inline">\(P(y&gt;k)\)</span> (from the fitted binner or the current batch).</li>
+<li><code>coral_loss_variant="focal"</code> applies focal weighting to the per-threshold BCE to combat collapse under severe imbalance <span class="citation" data-cites="FocalLoss-lin2017"><a href="#ref-FocalLoss-lin2017" role="doc-biblioref">[12]</a></span>.</li>
+</ul></li>
 <li><p><strong>Binning diagnostics (plots).</strong> The script <code>oracle_rri/scripts/plot_vin_binning.py</code> generates the RRI histogram with quantile edges and a dedicated edge plot (Seaborn):</p></li>
 </ol>
 <div id="fig-vin-rri-binning" class="quarto-layout-panel">
@@ -1705,6 +1711,9 @@ url<span>https://pytorch3d.readthedocs.io/en/latest/modules/transforms.html</spa
 </div>
 <div id="ref-coral-pytorch-2025" class="csl-entry" role="listitem">
 <div class="csl-left-margin">[11] </div><div class="csl-right-inline">Raschka Research Group, <span>“Coral-pytorch documentation.”</span> [Online]. Available: <a href="https://raschka-research-group.github.io/coral-pytorch/">https://raschka-research-group.github.io/coral-pytorch/</a></div>
+</div>
+<div id="ref-FocalLoss-lin2017" class="csl-entry" role="listitem">
+<div class="csl-left-margin">[12] </div><div class="csl-right-inline">T.-Y. Lin, P. Goyal, R. Girshick, K. He, and P. Dollár, <span>“Focal loss for dense object detection.”</span> 2017. Available: <a href="https://arxiv.org/abs/1708.02002">https://arxiv.org/abs/1708.02002</a></div>
 </div>
 </div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
@@ -2818,283 +2827,294 @@ url<span>https://pytorch3d.readthedocs.io/en/latest/modules/transforms.html</spa
 <span id="cb6-642"><a href="#cb6-642" aria-hidden="true" tabindex="-1"></a>inverse distance standard deviation. This yields a **view‑specific frustum descriptor**</span>
 <span id="cb6-643"><a href="#cb6-643" aria-hidden="true" tabindex="-1"></a>that complements the scalar projection statistics and injects a stronger inductive bias</span>
 <span id="cb6-644"><a href="#cb6-644" aria-hidden="true" tabindex="-1"></a>for “what lies in front of the candidate.”</span>
-<span id="cb6-645"><a href="#cb6-645" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-646"><a href="#cb6-646" aria-hidden="true" tabindex="-1"></a><span class="fu">## Suggested upgrade roadmap (summary)</span></span>
-<span id="cb6-647"><a href="#cb6-647" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-648"><a href="#cb6-648" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**(Done)** Key/value separation + residual/LN around the pose‑conditioned attention block.</span>
-<span id="cb6-649"><a href="#cb6-649" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**(Done)** View‑conditioned point features via semidense projection + MHCA frustum summary.</span>
-<span id="cb6-650"><a href="#cb6-650" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Add a stage proxy scalar** (e.g., coverage mean, max counts, or point count) to the head input.</span>
-<span id="cb6-651"><a href="#cb6-651" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Switch positional encoding to candidate‑relative** coordinates for attention keys.</span>
-<span id="cb6-652"><a href="#cb6-652" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**Optionally add voxel‑frustum local evidence** (sample a small K‑point frustum and pool).</span>
-<span id="cb6-653"><a href="#cb6-653" aria-hidden="true" tabindex="-1"></a><span class="ss">6. </span>**Optionally add candidate view‑plane feature grids** (VIN‑NBV‑style projection + CNN head).</span>
-<span id="cb6-654"><a href="#cb6-654" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-655"><a href="#cb6-655" aria-hidden="true" tabindex="-1"></a><span class="fu">## VIN internal architecture (current, with tensor shapes)</span></span>
-<span id="cb6-656"><a href="#cb6-656" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-657"><a href="#cb6-657" aria-hidden="true" tabindex="-1"></a>Shapes below match the current <span class="in">`VinLightningModule.summarize_vin()`</span> output for a typical oracle batch with <span class="in">`B=1`</span>,</span>
-<span id="cb6-658"><a href="#cb6-658" aria-hidden="true" tabindex="-1"></a><span class="in">`N=32`</span> candidates, EVL voxel grid resolution <span class="in">`48³`</span>, and VIN defaults. The v2 head does **not** use voxel‑frustum</span>
-<span id="cb6-659"><a href="#cb6-659" aria-hidden="true" tabindex="-1"></a>sampling; instead, it includes **semidense projection features** per candidate</span>
-<span id="cb6-660"><a href="#cb6-660" aria-hidden="true" tabindex="-1"></a>(<span class="in">`SEMIDENSE_PROJ_DIM=5`</span>: coverage, empty fraction, valid fraction, depth mean/std) plus a **semidense frustum MHCA**</span>
-<span id="cb6-661"><a href="#cb6-661" aria-hidden="true" tabindex="-1"></a>summary (<span class="in">`field_dim`</span> channels), and optional snippet‑level semidense/trajectory context embeddings.</span>
-<span id="cb6-662"><a href="#cb6-662" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-665"><a href="#cb6-665" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
-<span id="cb6-666"><a href="#cb6-666" aria-hidden="true" tabindex="-1"></a>flowchart TD</span>
-<span id="cb6-667"><a href="#cb6-667" aria-hidden="true" tabindex="-1"></a>    subgraph In[<span class="ot">"</span><span class="st">Inputs</span><span class="ot">"</span>]</span>
-<span id="cb6-668"><a href="#cb6-668" aria-hidden="true" tabindex="-1"></a>        efm[<span class="ot">"</span><span class="st">EFM snippet dict&lt;br/&gt;(unbatched: T×...)</span><span class="ot">"</span>]</span>
-<span id="cb6-669"><a href="#cb6-669" aria-hidden="true" tabindex="-1"></a>        cand[<span class="ot">"</span><span class="st">candidate_poses_world_cam&lt;br/&gt;PoseTW(B,N,12)&lt;br/&gt;(example: 1×32×12)</span><span class="ot">"</span>]</span>
-<span id="cb6-670"><a href="#cb6-670" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ref</span>[<span class="ot">"</span><span class="st">reference_pose_world_rig&lt;br/&gt;PoseTW(B,12)</span><span class="ot">"</span>]</span>
-<span id="cb6-671"><a href="#cb6-671" aria-hidden="true" tabindex="-1"></a>        p3d[<span class="ot">"</span><span class="st">p3d_cameras&lt;br/&gt;PerspectiveCameras(B*N)</span><span class="ot">"</span>]</span>
-<span id="cb6-672"><a href="#cb6-672" aria-hidden="true" tabindex="-1"></a>    end</span>
-<span id="cb6-673"><a href="#cb6-673" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-674"><a href="#cb6-674" aria-hidden="true" tabindex="-1"></a>    subgraph Frozen[<span class="ot">"</span><span class="st">Frozen EVL backbone</span><span class="ot">"</span>]</span>
-<span id="cb6-675"><a href="#cb6-675" aria-hidden="true" tabindex="-1"></a>        evl[<span class="ot">"</span><span class="st">EvlBackbone.forward(efm)</span><span class="ot">"</span>]</span>
-<span id="cb6-676"><a href="#cb6-676" aria-hidden="true" tabindex="-1"></a>        out[<span class="ot">"</span><span class="st">EvlBackboneOutput&lt;br/&gt;occ_pr/cent_pr/occ_input/counts&lt;br/&gt;T_world_voxel, voxel_extent, pts_world</span><span class="ot">"</span>]</span>
-<span id="cb6-677"><a href="#cb6-677" aria-hidden="true" tabindex="-1"></a>    end</span>
-<span id="cb6-678"><a href="#cb6-678" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-679"><a href="#cb6-679" aria-hidden="true" tabindex="-1"></a>    subgraph VIN[<span class="ot">"</span><span class="st">Trainable VIN v2 head</span><span class="ot">"</span>]</span>
-<span id="cb6-680"><a href="#cb6-680" aria-hidden="true" tabindex="-1"></a>        field_in[<span class="ot">"</span><span class="st">scene_field&lt;br/&gt;field_in: (B,C_in,D,H,W)</span><span class="ot">"</span>]</span>
-<span id="cb6-681"><a href="#cb6-681" aria-hidden="true" tabindex="-1"></a>        proj[<span class="ot">"</span><span class="st">field_proj&lt;br/&gt;1×1×1 Conv3d + GN + GELU</span><span class="ot">"</span>]</span>
-<span id="cb6-682"><a href="#cb6-682" aria-hidden="true" tabindex="-1"></a>        <span class="fu">pos</span>[<span class="ot">"</span><span class="st">pos_grid from pts_world&lt;br/&gt;rig frame + LFF</span><span class="ot">"</span>]</span>
-<span id="cb6-683"><a href="#cb6-683" aria-hidden="true" tabindex="-1"></a>        gpool[<span class="ot">"</span><span class="st">pose-conditioned attention&lt;br/&gt;global_feat: (B,N,C)</span><span class="ot">"</span>]</span>
-<span id="cb6-684"><a href="#cb6-684" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-685"><a href="#cb6-685" aria-hidden="true" tabindex="-1"></a>        rel[<span class="ot">"</span><span class="st">relative pose&lt;br/&gt;T_rig_ref_cam = T_world_rig_ref^{-1} T_world_cam</span><span class="ot">"</span>]</span>
-<span id="cb6-686"><a href="#cb6-686" aria-hidden="true" tabindex="-1"></a>        poseenc[<span class="ot">"</span><span class="st">pose_enc (R6D+LFF or shell)&lt;br/&gt;pose_enc: (B,N,E_pose)</span><span class="ot">"</span>]</span>
-<span id="cb6-687"><a href="#cb6-687" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-688"><a href="#cb6-688" aria-hidden="true" tabindex="-1"></a>        semproj[<span class="ot">"</span><span class="st">semidense projection&lt;br/&gt;coverage/empty/valid/depth stats&lt;br/&gt;semidense_proj: (B,N,5)</span><span class="ot">"</span>]</span>
-<span id="cb6-689"><a href="#cb6-689" aria-hidden="true" tabindex="-1"></a>        semfrustum[<span class="ot">"</span><span class="st">semidense frustum MHCA&lt;br/&gt;frustum_feat: (B,N,C)</span><span class="ot">"</span>]</span>
-<span id="cb6-690"><a href="#cb6-690" aria-hidden="true" tabindex="-1"></a>        semfeat[<span class="ot">"</span><span class="st">optional PointNeXt-S&lt;br/&gt;semidense_feat: (B,C_point)</span><span class="ot">"</span>]</span>
-<span id="cb6-691"><a href="#cb6-691" aria-hidden="true" tabindex="-1"></a>        traj[<span class="ot">"</span><span class="st">optional trajectory ctx&lt;br/&gt;traj_ctx: (B,C_traj)</span><span class="ot">"</span>]</span>
-<span id="cb6-692"><a href="#cb6-692" aria-hidden="true" tabindex="-1"></a>        film[<span class="ot">"</span><span class="st">optional FiLM on global_feat</span><span class="ot">"</span>]</span>
-<span id="cb6-693"><a href="#cb6-693" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-694"><a href="#cb6-694" aria-hidden="true" tabindex="-1"></a>        concat[<span class="ot">"</span><span class="st">concat feats&lt;br/&gt;[pose_enc, global_feat, semidense_proj,&lt;br/&gt; semidense_frustum, semidense_feat?, traj_ctx?]</span><span class="ot">"</span>]</span>
-<span id="cb6-695"><a href="#cb6-695" aria-hidden="true" tabindex="-1"></a>        head[<span class="ot">"</span><span class="st">MLP + CORAL&lt;br/&gt;logits: (B,N,K-1)</span><span class="ot">"</span>]</span>
-<span id="cb6-696"><a href="#cb6-696" aria-hidden="true" tabindex="-1"></a>    end</span>
-<span id="cb6-697"><a href="#cb6-697" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-698"><a href="#cb6-698" aria-hidden="true" tabindex="-1"></a>    efm --&gt; evl --&gt; out</span>
-<span id="cb6-699"><a href="#cb6-699" aria-hidden="true" tabindex="-1"></a>    out --&gt; field_in --&gt; proj --&gt; gpool --&gt; concat</span>
-<span id="cb6-700"><a href="#cb6-700" aria-hidden="true" tabindex="-1"></a>    out --&gt; <span class="fu">pos</span> --&gt; gpool</span>
-<span id="cb6-701"><a href="#cb6-701" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ref</span> --&gt; rel</span>
-<span id="cb6-702"><a href="#cb6-702" aria-hidden="true" tabindex="-1"></a>    cand --&gt; rel --&gt; poseenc --&gt; gpool</span>
-<span id="cb6-703"><a href="#cb6-703" aria-hidden="true" tabindex="-1"></a>    poseenc --&gt; concat</span>
-<span id="cb6-704"><a href="#cb6-704" aria-hidden="true" tabindex="-1"></a>    p3d --&gt; semproj --&gt; concat</span>
-<span id="cb6-705"><a href="#cb6-705" aria-hidden="true" tabindex="-1"></a>    p3d --&gt; semfrustum --&gt; concat</span>
-<span id="cb6-706"><a href="#cb6-706" aria-hidden="true" tabindex="-1"></a>    semfeat --&gt; film --&gt; gpool</span>
-<span id="cb6-707"><a href="#cb6-707" aria-hidden="true" tabindex="-1"></a>    semproj --&gt; film</span>
-<span id="cb6-708"><a href="#cb6-708" aria-hidden="true" tabindex="-1"></a>    traj --&gt; concat</span>
-<span id="cb6-709"><a href="#cb6-709" aria-hidden="true" tabindex="-1"></a>    concat --&gt; head</span>
-<span id="cb6-710"><a href="#cb6-710" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb6-711"><a href="#cb6-711" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-712"><a href="#cb6-712" aria-hidden="true" tabindex="-1"></a><span class="fu">## Scene field construction (math, current)</span></span>
-<span id="cb6-713"><a href="#cb6-713" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-714"><a href="#cb6-714" aria-hidden="true" tabindex="-1"></a><span class="in">`VinModel`</span> builds a compact voxel-aligned tensor field $F(\mathbf{v})\in\mathbb{R}^{C_\text{in}}$ from EVL outputs</span>
-<span id="cb6-715"><a href="#cb6-715" aria-hidden="true" tabindex="-1"></a>(<span class="in">`_build_scene_field(...)`</span> in <span class="in">`oracle_rri/oracle_rri/vin/model.py`</span>). With default channels:</span>
-<span id="cb6-716"><a href="#cb6-716" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-717"><a href="#cb6-717" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>occupancy prior: $F_1=\text{occ<span class="sc">\_</span>pr}(\mathbf{v})\in<span class="co">[</span><span class="ot">0,1</span><span class="co">]</span>$,</span>
-<span id="cb6-718"><a href="#cb6-718" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>occupied evidence: $F_2=\text{occ<span class="sc">\_</span>input}(\mathbf{v})\in<span class="sc">\{</span>0,1<span class="sc">\}</span>$,</span>
-<span id="cb6-719"><a href="#cb6-719" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>coverage: $F_3=\text{counts<span class="sc">\_</span>norm}(\mathbf{v})\in<span class="co">[</span><span class="ot">0,1</span><span class="co">]</span>$ (see formula above).</span>
-<span id="cb6-720"><a href="#cb6-720" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-721"><a href="#cb6-721" aria-hidden="true" tabindex="-1"></a>For ablations/variants we also support:</span>
-<span id="cb6-722"><a href="#cb6-722" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-723"><a href="#cb6-723" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`observed`</span>: $\mathbb{1}<span class="co">[</span><span class="ot">\text{counts}&gt;0</span><span class="co">]</span>$,</span>
-<span id="cb6-724"><a href="#cb6-724" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`unknown`</span>: $1-\mathbb{1}<span class="co">[</span><span class="ot">\text{counts}&gt;0</span><span class="co">]</span>$,</span>
-<span id="cb6-725"><a href="#cb6-725" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`new_surface_prior`</span>: $(1-\mathbb{1}<span class="co">[</span><span class="ot">\text{counts}&gt;0</span><span class="co">]</span>)\cdot \text{occ<span class="sc">\_</span>pr}$,</span>
-<span id="cb6-726"><a href="#cb6-726" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`free_input`</span>: EVL free-space evidence if available; otherwise a weak proxy derived from <span class="in">`counts`</span> and <span class="in">`occ_input`</span>.</span>
-<span id="cb6-727"><a href="#cb6-727" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-728"><a href="#cb6-728" aria-hidden="true" tabindex="-1"></a>The field is projected to <span class="in">`field_dim`</span> channels (default <span class="in">`16`</span>) by a 1×1×1 convolution + GroupNorm + GELU.</span>
-<span id="cb6-729"><a href="#cb6-729" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-730"><a href="#cb6-730" aria-hidden="true" tabindex="-1"></a><span class="fu">### Scene field construction in VinModelV2 (current)</span></span>
-<span id="cb6-731"><a href="#cb6-731" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-732"><a href="#cb6-732" aria-hidden="true" tabindex="-1"></a><span class="in">`VinModelV2`</span> builds an aux map in <span class="in">`_build_field_bundle`</span> with the following keys:</span>
-<span id="cb6-733"><a href="#cb6-733" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-734"><a href="#cb6-734" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`occ_pr`</span>, <span class="in">`cent_pr`</span>, <span class="in">`occ_input`</span>, <span class="in">`counts_norm`</span>,</span>
-<span id="cb6-735"><a href="#cb6-735" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`observed`</span>, <span class="in">`unknown`</span>, <span class="in">`free_input`</span>, <span class="in">`new_surface_prior`</span>.</span>
-<span id="cb6-736"><a href="#cb6-736" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-737"><a href="#cb6-737" aria-hidden="true" tabindex="-1"></a>All of these keys are supported in <span class="in">`scene_field_channels`</span>; invalid entries now raise a</span>
-<span id="cb6-738"><a href="#cb6-738" aria-hidden="true" tabindex="-1"></a>clear error during field construction.</span>
-<span id="cb6-739"><a href="#cb6-739" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-740"><a href="#cb6-740" aria-hidden="true" tabindex="-1"></a><span class="fu">## Candidate-conditioned voxel query (implemented)</span></span>
-<span id="cb6-741"><a href="#cb6-741" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-742"><a href="#cb6-742" aria-hidden="true" tabindex="-1"></a>We implement a **frustum point query** that is intentionally aligned with our depth renderer:</span>
-<span id="cb6-743"><a href="#cb6-743" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-744"><a href="#cb6-744" aria-hidden="true" tabindex="-1"></a><span class="fu">### 1) Sampling query points in front of the camera</span></span>
-<span id="cb6-745"><a href="#cb6-745" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-746"><a href="#cb6-746" aria-hidden="true" tabindex="-1"></a>We choose a small image-plane grid (<span class="in">`frustum_grid_size=g`</span>) and a list of metric depths</span>
-<span id="cb6-747"><a href="#cb6-747" aria-hidden="true" tabindex="-1"></a><span class="in">`frustum_depths_m=[d_1,\dots,d_M]`</span>. This gives $K=g^2M$ query points per candidate.</span>
-<span id="cb6-748"><a href="#cb6-748" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-749"><a href="#cb6-749" aria-hidden="true" tabindex="-1"></a>The points are constructed in the **same NDC convention** used by the depth backprojection code and unprojected via</span>
-<span id="cb6-750"><a href="#cb6-750" aria-hidden="true" tabindex="-1"></a>PyTorch3D <span class="in">`PerspectiveCameras.unproject_points(..., from_ndc=True, world_coordinates=True)`</span> (see</span>
-<span id="cb6-751"><a href="#cb6-751" aria-hidden="true" tabindex="-1"></a><span class="co">[</span><span class="ot">PyTorch3D :: Cameras</span><span class="co">](https://pytorch3d.readthedocs.io/en/latest/modules/renderer/cameras.html)</span> <span class="co">[</span><span class="ot">@PyTorch3D-Cameras-2025</span><span class="co">]</span>).</span>
-<span id="cb6-752"><a href="#cb6-752" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-753"><a href="#cb6-753" aria-hidden="true" tabindex="-1"></a>Practical note: our helper follows the “screen-space → NDC” mapping used by the renderer/backprojector (including the</span>
-<span id="cb6-754"><a href="#cb6-754" aria-hidden="true" tabindex="-1"></a>sign convention +X left, +Y up).</span>
-<span id="cb6-755"><a href="#cb6-755" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-756"><a href="#cb6-756" aria-hidden="true" tabindex="-1"></a><span class="fu">### 2) Mapping world points into the EVL voxel grid</span></span>
-<span id="cb6-757"><a href="#cb6-757" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-758"><a href="#cb6-758" aria-hidden="true" tabindex="-1"></a>EVL provides the voxel grid pose $T_{\text{world}\leftarrow\text{voxel}}$ and its metric extent</span>
-<span id="cb6-759"><a href="#cb6-759" aria-hidden="true" tabindex="-1"></a><span class="in">`voxel_extent=[x_min,x_max,y_min,y_max,z_min,z_max]`</span> in the voxel frame.</span>
-<span id="cb6-760"><a href="#cb6-760" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-761"><a href="#cb6-761" aria-hidden="true" tabindex="-1"></a>We invert the pose and transform the frustum points:</span>
-<span id="cb6-762"><a href="#cb6-762" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-763"><a href="#cb6-763" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb6-764"><a href="#cb6-764" aria-hidden="true" tabindex="-1"></a>\mathbf{p}_\text{voxel} = T_{\text{voxel}\leftarrow\text{world}}\,\mathbf{p}_\text{world},</span>
-<span id="cb6-765"><a href="#cb6-765" aria-hidden="true" tabindex="-1"></a>\qquad</span>
-<span id="cb6-766"><a href="#cb6-766" aria-hidden="true" tabindex="-1"></a>T_{\text{voxel}\leftarrow\text{world}} = T_{\text{world}\leftarrow\text{voxel}}^{-1}.</span>
-<span id="cb6-767"><a href="#cb6-767" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb6-768"><a href="#cb6-768" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-769"><a href="#cb6-769" aria-hidden="true" tabindex="-1"></a>Then we map metric voxel coordinates to **voxel-index coordinates** (per axis):</span>
-<span id="cb6-770"><a href="#cb6-770" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-771"><a href="#cb6-771" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb6-772"><a href="#cb6-772" aria-hidden="true" tabindex="-1"></a>i_x = \frac{x-x_{\min}}{\Delta x},\quad</span>
-<span id="cb6-773"><a href="#cb6-773" aria-hidden="true" tabindex="-1"></a>i_y = \frac{y-y_{\min}}{\Delta y},\quad</span>
-<span id="cb6-774"><a href="#cb6-774" aria-hidden="true" tabindex="-1"></a>i_z = \frac{z-z_{\min}}{\Delta z},</span>
-<span id="cb6-775"><a href="#cb6-775" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb6-776"><a href="#cb6-776" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-777"><a href="#cb6-777" aria-hidden="true" tabindex="-1"></a>with $(\Delta x,\Delta y,\Delta z)=\left(\frac{x_{\max}-x_{\min}}{W},\frac{y_{\max}-y_{\min}}{H},\frac{z_{\max}-z_{\min}}{D}\right)$.</span>
-<span id="cb6-778"><a href="#cb6-778" aria-hidden="true" tabindex="-1"></a>This corresponds exactly to <span class="in">`efm3d.utils.voxel_sampling.pc_to_vox`</span>. The actual trilinear sampling is delegated to</span>
-<span id="cb6-779"><a href="#cb6-779" aria-hidden="true" tabindex="-1"></a><span class="in">`efm3d.utils.voxel_sampling.sample_voxels`</span> (internally <span class="in">`torch.nn.functional.grid_sample`</span>, <span class="in">`align_corners=False`</span>,</span>
-<span id="cb6-780"><a href="#cb6-780" aria-hidden="true" tabindex="-1"></a><span class="in">`padding_mode="border"`</span>). (<span class="co">[</span><span class="ot">GitHub</span><span class="co">][4]</span>)</span>
-<span id="cb6-781"><a href="#cb6-781" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-782"><a href="#cb6-782" aria-hidden="true" tabindex="-1"></a><span class="fu">### 3) Pooling and candidate validity</span></span>
-<span id="cb6-783"><a href="#cb6-783" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-784"><a href="#cb6-784" aria-hidden="true" tabindex="-1"></a>We sample the projected scene field at those voxel-index coordinates, producing frustum tokens</span>
-<span id="cb6-785"><a href="#cb6-785" aria-hidden="true" tabindex="-1"></a><span class="in">`tokens (B,N,K,C_out)`</span> and a boolean in-bounds mask <span class="in">`token_valid (B,N,K)`</span>.</span>
-<span id="cb6-786"><a href="#cb6-786" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-787"><a href="#cb6-787" aria-hidden="true" tabindex="-1"></a>We then compute the candidate-local token via a masked mean:</span>
-<span id="cb6-788"><a href="#cb6-788" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-789"><a href="#cb6-789" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb6-790"><a href="#cb6-790" aria-hidden="true" tabindex="-1"></a>\text{local<span class="sc">\_</span>feat}=\frac{\sum_k \mathbb{1}<span class="co">[</span><span class="ot">\text{valid}_k</span><span class="co">]</span>\;\mathbf{t}_k}{\sum_k \mathbb{1}<span class="co">[</span><span class="ot">\text{valid}_k</span><span class="co">]</span> + \varepsilon}.</span>
-<span id="cb6-791"><a href="#cb6-791" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb6-792"><a href="#cb6-792" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-793"><a href="#cb6-793" aria-hidden="true" tabindex="-1"></a>Candidate validity is derived from the **fraction** of frustum samples that fall inside the voxel grid, controlled by</span>
-<span id="cb6-794"><a href="#cb6-794" aria-hidden="true" tabindex="-1"></a><span class="in">`VinModelConfig.candidate_min_valid_frac`</span> (default: 0.2) so we avoid admitting candidates with only a handful of</span>
-<span id="cb6-795"><a href="#cb6-795" aria-hidden="true" tabindex="-1"></a>in-bounds samples.</span>
-<span id="cb6-796"><a href="#cb6-796" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-797"><a href="#cb6-797" aria-hidden="true" tabindex="-1"></a><span class="fu"># Training objective (VIN-NBV style): CORAL ordinal regression</span></span>
-<span id="cb6-798"><a href="#cb6-798" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-799"><a href="#cb6-799" aria-hidden="true" tabindex="-1"></a>VIN-NBV reports that directly regressing RRI is difficult; it discretizes RRI into ordinal bins and trains with CORAL.</span>
-<span id="cb6-800"><a href="#cb6-800" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-801"><a href="#cb6-801" aria-hidden="true" tabindex="-1"></a>We follow the same structure:</span>
-<span id="cb6-802"><a href="#cb6-802" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-803"><a href="#cb6-803" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Oracle labels**: for each snippet, generate candidates and compute oracle RRI using <span class="in">`OracleRriLabeler`</span> (candidate → render depth → backproject PCs → mesh distance → RRI).</span>
-<span id="cb6-804"><a href="#cb6-804" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Binning (current implementation)**: convert oracle RRI values to ordinal labels $y\in<span class="sc">\{</span>0,\dots,K-1<span class="sc">\}</span>$ using</span>
-<span id="cb6-805"><a href="#cb6-805" aria-hidden="true" tabindex="-1"></a>   <span class="in">`oracle_rri/oracle_rri/vin/rri_binning.py`</span> (<span class="in">`RriOrdinalBinner`</span>).</span>
-<span id="cb6-806"><a href="#cb6-806" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-807"><a href="#cb6-807" aria-hidden="true" tabindex="-1"></a>   We fit $K-1$ **empirical quantiles** (equal-mass bins) on a stream of oracle RRIs and store the edges</span>
-<span id="cb6-808"><a href="#cb6-808" aria-hidden="true" tabindex="-1"></a>   $\mathbf{e}=(e_1,\dots,e_{K-1})$.</span>
-<span id="cb6-809"><a href="#cb6-809" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-810"><a href="#cb6-810" aria-hidden="true" tabindex="-1"></a>   **Implementation details (`RriOrdinalBinner.fit_from_iterable`)**:</span>
-<span id="cb6-811"><a href="#cb6-811" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-812"><a href="#cb6-812" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Accumulates RRI chunks on CPU; ignores non-finite values.</span>
-<span id="cb6-813"><a href="#cb6-813" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Computes quantiles at $q_j = j/K$ via <span class="in">`torch.quantile`</span>.</span>
-<span id="cb6-814"><a href="#cb6-814" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>If edges collapse (duplicate quantiles), falls back to uniform edges between</span>
-<span id="cb6-815"><a href="#cb6-815" aria-hidden="true" tabindex="-1"></a>     the observed min/max (or <span class="in">`[-1,1]`</span> as a last resort).</span>
-<span id="cb6-816"><a href="#cb6-816" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Supports resumable fitting by saving <span class="in">`.pt`</span> fit data and exporting the final binner as JSON.</span>
-<span id="cb6-817"><a href="#cb6-817" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-818"><a href="#cb6-818" aria-hidden="true" tabindex="-1"></a>   Then for an RRI value $r$ the label is computed via <span class="in">`torch.bucketize`</span>:</span>
-<span id="cb6-819"><a href="#cb6-819" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-820"><a href="#cb6-820" aria-hidden="true" tabindex="-1"></a>   $$</span>
-<span id="cb6-821"><a href="#cb6-821" aria-hidden="true" tabindex="-1"></a>   y(r)=\sum_{j=1}^{K-1}\mathbb{1}<span class="co">[</span><span class="ot">r \ge e_j</span><span class="co">]</span>.</span>
-<span id="cb6-822"><a href="#cb6-822" aria-hidden="true" tabindex="-1"></a>   $$</span>
-<span id="cb6-823"><a href="#cb6-823" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-824"><a href="#cb6-824" aria-hidden="true" tabindex="-1"></a>   Practical notes:</span>
-<span id="cb6-825"><a href="#cb6-825" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-826"><a href="#cb6-826" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Fit data can be saved/resumed (<span class="in">`.pt`</span> state with RRI chunks) and the fitted binner is saved as JSON (<span class="in">`num_classes`</span>,</span>
-<span id="cb6-827"><a href="#cb6-827" aria-hidden="true" tabindex="-1"></a>     <span class="in">`edges`</span>).</span>
-<span id="cb6-828"><a href="#cb6-828" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>On training start, if <span class="in">`VinLightningModuleConfig.num_classes`</span> differs from the saved binner JSON, the binner is</span>
-<span id="cb6-829"><a href="#cb6-829" aria-hidden="true" tabindex="-1"></a>     automatically refit and the JSON is overwritten with the new class count.</span>
-<span id="cb6-830"><a href="#cb6-830" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>If quantile edges collapse (degenerate quantiles), we fall back to uniform edges between the observed min/max (or</span>
-<span id="cb6-831"><a href="#cb6-831" aria-hidden="true" tabindex="-1"></a>     <span class="in">`[-1,1]`</span> as a last resort).</span>
-<span id="cb6-832"><a href="#cb6-832" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-833"><a href="#cb6-833" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Loss (CORAL)**: we use CORAL (*Rank consistent ordinal regression*, see</span>
-<span id="cb6-834"><a href="#cb6-834" aria-hidden="true" tabindex="-1"></a>   <span class="co">[</span><span class="ot">arXiv :: 1901.07884</span><span class="co">](https://arxiv.org/abs/1901.07884)</span> <span class="co">[</span><span class="ot">@CORAL-cao2019</span><span class="co">]</span> and</span>
-<span id="cb6-835"><a href="#cb6-835" aria-hidden="true" tabindex="-1"></a>   <span class="co">[</span><span class="ot">coral-pytorch</span><span class="co">](https://raschka-research-group.github.io/coral-pytorch/)</span> <span class="co">[</span><span class="ot">@coral-pytorch-2025</span><span class="co">]</span>).</span>
-<span id="cb6-836"><a href="#cb6-836" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-837"><a href="#cb6-837" aria-hidden="true" tabindex="-1"></a>   CORAL represents a K-class ordinal label $y\in<span class="sc">\{</span>0,\dots,K-1<span class="sc">\}</span>$ via $K-1$ binary “levels”:</span>
-<span id="cb6-838"><a href="#cb6-838" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-839"><a href="#cb6-839" aria-hidden="true" tabindex="-1"></a>   $$</span>
-<span id="cb6-840"><a href="#cb6-840" aria-hidden="true" tabindex="-1"></a>   \text{level}_k(y)=\mathbb{1}<span class="co">[</span><span class="ot">y&gt;k</span><span class="co">]</span>,\qquad k=0,\dots,K-2,</span>
-<span id="cb6-841"><a href="#cb6-841" aria-hidden="true" tabindex="-1"></a>   $$</span>
-<span id="cb6-842"><a href="#cb6-842" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-843"><a href="#cb6-843" aria-hidden="true" tabindex="-1"></a>   and predicts logits $\ell_k$ for each threshold. The loss is the sum of binary cross-entropies over thresholds</span>
-<span id="cb6-844"><a href="#cb6-844" aria-hidden="true" tabindex="-1"></a>   (see <span class="in">`oracle_rri/oracle_rri/vin/coral.py`</span>).</span>
-<span id="cb6-845"><a href="#cb6-845" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-846"><a href="#cb6-846" aria-hidden="true" tabindex="-1"></a>   Explicitly:</span>
-<span id="cb6-847"><a href="#cb6-847" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-848"><a href="#cb6-848" aria-hidden="true" tabindex="-1"></a>   $$</span>
-<span id="cb6-849"><a href="#cb6-849" aria-hidden="true" tabindex="-1"></a>   <span class="sc">\\</span>mathcal{L}_{<span class="sc">\\</span>text{CORAL}}</span>
-<span id="cb6-850"><a href="#cb6-850" aria-hidden="true" tabindex="-1"></a>   =<span class="sc">\\</span>sum_{k=0}^{K-2}</span>
-<span id="cb6-851"><a href="#cb6-851" aria-hidden="true" tabindex="-1"></a>   <span class="sc">\\</span>left[-<span class="sc">\\</span>text{level}_k<span class="sc">\\</span>log<span class="sc">\\</span>sigma(<span class="sc">\\</span>ell_k)</span>
-<span id="cb6-852"><a href="#cb6-852" aria-hidden="true" tabindex="-1"></a>   -(1-<span class="sc">\\</span>text{level}_k)<span class="sc">\\</span>log(1-<span class="sc">\\</span>sigma(<span class="sc">\\</span>ell_k))<span class="sc">\\</span>right].</span>
-<span id="cb6-853"><a href="#cb6-853" aria-hidden="true" tabindex="-1"></a>   $$</span>
-<span id="cb6-854"><a href="#cb6-854" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-855"><a href="#cb6-855" aria-hidden="true" tabindex="-1"></a>   **Random-classifier baseline.** If logits are zero (uninformative classifier), then</span>
-<span id="cb6-856"><a href="#cb6-856" aria-hidden="true" tabindex="-1"></a>   $p_k=\sigma(\ell_k)=0.5$ for all thresholds. The BCE for each level is $\log 2$,</span>
-<span id="cb6-857"><a href="#cb6-857" aria-hidden="true" tabindex="-1"></a>   so the expected CORAL loss is:</span>
-<span id="cb6-858"><a href="#cb6-858" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-859"><a href="#cb6-859" aria-hidden="true" tabindex="-1"></a>   $$</span>
-<span id="cb6-860"><a href="#cb6-860" aria-hidden="true" tabindex="-1"></a>   \mathbb{E}<span class="co">[</span><span class="ot">\mathcal{L}_{\text{CORAL}}</span><span class="co">]</span></span>
-<span id="cb6-861"><a href="#cb6-861" aria-hidden="true" tabindex="-1"></a>   =(K-1)\log 2.</span>
-<span id="cb6-862"><a href="#cb6-862" aria-hidden="true" tabindex="-1"></a>   $$</span>
-<span id="cb6-863"><a href="#cb6-863" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-864"><a href="#cb6-864" aria-hidden="true" tabindex="-1"></a>   For our default $K=15$, this gives $14\log 2 \approx 9.70$, which is a useful sanity</span>
-<span id="cb6-865"><a href="#cb6-865" aria-hidden="true" tabindex="-1"></a>   check when interpreting training curves. The Lightning module logs</span>
-<span id="cb6-866"><a href="#cb6-866" aria-hidden="true" tabindex="-1"></a>   <span class="in">`coral_loss_rel_random = coral_loss / ((K-1)\log 2)`</span> alongside the raw loss, plus</span>
-<span id="cb6-867"><a href="#cb6-867" aria-hidden="true" tabindex="-1"></a>   a candidate-level <span class="in">`top3_accuracy`</span> metric for ordinal classification.</span>
-<span id="cb6-868"><a href="#cb6-868" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-869"><a href="#cb6-869" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Binning diagnostics (plots).** The script <span class="in">`oracle_rri/scripts/plot_vin_binning.py`</span></span>
-<span id="cb6-870"><a href="#cb6-870" aria-hidden="true" tabindex="-1"></a>   generates the RRI histogram with quantile edges and a dedicated edge plot (Seaborn):</span>
-<span id="cb6-871"><a href="#cb6-871" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-872"><a href="#cb6-872" aria-hidden="true" tabindex="-1"></a>::: {#fig-vin-rri-binning layout-nrow=2}</span>
-<span id="cb6-873"><a href="#cb6-873" aria-hidden="true" tabindex="-1"></a><span class="al">![Raw RRI distribution with quantile edges.](../../figures/impl/vin/vin_rri_binning.png)</span></span>
-<span id="cb6-874"><a href="#cb6-874" aria-hidden="true" tabindex="-1"></a><span class="al">![Quantile thresholds $e_j$ (Seaborn).](../../figures/impl/vin/vin_rri_thresholds.png)</span></span>
-<span id="cb6-875"><a href="#cb6-875" aria-hidden="true" tabindex="-1"></a>:::</span>
-<span id="cb6-876"><a href="#cb6-876" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-877"><a href="#cb6-877" aria-hidden="true" tabindex="-1"></a>At inference time we use the expected ordinal value (normalized to $<span class="co">[</span><span class="ot">0,1</span><span class="co">]</span>$) as the candidate score. With</span>
-<span id="cb6-878"><a href="#cb6-878" aria-hidden="true" tabindex="-1"></a>$p_k=\sigma(\ell_k)=\mathbb{P}(y&gt;k)$:</span>
+<span id="cb6-645"><a href="#cb6-645" aria-hidden="true" tabindex="-1"></a>This block is optional and gated by <span class="in">`VinModelV2Config.enable_semidense_frustum`</span> (default: <span class="in">`False`</span>).</span>
+<span id="cb6-646"><a href="#cb6-646" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-647"><a href="#cb6-647" aria-hidden="true" tabindex="-1"></a><span class="fu">## Suggested upgrade roadmap (summary)</span></span>
+<span id="cb6-648"><a href="#cb6-648" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-649"><a href="#cb6-649" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**(Done)** Key/value separation + residual/LN around the pose‑conditioned attention block.</span>
+<span id="cb6-650"><a href="#cb6-650" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**(Done)** View‑conditioned point features via semidense projection + MHCA frustum summary.</span>
+<span id="cb6-651"><a href="#cb6-651" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Add a stage proxy scalar** (e.g., coverage mean, max counts, or point count) to the head input.</span>
+<span id="cb6-652"><a href="#cb6-652" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Switch positional encoding to candidate‑relative** coordinates for attention keys.</span>
+<span id="cb6-653"><a href="#cb6-653" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**Optionally add voxel‑frustum local evidence** (sample a small K‑point frustum and pool).</span>
+<span id="cb6-654"><a href="#cb6-654" aria-hidden="true" tabindex="-1"></a><span class="ss">6. </span>**Optionally add candidate view‑plane feature grids** (VIN‑NBV‑style projection + CNN head).</span>
+<span id="cb6-655"><a href="#cb6-655" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-656"><a href="#cb6-656" aria-hidden="true" tabindex="-1"></a><span class="fu">## VIN internal architecture (current, with tensor shapes)</span></span>
+<span id="cb6-657"><a href="#cb6-657" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-658"><a href="#cb6-658" aria-hidden="true" tabindex="-1"></a>Shapes below match the current <span class="in">`VinLightningModule.summarize_vin()`</span> output for a typical oracle batch with <span class="in">`B=1`</span>,</span>
+<span id="cb6-659"><a href="#cb6-659" aria-hidden="true" tabindex="-1"></a><span class="in">`N=32`</span> candidates, EVL voxel grid resolution <span class="in">`48³`</span>, and VIN defaults. The v2 head does **not** use voxel‑frustum</span>
+<span id="cb6-660"><a href="#cb6-660" aria-hidden="true" tabindex="-1"></a>sampling; instead, it includes **semidense projection features** per candidate</span>
+<span id="cb6-661"><a href="#cb6-661" aria-hidden="true" tabindex="-1"></a>(<span class="in">`SEMIDENSE_PROJ_DIM=5`</span>: coverage, empty fraction, valid fraction, depth mean/std) plus an optional **semidense frustum MHCA**</span>
+<span id="cb6-662"><a href="#cb6-662" aria-hidden="true" tabindex="-1"></a>summary (<span class="in">`field_dim`</span> channels, when enabled), and optional snippet‑level semidense/trajectory context embeddings.</span>
+<span id="cb6-663"><a href="#cb6-663" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-666"><a href="#cb6-666" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb6-667"><a href="#cb6-667" aria-hidden="true" tabindex="-1"></a>flowchart TD</span>
+<span id="cb6-668"><a href="#cb6-668" aria-hidden="true" tabindex="-1"></a>    subgraph In[<span class="ot">"</span><span class="st">Inputs</span><span class="ot">"</span>]</span>
+<span id="cb6-669"><a href="#cb6-669" aria-hidden="true" tabindex="-1"></a>        efm[<span class="ot">"</span><span class="st">EFM snippet dict&lt;br/&gt;(unbatched: T×...)</span><span class="ot">"</span>]</span>
+<span id="cb6-670"><a href="#cb6-670" aria-hidden="true" tabindex="-1"></a>        cand[<span class="ot">"</span><span class="st">candidate_poses_world_cam&lt;br/&gt;PoseTW(B,N,12)&lt;br/&gt;(example: 1×32×12)</span><span class="ot">"</span>]</span>
+<span id="cb6-671"><a href="#cb6-671" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ref</span>[<span class="ot">"</span><span class="st">reference_pose_world_rig&lt;br/&gt;PoseTW(B,12)</span><span class="ot">"</span>]</span>
+<span id="cb6-672"><a href="#cb6-672" aria-hidden="true" tabindex="-1"></a>        p3d[<span class="ot">"</span><span class="st">p3d_cameras&lt;br/&gt;PerspectiveCameras(B*N)</span><span class="ot">"</span>]</span>
+<span id="cb6-673"><a href="#cb6-673" aria-hidden="true" tabindex="-1"></a>    end</span>
+<span id="cb6-674"><a href="#cb6-674" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-675"><a href="#cb6-675" aria-hidden="true" tabindex="-1"></a>    subgraph Frozen[<span class="ot">"</span><span class="st">Frozen EVL backbone</span><span class="ot">"</span>]</span>
+<span id="cb6-676"><a href="#cb6-676" aria-hidden="true" tabindex="-1"></a>        evl[<span class="ot">"</span><span class="st">EvlBackbone.forward(efm)</span><span class="ot">"</span>]</span>
+<span id="cb6-677"><a href="#cb6-677" aria-hidden="true" tabindex="-1"></a>        out[<span class="ot">"</span><span class="st">EvlBackboneOutput&lt;br/&gt;occ_pr/cent_pr/occ_input/counts&lt;br/&gt;T_world_voxel, voxel_extent, pts_world</span><span class="ot">"</span>]</span>
+<span id="cb6-678"><a href="#cb6-678" aria-hidden="true" tabindex="-1"></a>    end</span>
+<span id="cb6-679"><a href="#cb6-679" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-680"><a href="#cb6-680" aria-hidden="true" tabindex="-1"></a>    subgraph VIN[<span class="ot">"</span><span class="st">Trainable VIN v2 head</span><span class="ot">"</span>]</span>
+<span id="cb6-681"><a href="#cb6-681" aria-hidden="true" tabindex="-1"></a>        field_in[<span class="ot">"</span><span class="st">scene_field&lt;br/&gt;field_in: (B,C_in,D,H,W)</span><span class="ot">"</span>]</span>
+<span id="cb6-682"><a href="#cb6-682" aria-hidden="true" tabindex="-1"></a>        proj[<span class="ot">"</span><span class="st">field_proj&lt;br/&gt;1×1×1 Conv3d + GN + GELU</span><span class="ot">"</span>]</span>
+<span id="cb6-683"><a href="#cb6-683" aria-hidden="true" tabindex="-1"></a>        <span class="fu">pos</span>[<span class="ot">"</span><span class="st">pos_grid from pts_world&lt;br/&gt;rig frame + LFF</span><span class="ot">"</span>]</span>
+<span id="cb6-684"><a href="#cb6-684" aria-hidden="true" tabindex="-1"></a>        gpool[<span class="ot">"</span><span class="st">pose-conditioned attention&lt;br/&gt;global_feat: (B,N,C)</span><span class="ot">"</span>]</span>
+<span id="cb6-685"><a href="#cb6-685" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-686"><a href="#cb6-686" aria-hidden="true" tabindex="-1"></a>        rel[<span class="ot">"</span><span class="st">relative pose&lt;br/&gt;T_rig_ref_cam = T_world_rig_ref^{-1} T_world_cam</span><span class="ot">"</span>]</span>
+<span id="cb6-687"><a href="#cb6-687" aria-hidden="true" tabindex="-1"></a>        poseenc[<span class="ot">"</span><span class="st">pose_enc (R6D+LFF or shell)&lt;br/&gt;pose_enc: (B,N,E_pose)</span><span class="ot">"</span>]</span>
+<span id="cb6-688"><a href="#cb6-688" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-689"><a href="#cb6-689" aria-hidden="true" tabindex="-1"></a>        semproj[<span class="ot">"</span><span class="st">semidense projection&lt;br/&gt;coverage/empty/valid/depth stats&lt;br/&gt;semidense_proj: (B,N,5)</span><span class="ot">"</span>]</span>
+<span id="cb6-690"><a href="#cb6-690" aria-hidden="true" tabindex="-1"></a>        semfrustum[<span class="ot">"</span><span class="st">optional semidense frustum MHCA&lt;br/&gt;frustum_feat: (B,N,C)</span><span class="ot">"</span>]</span>
+<span id="cb6-691"><a href="#cb6-691" aria-hidden="true" tabindex="-1"></a>        semfeat[<span class="ot">"</span><span class="st">optional PointNeXt-S&lt;br/&gt;semidense_feat: (B,C_point)</span><span class="ot">"</span>]</span>
+<span id="cb6-692"><a href="#cb6-692" aria-hidden="true" tabindex="-1"></a>        traj[<span class="ot">"</span><span class="st">optional trajectory ctx&lt;br/&gt;traj_ctx: (B,C_traj)</span><span class="ot">"</span>]</span>
+<span id="cb6-693"><a href="#cb6-693" aria-hidden="true" tabindex="-1"></a>        film[<span class="ot">"</span><span class="st">optional FiLM on global_feat</span><span class="ot">"</span>]</span>
+<span id="cb6-694"><a href="#cb6-694" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-695"><a href="#cb6-695" aria-hidden="true" tabindex="-1"></a>        concat[<span class="ot">"</span><span class="st">concat feats&lt;br/&gt;[pose_enc, global_feat, semidense_proj,&lt;br/&gt; semidense_frustum?, semidense_feat?, traj_ctx?]</span><span class="ot">"</span>]</span>
+<span id="cb6-696"><a href="#cb6-696" aria-hidden="true" tabindex="-1"></a>        head[<span class="ot">"</span><span class="st">MLP + CORAL&lt;br/&gt;logits: (B,N,K-1)</span><span class="ot">"</span>]</span>
+<span id="cb6-697"><a href="#cb6-697" aria-hidden="true" tabindex="-1"></a>    end</span>
+<span id="cb6-698"><a href="#cb6-698" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-699"><a href="#cb6-699" aria-hidden="true" tabindex="-1"></a>    efm --&gt; evl --&gt; out</span>
+<span id="cb6-700"><a href="#cb6-700" aria-hidden="true" tabindex="-1"></a>    out --&gt; field_in --&gt; proj --&gt; gpool --&gt; concat</span>
+<span id="cb6-701"><a href="#cb6-701" aria-hidden="true" tabindex="-1"></a>    out --&gt; <span class="fu">pos</span> --&gt; gpool</span>
+<span id="cb6-702"><a href="#cb6-702" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ref</span> --&gt; rel</span>
+<span id="cb6-703"><a href="#cb6-703" aria-hidden="true" tabindex="-1"></a>    cand --&gt; rel --&gt; poseenc --&gt; gpool</span>
+<span id="cb6-704"><a href="#cb6-704" aria-hidden="true" tabindex="-1"></a>    poseenc --&gt; concat</span>
+<span id="cb6-705"><a href="#cb6-705" aria-hidden="true" tabindex="-1"></a>    p3d --&gt; semproj --&gt; concat</span>
+<span id="cb6-706"><a href="#cb6-706" aria-hidden="true" tabindex="-1"></a>    p3d --&gt; semfrustum --&gt; concat</span>
+<span id="cb6-707"><a href="#cb6-707" aria-hidden="true" tabindex="-1"></a>    semfeat --&gt; film --&gt; gpool</span>
+<span id="cb6-708"><a href="#cb6-708" aria-hidden="true" tabindex="-1"></a>    semproj --&gt; film</span>
+<span id="cb6-709"><a href="#cb6-709" aria-hidden="true" tabindex="-1"></a>    traj --&gt; concat</span>
+<span id="cb6-710"><a href="#cb6-710" aria-hidden="true" tabindex="-1"></a>    concat --&gt; head</span>
+<span id="cb6-711"><a href="#cb6-711" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb6-712"><a href="#cb6-712" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-713"><a href="#cb6-713" aria-hidden="true" tabindex="-1"></a><span class="fu">## Scene field construction (math, current)</span></span>
+<span id="cb6-714"><a href="#cb6-714" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-715"><a href="#cb6-715" aria-hidden="true" tabindex="-1"></a><span class="in">`VinModel`</span> builds a compact voxel-aligned tensor field $F(\mathbf{v})\in\mathbb{R}^{C_\text{in}}$ from EVL outputs</span>
+<span id="cb6-716"><a href="#cb6-716" aria-hidden="true" tabindex="-1"></a>(<span class="in">`_build_scene_field(...)`</span> in <span class="in">`oracle_rri/oracle_rri/vin/model.py`</span>). With default channels:</span>
+<span id="cb6-717"><a href="#cb6-717" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-718"><a href="#cb6-718" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>occupancy prior: $F_1=\text{occ<span class="sc">\_</span>pr}(\mathbf{v})\in<span class="co">[</span><span class="ot">0,1</span><span class="co">]</span>$,</span>
+<span id="cb6-719"><a href="#cb6-719" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>occupied evidence: $F_2=\text{occ<span class="sc">\_</span>input}(\mathbf{v})\in<span class="sc">\{</span>0,1<span class="sc">\}</span>$,</span>
+<span id="cb6-720"><a href="#cb6-720" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>coverage: $F_3=\text{counts<span class="sc">\_</span>norm}(\mathbf{v})\in<span class="co">[</span><span class="ot">0,1</span><span class="co">]</span>$ (see formula above).</span>
+<span id="cb6-721"><a href="#cb6-721" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-722"><a href="#cb6-722" aria-hidden="true" tabindex="-1"></a>For ablations/variants we also support:</span>
+<span id="cb6-723"><a href="#cb6-723" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-724"><a href="#cb6-724" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`observed`</span>: $\mathbb{1}<span class="co">[</span><span class="ot">\text{counts}&gt;0</span><span class="co">]</span>$,</span>
+<span id="cb6-725"><a href="#cb6-725" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`unknown`</span>: $1-\mathbb{1}<span class="co">[</span><span class="ot">\text{counts}&gt;0</span><span class="co">]</span>$,</span>
+<span id="cb6-726"><a href="#cb6-726" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`new_surface_prior`</span>: $(1-\mathbb{1}<span class="co">[</span><span class="ot">\text{counts}&gt;0</span><span class="co">]</span>)\cdot \text{occ<span class="sc">\_</span>pr}$,</span>
+<span id="cb6-727"><a href="#cb6-727" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`free_input`</span>: EVL free-space evidence if available; otherwise a weak proxy derived from <span class="in">`counts`</span> and <span class="in">`occ_input`</span>.</span>
+<span id="cb6-728"><a href="#cb6-728" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-729"><a href="#cb6-729" aria-hidden="true" tabindex="-1"></a>The field is projected to <span class="in">`field_dim`</span> channels (default <span class="in">`16`</span>) by a 1×1×1 convolution + GroupNorm + GELU.</span>
+<span id="cb6-730"><a href="#cb6-730" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-731"><a href="#cb6-731" aria-hidden="true" tabindex="-1"></a><span class="fu">### Scene field construction in VinModelV2 (current)</span></span>
+<span id="cb6-732"><a href="#cb6-732" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-733"><a href="#cb6-733" aria-hidden="true" tabindex="-1"></a><span class="in">`VinModelV2`</span> builds an aux map in <span class="in">`_build_field_bundle`</span> with the following keys:</span>
+<span id="cb6-734"><a href="#cb6-734" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-735"><a href="#cb6-735" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`occ_pr`</span>, <span class="in">`cent_pr`</span>, <span class="in">`occ_input`</span>, <span class="in">`counts_norm`</span>,</span>
+<span id="cb6-736"><a href="#cb6-736" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`observed`</span>, <span class="in">`unknown`</span>, <span class="in">`free_input`</span>, <span class="in">`new_surface_prior`</span>.</span>
+<span id="cb6-737"><a href="#cb6-737" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-738"><a href="#cb6-738" aria-hidden="true" tabindex="-1"></a>All of these keys are supported in <span class="in">`scene_field_channels`</span>; invalid entries now raise a</span>
+<span id="cb6-739"><a href="#cb6-739" aria-hidden="true" tabindex="-1"></a>clear error during field construction.</span>
+<span id="cb6-740"><a href="#cb6-740" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-741"><a href="#cb6-741" aria-hidden="true" tabindex="-1"></a><span class="fu">## Candidate-conditioned voxel query (implemented)</span></span>
+<span id="cb6-742"><a href="#cb6-742" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-743"><a href="#cb6-743" aria-hidden="true" tabindex="-1"></a>We implement a **frustum point query** that is intentionally aligned with our depth renderer:</span>
+<span id="cb6-744"><a href="#cb6-744" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-745"><a href="#cb6-745" aria-hidden="true" tabindex="-1"></a><span class="fu">### 1) Sampling query points in front of the camera</span></span>
+<span id="cb6-746"><a href="#cb6-746" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-747"><a href="#cb6-747" aria-hidden="true" tabindex="-1"></a>We choose a small image-plane grid (<span class="in">`frustum_grid_size=g`</span>) and a list of metric depths</span>
+<span id="cb6-748"><a href="#cb6-748" aria-hidden="true" tabindex="-1"></a><span class="in">`frustum_depths_m=[d_1,\dots,d_M]`</span>. This gives $K=g^2M$ query points per candidate.</span>
+<span id="cb6-749"><a href="#cb6-749" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-750"><a href="#cb6-750" aria-hidden="true" tabindex="-1"></a>The points are constructed in the **same NDC convention** used by the depth backprojection code and unprojected via</span>
+<span id="cb6-751"><a href="#cb6-751" aria-hidden="true" tabindex="-1"></a>PyTorch3D <span class="in">`PerspectiveCameras.unproject_points(..., from_ndc=True, world_coordinates=True)`</span> (see</span>
+<span id="cb6-752"><a href="#cb6-752" aria-hidden="true" tabindex="-1"></a><span class="co">[</span><span class="ot">PyTorch3D :: Cameras</span><span class="co">](https://pytorch3d.readthedocs.io/en/latest/modules/renderer/cameras.html)</span> <span class="co">[</span><span class="ot">@PyTorch3D-Cameras-2025</span><span class="co">]</span>).</span>
+<span id="cb6-753"><a href="#cb6-753" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-754"><a href="#cb6-754" aria-hidden="true" tabindex="-1"></a>Practical note: our helper follows the “screen-space → NDC” mapping used by the renderer/backprojector (including the</span>
+<span id="cb6-755"><a href="#cb6-755" aria-hidden="true" tabindex="-1"></a>sign convention +X left, +Y up).</span>
+<span id="cb6-756"><a href="#cb6-756" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-757"><a href="#cb6-757" aria-hidden="true" tabindex="-1"></a><span class="fu">### 2) Mapping world points into the EVL voxel grid</span></span>
+<span id="cb6-758"><a href="#cb6-758" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-759"><a href="#cb6-759" aria-hidden="true" tabindex="-1"></a>EVL provides the voxel grid pose $T_{\text{world}\leftarrow\text{voxel}}$ and its metric extent</span>
+<span id="cb6-760"><a href="#cb6-760" aria-hidden="true" tabindex="-1"></a><span class="in">`voxel_extent=[x_min,x_max,y_min,y_max,z_min,z_max]`</span> in the voxel frame.</span>
+<span id="cb6-761"><a href="#cb6-761" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-762"><a href="#cb6-762" aria-hidden="true" tabindex="-1"></a>We invert the pose and transform the frustum points:</span>
+<span id="cb6-763"><a href="#cb6-763" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-764"><a href="#cb6-764" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb6-765"><a href="#cb6-765" aria-hidden="true" tabindex="-1"></a>\mathbf{p}_\text{voxel} = T_{\text{voxel}\leftarrow\text{world}}\,\mathbf{p}_\text{world},</span>
+<span id="cb6-766"><a href="#cb6-766" aria-hidden="true" tabindex="-1"></a>\qquad</span>
+<span id="cb6-767"><a href="#cb6-767" aria-hidden="true" tabindex="-1"></a>T_{\text{voxel}\leftarrow\text{world}} = T_{\text{world}\leftarrow\text{voxel}}^{-1}.</span>
+<span id="cb6-768"><a href="#cb6-768" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb6-769"><a href="#cb6-769" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-770"><a href="#cb6-770" aria-hidden="true" tabindex="-1"></a>Then we map metric voxel coordinates to **voxel-index coordinates** (per axis):</span>
+<span id="cb6-771"><a href="#cb6-771" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-772"><a href="#cb6-772" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb6-773"><a href="#cb6-773" aria-hidden="true" tabindex="-1"></a>i_x = \frac{x-x_{\min}}{\Delta x},\quad</span>
+<span id="cb6-774"><a href="#cb6-774" aria-hidden="true" tabindex="-1"></a>i_y = \frac{y-y_{\min}}{\Delta y},\quad</span>
+<span id="cb6-775"><a href="#cb6-775" aria-hidden="true" tabindex="-1"></a>i_z = \frac{z-z_{\min}}{\Delta z},</span>
+<span id="cb6-776"><a href="#cb6-776" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb6-777"><a href="#cb6-777" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-778"><a href="#cb6-778" aria-hidden="true" tabindex="-1"></a>with $(\Delta x,\Delta y,\Delta z)=\left(\frac{x_{\max}-x_{\min}}{W},\frac{y_{\max}-y_{\min}}{H},\frac{z_{\max}-z_{\min}}{D}\right)$.</span>
+<span id="cb6-779"><a href="#cb6-779" aria-hidden="true" tabindex="-1"></a>This corresponds exactly to <span class="in">`efm3d.utils.voxel_sampling.pc_to_vox`</span>. The actual trilinear sampling is delegated to</span>
+<span id="cb6-780"><a href="#cb6-780" aria-hidden="true" tabindex="-1"></a><span class="in">`efm3d.utils.voxel_sampling.sample_voxels`</span> (internally <span class="in">`torch.nn.functional.grid_sample`</span>, <span class="in">`align_corners=False`</span>,</span>
+<span id="cb6-781"><a href="#cb6-781" aria-hidden="true" tabindex="-1"></a><span class="in">`padding_mode="border"`</span>). (<span class="co">[</span><span class="ot">GitHub</span><span class="co">][4]</span>)</span>
+<span id="cb6-782"><a href="#cb6-782" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-783"><a href="#cb6-783" aria-hidden="true" tabindex="-1"></a><span class="fu">### 3) Pooling and candidate validity</span></span>
+<span id="cb6-784"><a href="#cb6-784" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-785"><a href="#cb6-785" aria-hidden="true" tabindex="-1"></a>We sample the projected scene field at those voxel-index coordinates, producing frustum tokens</span>
+<span id="cb6-786"><a href="#cb6-786" aria-hidden="true" tabindex="-1"></a><span class="in">`tokens (B,N,K,C_out)`</span> and a boolean in-bounds mask <span class="in">`token_valid (B,N,K)`</span>.</span>
+<span id="cb6-787"><a href="#cb6-787" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-788"><a href="#cb6-788" aria-hidden="true" tabindex="-1"></a>We then compute the candidate-local token via a masked mean:</span>
+<span id="cb6-789"><a href="#cb6-789" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-790"><a href="#cb6-790" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb6-791"><a href="#cb6-791" aria-hidden="true" tabindex="-1"></a>\text{local<span class="sc">\_</span>feat}=\frac{\sum_k \mathbb{1}<span class="co">[</span><span class="ot">\text{valid}_k</span><span class="co">]</span>\;\mathbf{t}_k}{\sum_k \mathbb{1}<span class="co">[</span><span class="ot">\text{valid}_k</span><span class="co">]</span> + \varepsilon}.</span>
+<span id="cb6-792"><a href="#cb6-792" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb6-793"><a href="#cb6-793" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-794"><a href="#cb6-794" aria-hidden="true" tabindex="-1"></a>Candidate validity is derived from the **fraction** of frustum samples that fall inside the voxel grid, controlled by</span>
+<span id="cb6-795"><a href="#cb6-795" aria-hidden="true" tabindex="-1"></a><span class="in">`VinModelConfig.candidate_min_valid_frac`</span> (default: 0.2) so we avoid admitting candidates with only a handful of</span>
+<span id="cb6-796"><a href="#cb6-796" aria-hidden="true" tabindex="-1"></a>in-bounds samples.</span>
+<span id="cb6-797"><a href="#cb6-797" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-798"><a href="#cb6-798" aria-hidden="true" tabindex="-1"></a><span class="fu"># Training objective (VIN-NBV style): CORAL ordinal regression</span></span>
+<span id="cb6-799"><a href="#cb6-799" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-800"><a href="#cb6-800" aria-hidden="true" tabindex="-1"></a>VIN-NBV reports that directly regressing RRI is difficult; it discretizes RRI into ordinal bins and trains with CORAL.</span>
+<span id="cb6-801"><a href="#cb6-801" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-802"><a href="#cb6-802" aria-hidden="true" tabindex="-1"></a>We follow the same structure:</span>
+<span id="cb6-803"><a href="#cb6-803" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-804"><a href="#cb6-804" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Oracle labels**: for each snippet, generate candidates and compute oracle RRI using <span class="in">`OracleRriLabeler`</span> (candidate → render depth → backproject PCs → mesh distance → RRI).</span>
+<span id="cb6-805"><a href="#cb6-805" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Binning (current implementation)**: convert oracle RRI values to ordinal labels $y\in<span class="sc">\{</span>0,\dots,K-1<span class="sc">\}</span>$ using</span>
+<span id="cb6-806"><a href="#cb6-806" aria-hidden="true" tabindex="-1"></a>   <span class="in">`oracle_rri/oracle_rri/vin/rri_binning.py`</span> (<span class="in">`RriOrdinalBinner`</span>).</span>
+<span id="cb6-807"><a href="#cb6-807" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-808"><a href="#cb6-808" aria-hidden="true" tabindex="-1"></a>   We fit $K-1$ **empirical quantiles** (equal-mass bins) on a stream of oracle RRIs and store the edges</span>
+<span id="cb6-809"><a href="#cb6-809" aria-hidden="true" tabindex="-1"></a>   $\mathbf{e}=(e_1,\dots,e_{K-1})$.</span>
+<span id="cb6-810"><a href="#cb6-810" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-811"><a href="#cb6-811" aria-hidden="true" tabindex="-1"></a>   **Implementation details (`RriOrdinalBinner.fit_from_iterable`)**:</span>
+<span id="cb6-812"><a href="#cb6-812" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-813"><a href="#cb6-813" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Accumulates RRI chunks on CPU; ignores non-finite values.</span>
+<span id="cb6-814"><a href="#cb6-814" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Computes quantiles at $q_j = j/K$ via <span class="in">`torch.quantile`</span>.</span>
+<span id="cb6-815"><a href="#cb6-815" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>If edges collapse (duplicate quantiles), falls back to uniform edges between</span>
+<span id="cb6-816"><a href="#cb6-816" aria-hidden="true" tabindex="-1"></a>     the observed min/max (or <span class="in">`[-1,1]`</span> as a last resort).</span>
+<span id="cb6-817"><a href="#cb6-817" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Supports resumable fitting by saving <span class="in">`.pt`</span> fit data and exporting the final binner as JSON.</span>
+<span id="cb6-818"><a href="#cb6-818" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-819"><a href="#cb6-819" aria-hidden="true" tabindex="-1"></a>   Then for an RRI value $r$ the label is computed via <span class="in">`torch.bucketize`</span>:</span>
+<span id="cb6-820"><a href="#cb6-820" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-821"><a href="#cb6-821" aria-hidden="true" tabindex="-1"></a>   $$</span>
+<span id="cb6-822"><a href="#cb6-822" aria-hidden="true" tabindex="-1"></a>   y(r)=\sum_{j=1}^{K-1}\mathbb{1}<span class="co">[</span><span class="ot">r \ge e_j</span><span class="co">]</span>.</span>
+<span id="cb6-823"><a href="#cb6-823" aria-hidden="true" tabindex="-1"></a>   $$</span>
+<span id="cb6-824"><a href="#cb6-824" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-825"><a href="#cb6-825" aria-hidden="true" tabindex="-1"></a>   Practical notes:</span>
+<span id="cb6-826"><a href="#cb6-826" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-827"><a href="#cb6-827" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Fit data can be saved/resumed (<span class="in">`.pt`</span> state with RRI chunks) and the fitted binner is saved as JSON (<span class="in">`num_classes`</span>,</span>
+<span id="cb6-828"><a href="#cb6-828" aria-hidden="true" tabindex="-1"></a>     <span class="in">`edges`</span>, optional <span class="in">`bin_means`</span>, <span class="in">`bin_stds`</span>, and <span class="in">`bin_counts`</span> for priors).</span>
+<span id="cb6-829"><a href="#cb6-829" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>On training start, if <span class="in">`VinLightningModuleConfig.num_classes`</span> differs from the saved binner JSON, the binner is</span>
+<span id="cb6-830"><a href="#cb6-830" aria-hidden="true" tabindex="-1"></a>     automatically refit and the JSON is overwritten with the new class count.</span>
+<span id="cb6-831"><a href="#cb6-831" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>If quantile edges collapse (degenerate quantiles), we fall back to uniform edges between the observed min/max (or</span>
+<span id="cb6-832"><a href="#cb6-832" aria-hidden="true" tabindex="-1"></a>     <span class="in">`[-1,1]`</span> as a last resort).</span>
+<span id="cb6-833"><a href="#cb6-833" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-834"><a href="#cb6-834" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Loss (CORAL)**: we use CORAL (*Rank consistent ordinal regression*, see</span>
+<span id="cb6-835"><a href="#cb6-835" aria-hidden="true" tabindex="-1"></a>   <span class="co">[</span><span class="ot">arXiv :: 1901.07884</span><span class="co">](https://arxiv.org/abs/1901.07884)</span> <span class="co">[</span><span class="ot">@CORAL-cao2019</span><span class="co">]</span> and</span>
+<span id="cb6-836"><a href="#cb6-836" aria-hidden="true" tabindex="-1"></a>   <span class="co">[</span><span class="ot">coral-pytorch</span><span class="co">](https://raschka-research-group.github.io/coral-pytorch/)</span> <span class="co">[</span><span class="ot">@coral-pytorch-2025</span><span class="co">]</span>).</span>
+<span id="cb6-837"><a href="#cb6-837" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-838"><a href="#cb6-838" aria-hidden="true" tabindex="-1"></a>   CORAL represents a K-class ordinal label $y\in<span class="sc">\{</span>0,\dots,K-1<span class="sc">\}</span>$ via $K-1$ binary “levels”:</span>
+<span id="cb6-839"><a href="#cb6-839" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-840"><a href="#cb6-840" aria-hidden="true" tabindex="-1"></a>   $$</span>
+<span id="cb6-841"><a href="#cb6-841" aria-hidden="true" tabindex="-1"></a>   \text{level}_k(y)=\mathbb{1}<span class="co">[</span><span class="ot">y&gt;k</span><span class="co">]</span>,\qquad k=0,\dots,K-2,</span>
+<span id="cb6-842"><a href="#cb6-842" aria-hidden="true" tabindex="-1"></a>   $$</span>
+<span id="cb6-843"><a href="#cb6-843" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-844"><a href="#cb6-844" aria-hidden="true" tabindex="-1"></a>   and predicts logits $\ell_k$ for each threshold. The loss is the sum of binary cross-entropies over thresholds</span>
+<span id="cb6-845"><a href="#cb6-845" aria-hidden="true" tabindex="-1"></a>   (see <span class="in">`oracle_rri/oracle_rri/vin/coral.py`</span>).</span>
+<span id="cb6-846"><a href="#cb6-846" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-847"><a href="#cb6-847" aria-hidden="true" tabindex="-1"></a>   Explicitly:</span>
+<span id="cb6-848"><a href="#cb6-848" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-849"><a href="#cb6-849" aria-hidden="true" tabindex="-1"></a>   $$</span>
+<span id="cb6-850"><a href="#cb6-850" aria-hidden="true" tabindex="-1"></a>   <span class="sc">\\</span>mathcal{L}_{<span class="sc">\\</span>text{CORAL}}</span>
+<span id="cb6-851"><a href="#cb6-851" aria-hidden="true" tabindex="-1"></a>   =<span class="sc">\\</span>sum_{k=0}^{K-2}</span>
+<span id="cb6-852"><a href="#cb6-852" aria-hidden="true" tabindex="-1"></a>   <span class="sc">\\</span>left[-<span class="sc">\\</span>text{level}_k<span class="sc">\\</span>log<span class="sc">\\</span>sigma(<span class="sc">\\</span>ell_k)</span>
+<span id="cb6-853"><a href="#cb6-853" aria-hidden="true" tabindex="-1"></a>   -(1-<span class="sc">\\</span>text{level}_k)<span class="sc">\\</span>log(1-<span class="sc">\\</span>sigma(<span class="sc">\\</span>ell_k))<span class="sc">\\</span>right].</span>
+<span id="cb6-854"><a href="#cb6-854" aria-hidden="true" tabindex="-1"></a>   $$</span>
+<span id="cb6-855"><a href="#cb6-855" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-856"><a href="#cb6-856" aria-hidden="true" tabindex="-1"></a>   **Random-classifier baseline.** If logits are zero (uninformative classifier), then</span>
+<span id="cb6-857"><a href="#cb6-857" aria-hidden="true" tabindex="-1"></a>   $p_k=\sigma(\ell_k)=0.5$ for all thresholds. The BCE for each level is $\log 2$,</span>
+<span id="cb6-858"><a href="#cb6-858" aria-hidden="true" tabindex="-1"></a>   so the expected CORAL loss is:</span>
+<span id="cb6-859"><a href="#cb6-859" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-860"><a href="#cb6-860" aria-hidden="true" tabindex="-1"></a>   $$</span>
+<span id="cb6-861"><a href="#cb6-861" aria-hidden="true" tabindex="-1"></a>   \mathbb{E}<span class="co">[</span><span class="ot">\mathcal{L}_{\text{CORAL}}</span><span class="co">]</span></span>
+<span id="cb6-862"><a href="#cb6-862" aria-hidden="true" tabindex="-1"></a>   =(K-1)\log 2.</span>
+<span id="cb6-863"><a href="#cb6-863" aria-hidden="true" tabindex="-1"></a>   $$</span>
+<span id="cb6-864"><a href="#cb6-864" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-865"><a href="#cb6-865" aria-hidden="true" tabindex="-1"></a>   For our default $K=15$, this gives $14\log 2 \approx 9.70$, which is a useful sanity</span>
+<span id="cb6-866"><a href="#cb6-866" aria-hidden="true" tabindex="-1"></a>   check when interpreting training curves. The Lightning module logs</span>
+<span id="cb6-867"><a href="#cb6-867" aria-hidden="true" tabindex="-1"></a>   <span class="in">`coral_loss_rel_random = coral_loss / ((K-1)\log 2)`</span> alongside the raw loss, plus</span>
+<span id="cb6-868"><a href="#cb6-868" aria-hidden="true" tabindex="-1"></a>   a candidate-level <span class="in">`top3_accuracy`</span> metric for ordinal classification.</span>
+<span id="cb6-869"><a href="#cb6-869" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-870"><a href="#cb6-870" aria-hidden="true" tabindex="-1"></a>   **Optional imbalance mitigation.** Threshold labels are imbalanced by construction (early thresholds have</span>
+<span id="cb6-871"><a href="#cb6-871" aria-hidden="true" tabindex="-1"></a>   many positives). We therefore support optional reweighting in <span class="in">`VinLightningModuleConfig`</span>:</span>
+<span id="cb6-872"><a href="#cb6-872" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-873"><a href="#cb6-873" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`coral_bias_init="prior_logits"`</span> initializes CORAL threshold biases from empirical priors (<span class="in">`bin_counts`</span>),</span>
+<span id="cb6-874"><a href="#cb6-874" aria-hidden="true" tabindex="-1"></a>     instead of a generic descending scheme.</span>
+<span id="cb6-875"><a href="#cb6-875" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`coral_loss_variant="balanced_bce"`</span> applies per-threshold positive-class weighting using</span>
+<span id="cb6-876"><a href="#cb6-876" aria-hidden="true" tabindex="-1"></a>     $P(y&gt;k)$ (from the fitted binner or the current batch).</span>
+<span id="cb6-877"><a href="#cb6-877" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`coral_loss_variant="focal"`</span> applies focal weighting to the per-threshold BCE to combat collapse</span>
+<span id="cb6-878"><a href="#cb6-878" aria-hidden="true" tabindex="-1"></a>     under severe imbalance <span class="co">[</span><span class="ot">@FocalLoss-lin2017</span><span class="co">]</span>.</span>
 <span id="cb6-879"><a href="#cb6-879" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-880"><a href="#cb6-880" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb6-881"><a href="#cb6-881" aria-hidden="true" tabindex="-1"></a>\mathbb{E}<span class="co">[</span><span class="ot">y</span><span class="co">]</span>=\sum_{k=0}^{K-2} p_k,\qquad \mathbb{E}<span class="co">[</span><span class="ot">y</span><span class="co">]</span>_\text{norm}=\frac{\mathbb{E}<span class="co">[</span><span class="ot">y</span><span class="co">]</span>}{K-1}.</span>
-<span id="cb6-882"><a href="#cb6-882" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb6-883"><a href="#cb6-883" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-884"><a href="#cb6-884" aria-hidden="true" tabindex="-1"></a><span class="fu"># Minimal training script</span></span>
-<span id="cb6-885"><a href="#cb6-885" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-886"><a href="#cb6-886" aria-hidden="true" tabindex="-1"></a>End-to-end training/evaluation lives in the Lightning experiment stack (<span class="in">`oracle_rri/oracle_rri/lightning/`</span>), exposed as</span>
-<span id="cb6-887"><a href="#cb6-887" aria-hidden="true" tabindex="-1"></a>the console script <span class="in">`nbv-train`</span> (see <span class="in">`oracle_rri/pyproject.toml`</span>). Convenience wrappers exist in <span class="in">`oracle_rri/scripts/`</span></span>
-<span id="cb6-888"><a href="#cb6-888" aria-hidden="true" tabindex="-1"></a>(e.g. <span class="in">`summarize_vin.py`</span>, <span class="in">`train_vin_lightning.py`</span>).</span>
-<span id="cb6-889"><a href="#cb6-889" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-890"><a href="#cb6-890" aria-hidden="true" tabindex="-1"></a>The pipeline does:</span>
-<span id="cb6-891"><a href="#cb6-891" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-892"><a href="#cb6-892" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>load a real ASE snippet (local ATEK shards + meshes),</span>
-<span id="cb6-893"><a href="#cb6-893" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>run <span class="in">`OracleRriLabeler`</span> online to produce labels,</span>
-<span id="cb6-894"><a href="#cb6-894" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>fit a binner (few snippets),</span>
-<span id="cb6-895"><a href="#cb6-895" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>train the head (EVL frozen) for a small number of steps.</span>
+<span id="cb6-880"><a href="#cb6-880" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Binning diagnostics (plots).** The script <span class="in">`oracle_rri/scripts/plot_vin_binning.py`</span></span>
+<span id="cb6-881"><a href="#cb6-881" aria-hidden="true" tabindex="-1"></a>   generates the RRI histogram with quantile edges and a dedicated edge plot (Seaborn):</span>
+<span id="cb6-882"><a href="#cb6-882" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-883"><a href="#cb6-883" aria-hidden="true" tabindex="-1"></a>::: {#fig-vin-rri-binning layout-nrow=2}</span>
+<span id="cb6-884"><a href="#cb6-884" aria-hidden="true" tabindex="-1"></a><span class="al">![Raw RRI distribution with quantile edges.](../../figures/impl/vin/vin_rri_binning.png)</span></span>
+<span id="cb6-885"><a href="#cb6-885" aria-hidden="true" tabindex="-1"></a><span class="al">![Quantile thresholds $e_j$ (Seaborn).](../../figures/impl/vin/vin_rri_thresholds.png)</span></span>
+<span id="cb6-886"><a href="#cb6-886" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb6-887"><a href="#cb6-887" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-888"><a href="#cb6-888" aria-hidden="true" tabindex="-1"></a>At inference time we use the expected ordinal value (normalized to $<span class="co">[</span><span class="ot">0,1</span><span class="co">]</span>$) as the candidate score. With</span>
+<span id="cb6-889"><a href="#cb6-889" aria-hidden="true" tabindex="-1"></a>$p_k=\sigma(\ell_k)=\mathbb{P}(y&gt;k)$:</span>
+<span id="cb6-890"><a href="#cb6-890" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-891"><a href="#cb6-891" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb6-892"><a href="#cb6-892" aria-hidden="true" tabindex="-1"></a>\mathbb{E}<span class="co">[</span><span class="ot">y</span><span class="co">]</span>=\sum_{k=0}^{K-2} p_k,\qquad \mathbb{E}<span class="co">[</span><span class="ot">y</span><span class="co">]</span>_\text{norm}=\frac{\mathbb{E}<span class="co">[</span><span class="ot">y</span><span class="co">]</span>}{K-1}.</span>
+<span id="cb6-893"><a href="#cb6-893" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb6-894"><a href="#cb6-894" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-895"><a href="#cb6-895" aria-hidden="true" tabindex="-1"></a><span class="fu"># Minimal training script</span></span>
 <span id="cb6-896"><a href="#cb6-896" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-897"><a href="#cb6-897" aria-hidden="true" tabindex="-1"></a>Example:</span>
-<span id="cb6-898"><a href="#cb6-898" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-899"><a href="#cb6-899" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
-<span id="cb6-900"><a href="#cb6-900" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> oracle_rri</span>
-<span id="cb6-901"><a href="#cb6-901" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run nbv-train <span class="at">--run-mode</span> summarize-vin</span>
-<span id="cb6-902"><a href="#cb6-902" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run nbv-train <span class="at">--run-mode</span> plot-vin-encodings</span>
-<span id="cb6-903"><a href="#cb6-903" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run nbv-train <span class="at">--run-mode</span> train</span>
-<span id="cb6-904"><a href="#cb6-904" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb6-905"><a href="#cb6-905" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-906"><a href="#cb6-906" aria-hidden="true" tabindex="-1"></a><span class="fu"># Implementation map</span></span>
+<span id="cb6-897"><a href="#cb6-897" aria-hidden="true" tabindex="-1"></a>End-to-end training/evaluation lives in the Lightning experiment stack (<span class="in">`oracle_rri/oracle_rri/lightning/`</span>), exposed as</span>
+<span id="cb6-898"><a href="#cb6-898" aria-hidden="true" tabindex="-1"></a>the console script <span class="in">`nbv-train`</span> (see <span class="in">`oracle_rri/pyproject.toml`</span>). Convenience wrappers exist in <span class="in">`oracle_rri/scripts/`</span></span>
+<span id="cb6-899"><a href="#cb6-899" aria-hidden="true" tabindex="-1"></a>(e.g. <span class="in">`summarize_vin.py`</span>, <span class="in">`train_vin_lightning.py`</span>).</span>
+<span id="cb6-900"><a href="#cb6-900" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-901"><a href="#cb6-901" aria-hidden="true" tabindex="-1"></a>The pipeline does:</span>
+<span id="cb6-902"><a href="#cb6-902" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-903"><a href="#cb6-903" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>load a real ASE snippet (local ATEK shards + meshes),</span>
+<span id="cb6-904"><a href="#cb6-904" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>run <span class="in">`OracleRriLabeler`</span> online to produce labels,</span>
+<span id="cb6-905"><a href="#cb6-905" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>fit a binner (few snippets),</span>
+<span id="cb6-906"><a href="#cb6-906" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>train the head (EVL frozen) for a small number of steps.</span>
 <span id="cb6-907"><a href="#cb6-907" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-908"><a href="#cb6-908" aria-hidden="true" tabindex="-1"></a>VIN code lives in <span class="in">`oracle_rri/oracle_rri/vin/`</span>:</span>
+<span id="cb6-908"><a href="#cb6-908" aria-hidden="true" tabindex="-1"></a>Example:</span>
 <span id="cb6-909"><a href="#cb6-909" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-910"><a href="#cb6-910" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`backbone_evl.py`</span>: <span class="in">`EvlBackbone`</span> wrapper that consumes raw EFM dicts and returns a small typed <span class="in">`EvlBackboneOutput`</span> (head outputs by default; optional neck outputs for ablations).</span>
-<span id="cb6-911"><a href="#cb6-911" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`pose_encoding.py`</span>: <span class="in">`LearnableFourierFeatures`</span> (default; learnable Fourier + MLP over $<span class="co">[</span><span class="ot">u,f,r,s</span><span class="co">]</span>$).</span>
-<span id="cb6-912"><a href="#cb6-912" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`pose_encoders.py`</span>: pose-encoder variants for VIN v2 (discriminated union config, R6D LFF or shell-based LFF/SH).</span>
-<span id="cb6-913"><a href="#cb6-913" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`spherical_encoding.py`</span>: <span class="in">`ShellShPoseEncoder`</span> (legacy; e3nn SH for $u,f$ + 1D Fourier for radius).</span>
-<span id="cb6-914"><a href="#cb6-914" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`pose_encoding.py`</span>: Learnable Fourier features baseline modules (as per Learnable Fourier Features, NeurIPS 2021).</span>
-<span id="cb6-915"><a href="#cb6-915" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`model.py`</span>: <span class="in">`VinModel`</span> (pose encoding + scene-field querying + pose-conditioned global pooling + frustum sampling + CORAL).</span>
-<span id="cb6-916"><a href="#cb6-916" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`coral.py`</span>: CORAL layer + loss and probability utilities (via <span class="in">`coral-pytorch`</span>).</span>
-<span id="cb6-917"><a href="#cb6-917" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`rri_binning.py`</span>: RRI→ordinal binning (<span class="in">`RriOrdinalBinner`</span>).</span>
+<span id="cb6-910"><a href="#cb6-910" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
+<span id="cb6-911"><a href="#cb6-911" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> oracle_rri</span>
+<span id="cb6-912"><a href="#cb6-912" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run nbv-train <span class="at">--run-mode</span> summarize-vin</span>
+<span id="cb6-913"><a href="#cb6-913" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run nbv-train <span class="at">--run-mode</span> plot-vin-encodings</span>
+<span id="cb6-914"><a href="#cb6-914" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run nbv-train <span class="at">--run-mode</span> train</span>
+<span id="cb6-915"><a href="#cb6-915" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb6-916"><a href="#cb6-916" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-917"><a href="#cb6-917" aria-hidden="true" tabindex="-1"></a><span class="fu"># Implementation map</span></span>
 <span id="cb6-918"><a href="#cb6-918" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-919"><a href="#cb6-919" aria-hidden="true" tabindex="-1"></a><span class="fu"># Known gaps / next steps (tracked in `todos.qmd`)</span></span>
+<span id="cb6-919"><a href="#cb6-919" aria-hidden="true" tabindex="-1"></a>VIN code lives in <span class="in">`oracle_rri/oracle_rri/vin/`</span>:</span>
 <span id="cb6-920"><a href="#cb6-920" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-921"><a href="#cb6-921" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>add ranking metrics (Spearman, top-$k$ recall) to the training loop,</span>
-<span id="cb6-922"><a href="#cb6-922" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>version bin thresholds by candidate generator config + EVL ckpt id,</span>
-<span id="cb6-923"><a href="#cb6-923" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>run ablations: occ-only vs occ+obb, $L=2$ vs $L=3$, query depths/rays.</span>
+<span id="cb6-921"><a href="#cb6-921" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`backbone_evl.py`</span>: <span class="in">`EvlBackbone`</span> wrapper that consumes raw EFM dicts and returns a small typed <span class="in">`EvlBackboneOutput`</span> (head outputs by default; optional neck outputs for ablations).</span>
+<span id="cb6-922"><a href="#cb6-922" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`pose_encoding.py`</span>: <span class="in">`LearnableFourierFeatures`</span> (default; learnable Fourier + MLP over $<span class="co">[</span><span class="ot">u,f,r,s</span><span class="co">]</span>$).</span>
+<span id="cb6-923"><a href="#cb6-923" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`pose_encoders.py`</span>: pose-encoder variants for VIN v2 (discriminated union config, R6D LFF or shell-based LFF/SH).</span>
+<span id="cb6-924"><a href="#cb6-924" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`spherical_encoding.py`</span>: <span class="in">`ShellShPoseEncoder`</span> (legacy; e3nn SH for $u,f$ + 1D Fourier for radius).</span>
+<span id="cb6-925"><a href="#cb6-925" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`pose_encoding.py`</span>: Learnable Fourier features baseline modules (as per Learnable Fourier Features, NeurIPS 2021).</span>
+<span id="cb6-926"><a href="#cb6-926" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`model.py`</span>: <span class="in">`VinModel`</span> (pose encoding + scene-field querying + pose-conditioned global pooling + frustum sampling + CORAL).</span>
+<span id="cb6-927"><a href="#cb6-927" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`coral.py`</span>: CORAL layer + loss and probability utilities (via <span class="in">`coral-pytorch`</span>).</span>
+<span id="cb6-928"><a href="#cb6-928" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`rri_binning.py`</span>: RRI→ordinal binning (<span class="in">`RriOrdinalBinner`</span>).</span>
+<span id="cb6-929"><a href="#cb6-929" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-930"><a href="#cb6-930" aria-hidden="true" tabindex="-1"></a><span class="fu"># Known gaps / next steps (tracked in `todos.qmd`)</span></span>
+<span id="cb6-931"><a href="#cb6-931" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-932"><a href="#cb6-932" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>add ranking metrics (Spearman, top-$k$ recall) to the training loop,</span>
+<span id="cb6-933"><a href="#cb6-933" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>version bin thresholds by candidate generator config + EVL ckpt id,</span>
+<span id="cb6-934"><a href="#cb6-934" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>run ablations: occ-only vs occ+obb, $L=2$ vs $L=3$, query depths/rays.</span>
 </code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

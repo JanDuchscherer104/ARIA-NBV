@@ -34,7 +34,7 @@ features, and semidense view conditioning. The model incorporates
 pose-conditioned global pooling, candidate-conditioned semidense projection
 statistics, and frustum-aware cross-attention over projected semidense points.
 We further include a trajectory encoder for history context and a voxel
-reliability proxy (`voxel_valid_frac`) that gates global features when
+reliability proxy (a voxel-validity fraction) that gates global features when
 candidates drift outside EVL's voxel extent. Optional PointNeXt-based semidense
 embeddings provide an additional global geometry cue, and we use FiLM-style
 feature modulation to condition voxel-derived features on view-dependent

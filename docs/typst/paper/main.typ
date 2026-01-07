@@ -9,16 +9,21 @@
 #show: ieee.with(
   title: [Aria-VIN-NBV: Quality-Driven Next-Best-View Planning with Egocentric Foundation Models],
   abstract: [
-    We present the current state of the Aria-VIN-NBV system, a quality-driven next-best-view (NBV)
-    planner that predicts Relative Reconstruction Improvement (RRI) for candidate views in complex
-    indoor scenes. Our approach leverages the Aria Synthetic Environments (ASE) dataset, a frozen
-    Egocentric Voxel Lifting (EVL) backbone from EFM3D, and an oracle RRI pipeline built from
-    ground-truth meshes and semi-dense SLAM points. We describe the end-to-end pipeline from
-    candidate generation and depth rendering to ordinal regression with CORAL, including
-    semidense view conditioning through projection statistics and frustum-aware attention, a
-    trajectory encoder for history context, and voxel-reliability gating via `voxel_valid_frac`.
-    The paper consolidates our implementation choices, diagnostics, and open design questions,
-    and provides a reproducible blueprint for future ablations and entity-aware extensions.
+    Next-Best-View (NBV) planning for active 3D reconstruction must decide where to move next in
+    order to maximize reconstruction quality under limited capture budgets. Existing learning-based
+    planners often optimize geometric coverage proxies that can fail in cluttered indoor scenes,
+    while VIN-NBV showed that directly predicting Relative Reconstruction Improvement (RRI) yields
+    better view selection in object-centric settings. We describe Aria-VIN-NBV, a quality-driven NBV
+    system that brings the RRI objective to egocentric indoor trajectories in the Aria ecosystem.
+    Using Aria Synthetic Environments data, we build an oracle RRI pipeline that renders candidate
+    depth from ground-truth meshes, fuses the resulting points with semi-dense SLAM reconstructions,
+    and evaluates improvement with point-to-surface distances. On top of a frozen EFM3D EVL
+    backbone, we train a lightweight ranking model that scores candidate poses with ordinal
+    regression and combines local voxel evidence with view-conditioned cues derived from semidense
+    projections, including mechanisms to down-weight unreliable voxel context when candidates leave
+    the local grid. The paper summarizes the full pipeline, implementation diagnostics, and open
+    design questions, providing a reproducible baseline for ablations and future entity-aware
+    extensions.
   ],
   authors: (
     (

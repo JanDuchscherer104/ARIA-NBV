@@ -1,0 +1,174 @@
+---
+title: "VIN v2: Component Architecture Diagrams (Mermaid)"
+format:
+  html:
+    page-layout: full
+    code-fold: true
+    code-summary: "Show code"
+    code-tools: false
+---
+
+This page contains **Mermaid architecture diagrams** of the major components in
+`oracle_rri/oracle_rri/vin/model_v2.py` (VIN v2).
+
+The goal is to make it easy to cross-check the implementation against the paper
+and to reason about ablations (e.g., enabling/disabling semidense frustum MHCA,
+PointNeXt, trajectory attention, voxel-valid-fraction gating).
+
+## 1) Pose preparation + pose encoder
+
+```{mermaid}
+flowchart LR
+    cand["Candidate poses<br/>PoseTW world←cam<br/>(B×N)"] --> cw
+    ref["Reference pose<br/>PoseTW world←rig_ref<br/>(B)"] --> cw
+    cw["Undo CW90 correction<br/>(optional)"] --> compose
+    compose["Compose candidate pose in rig frame<br/>T rig_ref←cam = T world←rig_ref^-1 · T world←cam"] --> enc
+    enc["PoseEncoder.encode()<br/>R6D + LFF"] --> pose_enc["pose_enc<br/>(B×N×d_pose)"]
+    enc --> pose_vec["pose_vec<br/>(B×N×9)"]
+    enc --> center["candidate_center_rig_m<br/>(B×N×3)"]
+```
+
+## 2) EVL scene field construction (voxel heads → compact field)
+
+```{mermaid}
+flowchart LR
+    occ_pr["EVL occ_pr"] --> field_aux
+    occ_in["EVL occ_input"] --> field_aux
+    cent["EVL cent_pr"] --> field_aux
+    counts["EVL counts"] --> counts_norm
+
+    counts_norm["counts_norm<br/>log1p(counts)/log1p(max)"] --> unknown
+    counts_norm --> field_aux
+
+    unknown["unknown = 1 - counts_norm"] --> new_surface
+    new_surface["new_surface_prior = unknown · occ_pr"] --> field_aux
+
+    free_in["EVL free_input<br/>(or derived)"] --> field_aux
+
+    field_aux["Select channels<br/>scene_field_channels"] --> concat
+    concat["Concat → F_in<br/>(B×C_in×D×H×W)"] --> proj
+    proj["Conv3d 1×1×1 + GroupNorm + GELU"] --> field["Field F<br/>(B×C×D×H×W)"]
+```
+
+## 3) Voxel-valid-fraction (coverage proxy) and gating
+
+```{mermaid}
+flowchart LR
+    centers["Candidate centers (world)<br/>t world←cam"] --> sample
+    counts_norm["counts_norm volume"] --> sample
+    sample["_sample_voxel_field<br/>@ candidate center"] --> cn["counts_norm_center"]
+    sample --> inb["center_in_bounds mask"]
+    finite["pose_finite mask"] --> frac
+    cn --> frac
+    inb --> frac
+    frac["voxel_valid_frac<br/>cn · inb · finite"] --> gate
+    gate["Gate (optional)<br/>Linear(1→C)+Sigmoid"] --> global_mod["global_feat · gate"]
+```
+
+## 4) Global context: pose-conditioned pooling + MH cross-attention
+
+```{mermaid}
+flowchart LR
+    field["Voxel field F<br/>(B×C×D×H×W)"] --> pool
+    pool["Pool to tokens<br/>G×G×G → T=G^3"] --> tokens["Voxel tokens<br/>(B×T×C)"]
+
+    pts["EVL pts_world<br/>(voxel grid centers)"] --> pos_grid
+    t_vox["T world←voxel"] --> pos_grid
+    rig_ref["T world←rig_ref"] --> pos_grid
+    extent["voxel_extent"] --> pos_grid
+    pos_grid["pos_grid_from_pts_world<br/>voxel centers in rig_ref"] --> pos_lff["LFF(pos)"]
+
+    pose_enc["pose_enc<br/>(B×N×d_pose)"] --> attn
+    tokens --> attn
+    pos_lff --> attn
+    attn["PoseConditionedGlobalPool<br/>MH cross-attn"] --> global["global_feat<br/>(B×N×C)"]
+```
+
+## 5) Semidense sampling + candidate projection (shared across branches)
+
+```{mermaid}
+flowchart LR
+    snippet["Snippet view<br/>EfmSnippetView / VinSnippetView"] --> collapse
+    collapse["collapse_points / cached points<br/>max_points + inv_dist_std + obs_count"] --> pts["points_world (+ extras)"]
+
+    cams["PerspectiveCameras<br/>(B×N flattened)"] --> proj
+    pts --> proj
+    proj["transform_points_screen<br/>→ x,y,z + valid mask"] --> proj_data["proj_data<br/>x,y,z,valid,extras"]
+```
+
+## 6) Semidense projection statistics (per-candidate summary)
+
+```{mermaid}
+flowchart LR
+    proj_data["proj_data"] --> grid
+    grid["2D grid binning<br/>coverage + empty_frac"] --> stats
+    proj_data --> visfrac
+    visfrac["semidense_candidate_vis_frac<br/>valid_count / finite_count"] --> stats
+    proj_data --> depth
+    depth["depth mean/std<br/>(optional inv_dist_std weighting)"] --> stats
+    stats["sem_proj = (coverage, empty_frac,<br/>vis_frac, depth_mean, depth_std)"] --> film
+    film["FiLM(global_feat, sem_proj)<br/>γ,β = Linear(sem_proj)"] --> global_mod["global_feat (modulated)"]
+```
+
+## 7) Semidense frustum MHCA (token-level view conditioning)
+
+```{mermaid}
+flowchart LR
+    proj_data["proj_data"] --> tokens
+    tokens["Tokens τ_i,k<br/>(x_norm,y_norm,depth,<br/>inv_dist_std, obs_count_norm)"] --> trunc
+    trunc["Truncate to K points<br/>semidense_frustum_max_points"] --> vis_embed
+    vis_embed["Add vis token embedding<br/>(optional)"] --> attn
+
+    pose_enc["pose_enc (query)"] --> qproj
+    qproj["Linear pose→Q"] --> attn
+    vis_embed --> kvproj
+    kvproj["Linear token→KV"] --> attn
+
+    attn["MH cross-attn + residual + MLP<br/>(optional invalid masking)"] --> frustum["semidense_frustum<br/>(B×N×C)"]
+```
+
+## 8) Optional PointNeXt semidense encoder (snippet-level)
+
+```{mermaid}
+flowchart LR
+    pts["semidense points_world (+ extras)"] --> to_rig
+    rig_ref["T world←rig_ref"] --> to_rig
+    to_rig["Transform points to rig_ref"] --> pointnext
+    pointnext["PointNeXtSEncoder (frozen)<br/>→ pooled embedding"] --> sem_feat["semidense_feat<br/>(B×d_point)"]
+    sem_feat --> film
+    film["FiLM(global_feat, semidense_feat)<br/>γ,β = Linear(sem_feat)"] --> global_mod["global_feat (modulated)"]
+```
+
+## 9) Optional trajectory encoder + candidate-query attention
+
+```{mermaid}
+flowchart LR
+    traj["Trajectory poses<br/>T world←rig(t)"] --> to_rig
+    rig_ref["T world←rig_ref"] --> to_rig
+    to_rig["Transform to rig_ref"] --> enc
+    enc["TrajectoryEncoder.encode_poses<br/>→ per-frame encodings"] --> pooled["traj_feat pooled<br/>(B×d_traj)"]
+    enc --> per_frame["traj_pose_enc<br/>(B×F×d_pose)"]
+
+    pose_enc["pose_enc (query)<br/>(B×N×d_pose)"] --> attn
+    per_frame --> attn
+    attn["MH cross-attn over frames<br/>→ traj_ctx"] --> ctx["traj_ctx<br/>(B×N×d_pose)"]
+```
+
+## 10) Feature fusion + CORAL head (ordinal RRI)
+
+```{mermaid}
+flowchart LR
+    pose["pose_enc"] --> concat
+    global["global_feat (modulated)"] --> concat
+    proj["sem_proj"] --> concat
+    frustum["semidense_frustum (optional)"] --> concat
+    point["semidense_feat (optional)"] --> concat
+    traj["traj_ctx (optional)"] --> concat
+    voxel["voxel_valid_frac (optional features)"] --> concat
+
+    concat["concat → h_i<br/>(B×N×D)"] --> flat
+    flat["flatten (B·N×D)"] --> mlp["MLP"]
+    mlp --> coral["CORAL layer<br/>(K-1 logits)"]
+    coral --> out["prob + expected RRI"]
+```
+

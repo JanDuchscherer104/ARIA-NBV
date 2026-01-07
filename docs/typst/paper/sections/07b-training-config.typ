@@ -13,7 +13,7 @@ candidates.
 #figure(
   kind: "table",
   supplement: [Table],
-  caption: [Representative training configuration for VIN v2 (current `offline_only.toml` baseline).],
+  caption: [Representative training configuration for VIN v2 (current baseline).],
   table(
     columns: (18em, auto),
     align: (left, left),

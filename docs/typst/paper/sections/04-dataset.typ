@@ -41,8 +41,8 @@ The public ASE release includes GT meshes for a subset of scenes. In the
 EFM3D/ASE release, 100 scenes include GT meshes that we use for oracle RRI
 labels. The ATEK data store also advertises a larger GT-mesh subset (1,641
 scenes), but our current offline snapshot focuses on the 100-scene GT subset
-in `.data/ase_efm`. This yields 4,608 snippets (median 40 per scene) with
-mesh supervision, as summarized in @fig:ase-hist. We call this subset
+in our local ASE-EFM store. This yields 4,608 snippets (median 40 per scene)
+with mesh supervision, as summarized in @fig:ase-hist. We call this subset
 the *ASE-EFM GT split* throughout the paper.
 
 We treat EVL outputs as a frozen scene representation. EVL produces voxelized

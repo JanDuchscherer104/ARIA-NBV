@@ -1385,6 +1385,8 @@ Figure&nbsp;2
 <li><em>All</em> poses coming from the OracleRriLabeler have been rotated by 90 deg cw about their foward axis to allow correct candidate generation in the world frame. However, the poses produced by the EVL do not have this rotation applied.!</li>
 <li>Poses with cw90 deg yaw: <code>candidate_poses_world_cam: PoseTW</code>, <code>reference_pose_world_rig: PoseTW</code>, extrinsics in <code>p3d_cameras: PerspectiveCameras</code>.</li>
 </ul></li>
+<li><label><input type="checkbox">Add a different kind of leaned embedding for all points from semi-dence PC depending on their visibility from candidate pose</label></li>
+<li><label><input type="checkbox">Add feature to the semi-dense: number of (historic) cameras in the efm snippet that saw this specific point.</label></li>
 </ul>
 </section>
 <section id="feature-inventory-what-vin-consumes" class="level3" data-number="6.5.4">
@@ -2524,7 +2526,7 @@ Figure&nbsp;2
 <span id="cb4-384"><a href="#cb4-384" aria-hidden="true" tabindex="-1"></a>  snippet_id: <span class="bu">str</span></span>
 <span id="cb4-385"><a href="#cb4-385" aria-hidden="true" tabindex="-1"></a>  backbone_out: EvlBackboneOutput <span class="co"># dict of tensors from EVL backbone!</span></span>
 <span id="cb4-386"><a href="#cb4-386" aria-hidden="true" tabindex="-1"></a>  <span class="in">```</span></span>
-<span id="cb4-387"><a href="#cb4-387" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>save the enitre output of the EVL backbone instead of EvlBackboneOutput so that we can avoid recomputation if we decide to use different features anywhere down the line. </span>
+<span id="cb4-387"><a href="#cb4-387" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>save the enitre output of the EVL backbone instead of EvlBackboneOutput so that we can avoid recomputation if we decide to use different features anywhere down the line.</span>
 <span id="cb4-388"><a href="#cb4-388" aria-hidden="true" tabindex="-1"></a><span class="ss">  -  </span>dict full OracleRriLabeler results to an offline dataset for fast parallel reading to support multiple workers in the dataloader. Carry a full OracleRriLabelerConfig snapshot but exclude large path lists (e.g. tar URLs / mesh maps).</span>
 <span id="cb4-389"><a href="#cb4-389" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>the metadata should carry all configuration settings</span>
 <span id="cb4-390"><a href="#cb4-390" aria-hidden="true" tabindex="-1"></a></span>
@@ -2602,191 +2604,195 @@ Figure&nbsp;2
 <span id="cb4-462"><a href="#cb4-462" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>*All* poses coming from the OracleRriLabeler have been rotated by 90 deg cw about their foward axis to allow correct candidate generation in the world frame. However, the poses produced by the EVL do not have this rotation applied.!</span>
 <span id="cb4-463"><a href="#cb4-463" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Poses with cw90 deg yaw: <span class="in">`candidate_poses_world_cam: PoseTW`</span>, <span class="in">`reference_pose_world_rig: PoseTW`</span>, extrinsics in <span class="in">`p3d_cameras: PerspectiveCameras`</span>.</span>
 <span id="cb4-464"><a href="#cb4-464" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-465"><a href="#cb4-465" aria-hidden="true" tabindex="-1"></a><span class="fu">### Feature Inventory (what VIN consumes)</span></span>
-<span id="cb4-466"><a href="#cb4-466" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-467"><a href="#cb4-467" aria-hidden="true" tabindex="-1"></a><span class="fu">#### EVL Features (frozen backbone outputs)</span></span>
+<span id="cb4-465"><a href="#cb4-465" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Add a different kind of leaned embedding for all points from semi-dence PC depending on their visibility from candidate pose</span>
+<span id="cb4-466"><a href="#cb4-466" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Add feature to the semi-dense: number of (historic) cameras in the efm snippet that saw this specific point.</span>
+<span id="cb4-467"><a href="#cb4-467" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-468"><a href="#cb4-468" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-469"><a href="#cb4-469" aria-hidden="true" tabindex="-1"></a>Use EVL as a frozen feature extractor on the raw <span class="in">`efm: dict[str, Any]`</span>.</span>
+<span id="cb4-469"><a href="#cb4-469" aria-hidden="true" tabindex="-1"></a><span class="fu">### Feature Inventory (what VIN consumes)</span></span>
 <span id="cb4-470"><a href="#cb4-470" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-471"><a href="#cb4-471" aria-hidden="true" tabindex="-1"></a>Currently used by <span class="in">`VinModel`</span> (via <span class="in">`EvlBackboneConfig.features_mode="heads"`</span>):</span>
+<span id="cb4-471"><a href="#cb4-471" aria-hidden="true" tabindex="-1"></a><span class="fu">#### EVL Features (frozen backbone outputs)</span></span>
 <span id="cb4-472"><a href="#cb4-472" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-473"><a href="#cb4-473" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`occ_pr`</span> (occupancy prediction volume; B×1×D×H×W, logits or probabilities depending on config)</span>
-<span id="cb4-474"><a href="#cb4-474" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`voxel/occ_input`</span> (occupied evidence from input points; B×1×D×H×W)</span>
-<span id="cb4-475"><a href="#cb4-475" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`voxel/counts`</span> (observation counts; B×D×H×W, used for <span class="in">`counts_norm`</span> / <span class="in">`observed`</span> / <span class="in">`unknown`</span>)</span>
-<span id="cb4-476"><a href="#cb4-476" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`voxel/T_world_voxel`</span> (PoseTW) + <span class="in">`voxel_extent`</span> (bounds) for WORLD↔VOXEL mapping</span>
-<span id="cb4-477"><a href="#cb4-477" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-478"><a href="#cb4-478" aria-hidden="true" tabindex="-1"></a>Optional (available via <span class="in">`EvlBackboneConfig.features_mode in {"neck","both"}`</span>; not consumed by <span class="in">`VinModel`</span> yet):</span>
-<span id="cb4-479"><a href="#cb4-479" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-480"><a href="#cb4-480" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`neck/occ_feat`</span> (high-dim geometry/context volume; B×C×D×H×W)</span>
-<span id="cb4-481"><a href="#cb4-481" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`neck/obb_feat`</span> (high-dim semantic/context volume; B×C×D×H×W)</span>
-<span id="cb4-482"><a href="#cb4-482" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-483"><a href="#cb4-483" aria-hidden="true" tabindex="-1"></a>Processing strategy (current implementation in <span class="in">`oracle_rri/oracle_rri/vin/model.py`</span>):</span>
-<span id="cb4-484"><a href="#cb4-484" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-485"><a href="#cb4-485" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Channel compression**: <span class="in">`Conv3d(1×1×1) + GroupNorm + GELU`</span> → <span class="in">`field_dim`</span> (default: 16)</span>
-<span id="cb4-486"><a href="#cb4-486" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Global pooling**: <span class="in">`mean(DHW)`</span> (optional via <span class="in">`use_global_pool=True`</span>)</span>
-<span id="cb4-487"><a href="#cb4-487" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Candidate-conditioned query** (required):</span>
-<span id="cb4-488"><a href="#cb4-488" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>build **K frustum points** in WORLD by unprojecting a <span class="in">`frustum_grid_size×frustum_grid_size`</span> pixel grid at fixed <span class="in">`frustum_depths_m`</span> using PyTorch3D <span class="in">`PerspectiveCameras.unproject_points(..., from_ndc=True)`</span></span>
-<span id="cb4-489"><a href="#cb4-489" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>sample voxel features at these WORLD points via EFM3D <span class="in">`pc_to_vox`</span> + <span class="in">`sample_voxels`</span></span>
-<span id="cb4-490"><a href="#cb4-490" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>aggregate with masked-mean pooling; candidates are masked out if too few samples fall inside the voxel grid (<span class="in">`candidate_min_valid_frac`</span>)</span>
-<span id="cb4-491"><a href="#cb4-491" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-492"><a href="#cb4-492" aria-hidden="true" tabindex="-1"></a><span class="fu">#### Candidate Pose Descriptors (computed in reference frame)</span></span>
-<span id="cb4-493"><a href="#cb4-493" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-494"><a href="#cb4-494" aria-hidden="true" tabindex="-1"></a>**Source of truth (current VIN I/O contract):**</span>
+<span id="cb4-473"><a href="#cb4-473" aria-hidden="true" tabindex="-1"></a>Use EVL as a frozen feature extractor on the raw <span class="in">`efm: dict[str, Any]`</span>.</span>
+<span id="cb4-474"><a href="#cb4-474" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-475"><a href="#cb4-475" aria-hidden="true" tabindex="-1"></a>Currently used by <span class="in">`VinModel`</span> (via <span class="in">`EvlBackboneConfig.features_mode="heads"`</span>):</span>
+<span id="cb4-476"><a href="#cb4-476" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-477"><a href="#cb4-477" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`occ_pr`</span> (occupancy prediction volume; B×1×D×H×W, logits or probabilities depending on config)</span>
+<span id="cb4-478"><a href="#cb4-478" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`voxel/occ_input`</span> (occupied evidence from input points; B×1×D×H×W)</span>
+<span id="cb4-479"><a href="#cb4-479" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`voxel/counts`</span> (observation counts; B×D×H×W, used for <span class="in">`counts_norm`</span> / <span class="in">`observed`</span> / <span class="in">`unknown`</span>)</span>
+<span id="cb4-480"><a href="#cb4-480" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`voxel/T_world_voxel`</span> (PoseTW) + <span class="in">`voxel_extent`</span> (bounds) for WORLD↔VOXEL mapping</span>
+<span id="cb4-481"><a href="#cb4-481" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-482"><a href="#cb4-482" aria-hidden="true" tabindex="-1"></a>Optional (available via <span class="in">`EvlBackboneConfig.features_mode in {"neck","both"}`</span>; not consumed by <span class="in">`VinModel`</span> yet):</span>
+<span id="cb4-483"><a href="#cb4-483" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-484"><a href="#cb4-484" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`neck/occ_feat`</span> (high-dim geometry/context volume; B×C×D×H×W)</span>
+<span id="cb4-485"><a href="#cb4-485" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`neck/obb_feat`</span> (high-dim semantic/context volume; B×C×D×H×W)</span>
+<span id="cb4-486"><a href="#cb4-486" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-487"><a href="#cb4-487" aria-hidden="true" tabindex="-1"></a>Processing strategy (current implementation in <span class="in">`oracle_rri/oracle_rri/vin/model.py`</span>):</span>
+<span id="cb4-488"><a href="#cb4-488" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-489"><a href="#cb4-489" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Channel compression**: <span class="in">`Conv3d(1×1×1) + GroupNorm + GELU`</span> → <span class="in">`field_dim`</span> (default: 16)</span>
+<span id="cb4-490"><a href="#cb4-490" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Global pooling**: <span class="in">`mean(DHW)`</span> (optional via <span class="in">`use_global_pool=True`</span>)</span>
+<span id="cb4-491"><a href="#cb4-491" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Candidate-conditioned query** (required):</span>
+<span id="cb4-492"><a href="#cb4-492" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>build **K frustum points** in WORLD by unprojecting a <span class="in">`frustum_grid_size×frustum_grid_size`</span> pixel grid at fixed <span class="in">`frustum_depths_m`</span> using PyTorch3D <span class="in">`PerspectiveCameras.unproject_points(..., from_ndc=True)`</span></span>
+<span id="cb4-493"><a href="#cb4-493" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>sample voxel features at these WORLD points via EFM3D <span class="in">`pc_to_vox`</span> + <span class="in">`sample_voxels`</span></span>
+<span id="cb4-494"><a href="#cb4-494" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>aggregate with masked-mean pooling; candidates are masked out if too few samples fall inside the voxel grid (<span class="in">`candidate_min_valid_frac`</span>)</span>
 <span id="cb4-495"><a href="#cb4-495" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-496"><a href="#cb4-496" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`candidate_poses_world_cam: PoseTW`</span> (world←camera) and <span class="in">`reference_pose_world_rig: PoseTW`</span> (world←rig_reference)</span>
-<span id="cb4-497"><a href="#cb4-497" aria-hidden="true" tabindex="-1"></a>  from <span class="in">`OracleRriLabelBatch.depths`</span> (used in <span class="in">`oracle_rri/oracle_rri/lightning/lit_datamodule.py`</span>).</span>
-<span id="cb4-498"><a href="#cb4-498" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-499"><a href="#cb4-499" aria-hidden="true" tabindex="-1"></a>Descriptor construction:</span>
-<span id="cb4-500"><a href="#cb4-500" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-501"><a href="#cb4-501" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Convert to the reference rig frame:</span>
-<span id="cb4-502"><a href="#cb4-502" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`T_rigref_camera = inverse(T_world_rigref) @ T_world_camera`</span></span>
-<span id="cb4-503"><a href="#cb4-503" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`t = T_rigref_camera.t ∈ R^3`</span> (camera center in reference frame)</span>
-<span id="cb4-504"><a href="#cb4-504" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Shell parameters:</span>
-<span id="cb4-505"><a href="#cb4-505" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>radius <span class="in">`r = ||t||`</span></span>
-<span id="cb4-506"><a href="#cb4-506" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>position direction <span class="in">`u = t / (r + eps) ∈ S^2`</span></span>
-<span id="cb4-507"><a href="#cb4-507" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>View direction parameters (camera forward in reference frame):</span>
-<span id="cb4-508"><a href="#cb4-508" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>choose camera-forward axis <span class="in">`z_cam = (0,0,1)`</span> (Aria depth convention is +Z forward)</span>
-<span id="cb4-509"><a href="#cb4-509" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`f = normalize(T_rigref_camera.R @ z_cam) ∈ S^2`</span></span>
-<span id="cb4-510"><a href="#cb4-510" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Minimal scalar inductive biases:</span>
-<span id="cb4-511"><a href="#cb4-511" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`r`</span> (optionally <span class="in">`log(r + eps)`</span> via <span class="in">`ShellShPoseEncoderConfig.radius_log_input`</span>)</span>
-<span id="cb4-512"><a href="#cb4-512" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`dot(f, -u)`</span>  (looking back towards reference center)</span>
-<span id="cb4-513"><a href="#cb4-513" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>optionally <span class="in">`dot(f, u)`</span> (looking outward)</span>
-<span id="cb4-514"><a href="#cb4-514" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-515"><a href="#cb4-515" aria-hidden="true" tabindex="-1"></a>Encoding (must use e3nn):</span>
-<span id="cb4-516"><a href="#cb4-516" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-517"><a href="#cb4-517" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`Y_u = SH_L(u)`</span> and <span class="in">`Y_f = SH_L(f)`</span> via <span class="in">`e3nn.o3.spherical_harmonics`</span> with small degree <span class="in">`L ∈ {2,3}`</span></span>
-<span id="cb4-518"><a href="#cb4-518" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Pose embedding:</span>
-<span id="cb4-519"><a href="#cb4-519" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`E_u = Proj(Y_u)`</span> and <span class="in">`E_f = Proj(Y_f)`</span> (small MLP/linear stacks)</span>
-<span id="cb4-520"><a href="#cb4-520" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`E_r = Proj(FF(r))`</span> (or <span class="in">`FF(log(r+eps))`</span> if <span class="in">`radius_log_input=True`</span>)</span>
-<span id="cb4-521"><a href="#cb4-521" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`E_scal = MLP([dot(f,-u), ...])`</span></span>
-<span id="cb4-522"><a href="#cb4-522" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`E_pose = [E_u || E_f || E_r || E_scal]`</span></span>
-<span id="cb4-523"><a href="#cb4-523" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-524"><a href="#cb4-524" aria-hidden="true" tabindex="-1"></a><span class="fu">### Action Items (from scratch, end-to-end)</span></span>
-<span id="cb4-525"><a href="#cb4-525" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-526"><a href="#cb4-526" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 1 EVL feature extractor wrapper (frozen, VIN-facing)</span></span>
+<span id="cb4-496"><a href="#cb4-496" aria-hidden="true" tabindex="-1"></a><span class="fu">#### Candidate Pose Descriptors (computed in reference frame)</span></span>
+<span id="cb4-497"><a href="#cb4-497" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-498"><a href="#cb4-498" aria-hidden="true" tabindex="-1"></a>**Source of truth (current VIN I/O contract):**</span>
+<span id="cb4-499"><a href="#cb4-499" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-500"><a href="#cb4-500" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`candidate_poses_world_cam: PoseTW`</span> (world←camera) and <span class="in">`reference_pose_world_rig: PoseTW`</span> (world←rig_reference)</span>
+<span id="cb4-501"><a href="#cb4-501" aria-hidden="true" tabindex="-1"></a>  from <span class="in">`OracleRriLabelBatch.depths`</span> (used in <span class="in">`oracle_rri/oracle_rri/lightning/lit_datamodule.py`</span>).</span>
+<span id="cb4-502"><a href="#cb4-502" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-503"><a href="#cb4-503" aria-hidden="true" tabindex="-1"></a>Descriptor construction:</span>
+<span id="cb4-504"><a href="#cb4-504" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-505"><a href="#cb4-505" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Convert to the reference rig frame:</span>
+<span id="cb4-506"><a href="#cb4-506" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`T_rigref_camera = inverse(T_world_rigref) @ T_world_camera`</span></span>
+<span id="cb4-507"><a href="#cb4-507" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`t = T_rigref_camera.t ∈ R^3`</span> (camera center in reference frame)</span>
+<span id="cb4-508"><a href="#cb4-508" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Shell parameters:</span>
+<span id="cb4-509"><a href="#cb4-509" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>radius <span class="in">`r = ||t||`</span></span>
+<span id="cb4-510"><a href="#cb4-510" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>position direction <span class="in">`u = t / (r + eps) ∈ S^2`</span></span>
+<span id="cb4-511"><a href="#cb4-511" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>View direction parameters (camera forward in reference frame):</span>
+<span id="cb4-512"><a href="#cb4-512" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>choose camera-forward axis <span class="in">`z_cam = (0,0,1)`</span> (Aria depth convention is +Z forward)</span>
+<span id="cb4-513"><a href="#cb4-513" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`f = normalize(T_rigref_camera.R @ z_cam) ∈ S^2`</span></span>
+<span id="cb4-514"><a href="#cb4-514" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Minimal scalar inductive biases:</span>
+<span id="cb4-515"><a href="#cb4-515" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`r`</span> (optionally <span class="in">`log(r + eps)`</span> via <span class="in">`ShellShPoseEncoderConfig.radius_log_input`</span>)</span>
+<span id="cb4-516"><a href="#cb4-516" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`dot(f, -u)`</span>  (looking back towards reference center)</span>
+<span id="cb4-517"><a href="#cb4-517" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>optionally <span class="in">`dot(f, u)`</span> (looking outward)</span>
+<span id="cb4-518"><a href="#cb4-518" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-519"><a href="#cb4-519" aria-hidden="true" tabindex="-1"></a>Encoding (must use e3nn):</span>
+<span id="cb4-520"><a href="#cb4-520" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-521"><a href="#cb4-521" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`Y_u = SH_L(u)`</span> and <span class="in">`Y_f = SH_L(f)`</span> via <span class="in">`e3nn.o3.spherical_harmonics`</span> with small degree <span class="in">`L ∈ {2,3}`</span></span>
+<span id="cb4-522"><a href="#cb4-522" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Pose embedding:</span>
+<span id="cb4-523"><a href="#cb4-523" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`E_u = Proj(Y_u)`</span> and <span class="in">`E_f = Proj(Y_f)`</span> (small MLP/linear stacks)</span>
+<span id="cb4-524"><a href="#cb4-524" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`E_r = Proj(FF(r))`</span> (or <span class="in">`FF(log(r+eps))`</span> if <span class="in">`radius_log_input=True`</span>)</span>
+<span id="cb4-525"><a href="#cb4-525" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`E_scal = MLP([dot(f,-u), ...])`</span></span>
+<span id="cb4-526"><a href="#cb4-526" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`E_pose = [E_u || E_f || E_r || E_scal]`</span></span>
 <span id="cb4-527"><a href="#cb4-527" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-528"><a href="#cb4-528" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement <span class="in">`oracle_rri/oracle_rri/vin/backbone_evl.py`</span> as a clean adapter:</span>
-<span id="cb4-529"><a href="#cb4-529" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>load EVL via Hydra YAML + checkpoint (strict load from <span class="in">`checkpoint["state_dict"]`</span>)</span>
-<span id="cb4-530"><a href="#cb4-530" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>run <span class="in">`torch.no_grad()`</span> + <span class="in">`eval()`</span> and optionally freeze params (<span class="in">`EvlBackboneConfig.freeze=True`</span>)</span>
-<span id="cb4-531"><a href="#cb4-531" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>robust <span class="in">`batchify`</span> handling (incl. TensorWrapper images)</span>
-<span id="cb4-532"><a href="#cb4-532" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>output <span class="in">`EvlBackboneOutput`</span> with (optional) neck features (<span class="in">`occ_feat`</span>, <span class="in">`obb_feat`</span>), head/evidence volumes (<span class="in">`occ_pr`</span>, <span class="in">`occ_input`</span>, <span class="in">`counts`</span>), and voxel pose (<span class="in">`t_world_voxel`</span>, <span class="in">`voxel_extent`</span>)</span>
-<span id="cb4-533"><a href="#cb4-533" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Add config knobs for checkpoint formats (<span class="in">`strict_load`</span>, <span class="in">`state_dict_key`</span> fallback, <span class="in">`weights_only`</span> fallback)</span>
-<span id="cb4-534"><a href="#cb4-534" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-535"><a href="#cb4-535" aria-hidden="true" tabindex="-1"></a>Acceptance criteria:</span>
-<span id="cb4-536"><a href="#cb4-536" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-537"><a href="#cb4-537" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>EVL forward runs on <span class="in">`EfmSnippetView.efm`</span> produced by <span class="in">`AseEfmDataset`</span> without manual preprocessing.</span>
+<span id="cb4-528"><a href="#cb4-528" aria-hidden="true" tabindex="-1"></a><span class="fu">### Action Items (from scratch, end-to-end)</span></span>
+<span id="cb4-529"><a href="#cb4-529" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-530"><a href="#cb4-530" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 1 EVL feature extractor wrapper (frozen, VIN-facing)</span></span>
+<span id="cb4-531"><a href="#cb4-531" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-532"><a href="#cb4-532" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement <span class="in">`oracle_rri/oracle_rri/vin/backbone_evl.py`</span> as a clean adapter:</span>
+<span id="cb4-533"><a href="#cb4-533" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>load EVL via Hydra YAML + checkpoint (strict load from <span class="in">`checkpoint["state_dict"]`</span>)</span>
+<span id="cb4-534"><a href="#cb4-534" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>run <span class="in">`torch.no_grad()`</span> + <span class="in">`eval()`</span> and optionally freeze params (<span class="in">`EvlBackboneConfig.freeze=True`</span>)</span>
+<span id="cb4-535"><a href="#cb4-535" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>robust <span class="in">`batchify`</span> handling (incl. TensorWrapper images)</span>
+<span id="cb4-536"><a href="#cb4-536" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>output <span class="in">`EvlBackboneOutput`</span> with (optional) neck features (<span class="in">`occ_feat`</span>, <span class="in">`obb_feat`</span>), head/evidence volumes (<span class="in">`occ_pr`</span>, <span class="in">`occ_input`</span>, <span class="in">`counts`</span>), and voxel pose (<span class="in">`t_world_voxel`</span>, <span class="in">`voxel_extent`</span>)</span>
+<span id="cb4-537"><a href="#cb4-537" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Add config knobs for checkpoint formats (<span class="in">`strict_load`</span>, <span class="in">`state_dict_key`</span> fallback, <span class="in">`weights_only`</span> fallback)</span>
 <span id="cb4-538"><a href="#cb4-538" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-539"><a href="#cb4-539" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 2 VIN feature processing (voxel compression + global + candidate query)</span></span>
+<span id="cb4-539"><a href="#cb4-539" aria-hidden="true" tabindex="-1"></a>Acceptance criteria:</span>
 <span id="cb4-540"><a href="#cb4-540" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-541"><a href="#cb4-541" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement voxel channel compression:</span>
-<span id="cb4-542"><a href="#cb4-542" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`field_proj = LazyConv3d(1×1×1) + GroupNorm + GELU`</span> → <span class="in">`field_dim`</span></span>
-<span id="cb4-543"><a href="#cb4-543" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement global context descriptor:</span>
-<span id="cb4-544"><a href="#cb4-544" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`global = mean(DHW)`</span> (optional via <span class="in">`use_global_pool=True`</span>)</span>
-<span id="cb4-545"><a href="#cb4-545" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement candidate-conditioned query descriptor:</span>
-<span id="cb4-546"><a href="#cb4-546" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>build K frustum points by unprojecting a <span class="in">`frustum_grid_size×frustum_grid_size`</span> grid at fixed <span class="in">`frustum_depths_m`</span> (PyTorch3D <span class="in">`PerspectiveCameras.unproject_points(..., from_ndc=True)`</span>)</span>
-<span id="cb4-547"><a href="#cb4-547" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>sample voxel features at these WORLD points via EFM3D <span class="in">`pc_to_vox`</span> + <span class="in">`sample_voxels`</span></span>
-<span id="cb4-548"><a href="#cb4-548" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>pool with masked mean across K points</span>
-<span id="cb4-549"><a href="#cb4-549" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Ensure strict validity masking:</span>
-<span id="cb4-550"><a href="#cb4-550" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>invalid query points do not contribute to pooling</span>
-<span id="cb4-551"><a href="#cb4-551" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>candidates are masked out via <span class="in">`candidate_min_valid_frac`</span></span>
-<span id="cb4-552"><a href="#cb4-552" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-553"><a href="#cb4-553" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 3 Candidate pose descriptor module (shell-aware, SH encoded)</span></span>
-<span id="cb4-554"><a href="#cb4-554" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-555"><a href="#cb4-555" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement the shell-aware pose descriptor (<span class="in">`r, u, f, scalars`</span>) in the reference rig frame.</span>
+<span id="cb4-541"><a href="#cb4-541" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>EVL forward runs on <span class="in">`EfmSnippetView.efm`</span> produced by <span class="in">`AseEfmDataset`</span> without manual preprocessing.</span>
+<span id="cb4-542"><a href="#cb4-542" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-543"><a href="#cb4-543" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 2 VIN feature processing (voxel compression + global + candidate query)</span></span>
+<span id="cb4-544"><a href="#cb4-544" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-545"><a href="#cb4-545" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement voxel channel compression:</span>
+<span id="cb4-546"><a href="#cb4-546" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`field_proj = LazyConv3d(1×1×1) + GroupNorm + GELU`</span> → <span class="in">`field_dim`</span></span>
+<span id="cb4-547"><a href="#cb4-547" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement global context descriptor:</span>
+<span id="cb4-548"><a href="#cb4-548" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`global = mean(DHW)`</span> (optional via <span class="in">`use_global_pool=True`</span>)</span>
+<span id="cb4-549"><a href="#cb4-549" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement candidate-conditioned query descriptor:</span>
+<span id="cb4-550"><a href="#cb4-550" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>build K frustum points by unprojecting a <span class="in">`frustum_grid_size×frustum_grid_size`</span> grid at fixed <span class="in">`frustum_depths_m`</span> (PyTorch3D <span class="in">`PerspectiveCameras.unproject_points(..., from_ndc=True)`</span>)</span>
+<span id="cb4-551"><a href="#cb4-551" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>sample voxel features at these WORLD points via EFM3D <span class="in">`pc_to_vox`</span> + <span class="in">`sample_voxels`</span></span>
+<span id="cb4-552"><a href="#cb4-552" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>pool with masked mean across K points</span>
+<span id="cb4-553"><a href="#cb4-553" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Ensure strict validity masking:</span>
+<span id="cb4-554"><a href="#cb4-554" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>invalid query points do not contribute to pooling</span>
+<span id="cb4-555"><a href="#cb4-555" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>candidates are masked out via <span class="in">`candidate_min_valid_frac`</span></span>
 <span id="cb4-556"><a href="#cb4-556" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-557"><a href="#cb4-557" aria-hidden="true" tabindex="-1"></a><span class="at">  &gt; **Done**: Implemented in </span><span class="in">`oracle_rri/oracle_rri/vin/model.py`</span><span class="at"> by consuming </span><span class="in">`reference_pose_world_rig`</span><span class="at"> (world←rig) and </span><span class="in">`candidate_poses_world_cam`</span><span class="at"> (world←cam), forming $T_{\mathrm{rig}\leftarrow\mathrm{cam}}$, and computing $(r, u, f, \mathrm{scalars})$ in the reference rig frame.</span></span>
+<span id="cb4-557"><a href="#cb4-557" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 3 Candidate pose descriptor module (shell-aware, SH encoded)</span></span>
 <span id="cb4-558"><a href="#cb4-558" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-559"><a href="#cb4-559" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement <span class="in">`ShellShPoseEncoder`</span> in <span class="in">`oracle_rri/oracle_rri/vin/spherical_encoding.py`</span>:</span>
-<span id="cb4-560"><a href="#cb4-560" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>uses <span class="in">`e3nn.o3.spherical_harmonics`</span> for <span class="in">`u`</span> and <span class="in">`f`</span></span>
-<span id="cb4-561"><a href="#cb4-561" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>no <span class="in">`so3log`</span></span>
-<span id="cb4-562"><a href="#cb4-562" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>outputs <span class="in">`E_pose`</span> per candidate</span>
-<span id="cb4-563"><a href="#cb4-563" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-564"><a href="#cb4-564" aria-hidden="true" tabindex="-1"></a>  <span class="at">&gt; **Done**: Implemented as `oracle_rri/oracle_rri/vin/spherical_encoding.py` (`ShellShPoseEncoder` + config) using `e3nn.o3.spherical_harmonics`, with **1D Fourier features** for the radius (</span><span class="in">`r`</span><span class="at"> by default; optionally $\log(r+\varepsilon)$ via config).</span></span>
-<span id="cb4-565"><a href="#cb4-565" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-566"><a href="#cb4-566" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 4 VIN scorer head architecture (minimal MLP + CORAL)</span></span>
+<span id="cb4-559"><a href="#cb4-559" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement the shell-aware pose descriptor (<span class="in">`r, u, f, scalars`</span>) in the reference rig frame.</span>
+<span id="cb4-560"><a href="#cb4-560" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-561"><a href="#cb4-561" aria-hidden="true" tabindex="-1"></a><span class="at">  &gt; **Done**: Implemented in </span><span class="in">`oracle_rri/oracle_rri/vin/model.py`</span><span class="at"> by consuming </span><span class="in">`reference_pose_world_rig`</span><span class="at"> (world←rig) and </span><span class="in">`candidate_poses_world_cam`</span><span class="at"> (world←cam), forming $T_{\mathrm{rig}\leftarrow\mathrm{cam}}$, and computing $(r, u, f, \mathrm{scalars})$ in the reference rig frame.</span></span>
+<span id="cb4-562"><a href="#cb4-562" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-563"><a href="#cb4-563" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement <span class="in">`ShellShPoseEncoder`</span> in <span class="in">`oracle_rri/oracle_rri/vin/spherical_encoding.py`</span>:</span>
+<span id="cb4-564"><a href="#cb4-564" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>uses <span class="in">`e3nn.o3.spherical_harmonics`</span> for <span class="in">`u`</span> and <span class="in">`f`</span></span>
+<span id="cb4-565"><a href="#cb4-565" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>no <span class="in">`so3log`</span></span>
+<span id="cb4-566"><a href="#cb4-566" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>outputs <span class="in">`E_pose`</span> per candidate</span>
 <span id="cb4-567"><a href="#cb4-567" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-568"><a href="#cb4-568" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement <span class="in">`VinModel`</span> (frozen EVL + trainable head):</span>
-<span id="cb4-569"><a href="#cb4-569" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>inputs:</span>
-<span id="cb4-570"><a href="#cb4-570" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span><span class="in">`efm: dict[str, Any]`</span></span>
-<span id="cb4-571"><a href="#cb4-571" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span><span class="in">`candidate_poses_world_cam: PoseTW`</span> (from labeler outputs)</span>
-<span id="cb4-572"><a href="#cb4-572" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span><span class="in">`reference_pose_world_rig: PoseTW`</span> (from labeler outputs)</span>
-<span id="cb4-573"><a href="#cb4-573" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span><span class="in">`p3d_cameras: PerspectiveCameras`</span> (aligned with <span class="in">`candidate_poses_world_cam`</span>)</span>
-<span id="cb4-574"><a href="#cb4-574" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>internal:</span>
-<span id="cb4-575"><a href="#cb4-575" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span>extract EVL head/evidence volumes once per snippet (<span class="in">`occ_pr`</span>, <span class="in">`occ_input`</span>, <span class="in">`counts`</span>)</span>
-<span id="cb4-576"><a href="#cb4-576" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span>compute per-candidate: <span class="in">`E_pose`</span>, <span class="in">`E_global`</span>, <span class="in">`E_query`</span></span>
-<span id="cb4-577"><a href="#cb4-577" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span>final MLP (2 layers, e.g. 256 hidden) → CORAL logits (K-1)</span>
-<span id="cb4-578"><a href="#cb4-578" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>outputs:</span>
-<span id="cb4-579"><a href="#cb4-579" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span>logits, expected score (normalized), candidate_valid mask</span>
-<span id="cb4-580"><a href="#cb4-580" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-581"><a href="#cb4-581" aria-hidden="true" tabindex="-1"></a>  <span class="at">&gt; **Done**: Implemented in </span><span class="in">`oracle_rri/oracle_rri/vin/model.py`</span><span class="at"> with shell+SH pose encoding, a minimal voxel field (</span><span class="in">`occ_pr`</span><span class="at">, </span><span class="in">`occ_input`</span><span class="at">, </span><span class="in">`counts_norm`</span><span class="at">), mean-pooled global context, masked-mean frustum sampling for candidates using PyTorch3D </span><span class="in">`PerspectiveCameras`</span><span class="at">, and CORAL logits/expected score outputs.</span></span>
-<span id="cb4-582"><a href="#cb4-582" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-583"><a href="#cb4-583" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement <span class="in">`VinPrediction`</span> dataclass (logits, scores, masks)</span>
+<span id="cb4-568"><a href="#cb4-568" aria-hidden="true" tabindex="-1"></a>  <span class="at">&gt; **Done**: Implemented as `oracle_rri/oracle_rri/vin/spherical_encoding.py` (`ShellShPoseEncoder` + config) using `e3nn.o3.spherical_harmonics`, with **1D Fourier features** for the radius (</span><span class="in">`r`</span><span class="at"> by default; optionally $\log(r+\varepsilon)$ via config).</span></span>
+<span id="cb4-569"><a href="#cb4-569" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-570"><a href="#cb4-570" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 4 VIN scorer head architecture (minimal MLP + CORAL)</span></span>
+<span id="cb4-571"><a href="#cb4-571" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-572"><a href="#cb4-572" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement <span class="in">`VinModel`</span> (frozen EVL + trainable head):</span>
+<span id="cb4-573"><a href="#cb4-573" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>inputs:</span>
+<span id="cb4-574"><a href="#cb4-574" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span><span class="in">`efm: dict[str, Any]`</span></span>
+<span id="cb4-575"><a href="#cb4-575" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span><span class="in">`candidate_poses_world_cam: PoseTW`</span> (from labeler outputs)</span>
+<span id="cb4-576"><a href="#cb4-576" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span><span class="in">`reference_pose_world_rig: PoseTW`</span> (from labeler outputs)</span>
+<span id="cb4-577"><a href="#cb4-577" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span><span class="in">`p3d_cameras: PerspectiveCameras`</span> (aligned with <span class="in">`candidate_poses_world_cam`</span>)</span>
+<span id="cb4-578"><a href="#cb4-578" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>internal:</span>
+<span id="cb4-579"><a href="#cb4-579" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span>extract EVL head/evidence volumes once per snippet (<span class="in">`occ_pr`</span>, <span class="in">`occ_input`</span>, <span class="in">`counts`</span>)</span>
+<span id="cb4-580"><a href="#cb4-580" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span>compute per-candidate: <span class="in">`E_pose`</span>, <span class="in">`E_global`</span>, <span class="in">`E_query`</span></span>
+<span id="cb4-581"><a href="#cb4-581" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span>final MLP (2 layers, e.g. 256 hidden) → CORAL logits (K-1)</span>
+<span id="cb4-582"><a href="#cb4-582" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>outputs:</span>
+<span id="cb4-583"><a href="#cb4-583" aria-hidden="true" tabindex="-1"></a><span class="ss">    - </span>logits, expected score (normalized), candidate_valid mask</span>
 <span id="cb4-584"><a href="#cb4-584" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-585"><a href="#cb4-585" aria-hidden="true" tabindex="-1"></a><span class="at">  &gt; **Done**: Implemented in </span><span class="in">`oracle_rri/oracle_rri/vin/types.py`</span><span class="at">.</span></span>
+<span id="cb4-585"><a href="#cb4-585" aria-hidden="true" tabindex="-1"></a>  <span class="at">&gt; **Done**: Implemented in </span><span class="in">`oracle_rri/oracle_rri/vin/model.py`</span><span class="at"> with shell+SH pose encoding, a minimal voxel field (</span><span class="in">`occ_pr`</span><span class="at">, </span><span class="in">`occ_input`</span><span class="at">, </span><span class="in">`counts_norm`</span><span class="at">), mean-pooled global context, masked-mean frustum sampling for candidates using PyTorch3D </span><span class="in">`PerspectiveCameras`</span><span class="at">, and CORAL logits/expected score outputs.</span></span>
 <span id="cb4-586"><a href="#cb4-586" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-587"><a href="#cb4-587" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 5 Training data generation (must use OracleRriLabeler)</span></span>
+<span id="cb4-587"><a href="#cb4-587" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement <span class="in">`VinPrediction`</span> dataclass (logits, scores, masks)</span>
 <span id="cb4-588"><a href="#cb4-588" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-589"><a href="#cb4-589" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement an online VIN training dataset wrapper using oracle labels:</span>
-<span id="cb4-590"><a href="#cb4-590" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`oracle_rri/oracle_rri/lightning/lit_datamodule.py`</span> (<span class="in">`VinOracleIterableDataset`</span> + <span class="in">`VinDataModule`</span>)</span>
-<span id="cb4-591"><a href="#cb4-591" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>iterates <span class="in">`AseEfmDataset`</span>, runs <span class="in">`OracleRriLabeler.run(sample)`</span>, and yields <span class="in">`VinOracleBatch`</span> (efm, poses, p3d_cameras, oracle RRI + point↔mesh diagnostics)</span>
-<span id="cb4-592"><a href="#cb4-592" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Add CLI entry points (installed via <span class="in">`oracle_rri/pyproject.toml`</span>):</span>
-<span id="cb4-593"><a href="#cb4-593" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`nbv-fit-binner`</span> (fit + save <span class="in">`rri_binner.json`</span>)</span>
-<span id="cb4-594"><a href="#cb4-594" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`nbv-train`</span> (train/val/test; can also run <span class="in">`--fit-binner-only`</span>)</span>
-<span id="cb4-595"><a href="#cb4-595" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`nbv-train --run-mode summarize-vin`</span> / <span class="in">`nbv-train --run-mode plot-vin-encodings`</span> (diagnostic summaries/plots on real oracle batches)</span>
-<span id="cb4-596"><a href="#cb4-596" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>(dev convenience) <span class="in">`oracle_rri/scripts/train_vin_lightning.py`</span></span>
-<span id="cb4-597"><a href="#cb4-597" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Add evaluation helpers (rank correlation + top-k recall; can be logged in Lightning or as a standalone script)</span>
-<span id="cb4-598"><a href="#cb4-598" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-599"><a href="#cb4-599" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 6 CORAL loss + bin thresholds (stable + easy)</span></span>
-<span id="cb4-600"><a href="#cb4-600" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-601"><a href="#cb4-601" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement RRI→ordinal binning:</span>
-<span id="cb4-602"><a href="#cb4-602" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Fit bin thresholds **globally** on training RRIs</span>
-<span id="cb4-603"><a href="#cb4-603" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Use **quantile edges** so bins have ~equal mass</span>
-<span id="cb4-604"><a href="#cb4-604" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Save binner to JSON (<span class="in">`num_classes`</span> + <span class="in">`edges`</span>) and reference it via <span class="in">`VinLightningModuleConfig.binner_path`</span></span>
-<span id="cb4-605"><a href="#cb4-605" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-606"><a href="#cb4-606" aria-hidden="true" tabindex="-1"></a>  <span class="at">&gt; **Done**: Implemented </span><span class="in">`oracle_rri/oracle_rri/vin/rri_binning.py`</span><span class="at"> (</span><span class="in">`RriOrdinalBinner.fit_from_iterable/transform/save/load`</span><span class="at">) and wired it into the Lightning CLI (</span><span class="in">`nbv-fit-binner`</span><span class="at"> / </span><span class="in">`nbv-train --fit-binner-only`</span><span class="at">).</span></span>
-<span id="cb4-607"><a href="#cb4-607" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-608"><a href="#cb4-608" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Apply CORAL:</span>
-<span id="cb4-609"><a href="#cb4-609" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`logits: (N, K-1)`</span></span>
-<span id="cb4-610"><a href="#cb4-610" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`labels: (N,)`</span> integer ordinal class</span>
-<span id="cb4-611"><a href="#cb4-611" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>mask invalid candidates (<span class="in">`candidate_valid`</span> ∧ <span class="in">`finite(rri)`</span>)</span>
-<span id="cb4-612"><a href="#cb4-612" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-613"><a href="#cb4-613" aria-hidden="true" tabindex="-1"></a>  <span class="at">&gt; **Done**: Implemented </span><span class="in">`oracle_rri/oracle_rri/vin/coral.py`</span><span class="at"> using </span><span class="in">`coral-pytorch`</span><span class="at"> and trained with </span><span class="in">`coral_loss`</span><span class="at"> in </span><span class="in">`oracle_rri/oracle_rri/lightning/lit_module.py`</span><span class="at">.</span></span>
-<span id="cb4-614"><a href="#cb4-614" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-615"><a href="#cb4-615" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Log metrics:</span>
-<span id="cb4-616"><a href="#cb4-616" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Spearman rank correlation between predicted score and oracle RRI</span>
-<span id="cb4-617"><a href="#cb4-617" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>top-1 / top-k recall of best oracle view</span>
+<span id="cb4-589"><a href="#cb4-589" aria-hidden="true" tabindex="-1"></a><span class="at">  &gt; **Done**: Implemented in </span><span class="in">`oracle_rri/oracle_rri/vin/types.py`</span><span class="at">.</span></span>
+<span id="cb4-590"><a href="#cb4-590" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-591"><a href="#cb4-591" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 5 Training data generation (must use OracleRriLabeler)</span></span>
+<span id="cb4-592"><a href="#cb4-592" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-593"><a href="#cb4-593" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement an online VIN training dataset wrapper using oracle labels:</span>
+<span id="cb4-594"><a href="#cb4-594" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`oracle_rri/oracle_rri/lightning/lit_datamodule.py`</span> (<span class="in">`VinOracleIterableDataset`</span> + <span class="in">`VinDataModule`</span>)</span>
+<span id="cb4-595"><a href="#cb4-595" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>iterates <span class="in">`AseEfmDataset`</span>, runs <span class="in">`OracleRriLabeler.run(sample)`</span>, and yields <span class="in">`VinOracleBatch`</span> (efm, poses, p3d_cameras, oracle RRI + point↔mesh diagnostics)</span>
+<span id="cb4-596"><a href="#cb4-596" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Add CLI entry points (installed via <span class="in">`oracle_rri/pyproject.toml`</span>):</span>
+<span id="cb4-597"><a href="#cb4-597" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`nbv-fit-binner`</span> (fit + save <span class="in">`rri_binner.json`</span>)</span>
+<span id="cb4-598"><a href="#cb4-598" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`nbv-train`</span> (train/val/test; can also run <span class="in">`--fit-binner-only`</span>)</span>
+<span id="cb4-599"><a href="#cb4-599" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`nbv-train --run-mode summarize-vin`</span> / <span class="in">`nbv-train --run-mode plot-vin-encodings`</span> (diagnostic summaries/plots on real oracle batches)</span>
+<span id="cb4-600"><a href="#cb4-600" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>(dev convenience) <span class="in">`oracle_rri/scripts/train_vin_lightning.py`</span></span>
+<span id="cb4-601"><a href="#cb4-601" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Add evaluation helpers (rank correlation + top-k recall; can be logged in Lightning or as a standalone script)</span>
+<span id="cb4-602"><a href="#cb4-602" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-603"><a href="#cb4-603" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 6 CORAL loss + bin thresholds (stable + easy)</span></span>
+<span id="cb4-604"><a href="#cb4-604" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-605"><a href="#cb4-605" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Implement RRI→ordinal binning:</span>
+<span id="cb4-606"><a href="#cb4-606" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Fit bin thresholds **globally** on training RRIs</span>
+<span id="cb4-607"><a href="#cb4-607" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Use **quantile edges** so bins have ~equal mass</span>
+<span id="cb4-608"><a href="#cb4-608" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Save binner to JSON (<span class="in">`num_classes`</span> + <span class="in">`edges`</span>) and reference it via <span class="in">`VinLightningModuleConfig.binner_path`</span></span>
+<span id="cb4-609"><a href="#cb4-609" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-610"><a href="#cb4-610" aria-hidden="true" tabindex="-1"></a>  <span class="at">&gt; **Done**: Implemented </span><span class="in">`oracle_rri/oracle_rri/vin/rri_binning.py`</span><span class="at"> (</span><span class="in">`RriOrdinalBinner.fit_from_iterable/transform/save/load`</span><span class="at">) and wired it into the Lightning CLI (</span><span class="in">`nbv-fit-binner`</span><span class="at"> / </span><span class="in">`nbv-train --fit-binner-only`</span><span class="at">).</span></span>
+<span id="cb4-611"><a href="#cb4-611" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-612"><a href="#cb4-612" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[x]</span> Apply CORAL:</span>
+<span id="cb4-613"><a href="#cb4-613" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`logits: (N, K-1)`</span></span>
+<span id="cb4-614"><a href="#cb4-614" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="in">`labels: (N,)`</span> integer ordinal class</span>
+<span id="cb4-615"><a href="#cb4-615" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>mask invalid candidates (<span class="in">`candidate_valid`</span> ∧ <span class="in">`finite(rri)`</span>)</span>
+<span id="cb4-616"><a href="#cb4-616" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-617"><a href="#cb4-617" aria-hidden="true" tabindex="-1"></a>  <span class="at">&gt; **Done**: Implemented </span><span class="in">`oracle_rri/oracle_rri/vin/coral.py`</span><span class="at"> using </span><span class="in">`coral-pytorch`</span><span class="at"> and trained with </span><span class="in">`coral_loss`</span><span class="at"> in </span><span class="in">`oracle_rri/oracle_rri/lightning/lit_module.py`</span><span class="at">.</span></span>
 <span id="cb4-618"><a href="#cb4-618" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-619"><a href="#cb4-619" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 7 Tests (must be real-data integration, not mocks)</span></span>
-<span id="cb4-620"><a href="#cb4-620" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-621"><a href="#cb4-621" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Unit tests:</span>
-<span id="cb4-622"><a href="#cb4-622" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>pose descriptor correctness from (<span class="in">`reference_pose_world_rig`</span>, <span class="in">`candidate_poses_world_cam`</span>) (r&gt;0, ||u||≈1, ||f||≈1, finite SH)</span>
-<span id="cb4-623"><a href="#cb4-623" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>SH output dimension = (L+1)^2 for chosen L</span>
-<span id="cb4-624"><a href="#cb4-624" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>voxel query pooling shapes + masking behavior</span>
-<span id="cb4-625"><a href="#cb4-625" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-626"><a href="#cb4-626" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-627"><a href="#cb4-627" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 8 Documentation (implementation proposal)</span></span>
-<span id="cb4-628"><a href="#cb4-628" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-629"><a href="#cb4-629" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Write <span class="in">`docs/contents/impl/vin_nbv.qmd`</span>:</span>
-<span id="cb4-630"><a href="#cb4-630" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[x]</span> clear I/O contract and tensor shapes</span>
-<span id="cb4-631"><a href="#cb4-631" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[x]</span> EVL feature taps to use</span>
-<span id="cb4-632"><a href="#cb4-632" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[x]</span> exact pose descriptor formulas $(r,u,f,\mathrm{scalars})$ and SH encoding (<span class="in">`e3nn`</span>)</span>
-<span id="cb4-633"><a href="#cb4-633" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[ ]</span> candidate voxel-frustum query method (K points + pooling)</span>
-<span id="cb4-634"><a href="#cb4-634" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[ ]</span> CORAL loss + how thresholds are fitted/saved/versioned</span>
-<span id="cb4-635"><a href="#cb4-635" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[ ]</span> minimal ablations (occ only vs occ+obb; L=2 vs L=3; query depth/rays)</span>
-<span id="cb4-636"><a href="#cb4-636" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-637"><a href="#cb4-637" aria-hidden="true" tabindex="-1"></a>  <span class="at">&gt; **Done**: Wrote the initial proposal and implementation notes in </span><span class="in">`docs/contents/impl/vin_nbv.qmd`</span><span class="at"> (EVL interface, shell+SH descriptor, CORAL objective, and a minimal training loop example). Remaining doc items are the frustum query method + threshold versioning + ablations.</span></span>
-<span id="cb4-638"><a href="#cb4-638" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-639"><a href="#cb4-639" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-619"><a href="#cb4-619" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Log metrics:</span>
+<span id="cb4-620"><a href="#cb4-620" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>Spearman rank correlation between predicted score and oracle RRI</span>
+<span id="cb4-621"><a href="#cb4-621" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>top-1 / top-k recall of best oracle view</span>
+<span id="cb4-622"><a href="#cb4-622" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-623"><a href="#cb4-623" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 7 Tests (must be real-data integration, not mocks)</span></span>
+<span id="cb4-624"><a href="#cb4-624" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-625"><a href="#cb4-625" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Unit tests:</span>
+<span id="cb4-626"><a href="#cb4-626" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>pose descriptor correctness from (<span class="in">`reference_pose_world_rig`</span>, <span class="in">`candidate_poses_world_cam`</span>) (r&gt;0, ||u||≈1, ||f||≈1, finite SH)</span>
+<span id="cb4-627"><a href="#cb4-627" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>SH output dimension = (L+1)^2 for chosen L</span>
+<span id="cb4-628"><a href="#cb4-628" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span>voxel query pooling shapes + masking behavior</span>
+<span id="cb4-629"><a href="#cb4-629" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-630"><a href="#cb4-630" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-631"><a href="#cb4-631" aria-hidden="true" tabindex="-1"></a><span class="fu">#### 8 Documentation (implementation proposal)</span></span>
+<span id="cb4-632"><a href="#cb4-632" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-633"><a href="#cb4-633" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Write <span class="in">`docs/contents/impl/vin_nbv.qmd`</span>:</span>
+<span id="cb4-634"><a href="#cb4-634" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[x]</span> clear I/O contract and tensor shapes</span>
+<span id="cb4-635"><a href="#cb4-635" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[x]</span> EVL feature taps to use</span>
+<span id="cb4-636"><a href="#cb4-636" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[x]</span> exact pose descriptor formulas $(r,u,f,\mathrm{scalars})$ and SH encoding (<span class="in">`e3nn`</span>)</span>
+<span id="cb4-637"><a href="#cb4-637" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[ ]</span> candidate voxel-frustum query method (K points + pooling)</span>
+<span id="cb4-638"><a href="#cb4-638" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[ ]</span> CORAL loss + how thresholds are fitted/saved/versioned</span>
+<span id="cb4-639"><a href="#cb4-639" aria-hidden="true" tabindex="-1"></a><span class="ss">  - </span><span class="va">[ ]</span> minimal ablations (occ only vs occ+obb; L=2 vs L=3; query depth/rays)</span>
 <span id="cb4-640"><a href="#cb4-640" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-641"><a href="#cb4-641" aria-hidden="true" tabindex="-1"></a><span class="fu">## Misc</span></span>
+<span id="cb4-641"><a href="#cb4-641" aria-hidden="true" tabindex="-1"></a>  <span class="at">&gt; **Done**: Wrote the initial proposal and implementation notes in </span><span class="in">`docs/contents/impl/vin_nbv.qmd`</span><span class="at"> (EVL interface, shell+SH descriptor, CORAL objective, and a minimal training loop example). Remaining doc items are the frustum query method + threshold versioning + ablations.</span></span>
 <span id="cb4-642"><a href="#cb4-642" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-643"><a href="#cb4-643" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Extend candidate generation to continuous policy conditioned on fused occupancy / OBB prior</span>
+<span id="cb4-643"><a href="#cb4-643" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-644"><a href="#cb4-644" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-645"><a href="#cb4-645" aria-hidden="true" tabindex="-1"></a><span class="fu"># Notes on Implementation Approach</span></span>
+<span id="cb4-645"><a href="#cb4-645" aria-hidden="true" tabindex="-1"></a><span class="fu">## Misc</span></span>
 <span id="cb4-646"><a href="#cb4-646" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-647"><a href="#cb4-647" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use enums/configs to compose candidate sampling rules; keep modules orthogonal (generation, filtering, scoring).</span>
-<span id="cb4-648"><a href="#cb4-648" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Prefer streaming + caching in visualization to avoid recomputation.</span>
-<span id="cb4-649"><a href="#cb4-649" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Keep tests close to metrics and candidate generation (test-driven as per agent instruction).</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb4-647"><a href="#cb4-647" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Extend candidate generation to continuous policy conditioned on fused occupancy / OBB prior</span>
+<span id="cb4-648"><a href="#cb4-648" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-649"><a href="#cb4-649" aria-hidden="true" tabindex="-1"></a><span class="fu"># Notes on Implementation Approach</span></span>
+<span id="cb4-650"><a href="#cb4-650" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-651"><a href="#cb4-651" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use enums/configs to compose candidate sampling rules; keep modules orthogonal (generation, filtering, scoring).</span>
+<span id="cb4-652"><a href="#cb4-652" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Prefer streaming + caching in visualization to avoid recomputation.</span>
+<span id="cb4-653"><a href="#cb4-653" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Keep tests close to metrics and candidate generation (test-driven as per agent instruction).</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

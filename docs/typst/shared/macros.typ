@@ -146,7 +146,8 @@ $
 /// - Mesh surface: `#sym_mesh`
 /// - Loss: `#sym_loss`
 #let sym_points = $cal(P)$
-#let sym_mesh = $cal(M)$
+#let sym_mesh = $cal(M)_"GT"$
+#let sym_faces = $cal(F)_"GT"$
 #let sym_loss = $cal(L)$
 #let sym_candidates = $cal(Q)$
 #let sym_depth = $bold(D)$

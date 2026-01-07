@@ -2,17 +2,17 @@
 
 #import "/typst/shared/macros.typ": *
 
-We consider an egocentric reconstruction episode with a sequence of captured frames and poses. Let $#sym_points _t$ be the current reconstruction point set at step $t$, and let $#sym_mesh$ denote the ground-truth surface mesh for the scene. At each step we sample a set of $N$ candidate camera poses $(q_i)_{i=1}^N in "SE"(3)$ (with optional roll constraints), render candidate point sets $#sym_points _(q_i)$, and select the view that maximizes the expected improvement in reconstruction quality.
+We consider an egocentric reconstruction episode with a sequence of captured frames and poses. Let $#sym_points _t$ be the current reconstruction point set at step $t$, and let $#sym_mesh$ denote the ground-truth surface mesh for the scene. At each step we sample a finite set of $N$ candidate camera poses $q in #sym_candidates subset "SE"(3)$ (with optional roll constraints), render a candidate point set $#sym_points _q$ by depth-rendering $#sym_mesh$ from pose $q$ and unprojecting it, and select the view that maximizes the expected improvement in reconstruction quality.
 
 == Chamfer distance and RRI
 
-We measure reconstruction quality using the symmetric Chamfer distance between a point set $#sym_points$ and a mesh surface $#sym_mesh$. We sample points from the mesh surface and compute the bidirectional distance
+We measure reconstruction quality using a Chamfer-style point #sym.arrow.l.r mesh distance between a point set $#sym_points$ and a mesh surface $#sym_mesh$. We represent $#sym_mesh$ by its triangular faces $#sym_faces$ and evaluate both directional terms using squared point-to-triangle and triangle-to-point distances.
 
 #block[
   #align(center)[
     $
       "CD"(#sym_points, #sym_mesh) =
-      (#sym_acc)(#sym_points, #sym_mesh) + (#sym_comp)(#sym_points, #sym_mesh)
+      #sym_acc (#sym_points, #sym_mesh) + #sym_comp (#sym_points, #sym_mesh)
     $
   ]
 ]
@@ -20,8 +20,8 @@ We measure reconstruction quality using the symmetric Chamfer distance between a
 #block[
   #align(center)[
     $
-      (#sym_acc)(#sym_points, #sym_mesh) =
-      (1)/(n_P) sum_(bold(p) in #sym_points) min_(bold(m) in #sym_mesh) d(bold(p), bold(m))^2
+      #sym_acc (#sym_points, #sym_mesh) =
+      (1)/(n_P) sum_(bold(p) in #sym_points) min_(f in #sym_faces) d(bold(p), f)^2
     $
   ]
 ]
@@ -29,13 +29,13 @@ We measure reconstruction quality using the symmetric Chamfer distance between a
 #block[
   #align(center)[
     $
-      (#sym_comp)(#sym_points, #sym_mesh) =
-      (1)/(n_M) sum_(bold(m) in #sym_mesh) min_(bold(p) in #sym_points) d(bold(m), bold(p))^2
+      #sym_comp (#sym_points, #sym_mesh) =
+      (1)/(n_F) sum_(f in #sym_faces) min_(bold(p) in #sym_points) d(bold(p), f)^2
     $
   ]
 ]
 
-where $n_P$ and $n_M$ denote the point counts. The Relative Reconstruction Improvement for candidate $q$ is then
+where $n_P$ and $n_F$ denote the number of points and faces, respectively. The Relative Reconstruction Improvement for candidate $q$ is then
 
 #block[
   #align(center)[
@@ -50,10 +50,9 @@ where $n_P$ and $n_M$ denote the point counts. The Relative Reconstruction Impro
 Here $epsilon$ is a small stabilizer. A positive RRI means that adding the
 candidate view decreases the Chamfer distance, thereby improving reconstruction
 quality. Our policy selects
-
 #block[
   #align(center)[
-    $ q_star = "argmax" "RRI"(q) $
+    $ q_star = op("argmax", limits: #true)_(q in #sym_candidates) "RRI"(q) $
   ]
 ]
 

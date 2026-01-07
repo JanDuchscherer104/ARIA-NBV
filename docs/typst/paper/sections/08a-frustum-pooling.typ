@@ -15,8 +15,8 @@ Representative frusta visualizations are included in the appendix.
 Let $#sym_points _t$ be the current reconstruction point set (semi-dense
 SLAM points) in
 world coordinates. For each candidate camera, we project points to screen-space
-using a standard pinhole camera model (implemented with PyTorch3D's
-`PerspectiveCameras`). Each projected point contributes a token:
+using a standard pinhole camera model consistent with the depth renderer. Each
+projected point contributes a token:
 
 #block[
   #align(center)[
@@ -29,16 +29,15 @@ positive depth in camera space, and $nu$ is an optional per-point
 inverse-distance uncertainty from the SLAM point cloud. The final feature $c$
 is the per-point observation count (track length), i.e., the number of snippet
 trajectory frames that observed the point, normalized with a configurable
-`log1p`/`log1p_norm` scheme.
+log scaling (e.g., $c' = log(1 + c) / log(1 + c_"max")$).
 
 A boolean mask marks valid projected points (finite, $z>0$, and inside image
 bounds). We truncate to a fixed maximum number of points per candidate for
 stable compute. Optionally, we add a learned token-type embedding for valid vs
 invalid projections and optionally mask invalid tokens in attention.
 
-The fraction of valid projected points (`semidense_candidate_vis_frac`)
-provides a view-specific reliability score and is logged as a key diagnostic
-signal.
+The fraction of valid projected points provides a view-specific reliability
+score and is logged as a key diagnostic signal.
 
 == Multi-head cross-attention
 
