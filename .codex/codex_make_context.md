@@ -117,6 +117,7 @@ namespace utils.optuna_optimizable{
         -_coerce(self, Any value)
         -_to_optuna_choice(self, Any choice)
         -_stringify_choice(self, choice)
+        -_dependencies_satisfied(self, value_lookup)
     }
 }
 namespace vin.backbone_evl{
@@ -181,6 +182,48 @@ namespace vin.pose_encoders{
         -_validate_pose_encoder_lff(cls, LearnableFourierFeaturesConfig value)
     }
     class ShellShPoseEncoderAdapterConfig{
+    }
+}
+namespace vin.traj_encoder{
+    class TrajectoryEncodingOutput{
+        +per_frame
+        +pooled
+    }
+    class TrajectoryEncoderConfig{
+    }
+    class TrajectoryEncoder{
+        +config
+        +pose_encoder
+        +\_\_init\_\_(self, TrajectoryEncoderConfig config)
+        +out_dim(self)
+        -_ensure_batch(self, PoseTW pose)
+        +encode_poses(self, PoseTW poses)
+        +forward(self, EfmTrajectoryView trajectory)
+    }
+}
+namespace vin.vin_v2_utils{
+    class PreparedInputs{
+        +pose_world_cam
+        +pose_world_rig_ref
+        +t_world_voxel
+        +batch_size
+        +num_candidates
+        +device
+        +snippet
+    }
+    class PoseFeatures{
+        +pose_enc
+        +pose_vec
+        +candidate_center_rig_m
+    }
+    class FieldBundle{
+        +field_in
+        +field
+        +aux
+    }
+    class GlobalContext{
+        +pos_grid
+        +global_feat
     }
 }
 namespace vin.pipeline{
@@ -353,8 +396,69 @@ namespace vin.plotting{
         +apply_global(self)
         +apply(self)
     }
+    class _FrustumTrajectoryStub{
+        +t_world_rig
+    }
+    class _FrustumSnippetStub{
+        +trajectory
+        +mesh
+        +semidense
+    }
+}
+namespace vin.pointnext_encoder{
+    class PointNeXtSEncoderConfig{
+        -_resolve_checkpoint_path(cls, v)
+        -_resolve_cfg_path(cls, v)
+    }
+    class PointNeXtSEncoder{
+        +config
+        +input_channels
+        +model
+        +out_dim
+        +proj
+        +\_\_init\_\_(self, PointNeXtSEncoderConfig config)
+        +train(self, bool mode)
+        -_forward_features(self, Tensor points, features)
+        +forward(self, Tensor points)
+    }
 }
 namespace vin.model_v2{
+    class VinModelV2Config{
+        -_validate_pos_grid_encoder_lff(cls, LearnableFourierFeaturesConfig value)
+        -_apply_candidate_min_valid_frac(self)
+    }
+    class VinModelV2{
+        +config
+        +backbone
+        +field_proj
+        +global_pooler
+        +sem_proj_film
+        +sem_proj_film_norm
+        +head_mlp
+        +head_coral
+        +\_\_init\_\_(self, VinModelV2Config config)
+        +pose_encoder_lff(self)
+        -_maybe_snippet_view(self, efm)
+        -_prepare_inputs(self, efm, PoseTW candidate_poses_world_cam, PoseTW reference_pose_world_rig, EvlBackboneOutput backbone_out)
+        -_encode_pose_features(self, PoseTW pose_world_cam, PoseTW pose_world_rig_ref)
+        -_build_field_bundle(self, EvlBackboneOutput backbone_out)
+        -_compute_global_context(self, Tensor field, Tensor pose_enc)
+        -_normalize_obs_count(self, Tensor obs_count)
+        -_encode_semidense_features(self, points_world)
+        -_sample_semidense_points(self, snippet)
+        -_project_semidense_points(self, points_world, PerspectiveCameras p3d_cameras)
+        -_encode_semidense_projection_features(self, proj_data)
+        -_semidense_proj_feature_index(str name)
+        -_encode_semidense_frustum_context(self, proj_data, Tensor pose_enc)
+        -_encode_traj_features(self, snippet)
+        -_forward_impl(self, efm, PoseTW candidate_poses_world_cam, PoseTW reference_pose_world_rig, PerspectiveCameras p3d_cameras, bool return_debug, backbone_out)
+        +forward(self, efm, PoseTW candidate_poses_world_cam, PoseTW reference_pose_world_rig, PerspectiveCameras p3d_cameras, backbone_out)
+        +forward_with_debug(self, efm, PoseTW candidate_poses_world_cam, PoseTW reference_pose_world_rig, PerspectiveCameras p3d_cameras, backbone_out)
+        +init_bin_values(self, Tensor values)
+        +summarize_vin(self, VinOracleBatch batch)
+    }
+}
+namespace vin.model_v2_old{
     class VinV2ForwardDiagnostics{
         +backbone_out
         +candidate_center_rig_m
@@ -365,43 +469,10 @@ namespace vin.model_v2{
         +global_feat
         +feats
         +candidate_valid
+        +voxel_valid_frac
     }
     class _AttrDict{
         +\_\_getattr\_\_(self, str key)
-    }
-    class PointNeXtSEncoderConfig{
-        -_coerce_paths(cls, value)
-    }
-    class PointNeXtSEncoder{
-        +config
-        +model
-        +out_dim
-        +proj
-        +\_\_init\_\_(self, PointNeXtSEncoderConfig config)
-        +train(self, bool mode)
-        -_forward_raw(self, Tensor points)
-        +forward(self, Tensor points)
-    }
-    class VinModelV2Config{
-        -_validate_pos_grid_encoder_lff(cls, LearnableFourierFeaturesConfig value)
-        -_validate_scene_field_channels(cls, value)
-    }
-    class VinModelV2{
-        +config
-        +backbone
-        +field_proj
-        +global_pooler
-        +head_mlp
-        +head_coral
-        +\_\_init\_\_(self, VinModelV2Config config)
-        +pose_encoder_lff(self)
-        -_pos_grid_from_pts_world(Tensor pts_world)
-        -_semidense_points_world(self, efm)
-        -_forward_impl(self, efm, PoseTW candidate_poses_world_cam, PoseTW reference_pose_world_rig, PerspectiveCameras p3d_cameras, bool return_debug, backbone_out)
-        +forward(self, efm, PoseTW candidate_poses_world_cam, PoseTW reference_pose_world_rig, PerspectiveCameras p3d_cameras, backbone_out)
-        +forward_with_debug(self, efm, PoseTW candidate_poses_world_cam, PoseTW reference_pose_world_rig, PerspectiveCameras p3d_cameras, backbone_out)
-        +init_bin_values(self, Tensor values)
-        +summarize_vin(self, VinOracleBatch batch)
     }
 }
 namespace vin.types{
@@ -438,7 +509,9 @@ namespace vin.types{
         +expected
         +expected_normalized
         +candidate_valid
-        +valid_frac
+        +voxel_valid_frac
+        +semidense_candidate_vis_frac
+        +semidense_valid_frac
     }
     class VinForwardDiagnostics{
         +backbone_out
@@ -463,7 +536,7 @@ namespace vin.types{
         +tokens
         +token_valid
         +candidate_valid
-        +valid_frac
+        +voxel_valid_frac
         +feats
     }
 }
@@ -489,6 +562,89 @@ namespace vin.spherical_encoding{
         +forward(self, Tensor u, Tensor f)
     }
     class ShellShPoseEncoderConfig{
+    }
+}
+namespace data.vin_snippet_cache{
+    class VinSnippetCacheMetadata{
+        +version
+        +created_at
+        +source_cache_dir
+        +source_cache_hash
+        +dataset_config
+        +include_inv_dist_std
+        +include_obs_count
+        +semidense_max_points
+        +config_hash
+        +num_samples
+    }
+    class VinSnippetCacheEntry{
+        +key
+        +scene_id
+        +snippet_id
+        +path
+    }
+    class VinSnippetCacheBuildResult{
+        +entry
+        +payload
+        +error
+    }
+    class VinSnippetCacheConfig{
+        -_resolve_cache_dir(cls, value, ValidationInfo info)
+        +samples_dir(self)
+        +index_path(self)
+        +metadata_path(self)
+    }
+    class VinSnippetCacheWriterConfig{
+        -_validate_inv_dist_std(cls, bool value)
+        -_validate_map_location(cls, value)
+        -_validate_num_workers(cls, int value)
+        -_validate_prefetch_factor(cls, value)
+    }
+    class VinSnippetCacheDatasetConfig{
+        -_validate_map_location(cls, str value)
+    }
+    class VinSnippetCacheBuildDataset{
+        -_entries
+        -_dataset_payload
+        -_map_location
+        -_paths
+        -_semidense_max_points
+        -_include_inv_dist_std
+        -_include_obs_count
+        -_include_gt_mesh
+        -_device
+        +\_\_init\_\_(self)
+        +\_\_len\_\_(self)
+        +\_\_getitem\_\_(self, int idx)
+        -_ensure_loader(self)
+        -_build_payload(self, OracleRriCacheEntry entry)
+    }
+    class VinSnippetCacheWriter{
+        +config
+        +console
+        -_dataset_payload
+        -_meta
+        -_config_hash
+        +\_\_init\_\_(self, VinSnippetCacheWriterConfig config)
+        +run(self)
+        -_resolve_dataset_payload(self)
+        -_prepare_metadata(self)
+        -_load_oracle_entries(self)
+        -_build_payload(self, OracleRriCacheEntry entry)
+        -_write_payload(self, OracleRriCacheEntry entry, payload, Path samples_dir)
+        -_write_sample(self, OracleRriCacheEntry entry, Path samples_dir)
+    }
+    class VinSnippetCacheDataset{
+        +config
+        +console
+        -_index
+        -_len
+        +\_\_init\_\_(self, VinSnippetCacheDatasetConfig config)
+        -_resolve_len(self)
+        +\_\_len\_\_(self)
+        +\_\_getitem\_\_(self, int idx)
+        +get_by_scene_snippet(self)
+        -_load_entry(self, VinSnippetCacheEntry entry)
     }
 }
 namespace data.mesh_cache{
@@ -523,10 +679,7 @@ namespace data.offline_cache{
     }
     class OracleRriCacheWriterConfig{
     }
-    class OracleRriCacheAppenderConfig{
-    }
     class OracleRriCacheDatasetConfig{
-        -_validate_map_location(cls, str value)
         -_validate_train_val_split(cls, float value)
         -_validate_simplification(cls, value)
     }
@@ -541,37 +694,56 @@ namespace data.offline_cache{
         -_write_sample(self, EfmSnippetView sample, Path samples_dir)
         -_encode_sample(self, OracleRriLabelBatch label_batch)
     }
-    class OracleRriCacheAppender{
-        +config
-        +console
-        -_meta
-        -_config_hash
-        -_index_path
-        -_samples_dir
-        -_num_samples
-        +\_\_init\_\_(self, OracleRriCacheAppenderConfig config)
-        +append(self, OracleRriLabelBatch label_batch)
-        -_prepare_metadata(self)
-        -_resolve_num_samples(self)
-        -_validate_metadata(self, OracleRriCacheMetadata meta)
-    }
     class OracleRriCacheDataset{
         +config
         +console
         -_index
         +metadata
-        -_warned_worker_cuda
         -_len
+        -_vin_snippet_expected_hash
         +\_\_init\_\_(self, OracleRriCacheDatasetConfig config)
         -_resolve_len(self)
         +\_\_getstate\_\_(self)
         +\_\_setstate\_\_(self, state)
-        -_resolve_map_location(self)
+        -_compute_vin_snippet_expected_hash(self)
+        -_ensure_vin_snippet_provider(self)
         +\_\_len\_\_(self)
         +\_\_getitem\_\_(self, int idx)
         -_to_vin_batch(self, OracleRriCacheSample cache_sample)
-        +append_entry(self, OracleRriCacheEntry entry)
+        -_to_vin_batch_from_parts(self)
+        -_filter_index_for_vin_snippet_cache(self, entries)
         -_load_index(self)
+    }
+    class OracleRriCacheVinDataset{
+        +return_format
+        +load_candidates
+        +load_candidate_pcs
+        +config
+        -_dataset
+        +\_\_init\_\_(self, OracleRriCacheDatasetConfig config)
+        +\_\_len\_\_(self)
+        +\_\_getitem\_\_(self, int idx)
+        +\_\_iter\_\_(self)
+    }
+}
+namespace data.vin_oracle_datasets{
+    class VinOracleOnlineDataset{
+        -_base
+        -_labeler
+        -_max_attempts
+        -_console
+        -_efm_keep_keys
+        +\_\_init\_\_(self)
+        +\_\_iter\_\_(self)
+    }
+    class VinOracleOnlineDatasetConfig{
+        +setup_target(self)
+        -_resolve_dataset_cfg(self, Stage split)
+        +is_map_style(self)
+    }
+    class VinOracleCacheDatasetConfig{
+        +setup_target(self)
+        +is_map_style(self)
     }
 }
 namespace data.efm_views{
@@ -629,7 +801,7 @@ namespace data.efm_views{
         +volume_max
         +lengths
         +to(self, device)
-        +collapse_points(self, max_points)
+        +collapse_points(self, max_points, bool include_inv_dist_std, bool include_obs_count)
         +last_frame_points_np(self, max_points)
         +\_\_repr\_\_(self)
     }
@@ -648,6 +820,9 @@ namespace data.efm_views{
         +mesh_faces
         +mesh_cache_key
         +mesh_specs
+        -_parse_key_ids(str sample_key)
+        -_infer_cache_bounds(efm)
+        +from_cache_efm(cls, efm)
         +get_camera(self, prefix)
         +camera_rgb(self)
         +camera_slam_left(self)
@@ -659,7 +834,13 @@ namespace data.efm_views{
         +has_mesh(self)
         +get_occupancy_extend(self)
         +to(self, device)
+        +prune_efm(self, keep_keys)
         +\_\_repr\_\_(self)
+    }
+    class VinSnippetView{
+        +points_world
+        +t_world_rig
+        +to(self, device)
     }
 }
 namespace data.plotting{
@@ -761,6 +942,41 @@ namespace data.offline_cache_types{
         +efm_snippet_view
     }
 }
+namespace data.vin_oracle_types{
+    class VinOracleBatch{
+        +efm_snippet_view
+        +candidate_poses_world_cam
+        +reference_pose_world_rig
+        +rri
+        +pm_dist_before
+        +pm_dist_after
+        +pm_acc_before
+        +pm_comp_before
+        +pm_acc_after
+        +pm_comp_after
+        +p3d_cameras
+        +scene_id
+        +snippet_id
+        +backbone_out
+        +shape_summary(self)
+        +from_label(cls, 'OracleRriLabelBatch' label_batch)
+        +collate(cls, samples)
+        -_pad_candidate_poses(PoseTW poses)
+        -_pad_points(Tensor points)
+        -_pad_trajectory(PoseTW poses)
+        -_pad_1d(Tensor values)
+        -_stack_reference_poses(poses)
+        -_expand_camera_param(Tensor param)
+        -_pad_camera_param(Tensor param)
+        -_stack_p3d_cameras(cls, cameras)
+        -_stack_tensor_field(cls, values)
+        -_stack_tensor_dict(cls, values)
+        -_stack_backbone_outputs(cls, outputs)
+    }
+    class VinOracleDatasetBase{
+        +\_\_iter\_\_(self)
+    }
+}
 namespace data.efm_dataset{
     class AseEfmDataset{
         +config
@@ -781,6 +997,76 @@ namespace data.efm_dataset{
         +taxonomy_csv(self)
         -_autofill_paths(self)
         +setup_target(self)
+    }
+}
+namespace data.vin_snippet_provider{
+    class VinSnippetProvider{
+        +get(self)
+    }
+    class VinSnippetCacheProvider{
+        -_cache
+        -_expected_config_hash
+        -_mode
+        -_console
+        -_disabled
+        -_validated
+        +\_\_init\_\_(self)
+        -_ensure_dataset(self, str map_location)
+        -_validate_metadata(self)
+        +get(self)
+    }
+    class EfmSnippetProvider{
+        -_dataset_payload
+        -_paths
+        -_include_gt_mesh
+        -_semidense_max_points
+        -_include_inv_dist_std
+        -_include_obs_count
+        -_efm_keep_keys
+        +\_\_init\_\_(self)
+        -_ensure_loader(self, str map_location)
+        +get(self)
+    }
+    class VinSnippetProviderChain{
+        -_providers
+        +\_\_init\_\_(self, providers)
+        +get(self)
+    }
+}
+namespace data.efm_snippet_loader{
+    class EfmSnippetLoader{
+        -_dataset_payload
+        -_device
+        -_paths
+        -_include_gt_mesh
+        +\_\_init\_\_(self)
+        -_build_dataset(self, str scene_id)
+        +load(self)
+    }
+}
+namespace data.offline_cache_coverage{
+    class SceneCoverage{
+        +scene_id
+        +dataset_snippets
+        +cache_train_snippets
+        +cache_val_snippets
+        +cache_all_snippets
+        +coverage_train
+        +coverage_val
+        +coverage_all
+    }
+    class CacheCoverageReport{
+        +dataset_scenes
+        +dataset_snippets
+        +cache_train_scenes
+        +cache_train_snippets
+        +cache_val_scenes
+        +cache_val_snippets
+        +cache_all_scenes
+        +cache_all_snippets
+        +cache_outside_dataset
+        +per_scene
+        +as_rows(self)
     }
 }
 namespace data.downloader{
@@ -870,20 +1156,6 @@ namespace app.app{
         -_render(self, Console console)
     }
 }
-namespace app.panels{
-    class Scene3DPlotOptions{
-        +show_scene_bounds
-        +show_crop_bounds
-        +show_frustum
-        +frustum_frame_indices
-        +frustum_scale
-        +mark_first_last
-        +show_gt_obbs
-        +gt_timestamp
-        +semidense_mode
-        +max_sem_points
-    }
-}
 namespace app.controller{
     class PipelineController{
         +state
@@ -906,29 +1178,83 @@ namespace app.config{
     class NbvStreamlitAppConfig{
     }
 }
-namespace rri_metrics.logging{
-    class Metric{
+namespace interpretability.attribution{
+    class AttributionMethod{
         <<enumeration>>
-        LOSS
-        RRI_MEAN
-        PRED_RRI_MEAN
-        VALID_FRAC_MEAN
-        CANDIDATE_VALID_FRACTION
-        TOP3_ACCURACY
-        SPEARMAN
-        SPEARMAN_STEP
-        CONFUSION_MATRIX
-        CONFUSION_MATRIX_STEP
-        LABEL_HISTOGRAM
-        LABEL_HISTOGRAM_STEP
+        GRAD_CAM
+        INTEGRATED_GRADIENTS
+        DEEP_LIFT
+        INPUT_X_GRADIENT
+        LAYER_GRAD_X_ACT
+        OCCLUSION
+        FEATURE_ABLATION
+        NOISE_TUNNEL_IG
+
+    }
+    class BaselineStrategy{
+        <<enumeration>>
+        ZERO
+        DATASET_MEAN
+
+    }
+    class AttributionEngine{
+        +config
+        +model
+        +forward_func
+        +console
+        +\_\_init\_\_(self, InterpretabilityConfig config, nn.Module model, forward_func)
+        +attribute(self, Tensor inputs)
+        -_build_attributor(self)
+        -_resolve_layer(self)
+        -_get_nested_attr(nn.Module root, str path)
+        -_run_attribution(self, object attrib_obj, Tensor inputs, target, additional_forward_args)
+        -_build_baseline(self, Tensor inputs)
+        -_to_heatmap(self, Tensor raw_attr, Tensor reference)
+        -_min_max_normalise(Tensor heatmap)
+    }
+    class AttributionResult{
+        +heatmap
+        +raw_attribution
+        +method
+        +target
+    }
+    class InterpretabilityConfig{
+        +setup_target(self, nn.Module model)
+    }
+}
+namespace rri_metrics.logging{
+    class LogSpec{
+        +on_step
+        +on_epoch
+        +prog_bar
+        +enabled
+    }
+    class Logable{
+        <<enumeration>>
 
         +\_\_str\_\_(self)
+        +log_spec(self, Stage stage)
+        +on_step(self, Stage stage)
+        +on_epoch(self, Stage stage)
+        +prog_bar(self, Stage stage)
+    }
+    class Metric{
+        +log_spec(self, Stage stage)
+    }
+    class Loss{
+        +log_spec(self, Stage stage)
     }
     class LabelHistogram{
         +num_classes
         +\_\_init\_\_(self, int num_classes)
         +update(self, Tensor target)
         +compute(self)
+    }
+    class RriErrorStats{
+        +\_\_init\_\_(self)
+        +update(self, Tensor pred_rri, Tensor rri)
+        +compute(self)
+        +reset(self)
     }
     class VinMetrics{
         +spearman
@@ -995,6 +1321,7 @@ namespace rri_metrics.coral{
         +num_classes(self)
         +has_bin_values(self)
         +init_bin_values(self, Tensor values)
+        +init_bias_from_priors(self, Tensor priors)
         +expected_from_probs(self, Tensor probs)
         +expected_from_logits(self, Tensor logits)
         +bin_value_regularizer(self, Tensor target_values)
@@ -1007,17 +1334,21 @@ namespace rri_metrics.rri_binning{
         +midpoints
         +bin_means
         +bin_stds
+        +bin_counts
         -_rri_chunks
         +is_fitted(self)
         +transform(self, Tensor rri)
         +labels_to_levels(self, Tensor labels)
         +rri_to_levels(self, Tensor rri)
         +class_midpoints(self)
+        +class_priors(self)
+        +threshold_priors(self)
         +expected_from_probs(self, Tensor probs)
         +to_dict(self)
         +from_dict(cls, data)
         +save(self, path)
         +load(cls, path)
+        +load_fit_data(path)
         +fit_from_iterable(cls, iterable)
         -_finalize(self)
     }
@@ -1259,6 +1590,7 @@ namespace configs.path_config{
         -_resolve_metadata_cache(cls, value, ValidationInfo info)
         -_resolve_rel_massive_dir(cls, value, ValidationInfo info)
         +resolve_checkpoint_path(self, path)
+        +resolve_external_checkpoint_path(self, str path)
         +resolve_mesh_path(self, str scene_id)
         +resolve_processed_mesh_path(self, str scene_id, float simplification_ratio, bool is_crop, str spec_hash)
         +resolve_atek_data_dir(self, str config_name)
@@ -1293,63 +1625,43 @@ namespace pipelines.oracle_rri_labeler{
     }
 }
 namespace lightning.lit_datamodule{
-    class VinOracleBatch{
-        +efm_snippet_view
-        +candidate_poses_world_cam
-        +reference_pose_world_rig
-        +rri
-        +pm_dist_before
-        +pm_dist_after
-        +pm_acc_before
-        +pm_comp_before
-        +pm_acc_after
-        +pm_comp_after
-        +p3d_cameras
-        +scene_id
-        +snippet_id
-        +backbone_out
-    }
-    class VinOracleIterableDataset{
-        -_base
-        -_labeler
-        -_max_attempts
-        -_console
-        +\_\_init\_\_(self)
-        +\_\_iter\_\_(self)
-    }
-    class VinOracleCacheAppendIterableDataset{
-        -_cache
-        -_base
-        -_labeler
-        -_appender
-        -_backbone
-        -_max_new_samples
-        -_max_attempts
-        -_console
-        +\_\_init\_\_(self)
-        +\_\_iter\_\_(self)
-    }
     class VinDataModuleConfig{
-        +needs_labeler(self)
         -_check_compatibility(self)
     }
     class VinDataModule{
         +config
         +\_\_init\_\_(self, VinDataModuleConfig config)
-        -_apply_cache_splits(self, Console console)
-        -_cache_with_simplification(self, OracleRriCacheDatasetConfig cache_cfg, float simplification)
+        -_resolve_map_style(self, object dataset)
+        -_build_stage_plan(self, Stage stage)
         +setup(self, stage)
         +train_dataloader(self)
         +val_dataloader(self)
         +test_dataloader(self)
         +iter_oracle_batches(self)
-        -_require_labeler(self)
+        -_describe_dataset(self, VinOracleDatasetBase dataset)
+    }
+}
+namespace lightning.optimizers{
+    class AdamWConfig{
+        +setup_target(self, params)
+    }
+    class ReduceLrOnPlateauConfig{
+        +setup_target(self, Optimizer optimizer)
+        +setup_lightning(self, Optimizer optimizer)
+    }
+    class OneCycleSchedulerConfig{
+        +setup_target(self, Optimizer optimizer)
+        +setup_lightning(self, Optimizer optimizer)
+        -_resolve_total_steps(trainer)
     }
 }
 namespace lightning.cli{
     class CLIAriaNBVExperimentConfig{
     }
     class CLICacheWriterConfig{
+    }
+    class CLIVinSnippetCacheBuildConfig{
+        -_validate_map_location(cls, value)
     }
 }
 namespace lightning.lit_trainer_callbacks{
@@ -1366,18 +1678,6 @@ namespace lightning.lit_trainer_callbacks{
     }
 }
 namespace lightning.lit_module{
-    class AdamWConfig{
-        +setup_target(self, params)
-    }
-    class ReduceLrOnPlateauConfig{
-        +setup_target(self, Optimizer optimizer)
-        +setup_lightning(self, Optimizer optimizer)
-    }
-    class OneCycleSchedulerConfig{
-        +setup_target(self, Optimizer optimizer)
-        +setup_lightning(self, Optimizer optimizer)
-        -_resolve_total_steps(trainer)
-    }
     class VinLightningModuleConfig{
         -_validate_log_interval_steps(cls, value)
         -_validate_num_classes(self)
@@ -1388,6 +1688,7 @@ namespace lightning.lit_module{
         +vin
         -_metrics
         -_interval_metrics
+        -_rri_error_stats
         +\_\_init\_\_(self, VinLightningModuleConfig config)
         +setup(self, str stage)
         +on_save_checkpoint(self, checkpoint)
@@ -1401,14 +1702,22 @@ namespace lightning.lit_module{
         +on_after_backward(self)
         +configure_optimizers(self)
         -_step(self, VinOracleBatch batch, int batch_idx)
+        -_aux_regression_weight(self)
+        -_coverage_weight_strength(self)
+        -_flatten_and_mask(self, values, Tensor mask)
+        -_select_coverage_fraction(self, Any pred)
+        -_coverage_weights(self, Any pred, Tensor mask)
         -_log_epoch_metrics(self, Stage stage)
         -_log_interval_metrics(self, Stage stage)
+        -_log_rri_error_stats(self)
         -_log_confusion_matrix(self, Tensor confusion)
         -_log_label_histogram(self, Tensor counts)
         -_log_figure(self, str tag, plt.Figure fig)
         -_log_loss_scalars(self, values)
         -_log_aux_scalars(self, values)
         -_maybe_init_bin_values(self)
+        -_maybe_init_coral_bias(self)
+        -_coral_loss_variant(self, Tensor logits, Tensor labels)
         -_load_binner_from_config(self)
         -_integrate_console(self)
         +summarize_vin(self, VinOracleBatch batch)
@@ -1434,7 +1743,8 @@ namespace lightning.aria_nbv_experiment{
         +plot_vin_encodings(self)
         -_interrupt_checkpoint_path(self, pl.Trainer trainer)
         -_save_interrupt_checkpoint(self, pl.Trainer trainer)
-        +fit_binner_and_save(self)
+        +fit_binner_and_save(self, datamodule)
+        -_ensure_binner_matches_num_classes(self)
         +run(self)
     }
 }
@@ -1444,12 +1754,69 @@ namespace lightning.lit_trainer_factory{
         +setup_target(self, experiment)
     }
 }
+namespace app.panels.data{
+    class Scene3DPlotOptions{
+        +show_scene_bounds
+        +show_crop_bounds
+        +show_frustum
+        +frustum_frame_indices
+        +frustum_scale
+        +mark_first_last
+        +show_gt_obbs
+        +gt_timestamp
+        +semidense_mode
+        +max_sem_points
+    }
+}
+namespace app.panels.testing_attribution{
+    class _VinAttributionHead{
+        +head_mlp
+        +head_coral
+        +\_\_init\_\_(self, nn.Module head_mlp, nn.Module head_coral)
+        +forward(self, torch.Tensor feats)
+    }
+    class _VinPoseAttributionHead{
+        +pose_encoder_lff
+        +sh_encoder
+        +head_mlp
+        +head_coral
+        +\_\_init\_\_(self, pose_encoder_lff, sh_encoder, nn.Module head_mlp, nn.Module head_coral)
+        -_encode_pose_vec(self, torch.Tensor pose_vec)
+        +forward(self, torch.Tensor pose_vec)
+    }
+    class _VinSceneFieldAttributionHead{
+        +field_proj
+        +global_pooler
+        +head_mlp
+        +head_coral
+        +\_\_init\_\_(self)
+        +forward(self, torch.Tensor field_in)
+    }
+}
+namespace app.panels.vin_diag_tabs.context{
+    class VinDiagContext{
+        +state
+        +debug
+        +pred
+        +batch
+        +cfg
+        +use_offline_cache
+        +attach_snippet
+        +include_gt_mesh
+        +has_tokens
+        +has_semidense_frustum
+        +num_candidates
+    }
+}
 %% inheritance
 BaseConfig <|-- SingletonConfig
 PoseEncoder <|-- R6dLffPoseEncoder
 PoseEncoder <|-- ShellLffPoseEncoder
 PoseEncoder <|-- ShellShPoseEncoderAdapter
+BaseConfig <|-- VinSnippetCacheConfig
 BaseConfig <|-- OracleRriCacheConfig
+Logable <|-- Metric
+Logable <|-- Loss
 SnippetPlotBuilder <|-- CandidatePlotBuilder
 RuleBase <|-- MinDistanceToMeshRule
 RuleBase <|-- PathCollisionRule
@@ -1460,6 +1827,7 @@ BaseConfig <|-- OptunaConfig
 SingletonConfig <|-- PathConfig
 AriaNBVExperimentConfig <|-- CLIAriaNBVExperimentConfig
 OracleRriCacheWriterConfig <|-- CLICacheWriterConfig
+BaseConfig <|-- CLIVinSnippetCacheBuildConfig
 BaseConfig <|-- AriaNBVExperimentConfig
 BaseConfig <|-- TrainerFactoryConfig
 ```
@@ -1487,8 +1855,42 @@ Methods:
 - get_candidate_pointclouds()
 - run_labeler()
 
-## app.panels.Scene3DPlotOptions
+## app.panels.data.Scene3DPlotOptions
 Plot options for the data page 3D scene view.
+
+## app.panels.testing_attribution._VinAttributionHead
+Lightweight wrapper to attribute VIN head outputs to input features.
+
+Methods:
+- forward()
+
+## app.panels.testing_attribution._VinPoseAttributionHead
+Attribute VIN outputs to the raw pose-vector inputs.
+
+Methods:
+- forward()
+
+## app.panels.testing_attribution._VinSceneFieldAttributionHead
+Attribute VIN outputs to scene-field channel inputs.
+
+Methods:
+- forward()
+
+## app.panels.vin_diag_tabs.context.VinDiagContext
+Shared context for VIN diagnostic tab renderers.
+
+Attributes:
+    state: Session-scoped diagnostics state.
+    debug: VIN forward debug outputs.
+    pred: VIN predictions.
+    batch: Oracle batch used for diagnostics.
+    cfg: Experiment configuration used for the run.
+    use_offline_cache: Whether the batch originates from the offline cache.
+    attach_snippet: Whether to load full EFM snippet for geometry plots.
+    include_gt_mesh: Whether to include GT mesh when loading snippets.
+    has_tokens: Whether frustum tokens are available (VIN v1).
+    has_semidense_frustum: Whether semidense frustum diagnostics are available (VIN v2).
+    num_candidates: Number of candidate views in the batch.
 
 ## app.state_types.DataCache
 —
@@ -1525,6 +1927,7 @@ Centralise all filesystem locations for the oracle_rri project.
 
 Methods:
 - resolve_checkpoint_path()
+- resolve_external_checkpoint_path()
 - resolve_mesh_path()
 - resolve_processed_mesh_path()
 - resolve_atek_data_dir()
@@ -1582,6 +1985,12 @@ Methods:
 - taxonomy_csv()
 - setup_target()
 
+## data.efm_snippet_loader.EfmSnippetLoader
+Persistent per-worker loader for on-demand EFM snippets.
+
+Methods:
+- load()
+
 ## data.efm_views.EfmGtCameraObbView
 Per-camera oriented bounding boxes for a single timestamp (EFM schema).
 
@@ -1627,6 +2036,7 @@ Snippet-level oriented bounding boxes (OBB) in snippet frame.
 Typed wrapper over an EFM-formatted sample plus optional mesh.
 
 Methods:
+- from_cache_efm()
 - get_camera()
 - camera_rgb()
 - camera_slam_left()
@@ -1637,6 +2047,19 @@ Methods:
 - gt()
 - has_mesh()
 - get_occupancy_extend()
+- to()
+- prune_efm()
+
+## data.efm_views.VinSnippetView
+Minimal snippet payload for VIN v2 batching.
+
+Attributes:
+    points_world: ``Tensor["K (3+C)", float32]`` collapsed semidense points.
+        Base columns are XYZ; optional extras include inv_dist_std and
+        observation count (number of snippet frames that saw the point).
+    t_world_rig: ``PoseTW["F 12"]`` historical world←rig poses.
+
+Methods:
 - to()
 
 ## data.mesh_cache.MeshProcessSpec
@@ -1674,9 +2097,6 @@ Methods:
 ## data.offline_cache.OracleRriCacheWriterConfig
 Configuration for building oracle caches from raw ASE snippets.
 
-## data.offline_cache.OracleRriCacheAppenderConfig
-Configuration for appending cached oracle outputs.
-
 ## data.offline_cache.OracleRriCacheDatasetConfig
 Configuration for loading cached oracle outputs.
 
@@ -1686,17 +2106,20 @@ Build an offline cache of oracle labels (and optional EVL outputs).
 Methods:
 - run()
 
-## data.offline_cache.OracleRriCacheAppender
-Append cached oracle outputs to an existing cache directory.
-
-Methods:
-- append()
-
 ## data.offline_cache.OracleRriCacheDataset
 Map-style dataset that reads cached oracle outputs.
 
+## data.offline_cache.OracleRriCacheVinDataset
+VIN-focused wrapper over the oracle cache that always yields VinOracleBatch.
+
+## data.offline_cache_coverage.SceneCoverage
+Coverage summary for one scene.
+
+## data.offline_cache_coverage.CacheCoverageReport
+Aggregated coverage report between dataset shards and cache indices.
+
 Methods:
-- append_entry()
+- as_rows()
 
 ## data.offline_cache_types.OracleRriCacheMetadata
 Top-level metadata for an oracle cache directory.
@@ -1733,6 +2156,140 @@ Methods:
 - add_image()
 - finalize()
 
+## data.vin_oracle_datasets.VinOracleOnlineDataset
+Iterable dataset yielding :class:`VinOracleBatch` with online oracle labels.
+
+## data.vin_oracle_datasets.VinOracleOnlineDatasetConfig
+Configuration for online oracle VIN datasets.
+
+Methods:
+- setup_target()
+- is_map_style()
+
+## data.vin_oracle_datasets.VinOracleCacheDatasetConfig
+Configuration for offline cached VIN datasets.
+
+Methods:
+- setup_target()
+- is_map_style()
+
+## data.vin_oracle_types.VinOracleBatch
+Single-snippet VIN training batch produced from an oracle label run.
+
+Attributes:
+    efm_snippet_view: EFM snippet view or minimal VIN snippet (None when loading from cache).
+    candidate_poses_world_cam: ``PoseTW["N 12"]`` or ``PoseTW["B N 12"]`` candidate poses as world←camera.
+    reference_pose_world_rig: ``PoseTW["12"]`` or ``PoseTW["B 12"]`` reference pose as world←rig_reference.
+    rri: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` oracle RRI per candidate.
+    pm_dist_before: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` Chamfer distance before (broadcasted).
+    pm_dist_after: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` Chamfer distance after (per-candidate).
+    pm_acc_before: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` accuracy distance before.
+    pm_comp_before: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` completeness distance before.
+    pm_acc_after: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` accuracy distance after.
+    pm_comp_after: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` completeness distance after.
+    p3d_cameras: PyTorch3D cameras used for depth rendering/unprojection (same ordering as candidates).
+    scene_id: ASE scene id for diagnostics (string or list when batched).
+    snippet_id: Snippet id (tar key/url stem) for diagnostics (string or list when batched).
+    backbone_out: Optional cached EVL backbone outputs.
+
+Methods:
+- shape_summary()
+- from_label()
+- collate()
+
+## data.vin_oracle_types.VinOracleDatasetBase
+Shared interface for datasets that yield :class:`VinOracleBatch`.
+
+## data.vin_snippet_cache.VinSnippetCacheMetadata
+Top-level metadata for a VIN snippet cache directory.
+
+## data.vin_snippet_cache.VinSnippetCacheEntry
+Index entry describing a cached VIN snippet.
+
+## data.vin_snippet_cache.VinSnippetCacheBuildResult
+Result of building a VIN snippet payload.
+
+## data.vin_snippet_cache.VinSnippetCacheConfig
+Filesystem configuration for VIN snippet cache artifacts.
+
+Methods:
+- samples_dir()
+- index_path()
+- metadata_path()
+
+## data.vin_snippet_cache.VinSnippetCacheWriterConfig
+Configuration for building a VIN snippet cache from an oracle cache.
+
+## data.vin_snippet_cache.VinSnippetCacheDatasetConfig
+Configuration for loading cached VIN snippet samples.
+
+## data.vin_snippet_cache.VinSnippetCacheBuildDataset
+Map-style dataset that builds VIN snippet payloads.
+
+## data.vin_snippet_cache.VinSnippetCacheWriter
+Build a cache of minimal VIN snippets from an oracle cache index.
+
+Methods:
+- run()
+
+## data.vin_snippet_cache.VinSnippetCacheDataset
+Map-style dataset that reads cached VIN snippet samples.
+
+Methods:
+- get_by_scene_snippet()
+
+## data.vin_snippet_provider.VinSnippetProvider
+Protocol for loading minimal VIN snippets.
+
+Methods:
+- get()
+
+## data.vin_snippet_provider.VinSnippetCacheProvider
+VIN snippet provider backed by a precomputed cache.
+
+Methods:
+- get()
+
+## data.vin_snippet_provider.EfmSnippetProvider
+VIN snippet provider that builds views from EFM snippets.
+
+Methods:
+- get()
+
+## data.vin_snippet_provider.VinSnippetProviderChain
+Try multiple snippet providers in order.
+
+Methods:
+- get()
+
+## interpretability.attribution.AttributionMethod
+Supported Captum algorithms for vision backbones.
+
+## interpretability.attribution.BaselineStrategy
+Reference construction for baseline-dependent methods.
+
+## interpretability.attribution.AttributionEngine
+Captum integration wrapper that yields input-aligned heatmaps.
+
+Methods:
+- attribute()
+
+## interpretability.attribution.AttributionResult
+Container for processed attribution outputs.
+
+Attributes:
+    heatmap: Attribution map normalised to [0, 1] with shape ``(B, H, W)``
+        for image inputs or ``(B, F)`` for feature vectors.
+    raw_attribution: Captum-native attribution tensor prior to projection.
+    method: Algorithm used.
+    target: Class index/indices the attribution was computed for.
+
+## interpretability.attribution.InterpretabilityConfig
+Factory config that builds an :class:`AttributionEngine`.
+
+Methods:
+- setup_target()
+
 ## lightning.aria_nbv_experiment.AriaNBVExperimentConfig
 Top-level experiment config for VIN training/evaluation.
 
@@ -1754,36 +2311,11 @@ CLI-enabled experiment config with optional TOML config path.
 ## lightning.cli.CLICacheWriterConfig
 CLI-enabled cache writer config with optional TOML config path.
 
-## lightning.lit_datamodule.VinOracleBatch
-Single-snippet VIN training batch produced from an oracle label run.
-
-Attributes:
-    efm_snippet_view: Typed EFM snippet view (None when loading from cache).
-    candidate_poses_world_cam: ``PoseTW["N 12"]`` candidate poses as world←camera for the rendered subset.
-    reference_pose_world_rig: ``PoseTW["12"]`` reference pose as world←rig_reference for the snippet.
-    rri: ``Tensor["N", float32]`` oracle RRI per candidate (same ordering as candidates).
-    pm_dist_before: ``Tensor["N", float32]`` Chamfer-style point↔mesh distance before (broadcasted).
-    pm_dist_after: ``Tensor["N", float32]`` Chamfer-style point↔mesh distance after (per-candidate).
-    pm_acc_before: ``Tensor["N", float32]`` point→mesh accuracy distance before (broadcasted).
-    pm_comp_before: ``Tensor["N", float32]`` mesh→point completeness distance before (broadcasted).
-    pm_acc_after: ``Tensor["N", float32]`` point→mesh accuracy distance after (per-candidate).
-    pm_comp_after: ``Tensor["N", float32]`` mesh→point completeness distance after (per-candidate).
-    p3d_cameras: PyTorch3D cameras used for depth rendering/unprojection (same ordering as candidates).
-    scene_id: ASE scene id for diagnostics.
-    snippet_id: Snippet id (tar key/url stem) for diagnostics.
-    backbone_out: Optional cached EVL backbone outputs.
-
-## lightning.lit_datamodule.VinOracleIterableDataset
-Iterable dataset yielding :class:`VinOracleBatch` with online oracle RRI labels.
-
-## lightning.lit_datamodule.VinOracleCacheAppendIterableDataset
-Iterable dataset that yields cached batches and appends new online samples.
+## lightning.cli.CLIVinSnippetCacheBuildConfig
+CLI config for building VIN snippet caches from an experiment TOML.
 
 ## lightning.lit_datamodule.VinDataModuleConfig
 Configuration for :class:`VinDataModule`.
-
-Methods:
-- needs_labeler()
 
 ## lightning.lit_datamodule.VinDataModule
 LightningDataModule that yields online or cached oracle-labelled VIN batches.
@@ -1795,30 +2327,51 @@ Methods:
 - test_dataloader()
 - iter_oracle_batches()
 
-## lightning.lit_module.AdamWConfig
+## lightning.lit_module.VinLightningModuleConfig
+Configuration for :class:`VinLightningModule`.
+
+## lightning.lit_module.VinLightningModule
+PyTorch Lightning module for VIN training with CORAL ordinal regression.
+
+Methods:
+- setup()
+- on_save_checkpoint()
+- on_load_checkpoint()
+- training_step()
+- validation_step()
+- test_step()
+- on_train_epoch_end()
+- on_validation_epoch_end()
+- on_test_epoch_end()
+- on_after_backward()
+- configure_optimizers()
+- summarize_vin()
+- plot_vin_encodings_batch()
+
+## lightning.lit_module_old.AdamWConfig
 AdamW optimizer configuration for VIN.
 
 Methods:
 - setup_target()
 
-## lightning.lit_module.ReduceLrOnPlateauConfig
+## lightning.lit_module_old.ReduceLrOnPlateauConfig
 ReduceLROnPlateau scheduler configuration.
 
 Methods:
 - setup_target()
 - setup_lightning()
 
-## lightning.lit_module.OneCycleSchedulerConfig
+## lightning.lit_module_old.OneCycleSchedulerConfig
 OneCycle learning-rate scheduler configuration.
 
 Methods:
 - setup_target()
 - setup_lightning()
 
-## lightning.lit_module.VinLightningModuleConfig
+## lightning.lit_module_old.VinLightningModuleConfig
 Configuration for :class:`VinLightningModule`.
 
-## lightning.lit_module.VinLightningModule
+## lightning.lit_module_old.VinLightningModule
 PyTorch Lightning module for VIN training with CORAL ordinal regression.
 
 Methods:
@@ -1859,6 +2412,26 @@ Configuration for constructing a PyTorch Lightning trainer.
 
 Methods:
 - setup_target()
+
+## lightning.optimizers.AdamWConfig
+AdamW optimizer configuration for VIN.
+
+Methods:
+- setup_target()
+
+## lightning.optimizers.ReduceLrOnPlateauConfig
+ReduceLROnPlateau scheduler configuration.
+
+Methods:
+- setup_target()
+- setup_lightning()
+
+## lightning.optimizers.OneCycleSchedulerConfig
+OneCycle learning-rate scheduler configuration.
+
+Methods:
+- setup_target()
+- setup_lightning()
 
 ## pipelines.oracle_rri_labeler.OracleRriLabelBatch
 —
@@ -2080,12 +2653,40 @@ Methods:
 - num_classes()
 - has_bin_values()
 - init_bin_values()
+- init_bias_from_priors()
 - expected_from_probs()
 - expected_from_logits()
 - bin_value_regularizer()
 
+## rri_metrics.logging.LogSpec
+Logging policy for a metric/loss.
+
+Attributes:
+    on_step: Log on step-level updates.
+    on_epoch: Log epoch-level aggregates.
+    prog_bar: Show in Lightning's progress bar.
+    enabled: Whether logging is enabled for the current stage.
+
+## rri_metrics.logging.Logable
+Base class for loggable metric/loss names.
+
+Methods:
+- log_spec()
+- on_step()
+- on_epoch()
+- prog_bar()
+
 ## rri_metrics.logging.Metric
 Metric suffixes composed with Stage as ``{stage}/{metric}``.
+
+Methods:
+- log_spec()
+
+## rri_metrics.logging.Loss
+Loss suffixes composed with Stage as ``{stage}/{loss}``.
+
+Methods:
+- log_spec()
 
 ## rri_metrics.logging.LabelHistogram
 Accumulate label counts for ordinal classes.
@@ -2093,6 +2694,14 @@ Accumulate label counts for ordinal classes.
 Methods:
 - update()
 - compute()
+
+## rri_metrics.logging.RriErrorStats
+Accumulate bias/variance statistics for RRI regression errors.
+
+Methods:
+- update()
+- compute()
+- reset()
 
 ## rri_metrics.logging.VinMetrics
 Container for VIN metrics computed from candidate rankings.
@@ -2136,11 +2745,14 @@ Methods:
 - labels_to_levels()
 - rri_to_levels()
 - class_midpoints()
+- class_priors()
+- threshold_priors()
 - expected_from_probs()
 - to_dict()
 - from_dict()
 - save()
 - load()
+- load_fit_data()
 - fit_from_iterable()
 
 ## rri_metrics.types.DistanceAggregation
@@ -2306,7 +2918,7 @@ a function:
                voxel_pose_enc?,
                global_feat?,
                local_frustum_feat,
-               valid_frac? ),
+               voxel_valid_frac? ),
 
 where ``pose_enc`` and ``voxel_pose_enc`` are LFF-based shell encodings,
 ``global_feat`` summarizes the voxel field (optionally pose-conditioned),
@@ -2329,7 +2941,7 @@ candidate camera poses. The architecture is deliberately simple:
 
 The overall score is computed as:
 
-    z = concat(pose_enc, global_feat?, voxel_pose_enc?, local_feat, valid_frac?)
+    z = concat(pose_enc, global_feat?, voxel_pose_enc?, local_feat, voxel_valid_frac?)
     logits = CORAL(MLP(z))
     score = E[y]/(K-1) = (1/(K-1)) * sum_k sigmoid(logit_k)
 
@@ -2408,23 +3020,36 @@ Methods:
 - forward()
 - forward_with_debug()
 
-## vin.model_v2.VinV2ForwardDiagnostics
+## vin.model_v2.VinModelV2Config
+Configuration for :class:`VinModelV2` (minimal, configurable).
+
+## vin.model_v2.VinModelV2
+Simplified VIN head for RRI prediction with configurable pose encoding.
+
+Methods:
+- pose_encoder_lff()
+- forward()
+- forward_with_debug()
+- init_bin_values()
+- summarize_vin()
+
+## vin.model_v2_old.VinV2ForwardDiagnostics
 Minimal diagnostics for VIN v2 (no frustum or shell encodings).
 
-## vin.model_v2._AttrDict
+## vin.model_v2_old._AttrDict
 Dict that exposes keys as attributes (minimal EasyDict fallback).
 
-## vin.model_v2.PointNeXtSEncoderConfig
+## vin.model_v2_old.PointNeXtSEncoderConfig
 Configuration for the optional PointNeXt-S semidense encoder.
 
-## vin.model_v2.PointNeXtSEncoder
+## vin.model_v2_old.PointNeXtSEncoder
 Optional PointNeXt-S adapter for semidense point cloud features.
 
 Methods:
 - train()
 - forward()
 
-## vin.model_v2.PoseConditionedGlobalPool
+## vin.model_v2_old.PoseConditionedGlobalPool
 Pose-conditioned attention pooling over a coarse voxel grid.
 
 Conceptually, this module summarizes a dense voxel field into a compact
@@ -2446,10 +3071,10 @@ remain pure content summaries of the voxel field.
 Methods:
 - forward()
 
-## vin.model_v2.VinModelV2Config
+## vin.model_v2_old.VinModelV2Config
 Configuration for :class:`VinModelV2` (minimal, configurable).
 
-## vin.model_v2.VinModelV2
+## vin.model_v2_old.VinModelV2
 Simplified VIN head for RRI prediction with configurable pose encoding.
 
 Methods:
@@ -2511,6 +3136,22 @@ Reusable plotting style that can be applied across figures.
 Methods:
 - apply_global()
 - apply()
+
+## vin.plotting._FrustumTrajectoryStub
+—
+
+## vin.plotting._FrustumSnippetStub
+—
+
+## vin.pointnext_encoder.PointNeXtSEncoderConfig
+Configuration for the optional PointNeXt-S semidense encoder.
+
+## vin.pointnext_encoder.PointNeXtSEncoder
+Optional PointNeXt-S adapter for semidense point cloud features.
+
+Methods:
+- train()
+- forward()
 
 ## vin.pose_encoders.PoseEncodingOutput
 Pose-encoding outputs for a pose expressed in a reference frame.
@@ -2645,6 +3286,24 @@ Methods:
 ## vin.spherical_encoding.ShellShPoseEncoderConfig
 Config-as-factory wrapper for :class:`ShellShPoseEncoder`.
 
+## vin.traj_encoder.TrajectoryEncodingOutput
+Trajectory encoding outputs.
+
+Attributes:
+    per_frame: PoseEncodingOutput for each frame.
+    pooled: ``Tensor["B E", float32]`` pooled trajectory embedding (or None).
+
+## vin.traj_encoder.TrajectoryEncoderConfig
+Configuration for :class:`TrajectoryEncoder`.
+
+## vin.traj_encoder.TrajectoryEncoder
+Encode EFM trajectory poses with an R6D + LFF pose encoder.
+
+Methods:
+- out_dim()
+- encode_poses()
+- forward()
+
 ## vin.types.EvlBackboneOutput
 EVL backbone features used by VIN.
 
@@ -2684,6 +3343,44 @@ VIN predictions for a candidate set.
 ## vin.types.VinForwardDiagnostics
 Intermediate tensors produced during a VIN forward pass.
 
+## vin.types.VinV2ForwardDiagnostics
+Minimal diagnostics for VIN v2 (no frustum or shell encodings).
+
+## vin.vin_v2_modules.PoseConditionedGlobalPool
+Pose-conditioned attention pooling over a coarse voxel grid.
+
+Conceptually, this module summarizes a dense voxel field into a compact
+per-candidate descriptor. It does so by:
+  1) downsampling the voxel field into a fixed set of tokens,
+  2) adding a learned positional embedding to those tokens, and
+  3) using candidate pose embeddings as queries to attend over the tokens
+     with a minimal residual + MLP block for stability.
+
+Q/K/V usage:
+  - **Queries (Q)**: projected candidate pose encodings (`q_proj(pose_enc)`).
+  - **Keys (K)**: projected voxel field tokens plus positional embeddings
+    (`kv_proj(field_tokens) + pos_proj(lff(pos_tokens))`).
+  - **Values (V)**: projected voxel field tokens (`kv_proj(field_tokens)`).
+
+Positional embeddings are **only added to the keys**, not to the values, so
+the attention weights depend on both content and position while the values
+remain pure content summaries of the voxel field.
+
+Methods:
+- forward()
+
+## vin.vin_v2_utils.PreparedInputs
+Prepared inputs for VIN v2 forward pass.
+
+## vin.vin_v2_utils.PoseFeatures
+Pose-related features for VIN v2.
+
+## vin.vin_v2_utils.FieldBundle
+Scene field tensors for VIN v2.
+
+## vin.vin_v2_utils.GlobalContext
+Global context features computed from the scene field.
+
 
 Directory tree for oracle_rri/oracle_rri/:
 oracle_rri/oracle_rri/
@@ -2693,7 +3390,33 @@ oracle_rri/oracle_rri/
 │   ├── app.py
 │   ├── config.py
 │   ├── controller.py
-│   ├── panels.py
+│   ├── panels
+│   │   ├── __init__.py
+│   │   ├── candidates.py
+│   │   ├── common.py
+│   │   ├── data.py
+│   │   ├── depth.py
+│   │   ├── offline_cache_utils.py
+│   │   ├── offline_stats.py
+│   │   ├── plot_utils.py
+│   │   ├── rri.py
+│   │   ├── rri_binning.py
+│   │   ├── testing_attribution.py
+│   │   ├── vin_diag_tabs
+│   │   │   ├── __init__.py
+│   │   │   ├── context.py
+│   │   │   ├── coral.py
+│   │   │   ├── encodings.py
+│   │   │   ├── evidence.py
+│   │   │   ├── field.py
+│   │   │   ├── geometry.py
+│   │   │   ├── pose.py
+│   │   │   ├── summary.py
+│   │   │   ├── tokens.py
+│   │   │   └── transforms.py
+│   │   ├── vin_diagnostics.py
+│   │   ├── vin_utils.py
+│   │   └── wandb.py
 │   ├── state.py
 │   ├── state_types.py
 │   └── ui.py
@@ -2707,24 +3430,36 @@ oracle_rri/oracle_rri/
 │   ├── __init__.py
 │   ├── downloader.py
 │   ├── efm_dataset.py
+│   ├── efm_snippet_loader.py
 │   ├── efm_views.py
 │   ├── mesh_cache.py
 │   ├── metadata.py
 │   ├── offline_cache.py
+│   ├── offline_cache_coverage.py
 │   ├── offline_cache_serialization.py
 │   ├── offline_cache_store.py
 │   ├── offline_cache_types.py
 │   ├── plotting.py
 │   ├── py.typed
-│   └── utils.py
+│   ├── utils.py
+│   ├── vin_oracle_datasets.py
+│   ├── vin_oracle_types.py
+│   ├── vin_snippet_cache.py
+│   ├── vin_snippet_provider.py
+│   └── vin_snippet_utils.py
+├── interpretability
+│   ├── __init__.py
+│   └── attribution.py
 ├── lightning
 │   ├── __init__.py
 │   ├── aria_nbv_experiment.py
 │   ├── cli.py
 │   ├── lit_datamodule.py
 │   ├── lit_module.py
+│   ├── lit_module_old.py
 │   ├── lit_trainer_callbacks.py
-│   └── lit_trainer_factory.py
+│   ├── lit_trainer_factory.py
+│   └── optimizers.py
 ├── pipelines
 │   ├── __init__.py
 │   └── oracle_rri_labeler.py
@@ -2773,17 +3508,20 @@ oracle_rri/oracle_rri/
 └── vin
     ├── __init__.py
     ├── backbone_evl.py
-    ├── coral.py
     ├── model.py
     ├── model_v1_SH.py
     ├── model_v2.py
+    ├── model_v2_old.py
     ├── pipeline.py
     ├── plotting.py
+    ├── pointnext_encoder.py
     ├── pose_encoders.py
     ├── pose_encoding.py
     ├── py.typed
-    ├── rri_binning.py
     ├── spherical_encoding.py
-    └── types.py
+    ├── traj_encoder.py
+    ├── types.py
+    ├── vin_v2_modules.py
+    └── vin_v2_utils.py
 
-11 directories, 88 files
+14 directories, 126 files

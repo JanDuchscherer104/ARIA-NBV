@@ -309,7 +309,7 @@ rings including type and shape for tensor/array arguments and return values
 - **In documentation**, include links to relevant documentations pages or external references like Wikipedia when mentioning key concepts or algorithms for the first time. Cite them as `[Wikipedia :: Concept Name](https://en.wikipedia.org/wiki/...)` in the text and add the corresponding entry in `references.bib`.
 - Aim for clarity and conciseness in explanations. Use diagrams or code snippets where appropriate to illustrate complex ideas.
 - Aim for a high educational value in explanations, assuming the reader has a graduate-level understanding of computer vision and machine learning but may not be familiar with the specific techniques used in this project.
-- **Always** ensure that the quarto project can be compiled wihtout issues, when making larger changes to the documentation run `quarto check` and `quarto render` to verify.
+- **Always** ensure that the quarto project can be compiled without issues, when making larger changes to the documentation run `quarto check` and `quarto render` to verify.
 
 **Example (Typing + Docstring)**:
 ```python
@@ -340,7 +340,7 @@ def compute_rri(
 ### Architecture & Design Patterns
 
 - **Config-as-Factory:** Every runtime object is created via their Pydantic config's `setup_target()` method. Never instantiate runtime classes directly. Use `field_validator` and `model_validator` decorators for cleanly structured validation within configs.
--
+
     - Examples:
 
     ```python
@@ -362,5 +362,3 @@ def compute_rri(
         def __init__(self, config: MyComponentConfig):
             self.config = config
     ```
-
-    - Config Composition:

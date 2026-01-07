@@ -1,0 +1,19 @@
+{
+  "study": "vin-v2-sweep",
+  "direction": "1",
+  "best_trial": 20,
+  "best_value": 0.7247058153152466,
+  "params": {
+    "module_config.vin.use_point_encoder": false,
+    "module_config.vin.use_traj_encoder": true,
+    "module_config.vin.enable_semidense_frustum": true,
+    "module_config.vin.semidense_include_obs_count": false,
+    "module_config.vin.semidense_visibility_embed": true,
+    "module_config.vin.semidense_frustum_mask_invalid": true,
+    "module_config.vin.use_voxel_valid_frac_feature": true,
+    "module_config.vin.use_voxel_valid_frac_gate": false,
+    "module_config.vin.global_pool_grid_size": 8,
+    "module_config.optimizer.learning_rate": 3.498274946816459e-05,
+    "module_config.optimizer.weight_decay": 0.0032501263020804556
+  }
+}
