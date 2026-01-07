@@ -156,7 +156,16 @@ class Optimizable(BaseModel, Generic[T]):
                 opt_choices.append(opt_choice)
                 if mapped is not None:
                     reverse_map[opt_choice] = mapped
-            value = trial.suggest_categorical(name, opt_choices)
+            if not opt_choices:
+                raise ValueError(f"Categorical optimizable '{name}' requires at least one choice.")
+            if len(opt_choices) == 1:
+                # Treat single-choice categoricals as fixed parameters. This avoids
+                # Optuna's "CategoricalDistribution does not support dynamic value
+                # space" error when continuing an existing study where the same
+                # parameter name previously had a larger choice set.
+                value = opt_choices[0]
+            else:
+                value = trial.suggest_categorical(name, opt_choices)
             if value in reverse_map:
                 value = reverse_map[value]
             return self._coerce(value)

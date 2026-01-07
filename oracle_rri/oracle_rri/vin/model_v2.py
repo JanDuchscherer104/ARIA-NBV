@@ -428,6 +428,8 @@ class VinModelV2Config(BaseConfig["VinModelV2"]):
 
     @model_validator(mode="after")
     def _apply_candidate_min_valid_frac(self) -> "VinModelV2Config":
+        if self.use_point_encoder and self.point_encoder is None:
+            raise ValueError("use_point_encoder=True requires a point_encoder configuration.")
         if self.candidate_min_valid_frac is not None:
             if self.candidate_min_voxel_valid_frac == 0.0 and self.candidate_min_semidense_valid_frac == 0.0:
                 value = float(self.candidate_min_valid_frac)
