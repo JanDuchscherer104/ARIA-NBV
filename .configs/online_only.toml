@@ -1,59 +1,28 @@
 run_mode = "train"
 
 [datamodule_config]
-# Offline cache usage
-num_workers        = 12
-batch_size         = 4
-persistent_workers = false
-shuffle            = true
-use_train_as_val   = false
+# Online oracle labels (no offline cache). Iterable dataset => no batch_size here.
+num_workers = 0
+use_train_as_val = false
 
-    [datamodule_config.source]
-    kind        = "offline_cache"
-    train_split = "train"
-    val_split   = "val"
+  [datamodule_config.source]
+  kind = "online"
 
-        [datamodule_config.source.cache]
-        load_backbone = true
-        include_efm_snippet = true
-        include_gt_mesh = false
-        load_candidates = false
-        load_depths = true
-        load_candidate_pcs = false
-        semidense_include_obs_count = true
-        efm_keep_keys = [
-            # EfmTrajectory
-            'pose/t_world_rig',
-            'pose/time_ns',
-            'pose/gravity_in_world',
-            # SemiDense Point Cloud
-            'points/p3s_world',
-            'points/dist_std',
-            'points/inv_dist_std',
-            'points/time_ns',
-            'scene/points/vol_min',
-            'scene/points/vol_max',
-            'points/lengths',
-        ]
-        backbone_keep_fields = [
-            "t_world_voxel",
-            "voxel_extent",
-            "occ_pr",
-            "occ_input",
-            "counts",
-            "cent_pr",
-            "free_input",
-            "pts_world",
-        ]
+    [datamodule_config.source.dataset]
+    # Customize these to restrict to a subset of scenes/snippets.
+    # scene_ids = ["81022"]
+    # snippet_key_filter = ["000024"]
+    wds_shuffle = true
+    wds_repeat = true
+    load_meshes = true
+    require_mesh = true
+    batch_size = 1
 
-            [datamodule_config.source.cache.vin_snippet_cache]
-            # Precomputed minimal VinSnippetView cache (collapsed semidense + trajectory).
-            # Build via: `uv run nbv-cache-vin-snippets` (defaults to `.configs/offline_only.toml`)
-            # or explicitly: `uv run nbv-cache-vin-snippets --config-path ./.configs/offline_only.toml`
-            cache_dir = "vin_snippet_cache"
+    [datamodule_config.source.labeler]
+    device = "cuda"
 
 [trainer_config]
-# Make sure validation runs
+# Default training config; adjust as needed
 enable_validation       = true
 check_val_every_n_epoch = 1
 num_sanity_val_steps    = 2
@@ -81,7 +50,6 @@ use_wandb               = true
     tqdm_refresh_rate       = 1
     use_rich_model_summary  = true
     rich_summary_max_depth  = 4
-
 [module_config]
 num_classes                 = 15
 save_binner                 = true
@@ -94,15 +62,6 @@ log_grad_norms              = true
 coral_bias_init             = "prior_logits"
 coral_loss_variant          = "coral"
 coral_balance_source        = "binner"
-coverage_weight_mode             = "voxel"
-coverage_weight_floor            = 0.2
-coverage_weight_power            = 1.0
-coverage_weight_strength_start   = 0.6
-coverage_weight_strength_end     = 0.0
-coverage_weight_schedule         = "linear"
-coverage_weight_interval         = "epoch"
-coverage_weight_anneal_epochs    = 5
-coverage_weight_apply_aux        = true
 
     [module_config.optimizer]
     learning_rate = 3e-4
@@ -128,9 +87,6 @@ coverage_weight_apply_aux        = true
     field_gn_groups = 4
     apply_cw90_correction = true
     global_pool_grid_size = 6
-    enable_semidense_frustum = true
-    semidense_include_obs_count = true
-    use_voxel_valid_frac_feature = true
     scene_field_channels = [
         "occ_pr",
         "occ_input",

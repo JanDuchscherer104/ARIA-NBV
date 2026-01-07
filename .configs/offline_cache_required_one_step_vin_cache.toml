@@ -1,9 +1,9 @@
-run_mode = "train"
+run_mode = "optuna"
 
 [datamodule_config]
-# Offline cache usage
-num_workers        = 12
-batch_size         = 4
+# Offline cache, strict vin_snippet_cache enforcement (VIN snippet cache required).
+num_workers        = 0
+batch_size         = 2
 persistent_workers = false
 shuffle            = true
 use_train_as_val   = false
@@ -20,20 +20,23 @@ use_train_as_val   = false
         load_candidates = false
         load_depths = true
         load_candidate_pcs = false
+        vin_snippet_cache_mode = "required"
+        vin_snippet_cache_allow_subset = true
         semidense_include_obs_count = true
+        limit = 20
         efm_keep_keys = [
             # EfmTrajectory
-            'pose/t_world_rig',
-            'pose/time_ns',
-            'pose/gravity_in_world',
+            "pose/t_world_rig",
+            "pose/time_ns",
+            "pose/gravity_in_world",
             # SemiDense Point Cloud
-            'points/p3s_world',
-            'points/dist_std',
-            'points/inv_dist_std',
-            'points/time_ns',
-            'scene/points/vol_min',
-            'scene/points/vol_max',
-            'points/lengths',
+            "points/p3s_world",
+            "points/dist_std",
+            "points/inv_dist_std",
+            "points/time_ns",
+            "scene/points/vol_min",
+            "scene/points/vol_max",
+            "points/lengths",
         ]
         backbone_keep_fields = [
             "t_world_voxel",
@@ -47,62 +50,57 @@ use_train_as_val   = false
         ]
 
             [datamodule_config.source.cache.vin_snippet_cache]
-            # Precomputed minimal VinSnippetView cache (collapsed semidense + trajectory).
-            # Build via: `uv run nbv-cache-vin-snippets` (defaults to `.configs/offline_only.toml`)
-            # or explicitly: `uv run nbv-cache-vin-snippets --config-path ./.configs/offline_only.toml`
             cache_dir = "vin_snippet_cache"
 
 [trainer_config]
-# Make sure validation runs
-enable_validation       = true
+enable_validation       = false
 check_val_every_n_epoch = 1
-num_sanity_val_steps    = 2
+num_sanity_val_steps    = 0
 fast_dev_run            = false
-max_epochs              = 50
+max_epochs              = 1
+limit_train_batches     = 10
+limit_val_batches       = 0
 accelerator             = "auto"
 devices                 = "auto"
 log_every_n_steps       = 1
 gradient_clip_val       = 3.0
-use_wandb               = true
+use_wandb               = false
 
     [trainer_config.callbacks]
-    use_early_stopping      = true
-    use_model_checkpoint    = true
-    checkpoint_monitor      = "val/loss"
-    checkpoint_mode         = "min"
-    checkpoint_save_top_k   = 1
-    early_stopping_monitor  = "val/loss"
-    early_stopping_mode     = "min"
-    early_stopping_patience = 5
-    use_lr_monitor          = true
-    lr_logging_interval     = "step"
-    use_rich_progress_bar   = true
-    use_tqdm_progress_bar   = false
-    tqdm_refresh_rate       = 1
-    use_rich_model_summary  = true
-    rich_summary_max_depth  = 4
+    use_early_stopping     = false
+    use_model_checkpoint   = true
+    checkpoint_monitor     = "val/loss"
+    checkpoint_mode        = "min"
+    checkpoint_save_top_k  = 1
+    use_lr_monitor         = true
+    lr_logging_interval    = "step"
+    use_rich_progress_bar  = true
+    use_tqdm_progress_bar  = false
+    tqdm_refresh_rate      = 1
+    use_rich_model_summary = true
+    rich_summary_max_depth = 4
 
 [module_config]
-num_classes                 = 15
-save_binner                 = true
-binner_path                 = ".logs/vin/rri_binner.json"
-aux_regression_loss         = "huber"
-aux_regression_weight       = 10.0
-aux_regression_weight_gamma = 0.90
-aux_regression_weight_min   = 0.1
-log_grad_norms              = true
-coral_bias_init             = "prior_logits"
-coral_loss_variant          = "coral"
-coral_balance_source        = "binner"
-coverage_weight_mode             = "voxel"
-coverage_weight_floor            = 0.2
-coverage_weight_power            = 1.0
-coverage_weight_strength_start   = 0.6
-coverage_weight_strength_end     = 0.0
-coverage_weight_schedule         = "linear"
-coverage_weight_interval         = "epoch"
-coverage_weight_anneal_epochs    = 5
-coverage_weight_apply_aux        = true
+num_classes                    = 15
+save_binner                    = true
+binner_path                    = ".logs/vin/rri_binner.json"
+aux_regression_loss            = "huber"
+aux_regression_weight          = 10.0
+aux_regression_weight_gamma    = 0.90
+aux_regression_weight_min      = 0.1
+log_grad_norms                 = true
+coral_bias_init                = "prior_logits"
+coral_loss_variant             = "coral"
+coral_balance_source           = "binner"
+coverage_weight_mode           = "voxel"
+coverage_weight_floor          = 0.2
+coverage_weight_power          = 1.0
+coverage_weight_strength_start = 0.6
+coverage_weight_strength_end   = 0.0
+coverage_weight_schedule       = "linear"
+coverage_weight_interval       = "epoch"
+coverage_weight_anneal_epochs  = 5
+coverage_weight_apply_aux      = true
 
     [module_config.optimizer]
     learning_rate = 3e-4
@@ -115,6 +113,13 @@ coverage_weight_apply_aux        = true
     div_factor      = 15.0
     # OneCycleLR: final_lr = max_lr / (div_factor * final_div_factor)
     final_div_factor = 5e3
+
+[optuna_config]
+study_name = "vin-v2-mock-sweep"
+monitor    = "train/loss"
+n_trials   = 10
+sampler    = "tpe"
+pruner     = "median"
 
     [module_config.vin]
     # VIN v2 core knobs
@@ -130,6 +135,8 @@ coverage_weight_apply_aux        = true
     global_pool_grid_size = 6
     enable_semidense_frustum = true
     semidense_include_obs_count = true
+    use_point_encoder = false
+    use_traj_encoder = true
     use_voxel_valid_frac_feature = true
     scene_field_channels = [
         "occ_pr",
