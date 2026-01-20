@@ -15,6 +15,12 @@ Initial considerations and conceptual notes should be the first section of each 
 -->
 
 
+## Master Thesis
+
+- find self-supervided objective for NBV pre-training
+- what would i render if i went to a candidate view?
+-
+
 # Overview
 
 This page consolidates all open tasks, questions, and references for the ASE/ATEK + EFM3D NBV project. Nothing has been removed; items are reorganized for clarity.
@@ -484,7 +490,7 @@ Optional (available via `EvlBackboneConfig.features_mode in {"neck","both"}`; no
 - `neck/occ_feat` (high-dim geometry/context volume; B×C×D×H×W)
 - `neck/obb_feat` (high-dim semantic/context volume; B×C×D×H×W)
 
-Processing strategy (current implementation in `oracle_rri/oracle_rri/vin/model.py`):
+Processing strategy (current implementation in `oracle_rri/oracle_rri/vin/experimental/model.py`):
 
 - **Channel compression**: `Conv3d(1×1×1) + GroupNorm + GELU` → `field_dim` (default: 16)
 - **Global pooling**: `mean(DHW)` (optional via `use_global_pool=True`)
@@ -558,7 +564,7 @@ Acceptance criteria:
 
 - [x] Implement the shell-aware pose descriptor (`r, u, f, scalars`) in the reference rig frame.
 
-  > **Done**: Implemented in `oracle_rri/oracle_rri/vin/model.py` by consuming `reference_pose_world_rig` (world←rig) and `candidate_poses_world_cam` (world←cam), forming $T_{\mathrm{rig}\leftarrow\mathrm{cam}}$, and computing $(r, u, f, \mathrm{scalars})$ in the reference rig frame.
+  > **Done**: Implemented in `oracle_rri/oracle_rri/vin/experimental/model.py` by consuming `reference_pose_world_rig` (world←rig) and `candidate_poses_world_cam` (world←cam), forming $T_{\mathrm{rig}\leftarrow\mathrm{cam}}$, and computing $(r, u, f, \mathrm{scalars})$ in the reference rig frame.
 
 - [x] Implement `ShellShPoseEncoder` in `oracle_rri/oracle_rri/vin/spherical_encoding.py`:
   - uses `e3nn.o3.spherical_harmonics` for `u` and `f`
@@ -582,7 +588,7 @@ Acceptance criteria:
   - outputs:
     - logits, expected score (normalized), candidate_valid mask
 
-  > **Done**: Implemented in `oracle_rri/oracle_rri/vin/model.py` with shell+SH pose encoding, a minimal voxel field (`occ_pr`, `occ_input`, `counts_norm`), mean-pooled global context, masked-mean frustum sampling for candidates using PyTorch3D `PerspectiveCameras`, and CORAL logits/expected score outputs.
+  > **Done**: Implemented in `oracle_rri/oracle_rri/vin/experimental/model.py` with shell+SH pose encoding, a minimal voxel field (`occ_pr`, `occ_input`, `counts_norm`), mean-pooled global context, masked-mean frustum sampling for candidates using PyTorch3D `PerspectiveCameras`, and CORAL logits/expected score outputs.
 
 - [x] Implement `VinPrediction` dataclass (logits, scores, masks)
 

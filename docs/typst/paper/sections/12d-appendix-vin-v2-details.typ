@@ -17,10 +17,10 @@ first two columns of the rotation matrix and flattening them into a 6-vector.
 This avoids discontinuities of Euler angles and improves learning stability
 @zhou2019continuity.
 
-== Candidate-conditioned semidense visibility fraction
+== Candidate-conditioned semi-dense visibility fraction
 
-The semidense view conditioning uses PyTorch3D screen-space projection
-(`transform_points_screen`) to decide which semidense points are visible from
+The semi-dense view conditioning uses PyTorch3D screen-space projection
+(`transform_points_screen`) to decide which semi-dense points are visible from
 candidate $i$. A point is considered valid if it projects to finite image
 coordinates, has positive depth in the candidate camera frame, and lies within
 image bounds. We define the candidate-conditioned visibility fraction
@@ -36,10 +36,10 @@ image bounds. We define the candidate-conditioned visibility fraction
 ]
 
 and refer to this scalar as `semidense_candidate_vis_frac` throughout the
-paper. This is a proxy for how much semidense evidence can be reused to score
+paper. This is a proxy for how much semi-dense evidence can be reused to score
 candidate $i$, even when voxel features are out-of-bounds.
 
-== Semidense frustum tokens and masking
+== Semi-dense frustum tokens and masking
 
 For the frustum attention block, we form tokens
 $bold(tau)_(i,k) = (u, v, z, nu, c)$ from the projected points, where $(u, v)$

@@ -15,8 +15,8 @@ References:
 - External code: [facebookresearch/efm3d](https://github.com/facebookresearch/efm3d)
 - CORAL ordinal regression (implementation): [coral-pytorch](https://raschka-research-group.github.io/coral-pytorch/) ([GitHub](https://github.com/Raschka-research-group/coral-pytorch))
 - Oracle label pipeline: [RRI computation](rri_computation.qmd) and `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`
-- VIN implementation: `oracle_rri/oracle_rri/vin/model.py` (`VinModel`), `oracle_rri/oracle_rri/vin/model_v2.py` (`VinModelV2`), and `oracle_rri/oracle_rri/lightning/lit_module.py` (`VinLightningModule.summarize_vin`)
-- Optional trajectory encoder: `oracle_rri/oracle_rri/vin/traj_encoder.py` (`TrajectoryEncoder`) for R6D+LFF encoding of `EfmTrajectoryView.t_world_rig`. In VIN v2, per-frame trajectory encodings are transformed into the reference rig frame and can be cross-attended by candidate pose embeddings.
+- VIN implementation: `oracle_rri/oracle_rri/vin/experimental/model.py` (`VinModel`), `oracle_rri/oracle_rri/vin/experimental/model_v2.py` (`VinModelV2`), `oracle_rri/oracle_rri/vin/model_v3.py` (`VinModelV3`, VIN-Core), and `oracle_rri/oracle_rri/lightning/lit_module.py` (`VinLightningModule.summarize_vin`)
+- Optional trajectory encoder: `oracle_rri/oracle_rri/vin/traj_encoder.py` (`TrajectoryEncoder`) for R6D+LFF encoding of `EfmTrajectoryView.t_world_rig`. In VIN v3, the pooled trajectory embedding can be appended to the candidate features (optional, no cross-attention).
 
 # Problem statement
 
@@ -538,7 +538,7 @@ $$
 
 # VIN head (v0.1 architecture)
 
-`oracle_rri/oracle_rri/vin/model.py` (`VinModel`) implements a lightweight scorer head on top of a frozen EVL backbone:
+`oracle_rri/oracle_rri/vin/experimental/model.py` (`VinModel`) implements a lightweight scorer head on top of a frozen EVL backbone:
 
 1. Run frozen EVL once on the snippet to get low-dimensional head/evidence volumes + voxel grid pose (`EvlBackbone`).
 2. Build a **voxel-aligned scene field** with `scene_field_channels` (default: `["occ_pr", "occ_input", "counts_norm"]`).
@@ -558,7 +558,7 @@ $$
 
 # VIN head (v0.2 simplified architecture)
 
-`oracle_rri/oracle_rri/vin/model_v2.py` (`VinModelV2`) keeps only the most promising components and removes
+`oracle_rri/oracle_rri/vin/experimental/model_v2.py` (`VinModelV2`) keeps only the most promising components and removes
 architecture toggles while exposing a **configurable pose encoder** via a discriminated union.
 
 1. **Pose encoding (reference frame, configurable).**
@@ -709,7 +709,7 @@ flowchart TD
 ## Scene field construction (math, current)
 
 `VinModel` builds a compact voxel-aligned tensor field $F(\mathbf{v})\in\mathbb{R}^{C_\text{in}}$ from EVL outputs
-(`_build_scene_field(...)` in `oracle_rri/oracle_rri/vin/model.py`). With default channels:
+(`_build_scene_field(...)` in `oracle_rri/oracle_rri/vin/experimental/model.py`). With default channels:
 
 - occupancy prior: $F_1=\text{occ\_pr}(\mathbf{v})\in[0,1]$,
 - occupied evidence: $F_2=\text{occ\_input}(\mathbf{v})\in\{0,1\}$,

@@ -1,19 +1,19 @@
 #import "@preview/booktabs:0.0.4": *
 #show: booktabs-default-table-style
 
-= Training Configuration Snapshot
+= Prototype Training Configuration (Future Work)
 
-The current default configuration used for VIN v2 experiments is summarized in
-@tab:train-config. These values are tuned to balance convergence stability and
-ordinal calibration, and are subject to ongoing ablation. We use AdamW with a
-OneCycle learning-rate policy @OneCycleLR-smith2018 and include a lightweight
-coverage-weight curriculum to avoid early collapse while still training on all
-candidates.
+This table records a prototype starting configuration for future VIN-style
+training runs. The central contribution of this paper is oracle label
+computation; learning a next-best-view policy remains future work. We include
+these hyperparameters to make planned experiments reproducible. We use AdamW
+with a OneCycle learning-rate policy @OneCycleLR-smith2018 and include a
+lightweight coverage-weight curriculum to reduce early collapse.
 
 #figure(
   kind: "table",
   supplement: [Table],
-  caption: [Representative training configuration for VIN v2 (current baseline).],
+  caption: [Prototype training configuration for future VIN-style experiments.],
   table(
     columns: (18em, auto),
     align: (left, left),
@@ -48,8 +48,3 @@ candidates.
     bottomrule(),
   ),
 ) <tab:train-config>
-
-#figure(
-  [*Placeholder*: Insert Streamlit-exported training curves (loss + LR schedule + grad norms).],
-  caption: [Training dynamics (placeholder; Streamlit export pending).]
-) <fig:val-loss>

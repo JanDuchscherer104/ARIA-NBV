@@ -1,4 +1,4 @@
-= Semidense Frustum Pooling and View-Conditioned Tokens
+= Semi-dense Frustum Pooling and View-Conditioned Tokens
 
 #import "/typst/shared/macros.typ": *
 
@@ -7,10 +7,12 @@ candidate view. In VIN v2 we approximate VIN-NBV's view-plane projection
 features by projecting the current semi-dense SLAM point cloud into each
 candidate camera and aggregating the resulting per-point tokens with multi-head
 cross-attention.
+We treat this frustum token aggregation as an optional module evaluated via
+ablations.
 
 Representative frusta visualizations are included in the appendix.
 
-== Semidense projection tokens
+== Semi-dense projection tokens
 
 Let $#sym_points _t$ be the current reconstruction point set (semi-dense
 SLAM points) in

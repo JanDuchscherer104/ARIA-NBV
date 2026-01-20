@@ -8,7 +8,7 @@
 
 This appendix provides a detailed, code-faithful overview of the oracle label
 pipeline implemented in `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`.
-The pipeline maps a snippet (trajectory, semidense SLAM points, and GT mesh) to
+The pipeline maps a snippet (trajectory, semi-dense SLAM points, and GT mesh) to
 per-candidate oracle RRI scores and the fitted ordinal binning used for CORAL
 training.
 
@@ -23,7 +23,7 @@ Given an ASE-EFM snippet with mesh supervision, `OracleRriLabeler` executes:
   rasterize the GT mesh from each candidate pose to obtain depth maps.
 3. *Backprojection* (`build_candidate_pointclouds`): unproject valid depth
   pixels to obtain per-candidate point clouds in world coordinates and fuse
-  with the semidense reconstruction point set.
+  with the semi-dense reconstruction point set.
 4. *Oracle scoring* (`OracleRRI`): compute Chamfer-based reconstruction quality
   before/after adding each candidate and report oracle RRI.
 5. *Ordinal binning* (`RriOrdinalBinner`): fit quantile edges and map continuous
@@ -365,7 +365,7 @@ The backprojection configuration used in our runs is summarized in
 
 == Oracle RRI computation
 
-Let $#sym_points _t$ be the semidense SLAM reconstruction for the snippet and
+Let $#sym_points _t$ be the semi-dense SLAM reconstruction for the snippet and
 $#sym_points _(q_i)$ the candidate point cloud rendered from the GT mesh.
 Oracle RRI is computed by comparing the point-to-mesh reconstruction quality
 before and after adding the candidate:
@@ -390,7 +390,7 @@ before and after adding the candidate:
 ]
 
 In our implementation (`oracle_rri/oracle_rri/rri_metrics/oracle_rri.py`), the
-GT mesh is cropped to a combined occupancy AABB covering semidense and
+GT mesh is cropped to a combined occupancy AABB covering semi-dense and
 candidate points to reduce compute. Distances are evaluated with PyTorch3D
 point-mesh primitives on GPU.
 
@@ -410,9 +410,9 @@ hyperparameters). The effective settings are summarized in
       toprule(),
       table.header([Setting], [Value]),
       midrule(), [mesh crop],
-      [AABB from semidense + candidate bounds], [accuracy (P #sym.arrow.r M)],
-      [mean point #sym.arrow.r triangle distance], [completeness (M #sym.arrow.r P)],
-      [mean triangle #sym.arrow.r point distance], [bidirectional],
+      [AABB from semi-dense + candidate bounds], [accuracy (P #sym.arrow.r M)],
+      [mean squared point #sym.arrow.r triangle distance], [completeness (M #sym.arrow.r P)],
+      [mean squared triangle #sym.arrow.r point distance], [bidirectional],
       [accuracy + completeness], [denominator stabilizer],
       [clamp_min $1e-12$], bottomrule(),
     )

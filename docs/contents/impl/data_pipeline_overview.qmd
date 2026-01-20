@@ -18,7 +18,9 @@ Pages in the app:
 - **Candidate Renders**: render depth for valid candidates via PyTorch3D.
 - **RRI**: compute oracle RRI scores and compare point-cloud distances.
 - **VIN Diagnostics**: run VIN `forward_with_debug` on oracle batches and inspect internal tensors.
+- **Offline Stats**: summarize offline cache distributions; VIN snippet stats include per-point `inv_dist_std`/`obs_count` mean, std, and p95.
 - **W&B Analysis**: compare multiple W&B runs in the project, including train/val dynamics and config-driven performance trends.
+- **Optuna Sweeps**: inspect Optuna study results and visualize parameter effects across trials.
 - **Testing & Attribution**: load checkpoints and compute VIN head attributions on cached samples.
 
 The app caches configs + results in `st.session_state`. “Run previous” auto-runs earlier stages with cached settings; background threads keep the UI responsive.

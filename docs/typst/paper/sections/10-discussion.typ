@@ -19,8 +19,15 @@ trajectory-conditioned binning may be required for consistent calibration.
 == Computational cost of oracle labels
 
 Oracle RRI computation requires depth rendering and point-to-mesh distances for
-all candidates, which is expensive and limits dataset size. Approximate labels
-or learned proxies could reduce this bottleneck.
+all candidates, which is expensive and limits dataset size. This cost also
+makes on-policy training of continuous 5-DoF action policies impractical in our
+current system: each policy step would require multiple oracle evaluations,
+and our labeler is not yet optimized for large-scale multiprocessing.
+Discretizing the action space into a candidate set amortizes oracle cost and
+provides dense supervision (RRI labels for all candidates), enabling stable
+offline training in future work. A learned RRI predictor can then act as a fast
+surrogate objective for continuous pose search or eventual on-policy
+fine-tuning.
 
 == Entity-aware objectives
 

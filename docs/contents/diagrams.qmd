@@ -1,0 +1,53 @@
+---
+title: "VIN NBV Diagrams"
+---
+
+This page contains the architecture diagrams for the VIN NBV system.
+
+## Overall Architecture
+
+```{mermaid}
+%%| file: ../diagrams/vin_nbv/mermaid/overall.mmd
+```
+
+## Scene Field
+
+```{mermaid}
+%%| file: ../diagrams/vin_nbv/mermaid/scene_field.mmd
+```
+
+## Pose Encoder
+
+```{mermaid}
+%%| file: ../diagrams/vin_nbv/mermaid/pose_encoder.mmd
+```
+
+## Global Pool
+
+```{mermaid}
+%%| file: ../diagrams/vin_nbv/mermaid/global_pool.mmd
+```
+
+## Head
+
+```{mermaid}
+%%| file: ../diagrams/vin_nbv/mermaid/head.mmd
+```
+
+## Trajectory
+
+```{mermaid}
+%%| file: ../diagrams/vin_nbv/mermaid/trajectory.mmd
+```
+
+## Semidense Projection
+
+```{mermaid}
+%%| file: ../diagrams/vin_nbv/mermaid/semidense_proj.mmd
+```
+
+## Semidense Frustum
+
+```{mermaid}
+%%| file: ../diagrams/vin_nbv/mermaid/semidense_frustum.mmd
+```

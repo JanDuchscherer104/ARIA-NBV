@@ -1,0 +1,39 @@
+flowchart LR
+  %% Submodule: Semidense frustum MH cross-attention (s_frustum)
+  %%
+  %% Symbols:
+  %% - B: batch size, N: number of candidate views
+  %% - P_fr: max frustum points per candidate
+  %% - F_tok: token feature dim
+  %% - F_q: pose embedding dim
+  %% - F_g: attention embed dim (and typically summary dim)
+  %% - F_fr: frustum summary dim (typically = F_g)
+
+  pose["Input<br/>\(\texttt{pose\_enc}\)"]
+  projdata["Input<br/>\(\texttt{proj\_data}\)<br/>(x,y,z,valid,inv_dist_std,obs_count)"]
+  tokens["Build tokens<br/>\(\tau_{i,k}=[\hat{x},\hat{y},z,\texttt{inv\_dist\_std},\texttt{obs\_count}]\)"]
+  vis["Optional visibility embed<br/>\(\texttt{nn.Embedding}(2,F_{tok})\)"]
+  kvproj["Token projection<br/>\(\texttt{nn.Linear}(F_{tok}\rightarrow F_g)\)"]
+  qproj["Query projection<br/>\(\texttt{nn.Linear}(F_q\rightarrow F_g)\)"]
+  mask["Optional masking<br/>\(\texttt{key\_padding\_mask}=\lnot valid\)"]
+  attn["Cross-attn block<br/>\(\texttt{nn.MultiheadAttention}(F_g)\)<br/>\(+\ \texttt{nn.LayerNorm}+\texttt{MLP}\)"]
+  out["Output<br/>\(s^{fr}\)"]
+
+  projdata -->|"\(\texttt{proj\_data}\Rightarrow \tau:(B,N,P_{fr},F_{tok})\)"| tokens
+  tokens -->|"\(\tau\)"| vis
+  vis -->|"\(\tau\)"| kvproj
+  pose -->|"\(e:(B,N,F_q)\)"| qproj
+  qproj -->|"\(q:(B\cdot N,1,F_g)\)"| attn
+  kvproj -->|"\(kv:(B\cdot N,P_{fr},F_g)\)"| attn
+  mask -->|"\(\texttt{mask}\)"| attn
+  attn -->|"\(s^{fr}:(B,N,F_{fr})\)"| out
+
+  classDef input fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
+  classDef compute fill:#e1d5e7,stroke:#9673a6,stroke-width:2px;
+  classDef neutral fill:#f5f5f5,stroke:#666666,stroke-width:2px;
+  classDef output fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
+
+  class pose,projdata input;
+  class tokens,mask neutral;
+  class vis,kvproj,qproj,attn compute;
+  class out output;

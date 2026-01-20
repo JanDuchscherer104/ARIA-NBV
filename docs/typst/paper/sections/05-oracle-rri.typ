@@ -19,6 +19,16 @@ constraints as the candidate camera.
 Depth-render diagnostics and example candidates are provided in the appendix
 to keep the main text focused on the pipeline details.
 
+#figure(
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 12pt,
+    image("/figures/app/candidate_renders.png", width: 100%),
+    image("/figures/app/rri_forward.png", width: 100%),
+  ),
+  caption: [Streamlit diagnostics: candidate depth renders (left) and oracle RRI scoring (right); config in @tab:oracle-label-config.],
+) <fig:oracle-dashboard>
+
 == Point cloud fusion and evaluation
 
 We fuse the candidate point cloud with the current reconstruction,
@@ -26,12 +36,12 @@ $#sym_points _(t union q) = #sym_points _t union #sym_points _q$, and evaluate t
 The oracle RRI is computed using the definition above. We also log the intermediate
 completeness and accuracy components of the Chamfer distance to diagnose
 failure modes (e.g., views that look into empty space). The resulting RRI values
-serve as supervised labels for the VIN model.
+serve as supervised labels for future learning-based candidate scoring.
 
-Implementation note: distances are evaluated with differentiable
-point-to-triangle and triangle-to-point primitives (averaged over points and
-faces). This yields the same accuracy (P #sym.arrow.r M) and completeness (M
-#sym.arrow.r P) split reported by ATEK-style surface reconstruction evaluation.
+We evaluate both directional terms with mean squared point-to-triangle and
+triangle-to-point distances (averaged over points and faces). This yields the
+same accuracy (P #sym.arrow.r M) and completeness (M #sym.arrow.r P) split
+reported by ATEK-style surface reconstruction evaluation.
 
 == Pipeline structure
 
@@ -46,9 +56,15 @@ The oracle label computation consists of four stages:
 - compute Chamfer-based reconstruction quality before/after adding each
   candidate, yielding per-candidate RRI labels.
 
+In practice, candidate scoring is batched on GPU: the ground-truth mesh is
+cropped to an occupancy-aligned bounding box shared across candidates and the
+point↔mesh distances are evaluated for all candidates in a single forward pass
+whenever memory permits.
+
 This separation ensures that rendering and label computation are decoupled from
-the VIN model. The VIN architecture consumes only the resulting labels and
-backbone features; it never accesses GT meshes or depth renders directly.
+any learned NBV policy. A future VIN-style architecture would consume only the
+resulting labels and scene features; it would never access GT meshes or depth
+renders directly.
 
 The oracle is expensive because it requires rendering and point-to-mesh
 distance computation for each candidate. This motivates a lightweight model

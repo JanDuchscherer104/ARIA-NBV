@@ -15,19 +15,29 @@ The Aria Synthetic Environments (ASE) dataset [@SceneScript-avetisyan2024] is a 
 
 ## Dataset Scale
 
-- **100,000 unique multi-room interior scenes**
-- **58M+ RGB images** captured from egocentric trajectories
-- **67 days** of total trajectory time
-- **7,800 km** of total trajectory distance
-- **~23 TB** total dataset size
-- **100** scenes with ground-truth meshes
-  - appox. 120 MB per mesh
-- **1,641** scenes with GT Meshes
-  - approx. 100MB per scene snippet (20 s @ 10 fps), hence approx. 164 GB for all snippets
+- **100,000 unique multi-room interior scenes** [@ProjectAria-ASE-2025]
+- **58M+ RGB images** captured from egocentric trajectories [@ProjectAria-ASE-2025]
+- **67 days** of total trajectory time [@ProjectAria-ASE-2025]
+- **7,800 km** of total trajectory distance [@ProjectAria-ASE-2025]
+- **~23 TB** total dataset size [@ProjectAria-ASE-2025]
+- **Ground-truth meshes**: the public EFM3D release provides watertight triangle meshes for **100 ASE validation scenes**, which we use for mesh-based oracle RRI labels and evaluation [@EFM3D-straub2024].
+
+## Coordinate conventions (quick reference)
+
+EFM3D/ATEK uses **left-up-forward (LUF)** camera coordinates:
+
+- $+x$ left, $+y$ up, $+z$ forward (along the optical axis).
+- Pixel coordinates follow the standard convention: origin in the top-left, $u$ increases to the right, $v$ increases downward.
+
+Machine Perception Services (MPS) provides trajectories and semi-dense point clouds in a gravity-aligned world frame [@projectaria-engel2023]. See the detailed *Coordinate Conventions* section below for the full frame contract used in this project.
+
+## ATEK-EFM snippet format (used by EFM3D / this project)
+
+EFM3D ingests ASE through ATEK as WebDataset shards and uses fixed-length snippet windows (typically 20 frames at 10 Hz, i.e., 2 s) with a stride of 10 frames (1 s) between consecutive snippets [@EFM3D-straub2024; @ATEK-DataStore-2025]. In the common ASE preprocessing, RGB frames are resized to 240×240 and SLAM grayscale frames to roughly 320×240 while preserving per-frame calibration and rig poses [@EFM3D-straub2024].
 
 ## Local ATEK shard snapshot (`.data/ase_efm`)
 
-This repo includes a local ASE-ATEK WebDataset snapshot at `.data/ase_efm` (per-scene folders with multiple `shards-*.tar`). To estimate snippet counts, each shard is scanned for `sequence_name.txt` entries (one per snippet), then summed across shards per scene. The histogram below summarizes the per-scene snippet distribution (see [Wikipedia :: Histogram](https://en.wikipedia.org/wiki/Histogram)). A fresh scan on **December 31, 2025** produced:
+This repo includes a local ASE-ATEK WebDataset snapshot at `.data/ase_efm` (per-scene folders with multiple `shards-*.tar`). To estimate snippet counts, each shard is scanned for `sequence_name.txt` entries (one per snippet), then summed across shards per scene. The histogram below summarizes the per-scene snippet distribution. A fresh scan on **December 31, 2025** produced:
 
 - **Scenes:** 100
 - **Total snippets:** 4,608
@@ -327,8 +337,8 @@ into this VIO frame before training or evaluation, so **+Z is consistently
 ## Camera Frames
 
 - **Origin**: At camera's optical center
-- **X-axis**: Points right (from camera perspective)
-- **Y-axis**: Points down
+- **X-axis**: Points left (from camera perspective)
+- **Y-axis**: Points up
 - **Z-axis**: Points forward (optical axis)
 
 EFM3D follows the **LUF camera convention** (`X = Left, Y = Up, Z =

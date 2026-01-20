@@ -2,20 +2,32 @@
 
 #import "/typst/shared/macros.typ": *
 
-This section describes the VIN v2 architecture with a focus on theoretical
-fidelity to VIN-NBV and exact alignment with the current implementation. The
-model predicts ordinal RRI scores for candidate views using a frozen EVL
-backbone, explicit view-conditioned evidence, and a lightweight CORAL head.
+This section outlines a VIN v2 candidate-scoring architecture that we plan to
+train on the oracle RRI labels computed in this paper. We include this
+implementation sketch to document the codebase and to motivate diagnostics,
+but we do not claim a learned NBV policy result yet. The model is designed to
+predict ordinal RRI scores for candidate views using explicit view-conditioned
+evidence and a lightweight CORAL head, optionally augmented with frozen EVL
+features @EFM3D-straub2024.
+
+== Core design and planned ablations
+
+To avoid ambiguity between what is implemented and what is exploratory, we
+separate the model into (i) a stable core that is always present and (ii)
+optional modules evaluated via ablations.
+
+- *Core*: voxel evidence from the frozen EVL backbone, pose encoding, a
+  pose-conditioned global context vector, and a lightweight trajectory context,
+  followed by an ordinal (CORAL) head.
+- *View-conditioned evidence*: candidate-conditioned cues obtained by projecting
+  the current semi-dense reconstruction into the candidate view.
+- *Optional ablations*: token-level frustum aggregation, global point-set
+  embeddings, and alternative late-fusion mechanisms.
 
 #figure(
   image("/figures/VIN-NBV_diagram.png", width: 100%),
-  caption: [VIN-NBV architecture overview (baseline reference; figure will be replaced by Streamlit exports).],
+  caption: [VIN-NBV architecture overview (baseline reference).],
 ) <fig:vin-nbv-diagram>
-
-#figure(
-  [*Placeholder*: Insert Streamlit-exported VIN v2 architecture diagram (VIN Diagnostics → Summary tab).],
-  caption: [Aria-VIN-NBV (VIN v2) architecture overview (Streamlit export pending).],
-) <fig:vin-v2-diagram>
 
 #figure(
   image("/figures/vin_v2/vin_v2_arch.png", width: 100%),
@@ -59,11 +71,20 @@ the scene field is provided in Appendix @fig:evl-summary.
 == Pose encoding
 
 Each candidate pose is expressed in the reference rig frame via
-// $(#sym_T)_{#fr_rig_ref <- #fr_cam} = (#sym_T)_{#fr_world <- #fr_rig_ref}^(-1) dot (#sym_T)_{#fr_world <- #fr_cam}$.
-$#sym_T _(#fr_rig_ref^#fr_cam) = #sym_T _(#fr_world <- #fr_rig_ref)^(-1) dot #sym_T _(#fr_world <- #fr_cam)$.
-We encode translation and rotation using a 6D rotation representation and
-Learnable Fourier Features (LFF) @zhou2019continuity @LFF-li2021. For each
-candidate $i$ the pose encoder yields:
+$#T(fr_rig_ref, fr_cam) = #T(fr_world, fr_rig_ref)^(-1) dot #T(fr_world, fr_cam)$.
+We encode translation and rotation using a 6D rotation representation
+@zhou2019continuity and Learnable Fourier Features (LFF) @LFF-li2021.
+The 6D choice follows the continuity analysis of @zhou2019continuity: commonly
+used low-dimensional parameterizations (Euler angles, axis--angle, quaternions)
+introduce discontinuities that can fragment the learning signal and lead to
+unstable optimization, while a continuous Euclidean representation of $"SO"(3)$
+is not possible in four or fewer dimensions. The 6D representation (two
+rotation-matrix columns) is a simple continuous alternative that maps to a
+valid rotation via a differentiable Gram--Schmidt-like orthogonalization,
+avoiding explicit orthogonality constraints of a full $3 times 3$ matrix.
+We prefer 6D over the minimal 5D continuous variant because it is simpler to
+implement and performed similarly or better in practice @zhou2019continuity.
+For each candidate $i$ the pose encoder yields:
 
 - a low-dimensional pose vector $bold(xi)_i in bb(R)^9$ (translation + rotation-6D),
 - an embedding $#sym_pose_emb _i in bb(R)^(d_"pose")$,
@@ -125,7 +146,7 @@ We use $v_i$ in two complementary ways:
 - *Feature*: we optionally append $(v_i, 1-v_i)$ to the final head input to
   make the head aware of evidence quality.
 
-== Semidense projection statistics
+== Semi-dense projection statistics
 
 To inject view-dependent evidence beyond the EVL voxel extent, we project
 semi-dense SLAM points into each candidate view using a consistent screen-space
@@ -155,7 +176,7 @@ statistics vector @perez2017filmvisualreasoninggeneral.
 == Frustum-aware cross-attention
 
 We further encode view-conditioned evidence using a frustum token set. Each
-projected semidense point contributes a token with features
+projected semi-dense point contributes a token with features
 $(x, y, z, nu, c)$, where $(x, y)$ are normalized image coordinates, $z$ is
 metric depth, $nu$ is an inverse-distance uncertainty term, and $c$ is a
 track-length feature (number of frames that observed the point), normalized
@@ -168,11 +189,11 @@ We optionally add a learned visibility token-type embedding (valid vs invalid
 projection) and optionally mask invalid tokens in attention; both toggles are
 part of our ablation suite.
 
-== Optional semidense and trajectory context
+== Optional semi-dense and trajectory context
 
-An optional PointNeXt-S encoder provides a global semidense embedding per
+An optional PointNeXt-S encoder provides a global semi-dense embedding per
 snippet @PointNeXt-qian2022. We treat PointNeXt as frozen and project its
-pooled embedding to a fixed dimension. The encoder operates on semidense points
+pooled embedding to a fixed dimension. The encoder operates on semi-dense points
 expressed in the reference rig frame and can ingest per-point uncertainty and
 observation counts as additional channels. The resulting embedding can
 FiLM-modulate the global context or be concatenated directly as a snippet-level cue.

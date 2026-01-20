@@ -2,9 +2,10 @@
 
 #import "/typst/shared/macros.typ": *
 
-We train VIN on oracle RRI labels using ordinal regression. RRI values are
-binned into $K$ ordered classes. CORAL models the cumulative probability that
-the class exceeds each threshold, yielding $K-1$ logits $ell_k$ (collectively
+To enable future learning of a VIN-style candidate scorer on oracle RRI labels,
+we describe an ordinal regression objective. RRI values are binned into $K$
+ordered classes. CORAL models the cumulative probability that the class exceeds
+each threshold, yielding $K-1$ logits $ell_k$ (collectively
 $bold(ell) in bb(R)^(K-1)$) and cumulative probabilities
 $bold(p) = sigma(bold(ell))$ @CORAL-cao2019. These are *cumulative*
 probabilities, not class marginals.
@@ -18,7 +19,7 @@ are binary levels $t_k = bb(1)[y > k]$. The per-sample loss is
   #align(center)[
     $
       #sym_loss _("coral")(y, bold(p))
-      = - sum_(k=0)^(K-2) t_k "log"(p_k) + (1 - t_k) "log"(1 - p_k)
+      = - sum_(k=0)^(K-2) (t_k "log"(p_k) + (1 - t_k) "log"(1 - p_k))
     $
   ]
 ]
@@ -46,6 +47,22 @@ avoids treating cumulative probabilities as class posteriors.
 
 When $u_k$ is learned, we constrain it to be monotone (e.g., via a cumulative
 softplus parameterization) to preserve ordinal ordering.
+
+We additionally monitor whether CORAL's cumulative probabilities are rank
+consistent. Since $p_k = P(y > k)$ should be non-increasing in $k$, we define a
+monotonicity violation rate
+
+#block[
+  #align(center)[
+    $
+      v =
+      (1) / (K - 2)
+      sum_(k=0)^(K-3) bb(1)[p_(k+1) > p_k]
+    $
+  ]
+]
+
+and report its mean over valid candidates as a diagnostic.
 
 == Auxiliary regression
 

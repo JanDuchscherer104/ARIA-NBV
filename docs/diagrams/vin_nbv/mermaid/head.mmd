@@ -1,0 +1,56 @@
+flowchart LR
+  %% Submodule: Feature concat + MLP scorer + CORAL
+  %%
+  %% Symbols:
+  %% - B: batch size, N: number of candidate views
+  %% - F_q: pose embedding dim
+  %% - F_g: global feature dim
+  %% - F_proj: semidense projection dim
+  %% - F_fr: semidense frustum summary dim (optional)
+  %% - F_tau: trajectory context dim (optional)
+  %% - F_pt: point encoder dim (optional)
+  %% - F_aux: auxiliary scalar dim (optional)
+  %% - F_head: concatenated feature dim
+  %% - F_hid: head hidden dim
+  %% - K: number of ordinal bins
+
+  pose["Input<br/>\(e_i=\texttt{pose\_enc}\)"]
+  global["Input<br/>\(g_i=\texttt{global\_feat}\)"]
+  semproj["Input<br/>\(s_i^{proj}=\texttt{semidense\_proj}\)"]
+  semfrus["Input (opt.)<br/>\(s_i^{fr}=\texttt{semidense\_frustum}\)"]
+  traj["Input (opt.)<br/>\(z_i^{traj}=\texttt{traj\_ctx}\)"]
+  point["Input (opt.)<br/>\(z_i^{pt}=\texttt{semidense\_feat}\)"]
+  vfrac["Input (opt.)<br/>\(\texttt{voxel\_valid\_frac}\)"]
+
+  concat["Concat<br/>\(h_i=[e_i;g_i;s_i^{proj};s_i^{fr};z_i^{traj};z_i^{pt};u_i]\)<br/>\(F_{head}=F_q+F_g+F_{proj}+F_{fr}+F_\tau+F_{pt}+F_{aux}\)"]
+  flat["Flatten<br/>\((B\cdot N,F_{head})\)"]
+  mlp["Scorer MLP<br/>\(\texttt{nn.Linear}(F_{head}\!\rightarrow\!F_{hid})+\phi\)<br/>\(+\ \texttt{Dropout}\) (×L)"]
+  coral["CORAL head<br/>\(\texttt{CoralLayer}(F_{hid},K)\)"]
+  post["Postproc<br/>\(\texttt{prob}=\texttt{coral\_logits\_to\_prob}(\texttt{logits})\)<br/>\(\texttt{expected}=\mathbb{E}[\texttt{prob}]\)"]
+  valid["candidate_valid<br/>\(\texttt{voxel\_valid\_frac}\ge\tau_v\)<br/>\(\texttt{vis\_frac}\ge\tau_s\)"]
+  out["Outputs<br/>\(\texttt{logits},\texttt{prob},\texttt{expected}\)<br/>\(\texttt{candidate\_valid}\)"]
+
+  pose -->|"\(e:(B,N,F_q)\)"| concat
+  global -->|"\(g:(B,N,F_g)\)"| concat
+  semproj -->|"\(s^{proj}:(B,N,F_{proj})\)"| concat
+  semfrus -->|"\(s^{fr}:(B,N,F_{fr})\)"| concat
+  traj -->|"\(z^{traj}:(B,N,F_\tau)\)"| concat
+  point -->|"\(z^{pt}:(B,N,F_{pt})\)"| concat
+  vfrac -->|"\(u_i=[v_i,1-v_i]:(B,N,F_{aux})\)"| concat
+
+  concat -->|"\(h:(B,N,F_{head})\)"| flat
+  flat -->|"\((B\cdot N,F_{head})\)"| mlp
+  mlp -->|"\((B\cdot N,F_{hid})\)"| coral
+  coral -->|"\(\texttt{logits}:(B,N,K-1)\)"| post
+  post -->|"\(\texttt{prob}:(B,N,K)\)"| out
+  valid -->|"\(\texttt{candidate\_valid}:(B,N)\)"| out
+
+  classDef input fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
+  classDef compute fill:#e1d5e7,stroke:#9673a6,stroke-width:2px;
+  classDef neutral fill:#f5f5f5,stroke:#666666,stroke-width:2px;
+  classDef output fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
+
+  class pose,global,semproj,semfrus,traj,point,vfrac input;
+  class concat,flat,post,valid neutral;
+  class mlp,coral compute;
+  class out output;

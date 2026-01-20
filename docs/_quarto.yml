@@ -113,6 +113,9 @@ website:
           - contents/impl/coral_intergarion.qmd
           - contents/impl/vin_nbv.qmd
           - contents/impl/vin_v2_feature_proposals.qmd
+      - section: "Architecture Diagrams"
+        contents:
+          - contents/diagrams.qmd
       - section: "External Implementations"
         contents:
           - contents/ext-impl/atek_implementation.qmd

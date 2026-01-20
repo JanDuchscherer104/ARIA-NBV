@@ -222,7 +222,7 @@ midpoints and optionally regularized with:
 u_reg = head_coral.bin_value_regularizer(target_values)
 ```
 
-### Initialization hook (`oracle_rri/oracle_rri/vin/model_v2.py`)
+### Initialization hook (`oracle_rri/oracle_rri/vin/experimental/model_v2.py`)
 
 `VinModelV2` exposes a lightweight hook to initialize the CORAL bin values:
 

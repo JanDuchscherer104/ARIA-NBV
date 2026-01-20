@@ -1,10 +1,11 @@
 = Conclusion
 
-We presented the current Aria-VIN-NBV system for quality-driven next-best-view
-planning in egocentric indoor scenes. The approach combines an oracle RRI
-pipeline built from ASE meshes, a frozen EVL backbone, and a lightweight VIN v2
-head that integrates pose encoding, global voxel context, and semidense
-view-conditioned features. This document serves as a comprehensive snapshot of
-our implementation, training objective, and diagnostics, and provides a
-foundation for future research on entity-aware NBV, stage-adaptive labeling,
-and more expressive view-conditioned representations.
+We presented an oracle supervision and diagnostics pipeline for quality-driven
+NBV research in egocentric indoor scenes. The approach computes per-candidate
+oracle RRI labels from ASE ground-truth meshes and semi-dense reconstructions,
+and provides tooling to inspect candidate generation, depth rendering, and
+surface-error behavior. We also outlined an ordinal label representation
+(CORAL) and a candidate-scoring architecture as an implementation sketch.
+Learning a next-best-view policy on top of these labels is left to future work,
+including entity-aware objectives, stage-adaptive labeling, and more expressive
+view-conditioned representations.

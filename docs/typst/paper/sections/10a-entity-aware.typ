@@ -1,4 +1,4 @@
-= Toward Entity-Aware NBV
+= Toward Entity-Aware NBV <sec:entity-aware>
 
 ASE provides object annotations and OBB predictions that enable
 entity-conditioned view planning. Instead of optimizing only global

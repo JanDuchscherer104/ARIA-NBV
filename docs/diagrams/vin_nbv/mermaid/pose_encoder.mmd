@@ -1,0 +1,40 @@
+flowchart LR
+  %% Submodule: Pose encoder (R6D + LFF)
+  %%
+  %% Symbols:
+  %% - B: batch size
+  %% - N: number of candidate views
+  %% - F_pose: pose vector dim (e.g., [t; r6d])
+  %% - F_ff: Fourier feature dim (LFF, even)
+  %% - F_pe: pose MLP hidden dim
+  %% - F_q: pose embedding dim
+  %% - W_r: learnable Fourier projection matrix
+  %% - W_1, b_1: first MLP layer params
+  %% - W_2, b_2: second MLP layer params
+
+  cand["Input candidate poses<br/>\(\mathbf{T}_{q}^{w}\in\mathrm{SE}(3)^{B\times N}\)"]
+  ref["Input reference pose<br/>\(\mathbf{T}_{r}^{w}\in\mathrm{SE}(3)^{B}\)"]
+  cw90["Frame correction (UI)<br/>\(\texttt{rotate\_yaw\_cw90}^{-1}\)"]
+  comp["Compose in rig-ref frame<br/>\(\mathbf{T}_{q}^{r}=(\mathbf{T}_{r}^{w})^{-1}\mathbf{T}_{q}^{w}\)"]
+  vec["Pose vector<br/>\(\texttt{pose\_vec}=[t\in\mathbb{R}^3;\ r6d\in\mathbb{R}^6]\)"]
+  mlp["LFF encoder (Fourier + MLP)<br/>\(z=\frac{1}{\sqrt{F_{ff}}}\,[\cos(W_r x),\ \sin(W_r x)]\)<br/>MLP: \(\mathrm{Linear}(F_{ff}\!\rightarrow\!F_{pe})\rightarrow \mathrm{GELU}\rightarrow \mathrm{Linear}(F_{pe}\!\rightarrow\!F_q)\)"]
+  enc["Output embedding<br/>\(\texttt{pose\_enc}\in\mathbb{R}^{B\times N\times F_q}\)"]
+  center["Output center<br/>\(\texttt{candidate\_center\_rig\_m}=\mathrm{trans}(\mathbf{T}_{q}^{r})\in\mathbb{R}^{B\times N\times 3}\)"]
+
+  cand -->|"\(\mathbf{T}_{q}^{w}\)"| cw90
+  ref -->|"\(\mathbf{T}_{r}^{w}\)"| cw90
+  cw90 -->|"\(\mathbf{T}_{q}^{w},\mathbf{T}_{r}^{w}\) (corrected)"| comp
+  comp -->|"\(\texttt{pose\_vec}:(B,N,F_{pose})\)"| vec
+  comp -->|"\(\texttt{candidate\_center\_rig\_m}:(B,N,3)\)"| center
+  vec -->|"\(x=\text{flatten}(\texttt{pose\_vec})\in\mathbb{R}^{(B\cdot N)\times F_{pose}}\)"| mlp
+  mlp -->|"\(\text{reshape}(y)\in\mathbb{R}^{B\times N\times F_q}\)"| enc
+
+  classDef input fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
+  classDef compute fill:#e1d5e7,stroke:#9673a6,stroke-width:2px;
+  classDef neutral fill:#f5f5f5,stroke:#666666,stroke-width:2px;
+  classDef output fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
+
+  class cand,ref input;
+  class cw90,comp,vec neutral;
+  class mlp compute;
+  class enc,center output;

@@ -16,7 +16,7 @@ Related context:
 # Context and constraints
 
 - EVL exposes a **local, fixed-size voxel grid** (default ~4x4x4 m) aligned to the last pose and anchored in a gravity-aligned frame. This local extent is expected but means many candidates can be partially or fully out-of-bounds. [@EFM3D-straub2024]
-- VinModelV2 currently uses **pose R6D + translation**, **scene field channels** from EVL heads/evidence, and **pose-conditioned global pooling**. See `oracle_rri/oracle_rri/vin/model_v2.py`.
+- VinModelV2 currently uses **pose R6D + translation**, **scene field channels** from EVL heads/evidence, and **pose-conditioned global pooling**. See `oracle_rri/oracle_rri/vin/experimental/model_v2.py`.
 - VIN predicts RRI as an **ordinal regression** problem via CORAL [@CORAL-cao2019]. [Wikipedia :: Ordinal regression](https://en.wikipedia.org/wiki/Ordinal_regression)
 
 # Design goals
@@ -304,7 +304,7 @@ Low entropy indicates focused attention; high entropy suggests that the attentio
 `torch.nn.MultiheadAttention` can return per-head attention weights by passing `need_weights=True` and `average_attn_weights=False`:
 
 ```python
-# oracle_rri/oracle_rri/vin/model_v2.py
+# oracle_rri/oracle_rri/vin/experimental/model_v2.py
 attn_out, attn_weights = self.attn(
     queries, keys, keys,
     need_weights=True,
@@ -343,7 +343,7 @@ A simple gating strategy can prevent over-confident predictions when voxel cover
 
 # Implementation anchors
 
-- Scene field construction: `oracle_rri/oracle_rri/vin/model_v2.py::_build_scene_field_v2`.
+- Scene field construction: `oracle_rri/oracle_rri/vin/experimental/model_v2.py::_build_scene_field_v2`.
 - Global pooling + positional keys: `PoseConditionedGlobalPool` in `model_v2.py`.
 - EVL feature contract: `oracle_rri/oracle_rri/vin/types.py::EvlBackboneOutput`.
 - VIN documentation: [VIN on EVL](vin_nbv.qmd).

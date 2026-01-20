@@ -22,9 +22,9 @@ key metrics are summarized in @tab:wandb-runs.
       [Run 1],
       [Loss NaN from the start; optimizer loop likely never advanced.],
       [Run 2],
-      [Train/val losses NaN; validation Spearman 0.004; top-3 accuracy 0.191.],
+      [Train/val losses NaN; validation Spearman 0.004; top-3 bin accuracy 0.191.],
       [Run 3],
-      [Finite losses (train 10.15, val 7.69); validation Spearman 0.127; top-3 accuracy 0.222.],
+      [Finite losses (train 10.15, val 7.69); validation Spearman 0.127; top-3 bin accuracy 0.222.],
       bottomrule(),
     )
   ],
@@ -36,12 +36,12 @@ key metrics are summarized in @tab:wandb-runs.
   labels early in training. In one case, the optimizer update loop likely never
   executed.
 - The stable run produced non-zero validation correlation (Spearman 0.127) and
-  a top-3 accuracy of 0.222. Balanced and focal threshold losses were logged
+  a top-3 bin accuracy of 0.222. Balanced and focal threshold losses were logged
   alongside the primary CORAL loss, suggesting that the imbalance-aware
   variants remain well-behaved even when the main CORAL loss is large.
 - Monotonicity violation rates were 0 across runs, indicating that the ordinal
   thresholds remained properly ordered when the loss was finite.
 
 These results support the emphasis on stronger candidate-specific signals
-(frustum MHCA, semidense projection features) and careful loss balancing to
+(frustum MHCA, semi-dense projection features) and careful loss balancing to
 avoid collapse.

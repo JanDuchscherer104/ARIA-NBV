@@ -7,6 +7,12 @@ We prioritize ablations that test whether candidate-dependent signals improve
 ordinal separation and reduce prediction collapse. Planned experiments and
 expected outcomes are summarized in @tab:ablations.
 
+We structure ablations as feature-contract deltas on top of the core EVL+pose
+baseline: (i) add candidate validity/evidence scalars, (ii) add semi-dense
+projection statistics, (iii) add token-level frustum aggregation, and (iv) add
+optional trajectory and point-set encoders. This ordering makes it explicit
+which additional signals are responsible for gains or failure modes.
+
 #figure(
   kind: "table",
   supplement: [Table],
@@ -19,10 +25,10 @@ expected outcomes are summarized in @tab:ablations.
       toprule(),
       table.header([Ablation], [Change], [Hypothesis]),
       midrule(),
-      [Semidense point encoder],
+      [Semi-dense point encoder],
       [on/off (PointNeXt)],
-      [Does a global semidense embedding help beyond view-conditioned cues?],
-      [Semidense frustum MHCA],
+      [Does a global semi-dense embedding help beyond view-conditioned cues?],
+      [Semi-dense frustum MHCA],
       [on/off],
       [Does token-level candidate conditioning improve ranking vs. projection stats alone?],
       [Visibility token embedding],
