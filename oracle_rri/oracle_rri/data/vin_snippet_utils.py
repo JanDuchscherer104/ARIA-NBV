@@ -18,6 +18,7 @@ def vin_snippet_cache_config_hash(
     include_inv_dist_std: bool,
     include_obs_count: bool,
     semidense_max_points: int | None,
+    pad_points: int | None,
 ) -> str:
     """Compute a stable hash for VIN snippet cache compatibility checks."""
     payload = {
@@ -25,6 +26,7 @@ def vin_snippet_cache_config_hash(
         "include_inv_dist_std": include_inv_dist_std,
         "include_obs_count": include_obs_count,
         "semidense_max_points": semidense_max_points,
+        "pad_points": pad_points,
     }
     serial = json.dumps(payload, sort_keys=True, ensure_ascii=True)
     return hashlib.sha1(serial.encode("utf-8")).hexdigest()
@@ -52,6 +54,7 @@ def build_vin_snippet_view(
             include_obs_count=include_obs_count,
         ).to(device=device, dtype=torch.float32)
 
+    lengths = torch.tensor([points_world.shape[0]], device=device, dtype=torch.int64)
     traj_world_rig = PoseTW(torch.zeros((0, 12), dtype=torch.float32, device=device))
     try:
         traj_view = efm_snippet.trajectory.to(device=device, dtype=torch.float32)
@@ -59,7 +62,7 @@ def build_vin_snippet_view(
     except Exception:
         pass
 
-    return VinSnippetView(points_world=points_world, t_world_rig=traj_world_rig)
+    return VinSnippetView(points_world=points_world, lengths=lengths, t_world_rig=traj_world_rig)
 
 
 def empty_vin_snippet(device: torch.device, *, extra_dim: int = 1) -> VinSnippetView:
@@ -70,6 +73,7 @@ def empty_vin_snippet(device: torch.device, *, extra_dim: int = 1) -> VinSnippet
     """
     return VinSnippetView(
         points_world=torch.zeros((0, 3 + int(extra_dim)), dtype=torch.float32, device=device),
+        lengths=torch.zeros((1,), dtype=torch.int64, device=device),
         t_world_rig=PoseTW(torch.zeros((0, 12), dtype=torch.float32, device=device)),
     )
 

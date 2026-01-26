@@ -75,6 +75,7 @@ class VinSnippetCacheProvider:
             include_inv_dist_std=bool(meta.include_inv_dist_std),
             include_obs_count=bool(meta.include_obs_count),
             semidense_max_points=meta.semidense_max_points,
+            pad_points=meta.pad_points,
         )
         if expected is not None and meta_hash != expected:
             msg = "VIN snippet cache config hash mismatch; cache may be stale or built with different settings."
@@ -221,13 +222,19 @@ def expected_vin_snippet_cache_hash(
     include_inv_dist_std: bool,
     include_obs_count: bool,
     semidense_max_points: int | None,
+    pad_points: int | None = None,
 ) -> str:
     """Compute the expected snippet cache hash for compatibility checks."""
+    if pad_points is None:
+        from .vin_snippet_cache import VIN_SNIPPET_PAD_POINTS
+
+        pad_points = VIN_SNIPPET_PAD_POINTS
     return vin_snippet_cache_config_hash(
         dataset_config=dataset_config,
         include_inv_dist_std=include_inv_dist_std,
         include_obs_count=include_obs_count,
         semidense_max_points=semidense_max_points,
+        pad_points=pad_points,
     )
 
 

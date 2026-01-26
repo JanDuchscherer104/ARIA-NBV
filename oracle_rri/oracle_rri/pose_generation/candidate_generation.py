@@ -302,14 +302,17 @@ def _maybe_seed(seed: int | None, *, device: torch.device) -> Iterator[None]:
         yield
         return
 
-    cuda_devices: list[int] | None = None
+    # IMPORTANT: `torch.random.fork_rng(devices=None)` will attempt to snapshot
+    # CUDA RNG state and triggers CUDA initialization even when running on CPU.
+    # Use an empty list unless we explicitly want to manage CUDA RNG state.
+    cuda_devices: list[int] = []
     if device.type == "cuda" and torch.cuda.is_available():
         idx = device.index if device.index is not None else torch.cuda.current_device()
         cuda_devices = [int(idx)]
 
     with torch.random.fork_rng(devices=cuda_devices, enabled=True):
         torch.manual_seed(int(seed))
-        if cuda_devices is not None:
+        if cuda_devices:
             torch.cuda.manual_seed_all(int(seed))
         yield
 
@@ -357,9 +360,7 @@ class CandidateViewGenerator:
         mesh_verts = sample.mesh_verts
         mesh_faces = sample.mesh_faces
 
-        assert mesh_verts is not None and mesh_faces is not None, (
-            "Mesh vertices and faces must be provided."
-        )
+        assert mesh_verts is not None and mesh_faces is not None, "Mesh vertices and faces must be provided."
 
         cam_view = sample.get_camera(self.config.camera_label)
 
@@ -407,7 +408,9 @@ class CandidateViewGenerator:
 
         Args:
             reference_pose:
-                reference2world :class:`PoseTW` that defines the sampling origin and local rig frame.
+                World<-reference :class:`PoseTW` used as the physical rig pose. When
+                ``align_to_gravity`` is enabled, a gravity-aligned copy of this pose
+                defines the sampling frame (stored in ``CandidateSamplingResult.sampling_pose``).
             gt_mesh:
                 Ground-truth :class:`trimesh.Trimesh` in the world frame for pruning.
             mesh_verts:
@@ -429,11 +432,7 @@ class CandidateViewGenerator:
         reference_pose = rotate_yaw_cw90(
             _ensure_unbatched_pose(reference_pose.to(device)),
         )
-        sampling_pose = (
-            _gravity_align_pose(reference_pose)
-            if self.config.align_to_gravity
-            else reference_pose
-        )
+        sampling_pose = _gravity_align_pose(reference_pose) if self.config.align_to_gravity else reference_pose
 
         with _maybe_seed(self.config.seed, device=torch.device(device)):
             centers_world, offsets_ref = PositionSampler(self.config).sample(
@@ -447,6 +446,7 @@ class CandidateViewGenerator:
         ctx = CandidateContext(
             cfg=self.config,
             reference_pose=reference_pose,
+            sampling_pose=sampling_pose,
             gt_mesh=gt_mesh,
             mesh_verts=mesh_verts.to(device),
             mesh_faces=mesh_faces.to(device),
@@ -460,9 +460,7 @@ class CandidateViewGenerator:
                 dtype=torch.bool,
                 device=device,
             ),
-            debug={"view_dirs_delta": view_dirs_delta}
-            if view_dirs_delta is not None
-            else {},
+            debug={"view_dirs_delta": view_dirs_delta} if view_dirs_delta is not None else {},
         )
 
         self._apply_rules(ctx)
@@ -510,6 +508,7 @@ class CandidateViewGenerator:
         return CandidateSamplingResult(
             views=poses_cam,
             reference_pose=reference_pose,
+            sampling_pose=ctx.sampling_pose,
             mask_valid=mask_valid,
             masks=ctx.rule_masks if ctx.cfg.collect_rule_masks else {},
             shell_poses=shell_poses,

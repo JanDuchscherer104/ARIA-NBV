@@ -15,9 +15,9 @@ import streamlit as st
 import torch
 
 from ...configs import PathConfig
+from ...rri_metrics.plotting import _histogram_overlay
 from ...rri_metrics.rri_binning import RriOrdinalBinner
 from .common import _info_popover, _pretty_label, _report_exception
-from .plot_utils import _histogram_overlay
 
 
 def render_rri_binning_page() -> None:

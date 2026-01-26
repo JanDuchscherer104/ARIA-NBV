@@ -60,13 +60,9 @@ def build_candidate_pointclouds(
 
     semidense_pts = sample.semidense.collapse_points()
     semidense_pts_t = torch.as_tensor(semidense_pts, device=device, dtype=dtype)
-    semidense_len = torch.tensor(
-        [semidense_pts_t.shape[0]], device=device, dtype=torch.long
-    )
+    semidense_len = torch.tensor([semidense_pts_t.shape[0]], device=device, dtype=torch.long)
 
-    occupancy_bounds = _compute_bounds(
-        sample.get_occupancy_extend(), padded, lengths, semidense_pts_t
-    )
+    occupancy_bounds = _compute_bounds(sample.get_occupancy_extend(), padded, lengths, semidense_pts_t)
 
     return CandidatePointClouds(
         points=padded,
@@ -123,12 +119,8 @@ def _backproject_depths_p3d_batch(
     x_ndc = x_ndc.unsqueeze(0).expand(bsz, -1)
     y_ndc = y_ndc.unsqueeze(0).expand(bsz, -1)
 
-    xy_depth = torch.stack(
-        [x_ndc, y_ndc, depth_filtered.to(depths.dtype)], dim=-1
-    )  # (B, P, 3)
-    pts_world = cameras.unproject_points(
-        xy_depth, world_coordinates=True, from_ndc=True
-    )  # (B, P, 3)
+    xy_depth = torch.stack([x_ndc, y_ndc, depth_filtered.to(depths.dtype)], dim=-1)  # (B, P, 3)
+    pts_world = cameras.unproject_points(xy_depth, world_coordinates=True, from_ndc=True)  # (B, P, 3)
 
     lengths = mask.sum(dim=1)
     max_len = int(lengths.max().item()) if lengths.numel() > 0 else 0
@@ -136,9 +128,7 @@ def _backproject_depths_p3d_batch(
         return torch.empty(bsz, 0, 3, device=depths.device, dtype=depths.dtype), lengths
 
     # Compact valid points per batch without sorting; use running counts.
-    padded = torch.full(
-        (bsz, max_len, 3), torch.nan, device=depths.device, dtype=depths.dtype
-    )
+    padded = torch.full((bsz, max_len, 3), torch.nan, device=depths.device, dtype=depths.dtype)
     cumsum = mask.cumsum(dim=1) - 1  # positions of each valid point within its batch
     batch_idx, flat_idx = torch.nonzero(mask, as_tuple=True)
     pos_idx = cumsum[batch_idx, flat_idx]
@@ -219,9 +209,7 @@ def _compute_bounds(
     x_min, x_max, y_min, y_max, z_min, z_max = out.unbind()
 
     if padded.numel() > 0 and padded.shape[1] > 0:
-        mask = torch.arange(padded.shape[1], device=padded.device).unsqueeze(
-            0
-        ) < lengths.unsqueeze(1)
+        mask = torch.arange(padded.shape[1], device=padded.device).unsqueeze(0) < lengths.unsqueeze(1)
         pts = padded[mask]
         if pts.numel() > 0:
             pmin = torch.amin(pts, dim=0)

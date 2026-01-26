@@ -65,6 +65,9 @@ class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     dtype: Literal["float32", "float16", "bfloat16"] = "float32"
     """Computation dtype; use float16/bfloat16 on CUDA for speed"""
 
+    is_debug: bool = False
+    """Enable debug logging on the renderer console."""
+
     verbosity: Verbosity = Field(
         default=Verbosity.VERBOSE,
         description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
@@ -82,7 +85,11 @@ class Pytorch3DDepthRenderer:
 
     def __init__(self, config: Pytorch3DDepthRendererConfig) -> None:
         self.config = config
-        self.console = Console.with_prefix(self.__class__.__name__).set_verbosity(self.config.verbosity)
+        self.console = (
+            Console.with_prefix(self.__class__.__name__)
+            .set_verbosity(self.config.verbosity)
+            .set_debug(self.config.is_debug)
+        )
 
         self.device = self.config.device
 

@@ -72,6 +72,11 @@ class PositionSampler:
         dirs = torch.stack([x, y, z], dim=-1)
         return dirs / dirs.norm(dim=-1, keepdim=True).clamp_min(1e-8)
 
+    def _sample_unit_sphere(self, n_draw: int) -> torch.Tensor:
+        """Fallback: sample unit vectors via normalized Gaussian noise."""
+        dirs = torch.randn(n_draw, 3, device=self.cfg.device, dtype=torch.float32)
+        return dirs / dirs.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+
     def sample(self, reference_pose: PoseTW) -> tuple[torch.Tensor, torch.Tensor]:
         """Draw candidate centers and offsets in reference frame.
 
@@ -86,10 +91,21 @@ class PositionSampler:
 
         match self.cfg.sampling_strategy:
             case SamplingStrategy.UNIFORM_SPHERE:
-                dirs = HypersphericalUniform(dim=3, device=self.cfg.device).sample((n_draw,))
+                try:
+                    dirs = HypersphericalUniform(dim=3, device=self.cfg.device).sample((n_draw,))
+                except Exception:
+                    dirs = self._sample_unit_sphere(n_draw)
             case SamplingStrategy.FORWARD_POWERSPHERICAL:
                 mu = torch.tensor(DEVICE_FWD, device=self.cfg.device)
-                dirs = PowerSpherical(mu, torch.tensor(self.cfg.kappa, device=self.cfg.device)).sample((n_draw,))
+                try:
+                    dirs = PowerSpherical(
+                        mu,
+                        torch.tensor(self.cfg.kappa, device=self.cfg.device),
+                    ).sample((n_draw,))
+                except Exception:
+                    noise = self._sample_unit_sphere(n_draw)
+                    kappa = float(self.cfg.kappa)
+                    dirs = (mu + noise / max(kappa, 1e-6)).to(dtype=noise.dtype)
         dirs_rig = dirs / dirs.norm(dim=-1, keepdim=True)
 
         # Work entirely in reference (rig) frame for angle limits.

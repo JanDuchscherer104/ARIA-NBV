@@ -13,6 +13,8 @@ from ...pose_generation.plotting import (
     plot_direction_marginals,
     plot_direction_polar,
     plot_direction_sphere,
+    plot_candidate_centers_simple,
+    plot_candidate_frusta_simple,
     plot_euler_reference,
     plot_euler_world,
     plot_min_distance_to_mesh,
@@ -25,6 +27,7 @@ from ...pose_generation.plotting import (
 )
 from ...pose_generation.types import CandidateSamplingResult
 from ...pose_generation.utils import (
+    rejected_pose_tensor,
     stats_to_markdown_table,
     summarise_dirs_ref,
     summarise_offsets_ref,
@@ -33,29 +36,26 @@ from ...utils.frames import world_up_tensor
 from .common import _info_popover, _pretty_label
 
 
-def rejected_pose_tensor(candidates: CandidateSamplingResult) -> torch.Tensor | None:
-    mask_valid = candidates.mask_valid
-    shell_poses = candidates.shell_poses
-    if mask_valid is None or shell_poses is None or mask_valid.numel() == 0:
-        return None
-    shell_tensor = shell_poses.tensor() if hasattr(shell_poses, "tensor") else shell_poses
-    if mask_valid.shape[0] != shell_tensor.shape[0]:
-        return None
-    rejected_mask = ~mask_valid
-    if not rejected_mask.any():
-        return None
-    return shell_tensor[rejected_mask]
-
-
 def render_candidates_page(
-    sample: EfmSnippetView,
+    sample: EfmSnippetView | None,
     candidates: CandidateSamplingResult,
-    cand_cfg: CandidateViewGeneratorConfig,
+    cand_cfg: CandidateViewGeneratorConfig | None,
+    *,
+    source_caption: str | None = None,
+    source_note: str | None = None,
 ) -> None:
+    st.header("Candidate Poses")
+
+    if source_caption:
+        st.caption(source_caption)
+    if source_note:
+        st.caption(source_note)
+
     shell_poses = candidates.shell_poses
     mask_valid = candidates.mask_valid
 
-    st.header("Candidate Poses")
+    cam_label = cand_cfg.camera_label if cand_cfg is not None else "cached"
+    has_snippet = sample is not None
 
     tab_pos, tab_frusta = st.tabs(["Positions (3D)", "Frusta (3D)"])
 
@@ -65,19 +65,30 @@ def render_candidates_page(
             "Candidate centers are sampled around the reference pose according "
             "to the sampling shell (radius, azimuth, elevation). Only valid "
             "candidates (after rule filtering) are shown in blue. The reference "
-            "axes are in the rig frame for interpretability.",
+            "axes show the sampling frame (gravity-aligned when enabled) to "
+            "stay symmetric with the candidate cloud.",
         )
-        cand_fig = (
-            CandidatePlotBuilder.from_candidates(
-                sample,
-                candidates,
-                title=_pretty_label(f"Candidate positions ({cand_cfg.camera_label})"),
+        if has_snippet:
+            cand_fig = (
+                CandidatePlotBuilder.from_candidates(
+                    sample,
+                    candidates,
+                    title=_pretty_label(f"Candidate positions ({cam_label})"),
+                )
+                .add_mesh()
+                .add_candidate_cloud(use_valid=True, color="royalblue", size=4, opacity=0.7)
+                .add_reference_axes(display_rotate=False)
+            ).finalize()
+            st.plotly_chart(cand_fig, width="stretch")
+        else:
+            st.warning("EFM snippet not attached; rendering candidates without mesh.")
+            st.plotly_chart(
+                plot_candidate_centers_simple(
+                    candidates,
+                    title=_pretty_label("Candidate positions (cached)"),
+                ),
+                width="stretch",
             )
-            .add_mesh()
-            .add_candidate_cloud(use_valid=True, color="royalblue", size=4, opacity=0.7)
-            .add_reference_axes(display_rotate=False)
-        ).finalize()
-        st.plotly_chart(cand_fig, width="stretch")
 
     offsets_ref, dirs_ref = candidates.get_offsets_and_dirs_ref(display_rotate=False)
 
@@ -111,31 +122,42 @@ def render_candidates_page(
                     key="cand_max_frustums",
                 )
 
-            frust_fig = (
-                CandidatePlotBuilder.from_candidates(
-                    sample,
-                    candidates,
-                    title=_pretty_label(f"Candidate frusta ({cand_cfg.camera_label})"),
+            if has_snippet:
+                frust_fig = (
+                    CandidatePlotBuilder.from_candidates(
+                        sample,
+                        candidates,
+                        title=_pretty_label(f"Candidate frusta ({cam_label})"),
+                    )
+                    .add_mesh()
+                    .add_candidate_cloud(
+                        use_valid=True,
+                        color="royalblue",
+                        size=3,
+                        opacity=0.35,
+                    )
+                    .add_candidate_frusta(
+                        scale=float(frustum_scale),
+                        color="crimson",
+                        name="Frustum",
+                        max_frustums=int(max_frustums),
+                        include_axes=False,
+                        include_center=False,
+                        display_rotate=False,
+                    )
+                    .add_reference_axes(display_rotate=False)
+                ).finalize()
+                st.plotly_chart(frust_fig, width="stretch")
+            else:
+                st.warning("EFM snippet not attached; rendering frusta without mesh.")
+                st.plotly_chart(
+                    plot_candidate_frusta_simple(
+                        candidates,
+                        scale=float(frustum_scale),
+                        max_frustums=int(max_frustums),
+                    ),
+                    width="stretch",
                 )
-                .add_mesh()
-                .add_candidate_cloud(
-                    use_valid=True,
-                    color="royalblue",
-                    size=3,
-                    opacity=0.35,
-                )
-                .add_candidate_frusta(
-                    scale=float(frustum_scale),
-                    color="crimson",
-                    name="Frustum",
-                    max_frustums=int(max_frustums),
-                    include_axes=False,
-                    include_center=False,
-                    display_rotate=False,
-                )
-                .add_reference_axes(display_rotate=False)
-            ).finalize()
-            st.plotly_chart(frust_fig, width="stretch")
 
     with st.expander("Distributions & Diagnostics", expanded=False):
         _info_popover(
@@ -320,7 +342,7 @@ def render_candidates_page(
                 "summarizes rejection counts per rule to reveal dominant filters.",
             )
             masks = candidates.masks
-            if isinstance(masks, dict) and len(masks) > 0 and shell_poses is not None:
+            if has_snippet and isinstance(masks, dict) and len(masks) > 0 and shell_poses is not None:
                 masks_tensor = torch.stack(list(masks.values()))
                 mask_fig = plot_rule_masks(
                     snippet=sample,
@@ -329,12 +351,14 @@ def render_candidates_page(
                     rule_names=list(masks.keys()),
                 )
                 st.plotly_chart(mask_fig, width="stretch")
+            elif not has_snippet:
+                st.info("Attach an EFM snippet to visualize rule masks in 3D.")
 
             extras = candidates.extras if hasattr(candidates, "extras") else {}
             dist_min = extras.get("min_distance_to_mesh")
             path_collide = extras.get("path_collision_mask")
 
-            if dist_min is not None:
+            if has_snippet and dist_min is not None:
                 st.plotly_chart(
                     plot_min_distance_to_mesh(
                         snippet=sample,
@@ -343,7 +367,7 @@ def render_candidates_page(
                     ),
                     width="stretch",
                 )
-            if path_collide is not None:
+            if has_snippet and path_collide is not None:
                 st.plotly_chart(
                     plot_path_collision_segments(
                         snippet=sample,
@@ -373,7 +397,7 @@ def render_candidates_page(
                     st.info(
                         "No rejected poses to plot; all sampled candidates survived rule filtering.",
                     )
-                else:
+                elif has_snippet:
                     rej_fig = (
                         CandidatePlotBuilder.from_candidates(
                             sample,
@@ -387,6 +411,8 @@ def render_candidates_page(
                         .add_reference_axes()
                     ).finalize()
                     st.plotly_chart(rej_fig, width="stretch")
+                else:
+                    st.info("Attach an EFM snippet to render rejected poses in 3D.")
 
 
 __all__ = ["render_candidates_page"]

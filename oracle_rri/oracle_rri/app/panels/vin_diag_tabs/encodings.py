@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
+import plotly.graph_objects as go
 import streamlit as st
 import torch
 
+from ....vin.experimental.plotting import build_candidate_encoding_figures, build_vin_encoding_figures
 from ....vin.plotting import (
-    build_candidate_encoding_figures,
     build_lff_empirical_figures,
     build_pose_enc_pca_figure,
     build_pose_grid_pca_figure,
     build_pose_grid_slices_figure,
     build_pose_vec_histogram,
-    build_vin_encoding_figures,
 )
-from ..common import _info_popover
+from ..common import _info_popover, _pretty_label
 from .context import VinDiagContext
 
 
@@ -242,6 +242,103 @@ def render_encodings_tab(ctx: VinDiagContext) -> None:
                     ),
                     width="stretch",
                 )
+
+                _info_popover(
+                    "encoding distances",
+                    "Compare pairwise distances between candidate encodings. "
+                    "We report L2 distances between the raw R6D rotation "
+                    "components and the final LFF pose embeddings. Use this to "
+                    "spot collapsed or overly clustered encodings.",
+                )
+                st.subheader(_pretty_label("Encoding distances"))
+                if pose_vec.shape[-1] < 9:
+                    st.info("Pose vector missing rotation-6D components.")
+                else:
+                    if pose_vec.ndim == 3:
+                        batch_size = int(pose_vec.shape[0])
+                        cand_count = int(pose_vec.shape[1])
+                        if batch_size > 1:
+                            batch_idx = int(
+                                st.slider(
+                                    "Batch index",
+                                    min_value=0,
+                                    max_value=batch_size - 1,
+                                    value=0,
+                                    step=1,
+                                    key="vin_enc_dist_batch_idx",
+                                ),
+                            )
+                        else:
+                            batch_idx = 0
+                        pose_vec_b = pose_vec[batch_idx]
+                        pose_enc_b = debug.pose_enc[batch_idx]
+                    else:
+                        cand_count = int(pose_vec.shape[0])
+                        pose_vec_b = pose_vec
+                        pose_enc_b = debug.pose_enc
+
+                    if cand_count < 2:
+                        st.info("Need at least two candidates to compute distances.")
+                    else:
+                        default_sel = list(range(min(2, cand_count)))
+                        selected = st.multiselect(
+                            "Candidate indices",
+                            options=list(range(cand_count)),
+                            default=default_sel,
+                            key="vin_enc_dist_candidates",
+                        )
+                        if len(selected) < 2:
+                            st.info("Select at least two candidates.")
+                        else:
+                            sel = torch.as_tensor(selected, device=pose_vec_b.device)
+                            r6d = pose_vec_b.index_select(0, sel)[:, 3:9]
+                            enc = pose_enc_b.index_select(0, sel)
+                            r6d_dist = torch.cdist(r6d, r6d, p=2).detach().cpu().numpy()
+                            enc_dist = torch.cdist(enc, enc, p=2).detach().cpu().numpy()
+
+                            if len(selected) == 2:
+                                st.metric(
+                                    "R6D distance",
+                                    f"{float(r6d_dist[0, 1]):.4f}",
+                                )
+                                st.metric(
+                                    "Pose-enc distance",
+                                    f"{float(enc_dist[0, 1]):.4f}",
+                                )
+                            else:
+                                col_a, col_b = st.columns(2)
+                                with col_a:
+                                    fig_r6d = go.Figure(
+                                        data=go.Heatmap(
+                                            z=r6d_dist,
+                                            x=selected,
+                                            y=selected,
+                                            colorscale="Viridis",
+                                            colorbar={"title": _pretty_label("L2")},
+                                        ),
+                                    )
+                                    fig_r6d.update_layout(
+                                        title=_pretty_label("R6D distance matrix"),
+                                        xaxis_title=_pretty_label("candidate idx"),
+                                        yaxis_title=_pretty_label("candidate idx"),
+                                    )
+                                    st.plotly_chart(fig_r6d, width="stretch")
+                                with col_b:
+                                    fig_enc = go.Figure(
+                                        data=go.Heatmap(
+                                            z=enc_dist,
+                                            x=selected,
+                                            y=selected,
+                                            colorscale="Viridis",
+                                            colorbar={"title": _pretty_label("L2")},
+                                        ),
+                                    )
+                                    fig_enc.update_layout(
+                                        title=_pretty_label("Pose-enc distance matrix"),
+                                        xaxis_title=_pretty_label("candidate idx"),
+                                        yaxis_title=_pretty_label("candidate idx"),
+                                    )
+                                    st.plotly_chart(fig_enc, width="stretch")
 
             try:
                 field_in = debug.field_in

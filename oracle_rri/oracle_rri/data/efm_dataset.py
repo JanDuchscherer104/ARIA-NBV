@@ -165,12 +165,7 @@ def infer_semidense_bounds(
     if vol_max is None:
         vol_max = _tensor3(efm_dict.get("points/vol_max"))
     vol_bounds: tuple[torch.Tensor, torch.Tensor] | None = None
-    if (
-        vol_min is not None
-        and vol_max is not None
-        and torch.isfinite(vol_min).all()
-        and torch.isfinite(vol_max).all()
-    ):
+    if vol_min is not None and vol_max is not None and torch.isfinite(vol_min).all() and torch.isfinite(vol_max).all():
         vol_bounds = (vol_min.detach().cpu(), vol_max.detach().cpu())
 
     points = efm_dict.get(ARIA_POINTS_WORLD)
@@ -234,9 +229,7 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
 
         self._efm_wds = self._load_atek_wds_dataset_as_efm()
         self._mesh_cache: dict[str, trimesh.Trimesh] = {}
-        self._snippet_key_filter = {
-            key for key in self.config.snippet_key_filter if key
-        }
+        self._snippet_key_filter = {key for key in self.config.snippet_key_filter if key}
         self.console.log("EFM loader ready")
 
     def _load_atek_wds_dataset_as_efm(self):
@@ -308,8 +301,7 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
                 efm_dict.get("sequence_name", ""),
             )
             if self._snippet_key_filter and not any(
-                _matches_snippet_token(snippet_id, token)
-                for token in self._snippet_key_filter
+                _matches_snippet_token(snippet_id, token) for token in self._snippet_key_filter
             ):
                 continue
             mesh_base = self._load_mesh(scene_id) if self.config.load_meshes else None
@@ -501,9 +493,7 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
             resolved = sorted(base.glob("**/*.tar"))
 
         # Be defensive: ignore empty placeholder shards (e.g. `dummy.tar`) and non-files.
-        resolved_tar_urls = [
-            str(p) for p in resolved if p.is_file() and p.stat().st_size > 0
-        ]
+        resolved_tar_urls = [str(p) for p in resolved if p.is_file() and p.stat().st_size > 0]
 
         if not resolved_tar_urls:
             raise ValueError(f"No tar files found under {base}.")
@@ -589,18 +579,11 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
                     )
                 resolved_tars.append(match)
 
-            tar_urls = [
-                str(p)
-                for p in _unique_preserve_order(p.as_posix() for p in resolved_tars)
-            ]
+            tar_urls = [str(p) for p in _unique_preserve_order(p.as_posix() for p in resolved_tars)]
 
         if not tar_urls:
             base = paths.resolve_atek_data_dir(self.atek_variant)
-            tar_urls = [
-                str(p)
-                for scene in scene_ids
-                for p in sorted((base / scene).glob("*.tar"))
-            ]
+            tar_urls = [str(p) for scene in scene_ids for p in sorted((base / scene).glob("*.tar"))]
             if not tar_urls:
                 raise ValueError(
                     f"No tar files found under {base} for scenes: {self.scene_ids}",
@@ -630,15 +613,10 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
         scene_to_mesh = dict(self.scene_to_mesh)
         if self.load_meshes and not scene_to_mesh:
             if scene_ids:
-                scene_to_mesh = {
-                    scene: paths.resolve_mesh_path(scene) for scene in scene_ids
-                }
+                scene_to_mesh = {scene: paths.resolve_mesh_path(scene) for scene in scene_ids}
             else:
                 mesh_dir = paths.ase_meshes
-                scene_to_mesh = {
-                    p.stem.replace("scene_ply_", ""): p
-                    for p in mesh_dir.glob("scene_ply_*.ply")
-                }
+                scene_to_mesh = {p.stem.replace("scene_ply_", ""): p for p in mesh_dir.glob("scene_ply_*.ply")}
 
         if self.load_meshes and not scene_to_mesh and self.require_mesh:
             raise ValueError("load_meshes=True but no meshes resolved.")
@@ -662,11 +640,7 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
         expanded_urls = [
             str(path)
             for url in self.tar_urls or []
-            for path in (
-                sorted(Path().glob(url))
-                if any(ch in url for ch in "*?[]")
-                else [Path(url)]
-            )
+            for path in (sorted(Path().glob(url)) if any(ch in url for ch in "*?[]") else [Path(url)])
         ]
         if not expanded_urls:
             raise FileNotFoundError("No tar files matched derived tar_urls")

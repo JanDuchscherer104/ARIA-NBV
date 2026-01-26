@@ -481,7 +481,14 @@ class AriaNBVExperimentConfig(BaseConfig):
         self._maybe_use_offline_cache_for_summary(stage=stage, console=console)
         _, module, datamodule = self.setup_target(setup_stage=stage)
 
-        iterator = datamodule.iter_oracle_batches(stage=stage)
+        plan = datamodule._build_stage_plan(stage)
+        if plan.use_batching:
+            if stage is Stage.TRAIN:
+                iterator = iter(datamodule.train_dataloader())
+            else:
+                iterator = iter(datamodule.val_dataloader())
+        else:
+            iterator = datamodule.iter_oracle_batches(stage=stage)
         for idx in range(int(self.summary_num_batches)):
             batch = next(iterator, None)
             if batch is None:

@@ -11,7 +11,7 @@ from efm3d.aria.pose import PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import]
 
 from ..data.efm_views import EfmSnippetView
-from ..data.plotting import SnippetPlotBuilder
+from ..data.plotting import SnippetPlotBuilder, get_frustum_segments
 from ..utils import Console
 
 if TYPE_CHECKING:
@@ -19,6 +19,119 @@ if TYPE_CHECKING:
     from .types import CandidateSamplingResult
 
 console = Console.with_prefix("pose_plotting")
+
+
+def _pose_axes_np(candidates: "CandidateSamplingResult") -> tuple[np.ndarray, np.ndarray]:
+    ref_pose = candidates.sampling_pose or candidates.reference_pose
+    centers = ref_pose.t.detach().cpu().numpy()
+    axes = ref_pose.R.detach().cpu().numpy()
+    if centers.ndim == 1:
+        centers = centers.reshape(1, 3)
+    if axes.ndim == 2:
+        axes = axes.reshape(1, 3, 3)
+    return centers, axes
+
+
+def plot_candidate_centers_simple(
+    candidates: "CandidateSamplingResult",
+    *,
+    title: str,
+    use_valid: bool = True,
+) -> go.Figure:
+    """Plot candidate centers without requiring a full snippet."""
+    centers = candidates.shell_poses.t
+    if use_valid:
+        centers = centers[candidates.mask_valid]
+    pts = centers.detach().cpu().numpy()
+    fig = go.Figure(
+        data=go.Scatter3d(
+            x=pts[:, 0],
+            y=pts[:, 1],
+            z=pts[:, 2],
+            mode="markers",
+            marker={"size": 3, "color": "royalblue", "opacity": 0.7},
+            name="Candidates",
+        )
+    )
+    centers_np, axes_np = _pose_axes_np(candidates)
+    fig = SnippetPlotBuilder.add_frame_axes_to_fig(
+        fig=fig,
+        cam_centers=centers_np,
+        cam_axes=axes_np,
+        title="Sampling frame",
+        scale=0.4,
+    )
+    fig.update_layout(
+        title=title,
+        scene={"xaxis_title": "X (left)", "yaxis_title": "Y (up)", "zaxis_title": "Z (fwd)", "aspectmode": "data"},
+    )
+    return fig
+
+
+def plot_candidate_frusta_simple(
+    candidates: "CandidateSamplingResult",
+    *,
+    scale: float,
+    max_frustums: int | None,
+) -> go.Figure:
+    """Plot candidate frusta without requiring a full snippet."""
+    poses = candidates.poses_world_cam()
+    cams = candidates.views
+    n = poses._data.shape[0] if poses._data.ndim == 2 else 1
+    if n == 0:
+        return go.Figure()
+    if max_frustums is not None and n > max_frustums:
+        idxs = np.linspace(0, n - 1, num=max_frustums, dtype=int)
+    else:
+        idxs = np.arange(n)
+
+    segments: list[np.ndarray] = []
+    for idx in idxs:
+        pose = poses[int(idx)] if n > 1 else poses
+        cam = cams[int(idx)] if cams.ndim > 1 else cams
+        segs = get_frustum_segments(cam, pose, scale=scale)
+        for seg in segs:
+            segments.append(np.vstack([seg, np.full((1, 3), np.nan, dtype=float)]))
+
+    if segments:
+        seg_all = np.vstack(segments)
+        fig = go.Figure(
+            data=go.Scatter3d(
+                x=seg_all[:, 0],
+                y=seg_all[:, 1],
+                z=seg_all[:, 2],
+                mode="lines",
+                line={"color": "crimson", "width": 3},
+                name="Frustum",
+            )
+        )
+    else:
+        fig = go.Figure()
+
+    centers = poses.t.detach().cpu().numpy()
+    fig.add_trace(
+        go.Scatter3d(
+            x=centers[:, 0],
+            y=centers[:, 1],
+            z=centers[:, 2],
+            mode="markers",
+            marker={"size": 2, "color": "royalblue", "opacity": 0.5},
+            name="Candidates",
+        )
+    )
+    centers_np, axes_np = _pose_axes_np(candidates)
+    fig = SnippetPlotBuilder.add_frame_axes_to_fig(
+        fig=fig,
+        cam_centers=centers_np,
+        cam_axes=axes_np,
+        title="Sampling frame",
+        scale=0.4,
+    )
+    fig.update_layout(
+        title="Candidate frusta (cached)",
+        scene={"xaxis_title": "X (left)", "yaxis_title": "Y (up)", "zaxis_title": "Z (fwd)", "aspectmode": "data"},
+    )
+    return fig
 
 
 class CandidatePlotBuilder(SnippetPlotBuilder):
@@ -77,7 +190,13 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
             self._ref_center = self.candidate_results.reference_pose.t.detach().cpu().numpy()
         return self._ref_center
 
-    def add_reference_axes(self, *, title: str = "Reference frame", display_rotate: bool = False) -> Self:
+    def add_reference_axes(
+        self,
+        *,
+        title: str = "Reference frame",
+        display_rotate: bool = False,
+        use_sampling_pose: bool = True,
+    ) -> Self:
         """Add the candidate reference frame axes to the figure.
 
         Notes:
@@ -86,12 +205,25 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
             Applying the same correction again in plotting would double-rotate the
             reference axes. Therefore, ``display_rotate`` defaults to ``False`` for
             candidate plots.
+
+            When gravity alignment is enabled, candidates are sampled around a
+            gravity-aligned copy of the reference pose. In that case, plotting the
+            sampling pose axes (``use_sampling_pose=True``) keeps the axes symmetric
+            with the candidate cloud.
         """
         if self.candidate_results is None:
             return self
+        pose = self.candidate_results.reference_pose
+        title_use = title
+        if use_sampling_pose:
+            sampling_pose = getattr(self.candidate_results, "sampling_pose", None)
+            if sampling_pose is not None:
+                pose = sampling_pose
+                if title == "Reference frame" and sampling_pose is not self.candidate_results.reference_pose:
+                    title_use = "Sampling frame"
         return self.add_frame_axes(
-            frame=self.candidate_results.reference_pose,
-            title=title,
+            frame=pose,
+            title=title_use,
             is_rotate_yaw_cw90=display_rotate,
         )
 

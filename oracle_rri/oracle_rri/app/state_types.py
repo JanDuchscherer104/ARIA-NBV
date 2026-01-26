@@ -23,10 +23,8 @@ from ..pose_generation.types import CandidateSamplingResult
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..rri_metrics.types import RriResult
-from ..vin import (
-    VinForwardDiagnostics,
-    VinPrediction,
-)
+from ..vin import VinPrediction
+from ..vin.experimental.types import VinForwardDiagnostics
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -115,6 +113,9 @@ class VinDiagnosticsState:
     offline_cache: Any | None = None
     offline_cache_len: int | None = None
     offline_cache_idx: int = 0
+    vin_snippet_cache_sig: str | None = None
+    vin_snippet_cache: Any | None = None
+    vin_snippet_cache_len: int | None = None
     offline_snippet_key: str | None = None
     offline_snippet: EfmSnippetView | None = None
     offline_snippet_error: str | None = None

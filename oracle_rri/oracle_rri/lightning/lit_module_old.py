@@ -22,6 +22,7 @@ from torch.optim import AdamW, Optimizer
 from torch.optim.lr_scheduler import OneCycleLR, ReduceLROnPlateau
 
 from ..configs import PathConfig
+from ..data.efm_views import EfmSnippetView, VinSnippetView
 from ..rri_metrics import (
     Metric,
     RriOrdinalBinner,
@@ -32,8 +33,9 @@ from ..rri_metrics import (
 )
 from ..rri_metrics.coral import coral_logits_to_label, coral_monotonicity_violation_rate
 from ..utils import BaseConfig, Console, Optimizable, Stage, optimizable_field
-from ..vin import VinModelConfig, VinModelV2Config
-from ..vin.plotting import plot_vin_encodings_from_debug
+from ..vin.experimental.model import VinModelConfig
+from ..vin.experimental.model_v2 import VinModelV2Config
+from ..vin.experimental.plotting import plot_vin_encodings_from_debug
 from .lit_datamodule import VinOracleBatch
 
 
@@ -426,9 +428,14 @@ class VinLightningModule(pl.LightningModule):
             )
 
         efm_snippet_view = batch.efm_snippet_view
-        efm = efm_snippet_view.efm if efm_snippet_view is not None else {}
+        if isinstance(efm_snippet_view, (EfmSnippetView, VinSnippetView)):
+            efm = efm_snippet_view
+        else:
+            raise RuntimeError(
+                "VIN batch missing semidense snippet view; VinModelV3 requires VinSnippetView or EfmSnippetView.",
+            )
         backbone_out = batch.backbone_out
-        if backbone_out is None and efm_snippet_view is None:
+        if backbone_out is None and not isinstance(efm_snippet_view, EfmSnippetView):
             raise RuntimeError(
                 "VIN batch missing both efm snippet view and cached backbone outputs.",
             )

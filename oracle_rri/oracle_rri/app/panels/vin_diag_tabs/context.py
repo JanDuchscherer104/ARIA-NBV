@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ....data.vin_oracle_types import VinOracleBatch
     from ....lightning.aria_nbv_experiment import AriaNBVExperimentConfig
-    from ....vin import VinForwardDiagnostics, VinPrediction
+    from ....vin import VinPrediction
+    from ....vin.experimental.types import VinForwardDiagnostics
     from ...state_types import VinDiagnosticsState
 
 

@@ -7,8 +7,8 @@ import streamlit as st
 import torch
 
 from ....rri_metrics.coral import coral_loss, coral_monotonicity_violation_rate
+from ....vin.plotting import _histogram_overlay
 from ..common import _info_popover, _pretty_label
-from ..plot_utils import _histogram_overlay
 from .context import VinDiagContext
 
 

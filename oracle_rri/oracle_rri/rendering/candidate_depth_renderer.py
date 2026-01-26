@@ -245,9 +245,7 @@ class CandidateDepthRenderer:
         """
         num_total = int(depths.shape[0])
         max_final = min(int(self.config.max_candidates_final), num_total)
-        valid_pixels = (
-            depths_valid_mask.view(num_total, -1).sum(dim=1).to(dtype=torch.int64)
-        )
+        valid_pixels = depths_valid_mask.view(num_total, -1).sum(dim=1).to(dtype=torch.int64)
         invalid_mask = valid_pixels <= 0
         num_invalid_total = int(invalid_mask.sum().item())
         if int(valid_pixels.max().item()) <= 0:
@@ -272,14 +270,8 @@ class CandidateDepthRenderer:
             )
 
         # Sort by (valid_pixels desc, candidate_indices asc) for deterministic output.
-        scale = (
-            int(candidate_indices.max().item()) + 1
-            if candidate_indices.numel()
-            else num_total
-        )
-        score = valid_pixels * scale + (
-            scale - 1 - candidate_indices.to(dtype=torch.int64)
-        )
+        scale = int(candidate_indices.max().item()) + 1 if candidate_indices.numel() else num_total
+        score = valid_pixels * scale + (scale - 1 - candidate_indices.to(dtype=torch.int64))
         keep_idx = torch.argsort(score, descending=True)[:max_final]
 
         num_kept = int(keep_idx.numel())

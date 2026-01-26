@@ -26,12 +26,13 @@ from .efm_views import VinSnippetView
 
 if TYPE_CHECKING:
     from .offline_cache import OracleRriCacheConfig
-from .offline_cache_store import _format_sample_key, _unique_sample_path
+from .offline_cache_store import _extract_snippet_token, _format_sample_key, _unique_sample_path
 from .offline_cache_store import _read_metadata as _read_oracle_metadata
 from .offline_cache_types import OracleRriCacheEntry, OracleRriCacheMetadata
 from .vin_snippet_utils import build_vin_snippet_view, vin_snippet_cache_config_hash
 
-VIN_SNIPPET_CACHE_VERSION = 1
+VIN_SNIPPET_CACHE_VERSION = 2
+VIN_SNIPPET_PAD_POINTS = 50000
 
 
 def _default_source_cache() -> "OracleRriCacheConfig":
@@ -52,6 +53,7 @@ class VinSnippetCacheMetadata:
     include_inv_dist_std: bool
     include_obs_count: bool
     semidense_max_points: int | None
+    pad_points: int | None
     config_hash: str | None = None
     num_samples: int | None = None
 
@@ -259,6 +261,7 @@ def _build_metadata(
         include_inv_dist_std=include_inv_dist_std,
         include_obs_count=include_obs_count,
         semidense_max_points=semidense_max_points,
+        pad_points=VIN_SNIPPET_PAD_POINTS,
     )
     return VinSnippetCacheMetadata(
         version=version,
@@ -269,6 +272,7 @@ def _build_metadata(
         include_inv_dist_std=include_inv_dist_std,
         include_obs_count=include_obs_count,
         semidense_max_points=semidense_max_points,
+        pad_points=VIN_SNIPPET_PAD_POINTS,
         config_hash=config_hash,
         num_samples=None,
     )
@@ -284,6 +288,7 @@ def _write_metadata(path: Path, meta: VinSnippetCacheMetadata) -> None:
         "include_inv_dist_std": meta.include_inv_dist_std,
         "include_obs_count": meta.include_obs_count,
         "semidense_max_points": meta.semidense_max_points,
+        "pad_points": meta.pad_points,
         "config_hash": meta.config_hash,
         "num_samples": meta.num_samples,
     }
@@ -301,6 +306,7 @@ def _read_metadata(path: Path) -> VinSnippetCacheMetadata:
         include_inv_dist_std=bool(payload.get("include_inv_dist_std", True)),
         include_obs_count=bool(payload.get("include_obs_count", False)),
         semidense_max_points=payload.get("semidense_max_points"),
+        pad_points=payload.get("pad_points"),
         config_hash=payload.get("config_hash"),
         num_samples=payload.get("num_samples"),
     )
@@ -309,6 +315,66 @@ def _read_metadata(path: Path) -> VinSnippetCacheMetadata:
 def read_vin_snippet_cache_metadata(path: Path) -> VinSnippetCacheMetadata:
     """Public helper to read VIN snippet cache metadata."""
     return _read_metadata(path)
+
+
+def migrate_vin_snippet_cache_inplace(
+    *,
+    cache: VinSnippetCacheConfig,
+    pad_points: int | None = None,
+) -> None:
+    """Upgrade an existing VIN snippet cache in-place to include lengths + padding."""
+    console = Console.with_prefix("VinSnippetCacheMigration")
+    meta_path = cache.metadata_path
+    if not meta_path.exists():
+        raise FileNotFoundError(f"Missing VIN snippet metadata at {meta_path}")
+
+    meta = _read_metadata(meta_path)
+    pad_points = int(pad_points or VIN_SNIPPET_PAD_POINTS)
+    console.log(f"Upgrading VIN snippet cache at {cache.cache_dir} to pad_points={pad_points}")
+
+    entries = _read_cache_index(cache.index_path, allow_missing=False)
+    for entry in entries:
+        payload_path = cache.cache_dir / entry.path
+        payload = torch.load(payload_path, map_location="cpu", weights_only=False)
+        points_world = payload.get("points_world")
+        if points_world is None:
+            continue
+        points_world = points_world.to(dtype=torch.float32)
+        lengths = payload.get("points_length")
+        if lengths is None:
+            finite = torch.isfinite(points_world[:, :3]).all(dim=-1)
+            num_points = int(finite.sum().item())
+        else:
+            lengths = lengths.reshape(-1)
+            num_points = int(lengths[0].item()) if lengths.numel() > 0 else int(points_world.shape[0])
+        num_points = min(num_points, int(points_world.shape[0]))
+        if num_points > pad_points:
+            idx = torch.randperm(num_points, device=points_world.device)[:pad_points]
+            points_world = points_world[:num_points][idx]
+            num_points = pad_points
+        if num_points < pad_points:
+            pad = torch.full(
+                (pad_points - num_points, points_world.shape[1]),
+                float("nan"),
+                dtype=points_world.dtype,
+                device=points_world.device,
+            )
+            points_world = torch.cat([points_world[:num_points], pad], dim=0)
+        payload["points_world"] = points_world
+        payload["points_length"] = torch.tensor([num_points], dtype=torch.int64)
+        torch.save(payload, payload_path)
+
+    meta.version = VIN_SNIPPET_CACHE_VERSION
+    meta.pad_points = pad_points
+    meta.config_hash = vin_snippet_cache_config_hash(
+        dataset_config=meta.dataset_config,
+        include_inv_dist_std=bool(meta.include_inv_dist_std),
+        include_obs_count=bool(meta.include_obs_count),
+        semidense_max_points=meta.semidense_max_points,
+        pad_points=pad_points,
+    )
+    _write_metadata(meta_path, meta)
+    console.log("VIN snippet cache migration complete.")
 
 
 def _read_cache_index(path: Path, *, allow_missing: bool = False) -> list[VinSnippetCacheEntry]:
@@ -366,10 +432,28 @@ def _build_vin_payload(
         include_inv_dist_std=include_inv_dist_std,
         include_obs_count=include_obs_count,
     )
+    points_world = vin_snippet.points_world.detach().cpu()
+    lengths = vin_snippet.lengths.detach().cpu().reshape(-1)
+    num_valid = int(lengths[0].item()) if lengths.numel() > 0 else int(points_world.shape[0])
+    num_valid = min(num_valid, int(points_world.shape[0]))
+    if num_valid > VIN_SNIPPET_PAD_POINTS:
+        idx = torch.randperm(num_valid, device=points_world.device)[:VIN_SNIPPET_PAD_POINTS]
+        points_world = points_world[:num_valid][idx]
+        num_valid = VIN_SNIPPET_PAD_POINTS
+    if num_valid < VIN_SNIPPET_PAD_POINTS:
+        pad = torch.full(
+            (VIN_SNIPPET_PAD_POINTS - num_valid, points_world.shape[1]),
+            float("nan"),
+            dtype=points_world.dtype,
+            device=points_world.device,
+        )
+        points_world = torch.cat([points_world[:num_valid], pad], dim=0)
+    lengths = torch.tensor([num_valid], dtype=torch.int64, device=points_world.device)
     return {
         "scene_id": entry.scene_id,
         "snippet_id": entry.snippet_id,
-        "points_world": vin_snippet.points_world.detach().cpu(),
+        "points_world": points_world,
+        "points_length": lengths,
         "t_world_rig": vin_snippet.t_world_rig.tensor().detach().cpu(),
     }
 
@@ -741,6 +825,9 @@ class VinSnippetCacheDataset(Dataset[VinSnippetView]):
     ) -> VinSnippetView | None:
         entry = self._by_scene_snippet.get((scene_id, snippet_id))
         if entry is None:
+            snippet_token = _extract_snippet_token(snippet_id)
+            entry = self._by_scene_snippet.get((scene_id, snippet_token))
+        if entry is None:
             return None
         return self._load_entry(entry, map_location=map_location)
 
@@ -753,8 +840,19 @@ class VinSnippetCacheDataset(Dataset[VinSnippetView]):
         )
         device = torch.device(map_loc)
         points_world = payload["points_world"].to(device=device, dtype=torch.float32)
+        lengths = payload.get("points_length")
+        finite = torch.isfinite(points_world[:, :3]).all(dim=-1)
+        finite_count = finite.sum().to(device=device, dtype=torch.int64)
+        if lengths is None or finite_count.numel() == 0:
+            lengths = finite_count.reshape(1)
+        else:
+            lengths = lengths.to(device=device, dtype=torch.int64).reshape(-1)
+            if lengths.numel() == 0:
+                lengths = finite_count.reshape(1)
+            else:
+                lengths = torch.minimum(lengths, finite_count.reshape(-1))
         t_world_rig = PoseTW(payload["t_world_rig"].to(device=device, dtype=torch.float32))
-        return VinSnippetView(points_world=points_world, t_world_rig=t_world_rig)
+        return VinSnippetView(points_world=points_world, lengths=lengths, t_world_rig=t_world_rig)
 
 
 __all__ = [

@@ -9,11 +9,8 @@ import torch
 from ....configs import PathConfig
 from ....data.efm_views import VinSnippetView
 from ....rri_metrics.coral import coral_loss
-from ....vin.plotting import (
-    build_alignment_figures,
-    build_geometry_overview_figure,
-    build_semidense_projection_figure,
-)
+from ....vin.experimental.plotting import build_alignment_figures
+from ....vin.plotting import build_geometry_overview_figure, build_semidense_projection_figure
 from ..common import _info_popover
 from ..data import scene_plot_options_ui
 from ..offline_cache_utils import _load_efm_snippet_for_cache
@@ -67,6 +64,42 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
         if snippet_view is not None:
             batch.efm_snippet_view = snippet_view
 
+    if isinstance(snippet_view, VinSnippetView) and ctx.use_offline_cache and ctx.attach_snippet:
+        snippet_key = f"{batch.scene_id}:{batch.snippet_id}"
+        if state.offline_snippet_key == snippet_key and state.offline_snippet is not None:
+            snippet_view = state.offline_snippet
+            batch.efm_snippet_view = snippet_view
+        else:
+            load_full = True
+            if (
+                torch.is_tensor(snippet_view.points_world)
+                and snippet_view.points_world.ndim == 3
+                and snippet_view.points_world.shape[0] > 1
+            ):
+                load_full = False
+            if load_full:
+                with st.spinner("Loading full EFM snippet for geometry..."):
+                    try:
+                        cache_ds = state.offline_cache
+                        dataset_payload = cache_ds.metadata.dataset_config if cache_ds else None
+                        paths = cfg.paths if isinstance(cfg.paths, PathConfig) else PathConfig()
+                        snippet_view = _load_efm_snippet_for_cache(
+                            scene_id=batch.scene_id,
+                            snippet_id=batch.snippet_id,
+                            dataset_payload=dataset_payload,
+                            device="cpu",
+                            paths=paths,
+                            include_gt_mesh=ctx.include_gt_mesh,
+                        )
+                        state.offline_snippet_key = snippet_key
+                        state.offline_snippet = snippet_view
+                        state.offline_snippet_error = None
+                        batch.efm_snippet_view = snippet_view
+                    except Exception as exc:  # pragma: no cover - IO guard
+                        state.offline_snippet_key = snippet_key
+                        state.offline_snippet = None
+                        state.offline_snippet_error = f"{type(exc).__name__}: {exc}"
+
     if snippet_view is None:
         if state.offline_snippet_error:
             st.warning(state.offline_snippet_error)
@@ -74,7 +107,7 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
             "Geometry plots require raw EFM snippets; enable 'Attach EFM snippet' or use online data.",
         )
         return
-    if isinstance(snippet_view, VinSnippetView):
+    if isinstance(snippet_view, VinSnippetView) or not hasattr(snippet_view, "camera_rgb"):
         st.info(
             "VIN snippet cache provides minimal geometry. Showing semidense-only views "
             "and candidate visibility instead of the full scene overview.",
@@ -154,6 +187,26 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
                         key="vin_geom_vin_snippet_candidate_idx",
                     ),
                 )
+                show_frustum = st.checkbox(
+                    "Show candidate frustum",
+                    value=True,
+                    key="vin_geom_vin_snippet_show_frustum",
+                )
+                frustum_scale = float(
+                    st.slider(
+                        "Frustum scale",
+                        min_value=0.1,
+                        max_value=10.0,
+                        value=1.0,
+                        step=0.1,
+                        key="vin_geom_vin_snippet_frustum_scale",
+                    ),
+                )
+                frustum_color = st.color_picker(
+                    "Frustum color",
+                    value="#ff4d4d",
+                    key="vin_geom_vin_snippet_frustum_color",
+                )
                 cam_count = int(batch.p3d_cameras.R.shape[0])
                 proj_batch = batch_idx if batch_idx < cand_batch else 0
                 global_idx = cand_idx
@@ -167,6 +220,9 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
                         p3d_cameras=batch.p3d_cameras,
                         candidate_index=global_idx,
                         max_points=max_points,
+                        show_frustum=show_frustum,
+                        frustum_scale=frustum_scale,
+                        frustum_color=frustum_color,
                     ),
                     width="stretch",
                 )

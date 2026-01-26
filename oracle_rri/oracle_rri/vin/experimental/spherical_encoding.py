@@ -18,7 +18,7 @@ from e3nn import o3  # type: ignore[import-untyped]
 from pydantic import Field
 from torch import Tensor, nn
 
-from ..utils import BaseConfig
+from ...utils import BaseConfig
 from .pose_encoding import FourierFeaturesConfig
 
 

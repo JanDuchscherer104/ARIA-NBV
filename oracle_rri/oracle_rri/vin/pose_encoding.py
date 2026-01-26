@@ -17,60 +17,9 @@ import math
 
 import torch
 from pydantic import Field, field_validator
-from torch import nn
+from torch import Tensor, nn
 
 from ..utils import BaseConfig
-
-Tensor = torch.Tensor
-
-
-class FourierFeatures(nn.Module):
-    """Learnable Fourier features for continuous inputs.
-
-    Given an input ``x ∈ R^D`` we compute features:
-
-        [x, sin(2π B x), cos(2π B x)]
-
-    where B is a learnable matrix of shape ``(F, D)``.
-    """
-
-    def __init__(self, config: "FourierFeaturesConfig") -> None:
-        super().__init__()
-        self.config = config
-        self.input_dim = self.config.input_dim
-        self.num_frequencies = self.config.num_frequencies
-        self.include_input = self.config.include_input
-        self.learnable = self.config.learnable
-
-        b_init = torch.randn((self.num_frequencies, self.input_dim)) * self.config.init_scale
-        if self.learnable:
-            self.B = nn.Parameter(b_init)
-        else:
-            self.register_buffer("B", b_init, persistent=False)
-
-    @property
-    def output_dim(self) -> int:
-        base = self.input_dim if self.include_input else 0
-        return base + 2 * self.num_frequencies
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Encode inputs.
-
-        Args:
-            x: ``Tensor["... input_dim", float32]``.
-
-        Returns:
-            ``Tensor["... output_dim", float32]``.
-        """
-
-        if x.shape[-1] != self.input_dim:
-            raise ValueError(f"Expected x[..., {self.input_dim}], got {tuple(x.shape)}.")
-
-        proj = (x @ self.B.T) * (2.0 * math.pi)
-        emb = torch.cat([torch.sin(proj), torch.cos(proj)], dim=-1)
-        if not self.include_input:
-            return emb
-        return torch.cat([x, emb], dim=-1)
 
 
 class LearnableFourierFeatures(nn.Module):
@@ -123,27 +72,6 @@ class LearnableFourierFeatures(nn.Module):
         if not self.include_input:
             return enc
         return torch.cat([x, enc], dim=-1)
-
-
-class FourierFeaturesConfig(BaseConfig[FourierFeatures]):
-    """Config-as-factory wrapper for :class:`FourierFeatures`."""
-
-    target: type[FourierFeatures] = Field(default=FourierFeatures, exclude=True)
-
-    input_dim: int = Field(default=6, gt=0)
-    """Input dimensionality (default: 6 for SE(3) relative pose as translation + so(3) log)."""
-
-    num_frequencies: int = Field(default=8, gt=0)
-    """Number of Fourier frequencies."""
-
-    include_input: bool = True
-    """Concatenate raw inputs to Fourier features when True."""
-
-    learnable: bool = True
-    """Make the frequency matrix learnable when True."""
-
-    init_scale: float = Field(default=1.0, gt=0.0)
-    """Stddev for initializing the frequency matrix."""
 
 
 class LearnableFourierFeaturesConfig(BaseConfig[LearnableFourierFeatures]):

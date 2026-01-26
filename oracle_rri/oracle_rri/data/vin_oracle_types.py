@@ -62,7 +62,7 @@ class VinOracleBatch:
 
         def _shape(value: object) -> str:
             if torch.is_tensor(value):
-                return str(tuple(value.shape))
+                return str(tuple(value.shape))  # type: ignore[attr-defined]
             return str(type(value).__name__)
 
         out: dict[str, str] = {
@@ -103,6 +103,7 @@ class VinOracleBatch:
 
         if isinstance(self.efm_snippet_view, VinSnippetView):
             out["vin_snippet.points_world"] = _shape(self.efm_snippet_view.points_world)
+            out["vin_snippet.lengths"] = _shape(self.efm_snippet_view.lengths)
             out["vin_snippet.t_world_rig"] = _shape(self.efm_snippet_view.t_world_rig.tensor())
         elif isinstance(self.efm_snippet_view, EfmSnippetView):
             out["efm_snippet_view"] = "EfmSnippetView"
@@ -242,11 +243,11 @@ class VinOracleBatch:
 
         backbone_out = None
         if any(sample.backbone_out is not None for sample in samples):
-            backbone_out = cls._stack_backbone_outputs([sample.backbone_out for sample in samples])  # type: ignore[arg-type]
-
+            backbone_out = cls._stack_backbone_outputs([sample.backbone_out for sample in samples])  # type: ignore
         vin_snippet = None
         if has_snippet:
             points_list = [view.points_world for view in snippet_views if view is not None]
+            lengths_list = [view.lengths for view in snippet_views if view is not None]
             traj_list = [view.t_world_rig for view in snippet_views if view is not None]
             max_points = max(int(points.shape[0]) for points in points_list)
             max_frames = max(int(traj.shape[0]) for traj in traj_list)
@@ -254,13 +255,22 @@ class VinOracleBatch:
                 [cls._pad_points(points, target_len=max_points) for points in points_list],
                 dim=0,
             )
+            lengths = torch.stack(
+                [
+                    length.reshape(-1)[0]
+                    if length.numel() > 0
+                    else torch.tensor(0, device=points_world.device, dtype=torch.int64)
+                    for length in lengths_list
+                ],
+                dim=0,
+            ).to(device=points_world.device, dtype=torch.int64)
             t_world_rig = PoseTW(
                 torch.stack(
                     [cls._pad_trajectory(traj, target_len=max_frames) for traj in traj_list],
                     dim=0,
                 ),
             )
-            vin_snippet = VinSnippetView(points_world=points_world, t_world_rig=t_world_rig)
+            vin_snippet = VinSnippetView(points_world=points_world, lengths=lengths, t_world_rig=t_world_rig)
 
         return cls(
             efm_snippet_view=vin_snippet,

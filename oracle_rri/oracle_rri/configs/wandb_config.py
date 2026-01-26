@@ -71,6 +71,7 @@ def _flatten_mapping(
     sep: str = ".",
 ) -> dict[str, Any]:
     """Flatten nested mappings to dot-separated keys, skipping private keys."""
+
     def _normalize_value(value: Any) -> Any:
         if isinstance(value, np.generic):
             return value.item()

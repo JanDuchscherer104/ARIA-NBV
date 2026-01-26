@@ -8,9 +8,9 @@ import streamlit as st
 import torch
 
 from ....data.efm_views import VinSnippetView
-from ....vin.model_v2 import FIELD_CHANNELS_V2
+from ....vin.experimental.model_v2 import FIELD_CHANNELS_V2
+from ....vin.plotting import _histogram_overlay, _parameter_distribution, _to_numpy
 from ..common import _info_popover, _pretty_label, _strip_ansi
-from ..plot_utils import _histogram_overlay, _parameter_distribution, _to_numpy
 from .context import VinDiagContext
 
 

@@ -6,9 +6,9 @@ from pathlib import Path
 
 import matplotlib
 import numpy as np
-import pandas as pd
-import plotly.graph_objects as go
-import seaborn as sns
+import pandas as pd  # type: ignore[import-untyped]
+import plotly.graph_objects as go  # type: ignore[import-untyped]
+import seaborn as sns  # type: ignore[import-untyped]
 import streamlit as st
 import torch
 
@@ -31,16 +31,16 @@ from ...data.vin_oracle_datasets import (
 from ...data.vin_snippet_cache import read_vin_snippet_cache_metadata
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...pose_generation.plotting import plot_position_polar
+from ...rri_metrics.plotting import _histogram_overlay, _plot_hist_counts_mpl
 from ...rri_metrics.rri_binning import RriOrdinalBinner
 from ...utils import Stage
-from ...vin.plotting import DEFAULT_PLOT_CFG
+from ...vin.experimental.plotting import DEFAULT_PLOT_CFG
 from .common import _info_popover, _pretty_label, _report_exception
 from .offline_cache_utils import (
     _collect_offline_cache_stats,
     _collect_vin_batch_shape_preview,
     _collect_vin_snippet_cache_stats,
 )
-from .plot_utils import _histogram_overlay, _plot_hist_counts_mpl
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -63,6 +63,13 @@ def render_offline_stats_page() -> None:
     stats_cache = st.session_state.get(stats_key, {})
     coverage_key = "vin_offline_coverage"
     coverage_cache = st.session_state.get(coverage_key, {})
+
+    def _as_path_str(value: str | Path | None) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, Path):
+            return str(value)
+        return str(value)
 
     with st.sidebar.form("vin_offline_stats_form"):
         st.subheader("Offline stats")
@@ -217,12 +224,15 @@ def render_offline_stats_page() -> None:
         paths = cfg.paths if isinstance(cfg.paths, PathConfig) else PathConfig()
         return cfg, paths
 
+    cache_dir_str = _as_path_str(cache_dir).strip()
+    toml_path_str = _as_path_str(toml_path).strip()
+
     cfg_key = "|".join(
         [
             cache_kind,
-            toml_path.strip(),
+            toml_path_str,
             stage.value,
-            cache_dir.strip(),
+            cache_dir_str,
             map_location,
             str(int(max_samples)),
             str(int(num_workers)),
@@ -233,9 +243,9 @@ def render_offline_stats_page() -> None:
     coverage_cfg_key = "|".join(
         [
             cache_kind,
-            toml_path.strip(),
+            toml_path_str,
             stage.value,
-            cache_dir.strip(),
+            cache_dir_str,
             f"{float(train_val_split):.3f}",
             str(int(max_tars)),
         ],
@@ -394,19 +404,19 @@ def render_offline_stats_page() -> None:
                     stats_cache = _collect_offline_cache_stats(
                         toml_path=toml_path.strip() or None,
                         stage=stage,
-                        cache_dir=cache_dir.strip() or None,
+                        cache_dir=cache_dir.as_posix().strip() or None,
                         max_samples=int(max_samples),
                         num_workers=int(num_workers) if num_workers > 0 else None,
                         train_val_split=float(train_val_split),
                     )
                 else:
                     stats_cache = _collect_vin_snippet_cache_stats(
-                        cache_dir=cache_dir.strip() or None,
+                        cache_dir=cache_dir.as_posix().strip() or None,
                         map_location=map_location,
                         max_samples=int(max_samples),
                         num_workers=int(num_workers) if num_workers > 0 else None,
                     )
-                    vin_cache_dir = cache_dir.strip() or None
+                    vin_cache_dir = cache_dir.as_posix().strip() or None
                     oracle_cache_dir = None
                     if vin_cache_dir:
                         parent = Path(vin_cache_dir).parent
@@ -612,7 +622,9 @@ def render_offline_stats_page() -> None:
         sample_df = stats_cache["sample_df"]
         points_counts = stats_cache["points_counts"]
         traj_lengths = stats_cache["traj_lengths"]
-        inv_std_values = stats_cache["inv_dist_std"]
+        inv_std_values = stats_cache.get("inv_dist_std", [])
+        obs_count_values = stats_cache.get("obs_count", [])
+        has_obs_count = bool(stats_cache.get("has_obs_count"))
 
         def _fmt(value: float) -> str:
             return f"{value:.4f}" if np.isfinite(value) else "n/a"
@@ -624,7 +636,25 @@ def render_offline_stats_page() -> None:
         col4, col5, col6 = st.columns(3)
         col4.metric("Points median", _fmt(summary["points_median"]))
         col5.metric("Traj len median", _fmt(summary["traj_len_median"]))
-        col6.metric("inv_dist_std mean", _fmt(summary["inv_dist_std_mean"]))
+        col6.metric("Points max", _fmt(summary.get("points_max", float("nan"))))
+        col7, col8, col9 = st.columns(3)
+        col7.metric("inv_dist_std mean (points)", _fmt(summary.get("inv_dist_std_mean", float("nan"))))
+        col8.metric("inv_dist_std std (points)", _fmt(summary.get("inv_dist_std_std", float("nan"))))
+        col9.metric("inv_dist_std p95 (points)", _fmt(summary.get("inv_dist_std_p95", float("nan"))))
+        if has_obs_count:
+            col10, col11, col12 = st.columns(3)
+            col10.metric("obs_count mean (points)", _fmt(summary.get("obs_count_mean", float("nan"))))
+            col11.metric("obs_count std (points)", _fmt(summary.get("obs_count_std", float("nan"))))
+            col12.metric("obs_count p95 (points)", _fmt(summary.get("obs_count_p95", float("nan"))))
+            col13, col14, col15, col16 = st.columns(4)
+            col13.metric("inv_dist_std min", _fmt(summary.get("inv_dist_std_min", float("nan"))))
+            col14.metric("inv_dist_std max", _fmt(summary.get("inv_dist_std_max", float("nan"))))
+            col15.metric("obs_count min", _fmt(summary.get("obs_count_min", float("nan"))))
+            col16.metric("obs_count max", _fmt(summary.get("obs_count_max", float("nan"))))
+        else:
+            col10, col11 = st.columns(2)
+            col10.metric("inv_dist_std min", _fmt(summary.get("inv_dist_std_min", float("nan"))))
+            col11.metric("inv_dist_std max", _fmt(summary.get("inv_dist_std_max", float("nan"))))
 
         if not sample_df.empty:
             st.subheader("Per-snippet summary")
@@ -652,8 +682,16 @@ def render_offline_stats_page() -> None:
                 _render_hist(
                     inv_std_values,
                     bins=60,
-                    title="inv_dist_std mean per snippet",
+                    title="inv_dist_std distribution (all points)",
                     xlabel="inv_dist_std",
+                    log_y=log_y,
+                )
+            if obs_count_values:
+                _render_hist(
+                    obs_count_values,
+                    bins=60,
+                    title="obs_count distribution (all points)",
+                    xlabel="obs_count",
                     log_y=log_y,
                 )
         st.subheader("VIN batch tensor shapes")

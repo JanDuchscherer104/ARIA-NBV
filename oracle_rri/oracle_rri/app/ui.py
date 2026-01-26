@@ -53,18 +53,18 @@ def candidate_config_ui(
     is_debug: bool = False,
     verbosity: Verbosity,
 ) -> CandidateViewGeneratorConfig:
-    ui.subheader("Candidate Generator")
+    expander = ui.expander("Candidate Generator", expanded=False)
     num_samples_default = default.num_samples
-    debug_flag = ui.checkbox("Debug (candidates)", value=is_debug)
+    debug_flag = expander.checkbox("Debug (candidates)", value=is_debug)
 
     seed_enabled_default = default.seed is not None
-    seed_enabled = ui.checkbox(
+    seed_enabled = expander.checkbox(
         "Deterministic seed",
         value=seed_enabled_default,
         help="When enabled, candidate sampling is reproducible across reruns. Disable for stochastic sampling.",
     )
     seed_value_default = int(default.seed) if default.seed is not None else 0
-    seed_value = ui.number_input(
+    seed_value = expander.number_input(
         "seed",
         min_value=0,
         value=int(seed_value_default),
@@ -74,7 +74,7 @@ def candidate_config_ui(
     )
     seed = int(seed_value) if seed_enabled else None
 
-    device_mode = ui.selectbox(
+    device_mode = expander.selectbox(
         "Generator device",
         ["cpu", "cuda"],
         index=1 if torch.cuda.is_available() else 0,
@@ -82,7 +82,7 @@ def candidate_config_ui(
     )
 
     sampling_opts = list(SamplingStrategy)
-    sampling_choice = ui.selectbox(
+    sampling_choice = expander.selectbox(
         "sampling_strategy",
         options=sampling_opts,
         index=sampling_opts.index(default.sampling_strategy),
@@ -90,7 +90,7 @@ def candidate_config_ui(
     )
 
     collision_opts = list(CollisionBackend)
-    collision_choice = ui.selectbox(
+    collision_choice = expander.selectbox(
         "collision_backend",
         options=collision_opts,
         index=collision_opts.index(default.collision_backend),
@@ -98,13 +98,13 @@ def candidate_config_ui(
         help="PyTorch3D for GPU, pyembree/trimesh for CPU.",
     )
 
-    num_samples = ui.slider("num_samples", 2, 512, num_samples_default, step=2)
-    oversample = ui.slider("oversample_factor", 1.0, 4.0, float(default.oversample_factor), step=0.25)
-    min_radius = ui.slider("min_radius (m)", 0.1, 2.0, float(default.min_radius), step=0.05)
-    max_radius = ui.slider("max_radius (m)", 0.2, 3.0, float(default.max_radius), step=0.05)
-    min_elev = ui.slider("min_elev_deg", -90.0, 0.0, float(default.min_elev_deg), step=1.0)
-    max_elev = ui.slider("max_elev_deg", 0.0, 90.0, float(default.max_elev_deg), step=1.0)
-    delta_az = ui.slider(
+    num_samples = expander.slider("num_samples", 2, 512, num_samples_default, step=2)
+    oversample = expander.slider("oversample_factor", 1.0, 4.0, float(default.oversample_factor), step=0.25)
+    min_radius = expander.slider("min_radius (m)", 0.1, 2.0, float(default.min_radius), step=0.05)
+    max_radius = expander.slider("max_radius (m)", 0.2, 3.0, float(default.max_radius), step=0.05)
+    min_elev = expander.slider("min_elev_deg", -90.0, 0.0, float(default.min_elev_deg), step=1.0)
+    max_elev = expander.slider("max_elev_deg", 0.0, 90.0, float(default.max_elev_deg), step=1.0)
+    delta_az = expander.slider(
         "delta_azimuth_deg",
         min_value=0.0,
         max_value=360.0,
@@ -112,14 +112,14 @@ def candidate_config_ui(
         step=5.0,
         help="Yaw span around the last forward direction; 360=full sphere, 90=±45°, 0=planar slice.",
     )
-    kappa = ui.slider("orientation kappa (PowerSpherical)", 0.0, 16.0, float(default.kappa), step=0.5)
-    align_to_gravity = ui.checkbox(
+    kappa = expander.slider("orientation kappa (PowerSpherical)", 0.0, 16.0, float(default.kappa), step=0.5)
+    align_to_gravity = expander.checkbox(
         "align_to_gravity",
         value=bool(default.align_to_gravity),
         help="Sample in a gravity-aligned reference frame (drops pitch/roll, keeps yaw) to avoid tilted shells.",
     )
 
-    view_mode = ui.selectbox(
+    view_mode = expander.selectbox(
         "view_direction_mode",
         options=list(ViewDirectionMode),
         index=list(ViewDirectionMode).index(default.view_direction_mode),
@@ -128,7 +128,7 @@ def candidate_config_ui(
     )
 
     view_sampling_opts = [None] + list(SamplingStrategy)
-    view_sampling_choice = ui.selectbox(
+    view_sampling_choice = expander.selectbox(
         "view_sampling_strategy",
         options=view_sampling_opts,
         index=view_sampling_opts.index(default.view_sampling_strategy),
@@ -140,7 +140,7 @@ def candidate_config_ui(
         ),
     )
 
-    view_kappa = ui.slider(
+    view_kappa = expander.slider(
         "view_kappa (PowerSpherical)",
         0.0,
         16.0,
@@ -148,7 +148,7 @@ def candidate_config_ui(
         step=0.5,
     )
 
-    view_max_azimuth_deg = ui.slider(
+    view_max_azimuth_deg = expander.slider(
         "view_max_azimuth_deg",
         0.0,
         90.0,
@@ -157,7 +157,7 @@ def candidate_config_ui(
         else float(default.view_max_angle_deg),
         step=1.0,
     )
-    view_max_elevation_deg = ui.slider(
+    view_max_elevation_deg = expander.slider(
         "view_max_elevation_deg",
         0.0,
         90.0,
@@ -166,7 +166,7 @@ def candidate_config_ui(
         else float(default.view_max_angle_deg),
         step=1.0,
     )
-    view_roll = ui.slider(
+    view_roll = expander.slider(
         "view_roll_jitter_deg",
         0.0,
         90.0,
@@ -176,7 +176,7 @@ def candidate_config_ui(
     )
 
     ref_frame_default = default.reference_frame_index if default.reference_frame_index is not None else -1
-    ref_frame_idx_input = ui.number_input(
+    ref_frame_idx_input = expander.number_input(
         "reference_frame_index (camera frame; -1 = final)",
         value=int(ref_frame_default),
         step=1,
@@ -189,25 +189,25 @@ def candidate_config_ui(
 
     target_point_world = default.view_target_point_world
     if view_mode is ViewDirectionMode.TARGET_POINT:
-        tp_x = ui.number_input(
+        tp_x = expander.number_input(
             "target_point_world.x", value=float(target_point_world[0]) if target_point_world is not None else 0.0
         )
-        tp_y = ui.number_input(
+        tp_y = expander.number_input(
             "target_point_world.y", value=float(target_point_world[1]) if target_point_world is not None else 0.0
         )
-        tp_z = ui.number_input(
+        tp_z = expander.number_input(
             "target_point_world.z", value=float(target_point_world[2]) if target_point_world is not None else 0.0
         )
         target_point_world = torch.tensor([tp_x, tp_y, tp_z], dtype=torch.float32)
     else:
         target_point_world = None
 
-    ensure_collision_free = ui.checkbox("ensure_collision_free", value=default.ensure_collision_free)
-    ensure_free_space = ui.checkbox("ensure_free_space", value=default.ensure_free_space)
-    min_distance = ui.slider("min_distance_to_mesh (m)", 0.0, 2.0, float(default.min_distance_to_mesh), step=0.01)
+    ensure_collision_free = expander.checkbox("ensure_collision_free", value=default.ensure_collision_free)
+    ensure_free_space = expander.checkbox("ensure_free_space", value=default.ensure_free_space)
+    min_distance = expander.slider("min_distance_to_mesh (m)", 0.0, 2.0, float(default.min_distance_to_mesh), step=0.01)
 
-    collect_rule_masks = ui.checkbox("collect_rule_masks", value=default.collect_rule_masks)
-    collect_debug_stats = ui.checkbox("collect_debug_stats", value=default.collect_debug_stats)
+    collect_rule_masks = expander.checkbox("collect_rule_masks", value=default.collect_rule_masks)
+    collect_debug_stats = expander.checkbox("collect_debug_stats", value=default.collect_debug_stats)
 
     updated = default.model_copy(
         update={

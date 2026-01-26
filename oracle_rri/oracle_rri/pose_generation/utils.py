@@ -57,3 +57,18 @@ def stats_to_markdown_table(stats: dict[str, dict[str, float]], *, header: str |
     for key, vals in stats.items():
         lines.append(f"{key} | {vals['min']:.3f} | {vals['max']:.3f} | {vals['mean']:.3f} | {vals['std']:.3f}")
     return "\n".join(lines)
+
+
+def rejected_pose_tensor(candidates: "CandidateSamplingResult") -> torch.Tensor | None:
+    """Return rejected candidate poses as a tensor (or None if none rejected)."""
+    mask_valid = candidates.mask_valid
+    shell_poses = candidates.shell_poses
+    if mask_valid is None or shell_poses is None or mask_valid.numel() == 0:
+        return None
+    shell_tensor = shell_poses.tensor() if hasattr(shell_poses, "tensor") else shell_poses
+    if mask_valid.shape[0] != shell_tensor.shape[0]:
+        return None
+    rejected_mask = ~mask_valid
+    if not rejected_mask.any():
+        return None
+    return shell_tensor[rejected_mask]

@@ -7,6 +7,7 @@ trainer factory.
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 from typing import Any, Literal, Self
@@ -37,8 +38,9 @@ from ..rri_metrics import (
 )
 from ..rri_metrics.coral import coral_logits_to_label, coral_monotonicity_violation_rate
 from ..utils import BaseConfig, Console, Stage
-from ..vin import VinModelConfig, VinModelV2Config
-from ..vin.plotting import plot_vin_encodings_from_debug
+from ..vin import VinModelV3Config
+from ..vin.experimental.plotting import plot_vin_encodings_from_debug
+from ..vin.vin_utils import largest_divisor_leq
 from .optimizers import AdamWConfig, OneCycleSchedulerConfig, ReduceLrOnPlateauConfig
 
 
@@ -50,7 +52,7 @@ class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
         exclude=True,
     )
 
-    vin: VinModelConfig | VinModelV2Config = Field(default_factory=VinModelV2Config)
+    vin: VinModelV3Config = Field(default_factory=VinModelV3Config)
 
     optimizer: AdamWConfig = Field(default_factory=AdamWConfig)
     """Optimizer configuration."""
@@ -191,6 +193,7 @@ class VinLightningModule(pl.LightningModule):
         )
         self._interval_metrics = metrics_cfg.setup_target()
         self._rri_error_stats = nn.ModuleDict({f"{Stage.VAL.value}_stage": RriErrorStats()})
+        self._logged_effective_config = False
 
     # --------------------------------------------------------------------- lifecycle
     def setup(self, stage: str) -> None:
@@ -200,6 +203,68 @@ class VinLightningModule(pl.LightningModule):
             self._binner = self._load_binner_from_config()
         self._maybe_init_bin_values()
         self._maybe_init_coral_bias()
+        self._log_vin_effective_config()
+
+    def _log_vin_effective_config(self) -> None:
+        """Log the effective VIN config (post-sanitization) and persist it as JSON."""
+        if self._logged_effective_config:
+            return
+
+        vin_cfg = self.config.vin
+        effective = vin_cfg.model_dump_jsonable()
+
+        field_dim = getattr(vin_cfg, "field_dim", None)
+        field_gn_groups = getattr(vin_cfg, "field_gn_groups", None)
+        applied: list[str] = []
+        if field_dim is not None and field_gn_groups is not None:
+            eff_groups = largest_divisor_leq(int(field_dim), int(field_gn_groups))
+            effective["field_gn_groups_effective"] = eff_groups
+            if int(field_gn_groups) != eff_groups:
+                applied.append("field_gn_groups")
+
+        if field_dim is not None:
+            effective["global_pool_num_heads_effective"] = largest_divisor_leq(int(field_dim), 4)
+
+        effective["vin_config_class"] = vin_cfg.__class__.__name__
+        if applied:
+            effective["applied_corrections"] = applied
+
+        run_dir: Path | None = None
+        config_path: Path | None = None
+        wandb_run = None
+
+        logger = getattr(self, "logger", None)
+        if isinstance(logger, WandbLogger):
+            try:
+                wandb_run = logger.experiment
+            except Exception:  # pragma: no cover - optional dep guard
+                wandb_run = None
+            if wandb_run is not None:
+                run_dir = Path(str(getattr(wandb_run, "dir", ""))).expanduser()
+
+        if run_dir is None:
+            log_dir = getattr(self.trainer, "log_dir", None)
+            if log_dir is not None:
+                run_dir = Path(str(log_dir)).expanduser()
+
+        if run_dir is not None:
+            run_dir.mkdir(parents=True, exist_ok=True)
+            config_path = run_dir / "vin_effective.json"
+            config_path.write_text(json.dumps(effective, indent=2, sort_keys=True))
+
+        if wandb_run is not None:
+            try:
+                wandb_run.config.update({"vin_effective": effective}, allow_val_change=True)
+                if config_path is not None and config_path.exists():
+                    import wandb  # type: ignore[import-not-found]
+
+                    artifact = wandb.Artifact("vin_effective_config", type="config")
+                    artifact.add_file(str(config_path))
+                    wandb_run.log_artifact(artifact)
+            except Exception:  # pragma: no cover - wandb optional
+                pass
+
+        self._logged_effective_config = True
 
     def on_save_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         if self._binner is not None:
@@ -306,12 +371,12 @@ class VinLightningModule(pl.LightningModule):
             )
 
         efm_snippet_view = batch.efm_snippet_view
-        if isinstance(efm_snippet_view, EfmSnippetView):
-            efm = efm_snippet_view.efm
-        elif isinstance(efm_snippet_view, VinSnippetView):
+        if isinstance(efm_snippet_view, (EfmSnippetView, VinSnippetView)):
             efm = efm_snippet_view
         else:
-            efm = {}
+            raise RuntimeError(
+                "VIN batch missing semidense snippet view; VinModelV3 requires VinSnippetView or EfmSnippetView.",
+            )
         backbone_out = batch.backbone_out
         if backbone_out is None and not isinstance(efm_snippet_view, EfmSnippetView):
             raise RuntimeError(
@@ -1044,9 +1109,9 @@ class VinLightningModule(pl.LightningModule):
         Returns:
             Mapping of plot names to saved paths.
         """
-        if isinstance(self.config.vin, VinModelV2Config):
+        if isinstance(self.config.vin, VinModelV3Config):
             self.console.warn(
-                "VIN v2 does not support SH/legacy encoding plots; returning empty plot set.",
+                "VIN v3 does not support SH/legacy encoding plots; returning empty plot set.",
             )
             return {}
 

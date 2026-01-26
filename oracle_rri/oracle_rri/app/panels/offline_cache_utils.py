@@ -507,11 +507,69 @@ def _collect_vin_snippet_cache_stats(
         collate_fn=_collate,
     )
 
+    def _finite_1d(values: torch.Tensor) -> torch.Tensor:
+        if values.numel() == 0:
+            return values.reshape(0)
+        flat = values.reshape(-1)
+        return flat[torch.isfinite(flat)]
+
+    def _point_stats(
+        values: torch.Tensor,
+        *,
+        max_quantile_samples: int = 200_000,
+        rng: torch.Generator | None = None,
+    ) -> dict[str, float]:
+        if values.numel() == 0:
+            return {
+                "count": 0.0,
+                "mean": float("nan"),
+                "std": float("nan"),
+                "min": float("nan"),
+                "max": float("nan"),
+                "p50": float("nan"),
+                "p95": float("nan"),
+            }
+        vals = values.to(dtype=torch.float32)
+        q_vals = vals
+        if vals.numel() > max_quantile_samples:
+            if rng is None:
+                rng = torch.Generator(device=vals.device)
+                rng.manual_seed(0)
+            idx = torch.randint(
+                low=0,
+                high=vals.numel(),
+                size=(max_quantile_samples,),
+                generator=rng,
+                device=vals.device,
+            )
+            q_vals = vals[idx]
+        if vals.numel() == 1:
+            p50 = float(vals.item())
+            p95 = p50
+        else:
+            qs = torch.quantile(
+                q_vals,
+                torch.tensor([0.5, 0.95], device=q_vals.device, dtype=q_vals.dtype),
+            )
+            p50 = float(qs[0].item())
+            p95 = float(qs[1].item())
+        return {
+            "count": float(vals.numel()),
+            "mean": float(vals.mean().item()),
+            "std": float(vals.std(unbiased=False).item()),
+            "min": float(vals.min().item()),
+            "max": float(vals.max().item()),
+            "p50": p50,
+            "p95": p95,
+        }
+
     sample_rows: list[dict[str, Any]] = []
     points_counts: list[int] = []
     traj_lengths: list[int] = []
     inv_std_values: list[float] = []
+    obs_count_values: list[float] = []
     snippet_shapes: dict[str, str] | None = None
+    has_obs_count = False
 
     progress = st.progress(0.0)
     total = len(dataset)
@@ -530,13 +588,16 @@ def _collect_vin_snippet_cache_stats(
         points_counts.append(points_count)
         traj_lengths.append(traj_len)
 
-        inv_std_mean = float("nan")
-        if points_count > 0 and points_world.shape[-1] >= 4:
-            inv_std = points_world[:, 3]
-            inv_std = inv_std[torch.isfinite(inv_std)]
-            if inv_std.numel() > 0:
-                inv_std_mean = float(inv_std.mean().item())
-                inv_std_values.append(inv_std_mean)
+        if points_count > 0 and points_world.shape[-1] > 3:
+            inv_vals = _finite_1d(points_world[:, 3])
+            if inv_vals.numel() > 0:
+                inv_std_values.extend(inv_vals.detach().cpu().tolist())
+
+        if points_count > 0 and points_world.shape[-1] > 4:
+            has_obs_count = True
+            obs_vals = _finite_1d(points_world[:, 4])
+            if obs_vals.numel() > 0:
+                obs_count_values.extend(obs_vals.detach().cpu().tolist())
 
         scene_id = entries[idx].scene_id if idx < len(entries) else ""
         snippet_id = entries[idx].snippet_id if idx < len(entries) else ""
@@ -546,7 +607,6 @@ def _collect_vin_snippet_cache_stats(
                 "snippet_id": snippet_id,
                 "points_count": points_count,
                 "traj_len": traj_len,
-                "inv_dist_std_mean": inv_std_mean,
             },
         )
     progress.empty()
@@ -561,13 +621,39 @@ def _collect_vin_snippet_cache_stats(
             return float("nan")
         return float(np.median(values))
 
+    def _safe_max(values: list[int | float]) -> float:
+        if not values:
+            return float("nan")
+        return float(np.max(values))
+
+    inv_stats = (
+        _point_stats(torch.tensor(inv_std_values), rng=torch.Generator().manual_seed(0))
+        if inv_std_values
+        else _point_stats(torch.empty(0))
+    )
+    obs_stats = (
+        _point_stats(torch.tensor(obs_count_values), rng=torch.Generator().manual_seed(0))
+        if obs_count_values
+        else _point_stats(torch.empty(0))
+    )
+
     summary = {
         "samples": len(points_counts),
         "points_mean": _safe_mean(points_counts),
         "points_median": _safe_median(points_counts),
+        "points_max": _safe_max(points_counts),
         "traj_len_mean": _safe_mean(traj_lengths),
         "traj_len_median": _safe_median(traj_lengths),
-        "inv_dist_std_mean": _safe_mean(inv_std_values),
+        "inv_dist_std_mean": inv_stats["mean"],
+        "inv_dist_std_std": inv_stats["std"],
+        "inv_dist_std_p95": inv_stats["p95"],
+        "inv_dist_std_min": inv_stats["min"],
+        "inv_dist_std_max": inv_stats["max"],
+        "obs_count_mean": obs_stats["mean"],
+        "obs_count_std": obs_stats["std"],
+        "obs_count_p95": obs_stats["p95"],
+        "obs_count_min": obs_stats["min"],
+        "obs_count_max": obs_stats["max"],
     }
 
     return {
@@ -576,6 +662,8 @@ def _collect_vin_snippet_cache_stats(
         "points_counts": points_counts,
         "traj_lengths": traj_lengths,
         "inv_dist_std": inv_std_values,
+        "obs_count": obs_count_values,
+        "has_obs_count": has_obs_count,
         "snippet_shapes": snippet_shapes,
     }
 

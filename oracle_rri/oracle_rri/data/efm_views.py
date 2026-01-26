@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, fields, replace
+from inspect import cleandoc, getsource
 from pprint import pformat
 from typing import Any, Literal, TypedDict
 
@@ -39,15 +40,59 @@ from efm3d.aria.pose import PoseTW
 from efm3d.aria.tensor_wrapper import TensorWrapper
 from efm3d.utils.pointcloud import collapse_pointcloud_time
 from torch import Tensor
-from trimesh import Trimesh
+from trimesh import Trimesh  # type: ignore[import-untyped]
 
 from oracle_rri.data.mesh_cache import MeshProcessSpec
 
 from ..utils import summarize
 
+_FIELD_DOC_CACHE: dict[type, dict[str, str]] = {}
 
-def _repr(obj: Any) -> str:
-    return pformat({f.name: summarize(getattr(obj, f.name)) for f in fields(obj)}, indent=2, width=100, compact=False)
+
+def _extract_field_docs(cls: type) -> dict[str, str]:
+    try:
+        source = getsource(cls)
+    except OSError:
+        return {}
+    source = cleandoc(source)
+    pattern = re.compile(r"^\s*(\w+)\s*:[^\n]*\n\s*\"\"\"(.*?)\"\"\"", re.MULTILINE | re.DOTALL)
+    return {name: cleandoc(doc) for name, doc in pattern.findall(source)}
+
+
+def _get_field_doc(cls: type, field_name: str) -> str | None:
+    docs = _FIELD_DOC_CACHE.get(cls)
+    if docs is None:
+        docs = _extract_field_docs(cls)
+        _FIELD_DOC_CACHE[cls] = docs
+    return docs.get(field_name)
+
+
+def _repr(obj: Any, *, include_docstrings: bool) -> str:
+    items: dict[str, Any] = {}
+    cls = obj.__class__
+    for f in fields(obj):
+        value = summarize(getattr(obj, f.name))
+        if include_docstrings:
+            doc = f.metadata.get("doc") if f.metadata else None
+            if doc is None:
+                doc = _get_field_doc(cls, f.name)
+            items[f.name] = {"value": value, "doc": doc} if doc else {"value": value}
+        else:
+            items[f.name] = value
+    return pformat(items, indent=2, width=100, compact=False)
+
+
+class BaseView:
+    """Base class for EFM view dataclasses with fast, optional docstring repr."""
+
+    __repr_docstrings__: bool = False
+
+    def __repr__(self) -> str:  # pragma: no cover - formatting only
+        return _repr(self, include_docstrings=getattr(self, "__repr_docstrings__", False))
+
+    def repr_with_docstrings(self) -> str:  # pragma: no cover - formatting only
+        """Return a repr that includes field docstrings when available."""
+        return _repr(self, include_docstrings=True)
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +101,7 @@ def _repr(obj: Any) -> str:
 
 
 @dataclass(slots=True)
-class EfmGtCameraObbView:
+class EfmGtCameraObbView(BaseView):
     """Per-camera oriented bounding boxes for a single timestamp (EFM schema)."""
 
     category_names: list[str]
@@ -70,9 +115,6 @@ class EfmGtCameraObbView:
     ts_world_object: Tensor
     """Tensor['K 3 4'] world←object pose matrices per instance."""
 
-    def __repr__(self) -> str:  # pragma: no cover
-        return _repr(self)
-
 
 CamerasDict = TypedDict(
     "CamerasDict",
@@ -81,18 +123,15 @@ CamerasDict = TypedDict(
 
 
 @dataclass(slots=True)
-class EfmGtTimestampView:
+class EfmGtTimestampView(BaseView):
     """EFM GT slice for one timestamp across cameras."""
 
     time_id: str
     cameras: CamerasDict
 
-    def __repr__(self) -> str:  # pragma: no cover
-        return _repr(self)
-
 
 @dataclass(slots=True)
-class EfmGTView:
+class EfmGTView(BaseView):
     """Ground-truth annotations (EFM schema) for a snippet."""
 
     raw: dict[str, Any]
@@ -133,12 +172,9 @@ class EfmGTView:
             raise KeyError(f"No efm_gt entry for timestamp {ts}")
         return self.efm_gt[key].cameras
 
-    def __repr__(self) -> str:  # pragma: no cover
-        return _repr(self)
-
 
 @dataclass(slots=True)
-class EfmCameraView:
+class EfmCameraView(BaseView):
     """Zero-copy camera stream view in EFM schema (images, calibration, timing, optional depth)."""
 
     images: Tensor
@@ -226,12 +262,9 @@ class EfmCameraView:
         traj_idx = torch.argmin(dt, dim=0)
         return cam_idx, traj_idx
 
-    def __repr__(self) -> str:  # pragma: no cover - formatting only
-        return _repr(self)
-
 
 @dataclass(slots=True)
-class EfmTrajectoryView:
+class EfmTrajectoryView(BaseView):
     """World-frame rig trajectory aligned to snippet frames."""
 
     t_world_rig: PoseTW
@@ -258,12 +291,9 @@ class EfmTrajectoryView:
             gravity_in_world=self.gravity_in_world.to(device=target_device, dtype=dtype),
         )
 
-    def __repr__(self) -> str:  # pragma: no cover
-        return _repr(self)
-
 
 @dataclass(slots=True)
-class EfmPointsView:
+class EfmPointsView(BaseView):
     """Padded semi-dense SLAM point cloud view with per-frame metadata."""
 
     points_world: Tensor
@@ -419,12 +449,9 @@ class EfmPointsView:
 
         return pts.detach().cpu().numpy()
 
-    def __repr__(self) -> str:  # pragma: no cover
-        return _repr(self)
-
 
 @dataclass(slots=True)
-class EfmObbView:
+class EfmObbView(BaseView):
     """Snippet-level oriented bounding boxes (OBB) in snippet frame."""
 
     obbs: ObbTW
@@ -432,12 +459,9 @@ class EfmObbView:
     hz: Tensor | None = None
     """Optional ``Tensor["1", int32]`` detection frequency."""
 
-    def __repr__(self) -> str:  # pragma: no cover
-        return _repr(self)
-
 
 @dataclass(slots=True)
-class EfmSnippetView:
+class EfmSnippetView(BaseView):
     """Typed wrapper over an EFM-formatted sample plus optional mesh."""
 
     efm: dict[str, Any]
@@ -750,18 +774,22 @@ class EfmSnippetView:
 
 
 @dataclass(slots=True)
-class VinSnippetView:
+class VinSnippetView(BaseView):
     """Minimal snippet payload for VIN v2 batching.
 
     Attributes:
         points_world: ``Tensor["K (3+C)", float32]`` collapsed semidense points.
             Base columns are XYZ; optional extras include inv_dist_std and
             observation count (number of snippet frames that saw the point).
+        lengths: ``Tensor["B"]`` or ``Tensor["1"]`` number of valid points in
+            ``points_world`` (before padding).
         t_world_rig: ``PoseTW["F 12"]`` historical world←rig poses.
     """
 
     points_world: Tensor
     """Collapsed semidense point cloud with optional extra features."""
+    lengths: Tensor
+    """Number of valid points in ``points_world`` (before padding)."""
     t_world_rig: PoseTW
     """Trajectory poses (world←rig)."""
 
@@ -770,8 +798,12 @@ class VinSnippetView:
         return replace(
             self,
             points_world=self.points_world.to(device=target_device, dtype=dtype),
+            lengths=self.lengths.to(target_device),
             t_world_rig=self.t_world_rig.to(device=target_device, dtype=dtype),  # type: ignore[arg-type]
         )
+
+    def __repr__(self) -> str:
+        return _repr(self, include_docstring=getattr(self, "__repr_docstrings__", False))
 
 
 __all__ = [

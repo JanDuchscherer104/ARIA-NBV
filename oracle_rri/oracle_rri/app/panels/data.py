@@ -4,18 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import numpy as np
 import streamlit as st
 import torch
 from efm3d.aria.pose import PoseTW
 
 from ...data import EfmSnippetView
-from ...data.efm_views import EfmCameraView
 from ...data.plotting import (
     SnippetPlotBuilder,
     collect_frame_modalities,
+    pose_world_cam,
     plot_first_last_frames,
     project_pointcloud_on_frame,
+    semidense_points_for_frame,
 )
 from .common import _info_popover, _pretty_label
 
@@ -34,53 +34,6 @@ class Scene3DPlotOptions:
     gt_timestamp: int | None
     semidense_mode: str
     max_sem_points: int
-
-
-def pose_world_cam(
-    sample: EfmSnippetView,
-    cam_view: EfmCameraView,
-    frame_idx: int,
-) -> tuple[PoseTW, object]:
-    cam_ts = cam_view.time_ns.cpu().numpy()
-    traj_ts = sample.trajectory.time_ns.cpu().numpy()
-    traj_idx = int(np.argmin(np.abs(traj_ts - cam_ts[frame_idx])))
-
-    t_world_rig = sample.trajectory.t_world_rig[traj_idx]
-    t_cam_rig = cam_view.calib.T_camera_rig[frame_idx]
-    return t_world_rig @ t_cam_rig.inverse(), cam_view.calib[frame_idx]
-
-
-def semidense_points_for_frame(
-    sample: EfmSnippetView,
-    frame_idx: int | None,
-    *,
-    all_frames: bool,
-) -> torch.Tensor:
-    sem = sample.semidense
-    if sem is None or sem.points_world.numel() == 0:
-        return torch.zeros((0, 3), dtype=torch.float32)
-
-    pts = sem.points_world
-    lengths = sem.lengths
-    if all_frames:
-        if lengths is not None:
-            max_len = pts.shape[1]
-            mask_valid = torch.arange(max_len, device=pts.device).unsqueeze(
-                0,
-            ) < lengths.clamp_max(max_len).unsqueeze(
-                -1,
-            )
-            pts = torch.where(mask_valid.unsqueeze(-1), pts, torch.nan)
-        pts = pts.reshape(-1, 3)
-    else:
-        if frame_idx is None:
-            frame_idx = int(torch.argmax(lengths).item()) if lengths.numel() else 0
-        frame_idx = max(0, min(int(frame_idx), pts.shape[0] - 1))
-        n_valid = int(lengths[frame_idx].item()) if lengths is not None else pts.shape[1]
-        pts = pts[frame_idx, :n_valid]
-
-    finite = torch.isfinite(pts).all(dim=-1)
-    return pts[finite]
 
 
 def scene_plot_options_ui(

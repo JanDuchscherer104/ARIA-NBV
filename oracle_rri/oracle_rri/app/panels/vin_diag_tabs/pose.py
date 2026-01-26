@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import numpy as np
+import plotly.graph_objects as go
 import streamlit as st
+import torch
+from plotly.subplots import make_subplots
+from pytorch3d.transforms import rotation_6d_to_matrix
 
 from ....pose_generation.plotting import (
     plot_direction_polar,
     plot_direction_sphere,
     plot_radius_hist,
 )
+from ....vin.plotting import _histogram_overlay, _to_numpy
 from ..common import _info_popover, _pretty_label
-from ..plot_utils import _histogram_overlay, _to_numpy
 from .context import VinDiagContext
 
 
@@ -40,6 +45,98 @@ def render_pose_tab(ctx: VinDiagContext) -> None:
         ),
         width="stretch",
     )
+
+    pose_vec = getattr(debug, "pose_vec", None)
+    if torch.is_tensor(pose_vec) and pose_vec.shape[-1] >= 9:
+        pose_flat = pose_vec.reshape(-1, pose_vec.shape[-1])
+        r6d = pose_flat[:, 3:9]
+        try:
+            r6d_rot = rotation_6d_to_matrix(r6d.to(dtype=torch.float32))
+            eye = torch.eye(3, device=r6d_rot.device, dtype=r6d_rot.dtype).unsqueeze(0)
+            resid = r6d_rot.transpose(1, 2) @ r6d_rot - eye
+            ortho_err = torch.linalg.norm(resid, dim=(1, 2))
+            det = torch.det(r6d_rot)
+
+            _info_popover(
+                "r6d orthonormality",
+                "Orthonormality error (||R^T R - I||_F) and determinant for rotations "
+                "reconstructed from the 6D representation (Zhou et al., 2019). "
+                "These should cluster near 0 error and det≈1.",
+            )
+            col_err, col_det = st.columns(2)
+            with col_err:
+                st.plotly_chart(
+                    _histogram_overlay(
+                        [("orthonormality error", _to_numpy(ortho_err))],
+                        bins=60,
+                        title=_pretty_label("R6D orthonormality error"),
+                        xaxis_title=_pretty_label("||R^T R - I||_F"),
+                        log1p_counts=False,
+                    ),
+                    width="stretch",
+                )
+            with col_det:
+                st.plotly_chart(
+                    _histogram_overlay(
+                        [("det(R)", _to_numpy(det))],
+                        bins=60,
+                        title=_pretty_label("R6D determinant"),
+                        xaxis_title=_pretty_label("det(R)"),
+                        log1p_counts=False,
+                    ),
+                    width="stretch",
+                )
+        except Exception:  # pragma: no cover - diagnostic-only
+            st.info("R6D orthonormality plot unavailable for this batch.")
+
+        _info_popover(
+            "r6d circles",
+            "R6D component circle plots (Zhou et al., 2019). Each 3D vector in the 6D "
+            "representation is projected to XY/XZ/YZ planes after normalization.",
+        )
+        r6d_cols = r6d.reshape(-1, 2, 3)
+        norms = torch.linalg.norm(r6d_cols, dim=-1, keepdim=True).clamp_min(1e-6)
+        r6d_norm = (r6d_cols / norms).detach().cpu().numpy()
+        colors = np.linspace(0.0, 1.0, r6d_norm.shape[0])
+        fig = make_subplots(
+            rows=2,
+            cols=3,
+            subplot_titles=(
+                "col1: (x, y)",
+                "col1: (x, z)",
+                "col1: (y, z)",
+                "col2: (x, y)",
+                "col2: (x, z)",
+                "col2: (y, z)",
+            ),
+        )
+        for row in range(2):
+            vec = r6d_norm[:, row, :]
+            pairs = [(0, 1), (0, 2), (1, 2)]
+            for col, (i, j) in enumerate(pairs, start=1):
+                fig.add_trace(
+                    go.Scatter(
+                        x=vec[:, i],
+                        y=vec[:, j],
+                        mode="markers",
+                        marker={
+                            "size": 3,
+                            "color": colors,
+                            "colorscale": "Turbo",
+                            "showscale": False,
+                            "opacity": 0.6,
+                        },
+                        name=f"col{row + 1}",
+                    ),
+                    row=row + 1,
+                    col=col,
+                )
+        fig.update_layout(
+            title=_pretty_label("R6D component circle plots"),
+            height=520,
+            showlegend=False,
+        )
+        st.plotly_chart(fig, width="stretch")
 
     if has_tokens:
         center_dirs = _to_numpy(debug.candidate_center_dir_rig.reshape(-1, 3))

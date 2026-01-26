@@ -5,67 +5,32 @@ backbone (EFM3D) for next-best-view scoring.
 """
 
 from .backbone_evl import EvlBackbone, EvlBackboneConfig
-from .model import VinModel, VinModelConfig
-from .model_v2 import VinModelV2, VinModelV2Config
-from .plotting import (
-    build_candidate_encoding_figures,
-    build_geometry_overview_figure,
-    build_scene_field_evidence_figures,
-    build_vin_encoding_figures,
-    plot_vin_encodings_from_debug,
-)
+from .model_v3 import VinModelV3, VinModelV3Config
 from .pose_encoders import (
     PoseEncoder,
-    PoseEncoderConfig,
     PoseEncodingOutput,
     R6dLffPoseEncoder,
     R6dLffPoseEncoderConfig,
-    ShellLffPoseEncoder,
-    ShellLffPoseEncoderConfig,
-    ShellShPoseEncoderAdapter,
-    ShellShPoseEncoderAdapterConfig,
 )
-from .pose_encoding import (
-    FourierFeatures,
-    FourierFeaturesConfig,
-    LearnableFourierFeatures,
-    LearnableFourierFeaturesConfig,
-)
-from .spherical_encoding import ShellShPoseEncoder, ShellShPoseEncoderConfig
+from .pose_encoding import LearnableFourierFeatures, LearnableFourierFeaturesConfig
 from .traj_encoder import TrajectoryEncoder, TrajectoryEncoderConfig, TrajectoryEncodingOutput
-from .types import EvlBackboneOutput, VinForwardDiagnostics, VinPrediction
+from .types import EvlBackboneOutput, VinPrediction, VinV3ForwardDiagnostics
 
 __all__ = [
     "EvlBackbone",
     "EvlBackboneConfig",
     "EvlBackboneOutput",
-    "FourierFeatures",
-    "FourierFeaturesConfig",
     "LearnableFourierFeatures",
     "LearnableFourierFeaturesConfig",
     "PoseEncoder",
-    "PoseEncoderConfig",
     "PoseEncodingOutput",
     "R6dLffPoseEncoder",
     "R6dLffPoseEncoderConfig",
-    "ShellLffPoseEncoder",
-    "ShellLffPoseEncoderConfig",
-    "ShellShPoseEncoderAdapter",
-    "ShellShPoseEncoderAdapterConfig",
-    "ShellShPoseEncoder",
-    "ShellShPoseEncoderConfig",
-    "VinModel",
-    "VinModelConfig",
-    "VinModelV2",
-    "VinModelV2Config",
-    "VinForwardDiagnostics",
+    "VinModelV3",
+    "VinModelV3Config",
+    "VinV3ForwardDiagnostics",
     "VinPrediction",
     "TrajectoryEncoder",
     "TrajectoryEncoderConfig",
     "TrajectoryEncodingOutput",
-    "build_candidate_encoding_figures",
-    "build_geometry_overview_figure",
-    "build_scene_field_evidence_figures",
-    "build_vin_encoding_figures",
-    "plot_vin_encodings_from_debug",
 ]

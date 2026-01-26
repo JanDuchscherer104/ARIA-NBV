@@ -5,12 +5,10 @@ from __future__ import annotations
 import streamlit as st
 import torch
 
-from ....vin.plotting import (
-    build_frustum_samples_figure,
-    build_semidense_projection_figure,
-)
+from ....vin.experimental.plotting import build_frustum_samples_figure
+from ....vin.plotting import build_semidense_projection_figure
+from ....vin.plotting import _plot_slice_grid, _to_numpy
 from ..common import _info_popover, _pretty_label
-from ..plot_utils import _plot_slice_grid, _to_numpy
 from .context import VinDiagContext
 
 

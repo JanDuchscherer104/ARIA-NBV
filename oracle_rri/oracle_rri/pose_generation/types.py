@@ -61,6 +61,7 @@ class CandidateContext:
 
     cfg: "CandidateViewGeneratorConfig"
     reference_pose: PoseTW
+    sampling_pose: PoseTW
 
     gt_mesh: Trimesh
     mesh_verts: torch.Tensor
@@ -99,13 +100,15 @@ class CandidateSamplingResult:
     views: CameraTW
     """views.T_camera_rig are candidate_camera <- reference_pose (camera pose in reference frame; intrinsics as per CandidateGenerationConfig :: camera_label)."""
     reference_pose: PoseTW
-    """World <- reference_pose around which candidates are defined."""
+    """World <- physical reference pose (rig) used to express candidate extrinsics. FIXME: pose is not gravity-aligned; This pose is used downstream!"""
     mask_valid: torch.Tensor
     masks: dict[str, torch.Tensor]
     shell_poses: PoseTW
     """cam2world poses for all sampled candidates (pre-pruning)."""
     shell_offsets_ref: torch.Tensor | None = None
-    """Sampled offsets in reference frame for the full shell (pre-pruning)."""
+    """Sampled offsets in the sampling frame for the full shell (pre-pruning)."""
+    sampling_pose: PoseTW | None = None
+    """World <- sampling pose (gravity-aligned when enabled) used to generate candidate centers. FIXME: Previously we only provided reference_pose, which was *not* gravity-aligned."""
     extras: dict[str, Any] = field(default_factory=dict)
 
     def poses_world_cam(self, *, device: torch.device | None = None) -> PoseTW:

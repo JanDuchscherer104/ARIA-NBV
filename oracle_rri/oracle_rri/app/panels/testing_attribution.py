@@ -21,7 +21,7 @@ from ...interpretability.attribution import (
 )
 from ...lightning.lit_module import VinLightningModule
 from ...rri_metrics.coral import coral_expected_from_logits, coral_logits_to_prob
-from ...vin.pose_encoders import infer_pose_vec_groups
+from ...vin.experimental.pose_encoders import infer_pose_vec_groups
 from ..state import get_vin_state
 from .common import _info_popover
 from .offline_cache_utils import _load_efm_snippet_for_cache

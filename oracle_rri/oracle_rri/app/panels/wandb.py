@@ -386,11 +386,7 @@ def render_wandb_analysis_page() -> None:
         overlap = meta_df.columns.intersection(summary_subset.columns)
         if not overlap.empty:
             summary_subset = summary_subset.drop(columns=list(overlap))
-    run_table = (
-        meta_df.copy()
-        .join(summary_subset, how="left")
-        .reset_index()
-    )
+    run_table = meta_df.copy().join(summary_subset, how="left").reset_index()
     default_selected = cache.get("selected_ids") or run_table["id"].head(3).tolist()
     run_table = run_table.assign(include=run_table["id"].isin(default_selected))
 
