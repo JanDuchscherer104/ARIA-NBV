@@ -54,9 +54,11 @@ class VinDataModuleConfig(BaseConfig["VinDataModule"]):
     shuffle: bool = True
     """Whether to shuffle the train dataset at each epoch (only applies to offline caches)."""
 
+    shuffle_candidates: bool = True
+    """Whether to shuffle candidate views and corresponding labels with each sample (only applies to offline caches)."""
+
     num_workers: int = 16
     """Number of DataLoader worker processes (use >0 for offline caches; keep 0 for online labeler)."""
-
     batch_size: int | None = None
     """Optional DataLoader batch size (offline-cache only; requires custom collation)."""
 
@@ -70,7 +72,7 @@ class VinDataModuleConfig(BaseConfig["VinDataModule"]):
     """Enable debug defaults (forces num_workers=0, lowers verbosity)."""
 
     use_train_as_val: bool = False
-    """Use the train dataset instance for validation/testing."""
+    """Use the train dataset instance for validation/testing (applies to online datasets)."""
 
     @model_validator(mode="after")
     def _check_compatibility(self) -> VinDataModuleConfig:
@@ -118,6 +120,34 @@ class VinDataModule(pl.LightningDataModule):
         is_map_style: bool
         allow_shuffle: bool
         use_batching: bool
+
+    class _ShuffleCandidatesMapDataset(Dataset[VinOracleBatch]):
+        """Map-style dataset wrapper that shuffles candidates per sample."""
+
+        def __init__(self, base: Dataset[VinOracleBatch]) -> None:
+            self._base = base
+
+        def __len__(self) -> int:  # type: ignore[override]
+            return len(self._base)
+
+        def __getitem__(self, idx: int) -> VinOracleBatch:  # type: ignore[override]
+            sample = self._base[idx]
+            if not isinstance(sample, VinOracleBatch):
+                raise TypeError("ShuffleCandidatesMapDataset expects VinOracleBatch samples.")
+            return sample.shuffle_candidates()
+
+    class _ShuffleCandidatesIterableDataset(IterableDataset[VinOracleBatch]):
+        """Iterable dataset wrapper that shuffles candidates per sample."""
+
+        def __init__(self, base: IterableDataset[VinOracleBatch]) -> None:
+            super().__init__()
+            self._base = base
+
+        def __iter__(self) -> Iterator[VinOracleBatch]:  # type: ignore[override]
+            for sample in self._base:
+                if not isinstance(sample, VinOracleBatch):
+                    raise TypeError("ShuffleCandidatesIterableDataset expects VinOracleBatch samples.")
+                yield sample.shuffle_candidates()
 
     def _resolve_map_style(self, dataset: object) -> bool:
         return bool(getattr(dataset, "is_map_style", isinstance(dataset, Dataset)))
@@ -184,8 +214,14 @@ class VinDataModule(pl.LightningDataModule):
     # ------------------------------------------------------------------ loaders
     def train_dataloader(self) -> DataLoader:
         plan = self._build_stage_plan(Stage.TRAIN)
+        dataset = plan.dataset
+        if plan.is_map_style and self.config.shuffle_candidates:
+            if isinstance(dataset, Dataset):
+                dataset = self._ShuffleCandidatesMapDataset(dataset)
+            elif isinstance(dataset, IterableDataset):
+                dataset = self._ShuffleCandidatesIterableDataset(dataset)
         return DataLoader(
-            plan.dataset,
+            dataset,
             batch_size=self.config.batch_size if plan.use_batching else None,
             shuffle=self.config.shuffle if plan.allow_shuffle else False,
             num_workers=self.config.num_workers,

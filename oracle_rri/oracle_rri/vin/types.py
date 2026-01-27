@@ -238,8 +238,23 @@ class VinV3ForwardDiagnostics:
     semidense_proj: Tensor | None = None
     """``Tensor["B N C_proj", float32]`` Per-candidate semidense projection features."""
 
+    semidense_grid_feat: Tensor | None = None
+    """``Tensor["B N C_cnn", float32]`` CNN-encoded semidense projection grid features."""
+
     voxel_proj: Tensor | None = None
     """``Tensor["B N C_proj", float32]`` Per-candidate voxel projection features."""
+
+    traj_feat: Tensor | None = None
+    """``Tensor["B F_traj", float32]`` Pooled trajectory embedding (if enabled)."""
+
+    traj_ctx: Tensor | None = None
+    """``Tensor["B N F_pose", float32]`` Trajectory context attended by pose tokens."""
+
+    traj_pose_vec: Tensor | None = None
+    """``Tensor["B T D_v", float32]`` Per-frame trajectory pose vectors."""
+
+    traj_pose_enc: Tensor | None = None
+    """``Tensor["B T F_traj", float32]`` Per-frame trajectory pose encodings."""
 
 
 EfmDict = TypedDict(

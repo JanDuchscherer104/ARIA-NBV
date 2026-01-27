@@ -9,14 +9,13 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 import torch
 from efm3d.aria.pose import PoseTW
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
+from torch import Tensor
 
 from ..vin.types import EvlBackboneOutput
 from .efm_views import EfmSnippetView, VinSnippetView
 
 if TYPE_CHECKING:
     from ..pipelines.oracle_rri_labeler import OracleRriLabelBatch
-
-Tensor = torch.Tensor
 
 
 @dataclass(slots=True)
@@ -122,6 +121,133 @@ class VinOracleBatch:
             out["backbone"] = "None"
 
         return out
+
+    def shuffle_candidates(self, *, generator: torch.Generator | None = None) -> "VinOracleBatch":
+        """Return a copy with candidate ordering randomly permuted.
+
+        The permutation is applied consistently across candidate-specific fields:
+        poses, oracle RRI targets, per-metric distances, and the corresponding
+        PyTorch3D cameras. Non-candidate fields (snippet view, backbone outputs)
+        are preserved.
+        """
+        poses = self.candidate_poses_world_cam.tensor()
+        if poses.ndim == 2:
+            batch_size = 1
+            num_candidates = int(poses.shape[0])
+            has_batch = False
+        elif poses.ndim == 3:
+            batch_size = int(poses.shape[0])
+            num_candidates = int(poses.shape[1])
+            has_batch = True
+        else:
+            raise ValueError("candidate_poses_world_cam must have shape (N,12) or (B,N,12).")
+
+        if num_candidates <= 1:
+            return self
+
+        if batch_size == 1:
+            perm = torch.randperm(num_candidates, device=poses.device, generator=generator).view(1, -1)
+        else:
+            perm = torch.rand((batch_size, num_candidates), device=poses.device, generator=generator).argsort(dim=1)
+
+        def _gather_candidate(data: Tensor) -> Tensor:
+            if data.ndim == 2 and not has_batch:
+                data_b = data.unsqueeze(0)
+            elif data.ndim >= 2 and has_batch:
+                data_b = data
+            else:
+                raise ValueError("Candidate tensors must have shape (N, ...) or (B, N, ...).")
+            if data_b.shape[0] != batch_size or data_b.shape[1] != num_candidates:
+                raise ValueError("Candidate tensor batch/length mismatch during shuffling.")
+            expand_shape = (batch_size, num_candidates) + (1,) * (data_b.ndim - 2)
+            index = perm.view(expand_shape).expand_as(data_b)
+            gathered = torch.gather(data_b, dim=1, index=index)
+            return gathered if has_batch else gathered.squeeze(0)
+
+        def _gather_1d(values: Tensor) -> Tensor:
+            if values.ndim == 1:
+                data = values.unsqueeze(0)
+                had_batch = False
+            elif values.ndim == 2:
+                data = values
+                had_batch = True
+            else:
+                raise ValueError("Candidate labels must have shape (N,) or (B, N).")
+            if data.shape[0] != batch_size or data.shape[1] != num_candidates:
+                raise ValueError("Candidate label batch/length mismatch during shuffling.")
+            gathered = torch.gather(data, dim=1, index=perm)
+            return gathered if had_batch else gathered.squeeze(0)
+
+        def _shuffle_camera_param(param: Tensor, *, name: str) -> Tensor:
+            if param.shape[0] == 1:
+                return param
+            if param.shape[0] == num_candidates and batch_size == 1:
+                data = param.unsqueeze(0)
+                expand_shape = (batch_size, num_candidates) + (1,) * (data.ndim - 2)
+                index = perm.view(expand_shape).expand_as(data)
+                return torch.gather(data, dim=1, index=index).squeeze(0)
+            if param.shape[0] == batch_size * num_candidates:
+                data = param.reshape(batch_size, num_candidates, *param.shape[1:])
+                expand_shape = (batch_size, num_candidates) + (1,) * (data.ndim - 2)
+                index = perm.view(expand_shape).expand_as(data)
+                gathered = torch.gather(data, dim=1, index=index)
+                return gathered.reshape(batch_size * num_candidates, *param.shape[1:])
+            raise ValueError(f"Camera param '{name}' has unsupported shape {tuple(param.shape)} for shuffling.")
+
+        candidate_poses_world_cam = PoseTW(_gather_candidate(poses))
+        rri = _gather_1d(self.rri)
+        pm_dist_before = _gather_1d(self.pm_dist_before)
+        pm_dist_after = _gather_1d(self.pm_dist_after)
+        pm_acc_before = _gather_1d(self.pm_acc_before)
+        pm_comp_before = _gather_1d(self.pm_comp_before)
+        pm_acc_after = _gather_1d(self.pm_acc_after)
+        pm_comp_after = _gather_1d(self.pm_comp_after)
+
+        in_ndc = getattr(self.p3d_cameras, "in_ndc", False)
+        if callable(in_ndc):
+            in_ndc = in_ndc()
+        znear = getattr(self.p3d_cameras, "znear", None)
+        zfar = getattr(self.p3d_cameras, "zfar", None)
+        cam_kwargs = {
+            "device": self.p3d_cameras.R.device,
+            "R": _shuffle_camera_param(self.p3d_cameras.R, name="R"),
+            "T": _shuffle_camera_param(self.p3d_cameras.T, name="T"),
+            "focal_length": _shuffle_camera_param(self.p3d_cameras.focal_length, name="focal_length"),
+            "principal_point": _shuffle_camera_param(self.p3d_cameras.principal_point, name="principal_point"),
+            "image_size": _shuffle_camera_param(self.p3d_cameras.image_size, name="image_size"),
+            "in_ndc": bool(in_ndc),
+        }
+        if znear is not None:
+            cam_kwargs["znear"] = znear
+        if zfar is not None:
+            cam_kwargs["zfar"] = zfar
+        try:
+            p3d_cameras = PerspectiveCameras(**cam_kwargs)
+        except TypeError:
+            cam_kwargs.pop("znear", None)
+            cam_kwargs.pop("zfar", None)
+            p3d_cameras = PerspectiveCameras(**cam_kwargs)
+            if znear is not None:
+                p3d_cameras.znear = znear
+            if zfar is not None:
+                p3d_cameras.zfar = zfar
+
+        return VinOracleBatch(
+            efm_snippet_view=self.efm_snippet_view,
+            candidate_poses_world_cam=candidate_poses_world_cam,
+            reference_pose_world_rig=self.reference_pose_world_rig,
+            rri=rri,
+            pm_dist_before=pm_dist_before,
+            pm_dist_after=pm_dist_after,
+            pm_acc_before=pm_acc_before,
+            pm_comp_before=pm_comp_before,
+            pm_acc_after=pm_acc_after,
+            pm_comp_after=pm_comp_after,
+            p3d_cameras=p3d_cameras,
+            scene_id=self.scene_id,
+            snippet_id=self.snippet_id,
+            backbone_out=self.backbone_out,
+        )
 
     @classmethod
     def from_label(

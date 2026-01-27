@@ -4,7 +4,8 @@ This module implements a streamlined VIN baseline distilled from the vin-v2
 optuna sweep. The sweep showed that extra modules (PointNeXt point encoder,
 semidense frustum MHCA, trajectory context) were confounded by config fixes or
 only weakly positive. The most reliable signal came from semidense projection
-coverage and voxel-validity cues, so v3 keeps a minimal, deterministic path:
+coverage and voxel-validity cues, so v3 keeps a minimal, deterministic path
+with optional trajectory context re-enabled behind a config flag:
 
 1) Pose encoding (R6D + LFF):
    Candidate poses are expressed in the reference rig frame
@@ -25,15 +26,20 @@ coverage and voxel-validity cues, so v3 keeps a minimal, deterministic path:
 4) Semidense projection stats (VIN-NBV proxy):
    We project semidense points into each candidate view to compute coverage,
    empty fraction, visibility fraction, and depth moments. These features act as
-   a lightweight proxy for frustum attention and are used for candidate validity
-   and diagnostics (no FiLM, no concat).
+   a lightweight proxy for frustum attention, are concatenated into the scorer
+   input, and drive a tiny CNN over the projection grid for richer cues.
 
 5) Voxel projection FiLM:
    Pooled voxel centers are projected into candidate views and summarized; this
    drives a light FiLM modulation of the global feature (kept as the only
    view-conditioned modulation).
 
-6) CORAL head:
+6) Optional trajectory context (disabled by default):
+   Snippet rig poses can be encoded and attended by candidate embeddings to
+   provide motion context, mirroring the v2 path without forcing it on the
+   baseline.
+
+7) CORAL head:
    A shallow MLP plus CORAL ordinal head produces per-candidate RRI scores.
 
 Frame-consistency:
@@ -45,6 +51,8 @@ enabled, callers must pre-correct p3d_cameras and set cw90_corrected=True.
 NOTE: vin inputs are typically VinSnippetView with points_world shaped (N,5)
 containing (x, y, z, 1/sigma_d, n_obs). This file enforces that contract to
 avoid silent failure modes.
+
+TODO: Do we differentiate between semi-dense points based on their visibility from each candidate view?
 """
 
 from __future__ import annotations
@@ -70,6 +78,7 @@ from .backbone_evl import EvlBackboneConfig
 from .pose_encoders import PoseEncoder, R6dLffPoseEncoderConfig
 from .pose_encoding import LearnableFourierFeaturesConfig
 from .summarize_v3 import summarize_vin_v3
+from .traj_encoder import TrajectoryEncoder, TrajectoryEncoderConfig
 from .types import EvlBackboneOutput, VinPrediction, VinV3ForwardDiagnostics
 from .vin_modules import PoseConditionedGlobalPool
 from .vin_utils import (
@@ -108,6 +117,12 @@ SEMIDENSE_PROJ_FEATURES: tuple[str, ...] = (
     "depth_std",
 )
 SEMIDENSE_PROJ_DIM = len(SEMIDENSE_PROJ_FEATURES)
+SEMIDENSE_GRID_FEATURES: tuple[str, ...] = (
+    "occupancy",
+    "depth_mean",
+    "depth_std",
+)
+SEMIDENSE_GRID_CHANNELS = len(SEMIDENSE_GRID_FEATURES)
 
 SEMIDENSE_PROJ_FEATURE_ALIASES: dict[str, str] = {
     "valid_frac": "semidense_candidate_vis_frac",
@@ -158,13 +173,29 @@ class VinModelV3Config(BaseConfig["VinModelV3"]):
     field_gn_groups: int = Field(default=4, gt=0)
     """Requested GroupNorm groups (clamped to a divisor of ``field_dim``) for stability."""
 
-    semidense_proj_grid_size: int = Field(default=16, gt=0)
-    """Grid size for semidense coverage stats (sweep best used 12)."""
+    semidense_proj_grid_size: int = Field(default=24, gt=0)
+    """Grid size for semidense projection stats (higher for tiny-CNN cues)."""
 
     semidense_proj_max_points: int = Field(default=4096, gt=0)
     """Maximum semidense points used for projection stats (sweep best used 4096)."""
-    use_voxel_valid_frac_gate: bool = True
-    """Gate voxel/global features based on voxel coverage (best trials often off)."""
+
+    semidense_cnn_enabled: bool = True
+    """Whether to encode a tiny 2D CNN over the semidense projection grid."""
+
+    semidense_cnn_channels: int = Field(default=8, gt=0)
+    """Hidden channel width for the semidense projection CNN."""
+
+    semidense_cnn_out_dim: int = Field(default=16, gt=0)
+    """Output feature dimension of the semidense projection CNN."""
+
+    use_traj_encoder: bool = Field(default=True)
+    """Whether to encode snippet trajectories and append trajectory context."""
+
+    traj_encoder: TrajectoryEncoderConfig | None = Field(default_factory=TrajectoryEncoderConfig)
+    """Optional trajectory encoder for snippet rig poses (R6D + LFF)."""
+
+    use_voxel_valid_frac_gate: bool = False
+    """Deprecated: voxel gate removed. Keep ``False`` (use FiLM only)."""
 
     semidense_obs_count_min: float = 1.0
     """Global minimum of semidense observation count ``n_obs`` (cache summary)."""
@@ -254,14 +285,21 @@ class VinModelV3(nn.Module):
         self.config = config
 
         # Optional modules (may be None)
-        self.voxel_gate: nn.Module | None = None
         self.voxel_proj_film: nn.Module | None = None
         self.voxel_proj_film_norm: nn.GroupNorm | None = None
+        self.semidense_cnn: nn.Module | None = None
+        self.traj_encoder: TrajectoryEncoder | None = None
+        self.traj_attn: nn.MultiheadAttention | None = None
+        self.traj_attn_norm: nn.GroupNorm | None = None
 
         # Init backbone lazily during first forward pass iff backbone outputs are not provided
         self.backbone = None
 
         self.pose_encoder: PoseEncoder = self.config.pose_encoder.setup_target()
+        traj_encoder_cfg = self.config.traj_encoder if self.config.use_traj_encoder else None
+        if self.config.use_traj_encoder and traj_encoder_cfg is None:
+            raise ValueError("use_traj_encoder=True requires a traj_encoder configuration.")
+        self.traj_encoder = traj_encoder_cfg.setup_target() if traj_encoder_cfg is not None else None
 
         field_dim = self.config.field_dim
         gn_groups = largest_divisor_leq(field_dim, self.config.field_gn_groups)
@@ -285,12 +323,6 @@ class VinModelV3(nn.Module):
             num_heads=num_heads,
             pos_grid_encoder=self.config.pos_grid_encoder_lff,
         )
-        # TODO: why are we using sigmoid gate as well as FiLM?
-        if self.config.use_voxel_valid_frac_gate:
-            self.voxel_gate = nn.Sequential(
-                nn.Linear(1, field_dim),
-                nn.Sigmoid(),
-            )
 
         self.voxel_proj_film = nn.Linear(SEMIDENSE_PROJ_DIM, 2 * field_dim, bias=True)
         voxel_proj_groups = largest_divisor_leq(field_dim, 4)
@@ -299,9 +331,27 @@ class VinModelV3(nn.Module):
             num_channels=field_dim,
         )
 
+        # Tiny CNN for semidense projection grids (per-candidate cues).
+        if self.config.semidense_cnn_enabled:
+            cnn_channels = int(self.config.semidense_cnn_channels)
+            cnn_out_dim = int(self.config.semidense_cnn_out_dim)
+            self.semidense_cnn = nn.Sequential(
+                nn.Conv2d(SEMIDENSE_GRID_CHANNELS, cnn_channels, kernel_size=3, padding=1),
+                nn.GELU(),
+                nn.Conv2d(cnn_channels, cnn_channels, kernel_size=3, padding=1),
+                nn.GELU(),
+                nn.AdaptiveAvgPool2d((2, 2)),
+                nn.Flatten(),
+                nn.Linear(cnn_channels * 4, cnn_out_dim),
+            )
+
         # ---------------------------------------------------------------------------------
-        # Scorer head: MLP + CORAL
-        head_in_dim = pose_dim + field_dim
+        # Scorer head: MLP + CORAL (pose + global voxel + semidense projection stats + CNN)
+        head_in_dim = pose_dim + field_dim + SEMIDENSE_PROJ_DIM
+        if self.traj_encoder is not None:
+            head_in_dim += pose_dim
+        if self.semidense_cnn is not None:
+            head_in_dim += int(self.config.semidense_cnn_out_dim)
         act: nn.Module = nn.GELU()
         hidden_dim = int(self.config.head_hidden_dim)
         layers: list[nn.Module] = [nn.Linear(head_in_dim, hidden_dim), act]
@@ -318,6 +368,22 @@ class VinModelV3(nn.Module):
             num_classes=self.config.num_classes,
             preinit_bias=self.config.coral_preinit_bias,
         )
+
+        if self.traj_encoder is not None:
+            traj_dim = int(self.traj_encoder.out_dim)
+            traj_heads = largest_divisor_leq(pose_dim, 4)
+            self.traj_attn = nn.MultiheadAttention(
+                embed_dim=pose_dim,
+                num_heads=traj_heads,
+                kdim=traj_dim,
+                vdim=traj_dim,
+                batch_first=True,
+            )
+            traj_norm_groups = largest_divisor_leq(pose_dim, 4)
+            self.traj_attn_norm = nn.GroupNorm(
+                num_groups=traj_norm_groups,
+                num_channels=pose_dim,
+            )
 
         self.to(self.backbone.device if self.backbone is not None else torch.device("cpu"))
 
@@ -454,6 +520,78 @@ class VinModelV3(nn.Module):
             pose_vec=pose_out.pose_vec,
             candidate_center_rig_m=pose_out.center_m,
         )
+
+    def _encode_traj_features(
+        self,
+        snippet: EfmSnippetView | VinSnippetView,
+        *,
+        pose_world_rig_ref: PoseTW,
+        batch_size: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> tuple[Tensor | None, Tensor | None, Tensor | None]:
+        """Encode snippet trajectory poses in the reference rig frame.
+
+        This mirrors the v2 trajectory context path but keeps it optional
+        (disabled by default) to preserve the streamlined baseline.
+
+        Args:
+            snippet (EfmSnippetView | VinSnippetView): Snippet with rig trajectory.
+            pose_world_rig_ref (PoseTW["B, 12"]): Reference rig pose T_w^r.
+            batch_size (int): B (batch size).
+            device (torch.device): Target device for outputs.
+            dtype (torch.dtype): Output dtype.
+
+        Returns:
+            Tuple of:
+                traj_feat (Tensor["B, F_traj"] or None): Pooled trajectory embedding.
+                traj_pose_vec (Tensor["B, T, D_v"] or None): Per-frame pose vectors.
+                traj_pose_enc (Tensor["B, T, F_traj"] or None): Per-frame pose encodings.
+        """
+        if self.traj_encoder is None:
+            return None, None, None
+
+        traj_world_rig: PoseTW | None = None
+        if isinstance(snippet, VinSnippetView):
+            traj_world_rig = snippet.t_world_rig
+        elif isinstance(snippet, EfmSnippetView):
+            try:
+                traj_world_rig = snippet.trajectory.t_world_rig
+            except Exception:
+                traj_world_rig = None
+
+        if traj_world_rig is None or traj_world_rig.numel() == 0:
+            traj_feat = torch.zeros(
+                (batch_size, self.traj_encoder.out_dim),
+                device=device,
+                dtype=dtype,
+            )
+            return traj_feat, None, None
+
+        traj_world_rig = traj_world_rig.to(device=device, dtype=torch.float32)
+        if traj_world_rig.ndim == 2:
+            traj_world_rig = PoseTW(traj_world_rig._data.unsqueeze(0))
+        elif traj_world_rig.ndim != 3:
+            raise ValueError(
+                f"Expected trajectory poses with ndim 2 or 3, got {traj_world_rig.ndim}.",
+            )
+        if traj_world_rig.shape[0] == 1 and batch_size > 1:
+            traj_world_rig = PoseTW(traj_world_rig._data.expand(batch_size, -1, -1))
+        elif traj_world_rig.shape[0] != batch_size:
+            raise ValueError(
+                "Trajectory batch size must match candidates or be broadcastable.",
+            )
+
+        t_rig_world = pose_world_rig_ref.inverse()
+        traj_rig_ref = t_rig_world[:, None] @ traj_world_rig
+        traj_out = self.traj_encoder.encode_poses(traj_rig_ref)
+        traj_feat = traj_out.pooled
+        if traj_feat is None:
+            traj_feat = traj_out.per_frame.pose_enc.mean(dim=1)
+        traj_feat = traj_feat.to(device=device, dtype=dtype)
+        traj_pose_vec = traj_out.per_frame.pose_vec.to(device=device, dtype=dtype)
+        traj_pose_enc = traj_out.per_frame.pose_enc.to(device=device, dtype=dtype)
+        return traj_feat, traj_pose_vec, traj_pose_enc
 
     def _build_field_bundle(self, backbone_out: EvlBackboneOutput) -> FieldBundle:
         """Construct the compact voxel scene field and its projection.
@@ -721,37 +859,56 @@ class VinModelV3(nn.Module):
                 valid_len = int(points.shape[0])
             if valid_len <= 0:
                 raise RuntimeError("VinSnippetView.points_world has zero valid points.")
+            if not torch.isfinite(points[:valid_len, :3]).all():
+                raise ValueError("VinSnippetView.points_world contains non-finite XYZ values.")
             if valid_len > max_points:
                 idx = torch.randperm(valid_len, device=points.device)[:max_points]
                 points = points[:valid_len][idx]
             else:
                 points = points[:valid_len]
-            if not torch.isfinite(points[..., :3]).all():
-                raise ValueError("VinSnippetView.points_world contains non-finite XYZ values.")
         elif points.ndim == 3:
-            batch_size, _, dim = points.shape
+            batch_size, num_points, dim = points.shape
+            if lengths is None or lengths.numel() == 0:
+                lengths = torch.full(
+                    (batch_size,),
+                    num_points,
+                    device=points.device,
+                    dtype=torch.long,
+                )
+            else:
+                lengths = lengths.reshape(-1).to(device=points.device, dtype=torch.long)
+                if lengths.numel() == 1 and batch_size > 1:
+                    lengths = lengths.expand(batch_size)
+                if lengths.numel() != batch_size:
+                    raise ValueError(
+                        "VinSnippetView.lengths must have shape (B,) or (1,) when points_world is batched.",
+                    )
+            lengths = lengths.clamp(min=0, max=num_points)
+            valid_mask = torch.arange(num_points, device=points.device).unsqueeze(0) < lengths.unsqueeze(1)
+            if not valid_mask.any():
+                raise RuntimeError("VinSnippetView.points_world has zero valid points.")
+            if not torch.isfinite(points[..., :3])[valid_mask].all():
+                raise ValueError("VinSnippetView.points_world contains non-finite XYZ values.")
+
+            k = min(int(max_points), int(num_points))
+            scores = torch.rand((batch_size, num_points), device=points.device)
+            scores = scores.masked_fill(~valid_mask, float("-inf"))
+            topk_scores, topk_idx = scores.topk(k, dim=1)
+            selected = points.gather(1, topk_idx.unsqueeze(-1).expand(-1, -1, dim))
+
             points_out = torch.full(
                 (batch_size, max_points, dim),
                 float("nan"),
                 dtype=points.dtype,
                 device=points.device,
             )
-            for b in range(batch_size):
-                if lengths is not None and lengths.numel() > b:
-                    valid_len = int(lengths.reshape(-1)[b].item())
-                    valid_len = min(valid_len, int(points.shape[1]))
-                else:
-                    valid_len = int(points.shape[1])
-                if valid_len <= 0:
-                    continue
-                if valid_len > max_points:
-                    idx = torch.randperm(valid_len, device=points.device)[:max_points]
-                    points_out[b, :max_points] = points[b, :valid_len][idx]
-                else:
-                    points_out[b, :valid_len] = points[b, :valid_len]
+            valid_topk = torch.isfinite(topk_scores)
+            points_out[:, :k] = torch.where(
+                valid_topk.unsqueeze(-1),
+                selected,
+                points_out[:, :k],
+            )
             points = points_out
-            if not torch.isfinite(points[..., :3]).all():
-                raise ValueError("VinSnippetView.points_world contains non-finite XYZ values.")
         else:
             raise ValueError(
                 f"Expected VinSnippetView.points_world with ndim 2 or 3, got {points.ndim}.",
@@ -1017,6 +1174,89 @@ class VinModelV3(nn.Module):
             proj_feat = feats.view(batch_size, num_candidates, -1)
         return proj_feat.to(device=device, dtype=dtype)
 
+    def _encode_semidense_grid_features(
+        self,
+        proj_data: dict[str, Tensor] | None,
+        *,
+        batch_size: int,
+        num_candidates: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> Tensor:
+        """Encode semidense projection grids with a tiny CNN.
+
+        Args:
+            proj_data (dict[str, Tensor] | None): Projection outputs.
+                - x, y, z (Tensor["B*Nq, P_proj"]): screen coords + depth.
+                - valid (Tensor["B*Nq, P_proj"]): projection mask.
+                - image_size (Tensor["B*Nq, 2"]): (H, W) per camera.
+                - num_cams (Tensor[""]): scalar camera count.
+            batch_size (int): B (batch size).
+            num_candidates (int): Nq (candidates per batch).
+            device (torch.device): Target device for features.
+            dtype (torch.dtype): Output dtype.
+
+        Returns:
+            Tensor["B, Nq, F_cnn"]: Semidense grid CNN features.
+        """
+        if self.semidense_cnn is None:
+            raise RuntimeError("Semidense CNN is disabled.")
+        if proj_data is None:
+            raise RuntimeError("Semidense projection data is missing.")
+
+        x = proj_data["x"]  # (B*N_q, P_proj)
+        y = proj_data["y"]  # (B*N_q, P_proj)
+        z = proj_data["z"]  # (B*N_q, P_proj)
+        valid = proj_data["valid"]  # (B*N_q, P_proj)
+        image_size = proj_data["image_size"]  # (B*N_q, 2) as (H, W)
+        num_cams = int(proj_data["num_cams"].item())
+
+        grid_size = int(self.config.semidense_proj_grid_size)
+        num_bins = grid_size * grid_size
+        h = image_size[:, 0].unsqueeze(1).clamp_min(1.0)
+        w = image_size[:, 1].unsqueeze(1).clamp_min(1.0)
+
+        x_safe = torch.where(valid, x, torch.zeros_like(x))
+        y_safe = torch.where(valid, y, torch.zeros_like(y))
+        z_safe = torch.where(valid, z, torch.zeros_like(z))
+        x_safe = torch.nan_to_num(x_safe, nan=0.0, posinf=0.0, neginf=0.0)
+        y_safe = torch.nan_to_num(y_safe, nan=0.0, posinf=0.0, neginf=0.0)
+        z_safe = torch.nan_to_num(z_safe, nan=0.0, posinf=0.0, neginf=0.0)
+
+        x_bin = torch.clamp((x_safe / w) * grid_size, 0.0, float(grid_size - 1)).to(dtype=torch.long)
+        y_bin = torch.clamp((y_safe / h) * grid_size, 0.0, float(grid_size - 1)).to(dtype=torch.long)
+        bin_idx = y_bin * grid_size + x_bin
+
+        counts = torch.zeros((num_cams, num_bins), device=device, dtype=torch.float32)
+        sum_z = torch.zeros_like(counts)
+        sum_z2 = torch.zeros_like(counts)
+        bin_idx = torch.where(valid, bin_idx, torch.zeros_like(bin_idx))
+        valid_f = valid.to(dtype=counts.dtype)
+
+        counts.scatter_add_(1, bin_idx, valid_f)
+        sum_z.scatter_add_(1, bin_idx, z_safe * valid_f)
+        sum_z2.scatter_add_(1, bin_idx, (z_safe**2) * valid_f)
+
+        denom = counts.clamp_min(1.0)
+        depth_mean = sum_z / denom
+        depth_var = (sum_z2 / denom) - depth_mean**2
+        depth_std = torch.sqrt(depth_var.clamp_min(0.0))
+
+        empty_mask = counts <= 0.0
+        depth_mean = torch.where(empty_mask, torch.zeros_like(depth_mean), depth_mean)
+        depth_std = torch.where(empty_mask, torch.zeros_like(depth_std), depth_std)
+
+        occupancy = (counts > 0.0).to(dtype=counts.dtype)
+        occ_grid = occupancy.view(num_cams, grid_size, grid_size)
+        mean_grid = depth_mean.view(num_cams, grid_size, grid_size)
+        std_grid = depth_std.view(num_cams, grid_size, grid_size)
+        grid = torch.stack([occ_grid, mean_grid, std_grid], dim=1).to(device=device, dtype=dtype)
+
+        feats = self.semidense_cnn(grid)
+        if batch_size == 1 and num_cams == num_candidates:
+            return feats.view(1, num_candidates, -1)
+        return feats.view(batch_size, num_candidates, -1)
+
     @staticmethod
     def _semidense_proj_feature_index(name: str) -> int:
         if name in SEMIDENSE_PROJ_FEATURES:
@@ -1063,7 +1303,9 @@ class VinModelV3(nn.Module):
                 VinV3ForwardDiagnostics (optional):
                     field_in (Tensor["B, F_in, D, H, W"]), field (Tensor["B, F_g, D, H, W"]),
                     global_feat (Tensor["B, Nq, F_g"]), semidense_proj (Tensor["B, Nq, F_proj"]),
-                    voxel_proj (Tensor["B, Nq, F_proj"]), pos_grid (Tensor["B, 3, D, H, W"]), feats (Tensor["B, Nq, F_head"]).
+                    semidense_grid_feat (Tensor["B, Nq, F_cnn"]), voxel_proj (Tensor["B, Nq, F_proj"]),
+                    pos_grid (Tensor["B, 3, D, H, W"]), feats (Tensor["B, Nq, F_head"]),
+                    traj_feat (Tensor["B, F_traj"]), traj_ctx (Tensor["B, Nq, F_pose"]).
         """
         # Shape notation (see docs/typst/shared/macros.typ):
         # B=batch size, N_q=#candidates (alias of N), D/H/W=voxel grid, V=voxel points,
@@ -1152,10 +1394,6 @@ class VinModelV3(nn.Module):
         )
         # global_feat: (B, N_q, F_g); pos_grid: (B, 3, D, H, W)
         global_feat = global_ctx.global_feat
-        if self.voxel_gate is not None:
-            # Gate down candidates whose centers fall outside observed voxels.
-            gate = self.voxel_gate(voxel_valid_frac.unsqueeze(-1).to(dtype=global_feat.dtype))
-            global_feat = global_feat * gate
         pool_grid = min(
             int(self.config.global_pool_grid_size),
             int(field_bundle.field.shape[-3]),
@@ -1217,7 +1455,44 @@ class VinModelV3(nn.Module):
             dtype=field_bundle.field.dtype,
         )
         # semidense_proj: (B, N_q, F_proj=5)
-        global_ctx = GlobalContext(pos_grid=global_ctx.pos_grid, global_feat=global_ctx.global_feat)
+        semidense_grid_feat = None
+        if self.semidense_cnn is not None:
+            semidense_grid_feat = self._encode_semidense_grid_features(
+                proj_data,
+                batch_size=prepared.batch_size,
+                num_candidates=prepared.num_candidates,
+                device=prepared.device,
+                dtype=field_bundle.field.dtype,
+            )
+        # semidense_grid_feat: (B, N_q, F_cnn) when enabled
+        # TOOD: why init GlobalContext twice?
+        # global_ctx = GlobalContext(pos_grid=global_ctx.pos_grid, global_feat=global_ctx.global_feat)
+
+        traj_feat, traj_pose_vec, traj_pose_enc = self._encode_traj_features(
+            vin_snippet,
+            pose_world_rig_ref=prepared.pose_world_rig_ref,
+            batch_size=prepared.batch_size,
+            device=prepared.device,
+            dtype=field_bundle.field.dtype,
+        )
+        traj_ctx = None
+        if self.traj_attn is not None:
+            if traj_pose_enc is None:
+                traj_ctx = torch.zeros(
+                    (prepared.batch_size, prepared.num_candidates, pose_feats.pose_enc.shape[-1]),
+                    device=prepared.device,
+                    dtype=field_bundle.field.dtype,
+                )
+            else:
+                traj_ctx, _ = self.traj_attn(
+                    query=pose_feats.pose_enc.to(dtype=traj_pose_enc.dtype),
+                    key=traj_pose_enc,
+                    value=traj_pose_enc,
+                    need_weights=False,
+                )
+                traj_ctx = traj_ctx.to(dtype=field_bundle.field.dtype)
+                if self.traj_attn_norm is not None:
+                    traj_ctx = self.traj_attn_norm(traj_ctx.transpose(1, 2)).transpose(1, 2)
 
         semidense_idx = self._semidense_proj_feature_index("semidense_candidate_vis_frac")
         semidense_candidate_vis_frac = semidense_proj[..., semidense_idx]
@@ -1228,7 +1503,12 @@ class VinModelV3(nn.Module):
         parts: list[Tensor] = [
             pose_feats.pose_enc.to(device=prepared.device, dtype=field_bundle.field.dtype),
             global_feat,
+            semidense_proj.to(device=prepared.device, dtype=field_bundle.field.dtype),
         ]
+        if semidense_grid_feat is not None:
+            parts.append(semidense_grid_feat.to(device=prepared.device, dtype=field_bundle.field.dtype))
+        if traj_ctx is not None:
+            parts.append(traj_ctx.to(device=prepared.device, dtype=field_bundle.field.dtype))
 
         feats = torch.cat(parts, dim=-1)  # (B, N_q, F_head)
         flat_feats = feats.reshape(prepared.batch_size * prepared.num_candidates, -1)  # (B*N_q, F_head)
@@ -1274,7 +1554,12 @@ class VinModelV3(nn.Module):
             pos_grid=global_ctx.pos_grid,
             feats=feats,
             semidense_proj=semidense_proj,
+            semidense_grid_feat=semidense_grid_feat,
             voxel_proj=voxel_proj,
+            traj_feat=traj_feat,
+            traj_ctx=traj_ctx,
+            traj_pose_vec=traj_pose_vec,
+            traj_pose_enc=traj_pose_enc,
         )
         return pred, debug
 

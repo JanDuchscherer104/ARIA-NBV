@@ -138,6 +138,15 @@ def summarize_vin_v3(
             debug.voxel_proj,
             include_stats=True,
         )
+    traj_summary: dict[str, str] = {}
+    if debug.traj_feat is not None:
+        traj_summary["traj_feat"] = summarize(debug.traj_feat, include_stats=True)
+    if debug.traj_ctx is not None:
+        traj_summary["traj_ctx"] = summarize(debug.traj_ctx, include_stats=True)
+    if debug.traj_pose_vec is not None:
+        traj_summary["traj_pose_vec"] = summarize(debug.traj_pose_vec, include_stats=True)
+    if debug.traj_pose_enc is not None:
+        traj_summary["traj_pose_enc"] = summarize(debug.traj_pose_enc, include_stats=True)
 
     summary_dict = {
         "meta": {
@@ -177,6 +186,8 @@ def summarize_vin_v3(
             ),
         },
     }
+    if traj_summary:
+        summary_dict["trajectory"] = traj_summary
     for key in ["points/p3s_world", "points/dist_std", "pose/gravity_in_world"]:
         if key in efm_dict:
             summary_dict.setdefault("efm", {})[key] = summarize(efm_dict.get(key))

@@ -450,6 +450,43 @@ def _scatter3d(
     )
 
 
+def _select_p3d_camera(cameras: PerspectiveCameras, index: int) -> PerspectiveCameras:
+    num_cams = int(cameras.R.shape[0]) if cameras.R is not None else 0
+    if num_cams == 0:
+        return cameras
+
+    in_ndc = getattr(cameras, "in_ndc", False)
+    if callable(in_ndc):
+        in_ndc = in_ndc()
+    needs_rebuild = not hasattr(cameras, "_in_ndc")
+
+    def _ensure_batch(param: torch.Tensor | None) -> torch.Tensor | None:
+        if param is None:
+            return None
+        if param.ndim == 1:
+            return param.unsqueeze(0)
+        return param
+
+    if num_cams > 1 or needs_rebuild:
+        idx = min(int(index), num_cams - 1)
+        rot = cameras.R[idx : idx + 1] if num_cams > 1 else cameras.R
+        trans = cameras.T[idx : idx + 1] if num_cams > 1 else cameras.T
+        cameras = PerspectiveCameras(
+            device=cameras.device,
+            R=_ensure_batch(rot),
+            T=_ensure_batch(trans),
+            focal_length=_ensure_batch(cameras.focal_length[idx : idx + 1] if num_cams > 1 else cameras.focal_length),
+            principal_point=_ensure_batch(
+                cameras.principal_point[idx : idx + 1] if num_cams > 1 else cameras.principal_point,
+            ),
+            image_size=_ensure_batch(cameras.image_size[idx : idx + 1] if num_cams > 1 else cameras.image_size)
+            if cameras.image_size is not None
+            else None,
+            in_ndc=bool(in_ndc),
+        )
+    return cameras
+
+
 def _voxel_indices_to_world(
     indices: np.ndarray,
     *,
@@ -1293,39 +1330,7 @@ def build_semidense_projection_figure(
     if points_world.shape[0] > 1:
         points_world = points_world[:1]
 
-    cam = p3d_cameras.to(points_world.device)
-    num_cams = int(cam.R.shape[0])
-    if num_cams == 0:
-        return go.Figure()
-    in_ndc = getattr(cam, "in_ndc", False)
-    if callable(in_ndc):
-        in_ndc = in_ndc()
-    needs_rebuild = not hasattr(cam, "_in_ndc")
-
-    def _ensure_batch(param: torch.Tensor | None) -> torch.Tensor | None:
-        if param is None:
-            return None
-        if param.ndim == 1:
-            return param.unsqueeze(0)
-        return param
-
-    if num_cams > 1 or needs_rebuild:
-        idx = min(int(candidate_index), num_cams - 1)
-        rot = cam.R[idx : idx + 1] if num_cams > 1 else cam.R
-        trans = cam.T[idx : idx + 1] if num_cams > 1 else cam.T
-        cam = PerspectiveCameras(
-            device=cam.device,
-            R=_ensure_batch(rot),
-            T=_ensure_batch(trans),
-            focal_length=_ensure_batch(cam.focal_length[idx : idx + 1] if num_cams > 1 else cam.focal_length),
-            principal_point=_ensure_batch(
-                cam.principal_point[idx : idx + 1] if num_cams > 1 else cam.principal_point,
-            ),
-            image_size=_ensure_batch(cam.image_size[idx : idx + 1] if num_cams > 1 else cam.image_size)
-            if cam.image_size is not None
-            else None,
-            in_ndc=bool(in_ndc),
-        )
+    cam = _select_p3d_camera(p3d_cameras.to(points_world.device), int(candidate_index))
     cam_idx = 0
 
     pts_world = points_world[0]
@@ -1341,8 +1346,8 @@ def build_semidense_projection_figure(
     image_size = cam.image_size
     if image_size is None or image_size.numel() == 0:
         return go.Figure()
-    h = image_size[:, 0].unsqueeze(1)
-    w = image_size[:, 1].unsqueeze(1)
+    h = image_size[0, 0].clamp_min(1.0)
+    w = image_size[0, 1].clamp_min(1.0)
     finite = torch.isfinite(pts_screen).all(dim=-1)
     valid_mask = finite & (z > 0.0) & (x >= 0.0) & (y >= 0.0) & (x <= (w - 1.0)) & (y <= (h - 1.0))
     valid = valid_mask.squeeze(0).detach().cpu().numpy()
@@ -1403,6 +1408,275 @@ def build_semidense_projection_figure(
         margin={"l": 0, "r": 0, "t": 40, "b": 0},
     )
     return fig
+
+
+def build_semidense_projection_feature_maps(
+    points_world: torch.Tensor,
+    *,
+    p3d_cameras: PerspectiveCameras,
+    candidate_index: int,
+    grid_size: int,
+    max_points: int,
+    semidense_obs_count_max: float,
+    semidense_inv_dist_std_min: float,
+    semidense_inv_dist_std_p95: float,
+) -> dict[str, np.ndarray]:
+    """Compute semidense projection feature maps for a candidate view."""
+    if points_world.ndim == 2:
+        points_world = points_world.unsqueeze(0)
+    if points_world.ndim != 3:
+        return {}
+
+    points_world = points_world[:1]
+    pts = points_world[0]
+    if pts.numel() == 0:
+        return {}
+
+    xyz = pts[..., :3]
+    extra = pts[..., 3:] if pts.shape[-1] > 3 else None
+    inv_dist_std = extra[..., 0] if extra is not None and extra.shape[-1] >= 1 else None
+    obs_count = extra[..., 1] if extra is not None and extra.shape[-1] >= 2 else None
+
+    finite_xyz = torch.isfinite(xyz).all(dim=-1)
+    if not finite_xyz.any():
+        return {}
+    if xyz.shape[0] > max_points:
+        idx = torch.randperm(xyz.shape[0], device=xyz.device)[:max_points]
+        xyz = xyz[idx]
+        finite_xyz = finite_xyz[idx]
+        if inv_dist_std is not None:
+            inv_dist_std = inv_dist_std[idx]
+        if obs_count is not None:
+            obs_count = obs_count[idx]
+
+    cam = _select_p3d_camera(p3d_cameras.to(xyz.device), int(candidate_index))
+    if cam.R is None or int(cam.R.shape[0]) == 0:
+        return {}
+
+    pts_screen = cam.transform_points_screen(xyz.unsqueeze(0))
+    x, y, z = pts_screen[0].unbind(dim=-1)
+    image_size = cam.image_size
+    if image_size is None or image_size.numel() == 0:
+        return {}
+    h = image_size[0, 0].clamp_min(1.0)
+    w = image_size[0, 1].clamp_min(1.0)
+
+    finite = torch.isfinite(pts_screen[0]).all(dim=-1) & finite_xyz
+    valid = finite & (z > 0.0) & (x >= 0.0) & (y >= 0.0) & (x <= (w - 1.0)) & (y <= (h - 1.0))
+
+    x_safe = torch.where(valid, x, torch.zeros_like(x))
+    y_safe = torch.where(valid, y, torch.zeros_like(y))
+    z_safe = torch.where(valid, z, torch.zeros_like(z))
+    x_safe = torch.nan_to_num(x_safe, nan=0.0, posinf=0.0, neginf=0.0)
+    y_safe = torch.nan_to_num(y_safe, nan=0.0, posinf=0.0, neginf=0.0)
+    z_safe = torch.nan_to_num(z_safe, nan=0.0, posinf=0.0, neginf=0.0)
+
+    grid = int(grid_size)
+    x_bin = torch.clamp((x_safe / w) * grid, 0.0, float(grid - 1)).to(dtype=torch.long)
+    y_bin = torch.clamp((y_safe / h) * grid, 0.0, float(grid - 1)).to(dtype=torch.long)
+    bin_idx = y_bin * grid + x_bin
+    bin_idx = torch.where(valid, bin_idx, torch.zeros_like(bin_idx))
+
+    valid_f = valid.to(dtype=torch.float32)
+
+    eps = 1e-6
+    if obs_count is not None:
+        obs = obs_count.to(dtype=torch.float32).clamp_min(0.0)
+        obs = torch.nan_to_num(obs, nan=0.0, posinf=0.0, neginf=0.0)
+        obs_log = torch.log1p(obs)
+        denom = torch.log1p(torch.tensor(float(semidense_obs_count_max), device=xyz.device)).clamp_min(eps)
+        a = (obs_log / denom).clamp(0.0, 1.0)
+        a = torch.where(finite, a, torch.zeros_like(a))
+    else:
+        a = torch.ones_like(valid_f)
+
+    if inv_dist_std is not None:
+        inv = inv_dist_std.to(dtype=torch.float32).clamp_min(0.0)
+        inv = torch.nan_to_num(inv, nan=0.0, posinf=0.0, neginf=0.0)
+        inv_min = float(semidense_inv_dist_std_min)
+        inv_p95 = max(float(semidense_inv_dist_std_p95), inv_min + eps)
+        denom = torch.tensor(inv_p95 - inv_min, device=xyz.device, dtype=torch.float32).clamp_min(eps)
+        b = ((inv - inv_min) / denom).clamp(0.0, 1.0)
+    else:
+        b = torch.ones_like(valid_f)
+
+    w_rel = (a * b).clamp(0.0, 1.0)
+    weight_valid = w_rel * valid_f
+
+    num_bins = grid * grid
+    counts = torch.zeros(num_bins, device=xyz.device, dtype=torch.float32)
+    weights = torch.zeros_like(counts)
+    depth_sum = torch.zeros_like(counts)
+    depth_sq_sum = torch.zeros_like(counts)
+
+    counts.scatter_add_(0, bin_idx, valid_f)
+    weights.scatter_add_(0, bin_idx, weight_valid)
+    depth_sum.scatter_add_(0, bin_idx, z_safe * weight_valid)
+    depth_sq_sum.scatter_add_(0, bin_idx, (z_safe**2) * weight_valid)
+
+    weights_clamped = weights.clamp_min(eps)
+    depth_mean = depth_sum / weights_clamped
+    depth_var = depth_sq_sum / weights_clamped - depth_mean**2
+    depth_std = torch.sqrt(depth_var.clamp_min(0.0))
+
+    maps = {
+        "counts": counts.view(grid, grid).detach().cpu().numpy(),
+        "weights": weights.view(grid, grid).detach().cpu().numpy(),
+        "depth_mean": depth_mean.view(grid, grid).detach().cpu().numpy(),
+        "depth_std": depth_std.view(grid, grid).detach().cpu().numpy(),
+    }
+    return maps
+
+
+def build_semidense_cnn_grid_maps(
+    points_world: torch.Tensor,
+    *,
+    p3d_cameras: PerspectiveCameras,
+    candidate_index: int,
+    grid_size: int,
+    max_points: int,
+) -> dict[str, np.ndarray]:
+    """Compute semidense grid maps that match VIN v3's tiny-CNN inputs."""
+    if points_world.ndim == 2:
+        points_world = points_world.unsqueeze(0)
+    if points_world.ndim != 3:
+        return {}
+
+    points_world = points_world[:1]
+    pts = points_world[0]
+    if pts.numel() == 0:
+        return {}
+
+    xyz = pts[..., :3]
+    finite_xyz = torch.isfinite(xyz).all(dim=-1)
+    if not finite_xyz.any():
+        return {}
+    if xyz.shape[0] > max_points:
+        idx = torch.randperm(xyz.shape[0], device=xyz.device)[:max_points]
+        xyz = xyz[idx]
+        finite_xyz = finite_xyz[idx]
+
+    cam = _select_p3d_camera(p3d_cameras.to(xyz.device), int(candidate_index))
+    if cam.R is None or int(cam.R.shape[0]) == 0:
+        return {}
+
+    pts_screen = cam.transform_points_screen(xyz.unsqueeze(0))
+    x, y, z = pts_screen[0].unbind(dim=-1)
+    image_size = cam.image_size
+    if image_size is None or image_size.numel() == 0:
+        return {}
+    h = image_size[0, 0].clamp_min(1.0)
+    w = image_size[0, 1].clamp_min(1.0)
+
+    finite = torch.isfinite(pts_screen[0]).all(dim=-1) & finite_xyz
+    valid = finite & (z > 0.0) & (x >= 0.0) & (y >= 0.0) & (x <= (w - 1.0)) & (y <= (h - 1.0))
+
+    x_safe = torch.where(valid, x, torch.zeros_like(x))
+    y_safe = torch.where(valid, y, torch.zeros_like(y))
+    z_safe = torch.where(valid, z, torch.zeros_like(z))
+    x_safe = torch.nan_to_num(x_safe, nan=0.0, posinf=0.0, neginf=0.0)
+    y_safe = torch.nan_to_num(y_safe, nan=0.0, posinf=0.0, neginf=0.0)
+    z_safe = torch.nan_to_num(z_safe, nan=0.0, posinf=0.0, neginf=0.0)
+
+    grid = int(grid_size)
+    x_bin = torch.clamp((x_safe / w) * grid, 0.0, float(grid - 1)).to(dtype=torch.long)
+    y_bin = torch.clamp((y_safe / h) * grid, 0.0, float(grid - 1)).to(dtype=torch.long)
+    bin_idx = y_bin * grid + x_bin
+    bin_idx = torch.where(valid, bin_idx, torch.zeros_like(bin_idx))
+
+    valid_f = valid.to(dtype=torch.float32)
+    num_bins = grid * grid
+    counts = torch.zeros(num_bins, device=xyz.device, dtype=torch.float32)
+    depth_sum = torch.zeros_like(counts)
+    depth_sq_sum = torch.zeros_like(counts)
+    counts.scatter_add_(0, bin_idx, valid_f)
+    depth_sum.scatter_add_(0, bin_idx, z_safe * valid_f)
+    depth_sq_sum.scatter_add_(0, bin_idx, (z_safe**2) * valid_f)
+
+    denom = counts.clamp_min(1.0)
+    depth_mean = depth_sum / denom
+    depth_var = depth_sq_sum / denom - depth_mean**2
+    depth_std = torch.sqrt(depth_var.clamp_min(0.0))
+
+    occupancy = (counts > 0).to(dtype=torch.float32)
+    depth_mean = torch.where(occupancy > 0, depth_mean, torch.zeros_like(depth_mean))
+    depth_std = torch.where(occupancy > 0, depth_std, torch.zeros_like(depth_std))
+
+    return {
+        "occupancy": occupancy.view(grid, grid).detach().cpu().numpy(),
+        "depth_mean": depth_mean.view(grid, grid).detach().cpu().numpy(),
+        "depth_std": depth_std.view(grid, grid).detach().cpu().numpy(),
+    }
+
+
+def build_semidense_cnn_grid_figure(
+    points_world: torch.Tensor,
+    *,
+    p3d_cameras: PerspectiveCameras,
+    candidate_index: int,
+    grid_size: int,
+    max_points: int,
+) -> go.Figure:
+    """Visualize the projection grid maps used by the VIN v3 semidense CNN."""
+    maps = build_semidense_cnn_grid_maps(
+        points_world,
+        p3d_cameras=p3d_cameras,
+        candidate_index=candidate_index,
+        grid_size=grid_size,
+        max_points=max_points,
+    )
+    if not maps:
+        return go.Figure()
+
+    titles = ["occupancy", "depth_mean", "depth_std"]
+    slices = [maps[name] for name in titles if name in maps]
+    return _plot_slice_grid(
+        slices,
+        titles=titles,
+        title=_pretty_label("Semidense CNN grid inputs"),
+        cols=3,
+        percentile=99.0,
+        symmetric=False,
+        cmap_name="viridis",
+    )
+
+
+def build_semidense_projection_feature_figure(
+    points_world: torch.Tensor,
+    *,
+    p3d_cameras: PerspectiveCameras,
+    candidate_index: int,
+    grid_size: int,
+    max_points: int,
+    semidense_obs_count_max: float,
+    semidense_inv_dist_std_min: float,
+    semidense_inv_dist_std_p95: float,
+) -> go.Figure:
+    """Visualize semidense projection feature maps for a candidate."""
+    maps = build_semidense_projection_feature_maps(
+        points_world,
+        p3d_cameras=p3d_cameras,
+        candidate_index=candidate_index,
+        grid_size=grid_size,
+        max_points=max_points,
+        semidense_obs_count_max=semidense_obs_count_max,
+        semidense_inv_dist_std_min=semidense_inv_dist_std_min,
+        semidense_inv_dist_std_p95=semidense_inv_dist_std_p95,
+    )
+    if not maps:
+        return go.Figure()
+
+    titles = ["counts", "weights", "depth_mean", "depth_std"]
+    slices = [maps[name] for name in titles if name in maps]
+    return _plot_slice_grid(
+        slices,
+        titles=titles,
+        title=_pretty_label("Semidense projection feature maps (grid space)"),
+        cols=2,
+        percentile=99.0,
+        symmetric=False,
+        cmap_name="viridis",
+    )
 
 
 def build_field_slice_figures(
@@ -1906,6 +2180,10 @@ __all__ = [
     "build_scene_field_evidence_figures",
     "build_se3_closure_figure",
     "build_semidense_projection_figure",
+    "build_semidense_cnn_grid_figure",
+    "build_semidense_cnn_grid_maps",
+    "build_semidense_projection_feature_figure",
+    "build_semidense_projection_feature_maps",
     "build_valid_fraction_figure",
     "build_voxel_frame_figure",
     "build_voxel_inbounds_figure",

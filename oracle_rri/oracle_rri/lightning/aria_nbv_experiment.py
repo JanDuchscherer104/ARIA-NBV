@@ -74,25 +74,10 @@ class AriaNBVExperimentConfig(BaseConfig):
     summary_torchsummary_depth: int = Field(default=3, gt=0)
     """Max depth for torchsummary module traversal."""
 
-    plot_stage: Stage = Field(default=Stage.TRAIN)
-    """Stage used when running VIN encoding plots."""
-
-    plot_num_batches: int = Field(default=1, gt=0)
-    """Number of oracle batches to plot when run_mode="plot_vin_encodings"."""
-
     plot_out_dir: Path = Field(
         default_factory=lambda: Path("docs") / "figures" / "impl" / "vin",
     )
     """Output directory for VIN encoding plots."""
-
-    plot_lmax: int = Field(default=3, gt=0)
-    """Max spherical-harmonics degree to visualize."""
-
-    plot_sh_normalization: Literal["component", "norm"] = "component"
-    """Spherical harmonics normalization mode for plots."""
-
-    plot_radius_freqs: list[float] = Field(default_factory=lambda: [1.0, 2.0, 4.0, 8.0])
-    """Frequencies used for the radius Fourier feature plot."""
 
     ckpt_path: Path | None = None
     """Optional checkpoint path for val/test (or resume training)."""
@@ -144,15 +129,6 @@ class AriaNBVExperimentConfig(BaseConfig):
             return Stage.from_str(value.lower())
         return Stage.from_str(str(value).lower())
 
-    @field_validator("plot_stage", mode="before")
-    @classmethod
-    def _coerce_plot_stage(cls, value: Any) -> Stage:
-        if isinstance(value, Stage):
-            return value
-        if isinstance(value, str):
-            return Stage.from_str(value.lower())
-        return Stage.from_str(str(value).lower())
-
     @field_validator("run_mode", mode="before")
     @classmethod
     def _coerce_run_mode(cls, value: Any) -> str:
@@ -176,6 +152,79 @@ class AriaNBVExperimentConfig(BaseConfig):
             f"{self.run_name}.toml",
             must_exist=False,
         )
+
+    def _resolve_ckpt_path(self) -> Path | None:
+        """Resolve ckpt_path using PathConfig when provided."""
+        if self.ckpt_path in (None, ""):
+            return None
+        return self.paths.resolve_checkpoint_path(self.ckpt_path)
+
+    def _extract_checkpoint_hparams(self, payload: dict[str, Any]) -> dict[str, Any]:
+        raw = payload.get("hyper_parameters") or payload.get("hparams") or payload.get("module_arguments")
+        if isinstance(raw, dict) and "config" in raw and isinstance(raw["config"], dict):
+            return raw["config"]
+        if isinstance(raw, dict):
+            return raw
+        return {}
+
+    def _diff_config_keys(
+        self,
+        left: dict[str, Any],
+        right: dict[str, Any],
+        *,
+        prefix: str = "",
+    ) -> list[str]:
+        diff: list[str] = []
+        missing = object()
+        keys = set(left.keys()) | set(right.keys())
+        for key in sorted(keys):
+            lval = left.get(key, missing)
+            rval = right.get(key, missing)
+            path = f"{prefix}{key}"
+            if isinstance(lval, dict) and isinstance(rval, dict):
+                diff.extend(self._diff_config_keys(lval, rval, prefix=f"{path}."))
+                continue
+            if lval is missing or rval is missing or lval != rval:
+                diff.append(path)
+        return diff
+
+    def _log_checkpoint_config_drift(self, ckpt_path: Path, *, console: Console) -> None:
+        try:
+            payload = torch.load(ckpt_path, map_location="cpu")
+        except Exception as exc:  # noqa: BLE001
+            console.warn(f"Failed to read checkpoint metadata from {ckpt_path}: {exc}")
+            return
+
+        ckpt_cfg = self._extract_checkpoint_hparams(payload)
+        if not ckpt_cfg:
+            console.warn(
+                "Checkpoint missing hyper_parameters; continuing with current config overrides.",
+            )
+            return
+
+        current_cfg = self.module_config.model_dump_jsonable()
+        diff = self._diff_config_keys(ckpt_cfg, current_cfg)
+        if not diff:
+            return
+        sample = ", ".join(diff[:12])
+        suffix = "..." if len(diff) > 12 else ""
+        console.warn(
+            "Config drift detected vs checkpoint hparams; current config will override. "
+            f"Changed keys ({len(diff)}): {sample}{suffix}",
+        )
+
+    def _init_module_for_resume(
+        self,
+        ckpt_path: Path | None,
+        *,
+        console: Console,
+    ) -> VinLightningModule:
+        if ckpt_path is not None:
+            console.log(
+                f"Resuming from checkpoint {ckpt_path} with current config overrides.",
+            )
+            self._log_checkpoint_config_drift(ckpt_path, console=console)
+        return self.module_config.setup_target()
 
     def save_config(
         self,
@@ -261,7 +310,8 @@ class AriaNBVExperimentConfig(BaseConfig):
         out_dir.mkdir(parents=True, exist_ok=True)
 
         trainer: pl.Trainer = self.trainer_config.setup_target(experiment=self, trial=trial)
-        module: VinLightningModule = self.module_config.setup_target()
+        ckpt_path = self._resolve_ckpt_path()
+        module = self._init_module_for_resume(ckpt_path, console=console)
         datamodule: VinDataModule = self.datamodule_config.setup_target()
 
         datamodule.setup(stage=resolved_stage)
@@ -275,7 +325,7 @@ class AriaNBVExperimentConfig(BaseConfig):
         resolved_stage = Stage.from_str(stage) if stage is not None else self.stage
         trainer, module, datamodule = self.setup_target(setup_stage=resolved_stage)
 
-        ckpt_path = self.paths.resolve_checkpoint_path(self.ckpt_path)
+        ckpt_path = self._resolve_ckpt_path()
         ckpt_input = str(ckpt_path) if ckpt_path is not None else None
         match resolved_stage:
             case Stage.TRAIN:
@@ -554,33 +604,6 @@ class AriaNBVExperimentConfig(BaseConfig):
         object.__setattr__(self.datamodule_config, "source", cache_source_cfg)
         console.log(f"Using offline oracle cache at {cache_cfg.cache_dir} (map_location=cpu).")
 
-    def plot_vin_encodings(self) -> None:
-        """Generate VIN encoding plots using real oracle batches."""
-        stage = self.plot_stage
-        console = Console.with_prefix(self.__class__.__name__, "plot_vin_encodings")
-        _, module, datamodule = self.setup_target(setup_stage=stage)
-
-        out_dir = self.paths.resolve_under_root(self.plot_out_dir)
-        iterator = datamodule.iter_oracle_batches(stage=stage)
-        for idx in range(int(self.plot_num_batches)):
-            batch = next(iterator)
-            stem = f"{batch.scene_id}_{batch.snippet_id}".replace("/", "_")
-            batch_dir = out_dir / stem
-            plots = module.plot_vin_encodings_batch(
-                batch,
-                out_dir=batch_dir,
-                lmax=int(self.plot_lmax),
-                sh_normalization=str(self.plot_sh_normalization),
-                radius_freqs=list(self.plot_radius_freqs),
-                file_stem_prefix=stem,
-            )
-            console.log(
-                f"Saved VIN encoding plots for batch {idx + 1}/{self.plot_num_batches} "
-                f"(scene_id={batch.scene_id}, snippet_id={batch.snippet_id})",
-            )
-            for label, path in plots.items():
-                console.log(f"  {label}: {path}")
-
     def _interrupt_checkpoint_path(self, trainer: pl.Trainer) -> Path:
         """Build the checkpoint path used when training is interrupted.
 
@@ -746,8 +769,6 @@ class AriaNBVExperimentConfig(BaseConfig):
                 self.setup_target_and_run()
             case "summarize_vin":
                 self.summarize_vin()
-            case "plot_vin_encodings":
-                self.plot_vin_encodings()
 
 
 __all__ = ["AriaNBVExperimentConfig"]

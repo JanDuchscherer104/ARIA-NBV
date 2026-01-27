@@ -17,20 +17,22 @@ try:  # Optional dependency for W&B diagnostics.
 except ImportError:  # pragma: no cover - optional dependency guard
     wandb = None
 
-from ...configs.wandb_config import (
+from ...utils.wandb_utils import (
     WANDB_STEP_KEYS,
-    _extract_run_steps,
-    _filter_runs,
-    _flatten_mapping,
+    _ensure_wandb_api,
+    _linear_slope,
     _list_entities,
     _list_projects,
-    _list_runs,
-    _load_wandb_history,
+    _load_runs_filtered,
     _metric_pairs,
+    _resolve_x_key,
     _safe_mapping,
-    _select_metric_key,
+    build_dynamics_dataframe,
+    build_run_dataframes,
+    collect_run_media_images,
+    load_run_histories,
 )
-from .common import _info_popover, _linear_slope, _pretty_label, _report_exception, _segment_indices
+from .common import _info_popover, _pretty_label, _report_exception
 
 _ENTITY_CACHE_TTL_S = 300
 _DEFAULT_METRIC_FILTER = (
@@ -44,7 +46,7 @@ def _cached_entities(api_key: str) -> list[str]:
     if wandb is None:
         return []
     try:
-        api = wandb.Api(api_key=api_key) if api_key else wandb.Api()
+        api = _ensure_wandb_api(api_key)
     except Exception:  # pragma: no cover - API guard
         return []
     return _list_entities(api)
@@ -56,19 +58,10 @@ def _cached_projects(api_key: str, entity: str) -> list[str]:
     if wandb is None or not entity:
         return []
     try:
-        api = wandb.Api(api_key=api_key) if api_key else wandb.Api()
+        api = _ensure_wandb_api(api_key)
     except Exception:  # pragma: no cover - API guard
         return []
     return _list_projects(api, entity=entity)
-
-
-def _format_timestamp(value: Any) -> str:
-    """Render timestamps consistently for run tables."""
-    if value is None:
-        return ""
-    if hasattr(value, "strftime"):
-        return value.strftime("%Y-%m-%d %H:%M:%S")
-    return str(value)
 
 
 def _select_with_custom(
@@ -140,96 +133,6 @@ def _normalize_step_bounds(min_steps: int, max_steps: int) -> tuple[float | None
     return min_steps_value, max_steps_value, None
 
 
-def _run_metadata(run: Any) -> dict[str, Any]:
-    """Extract a lightweight metadata row for a run."""
-    tags = list(getattr(run, "tags", []) or [])
-    steps = _extract_run_steps(run)
-    return {
-        "id": str(getattr(run, "id", "")),
-        "name": str(getattr(run, "name", "")),
-        "state": str(getattr(run, "state", "")),
-        "group": str(getattr(run, "group", "")),
-        "job_type": str(getattr(run, "job_type", "")),
-        "tags": ", ".join(tags),
-        "created_at": _format_timestamp(getattr(run, "created_at", None)),
-        "steps": steps if steps is not None else np.nan,
-    }
-
-
-def _resolve_x_key(history: pd.DataFrame, preferred_keys: list[str]) -> str:
-    """Pick the best x-axis key and add a row index when needed."""
-    for key in preferred_keys:
-        if key in history.columns:
-            return key
-    if "row" not in history.columns:
-        history["row"] = np.arange(len(history))
-    return "row"
-
-
-def _finite_values(values: np.ndarray) -> np.ndarray:
-    """Return only finite values to avoid empty-slice warnings."""
-    return values[np.isfinite(values)]
-
-
-def _finite_mean(values: np.ndarray) -> float:
-    """Return the mean of finite values or NaN when none are finite."""
-    finite = _finite_values(values)
-    if finite.size == 0:
-        return float("nan")
-    return float(finite.mean())
-
-
-def _summarize_metric(
-    history: pd.DataFrame,
-    *,
-    metric_key: str,
-    x_key: str,
-    segment_frac: float,
-) -> dict[str, float]:
-    """Compute basic dynamics statistics for a metric."""
-    if metric_key not in history.columns or x_key not in history.columns:
-        return {}
-    df_metric = history[[x_key, metric_key]].dropna().sort_values(x_key)
-    if df_metric.empty:
-        return {}
-    values = df_metric[metric_key].to_numpy(dtype=float)
-    steps = df_metric[x_key].to_numpy(dtype=float)
-    early, mid, late = _segment_indices(len(df_metric), segment_frac)
-    finite = _finite_values(values)
-    mean_mid = float("nan") if mid.start >= mid.stop else _finite_mean(values[mid])
-    return {
-        "last": float(values[-1]),
-        "min": float(np.nan) if finite.size == 0 else float(finite.min()),
-        "max": float(np.nan) if finite.size == 0 else float(finite.max()),
-        "mean_early": _finite_mean(values[early]),
-        "mean_mid": mean_mid,
-        "mean_late": _finite_mean(values[late]),
-        "slope_early": _linear_slope(steps[early], values[early]),
-        "slope_late": _linear_slope(steps[late], values[late]),
-    }
-
-
-def _summarize_gap(
-    history: pd.DataFrame,
-    *,
-    x_key: str,
-    train_key: str,
-    val_key: str,
-) -> dict[str, float]:
-    """Summarize the train/val gap over the run."""
-    if train_key not in history.columns or val_key not in history.columns:
-        return {}
-    df_gap = history[[x_key, train_key, val_key]].dropna().sort_values(x_key)
-    if df_gap.empty:
-        return {}
-    gap = df_gap[train_key] - df_gap[val_key]
-    return {
-        "gap_last": float(gap.iloc[-1]),
-        "gap_mean": float(gap.mean()),
-        "gap_slope": _linear_slope(df_gap[x_key].to_numpy(dtype=float), gap.to_numpy(dtype=float)),
-    }
-
-
 def render_wandb_analysis_page() -> None:
     """Render cross-run analytics from W&B run history."""
     st.header("W&B Run Comparison")
@@ -290,10 +193,9 @@ def render_wandb_analysis_page() -> None:
         if not entity.strip() or not project.strip():
             st.warning("Enter an entity and project to load runs.")
         else:
-            name_regex = None
             if filters["name_regex_raw"].strip():
                 try:
-                    name_regex = re.compile(filters["name_regex_raw"].strip())
+                    re.compile(filters["name_regex_raw"].strip())
                 except re.error as exc:
                     st.warning(f"Invalid regex: {exc}")
             tags_filter = {tag.strip() for tag in filters["tags_raw"].split(",") if tag.strip()}
@@ -304,24 +206,21 @@ def render_wandb_analysis_page() -> None:
             if step_error:
                 st.warning(step_error)
             try:
-                api = wandb.Api()
+                api = _ensure_wandb_api(api_key)
                 with st.spinner("Loading runs from W&B..."):
-                    runs = _list_runs(
-                        api,
+                    runs = _load_runs_filtered(
+                        api=api,
                         entity=entity.strip(),
                         project=project.strip(),
                         max_runs=int(max_runs),
+                        name_regex=filters["name_regex_raw"].strip() or None,
+                        states=list(filters["states"]),
+                        tags=tags_filter,
+                        group=filters["group_filter"].strip(),
+                        job_type=filters["job_type_filter"].strip(),
+                        min_steps=min_steps_value,
+                        max_steps=max_steps_value,
                     )
-                runs = _filter_runs(
-                    runs,
-                    name_regex=name_regex,
-                    states=list(filters["states"]),
-                    tags=tags_filter,
-                    group=filters["group_filter"].strip(),
-                    job_type=filters["job_type_filter"].strip(),
-                    min_steps=min_steps_value,
-                    max_steps=max_steps_value,
-                )
                 cache = {
                     "entity": entity,
                     "project": project,
@@ -346,18 +245,8 @@ def render_wandb_analysis_page() -> None:
         return
 
     run_by_id = {str(getattr(run, "id", "")): run for run in runs}
-    meta_rows = [_run_metadata(run) for run in runs]
-    meta_df = pd.DataFrame(meta_rows).set_index("id")
-
-    summary_rows = []
-    config_by_id: dict[str, dict[str, Any]] = {}
-    for run in runs:
-        run_id = str(getattr(run, "id", ""))
-        config = _flatten_mapping(_safe_mapping(getattr(run, "config", None)))
-        summary = _flatten_mapping(_safe_mapping(getattr(run, "summary", None)))
-        config_by_id[run_id] = config
-        summary_rows.append({"id": run_id, **summary})
-    summary_df = pd.DataFrame(summary_rows).set_index("id")
+    meta_df, summary_df, config_df = build_run_dataframes(runs)
+    config_by_id: dict[str, dict[str, Any]] = config_df.to_dict(orient="index") if not config_df.empty else {}
 
     summary_keys = sorted(summary_df.columns)
     summary_filter_raw = st.text_input(
@@ -428,11 +317,12 @@ def render_wandb_analysis_page() -> None:
     if fetch_histories:
         try:
             with st.spinner("Fetching run histories..."):
-                for run in selected_runs:
-                    run_id = str(getattr(run, "id", ""))
-                    history = _load_wandb_history(run, keys=None, max_rows=int(history_rows))
-                    history = history.replace([np.inf, -np.inf], np.nan)
-                    histories[run_id] = history
+                histories = load_run_histories(
+                    selected_runs,
+                    keys=None,
+                    max_rows=int(history_rows),
+                    replace_inf=True,
+                )
             cache["histories"] = histories
             cache["history_rows"] = int(history_rows)
             st.session_state[cache_key] = cache
@@ -478,52 +368,13 @@ def render_wandb_analysis_page() -> None:
         default=default_bases,
     )
 
-    dynamics_rows: list[dict[str, Any]] = []
-    for run in selected_runs:
-        run_id = str(getattr(run, "id", ""))
-        history = selected_histories.get(run_id)
-        if history is None or history.empty:
-            continue
-        history = history.copy()
-        x_key = _resolve_x_key(history, prefer_keys)
-        pairs = _metric_pairs(list(history.columns))
-        prefer_suffix = "epoch" if "epoch" in x_key else "step"
-        for base in selected_bases:
-            train_key = _select_metric_key(pairs.get(base, {}).get("train", {}), prefer_suffix)
-            val_key = _select_metric_key(pairs.get(base, {}).get("val", {}), prefer_suffix)
-            if train_key is None and val_key is None:
-                continue
-            row: dict[str, Any] = {
-                "run_id": run_id,
-                "run_name": str(getattr(run, "name", run_id)),
-                "base": base,
-                "x_key": x_key,
-                "train_key": train_key or "",
-                "val_key": val_key or "",
-            }
-            if train_key:
-                train_summary = _summarize_metric(
-                    history,
-                    metric_key=train_key,
-                    x_key=x_key,
-                    segment_frac=segment_frac,
-                )
-                row.update({f"train_{key}": value for key, value in train_summary.items()})
-            if val_key:
-                val_summary = _summarize_metric(
-                    history,
-                    metric_key=val_key,
-                    x_key=x_key,
-                    segment_frac=segment_frac,
-                )
-                row.update({f"val_{key}": value for key, value in val_summary.items()})
-            if train_key and val_key:
-                row.update(
-                    _summarize_gap(history, x_key=x_key, train_key=train_key, val_key=val_key),
-                )
-            dynamics_rows.append(row)
-
-    dynamics_df = pd.DataFrame(dynamics_rows)
+    dynamics_df = build_dynamics_dataframe(
+        selected_runs,
+        selected_histories,
+        base_metrics=selected_bases,
+        prefer_x_keys=prefer_keys,
+        segment_frac=segment_frac,
+    )
     if dynamics_df.empty:
         st.info("No paired train/val metrics found for the selected bases.")
     else:
@@ -788,3 +639,32 @@ def render_wandb_analysis_page() -> None:
         with col_f2:
             st.markdown("**Summary**")
             st.json(_safe_mapping(getattr(focus_run, "summary", None)))
+
+        st.subheader("Local W&B figures")
+        max_images = st.slider(
+            "Max images per group",
+            min_value=4,
+            max_value=60,
+            value=12,
+            step=4,
+        )
+        local_images = collect_run_media_images(focus_id, include_latest=True)
+        train_images = local_images.get("train_figures", [])
+        val_images = local_images.get("val_figures", [])
+        if not train_images and not val_images:
+            st.info("No local train/val figures found for this run.")
+        else:
+            if train_images:
+                st.markdown("**Train figures**")
+                st.image(
+                    [str(path) for path in train_images[:max_images]],
+                    caption=[path.name for path in train_images[:max_images]],
+                    width=None,
+                )
+            if val_images:
+                st.markdown("**Val figures**")
+                st.image(
+                    [str(path) for path in val_images[:max_images]],
+                    caption=[path.name for path in val_images[:max_images]],
+                    width=None,
+                )

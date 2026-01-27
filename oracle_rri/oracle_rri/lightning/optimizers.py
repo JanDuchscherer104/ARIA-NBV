@@ -58,11 +58,29 @@ class ReduceLrOnPlateauConfig(BaseConfig[ReduceLROnPlateau]):
     )
     """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
 
-    patience: int = 2
-    """Number of steps with no improvement before reducing the LR."""
+    mode: Literal["min", "max"] = "min"
+    """Whether to reduce on metric min or max."""
 
     factor: float = 0.2
     """Multiplicative factor of LR reduction."""
+
+    patience: int = 2
+    """Number of steps with no improvement before reducing the LR."""
+
+    threshold: float = 1e-4
+    """Threshold for measuring new optimum."""
+
+    threshold_mode: Literal["rel", "abs"] = "rel"
+    """Threshold interpretation (relative or absolute)."""
+
+    cooldown: int = 0
+    """Number of epochs to wait before resuming normal operation."""
+
+    min_lr: float | list[float] = 0.0
+    """Lower bound on the learning rate."""
+
+    eps: float = 1e-8
+    """Minimal decay applied to LR."""
 
     monitor: str = "train/loss"
     """Metric name to monitor for plateau reduction."""
@@ -79,7 +97,17 @@ class ReduceLrOnPlateauConfig(BaseConfig[ReduceLROnPlateau]):
         *,
         trainer: pl.Trainer | None = None,
     ) -> ReduceLROnPlateau:
-        return ReduceLROnPlateau(optimizer, patience=self.patience, factor=self.factor)
+        return ReduceLROnPlateau(
+            optimizer,
+            mode=self.mode,
+            factor=self.factor,
+            patience=self.patience,
+            threshold=self.threshold,
+            threshold_mode=self.threshold_mode,
+            cooldown=self.cooldown,
+            min_lr=self.min_lr,
+            eps=self.eps,
+        )
 
     def setup_lightning(
         self,

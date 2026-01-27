@@ -38,6 +38,11 @@ from ..rri_metrics import (
 )
 from ..rri_metrics.coral import coral_logits_to_label, coral_monotonicity_violation_rate
 from ..utils import BaseConfig, Console, Stage
+from ..utils.grad_norms import (
+    GradNormLoggingConfig,
+    _collect_grad_norm_targets,
+    _grad_norm_from_params,
+)
 from ..vin import VinModelV3Config
 from ..vin.experimental.plotting import plot_vin_encodings_from_debug
 from ..vin.vin_utils import largest_divisor_leq
@@ -113,8 +118,8 @@ class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
     log_interval_steps: int | None = Field(default=None)
     """Step interval for logging rank/confusion/histogram metrics (train stage only). If ``None`` only log per-epoch metrics."""
 
-    log_grad_norms: bool = True
-    """Whether to log gradient norms for key VIN submodules."""
+    grad_norms: GradNormLoggingConfig = Field(default_factory=GradNormLoggingConfig)
+    """Configuration for gradient-norm logging."""
 
     coverage_weight_mode: Literal["none", "voxel", "semidense", "min", "mean", "product"] = "none"
     """How to compute coverage-based loss weights from VIN predictions."""
@@ -298,42 +303,24 @@ class VinLightningModule(pl.LightningModule):
         self._log_epoch_metrics(Stage.TEST)
 
     def on_after_backward(self) -> None:
-        if not self.config.log_grad_norms:
+        grad_cfg = self.config.grad_norms
+        if not grad_cfg.enabled:
             return
         if getattr(self.trainer, "sanity_checking", False):
             return
         if not self.training:
             return
 
-        def _log_grad(name: str, module: nn.Module | None) -> None:
-            if module is None:
-                return
-            total = 0.0
-            for param in module.parameters():
-                if param.grad is None:
-                    continue
-                param_norm = float(param.grad.detach().data.norm(2).item())
-                total += param_norm * param_norm
+        targets = _collect_grad_norm_targets(self.vin, grad_cfg)
+        for name, params in targets:
+            value = _grad_norm_from_params(params, grad_cfg.norm_type)
             self.log(
                 f"train-gradnorms/grad_norm_{name}",
-                float(total**0.5),
+                value,
                 on_step=True,
                 on_epoch=False,
                 prog_bar=False,
             )
-
-        _log_grad("pose_encoder_lff", getattr(self.vin, "pose_encoder_lff", None))
-        _log_grad("field_proj", getattr(self.vin, "field_proj", None))
-        _log_grad("global_pooler", getattr(self.vin, "global_pooler", None))
-        _log_grad("point_encoder", getattr(self.vin, "point_encoder", None))
-        _log_grad("point_film", getattr(self.vin, "point_film", None))
-        _log_grad("sem_proj_film", getattr(self.vin, "sem_proj_film", None))
-        _log_grad("sem_frustum_attn", getattr(self.vin, "sem_frustum_attn", None))
-        _log_grad("sem_frustum_proj", getattr(self.vin, "sem_frustum_proj", None))
-        _log_grad("traj_encoder", getattr(self.vin, "traj_encoder", None))
-        _log_grad("traj_attn", getattr(self.vin, "traj_attn", None))
-        _log_grad("head_mlp", getattr(self.vin, "head_mlp", None))
-        _log_grad("head_coral", getattr(self.vin, "head_coral", None))
 
     # ------------------------------------------------------------------ optim
     def configure_optimizers(self) -> dict[str, Any]:
