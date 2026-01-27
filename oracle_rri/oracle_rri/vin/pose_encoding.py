@@ -77,7 +77,9 @@ class LearnableFourierFeatures(nn.Module):
 class LearnableFourierFeaturesConfig(BaseConfig[LearnableFourierFeatures]):
     """Config-as-factory wrapper for :class:`LearnableFourierFeatures`."""
 
-    target: type[LearnableFourierFeatures] = Field(default=LearnableFourierFeatures, exclude=True)
+    @property
+    def target(self) -> type[LearnableFourierFeatures]:
+        return LearnableFourierFeatures
 
     input_dim: int = Field(default=6, gt=0)
     """Input dimensionality (default: 6 for SE(3) relative pose as translation + so(3) log)."""

@@ -40,10 +40,9 @@ def _default_source() -> VinOracleDatasetConfig:
 class VinDataModuleConfig(BaseConfig["VinDataModule"]):
     """Configuration for :class:`VinDataModule`."""
 
-    target: type[VinDataModule] = Field(
-        default_factory=lambda: VinDataModule,
-        exclude=True,
-    )
+    @property
+    def target(self) -> type["VinDataModule"]:
+        return VinDataModule
 
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver."""

@@ -52,10 +52,9 @@ from .optimizers import AdamWConfig, OneCycleSchedulerConfig, ReduceLrOnPlateauC
 class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
     """Configuration for :class:`VinLightningModule`."""
 
-    target: type[VinLightningModule] = Field(
-        default_factory=lambda: VinLightningModule,
-        exclude=True,
-    )
+    @property
+    def target(self) -> type["VinLightningModule"]:
+        return VinLightningModule
 
     vin: VinModelV3Config = Field(default_factory=VinModelV3Config)
 

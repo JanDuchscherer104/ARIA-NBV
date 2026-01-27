@@ -132,10 +132,9 @@ class VinSnippetCacheConfig(BaseConfig):
 class VinSnippetCacheWriterConfig(BaseConfig["VinSnippetCacheWriter"]):
     """Configuration for building a VIN snippet cache from an oracle cache."""
 
-    target: type["VinSnippetCacheWriter"] = Field(
-        default_factory=lambda: VinSnippetCacheWriter,
-        exclude=True,
-    )
+    @property
+    def target(self) -> type["VinSnippetCacheWriter"]:
+        return VinSnippetCacheWriter
 
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver."""
@@ -226,10 +225,9 @@ class VinSnippetCacheWriterConfig(BaseConfig["VinSnippetCacheWriter"]):
 class VinSnippetCacheDatasetConfig(BaseConfig["VinSnippetCacheDataset"]):
     """Configuration for loading cached VIN snippet samples."""
 
-    target: type["VinSnippetCacheDataset"] = Field(
-        default_factory=lambda: VinSnippetCacheDataset,
-        exclude=True,
-    )
+    @property
+    def target(self) -> type["VinSnippetCacheDataset"]:
+        return VinSnippetCacheDataset
 
     cache: VinSnippetCacheConfig = Field(default_factory=VinSnippetCacheConfig)
     """Cache path configuration."""

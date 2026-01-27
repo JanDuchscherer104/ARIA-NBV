@@ -49,10 +49,9 @@ class CandidateDepths:
 
 
 class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
-    target: type[CandidateDepthRenderer] = Field(
-        default_factory=lambda: CandidateDepthRenderer,
-        exclude=True,
-    )
+    @property
+    def target(self) -> type["CandidateDepthRenderer"]:
+        return CandidateDepthRenderer
 
     device: Annotated[torch.device, Field(default="auto")]
 

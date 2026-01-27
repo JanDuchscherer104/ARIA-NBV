@@ -370,8 +370,11 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
 
     cache_exclude_fields: ClassVar[set[str]] = {"tar_urls", "scene_to_mesh"}
 
-    target: type[AseEfmDataset] = Field(default=AseEfmDataset, exclude=True)
-    """Factory target for :meth:`BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[AseEfmDataset]:
+        """Factory target for :meth:`BaseConfig.setup_target`."""
+        return AseEfmDataset
+
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver (data roots, mesh locations, etc.)."""
     atek_variant: Literal["efm", "efm_eval", "cubercnn", "cubercnn_eval"] = Field(

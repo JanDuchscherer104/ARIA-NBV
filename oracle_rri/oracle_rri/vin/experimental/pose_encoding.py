@@ -61,7 +61,9 @@ class FourierFeatures(nn.Module):
 class FourierFeaturesConfig(BaseConfig[FourierFeatures]):
     """Config-as-factory wrapper for :class:`FourierFeatures`."""
 
-    target: type[FourierFeatures] = Field(default=FourierFeatures, exclude=True)
+    @property
+    def target(self) -> type[FourierFeatures]:
+        return FourierFeatures
 
     input_dim: int = Field(default=1, gt=0)
     """Input dimensionality."""

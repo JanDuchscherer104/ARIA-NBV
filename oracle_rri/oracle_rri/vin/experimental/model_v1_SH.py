@@ -513,8 +513,10 @@ class VinScorerHeadConfig(BaseConfig[VinScorerHead]):
     reduces parameter count compared to a full K-way classifier.
     """
 
-    target: type[VinScorerHead] = Field(default_factory=lambda: VinScorerHead, exclude=True)
-    """Factory target for :meth:`BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[VinScorerHead]:
+        """Factory target for :meth:`BaseConfig.setup_target`."""
+        return VinScorerHead
 
     hidden_dim: int = Field(default=128, gt=0)
     """Hidden dimension for MLP layers."""
@@ -552,8 +554,10 @@ class VinModelConfig(BaseConfig["VinModel"]):
     samples the voxel field along a candidate frustum.
     """
 
-    target: type["VinModel"] = Field(default_factory=lambda: VinModel, exclude=True)
-    """Factory target for :meth:`BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type["VinModel"]:
+        """Factory target for :meth:`BaseConfig.setup_target`."""
+        return VinModel
 
     backbone: EvlBackboneConfig = Field(default_factory=EvlBackboneConfig)
     """Frozen EVL backbone configuration."""

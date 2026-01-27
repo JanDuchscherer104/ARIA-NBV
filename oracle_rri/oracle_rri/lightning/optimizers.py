@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any, Literal
 
 import pytorch_lightning as pl
-from pydantic import Field
 from torch import Tensor
 from torch.nn import functional as functional
 from torch.optim import AdamW, Optimizer
@@ -15,8 +14,10 @@ from ..utils import BaseConfig, Optimizable, optimizable_field
 class AdamWConfig(BaseConfig[Optimizer]):
     """AdamW optimizer configuration for VIN."""
 
-    target: type[Optimizer] = Field(default_factory=lambda: AdamW, exclude=True)
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[Optimizer]:
+        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        return AdamW
 
     learning_rate: float = optimizable_field(
         default=1e-3,
@@ -52,11 +53,10 @@ class AdamWConfig(BaseConfig[Optimizer]):
 class ReduceLrOnPlateauConfig(BaseConfig[ReduceLROnPlateau]):
     """ReduceLROnPlateau scheduler configuration."""
 
-    target: type[ReduceLROnPlateau] = Field(
-        default_factory=lambda: ReduceLROnPlateau,
-        exclude=True,
-    )
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[ReduceLROnPlateau]:
+        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        return ReduceLROnPlateau
 
     mode: Literal["min", "max"] = "min"
     """Whether to reduce on metric min or max."""
@@ -136,7 +136,9 @@ class ReduceLrOnPlateauConfig(BaseConfig[ReduceLROnPlateau]):
 class OneCycleSchedulerConfig(BaseConfig[OneCycleLR]):
     """OneCycle learning-rate scheduler configuration."""
 
-    target: type[OneCycleLR] = Field(default_factory=lambda: OneCycleLR, exclude=True)
+    @property
+    def target(self) -> type[OneCycleLR]:
+        return OneCycleLR
 
     max_lr: float | None = optimizable_field(
         default=1e-4,

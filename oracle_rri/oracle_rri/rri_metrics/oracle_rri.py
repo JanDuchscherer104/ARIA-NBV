@@ -16,7 +16,6 @@ kept modular:
 from __future__ import annotations
 
 import torch
-from pydantic import Field
 
 from oracle_rri.utils.base_config import BaseConfig
 
@@ -27,10 +26,9 @@ from .types import RriResult
 class OracleRRIConfig(BaseConfig["OracleRRI"]):
     """Config-as-factory wrapper for oracle RRI computation."""
 
-    target: type["OracleRRI"] = Field(
-        default_factory=lambda: OracleRRI,
-        exclude=True,
-    )
+    @property
+    def target(self) -> type["OracleRRI"]:
+        return OracleRRI
 
 
 class OracleRRI:

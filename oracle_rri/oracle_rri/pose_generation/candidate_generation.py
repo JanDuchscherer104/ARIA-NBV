@@ -54,11 +54,10 @@ class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
     filtering, and logging/debug controls used by :class:`CandidateViewGenerator`.
     """
 
-    target: type[CandidateViewGenerator] = Field(
-        default_factory=lambda: CandidateViewGenerator,
-        exclude=True,
-    )
-    """Factory target for :meth:`BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type["CandidateViewGenerator"]:
+        """Factory target for :meth:`BaseConfig.setup_target`."""
+        return CandidateViewGenerator
 
     camera_label: Literal["rgb", "slaml", "slamr"] = "rgb"
     """Camera index to use for candidate generation."""

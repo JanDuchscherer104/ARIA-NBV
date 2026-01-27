@@ -58,8 +58,10 @@ def _load_checkpoint_strict(model: nn.Module, checkpoint_path: Path) -> None:
 class PointNeXtSEncoderConfig(BaseConfig["PointNeXtSEncoder"]):
     """Configuration for the optional PointNeXt-S semidense encoder."""
 
-    target: type["PointNeXtSEncoder"] = Field(default_factory=lambda: PointNeXtSEncoder, exclude=True)
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type["PointNeXtSEncoder"]:
+        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        return PointNeXtSEncoder
 
     cfg_path: Path = Field(default_factory=lambda: Path("PointNeXt/cfgs/s3dis/pointnext-s.yaml"))  #
     """Path to the PointNeXt YAML config (relative to relative to PathConfig().external)."""

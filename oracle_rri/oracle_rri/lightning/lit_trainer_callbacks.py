@@ -6,7 +6,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Self
 
-from pydantic import Field, model_validator
+from pydantic import model_validator
 from pytorch_lightning.callbacks import (
     BackboneFinetuning,
     Callback,
@@ -49,8 +49,10 @@ class CustomRichProgressBar(RichProgressBar):
 class TrainerCallbacksConfig(BaseConfig[list]):
     """Configuration for standard trainer callbacks."""
 
-    target: type[list] = Field(default_factory=lambda: list, exclude=True)
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[list]:
+        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        return list
 
     use_model_checkpoint: bool = True
     checkpoint_monitor: str = "train/loss"

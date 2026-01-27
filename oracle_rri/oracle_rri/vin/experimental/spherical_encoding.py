@@ -165,7 +165,9 @@ class ShellShPoseEncoder(nn.Module):
 class ShellShPoseEncoderConfig(BaseConfig[ShellShPoseEncoder]):
     """Config-as-factory wrapper for :class:`ShellShPoseEncoder`."""
 
-    target: type[ShellShPoseEncoder] = Field(default=ShellShPoseEncoder, exclude=True)
+    @property
+    def target(self) -> type[ShellShPoseEncoder]:
+        return ShellShPoseEncoder
 
     kind: Literal["shell_sh"] = "shell_sh"
     """Discriminator for pose-encoder selection."""

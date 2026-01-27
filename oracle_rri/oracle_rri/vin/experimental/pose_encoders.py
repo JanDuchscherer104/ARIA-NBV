@@ -120,7 +120,9 @@ class ShellLffPoseEncoder(PoseEncoder):
 class ShellLffPoseEncoderConfig(BaseConfig[ShellLffPoseEncoder]):
     """Config for :class:`ShellLffPoseEncoder`."""
 
-    target: type[ShellLffPoseEncoder] = Field(default=ShellLffPoseEncoder, exclude=True)
+    @property
+    def target(self) -> type[ShellLffPoseEncoder]:
+        return ShellLffPoseEncoder
 
     kind: Literal["shell_lff"] = "shell_lff"
     """Discriminator for pose-encoder selection."""
@@ -146,10 +148,9 @@ class ShellLffPoseEncoderConfig(BaseConfig[ShellLffPoseEncoder]):
 class ShellShPoseEncoderAdapterConfig(BaseConfig[ShellShPoseEncoderAdapter]):
     """Config for :class:`ShellShPoseEncoderAdapter`."""
 
-    target: type[ShellShPoseEncoderAdapter] = Field(
-        default=ShellShPoseEncoderAdapter,
-        exclude=True,
-    )
+    @property
+    def target(self) -> type[ShellShPoseEncoderAdapter]:
+        return ShellShPoseEncoderAdapter
 
     kind: Literal["shell_sh"] = "shell_sh"
     """Discriminator for pose-encoder selection."""

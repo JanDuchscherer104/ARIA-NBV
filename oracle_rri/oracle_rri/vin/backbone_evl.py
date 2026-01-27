@@ -38,8 +38,10 @@ def _target_cls() -> type["EvlBackbone"]:
 class EvlBackboneConfig(BaseConfig["EvlBackbone"]):
     """Configuration for :class:`EvlBackbone`."""
 
-    target: type["EvlBackbone"] = Field(default_factory=_target_cls, exclude=True)
-    """Factory target for :meth:`BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type["EvlBackbone"]:
+        """Factory target for :meth:`BaseConfig.setup_target`."""
+        return _target_cls()
 
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver."""

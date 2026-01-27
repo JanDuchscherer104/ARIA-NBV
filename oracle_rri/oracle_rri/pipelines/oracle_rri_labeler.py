@@ -54,7 +54,9 @@ class OracleRriLabelerConfig(BaseConfig["OracleRriLabeler"]):
     scoring) and adds a small number of pipeline-level knobs.
     """
 
-    target: type[OracleRriLabeler] = Field(default_factory=_target_cls, exclude=True)
+    @property
+    def target(self) -> type[OracleRriLabeler]:
+        return _target_cls()
 
     device: Annotated[torch.device, Field(default="auto")]
 

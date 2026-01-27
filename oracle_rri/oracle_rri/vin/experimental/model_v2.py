@@ -125,8 +125,10 @@ SEMIDENSE_FRUSTUM_TOKEN_DIM = len(SEMIDENSE_FRUSTUM_TOKEN_FEATURES)
 class VinModelV2Config(BaseConfig["VinModelV2"]):
     """Configuration for :class:`VinModelV2` (minimal, configurable)."""
 
-    target: type[VinModelV2] = Field(default_factory=lambda: VinModelV2, exclude=True)
-    """Factory target for :meth:`BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[VinModelV2]:
+        """Factory target for :meth:`BaseConfig.setup_target`."""
+        return VinModelV2
 
     backbone: EvlBackboneConfig | None = Field(default_factory=EvlBackboneConfig)
     """Optional frozen EVL backbone configuration."""

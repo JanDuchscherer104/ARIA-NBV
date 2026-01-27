@@ -133,8 +133,10 @@ SEMIDENSE_PROJ_FEATURE_ALIASES: dict[str, str] = {
 class VinModelV3Config(BaseConfig["VinModelV3"]):
     """Configuration for :class:`VinModelV3` (streamlined VIN baseline)."""
 
-    target: type["VinModelV3"] = Field(default_factory=lambda: VinModelV3, exclude=True)
-    """Factory target for :meth:`BaseConfig.setup_target` (config-as-factory)."""
+    @property
+    def target(self) -> type["VinModelV3"]:
+        """Factory target for :meth:`BaseConfig.setup_target` (config-as-factory)."""
+        return VinModelV3
 
     backbone: EvlBackboneConfig | None = Field(default_factory=EvlBackboneConfig)
     """Frozen EVL backbone configuration that supplies voxel features."""

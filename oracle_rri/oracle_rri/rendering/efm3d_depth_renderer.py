@@ -34,11 +34,10 @@ if TYPE_CHECKING:
 class Efm3dDepthRendererConfig(BaseConfig["Efm3dDepthRenderer"]):
     """Configuration for :class:`Efm3dDepthRenderer`."""
 
-    target: type["Efm3dDepthRenderer"] = Field(  # type: ignore[assignment]
-        default_factory=lambda: Efm3dDepthRenderer,
-        exclude=True,
-    )
-    """Factory target for :meth:`BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type["Efm3dDepthRenderer"]:
+        """Factory target for :meth:`BaseConfig.setup_target`."""
+        return Efm3dDepthRenderer
 
     device: str = "cpu"
     """Torch device for the returned depth tensor."""

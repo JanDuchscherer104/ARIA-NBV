@@ -27,10 +27,9 @@ if TYPE_CHECKING:
 class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
     """Configuration for :class:`Pytorch3DDepthRenderer`."""
 
-    target: type["Pytorch3DDepthRenderer"] = Field(  # type: ignore[assignment]
-        default_factory=lambda: Pytorch3DDepthRenderer,
-        exclude=True,
-    )
+    @property
+    def target(self) -> type["Pytorch3DDepthRenderer"]:
+        return Pytorch3DDepthRenderer
 
     device: Annotated[torch.device, Field(default="auto")]
     """Torch device to run rasterisation on (falls back to CPU if unavailable)."""

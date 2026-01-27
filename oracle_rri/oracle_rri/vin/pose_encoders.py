@@ -113,7 +113,9 @@ class R6dLffPoseEncoder(PoseEncoder):
 class R6dLffPoseEncoderConfig(BaseConfig[R6dLffPoseEncoder]):
     """Config for :class:`R6dLffPoseEncoder`."""
 
-    target: type[R6dLffPoseEncoder] = Field(default=R6dLffPoseEncoder, exclude=True)
+    @property
+    def target(self) -> type[R6dLffPoseEncoder]:
+        return R6dLffPoseEncoder
 
     kind: Literal["r6d_lff"] = "r6d_lff"
     """Discriminator for pose-encoder selection."""

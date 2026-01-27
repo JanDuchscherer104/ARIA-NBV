@@ -140,10 +140,9 @@ class OracleRriCacheConfig(BaseConfig):
 class OracleRriCacheWriterConfig(BaseConfig["OracleRriCacheWriter"]):
     """Configuration for building oracle caches from raw ASE snippets."""
 
-    target: type[OracleRriCacheWriter] = Field(
-        default_factory=_target_cache_writer,
-        exclude=True,
-    )
+    @property
+    def target(self) -> type["OracleRriCacheWriter"]:
+        return _target_cache_writer()
 
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver."""
@@ -187,10 +186,9 @@ class OracleRriCacheWriterConfig(BaseConfig["OracleRriCacheWriter"]):
 class OracleRriCacheDatasetConfig(BaseConfig["OracleRriCacheDataset"]):
     """Configuration for loading cached oracle outputs."""
 
-    target: type[OracleRriCacheDataset] = Field(
-        default_factory=_target_cache_dataset,
-        exclude=True,
-    )
+    @property
+    def target(self) -> type["OracleRriCacheDataset"]:
+        return _target_cache_dataset()
 
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver."""

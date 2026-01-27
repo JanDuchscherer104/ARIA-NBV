@@ -17,7 +17,6 @@ from enum import StrEnum
 from typing import Literal
 
 import torch
-from pydantic import Field
 from torch import Tensor
 from torchmetrics import Metric as MetricBase
 from torchmetrics.classification import MulticlassConfusionMatrix
@@ -277,8 +276,10 @@ class VinMetrics(MetricBase):
 class VinMetricsConfig(BaseConfig[VinMetrics]):
     """Configuration for VIN torchmetrics bundles."""
 
-    target: type[VinMetrics] = Field(default_factory=lambda: VinMetrics, exclude=True)
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[VinMetrics]:
+        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        return VinMetrics
 
     num_classes: int
     """Number of ordinal classes used for confusion/histogram metrics."""

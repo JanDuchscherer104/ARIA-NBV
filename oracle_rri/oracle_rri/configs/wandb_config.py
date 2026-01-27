@@ -18,7 +18,9 @@ class WandbConfig(BaseConfig):
         https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.loggers.wandb.html
     """
 
-    target: type[WandbLogger] = Field(default_factory=lambda: WandbLogger, exclude=True)
+    @property
+    def target(self) -> type[WandbLogger]:
+        return WandbLogger
 
     name: str | None = Field(default=None, description="Display name for the run.")
     project: str = Field(default="aria-nbv", description="W&B project name.")

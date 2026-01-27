@@ -90,11 +90,10 @@ class VinOracleOnlineDatasetConfig(BaseConfig[VinOracleOnlineDataset]):
     kind: Literal["online"] = "online"
     """Discriminator for online datasets."""
 
-    target: type[VinOracleOnlineDataset] = Field(
-        default_factory=lambda: VinOracleOnlineDataset,
-        exclude=True,
-    )
-    """Factory target for :meth:`BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[VinOracleOnlineDataset]:
+        """Factory target for :meth:`BaseConfig.setup_target`."""
+        return VinOracleOnlineDataset
 
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver."""
@@ -159,11 +158,10 @@ class VinOracleCacheDatasetConfig(BaseConfig[OracleRriCacheVinDataset]):
     kind: Literal["offline_cache"] = "offline_cache"
     """Discriminator for offline cache datasets."""
 
-    target: type[OracleRriCacheVinDataset] = Field(
-        default_factory=lambda: OracleRriCacheVinDataset,
-        exclude=True,
-    )
-    """Factory target for :meth:`BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[OracleRriCacheVinDataset]:
+        """Factory target for :meth:`BaseConfig.setup_target`."""
+        return OracleRriCacheVinDataset
 
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver."""

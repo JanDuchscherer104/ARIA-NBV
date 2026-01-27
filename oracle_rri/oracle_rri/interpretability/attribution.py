@@ -18,7 +18,6 @@ from captum.attr import (  # type: ignore[import-untyped]
     NoiseTunnel,
     Occlusion,
 )
-from pydantic import Field
 from torch import Tensor, nn
 
 from ..utils import BaseConfig, Console
@@ -329,11 +328,10 @@ class AttributionResult:
 class InterpretabilityConfig(BaseConfig["AttributionEngine"]):
     """Factory config that builds an :class:`AttributionEngine`."""
 
-    target: type["AttributionEngine"] = Field(
-        default_factory=lambda: AttributionEngine,
-        exclude=True,
-    )
-    """Factory target for the config."""
+    @property
+    def target(self) -> type["AttributionEngine"]:
+        """Factory target for the config."""
+        return AttributionEngine
 
     method: AttributionMethod = AttributionMethod.GRAD_CAM
     """Attribution algorithm to apply."""

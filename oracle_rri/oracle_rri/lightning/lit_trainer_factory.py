@@ -30,7 +30,9 @@ if TYPE_CHECKING:
 class TrainerFactoryConfig(BaseConfig):
     """Configuration for constructing a PyTorch Lightning trainer."""
 
-    target: type[pl.Trainer] = Field(default_factory=lambda: pl.Trainer, exclude=True)
+    @property
+    def target(self) -> type[pl.Trainer]:
+        return pl.Trainer
 
     is_debug: bool = False
     """Set fast_dev_run to True, use CPU, set num_workers to 0, disable checkpointing when True."""

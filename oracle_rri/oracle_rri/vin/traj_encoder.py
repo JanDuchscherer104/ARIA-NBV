@@ -33,8 +33,10 @@ class TrajectoryEncodingOutput:
 class TrajectoryEncoderConfig(BaseConfig["TrajectoryEncoder"]):
     """Configuration for :class:`TrajectoryEncoder`."""
 
-    target: type["TrajectoryEncoder"] = Field(default_factory=lambda: TrajectoryEncoder, exclude=True)
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type["TrajectoryEncoder"]:
+        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        return TrajectoryEncoder
 
     pose_encoder: R6dLffPoseEncoderConfig = Field(default_factory=R6dLffPoseEncoderConfig)
     """Pose encoder configuration (R6D + LFF)."""

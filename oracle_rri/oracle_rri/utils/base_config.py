@@ -2,22 +2,20 @@ import tomllib
 from enum import Enum
 from pathlib import Path
 from threading import Lock
-from typing import (
-    Any,
-    ClassVar,
-    ForwardRef,
-    Generic,
-    Self,
-    TypeVar,
-)
+from typing import Any, ClassVar, ForwardRef, Generic, Self, TypeVar
 
+import tomli_w
 import torch
-from pydantic import ConfigDict, Field, model_validator
-from pydantic_settings import CLI_SUPPRESS, BaseSettings, SettingsConfigDict
+from pydantic import PrivateAttr, model_validator
+from pydantic_settings import (
+    BaseSettings,
+    CliSettingsSource,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    TomlConfigSettingsSource,
+)
 from rich.text import Text
 from rich.tree import Tree
-from tomlkit import TOMLDocument, aot, array, comment, document, dumps, string, table
-from tomlkit.items import Table
 
 from .console import Console
 
@@ -37,14 +35,13 @@ class BaseConfig(BaseSettings, Generic[TargetType]):
     cache_exclude_extra_key: ClassVar[str] = "cache_exclude"
     """json_schema_extra key for marking fields excluded from cache snapshots."""
 
-    target: type[TargetType] = Field(  # type: ignore
-        default_factory=lambda: NoTarget,
-        exclude=True,
-        json_schema_extra={
-            "type": "string",
-            "description": "Internal callable target, not configurable via CLI/JSON",
-        },
-    )
+    @property
+    def target(self) -> Any:
+        """Callable target used by `setup_target`.
+
+        Defaults to ``NoTarget``; subclasses should override as a property.
+        """
+        return NoTarget
 
     model_config = SettingsConfigDict(
         arbitrary_types_allowed=True,
@@ -56,12 +53,12 @@ class BaseConfig(BaseSettings, Generic[TargetType]):
         cli_kebab_case=True,
     )
 
-    propagated_fields: dict[str, Any] = Field(
-        default_factory=dict,
-        exclude=True,
-        # TODO: figure out how to CLI_SUPPRESS should be used correctly - get-library-docs pydantic
-        description=CLI_SUPPRESS,
-    )
+    _propagated_fields: dict[str, Any] = PrivateAttr(default_factory=dict)
+
+    @property
+    def propagated_fields(self) -> dict[str, Any]:
+        """Track which fields were propagated from a parent config."""
+        return self._propagated_fields
 
     @staticmethod
     def _resolve_device(value: str | torch.device) -> torch.device:
@@ -72,15 +69,45 @@ class BaseConfig(BaseSettings, Generic[TargetType]):
         return torch.device(value)
 
     def setup_target(self, **kwargs: Any) -> TargetType:
-        if not callable(factory := getattr(self.target, "setup_target", self.target)):
+        target = getattr(self, "target", NoTarget)
+        factory = getattr(target, "setup_target", target)
+
+        if not callable(factory):
             Console().print(
-                f"Target '[bold yellow]{self.target}[/bold yellow]' of type [bold yellow]{factory.__class__.__name__}[/bold yellow] is not callable."
+                f"Target '[bold yellow]{target}[/bold yellow]' of type [bold yellow]{factory.__class__.__name__}[/bold yellow] is not callable."
             )
             raise ValueError(
-                f"Target '{self.target}' of type {factory.__class__.__name__} is not callable / does not have a 'setup_target' or '__init__' method."
+                f"Target '{target}' of type {factory.__class__.__name__} is not callable / does not have a 'setup_target' or '__init__' method."
             )
 
-        return factory(self, **kwargs)  # type: ignore
+        return factory(self, **kwargs)  # type: ignore[return-value]
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Restrict default settings sources to init + optional TOML/CLI.
+
+        By default, environment/dotenv/file-secret sources are disabled for safety.
+        Classes can opt into CLI by setting `cli_parse_args=True` in model_config or
+        override this method for custom behavior.
+        """
+        sources: list[PydanticBaseSettingsSource] = [init_settings]
+
+        model_cfg = getattr(settings_cls, "model_config", {}) or {}
+        toml_file = model_cfg.get("toml_file")
+        if toml_file:
+            sources.append(TomlConfigSettingsSource(settings_cls, toml_file=toml_file))
+
+        if model_cfg.get("cli_parse_args"):
+            sources.append(CliSettingsSource(settings_cls, cli_parse_args=True))
+
+        return tuple(sources)
 
     # ------------------------------------------------------------------ JSON-friendly dumps
     def model_dump_jsonable(self, **kwargs: Any) -> dict[str, Any]:
@@ -171,23 +198,15 @@ class BaseConfig(BaseSettings, Generic[TargetType]):
 
         Args:
             path: Optional path to write the TOML to.
-            include_comments: When true, injects docstrings/descriptions as comments.
-            include_type_hints: When true, append type information to the comments.
+            include_comments: Ignored (kept for API compatibility).
+            include_type_hints: Ignored (kept for API compatibility).
 
         Returns:
             The rendered TOML string.
         """
-        doc = document()
-        if include_comments and self.__class__.__doc__:
-            for line in self.__class__.__doc__.strip().splitlines():
-                if line.strip():
-                    doc.add(comment(line.strip()))
-        self._write_toml_fields(
-            container=doc,
-            include_comments=include_comments,
-            include_type_hints=include_type_hints,
-        )
-        rendered = dumps(doc)
+        del include_comments, include_type_hints
+        data = self._toml_normalize(self.model_dump(exclude_none=True))
+        rendered = tomli_w.dumps(data)
         if path is not None:
             Path(path).write_text(rendered, encoding="utf-8")
         return rendered
@@ -212,17 +231,19 @@ class BaseConfig(BaseSettings, Generic[TargetType]):
     def from_toml(cls: type[Self], source: str | Path | bytes) -> Self:
         """Load a config from a TOML string or file path."""
         if isinstance(source, Path):
-            text = source.read_text(encoding="utf-8")
+            data = cls._load_toml_path(source)
         elif isinstance(source, bytes):
-            text = source.decode("utf-8")
+            data = tomllib.loads(source.decode("utf-8"))
         else:
-            potential_path = Path(source)
-            if potential_path.exists():
-                text = potential_path.read_text(encoding="utf-8")
+            if "\n" in source or "\r" in source:
+                data = tomllib.loads(source)
             else:
-                text = source
+                potential_path = Path(source)
+                if potential_path.exists():
+                    data = cls._load_toml_path(potential_path)
+                else:
+                    data = tomllib.loads(source)
 
-        data = tomllib.loads(text)
         return cls.model_validate(data)
 
     # ------------------------------------------------------------------ Visualization
@@ -476,105 +497,33 @@ class BaseConfig(BaseSettings, Generic[TargetType]):
                 )
 
     # ------------------------------------------------------------------ TOML utils
-    def _write_toml_fields(  # pragma: no cover - serialization helper
-        self,
-        *,
-        container: TOMLDocument | Table,
-        include_comments: bool,
-        include_type_hints: bool,
-    ) -> None:
-        for field_name, field in self.__class__.model_fields.items():
-            if getattr(field, "exclude", False) or field_name in {"propagated_fields", "target"}:
-                continue
+    @classmethod
+    def _load_toml_path(cls, path: Path) -> dict[str, Any]:
+        class _TomlReader(BaseSettings):
+            model_config = SettingsConfigDict(toml_file=path)
 
-            value = getattr(self, field_name)
-            if value is None:
-                continue
-            type_hint: str | None = None
-            if include_comments and include_type_hints:
-                type_hint = self._get_type_name(field.annotation)
+        source = TomlConfigSettingsSource(_TomlReader, toml_file=path)
+        return source()
 
-            toml_value = self._to_toml_item(
-                value,
-                include_comments=include_comments,
-                include_type_hints=include_type_hints,
-            )
-
-            # Add type hint comment BEFORE the field (or section header for nested configs)
-            if type_hint is not None:
-                container.add(comment(f"type: {type_hint}"))
-
-            container.add(field_name, toml_value)
-
-    def _to_toml_item(  # pragma: no cover - serialization helper
-        self,
-        value: Any,
-        *,
-        include_comments: bool,
-        include_type_hints: bool,
-    ) -> Any:
+    @classmethod
+    def _toml_normalize(cls, value: Any) -> Any:
         if isinstance(value, BaseConfig):
-            nested = table()
-            value._write_toml_fields(
-                container=nested,
-                include_comments=include_comments,
-                include_type_hints=include_type_hints,
-            )
-            return nested
-
+            return cls._toml_normalize(value.model_dump(exclude_none=True))
         if isinstance(value, dict):
-            tbl = table()
-            for key, sub_value in value.items():
-                tbl.add(key, self._normalise_scalar(sub_value))
-            return tbl
-
+            return {key: cls._toml_normalize(item) for key, item in value.items()}
         if isinstance(value, (list, tuple, set)):
-            sequence = list(value)
-            if all(isinstance(item_value, BaseConfig) for item_value in sequence):
-                tables = aot()
-                for item_config in sequence:
-                    nested = table()
-                    item_config._write_toml_fields(
-                        container=nested,
-                        include_comments=include_comments,
-                        include_type_hints=include_type_hints,
-                    )
-                    tables.append(nested)
-                return tables
-
-            arr = array()
-            arr.multiline(True)
-            for item_value in sequence:
-                if isinstance(item_value, BaseConfig):
-                    nested = table()
-                    item_value._write_toml_fields(
-                        container=nested,
-                        include_comments=include_comments,
-                        include_type_hints=include_type_hints,
-                    )
-                    arr.append(nested)
-                else:
-                    arr.append(self._normalise_scalar(item_value))
-            return arr
-
-        return self._normalise_scalar(value)
-
-    def _normalise_scalar(self, value: Any) -> Any:
-        try:
-            import torch
-        except ModuleNotFoundError:  # pragma: no cover
-            torch = None
-
-        if torch is not None and isinstance(value, torch.device):
-            return string(str(value))
+            return [cls._toml_normalize(item) for item in value]
         if isinstance(value, Path):
-            return string(str(value))
+            return str(value)
+        if isinstance(value, torch.device):
+            return str(value)
+        if isinstance(value, torch.dtype):
+            return str(value)
+        if isinstance(value, torch.Tensor):
+            return value.detach().cpu().tolist()
         if isinstance(value, Enum):
             enum_value = value.value if hasattr(value, "value") else str(value)
-            # Preserve numeric types for IntEnum/FloatEnum
-            if isinstance(enum_value, (int, float)):
-                return enum_value
-            return string(str(enum_value))
+            return enum_value
         return value
 
 
@@ -584,7 +533,11 @@ class SingletonConfig(BaseConfig):
     _instances: ClassVar[dict[type, Any]] = {}
     _lock: ClassVar[Lock] = Lock()
 
-    model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True, validate_default=True)
+    model_config = SettingsConfigDict(
+        arbitrary_types_allowed=True,
+        validate_assignment=True,
+        validate_default=True,
+    )
 
     def __new__(cls, *args: Any, **kwargs: Any):
         with cls._lock:
@@ -601,11 +554,11 @@ class SingletonConfig(BaseConfig):
         else:
             for key, value in kwargs.items():
                 if hasattr(self, key):
-                    # current = getattr(self, key)
-                    # # if current != value:
-                    # #     Console().log(
-                    # #         f"Updating singleton {self.__class__.__name__} field '{key}' from {current} to {value}"
-                    # #     )
+                    current = getattr(self, key)
+                    if current != value:
+                        Console().log(
+                            f"Updating singleton {self.__class__.__name__} field '{key}' from {current} to {value}"
+                        )
                     setattr(self, key, value)
 
     def __copy__(self) -> "SingletonConfig":

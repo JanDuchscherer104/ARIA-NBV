@@ -450,7 +450,7 @@ def render_wandb_analysis_page() -> None:
             if history is None or metric_choice not in history.columns:
                 continue
             history = history.copy()
-            x_key = _resolve_x_key(history, prefer_keys)
+            x_key, history = _resolve_x_key(history, prefer_keys)
             df_metric = history[[x_key, metric_choice]].dropna().sort_values(x_key)
             if df_metric.empty:
                 continue

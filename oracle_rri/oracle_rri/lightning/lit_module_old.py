@@ -42,8 +42,10 @@ from .lit_datamodule import VinOracleBatch
 class AdamWConfig(BaseConfig[Optimizer]):
     """AdamW optimizer configuration for VIN."""
 
-    target: type[Optimizer] = Field(default_factory=lambda: AdamW, exclude=True)
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[Optimizer]:
+        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        return AdamW
 
     learning_rate: float = optimizable_field(
         default=1e-3,
@@ -78,11 +80,10 @@ class AdamWConfig(BaseConfig[Optimizer]):
 class ReduceLrOnPlateauConfig(BaseConfig[ReduceLROnPlateau]):
     """ReduceLROnPlateau scheduler configuration."""
 
-    target: type[ReduceLROnPlateau] = Field(
-        default_factory=lambda: ReduceLROnPlateau,
-        exclude=True,
-    )
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[ReduceLROnPlateau]:
+        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        return ReduceLROnPlateau
 
     patience: int = 2
     """Number of steps with no improvement before reducing the LR."""
@@ -135,8 +136,10 @@ class ReduceLrOnPlateauConfig(BaseConfig[ReduceLROnPlateau]):
 class OneCycleSchedulerConfig(BaseConfig[OneCycleLR]):
     """OneCycle learning-rate scheduler configuration."""
 
-    target: type[OneCycleLR] = Field(default_factory=lambda: OneCycleLR, exclude=True)
-    """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+    @property
+    def target(self) -> type[OneCycleLR]:
+        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        return OneCycleLR
 
     max_lr: float | None = None
     """Maximum learning rate in the cycle (defaults to optimizer LR)."""
@@ -237,10 +240,9 @@ class OneCycleSchedulerConfig(BaseConfig[OneCycleLR]):
 class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
     """Configuration for :class:`VinLightningModule`."""
 
-    target: type[VinLightningModule] = Field(
-        default_factory=lambda: VinLightningModule,
-        exclude=True,
-    )
+    @property
+    def target(self) -> type["VinLightningModule"]:
+        return VinLightningModule
 
     vin: VinModelConfig | VinModelV2Config = Field(default_factory=VinModelV2Config)
 

@@ -23,7 +23,9 @@ def _target_cls():
 class NbvStreamlitAppConfig(BaseConfig["NbvStreamlitApp"]):
     """Top-level config for the refactored Streamlit app."""
 
-    target: type["NbvStreamlitApp"] = Field(default_factory=_target_cls, exclude=True)
+    @property
+    def target(self) -> type["NbvStreamlitApp"]:
+        return _target_cls()
 
     dataset: AseEfmDatasetConfig = Field(default_factory=AseEfmDatasetConfig)
     """Dataset configuration used by the app."""

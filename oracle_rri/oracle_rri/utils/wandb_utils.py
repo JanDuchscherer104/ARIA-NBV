@@ -1,19 +1,58 @@
-"""W&B helper utilities for analysis and local media retrieval."""
+"""W&B helper utilities for analysis and local media retrieval.
+
+These helpers are designed to be chain-friendly for pandas workflows (they
+return new dataframes instead of mutating inputs) and provide optional plotting
+wrappers for quick run comparisons.
+"""
 
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import numpy as np
 
 if TYPE_CHECKING:
     import pandas as pd
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
 
 
 WANDB_STEP_KEYS: tuple[str, ...] = ("trainer/global_step", "global_step", "_step", "epoch")
+
+
+class WandbRun(Protocol):
+    """Minimal W&B Run interface used by these utilities."""
+
+    id: str
+    name: str
+    state: str
+    group: str | None
+    job_type: str | None
+    tags: Sequence[str] | None
+    created_at: Any
+    summary: Mapping[str, Any] | None
+    config: Mapping[str, Any] | None
+
+    def history(self, keys: list[str] | None = None, samples: int | None = None) -> Any:
+        """Return history data (typically a pandas.DataFrame or list of dicts)."""
+        ...  # pragma: no cover - protocol signature only
+
+
+class WandbApi(Protocol):
+    """Minimal W&B API interface used by these utilities."""
+
+    def viewer(self) -> Any: ...  # pragma: no cover - protocol signature only
+
+    def projects(self, entity: str) -> Iterable[Any]: ...  # pragma: no cover - protocol signature only
+
+    def runs(
+        self, path: str, order: str | None = None
+    ) -> Iterable[WandbRun]: ...  # pragma: no cover - protocol signature only
+
+    def run(self, path: str) -> WandbRun: ...  # pragma: no cover - protocol signature only
 
 
 def _flatten_mapping(
@@ -47,7 +86,7 @@ def _flatten_mapping(
 
 
 def _safe_mapping(raw: Any) -> dict[str, Any]:
-    """Safely coerce a W&B mapping-like object to a dict."""
+    """Safely coerce a W&B mapping-like object to a plain dict."""
     if raw is None:
         return {}
     try:
@@ -56,7 +95,7 @@ def _safe_mapping(raw: Any) -> dict[str, Any]:
         return {}
 
 
-def _list_entities(api: Any) -> list[str]:
+def _list_entities(api: WandbApi) -> list[str]:
     """Return available entities (user + teams) for the current API token."""
     entities: list[str] = []
     try:
@@ -78,7 +117,7 @@ def _list_entities(api: Any) -> list[str]:
     return list(dict.fromkeys(entities))
 
 
-def _list_projects(api: Any, *, entity: str) -> list[str]:
+def _list_projects(api: WandbApi, *, entity: str) -> list[str]:
     """Return available projects for a given entity."""
     projects: list[str] = []
     if not entity:
@@ -99,18 +138,18 @@ def _list_projects(api: Any, *, entity: str) -> list[str]:
 
 
 def _list_runs(
-    api: Any,
+    api: WandbApi,
     *,
     entity: str,
     project: str,
     max_runs: int,
-) -> list[Any]:
+) -> list[WandbRun]:
     """Fetch up to max_runs from W&B, ordered by recency when supported."""
     try:
         iterator = api.runs(f"{entity}/{project}", order="-created_at")
     except TypeError:  # pragma: no cover - older API versions
         iterator = api.runs(f"{entity}/{project}")
-    runs: list[Any] = []
+    runs: list[WandbRun] = []
     for run in iterator:
         runs.append(run)
         if max_runs and len(runs) >= max_runs:
@@ -118,7 +157,7 @@ def _list_runs(
     return runs
 
 
-def _extract_run_steps(run: Any, *, keys: tuple[str, ...] = WANDB_STEP_KEYS) -> float | None:
+def _extract_run_steps(run: WandbRun, *, keys: tuple[str, ...] = WANDB_STEP_KEYS) -> float | None:
     """Extract the best-available step count from a run summary."""
     summary = _safe_mapping(getattr(run, "summary", None))
     for key in keys:
@@ -144,7 +183,7 @@ def _format_timestamp(value: Any) -> str:
     return str(value)
 
 
-def _run_metadata(run: Any) -> dict[str, Any]:
+def _run_metadata(run: WandbRun) -> dict[str, Any]:
     """Extract a lightweight metadata row for a run."""
     tags = list(getattr(run, "tags", []) or [])
     steps = _extract_run_steps(run)
@@ -161,7 +200,7 @@ def _run_metadata(run: Any) -> dict[str, Any]:
 
 
 def _filter_runs(
-    runs: list[Any],
+    runs: list[WandbRun],
     *,
     name_regex: re.Pattern[str] | None,
     states: list[str],
@@ -170,9 +209,9 @@ def _filter_runs(
     job_type: str,
     min_steps: float | None,
     max_steps: float | None,
-) -> list[Any]:
+) -> list[WandbRun]:
     """Filter runs by state, regex, tags, group, job_type, and steps."""
-    filtered: list[Any] = []
+    filtered: list[WandbRun] = []
     for run in runs:
         state = str(getattr(run, "state", "") or "")
         if states and state not in states:
@@ -202,14 +241,21 @@ def _filter_runs(
     return filtered
 
 
-def _resolve_x_key(history: "pd.DataFrame", preferred_keys: list[str]) -> str:
-    """Pick the best x-axis key and add a row index when needed."""
+def _resolve_x_key(
+    history: "pd.DataFrame",
+    preferred_keys: Sequence[str],
+) -> tuple[str, "pd.DataFrame"]:
+    """Pick the best x-axis key and return (x_key, history_copy).
+
+    Returns a copy with an added ``row`` column when no preferred step key
+    exists, keeping the helper chain-friendly (no in-place mutation).
+    """
     for key in preferred_keys:
         if key in history.columns:
-            return key
-    if "row" not in history.columns:
-        history["row"] = np.arange(len(history))
-    return "row"
+            return key, history
+    if "row" in history.columns:
+        return "row", history
+    return "row", history.assign(row=np.arange(len(history)))
 
 
 def _finite_values(values: np.ndarray) -> np.ndarray:
@@ -298,11 +344,12 @@ def _summarize_gap(
 
 
 def _load_wandb_history(
-    run: Any,
+    run: WandbRun,
     *,
     keys: list[str] | None,
     max_rows: int,
 ) -> "pd.DataFrame":
+    """Fetch a raw W&B history dataframe (no cleanup)."""
     import pandas as pd
 
     history = run.history(keys=keys, samples=int(max_rows))
@@ -312,16 +359,19 @@ def _load_wandb_history(
 
 
 def _load_wandb_history_clean(
-    run: Any,
+    run: WandbRun,
     *,
     keys: list[str] | None,
     max_rows: int,
     replace_inf: bool = True,
 ) -> "pd.DataFrame":
-    """Load W&B history with basic cleanup (optional inf -> nan)."""
+    """Load W&B history with basic cleanup (optional inf -> nan).
+
+    Returns a new dataframe suitable for chaining.
+    """
     history = _load_wandb_history(run, keys=keys, max_rows=max_rows)
     if replace_inf:
-        history = history.replace([np.inf, -np.inf], np.nan)
+        return history.replace([np.inf, -np.inf], np.nan)
     return history
 
 
@@ -330,6 +380,7 @@ def _metric_pairs_with_pattern(
     *,
     pattern: str,
 ) -> dict[str, dict[str, dict[str, str]]]:
+    """Group metric column names into train/val + suffix buckets."""
     pairs: dict[str, dict[str, dict[str, str]]] = {}
     regex = re.compile(pattern)
     for name in columns:
@@ -343,6 +394,7 @@ def _metric_pairs_with_pattern(
 
 
 def _metric_pairs(columns: list[str]) -> dict[str, dict[str, dict[str, str]]]:
+    """Group metric columns using the default train/val naming convention."""
     return _metric_pairs_with_pattern(
         columns,
         pattern=r"^(train|val)/(.+?)(?:_(step|epoch))?$",
@@ -350,6 +402,7 @@ def _metric_pairs(columns: list[str]) -> dict[str, dict[str, dict[str, str]]]:
 
 
 def _select_metric_key(stage_map: dict[str, str], prefer: str) -> str | None:
+    """Select the best metric key for a stage, preferring step/epoch suffixes."""
     if prefer in stage_map:
         return stage_map[prefer]
     if "raw" in stage_map:
@@ -359,7 +412,7 @@ def _select_metric_key(stage_map: dict[str, str], prefer: str) -> str | None:
     return None
 
 
-def _ensure_wandb_api(api_key: str | None = None) -> Any:
+def _ensure_wandb_api(api_key: str | None = None) -> WandbApi:
     """Instantiate the W&B API client, importing lazily."""
     try:
         import wandb  # type: ignore[import-not-found]
@@ -381,8 +434,8 @@ def _load_runs_filtered(
     min_steps: float | None = None,
     max_steps: float | None = None,
     api_key: str | None = None,
-    api: Any | None = None,
-) -> list[Any]:
+    api: WandbApi | None = None,
+) -> list[WandbRun]:
     """Load runs for an entity/project and apply filters."""
     if api is None:
         api = _ensure_wandb_api(api_key)
@@ -400,15 +453,18 @@ def _load_runs_filtered(
     )
 
 
-def _get_run(api: Any, run_path: str) -> Any:
+def _get_run(api: WandbApi, run_path: str) -> WandbRun:
     """Fetch a single run by its W&B path."""
     return api.run(run_path)
 
 
 def build_run_dataframes(
-    runs: Sequence[Any],
+    runs: Sequence[WandbRun],
 ) -> tuple["pd.DataFrame", "pd.DataFrame", "pd.DataFrame"]:
-    """Build meta/summary/config dataframes from W&B runs."""
+    """Build meta/summary/config dataframes from W&B runs.
+
+    Returns new dataframes suitable for method chaining.
+    """
     import pandas as pd
 
     meta_rows = [_run_metadata(run) for run in runs]
@@ -429,7 +485,7 @@ def build_run_dataframes(
 
 
 def load_run_histories(
-    runs: Sequence[Any],
+    runs: Sequence[WandbRun],
     *,
     keys: list[str] | None = None,
     max_rows: int = 2000,
@@ -450,14 +506,17 @@ def load_run_histories(
 
 
 def build_dynamics_dataframe(
-    runs: Sequence[Any],
+    runs: Sequence[WandbRun],
     histories: Mapping[str, "pd.DataFrame"],
     *,
     base_metrics: Sequence[str] | None = None,
     prefer_x_keys: Sequence[str] | None = None,
     segment_frac: float = 0.2,
 ) -> "pd.DataFrame":
-    """Compute per-run dynamics summaries for selected base metrics."""
+    """Compute per-run dynamics summaries for selected base metrics.
+
+    Returns a new dataframe suitable for method chaining.
+    """
     import pandas as pd
 
     prefer_keys = list(prefer_x_keys) if prefer_x_keys else list(WANDB_STEP_KEYS)
@@ -469,7 +528,7 @@ def build_dynamics_dataframe(
         if history is None or history.empty:
             continue
         history = history.copy()
-        x_key = _resolve_x_key(history, prefer_keys)
+        x_key, history = _resolve_x_key(history, prefer_keys)
         pairs = _metric_pairs(list(history.columns))
         prefer_suffix = "epoch" if "epoch" in x_key else "step"
         bases = list(base_metrics) if base_metrics else sorted(pairs)
@@ -572,8 +631,128 @@ def collect_run_media_images(
     }
 
 
+def prepare_history_long_dataframe(
+    histories: Mapping[str, "pd.DataFrame"],
+    *,
+    metric: str,
+    prefer_x_keys: Sequence[str] | None = None,
+    run_name_map: Mapping[str, str] | None = None,
+) -> "pd.DataFrame":
+    """Build a long-form dataframe for plotting metric curves.
+
+    Args:
+        histories: Mapping of run_id -> history dataframe.
+        metric: Metric column name to extract.
+        prefer_x_keys: Preferred x-axis keys (defaults to WANDB_STEP_KEYS).
+        run_name_map: Optional map of run_id -> display name.
+
+    Returns:
+        Long-form dataframe with columns: run_id, run_name, step, value.
+    """
+    import pandas as pd
+
+    prefer_keys = list(prefer_x_keys) if prefer_x_keys else list(WANDB_STEP_KEYS)
+    rows: list[dict[str, Any]] = []
+    for run_id, history in histories.items():
+        if history is None or history.empty or metric not in history.columns:
+            continue
+        x_key, history = _resolve_x_key(history.copy(), prefer_keys)
+        df = history[[x_key, metric]].dropna().sort_values(x_key)
+        if df.empty:
+            continue
+        run_name = run_name_map.get(run_id, run_id) if run_name_map else run_id
+        rows.extend(
+            {
+                "run_id": run_id,
+                "run_name": run_name,
+                "step": float(step),
+                "value": float(value),
+            }
+            for step, value in zip(df[x_key], df[metric], strict=False)
+        )
+    return pd.DataFrame(rows)
+
+
+def plot_metric_curves(
+    histories: Mapping[str, "pd.DataFrame"],
+    *,
+    metric: str,
+    prefer_x_keys: Sequence[str] | None = None,
+    run_name_map: Mapping[str, str] | None = None,
+    ax: "Axes | None" = None,
+) -> tuple["Figure", "Axes"]:
+    """Plot metric curves across runs using seaborn."""
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    df_long = prepare_history_long_dataframe(
+        histories,
+        metric=metric,
+        prefer_x_keys=prefer_x_keys,
+        run_name_map=run_name_map,
+    )
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 4))
+    else:
+        fig = ax.figure
+    if not df_long.empty:
+        sns.lineplot(data=df_long, x="step", y="value", hue="run_name", ax=ax)
+    ax.set_title(f"{metric} over time")
+    ax.set_xlabel("step")
+    ax.set_ylabel(metric)
+    return fig, ax
+
+
+def plot_dynamics_scatter(
+    dynamics_df: "pd.DataFrame",
+    *,
+    x: str = "train_last",
+    y: str = "val_last",
+    hue: str = "run_name",
+    style: str | None = "base",
+    ax: "Axes | None" = None,
+) -> tuple["Figure", "Axes"]:
+    """Scatter plot comparing train vs val dynamics summary."""
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(6, 4))
+    else:
+        fig = ax.figure
+    sns.scatterplot(data=dynamics_df, x=x, y=y, hue=hue, style=style, ax=ax)
+    ax.set_title(f"{y} vs {x}")
+    return fig, ax
+
+
+def plot_dynamics_bar(
+    dynamics_df: "pd.DataFrame",
+    *,
+    metric: str = "val_last",
+    base: str | None = None,
+    ax: "Axes | None" = None,
+) -> tuple["Figure", "Axes"]:
+    """Bar plot of a chosen dynamics metric across runs."""
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 4))
+    else:
+        fig = ax.figure
+    plot_df = dynamics_df.copy()
+    if base is not None:
+        plot_df = plot_df[plot_df["base"] == base]
+    sns.barplot(data=plot_df, x="run_name", y=metric, ax=ax)
+    ax.set_title(f"{metric} by run")
+    ax.tick_params(axis="x", rotation=45)
+    return fig, ax
+
+
 __all__ = [
     "WANDB_STEP_KEYS",
+    "WandbApi",
+    "WandbRun",
     "_ensure_wandb_api",
     "_extract_run_steps",
     "_filter_runs",
@@ -601,4 +780,8 @@ __all__ = [
     "collect_run_media_images",
     "list_run_dirs",
     "load_run_histories",
+    "plot_dynamics_bar",
+    "plot_dynamics_scatter",
+    "plot_metric_curves",
+    "prepare_history_long_dataframe",
 ]
