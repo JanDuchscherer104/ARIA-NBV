@@ -1,6 +1,6 @@
 = Coordinate Conventions and Geometry
 
-#import "/typst/shared/macros.typ": *
+#import "../../shared/macros.typ": *
 
 We follow the EFM3D/ATEK coordinate conventions throughout the pipeline. The
 world frame is gravity-aligned, the rig frame moves with the headset, and each

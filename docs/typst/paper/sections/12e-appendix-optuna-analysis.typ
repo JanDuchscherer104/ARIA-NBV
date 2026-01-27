@@ -2,7 +2,7 @@
 
 = Appendix: Optuna Sweep Evidence & Diagnostics
 
-#import "/typst/shared/macros.typ": *
+#import "../../shared/macros.typ": *
 
 #block[
   #smallcaps[Scope] This appendix formalises the evidence routines implemented in

@@ -2,7 +2,7 @@
 
 = Appendix: OracleRriLabeler Pipeline
 
-#import "/typst/shared/macros.typ": *
+#import "../../shared/macros.typ": *
 #import "@preview/booktabs:0.0.4": *
 #show: booktabs-default-table-style
 
@@ -31,23 +31,23 @@ Given an ASE-EFM snippet with mesh supervision, `OracleRriLabeler` executes:
 
 == Candidate center sampling (hyperspherical shell)
 
-Let $#sym_T _(#fr_world <- #fr_rig_ref)$ be the reference rig pose (world
+Let $#(s.T)_(#fr_world <- #fr_rig_ref)$ be the reference rig pose (world
 coordinates). Candidate centers are sampled by drawing a direction
-$#sym_dir _i in bb(S)^2$ and a radius $r_i in [r_"min", r_"max"]$, then
+$#(s.dir)_i in bb(S)^2$ and a radius $r_i in [r_"min", r_"max"]$, then
 transforming the resulting offset into world coordinates:
 
 #block[
   #align(center)[
     $
-      #sym_offset _i = r_i #sym_dir _i,
-      quad #sym_center _i = #sym_T _(#fr_world <- #fr_rig_ref) #sym_offset _i
+      #(s.offset)_i = r_i #(s.dir)_i,
+      quad #(s.center)_i = #(s.T)_(#fr_world <- #fr_rig_ref) #(s.offset)_i
     $
   ]
 ]
 
 We draw directions either uniformly on the sphere, or from a forward-biased
 Power Spherical distribution centered at the device forward axis
-$(#sym_dir) ~ "PS"(bold(mu), kappa)$ @PowerSpherical-deCao2020. Angular caps
+$(#s.dir) ~ "PS"(bold(mu), kappa)$ @PowerSpherical-deCao2020. Angular caps
 are enforced *without rejection* by deterministically mapping the raw samples
 into the target azimuth/elevation ranges (see
 `oracle_rri/oracle_rri/pose_generation/positional_sampling.py`).
@@ -84,7 +84,7 @@ The candidate center sampling configuration used in our runs is summarized in
 ) <tab:oracle-cfg-centers>
 
 *Azimuth/elevation caps without rejection.* Let
-$tilde(#sym_dir) = (x, y, z)$ be a raw unit direction. We define
+$tilde(#s.dir) = (x, y, z)$ be a raw unit direction. We define
 
 #block[
   #align(center)[
@@ -116,7 +116,7 @@ renormalization.
 
 == Candidate orientations
 
-For each candidate center $(#sym_center)_i$, we construct a base camera
+For each candidate center $(#s.center)_i$, we construct a base camera
 orientation according to the configured `ViewDirectionMode`
 (`oracle_rri/oracle_rri/pose_generation/orientations.py`). The most common mode
 is radial "look-away", which points the camera optical axis away from the
@@ -152,7 +152,7 @@ translation. Define the forward axis
   #align(center)[
     $
       bold(z)_i =
-      ( #sym_center _i - bold(t)_("ref") ) / (|| #sym_center _i - bold(t)_("ref") ||_2 + epsilon)
+      ( #(s.center)_i - bold(t)_("ref") ) / (|| #(s.center)_i - bold(t)_("ref") ||_2 + epsilon)
     $
   ]
 ]
@@ -172,8 +172,8 @@ and construct a roll-stable orthonormal basis
 ]
 
 The resulting rotation is $bold(R)_i = [bold(x)_i, bold(y)_i, bold(z)_i]$ and
-the candidate pose is $(#sym_T)_{#fr_world <- (#fr_cam)_i} = (bold(R)_i,
-  (#sym_center)_i)$.
+the candidate pose is $(#s.T)_{#fr_world <- (#fr_cam)_i} = (bold(R)_i,
+  (#s.center)_i)$.
 
 *View jitter.* After base pose construction, we optionally apply bounded yaw,
 pitch, and roll perturbations in the camera frame. Using yaw about +Y, pitch
@@ -194,7 +194,7 @@ and update $bold(R)_i <- bold(R)_i bold(R)_i^("jitter")$.
 
 Candidates are oversampled and then filtered by modular rule objects
 (`oracle_rri/oracle_rri/pose_generation/candidate_generation_rules.py`).
-Let #sym_mesh be the GT mesh and $cal(B)$ be the snippet occupancy AABB.
+Let #s.mesh be the GT mesh and $cal(B)$ be the snippet occupancy AABB.
 
 The pruning configuration used in our runs is summarized in
 @tab:oracle-cfg-prune.
@@ -226,7 +226,7 @@ The pruning configuration used in our runs is summarized in
 #block[
   #align(center)[
     $
-      d_i = min_(bold(m) in #sym_mesh) || #sym_center _i - bold(m) ||_2,
+      d_i = min_(bold(m) in #s.mesh) || #(s.center)_i - bold(m) ||_2,
       quad
       d_i > d_"min"
     $
@@ -240,22 +240,22 @@ points along the segment and require a minimum clearance:
 #block[
   #align(center)[
     $
-      bold(s)_(i,k) = bold(t)_("ref") + alpha_k (#sym_center _i - bold(t)_("ref")),
+      bold(s)_(i,k) = bold(t)_("ref") + alpha_k (#(s.center)_i - bold(t)_("ref")),
       quad alpha_k in [0, 1], \
-      min_(bold(m) in #sym_mesh) || bold(s)_(i,k) - bold(m) ||_2 > delta
+      min_(bold(m) in #s.mesh) || bold(s)_(i,k) - bold(m) ||_2 > delta
     $
   ]
 ]
 
 *Free space.* Reject candidates outside the occupancy bounds:
-$(#sym_center)_i in cal(B)$.
+$(#s.center)_i in cal(B)$.
 
 == Depth rendering with PyTorch3D
 
 Depth rendering is implemented in
 `oracle_rri/oracle_rri/rendering/pytorch3d_depth_renderer.py` using PyTorch3D's
 `PerspectiveCameras`, `RasterizationSettings`, and `MeshRasterizer`
-@PyTorch3D-Cameras-2025. Given a candidate pose $#sym_T _(#fr_world <- #fr_cam)$
+@PyTorch3D-Cameras-2025. Given a candidate pose $#(s.T)_(#fr_world <- #fr_cam)$
 and camera intrinsics (focal length and principal point), we build a batched
 `PerspectiveCameras` instance with `in_ndc=false` and rasterize the GT mesh.
 
@@ -298,7 +298,7 @@ $bold(x)_("cam") = bold(x)_("world") bold(R) + bold(T)$.
 We therefore invert the pose and transpose the rotation before passing it to
 PyTorch3D (see in-code comments in the renderer).
 
-The rasterizer outputs a z-buffer $(#sym_depth)_i(u,v)$ and a face-index buffer
+The rasterizer outputs a z-buffer $(#s.depth)_i(u,v)$ and a face-index buffer
 `pix_to_face_i(u,v)`. Valid pixels satisfy `pix_to_face >= 0` and are further
 clipped to `znear < depth < zfar`.
 
@@ -326,7 +326,7 @@ We then unproject in NDC space:
   #align(center)[
     $
       bold(p)_"world" =
-      "unproject"(x_"ndc", y_"ndc", #sym_depth _i(u,v))
+      "unproject"(x_"ndc", y_"ndc", #(s.depth)_i(u,v))
     $
   ]
 ]
@@ -340,7 +340,7 @@ the same NDC convention used by the rasterizer makes depth unprojection and
 rasterization consistent.
 
 The per-candidate point set is then
-$#sym_points _(q_i) = { bold(p)_("world") : (u,v) "valid" }$, optionally
+$#(s.points)_(q_i) = { bold(p)_("world") : (u,v) "valid" }$, optionally
 subsampled by a stride to control point count.
 
 The backprojection configuration used in our runs is summarized in
@@ -365,15 +365,15 @@ The backprojection configuration used in our runs is summarized in
 
 == Oracle RRI computation
 
-Let $#sym_points _t$ be the semi-dense SLAM reconstruction for the snippet and
-$#sym_points _(q_i)$ the candidate point cloud rendered from the GT mesh.
+Let $#(s.points)_t$ be the semi-dense SLAM reconstruction for the snippet and
+$#(s.points)_(q_i)$ the candidate point cloud rendered from the GT mesh.
 Oracle RRI is computed by comparing the point-to-mesh reconstruction quality
 before and after adding the candidate:
 
 #block[
   #align(center)[
     $
-      #sym_points _(t union q_i) = #sym_points _t union #sym_points _(q_i)
+      #(s.points)_(t union q_i) = #(s.points)_t union #(s.points)_(q_i)
     $
   ]
 ]
@@ -382,9 +382,9 @@ before and after adding the candidate:
   #align(center)[
     $
       "RRI"(q_i) =
-      ("CD"(#sym_points _t, #sym_mesh)
-      - "CD"(#sym_points _(t union q_i), #sym_mesh))
-      / ("CD"(#sym_points _t, #sym_mesh) + epsilon)
+      ("CD"(#(s.points)_t, #s.mesh)
+      - "CD"(#(s.points)_(t union q_i), #s.mesh))
+      / ("CD"(#(s.points)_t, #s.mesh) + epsilon)
     $
   ]
 ]

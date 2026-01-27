@@ -1,6 +1,6 @@
 = Oracle RRI Computation
 
-#import "/typst/shared/macros.typ": *
+#import "../../shared/macros.typ": *
 
 Oracle RRI labels are computed offline by rendering candidate depth maps from
 ground-truth meshes and fusing these points with the current reconstruction.
@@ -12,7 +12,7 @@ for unprojection, point fusion, and Chamfer evaluation.
 For each candidate pose $q$, we render a depth map from the GT mesh using a
 metric z-buffer. Let $D_q$ denote the depth map and $C_q$ the camera
 intrinsics. We backproject valid depth pixels into world coordinates to obtain
-$#sym_points _q$. Missing pixels are masked out and do not contribute to the fused point
+$#(s.points)_q$. Missing pixels are masked out and do not contribute to the fused point
 cloud. This ensures that the oracle computation respects the same geometric
 constraints as the candidate camera.
 
@@ -20,7 +20,7 @@ Depth-render diagnostics and example candidates are provided in the appendix
 to keep the main text focused on the pipeline details.
 
 #figure(
-  #grid(
+  grid(
     columns: (1fr, 1fr),
     gutter: 12pt,
     image("/figures/app/candidate_renders.png", width: 100%),
@@ -32,11 +32,24 @@ to keep the main text focused on the pipeline details.
 == Point cloud fusion and evaluation
 
 We fuse the candidate point cloud with the current reconstruction,
-$#sym_points _(t union q) = #sym_points _t union #sym_points _q$, and evaluate the Chamfer distance to the mesh.
+$#(s.points)_(t union q) = #(s.points)_t union #(s.points)_q$, and evaluate the Chamfer distance to the mesh.
 The oracle RRI is computed using the definition above. We also log the intermediate
 completeness and accuracy components of the Chamfer distance to diagnose
 failure modes (e.g., views that look into empty space). The resulting RRI values
 serve as supervised labels for future learning-based candidate scoring.
+
+In practice, the per-candidate oracle scores are highly skewed: most candidates
+produce only marginal improvements, while a small subset yields large gains
+depending on whether the view opens new surface regions or refines previously
+observed geometry. For example, in a cached oracle run (scene 81056, sample
+000022) the median candidate achieves $0.0116$ RRI while the best candidate
+achieves $0.766$ RRI, corresponding to a reduction of bidirectional
+point↔mesh error from $2.286$ to $0.535$.
+
+#figure(
+  image("/figures/app/rri_hist_81056_000022.png", width: 100%),
+  caption: [Oracle RRI distribution across candidates for one example snippet (scene 81056, sample 000022).],
+) <fig:rri-hist-example>
 
 We evaluate both directional terms with mean squared point-to-triangle and
 triangle-to-point distances (averaged over points and faces). This yields the

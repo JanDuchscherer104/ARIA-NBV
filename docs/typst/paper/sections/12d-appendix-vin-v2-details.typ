@@ -2,7 +2,7 @@
 
 = Appendix: VIN v2 Implementation Notes
 
-#import "/typst/shared/macros.typ": *
+#import "../../shared/macros.typ": *
 
 This appendix collects implementation-level details of the VIN v2 architecture
 that are too dense for the main architecture section. The goal is to keep the
@@ -11,7 +11,7 @@ current `VinModelV2` implementation.
 
 == Pose representation and rotation-6D
 
-VIN v2 represents candidate poses as $#sym_T _(#fr_rig_ref <- #fr_cam) in "SE"(3)$.
+VIN v2 represents candidate poses as $#(s.T)_(#fr_rig_ref <- #fr_cam) in "SE"(3)$.
 We encode rotation via the continuous 6D representation obtained by taking the
 first two columns of the rotation matrix and flattening them into a 6-vector.
 This avoids discontinuities of Euler angles and improves learning stability
@@ -29,8 +29,8 @@ image bounds. We define the candidate-conditioned visibility fraction
   #align(center)[
     $
       v_i^("sem") =
-      (1)/(max(1, |#sym_points _t|))
-      sum_(bold(p) in #sym_points _t) bb(1)["valid"_(i)(bold(p))]
+      (1)/(max(1, |#(s.points)_t|))
+      sum_(bold(p) in #(s.points)_t) bb(1)["valid"_(i)(bold(p))]
     $
   ]
 ]

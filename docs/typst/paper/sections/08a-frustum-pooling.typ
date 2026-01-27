@@ -1,6 +1,6 @@
 = Semi-dense Frustum Pooling and View-Conditioned Tokens
 
-#import "/typst/shared/macros.typ": *
+#import "../../shared/macros.typ": *
 
 A key requirement for NBV is that features be explicitly conditioned on the
 candidate view. In VIN v2 we approximate VIN-NBV's view-plane projection
@@ -14,7 +14,7 @@ Representative frusta visualizations are included in the appendix.
 
 == Semi-dense projection tokens
 
-Let $#sym_points _t$ be the current reconstruction point set (semi-dense
+Let $#(s.points)_t$ be the current reconstruction point set (semi-dense
 SLAM points) in
 world coordinates. For each candidate camera, we project points to screen-space
 using a standard pinhole camera model consistent with the depth renderer. Each

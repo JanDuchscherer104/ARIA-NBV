@@ -1,14 +1,14 @@
 = Problem Formulation <sec:problem>
 
-#import "/typst/shared/macros.typ": *
+#import "../../shared/macros.typ": *
 
 We consider an egocentric reconstruction episode with a sequence of captured
-frames and poses. Let $#sym_points _t$ be the current reconstruction point set
-at step $t$, and let $#sym_mesh$ denote the ground-truth surface mesh for the
+frames and poses. Let $#(s.points)_t$ be the current reconstruction point set
+at step $t$, and let $#s.mesh$ denote the ground-truth surface mesh for the
 scene. At each step we sample a finite set of $N$ candidate camera poses
-$q in #sym_candidates subset "SE"(3)$ (with optional roll constraints), render
-a candidate point set $#sym_points _q$ by rasterized depth-rendering
-$#sym_mesh$ from pose $q$, unprojecting it in normalized device coordinates,
+$q in #s.candidates subset "SE"(3)$ (with optional roll constraints), render
+a candidate point set $#(s.points)_q$ by rasterized depth-rendering
+$#s.mesh$ from pose $q$, unprojecting it in normalized device coordinates,
 and score candidates by their expected improvement in reconstruction quality.
 
 Our work to date focuses on computing these oracle per-candidate scores: the
@@ -18,13 +18,13 @@ future work.
 
 == Chamfer distance and RRI
 
-We measure reconstruction quality using a Chamfer-style point #sym.arrow.l.r mesh distance between a point set $#sym_points$ and a mesh surface $#sym_mesh$. We represent $#sym_mesh$ by its triangular faces $#sym_faces$ and evaluate both directional terms using squared point-to-triangle and triangle-to-point distances.
+We measure reconstruction quality using a Chamfer-style point #sym.arrow.l.r mesh distance between a point set $#s.points$ and a mesh surface $#s.mesh$. We represent $#s.mesh$ by its triangular faces $#s.faces$ and evaluate both directional terms using squared point-to-triangle and triangle-to-point distances.
 
 #block[
   #align(center)[
     $
-      "CD"(#sym_points, #sym_mesh) =
-      #sym_acc (#sym_points, #sym_mesh) + #sym_comp (#sym_points, #sym_mesh)
+      "CD"(#s.points, #s.mesh) =
+      #s.acc (#s.points, #s.mesh) + #s.comp (#s.points, #s.mesh)
     $
   ]
 ]
@@ -32,8 +32,8 @@ We measure reconstruction quality using a Chamfer-style point #sym.arrow.l.r mes
 #block[
   #align(center)[
     $
-      #sym_acc (#sym_points, #sym_mesh) =
-      (1)/(||#sym_points||) sum_(bold(p) in #sym_points) min_(bold(f) in #sym_faces) d(bold(p), bold(f))^2
+      #s.acc (#s.points, #s.mesh) =
+      (1)/(||#s.points||) sum_(bold(p) in #s.points) min_(bold(f) in #s.faces) d(bold(p), bold(f))^2
     $
   ]
 ]
@@ -41,8 +41,8 @@ We measure reconstruction quality using a Chamfer-style point #sym.arrow.l.r mes
 #block[
   #align(center)[
     $
-      #sym_comp (#sym_points, #sym_mesh) =
-      (1)/(||#sym_faces||) sum_(bold(f) in #sym_faces) min_(bold(p) in #sym_points) d(bold(p), bold(f))^2
+      #s.comp (#s.points, #s.mesh) =
+      (1)/(||#s.faces||) sum_(bold(f) in #s.faces) min_(bold(p) in #s.points) d(bold(p), bold(f))^2
     $
   ]
 ]
@@ -53,8 +53,8 @@ The Relative Reconstruction Improvement for candidate $q$ is then
   #align(center)[
     $
       "RRI"(q) =
-      ("CD"(#sym_points _t, #sym_mesh) - "CD"(#sym_points _t union #sym_points _q, #sym_mesh))
-      / ("CD"(#sym_points _t, #sym_mesh) + epsilon)
+      ("CD"(#(s.points)_t, #s.mesh) - "CD"(#(s.points)_t union #(s.points)_q, #s.mesh))
+      / ("CD"(#(s.points)_t, #s.mesh) + epsilon)
     $
   ]
 ]
@@ -64,7 +64,7 @@ candidate view decreases the Chamfer distance, thereby improving reconstruction
 quality. A greedy one-step oracle policy would select
 #block[
   #align(center)[
-    $ q_star = op("argmax", limits: #true)_(q in #sym_candidates) "RRI"(q) $
+    $ q_star = op("argmax", limits: #true)_(q in #s.candidates) "RRI"(q) $
   ]
 ]
 

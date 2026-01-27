@@ -1,7 +1,7 @@
 #import "@preview/booktabs:0.0.4": *
 #show: booktabs-default-table-style
 
-#import "/typst/shared/macros.typ": *
+#import "../../shared/macros.typ": *
 
 = System Pipeline and Implementation
 
@@ -12,8 +12,15 @@ summarized in @tab:pipeline and visualized in @fig:candidate-poses.
 
 
 #figure(
-  image("/figures/app/cand_frusta_kappa4_r06-29.png", width: 100%),
-  caption: [Candidate frusta sampled around a reference pose (Streamlit diagnostics view; config in @tab:oracle-label-config).],
+  grid(
+    columns: (1fr, 1fr),
+    gutter: 10pt,
+    image("/figures/app/cand_frusta_kappa4_r06-29.png", width: 100%),
+    image("/figures/app/candidate_renders.png", width: 100%),
+    image("/figures/app/render_frusta.png", width: 100%),
+    image("/figures/app/depth_hist.png", width: 100%),
+  ),
+  caption: [Streamlit pipeline diagnostics: candidate frusta (top-left), depth renders (top-right), rendered frusta (bottom-left), and per-candidate depth histograms (bottom-right).],
 ) <fig:candidate-poses>
 
 #figure(
@@ -34,7 +41,7 @@ summarized in @tab:pipeline and visualized in @fig:candidate-poses.
     midrule(), [Dataset loader], [ASE shards, mesh],
     [Snippet window (streams, poses, semi-dense points, mesh)], [Candidate generation], [Rig pose, mesh, bounds],
     [Candidate poses], [Depth rendering], [Candidates, mesh, cameras],
-    [Depth maps, masks], [Oracle RRI], [$#sym_points _t, #sym_points _q, #sym_mesh$],
+    [Depth maps, masks], [Oracle RRI], [$#(s.points)_t, #(s.points)_q, #s.mesh$],
     [RRI labels (continuous + ordinal)], [Future: learned scorer], [oracle labels, scene features],
     [Predicted ordinal scores], bottomrule(),
   ),
@@ -66,6 +73,9 @@ summarized in @tab:pipeline and visualized in @fig:candidate-poses.
     bottomrule(),
   ),
 ) <tab:oracle-label-config>
+
+The corresponding runnable configuration is provided in
+`.configs/paper_figures_oracle_labeler.toml`.
 
 == Candidate generation
 

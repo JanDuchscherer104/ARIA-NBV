@@ -20,6 +20,11 @@ validation of pose distributions, collision checks, and view frusta.
 ) <fig:rri-forward>
 
 #figure(
+  image("/figures/app/rri_hist_81056_000022.png", width: 100%),
+  caption: [Example oracle RRI histogram over candidates (scene 81056, sample 000022).]
+) <fig:rri-hist>
+
+#figure(
   image("/figures/app/render_frusta.png", width: 100%),
   caption: [Rendered frusta with depth overlay for candidate validation.]
 ) <fig:render-frusta>

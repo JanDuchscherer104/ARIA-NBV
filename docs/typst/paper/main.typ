@@ -1,19 +1,20 @@
 #import "charged_ieee_local.typ": ieee
 #import "@preview/booktabs:0.0.4": *
-#import "/typst/shared/macros.typ": *
+#import "../shared/macros.typ": *
 
 #show: booktabs-default-table-style
 
 #let figures_path = "/figures/"
 
 #show: ieee.with(
-  title: [Aria-VIN-NBV: Quality-Driven Next-Best-View Planning with Egocentric Foundation Models],
+  title: [Aria-NBV: Quality-Driven Next-Best-View Planning with Egocentric Foundation Models],
   abstract: [
     Next-Best-View (NBV) planning selects future viewpoints for active 3D reconstruction to
     maximize reconstruction quality under limited capture budgets. Many learning-based planners
     optimize coverage- or information-gain proxies that can fail in cluttered indoor scenes with
-    occlusions and fine details. We introduce Aria-VIN-NBV, a quality-driven NBV system for
-    egocentric indoor trajectories in Aria Synthetic Environments (ASE). Building on the
+    occlusions and fine details. We introduce Aria-VIN-NBV, an oracle label and diagnostics
+    pipeline for quality-driven NBV research on egocentric indoor trajectories in Aria Synthetic
+    Environments (ASE). Building on the
     view-introspection paradigm of predicting Relative Reconstruction Improvement (RRI) for
     candidate views, we compute oracle labels by rendering candidate depth from ASE ground-truth
     meshes, fusing the resulting points with semi-dense simultaneous localization and mapping
@@ -53,7 +54,6 @@
 #set text(font: "New Computer Modern")
 
 
-#import "/typst/shared/macros.typ": *
 
 #include "sections/01-introduction.typ"
 #include "sections/02-related-work.typ"
@@ -75,6 +75,8 @@
 #include "sections/11-conclusion.typ"
 #include "sections/12c-appendix-oracle-rri-labeler.typ"
 #include "sections/12d-appendix-vin-v2-details.typ"
+#include "sections/12f-appendix-pose-frames.typ"
 #include "sections/12e-appendix-optuna-analysis.typ"
+#include "sections/12g-appendix-vin-v3-streamline.typ"
 #include "sections/12-appendix-gallery.typ"
 #include "sections/12b-appendix-extra.typ"

@@ -18,6 +18,7 @@ per-frame calibration and world-frame rig poses. This structured
 representation ensures that all geometry uses consistent coordinate conventions
 (LUF for camera frames, gravity-aligned world frame for voxels).
 An example semi-dense SLAM point cloud used by the oracle is shown in
+@fig:ase-app-diagnostics (top-right), with additional overlays provided in
 Appendix @fig:ase-semidense.
 
 #figure(
@@ -67,6 +68,13 @@ tools and do not rely on them for the oracle label computation described in
 this paper.
 
 #figure(
-  image("/figures/scene-script/ase_modalities.jpg", width: 100%),
-  caption: [ASE modalities and synthetic sensor streams (SceneScript dataset view).],
-) <fig:ase-modalities>
+  grid(
+    columns: (1fr, 1fr),
+    gutter: 10pt,
+    image("/figures/app/traj.png", width: 100%),
+    image("/figures/app/semidense.png", width: 100%),
+    image("/figures/app/gt_obbs.png", width: 100%),
+    image("/figures/app/first_final_frames.png", width: 100%),
+  ),
+  caption: [Streamlit diagnostics snapshots for the ASE pipeline: trajectory overview (top-left), semi-dense overlay (top-right), ground-truth OBBs (bottom-left), and first vs. final frames (bottom-right).],
+) <fig:ase-app-diagnostics>

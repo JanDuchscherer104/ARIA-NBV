@@ -1,6 +1,6 @@
 = Related Work
 
-#import "/typst/shared/macros.typ": *
+#import "../../shared/macros.typ": *
 
 == Next-best-view planning
 

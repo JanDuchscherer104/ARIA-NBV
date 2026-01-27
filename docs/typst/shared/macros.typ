@@ -140,82 +140,78 @@ $
 #let fr_cam = "q"
 #let fr_voxel = "voxel"
 
-/// Common short-hands for sets and tensors used in equations.
+/// Common short-hands for sets, tensors, and dimensions used in equations.
 ///
-/// - Point set: `#sym_points`
-/// - Mesh surface: `#sym_mesh`
-/// - Loss: `#sym_loss`
-#let sym_points = $cal(P)$
-#let sym_mesh = $cal(M)_"GT"$
-#let sym_faces = $cal(F)_"GT"$
-#let sym_loss = $cal(L)$
-#let sym_candidates = $cal(Q)$
-#let sym_depth = $bold(D)$
-#let sym_dir = $bold(d)$
-#let sym_center = $bold(c)$
-#let sym_offset = $bold(o)$
-#let sym_acc = $cal(A)$
-#let sym_comp = $cal(C)$
+/// Access with `#s.key` inside math (e.g., `$#(s.points)_t$`).
+/// Use `#(s.key)_t` when applying scripts to avoid spacing issues.
+#let s = (
+  points: $cal(P)$,
+  mesh: $cal(M)_"GT"$,
+  faces: $cal(F)_"GT"$,
+  loss: $cal(L)$,
+  candidates: $cal(Q)$,
+  depth: $bold(D)$,
+  dir: $bold(d)$,
+  center: $bold(c)$,
+  offset: $bold(o)$,
+  acc: $cal(A)$,
+  comp: $cal(C)$,
 
-/// Attention and feature symbols (all tensors/vectors; already bold).
-#let sym_pose_emb = $bold(e)$
-#let sym_token = $bold(x)$
-#let sym_pos = $bold(p)$
-#let sym_global = $bold(g)$
-#let sym_query = $bold(q)$
-#let sym_key = $bold(k)$
-#let sym_value = $bold(v)$
+  // Attention and feature symbols (all tensors/vectors; already bold).
+  pose_emb: $bold(e)$,
+  token: $bold(x)$,
+  pos: $bold(p)$,
+  global: $bold(g)$,
+  query: $bold(q)$,
+  key: $bold(k)$,
+  value: $bold(v)$,
 
-/// Dimension symbols used in architecture diagrams and shape annotations.
-///
-/// These are intended to appear inside shape tuples like `(B, N, F_q)` and
-/// to keep notation consistent across Typst text and imported diagrams.
-#let sym_B = $B$
-#let sym_N = $N$
-#let sym_Tlen = $T$
-#let sym_P = $P$
-#let sym_Pproj = $P_"proj"$
-#let sym_Pfr = $P_"fr"$
-#let sym_D = $D$
-#let sym_H = $H$
-#let sym_W = $W$
-#let sym_Vvox = $V$
-#let sym_Gpool = $G_"pool"$
-#let sym_Gproj = $G_"proj"$
-#let sym_M = $M$
-#let sym_K = $K$
+  // Dimension symbols used in architecture diagrams and shape annotations.
+  B: $B$,
+  N: $N$,
+  Tlen: $T$,
+  P: $P$,
+  Pproj: $P_"proj"$,
+  Pfr: $P_"fr"$,
+  D: $D$,
+  H: $H$,
+  Wdim: $W$,
+  Vvox: $V$,
+  Gpool: $G_"pool"$,
+  Gproj: $G_"proj"$,
+  M: $M$,
+  K: $K$,
 
-/// Per-point semidense feature dimension (e.g., XYZ + extras).
-#let sym_Csem = $C_"sem"$
+  // Per-point semidense feature dimension (e.g., XYZ + extras).
+  Csem: $C_"sem"$,
 
-/// Feature channel / embedding dimensions.
-#let sym_Fin = $F_"in"$
-#let sym_Fpose = $F_"pose"$
-#let sym_Fpe = $F_"pe"$
-#let sym_Fq = $F_q$
-#let sym_Fg = $F_g$
-#let sym_Ftau = $F_tau$
-#let sym_Fproj = $F_"proj"$
-#let sym_Ftok = $F_"tok"$
-#let sym_Ffr = $F_"fr"$
-#let sym_Fpt = $F_"pt"$
-#let sym_Faux = $F_"aux"$
-#let sym_Fhead = $F_"head"$
-#let sym_Fhid = $F_"hid"$
+  // Feature channel / embedding dimensions.
+  Fin: $F_"in"$,
+  Fpose: $F_"pose"$,
+  Fpe: $F_"pe"$,
+  Fq: $F_q$,
+  Fg: $F_g$,
+  Ftau: $F_tau$,
+  Fproj: $F_"proj"$,
+  Ftok: $F_"tok"$,
+  Ffr: $F_"fr"$,
+  Fpt: $F_"pt"$,
+  Faux: $F_"aux"$,
+  Fhead: $F_"head"$,
+  Fhid: $F_"hid"$,
 
-/// Transform / weight symbols.
-/// SE(3) transform symbol (matrix).
-#let sym_T = $bold(T)$
+  // Transform / weight symbols.
+  T: $bold(T)$,
+  W: $bold(W)$,
+  gamma: $bold(gamma)$,
+  beta: $bold(beta)$,
+)
+
 /// SE(3) transform from frame `B` to frame `A` (i.e., `A <- B`).
 ///
 /// Note: Using a function avoids needing whitespace when applying scripts to
-/// interpolated symbols (e.g., `$#sym_T _A$` would require a space).
-#let T(A, B) = $#sym_T^(#A)_(#B)$
-/// Linear projection matrix symbol.
-#let sym_W = $bold(W)$
-/// FiLM scale/bias symbols (vectors).
-#let sym_gamma = $bold(gamma)$
-#let sym_beta = $bold(beta)$
+/// interpolated symbols (e.g., `$#(s.T)_A$` would require a space).
+#let T(A, B) = $#s.T^(#A)_(#B)$
 
 // ============================================================================
 // Utility Functions

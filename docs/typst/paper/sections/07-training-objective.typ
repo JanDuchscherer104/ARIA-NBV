@@ -1,6 +1,6 @@
 = Training Objective
 
-#import "/typst/shared/macros.typ": *
+#import "../../shared/macros.typ": *
 
 To enable future learning of a VIN-style candidate scorer on oracle RRI labels,
 we describe an ordinal regression objective. RRI values are binned into $K$
@@ -18,7 +18,7 @@ are binary levels $t_k = bb(1)[y > k]$. The per-sample loss is
 #block[
   #align(center)[
     $
-      #sym_loss _("coral")(y, bold(p))
+      #(s.loss)_("coral")(y, bold(p))
       = - sum_(k=0)^(K-2) (t_k "log"(p_k) + (1 - t_k) "log"(1 - p_k))
     $
   ]
@@ -71,7 +71,7 @@ improve calibration. The final objective is
 
 #block[
   #align(center)[
-    $ #sym_loss = #sym_loss _"coral" + lambda dot #sym_loss _"reg" $
+    $ #s.loss = #(s.loss)_"coral" + lambda dot #(s.loss)_"reg" $
   ]
 ]
 

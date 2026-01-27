@@ -54,7 +54,7 @@
 
 #section-slide(
   title: [Oracle RRI Pipeline],
-  subtitle: [Reusable compute path for dashboard, preprocessing, and training #image(fig_path + "impl/label_batch.png", width: 60%)],
+  subtitle: [Reusable compute path for dashboard, preprocessing, and future training #image(fig_path + "impl/label_batch.png", width: 60%)],
 )
 
 #slide(title: [Oracle RRI Pipeline])[
@@ -93,7 +93,7 @@
   )
 
   #quote-block(color: rgb("#ff0000"))[
-    Currently engineered for plotting and debugging in the streamlit app. Results contain too many intermediate tensors for optimal batching per snippet.
+    Current scope: oracle label computation + diagnostics. Learning a NBV policy is future work. The label batch contains many intermediate tensors and is not yet optimized for large-scale batching.
   ]
 ]
 
@@ -793,7 +793,7 @@
         - *Numerical safety*: clamp denominator to avoid divide-by-zero.
       ]
       #quote-block(color: rgb("#fc5555"))[
-        The oracle is only used to generate training labels; at test time, the learned predictor replaces this expensive pipeline.
+        The oracle is used to generate supervision labels. In a future learned system, a lightweight predictor could replace this expensive pipeline at inference time.
       ]
     ],
   )
@@ -804,7 +804,7 @@
 // ---------------------------------------------------------------------------
 
 #section-slide(
-  title: [VIN: View Introspection Network],
+  title: [Future Work: VIN (View Introspection Network)],
   subtitle: [Predict per-candidate #RRI from frozen #EVL features + a shell-aware pose descriptor],
 )[
   #text(size: 16pt)[
@@ -824,7 +824,7 @@
         - EVL input: raw EFM snippet dict `efm: dict[str, Any]`.
         - Candidate poses: `PoseTW["B N_c 12"]` (world$<-$camera).
         - Reference pose: `PoseTW["B 12"]` (world$<-$rig).
-        - Training-aligned candidates: `T_camera_rig` (camera$<-$rig) from `OracleRriLabelBatch.depths.camera`.
+        - Labeler-aligned candidates: `T_camera_rig` (camera$<-$rig) from `OracleRriLabelBatch.depths.camera`.
       ]
       #color-block(title: [Outputs])[
         - CORAL logits: `logits["B N_c (K-1)"]` for $K$ ordinal classes.
@@ -879,7 +879,7 @@
     gutter: 1cm,
     [
       #color-block(title: [Descriptor (rig frame) + shapes])[
-        From the training-aligned pose `T_camera_rig` (camera$<-$rig) we invert:
+        From the labeler-aligned pose `T_camera_rig` (camera$<-$rig) we invert:
         $
           bold(T)_("rig"<-"cam") = (bold(T)_("cam"<-"rig"))^(-1).
         $
@@ -1023,7 +1023,7 @@
       ]
       #color-block(title: [Where it lives])[
         - `oracle_rri/oracle_rri/vin/rri_binning.py`
-        - saved once (JSON) and reused during training/inference
+        - saved once (JSON) and reused for future training/inference
       ]
     ],
     [
@@ -1075,7 +1075,7 @@
   )
 ]
 
-#slide(title: [Training Step: End-to-end labeler #sym.arrow.r VIN #sym.arrow.r loss])[
+#slide(title: [Future Training Step: End-to-end labeler #sym.arrow.r VIN #sym.arrow.r loss])[
   #grid(
     columns: (1fr, 1fr),
     gutter: 1cm,
@@ -1089,7 +1089,7 @@
         5. Backprop CORAL loss over valid candidates only.
       ]
       #quote-block(color: rgb("#fc5555"))[
-        Online oracle labels are expensive. The minimal script is a correctness/smoke test; real training should cache
+        Online oracle labels are expensive. The minimal script is a correctness/smoke test; future training should cache
         labels (depths/PCs or RRIs).
       ]
     ],
@@ -1123,7 +1123,7 @@
     - SH degree $L$ (2 vs 3) and normalization choice; include camera *up* direction?
     - Which scalar terms help most: $<bold(f),-bold(u)>$, height, gravity alignment, etc.?
   ]
-  #color-block(title: [Ordinal setup + training])[
+  #color-block(title: [Ordinal setup + future training])[
     - $K$ bins (15 default): does more resolution help or just add label noise?
     - Metrics to optimize/report: Spearman rank corr, top-$k$ recall, calibration of predicted scores.
   ]
@@ -1142,7 +1142,7 @@
 
 #slide(title: [Resolved Issues (High Impact)])[
   #color-block(title: [App + pipeline refactor])[
-    - Separated UI (Streamlit panels) from compute (`OracleRriLabeler`) for reuse in training/CLI.
+    - Separated UI (Streamlit panels) from compute (`OracleRriLabeler`) for reuse in future training/CLI.
     - Replaced untyped Streamlit caches with a typed `AppState` + explicit stage caches.
   ]
   #color-block(title: [Correctness + reproducibility])[

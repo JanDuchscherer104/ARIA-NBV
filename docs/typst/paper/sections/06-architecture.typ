@@ -1,28 +1,25 @@
 = Aria-VIN-NBV Architecture
 
-#import "/typst/shared/macros.typ": *
+#import "../../shared/macros.typ": *
 
-This section outlines a VIN v2 candidate-scoring architecture that we plan to
-train on the oracle RRI labels computed in this paper. We include this
-implementation sketch to document the codebase and to motivate diagnostics,
-but we do not claim a learned NBV policy result yet. The model is designed to
-predict ordinal RRI scores for candidate views using explicit view-conditioned
-evidence and a lightweight CORAL head, optionally augmented with frozen EVL
-features @EFM3D-straub2024.
+This section describes the currently implemented VIN v3 candidate scorer that
+we train against oracle RRI labels. The design emphasizes explicit
+view-conditioned evidence and a lightweight CORAL head, with EVL providing the
+voxel backbone @EFM3D-straub2024. We separate stable core computations from
+optional ablations to keep the implementation and evaluation contract clear.
 
-== Core design and planned ablations
+== Core design and optional ablations
 
 To avoid ambiguity between what is implemented and what is exploratory, we
 separate the model into (i) a stable core that is always present and (ii)
 optional modules evaluated via ablations.
 
-- *Core*: voxel evidence from the frozen EVL backbone, pose encoding, a
-  pose-conditioned global context vector, and a lightweight trajectory context,
-  followed by an ordinal (CORAL) head.
-- *View-conditioned evidence*: candidate-conditioned cues obtained by projecting
-  the current semi-dense reconstruction into the candidate view.
-- *Optional ablations*: token-level frustum aggregation, global point-set
-  embeddings, and alternative late-fusion mechanisms.
+- *Core*: EVL voxel evidence, pose encoding, pose-conditioned global context,
+  per-candidate semi-dense projection statistics, and a lightweight CORAL head.
+- *View-conditioned evidence*: candidate-specific cues obtained by projecting
+  both semi-dense points and pooled voxel centers into each candidate view.
+- *Optional ablations*: trajectory-context encoder and alternative feature
+  fusion mechanisms evaluated separately.
 
 #figure(
   image("/figures/VIN-NBV_diagram.png", width: 100%),
@@ -31,7 +28,7 @@ optional modules evaluated via ablations.
 
 #figure(
   image("/figures/vin_v2/vin_v2_arch.png", width: 100%),
-  caption: [Auto-generated VIN v2 module diagram (Graphviz; derived from the current implementation).],
+  caption: [Legacy VIN v2 module diagram (Graphviz; retained for reference).],
 ) <fig:vin-v2-graphviz>
 
 == Backbone and scene field
@@ -65,8 +62,16 @@ derive
 Here $bold(u)$ is a soft unknown mask and $bold(s)^("new")$ is a new-surface
 prior. The projected scene field is then
 $bold(F) = phi("Conv"_(1 times 1 times 1)(bold(F)_("in"))) in bb(R)^(B times C times D times H times W)$,
-implemented as `Conv3d + GroupNorm + GELU` @GroupNorm-wu2018. An EVL output summary used to form
-the scene field is provided in Appendix @fig:evl-summary.
+implemented as `Conv3d + GroupNorm + GELU` @GroupNorm-wu2018. An example
+occupancy-prior slice from the diagnostics dashboard is shown in
+@fig:evl-occ-pr.
+
+#figure(
+  image("/figures/app/scene_field_occ_pr.png", width: 100%),
+  caption: [Streamlit diagnostics view of an EVL occupancy-prior slice (occ_pr) used to build the scene field.],
+) <fig:evl-occ-pr>
+
+An EVL output summary used to form the scene field is provided in Appendix @fig:evl-summary.
 
 == Pose encoding
 
@@ -87,7 +92,7 @@ implement and performed similarly or better in practice @zhou2019continuity.
 For each candidate $i$ the pose encoder yields:
 
 - a low-dimensional pose vector $bold(xi)_i in bb(R)^9$ (translation + rotation-6D),
-- an embedding $#sym_pose_emb _i in bb(R)^(d_"pose")$,
+- an embedding $#(s.pose_emb)_i in bb(R)^(d_"pose")$,
 - the candidate center $bold(c)_i in bb(R)^3$ in the rig frame.
 
 == Global context via pose-conditioned attention
@@ -99,111 +104,155 @@ the rig frame. Candidate pose embeddings serve as queries in a multi-head
 cross-attention block @Transformer-vaswani2017.
 // #block[
 //   #align(center)[
-//     $ (#sym_query)_i = (#sym_W)_Q dot (#sym_pose_emb)_i $
+//     $ (#s.query)_i = (#s.W)_Q dot (#(s.pose)_emb)_i $
 //   ]
 // ]
 // #block[
 //   #align(center)[
 //     $
-//       (#sym_key)_j = (#sym_W)_K dot (#sym_token)_j + phi((#sym_pos)_j),
-//       quad (#sym_value)_j = (#sym_W)_V dot (#sym_token)_j
+//       (#s.key)_j = (#s.W)_K dot (#s.token)_j + phi((#s.pos)_j),
+//       quad (#s.value)_j = (#s.W)_V dot (#s.token)_j
 //     $
 //   ]
 // ]
 #block[
   #align(center)[
-    $ #sym_query _i = #sym_W _Q dot #sym_pose_emb _i $
+    $ #(s.query)_i = #(s.W)_Q dot #(s.pose_emb)_i $
   ]
 ]
 #block[
   #align(center)[
     $
-      #sym_key _j = #sym_W _K dot #sym_token _j + phi(#sym_pos _j),
-      quad #sym_value _j = #sym_W _V dot #sym_token _j
+      #(s.key)_j = #(s.W)_K dot #(s.token)_j + phi(#(s.pos)_j),
+      quad #(s.value)_j = #(s.W)_V dot #(s.token)_j
     $
   ]
 ]
 
-The attention output yields a global context vector $(#sym_global)_i in bb(R)^C$
+The attention output yields a global context vector $(#s.global)_i in bb(R)^C$
 for each candidate. We apply residual connections and an MLP block for
 stability.
 
-== Coverage proxies and voxel gating
+== Coverage proxies and candidate validity
 
-Candidate shells can place views outside EVL's local voxel extent. VIN v2
-therefore computes a per-candidate voxel-evidence fraction by sampling the
+Candidate shells can place views outside EVL's local voxel extent. We therefore
+compute a per-candidate voxel-evidence fraction $v_i$ by sampling the
 normalized observation-count field $bold(n)^("norm")$ at the candidate camera
 center in world coordinates and masking with (i) voxel in-bounds checks and
-(ii) pose finiteness. This scalar serves as a lightweight reliability signal
-for voxel-based features.
-We denote this scalar by $v_i$ for candidate $i$.
+(ii) pose finiteness. This scalar is used to form the candidate validity mask
+and as a coverage proxy for training diagnostics and optional loss reweighting.
+VIN v3 no longer applies a hard gate to the global feature to avoid silently
+suppressing gradients for low-coverage candidates.
+Together with the semi-dense visibility fraction $v_i^("sem")$, we define
+`candidate_valid` as the conjunction of finite pose, $v_i > 0$, and
+$v_i^("sem") > 0$.
 
-We use $v_i$ in two complementary ways:
+== Voxel projection FiLM
 
-- *Gating*: a tiny learned sigmoid gate predicts $g_i in [0, 1]$ from
-  $v_i$ and scales the global feature
-  $#sym_global _i := g_i dot.o #sym_global _i$.
-- *Feature*: we optionally append $(v_i, 1-v_i)$ to the final head input to
-  make the head aware of evidence quality.
-
-== Semi-dense projection statistics
-
-To inject view-dependent evidence beyond the EVL voxel extent, we project
-semi-dense SLAM points into each candidate view using a consistent screen-space
-camera model aligned with the depth renderer. For candidate $q$, we compute
-per-view statistics:
-
-- coverage ratio and empty fraction using a coarse $G times G$ occupancy grid in the
-  image plane (fraction of bins hit by at least one projected point)
-- candidate visibility fraction $v_i^("sem")$: fraction of projected points
-  that are valid ($z > 0$ and inside image bounds)
-- depth mean and depth standard deviation (optionally weighted by inverse-distance
-  uncertainty when available)
-
-The visibility fraction $v_i^("sem")$ is a candidate-conditioned reliability
-proxy that remains informative even when voxel features are weak. We concatenate
-these projection statistics to the head input and use FiLM modulation:
+To modulate global features with candidate-dependent evidence, we pool voxel
+centers to the same coarse grid used in global attention ($G_"pool"^3$ points),
+project those centers into each candidate view, and summarize their
+screen-space coverage and depth statistics. A linear FiLM head predicts
+per-channel $(#(s.gamma)_i, #(s.beta)_i)$ from these projection statistics and
+applies
 
 #block[
   #align(center)[
-    $ #sym_global _i^("film") = (1 + #sym_gamma _i) dot.o #sym_global _i + #sym_beta _i $
+    $ #(s.global)_i^("film") = (1 + #(s.gamma)_i) dot.o #(s.global)_i + #(s.beta)_i $
   ]
 ]
 
-with per-channel $( #sym_gamma _i, #sym_beta _i)$ predicted from the projection
-statistics vector @perez2017filmvisualreasoninggeneral.
+This provides lightweight view-conditioned modulation without introducing
+additional token-level attention @perez2017filmvisualreasoninggeneral.
 
-== Frustum-aware cross-attention
+== Semi-dense projection statistics
 
-We further encode view-conditioned evidence using a frustum token set. Each
-projected semi-dense point contributes a token with features
-$(x, y, z, nu, c)$, where $(x, y)$ are normalized image coordinates, $z$ is
-metric depth, $nu$ is an inverse-distance uncertainty term, and $c$ is a
-track-length feature (number of frames that observed the point), normalized
-with a log scaling. A multi-head cross-attention block aggregates these tokens
-using pose embeddings as queries, producing a per-candidate frustum feature.
+To inject view-dependent evidence beyond the EVL voxel extent, we project the
+semi-dense SLAM points into each candidate view using the same screen-space
+camera model as the depth renderer. A projected point is valid if it is finite,
+in front of the camera ($z > 0$), and within the image bounds. For each
+candidate we compute:
 
-This stage approximates VIN-NBV's view-plane projection in a lightweight way:
-it is explicitly candidate-conditioned while avoiding a full 2D CNN grid.
-We optionally add a learned visibility token-type embedding (valid vs invalid
-projection) and optionally mask invalid tokens in attention; both toggles are
-part of our ablation suite.
+- coverage ratio and empty fraction using a coarse $G times G$ image grid
+  (fraction of bins hit by at least one valid point),
+- visibility fraction $v_i^("sem")$ as the (optionally reliability-weighted)
+  fraction of valid projections among finite projections,
+- depth mean and depth standard deviation over valid points.
 
-== Optional semi-dense and trajectory context
+Reliability weights combine normalized observation count and inverse depth
+uncertainty when available, attenuating noisy points without hard masking.
+The resulting projection statistics are concatenated to the head input.
+We subsample the padded semi-dense point cloud using the per-snippet
+`lengths` field to avoid including invalid padding in the projection.
 
-An optional PointNeXt-S encoder provides a global semi-dense embedding per
-snippet @PointNeXt-qian2022. We treat PointNeXt as frozen and project its
-pooled embedding to a fixed dimension. The encoder operates on semi-dense points
-expressed in the reference rig frame and can ingest per-point uncertainty and
-observation counts as additional channels. The resulting embedding can
-FiLM-modulate the global context or be concatenated directly as a snippet-level cue.
+More explicitly, let $bold(p)_j in bb(R)^3$ denote a semidense point in the
+world frame and let candidate $i$ have camera pose $#T(fr_world, fr_cam)_i$ and
+intrinsics $K_i$. We compute camera-frame coordinates
 
-VIN v2 also includes a lightweight trajectory encoder that embeds the snippet's
-rig pose history (again expressed in the reference rig frame). We pool per-frame
-trajectory embeddings and additionally apply candidate-query cross-attention to
-obtain a candidate-specific context vector, providing a compact notion of
-*where we came from* and improving disambiguation between geometrically similar
-candidates.
+#block[
+  #align(center)[
+    $ bold(p)^c_(i,j) = #T(fr_cam, fr_world)_i dot bold(p)_j $
+  ]
+]
+
+and screen-space projection
+$(u_(i,j), v_(i,j), z_(i,j)) = op("proj")(K_i, bold(p)^c_(i,j))$.
+The validity mask is
+
+#block[
+  #align(center)[
+    $
+      m_(i,j) =
+      bb(1)["finite"] dot bb(1)[z_(i,j) > 0] dot
+      bb(1)[0 <= u_(i,j) < W_i] dot bb(1)[0 <= v_(i,j) < H_i]
+    $
+  ]
+]
+
+We form a $G times G$ occupancy grid by binning $(u, v)$ and counting valid
+projections per bin. Coverage is the fraction of non-empty bins and
+empty fraction is its complement. With per-point reliability weights
+$w_(i,j) = a_(i,j) b_(i,j)$, where
+
+#block[
+  #align(center)[
+    $
+      a_(i,j) = "log"(1 + n_"obs"(i,j)) / "log"(1 + n_"obs"^"max"), quad
+      b_(i,j) = "clip"((sigma_d^(-1)(i,j) - s_"min") / (s_"p95" - s_"min"), 0, 1)
+    $
+  ]
+]
+
+the visibility fraction is
+$
+  v_i^("sem") =
+  (sum_j w_(i,j) m_(i,j)) / (sum_j w_(i,j) f_(i,j))
+$,
+with $f_(i,j) = bb(1)["finite"]$ the finite mask. Depth mean and standard deviation are computed
+as weighted moments over the valid set.
+
+== Semi-dense projection grid CNN
+
+We also build a per-candidate $G times G$ grid from the projected semi-dense
+points, storing occupancy, depth mean, and depth standard deviation per bin.
+A tiny 2D CNN encodes this grid into a compact feature vector that is appended
+to the head input. This adds local view-plane structure while remaining far
+lighter than a full image encoder.
+
+For each candidate $i$ and bin $b$, we compute
+$O_(i,b) = bb(1)[c_(i,b) > 0]$, the per-bin mean depth $mu_(i,b)$, and
+standard deviation $sigma_(i,b)$. The grid tensor
+$bold(G)_i = [O_(i,*) ; mu_(i,*) ; sigma_(i,*)]$ is encoded by a small CNN to
+produce $bold(s)_i^("grid")$.
+
+== Optional trajectory context
+
+An optional trajectory encoder embeds the snippet's rig pose history (expressed
+in the reference rig frame). Per-frame pose encodings are pooled and can also
+be attended by candidate pose queries to yield a candidate-specific context
+vector, providing a compact notion of motion history and improving
+disambiguation between geometrically similar candidates. This module is
+disabled by default and is evaluated as an ablation.
 
 == Feature fusion and CORAL head
 
@@ -214,14 +263,11 @@ and snippet-level signals, e.g.
   #align(center)[
     $
       bold(h)_i =
-      [#sym_pose_emb _i ;
-        #sym_global _i ;
+      [#(s.pose_emb)_i ;
+        #(s.global)_i ;
         bold(s)_i^("proj") ;
-        bold(s)_i^("frustum") ;
-        bold(z)^("traj") ;
-        bold(z)^("point") ;
-        v_i ;
-        (1 - v_i)]
+        bold(s)_i^("grid") ;
+        bold(z)^("traj")]
     $
   ]
 ]

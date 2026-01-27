@@ -7,8 +7,19 @@ errors, and reports oracle RRI distributions. For future learning-based
 experiments, we also define ranking and ordinal metrics (Spearman correlation,
 top-k bin accuracy, confusion matrices) that diagnose collapse and calibration.
 
-Key diagnostic figures (candidate frusta, depth histograms, semi-dense overlays)
-are moved to the appendix to reduce clutter in the main text.
+#figure(
+  grid(
+    columns: (1fr, 1fr, 1fr),
+    gutter: 8pt,
+    image("/figures/app/dir_dist_full_circ.png", width: 100%),
+    image("/figures/app/candidates_full_circ.png", width: 100%),
+    image("/figures/app/collision.png", width: 100%),
+  ),
+  caption: [Streamlit diagnostics for candidate sampling: direction/distance coverage (left), candidate distribution in the reference frame (center), and collision checking against the mesh (right).],
+) <fig:diagnostics-candidates>
+
+Additional diagnostic figures (candidate frusta, depth histograms, semi-dense
+overlays) are provided in the appendix for completeness.
 
 == Failure modes
 
