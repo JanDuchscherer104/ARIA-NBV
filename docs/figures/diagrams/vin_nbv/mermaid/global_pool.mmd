@@ -1,0 +1,43 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 34
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 18px; }
+---
+flowchart TB
+  %% Global pooling + voxel FiLM (compact)
+
+  InputsVoxel["$$\\begin{array}{c}\texttt{Voxel field + centers}\\\\\mathbf{F},\ \mathcal{V},\ \mathbf{T}^{w}_{v},\ \texttt{extent}\end{array}$$"]
+  PoseEmb["$$\\begin{array}{c}\mathbf{e}\\\\\in\mathbb{R}^{B\times N_q\times F_{pose}}\end{array}$$"]
+  Cam["$$\\begin{array}{c}\texttt{Cams}\\\\B\cdot N_q\end{array}$$"]
+
+  GlobalPool["$$\\begin{array}{c}\texttt{PoseConditionedGlobalPool}\\\\\texttt{LFF keys + MHA}\end{array}$$"]
+  VoxProj["$$\\begin{array}{c}\texttt{voxel\_proj\_stats}\\\\\mathbf{s}_{vox}\end{array}$$"]
+  FiLM["$$\\begin{array}{c}\texttt{FiLM}\\\\\tilde{\\mathbf{g}}\end{array}$$"]
+  GOut["$$\\begin{array}{c}\tilde{\\mathbf{g}}\\\\\in\mathbb{R}^{B\times N_q\times F_g}\end{array}$$"]
+
+  InputsVoxel -->|"$$\mathbf{F},\mathcal{V}$$"| GlobalPool
+  PoseEmb -->|"$$\mathbf{e}$$"| GlobalPool
+  GlobalPool -->|"$$\mathbf{g}$$"| FiLM
+
+  InputsVoxel -->|"$$\mathcal{V}$$"| VoxProj
+  Cam -->|"$$\texttt{Cams}$$"| VoxProj
+  VoxProj -->|"$$\mathbf{s}_{vox}$$"| FiLM
+  FiLM -->|"$$\tilde{\\mathbf{g}}$$"| GOut
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class InputsVoxel,PoseEmb,Cam input;
+  class GlobalPool,VoxProj,FiLM compute;
+  class GOut output;

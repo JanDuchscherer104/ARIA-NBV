@@ -2,10 +2,44 @@
 #import "@preview/tableau-icons:0.331.0": *
 #import "@preview/muchpdf:0.1.1": muchpdf
 #import "@preview/booktabs:0.0.4": *
+#import "@preview/codly:1.3.0": *
 
 #let theme_color_primary_hm = rgb("fc5555")
 #let theme_color_block = rgb("f4f6fb")
 #let theme_color_footer = rgb("808080")
+
+// ---------------------------------------------------------------------------
+// Code blocks (minimal raw styling)
+// ---------------------------------------------------------------------------
+
+/// Render a minimal code block (raw) for slides.
+#let code-block(
+  body,
+  size: 13pt,
+  fill: theme_color_block,
+  stroke: 0.75pt + theme_color_block.darken(12%),
+  radius: 8pt,
+  inset: (x: 0.6em, y: 0.45em),
+) = [
+  #show raw.where(block: true): set text(font: "DejaVu Sans Mono", size: size)
+  #show raw.where(block: true): block.with(
+    fill: fill,
+    stroke: stroke,
+    radius: radius,
+    inset: inset,
+  )
+  #body
+]
+
+/// Code block wrapped as a captioned figure (for slides).
+#let code-figure(
+  caption: none,
+  size: 13pt,
+  body,
+) = figure(
+  caption: caption,
+  code-block(size: size)[body],
+)
 
 // Redefine the slide function to use custom logo in header (no institute name)
 #let slide(
@@ -115,6 +149,18 @@
       body,
     )
   ])
+]
+
+#let io-formulation(input-items, output-items) = [
+  #grid(
+    gutter: 0.4cm,
+    color-block(title: [Input], color-body: rgb("#d5e8d4"))[
+      #input-items
+    ],
+    color-block(title: [Output], color-body: rgb("#f8cecc"))[
+      #output-items
+    ],
+  )
 ]
 
 // Parse the training step from filenames shaped like:

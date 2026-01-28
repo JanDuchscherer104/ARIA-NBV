@@ -15,31 +15,16 @@ probabilities, not class marginals.
 Let $r$ be the continuous RRI and $y$ the ordinal bin index. The CORAL targets
 are binary levels $t_k = bb(1)[y > k]$. The per-sample loss is
 
-#block[
-  #align(center)[
-    $
-      #(s.loss)_("coral")(y, bold(p))
-      = - sum_(k=0)^(K-2) (t_k "log"(p_k) + (1 - t_k) "log"(1 - p_k))
-    $
-  ]
-]
+#block[#align(center)[#eqs.coral.loss]]
 
 To recover a scalar prediction, we convert cumulative probabilities into
 marginal class probabilities:
 
-#block[
-  #align(center)[
-    $ pi_k = p_(k-1) - p_k, quad p_(-1) = 1, quad p_(K-1) = 0 $
-  ]
-]
+#block[#align(center)[#eqs.coral.marginals]]
 
 The expected RRI is then
 
-#block[
-  #align(center)[
-    $ hat(r) = sum_(k=0)^(K-1) pi_k dot u_k $
-  ]
-]
+#block[#align(center)[#eqs.coral.expected]]
 
 where $u_k$ is a representative value for bin $k$ (initialized from bin means
 and optionally learned). This matches the CORAL paper's ordinal semantics and
@@ -52,15 +37,7 @@ We additionally monitor whether CORAL's cumulative probabilities are rank
 consistent. Since $p_k = P(y > k)$ should be non-increasing in $k$, we define a
 monotonicity violation rate
 
-#block[
-  #align(center)[
-    $
-      v =
-      (1) / (K - 2)
-      sum_(k=0)^(K-3) bb(1)[p_(k+1) > p_k]
-    $
-  ]
-]
+#block[#align(center)[#eqs.coral.violation]]
 
 and report its mean over valid candidates as a diagnostic.
 
@@ -69,11 +46,7 @@ and report its mean over valid candidates as a diagnostic.
 We optionally add a Huber loss on $hat(r)$ to stabilize early training and
 improve calibration. The final objective is
 
-#block[
-  #align(center)[
-    $ #s.loss = #(s.loss)_"coral" + lambda dot #(s.loss)_"reg" $
-  ]
-]
+#block[#align(center)[#eqs.vin.loss_total]]
 
 The auxiliary weight $lambda$ is decayed over training to encourage sharper
 ordinal separation while retaining a meaningful continuous prediction.

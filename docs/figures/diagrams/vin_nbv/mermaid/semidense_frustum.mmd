@@ -1,0 +1,34 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 18px; }
+---
+flowchart TB
+  %% Semidense grid CNN (compact)
+
+  Inputs["$$\\begin{array}{c}\texttt{proj\_data}\\\\(x_s,y_s,z_s,valid)\end{array}$$"]
+  Grid["$$\\begin{array}{c}\texttt{grid\_builder}\\\\\mathbf{G}\in\mathbb{R}^{B\times N_q\times C_{grid}\times G\times G}\end{array}$$"]
+  CNN["$$\\begin{array}{c}\texttt{tiny\_cnn}\\\\\texttt{Conv2d + GELU + Pool + Linear}\end{array}$$"]
+  Out["$$\\begin{array}{c}\mathbf{s}_{grid}\\\\\in\mathbb{R}^{B\times N_q\times F_{cnn}}\end{array}$$"]
+
+  Inputs -->|"$$\texttt{proj\_data}$$"| Grid
+  Grid -->|"$$\mathbf{G}$$"| CNN
+  CNN -->|"$$\mathbf{s}_{grid}$$"| Out
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Inputs input;
+  class Grid,CNN compute;
+  class Out output;

@@ -1,0 +1,46 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 18px; }
+---
+flowchart TB
+  %% Head (compact)
+
+  Features["$$\\begin{array}{c}\texttt{Features}\\\\\mathbf{e},\ \tilde{\mathbf{g}},\ \mathbf{s}_{proj},\ \mathbf{s}_{grid}\end{array}$$"]
+  ValidInputs["$$\\begin{array}{c}\texttt{Validity cues}\\\\v_{vox},\ s_{vis}\end{array}$$"]
+
+  Concat["$$\\begin{array}{c}\texttt{concat}\\\\\mathbf{h}\end{array}$$"]
+  MLP["$$\\begin{array}{c}\texttt{MLP}\\\\\mathbf{z}\end{array}$$"]
+  Coral["$$\\begin{array}{c}\texttt{CoralLayer}\\\\\texttt{logits}\end{array}$$"]
+  Post["$$\\begin{array}{c}\texttt{postproc}\\\\\texttt{prob},\ \texttt{expected}\end{array}$$"]
+  ValidFn["$$\\begin{array}{c}\texttt{candidate\_valid}\\\\m=\mathbb{1}[v_{vox}>0]\wedge\mathbb{1}[s_{vis}>0]\end{array}$$"]
+
+  Pred["$$\\begin{array}{c}\texttt{VinPrediction}\\\\\texttt{logits, prob, expected}\end{array}$$"]
+  Valid["$$\\begin{array}{c}\texttt{candidate\_valid}\\\\m\in\{0,1\}^{B\times N_q}\end{array}$$"]
+
+  Features -->|"$$\mathbf{e},\tilde{\mathbf{g}},\mathbf{s}_{proj},\mathbf{s}_{grid}$$"| Concat
+  Concat -->|"$$\mathbf{h}$$"| MLP
+  MLP -->|"$$\mathbf{z}$$"| Coral
+  Coral -->|"$$\texttt{logits}$$"| Post
+  Post -->|"$$\texttt{prob},\texttt{expected}$$"| Pred
+
+  ValidInputs -->|"$$v_{vox},s_{vis}$$"| ValidFn
+  ValidFn -->|"$$m$$"| Valid
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Features,ValidInputs input;
+  class Concat,MLP,Coral,Post,ValidFn compute;
+  class Pred,Valid output;

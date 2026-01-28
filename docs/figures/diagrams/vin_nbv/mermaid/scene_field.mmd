@@ -1,0 +1,34 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 18px; }
+---
+flowchart TB
+  %% Scene field (compact)
+
+  VoxelHeads["$$\\begin{array}{c}\texttt{voxel heads}\\\\\texttt{occ\_pr, occ\_input, cent\_pr, counts, free\_input}\end{array}$$"]
+  Derive["$$\\begin{array}{c}\texttt{derive\_channels}\\\\\texttt{counts\_norm, unknown, new\_surface\_prior}\end{array}$$"]
+  FieldProj["$$\\begin{array}{c}\texttt{field\_proj}\\\\\texttt{Conv3d + GN + GELU}\end{array}$$"]
+  Field["$$\\begin{array}{c}\mathbf{F}\\\\\in\mathbb{R}^{B\times F_g\times D\times H\times W}\end{array}$$"]
+
+  VoxelHeads -->|"$$\texttt{heads}$$"| Derive
+  Derive -->|"$$\mathbf{F}_{in}$$"| FieldProj
+  FieldProj -->|"$$\mathbf{F}$$"| Field
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class VoxelHeads input;
+  class Derive,FieldProj compute;
+  class Field output;

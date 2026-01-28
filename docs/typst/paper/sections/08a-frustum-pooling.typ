@@ -14,7 +14,7 @@ Representative frusta visualizations are included in the appendix.
 
 == Semi-dense projection tokens
 
-Let $#(s.points)_t$ be the current reconstruction point set (semi-dense
+Let $#(symb.oracle.points)_t$ be the current reconstruction point set (semi-dense
 SLAM points) in
 world coordinates. For each candidate camera, we project points to screen-space
 using a standard pinhole camera model consistent with the depth renderer. Each

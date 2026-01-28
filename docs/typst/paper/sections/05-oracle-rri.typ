@@ -12,7 +12,7 @@ for unprojection, point fusion, and Chamfer evaluation.
 For each candidate pose $q$, we render a depth map from the GT mesh using a
 metric z-buffer. Let $D_q$ denote the depth map and $C_q$ the camera
 intrinsics. We backproject valid depth pixels into world coordinates to obtain
-$#(s.points)_q$. Missing pixels are masked out and do not contribute to the fused point
+$#symb.oracle.points_q$. Missing pixels are masked out and do not contribute to the fused point
 cloud. This ensures that the oracle computation respects the same geometric
 constraints as the candidate camera.
 
@@ -32,7 +32,7 @@ to keep the main text focused on the pipeline details.
 == Point cloud fusion and evaluation
 
 We fuse the candidate point cloud with the current reconstruction,
-$#(s.points)_(t union q) = #(s.points)_t union #(s.points)_q$, and evaluate the Chamfer distance to the mesh.
+$#(symb.oracle.points)_(t union q) = #(symb.oracle.points)_t union #symb.oracle.points_q$, and evaluate the Chamfer distance to the mesh.
 The oracle RRI is computed using the definition above. We also log the intermediate
 completeness and accuracy components of the Chamfer distance to diagnose
 failure modes (e.g., views that look into empty space). The resulting RRI values

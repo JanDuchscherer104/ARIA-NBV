@@ -1,0 +1,34 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 18px; }
+---
+flowchart TB
+  %% Semidense projection stats (compact)
+
+  Inputs["$$\\begin{array}{c}\texttt{Semidense + Cams}\\\\\mathcal{P},\ \texttt{Cams}\end{array}$$"]
+  Proj["$$\\begin{array}{c}\texttt{transform\_points\_screen}\\\\(x_s,y_s,z_s,valid)\end{array}$$"]
+  Stats["$$\\begin{array}{c}\texttt{projection\_stats}\\\\\mathbf{s}_{proj}=[\texttt{coverage},\texttt{empty\_frac},\texttt{vis\_frac},\mu_z,\sigma_z]\end{array}$$"]
+  Out["$$\\begin{array}{c}\mathbf{s}_{proj}\\\\\in\mathbb{R}^{B\times N_q\times F_{proj}}\end{array}$$"]
+
+  Inputs -->|"$$\mathcal{P},\texttt{Cams}$$"| Proj
+  Proj -->|"$$x_s,y_s,z_s$$"| Stats
+  Stats -->|"$$\mathbf{s}_{proj}$$"| Out
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Inputs input;
+  class Proj,Stats compute;
+  class Out output;

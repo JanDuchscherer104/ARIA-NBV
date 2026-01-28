@@ -78,5 +78,6 @@
 #include "sections/12f-appendix-pose-frames.typ"
 #include "sections/12e-appendix-optuna-analysis.typ"
 #include "sections/12g-appendix-vin-v3-streamline.typ"
+#include "sections/12h-appendix-offline-cache.typ"
 #include "sections/12-appendix-gallery.typ"
 #include "sections/12b-appendix-extra.typ"

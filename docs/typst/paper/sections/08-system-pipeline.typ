@@ -2,6 +2,10 @@
 #show: booktabs-default-table-style
 
 #import "../../shared/macros.typ": *
+#let labeler_cfg = toml("/typst/slides/data/paper_figures_oracle_labeler.toml")
+#let gen_cfg = labeler_cfg.labeler.generator
+#let depth_cfg = labeler_cfg.labeler.depth
+#let renderer_cfg = depth_cfg.renderer
 
 = System Pipeline and Implementation
 
@@ -17,8 +21,8 @@ summarized in @tab:pipeline and visualized in @fig:candidate-poses.
     gutter: 10pt,
     image("/figures/app/cand_frusta_kappa4_r06-29.png", width: 100%),
     image("/figures/app/candidate_renders.png", width: 100%),
-    image("/figures/app/render_frusta.png", width: 100%),
-    image("/figures/app/depth_hist.png", width: 100%),
+
+    image("/figures/app/render_frusta.png", width: 100%), image("/figures/app/depth_hist.png", width: 100%),
   ),
   caption: [Streamlit pipeline diagnostics: candidate frusta (top-left), depth renders (top-right), rendered frusta (bottom-left), and per-candidate depth histograms (bottom-right).],
 ) <fig:candidate-poses>
@@ -41,7 +45,7 @@ summarized in @tab:pipeline and visualized in @fig:candidate-poses.
     midrule(), [Dataset loader], [ASE shards, mesh],
     [Snippet window (streams, poses, semi-dense points, mesh)], [Candidate generation], [Rig pose, mesh, bounds],
     [Candidate poses], [Depth rendering], [Candidates, mesh, cameras],
-    [Depth maps, masks], [Oracle RRI], [$#(s.points)_t, #(s.points)_q, #s.mesh$],
+    [Depth maps, masks], [Oracle RRI], [$#(symb.oracle.points) _t, #symb.oracle.points_q, #symb.ase.mesh$],
     [RRI labels (continuous + ordinal)], [Future: learned scorer], [oracle labels, scene features],
     [Predicted ordinal scores], bottomrule(),
   ),
@@ -50,31 +54,33 @@ summarized in @tab:pipeline and visualized in @fig:candidate-poses.
 #figure(
   kind: "table",
   supplement: [Table],
-  caption: [Representative oracle label configuration used in the Streamlit figures.],
+  caption: [Oracle label configuration used for the offline cache (nbv-cache-samples).],
   table(
     columns: (18em, auto),
     align: (left, left),
     toprule(),
     table.header([Parameter], [Value]),
-    midrule(),
-    [Candidate count (requested)], [32],
-    [Candidate shell radius], [[0.6, 2.9] m],
-    [Elevation range], [-15° to 25°],
-    [Azimuth spread], [170°],
-    [Direction sampler], [uniform sphere ($kappa = 4$ when biased)],
-    [Min distance to mesh], [$0.4$ m],
-    [Collision + free-space checks], [enabled],
-    [View direction mode], [radial away],
-    [View jitter caps], [60° az / 30° elev],
-    [View roll jitter], [0°],
-    [Depth renderer (max kept)], [16],
-    [Depth z-range], [znear=1e-3, zfar=20],
-    [Oracle reduction], [mean over triangles (cropped AABB)],
-    bottomrule(),
+    midrule(), [Candidate count (requested)],
+    [#gen_cfg.num_samples], [Candidate shell radius],
+    [[#gen_cfg.min_radius, #gen_cfg.max_radius] m], [Elevation range],
+    [#gen_cfg.min_elev_deg#sym.degree to #gen_cfg.max_elev_deg#sym.degree], [Azimuth spread],
+    [#gen_cfg.delta_azimuth_deg#sym.degree], [Direction sampler],
+    [#gen_cfg.sampling_strategy ($kappa = #gen_cfg.kappa$)], [Oversample factor / resamples],
+    [#gen_cfg.oversample_factor / #gen_cfg.max_resamples], [Min distance to mesh],
+    [$#gen_cfg.min_distance_to_mesh$ m], [Collision + free-space checks],
+    [enabled (#gen_cfg.collision_backend)], [View direction mode],
+    [#gen_cfg.view_direction_mode], [View jitter caps],
+    [#gen_cfg.view_max_azimuth_deg#sym.degree az / #gen_cfg.view_max_elevation_deg#sym.degree elev], [View roll jitter],
+    [#gen_cfg.view_roll_jitter_deg#sym.degree], [Ray subsample / step clearance],
+    [#gen_cfg.ray_subsample / #gen_cfg.step_clearance m], [Depth renderer (max kept)],
+    [#depth_cfg.max_candidates_final], [Depth z-range],
+    [znear=#renderer_cfg.znear, zfar=#renderer_cfg.zfar], [Backprojection stride],
+    [#labeler_cfg.labeler.backprojection_stride], [Oracle reduction],
+    [mean over triangles (cropped AABB)], bottomrule(),
   ),
 ) <tab:oracle-label-config>
 
-The corresponding runnable configuration is provided in
+The corresponding runtime configuration is stored in
 `.configs/paper_figures_oracle_labeler.toml`.
 
 == Candidate generation

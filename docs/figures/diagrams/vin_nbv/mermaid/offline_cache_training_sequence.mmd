@@ -1,0 +1,34 @@
+sequenceDiagram
+autonumber
+participant DM as VinDataModule
+participant CFG as VinOracleCacheDatasetConfig
+participant DS as OracleRriCacheVinDataset
+participant CACHE as OracleRriCacheDataset
+participant PROV as VinSnippetProviderChain
+participant VSC as VinSnippetCacheProvider
+participant EFM as EfmSnippetProvider
+participant DL as DataLoader
+participant B as VinOracleBatch
+
+DM->>CFG: setup_target(split)
+CFG->>DS: build dataset
+DS->>CACHE: init(cfg)
+Note over CACHE: reads index.jsonl and cached samples
+
+loop Each batch
+  DL->>DS: get(idx)
+  DS->>CACHE: get(idx)
+  Note over CACHE: torch.load(.pt) + decode depths/rri/backbone
+  CACHE->>PROV: request snippet (if include_efm_snippet)
+  alt vin_snippet_cache available
+    PROV->>VSC: get(snippet_id)
+    VSC-->>PROV: VinSnippetView
+  else fallback to EFM
+    PROV->>EFM: load snippet
+    EFM-->>PROV: VinSnippetView
+  end
+  PROV-->>CACHE: VinSnippetView
+  CACHE-->>DS: VinOracleBatch
+  DS-->>DL: sample
+  DL-->>B: collate
+end

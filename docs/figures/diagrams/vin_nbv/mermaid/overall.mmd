@@ -1,0 +1,82 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 36
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 18px; }
+    .cluster-label { font-size: 18px; font-weight: 700; }
+    .title { font-size: 18px; font-weight: 700; }
+---
+flowchart TB
+  %% VIN v3 overview (trajectory excluded)
+
+  InputsPose["$$\\begin{array}{c}\texttt{Poses + Cameras}\\\\\mathbf{T}^{w}_{c_q},\ \mathbf{T}^{w}_{r},\ \texttt{Cams}\end{array}$$"]
+  InputsSnip["$$\\begin{array}{c}\texttt{Snippet + EVL}\\\\\mathcal{P}\in\mathbb{R}^{B\times P\times C_{sem}},\ \mathcal{V}\end{array}$$"]
+
+  PoseEnc["$$\\begin{array}{c}\texttt{PoseEncoder}\\\\\mathbf{T}^{r}_{c_q}=(\mathbf{T}^{w}_{r})^{-1}\mathbf{T}^{w}_{c_q}\\\\\mathbf{e}\end{array}$$"]
+
+  FieldProj["$$\\begin{array}{c}\texttt{field\_proj}\\\\\mathbf{F}\end{array}$$"]
+  GlobalPool["$$\\begin{array}{c}\texttt{PoseConditionedGlobalPool}\\\\\mathbf{g}\end{array}$$"]
+  VoxFiLM["$$\\begin{array}{c}\texttt{voxel\_proj\_stats} + \texttt{FiLM}\\\\\tilde{\mathbf{g}}\end{array}$$"]
+  VoxValid["$$\\begin{array}{c}\texttt{voxel\_valid\_frac}\\\\v_{vox}\end{array}$$"]
+
+  SemProj["$$\\begin{array}{c}\texttt{semidense\_proj\_stats}\\\\\mathbf{s}_{proj}\end{array}$$"]
+  SemGrid["$$\\begin{array}{c}\texttt{semidense\_grid\_cnn}\\\\\mathbf{s}_{grid}\end{array}$$"]
+
+  Concat["$$\\begin{array}{c}\texttt{concat}\\\\\mathbf{h}=[\mathbf{e},\tilde{\mathbf{g}},\mathbf{s}_{proj},\mathbf{s}_{grid}]\end{array}$$"]
+  MLP["$$\\begin{array}{c}\texttt{MLP}\\\\\mathbf{z}\end{array}$$"]
+  Coral["$$\\begin{array}{c}\texttt{CoralLayer}\\\\\texttt{logits}\end{array}$$"]
+  Post["$$\\begin{array}{c}\texttt{postproc}\\\\\texttt{prob},\ \texttt{expected}\end{array}$$"]
+
+  ValidFn["$$\\begin{array}{c}\texttt{candidate\_valid}\\\\m=\mathbb{1}[v_{vox}>0]\wedge\mathbb{1}[s_{vis}>0]\end{array}$$"]
+
+  Pred["$$\\begin{array}{c}\texttt{VinPrediction}\\\\\texttt{logits, prob, expected}\end{array}$$"]
+  Valid["$$\\begin{array}{c}\texttt{candidate\_valid}\\\\m\in\{0,1\}^{B\times N_q}\end{array}$$"]
+
+  InputsPose -->|"$$\mathbf{T}^{w}_{c_q},\mathbf{T}^{w}_{r}$$"| PoseEnc
+  InputsSnip -->|"$$\mathcal{V}\ \text{(voxel heads)}$$"| FieldProj
+  InputsSnip -->|"$$\mathcal{V}$$"| GlobalPool
+  InputsPose -->|"$$\mathbf{T}^{w}_{r}$$"| GlobalPool
+
+  PoseEnc -->|"$$\mathbf{e}$$"| GlobalPool
+  FieldProj -->|"$$\mathbf{F}$$"| GlobalPool
+  GlobalPool -->|"$$\mathbf{g}$$"| VoxFiLM
+  InputsPose -->|"$$\texttt{Cams}$$"| VoxFiLM
+  InputsSnip -->|"$$\mathcal{V}$$"| VoxFiLM
+
+  InputsSnip -->|"$$\mathcal{P}$$"| SemProj
+  InputsPose -->|"$$\texttt{Cams}$$"| SemProj
+  InputsSnip -->|"$$\mathcal{P}$$"| SemGrid
+  InputsPose -->|"$$\texttt{Cams}$$"| SemGrid
+
+  VoxFiLM -->|"$$\tilde{\mathbf{g}}$$"| Concat
+  PoseEnc -->|"$$\mathbf{e}$$"| Concat
+  SemProj -->|"$$\mathbf{s}_{proj}$$"| Concat
+  SemGrid -->|"$$\mathbf{s}_{grid}$$"| Concat
+
+  Concat -->|"$$\mathbf{h}$$"| MLP
+  MLP -->|"$$\mathbf{z}$$"| Coral
+  Coral -->|"$$\texttt{logits}$$"| Post
+  Post -->|"$$\texttt{prob},\texttt{expected}$$"| Pred
+
+  InputsSnip -->|"$$\texttt{counts\_norm}$$"| VoxValid
+  InputsPose -->|"$$\mathbf{T}^{w}_{c_q}$$"| VoxValid
+  VoxValid -->|"$$v_{vox}$$"| ValidFn
+  SemProj -->|"$$s_{vis}$$"| ValidFn
+  ValidFn -->|"$$m$$"| Valid
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class InputsPose,InputsSnip input;
+  class PoseEnc,FieldProj,GlobalPool,VoxFiLM,VoxValid,SemProj,SemGrid,Concat,MLP,Coral,Post,ValidFn compute;
+  class Pred,Valid output;

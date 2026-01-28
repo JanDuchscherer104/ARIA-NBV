@@ -92,7 +92,7 @@ implement and performed similarly or better in practice @zhou2019continuity.
 For each candidate $i$ the pose encoder yields:
 
 - a low-dimensional pose vector $bold(xi)_i in bb(R)^9$ (translation + rotation-6D),
-- an embedding $#(s.pose_emb)_i in bb(R)^(d_"pose")$,
+- an embedding $#(symb.vin.pose_emb)_i in bb(R)^(d_"pose")$,
 - the candidate center $bold(c)_i in bb(R)^3$ in the rig frame.
 
 == Global context via pose-conditioned attention
@@ -104,32 +104,32 @@ the rig frame. Candidate pose embeddings serve as queries in a multi-head
 cross-attention block @Transformer-vaswani2017.
 // #block[
 //   #align(center)[
-//     $ (#s.query)_i = (#s.W)_Q dot (#(s.pose)_emb)_i $
+//     $ (#symb.vin.query)_i = (#symb.vin.W)_Q dot (#(symb.vin.pose_emb))_i $
 //   ]
 // ]
 // #block[
 //   #align(center)[
 //     $
-//       (#s.key)_j = (#s.W)_K dot (#s.token)_j + phi((#s.pos)_j),
-//       quad (#s.value)_j = (#s.W)_V dot (#s.token)_j
+//       (#symb.vin.key)_j = (#symb.vin.W)_K dot (#symb.vin.token)_j + phi((#symb.vin.pos)_j),
+//       quad (#symb.vin.value)_j = (#symb.vin.W)_V dot (#symb.vin.token)_j
 //     $
 //   ]
 // ]
 #block[
   #align(center)[
-    $ #(s.query)_i = #(s.W)_Q dot #(s.pose_emb)_i $
+    $ #(symb.vin.query)_i = #(symb.vin.W)_Q dot #(symb.vin.pose_emb)_i $
   ]
 ]
 #block[
   #align(center)[
     $
-      #(s.key)_j = #(s.W)_K dot #(s.token)_j + phi(#(s.pos)_j),
-      quad #(s.value)_j = #(s.W)_V dot #(s.token)_j
+      #(symb.vin.key)_j = #(symb.vin.W)_K dot #(symb.vin.token)_j + phi(#(symb.vin.pos)_j),
+      quad #(symb.vin.value)_j = #(symb.vin.W)_V dot #(symb.vin.token)_j
     $
   ]
 ]
 
-The attention output yields a global context vector $(#s.global)_i in bb(R)^C$
+The attention output yields a global context vector $(#symb.vin.global)_i in bb(R)^C$
 for each candidate. We apply residual connections and an MLP block for
 stability.
 
@@ -153,12 +153,12 @@ To modulate global features with candidate-dependent evidence, we pool voxel
 centers to the same coarse grid used in global attention ($G_"pool"^3$ points),
 project those centers into each candidate view, and summarize their
 screen-space coverage and depth statistics. A linear FiLM head predicts
-per-channel $(#(s.gamma)_i, #(s.beta)_i)$ from these projection statistics and
+per-channel $(#(symb.vin.gamma)_i, #(symb.vin.beta)_i)$ from these projection statistics and
 applies
 
 #block[
   #align(center)[
-    $ #(s.global)_i^("film") = (1 + #(s.gamma)_i) dot.o #(s.global)_i + #(s.beta)_i $
+    $ #(symb.vin.global)_i^("film") = (1 + #(symb.vin.gamma)_i) dot.o #(symb.vin.global)_i + #(symb.vin.beta)_i $
   ]
 ]
 
@@ -263,8 +263,8 @@ and snippet-level signals, e.g.
   #align(center)[
     $
       bold(h)_i =
-      [#(s.pose_emb)_i ;
-        #(s.global)_i ;
+      [#(symb.vin.pose_emb)_i ;
+        #(symb.vin.global)_i ;
         bold(s)_i^("proj") ;
         bold(s)_i^("grid") ;
         bold(z)^("traj")]

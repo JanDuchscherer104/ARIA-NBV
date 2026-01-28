@@ -1,0 +1,41 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 18px; }
+    .cluster-label { font-size: 18px; font-weight: 700; }
+---
+flowchart TB
+  %% Pose encoding branch (compact)
+
+  Inputs["$$\\begin{array}{c}\texttt{Poses}\\\\\mathbf{T}^{w}_{c_q},\ \mathbf{T}^{w}_{r}\end{array}$$"]
+  Rel["$$\\begin{array}{c}\texttt{rig\_relative}\\\\\mathbf{T}^{r}_{c_q}=(\mathbf{T}^{w}_{r})^{-1}\mathbf{T}^{w}_{c_q}\end{array}$$"]
+  Encoder["$$\\begin{array}{c}\texttt{PoseEncoder}\\\\\texttt{R6D}+\texttt{LFF}+\texttt{MLP}\\end{array}$$"]
+
+  PoseVec["$$\\begin{array}{c}\texttt{pose\_vec}\\\\\left[\mathbf{t},\mathrm{R6D}\right]\in\mathbb{R}^{B\times N_q\times 9}\end{array}$$"]
+  PoseEmb["$$\\begin{array}{c}\mathbf{e}\\\\\in\mathbb{R}^{B\times N_q\times F_{pose}}\end{array}$$"]
+  Center["$$\\begin{array}{c}\mathbf{c}\\\\\in\mathbb{R}^{B\times N_q\times 3}\end{array}$$"]
+
+  Inputs -->|"$$\mathbf{T}^{w}_{c_q},\mathbf{T}^{w}_{r}$$"| Rel
+  Rel -->|"$$\mathbf{T}^{r}_{c_q}$$"| PoseVec
+  Rel -->|"$$\mathbf{c}$$"| Center
+  PoseVec -->|"$$\texttt{pose\_vec}$$"| Encoder
+  Encoder -->|"$$\mathbf{e}$$"| PoseEmb
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Inputs input;
+  class Rel,Encoder compute;
+  class PoseVec data;
+  class PoseEmb,Center output;

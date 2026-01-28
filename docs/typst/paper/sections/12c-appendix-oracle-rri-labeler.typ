@@ -1,6 +1,6 @@
 #pagebreak()
 
-= Appendix: OracleRriLabeler Pipeline
+= Appendix: OracleRriLabeler Pipeline <sec:appendix-oracle-rri-labeler>
 
 #import "../../shared/macros.typ": *
 #import "@preview/booktabs:0.0.4": *
@@ -31,23 +31,23 @@ Given an ASE-EFM snippet with mesh supervision, `OracleRriLabeler` executes:
 
 == Candidate center sampling (hyperspherical shell)
 
-Let $#(s.T)_(#fr_world <- #fr_rig_ref)$ be the reference rig pose (world
+Let #T(fr_world, fr_rig_ref) be the reference rig pose (world
 coordinates). Candidate centers are sampled by drawing a direction
-$#(s.dir)_i in bb(S)^2$ and a radius $r_i in [r_"min", r_"max"]$, then
+$#(symb.oracle.dir) _q in bb(S)^2$ and a radius $r_q in [r_"min", r_"max"]$, then
 transforming the resulting offset into world coordinates:
 
 #block[
   #align(center)[
     $
-      #(s.offset)_i = r_i #(s.dir)_i,
-      quad #(s.center)_i = #(s.T)_(#fr_world <- #fr_rig_ref) #(s.offset)_i
+      #(symb.oracle.offset) _q = r_q #(symb.oracle.dir) _q,
+      quad #(symb.oracle.center) _q = #T(fr_world, fr_rig_ref) #(symb.oracle.offset) _q
     $
   ]
 ]
 
 We draw directions either uniformly on the sphere, or from a forward-biased
 Power Spherical distribution centered at the device forward axis
-$(#s.dir) ~ "PS"(bold(mu), kappa)$ @PowerSpherical-deCao2020. Angular caps
+$(#symb.oracle.dir) ~ "PS"(bold(mu), kappa)$ @PowerSpherical-deCao2020. Angular caps
 are enforced *without rejection* by deterministically mapping the raw samples
 into the target azimuth/elevation ranges (see
 `oracle_rri/oracle_rri/pose_generation/positional_sampling.py`).
@@ -68,8 +68,8 @@ The candidate center sampling configuration used in our runs is summarized in
       table.header([Parameter], [Value]),
       midrule(), [camera_label],
       [rgb], [reference_frame_index],
-      [None (final pose)], [num_samples],
-      [32], [oversample_factor],
+      [#symb.ase.traj_final], [num_samples],
+      [60], [oversample_factor],
       [1.5], [align_to_gravity],
       [true], [min_radius],
       [0.6 m], [max_radius],
@@ -84,7 +84,7 @@ The candidate center sampling configuration used in our runs is summarized in
 ) <tab:oracle-cfg-centers>
 
 *Azimuth/elevation caps without rejection.* Let
-$tilde(#s.dir) = (x, y, z)$ be a raw unit direction. We define
+$tilde(#symb.oracle.dir) = (x, y, z)$ be a raw unit direction. We define
 
 #block[
   #align(center)[
@@ -112,11 +112,11 @@ To cap elevation, we map $y = "sin"(theta)$ from $[-1, 1]$ into the target band:
 
 and rescale the horizontal components to preserve unit norm:
 $(x, z) <- (x, z) dot sqrt(1 - y'^2) / sqrt(x^2 + z^2)$, followed by
-renormalization.
+renormalization @Formelsammlung-papula2024.
 
 == Candidate orientations
 
-For each candidate center $(#s.center)_i$, we construct a base camera
+For each candidate center $(#symb.oracle.center)_i$, we construct a base camera
 orientation according to the configured `ViewDirectionMode`
 (`oracle_rri/oracle_rri/pose_generation/orientations.py`). The most common mode
 is radial "look-away", which points the camera optical axis away from the
@@ -152,7 +152,7 @@ translation. Define the forward axis
   #align(center)[
     $
       bold(z)_i =
-      ( #(s.center)_i - bold(t)_("ref") ) / (|| #(s.center)_i - bold(t)_("ref") ||_2 + epsilon)
+      ( #(symb.oracle.center) _i - bold(t)_("ref") ) / (|| #(symb.oracle.center) _i - bold(t)_("ref") ||_2 + epsilon)
     $
   ]
 ]
@@ -172,8 +172,8 @@ and construct a roll-stable orthonormal basis
 ]
 
 The resulting rotation is $bold(R)_i = [bold(x)_i, bold(y)_i, bold(z)_i]$ and
-the candidate pose is $(#s.T)_{#fr_world <- (#fr_cam)_i} = (bold(R)_i,
-  (#s.center)_i)$.
+the candidate pose is $(#symb.vin.T)_{#fr_world <- (#fr_cam)_i} = (bold(R)_i,
+  (#symb.oracle.center)_i)$.
 
 *View jitter.* After base pose construction, we optionally apply bounded yaw,
 pitch, and roll perturbations in the camera frame. Using yaw about +Y, pitch
@@ -194,7 +194,7 @@ and update $bold(R)_i <- bold(R)_i bold(R)_i^("jitter")$.
 
 Candidates are oversampled and then filtered by modular rule objects
 (`oracle_rri/oracle_rri/pose_generation/candidate_generation_rules.py`).
-Let #s.mesh be the GT mesh and $cal(B)$ be the snippet occupancy AABB.
+Let #symb.ase.mesh be the GT mesh and $cal(B)$ be the snippet occupancy AABB.
 
 The pruning configuration used in our runs is summarized in
 @tab:oracle-cfg-prune.
@@ -226,7 +226,7 @@ The pruning configuration used in our runs is summarized in
 #block[
   #align(center)[
     $
-      d_i = min_(bold(m) in #s.mesh) || #(s.center)_i - bold(m) ||_2,
+      d_i = min_(bold(m) in #symb.ase.mesh) || #(symb.oracle.center) _i - bold(m) ||_2,
       quad
       d_i > d_"min"
     $
@@ -240,22 +240,22 @@ points along the segment and require a minimum clearance:
 #block[
   #align(center)[
     $
-      bold(s)_(i,k) = bold(t)_("ref") + alpha_k (#(s.center)_i - bold(t)_("ref")),
+      bold(s)_(i,k) = bold(t)_("ref") + alpha_k (#(symb.oracle.center) _i - bold(t)_("ref")),
       quad alpha_k in [0, 1], \
-      min_(bold(m) in #s.mesh) || bold(s)_(i,k) - bold(m) ||_2 > delta
+      min_(bold(m) in #symb.ase.mesh) || bold(s)_(i,k) - bold(m) ||_2 > delta
     $
   ]
 ]
 
 *Free space.* Reject candidates outside the occupancy bounds:
-$(#s.center)_i in cal(B)$.
+$(#symb.oracle.center)_i in cal(B)$.
 
 == Depth rendering with PyTorch3D
 
 Depth rendering is implemented in
 `oracle_rri/oracle_rri/rendering/pytorch3d_depth_renderer.py` using PyTorch3D's
 `PerspectiveCameras`, `RasterizationSettings`, and `MeshRasterizer`
-@PyTorch3D-Cameras-2025. Given a candidate pose $#(s.T)_(#fr_world <- #fr_cam)$
+@PyTorch3D-Cameras-2025. Given a candidate pose $#(symb.vin.T) _(#fr_world <- #fr_cam)$
 and camera intrinsics (focal length and principal point), we build a batched
 `PerspectiveCameras` instance with `in_ndc=false` and rasterize the GT mesh.
 
@@ -298,7 +298,7 @@ $bold(x)_("cam") = bold(x)_("world") bold(R) + bold(T)$.
 We therefore invert the pose and transpose the rotation before passing it to
 PyTorch3D (see in-code comments in the renderer).
 
-The rasterizer outputs a z-buffer $(#s.depth)_i(u,v)$ and a face-index buffer
+The rasterizer outputs a z-buffer $(#symb.oracle.depth_q)_i(u,v)$ and a face-index buffer
 `pix_to_face_i(u,v)`. Valid pixels satisfy `pix_to_face >= 0` and are further
 clipped to `znear < depth < zfar`.
 
@@ -326,7 +326,7 @@ We then unproject in NDC space:
   #align(center)[
     $
       bold(p)_"world" =
-      "unproject"(x_"ndc", y_"ndc", #(s.depth)_i(u,v))
+      "unproject"(x_"ndc", y_"ndc", #(symb.oracle.depth_q) _i(u,v))
     $
   ]
 ]
@@ -340,7 +340,7 @@ the same NDC convention used by the rasterizer makes depth unprojection and
 rasterization consistent.
 
 The per-candidate point set is then
-$#(s.points)_(q_i) = { bold(p)_("world") : (u,v) "valid" }$, optionally
+$#(symb.oracle.points_q) _i = { bold(p)_("world") : (u,v) "valid" }$, optionally
 subsampled by a stride to control point count.
 
 The backprojection configuration used in our runs is summarized in
@@ -365,29 +365,14 @@ The backprojection configuration used in our runs is summarized in
 
 == Oracle RRI computation
 
-Let $#(s.points)_t$ be the semi-dense SLAM reconstruction for the snippet and
-$#(s.points)_(q_i)$ the candidate point cloud rendered from the GT mesh.
+Let $#(symb.oracle.points) _t$ be the semi-dense SLAM reconstruction for the snippet and
+$#symb.oracle.points_q$ the candidate point cloud rendered from the GT mesh.
 Oracle RRI is computed by comparing the point-to-mesh reconstruction quality
 before and after adding the candidate:
 
-#block[
-  #align(center)[
-    $
-      #(s.points)_(t union q_i) = #(s.points)_t union #(s.points)_(q_i)
-    $
-  ]
-]
+#block[#align(center)[#eqs.rri.union]]
 
-#block[
-  #align(center)[
-    $
-      "RRI"(q_i) =
-      ("CD"(#(s.points)_t, #s.mesh)
-      - "CD"(#(s.points)_(t union q_i), #s.mesh))
-      / ("CD"(#(s.points)_t, #s.mesh) + epsilon)
-    $
-  ]
-]
+#block[#align(center)[#eqs.rri.rri]]
 
 In our implementation (`oracle_rri/oracle_rri/rri_metrics/oracle_rri.py`), the
 GT mesh is cropped to a combined occupancy AABB covering semi-dense and
@@ -426,32 +411,25 @@ empirical quantile edges (`oracle_rri/oracle_rri/rri_metrics/rri_binning.py`).
 Given a stream of oracle RRIs $\{r_n\}_{n=1}^N$, we compute
 $K-1$ edges at the quantiles $k/K$:
 
-#block[
-  #align(center)[
-    $
-      e_k = "Quantile"( {r_n}, k/K),
-      quad k in {1, dots, K-1}
-    $
-  ]
-]
+#block[#align(center)[#eqs.binning.edges]]
 
 The ordinal label is then the number of edges below the value (implemented via
 `torch.bucketize`):
 
-#block[
-  #align(center)[
-    $
-      y(r) = sum_(k=1)^(K-1) bb(1)[r > e_k],
-      quad y(r) in {0, dots, K-1}
-    $
-  ]
-]
+#block[#align(center)[#eqs.binning.label]]
 
-CORAL represents the label $y$ as binary level targets
-$t_k = bb(1)[y > k]$ for $k = 0, dots, K-2$ @CORAL-cao2019. The fitted binner also
-provides class priors and cumulative threshold priors
+CORAL represents the label $y$ as binary level targets @CORAL-cao2019:
+
+#block[#align(center)[#eqs.binning.levels]]
+
+The fitted binner also provides class priors and cumulative threshold priors
 $P(y > k)$, which we use for prior-aligned bias initialization and optional
 balanced threshold losses.
+
+Compared to VIN-NBV's stage-normalized, dynamically sized bins (binning after a
+per-stage z-score + soft clipping), we currently fit a single global quantile
+binner over all oracle RRIs as a streamlined baseline. This keeps the label
+distribution close to uniform while leaving stage-conditioning to the model.
 
 The binning configuration used in our runs is summarized in
 @tab:oracle-cfg-binning.
@@ -475,3 +453,25 @@ The binning configuration used in our runs is summarized in
     )
   ],
 ) <tab:oracle-cfg-binning>
+
+#figure(
+  grid(
+    columns: (1fr, 1fr),
+    gutter: 10pt,
+    image("/figures/coral/coral_dataset_stats_baselines.png", width: 100%),
+    image("/figures/coral/rri_distribution_linear.png", width: 100%),
+    image("/figures/coral/rri_distribution_log_with_bin_edges.png", width: 100%),
+    image("/figures/coral/ordinal_label_histogram_fit.png", width: 100%),
+  ),
+  caption: [Oracle RRI distribution and fitted quantile binning (fit data). The skewed distribution motivates discretization; quantile edges yield approximately uniform ordinal class counts.],
+) <fig:coral-binning-overview>
+
+#figure(
+  grid(
+    columns: (1fr, 1fr),
+    gutter: 10pt,
+    image("/figures/coral/bin_means_vs_midpoints.png", width: 100%),
+    image("/figures/coral/bin_stds_vs_uniform_baseline.png", width: 100%),
+  ),
+  caption: [Per-bin statistics for ordinal bins (fit data). Quantile bins have uneven widths; we initialize bin representatives from bin means and monitor calibration and variance across bins.],
+) <fig:coral-binning-stats>

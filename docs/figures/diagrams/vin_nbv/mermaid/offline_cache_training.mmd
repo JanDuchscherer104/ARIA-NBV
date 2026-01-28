@@ -1,0 +1,44 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 36
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 18px; }
+    .cluster-label { font-size: 18px; font-weight: 700; }
+    .title { font-size: 18px; font-weight: 700; }
+---
+flowchart TB
+  Cfg["$$\\begin{array}{c}\\texttt{VinDataModuleConfig}\\end{array}$$"]
+  SrcCfg["$$\\begin{array}{c}\\texttt{VinOracleCacheDatasetConfig}\\end{array}$$"]
+  VinDs["$$\\begin{array}{c}\\texttt{OracleRriCacheVinDataset}\\end{array}$$"]
+  CacheDs["$$\\begin{array}{c}\\texttt{OracleRriCacheDataset}\\end{array}$$"]
+  CacheIdx["$$\\begin{array}{c}\\texttt{cache index + samples}\\end{array}$$"]
+  Providers["$$\\begin{array}{c}\\texttt{VinSnippetProviderChain}\\end{array}$$"]
+  Loader["$$\\begin{array}{c}\\texttt{DataLoader}\\end{array}$$"]
+  Out["$$\\begin{array}{c}\\texttt{VinOracleBatch}\\end{array}$$"]
+
+  Cfg -->|"$$\\texttt{source(kind=offline\\_cache)}$$"| SrcCfg
+  SrcCfg -->|"$$\\texttt{setup\\_target(split)}$$"| VinDs
+  VinDs -->|"$$\\texttt{wraps}$$"| CacheDs
+  CacheIdx -->|"$$\\texttt{index.jsonl + *.pt}$$"| CacheDs
+  Providers -->|"$$\\texttt{VinSnippetView}$$"| CacheDs
+  CacheDs -->|"$$\\texttt{oracle sample}$$"| VinDs
+  VinDs -->|"$$\\texttt{sample}$$"| Loader
+  Loader -->|"$$\\texttt{batch}$$"| Out
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Cfg input;
+  class CacheIdx data;
+  class SrcCfg,VinDs,CacheDs,Providers,Loader compute;
+  class Out output;

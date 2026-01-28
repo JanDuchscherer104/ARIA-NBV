@@ -1,0 +1,157 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 18
+    rankSpacing: 36
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 24px; font-weight: 700; }
+    .title { font-size: 24px; font-weight: 700; }
+---
+flowchart TB
+  Sample["$$\\begin{array}{c}\\texttt{EfmSnippetView}\\\\\\mathcal{M}_{GT},\\mathcal{P}_t\\end{array}$$"]
+
+  subgraph Row1
+    direction LR
+    subgraph CandGen["<span class='title'>Candidate Generation</span>"]
+      direction LR
+      Gen["$$\\begin{array}{c}\\texttt{CandidateViewGenerator}\\\\\\mathcal{Q}(\\mathcal{M}_{GT})\\end{array}$$"]
+      Cand["$$\\begin{array}{c}\\texttt{CandidateSamplingResult}\\\\\\mathcal{Q} \\in \\mathrm{SE}(3)^{N_q}\\end{array}$$"]
+
+      subgraph Sampling["Sampling + orientation"]
+        direction TB
+        PosSampler["$$\\begin{array}{c}\\texttt{PositionSampler}\\\\\\mathbf{d},\\mathbf{c}\\end{array}$$"]
+        Orient["$$\\begin{array}{c}\\texttt{OrientationBuilder}\\\\\\mathcal{Q}(\\mathbf{d})\\end{array}$$"]
+      end
+
+      subgraph Prune["Pruning rules"]
+        direction TB
+        RuleMesh["$$\\begin{array}{c}\\texttt{MinDistanceToMeshRule}\\\\m(\\mathcal{M}_{GT})\\end{array}$$"]
+        RulePath["$$\\begin{array}{c}\\texttt{PathCollisionRule}\\\\c(\\mathcal{M}_{GT})\\end{array}$$"]
+        RuleFree["$$\\begin{array}{c}\\texttt{FreeSpaceRule}\\\\a(\\mathcal{M}_{GT})\\end{array}$$"]
+        MaskFn["$$\\begin{array}{c}\\texttt{combine\\_pruning\\_masks}\\\\\\mathbf{m}(\\mathcal{Q})\\end{array}$$"]
+        Mask["$$\\begin{array}{c}\\texttt{PruningMask}\\\\\\mathbf{m}\\end{array}$$"]
+      end
+      ApplyMask["$$\\begin{array}{c}\\texttt{apply\\_mask}\\\\\\mathcal{Q} = \\mathcal{Q}[\\mathbf{m}]\\end{array}$$"]
+    end
+  end
+
+  subgraph Row2
+    direction LR
+    PadRow2["<span style='display:inline-block;width:120px'></span>"]:::spacer
+    subgraph Depth["<span class='title'>Depth Rendering</span>"]
+      direction LR
+      Renderer["$$\\begin{array}{c}\\texttt{CandidateDepthRenderer.render}\\\\\\mathbf{D}(\\mathcal{Q},\\mathcal{M}_{GT})\\end{array}$$"]
+      P3D["$$\\begin{array}{c}\\texttt{Pytorch3DDepthRenderer.render}\\\\\\mathbf{D}(\\mathcal{Q},\\mathcal{M}_{GT})\\end{array}$$"]
+      Depths["$$\\begin{array}{c}\\texttt{CandidateDepths}\\\\\\mathbf{D} \\in \\mathbb{R}^{N_q \\times H \\times W}\\end{array}$$"]
+    end
+  end
+
+  subgraph Row3
+    direction LR
+    PadRow3["<span style='display:inline-block;width:240px'></span>"]:::spacer
+    subgraph Backproj["<span class='title'>Backproject + Fusion</span>"]
+      direction LR
+      BackprojFn["$$\\begin{array}{c}\\texttt{\\_backproject\\_depths\\_p3d\\_batch}\\\\\\mathcal{P}_q(\\mathbf{D})\\end{array}$$"]
+      BuildPC["$$\\begin{array}{c}\\texttt{build\\_candidate\\_pointclouds}\\\\\\mathcal{P}_q(\\mathbf{D})\\end{array}$$"]
+      PCs["$$\\begin{array}{c}\\texttt{CandidatePointClouds}\\\\\\mathcal{P}_q,\\mathcal{P}_t\\end{array}$$"]
+    end
+  end
+
+  subgraph Row4
+    direction LR
+    PadRow4["<span style='display:inline-block;width:360px'></span>"]:::spacer
+    subgraph Oracle["<span class='title'>Oracle RRI Computation</span>"]
+      direction LR
+      OracleR["$$\\begin{array}{c}\\texttt{OracleRRI.score}\\\\\\mathrm{RRI}(\\mathcal{P}_t,\\mathcal{P}_q)\\end{array}$$"]
+      Chamfer["$$\\begin{array}{c}\\texttt{chamfer\\_point\\_mesh}\\\\\\mathrm{CD}(\\mathcal{P},\\mathcal{M}_{GT})\\end{array}$$"]
+      Rri["$$\\begin{array}{c}\\texttt{RriResult}\\\\\\mathrm{RRI},\\mathcal{A},\\mathcal{C}\\end{array}$$"]
+    end
+  end
+
+  Batch["$$\\begin{array}{c}\\texttt{OracleRriLabelBatch}\\\\\\mathcal{Q},\\mathbf{D},\\mathrm{RRI}\\end{array}$$"]
+
+  %% Main data flow with symbolic edge labels
+  Sample -->|"$$\\mathcal{M}_{GT},\\mathcal{P}_t$$"| Gen
+  Gen -->|"$$\\mathcal{Q}$$"| Cand
+  Cand -->|"$$\\mathcal{Q}$$"| Renderer
+  Renderer -->|"$$\\mathbf{D}$$"| Depths
+  Depths -->|"$$\\mathbf{D}$$"| BuildPC
+  BuildPC -->|"$$\\mathcal{P}_q,\\mathcal{P}_t$$"| PCs
+  PCs -->|"$$\\mathcal{P}_t,\\mathcal{P}_q$$"| OracleR
+  OracleR -->|"$$\\mathrm{RRI},\\mathcal{A},\\mathcal{C}$$"| Rri
+  Rri -->|"$$\\mathrm{RRI}$$"| Batch
+
+  %% Candidate generation internals
+  Gen -->|"$$\\mathbf{d},\\mathbf{c}$$"| PosSampler
+  PosSampler -->|"$$\\mathbf{d},\\mathbf{c}$$"| Orient
+  Orient -->|"$$\\mathcal{Q}$$"| ApplyMask
+  Gen -->|"$$\\mathcal{M}_{GT}$$"| RuleMesh
+  Gen -->|"$$\\mathcal{M}_{GT}$$"| RulePath
+  Gen -->|"$$\\mathcal{M}_{GT}$$"| RuleFree
+  RuleMesh -->|"$$\\mathcal{Q}$$"| MaskFn
+  RulePath -->|"$$\\mathcal{Q}$$"| MaskFn
+  RuleFree -->|"$$\\mathcal{Q}$$"| MaskFn
+  MaskFn -->|"$$\\mathbf{m}$$"| Mask
+  Mask -->|"$$\\mathbf{m}$$"| ApplyMask
+  ApplyMask -->|"$$\\mathcal{Q}$$"| Cand
+
+  %% Rendering internals
+  Renderer -->|"$$\\mathcal{Q},\\mathcal{M}_{GT}$$"| P3D
+  P3D -->|"$$\\mathbf{D}$$"| Depths
+
+  %% Backprojection internals
+  Depths -->|"$$\\mathbf{D}$$"| BackprojFn
+  BackprojFn -->|"$$\\mathcal{P}_q$$"| BuildPC
+
+  %% Oracle internals
+  OracleR -->|"$$\\mathcal{P}_t,\\mathcal{P}_q,\\mathcal{M}_{GT}$$"| Chamfer
+  Chamfer -->|"$$\\mathrm{CD}$$"| Rri
+
+  %% Auxiliary inputs (symbolic labels)
+  Sample -. "$$\\mathcal{M}_{GT},\\mathcal{P}_t$$" .-> Renderer
+  Sample -. "$$\\mathcal{M}_{GT},\\mathcal{P}_t$$" .-> BuildPC
+  Sample -. "$$\\mathcal{M}_{GT}$$" .-> OracleR
+
+  %% Spacer edges for diagonal offsets
+  PadRow2 --> Renderer
+  PadRow3 --> BackprojFn
+  PadRow4 --> OracleR
+
+  %% Styling: rounded cluster hulls + cooler palette.
+  style Row1 fill:transparent,stroke:transparent
+  style Row2 fill:transparent,stroke:transparent
+  style Row3 fill:transparent,stroke:transparent
+  style Row4 fill:transparent,stroke:transparent
+  style CandGen fill:#f0f6ff,stroke:#9db9ff,stroke-width:2px,rx:12,ry:12
+  style Sampling fill:#ffffff,stroke:#9db9ff,stroke-width:2px,rx:12,ry:12
+  style Prune fill:#ffffff,stroke:#9db9ff,stroke-width:2px,rx:12,ry:12
+  style Depth fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12
+  style Backproj fill:#f1fff6,stroke:#97ddb5,stroke-width:2px,rx:12,ry:12
+  style Oracle fill:#f7f3ff,stroke:#cdb2ff,stroke-width:2px,rx:12,ry:12
+  style Sample fill:#fff4e6,stroke:#ffb266,stroke-width:2px,rx:10,ry:10
+  style Batch fill:#ffeef2,stroke:#ff9bb6,stroke-width:2px,rx:10,ry:10
+
+  %% Node classes
+  classDef compute fill:#fff1d6,stroke:#e3a74f,stroke-width:1px,rx:8,ry:8
+  classDef data fill:#e8f2ff,stroke:#6aa1e6,stroke-width:1px,rx:8,ry:8
+  classDef result fill:#e8ffe9,stroke:#67c57a,stroke-width:1px,rx:8,ry:8
+  classDef spacer fill:transparent,stroke:transparent,color:transparent
+
+  class Gen,PosSampler,Orient,RuleMesh,RulePath,RuleFree,MaskFn,ApplyMask,Renderer,P3D,BackprojFn,BuildPC,OracleR,Chamfer compute
+  class Sample,Cand,Depths,PCs,Mask data
+  class Rri,Batch result
+
+
+  class PadRow2,PadRow3,PadRow4 spacer
+
+  %% Hide spacer edges
+  linkStyle 27 stroke:transparent,stroke-width:0px
+  linkStyle 28 stroke:transparent,stroke-width:0px
+  linkStyle 29 stroke:transparent,stroke-width:0px
