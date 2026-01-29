@@ -38,8 +38,12 @@ latest rig pose and outputs multiple dense heads (occupancy probability,
 centerness, free-space evidence, and observation counts) @EFM3D-straub2024. We
 construct an input scene field $bold(F)_("in") in bb(R)^(B times C_"in" times D times H times W)$
 by concatenating selected EVL head channels (occupancy prior, occupancy
-evidence, observation counts, centerness, and free-space evidence) plus derived
-features.
+evidence, normalized observation counts, centerness after NMS, and optional
+free-space evidence) plus derived features. In the current VIN v3 baseline,
+the default channel set is
+$(#(symb.vin.occ_pr), #(symb.vin.occ_in), #(symb.vin.counts_norm), #(symb.vin.cent_pr_nms))$
+with optional inclusion of #(symb.vin.free_in), #(symb.vin.unknown), and
+#(symb.vin.new_surface_prior) via configuration.
 
 Let $bold(n)$ denote the per-voxel observation counts and $bold(o)^("pr")$ the
 occupancy prior. We define
@@ -60,7 +64,9 @@ derive
 ]
 
 Here $bold(u)$ is a soft unknown mask and $bold(s)^("new")$ is a new-surface
-prior. The projected scene field is then
+prior. When EVL does not provide free-space evidence, we derive it as
+$ #(symb.vin.free_in) = #(symb.vin.observed) dot.o (1 - #(symb.vin.occ_in)) $
+(observed mask times empty occupancy). The projected scene field is then
 $bold(F) = phi("Conv"_(1 times 1 times 1)(bold(F)_("in"))) in bb(R)^(B times C times D times H times W)$,
 implemented as `Conv3d + GroupNorm + GELU` @GroupNorm-wu2018. An example
 occupancy-prior slice from the diagnostics dashboard is shown in
@@ -98,7 +104,8 @@ For each candidate $i$ the pose encoder yields:
 == Global context via pose-conditioned attention
 
 We pool $bold(F)$ to a coarse grid of size $G times G times G$, yielding
-$T = G^3$ tokens.
+$T = G^3$ tokens. The voxel-center tensor $bold(p)_v$ (world-frame voxel centers)
+is required to compute positional keys and the voxel-projection branch.
 Each token is augmented with an LFF positional encoding of its voxel center in
 the rig frame. Candidate pose embeddings serve as queries in a multi-head
 cross-attention block @Transformer-vaswani2017.
@@ -150,9 +157,12 @@ $v_i^("sem") > 0$.
 == Voxel projection FiLM
 
 To modulate global features with candidate-dependent evidence, we pool voxel
-centers to the same coarse grid used in global attention ($G_"pool"^3$ points),
-project those centers into each candidate view, and summarize their
-screen-space coverage and depth statistics. A linear FiLM head predicts
+centers to the same coarse grid used in global attention ($G_"pool"^3$ points)
+via adaptive average pooling over the voxel-center grid (with symmetric
+center-cropping if the grid is padded), project those centers into each
+candidate view, and summarize their screen-space coverage and depth statistics.
+Because voxel centers have no per-point reliability metadata, the projection
+statistics use uniform weights. A linear FiLM head predicts
 per-channel $(#(symb.vin.gamma)_i, #(symb.vin.beta)_i)$ from these projection statistics and
 applies
 
@@ -245,6 +255,10 @@ standard deviation $sigma_(i,b)$. The grid tensor
 $bold(G)_i = [O_(i,*) ; mu_(i,*) ; sigma_(i,*)]$ is encoded by a small CNN to
 produce $bold(s)_i^("grid")$.
 
+In the current implementation, the grid CNN uses the hard validity mask
+($m_(i,j)$) but does not apply the reliability weights $w_(i,j)$ within each
+bin; weighting can be added if it improves stability.
+
 == Optional trajectory context
 
 An optional trajectory encoder embeds the snippet's rig pose history (expressed
@@ -267,7 +281,7 @@ and snippet-level signals, e.g.
         #(symb.vin.global)_i ;
         bold(s)_i^("proj") ;
         bold(s)_i^("grid") ;
-        bold(z)^("traj")]
+        bold(z)_i^("traj")]
     $
   ]
 ]
@@ -275,6 +289,12 @@ and snippet-level signals, e.g.
 The head MLP produces $K-1$ logits per candidate. CORAL interprets these as
 cumulative probabilities and yields ordinal predictions and expected RRI
 estimates @CORAL-cao2019.
+
+In our v3 code, the trajectory signal used in the concatenation is a
+candidate-specific context $bold(z)_i^("traj")$ obtained by attending candidate
+pose queries to per-frame trajectory encodings (when enabled). The pooled
+trajectory embedding (snippet-level) is currently used for diagnostics rather
+than as a direct head input.
 
 This architecture preserves VIN-NBV's inductive bias (view-conditioned
 projection features) while leveraging EVL's egocentric voxel representation and

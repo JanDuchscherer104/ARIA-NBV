@@ -3,6 +3,9 @@
 #import "@preview/muchpdf:0.1.1": muchpdf
 #import "@preview/booktabs:0.0.4": *
 #import "@preview/codly:1.3.0": *
+#import "@preview/tdtr:0.5.0": *
+// Shared math symbols (also imported by slides; safe to import here for helpers).
+#import "../shared/macros.typ": *
 
 #let theme_color_primary_hm = rgb("fc5555")
 #let theme_color_block = rgb("f4f6fb")
@@ -162,6 +165,202 @@
     ],
   )
 ]
+
+// ---------------------------------------------------------------------------
+// tdtr helpers (tidy trees)
+// ---------------------------------------------------------------------------
+
+/// Compact tdtr tree visualization for EVL backbone output dictionaries.
+///
+/// This is intended to replace screenshot-style "rich_summary(...)" outputs in
+/// slides with a structured view grouped by namespace (voxel/neck/obbs/rgb).
+///
+/// Note: Leaf labels are schematic (symbolic shapes), so the diagram stays
+/// stable across runs and configs.
+#let evl-backbone-tree(
+  compact: true,
+  text-size: 9pt,
+  node-width: 15em,
+  spacing: (10pt, 16pt),
+) = {
+  let group = metadata("group")
+  let leaf = metadata("leaf")
+
+  let tree = tidy-tree-graph.with(
+    compact: compact,
+    text-size: text-size,
+    node-width: node-width,
+    node-inset: 3pt,
+    spacing: spacing,
+    draw-edge: tidy-tree-draws.horizontal-vertical-draw-edge,
+    draw-node: (
+      tidy-tree-draws.metadata-match-draw-node.with(
+        matches: (
+          group: (fill: theme_color_primary_hm.lighten(75%), stroke: 0.6pt + theme_color_primary_hm),
+          leaf: (fill: theme_color_block, stroke: 0.5pt + theme_color_block.darken(18%)),
+        ),
+        default: (fill: theme_color_block, stroke: 0.5pt + theme_color_block.darken(18%)),
+      ),
+    ),
+  )
+
+  tree[
+    - EVL backbone outputs (EvlBackboneOutput) #group
+      - Grid contract (geometry + frame) #group
+        - Anchor + pose #group
+          - [#symb.frame.v voxel grid anchored at #symb.ase.traj_final] #leaf
+          - [t_world_voxel: PoseTW(#symb.shape.B, 12) = #T(fr_world, fr_voxel)] #leaf
+          - [voxel_select_t: Tensor(#symb.shape.B, 1) int64 (optional)] #leaf
+        - Metric extent #group
+          - [voxel_extent: Tensor(#symb.shape.B, 6) in meters (voxel frame)] #leaf
+        - Voxel centers (optional) #group
+          - [pts_world: Tensor(#symb.shape.B, #symb.shape.Vvox, 3) (world)] #leaf
+      - Input/evidence features (voxel/(...)) #group
+        - Occupied evidence #group
+          - [#symb.vin.occ_in : Tensor(#symb.shape.B, 1, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+        - Free-space evidence (optional) #group
+          - [#symb.vin.free_in : Tensor(#symb.shape.B, 1, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+        - Coverage / visibility counts #group
+          - [#symb.vin.counts : Tensor(#symb.shape.B, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim) int64] #leaf
+          - [counts_m: Tensor(#symb.shape.B, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim) (debug)] #leaf
+      - Internal voxel features (voxel/feat, neck/(...)) #group
+        - Raw lifted voxel features (optional) #group
+          - [voxel_feat: Tensor(#symb.shape.B, #symb.shape.Fin, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+        - Neck features (optional) #group
+          - [occ_feat: Tensor(#symb.shape.B, #symb.shape.Fhead, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+          - [obb_feat: Tensor(#symb.shape.B, #symb.shape.Fhead, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+      - Head features (dense voxel heads) #group
+        - Surface reconstruction #group
+          - [#symb.vin.occ_pr : Tensor(#symb.shape.B, 1, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+        - OBB detection #group
+          - Centerness (anchor for NMS) #group
+            - [#symb.vin.cent_pr : Tensor(#symb.shape.B, 1, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+          - Regression heads (optional) #group
+            - [bbox_pr: Tensor(#symb.shape.B, 7, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+            - [clas_pr: Tensor(#symb.shape.B, #symb.shape.K, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+      - Post-processing (obbs/(...)) #group
+        - Post-NMS boxes (optional) #group
+          - [obbs_pr_nms: ObbTW(#symb.shape.B, #symb.shape.M, 34)] #leaf
+        - Snippet-frame boxes (optional) #group
+          - [obb_pred: ObbTW(#symb.shape.B, #symb.shape.M, 34)] #leaf
+        - Taxonomy + probabilities (optional) #group
+          - [sem_id_to_name: dict(int, str)] #leaf
+      - RGB debug features (rgb/(...)) #group
+        - 2D features (optional) #group
+          - [feat2d_upsampled: Tensor(#symb.shape.B, #symb.shape.Tlen, C, Hp, Wp)] #leaf
+        - Tokens (optional) #group
+          - [token2d: Tensor or list(Tensor)] #leaf
+  ]
+}
+
+/// Multi-panel EVL backbone output visualization (split by semantic group).
+///
+/// Rationale: `EvlBackboneOutput` is wide; splitting into multiple trees keeps
+/// each view narrow and makes it easier to compare occ vs OBB heads.
+// Shared style wrapper for the EVL trees.
+#let _evl-tree-style(compact, text-size, node-width, spacing) = tidy-tree-graph.with(
+  compact: compact,
+  text-size: text-size,
+  node-width: node-width,
+  node-inset: 3pt,
+  spacing: spacing,
+  draw-edge: tidy-tree-draws.horizontal-vertical-draw-edge,
+  draw-node: (
+    tidy-tree-draws.metadata-match-draw-node.with(
+      matches: (
+        group: (fill: theme_color_primary_hm.lighten(75%), stroke: 0.6pt + theme_color_primary_hm),
+        leaf: (fill: theme_color_block, stroke: 0.5pt + theme_color_block.darken(18%)),
+      ),
+      default: (fill: theme_color_block, stroke: 0.5pt + theme_color_block.darken(18%)),
+    ),
+  ),
+)
+
+/// EVL tree: grid contract (pose + extent + optional voxel centers).
+#let evl-backbone-tree-grid(
+  compact: true,
+  text-size: 9pt,
+  node-width: 16em,
+  spacing: (10pt, 16pt),
+) = {
+  let group = metadata("group")
+  let leaf = metadata("leaf")
+  let tree = _evl-tree-style(compact, text-size, node-width, spacing)
+  tree[
+    - Grid contract #group
+      - [#symb.frame.v voxel grid anchored at #symb.ase.traj_final] #leaf
+      - [t_world_voxel: PoseTW(#symb.shape.B, 12) = #T(fr_world, fr_voxel)] #leaf
+      - [voxel_extent: Tensor(#symb.shape.B, 6) in meters (voxel frame)] #leaf
+      - [pts_world: Tensor(#symb.shape.B, #symb.shape.Vvox, 3) (optional)] #leaf
+  ]
+}
+
+/// EVL tree: evidence + internal features (voxel evidence, neck, rgb debug).
+#let evl-backbone-tree-evidence(
+  compact: true,
+  text-size: 9pt,
+  node-width: 16em,
+  spacing: (10pt, 16pt),
+) = {
+  let group = metadata("group")
+  let leaf = metadata("leaf")
+  let tree = _evl-tree-style(compact, text-size, node-width, spacing)
+  tree[
+    - Evidence + internal features #group
+      - Evidence (voxel/(...)) #group
+        - [#symb.vin.occ_in : Tensor(#symb.shape.B, 1, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+        - [#symb.vin.free_in : Tensor(#symb.shape.B, 1, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim) (optional)] #leaf
+        - [#symb.vin.counts : Tensor(#symb.shape.B, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim) int64] #leaf
+        - [counts_m: Tensor(#symb.shape.B, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim) (debug)] #leaf
+      - Internal (optional) #group
+        - [voxel_feat: Tensor(#symb.shape.B, #symb.shape.Fin, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+        - [occ_feat: Tensor(#symb.shape.B, #symb.shape.Fhead, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+        - [obb_feat: Tensor(#symb.shape.B, #symb.shape.Fhead, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+      - RGB debug (optional) #group
+        - [feat2d_upsampled: Tensor(#symb.shape.B, #symb.shape.Tlen, C, Hp, Wp)] #leaf
+        - [token2d: Tensor or list(Tensor)] #leaf
+  ]
+}
+
+/// EVL tree: head voxel fields, split into occ vs obb (+ post-processing).
+#let evl-backbone-tree-heads(
+  compact: true,
+  text-size: 9pt,
+  node-width: 16em,
+  spacing: (10pt, 16pt),
+) = {
+  let group = metadata("group")
+  let leaf = metadata("leaf")
+  let tree = _evl-tree-style(compact, text-size, node-width, spacing)
+  tree[
+    - Head voxel fields #group
+      - Surface reconstruction (occ) #group
+        - [#symb.vin.occ_pr : Tensor(#symb.shape.B, 1, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+      - OBB detection (obb) #group
+        - [#symb.vin.cent_pr : Tensor(#symb.shape.B, 1, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim)] #leaf
+        - [bbox_pr: Tensor(#symb.shape.B, 7, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim) (optional)] #leaf
+        - [clas_pr: Tensor(#symb.shape.B, #symb.shape.K, #symb.shape.D, #symb.shape.H, #symb.shape.Wdim) (optional)] #leaf
+      - Post-processing (obbs/(...)) #group
+        - [obbs_pr_nms: ObbTW(#symb.shape.B, #symb.shape.M, 34) (optional)] #leaf
+        - [obb_pred: ObbTW(#symb.shape.B, #symb.shape.M, 34) (optional)] #leaf
+        - [sem_id_to_name: dict(int, str) (optional)] #leaf
+  ]
+}
+
+/// Multi-panel EVL backbone output visualization (split by semantic group).
+#let evl-backbone-trees(
+  compact: true,
+  text-size: 9pt,
+  node-width: 16em,
+  spacing: (10pt, 16pt),
+  gutter: 0.35cm,
+) = grid(
+  columns: (1fr, 1fr, 1fr),
+  gutter: gutter,
+  evl-backbone-tree-grid(compact: compact, text-size: text-size, node-width: node-width, spacing: spacing),
+  evl-backbone-tree-evidence(compact: compact, text-size: text-size, node-width: node-width, spacing: spacing),
+  evl-backbone-tree-heads(compact: compact, text-size: text-size, node-width: node-width, spacing: spacing),
+)
 
 // Parse the training step from filenames shaped like:
 // `confusion_matrix_<step>_<hash>.png`.

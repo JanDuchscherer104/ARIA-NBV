@@ -161,6 +161,9 @@
     candidates: $bold(cal(Q))$,
     // Candidate depth maps.
     depth_q: $bold(D)_q$,
+    // Pixel-wise valid mask for candidate depth maps / projections.
+    // (Used e.g. for rendered depth validity and projection validity.)
+    mask_q: $bold(M)_q$,
     // Candidate camera intrinsics/extrinsics (non-PyTorch3D).
     cameras_q: $bold(bold(C))_q$,
     // Direction vector (sampling).
@@ -201,6 +204,39 @@
     gamma: $bold(gamma)$,
     // FiLM shift.
     beta: $bold(beta)$,
+    // -----------------------------------------------------------------------
+    // EVL voxel-field features (as used by VIN v3)
+    //
+    // Notes:
+    // - The voxel grid lives in the voxel frame #symb.frame.v and is anchored
+    //   at the final rig pose #symb.ase.traj_final (gravity-aligned).
+    // - We keep notation head-centric: occupancy / evidence / counts, matching
+    //   `oracle_rri/oracle_rri/vin/model_v3.py`.
+    // -----------------------------------------------------------------------
+    // Occupancy prediction (sigmoid) on the voxel grid.
+    occ_pr: $bold(V)_"occ"^"pr"$,
+    // Occupied evidence (voxelized surface evidence from inputs).
+    occ_in: $bold(V)_"occ"^"in"$,
+    // Free-space evidence (optional; if provided by EVL).
+    free_in: $bold(V)_"free"^"in"$,
+    // Observation counts / coverage proxy per voxel.
+    counts: $bold(V)_"count"^"in"$,
+    // Normalized counts (log1p normalized).
+    counts_norm: $bold(V)_"count"^"norm"$,
+    // Centerness prediction (geometric prior).
+    cent_pr: $bold(V)_"cent"^"pr"$,
+    // Centerness after NMS (used in VIN v3 field bundle).
+    cent_pr_nms: $bold(V)_"cent"^"pr,nms"$,
+    // Observed mask (counts > 0).
+    observed: $bold(V)_"obs"$,
+    // Unknown mask (1 - counts_norm).
+    unknown: $bold(V)_"unk"$,
+    // New-surface prior (unknown ⊙ occ_pr).
+    new_surface_prior: $bold(V)_"new"$,
+    // VIN scene field after lightweight 3D projection/assembly (multi-channel).
+    field_v: $bold(F)_v$,
+    // Per-candidate voxel features sampled/pooled from the scene field.
+    field_q: $bold(F)_q^("vox")$,
   ),
   shape: (
     // Batch size.
@@ -326,7 +362,7 @@
   ),
   vin: (
     // Optional auxiliary regression combined with the CORAL loss.
-    loss_total: $ #symb.vin.loss = #(symb.vin.loss)_"coral" + lambda dot #(symb.vin.loss)_"reg" $,
+    loss_total: $ #symb.vin.loss = #(symb.vin.loss) _"coral" + lambda dot #(symb.vin.loss) _"reg" $,
   ),
   metrics: (
     spearman: $ rho = "corr"("rank"(hat(r)_i), "rank"(r_i)) $,
