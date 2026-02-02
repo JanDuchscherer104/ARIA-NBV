@@ -3,41 +3,47 @@ config:
   htmlLabels: true
   flowchart:
     htmlLabels: true
-    nodeSpacing: 20
-    rankSpacing: 34
+    nodeSpacing: 18
+    rankSpacing: 30
   layout: elk
   themeVariables:
-    fontSize: "18px"
+    fontSize: "19px"
   themeCSS: |
-    .nodeLabel { font-size: 18px; }
-    .edgeLabel { font-size: 18px; }
+    .nodeLabel { font-size: 19px; }
+    .edgeLabel { font-size: 15px; opacity: 0.85; }
 ---
 flowchart TB
   %% Global pooling + voxel FiLM (compact)
 
-  InputsVoxel["$$\\begin{array}{c}\texttt{Voxel field + centers}\\\\\mathbf{F},\ \mathcal{V},\ \mathbf{T}^{w}_{v},\ \texttt{extent}\end{array}$$"]
-  PoseEmb["$$\\begin{array}{c}\mathbf{e}\\\\\in\mathbb{R}^{B\times N_q\times F_{pose}}\end{array}$$"]
-  Cam["$$\\begin{array}{c}\texttt{Cams}\\\\B\cdot N_q\end{array}$$"]
+  Field["$$\\begin{array}{c}\\textbf{Scene Field}\\\\\\mathbf{F}\\end{array}$$"]
+  PoseEnc["$$\\begin{array}{c}\\textbf{Pose Embedding}\\\\\\mathbf{e}_{\\mathrm{pose}}\\end{array}$$"]
+  VoxCenters["$$\\begin{array}{c}\\textbf{Voxel Centers}\\\\\\mathbf{x}_w\\end{array}$$"]
+  Cam["$$\\begin{array}{c}\\textbf{Candidate Cameras}\\\\\\mathbf{C}_q\\end{array}$$"]
 
-  GlobalPool["$$\\begin{array}{c}\texttt{PoseConditionedGlobalPool}\\\\\texttt{LFF keys + MHA}\end{array}$$"]
-  VoxProj["$$\\begin{array}{c}\texttt{voxel\_proj\_stats}\\\\\mathbf{s}_{vox}\end{array}$$"]
-  FiLM["$$\\begin{array}{c}\texttt{FiLM}\\\\\tilde{\\mathbf{g}}\end{array}$$"]
-  GOut["$$\\begin{array}{c}\tilde{\\mathbf{g}}\\\\\in\mathbb{R}^{B\times N_q\times F_g}\end{array}$$"]
+  GlobalPool["$$\\begin{array}{c}\\textbf{PoseConditionedGlobalPool}\\\\\\mathbf{g}=\\texttt{Pool}(\\mathbf{F},\\mathbf{e}_{\\mathrm{pose}},\\mathbf{x}_w)\\end{array}$$"]
 
-  InputsVoxel -->|"$$\mathbf{F},\mathcal{V}$$"| GlobalPool
-  PoseEmb -->|"$$\mathbf{e}$$"| GlobalPool
-  GlobalPool -->|"$$\mathbf{g}$$"| FiLM
+  VoxPool["$$\\begin{array}{c}\\textbf{Voxel Pooling}\\\\\\mathbf{p}=\\texttt{adaptive\\_avg\\_pool3d}(\\mathbf{x}_w)\\end{array}$$"]
+  VoxProj["$$\\begin{array}{c}\\textbf{Voxel Projection Stats}\\\\\\Pi(\\mathbf{p})=\\texttt{transform\\_points\\_screen}(\\mathbf{C}_q,\\mathbf{p})\\\\\\mathbf{s}_{\\mathrm{vox}}=\\texttt{stats}(\\Pi(\\mathbf{p}))\\ \\ \\text{(coverage/validity + depth)}\\end{array}$$"]
 
-  InputsVoxel -->|"$$\mathcal{V}$$"| VoxProj
-  Cam -->|"$$\texttt{Cams}$$"| VoxProj
-  VoxProj -->|"$$\mathbf{s}_{vox}$$"| FiLM
-  FiLM -->|"$$\tilde{\\mathbf{g}}$$"| GOut
+  FiLM["$$\\begin{array}{c}\\textbf{FiLM Modulation}\\\\(\\boldsymbol{\\gamma},\\boldsymbol{\\beta})=\\texttt{Linear}(\\mathbf{s}_{\\mathrm{vox}})\\\\\\tilde{\\mathbf{g}}=(1+\\boldsymbol{\\gamma})\\odot\\mathbf{g}+\\boldsymbol{\\beta}\\\\\\texttt{GroupNorm}\\end{array}$$"]
+  GOut["$$\\begin{array}{c}\\textbf{Global Feature}\\\\\\tilde{\\mathbf{g}}\\end{array}$$"]
+
+  Field --> GlobalPool
+  PoseEnc --> GlobalPool
+  VoxCenters --> GlobalPool
+  GlobalPool -->|"$$\\mathbf{g}:\\ [B,N_q,F_g]$$"| FiLM
+
+  VoxCenters --> VoxPool
+  VoxPool --> VoxProj
+  Cam --> VoxProj
+  VoxProj -->|"$$\\mathbf{s}_{\\mathrm{vox}}:\\ [B,N_q,F_{\\mathrm{vox}}]$$"| FiLM
+  FiLM -->|"$$\\texttt{FloatTensor}[B,N_q,F_g]$$"| GOut
 
   classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
   classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
   classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
   classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
 
-  class InputsVoxel,PoseEmb,Cam input;
-  class GlobalPool,VoxProj,FiLM compute;
+  class Field,PoseEnc,VoxCenters,Cam input;
+  class GlobalPool,VoxPool,VoxProj,FiLM compute;
   class GOut output;

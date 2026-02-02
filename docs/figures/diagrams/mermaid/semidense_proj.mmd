@@ -1,0 +1,36 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+---
+flowchart TB
+  %% Semidense projection stats (compact)
+
+  SemPts["semidense_points"]
+  Cam["C_q (candidate cameras)"]
+  Proj["<b>Screen-space projection</b><br/><br/><code>Pi(x) = transform_points_screen(C_q, x)</code>"]
+  Stats["<b>Projection statistics</b><br/><br/><code>proj_data = Pi(semidense_points)</code><br/><code>proj_data = {x_s, y_s, z_s, valid, finite, ...}</code><br/><br/><code>semidense_proj = _encode_semidense_projection_features(proj_data)</code><br/><code>[coverage, empty_frac, v_sem, mu_z, sigma_z]</code>"]
+  Out["semidense_proj"]
+
+  SemPts -->|"FloatTensor[B, P,<br/>C_sem]"| Proj
+  Cam -->|"PerspectiveCameras[B*N_q]"| Proj
+  Proj -->|"FloatTensor[B, N_q, P]<br/>BoolTensor[B, N_q, P]"| Stats
+  Stats -->|"FloatTensor[B, N_q,<br/>F_proj]"| Out
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class SemPts,Cam input;
+  class Proj,Stats compute;
+  class Out output;
