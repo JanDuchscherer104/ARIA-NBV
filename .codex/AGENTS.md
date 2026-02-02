@@ -4,6 +4,88 @@ This document orients AI coding agents and contributors working on the **NBV –
 
 ---
 
+## 0. Codex Alignment DB (Must Use)
+
+This repository maintains a small, Codex-optimized internal database of the *essential* project constraints, workflows, tool usage patterns, and core technical facts.
+
+- **Internal database (source of truth):** `.codex/AGENTS_INTERNAL_DB.md`
+- **Update policy:** When you learn new constraints, “gotchas”, or stable facts (e.g., I/O contracts, evaluation protocol, oracle details), update the internal DB instead of relying on chat memory.
+- **Task notes:** For non-trivial work, write a short `.codex/<label>.md` report capturing findings, decisions, and follow-ups.
+
+### Project “skills” (playbooks)
+
+Treat these as repeatable playbooks; follow them by default unless the user explicitly overrides.
+
+1) `skill.context_init`
+   - Run: `make context` (writes to `.codex/codex_make_context.md`), then use `rg` to extract what you need.
+   - Run `make context-dir-tree` only if you need the tree printed to stdout.
+   - Read: `docs/index.qmd` and `docs/contents/todos.qmd`.
+   - Confirm environment is the uv-managed venv (`oracle_rri/.venv`).
+
+### `.codex/codex_make_context.md` structure (what to search)
+The `make context` snapshot is a single Markdown file with stable section headers:
+
+- **Header + Contents**:
+  - Title: `# Context Snapshot (make context)`
+  - Generated timestamp
+  - `## Contents` list
+- **Section 0: Source index**
+  - `## 0) Source index (all context pools)` (embedded `.codex/context_sources_index.md`)
+- **Section 1: Environment**
+  - `## 1) Environment` (python/venv info)
+- **Section 2: Mermaid UML**
+  - `## 2) Mermaid UML (oracle_rri)` followed by a `{mermaid}` block
+- **Section 3: Class docstrings**
+  - `## 3) Class docstrings (oracle_rri)` (full class docs from AST)
+- **Section 4: Directory tree**
+  - `## 4) Directory tree (oracle_rri)` (tree output)
+
+Search examples:
+- `rg -n "^## 0\\) Source index" .codex/codex_make_context.md`
+- `rg -n "^## 2\\) Mermaid UML" .codex/codex_make_context.md`
+- `rg -n "VinModelV3|CandidateDepthRenderer" .codex/codex_make_context.md`
+- `rg -n "^## 4\\) Directory tree" .codex/codex_make_context.md`
+
+### Cheat sheet: common `rg` queries (based on current snapshot content)
+Use these to jump to relevant classes/namespaces without dumping the full file:
+
+```bash
+# Data views and snippet types
+rg -n "EfmSnippetView|EfmCameraView|EfmPointsView" .codex/codex_make_context.md
+
+# Candidate generation + pose sampling
+rg -n "pose_generation\\.candidate_generation|CandidateSamplingResult" .codex/codex_make_context.md
+
+# Rendering pipeline (depth + point clouds)
+rg -n "rendering\\.candidate_depth_renderer|CandidateDepthRenderer" .codex/codex_make_context.md
+
+# Oracle labeling + cache
+rg -n "pipelines\\.oracle_rri_labeler|OracleRriLabeler|OracleRriCache" .codex/codex_make_context.md
+
+# VIN models + encoders
+rg -n "vin\\.model_v3|VinModelV3|pose_encoders|traj_encoder" .codex/codex_make_context.md
+```
+
+Note on UML filtering:
+- `make context` prints a filtered UML to stdout (default excludes: `data.downloader, vin.experimental, app`).
+- `.codex/codex_make_context.md` always stores the full, unfiltered UML.
+
+2) `skill.repo_hygiene` (pre-commit readiness)
+   - Inventory: `git status -sb`, `git diff --stat`, `git diff --name-only`.
+   - Classify untracked: keep vs ignore vs delete (ask if unsure).
+   - Add ignores for logs/renders/caches when appropriate (avoid committing artifacts).
+   - Stage by intent and keep commits small (code vs docs vs assets).
+
+3) `skill.vin_oracle_dev` (VIN/oracle changes)
+   - Keep pose/camera types: `PoseTW`, `CameraTW` (no raw matrices).
+   - Run per-file quality loop for package code: `ruff format` → `ruff check` → `uv run pytest <path>`.
+   - Prefer integration tests with real data over mocks where feasible.
+
+4) `skill.docs_typst_quarto`
+   - Keep bibliography consistent via `docs/references.bib`.
+   - Validate Mermaid diagrams (Mermaid 11+ safe IDs, `<br/>` in labels).
+   - For doc/diagram edits: `quarto render <file>.qmd --to html`.
+
 ## 1. Mission & Scope
 
 We are building an **active Next-Best-View planning system** for complex indoor scenes, using:
@@ -36,7 +118,7 @@ We are building an **active Next-Best-View planning system** for complex indoor 
 
 ### Commands (use the uv-managed venv)
 
-- Context: `make context` then `make context-dir-tree`
+- Context: `make context` (writes `.codex/codex_make_context.md`; search with `rg`)
 - Tests (avoid system python): `uv run pytest <path>` or `oracle_rri/.venv/bin/python -m pytest <path>`
 - Lint/format: `ruff format <file>` then `ruff check <file>`
 
@@ -53,13 +135,14 @@ We are building an **active Next-Best-View planning system** for complex indoor 
 - Training/validation from cache uses `OracleRriCacheDatasetConfig.train_val_split` + `split="train"/"val"`; `VinDataModule` will auto-derive `val_cache` when split is active.
 
 - **On Initialization**:
-  - **Always** run `make context` (it uses the uv `.venv` automatically and prints which interpreter is used; if `.venv` is missing, run the sync command above first) to generate an up-to-date class diagram of the `oracle_rri` package. *Note*, an offline snapshot is stored in `.codex/codex_make_context.md`.
-  - **Always** run `make context-dir-tree` right after `make context` to get the current oracle_rri directory tree snapshot.
-  - **Always** read: `index.qmd`, `todos.qmd`
+  - **Always** run `make context` to generate the up-to-date snapshot in `.codex/codex_make_context.md`.
+  - Use `rg` on that file to pull only relevant sections; avoid dumping the whole file into chat.
+  - Run `make context-dir-tree` only if you need a standalone tree printout.
+  - **Always** read: `docs/typst/paper/main.typ` to get a high-level understanding of the project goals.
   - **Always** start with defining and clarifying the task at hand, deciding wether to compress your context and wether to gather additional context from relevant files or external libraries (git-library-docs MCP tool) before proceeding.
   - The user prompt may contain *Termination Criteria* that must be strictly followed by defining a verifiable condition for successful task completion - this often involves writing and executing tests to ensure that *all* potential issues or or failure modes have been addressed and you can confidently declare the initial request as done. It is often a good idea to test the assess interpretable (intermediate) results in quick cli experiments when debugging, this allows for incremental verification of your changes.i
   - **Never** too definsively - i.e. assume a properly working environment with all dependencies installed unless explicitly told otherwise.
-  - **Optional** (depending on your task) read: `ase_dataset.qmd`, `resources.qmd`, `oracle_rri_impl.qmd`, `efm3d_implementation.qmd`, `efm3d_symbol_index.qmd`, `prj_aria_tools_impl.qmd`, `rri_computation.qmd` to get a comprehensive understanding of the project goals, architecture, and technical details.
+  - **Optional** (depending on your task) read: `ase_dataset.qmd`, `resources.qmd`, `oracle_rri_impl.qmd`, `efm3d_implementation.qmd`, `efm3d_symbol_index.qmd`, `prj_aria_tools_impl.qmd`, `rri_computation.qmd` as well as any of the sections of the current version of our paper `docs/typst/paper/sections/*.typ` to get a comprehensive understanding of the project goals, architecture, and technical details.
 - **Always** start with condensing the problem description, then do initial exploration of all potentially relvant files before presenting a rough outline of the solution together with termination and acceptance criteria then implement incrementally while testing along the way. Always maintain a list of tasks.
 - **NEVER** run "git restore" on any file. **Always** asume that other agents or humans may have made changes to the codebase that you are not aware of. Don't concern yourself with changes outside your current task scope!
 - **Always** follow code conventions (type hints, Google docstrings, Column enums)
@@ -67,7 +150,11 @@ We are building an **active Next-Best-View planning system** for complex indoor 
 - **Follow** established patterns and aim for clear separation of concerns (modularity, single responsibility principle, config-as-factory pattern).
 - **Ensure** code quality:
   - **For package code:** Run `ruff format <file>` -> `ruff check <file>` -> `pytest <file>` to ensure code style compliance after finishing work on a file; Work test-driven and run pytest for changed code.
-- **Use** your **MCP tools** (upstash_context7 [get-library-docs, resolve-library-id], code-index [find_files, get_file_summary, get_file_watcher_status], github_mcp_server) to retrieve helpful context from external libraries or our own codebase when needed. `make context-dir-tree` can be used to get an overview of the project directory structure. And `make context-external` to get a summary of the `efm3d` and `atek` packages.
+- **Use** your **MCP tools**:
+  - Context7: `mcp__upstash_context7__resolve-library-id` then `mcp__upstash_context7__query-docs`
+  - Code index: `mcp__code-index__find_files`, `mcp__code-index__get_file_summary`, `mcp__code-index__search_code_advanced`
+  - GitHub: `mcp__github_github_mcp_server__*` (when working against remote repos/PRs)
+  - `make context-dir-tree` gives a current package tree snapshot; `make context-external` summarizes vendored `efm3d`/`atek` when needed.
 - **Use** your web search capabilities to find further sources (i.e. papers on arXiv, Wikipedia)
 - **Regularly** step back and think about your alignment, high-level design and implementation strategy before diving into code changes. Checking your alignment with the project goals must be done by #think-ing about the problem at hand.
 - **Always** inspect all referenced symbols or files and get an initial understanding, then #think to plan your next steps before potentially gathering additional context or making code changes.

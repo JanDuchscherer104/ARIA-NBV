@@ -1,0 +1,22 @@
+# Cache parameter update (nbv-cache-samples)
+
+- Source of truth: `.data/oracle_rri_cache/metadata.json` (offline cache metadata).
+- Candidate generation:
+  - num_samples=32, oversample_factor=2.0, max_resamples=2
+  - min_radius=0.6 m, max_radius=3.0 m
+  - min_elev_deg=-20, max_elev_deg=25, delta_azimuth_deg=170
+  - sampling_strategy=uniform_sphere, kappa=4.0
+  - min_distance_to_mesh=0.4 m
+  - view_direction_mode=radial_away, view_max_azimuth_deg=60, view_max_elevation_deg=30, view_roll_jitter_deg=0
+  - collision_backend=pytorch3d, ensure_collision_free=true, ensure_free_space=true
+  - ray_subsample=64, step_clearance=0.1 m
+- Depth rendering:
+  - max_candidates_final=32, oversample_factor=1.0
+  - renderer znear=1e-3, zfar=20, device=cuda
+  - resolution_scale not in metadata (uses default 0.5)
+  - backprojection_stride=2
+- Files updated:
+  - `docs/typst/slides/slides_4.typ`
+  - `docs/typst/paper/sections/08-system-pipeline.typ`
+- Follow-up:
+  - Verify the `Oracle label config (from cache metadata)` slide field names (num_samples vs num_candidates) if any missing keys appear.

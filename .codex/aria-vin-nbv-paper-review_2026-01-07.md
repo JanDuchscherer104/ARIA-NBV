@@ -9,6 +9,16 @@ This note records a full-draft review of `docs/typst/paper/main.typ` + included 
 - Reduced “run-ID” / file-name leakage in `docs/typst/paper/sections/09c-wandb.typ` (kept the actual metrics; removed opaque IDs).
 - Verified the Typst paper compiles cleanly (`typst compile --root docs ...`).
 
+## Follow-up: incorporated external alignment review
+
+An additional review emphasized two recurring risks: (i) silently implying a one-sided metric while the implementation uses a bidirectional accuracy+completeness decomposition, and (ii) blurring the implemented baseline vs. optional ablations. The paper was updated accordingly:
+
+- Abstract now explicitly states the bidirectional Chamfer-style surface error (accuracy + completeness) and calls out that semi-dense view conditioning is evaluated as ablations rather than implied as always-on.
+- Problem formulation includes an explicit “oracle for training, predictor for inference” statement.
+- Dataset section mentions optional visibility metadata as optional (not required by the oracle) and notes mesh preprocessing (crop/simplify/cache).
+- Coordinate section adds an explicit “EVL voxel grid contract” paragraph and frames candidate out-of-bounds as a reliability issue handled via validity signals.
+- Evaluation section now states that both accuracy and completeness use mean squared point↔triangle distances (matching the PyTorch3D distance primitives used by the oracle).
+
 ## Paper content overview (current state)
 
 - **Abstract + Index Terms (`docs/typst/paper/main.typ`)**
@@ -99,4 +109,3 @@ For Aria-VIN-NBV, the draft is strongest when it highlights the *two deltas*:
 2) Rework the Introduction’s “model module list” into 2–3 motivation-driven paragraphs.
 3) Normalize terminology (“semi-dense” vs “semidense”, “Weights & Biases” naming, etc.).
 4) Replace/resolve the main-text placeholders for the architecture overview and training curves (or move them to appendix).
-

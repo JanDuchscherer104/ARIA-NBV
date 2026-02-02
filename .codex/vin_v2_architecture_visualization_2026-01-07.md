@@ -28,6 +28,31 @@ dot -Tsvg docs/figures/vin_v2/vin_v2_arch.dot -o docs/figures/vin_v2/vin_v2_arch
 dot -Tpng docs/figures/vin_v2/vin_v2_arch.dot -o docs/figures/vin_v2/vin_v2_arch.png
 ```
 
+## Implemented tooling (shape-aware DOT + draw.io import)
+
+Added a small, iteration-friendly generator:
+
+- Script: `oracle_rri/scripts/generate_vin_v2_arch.py`
+- DOT builder: `oracle_rri/oracle_rri/vin/arch_viz.py`
+
+It runs `VinModelV2.forward_with_debug(...)` on **synthetic inputs** (no EVL checkpoint or ASE data
+required) and emits:
+
+- `*.dot` (canonical source)
+- `*.svg` / `*.png` (quick inspection)
+- `*.vdx` (Visio XML) which **draw.io can import as editable shapes**
+
+Example:
+
+```bash
+oracle_rri/.venv/bin/python oracle_rri/scripts/generate_vin_v2_arch.py \
+  --out-dir docs/figures/vin_v2 \
+  --stem vin_v2_arch_shapes \
+  --include-node-shapes \
+  --enable-sem-frustum \
+  --drawio
+```
+
 ## VIN v2 block decomposition (as implemented)
 
 High-level forward pass (`VinModelV2._forward_impl`):
@@ -74,12 +99,12 @@ Suggested approach:
    - Use Graphviz HTML-table labels and ports for dataclass-like bundles.
    - Attach edge labels from the measured shapes (or from docstring shape annotations as fallback).
 3. **(Optional) Convert DOT → draw.io** for final edits + math:
-   - Use `graphviz2drawio` (GPL-3; treat as an external tool, not a project dependency).
-   - Enable draw.io “Mathematical Typesetting” to render LaTeX in nodes.
+   - Prefer Graphviz’ built-in `dot -Tvdx` export (the script supports `--drawio`) and import the resulting `*.vdx` in draw.io as editable shapes.
+   - Enable draw.io “Mathematical Typesetting” to render LaTeX in nodes (the DOT generator keeps formulas as plain text).
 
 References:
 - Torchview (PyTorch → Graphviz): https://github.com/mert-kurttutan/torchview
-- Graphviz2drawio (DOT → draw.io XML): https://github.com/hbmartin/graphviz2drawio
+- Graphviz VDX export (DOT → VDX via `dot -Tvdx`): https://graphviz.org/docs/outputs/
 - draw.io MathJax support: https://www.drawio.com/blog/maths-in-diagrams
 - PyTorch export dataclass/pytree registration: https://pytorch.org/docs/stable/export.html
 
@@ -89,4 +114,3 @@ If a model’s `forward()` takes/returns nested dataclasses, tools usually need 
 
 - Prefer an explicit “flatten/unflatten” layer (PyTree) so tracing/export can see tensor leaves.
 - For `torch.export`, register dataclasses as PyTrees so exported signatures can preserve structure.
-

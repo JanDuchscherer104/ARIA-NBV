@@ -1,0 +1,5 @@
+# VIN diagnostics: snippet cache batching fix
+
+- Issue: VIN diagnostics built batches manually and, when using the VIN snippet cache, would fall back to full `EfmSnippetView` on missing entries. For batch sizes >1 this mixed `VinSnippetView`/`EfmSnippetView` and tripped `VinOracleBatch.collate` with `NotImplementedError`. Training uses `OracleRriCacheDataset(return_format="vin_batch")`, which never loads full EFM snippets and instead uses VIN snippet cache (or empty snippets), so it did not exhibit the issue.
+- Fix: In `oracle_rri/oracle_rri/app/panels/vin_diagnostics.py`, removed the EFM fallback for the VIN snippet cache path. Now missing entries either raise when `require_vin_snippet` is set or use an `empty_vin_snippet` with channel count derived from VIN snippet cache metadata. This keeps batched diagnostics aligned with training behavior.
+- Follow-ups: Consider surfacing a UI warning when empty snippets are used, and/or refactor diagnostics to use `OracleRriCacheDataset(return_format="vin_batch")` directly to guarantee parity with training.
