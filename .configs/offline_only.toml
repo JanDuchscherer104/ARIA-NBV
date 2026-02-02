@@ -1,5 +1,5 @@
-run_mode = "train"
-# ckpt_path = "epoch=5-step=534-train-loss=7.1604.ckpt"
+run_mode  = "train"
+ckpt_path = "epoch=20-step=1869-train-loss=6.2684.ckpt"
 [datamodule_config]
 # Offline cache usage
 num_workers        = 16
@@ -83,11 +83,14 @@ use_wandb               = true
     use_rich_model_summary  = true
     rich_summary_max_depth  = 4
 
+    # [trainer_config.wandb_config]
+    # run_id = "1wz4g6ex"
+
 [module_config]
 num_classes                    = 15
 save_binner                    = true
 binner_path                    = ".logs/vin/rri_binner.json"
-aux_regression_loss            = "huber"
+aux_regression_loss            = "none"
 aux_regression_weight          = 10.0
 aux_regression_weight_gamma    = 0.90
 aux_regression_weight_min      = 0.1
@@ -101,22 +104,22 @@ coverage_weight_strength_start = 0.6
 coverage_weight_strength_end   = 0.0
 coverage_weight_schedule       = "linear"
 coverage_weight_interval       = "epoch"
-coverage_weight_anneal_epochs  = 8
+coverage_weight_anneal_epochs  = 6
 coverage_weight_apply_aux      = true
 
     [module_config.grad_norms]
     enabled = true
 
     [module_config.optimizer]
-    learning_rate = 1.8e-4
+    learning_rate = 0.0008
     weight_decay  = 0.013244782071249196
 
     [module_config.lr_scheduler]
-    factor         = 0.2
+    factor         = 0.4
     patience       = 2
     threshold      = 1e-3
     threshold_mode = "rel"
-    cooldown       = 0
+    cooldown       = 1
     min_lr         = 8e-7
     monitor        = "val/loss"
     interval       = "epoch"
@@ -134,11 +137,11 @@ coverage_weight_apply_aux      = true
     # final_div_factor = 316
 
     [module_config.vin]
-    # VIN v3 (VIN-Core) knobs
+    # VINv3 (VIN-Core) knobs
     num_classes = 15
     head_hidden_dim = 192
     head_num_layers = 2
-    head_dropout = 0.071317082333434145
+    head_dropout = 0.031317082333434145
     coral_preinit_bias = true
     field_dim = 24
     field_gn_groups = 7

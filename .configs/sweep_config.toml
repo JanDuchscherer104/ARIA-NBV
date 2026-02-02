@@ -51,7 +51,7 @@ use_train_as_val   = false
             cache_dir = "vin_snippet_cache"
 
 [optuna_config]
-study_name = "vin-v2-sweep"
+study_name = "vin-v2-sweep-2"
 # minimize training coral loss slope proxy
 monitor  = "val/coral_loss_rel_random"
 n_trials = 10
@@ -112,7 +112,7 @@ coverage_weight_anneal_epochs  = 3
 coverage_weight_apply_aux      = true
 
     [module_config.optimizer]
-    learning_rate = 3e-4
+    learning_rate = 2e-4
     weight_decay  = 1e-3
 
     [module_config.lr_scheduler]

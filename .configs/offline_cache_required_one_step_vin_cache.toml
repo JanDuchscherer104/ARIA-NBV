@@ -123,21 +123,21 @@ pruner     = "median"
 
     [module_config.vin]
     # VIN v2 core knobs
-    num_classes = 15
+    num_classes     = 15
     head_hidden_dim = 192
     head_num_layers = 3
-    head_dropout = 0.05
-    head_activation = "gelu"
-    coral_preinit_bias = true
-    field_dim = 16
-    field_gn_groups = 4
+    head_dropout    = 0.05
+    # head_activation = "gelu"
+    coral_preinit_bias    = true
+    field_dim             = 16
+    field_gn_groups       = 4
     apply_cw90_correction = true
     global_pool_grid_size = 6
-    enable_semidense_frustum = true
-    semidense_include_obs_count = true
-    use_point_encoder = false
+    # enable_semidense_frustum = true
+    # semidense_include_obs_count = true
+    # use_point_encoder = false
     use_traj_encoder = true
-    use_voxel_valid_frac_feature = true
+    # use_voxel_valid_frac_feature = true
     scene_field_channels = [
         "occ_pr",
         "occ_input",
@@ -185,19 +185,19 @@ pruner     = "median"
         # freeze          = true
         # strict_load     = false
 
-        [module_config.vin.traj_encoder]
-        pool_mode = "mean"
+        # [module_config.vin.traj_encoder]
+        # pool_mode = "mean"
 
-            [module_config.vin.traj_encoder.pose_encoder]
-            kind                 = "r6d_lff"
-            pose_scale_init      = [1.0, 1.0]
-            pose_scale_learnable = true
-            pose_scale_eps       = 1e-6
+        #     [module_config.vin.traj_encoder.pose_encoder]
+        #     kind                 = "r6d_lff"
+        #     pose_scale_init      = [1.0, 1.0]
+        #     pose_scale_learnable = true
+        #     pose_scale_eps       = 1e-6
 
-                [module_config.vin.traj_encoder.pose_encoder.pose_encoder_lff]
-                input_dim     = 9
-                fourier_dim   = 64
-                hidden_dim    = 128
-                output_dim    = 32
-                gamma         = 1.0
-                include_input = false
+        #         [module_config.vin.traj_encoder.pose_encoder.pose_encoder_lff]
+        #         input_dim     = 9
+        #         fourier_dim   = 64
+        #         hidden_dim    = 128
+        #         output_dim    = 32
+        #         gamma         = 1.0
+        #         include_input = false
