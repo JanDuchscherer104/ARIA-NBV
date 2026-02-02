@@ -1035,10 +1035,11 @@ def build_geometry_overview_figure(
     mark_first_last: bool = True,
     candidate_pose_mode: Literal["ref_rig", "world_cam", "rig"] = "ref_rig",
     candidate_poses_world_cam: PoseTW | None = None,
-    candidate_color_mode: Literal["valid_fraction", "solid", "loss"] = "valid_fraction",
+    candidate_color_mode: Literal["valid_fraction", "solid", "scalar"] = "valid_fraction",
     candidate_color: str = "#ffd966",
     candidate_colorscale: str = "Viridis",
-    candidate_loss: torch.Tensor | None = None,
+    candidate_color_values: torch.Tensor | None = None,
+    candidate_color_title: str = "value",
     candidate_frusta_indices: list[int] | None = None,
     candidate_frusta_camera: str = "rgb",
     candidate_frusta_frame_index: int | None = None,
@@ -1203,16 +1204,12 @@ def build_geometry_overview_figure(
         valid_frac = valid_frac.reshape(-1)
         color_values = valid_frac
         color_title = "valid frac"
-        if candidate_color_mode == "loss" and candidate_loss is not None:
-            color_values = candidate_loss.to(device=centers_world.device).reshape(-1)
-            color_values = torch.nan_to_num(
-                color_values,
-                nan=0.0,
-                posinf=0.0,
-                neginf=0.0,
-            )
-            color_title = "loss"
+        if candidate_color_mode == "scalar" and candidate_color_values is not None:
+            color_values = candidate_color_values.to(device=centers_world.device).reshape(-1)
+            color_title = str(candidate_color_title)
         finite = torch.isfinite(centers_world).all(dim=-1)
+        if candidate_color_mode != "solid":
+            finite = finite & torch.isfinite(color_values)
         centers_world = centers_world[finite]
         valid_frac = valid_frac[finite]
         if candidate_color_mode != "solid":

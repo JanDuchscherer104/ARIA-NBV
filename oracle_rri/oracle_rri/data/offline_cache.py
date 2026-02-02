@@ -22,7 +22,7 @@ from pydantic import Field, ValidationInfo, field_validator
 from torch.utils.data import Dataset
 
 from ..configs import PathConfig
-from ..pipelines.oracle_rri_labeler import OracleRriLabelBatch, OracleRriLabelerConfig
+from ..pipelines.oracle_rri_labeler import OracleRriLabelerConfig, OracleRriSample
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rri_metrics.types import RriResult
 from ..utils import BaseConfig, Console, Verbosity
@@ -385,7 +385,7 @@ def _ensure_train_val_split(
 
 # ----------------------------------------------------------------------------- Cache IO helpers
 def build_cache_payload(
-    label_batch: OracleRriLabelBatch,
+    label_batch: OracleRriSample,
     *,
     backbone_out: EvlBackboneOutput | None,
     include_backbone: bool,
@@ -576,7 +576,7 @@ class OracleRriCacheWriter:
 
     def _encode_sample(
         self,
-        label_batch: OracleRriLabelBatch,
+        label_batch: OracleRriSample,
         *,
         backbone_out: EvlBackboneOutput | None,
     ) -> dict[str, Any]:

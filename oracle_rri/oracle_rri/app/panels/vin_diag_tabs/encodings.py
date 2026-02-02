@@ -97,7 +97,7 @@ def render_encodings_tab(ctx: VinDiagContext) -> None:
                     key=f"vin_plot_actual_{label}",
                 )
     else:
-        st.caption("VIN v2 positional encodings (pose grid + LFF pose encoder).")
+        st.caption("VIN v2/v3 positional encodings (pose grid + LFF pose encoder).")
         vin_model = state.module.vin if state.module is not None else None
         if vin_model is None:
             st.info("VIN model not available.")
@@ -341,18 +341,25 @@ def render_encodings_tab(ctx: VinDiagContext) -> None:
                                     st.plotly_chart(fig_enc, width="stretch")
 
             try:
-                field_in = debug.field_in
+                pos_grid = getattr(debug, "pos_grid", None)
+                if pos_grid is None:
+                    field_in = debug.field_in
+                    grid_shape = (
+                        int(field_in.shape[-3]),
+                        int(field_in.shape[-2]),
+                        int(field_in.shape[-1]),
+                    )
+                    pos_grid = vin_model._pos_grid_from_pts_world(
+                        debug.backbone_out.pts_world,
+                        t_world_voxel=debug.backbone_out.t_world_voxel,
+                        pose_world_rig_ref=batch.reference_pose_world_rig,
+                        voxel_extent=debug.backbone_out.voxel_extent,
+                        grid_shape=grid_shape,
+                    )
                 grid_shape = (
-                    int(field_in.shape[-3]),
-                    int(field_in.shape[-2]),
-                    int(field_in.shape[-1]),
-                )
-                pos_grid = vin_model._pos_grid_from_pts_world(
-                    debug.backbone_out.pts_world,
-                    t_world_voxel=debug.backbone_out.t_world_voxel,
-                    pose_world_rig_ref=batch.reference_pose_world_rig,
-                    voxel_extent=debug.backbone_out.voxel_extent,
-                    grid_shape=grid_shape,
+                    int(pos_grid.shape[-3]),
+                    int(pos_grid.shape[-2]),
+                    int(pos_grid.shape[-1]),
                 )
                 axis = st.selectbox(
                     "Grid axis",

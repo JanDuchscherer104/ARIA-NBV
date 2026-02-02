@@ -6,10 +6,16 @@ import traceback
 from pathlib import Path
 
 import streamlit as st
+import torch
 
 from ...configs import PathConfig
 from ...data import VinOracleBatch
-from ...data.vin_snippet_cache import VinSnippetCacheConfig, VinSnippetCacheDatasetConfig
+from ...data.vin_snippet_cache import (
+    VinSnippetCacheConfig,
+    VinSnippetCacheDatasetConfig,
+    read_vin_snippet_cache_metadata,
+)
+from ...data.vin_snippet_utils import empty_vin_snippet
 from ...utils import Stage
 from ..state import VIN_DIAG_STATE_KEY, get_vin_state
 from ..state_types import config_signature
@@ -19,6 +25,7 @@ from .offline_cache_utils import (
 )
 from .vin_diag_tabs import (
     VinDiagContext,
+    render_bin_values_tab,
     render_coral_tab,
     render_encodings_tab,
     render_evidence_tab,
@@ -32,7 +39,6 @@ from .vin_diag_tabs import (
 from .vin_utils import (
     _build_experiment_config,
     _has_backbone_obbs,
-    _load_vin_module_from_checkpoint,
     _run_vin_debug,
     _should_fetch_vin_snippet,
     _vin_oracle_batch_from_cache,
@@ -73,24 +79,6 @@ def render_vin_diagnostics_page() -> None:
         )
         toml_path = None if toml_choice == "(none)" else str(config_dir / toml_choice)
 
-        ckpt_dir = paths.checkpoints
-        ckpt_paths = sorted(
-            ckpt_dir.glob("*.ckpt"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        use_checkpoint = st.checkbox("Use checkpoint", value=False)
-        ckpt_path = None
-        if use_checkpoint:
-            if ckpt_paths:
-                ckpt_choice = st.selectbox(
-                    "Checkpoint",
-                    options=[path.name for path in ckpt_paths],
-                    index=0,
-                )
-                ckpt_path = ckpt_dir / ckpt_choice
-            else:
-                st.info(f"No checkpoints found in {ckpt_dir}.")
         data_source = st.selectbox(
             "Data source",
             options=["offline cache", "online (oracle labeler)"],
@@ -188,6 +176,10 @@ def render_vin_diagnostics_page() -> None:
             cache_ds = None
         cache_len = int(state.offline_cache_len or 0)
         if cache_len > 0:
+            if "vin_cache_index" not in st.session_state:
+                st.session_state["vin_cache_index"] = int(state.offline_cache_idx)
+            elif int(st.session_state["vin_cache_index"]) > max(0, cache_len - 1):
+                st.session_state["vin_cache_index"] = max(0, cache_len - 1)
             advance = st.sidebar.button("Next cached batch")
             if advance:
                 step = max(int(batch_size), 1)
@@ -198,7 +190,6 @@ def render_vin_diagnostics_page() -> None:
                 "Cache index",
                 min_value=0,
                 max_value=max(0, cache_len - 1),
-                value=int(state.offline_cache_idx),
                 step=1,
                 key="vin_cache_index",
             )
@@ -209,14 +200,6 @@ def render_vin_diagnostics_page() -> None:
 
     if run:
         try:
-            resolved_ckpt = None
-            if use_checkpoint and ckpt_path is not None:
-                try:
-                    resolved_ckpt = PathConfig().resolve_checkpoint_path(ckpt_path)
-                except Exception as exc:  # pragma: no cover - IO guard
-                    st.sidebar.error(f"{type(exc).__name__}: {exc}")
-                    resolved_ckpt = None
-
             include_efm_snippet = snippet_source == "OracleRriCacheDataset (EFM)"
             cfg = _build_experiment_config(
                 toml_path=toml_path,
@@ -227,8 +210,6 @@ def render_vin_diagnostics_page() -> None:
                 include_gt_mesh=include_gt_mesh,
             )
             cfg_sig = config_signature(cfg)
-            if resolved_ckpt is not None:
-                cfg_sig = f"{cfg_sig}|ckpt:{resolved_ckpt}"
 
             if state.cfg_sig != cfg_sig or state.module is None or state.datamodule is None:
                 trainer, module, datamodule = cfg.setup_target(setup_stage=stage)
@@ -237,13 +218,18 @@ def render_vin_diagnostics_page() -> None:
                 state.experiment = cfg
                 state.module = module
                 state.datamodule = datamodule
-            if resolved_ckpt is not None:
-                state.module = _load_vin_module_from_checkpoint(
-                    checkpoint_path=resolved_ckpt,
-                    device="cpu",
-                )
 
             assert state.module is not None and state.datamodule is not None
+            if getattr(state.module, "_binner", None) is None and hasattr(state.module, "_load_binner_from_config"):
+                try:
+                    state.module._binner = state.module._load_binner_from_config()  # type: ignore[attr-defined]
+                except Exception as exc:  # pragma: no cover - diagnostics guard
+                    st.sidebar.warning(f"Failed to load RRI binner: {type(exc).__name__}: {exc}")
+            try:
+                if hasattr(state.module, "_maybe_init_bin_values"):
+                    state.module._maybe_init_bin_values()  # type: ignore[attr-defined]
+            except Exception as exc:  # pragma: no cover - diagnostics guard
+                st.sidebar.warning(f"Failed to init CORAL bin values: {type(exc).__name__}: {exc}")
             with st.spinner("Running oracle labeler + VIN forward..."):
                 if use_offline_cache:
                     if cache_ds is None:
@@ -259,6 +245,7 @@ def render_vin_diagnostics_page() -> None:
                     stripped_obbs = False
 
                     vin_snippet_ds = None
+                    vin_snippet_extra_dim: int | None = None
                     use_vin_snippet_cache = snippet_source == "VinSnippetCacheDataset"
                     should_fetch_vin_snippet = _should_fetch_vin_snippet(
                         use_vin_snippet_cache=use_vin_snippet_cache,
@@ -280,6 +267,11 @@ def render_vin_diagnostics_page() -> None:
                             cache=VinSnippetCacheConfig(cache_dir=vin_cache_path, paths=paths),
                             map_location="cpu",
                         )
+                        try:
+                            meta = read_vin_snippet_cache_metadata(vin_cfg.cache.metadata_path)
+                            vin_snippet_extra_dim = int(meta.include_inv_dist_std) + int(meta.include_obs_count)
+                        except FileNotFoundError:
+                            vin_snippet_extra_dim = None
                         vin_sig = config_signature(vin_cfg)
                         if state.vin_snippet_cache_sig != vin_sig or state.vin_snippet_cache is None:
                             vin_snippet_ds = vin_cfg.setup_target()
@@ -311,29 +303,19 @@ def render_vin_diagnostics_page() -> None:
                                     if require_vin_snippet:
                                         raise RuntimeError(missing_msg)
                             if vin_snippet is None:
-                                if batch_size > 1 and missing_msg is not None:
-                                    raise RuntimeError(
-                                        f"{missing_msg} (batching requires VIN snippet cache)",
-                                    )
-                                try:
-                                    paths = cfg.paths if isinstance(cfg.paths, PathConfig) else PathConfig()
-                                    snippet_view = _load_efm_snippet_for_cache(
-                                        scene_id=cache_sample.scene_id,
-                                        snippet_id=cache_sample.snippet_id,
-                                        dataset_payload=cache_ds.metadata.dataset_config,
-                                        device="cpu",
-                                        paths=paths,
-                                        include_gt_mesh=include_gt_mesh,
-                                    )
-                                    if missing_msg is not None:
-                                        state.offline_snippet_error = f"{missing_msg} (fallback to EFM snippet)"
-                                    else:
-                                        state.offline_snippet_error = None
-                                except Exception as exc:  # pragma: no cover - IO guard
-                                    msg = f"{type(exc).__name__}: {exc}"
-                                    if missing_msg is not None:
-                                        msg = f"{missing_msg} (fallback failed: {exc})"
-                                    raise RuntimeError(msg) from exc
+                                msg = missing_msg or (
+                                    "VIN snippet cache is unavailable for this sample; "
+                                    "ensure the cache is built for the selected split."
+                                )
+                                if require_vin_snippet:
+                                    raise RuntimeError(msg)
+                                if vin_snippet_extra_dim is None:
+                                    vin_snippet_extra_dim = 2
+                                snippet_view = empty_vin_snippet(
+                                    torch.device("cpu"),
+                                    extra_dim=vin_snippet_extra_dim,
+                                )
+                                state.offline_snippet_error = f"{msg} (using empty VIN snippet)"
                             else:
                                 snippet_view = vin_snippet
                                 state.offline_snippet_error = None
@@ -472,6 +454,7 @@ def render_vin_diagnostics_page() -> None:
         tab_transforms,
         tab_concept,
         tab_coral,
+        tab_bin_values,
     ) = st.tabs(
         [
             "Summary",
@@ -483,6 +466,7 @@ def render_vin_diagnostics_page() -> None:
             "Transforms",
             "FF Encodings",
             "CORAL / Ordinal",
+            "Bin Values",
         ],
     )
 
@@ -526,3 +510,6 @@ def render_vin_diagnostics_page() -> None:
 
     with tab_coral:
         render_coral_tab(ctx)
+
+    with tab_bin_values:
+        render_bin_values_tab(ctx)

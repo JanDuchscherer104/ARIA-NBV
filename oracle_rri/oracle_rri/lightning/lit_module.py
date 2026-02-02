@@ -150,6 +150,11 @@ class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
     coverage_weight_apply_aux: bool = True
     """Whether to apply coverage weights to the auxiliary regression loss."""
 
+    @field_validator("aux_regression_loss", mode="before")
+    @classmethod
+    def _validate_aux_regression_loss(cls, value: Any) -> Any:
+        return None if value is None or value in ("", "none", "None") else value
+
     @field_validator("log_interval_steps")
     @classmethod
     def _validate_log_interval_steps(cls, value: int | None) -> int | None:

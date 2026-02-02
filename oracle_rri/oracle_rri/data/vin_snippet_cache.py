@@ -311,8 +311,19 @@ def _read_metadata(path: Path) -> VinSnippetCacheMetadata:
 
 
 def read_vin_snippet_cache_metadata(path: Path) -> VinSnippetCacheMetadata:
-    """Public helper to read VIN snippet cache metadata."""
-    return _read_metadata(path)
+    """Read VIN snippet cache metadata.
+
+    Args:
+        path: Either the metadata JSON path or the cache directory containing it.
+
+    Returns:
+        Parsed VIN snippet cache metadata payload.
+    """
+
+    meta_path = path
+    if meta_path.is_dir():
+        meta_path = meta_path / "metadata.json"
+    return _read_metadata(meta_path)
 
 
 def migrate_vin_snippet_cache_inplace(

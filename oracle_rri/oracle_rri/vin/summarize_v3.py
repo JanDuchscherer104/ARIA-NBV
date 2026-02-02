@@ -11,6 +11,7 @@ from efm3d.aria.aria_constants import (
 from torch.nn import functional as functional
 
 from ..data.efm_views import EfmSnippetView, VinSnippetView
+from ..rri_metrics.coral import coral_monotonicity_violation_rate
 from ..utils import Console
 from ..utils.rich_summary import rich_summary, summarize
 
@@ -26,6 +27,56 @@ def summarize_vin_v3(
     include_torchsummary: bool = True,
     torchsummary_depth: int = 3,
 ) -> str:
+    def _finite_1d(values: torch.Tensor) -> torch.Tensor:
+        flat = values.detach().reshape(-1).to(dtype=torch.float32)
+        return flat[torch.isfinite(flat)]
+
+    def _pearson_corr(x: torch.Tensor, y: torch.Tensor) -> float | None:
+        x_f = _finite_1d(x)
+        y_f = _finite_1d(y)
+        num = min(int(x_f.numel()), int(y_f.numel()))
+        if num < 2:
+            return None
+        x_f = x_f[:num]
+        y_f = y_f[:num]
+        x_f = x_f - x_f.mean()
+        y_f = y_f - y_f.mean()
+        denom = x_f.std(unbiased=False) * y_f.std(unbiased=False)
+        if float(denom.item()) < 1e-12:
+            return None
+        return float((x_f * y_f).mean().item() / denom.item())
+
+    def _rankdata(x: torch.Tensor) -> torch.Tensor:
+        order = torch.argsort(x)
+        ranks = torch.empty_like(order, dtype=torch.float32)
+        ranks[order] = torch.arange(order.numel(), device=order.device, dtype=torch.float32)
+        return ranks
+
+    def _spearman_corr(x: torch.Tensor, y: torch.Tensor) -> float | None:
+        x_f = _finite_1d(x)
+        y_f = _finite_1d(y)
+        num = min(int(x_f.numel()), int(y_f.numel()))
+        if num < 2:
+            return None
+        x_f = x_f[:num]
+        y_f = y_f[:num]
+        return _pearson_corr(_rankdata(x_f), _rankdata(y_f))
+
+    def _q_stats(x: torch.Tensor) -> dict[str, float] | None:
+        x_f = _finite_1d(x)
+        if x_f.numel() == 0:
+            return None
+        qs = torch.quantile(
+            x_f,
+            torch.tensor([0.0, 0.5, 0.95], device=x_f.device, dtype=x_f.dtype),
+        )
+        return {
+            "min": float(qs[0].item()),
+            "median": float(qs[1].item()),
+            "p95": float(qs[2].item()),
+            "mean": float(x_f.mean().item()),
+        }
+
     def _capture_tree(tree) -> str:
         console = Console()
         with console.capture() as capture:
@@ -77,11 +128,24 @@ def summarize_vin_v3(
     if snippet_view is None:
         efm_summary = {"note": "cached batch (raw EFM inputs unavailable)"}
     elif isinstance(snippet_view, VinSnippetView):
+        points_world = snippet_view.points_world
+        points_mask = torch.isfinite(points_world[..., :3]).all(dim=-1)
+        valid_points = int(points_mask.sum().item())
+        total_points = int(points_mask.numel())
+        inv_dist_std_stats = None
+        obs_count_stats = None
+        if points_world.shape[-1] >= 4:
+            inv_dist_std_stats = _q_stats(points_world[..., 3][points_mask])
+        if points_world.shape[-1] >= 5:
+            obs_count_stats = _q_stats(points_world[..., 4][points_mask])
         efm_summary = {
             "note": "VIN snippet cache (no raw EFM inputs)",
-            "vin_snippet.points_world": summarize(snippet_view.points_world),
-            "vin_snippet.lengths": summarize(snippet_view.lengths),
+            "vin_snippet.points_world": summarize(snippet_view.points_world, include_stats=True),
+            "vin_snippet.lengths": summarize(snippet_view.lengths, include_stats=True),
             "vin_snippet.t_world_rig": summarize(snippet_view.t_world_rig.tensor()),
+            "vin_snippet.valid_points": f"{valid_points}/{total_points}",
+            "vin_snippet.inv_dist_std": inv_dist_std_stats,
+            "vin_snippet.obs_count": obs_count_stats,
         }
     else:
         efm_summary = {
@@ -121,16 +185,21 @@ def summarize_vin_v3(
             backbone_summary[key] = summarize(value)
 
     feature_summary = {
-        "field_in": summarize(debug.field_in),
-        "field": summarize(debug.field),
-        "global_feat": summarize(debug.global_feat),
-        "concat_feats": summarize(debug.feats),
+        "field_in": summarize(debug.field_in, include_stats=True),
+        "field": summarize(debug.field, include_stats=True),
+        "global_feat": summarize(debug.global_feat, include_stats=True),
+        "concat_feats": summarize(debug.feats, include_stats=True),
     }
     if debug.pos_grid is not None:
-        feature_summary["pos_grid"] = summarize(debug.pos_grid)
+        feature_summary["pos_grid"] = summarize(debug.pos_grid, include_stats=True)
     if debug.semidense_proj is not None:
         feature_summary["semidense_proj"] = summarize(
             debug.semidense_proj,
+            include_stats=True,
+        )
+    if debug.semidense_grid_feat is not None:
+        feature_summary["semidense_grid_feat"] = summarize(
+            debug.semidense_grid_feat,
             include_stats=True,
         )
     if debug.voxel_proj is not None:
@@ -148,6 +217,39 @@ def summarize_vin_v3(
     if debug.traj_pose_enc is not None:
         traj_summary["traj_pose_enc"] = summarize(debug.traj_pose_enc, include_stats=True)
 
+    expected_rri = None
+    if getattr(self.head_coral, "has_bin_values", False):
+        try:
+            expected_rri = self.head_coral.expected_from_probs(pred.prob)
+        except Exception:
+            expected_rri = None
+    entropy = None
+    try:
+        prob = pred.prob.clamp_min(1e-12)
+        entropy = (-prob * torch.log(prob)).sum(dim=-1)
+    except Exception:
+        entropy = None
+    monotonicity = coral_monotonicity_violation_rate(pred.logits)
+
+    candidate_radius = torch.linalg.vector_norm(debug.candidate_center_rig_m, dim=-1)
+    candidate_valid_rate = float(pred.candidate_valid.to(dtype=torch.float32).mean().item())
+    metrics_dict: dict[str, Any] = {
+        "candidate_valid_rate": candidate_valid_rate,
+        "candidate_radius_m": _q_stats(candidate_radius),
+        "voxel_valid_frac": _q_stats(pred.voxel_valid_frac) if pred.voxel_valid_frac is not None else None,
+        "semidense_candidate_vis_frac": (
+            _q_stats(pred.semidense_candidate_vis_frac) if pred.semidense_candidate_vis_frac is not None else None
+        ),
+        "coral_monotonicity_violation_rate": _q_stats(monotonicity),
+        "coral_entropy": _q_stats(entropy) if entropy is not None else None,
+    }
+    if batch.rri is not None:
+        corr = {
+            "pearson": _pearson_corr(batch.rri, pred.expected_normalized),
+            "spearman": _spearman_corr(batch.rri, pred.expected_normalized),
+        }
+        metrics_dict["oracle_rri_vs_expected_normalized"] = corr
+
     summary_dict = {
         "meta": {
             "scene_id": batch.scene_id,
@@ -155,6 +257,7 @@ def summarize_vin_v3(
             "device": str(debug.candidate_center_rig_m.device),
             "candidates": summarize(batch.candidate_poses_world_cam),
         },
+        "metrics": metrics_dict,
         "efm": efm_summary,
         "backbone": backbone_summary,
         "pose": {
@@ -174,16 +277,11 @@ def summarize_vin_v3(
                 pred.expected_normalized,
                 include_stats=True,
             ),
+            "expected_rri": summarize(expected_rri, include_stats=True),
             "candidate_valid": summarize(pred.candidate_valid),
             "voxel_valid_frac": summarize(pred.voxel_valid_frac, include_stats=True),
-            "semidense_candidate_vis_frac": summarize(
-                getattr(pred, "semidense_candidate_vis_frac", pred.semidense_valid_frac),
-                include_stats=True,
-            ),
-            "semidense_valid_frac": summarize(
-                getattr(pred, "semidense_candidate_vis_frac", pred.semidense_valid_frac),
-                include_stats=True,
-            ),
+            "semidense_candidate_vis_frac": summarize(pred.semidense_candidate_vis_frac, include_stats=True),
+            "semidense_valid_frac": summarize(pred.semidense_valid_frac, include_stats=True),
         },
     }
     if traj_summary:
@@ -206,6 +304,58 @@ def summarize_vin_v3(
         f"Trainable VIN params: {trainable_params:,} (vin total params: {total_params:,}; EVL frozen not counted)",
     )
     lines.append("")
+
+    def _add_candidate_table(title: str, indices: torch.Tensor, *, batch_idx: int) -> None:
+        def _get_scalar(values: torch.Tensor | None, b: int, n: int) -> float:
+            if values is None:
+                return float("nan")
+            if values.ndim == 1:
+                return float(values[n].item())
+            if values.ndim == 2:
+                return float(values[b, n].item())
+            return float(values.reshape(-1)[n].item())
+
+        def _get_bool(values: torch.Tensor, b: int, n: int) -> bool:
+            if values.ndim == 1:
+                return bool(values[n].item())
+            if values.ndim == 2:
+                return bool(values[b, n].item())
+            return bool(values.reshape(-1)[n].item())
+
+        lines.append(title)
+        header = "idx  expected  exp_rri    vox   sem   rad_m  valid"
+        if batch.rri is not None:
+            header += "  oracle_rri"
+        lines.append(header)
+        for idx in indices.tolist():
+            expected = _get_scalar(pred.expected_normalized, batch_idx, idx)
+            vox_val = _get_scalar(pred.voxel_valid_frac, batch_idx, idx)
+            sem_val = _get_scalar(pred.semidense_candidate_vis_frac, batch_idx, idx)
+            rad = _get_scalar(candidate_radius, batch_idx, idx)
+            valid = _get_bool(pred.candidate_valid, batch_idx, idx)
+            exp_rri_val = float("nan")
+            if expected_rri is not None:
+                exp_rri_val = _get_scalar(expected_rri, batch_idx, idx)
+            row = f"{idx:3d}  {expected:7.3f}  {exp_rri_val:7.4f}  {vox_val:5.2f}  {sem_val:5.2f}  {rad:5.2f}  {valid!s:>5}"
+            if batch.rri is not None:
+                oracle_val = _get_scalar(batch.rri, batch_idx, idx)
+                row += f"  {oracle_val:9.4f}"
+            lines.append(row)
+        lines.append("")
+
+    batch_size = int(pred.expected_normalized.shape[0]) if pred.expected_normalized.ndim == 2 else 1
+    num_candidates = int(pred.expected_normalized.shape[1]) if pred.expected_normalized.ndim == 2 else 0
+    if batch_size > 0 and num_candidates > 0:
+        max_show_batches = min(batch_size, 2)
+        k = min(8, num_candidates)
+        for b in range(max_show_batches):
+            scores = pred.expected_normalized[b]
+            topk = torch.topk(scores, k=k, largest=True).indices
+            bottomk = torch.topk(scores, k=k, largest=False).indices
+            lines.append(f"Candidate ranking (batch {b})")
+            lines.append("")
+            _add_candidate_table(f"Top-{k} by expected_normalized:", topk, batch_idx=b)
+            _add_candidate_table(f"Bottom-{k} by expected_normalized:", bottomk, batch_idx=b)
 
     if include_torchsummary:
         from torchsummary import summary as torch_summary

@@ -48,7 +48,7 @@ def _first_mesh_sample() -> EfmSnippetView:
 
 
 def test_render_and_backproject_pixel_signs_real() -> None:
-    """A pixel to the right of cx must backproject to +X in the camera frame (real data)."""
+    """A pixel to the right of cx backprojects to -X in the camera frame (P3D NDC)."""
 
     sample = _first_mesh_sample()
     device = torch.device("cpu")
@@ -116,5 +116,5 @@ def test_render_and_backproject_pixel_signs_real() -> None:
 
     assert pt_cam_right[2].item() > 0
     assert pt_cam_left[2].item() > 0
-    assert pt_cam_right[0].item() > 0, "Pixel right of cx should map to +X (camera right)."
-    assert pt_cam_left[0].item() < 0, "Pixel left of cx should map to -X (camera left)."
+    assert pt_cam_right[0].item() < 0, "Pixel right of cx should map to -X (P3D NDC convention)."
+    assert pt_cam_left[0].item() > 0, "Pixel left of cx should map to +X (P3D NDC convention)."

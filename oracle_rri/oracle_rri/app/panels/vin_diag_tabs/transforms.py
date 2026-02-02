@@ -6,13 +6,13 @@ import streamlit as st
 
 from ....vin.experimental.plotting import build_prediction_alignment_figure
 from ....vin.plotting import (
+    _to_numpy,
     build_pos_grid_linearity_figure,
     build_se3_closure_figure,
     build_voxel_inbounds_figure,
     build_voxel_roundtrip_figure,
 )
 from ..common import _info_popover
-from ....vin.plotting import _to_numpy
 from .context import VinDiagContext
 
 
@@ -71,21 +71,23 @@ def render_transforms_tab(ctx: VinDiagContext) -> None:
         width="stretch",
     )
     vin_model = state.module.vin if state.module is not None else None
-    if vin_model is not None and hasattr(vin_model, "_pos_grid_from_pts_world"):
+    pos_grid = getattr(debug, "pos_grid", None)
+    if pos_grid is not None or (vin_model is not None and hasattr(vin_model, "_pos_grid_from_pts_world")):
         try:
-            field_in = debug.field_in
-            grid_shape = (
-                int(field_in.shape[-3]),
-                int(field_in.shape[-2]),
-                int(field_in.shape[-1]),
-            )
-            pos_grid = vin_model._pos_grid_from_pts_world(
-                debug.backbone_out.pts_world,
-                t_world_voxel=debug.backbone_out.t_world_voxel,
-                pose_world_rig_ref=batch.reference_pose_world_rig,
-                voxel_extent=debug.backbone_out.voxel_extent,
-                grid_shape=grid_shape,
-            )
+            if pos_grid is None:
+                field_in = debug.field_in
+                grid_shape = (
+                    int(field_in.shape[-3]),
+                    int(field_in.shape[-2]),
+                    int(field_in.shape[-1]),
+                )
+                pos_grid = vin_model._pos_grid_from_pts_world(  # type: ignore[union-attr]
+                    debug.backbone_out.pts_world,
+                    t_world_voxel=debug.backbone_out.t_world_voxel,
+                    pose_world_rig_ref=batch.reference_pose_world_rig,
+                    voxel_extent=debug.backbone_out.voxel_extent,
+                    grid_shape=grid_shape,
+                )
             _info_popover(
                 "pos grid linearity",
                 "Fits an affine map from voxel coordinates to pos_grid values "
@@ -94,7 +96,7 @@ def render_transforms_tab(ctx: VinDiagContext) -> None:
             )
             st.plotly_chart(
                 build_pos_grid_linearity_figure(
-                    pos_grid,
+                    pos_grid,  # type: ignore[arg-type]
                     debug.backbone_out.voxel_extent,
                 ),
                 width="stretch",

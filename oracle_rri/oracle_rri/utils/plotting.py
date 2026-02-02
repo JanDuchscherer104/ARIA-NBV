@@ -89,6 +89,8 @@ def _histogram_overlay(
     title: str,
     xaxis_title: str,
     log1p_counts: bool,
+    log_x: bool = False,
+    log_x_epsilon: float = 1e-12,
     pretty_label: callable | None = None,
 ) -> go.Figure:
     all_vals: list[np.ndarray] = []
@@ -100,18 +102,39 @@ def _histogram_overlay(
     if not all_vals:
         return go.Figure()
 
-    edges = np.histogram_bin_edges(np.concatenate(all_vals, axis=0), bins=int(bins))
-    centers = 0.5 * (edges[:-1] + edges[1:])
+    merged = np.concatenate(all_vals, axis=0)
+    if log_x:
+        merged = merged[np.isfinite(merged)]
+        merged_pos = merged[merged > 0.0]
+        if merged_pos.size == 0:
+            return go.Figure()
+        vmin = float(np.nanmin(merged_pos))
+        vmax = float(np.nanmax(merged_pos))
+        eps = float(max(log_x_epsilon, vmin * 0.5))
+        vmin = max(vmin, eps)
+        vmax = max(vmax, vmin * (1.0 + 1e-6))
+        edges = np.logspace(np.log10(vmin), np.log10(vmax), num=int(bins) + 1)
+        centers = np.sqrt(edges[:-1] * edges[1:])
+        widths = np.diff(edges)
+    else:
+        edges = np.histogram_bin_edges(merged, bins=int(bins))
+        centers = 0.5 * (edges[:-1] + edges[1:])
+        widths = None
 
     label_fn = pretty_label if callable(pretty_label) else (lambda x: x)
     fig = go.Figure()
     for name, values in series:
         vals = np.asarray(values, dtype=float).reshape(-1)
         vals = vals[np.isfinite(vals)]
+        if log_x:
+            vals = np.clip(vals, eps, None)
         counts, _ = np.histogram(vals, bins=edges)
         y = np.log1p(counts) if log1p_counts else counts
+        bar_kwargs: dict[str, Any] = {"x": centers, "y": y, "name": label_fn(name), "opacity": 0.6}
+        if widths is not None:
+            bar_kwargs["width"] = widths
         fig.add_trace(
-            go.Bar(x=centers, y=y, name=label_fn(name), opacity=0.6),
+            go.Bar(**bar_kwargs),
         )
     fig.update_layout(
         barmode="overlay",
@@ -119,6 +142,8 @@ def _histogram_overlay(
         xaxis_title=label_fn(xaxis_title),
         yaxis_title=label_fn("log1p(count)" if log1p_counts else "count"),
     )
+    if log_x:
+        fig.update_xaxes(type="log")
     return fig
 
 

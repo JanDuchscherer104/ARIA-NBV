@@ -15,8 +15,8 @@ class SceneMetadata:
     has_gt_mesh: bool
     mesh_url: str | None
     mesh_sha: str | None
-    snippet_count: int
-    snippet_ids: list[str]
+    shard_count: int
+    shard_ids: list[str]
     atek_config: str
     total_frames: int
 
@@ -39,10 +39,10 @@ class ASEMetadata:
         self._parse()
 
     def _maybe_store(self, scene_id: str, meta: SceneMetadata) -> None:
-        """Store scene metadata, preferring entries with more snippets."""
+        """Store scene metadata, preferring entries with more shards."""
 
         existing = self.scenes.get(scene_id)
-        if existing is None or meta.snippet_count >= existing.snippet_count:
+        if existing is None or meta.shard_count >= existing.shard_count:
             self.scenes[scene_id] = meta
 
     def _parse(self) -> None:
@@ -60,15 +60,15 @@ class ASEMetadata:
             cfg_store: dict[str, SceneMetadata] = {}
             wds_urls = cfg.get("wds_file_urls", {}) or {}
             for scene_id, shards in wds_urls.items():
-                snippet_ids = [k.replace("_tar", "") for k in shards.keys()]
+                shard_ids = [k.replace("_tar", "") for k in shards.keys()]
                 mesh_url, mesh_sha = mesh_lookup.get(scene_id, (None, None))
                 meta = SceneMetadata(
                     scene_id=scene_id,
                     has_gt_mesh=scene_id in mesh_lookup,
                     mesh_url=mesh_url,
                     mesh_sha=mesh_sha,
-                    snippet_count=len(snippet_ids),
-                    snippet_ids=snippet_ids,
+                    shard_count=len(shard_ids),
+                    shard_ids=shard_ids,
                     atek_config=cfg_name,
                     total_frames=0,
                 )
@@ -78,15 +78,15 @@ class ASEMetadata:
             for entry in cfg.get("sequences", []) or []:
                 scene_id = entry.get("sequence_name") or "unknown"
                 tar_urls = entry.get("tar_urls") or []
-                snippet_ids = tar_urls if isinstance(tar_urls, list) else []
+                shard_ids = tar_urls if isinstance(tar_urls, list) else []
                 mesh_url, mesh_sha = mesh_lookup.get(scene_id, (None, None))
                 meta = SceneMetadata(
                     scene_id=scene_id,
                     has_gt_mesh=scene_id in mesh_lookup,
                     mesh_url=mesh_url,
                     mesh_sha=mesh_sha,
-                    snippet_count=len(snippet_ids),
-                    snippet_ids=snippet_ids,
+                    shard_count=len(shard_ids),
+                    shard_ids=shard_ids,
                     atek_config=cfg_name,
                     total_frames=entry.get("num_frames", 0),
                 )
@@ -95,29 +95,40 @@ class ASEMetadata:
 
             self.scenes_by_config[cfg_name] = cfg_store
 
-    def get_scenes_with_meshes(self) -> list[SceneMetadata]:
-        return [s for s in self.scenes.values() if s.has_gt_mesh]
+    def get_scenes_with_meshes(self, config: str | None = None) -> list[SceneMetadata]:
+        """Return scenes that have GT meshes.
+
+        Args:
+            config: Optional ATEK config name. If provided, scenes are returned for that
+                specific ATEK config.
+
+        Returns:
+            List of scenes that have GT meshes.
+        """
+        if config is None:
+            return [s for s in self.scenes.values() if s.has_gt_mesh]
+        return [s for s in self.scenes_by_config.get(config, {}).values() if s.has_gt_mesh]
 
     def filter_scenes(
-        self, min_snippets: int = 0, require_mesh: bool = False, config: str | None = None
+        self, min_shards: int = 0, require_mesh: bool = False, config: str | None = None
     ) -> list[SceneMetadata]:
         scenes = list(self.scenes_by_config.get(config, {}).values()) if config else list(self.scenes.values())
         if require_mesh:
             scenes = [s for s in scenes if s.has_gt_mesh]
-        scenes = [s for s in scenes if s.snippet_count >= min_snippets]
+        scenes = [s for s in scenes if s.shard_count >= min_shards]
         return scenes
 
-    def get_scenes(self, n: int | None = None, max_snippets: int | None = None) -> list[SceneMetadata]:
+    def get_scenes(self, n: int | None = None, max_shards: int | None = None) -> list[SceneMetadata]:
         scenes = sorted(self.scenes.values(), key=lambda s: s.scene_id)
-        if max_snippets is not None:
+        if max_shards is not None:
             scenes = [
                 SceneMetadata(
                     scene_id=s.scene_id,
                     has_gt_mesh=s.has_gt_mesh,
                     mesh_url=s.mesh_url,
                     mesh_sha=s.mesh_sha,
-                    snippet_count=min(s.snippet_count, max_snippets),
-                    snippet_ids=s.snippet_ids[:max_snippets],
+                    shard_count=min(s.shard_count, max_shards),
+                    shard_ids=s.shard_ids[:max_shards],
                     atek_config=s.atek_config,
                     total_frames=s.total_frames,
                 )

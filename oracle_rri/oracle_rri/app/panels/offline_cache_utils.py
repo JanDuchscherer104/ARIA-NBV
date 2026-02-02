@@ -32,6 +32,63 @@ BACKBONE_KEEP_FIELDS_FOR_STATS = [
 ]
 
 
+def _tensor_nbytes(value: torch.Tensor) -> int:
+    return int(value.numel()) * int(value.element_size())
+
+
+def _estimate_nbytes(value: Any, *, _seen: set[int] | None = None) -> int:
+    """Best-effort estimate of the memory footprint for nested tensor containers."""
+    if value is None:
+        return 0
+
+    if _seen is None:
+        _seen = set()
+
+    obj_id = id(value)
+    if obj_id in _seen:
+        return 0
+    _seen.add(obj_id)
+
+    if torch.is_tensor(value):
+        return _tensor_nbytes(value)
+    if isinstance(value, np.ndarray):
+        return int(value.nbytes)
+
+    tensor_fn = getattr(value, "tensor", None)
+    if callable(tensor_fn):
+        try:
+            tensor = tensor_fn()
+        except Exception:
+            tensor = None
+        if torch.is_tensor(tensor):
+            return _tensor_nbytes(tensor)
+
+    if is_dataclass(value):
+        return sum(_estimate_nbytes(getattr(value, field.name), _seen=_seen) for field in fields(value))
+
+    if isinstance(value, dict):
+        return sum(_estimate_nbytes(item, _seen=_seen) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return sum(_estimate_nbytes(item, _seen=_seen) for item in value)
+
+    if hasattr(value, "__dict__"):
+        return sum(_estimate_nbytes(item, _seen=_seen) for item in vars(value).values())
+
+    return 0
+
+
+def _p3d_cameras_nbytes(value: Any) -> int:
+    """Estimate size of the commonly-used PerspectiveCameras tensor fields."""
+    if value is None:
+        return 0
+    total = 0
+    for name in ("R", "T", "focal_length", "principal_point", "image_size"):
+        tensor = getattr(value, name, None)
+        if torch.is_tensor(tensor):
+            total += _tensor_nbytes(tensor)
+    return total
+
+
 def _load_efm_snippet_for_cache(
     *,
     scene_id: str,
@@ -287,6 +344,11 @@ def _collect_offline_cache_stats(
     pm_comp_after_values: list[float] = []
     pm_acc_after_values: list[float] = []
     num_valid_values: list[int] = []
+    mem_backbone_bytes: list[int] = []
+    mem_rri_bytes: list[int] = []
+    mem_vin_snippet_bytes: list[int] = []
+    mem_pose_camera_bytes: list[int] = []
+    mem_total_bytes: list[int] = []
     candidate_offsets: list[np.ndarray] = []
     candidate_yaw: list[np.ndarray] = []
     candidate_pitch: list[np.ndarray] = []
@@ -342,6 +404,34 @@ def _collect_offline_cache_stats(
         rri_mean, rri_min, rri_max = _finite_stats(rri)
         pm_comp_mean, _, _ = _finite_stats(pm_comp_after)
         pm_acc_mean, _, _ = _finite_stats(pm_acc_after)
+
+        backbone_bytes = _estimate_nbytes(batch.backbone_out)
+        rri_bytes = sum(
+            _estimate_nbytes(getattr(batch, name, None))
+            for name in (
+                "rri",
+                "pm_dist_before",
+                "pm_dist_after",
+                "pm_acc_before",
+                "pm_comp_before",
+                "pm_acc_after",
+                "pm_comp_after",
+            )
+        )
+        vin_snippet_bytes = _estimate_nbytes(getattr(batch, "efm_snippet_view", None))
+        pose_camera_bytes = (
+            _estimate_nbytes(batch.candidate_poses_world_cam)
+            + _estimate_nbytes(batch.reference_pose_world_rig)
+            + _p3d_cameras_nbytes(batch.p3d_cameras)
+        )
+        total_bytes = backbone_bytes + rri_bytes + vin_snippet_bytes + pose_camera_bytes
+        mem_backbone_bytes.append(backbone_bytes)
+        mem_rri_bytes.append(rri_bytes)
+        mem_vin_snippet_bytes.append(vin_snippet_bytes)
+        mem_pose_camera_bytes.append(pose_camera_bytes)
+        mem_total_bytes.append(total_bytes)
+
+        mib = float(1024**2)
         sample_rows.append(
             {
                 "scene_id": batch.scene_id,
@@ -352,6 +442,11 @@ def _collect_offline_cache_stats(
                 "rri_max": rri_max,
                 "pm_comp_after_mean": pm_comp_mean,
                 "pm_acc_after_mean": pm_acc_mean,
+                "mem_backbone_mib": float(backbone_bytes) / mib,
+                "mem_rri_mib": float(rri_bytes) / mib,
+                "mem_vin_snippet_mib": float(vin_snippet_bytes) / mib,
+                "mem_pose_camera_mib": float(pose_camera_bytes) / mib,
+                "mem_total_mib": float(total_bytes) / mib,
             },
         )
 
@@ -437,6 +532,25 @@ def _collect_offline_cache_stats(
 
     sample_df = pd.DataFrame(sample_rows)
     backbone_df = pd.DataFrame(backbone_rows)
+
+    def _summarize_bytes(values: list[int]) -> dict[str, float]:
+        if not values:
+            return {"mean_mib": float("nan"), "median_mib": float("nan"), "p95_mib": float("nan")}
+        arr = np.asarray(values, dtype=np.float64)
+        mib = float(1024**2)
+        return {
+            "mean_mib": float(arr.mean() / mib),
+            "median_mib": float(np.median(arr) / mib),
+            "p95_mib": float(np.percentile(arr, 95) / mib),
+        }
+
+    mem_summary = {
+        "backbone": _summarize_bytes(mem_backbone_bytes),
+        "rri": _summarize_bytes(mem_rri_bytes),
+        "vin_snippet": _summarize_bytes(mem_vin_snippet_bytes),
+        "pose_camera": _summarize_bytes(mem_pose_camera_bytes),
+        "total": _summarize_bytes(mem_total_bytes),
+    }
     summary = {
         "samples": len(sample_rows),
         "total_candidates": int(sum(num_valid_values)),
@@ -453,6 +567,7 @@ def _collect_offline_cache_stats(
         "pm_comp_after_values": pm_comp_after_values,
         "pm_acc_after_values": pm_acc_after_values,
         "num_valid_values": num_valid_values,
+        "memory_summary": mem_summary,
         "candidate_offsets": np.concatenate(candidate_offsets, axis=0)
         if candidate_offsets
         else np.zeros((0, 3), dtype=np.float32),

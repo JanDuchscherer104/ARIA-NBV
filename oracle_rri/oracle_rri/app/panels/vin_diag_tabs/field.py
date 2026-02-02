@@ -23,7 +23,7 @@ def render_field_tab(ctx: VinDiagContext) -> None:
         "scene field",
         "`field_in` is the raw concatenated EVL channels. `field` is the "
         "projected version after 1x1x1 Conv3d + GroupNorm + GELU "
-        "(VIN v2), which compresses the channels for attention pooling.",
+        "(VIN v2/v3), which compresses the channels for attention pooling.",
     )
     channel_labels = cfg.module_config.vin.scene_field_channels
     field_in = debug.field_in

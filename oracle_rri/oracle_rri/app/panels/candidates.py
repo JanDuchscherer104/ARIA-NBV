@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import streamlit as st
 import torch
+from efm3d.aria.pose import PoseTW
 
 from ...data import EfmSnippetView
 from ...pose_generation import CandidateViewGeneratorConfig
 from ...pose_generation.plotting import (
     CandidatePlotBuilder,
     _euler_histogram,
+    plot_candidate_centers_simple,
+    plot_candidate_frusta_simple,
     plot_direction_marginals,
     plot_direction_polar,
     plot_direction_sphere,
-    plot_candidate_centers_simple,
-    plot_candidate_frusta_simple,
     plot_euler_reference,
     plot_euler_world,
     plot_min_distance_to_mesh,
@@ -34,6 +35,87 @@ from ...pose_generation.utils import (
 )
 from ...utils.frames import world_up_tensor
 from .common import _info_popover, _pretty_label
+
+
+def _shell_offsets_dirs_ref(
+    candidates: CandidateSamplingResult,
+) -> tuple[torch.Tensor, torch.Tensor] | None:
+    """Offsets and forward directions for the full sampling shell in reference frame."""
+
+    shell = candidates.shell_poses
+    if shell is None or shell._data is None or shell._data.numel() == 0:
+        return None
+    ref_inv = candidates.reference_pose.inverse().to(shell.t.device)
+    poses_ref_cam = ref_inv.compose(shell)
+    offsets = poses_ref_cam.t.view(-1, 3)
+    z_cam = (
+        torch.tensor([0.0, 0.0, 1.0], device=offsets.device, dtype=offsets.dtype).view(1, 3).expand(offsets.shape[0], 3)
+    )
+    dirs = poses_ref_cam.rotate(z_cam).view(-1, 3)
+    dirs = dirs / dirs.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+    return offsets, dirs
+
+
+def _pose_orthonormality_stats(pose: PoseTW) -> dict[str, float]:
+    """Summarize orthonormality statistics for a pose rotation matrix.
+
+    Args:
+        pose: PoseTW with rotation matrices in ``pose.R``.
+
+    Returns:
+        Aggregated orthonormality statistics across all poses in the batch.
+    """
+
+    r = pose.R.detach()
+    if r.ndim == 2:
+        r = r.unsqueeze(0)
+    eye = torch.eye(3, device=r.device, dtype=r.dtype).unsqueeze(0)
+    resid = r.transpose(-1, -2) @ r - eye
+    resid_abs = resid.abs()
+    ortho_max = resid_abs.amax(dim=(-1, -2))
+    ortho_mean = resid_abs.mean(dim=(-1, -2))
+
+    axis_norms = torch.linalg.norm(r, dim=-2)
+    axis_norm_err = (axis_norms - 1.0).abs()
+    axis_norm_max = axis_norm_err.amax(dim=-1)
+    axis_norm_mean = axis_norm_err.mean(dim=-1)
+
+    det = torch.linalg.det(r)
+
+    return {
+        "orth_max": float(ortho_max.max().item()),
+        "orth_mean": float(ortho_mean.mean().item()),
+        "axis_norm_max": float(axis_norm_max.max().item()),
+        "axis_norm_mean": float(axis_norm_mean.mean().item()),
+        "det_min": float(det.min().item()),
+        "det_max": float(det.max().item()),
+        "det_mean": float(det.mean().item()),
+    }
+
+
+def _render_pose_orthonormality(label: str, pose: PoseTW | None) -> None:
+    """Render orthonormality metrics for a pose in Streamlit."""
+
+    if pose is None:
+        st.info(f"{label}: pose not available.")
+        return
+
+    stats = _pose_orthonormality_stats(pose)
+    st.markdown(f"**{label}**")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("max |R^T R - I|", f"{stats['orth_max']:.2e}")
+    with col2:
+        st.metric("mean |R^T R - I|", f"{stats['orth_mean']:.2e}")
+    with col3:
+        st.metric("max |axis_norm - 1|", f"{stats['axis_norm_max']:.2e}")
+    with col4:
+        st.metric("det(R) mean", f"{stats['det_mean']:.6f}")
+    st.caption(
+        "det(R) range: "
+        f"[{stats['det_min']:.6f}, {stats['det_max']:.6f}] · "
+        f"mean |axis_norm - 1|: {stats['axis_norm_mean']:.2e}",
+    )
 
 
 def render_candidates_page(
@@ -57,6 +139,22 @@ def render_candidates_page(
     cam_label = cand_cfg.camera_label if cand_cfg is not None else "cached"
     has_snippet = sample is not None
 
+    with st.expander("Frame orthonormality", expanded=False):
+        _info_popover(
+            "frame orthonormality",
+            "Reports orthonormality errors for the reference and sampling poses "
+            "(R^T R should be close to I, det(R) near +1). These stats are "
+            "computed before any display-only rotations.",
+        )
+        _render_pose_orthonormality("Reference pose (world <- rig)", candidates.reference_pose)
+        sampling_pose = candidates.sampling_pose
+        if sampling_pose is None:
+            st.info("Sampling pose not available (cached data or gravity alignment disabled).")
+        else:
+            if sampling_pose is candidates.reference_pose:
+                st.caption("Sampling pose matches reference pose.")
+            _render_pose_orthonormality("Sampling pose (world <- sampling)", sampling_pose)
+
     tab_pos, tab_frusta = st.tabs(["Positions (3D)", "Frusta (3D)"])
 
     with tab_pos:
@@ -77,7 +175,7 @@ def render_candidates_page(
                 )
                 .add_mesh()
                 .add_candidate_cloud(use_valid=True, color="royalblue", size=4, opacity=0.7)
-                .add_reference_axes(display_rotate=False)
+                .add_reference_axes(display_rotate=True)
             ).finalize()
             st.plotly_chart(cand_fig, width="stretch")
         else:
@@ -91,6 +189,8 @@ def render_candidates_page(
             )
 
     offsets_ref, dirs_ref = candidates.get_offsets_and_dirs_ref(display_rotate=False)
+    shell_data = _shell_offsets_dirs_ref(candidates)
+    dirs_shell_ref = shell_data[1] if shell_data is not None else None
 
     with tab_frusta:
         if mask_valid is None or mask_valid.sum() == 0:
@@ -145,7 +245,7 @@ def render_candidates_page(
                         include_center=False,
                         display_rotate=False,
                     )
-                    .add_reference_axes(display_rotate=False)
+                    .add_reference_axes(display_rotate=True)
                 ).finalize()
                 st.plotly_chart(frust_fig, width="stretch")
             else:
@@ -182,6 +282,11 @@ def render_candidates_page(
                 "Polar plots show azimuth/elevation of the offset direction; the "
                 "radius histogram shows the sampled distance distribution.",
             )
+            show_view_dirs = st.checkbox(
+                "Show view directions (rig frame)",
+                value=False,
+                key="cand_offsets_show_view_dirs",
+            )
             st.markdown(
                 stats_to_markdown_table(
                     summarise_offsets_ref(offsets_ref),
@@ -189,6 +294,12 @@ def render_candidates_page(
                 ),
             )
             offsets_np = offsets_ref.cpu().numpy()
+            dirs_overlay = None
+            if show_view_dirs:
+                dirs_overlay = dirs_ref
+                if dirs_shell_ref is not None and mask_valid.shape[0] == dirs_shell_ref.shape[0]:
+                    dirs_overlay = dirs_shell_ref[mask_valid]
+            dirs_overlay_np = dirs_overlay.cpu().numpy() if dirs_overlay is not None else None
             colp1, colp2 = st.columns(2)
             with colp1:
                 st.plotly_chart(
@@ -201,7 +312,11 @@ def render_candidates_page(
                 )
             with colp2:
                 st.plotly_chart(
-                    plot_position_sphere(offsets_np, show_axes=True),
+                    plot_position_sphere(
+                        offsets_np,
+                        show_axes=True,
+                        dirs=dirs_overlay_np,
+                    ),
                     width="stretch",
                 )
             st.plotly_chart(plot_radius_hist(offsets_np), width="stretch")
@@ -214,10 +329,11 @@ def render_candidates_page(
                 "Euler plots are shown in both world and reference frames to "
                 "highlight frame-dependent interpretations.",
             )
+            dirs_plot = dirs_shell_ref if dirs_shell_ref is not None else dirs_ref
             st.markdown(
-                stats_to_markdown_table(summarise_dirs_ref(dirs_ref), header=None),
+                stats_to_markdown_table(summarise_dirs_ref(dirs_plot), header=None),
             )
-            dirs_np = dirs_ref.cpu().numpy()
+            dirs_np = dirs_plot.cpu().numpy()
 
             col1, col2 = st.columns(2)
             with col1:

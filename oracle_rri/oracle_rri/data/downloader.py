@@ -1,4 +1,4 @@
-"""Download orchestration for ASE dataset meshes + ATEK snippets."""
+"""Download orchestration for ASE dataset meshes + ATEK shards."""
 
 from __future__ import annotations
 
@@ -12,15 +12,14 @@ import requests
 from atek.data_download.atek_data_store_download import download_atek_wds_sequences  # type: ignore[import-untyped]
 from pydantic import AliasChoices, Field
 from pydantic_settings import (
-    CLI_SUPPRESS,
     CliSettingsSource,
-    CliSuppress,
     SettingsConfigDict,
 )
 from tqdm import tqdm
 
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console, Verbosity
+from .download_stats import compute_downloaded_atek_stats
 from .metadata import ASEMetadata, SceneMetadata
 
 
@@ -28,19 +27,20 @@ class ASEDownloaderConfig(BaseConfig["ASEDownloader"]):
     """Configuration for ASE downloader with CLI support.
 
     Supports two CLI modes (explicitly selected via positional `mode`):
-        1. Download mode: Download N scenes with meshes + ATEK snippets
+        1. Download mode: Download N scenes with meshes + ATEK shards
         2. List mode: List available scenes
 
     Example (CLI - Download):
-        $ python -m oracle_rri.data.downloader download --n_scenes=5 --max_snippets=2
+        $ python -m oracle_rri.data.downloader download --n_scenes=5 --max_shards=2
         $ python -m oracle_rri.data.downloader download --ns=10 --skip_meshes
 
     Example (CLI - List):
         $ python -m oracle_rri.data.downloader list --n=10
     """
 
-    # Internal fields (excluded from CLI)
-    target: CliSuppress[type[ASEDownloader]] = Field(default_factory=lambda: ASEDownloader, description=CLI_SUPPRESS)
+    @property
+    def target(self) -> type[ASEDownloader]:
+        return ASEDownloader
 
     # CLI dispatch
     mode: Literal["download", "list"] = Field(default="download", description="Execution mode.", alias="m")
@@ -67,8 +67,8 @@ class ASEDownloaderConfig(BaseConfig["ASEDownloader"]):
     is_debug: bool = Field(default=True)
     """Enable debug logging (forces max verbosity)."""
 
-    prefer_scenes_with_max_snippets: bool = True
-    """Prefer scenes with maximum snippets when limiting number of scenes."""
+    prefer_scenes_with_max_shards: bool = True
+    """Prefer scenes with maximum shards when limiting number of scenes."""
 
     # JSON file configuration
     mesh_json_filename: str = Field(default="ase_mesh_download_urls.json")
@@ -78,7 +78,13 @@ class ASEDownloaderConfig(BaseConfig["ASEDownloader"]):
     """Filename of the ATEK download URLs JSON in url_dir. Relative to paths.url_dir."""
 
     atek_config_name: Literal["efm", "efm_eval", "cubercnn", "cubercnn_eval"] = Field(default="efm_eval", alias="c")
-    """ATEK configuration name. No difference between `efm` and `efm_eval`. This will select the specified config in the json file under :field:`atek_json_filename`."""
+    """ATEK configuration name.
+
+    Notes:
+        `efm` and `efm_eval` are shipped as different shard archives (different filenames/SHA
+        in the manifest). The snippet payloads are expected to be equivalent, but treat them
+        as distinct downloads on disk.
+    """
 
     # Download selection
     n_scenes: int = Field(
@@ -88,12 +94,12 @@ class ASEDownloaderConfig(BaseConfig["ASEDownloader"]):
     )
     """Number of scenes to download (0 = all available scenes)."""
 
-    max_snippets: int | None = Field(
+    max_shards: int | None = Field(
         default=None,
         ge=1,
-        validation_alias=AliasChoices("max_snippets", "ms"),
+        validation_alias=AliasChoices("max_shards", "ms"),
     )
-    """Maximum snippets per scene (None = all snippets)."""
+    """Maximum shards per scene (None = all shards)."""
 
     skip_meshes: bool = Field(
         default=False,
@@ -157,7 +163,7 @@ class ASEDownloaderConfig(BaseConfig["ASEDownloader"]):
 
 
 class ASEDownloader:
-    """Download ASE meshes + ATEK snippets."""
+    """Download ASE meshes + ATEK shards."""
 
     def __init__(self, config: ASEDownloaderConfig):
         self.config = config
@@ -191,7 +197,7 @@ class ASEDownloader:
         Args:
             scenes: List of SceneInfo to download
             download_meshes: Download GT meshes
-            download_atek: Download ATEK WDS snippets
+            download_atek: Download ATEK WDS shards
         """
         scenes = scenes or []
         if scene_ids:
@@ -277,7 +283,7 @@ class ASEDownloader:
         self.console.log("✓ Mesh downloads complete")
 
     def _download_atek(self, scenes: list[SceneMetadata]) -> None:
-        """Download ATEK WDS snippets using ATEK's download_atek_wds_sequences."""
+        """Download ATEK WDS shards using ATEK's download_atek_wds_sequences."""
         self.console.log(f"Downloading ATEK data for {len(scenes)} scenes...")
 
         # Load ATEK JSON and filter to selected scenes
@@ -290,7 +296,7 @@ class ASEDownloader:
         with atek_json.open() as f:
             atek_data = json.load(f)
 
-        # Filter wds_file_urls to only include our scenes AND snippets
+        # Filter wds_file_urls to only include our scenes AND shards
         config_data = atek_data["atek_data_for_all_configs"][self.config.atek_config_name]
         all_urls = config_data["wds_file_urls"]
 
@@ -299,16 +305,16 @@ class ASEDownloader:
             if scene.scene_id not in all_urls:
                 continue
 
-            # Only include snippets that are in scene.snippet_ids
-            scene_snippets = all_urls[scene.scene_id]
-            filtered_snippets = {
+            # Only include shards that are in scene.shard_ids
+            scene_shards = all_urls[scene.scene_id]
+            filtered_shards = {
                 shard_key: shard_info
-                for shard_key, shard_info in scene_snippets.items()
-                if shard_key.replace("_tar", "") in scene.snippet_ids
+                for shard_key, shard_info in scene_shards.items()
+                if shard_key.replace("_tar", "") in scene.shard_ids
             }
 
-            if filtered_snippets:
-                filtered_urls[scene.scene_id] = filtered_snippets
+            if filtered_shards:
+                filtered_urls[scene.scene_id] = filtered_shards
 
         if not filtered_urls:
             self.console.warn("No ATEK data found for selected scenes")
@@ -361,9 +367,9 @@ class ASEDownloader:
         if computed != expected_sha:
             raise ValueError(f"SHA1 mismatch for {path}: {computed} != {expected_sha}")
 
-    def download_scenes_with_meshes(self, min_snippets: int, config: str, overwrite: bool) -> None:
-        """Download scenes that have meshes and at least `min_snippets` snippets for a given config."""
-        scenes = self.metadata.filter_scenes(min_snippets=min_snippets, require_mesh=True, config=config)
+    def download_scenes_with_meshes(self, min_shards: int, config: str, overwrite: bool) -> None:
+        """Download scenes that have meshes and at least `min_shards` shards for a given config."""
+        scenes = self.metadata.filter_scenes(min_shards=min_shards, require_mesh=True, config=config)
         self.config.overwrite = overwrite
         scene_ids = [s.scene_id for s in scenes]
         self.download_scenes(
@@ -391,7 +397,7 @@ def cli_download(config: ASEDownloaderConfig | None = None) -> None:
     """CLI entry point for downloading scenes.
 
     Usage:
-        python -m oracle_rri.data.downloader download --n_scenes=5 --max_snippets=2
+        python -m oracle_rri.data.downloader download --n_scenes=5 --max_shards=2
         python -m oracle_rri.data.downloader download --ns=10 --skip_meshes
     """
     config = config or ASEDownloaderConfig()
@@ -404,28 +410,28 @@ def cli_download(config: ASEDownloaderConfig | None = None) -> None:
         scenes = downloader.metadata.get_scenes()
     else:
         scenes = downloader.metadata.filter_scenes(
-            min_snippets=0,
+            min_shards=0,
             require_mesh=True,
             config=config.atek_config_name,
         )
-    # apply snippet cap
-    if config.max_snippets:
+    # apply shard cap
+    if config.max_shards:
         scenes = [
             SceneMetadata(
                 scene_id=s.scene_id,
                 has_gt_mesh=s.has_gt_mesh,
                 mesh_url=s.mesh_url,
                 mesh_sha=s.mesh_sha,
-                snippet_count=min(s.snippet_count, config.max_snippets),
-                snippet_ids=s.snippet_ids[: config.max_snippets],
+                shard_count=min(s.shard_count, config.max_shards),
+                shard_ids=s.shard_ids[: config.max_shards],
                 atek_config=s.atek_config,
                 total_frames=s.total_frames,
             )
             for s in scenes
         ]
     # prefer richest scenes first
-    if config.prefer_scenes_with_max_snippets:
-        scenes = sorted(scenes, key=lambda s: (-s.snippet_count, s.scene_id))
+    if config.prefer_scenes_with_max_shards:
+        scenes = sorted(scenes, key=lambda s: (-s.shard_count, s.scene_id))
     # limit number of scenes
     if n:
         scenes = scenes[:n]
@@ -435,13 +441,13 @@ def cli_download(config: ASEDownloaderConfig | None = None) -> None:
     console.log("=" * 60)
     console.log(f"Downloading {len(scenes)} scenes:")
     for scene in scenes[:10]:  # Show first 10
-        console.log(f"  - Scene {scene.scene_id}: {len(scene.snippet_ids)} snippets")
+        console.log(f"  - Scene {scene.scene_id}: {len(scene.shard_ids)} shards")
     if len(scenes) > 10:
         console.log(f"  ... and {len(scenes) - 10} more")
 
-    total_snippets = sum(len(s.snippet_ids) for s in scenes)
+    total_shards = sum(len(s.shard_ids) for s in scenes)
     mesh_note = " (mesh-required)" if not config.skip_meshes else ""
-    console.log(f"\nTotal: {len(scenes)} scenes{mesh_note}, {total_snippets} snippets")
+    console.log(f"\nTotal: {len(scenes)} scenes{mesh_note}, {total_shards} shards")
 
     # Download
     downloader.download_scenes(
@@ -468,14 +474,16 @@ def cli_list(config: ASEDownloaderConfig, n: int | None = None) -> None:
     console = Console.with_prefix("DownloaderCLI").set_verbosity(config.verbosity).set_debug(config.is_debug)
     downloader = config.setup_target()
 
-    all_scenes = downloader.metadata.get_scenes_with_meshes()
-    total_snippets = sum(scene.snippet_count for scene in all_scenes)
+    console.log(f"ATEK config: {config.atek_config_name}")
+
+    all_scenes = downloader.metadata.get_scenes_with_meshes(config=config.atek_config_name)
+    total_shards = sum(scene.shard_count for scene in all_scenes)
     scenes = all_scenes
-    if config.prefer_scenes_with_max_snippets:
-        scenes = sorted(scenes, key=lambda s: (-s.snippet_count, s.scene_id))
+    if config.prefer_scenes_with_max_shards:
+        scenes = sorted(scenes, key=lambda s: (-s.shard_count, s.scene_id))
     if n:
         scenes = scenes[:n]
-    shown_snippets = sum(scene.snippet_count for scene in scenes)
+    shown_shards = sum(scene.shard_count for scene in scenes)
 
     console.log("=" * 60)
     console.log("ASE Dataset - Available Scenes")
@@ -483,10 +491,29 @@ def cli_list(config: ASEDownloaderConfig, n: int | None = None) -> None:
     console.log(f"Total scenes with GT meshes: {len(all_scenes)}")
     console.log(f"\nShowing {len(scenes)} scenes:")
     for scene in scenes:
-        console.log(f"  Scene {scene.scene_id}: {len(scene.snippet_ids)} snippets")
-    console.log(f"\nTotal snippets (all GT-mesh scenes): {total_snippets}")
+        console.log(f"  Scene {scene.scene_id}: {len(scene.shard_ids)} shards")
+    console.log(f"\nTotal shards (all GT-mesh scenes): {total_shards}")
     if n is not None and len(scenes) != len(all_scenes):
-        console.log(f"Total snippets (shown scenes): {shown_snippets}")
+        console.log(f"Total shards (shown scenes): {shown_shards}")
+
+    console.log("\nDownloaded overview (GT-mesh scenes):")
+    for cfg_name in ("efm", "efm_eval"):
+        stats = compute_downloaded_atek_stats(
+            metadata=downloader.metadata,
+            data_root=config.paths.data_root,
+            config_name=cfg_name,
+        )
+        pct = 0.0 if stats.expected_shards == 0 else (100.0 * stats.downloaded_shards / stats.expected_shards)
+        snippet_note = ""
+        if stats.snippets_per_shard is not None:
+            suffix = " (estimated)" if stats.snippet_count_is_estimate else ""
+            snippet_note = f", {stats.downloaded_snippets} snippets ({stats.snippets_per_shard}/shard{suffix})"
+        else:
+            snippet_note = f", {stats.downloaded_snippets} snippets"
+        console.log(
+            f"  - {cfg_name}: {stats.downloaded_shards}/{stats.expected_shards} shards "
+            f"({pct:.1f}%), {stats.downloaded_scenes}/{stats.expected_scenes} scenes{snippet_note}"
+        )
     console.log("=" * 60)
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .bin_values import render_bin_values_tab
 from .context import VinDiagContext
 from .coral import render_coral_tab
 from .encodings import render_encodings_tab
@@ -15,6 +16,7 @@ from .transforms import render_transforms_tab
 
 __all__ = [
     "VinDiagContext",
+    "render_bin_values_tab",
     "render_coral_tab",
     "render_encodings_tab",
     "render_evidence_tab",

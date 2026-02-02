@@ -11,6 +11,7 @@ dependencies = [
     "torch==2.4.1",
     "torchvision==0.19.1",
     "torchaudio==2.4.1",
+    "pytorch3d @ git+https://github.com/facebookresearch/pytorch3d.git@main",
     # Scientific computing
     "numpy>=1.26.4",
     "scipy",
@@ -28,6 +29,7 @@ dependencies = [
     "opencv-python==4.10.0.84",
     "tqdm==4.66.4",
     "matplotlib==3.9.0",
+    "seaborn>=0.13.2",
     "moderngl==5.8.2",
     "trimesh==3.23.5",
     "scikit-image==0.24.0",
@@ -45,21 +47,45 @@ dependencies = [
     "pydantic-settings>=2.12.0",
     "tqdm-stubs>=0.2.1",
     "types-requests>=2.32.4.20250913",
-    "streamlit>=1.51.0",
+    "streamlit>=1.52.2",
+    "tomli-w>=1.0.0",
     "tomlkit>=0.13.3",
-    "fast-simplification>=0.1.12",
+    "fast-simplification>=0.1.13",
     "rtree>=1.4.1",
     "pyembree>=0.1.12",
     "power-spherical>=0.8.1",
+    # Training stack (VIN head)
+    "pytorch-lightning==2.6.0",
+    "wandb>=0.17.0",
     # VIN pose encoding + ordinal loss
-    "e3nn==0.5.1",
+    "e3nn==0.5.9",
     "coral-pytorch==1.4.0",
+    "torch-summary>=1.4.5",
+    "optuna>=4.6.0",
+    "optuna-integration[pytorch-lightning]>=4.5.0",
+    "captum>=0.8.0",
+    # Openpoints
+    "openpoints-shim; sys_platform == 'linux'",
+    "pyyaml>=6.0; sys_platform == 'linux'",
+    "multimethod>=1.7; sys_platform == 'linux'",
+    "termcolor>=1.1.0; sys_platform == 'linux'",
+    "easydict>=1.9; sys_platform == 'linux'",
+    "shortuuid>=1.0.11; sys_platform == 'linux'",
+    "jaxtyping>=0.3.6",
 ]
 
     [project.scripts]
-    nbv-downloader = "oracle_rri.data.downloader:main"
-    nbv-st         = "oracle_rri.streamlit_app:streamlit_entry"
-    nbv-st-dbg     = "oracle_rri.streamlit_app:streamlit_entry"
+    nbv-summary       = "oracle_rri.lightning.cli:summarize_main"
+    nbv-downloader    = "oracle_rri.data.downloader:main"
+    nbv-cache-samples = "oracle_rri.lightning.cli:cache_main"
+    nbv-cache-vin-snippets = "oracle_rri.lightning.cli:cache_vin_snippets_main"
+    nbv-st            = "oracle_rri.streamlit_app:streamlit_entry"
+    nbv-fit-binner    = "oracle_rri.lightning.cli:fit_binner_main"
+    nbv-train         = "oracle_rri.lightning.cli:train_main"
+    nbv-optuna        = "oracle_rri.lightning.cli:optuna_main"
+    nbv-wandb         = "oracle_rri.lightning.cli:wandb_main"
+    nbv-cli           = "oracle_rri.lightning.cli:main"
+
 
     [project.optional-dependencies]
     dev = [
@@ -71,11 +97,6 @@ dependencies = [
         "debugpy>=1.8.17",
     ]
 
-    # PyTorch3D requires torch to be installed first, so it's an extra
-    pytorch3d = [
-        "pytorch3d @ git+https://github.com/facebookresearch/pytorch3d.git@main",
-    ]
-
     notebook = [
         "ipympl>=0.9.0",
         "jupyter>=1.0.0",
@@ -83,6 +104,10 @@ dependencies = [
         "notebook>=7.5.0",
         "jupyterlab>=4.5.0",
     ]
+
+    # Optional performance dep used by EFM3D's DinoV2 attention utils.
+    # NOTE: Pinned to avoid upgrading our Torch (2.4.1+cu121).
+    xformers = ["xformers==0.0.28.post1; sys_platform == 'linux'"]
 
 [build-system]
 requires      = ["hatchling"]
@@ -96,7 +121,17 @@ allow-direct-references = true
 
 [tool.uv]
 # Ensure pytorch3d is built with the runtime torch
-extra-build-dependencies = { pytorch3d = ["torch"] }
+extra-build-dependencies = { pytorch3d = [
+    "torch",
+], openpoints-shim = [
+    "torch==2.4.1",
+    "ninja",
+    "pyyaml",
+    "multimethod",
+    "termcolor",
+    "easydict",
+    "shortuuid",
+] }
 
     [[tool.uv.index]]
     name     = "pytorch-cu121"
@@ -111,6 +146,8 @@ extra-build-dependencies = { pytorch3d = ["torch"] }
     torchaudio = [
         { index = "pytorch-cu121", marker = "sys_platform == 'linux'" },
     ]
+    xformers = [{ index = "pytorch-cu121", marker = "sys_platform == 'linux'" }]
+    openpoints-shim = { path = "../external/openpoints_shim", editable = false }
     efm3d = { path = "../external/efm3d", editable = true }
     oracle_rri = { path = ".", editable = true }
 

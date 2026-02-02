@@ -12,10 +12,11 @@ import torch
 import trimesh
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
+from torch.utils.data import DataLoader
+
 from oracle_rri.configs import PathConfig
 from oracle_rri.data.efm_dataset import AseEfmDataset, AseEfmDatasetConfig
 from oracle_rri.data.efm_views import EfmCameraView, EfmSnippetView
-from torch.utils.data import DataLoader
 
 DATA_BASE = Path(__file__).resolve().parents[3] / ".data" / "ase_efm"
 
@@ -153,6 +154,17 @@ class TestAseEfmDataset:
 
         assert batch["scene_id"] == ["00000", "00001"]
         assert len(batch["samples"]) == 2
+
+    def test_from_cache_efm_parses_key_and_bounds(self):
+        efm = _mock_efm_sample(scene="82832", snippet="shards-0007")
+        efm["__key__"] = "AriaSyntheticEnvironment_82832_AtekDataSample_000056"
+        sample = EfmSnippetView.from_cache_efm(efm)
+        assert sample.scene_id == "82832"
+        assert sample.snippet_id == "000056"
+        assert sample.crop_bounds is not None
+        bounds_min, bounds_max = sample.crop_bounds
+        assert torch.allclose(bounds_min, torch.tensor([0.0, 0.0, 0.0]))
+        assert torch.allclose(bounds_max, torch.tensor([1.0, 1.0, 1.0]))
 
     def test_missing_camera_key_raises(self):
         efm = _mock_efm_sample()

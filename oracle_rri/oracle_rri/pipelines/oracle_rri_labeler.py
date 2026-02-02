@@ -35,7 +35,7 @@ from ..utils import BaseConfig, Console
 
 
 @dataclass(slots=True)
-class OracleRriLabelBatch:
+class OracleRriSample:
     sample: EfmSnippetView
     candidates: CandidateSamplingResult
     depths: CandidateDepths
@@ -95,7 +95,7 @@ class OracleRriLabeler:
         self._depth_renderer = self.config.depth.setup_target()
         self._oracle = self.config.oracle.setup_target()
 
-    def run(self, sample: EfmSnippetView) -> OracleRriLabelBatch:
+    def run(self, sample: EfmSnippetView) -> OracleRriSample:
         """Run the full candidate→render→RRI pipeline for one snippet.
 
         Args:
@@ -155,7 +155,7 @@ class OracleRriLabeler:
             extend=candidate_pcs.occupancy_bounds.to(device=device, dtype=dtype),
         )
 
-        return OracleRriLabelBatch(
+        return OracleRriSample(
             sample=sample,
             candidates=candidates,
             depths=depths,
@@ -165,7 +165,7 @@ class OracleRriLabeler:
 
 
 __all__ = [
-    "OracleRriLabelBatch",
+    "OracleRriSample",
     "OracleRriLabeler",
     "OracleRriLabelerConfig",
 ]

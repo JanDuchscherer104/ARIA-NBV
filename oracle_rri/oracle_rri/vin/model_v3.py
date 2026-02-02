@@ -190,7 +190,7 @@ class VinModelV3Config(BaseConfig["VinModelV3"]):
     semidense_cnn_out_dim: int = Field(default=16, gt=0)
     """Output feature dimension of the semidense projection CNN."""
 
-    use_traj_encoder: bool = Field(default=True)
+    use_traj_encoder: bool = Field(default=False)
     """Whether to encode snippet trajectories and append trajectory context."""
 
     traj_encoder: TrajectoryEncoderConfig | None = Field(default_factory=TrajectoryEncoderConfig)
@@ -504,8 +504,8 @@ class VinModelV3(nn.Module):
         """Encode candidate poses in the reference rig frame.
 
         Args:
-            pose_world_cam (PoseTW["B, Nq, 12"]): SE(3) candidate camera poses in world frame, T_w^c.
-            pose_world_rig_ref (PoseTW["B, 12"]): SE(3) reference rig pose in world frame, T_w^r.
+            pose_world_cam (PoseTW["B, Nq, 12"]): SE(3) candidate camera poses ``T_w_cq`` (world <- cam_q).
+            pose_world_rig_ref (PoseTW["B, 12"]): SE(3) reference rig pose ``T_w_r`` (world <- rig_ref).
 
         Returns:
             PoseFeatures (dataclass):
@@ -513,7 +513,14 @@ class VinModelV3(nn.Module):
                 pose_vec (Tensor["B, Nq, 9"]): Pose vector (t + R6D).
                 candidate_center_rig_m (Tensor["B, Nq, 3"]): Candidate centers in rig frame (meters).
 
-        Relative pose encoding (R6D + LFF) avoids global-frame drift and was consistently stable in the vin-v2 sweep.
+        We work in the reference rig frame to remove global-frame drift:
+
+        - Relative pose: ``T_r_cq = (T_w_r)^-1 @ T_w_cq``.
+        - Pose vector: ``[t_r_cq, R6D(R_r_cq)]`` with translation in metres.
+        - ``candidate_center_rig_m`` is the camera center ``t_r_cq`` in rig_ref.
+
+        Relative pose encoding (R6D + LFF) was the most stable pose representation
+        in the vin-v2 sweep.
         """
         pose_rig_cam = pose_world_rig_ref.inverse()[:, None] @ pose_world_cam
         pose_out = self.pose_encoder.encode(pose_rig_cam)
@@ -539,7 +546,7 @@ class VinModelV3(nn.Module):
 
         Args:
             snippet (EfmSnippetView | VinSnippetView): Snippet with rig trajectory.
-            pose_world_rig_ref (PoseTW["B, 12"]): Reference rig pose T_w^r.
+            pose_world_rig_ref (PoseTW["B, 12"]): Reference rig pose ``T_w_r`` (world <- rig_ref).
             batch_size (int): B (batch size).
             device (torch.device): Target device for outputs.
             dtype (torch.dtype): Output dtype.
@@ -549,6 +556,15 @@ class VinModelV3(nn.Module):
                 traj_feat (Tensor["B, F_traj"] or None): Pooled trajectory embedding.
                 traj_pose_vec (Tensor["B, T, D_v"] or None): Per-frame pose vectors.
                 traj_pose_enc (Tensor["B, T, F_traj"] or None): Per-frame pose encodings.
+
+        Notes:
+            The trajectory is provided as ``t_world_rig`` (world <- rig_t). We convert
+            it into the reference rig frame via:
+
+            - ``T_r_rig_t = (T_w_r)^-1 @ T_w_rig_t``.
+
+            The per-frame encodings can optionally be attended by candidate pose
+            tokens (``traj_attn``) to produce a per-candidate context ``traj_ctx``.
         """
         if self.traj_encoder is None:
             return None, None, None
@@ -683,15 +699,25 @@ class VinModelV3(nn.Module):
         Args:
             field (Tensor["B, F_g, D, H, W"]): Projected voxel field.
             pose_enc (Tensor["B, Nq, F_pose"]): Pose embeddings per candidate.
-            pts_world (Tensor["B, V, 3"]): Voxel center positions in world frame.
-            t_world_voxel (PoseTW["B, 12"]): Voxel frame pose in world frame.
-            pose_world_rig_ref (PoseTW["B, 12"]): Reference rig pose in world frame.
-            voxel_extent (Tensor["B, 6"]): Voxel extent [xmin,xmax,ymin,ymax,zmin,zmax].
+            pts_world (Tensor["B, V, 3"]): Voxel center positions ``x_w_v`` in world frame (metres).
+            t_world_voxel (PoseTW["B, 12"]): Voxel grid pose ``T_w_v`` (world <- voxel).
+            pose_world_rig_ref (PoseTW["B, 12"]): Reference rig pose ``T_w_r`` (world <- rig_ref).
+            voxel_extent (Tensor["B, 6"]): Voxel extent in voxel frame:
+                ``[x_min,x_max,y_min,y_max,z_min,z_max]`` (metres).
 
         Returns:
             GlobalContext:
-                pos_grid (Tensor["B, 3, D, H, W"]): Normalized XYZ grid in rig_ref frame.
+                pos_grid (Tensor["B, 3, D, H, W"]): Normalized voxel centers in rig_ref frame.
                 global_feat (Tensor["B, Nq, F_g"]): Pose-conditioned global tokens.
+
+        Notes:
+            ``pos_grid`` is computed from world-space voxel centers by:
+
+            - Convert voxel centers into rig_ref: ``x_r = (T_w_r)^-1 * x_w``.
+            - Normalize by half-extent of the EVL voxel grid (in metres). The center used for
+              normalization is the voxel-grid center expressed in rig_ref.
+
+            This keeps positional keys in a consistent metric frame tied to the snippet.
         """
         # pos_grid is normalized XYZ in the reference rig frame, scaled by voxel extent.
         pos_grid = pos_grid_from_pts_world(
@@ -933,7 +959,9 @@ class VinModelV3(nn.Module):
 
         Args:
             points_world (Tensor["B, P, C_sem"] or Tensor["P, C_sem"]):
-                Semidense points in world frame (XYZ + extras).
+                Points in world frame (XYZ + optional extras).
+                - XYZ are positions ``x_w`` in metres.
+                - Extras are per-point scalars (e.g. ``1/sigma_d`` and ``n_obs``) and are not frame-dependent.
             p3d_cameras (PerspectiveCameras): Camera batch with size B*Nq.
             batch_size (int): B (batch size).
             num_candidates (int): Nq (candidates per batch).
@@ -943,7 +971,7 @@ class VinModelV3(nn.Module):
             dict[str, Tensor]:
                 x (Tensor["B*Nq, P_proj"]): Screen x (pixels).
                 y (Tensor["B*Nq, P_proj"]): Screen y (pixels).
-                z (Tensor["B*Nq, P_proj"]): Screen depth (positive in front).
+                z (Tensor["B*Nq, P_proj"]): Camera-view depth along +Z (positive in front).
                 finite (Tensor["B*Nq, P_proj"]): Finite projection mask.
                 valid (Tensor["B*Nq, P_proj"]): In-bounds + positive depth mask.
                 inv_dist_std (Tensor["B*Nq, P_proj"] or empty): Optional per-point uncertainty.
@@ -953,6 +981,13 @@ class VinModelV3(nn.Module):
             Note:
                 P_proj equals the number of points per camera after tiling:
                 semidense points use P_proj = P_fr, voxel centers use P_proj = G_pool^3.
+
+        Notes:
+            PyTorch3D ``transform_points_screen`` expects input points in world
+            coordinates and applies the camera's world->view transform + projection.
+            The returned x/y are in pixel coordinates consistent with ``image_size``.
+            Depth values are taken from the world->view transform to preserve
+            metric camera-Z.
         """
         if points_world is None or points_world.numel() == 0:
             raise RuntimeError("Semidense projection requires non-empty points_world.")
@@ -1019,11 +1054,13 @@ class VinModelV3(nn.Module):
                 f"got {num_cams} for B={batch_size}, N={num_candidates}.",
             )
 
-        pts_screen = cameras.transform_points_screen(points_cam)
-        x, y, z = pts_screen.unbind(dim=-1)
+        pts_screen = cameras.transform_points_screen(points_cam, image_size=image_size)
+        pts_view = cameras.get_world_to_view_transform().transform_points(points_cam)
+        x, y = pts_screen[..., 0], pts_screen[..., 1]
+        z = pts_view[..., 2]
         h = image_size[:, 0].unsqueeze(1)
         w = image_size[:, 1].unsqueeze(1)
-        finite = torch.isfinite(pts_screen).all(dim=-1)
+        finite = torch.isfinite(pts_screen).all(dim=-1) & torch.isfinite(pts_view).all(dim=-1)
         valid = finite & (z > 0.0) & (x >= 0.0) & (y >= 0.0) & (x <= (w - 1.0)) & (y <= (h - 1.0))
 
         return {
@@ -1055,8 +1092,10 @@ class VinModelV3(nn.Module):
 
         Args:
             proj_data (dict[str, Tensor] | None): Projection outputs.
-                - x, y, z (Tensor["B*Nq, P_proj"]): screen coords + depth.
-                - valid, finite (Tensor["B*Nq, P_proj"]): projection masks.
+                - x, y (Tensor["B*Nq, P_proj"]): screen/pixel coordinates.
+                - z (Tensor["B*Nq, P_proj"]): depth along camera axis (positive in front).
+                - valid, finite (Tensor["B*Nq, P_proj"]): projection masks:
+                  valid = finite & in-bounds & z>0.
                 - inv_dist_std (Tensor["B*Nq, P_proj"] or empty): optional uncertainty.
                 - obs_count (Tensor["B*Nq, P_proj"] or empty): optional track length.
                 - image_size (Tensor["B*Nq, 2"]): (H, W) per camera.
@@ -1069,6 +1108,13 @@ class VinModelV3(nn.Module):
         Returns:
             Tensor["B, Nq, F_proj"]: Projection summary features in order:
                 [coverage, empty_frac, semidense_candidate_vis_frac, depth_mean, depth_std].
+
+        Notes:
+            ``semidense_candidate_vis_frac`` is a weighted visible fraction among
+            finite projections, where weights combine:
+
+            - ``n_obs``: track length (stabilizes gradients by de-emphasizing ephemeral points).
+            - ``1/sigma_d``: inverse depth uncertainty (de-emphasizes noisy depth estimates).
         """
         # Shapes (batched): x/y/z/valid are (B*N_q, P_proj); outputs are (B, N_q, F_proj).
         proj_feat = torch.zeros(
@@ -1187,6 +1233,10 @@ class VinModelV3(nn.Module):
     ) -> Tensor:
         """Encode semidense projection grids with a tiny CNN.
 
+        This produces a per-candidate 2D grid in screen space (GxG) from the
+        projected semidense points and applies a small CNN to obtain richer
+        cues than the scalar projection statistics alone.
+
         Args:
             proj_data (dict[str, Tensor] | None): Projection outputs.
                 - x, y, z (Tensor["B*Nq, P_proj"]): screen coords + depth.
@@ -1200,6 +1250,15 @@ class VinModelV3(nn.Module):
 
         Returns:
             Tensor["B, Nq, F_cnn"]: Semidense grid CNN features.
+
+        Notes:
+            Each grid cell aggregates projected points (valid-only) into:
+            - occupancy (binary),
+            - mean depth,
+            - depth std.
+
+            Depth is in camera coordinates (z>0 in front). x/y are in pixel
+            coordinates normalized into grid indices via ``image_size``.
         """
         if self.semidense_cnn is None:
             raise RuntimeError("Semidense CNN is disabled.")
@@ -1277,40 +1336,66 @@ class VinModelV3(nn.Module):
         return_debug: bool,
         backbone_out: EvlBackboneOutput | None = None,
     ) -> tuple[VinPrediction, VinV3ForwardDiagnostics | None]:
-        """Run the VIN v3 forward pass.
+        """Run the VIN v3 forward pass (VIN-Core).
 
-        The pipeline enforces semidense availability, constructs the compact
-        voxel field, applies pose-conditioned pooling and voxel FiLM, and uses
-        CORAL ordinal regression to score candidates.
-        # TODO: include a graph-like overview of the data flow within the _forward_impl in this doc-string. functions / modules / layers should be nodes; include shape and data information in the edges. i.e.
+        This method scores a set of candidate camera poses for a single snippet
+        using a compact 3D voxel field from EVL and per-candidate semidense
+        projection statistics.
+
+        Frame / transform conventions:
+            - w: World frame (ASE/EFM global).
+            - r: Reference rig frame at the reference timestamp.
+            - c_q: Candidate camera frame for candidate q.
+            - v: EVL voxel grid frame (axis-aligned metric grid).
+            - s: Screen/pixel coordinates from PyTorch3D.
+
+        PoseTW convention:
+            - ``pose_world_cam`` stores ``T_w_c`` (world <- cam).
+            - ``pose_world_rig_ref`` stores ``T_w_r`` (world <- rig_ref).
+            - ``t_world_voxel`` stores ``T_w_v`` (world <- voxel).
+            - Pose composition uses ``@`` and point transforms use ``PoseTW * xyz``.
+
+        Branch overview (high-level data flow):
+            1) Pose encoding:
+               ``T_r_cq = (T_w_r)^-1 @ T_w_cq`` -> (t, R6D) -> LFF MLP -> ``pose_enc``.
+            2) Scene field:
+               EVL per-voxel scalars in voxel grid v -> concat -> Conv3d -> ``field``.
+            3) Candidate voxel coverage:
+               Sample ``counts_norm`` at candidate camera centers ``x_w_cq`` -> ``voxel_valid_frac``.
+            4) Global context:
+               Compute ``pos_grid`` (voxel centers expressed in r, normalized by voxel extent)
+               and pool ``field`` with pose queries -> ``global_feat``.
+            5) Voxel-projection FiLM:
+               Project pooled voxel centers ``x_w_v`` into each candidate camera via ``p3d_cameras``
+               (x_s, y_s in pixels; z_s depth) -> ``voxel_proj`` stats -> FiLM(global_feat, voxel_proj).
+            6) Semidense projection:
+               Sample semidense points ``x_w`` (length-masked) -> project into candidates -> ``semidense_proj``
+               stats (+ optional tiny CNN over a GxG occupancy/depth grid).
+            7) Optional trajectory context:
+               Transform historical rig poses into r and attend by pose tokens -> ``traj_ctx``.
+            8) Scoring head:
+               Concatenate [pose_enc, global_feat, semidense_proj, (semidense_grid_feat), (traj_ctx)]
+               and apply MLP + CORAL -> logits -> prob / expected scores.
+
+        CW90 correction:
+            Candidate generation may apply a CW90 yaw convention for visualization. When
+            ``apply_cw90_correction=True``, v3 undoes this rotation for PoseTW inputs.
+            In that case, callers must also pre-correct ``p3d_cameras`` and set
+            ``p3d_cameras.cw90_corrected = True`` to avoid silent pose/camera mismatch.
 
         Args:
             efm (EfmSnippetView | VinSnippetView): EFM or VIN snippet view.
-            candidate_poses_world_cam (PoseTW["B, Nq, 12"]): Candidate camera poses T_w^c.
-            reference_pose_world_rig (PoseTW["B, 12"]): Reference rig pose T_w^r.
-            p3d_cameras (PerspectiveCameras): Camera batch size B*Nq (R, T, K).
-            return_debug (bool): If True, return VinV3ForwardDiagnostics.
-            backbone_out (EvlBackboneOutput | None): Optional cached EVL outputs.
+            candidate_poses_world_cam (PoseTW["B, Nq, 12"]): Candidate camera poses ``T_w_cq``.
+            reference_pose_world_rig (PoseTW["B, 12"]): Reference rig pose ``T_w_r``.
+            p3d_cameras (PerspectiveCameras): PyTorch3D camera batch (size ``B*Nq``) aligned with candidates.
+            return_debug (bool): If True, return :class:`VinV3ForwardDiagnostics`.
+            backbone_out (EvlBackboneOutput | None): Optional cached EVL outputs (required for VinSnippetView).
 
         Returns:
-            Tuple[VinPrediction, VinV3ForwardDiagnostics | None]:
-                VinPrediction:
-                    logits (Tensor["B, Nq, K-1"]): CORAL logits.
-                    prob (Tensor["B, Nq, K"]): Ordinal probabilities.
-                    expected (Tensor["B, Nq"]): Expected RRI.
-                    expected_normalized (Tensor["B, Nq"]): Expected RRI in [0,1].
-                    candidate_valid (Tensor["B, Nq"]): Valid candidate mask.
-                    voxel_valid_frac (Tensor["B, Nq"]): Voxel coverage proxy.
-                    semidense_candidate_vis_frac (Tensor["B, Nq"]): Semidense visibility proxy.
-                VinV3ForwardDiagnostics (optional):
-                    field_in (Tensor["B, F_in, D, H, W"]), field (Tensor["B, F_g, D, H, W"]),
-                    global_feat (Tensor["B, Nq, F_g"]), semidense_proj (Tensor["B, Nq, F_proj"]),
-                    semidense_grid_feat (Tensor["B, Nq, F_cnn"]), voxel_proj (Tensor["B, Nq, F_proj"]),
-                    pos_grid (Tensor["B, 3, D, H, W"]), feats (Tensor["B, Nq, F_head"]),
-                    traj_feat (Tensor["B, F_traj"]), traj_ctx (Tensor["B, Nq, F_pose"]).
+            Tuple[VinPrediction, VinV3ForwardDiagnostics | None]: Prediction plus optional diagnostics.
         """
         # Shape notation (see docs/typst/shared/macros.typ):
-        # B=batch size, N_q=#candidates (alias of N), D/H/W=voxel grid, V=voxel points,
+        # B=batch size, N_q=num_candidates, D/H/W=voxel grid, V=voxel points,
         # P=points per snippet, P_proj=points per projection, F_*=feature dims.
         if self.config.apply_cw90_correction and not getattr(p3d_cameras, "cw90_corrected", False):
             raise RuntimeError(
@@ -1346,6 +1431,7 @@ class VinModelV3(nn.Module):
         if param_device != device:
             self.to(device)
 
+        # vin_snippet.points_world is in WORLD frame (x_w, y_w, z_w) with optional extras per point.
         vin_snippet = self._ensure_vin_snippet(efm, device=device)  # points_world: (B, P, C_sem)
         prepared = self._prepare_inputs(
             vin_snippet,
@@ -1353,18 +1439,19 @@ class VinModelV3(nn.Module):
             reference_pose_world_rig=reference_pose_world_rig,
             backbone_out=backbone_out,
         )
-        # prepared.pose_world_cam: (B, N_q, 12); pose_world_rig_ref: (B, 12)
+        # prepared.pose_world_cam: (B, N_q, 12) as T_w_cq; prepared.pose_world_rig_ref: (B, 12) as T_w_r.
         pose_feats = self._encode_pose_features(
             prepared.pose_world_cam,
             prepared.pose_world_rig_ref,
         )
-        # pose_vec: (B, N_q, 9); pose_enc: (B, N_q, F_pose); candidate_center_rig_m: (B, N_q, 3)
+        # pose_vec: (B, N_q, 9); pose_enc: (B, N_q, F_pose); candidate_center_rig_m: (B, N_q, 3) in rig_ref metres.
         field_bundle = self._build_field_bundle(backbone_out)
         # field_in: (B, F_in, D, H, W); field: (B, F_g, D, H, W)
 
         candidate_centers_world = prepared.pose_world_cam.t.to(
             dtype=field_bundle.field.dtype,
         )  # (B, N_q, 3)
+        # candidate_centers_world are camera centers x_w_cq in WORLD frame (metres).
         counts_norm = field_bundle.aux.get("counts_norm")
         if counts_norm is None:
             raise KeyError("Missing counts_norm in field bundle.")
@@ -1386,6 +1473,7 @@ class VinModelV3(nn.Module):
             raise KeyError(
                 "Missing backbone output 'voxel/pts_world' required for positional encoding.",
             )
+        # pts_world contains WORLD-space voxel center coordinates x_w_v for each voxel cell.
         global_ctx = self._compute_global_context(
             field_bundle.field,
             pose_feats.pose_enc,
@@ -1394,7 +1482,7 @@ class VinModelV3(nn.Module):
             pose_world_rig_ref=prepared.pose_world_rig_ref,
             voxel_extent=backbone_out.voxel_extent,
         )
-        # global_feat: (B, N_q, F_g); pos_grid: (B, 3, D, H, W)
+        # global_feat: (B, N_q, F_g); pos_grid: (B, 3, D, H, W) = normalized voxel centers in rig_ref frame.
         global_feat = global_ctx.global_feat
         pool_grid = min(
             int(self.config.global_pool_grid_size),
@@ -1411,7 +1499,7 @@ class VinModelV3(nn.Module):
             ),
             pool_grid=pool_grid,
         )
-        # voxel_points: (B, P_proj, 3) with P_proj = G_pool^3
+        # voxel_points: (B, P_proj, 3) WORLD coords with P_proj = G_pool^3 (pooled voxel centers).
         voxel_proj_data = self._project_semidense_points(
             voxel_points,
             p3d_cameras,
@@ -1419,7 +1507,7 @@ class VinModelV3(nn.Module):
             num_candidates=prepared.num_candidates,
             device=prepared.device,
         )
-        # voxel_proj_data: x/y/z/valid are (B*N_q, P_proj)
+        # voxel_proj_data: per-camera screen coords (x_s, y_s in pixels) and depth z_s, shape (B*N_q, P_proj).
         voxel_proj = self._encode_semidense_projection_features(
             voxel_proj_data,
             batch_size=prepared.batch_size,
@@ -1436,11 +1524,13 @@ class VinModelV3(nn.Module):
                 norm=self.voxel_proj_film_norm,
             )
         global_ctx = GlobalContext(pos_grid=global_ctx.pos_grid, global_feat=global_feat)
+
+        # ------------------------------------------------------------------ semidense projection
         semidense_points = self._sample_semidense_points(
             vin_snippet,
             device=prepared.device,
         )
-        # semidense_points: (B, P_fr, C_sem)
+        # semidense_points: (B, P_fr, C_sem) in WORLD frame (XYZ + extras), with P_fr <= semidense_proj_max_points.
         proj_data = self._project_semidense_points(
             semidense_points,
             p3d_cameras,
@@ -1448,7 +1538,7 @@ class VinModelV3(nn.Module):
             num_candidates=prepared.num_candidates,
             device=prepared.device,
         )
-        # proj_data: x/y/z/valid are (B*N_q, P_fr)
+        # proj_data: per-camera screen coords + depth for semidense points, shape (B*N_q, P_fr).
         semidense_proj = self._encode_semidense_projection_features(
             proj_data,
             batch_size=prepared.batch_size,
@@ -1502,6 +1592,12 @@ class VinModelV3(nn.Module):
         candidate_valid = pose_finite & (voxel_valid_frac > 0.0) & (semidense_candidate_vis_frac > 0.0)
 
         # ------------------------------------------------------------------ final feature assembly + scoring
+        # Head input features (per candidate):
+        # - pose_enc: relative pose features in rig_ref frame (R6D+LFF).
+        # - global_feat: pose-conditioned global scene features from the voxel field (optionally FiLM-modulated).
+        # - semidense_proj: per-candidate screen-space coverage/visibility/depth stats from semidense points.
+        # - semidense_grid_feat (optional): tiny-CNN encoding over a GxG projection grid.
+        # - traj_ctx (optional): trajectory context attended by pose tokens.
         parts: list[Tensor] = [
             pose_feats.pose_enc.to(device=prepared.device, dtype=field_bundle.field.dtype),
             global_feat,

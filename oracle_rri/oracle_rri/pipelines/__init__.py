@@ -5,10 +5,10 @@ Training and offline label generation should use the non-UI pipelines in this
 package so data-flow, batching, and performance controls remain explicit.
 """
 
-from .oracle_rri_labeler import OracleRriLabelBatch, OracleRriLabeler, OracleRriLabelerConfig
+from .oracle_rri_labeler import OracleRriLabeler, OracleRriLabelerConfig, OracleRriSample
 
 __all__ = [
-    "OracleRriLabelBatch",
+    "OracleRriSample",
     "OracleRriLabeler",
     "OracleRriLabelerConfig",
 ]

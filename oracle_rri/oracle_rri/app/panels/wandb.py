@@ -31,6 +31,9 @@ from ...utils.wandb_utils import (
     build_run_dataframes,
     collect_run_media_images,
     load_run_histories,
+    plot_dynamics_bar,
+    plot_dynamics_scatter,
+    plot_metric_curves,
 )
 from .common import _info_popover, _pretty_label, _report_exception
 
@@ -482,6 +485,37 @@ def render_wandb_analysis_page() -> None:
             yaxis_title=_pretty_label(metric_choice),
         )
         st.plotly_chart(fig, width="stretch")
+
+    st.subheader("Seaborn quick plots")
+    with st.expander("Quick diagnostic plots (seaborn)", expanded=False):
+        if not selected_histories:
+            st.info("Fetch histories to use seaborn plots.")
+        else:
+            col_s1, col_s2 = st.columns([2, 1])
+            seaborn_metric = col_s1.selectbox(
+                "Metric for seaborn curves",
+                options=metric_choices if metric_choices else [],
+                index=0 if metric_choices else 0,
+            )
+            seaborn_base = col_s2.selectbox(
+                "Base metric for dynamics plots",
+                options=sorted(dynamics_df["base"].unique()) if not dynamics_df.empty else [],
+                index=0 if not dynamics_df.empty else 0,
+            )
+            if seaborn_metric:
+                fig, _ = plot_metric_curves(
+                    selected_histories,
+                    metric=seaborn_metric,
+                    prefer_x_keys=prefer_keys,
+                    run_name_map={str(getattr(run, "id", "")): str(getattr(run, "name", "")) for run in selected_runs},
+                )
+                st.pyplot(fig, clear_figure=True)
+            if not dynamics_df.empty:
+                fig_scatter, _ = plot_dynamics_scatter(dynamics_df)
+                st.pyplot(fig_scatter, clear_figure=True)
+                if seaborn_base:
+                    fig_bar, _ = plot_dynamics_bar(dynamics_df, metric="val_last", base=seaborn_base)
+                    st.pyplot(fig_bar, clear_figure=True)
 
     st.subheader("Architecture & hparam influence")
     if dynamics_df.empty:

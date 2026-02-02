@@ -51,8 +51,9 @@ def render_summary_tab(ctx: VinDiagContext) -> None:
             "mesh distances (before vs after adding the candidate point cloud). "
             "**Y** is the VIN expected score from the CORAL ordinal head "
             "(mean of `P(y>k)` across bins, normalized to `[0,1]`). "
-            "VIN v2 uses pose features from `[t, r6d]` in the reference rig "
-            "frame plus global voxel context; VIN v1 may also use local "
+            "VIN v2/v3 use pose features from `[t, r6d]` in the reference rig "
+            "frame plus global voxel context; VIN v3 additionally concatenates "
+            "semidense/voxel projection statistics. VIN v1 may also use local "
             "frustum tokens.",
         )
         rri = _to_numpy(batch.rri.reshape(-1))
@@ -83,6 +84,159 @@ def render_summary_tab(ctx: VinDiagContext) -> None:
         )
         st.plotly_chart(fig, width="stretch")
 
+    with st.expander("Candidate leaderboard + proxy correlations", expanded=False):
+        expected = pred.expected_normalized.reshape(-1)
+        candidate_valid = pred.candidate_valid.reshape(-1).to(dtype=torch.bool)
+        voxel_valid = pred.voxel_valid_frac.reshape(-1) if pred.voxel_valid_frac is not None else None
+        sem_vis = (
+            pred.semidense_candidate_vis_frac.reshape(-1)
+            if pred.semidense_candidate_vis_frac is not None
+            else pred.semidense_valid_frac.reshape(-1)
+            if pred.semidense_valid_frac is not None
+            else None
+        )
+        radius_m = torch.linalg.vector_norm(debug.candidate_center_rig_m, dim=-1).reshape(-1)
+
+        vin_model_local = state.module.vin if state.module is not None else None
+        expected_rri = None
+        if vin_model_local is not None and getattr(vin_model_local, "head_coral", None) is not None:
+            head_coral = vin_model_local.head_coral
+            if getattr(head_coral, "has_bin_values", False):
+                try:
+                    expected_rri = head_coral.expected_from_probs(pred.prob).reshape(-1)
+                except Exception:  # pragma: no cover - diagnostics only
+                    expected_rri = None
+
+        total = int(expected.numel())
+        k_default = min(12, total) if total else 1
+        k = int(
+            st.number_input(
+                "Top-k candidates",
+                min_value=1,
+                max_value=max(1, min(128, total)),
+                value=k_default,
+                step=1,
+                key="vin_summary_topk",
+            )
+        )
+        only_valid = st.checkbox(
+            "Only valid candidates",
+            value=False,
+            key="vin_summary_only_valid",
+        )
+        mask = torch.isfinite(expected)
+        if only_valid:
+            mask = mask & candidate_valid
+
+        masked_idx = torch.where(mask)[0]
+        if masked_idx.numel() == 0:
+            st.info("No candidates available for leaderboard (mask filtered everything).")
+        else:
+            scores = expected[masked_idx]
+            k_eff = int(min(k, int(scores.numel())))
+            top_local = torch.topk(scores, k=k_eff, largest=True).indices
+            top_idx = masked_idx[top_local]
+            rows: list[dict[str, object]] = []
+            for flat_idx in top_idx.tolist():
+                row: dict[str, object] = {
+                    "flat_idx": int(flat_idx),
+                    "expected_norm": float(expected[flat_idx].item()),
+                    "radius_m": float(radius_m[flat_idx].item()),
+                    "candidate_valid": bool(candidate_valid[flat_idx].item()),
+                }
+                if voxel_valid is not None:
+                    row["voxel_valid_frac"] = float(voxel_valid[flat_idx].item())
+                if sem_vis is not None:
+                    row["semidense_vis_frac"] = float(sem_vis[flat_idx].item())
+                if expected_rri is not None:
+                    row["expected_rri"] = float(expected_rri[flat_idx].item())
+                if batch.rri is not None:
+                    try:
+                        row["oracle_rri"] = float(batch.rri.reshape(-1)[flat_idx].item())
+                    except Exception:  # pragma: no cover - guard
+                        pass
+                rows.append(row)
+            st.dataframe(rows, width="stretch", hide_index=True)
+
+        def _corr(x: torch.Tensor, y: torch.Tensor) -> float | None:
+            x_np = _to_numpy(x.reshape(-1))
+            y_np = _to_numpy(y.reshape(-1))
+            finite = np.isfinite(x_np) & np.isfinite(y_np)
+            if finite.sum() < 3:
+                return None
+            xv = x_np[finite]
+            yv = y_np[finite]
+            denom = np.std(xv) * np.std(yv)
+            if denom < 1e-12:
+                return None
+            return float(np.mean((xv - xv.mean()) * (yv - yv.mean())) / denom)
+
+        _info_popover(
+            "proxy correlations",
+            "Quick sanity checks: if expected score correlates almost perfectly with a proxy "
+            "(e.g., semidense visibility), the model might be ignoring other cues.",
+        )
+        corr_rows: list[dict[str, object]] = []
+        for name, values in (
+            ("radius_m", radius_m),
+            ("voxel_valid_frac", voxel_valid),
+            ("semidense_candidate_vis_frac", sem_vis),
+        ):
+            if values is None:
+                continue
+            corr = _corr(values, expected)
+            corr_rows.append({"feature": name, "pearson": corr})
+        if corr_rows:
+            st.dataframe(corr_rows, width="stretch", hide_index=True)
+
+        semidense_proj = getattr(debug, "semidense_proj", None)
+        voxel_proj = getattr(debug, "voxel_proj", None)
+        for label, values in (("semidense_proj", semidense_proj), ("voxel_proj", voxel_proj)):
+            if not torch.is_tensor(values) or values.ndim != 3:
+                continue
+            vec = values.reshape(-1, values.shape[-1])
+            if int(vec.shape[-1]) != 5:
+                continue
+            names = [
+                "coverage",
+                "empty_frac",
+                "semidense_candidate_vis_frac",
+                "depth_mean",
+                "depth_std",
+            ]
+            corr_vals: list[dict[str, object]] = []
+            for idx, name in enumerate(names):
+                corr = _corr(vec[:, idx], expected)
+                corr_vals.append({"feature": f"{label}.{name}", "pearson": corr})
+            fig_corr = px.bar(
+                corr_vals,
+                x="feature",
+                y="pearson",
+                title=_pretty_label(f"{label} feature correlations vs expected"),
+                labels={"pearson": _pretty_label("pearson")},
+            )
+            st.plotly_chart(fig_corr, width="stretch")
+
+        if voxel_valid is not None:
+            fig = px.scatter(
+                x=_to_numpy(voxel_valid),
+                y=_to_numpy(expected),
+                labels={"x": _pretty_label("voxel_valid_frac"), "y": _pretty_label("expected (normalized)")},
+                title=_pretty_label("Expected vs voxel_valid_frac"),
+            )
+            st.plotly_chart(fig, width="stretch")
+        if sem_vis is not None:
+            fig = px.scatter(
+                x=_to_numpy(sem_vis),
+                y=_to_numpy(expected),
+                labels={
+                    "x": _pretty_label("semidense_candidate_vis_frac"),
+                    "y": _pretty_label("expected (normalized)"),
+                },
+                title=_pretty_label("Expected vs semidense_candidate_vis_frac"),
+            )
+            st.plotly_chart(fig, width="stretch")
+
     feature_dims: list[tuple[str, int]] = []
     if hasattr(debug, "pose_enc"):
         feature_dims.append(("pose_enc", int(debug.pose_enc.shape[-1])))
@@ -94,10 +248,11 @@ def render_summary_tab(ctx: VinDiagContext) -> None:
         _info_popover(
             "feature dims",
             "Feature blocks concatenated before the scorer MLP. "
-            "VIN v2 uses `pose_enc` (LFF over translation + rotation-6D "
+            "VIN v2/v3 use `pose_enc` (LFF over translation + rotation-6D "
             "with learned scales) and `global_feat` (pose-conditioned "
-            "attention pooling over the voxel field). "
-            "VIN v1 can add `local_feat` from frustum sampling.",
+            "attention pooling over the voxel field). VIN v3 may also append "
+            "projection stats (see Tokens tab). VIN v1 can add `local_feat` "
+            "from frustum sampling.",
         )
         dims_df = {
             "modality": [name for name, _ in feature_dims],
@@ -145,10 +300,10 @@ def render_summary_tab(ctx: VinDiagContext) -> None:
             "and plotted as |value|.",
         )
         channel_count = int(field_in.shape[1])
-        if channel_count == len(FIELD_CHANNELS_V2):
-            channel_names = list(FIELD_CHANNELS_V2)
-        elif channel_count == len(cfg.module_config.vin.scene_field_channels):
+        if channel_count == len(cfg.module_config.vin.scene_field_channels):
             channel_names = list(cfg.module_config.vin.scene_field_channels)
+        elif channel_count == len(FIELD_CHANNELS_V2):
+            channel_names = list(FIELD_CHANNELS_V2)
         else:
             channel_names = [f"ch_{idx}" for idx in range(channel_count)]
         default_channels = channel_names[: min(len(channel_names), 6)]
@@ -214,13 +369,20 @@ def render_summary_tab(ctx: VinDiagContext) -> None:
         value=False,
         key="vin_summary_feat_norm_log1p",
     )
+    log_norm_x = st.checkbox(
+        "Log x-axis (norm)",
+        value=False,
+        key="vin_summary_feat_norm_logx",
+    )
+    norm_bins = int(st.session_state.get("vin_summary_field_hist_bins", 60))
     norm_series = [(name, _to_numpy(vals)) for name, vals in feat_norms.items()]
     fig = _histogram_overlay(
         norm_series,
-        bins=60,
+        bins=norm_bins,
         title=_pretty_label("Feature norms (per-candidate)"),
         xaxis_title=_pretty_label("norm"),
         log1p_counts=log1p_norm_counts,
+        log_x=log_norm_x,
     )
     st.plotly_chart(fig, width="stretch")
 

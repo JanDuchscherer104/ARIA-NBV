@@ -266,15 +266,23 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
             index=0,
             key="vin_geom_candidate_pose_mode",
         )
-        candidate_color_mode = st.selectbox(
+        candidate_color_mode_ui = st.selectbox(
             "Candidate color mode",
-            options=["valid fraction", "solid", "loss"],
+            options=[
+                "valid fraction",
+                "solid",
+                "loss",
+                "predicted score",
+                "oracle rri",
+                "voxel_valid_frac",
+                "semidense_candidate_vis_frac",
+            ],
             index=0,
             key="vin_geom_candidate_color_mode",
         )
         candidate_color = "#ffd966"
         candidate_colorscale = "Viridis"
-        if candidate_color_mode == "solid":
+        if candidate_color_mode_ui == "solid":
             candidate_color = st.color_picker(
                 "Candidate color",
                 value="#ffd966",
@@ -391,43 +399,87 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
                     key="vin_geom_backbone_max_points",
                 ),
             )
-    candidate_loss: torch.Tensor | None = None
-    if candidate_color_mode == "loss":
-        loss_error = None
-        binner = getattr(state.module, "_binner", None)
-        if binner is None:
-            loss_error = "RRI binner unavailable; cannot compute loss hue."
-        elif batch.rri is None:
-            loss_error = "Loss hue requires oracle RRI labels."
-        else:
-            try:
-                with torch.no_grad():
-                    logits = pred.logits
-                    rri = batch.rri.to(device=logits.device)
-                    rri_flat = rri.reshape(-1)
-                    mask = torch.isfinite(rri_flat)
-                    if mask.any():
-                        labels = binner.transform(rri_flat)
-                        loss_per = coral_loss(
-                            logits.reshape(-1, logits.shape[-1])[mask],
-                            labels[mask],
-                            num_classes=int(binner.num_classes),
-                            reduction="none",
-                        )
-                        loss_flat = torch.full(
-                            (rri_flat.numel(),),
-                            float("nan"),
-                            device=logits.device,
-                            dtype=torch.float32,
-                        )
-                        loss_flat[mask] = loss_per
-                        candidate_loss = loss_flat.reshape(rri.shape)
-                    else:
-                        loss_error = "Loss hue requires finite RRI labels."
-            except Exception as exc:  # pragma: no cover - UI guard
-                loss_error = f"{type(exc).__name__}: {exc}"
-        if loss_error:
-            st.info(loss_error)
+    candidate_plot_mode = "valid_fraction"
+    candidate_color_values: torch.Tensor | None = None
+    candidate_color_title = "value"
+    match candidate_color_mode_ui:
+        case "solid":
+            candidate_plot_mode = "solid"
+        case "valid fraction":
+            candidate_plot_mode = "valid_fraction"
+        case "predicted score":
+            candidate_plot_mode = "scalar"
+            candidate_color_values = pred.expected_normalized
+            candidate_color_title = "expected_norm"
+        case "oracle rri":
+            if batch.rri is None:
+                st.info("Oracle RRI unavailable; falling back to valid fraction.")
+            else:
+                candidate_plot_mode = "scalar"
+                candidate_color_values = batch.rri
+                candidate_color_title = "oracle_rri"
+        case "voxel_valid_frac":
+            values = pred.voxel_valid_frac
+            if values is None:
+                values = getattr(debug, "voxel_valid_frac", None)
+            if values is None:
+                st.info("voxel_valid_frac unavailable; falling back to valid fraction.")
+            else:
+                candidate_plot_mode = "scalar"
+                candidate_color_values = values
+                candidate_color_title = "voxel_valid_frac"
+        case "semidense_candidate_vis_frac":
+            values = pred.semidense_candidate_vis_frac
+            if values is None:
+                values = getattr(debug, "semidense_candidate_vis_frac", None)
+            if values is None:
+                values = pred.semidense_valid_frac
+            if values is None:
+                st.info("semidense_candidate_vis_frac unavailable; falling back to valid fraction.")
+            else:
+                candidate_plot_mode = "scalar"
+                candidate_color_values = values
+                candidate_color_title = "semidense_candidate_vis_frac"
+        case "loss":
+            loss_error = None
+            binner = getattr(state.module, "_binner", None)
+            if binner is None:
+                loss_error = "RRI binner unavailable; cannot compute loss hue."
+            elif batch.rri is None:
+                loss_error = "Loss hue requires oracle RRI labels."
+            else:
+                try:
+                    with torch.no_grad():
+                        logits = pred.logits
+                        rri = batch.rri.to(device=logits.device)
+                        rri_flat = rri.reshape(-1)
+                        mask = torch.isfinite(rri_flat)
+                        if mask.any():
+                            labels = binner.transform(rri_flat)
+                            loss_per = coral_loss(
+                                logits.reshape(-1, logits.shape[-1])[mask],
+                                labels[mask],
+                                num_classes=int(binner.num_classes),
+                                reduction="none",
+                            )
+                            loss_flat = torch.full(
+                                (rri_flat.numel(),),
+                                float("nan"),
+                                device=logits.device,
+                                dtype=torch.float32,
+                            )
+                            loss_flat[mask] = loss_per
+                            candidate_plot_mode = "scalar"
+                            candidate_color_values = loss_flat.reshape(rri.shape)
+                            candidate_color_title = "loss"
+                        else:
+                            loss_error = "Loss hue requires finite RRI labels."
+                except Exception as exc:  # pragma: no cover - UI guard
+                    loss_error = f"{type(exc).__name__}: {exc}"
+            if loss_error:
+                st.info(loss_error)
+        case _:
+            st.info("Unknown candidate color mode; falling back to valid fraction.")
     apply_cw90_correction = False
     if state.module is not None and hasattr(state.module, "vin"):
         apply_cw90_correction = bool(
@@ -469,14 +521,11 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
             if candidate_pose_mode == "world cam"
             else "rig",
             candidate_poses_world_cam=candidate_poses_world_cam,
-            candidate_color_mode="solid"
-            if candidate_color_mode == "solid"
-            else "loss"
-            if candidate_color_mode == "loss"
-            else "valid_fraction",
+            candidate_color_mode=candidate_plot_mode,
             candidate_color=candidate_color,
             candidate_colorscale=candidate_colorscale,
-            candidate_loss=candidate_loss,
+            candidate_color_values=candidate_color_values,
+            candidate_color_title=candidate_color_title,
             candidate_frusta_indices=candidate_frusta_indices,
             candidate_frusta_camera=candidate_frusta_camera,
             candidate_frusta_frame_index=candidate_frusta_frame_index,

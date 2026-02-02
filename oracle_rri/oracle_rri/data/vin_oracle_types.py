@@ -15,7 +15,7 @@ from ..vin.types import EvlBackboneOutput
 from .efm_views import EfmSnippetView, VinSnippetView
 
 if TYPE_CHECKING:
-    from ..pipelines.oracle_rri_labeler import OracleRriLabelBatch
+    from ..pipelines.oracle_rri_labeler import OracleRriSample
 
 
 @dataclass(slots=True)
@@ -252,7 +252,7 @@ class VinOracleBatch:
     @classmethod
     def from_label(
         cls,
-        label_batch: "OracleRriLabelBatch",
+        label_batch: "OracleRriSample",
         *,
         efm_keep_keys: set[str] | None,
     ) -> "VinOracleBatch":

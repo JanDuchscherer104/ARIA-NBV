@@ -32,13 +32,25 @@ def render_coral_tab(ctx: VinDiagContext) -> None:
     binner = getattr(state.module, "_binner", None)
     head_coral = getattr(state.module.vin, "head_coral", None) if state.module is not None else None
 
-    logits = pred.logits
-    probs = pred.prob
-    if logits.ndim == 3:
-        logits = logits[0]
-    if probs.ndim == 3:
-        probs = probs[0]
-    num_classes = int(probs.shape[-1])
+    logits_full = pred.logits
+    probs_full = pred.prob
+    num_classes = int(probs_full.shape[-1])
+
+    batch_index = 0
+    if logits_full.ndim == 3 and logits_full.shape[0] > 1:
+        batch_index = int(
+            st.slider(
+                "Batch index",
+                min_value=0,
+                max_value=max(0, int(logits_full.shape[0]) - 1),
+                value=0,
+                step=1,
+                key="vin_coral_batch",
+            ),
+        )
+
+    logits = logits_full[batch_index] if logits_full.ndim == 3 else logits_full
+    probs = probs_full[batch_index] if probs_full.ndim == 3 else probs_full
 
     col_left, col_right = st.columns(2)
     with col_left:
@@ -184,7 +196,7 @@ def render_coral_tab(ctx: VinDiagContext) -> None:
             st.info("No bin representatives available.")
 
     st.subheader("CORAL diagnostics across candidates")
-    monotonicity = coral_monotonicity_violation_rate(logits).detach().cpu().numpy()
+    monotonicity = coral_monotonicity_violation_rate(logits_full).reshape(-1).detach().cpu().numpy()
     fig_mono = _histogram_overlay(
         [("monotonicity_violation_rate", monotonicity)],
         bins=60,
@@ -196,7 +208,7 @@ def render_coral_tab(ctx: VinDiagContext) -> None:
 
     if batch.rri is not None and binner is not None:
         rri_flat = batch.rri.reshape(-1)
-        logits_flat = logits.reshape(-1, logits.shape[-1])
+        logits_flat = logits_full.reshape(-1, logits_full.shape[-1])
         mask = torch.isfinite(rri_flat)
         if mask.any():
             labels = binner.transform(rri_flat)

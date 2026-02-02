@@ -730,6 +730,62 @@ def render_offline_stats_page() -> None:
         st.subheader("VIN batch tensor shapes")
         st.json(batch_shapes)
 
+    memory_summary = stats_cache.get("memory_summary")
+    if isinstance(memory_summary, dict) and memory_summary:
+        st.subheader("Memory footprint")
+        _info_popover(
+            "memory footprint",
+            "Estimates the in-memory footprint (CPU) of the returned VinOracleBatch "
+            "components by summing tensor storage sizes. This is a lower bound on "
+            "peak memory during loading (temporary decode buffers are not included).",
+        )
+        order = ["backbone", "vin_snippet", "rri", "pose_camera", "total"]
+        rows = []
+        for name in order:
+            stats = memory_summary.get(name)
+            if not isinstance(stats, dict):
+                continue
+            rows.append(
+                {
+                    "component": name,
+                    "mean_mib": float(stats.get("mean_mib", float("nan"))),
+                    "median_mib": float(stats.get("median_mib", float("nan"))),
+                    "p95_mib": float(stats.get("p95_mib", float("nan"))),
+                },
+            )
+        mem_df = pd.DataFrame(rows)
+        if not mem_df.empty:
+            st.dataframe(mem_df, width="stretch", height=220)
+            with DEFAULT_PLOT_CFG.apply():
+                plot_df = mem_df.copy()
+                if log_y:
+                    for col in ("mean_mib", "p95_mib"):
+                        vals = plot_df[col].to_numpy(dtype=float, copy=True)
+                        vals[vals <= 0] = np.nan
+                        plot_df[col] = vals
+
+                fig, ax = plt.subplots(figsize=(7, 3))
+                sns.barplot(data=plot_df, x="component", y="mean_mib", ax=ax, color="#4c78a8")
+                if log_y:
+                    ax.set_yscale("log")
+                ax.set_title(_pretty_label("Mean memory footprint by component"))
+                ax.set_xlabel(_pretty_label("component"))
+                ax.set_ylabel(_pretty_label("MiB (log)" if log_y else "MiB"))
+                ax.tick_params(axis="x", rotation=25)
+                st.pyplot(fig, clear_figure=True)
+                plt.close(fig)
+
+                fig, ax = plt.subplots(figsize=(7, 3))
+                sns.barplot(data=plot_df, x="component", y="p95_mib", ax=ax, color="#f58518")
+                if log_y:
+                    ax.set_yscale("log")
+                ax.set_title(_pretty_label("P95 memory footprint by component"))
+                ax.set_xlabel(_pretty_label("component"))
+                ax.set_ylabel(_pretty_label("MiB (log)" if log_y else "MiB"))
+                ax.tick_params(axis="x", rotation=25)
+                st.pyplot(fig, clear_figure=True)
+                plt.close(fig)
+
     def _apply_log_y(fig: go.Figure) -> None:
         if not log_y:
             return

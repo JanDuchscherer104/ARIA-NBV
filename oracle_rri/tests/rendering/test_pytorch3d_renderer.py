@@ -54,6 +54,14 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def test_pytorch3d_config_accepts_debug() -> None:
+    cfg = Pytorch3DDepthRendererConfig(device="cpu", is_debug=True)
+    assert cfg.is_debug is True
+
+    renderer = cfg.setup_target()
+    assert renderer.console.is_debug is True
+
+
 def _make_camera(width: int = 64, height: int = 64) -> CameraTW:
     params = torch.tensor([[60.0, 60.0, width / 2.0, height / 2.0]], dtype=torch.float32)
     return CameraTW.from_surreal(

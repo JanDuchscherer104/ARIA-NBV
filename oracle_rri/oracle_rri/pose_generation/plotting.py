@@ -195,7 +195,7 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
         *,
         title: str = "Reference frame",
         display_rotate: bool = False,
-        use_sampling_pose: bool = True,
+        use_sampling_pose: bool = False,
     ) -> Self:
         """Add the candidate reference frame axes to the figure.
 
@@ -388,7 +388,7 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
         include_axes: bool = False,
         include_center: bool = False,
         display_rotate: bool = False,
-    ) -> "SnippetPlotBuilder":
+    ) -> Self:
         """Overlay frusta using the attached candidate results.
 
         Notes:
@@ -525,8 +525,11 @@ def plot_position_sphere(
     *,
     title: str = "Positions in rig frame",
     show_axes: bool = True,
+    dirs: np.ndarray | None = None,
+    dir_scale: float | None = None,
 ) -> go.Figure:
     """3D scatter of position offsets."""
+    offsets = np.asarray(offsets)
     fig = go.Figure(
         data=go.Scatter3d(
             x=offsets[:, 0],
@@ -540,6 +543,40 @@ def plot_position_sphere(
     if show_axes:
         fig = SnippetPlotBuilder.add_frame_axes_to_fig(
             fig=fig, cam_centers=np.zeros((1, 3)), cam_axes=np.eye(3)[None, ...], scale=0.4
+        )
+    if dirs is not None:
+        dirs = np.asarray(dirs)
+        if dirs.shape[0] != offsets.shape[0]:
+            n = min(dirs.shape[0], offsets.shape[0])
+            console.warn(
+                f"Direction count mismatch for position plot: offsets={offsets.shape[0]}, dirs={dirs.shape[0]}."
+            )
+            offsets_use = offsets[:n]
+            dirs = dirs[:n]
+        else:
+            offsets_use = offsets
+        norms = np.linalg.norm(dirs, axis=1, keepdims=True)
+        dirs = dirs / np.clip(norms, 1e-8, None)
+        if dir_scale is None:
+            radii = np.linalg.norm(offsets_use, axis=1)
+            median = float(np.median(radii)) if radii.size else 1.0
+            if not np.isfinite(median) or median <= 0:
+                median = 1.0
+            dir_scale = 0.15 * median
+        seg_start = offsets_use
+        seg_ends = offsets_use + dirs * float(dir_scale)
+        seg = np.stack([seg_start, seg_ends], axis=1)
+        seg = np.concatenate([seg, np.full((seg.shape[0], 1, 3), np.nan, dtype=float)], axis=1).reshape(-1, 3)
+        fig.add_trace(
+            go.Scatter3d(
+                x=seg[:, 0],
+                y=seg[:, 1],
+                z=seg[:, 2],
+                mode="lines",
+                line={"color": "firebrick", "width": 2},
+                name="view dirs",
+                opacity=0.7,
+            )
         )
     fig.update_layout(
         title=title,

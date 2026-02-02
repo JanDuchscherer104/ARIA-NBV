@@ -196,10 +196,13 @@ def render_rri_binning_page() -> None:
     if normalize_x and cdf_sorter is not None and cdf_values is not None:
         tick_levels = np.linspace(0.0, 1.0, num=11, endpoint=True)
         tick_labels = np.interp(tick_levels, cdf_values, cdf_sorter)
+        def _format_tick_label(value: float) -> str:
+            return f"{value:.2e}"
+
         fig_hist.update_xaxes(
             tickmode="array",
             tickvals=tick_levels.tolist(),
-            ticktext=[f"{val:.2f}" for val in tick_labels],
+            ticktext=[_format_tick_label(float(val)) for val in tick_labels],
             range=[0.0, 1.0],
         )
     if show_edges:
