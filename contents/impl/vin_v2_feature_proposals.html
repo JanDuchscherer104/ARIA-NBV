@@ -1,0 +1,1976 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>VIN v2 Feature + Encoding Proposals – Semantic NBV Planning</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-f418161beb48e0141c760e455f12af2c.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-6cd23cb7756619bc0e9bdda1db2af307.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-bff151b320a95a122dd3cd8d05e7679b.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-6cd23cb7756619bc0e9bdda1db2af307.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar docked nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Semantic NBV Planning</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="../../contents/todos.html" aria-current="page"> 
+<span class="menu-text">TODOs</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../contents/setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-project-state" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Project State</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-project-state">    
+        <li>
+    <a class="dropdown-item" href="../../contents/roadmap.html">
+ <span class="dropdown-text">Roadmap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/questions.html">
+ <span class="dropdown-text">Research Questions</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/experiments/findings.html">
+ <span class="dropdown-text">Findings</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-resources" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Resources</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-resources">    
+        <li>
+    <a class="dropdown-item" href="../../contents/resources.html">
+ <span class="dropdown-text">Resources (External Links, Repos, Docs, etc.)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/ase_dataset.html">
+ <span class="dropdown-text">ASE Dataset</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/glossary.html">
+ <span class="dropdown-text">Glossary</span></a>
+  </li>  
+    </ul>
+  </li>
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-bi-github" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+      <i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="nav-menu-bi-github">    
+        <li>
+    <a class="dropdown-item" href="https://github.com/JanDuchscherer104/NBV">
+ <span class="dropdown-text">View Source</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="https://github.com/JanDuchscherer104/NBV/issues">
+ <span class="dropdown-text">Open Issue</span></a>
+  </li>  
+    </ul>
+  </li>
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/impl/overview.html">Implementations</a></li><li class="breadcrumb-item"><a href="../../contents/impl/vin_v2_feature_proposals.html">VIN v2 Feature + Encoding Proposals</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Home</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Literature</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/literature/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Literature Review</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/literature/vin_nbv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">VIN-NBV: A View Introspection Network for Next-Best-View Selection</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/literature/gen_nbv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/literature/scene_script.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/literature/efm3d.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D &amp; EVL</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Project State</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/experiments/findings.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Experimental Findings</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/questions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Research Questions</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/roadmap.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Project Roadmap</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/todos.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Action Items &amp; TODOs</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Resources</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/setup.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Setup Instructions</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/resources.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Resources &amp; Tools</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ase_dataset.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Aria Synthetic Environments (ASE) Dataset</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/glossary.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Glossary</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Theory</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/theory/nbv_background.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">NBV Background</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/theory/rri_theory.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Relative Reconstruction Improvement (RRI) Theory</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/theory/surface_metrics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Surface Reconstruction Metrics</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/theory/semi-dense-pc.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Semi-Dense Point Clouds</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Implementations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Implementation Overview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/aria_nbv_overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">aria_nbv Overview &amp; Architecture</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/aria_nbv_package.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">aria_nbv Package (formerly oracle_rri)</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/data_pipeline_overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ASE Data Pipeline &amp; Streamlit Usage</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/oracle_rri_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">aria_nbv Implementation Overview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/rri_computation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Computing RRI with Ground Truth Meshes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/coral_intergarion.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Implementing CORAL for Ordinal Regression to Continuous Targets</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/vin_nbv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">View Introspection Network (VIN) on EVL</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/vin_v2_feature_proposals.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">VIN v2 Feature + Encoding Proposals</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
+ <span class="menu-text">Architecture Diagrams</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/diagrams.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">VIN NBV Diagrams</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true">
+ <span class="menu-text">External Implementations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-7" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ext-impl/atek_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ATEK Implementation Index</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ext-impl/efm3d_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D Implementation Index</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ext-impl/prj_aria_tools_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ProjectAria Tools: Complete Reference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ext-impl/efm3d_symbol_index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D Symbol Index</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="true">
+ <span class="menu-text">Presentations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-8" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../typst/slides/slides_1.pdf" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Typst Slides 1</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../typst/slides/slides_2.pdf" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Typst Slides 2</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#scope" id="toc-scope" class="nav-link active" data-scroll-target="#scope"><span class="header-section-number">1</span> Scope</a></li>
+  <li><a href="#context-and-constraints" id="toc-context-and-constraints" class="nav-link" data-scroll-target="#context-and-constraints"><span class="header-section-number">2</span> Context and constraints</a></li>
+  <li><a href="#design-goals" id="toc-design-goals" class="nav-link" data-scroll-target="#design-goals"><span class="header-section-number">3</span> Design goals</a></li>
+  <li><a href="#proposed-feature-bundles" id="toc-proposed-feature-bundles" class="nav-link" data-scroll-target="#proposed-feature-bundles"><span class="header-section-number">4</span> Proposed feature bundles</a>
+  <ul class="collapse">
+  <li><a href="#p0-coverage-occupancy-core-baseline" id="toc-p0-coverage-occupancy-core-baseline" class="nav-link" data-scroll-target="#p0-coverage-occupancy-core-baseline"><span class="header-section-number">4.1</span> P0: Coverage + occupancy core (baseline++)</a></li>
+  <li><a href="#p1-boundary-uncertainty-cues-derived-channels" id="toc-p1-boundary-uncertainty-cues-derived-channels" class="nav-link" data-scroll-target="#p1-boundary-uncertainty-cues-derived-channels"><span class="header-section-number">4.2</span> P1: Boundary + uncertainty cues (derived channels)</a></li>
+  <li><a href="#p2-compressed-neck-features" id="toc-p2-compressed-neck-features" class="nav-link" data-scroll-target="#p2-compressed-neck-features"><span class="header-section-number">4.3</span> P2: Compressed neck features</a></li>
+  <li><a href="#p3-entity-aware-cues-obb-aware-vin" id="toc-p3-entity-aware-cues-obb-aware-vin" class="nav-link" data-scroll-target="#p3-entity-aware-cues-obb-aware-vin"><span class="header-section-number">4.4</span> P3: Entity-aware cues (OBB-aware VIN)</a></li>
+  <li><a href="#p4-semidense-projection-features-always-on-voxel-independent" id="toc-p4-semidense-projection-features-always-on-voxel-independent" class="nav-link" data-scroll-target="#p4-semidense-projection-features-always-on-voxel-independent"><span class="header-section-number">4.5</span> P4: Semidense projection features (always-on, voxel-independent)</a>
+  <ul class="collapse">
+  <li><a href="#theory-projection-based-coverage-as-an-rri-proxy" id="toc-theory-projection-based-coverage-as-an-rri-proxy" class="nav-link" data-scroll-target="#theory-projection-based-coverage-as-an-rri-proxy"><span class="header-section-number">4.5.1</span> Theory: projection-based coverage as an RRI proxy</a></li>
+  <li><a href="#suggested-injection-point-vinmodelv2" id="toc-suggested-injection-point-vinmodelv2" class="nav-link" data-scroll-target="#suggested-injection-point-vinmodelv2"><span class="header-section-number">4.5.2</span> Suggested injection point (VinModelV2)</a></li>
+  <li><a href="#practical-recipe-using-efmpointsviewcollapse_points" id="toc-practical-recipe-using-efmpointsviewcollapse_points" class="nav-link" data-scroll-target="#practical-recipe-using-efmpointsviewcollapse_points"><span class="header-section-number">4.5.3</span> Practical recipe (using EfmPointsView::collapse_points)</a></li>
+  <li><a href="#optional-pointnext-s-semidense-encoder-global-point-embedding" id="toc-optional-pointnext-s-semidense-encoder-global-point-embedding" class="nav-link" data-scroll-target="#optional-pointnext-s-semidense-encoder-global-point-embedding"><span class="header-section-number">4.5.4</span> Optional: PointNeXt-S semidense encoder (global point embedding)</a></li>
+  <li><a href="#film-style-modulation-of-the-global-voxel-context-recommended-injection" id="toc-film-style-modulation-of-the-global-voxel-context-recommended-injection" class="nav-link" data-scroll-target="#film-style-modulation-of-the-global-voxel-context-recommended-injection"><span class="header-section-number">4.5.5</span> FiLM-style modulation of the global voxel context (recommended injection)</a></li>
+  <li><a href="#optional-encoder-for-past-ego-trajectory-global-point-embedding" id="toc-optional-encoder-for-past-ego-trajectory-global-point-embedding" class="nav-link" data-scroll-target="#optional-encoder-for-past-ego-trajectory-global-point-embedding"><span class="header-section-number">4.5.6</span> Optional: encoder for past ego trajectory (global point embedding)</a></li>
+  </ul></li>
+  <li><a href="#p5-2d-token-reuse-appearance-priors" id="toc-p5-2d-token-reuse-appearance-priors" class="nav-link" data-scroll-target="#p5-2d-token-reuse-appearance-priors"><span class="header-section-number">4.6</span> P5: 2D token reuse (appearance priors)</a></li>
+  </ul></li>
+  <li><a href="#encoding-schemas" id="toc-encoding-schemas" class="nav-link" data-scroll-target="#encoding-schemas"><span class="header-section-number">5</span> Encoding schemas</a>
+  <ul class="collapse">
+  <li><a href="#candidate-relative-positional-keys" id="toc-candidate-relative-positional-keys" class="nav-link" data-scroll-target="#candidate-relative-positional-keys"><span class="header-section-number">5.1</span> Candidate-relative positional keys</a></li>
+  <li><a href="#hybrid-pose-encoding-r6d-shell" id="toc-hybrid-pose-encoding-r6d-shell" class="nav-link" data-scroll-target="#hybrid-pose-encoding-r6d-shell"><span class="header-section-number">5.2</span> Hybrid pose encoding (R6D + shell)</a></li>
+  <li><a href="#distance-to-voxel-features" id="toc-distance-to-voxel-features" class="nav-link" data-scroll-target="#distance-to-voxel-features"><span class="header-section-number">5.3</span> Distance-to-voxel features</a></li>
+  <li><a href="#multi-scale-pooling" id="toc-multi-scale-pooling" class="nav-link" data-scroll-target="#multi-scale-pooling"><span class="header-section-number">5.4</span> Multi-scale pooling</a></li>
+  <li><a href="#pose-conditioned-attention-diagnostics" id="toc-pose-conditioned-attention-diagnostics" class="nav-link" data-scroll-target="#pose-conditioned-attention-diagnostics"><span class="header-section-number">5.5</span> Pose-conditioned attention diagnostics</a>
+  <ul class="collapse">
+  <li><a href="#theory-attention-concentration-as-a-diagnostic" id="toc-theory-attention-concentration-as-a-diagnostic" class="nav-link" data-scroll-target="#theory-attention-concentration-as-a-diagnostic"><span class="header-section-number">5.5.1</span> Theory: attention concentration as a diagnostic</a></li>
+  <li><a href="#implementation-sketch-poseconditionedglobalpool" id="toc-implementation-sketch-poseconditionedglobalpool" class="nav-link" data-scroll-target="#implementation-sketch-poseconditionedglobalpool"><span class="header-section-number">5.5.2</span> Implementation sketch (PoseConditionedGlobalPool)</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#out-of-voxel-mitigation-recipe" id="toc-out-of-voxel-mitigation-recipe" class="nav-link" data-scroll-target="#out-of-voxel-mitigation-recipe"><span class="header-section-number">6</span> Out-of-voxel mitigation recipe</a></li>
+  <li><a href="#suggested-ablation-order" id="toc-suggested-ablation-order" class="nav-link" data-scroll-target="#suggested-ablation-order"><span class="header-section-number">7</span> Suggested ablation order</a></li>
+  <li><a href="#implementation-anchors" id="toc-implementation-anchors" class="nav-link" data-scroll-target="#implementation-anchors"><span class="header-section-number">8</span> Implementation anchors</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/impl/overview.html">Implementations</a></li><li class="breadcrumb-item"><a href="../../contents/impl/vin_v2_feature_proposals.html">VIN v2 Feature + Encoding Proposals</a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">VIN v2 Feature + Encoding Proposals</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="scope" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Scope</h1>
+<p>This document summarizes concrete feature sets and encoding schemas to explore for <strong>VinModelV2</strong>, with a focus on mitigating EVL’s local voxel grid limits and improving RRI prediction quality. It is intended as an implementation-oriented checklist for ablations and incremental upgrades.</p>
+<p>Related context:</p>
+<ul>
+<li>Implementation overview: <a href="../../contents/impl/vin_nbv.html">VIN on EVL</a></li>
+<li>EFM3D/EVL background: <a href="../../contents/literature/efm3d.html">EFM3D</a></li>
+<li>VIN-NBV paper summary: <a href="../../contents/literature/vin_nbv.html">VIN-NBV</a> <span class="citation" data-cites="VIN-NBV-frahm2025"><a href="#ref-VIN-NBV-frahm2025" role="doc-biblioref">[1]</a></span></li>
+</ul>
+</section>
+<section id="context-and-constraints" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Context and constraints</h1>
+<ul>
+<li>EVL exposes a <strong>local, fixed-size voxel grid</strong> (default ~4x4x4 m) aligned to the last pose and anchored in a gravity-aligned frame. This local extent is expected but means many candidates can be partially or fully out-of-bounds. <span class="citation" data-cites="EFM3D-straub2024"><a href="#ref-EFM3D-straub2024" role="doc-biblioref">[2]</a></span></li>
+<li>VinModelV2 currently uses <strong>pose R6D + translation</strong>, <strong>scene field channels</strong> from EVL heads/evidence, and <strong>pose-conditioned global pooling</strong>. See <code>oracle_rri/oracle_rri/vin/experimental/model_v2.py</code>.</li>
+<li>VIN predicts RRI as an <strong>ordinal regression</strong> problem via CORAL <span class="citation" data-cites="CORAL-cao2019"><a href="#ref-CORAL-cao2019" role="doc-biblioref">[3]</a></span>. <a href="https://en.wikipedia.org/wiki/Ordinal_regression">Wikipedia :: Ordinal regression</a></li>
+</ul>
+</section>
+<section id="design-goals" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Design goals</h1>
+<ul>
+<li>Provide <strong>high-signal scene cues</strong> for RRI without over-reliance on heavy neck features.</li>
+<li>Remain robust when candidates <strong>fall outside the EVL voxel extent</strong>.</li>
+<li>Preserve <strong>interpretability</strong> (feature channels map to clear geometry/evidence semantics).</li>
+<li>Keep additions incremental and ablation-friendly.</li>
+</ul>
+</section>
+<section id="proposed-feature-bundles" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Proposed feature bundles</h1>
+<p>The bundles below are additive. Start with P0/P1; add P2/P3 only if needed; P4 can be always-on, and P5 is optional when appearance priors are desired.</p>
+<section id="p0-coverage-occupancy-core-baseline" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="p0-coverage-occupancy-core-baseline"><span class="header-section-number">4.1</span> P0: Coverage + occupancy core (baseline++)</h2>
+<p><strong>Inputs</strong> (from <code>EvlBackboneOutput</code>):</p>
+<ul>
+<li><code>occ_pr</code>, <code>occ_input</code>, <code>free_input</code>, <code>counts_norm</code>, <code>unknown</code>, <code>new_surface_prior</code></li>
+</ul>
+<p><strong>Candidate-level scalars</strong>:</p>
+<ul>
+<li><code>valid_frac</code> (fraction of in-bounds samples),</li>
+<li><code>center_in_bounds</code> (center validity),</li>
+<li>signed distance to voxel bounds (x/y/z).</li>
+</ul>
+<p><strong>Motivation</strong>: Explicitly communicates <em>what is known</em> vs.&nbsp;<em>unknown</em> in the local grid, and when the voxel context is unreliable.</p>
+</section>
+<section id="p1-boundary-uncertainty-cues-derived-channels" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="p1-boundary-uncertainty-cues-derived-channels"><span class="header-section-number">4.2</span> P1: Boundary + uncertainty cues (derived channels)</h2>
+<p><strong>Derived channels</strong>:</p>
+<ul>
+<li><code>surface_boundary = occ_pr * free_input</code></li>
+<li><code>uncertainty = occ_pr * (1 - occ_pr)</code></li>
+</ul>
+<p><strong>Motivation</strong>: Lightweight proxies for surface complexity and model uncertainty, without adding neck features.</p>
+</section>
+<section id="p2-compressed-neck-features" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="p2-compressed-neck-features"><span class="header-section-number">4.3</span> P2: Compressed neck features</h2>
+<p><strong>Inputs</strong>:</p>
+<ul>
+<li><code>occ_feat</code> (and optionally <code>obb_feat</code>) with 1x1x1 Conv compression (e.g., 64 -&gt; 8/16 channels).</li>
+</ul>
+<p><strong>Motivation</strong>: Adds richer 3D semantics while keeping compute in check. Use only if P0/P1 saturate.</p>
+</section>
+<section id="p3-entity-aware-cues-obb-aware-vin" class="level2" data-number="4.4">
+<h2 data-number="4.4" class="anchored" data-anchor-id="p3-entity-aware-cues-obb-aware-vin"><span class="header-section-number">4.4</span> P3: Entity-aware cues (OBB-aware VIN)</h2>
+<p><strong>Inputs</strong>:</p>
+<ul>
+<li><code>obb_pred</code>, <code>obb_pred_probs_full</code> (decoded OBBs + class probs).</li>
+</ul>
+<p><strong>Candidate-level scalars</strong>:</p>
+<ul>
+<li>distance to nearest OBB center,</li>
+<li>view alignment to OBB axes,</li>
+<li>fraction of the candidate view frustum intersecting top-k OBBs <a href="https://en.wikipedia.org/wiki/View_frustum">Wikipedia :: View frustum</a>,</li>
+<li>top-k semantic class probabilities.</li>
+</ul>
+<p><strong>Motivation</strong>: Supports entity-aware NBV objectives and task-specific weighting.</p>
+</section>
+<section id="p4-semidense-projection-features-always-on-voxel-independent" class="level2" data-number="4.5">
+<h2 data-number="4.5" class="anchored" data-anchor-id="p4-semidense-projection-features-always-on-voxel-independent"><span class="header-section-number">4.5</span> P4: Semidense projection features (always-on, voxel-independent)</h2>
+<p><strong>Inputs</strong>:</p>
+<ul>
+<li><code>points/p3s_world</code> (semi-dense SLAM points, i.e.&nbsp;a <strong>point cloud</strong> <a href="https://en.wikipedia.org/wiki/Point_cloud">Wikipedia :: Point cloud</a>) plus camera intrinsics and candidate poses for projection.</li>
+</ul>
+<p><strong>Per-candidate features</strong>:</p>
+<ul>
+<li>projected coverage/empty fraction (<code>F_empty</code>),</li>
+<li>depth statistics (mean/variance/percentiles),</li>
+<li>visibility density per view (histogram or angular bins).</li>
+</ul>
+<p><strong>Motivation</strong>: These features are <strong>candidate-agnostic to voxel extent</strong> and should help even when the EVL grid is small. They mirror VIN-NBV’s view-projection features and can be used for every candidate. <span class="citation" data-cites="VIN-NBV-frahm2025"><a href="#ref-VIN-NBV-frahm2025" role="doc-biblioref">[1]</a></span></p>
+<section id="theory-projection-based-coverage-as-an-rri-proxy" class="level3" data-number="4.5.1">
+<h3 data-number="4.5.1" class="anchored" data-anchor-id="theory-projection-based-coverage-as-an-rri-proxy"><span class="header-section-number">4.5.1</span> Theory: projection-based coverage as an RRI proxy</h3>
+<p>Given a candidate camera with intrinsics/extrinsics and a point cloud of the current reconstruction, we project 3D points into the candidate image plane using a standard camera model (pinhole or fisheye) <a href="https://en.wikipedia.org/wiki/Pinhole_camera_model">Wikipedia :: Pinhole camera model</a>. Let <code>I</code> be the image grid, and <code>M(q)</code> the set of pixels hit by at least one projected 3D point for candidate <code>q</code>. A simple coverage proxy is:</p>
+<p><span class="math display">\[
+F_{\\text{empty}}(q) = 1 - \\frac{|M(q)|}{|I|}
+\]</span></p>
+<p>Low coverage (high <code>F_empty</code>) indicates that large parts of the candidate image would reveal <strong>new</strong> geometry, which correlates with potential reconstruction improvement. This is the core intuition behind VIN-NBV’s coverage feature and remains useful even when voxel features are unreliable.</p>
+</section>
+<section id="suggested-injection-point-vinmodelv2" class="level3" data-number="4.5.2">
+<h3 data-number="4.5.2" class="anchored" data-anchor-id="suggested-injection-point-vinmodelv2"><span class="header-section-number">4.5.2</span> Suggested injection point (VinModelV2)</h3>
+<p>Treat semidense projection features as <strong>per-candidate scalars</strong> and inject them in two places:</p>
+<ol type="1">
+<li><strong>FiLM-modulate</strong> the pose-conditioned global voxel context (<code>global_feat</code>) so the semidense coverage cues can <em>reweight</em> voxel features when the EVL grid is sparse or out-of-bounds.</li>
+<li><strong>Concatenate</strong> the raw projection features alongside <code>pose_enc</code> and <code>global_feat</code> before the MLP head.</li>
+</ol>
+<p>The current VinModelV2 implementation uses a lightweight FiLM (linear -&gt; γ/β) plus a direct concat:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># VinModelV2._forward_impl</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>sem_proj <span class="op">=</span> <span class="va">self</span>._semidense_projection_features(...)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>gamma, beta <span class="op">=</span> <span class="va">self</span>.sem_proj_film(sem_proj).chunk(<span class="dv">2</span>, dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>global_feat <span class="op">=</span> global_feat <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">+</span> gamma) <span class="op">+</span> beta</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>parts.append(sem_proj)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This keeps the scene field untouched and avoids reintroducing heavy 3D volumes.</p>
+</section>
+<section id="practical-recipe-using-efmpointsviewcollapse_points" class="level3" data-number="4.5.3">
+<h3 data-number="4.5.3" class="anchored" data-anchor-id="practical-recipe-using-efmpointsviewcollapse_points"><span class="header-section-number">4.5.3</span> Practical recipe (using EfmPointsView::collapse_points)</h3>
+<p>Use <code>EfmPointsView.collapse_points()</code> to collapse time and subsample the point cloud before projection:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> efm3d.aria.camera <span class="im">import</span> CameraTW</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> efm3d.aria.pose <span class="im">import</span> PoseTW</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> project_semidense_features(</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    points_view: EfmPointsView,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    candidate_poses_world_cam: PoseTW,   <span class="co"># world &lt;- cam (B, N, 12)</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    candidate_camera: CameraTW,          <span class="co"># intrinsics (per candidate or shared)</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    image_size: <span class="bu">tuple</span>[<span class="bu">int</span>, <span class="bu">int</span>],         <span class="co"># (H, W)</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    max_points: <span class="bu">int</span> <span class="op">=</span> <span class="dv">50000</span>,</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> Tensor:</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 1) Collapse points across time (subsampled)</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    pts_world <span class="op">=</span> points_view.collapse_points(max_points<span class="op">=</span>max_points)  <span class="co"># (K, 3)</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> pts_world.numel() <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> torch.zeros((candidate_poses_world_cam.shape[<span class="dv">0</span>],</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>                            candidate_poses_world_cam.shape[<span class="dv">1</span>],</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>                            <span class="dv">3</span>), device<span class="op">=</span>pts_world.device)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 2) Transform into each candidate camera frame</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    pose_cam_world <span class="op">=</span> candidate_poses_world_cam.inverse()  <span class="co"># cam &lt;- world</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    pts_cam <span class="op">=</span> pose_cam_world[:, :, <span class="va">None</span>] <span class="op">*</span> pts_world      <span class="co"># (B, N, K, 3)</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3) Project to pixels + validity mask</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    p2d, valid <span class="op">=</span> candidate_camera.project(pts_cam)        <span class="co"># (B, N, K, 2), (B, N, K)</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 4) Coverage / empty fraction (sketch)</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    H, W <span class="op">=</span> image_size</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    in_bounds <span class="op">=</span> valid <span class="op">&amp;</span> (p2d[..., <span class="dv">0</span>] <span class="op">&gt;=</span> <span class="dv">0</span>) <span class="op">&amp;</span> (p2d[..., <span class="dv">0</span>] <span class="op">&lt;</span> W) <span class="op">&amp;</span> (p2d[..., <span class="dv">1</span>] <span class="op">&gt;=</span> <span class="dv">0</span>) <span class="op">&amp;</span> (p2d[..., <span class="dv">1</span>] <span class="op">&lt;</span> H)</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Convert to integer pixel coords and build a sparse occupancy mask.</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Use scatter or bincount for efficiency.</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Compute |M(q)| / (H*W) and derive F_empty.</span></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Also collect depth statistics from pts_cam[..., 2] where in_bounds is True.</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    ...</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Notes:</p>
+<ul>
+<li><code>CameraTW.project</code> supports both pinhole and fisheye models and returns a validity mask (in-front + in-image + in-radius). This avoids manual distortion handling. See <code>external/efm3d/efm3d/aria/camera.py</code> for details.</li>
+<li>If <code>candidate_camera</code> is shared across candidates, broadcast the camera to <code>(B, N, ...)</code> or slice per candidate frame index.</li>
+<li>For performance, compute coverage using <code>torch.bincount</code> on <code>p2d_int = (y * W + x)</code> with per-candidate batching.</li>
+</ul>
+</section>
+<section id="optional-pointnext-s-semidense-encoder-global-point-embedding" class="level3" data-number="4.5.4">
+<h3 data-number="4.5.4" class="anchored" data-anchor-id="optional-pointnext-s-semidense-encoder-global-point-embedding"><span class="header-section-number">4.5.4</span> Optional: PointNeXt-S semidense encoder (global point embedding)</h3>
+<p>For a stronger geometric prior than simple projection stats, we can encode the semi-dense point cloud with <strong>PointNeXt-S</strong> (small, pretrained, robust to non-uniform sampling). We subsample to ~3k points (from the padded 50k) and encode the point cloud once per snippet, then concatenate the embedding to the VIN head input.</p>
+<p>Key references:</p>
+<ul>
+<li>PointNeXt paper: <span class="citation" data-cites="PointNeXt-qian2022"><a href="#ref-PointNeXt-qian2022" role="doc-biblioref">[4]</a></span></li>
+<li>OpenPoints model zoo (pretrained PointNeXt-S configs/weights): <span class="citation" data-cites="OpenPoints-modelzoo"><a href="#ref-OpenPoints-modelzoo" role="doc-biblioref">[5]</a></span></li>
+</ul>
+<p>Implementation notes:</p>
+<ul>
+<li>The encoder is <strong>optional</strong> and only active if <code>VinModelV2Config.point_encoder</code> is set.</li>
+<li>Use <code>EfmPointsView.collapse_points(max_points=3000)</code> before encoding.</li>
+<li>Transform points into the <strong>reference rig frame</strong> for consistent pose alignment.</li>
+</ul>
+</section>
+<section id="film-style-modulation-of-the-global-voxel-context-recommended-injection" class="level3" data-number="4.5.5">
+<h3 data-number="4.5.5" class="anchored" data-anchor-id="film-style-modulation-of-the-global-voxel-context-recommended-injection"><span class="header-section-number">4.5.5</span> FiLM-style modulation of the global voxel context (recommended injection)</h3>
+<p>Rather than only late-fusing the PointNeXt embedding, use it to <strong>modulate</strong> the voxel-derived global context. This is a feature-wise linear modulation (FiLM) style injection <span class="citation" data-cites="FiLM-perez2018"><a href="#ref-FiLM-perez2018" role="doc-biblioref">[6]</a></span> that conditions the global context on the semidense geometry <em>without</em> disrupting the interpretable voxel channels.</p>
+<p><strong>Motivation (conceptual)</strong>:</p>
+<ul>
+<li>The voxel field provides <strong>local occupancy evidence</strong>; the semidense embedding summarizes <strong>global geometry</strong>. We want the global geometry to <em>shape</em> how the voxel context is interpreted rather than merely append another vector at the end.</li>
+<li>FiLM-style modulation implements <strong>content-aware gating</strong>: the point cloud decides which global-context features should be amplified, suppressed, or shifted. This is analogous to conditional normalization, but keeps the base representation intact and interpretable.</li>
+<li>It is <strong>parameter-efficient</strong> and stable: one linear layer produces scale/shift and can be paired with GroupNorm for controlled statistics.</li>
+</ul>
+<p><strong>Formulation</strong> (per snippet, broadcast to candidates):</p>
+<p>Let <code>g ∈ R^{B×N×C}</code> be the global voxel context and <code>p ∈ R^{B×D}</code> the PointNeXt embedding. We compute:</p>
+<p><span class="math display">\[
+\\gamma, \\beta = W p, \\quad g' = \\text{GN}( g \\odot (1 + \\gamma) + \\beta )
+\]</span></p>
+<p>where <code>γ, β ∈ R^{B×C}</code> are broadcast across candidates and <code>GN</code> is GroupNorm.</p>
+<p><strong>Implementation sketch</strong>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># VinModelV2.__init__</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="va">self</span>.point_film <span class="op">=</span> nn.Linear(point_dim, <span class="dv">2</span> <span class="op">*</span> field_dim)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="va">self</span>.point_film_norm <span class="op">=</span> nn.GroupNorm(num_groups<span class="op">=</span><span class="dv">4</span>, num_channels<span class="op">=</span>field_dim)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co"># VinModelV2._forward_impl</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>gamma, beta <span class="op">=</span> <span class="va">self</span>.point_film(semidense_feat).chunk(<span class="dv">2</span>, dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>global_feat <span class="op">=</span> global_feat <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">+</span> gamma[:, <span class="va">None</span>, :]) <span class="op">+</span> beta[:, <span class="va">None</span>, :]</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>global_feat <span class="op">=</span> <span class="va">self</span>.point_film_norm(global_feat.transpose(<span class="dv">1</span>, <span class="dv">2</span>)).transpose(<span class="dv">1</span>, <span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Why this helps</strong>:</p>
+<ul>
+<li>When the voxel grid misses geometry (out-of-bounds candidates), the point embedding can <strong>down-weight unreliable global features</strong>.</li>
+<li>When semidense points indicate rich structure, the modulation <strong>amplifies</strong> the relevant global-context channels, improving RRI discrimination.</li>
+</ul>
+</section>
+<section id="optional-encoder-for-past-ego-trajectory-global-point-embedding" class="level3" data-number="4.5.6">
+<h3 data-number="4.5.6" class="anchored" data-anchor-id="optional-encoder-for-past-ego-trajectory-global-point-embedding"><span class="header-section-number">4.5.6</span> Optional: encoder for past ego trajectory (global point embedding)</h3>
+<p>Use tiny transformer to encode past ego trajectory frames in reference rig frame.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode py code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span>(slots<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> EfmTrajectoryView:</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""World-frame rig trajectory aligned to snippet frames."""</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    t_world_rig: PoseTW</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Rig SE(3) poses per frame (world←rig)."""</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    time_ns: Tensor</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""``Tensor["F", int64]`` pose timestamps."""</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    gravity_in_world: Tensor</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""``Tensor["3", float32]`` gravity vector in world frame (aligned to [0,0,-9.81])."""</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="p5-2d-token-reuse-appearance-priors" class="level2" data-number="4.6">
+<h2 data-number="4.6" class="anchored" data-anchor-id="p5-2d-token-reuse-appearance-priors"><span class="header-section-number">4.6</span> P5: 2D token reuse (appearance priors)</h2>
+<p><strong>Inputs</strong>:</p>
+<ul>
+<li><code>feat2d_upsampled</code> or <code>token2d</code> from EVL outputs.</li>
+</ul>
+<p><strong>Mechanism</strong>:</p>
+<ul>
+<li>Project semidense points into current RGB frames, sample 2D features, reproject to candidate view or pool directly per candidate.</li>
+</ul>
+<p><strong>Motivation</strong>: Adds appearance/texture cues without expanding the voxel grid.</p>
+</section>
+</section>
+<section id="encoding-schemas" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Encoding schemas</h1>
+<section id="candidate-relative-positional-keys" class="level2" data-number="5.1">
+<h2 data-number="5.1" class="anchored" data-anchor-id="candidate-relative-positional-keys"><span class="header-section-number">5.1</span> Candidate-relative positional keys</h2>
+<p><strong>Idea</strong>: Build <code>pos_grid</code> in the <strong>candidate frame</strong> so attention keys and candidate queries share the same spatial basis. This should improve alignment when the candidate is far from the reference frame.</p>
+<ul>
+<li>Implementation anchor: <code>VinModelV2Config.tf_pos_grid_in_candidate_frame</code> (TODO in <code>model_v2.py</code>).</li>
+</ul>
+</section>
+<section id="hybrid-pose-encoding-r6d-shell" class="level2" data-number="5.2">
+<h2 data-number="5.2" class="anchored" data-anchor-id="hybrid-pose-encoding-r6d-shell"><span class="header-section-number">5.2</span> Hybrid pose encoding (R6D + shell)</h2>
+<p><strong>Idea</strong>: Combine the current R6D+translation encoding with shell features (direction <code>u</code>, forward <code>f</code>, radius <code>r</code>, alignment). This keeps rotation/translation expressivity while adding geometry cues independent of voxel extent.</p>
+</section>
+<section id="distance-to-voxel-features" class="level2" data-number="5.3">
+<h2 data-number="5.3" class="anchored" data-anchor-id="distance-to-voxel-features"><span class="header-section-number">5.3</span> Distance-to-voxel features</h2>
+<p><strong>Idea</strong>: Add explicit scalars for candidate distance to voxel center and normalized signed distance to bounds (x/y/z). This provides a direct indicator of voxel-context reliability.</p>
+</section>
+<section id="multi-scale-pooling" class="level2" data-number="5.4">
+<h2 data-number="5.4" class="anchored" data-anchor-id="multi-scale-pooling"><span class="header-section-number">5.4</span> Multi-scale pooling</h2>
+<p><strong>Idea</strong>: Pool the voxel field at 2-3 grid sizes and concatenate. This helps when only a subregion of the voxel grid is informative.</p>
+</section>
+<section id="pose-conditioned-attention-diagnostics" class="level2" data-number="5.5">
+<h2 data-number="5.5" class="anchored" data-anchor-id="pose-conditioned-attention-diagnostics"><span class="header-section-number">5.5</span> Pose-conditioned attention diagnostics</h2>
+<p>The global pooling uses multi-head attention <a href="https://en.wikipedia.org/wiki/Attention_(machine_learning)">Wikipedia :: Attention (machine learning)</a>. Exposing attention weights lets us assess whether candidates attend to spatially meaningful voxels and whether out-of-grid candidates produce <strong>diffuse</strong> (uninformative) attention.</p>
+<section id="theory-attention-concentration-as-a-diagnostic" class="level3" data-number="5.5.1">
+<h3 data-number="5.5.1" class="anchored" data-anchor-id="theory-attention-concentration-as-a-diagnostic"><span class="header-section-number">5.5.1</span> Theory: attention concentration as a diagnostic</h3>
+<p>Let <code>A(q)</code> be the attention matrix for candidate <code>q</code> (queries = candidate pose tokens, keys = pooled voxel tokens). If attention is well-aligned, <code>A(q)</code> should concentrate on a few spatial tokens. If the candidate is out-of-grid or the positional encoding is misaligned, <code>A(q)</code> becomes uniform.</p>
+<p>A simple diagnostic is <strong>attention entropy</strong>:</p>
+<p><span class="math display">\[
+H(q) = -\\sum_i A_i(q) \\log (A_i(q) + \\varepsilon)
+\]</span></p>
+<p>Low entropy indicates focused attention; high entropy suggests that the attention mechanism has no spatial anchor for that candidate.</p>
+</section>
+<section id="implementation-sketch-poseconditionedglobalpool" class="level3" data-number="5.5.2">
+<h3 data-number="5.5.2" class="anchored" data-anchor-id="implementation-sketch-poseconditionedglobalpool"><span class="header-section-number">5.5.2</span> Implementation sketch (PoseConditionedGlobalPool)</h3>
+<p><code>torch.nn.MultiheadAttention</code> can return per-head attention weights by passing <code>need_weights=True</code> and <code>average_attn_weights=False</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># oracle_rri/oracle_rri/vin/experimental/model_v2.py</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>attn_out, attn_weights <span class="op">=</span> <span class="va">self</span>.attn(</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    queries, keys, keys,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    need_weights<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    average_attn_weights<span class="op">=</span><span class="va">False</span>,  <span class="co"># keep per-head weights</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co"># attn_weights: (B, num_heads, N, T)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>From this, compute diagnostics per candidate:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>weights <span class="op">=</span> attn_weights.mean(dim<span class="op">=</span><span class="dv">1</span>)  <span class="co"># (B, N, T) average heads</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>entropy <span class="op">=</span> <span class="op">-</span>(weights <span class="op">*</span> (weights <span class="op">+</span> <span class="fl">1e-9</span>).log()).<span class="bu">sum</span>(dim<span class="op">=-</span><span class="dv">1</span>)  <span class="co"># (B, N)</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>peak <span class="op">=</span> weights.<span class="bu">max</span>(dim<span class="op">=-</span><span class="dv">1</span>).values  <span class="co"># (B, N)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Log <code>entropy</code> and <code>peak</code> alongside <code>valid_frac</code> to check whether attention degenerates when coverage is low.</p>
+</section>
+</section>
+</section>
+<section id="out-of-voxel-mitigation-recipe" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Out-of-voxel mitigation recipe</h1>
+<p>A simple gating strategy can prevent over-confident predictions when voxel coverage is low:</p>
+<ol type="1">
+<li>Compute <code>valid_frac</code> and <code>center_in_bounds</code>.</li>
+<li>If <code>valid_frac &lt; tau</code> (e.g., 0.2), blend voxel features with P4/P5 features:
+<ul>
+<li><code>feat = alpha * voxel_feat + (1 - alpha) * semidense_feat</code> where <code>alpha = clamp(valid_frac / tau, 0, 1)</code>.</li>
+</ul></li>
+<li>Add a binary OOB indicator as input to the head.</li>
+</ol>
+</section>
+<section id="suggested-ablation-order" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Suggested ablation order</h1>
+<ol type="1">
+<li>P0 baseline++ (coverage + occupancy + explicit OOB scalars).</li>
+<li>P1 derived channels.</li>
+<li>P2 compressed neck features (if P1 gains plateau).</li>
+<li>P4 semidense projection features (always-on).</li>
+<li>P3 entity-aware cues.</li>
+<li>P5 2D token reuse (heavier pipeline but potentially strong gains).</li>
+</ol>
+</section>
+<section id="implementation-anchors" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> Implementation anchors</h1>
+<ul>
+<li>Scene field construction: <code>oracle_rri/oracle_rri/vin/experimental/model_v2.py::_build_scene_field_v2</code>.</li>
+<li>Global pooling + positional keys: <code>PoseConditionedGlobalPool</code> in <code>model_v2.py</code>.</li>
+<li>EVL feature contract: <code>oracle_rri/oracle_rri/vin/types.py::EvlBackboneOutput</code>.</li>
+<li>VIN documentation: <a href="../../contents/impl/vin_nbv.html">VIN on EVL</a>.</li>
+</ul>
+
+
+<!-- -->
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body" data-entry-spacing="0" role="list">
+<div id="ref-VIN-NBV-frahm2025" class="csl-entry" role="listitem">
+<div class="csl-left-margin">[1] </div><div class="csl-right-inline">N. Frahm <em>et al.</em>, <span>“VIN-NBV: A view introspection network for next-best-view selection.”</span> 2025. Available: <a href="https://arxiv.org/abs/2505.06219">https://arxiv.org/abs/2505.06219</a></div>
+</div>
+<div id="ref-EFM3D-straub2024" class="csl-entry" role="listitem">
+<div class="csl-left-margin">[2] </div><div class="csl-right-inline">J. Straub, D. DeTone, T. Shen, N. Yang, C. Sweeney, and R. Newcombe, <span>“EFM3D: A benchmark for measuring progress towards 3D egocentric foundation models.”</span> 2024. Available: <a href="https://arxiv.org/abs/2406.10224">https://arxiv.org/abs/2406.10224</a></div>
+</div>
+<div id="ref-CORAL-cao2019" class="csl-entry" role="listitem">
+<div class="csl-left-margin">[3] </div><div class="csl-right-inline">W. Cao, V. Mirjalili, and S. Raschka, <span>“Rank consistent ordinal regression for neural networks with application to age estimation.”</span> 2019. Available: <a href="https://arxiv.org/abs/1901.07884">https://arxiv.org/abs/1901.07884</a></div>
+</div>
+<div id="ref-PointNeXt-qian2022" class="csl-entry" role="listitem">
+<div class="csl-left-margin">[4] </div><div class="csl-right-inline">G. Qian <em>et al.</em>, <span>“PointNeXt: Revisiting PointNet++ with improved training and scaling strategies.”</span> [Online]. Available: <a href="https://arxiv.org/abs/2206.04670">https://arxiv.org/abs/2206.04670</a></div>
+</div>
+<div id="ref-OpenPoints-modelzoo" class="csl-entry" role="listitem">
+<div class="csl-left-margin">[5] </div><div class="csl-right-inline">OpenPoints contributors, <span>“OpenPoints: PointNeXt model zoo.”</span> [Online]. Available: <a href="https://guochengqian.github.io/PointNeXt/modelzoo/">https://guochengqian.github.io/PointNeXt/modelzoo/</a></div>
+</div>
+<div id="ref-FiLM-perez2018" class="csl-entry" role="listitem">
+<div class="csl-left-margin">[6] </div><div class="csl-right-inline">E. Perez, F. Strub, H. de Vries, V. Dumoulin, and A. Courville, <span>“FiLM: Visual reasoning with a general conditioning layer,”</span> in <em>Proceedings of the AAAI conference on artificial intelligence</em>, 2018. Available: <a href="https://arxiv.org/abs/1709.07871">https://arxiv.org/abs/1709.07871</a></div>
+</div>
+</div></section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "VIN v2 Feature + Encoding Proposals"</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span><span class="co"> html</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu"># Scope</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>This document summarizes concrete feature sets and encoding schemas to explore for **VinModelV2**, with a focus on mitigating EVL's local voxel grid limits and improving RRI prediction quality. It is intended as an implementation-oriented checklist for ablations and incremental upgrades.</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>Related context:</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Implementation overview: <span class="co">[</span><span class="ot">VIN on EVL</span><span class="co">](vin_nbv.qmd)</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>EFM3D/EVL background: <span class="co">[</span><span class="ot">EFM3D</span><span class="co">](../literature/efm3d.qmd)</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>VIN-NBV paper summary: <span class="co">[</span><span class="ot">VIN-NBV</span><span class="co">](../literature/vin_nbv.qmd)</span> <span class="co">[</span><span class="ot">@VIN-NBV-frahm2025</span><span class="co">]</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="fu"># Context and constraints</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>EVL exposes a **local, fixed-size voxel grid** (default ~4x4x4 m) aligned to the last pose and anchored in a gravity-aligned frame. This local extent is expected but means many candidates can be partially or fully out-of-bounds. <span class="co">[</span><span class="ot">@EFM3D-straub2024</span><span class="co">]</span></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>VinModelV2 currently uses **pose R6D + translation**, **scene field channels** from EVL heads/evidence, and **pose-conditioned global pooling**. See <span class="in">`oracle_rri/oracle_rri/vin/experimental/model_v2.py`</span>.</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>VIN predicts RRI as an **ordinal regression** problem via CORAL <span class="co">[</span><span class="ot">@CORAL-cao2019</span><span class="co">]</span>. <span class="co">[</span><span class="ot">Wikipedia :: Ordinal regression</span><span class="co">](https://en.wikipedia.org/wiki/Ordinal_regression)</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="fu"># Design goals</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Provide **high-signal scene cues** for RRI without over-reliance on heavy neck features.</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Remain robust when candidates **fall outside the EVL voxel extent**.</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Preserve **interpretability** (feature channels map to clear geometry/evidence semantics).</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Keep additions incremental and ablation-friendly.</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a><span class="fu"># Proposed feature bundles</span></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>The bundles below are additive. Start with P0/P1; add P2/P3 only if needed; P4 can be always-on, and P5 is optional when appearance priors are desired.</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a><span class="fu">## P0: Coverage + occupancy core (baseline++)</span></span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>**Inputs** (from <span class="in">`EvlBackboneOutput`</span>):</span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`occ_pr`</span>, <span class="in">`occ_input`</span>, <span class="in">`free_input`</span>, <span class="in">`counts_norm`</span>, <span class="in">`unknown`</span>, <span class="in">`new_surface_prior`</span></span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>**Candidate-level scalars**:</span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`valid_frac`</span> (fraction of in-bounds samples),</span>
+<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`center_in_bounds`</span> (center validity),</span>
+<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>signed distance to voxel bounds (x/y/z).</span>
+<span id="cb7-44"><a href="#cb7-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-45"><a href="#cb7-45" aria-hidden="true" tabindex="-1"></a>**Motivation**: Explicitly communicates *what is known* vs. *unknown* in the local grid, and when the voxel context is unreliable.</span>
+<span id="cb7-46"><a href="#cb7-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-47"><a href="#cb7-47" aria-hidden="true" tabindex="-1"></a><span class="fu">## P1: Boundary + uncertainty cues (derived channels)</span></span>
+<span id="cb7-48"><a href="#cb7-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-49"><a href="#cb7-49" aria-hidden="true" tabindex="-1"></a>**Derived channels**:</span>
+<span id="cb7-50"><a href="#cb7-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-51"><a href="#cb7-51" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`surface_boundary = occ_pr * free_input`</span></span>
+<span id="cb7-52"><a href="#cb7-52" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`uncertainty = occ_pr * (1 - occ_pr)`</span></span>
+<span id="cb7-53"><a href="#cb7-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-54"><a href="#cb7-54" aria-hidden="true" tabindex="-1"></a>**Motivation**: Lightweight proxies for surface complexity and model uncertainty, without adding neck features.</span>
+<span id="cb7-55"><a href="#cb7-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-56"><a href="#cb7-56" aria-hidden="true" tabindex="-1"></a><span class="fu">## P2: Compressed neck features</span></span>
+<span id="cb7-57"><a href="#cb7-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-58"><a href="#cb7-58" aria-hidden="true" tabindex="-1"></a>**Inputs**:</span>
+<span id="cb7-59"><a href="#cb7-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-60"><a href="#cb7-60" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`occ_feat`</span> (and optionally <span class="in">`obb_feat`</span>) with 1x1x1 Conv compression (e.g., 64 -&gt; 8/16 channels).</span>
+<span id="cb7-61"><a href="#cb7-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-62"><a href="#cb7-62" aria-hidden="true" tabindex="-1"></a>**Motivation**: Adds richer 3D semantics while keeping compute in check. Use only if P0/P1 saturate.</span>
+<span id="cb7-63"><a href="#cb7-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-64"><a href="#cb7-64" aria-hidden="true" tabindex="-1"></a><span class="fu">## P3: Entity-aware cues (OBB-aware VIN)</span></span>
+<span id="cb7-65"><a href="#cb7-65" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-66"><a href="#cb7-66" aria-hidden="true" tabindex="-1"></a>**Inputs**:</span>
+<span id="cb7-67"><a href="#cb7-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-68"><a href="#cb7-68" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`obb_pred`</span>, <span class="in">`obb_pred_probs_full`</span> (decoded OBBs + class probs).</span>
+<span id="cb7-69"><a href="#cb7-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-70"><a href="#cb7-70" aria-hidden="true" tabindex="-1"></a>**Candidate-level scalars**:</span>
+<span id="cb7-71"><a href="#cb7-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-72"><a href="#cb7-72" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>distance to nearest OBB center,</span>
+<span id="cb7-73"><a href="#cb7-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>view alignment to OBB axes,</span>
+<span id="cb7-74"><a href="#cb7-74" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>fraction of the candidate view frustum intersecting top-k OBBs <span class="co">[</span><span class="ot">Wikipedia :: View frustum</span><span class="co">](https://en.wikipedia.org/wiki/View_frustum)</span>,</span>
+<span id="cb7-75"><a href="#cb7-75" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>top-k semantic class probabilities.</span>
+<span id="cb7-76"><a href="#cb7-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-77"><a href="#cb7-77" aria-hidden="true" tabindex="-1"></a>**Motivation**: Supports entity-aware NBV objectives and task-specific weighting.</span>
+<span id="cb7-78"><a href="#cb7-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-79"><a href="#cb7-79" aria-hidden="true" tabindex="-1"></a><span class="fu">## P4: Semidense projection features (always-on, voxel-independent)</span></span>
+<span id="cb7-80"><a href="#cb7-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-81"><a href="#cb7-81" aria-hidden="true" tabindex="-1"></a>**Inputs**:</span>
+<span id="cb7-82"><a href="#cb7-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-83"><a href="#cb7-83" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`points/p3s_world`</span> (semi-dense SLAM points, i.e. a **point cloud** <span class="co">[</span><span class="ot">Wikipedia :: Point cloud</span><span class="co">](https://en.wikipedia.org/wiki/Point_cloud)</span>) plus camera intrinsics and candidate poses for projection.</span>
+<span id="cb7-84"><a href="#cb7-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-85"><a href="#cb7-85" aria-hidden="true" tabindex="-1"></a>**Per-candidate features**:</span>
+<span id="cb7-86"><a href="#cb7-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-87"><a href="#cb7-87" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>projected coverage/empty fraction (<span class="in">`F_empty`</span>),</span>
+<span id="cb7-88"><a href="#cb7-88" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>depth statistics (mean/variance/percentiles),</span>
+<span id="cb7-89"><a href="#cb7-89" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>visibility density per view (histogram or angular bins).</span>
+<span id="cb7-90"><a href="#cb7-90" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-91"><a href="#cb7-91" aria-hidden="true" tabindex="-1"></a>**Motivation**: These features are **candidate-agnostic to voxel extent** and should help even when the EVL grid is small. They mirror VIN-NBV's view-projection features and can be used for every candidate. <span class="co">[</span><span class="ot">@VIN-NBV-frahm2025</span><span class="co">]</span></span>
+<span id="cb7-92"><a href="#cb7-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-93"><a href="#cb7-93" aria-hidden="true" tabindex="-1"></a><span class="fu">### Theory: projection-based coverage as an RRI proxy</span></span>
+<span id="cb7-94"><a href="#cb7-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-95"><a href="#cb7-95" aria-hidden="true" tabindex="-1"></a>Given a candidate camera with intrinsics/extrinsics and a point cloud of the current reconstruction, we project 3D points into the candidate image plane using a standard camera model (pinhole or fisheye) <span class="co">[</span><span class="ot">Wikipedia :: Pinhole camera model</span><span class="co">](https://en.wikipedia.org/wiki/Pinhole_camera_model)</span>. Let <span class="in">`I`</span> be the image grid, and <span class="in">`M(q)`</span> the set of pixels hit by at least one projected 3D point for candidate <span class="in">`q`</span>. A simple coverage proxy is:</span>
+<span id="cb7-96"><a href="#cb7-96" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-97"><a href="#cb7-97" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb7-98"><a href="#cb7-98" aria-hidden="true" tabindex="-1"></a>F_{<span class="sc">\\</span>text{empty}}(q) = 1 - <span class="sc">\\</span>frac{|M(q)|}{|I|}</span>
+<span id="cb7-99"><a href="#cb7-99" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb7-100"><a href="#cb7-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-101"><a href="#cb7-101" aria-hidden="true" tabindex="-1"></a>Low coverage (high <span class="in">`F_empty`</span>) indicates that large parts of the candidate image would reveal **new** geometry, which correlates with potential reconstruction improvement. This is the core intuition behind VIN-NBV's coverage feature and remains useful even when voxel features are unreliable.</span>
+<span id="cb7-102"><a href="#cb7-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-103"><a href="#cb7-103" aria-hidden="true" tabindex="-1"></a><span class="fu">### Suggested injection point (VinModelV2)</span></span>
+<span id="cb7-104"><a href="#cb7-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-105"><a href="#cb7-105" aria-hidden="true" tabindex="-1"></a>Treat semidense projection features as **per-candidate scalars** and inject them in two places:</span>
+<span id="cb7-106"><a href="#cb7-106" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-107"><a href="#cb7-107" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**FiLM-modulate** the pose-conditioned global voxel context (<span class="in">`global_feat`</span>) so the semidense coverage cues can *reweight* voxel features when the EVL grid is sparse or out-of-bounds.</span>
+<span id="cb7-108"><a href="#cb7-108" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Concatenate** the raw projection features alongside <span class="in">`pose_enc`</span> and <span class="in">`global_feat`</span> before the MLP head.</span>
+<span id="cb7-109"><a href="#cb7-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-110"><a href="#cb7-110" aria-hidden="true" tabindex="-1"></a>The current VinModelV2 implementation uses a lightweight FiLM (linear -&gt; γ/β) plus a direct concat:</span>
+<span id="cb7-111"><a href="#cb7-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-112"><a href="#cb7-112" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb7-113"><a href="#cb7-113" aria-hidden="true" tabindex="-1"></a><span class="co"># VinModelV2._forward_impl</span></span>
+<span id="cb7-114"><a href="#cb7-114" aria-hidden="true" tabindex="-1"></a>sem_proj <span class="op">=</span> <span class="va">self</span>._semidense_projection_features(...)</span>
+<span id="cb7-115"><a href="#cb7-115" aria-hidden="true" tabindex="-1"></a>gamma, beta <span class="op">=</span> <span class="va">self</span>.sem_proj_film(sem_proj).chunk(<span class="dv">2</span>, dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb7-116"><a href="#cb7-116" aria-hidden="true" tabindex="-1"></a>global_feat <span class="op">=</span> global_feat <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">+</span> gamma) <span class="op">+</span> beta</span>
+<span id="cb7-117"><a href="#cb7-117" aria-hidden="true" tabindex="-1"></a>parts.append(sem_proj)</span>
+<span id="cb7-118"><a href="#cb7-118" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb7-119"><a href="#cb7-119" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-120"><a href="#cb7-120" aria-hidden="true" tabindex="-1"></a>This keeps the scene field untouched and avoids reintroducing heavy 3D volumes.</span>
+<span id="cb7-121"><a href="#cb7-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-122"><a href="#cb7-122" aria-hidden="true" tabindex="-1"></a><span class="fu">### Practical recipe (using EfmPointsView::collapse_points)</span></span>
+<span id="cb7-123"><a href="#cb7-123" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-124"><a href="#cb7-124" aria-hidden="true" tabindex="-1"></a>Use <span class="in">`EfmPointsView.collapse_points()`</span> to collapse time and subsample the point cloud before projection:</span>
+<span id="cb7-125"><a href="#cb7-125" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-126"><a href="#cb7-126" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb7-127"><a href="#cb7-127" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> efm3d.aria.camera <span class="im">import</span> CameraTW</span>
+<span id="cb7-128"><a href="#cb7-128" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> efm3d.aria.pose <span class="im">import</span> PoseTW</span>
+<span id="cb7-129"><a href="#cb7-129" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-130"><a href="#cb7-130" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> project_semidense_features(</span>
+<span id="cb7-131"><a href="#cb7-131" aria-hidden="true" tabindex="-1"></a>    points_view: EfmPointsView,</span>
+<span id="cb7-132"><a href="#cb7-132" aria-hidden="true" tabindex="-1"></a>    candidate_poses_world_cam: PoseTW,   <span class="co"># world &lt;- cam (B, N, 12)</span></span>
+<span id="cb7-133"><a href="#cb7-133" aria-hidden="true" tabindex="-1"></a>    candidate_camera: CameraTW,          <span class="co"># intrinsics (per candidate or shared)</span></span>
+<span id="cb7-134"><a href="#cb7-134" aria-hidden="true" tabindex="-1"></a>    image_size: <span class="bu">tuple</span>[<span class="bu">int</span>, <span class="bu">int</span>],         <span class="co"># (H, W)</span></span>
+<span id="cb7-135"><a href="#cb7-135" aria-hidden="true" tabindex="-1"></a>    max_points: <span class="bu">int</span> <span class="op">=</span> <span class="dv">50000</span>,</span>
+<span id="cb7-136"><a href="#cb7-136" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> Tensor:</span>
+<span id="cb7-137"><a href="#cb7-137" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 1) Collapse points across time (subsampled)</span></span>
+<span id="cb7-138"><a href="#cb7-138" aria-hidden="true" tabindex="-1"></a>    pts_world <span class="op">=</span> points_view.collapse_points(max_points<span class="op">=</span>max_points)  <span class="co"># (K, 3)</span></span>
+<span id="cb7-139"><a href="#cb7-139" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> pts_world.numel() <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb7-140"><a href="#cb7-140" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> torch.zeros((candidate_poses_world_cam.shape[<span class="dv">0</span>],</span>
+<span id="cb7-141"><a href="#cb7-141" aria-hidden="true" tabindex="-1"></a>                            candidate_poses_world_cam.shape[<span class="dv">1</span>],</span>
+<span id="cb7-142"><a href="#cb7-142" aria-hidden="true" tabindex="-1"></a>                            <span class="dv">3</span>), device<span class="op">=</span>pts_world.device)</span>
+<span id="cb7-143"><a href="#cb7-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-144"><a href="#cb7-144" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 2) Transform into each candidate camera frame</span></span>
+<span id="cb7-145"><a href="#cb7-145" aria-hidden="true" tabindex="-1"></a>    pose_cam_world <span class="op">=</span> candidate_poses_world_cam.inverse()  <span class="co"># cam &lt;- world</span></span>
+<span id="cb7-146"><a href="#cb7-146" aria-hidden="true" tabindex="-1"></a>    pts_cam <span class="op">=</span> pose_cam_world[:, :, <span class="va">None</span>] <span class="op">*</span> pts_world      <span class="co"># (B, N, K, 3)</span></span>
+<span id="cb7-147"><a href="#cb7-147" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-148"><a href="#cb7-148" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3) Project to pixels + validity mask</span></span>
+<span id="cb7-149"><a href="#cb7-149" aria-hidden="true" tabindex="-1"></a>    p2d, valid <span class="op">=</span> candidate_camera.project(pts_cam)        <span class="co"># (B, N, K, 2), (B, N, K)</span></span>
+<span id="cb7-150"><a href="#cb7-150" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-151"><a href="#cb7-151" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 4) Coverage / empty fraction (sketch)</span></span>
+<span id="cb7-152"><a href="#cb7-152" aria-hidden="true" tabindex="-1"></a>    H, W <span class="op">=</span> image_size</span>
+<span id="cb7-153"><a href="#cb7-153" aria-hidden="true" tabindex="-1"></a>    in_bounds <span class="op">=</span> valid <span class="op">&amp;</span> (p2d[..., <span class="dv">0</span>] <span class="op">&gt;=</span> <span class="dv">0</span>) <span class="op">&amp;</span> (p2d[..., <span class="dv">0</span>] <span class="op">&lt;</span> W) <span class="op">&amp;</span> (p2d[..., <span class="dv">1</span>] <span class="op">&gt;=</span> <span class="dv">0</span>) <span class="op">&amp;</span> (p2d[..., <span class="dv">1</span>] <span class="op">&lt;</span> H)</span>
+<span id="cb7-154"><a href="#cb7-154" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Convert to integer pixel coords and build a sparse occupancy mask.</span></span>
+<span id="cb7-155"><a href="#cb7-155" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Use scatter or bincount for efficiency.</span></span>
+<span id="cb7-156"><a href="#cb7-156" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Compute |M(q)| / (H*W) and derive F_empty.</span></span>
+<span id="cb7-157"><a href="#cb7-157" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Also collect depth statistics from pts_cam[..., 2] where in_bounds is True.</span></span>
+<span id="cb7-158"><a href="#cb7-158" aria-hidden="true" tabindex="-1"></a>    ...</span>
+<span id="cb7-159"><a href="#cb7-159" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb7-160"><a href="#cb7-160" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-161"><a href="#cb7-161" aria-hidden="true" tabindex="-1"></a>Notes:</span>
+<span id="cb7-162"><a href="#cb7-162" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-163"><a href="#cb7-163" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`CameraTW.project`</span> supports both pinhole and fisheye models and returns a validity mask (in-front + in-image + in-radius). This avoids manual distortion handling. See <span class="in">`external/efm3d/efm3d/aria/camera.py`</span> for details.</span>
+<span id="cb7-164"><a href="#cb7-164" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>If <span class="in">`candidate_camera`</span> is shared across candidates, broadcast the camera to <span class="in">`(B, N, ...)`</span> or slice per candidate frame index.</span>
+<span id="cb7-165"><a href="#cb7-165" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>For performance, compute coverage using <span class="in">`torch.bincount`</span> on <span class="in">`p2d_int = (y * W + x)`</span> with per-candidate batching.</span>
+<span id="cb7-166"><a href="#cb7-166" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-167"><a href="#cb7-167" aria-hidden="true" tabindex="-1"></a><span class="fu">### Optional: PointNeXt-S semidense encoder (global point embedding)</span></span>
+<span id="cb7-168"><a href="#cb7-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-169"><a href="#cb7-169" aria-hidden="true" tabindex="-1"></a>For a stronger geometric prior than simple projection stats, we can encode the</span>
+<span id="cb7-170"><a href="#cb7-170" aria-hidden="true" tabindex="-1"></a>semi-dense point cloud with **PointNeXt-S** (small, pretrained, robust to</span>
+<span id="cb7-171"><a href="#cb7-171" aria-hidden="true" tabindex="-1"></a>non-uniform sampling). We subsample to ~3k points (from the padded 50k) and</span>
+<span id="cb7-172"><a href="#cb7-172" aria-hidden="true" tabindex="-1"></a>encode the point cloud once per snippet, then concatenate the embedding to the</span>
+<span id="cb7-173"><a href="#cb7-173" aria-hidden="true" tabindex="-1"></a>VIN head input.</span>
+<span id="cb7-174"><a href="#cb7-174" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-175"><a href="#cb7-175" aria-hidden="true" tabindex="-1"></a>Key references:</span>
+<span id="cb7-176"><a href="#cb7-176" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-177"><a href="#cb7-177" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>PointNeXt paper: <span class="co">[</span><span class="ot">@PointNeXt-qian2022</span><span class="co">]</span></span>
+<span id="cb7-178"><a href="#cb7-178" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>OpenPoints model zoo (pretrained PointNeXt-S configs/weights): <span class="co">[</span><span class="ot">@OpenPoints-modelzoo</span><span class="co">]</span></span>
+<span id="cb7-179"><a href="#cb7-179" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-180"><a href="#cb7-180" aria-hidden="true" tabindex="-1"></a>Implementation notes:</span>
+<span id="cb7-181"><a href="#cb7-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-182"><a href="#cb7-182" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The encoder is **optional** and only active if <span class="in">`VinModelV2Config.point_encoder`</span> is set.</span>
+<span id="cb7-183"><a href="#cb7-183" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use <span class="in">`EfmPointsView.collapse_points(max_points=3000)`</span> before encoding.</span>
+<span id="cb7-184"><a href="#cb7-184" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Transform points into the **reference rig frame** for consistent pose alignment.</span>
+<span id="cb7-185"><a href="#cb7-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-186"><a href="#cb7-186" aria-hidden="true" tabindex="-1"></a><span class="fu">### FiLM-style modulation of the global voxel context (recommended injection)</span></span>
+<span id="cb7-187"><a href="#cb7-187" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-188"><a href="#cb7-188" aria-hidden="true" tabindex="-1"></a>Rather than only late-fusing the PointNeXt embedding, use it to **modulate**</span>
+<span id="cb7-189"><a href="#cb7-189" aria-hidden="true" tabindex="-1"></a>the voxel-derived global context. This is a feature-wise linear modulation</span>
+<span id="cb7-190"><a href="#cb7-190" aria-hidden="true" tabindex="-1"></a>(FiLM) style injection <span class="co">[</span><span class="ot">@FiLM-perez2018</span><span class="co">]</span> that conditions the global context on</span>
+<span id="cb7-191"><a href="#cb7-191" aria-hidden="true" tabindex="-1"></a>the semidense geometry *without* disrupting the interpretable voxel channels.</span>
+<span id="cb7-192"><a href="#cb7-192" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-193"><a href="#cb7-193" aria-hidden="true" tabindex="-1"></a>**Motivation (conceptual)**:</span>
+<span id="cb7-194"><a href="#cb7-194" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-195"><a href="#cb7-195" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The voxel field provides **local occupancy evidence**; the semidense embedding</span>
+<span id="cb7-196"><a href="#cb7-196" aria-hidden="true" tabindex="-1"></a>  summarizes **global geometry**. We want the global geometry to *shape* how the</span>
+<span id="cb7-197"><a href="#cb7-197" aria-hidden="true" tabindex="-1"></a>  voxel context is interpreted rather than merely append another vector at the</span>
+<span id="cb7-198"><a href="#cb7-198" aria-hidden="true" tabindex="-1"></a>  end.</span>
+<span id="cb7-199"><a href="#cb7-199" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>FiLM-style modulation implements **content-aware gating**: the point cloud</span>
+<span id="cb7-200"><a href="#cb7-200" aria-hidden="true" tabindex="-1"></a>  decides which global-context features should be amplified, suppressed, or</span>
+<span id="cb7-201"><a href="#cb7-201" aria-hidden="true" tabindex="-1"></a>  shifted. This is analogous to conditional normalization, but keeps the base</span>
+<span id="cb7-202"><a href="#cb7-202" aria-hidden="true" tabindex="-1"></a>  representation intact and interpretable.</span>
+<span id="cb7-203"><a href="#cb7-203" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>It is **parameter-efficient** and stable: one linear layer produces scale/shift</span>
+<span id="cb7-204"><a href="#cb7-204" aria-hidden="true" tabindex="-1"></a>  and can be paired with GroupNorm for controlled statistics.</span>
+<span id="cb7-205"><a href="#cb7-205" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-206"><a href="#cb7-206" aria-hidden="true" tabindex="-1"></a>**Formulation** (per snippet, broadcast to candidates):</span>
+<span id="cb7-207"><a href="#cb7-207" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-208"><a href="#cb7-208" aria-hidden="true" tabindex="-1"></a>Let <span class="in">`g ∈ R^{B×N×C}`</span> be the global voxel context and <span class="in">`p ∈ R^{B×D}`</span> the PointNeXt</span>
+<span id="cb7-209"><a href="#cb7-209" aria-hidden="true" tabindex="-1"></a>embedding. We compute:</span>
+<span id="cb7-210"><a href="#cb7-210" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-211"><a href="#cb7-211" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb7-212"><a href="#cb7-212" aria-hidden="true" tabindex="-1"></a><span class="sc">\\</span>gamma, <span class="sc">\\</span>beta = W p, <span class="sc">\\</span>quad g' = <span class="sc">\\</span>text{GN}( g <span class="sc">\\</span>odot (1 + <span class="sc">\\</span>gamma) + <span class="sc">\\</span>beta )</span>
+<span id="cb7-213"><a href="#cb7-213" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb7-214"><a href="#cb7-214" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-215"><a href="#cb7-215" aria-hidden="true" tabindex="-1"></a>where <span class="in">`γ, β ∈ R^{B×C}`</span> are broadcast across candidates and <span class="in">`GN`</span> is GroupNorm.</span>
+<span id="cb7-216"><a href="#cb7-216" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-217"><a href="#cb7-217" aria-hidden="true" tabindex="-1"></a>**Implementation sketch**:</span>
+<span id="cb7-218"><a href="#cb7-218" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-219"><a href="#cb7-219" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb7-220"><a href="#cb7-220" aria-hidden="true" tabindex="-1"></a><span class="co"># VinModelV2.__init__</span></span>
+<span id="cb7-221"><a href="#cb7-221" aria-hidden="true" tabindex="-1"></a><span class="va">self</span>.point_film <span class="op">=</span> nn.Linear(point_dim, <span class="dv">2</span> <span class="op">*</span> field_dim)</span>
+<span id="cb7-222"><a href="#cb7-222" aria-hidden="true" tabindex="-1"></a><span class="va">self</span>.point_film_norm <span class="op">=</span> nn.GroupNorm(num_groups<span class="op">=</span><span class="dv">4</span>, num_channels<span class="op">=</span>field_dim)</span>
+<span id="cb7-223"><a href="#cb7-223" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-224"><a href="#cb7-224" aria-hidden="true" tabindex="-1"></a><span class="co"># VinModelV2._forward_impl</span></span>
+<span id="cb7-225"><a href="#cb7-225" aria-hidden="true" tabindex="-1"></a>gamma, beta <span class="op">=</span> <span class="va">self</span>.point_film(semidense_feat).chunk(<span class="dv">2</span>, dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb7-226"><a href="#cb7-226" aria-hidden="true" tabindex="-1"></a>global_feat <span class="op">=</span> global_feat <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">+</span> gamma[:, <span class="va">None</span>, :]) <span class="op">+</span> beta[:, <span class="va">None</span>, :]</span>
+<span id="cb7-227"><a href="#cb7-227" aria-hidden="true" tabindex="-1"></a>global_feat <span class="op">=</span> <span class="va">self</span>.point_film_norm(global_feat.transpose(<span class="dv">1</span>, <span class="dv">2</span>)).transpose(<span class="dv">1</span>, <span class="dv">2</span>)</span>
+<span id="cb7-228"><a href="#cb7-228" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb7-229"><a href="#cb7-229" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-230"><a href="#cb7-230" aria-hidden="true" tabindex="-1"></a>**Why this helps**:</span>
+<span id="cb7-231"><a href="#cb7-231" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-232"><a href="#cb7-232" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>When the voxel grid misses geometry (out-of-bounds candidates), the point</span>
+<span id="cb7-233"><a href="#cb7-233" aria-hidden="true" tabindex="-1"></a>  embedding can **down-weight unreliable global features**.</span>
+<span id="cb7-234"><a href="#cb7-234" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>When semidense points indicate rich structure, the modulation **amplifies**</span>
+<span id="cb7-235"><a href="#cb7-235" aria-hidden="true" tabindex="-1"></a>  the relevant global-context channels, improving RRI discrimination.</span>
+<span id="cb7-236"><a href="#cb7-236" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-237"><a href="#cb7-237" aria-hidden="true" tabindex="-1"></a><span class="fu">### Optional: encoder for past ego trajectory (global point embedding)</span></span>
+<span id="cb7-238"><a href="#cb7-238" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-239"><a href="#cb7-239" aria-hidden="true" tabindex="-1"></a>Use tiny transformer to encode past ego trajectory frames in reference rig frame.</span>
+<span id="cb7-240"><a href="#cb7-240" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-241"><a href="#cb7-241" aria-hidden="true" tabindex="-1"></a><span class="in">```py</span></span>
+<span id="cb7-242"><a href="#cb7-242" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span>(slots<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-243"><a href="#cb7-243" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> EfmTrajectoryView:</span>
+<span id="cb7-244"><a href="#cb7-244" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""World-frame rig trajectory aligned to snippet frames."""</span></span>
+<span id="cb7-245"><a href="#cb7-245" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-246"><a href="#cb7-246" aria-hidden="true" tabindex="-1"></a>    t_world_rig: PoseTW</span>
+<span id="cb7-247"><a href="#cb7-247" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Rig SE(3) poses per frame (world←rig)."""</span></span>
+<span id="cb7-248"><a href="#cb7-248" aria-hidden="true" tabindex="-1"></a>    time_ns: Tensor</span>
+<span id="cb7-249"><a href="#cb7-249" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""``Tensor["F", int64]`` pose timestamps."""</span></span>
+<span id="cb7-250"><a href="#cb7-250" aria-hidden="true" tabindex="-1"></a>    gravity_in_world: Tensor</span>
+<span id="cb7-251"><a href="#cb7-251" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""``Tensor["3", float32]`` gravity vector in world frame (aligned to [0,0,-9.81])."""</span></span>
+<span id="cb7-252"><a href="#cb7-252" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb7-253"><a href="#cb7-253" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-254"><a href="#cb7-254" aria-hidden="true" tabindex="-1"></a><span class="fu">## P5: 2D token reuse (appearance priors)</span></span>
+<span id="cb7-255"><a href="#cb7-255" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-256"><a href="#cb7-256" aria-hidden="true" tabindex="-1"></a>**Inputs**:</span>
+<span id="cb7-257"><a href="#cb7-257" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-258"><a href="#cb7-258" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`feat2d_upsampled`</span> or <span class="in">`token2d`</span> from EVL outputs.</span>
+<span id="cb7-259"><a href="#cb7-259" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-260"><a href="#cb7-260" aria-hidden="true" tabindex="-1"></a>**Mechanism**:</span>
+<span id="cb7-261"><a href="#cb7-261" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-262"><a href="#cb7-262" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Project semidense points into current RGB frames, sample 2D features, reproject to candidate view or pool directly per candidate.</span>
+<span id="cb7-263"><a href="#cb7-263" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-264"><a href="#cb7-264" aria-hidden="true" tabindex="-1"></a>**Motivation**: Adds appearance/texture cues without expanding the voxel grid.</span>
+<span id="cb7-265"><a href="#cb7-265" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-266"><a href="#cb7-266" aria-hidden="true" tabindex="-1"></a><span class="fu"># Encoding schemas</span></span>
+<span id="cb7-267"><a href="#cb7-267" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-268"><a href="#cb7-268" aria-hidden="true" tabindex="-1"></a><span class="fu">## Candidate-relative positional keys</span></span>
+<span id="cb7-269"><a href="#cb7-269" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-270"><a href="#cb7-270" aria-hidden="true" tabindex="-1"></a>**Idea**: Build `pos_grid` in the **candidate frame** so attention keys and candidate queries share the same spatial basis. This should improve alignment when the candidate is far from the reference frame.</span>
+<span id="cb7-271"><a href="#cb7-271" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-272"><a href="#cb7-272" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Implementation anchor: <span class="in">`VinModelV2Config.tf_pos_grid_in_candidate_frame`</span> (TODO in <span class="in">`model_v2.py`</span>).</span>
+<span id="cb7-273"><a href="#cb7-273" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-274"><a href="#cb7-274" aria-hidden="true" tabindex="-1"></a><span class="fu">## Hybrid pose encoding (R6D + shell)</span></span>
+<span id="cb7-275"><a href="#cb7-275" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-276"><a href="#cb7-276" aria-hidden="true" tabindex="-1"></a>**Idea**: Combine the current R6D+translation encoding with shell features (direction <span class="in">`u`</span>, forward <span class="in">`f`</span>, radius <span class="in">`r`</span>, alignment). This keeps rotation/translation expressivity while adding geometry cues independent of voxel extent.</span>
+<span id="cb7-277"><a href="#cb7-277" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-278"><a href="#cb7-278" aria-hidden="true" tabindex="-1"></a><span class="fu">## Distance-to-voxel features</span></span>
+<span id="cb7-279"><a href="#cb7-279" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-280"><a href="#cb7-280" aria-hidden="true" tabindex="-1"></a>**Idea**: Add explicit scalars for candidate distance to voxel center and normalized signed distance to bounds (x/y/z). This provides a direct indicator of voxel-context reliability.</span>
+<span id="cb7-281"><a href="#cb7-281" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-282"><a href="#cb7-282" aria-hidden="true" tabindex="-1"></a><span class="fu">## Multi-scale pooling</span></span>
+<span id="cb7-283"><a href="#cb7-283" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-284"><a href="#cb7-284" aria-hidden="true" tabindex="-1"></a>**Idea**: Pool the voxel field at 2-3 grid sizes and concatenate. This helps when only a subregion of the voxel grid is informative.</span>
+<span id="cb7-285"><a href="#cb7-285" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-286"><a href="#cb7-286" aria-hidden="true" tabindex="-1"></a><span class="fu">## Pose-conditioned attention diagnostics</span></span>
+<span id="cb7-287"><a href="#cb7-287" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-288"><a href="#cb7-288" aria-hidden="true" tabindex="-1"></a>The global pooling uses multi-head attention <span class="co">[</span><span class="ot">Wikipedia :: Attention (machine learning)</span><span class="co">]</span>(https://en.wikipedia.org/wiki/Attention_(machine_learning)). Exposing attention weights lets us assess whether candidates attend to spatially meaningful voxels and whether out-of-grid candidates produce **diffuse** (uninformative) attention.</span>
+<span id="cb7-289"><a href="#cb7-289" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-290"><a href="#cb7-290" aria-hidden="true" tabindex="-1"></a><span class="fu">### Theory: attention concentration as a diagnostic</span></span>
+<span id="cb7-291"><a href="#cb7-291" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-292"><a href="#cb7-292" aria-hidden="true" tabindex="-1"></a>Let <span class="in">`A(q)`</span> be the attention matrix for candidate <span class="in">`q`</span> (queries = candidate pose tokens, keys = pooled voxel tokens). If attention is well-aligned, <span class="in">`A(q)`</span> should concentrate on a few spatial tokens. If the candidate is out-of-grid or the positional encoding is misaligned, <span class="in">`A(q)`</span> becomes uniform.</span>
+<span id="cb7-293"><a href="#cb7-293" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-294"><a href="#cb7-294" aria-hidden="true" tabindex="-1"></a>A simple diagnostic is **attention entropy**:</span>
+<span id="cb7-295"><a href="#cb7-295" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-296"><a href="#cb7-296" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb7-297"><a href="#cb7-297" aria-hidden="true" tabindex="-1"></a>H(q) = -<span class="sc">\\</span>sum_i A_i(q) <span class="sc">\\</span>log (A_i(q) + <span class="sc">\\</span>varepsilon)</span>
+<span id="cb7-298"><a href="#cb7-298" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb7-299"><a href="#cb7-299" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-300"><a href="#cb7-300" aria-hidden="true" tabindex="-1"></a>Low entropy indicates focused attention; high entropy suggests that the attention mechanism has no spatial anchor for that candidate.</span>
+<span id="cb7-301"><a href="#cb7-301" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-302"><a href="#cb7-302" aria-hidden="true" tabindex="-1"></a><span class="fu">### Implementation sketch (PoseConditionedGlobalPool)</span></span>
+<span id="cb7-303"><a href="#cb7-303" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-304"><a href="#cb7-304" aria-hidden="true" tabindex="-1"></a><span class="in">`torch.nn.MultiheadAttention`</span> can return per-head attention weights by passing <span class="in">`need_weights=True`</span> and <span class="in">`average_attn_weights=False`</span>:</span>
+<span id="cb7-305"><a href="#cb7-305" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-306"><a href="#cb7-306" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb7-307"><a href="#cb7-307" aria-hidden="true" tabindex="-1"></a><span class="co"># oracle_rri/oracle_rri/vin/experimental/model_v2.py</span></span>
+<span id="cb7-308"><a href="#cb7-308" aria-hidden="true" tabindex="-1"></a>attn_out, attn_weights <span class="op">=</span> <span class="va">self</span>.attn(</span>
+<span id="cb7-309"><a href="#cb7-309" aria-hidden="true" tabindex="-1"></a>    queries, keys, keys,</span>
+<span id="cb7-310"><a href="#cb7-310" aria-hidden="true" tabindex="-1"></a>    need_weights<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb7-311"><a href="#cb7-311" aria-hidden="true" tabindex="-1"></a>    average_attn_weights<span class="op">=</span><span class="va">False</span>,  <span class="co"># keep per-head weights</span></span>
+<span id="cb7-312"><a href="#cb7-312" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-313"><a href="#cb7-313" aria-hidden="true" tabindex="-1"></a><span class="co"># attn_weights: (B, num_heads, N, T)</span></span>
+<span id="cb7-314"><a href="#cb7-314" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb7-315"><a href="#cb7-315" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-316"><a href="#cb7-316" aria-hidden="true" tabindex="-1"></a>From this, compute diagnostics per candidate:</span>
+<span id="cb7-317"><a href="#cb7-317" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-318"><a href="#cb7-318" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb7-319"><a href="#cb7-319" aria-hidden="true" tabindex="-1"></a>weights <span class="op">=</span> attn_weights.mean(dim<span class="op">=</span><span class="dv">1</span>)  <span class="co"># (B, N, T) average heads</span></span>
+<span id="cb7-320"><a href="#cb7-320" aria-hidden="true" tabindex="-1"></a>entropy <span class="op">=</span> <span class="op">-</span>(weights <span class="op">*</span> (weights <span class="op">+</span> <span class="fl">1e-9</span>).log()).<span class="bu">sum</span>(dim<span class="op">=-</span><span class="dv">1</span>)  <span class="co"># (B, N)</span></span>
+<span id="cb7-321"><a href="#cb7-321" aria-hidden="true" tabindex="-1"></a>peak <span class="op">=</span> weights.<span class="bu">max</span>(dim<span class="op">=-</span><span class="dv">1</span>).values  <span class="co"># (B, N)</span></span>
+<span id="cb7-322"><a href="#cb7-322" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb7-323"><a href="#cb7-323" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-324"><a href="#cb7-324" aria-hidden="true" tabindex="-1"></a>Log <span class="in">`entropy`</span> and <span class="in">`peak`</span> alongside <span class="in">`valid_frac`</span> to check whether attention degenerates when coverage is low.</span>
+<span id="cb7-325"><a href="#cb7-325" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-326"><a href="#cb7-326" aria-hidden="true" tabindex="-1"></a><span class="fu"># Out-of-voxel mitigation recipe</span></span>
+<span id="cb7-327"><a href="#cb7-327" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-328"><a href="#cb7-328" aria-hidden="true" tabindex="-1"></a>A simple gating strategy can prevent over-confident predictions when voxel coverage is low:</span>
+<span id="cb7-329"><a href="#cb7-329" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-330"><a href="#cb7-330" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Compute <span class="in">`valid_frac`</span> and <span class="in">`center_in_bounds`</span>.</span>
+<span id="cb7-331"><a href="#cb7-331" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>If <span class="in">`valid_frac &lt; tau`</span> (e.g., 0.2), blend voxel features with P4/P5 features:</span>
+<span id="cb7-332"><a href="#cb7-332" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span><span class="in">`feat = alpha * voxel_feat + (1 - alpha) * semidense_feat`</span> where <span class="in">`alpha = clamp(valid_frac / tau, 0, 1)`</span>.</span>
+<span id="cb7-333"><a href="#cb7-333" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Add a binary OOB indicator as input to the head.</span>
+<span id="cb7-334"><a href="#cb7-334" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-335"><a href="#cb7-335" aria-hidden="true" tabindex="-1"></a><span class="fu"># Suggested ablation order</span></span>
+<span id="cb7-336"><a href="#cb7-336" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-337"><a href="#cb7-337" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>P0 baseline++ (coverage + occupancy + explicit OOB scalars).</span>
+<span id="cb7-338"><a href="#cb7-338" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>P1 derived channels.</span>
+<span id="cb7-339"><a href="#cb7-339" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>P2 compressed neck features (if P1 gains plateau).</span>
+<span id="cb7-340"><a href="#cb7-340" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>P4 semidense projection features (always-on).</span>
+<span id="cb7-341"><a href="#cb7-341" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>P3 entity-aware cues.</span>
+<span id="cb7-342"><a href="#cb7-342" aria-hidden="true" tabindex="-1"></a><span class="ss">6. </span>P5 2D token reuse (heavier pipeline but potentially strong gains).</span>
+<span id="cb7-343"><a href="#cb7-343" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-344"><a href="#cb7-344" aria-hidden="true" tabindex="-1"></a><span class="fu"># Implementation anchors</span></span>
+<span id="cb7-345"><a href="#cb7-345" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-346"><a href="#cb7-346" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Scene field construction: <span class="in">`oracle_rri/oracle_rri/vin/experimental/model_v2.py::_build_scene_field_v2`</span>.</span>
+<span id="cb7-347"><a href="#cb7-347" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Global pooling + positional keys: <span class="in">`PoseConditionedGlobalPool`</span> in <span class="in">`model_v2.py`</span>.</span>
+<span id="cb7-348"><a href="#cb7-348" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>EVL feature contract: <span class="in">`oracle_rri/oracle_rri/vin/types.py::EvlBackboneOutput`</span>.</span>
+<span id="cb7-349"><a href="#cb7-349" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>VIN documentation: <span class="co">[</span><span class="ot">VIN on EVL</span><span class="co">](vin_nbv.qmd)</span>.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p>Built with Quarto</p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

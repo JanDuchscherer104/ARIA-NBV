@@ -1,0 +1,43 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 18px; font-weight: 700; }
+---
+flowchart TB
+  %% Pose encoding branch (compact)
+
+  Inputs["Poses"]
+
+  Rel["<b>Rig-relative pose</b><br/><br/><code>pose_rig_cam = inv(pose_world_rig_ref) o pose_world_cam</code>"]
+
+  PoseVec["<b>Pose vector</b><br/><br/><code>pose_vec = concat(t_rcq, R6D(R_rcq))</code>"]
+
+  Encoder["<b>Pose encoder</b> (12.7K params)<br/><br/><code>pose_enc = R6dLffPoseEncoder(pose_vec)</code><br/><br/><b>Internal ops</b><br/><code>LearnableFourierFeatures(pose_vec)</code><br/><code>-&gt; nn.Sequential(MLP)</code>"]
+
+  PoseEmb["pose_enc"]
+  Center["candidate_center_rig_m"]
+
+  Inputs -->|"PoseTW[B, N_q, 12]<br/>PoseTW[B, 12]"| Rel
+  Rel -->|"FloatTensor[B, N_q,<br/>9]"| PoseVec
+  PoseVec -->|"FloatTensor[B, N_q,<br/>9]"| Encoder
+  Encoder -->|"FloatTensor[B, N_q,<br/>F_pose]"| PoseEmb
+  Rel -->|"FloatTensor[B, N_q,<br/>3]"| Center
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Inputs input;
+  class Rel,PoseVec,Encoder compute;
+  class PoseEmb,Center output;

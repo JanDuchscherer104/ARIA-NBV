@@ -1,0 +1,37 @@
+sequenceDiagram
+autonumber
+participant DM as VinDataModule
+participant DS as OracleRriCacheVinDataset
+participant CACHE as OracleRriCacheDataset
+participant PROV as VinSnippetProviderChain
+participant VSC as VinSnippetCacheProvider
+participant LDR as EfmSnippetLoader
+participant ASE as AseEfmDataset
+participant DL as DataLoader
+participant BATCH as VinOracleBatch
+
+DM->>DS: setup() builds dataset
+DS->>CACHE: init(cache_dir, split, flags)
+Note over CACHE: reads index.jsonl and cached samples
+
+loop Each batch
+  DM->>DL: train_dataloader()
+  DL->>DS: __getitem__(idx)
+  DS->>CACHE: get(idx)
+  CACHE->>CACHE: torch.load(.pt) + decode outputs
+  CACHE->>PROV: request snippet (if include_efm_snippet)
+  alt vin_snippet_cache available
+    PROV->>VSC: get(snippet_id)
+    VSC-->>PROV: VinSnippetView
+  else fallback to dataset
+    PROV->>LDR: load(scene_id, snippet_id)
+    LDR->>ASE: iterate/read snippet
+    ASE-->>LDR: EfmSnippetView
+    LDR-->>PROV: VinSnippetView
+  end
+  PROV-->>CACHE: VinSnippetView
+  CACHE-->>DS: VinOracleBatch
+  DS-->>DL: sample
+  DL->>BATCH: collate(samples)
+  Note over BATCH: pad candidates to max Nq, stack cameras, pad semidense points
+end

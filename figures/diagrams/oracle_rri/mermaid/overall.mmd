@@ -1,0 +1,70 @@
+flowchart LR
+  %% Overall oracle RRI label pipeline (block-level)
+  %%
+  %% Stages (files):
+  %% - efm_dataset.py                -> EfmSnippetView
+  %% - candidate_generation.py       -> CandidateSamplingResult
+  %% - candidate_depth_renderer.py   -> CandidateDepths
+  %% - candidate_pointclouds.py      -> CandidatePointClouds
+  %% - oracle_rri.py                 -> RriResult
+  %%
+  %% Symbols:
+  %% - B: snippet batch size (usually B=1 for offline labeling)
+  %% - T: snippet length (trajectory frames)
+  %% - N: number of valid candidate views
+  %% - H,W: render resolution (pixels)
+  %% - P_t: number of points in the current reconstruction \(\mathcal{P}_t\)
+  %% - P_max: max backprojected points per candidate (stride-dependent)
+  %% - V,F: mesh vertices / faces
+
+  ds["AseEfmDataset<br/>\(\texttt{IterableDataset}\)"]
+  sample["EfmSnippetView<br/>\(\texttt{efm}:\texttt{dict}\)<br/>\(\mathcal{M}_{GT}\) (GT mesh, optional crop)"]
+
+  gen["CandidateViewGenerator<br/>\(\texttt{generate\_from\_typed\_sample}\)"]
+  cand["CandidateSamplingResult<br/>\(\texttt{views}:\texttt{CameraTW}^{N}\)<br/>\(q\in\mathcal{Q}\subset\mathrm{SE}(3):\ \mathbf{T}_{q}^{w}\) + \(\mathbf{T}_{r}^{w}\)"]
+
+  depth["CandidateDepthRenderer<br/>\(\texttt{Pytorch3DDepthRenderer}\)"]
+  depths["CandidateDepths<br/>\(D_{q}\) + \(\texttt{valid\_mask}\)"]
+
+  pcs["build_candidate_pointclouds<br/>\(\mathcal{P}_q=\Pi^{-1}(D_q,C_q,\mathbf{T}_{q}^{w})\)"]
+  pc_out["CandidatePointClouds<br/>\(\mathcal{P}_q\), \(\mathcal{P}_t\), \(\texttt{extend}\)"]
+
+  oracle["OracleRRI<br/>\(\mathrm{RRI}(q)=\frac{\mathrm{CD}(\mathcal{P}_t,\mathcal{M}_{GT})-\mathrm{CD}(\mathcal{P}_{t\cup q},\mathcal{M}_{GT})}{\mathrm{CD}(\mathcal{P}_t,\mathcal{M}_{GT})+\epsilon}\)"]
+  rri["RriResult<br/>\(\texttt{rri}\in\mathbb{R}^{N}\)<br/>\(\texttt{pm\_dist\_before/after}\)"]
+
+  out["OracleRriLabelBatch<br/>(sample, candidates, depths, candidate_pcs, rri)"]
+
+  ds -->|"\(\texttt{efm}\) snippets"| sample
+
+  sample -->|"\(\mathbf{T}_{rig}^{w}(t)\in\mathrm{SE}(3)^{B\times T},\ \mathcal{P}_t\in\mathbb{R}^{P_t\times 3}\)"| gen
+  sample -->|"\(\mathcal{M}_{GT}=(\mathbf{V}^w\!\in\!\mathbb{R}^{V\times 3},\mathcal{F}_{GT}\!\in\!\mathbb{N}^{F\times 3})\)"| gen
+  gen -->|"\(\mathbf{T}_{r}^{w}\in\mathrm{SE}(3)^{B},\ \mathbf{T}_{q}^{w}\in\mathrm{SE}(3)^{N}\)"| cand
+
+  sample -->|"\(\mathcal{M}_{GT}\)"| depth
+  cand -->|"\(\texttt{views}:\texttt{CameraTW}^{N},\ \mathbf{T}_{q}^{w}\)"| depth
+  depth -->|"\(D_q\in\mathbb{R}^{N\times H\times W}\)"| depths
+
+  sample -->|"\(\mathcal{P}_t\)"| pcs
+  depths -->|"\(D_q,\ \texttt{p3d\_cameras}\Rightarrow C_q\)"| pcs
+  pcs -->|"\(\mathcal{P}_q\in\mathbb{R}^{N\times P_{\max}\times 3},\ \texttt{lengths}\in\mathbb{N}^{N}\)"| pc_out
+
+  sample -->|"\(\mathcal{M}_{GT}\)"| oracle
+  pc_out -->|"\(\mathcal{P}_t,\ \mathcal{P}_q,\ \texttt{extend}\in\mathbb{R}^{6}\)"| oracle
+  oracle -->|"\(\mathrm{RRI}\in\mathbb{R}^{N}\)"| rri
+
+  sample -->|"\(\texttt{sample}\)"| out
+  cand -->|"\(\texttt{candidates}\)"| out
+  depths -->|"\(\texttt{depths}\)"| out
+  pc_out -->|"\(\texttt{candidate\_pcs}\)"| out
+  rri -->|"\(\texttt{rri}\)"| out
+
+  %% Styling
+  classDef input fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
+  classDef compute fill:#e1d5e7,stroke:#9673a6,stroke-width:2px;
+  classDef neutral fill:#f5f5f5,stroke:#666666,stroke-width:2px;
+  classDef output fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
+
+  class ds,sample input;
+  class gen,depth,pcs,oracle compute;
+  class cand,depths,pc_out neutral;
+  class rri,out output;

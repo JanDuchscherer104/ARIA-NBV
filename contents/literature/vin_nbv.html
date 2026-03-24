@@ -2,13 +2,16 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.8.25">
+<meta name="generator" content="quarto-1.9.36">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
 <title>vin_nbv – Semantic NBV Planning</title>
 <style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
 div.columns{display: flex; gap: min(4vw, 1.5em);}
@@ -67,19 +70,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <meta name="quarto:offset" content="../../">
 <script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="../../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
 <script src="../../site_libs/quarto-html/popper.min.js"></script>
 <script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-707d8167ce6003fca903bfe2be84ab7f.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-f418161beb48e0141c760e455f12af2c.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-74ccc60397116b75c66017aca1c58e3c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-8867f034249725ad380f9d6206564ba2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-74ccc60397116b75c66017aca1c58e3c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-6cd23cb7756619bc0e9bdda1db2af307.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-bff151b320a95a122dd3cd8d05e7679b.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-6cd23cb7756619bc0e9bdda1db2af307.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script src="../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
 <link href="../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
 <link href="../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
@@ -111,7 +113,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 }</script>
 
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
 
 <script type="text/javascript">
 const typesetMath = (el) => {
@@ -311,8 +313,6 @@ window.Quarto = {
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a href="../../index.html" class="navbar-brand navbar-brand-logo">
-    </a>
     <a class="navbar-brand" href="../../index.html">
     <span class="navbar-title">Semantic NBV Planning</span>
     </a>
@@ -324,17 +324,60 @@ window.Quarto = {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">Home</span>
-    </span>
+    <a class="nav-link active" href="../../contents/todos.html" aria-current="page"> 
+<span class="menu-text">TODOs</span></a>
   </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../contents/setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-project-state" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Project State</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-project-state">    
+        <li>
+    <a class="dropdown-item" href="../../contents/roadmap.html">
+ <span class="dropdown-text">Roadmap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/questions.html">
+ <span class="dropdown-text">Research Questions</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/experiments/findings.html">
+ <span class="dropdown-text">Findings</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-resources" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Resources</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-resources">    
+        <li>
+    <a class="dropdown-item" href="../../contents/resources.html">
+ <span class="dropdown-text">Resources (External Links, Repos, Docs, etc.)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/ase_dataset.html">
+ <span class="dropdown-text">ASE Dataset</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../../contents/glossary.html">
+ <span class="dropdown-text">Glossary</span></a>
+  </li>  
+    </ul>
+  </li>
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-bi-github" role="link" data-bs-toggle="dropdown" aria-expanded="false">
       <i class="bi bi-github" role="img">
 </i> 
  <span class="menu-text"></span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-bi-github">    
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="nav-menu-bi-github">    
         <li>
     <a class="dropdown-item" href="https://github.com/JanDuchscherer104/NBV">
  <span class="dropdown-text">View Source</span></a>
@@ -357,7 +400,7 @@ window.Quarto = {
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/literature/vin_nbv.html">Literature</a></li><li class="breadcrumb-item"><a href="../../contents/literature/vin_nbv.html">VIN-NBV: A View Introspection Network for Next-Best-View Selection</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/literature/index.html">Literature</a></li><li class="breadcrumb-item"><a href="../../contents/literature/vin_nbv.html">VIN-NBV: A View Introspection Network for Next-Best-View Selection</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
       <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
@@ -370,10 +413,6 @@ window.Quarto = {
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
   <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
-    <div class="pt-lg-2 mt-2 text-left sidebar-header">
-      <a href="../../index.html" class="sidebar-logo-link">
-      </a>
-      </div>
         <div class="mt-2 flex-shrink-0 align-items-center">
         <div class="sidebar-search">
         <div id="quarto-search" class="" title="Search"></div>
@@ -381,10 +420,16 @@ window.Quarto = {
         </div>
     <div class="sidebar-menu-container"> 
     <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Home</span></a>
+  </div>
+</li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
- <span class="menu-text">Overview</span></a>
+ <span class="menu-text">Literature</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
@@ -392,21 +437,10 @@ window.Quarto = {
       <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Next-Best-View Planning with Foundation Models</span></a>
+  <a href="../../contents/literature/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Literature Review</span></a>
   </div>
 </li>
-      </ul>
-  </li>
-        <li class="sidebar-item sidebar-item-section">
-      <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
- <span class="menu-text">Literature</span></a>
-          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
-            <i class="bi bi-chevron-right ms-2"></i>
-          </a> 
-      </div>
-      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../../contents/literature/vin_nbv.html" class="sidebar-item-text sidebar-link active">
@@ -431,23 +465,23 @@ window.Quarto = {
  <span class="menu-text">EFM3D &amp; EVL</span></a>
   </div>
 </li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../contents/glossary.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Glossary</span></a>
-  </div>
-</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
  <span class="menu-text">Project State</span></a>
-          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
-      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/experiments/findings.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Experimental Findings</span></a>
+  </div>
+</li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../../contents/questions.html" class="sidebar-item-text sidebar-link">
@@ -470,8 +504,43 @@ window.Quarto = {
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
  <span class="menu-text">Resources</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/setup.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Setup Instructions</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/resources.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Resources &amp; Tools</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ase_dataset.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Aria Synthetic Environments (ASE) Dataset</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/glossary.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Glossary</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Theory</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
@@ -479,55 +548,91 @@ window.Quarto = {
       <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../contents/ase_dataset.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Aria Synthetic Environments (ASE) Dataset</span></a>
-  </div>
-</li>
-          <li class="sidebar-item sidebar-item-section">
-      <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false">
- <span class="menu-text">Metrics</span></a>
-          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false" aria-label="Toggle section">
-            <i class="bi bi-chevron-right ms-2"></i>
-          </a> 
-      </div>
-      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth2 ">  
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../contents/metrics/index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Reconstruction Quality Metrics &amp; RRI Computation</span></a>
+  <a href="../../contents/theory/nbv_background.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">NBV Background</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../contents/metrics/surface_metrics.html" class="sidebar-item-text sidebar-link">
+  <a href="../../contents/theory/rri_theory.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Relative Reconstruction Improvement (RRI) Theory</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/theory/surface_metrics.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Surface Reconstruction Metrics</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../contents/metrics/atek_implementation.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">ATEK Implementation Details</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../contents/metrics/efm3d_implementation.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">EFM3D Implementation Details</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../contents/metrics/rri_computation.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Computing RRI with Ground Truth Meshes</span></a>
+  <a href="../../contents/theory/semi-dense-pc.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Semi-Dense Point Clouds</span></a>
   </div>
 </li>
       </ul>
   </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Implementations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../contents/resources.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Resources &amp; Tools</span></a>
+  <a href="../../contents/impl/overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Implementation Overview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/aria_nbv_overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">aria_nbv Overview &amp; Architecture</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/aria_nbv_package.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">aria_nbv Package (formerly oracle_rri)</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/data_pipeline_overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ASE Data Pipeline &amp; Streamlit Usage</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/oracle_rri_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">aria_nbv Implementation Overview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/rri_computation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Computing RRI with Ground Truth Meshes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/coral_intergarion.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Implementing CORAL for Ordinal Regression to Continuous Targets</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/vin_nbv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">View Introspection Network (VIN) on EVL</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/impl/vin_v2_feature_proposals.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">VIN v2 Feature + Encoding Proposals</span></a>
   </div>
 </li>
       </ul>
@@ -535,12 +640,64 @@ window.Quarto = {
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
- <span class="menu-text">Presentations</span></a>
+ <span class="menu-text">Architecture Diagrams</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
       <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/diagrams.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">VIN NBV Diagrams</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true">
+ <span class="menu-text">External Implementations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-7" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ext-impl/atek_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ATEK Implementation Index</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ext-impl/efm3d_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D Implementation Index</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ext-impl/prj_aria_tools_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ProjectAria Tools: Complete Reference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../contents/ext-impl/efm3d_symbol_index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D Symbol Index</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="true">
+ <span class="menu-text">Presentations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-8" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../../typst/slides/slides_1.pdf" class="sidebar-item-text sidebar-link">
@@ -567,20 +724,21 @@ window.Quarto = {
   <ul>
   <li><a href="#vin-nbv" id="toc-vin-nbv" class="nav-link active" data-scroll-target="#vin-nbv"><span class="header-section-number">1</span> VIN-NBV: A View Introspection Network for Next-Best-View Selection</a>
   <ul class="collapse">
-  <li><a href="#key-contributions" id="toc-key-contributions" class="nav-link" data-scroll-target="#key-contributions"><span class="header-section-number">1.1</span> Key Contributions</a></li>
-  <li><a href="#problem-formulation-and-rri-metric" id="toc-problem-formulation-and-rri-metric" class="nav-link" data-scroll-target="#problem-formulation-and-rri-metric"><span class="header-section-number">1.2</span> Problem Formulation and RRI Metric</a></li>
-  <li><a href="#vin-architecture" id="toc-vin-architecture" class="nav-link" data-scroll-target="#vin-architecture"><span class="header-section-number">1.3</span> VIN Architecture</a></li>
-  <li><a href="#vin-nbv-policy-algorithm" id="toc-vin-nbv-policy-algorithm" class="nav-link" data-scroll-target="#vin-nbv-policy-algorithm"><span class="header-section-number">1.4</span> VIN-NBV Policy (Algorithm)</a></li>
-  <li><a href="#training-methodology" id="toc-training-methodology" class="nav-link" data-scroll-target="#training-methodology"><span class="header-section-number">1.5</span> Training Methodology</a></li>
-  <li><a href="#experimental-results" id="toc-experimental-results" class="nav-link" data-scroll-target="#experimental-results"><span class="header-section-number">1.6</span> Experimental Results</a></li>
-  <li><a href="#comparison-to-our-nbv-research" id="toc-comparison-to-our-nbv-research" class="nav-link" data-scroll-target="#comparison-to-our-nbv-research"><span class="header-section-number">1.7</span> Comparison to Our NBV Research</a></li>
-  <li><a href="#limitations" id="toc-limitations" class="nav-link" data-scroll-target="#limitations"><span class="header-section-number">1.8</span> Limitations</a></li>
+  <li><a href="#local-sources" id="toc-local-sources" class="nav-link" data-scroll-target="#local-sources"><span class="header-section-number">1.1</span> Local Sources</a></li>
+  <li><a href="#key-contributions" id="toc-key-contributions" class="nav-link" data-scroll-target="#key-contributions"><span class="header-section-number">1.2</span> Key Contributions</a></li>
+  <li><a href="#problem-formulation-and-rri-metric" id="toc-problem-formulation-and-rri-metric" class="nav-link" data-scroll-target="#problem-formulation-and-rri-metric"><span class="header-section-number">1.3</span> Problem Formulation and RRI Metric</a></li>
+  <li><a href="#vin-architecture" id="toc-vin-architecture" class="nav-link" data-scroll-target="#vin-architecture"><span class="header-section-number">1.4</span> VIN Architecture</a></li>
+  <li><a href="#vin-nbv-policy-algorithm" id="toc-vin-nbv-policy-algorithm" class="nav-link" data-scroll-target="#vin-nbv-policy-algorithm"><span class="header-section-number">1.5</span> VIN-NBV Policy (Algorithm)</a></li>
+  <li><a href="#training-methodology" id="toc-training-methodology" class="nav-link" data-scroll-target="#training-methodology"><span class="header-section-number">1.6</span> Training Methodology</a></li>
+  <li><a href="#experimental-results" id="toc-experimental-results" class="nav-link" data-scroll-target="#experimental-results"><span class="header-section-number">1.7</span> Experimental Results</a></li>
+  <li><a href="#comparison-to-our-nbv-research" id="toc-comparison-to-our-nbv-research" class="nav-link" data-scroll-target="#comparison-to-our-nbv-research"><span class="header-section-number">1.8</span> Comparison to Our NBV Research</a></li>
+  <li><a href="#limitations" id="toc-limitations" class="nav-link" data-scroll-target="#limitations"><span class="header-section-number">1.9</span> Limitations</a></li>
   </ul></li>
   </ul>
 </nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/literature/vin_nbv.html">Literature</a></li><li class="breadcrumb-item"><a href="../../contents/literature/vin_nbv.html">VIN-NBV: A View Introspection Network for Next-Best-View Selection</a></li></ol></nav><h1 class="title display-7"></h1></header><div class="quarto-title-block"><div class="quarto-title-tools-only"><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../../contents/literature/index.html">Literature</a></li><li class="breadcrumb-item"><a href="../../contents/literature/vin_nbv.html">VIN-NBV: A View Introspection Network for Next-Best-View Selection</a></li></ol></nav><h1 class="title display-7"></h1></header><div class="quarto-title-block"><div class="quarto-title-tools-only"><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
 
 
 
@@ -589,8 +747,18 @@ window.Quarto = {
 <section id="vin-nbv" class="level2" data-number="1">
 <h2 data-number="1" class="anchored" data-anchor-id="vin-nbv"><span class="header-section-number">1</span> VIN-NBV: A View Introspection Network for Next-Best-View Selection</h2>
 <p>VIN-NBV@VIN-NBV-frahm2025 presents a learning-based approach to NBV that directly optimizes for <strong>reconstruction quality</strong> rather than coverage. The key innovation is the View Introspection Network (VIN), which predicts the <strong>Relative Reconstruction Improvement (RRI)</strong> of candidate viewpoints without actually capturing new images.</p>
-<section id="key-contributions" class="level3" data-number="1.1">
-<h3 data-number="1.1" class="anchored" data-anchor-id="key-contributions"><span class="header-section-number">1.1</span> Key Contributions</h3>
+<section id="local-sources" class="level3" data-number="1.1">
+<h3 data-number="1.1" class="anchored" data-anchor-id="local-sources"><span class="header-section-number">1.1</span> Local Sources</h3>
+<ul>
+<li><a href="../../literature/tex-src/arXiv-VIN-NBV/main.tex"><code>main.tex</code></a> – complete manuscript (sections live in <code>sec/</code>).</li>
+<li><a href="../../literature/tex-src/arXiv-VIN-NBV/sec/3_methods.tex"><code>sec/3_methods.tex</code></a> – VIN architecture details.</li>
+<li><a href="../../literature/tex-src/arXiv-VIN-NBV/sec/4_experiments.tex"><code>sec/4_experiments.tex</code></a> – NBV benchmarks and Chamfer-distance evaluations.</li>
+<li><a href="../../literature/tex-src/arXiv-VIN-NBV/Figures/VIN-NBV_diagram.png"><code>Figures/VIN-NBV_diagram.png</code></a> – reference architecture figure.</li>
+<li><a href="../../literature/tex-src/arXiv-VIN-NBV/main.bib"><code>main.bib</code></a> – BibTeX entries for cross-referencing in our docs.</li>
+</ul>
+</section>
+<section id="key-contributions" class="level3" data-number="1.2">
+<h3 data-number="1.2" class="anchored" data-anchor-id="key-contributions"><span class="header-section-number">1.2</span> Key Contributions</h3>
 <ol type="1">
 <li><strong>Reconstruction Quality Optimization</strong>: First NBV method to directly maximize reconstruction quality (measured via Chamfer Distance) rather than coverage</li>
 <li><strong>View Introspection Network (VIN)</strong>: Lightweight NN that predicts RRI of candidate views from current reconstruction state</li>
@@ -609,8 +777,8 @@ Figure&nbsp;1: VIN-NBV Architecture
 </figure>
 </div>
 </section>
-<section id="problem-formulation-and-rri-metric" class="level3" data-number="1.2">
-<h3 data-number="1.2" class="anchored" data-anchor-id="problem-formulation-and-rri-metric"><span class="header-section-number">1.2</span> Problem Formulation and RRI Metric</h3>
+<section id="problem-formulation-and-rri-metric" class="level3" data-number="1.3">
+<h3 data-number="1.3" class="anchored" data-anchor-id="problem-formulation-and-rri-metric"><span class="header-section-number">1.3</span> Problem Formulation and RRI Metric</h3>
 <p><strong>Input</strong>: Initial base images <span class="math inline">\(I_{base} = \{I_1, ..., I_k\}\)</span> with camera parameters <span class="math inline">\(C_{base}\)</span> and depth maps <span class="math inline">\(D_{base}\)</span></p>
 <p><strong>Objective</strong>: Find next best views <span class="math inline">\(C_{nbv} = \{q_1, ..., q_m\} \subseteq \{c | c \in SE(3) \land c_{\phi} = 0\} ^ m\)</span> that maximize reconstruction quality:</p>
 <p><span class="math display">\[
@@ -630,23 +798,23 @@ C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
 <li>Candidate poses are sampled randomly around the latest pose; roll is fixed to 0°, such that the cameras optical axis is parallel to the ground plane.</li>
 </ul>
 </section>
-<section id="vin-architecture" class="level3" data-number="1.3">
-<h3 data-number="1.3" class="anchored" data-anchor-id="vin-architecture"><span class="header-section-number">1.3</span> VIN Architecture</h3>
+<section id="vin-architecture" class="level3" data-number="1.4">
+<h3 data-number="1.4" class="anchored" data-anchor-id="vin-architecture"><span class="header-section-number">1.4</span> VIN Architecture</h3>
 <p><strong>Three-Stage Pipeline</strong>:</p>
 <ol type="1">
-<li><p><strong>Scene Reconstruction</strong>:</p>
+<li><strong>Scene Reconstruction</strong>:
 <ul>
 <li>Backproject RGB-D images to 3D point cloud <span class="math inline">\(\mathcal{P}_{base}\)</span></li>
 <li>Voxel downsample for efficiency</li>
 </ul></li>
-<li><p><strong>3D-Aware Featurization</strong>:</p>
+<li><strong>3D-Aware Featurization</strong>:
 <ul>
 <li><strong>Surface Normals</strong>: Variance indicates geometric complexity (high variance = complex surfaces needing more views)</li>
 <li><strong>Visibility Count</strong>: Tracks how many base views observe each point (low count = potentially informative)</li>
 <li><strong>Depth Values</strong>: Distance information for surface consistency</li>
 <li><strong>Coverage Feature <span class="math inline">\(F_{empty}\)</span></strong>: Empty pixel mask when projecting <span class="math inline">\(\mathcal{P}_{base}\)</span> to query view</li>
 </ul></li>
-<li><p><strong>RRI Prediction</strong>:</p>
+<li><strong>RRI Prediction</strong>:
 <ul>
 <li><strong>Convolutional Encoder</strong>: 4 layers, hidden dimension 256</li>
 <li>Processes featurized point cloud projected to query view</li>
@@ -658,8 +826,8 @@ C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
 \widehat{\mathcal{RRI}}(q) = \text{VIN}_\theta(\mathcal{P}_{base}, C_{base}, C_q)
 \]</span></p>
 </section>
-<section id="vin-nbv-policy-algorithm" class="level3" data-number="1.4">
-<h3 data-number="1.4" class="anchored" data-anchor-id="vin-nbv-policy-algorithm"><span class="header-section-number">1.4</span> VIN-NBV Policy (Algorithm)</h3>
+<section id="vin-nbv-policy-algorithm" class="level3" data-number="1.5">
+<h3 data-number="1.5" class="anchored" data-anchor-id="vin-nbv-policy-algorithm"><span class="header-section-number">1.5</span> VIN-NBV Policy (Algorithm)</h3>
 <p><strong>Greedy Sequential Strategy</strong>:</p>
 <pre><code>1. Start with k=2 base views (first random, second closest to first)
 2. Repeat until termination criterion:
@@ -672,8 +840,8 @@ C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
    e. Move to q*, capture image, update base views
 3. Return final reconstruction R_final</code></pre>
 </section>
-<section id="training-methodology" class="level3" data-number="1.5">
-<h3 data-number="1.5" class="anchored" data-anchor-id="training-methodology"><span class="header-section-number">1.5</span> Training Methodology</h3>
+<section id="training-methodology" class="level3" data-number="1.6">
+<h3 data-number="1.6" class="anchored" data-anchor-id="training-methodology"><span class="header-section-number">1.6</span> Training Methodology</h3>
 <p><strong>Dataset</strong>:</p>
 <ul>
 <li><strong>Train</strong>: Modified subset of Houses3K</li>
@@ -705,8 +873,8 @@ C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
 <li><strong>Generalizable</strong>: Trained on houses, tested on unseen categories (dinosaurs, trucks, animals)</li>
 </ul>
 </section>
-<section id="experimental-results" class="level3" data-number="1.6">
-<h3 data-number="1.6" class="anchored" data-anchor-id="experimental-results"><span class="header-section-number">1.6</span> Experimental Results</h3>
+<section id="experimental-results" class="level3" data-number="1.7">
+<h3 data-number="1.7" class="anchored" data-anchor-id="experimental-results"><span class="header-section-number">1.7</span> Experimental Results</h3>
 <p><strong>Limited Acquisitions (20 captures)</strong>:</p>
 <ul>
 <li>VIN-NBV: <strong>0.20 cm</strong> Chamfer Distance (houses)</li>
@@ -716,9 +884,9 @@ C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
 </ul>
 <p><strong>Coverage vs Quality</strong>:</p>
 <ul>
-<li>Cov-NBV baseline uses same greedy strategy but scores views by empty pixel count: <span class="math display">\[Cov(q) = W \times H - \sum_{u,v} \mathbb{1}(C_q(\mathcal{P}_{base})_{u,v})\]</span></li>
-<li>VIN-NBV achieves largest gains in early capture stages</li>
-<li>Late stages: both converge (coverage becomes more important)</li>
+<li><p>Cov-NBV baseline uses same greedy strategy but scores views by empty pixel count: <span class="math display">\[Cov(q) = W \times H - \sum_{u,v} \mathbb{1}(C_q(\mathcal{P}_{base})_{u,v})\]</span></p></li>
+<li><p>VIN-NBV achieves largest gains in early capture stages</p></li>
+<li><p>Late stages: both converge (coverage becomes more important)</p></li>
 </ul>
 <p><strong>Ablation - Coverage Feature <span class="math inline">\(F_{empty}\)</span></strong>:</p>
 <ul>
@@ -733,8 +901,8 @@ C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
 <li>Toy trucks: <strong>Significantly outperforms</strong> both baselines</li>
 </ul>
 </section>
-<section id="comparison-to-our-nbv-research" class="level3" data-number="1.7">
-<h3 data-number="1.7" class="anchored" data-anchor-id="comparison-to-our-nbv-research"><span class="header-section-number">1.7</span> Comparison to Our NBV Research</h3>
+<section id="comparison-to-our-nbv-research" class="level3" data-number="1.8">
+<h3 data-number="1.8" class="anchored" data-anchor-id="comparison-to-our-nbv-research"><span class="header-section-number">1.8</span> Comparison to Our NBV Research</h3>
 <p><strong>Similarities</strong>:</p>
 <ul>
 <li>Both use Chamfer Distance for reconstruction quality</li>
@@ -764,8 +932,8 @@ C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
 <li>Weighted combination: <span class="math inline">\(\mathcal{RRI}_{total} = \sum_e w_e \cdot \mathcal{RRI}_e\)</span></li>
 </ul>
 </section>
-<section id="limitations" class="level3" data-number="1.8">
-<h3 data-number="1.8" class="anchored" data-anchor-id="limitations"><span class="header-section-number">1.8</span> Limitations</h3>
+<section id="limitations" class="level3" data-number="1.9">
+<h3 data-number="1.9" class="anchored" data-anchor-id="limitations"><span class="header-section-number">1.9</span> Limitations</h3>
 <ul>
 <li><strong>Ground truth depth</strong>: Uses noise-free depth maps (not realistic)</li>
 <li><strong>Real-world validation</strong>: Not evaluated on real sensor data</li>
@@ -1253,185 +1421,187 @@ C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>VIN-NBV@VIN-NBV-frahm2025 presents a learning-based approach to NBV that directly optimizes for **reconstruction quality** rather than coverage. The key innovation is the View Introspection Network (VIN), which predicts the **Relative Reconstruction Improvement (RRI)** of candidate viewpoints without actually capturing new images.</span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">### Key Contributions</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">### Local \LaTeX{} Sources</span></span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Reconstruction Quality Optimization**: First NBV method to directly maximize reconstruction quality (measured via Chamfer Distance) rather than coverage</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**View Introspection Network (VIN)**: Lightweight NN that predicts RRI of candidate views from current reconstruction state</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Imitation Learning Approach**: Trained using pre-computed ground truth RRI values</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Greedy Sequential Policy**: Simple sampling-based strategy that selects best view given n randomly sampled candidates</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**Performance**: 30% improvement over coverage-based baseline, 40% improvement over RL methods (GenNBV, ScanRL)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`main.tex`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/main.tex)</span> – complete manuscript (sections live in <span class="in">`sec/`</span>).</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`sec/3_methods.tex`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/sec/3_methods.tex)</span> – VIN architecture details.</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`sec/4_experiments.tex`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/sec/4_experiments.tex)</span> – NBV benchmarks and Chamfer-distance evaluations.</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`Figures/VIN-NBV_diagram.png`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/Figures/VIN-NBV_diagram.png)</span> – reference architecture figure.</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">`main.bib`</span><span class="co">](../../literature/tex-src/arXiv-VIN-NBV/main.bib)</span> – BibTeX entries for cross-referencing in our docs.</span>
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="al">![VIN-NBV Architecture](../../figures/VIN_arch.png)</span>{#fig-vin-arch width=80%}</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="fu">### Key Contributions</span></span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="fu">### Problem Formulation and RRI Metric</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>**Input**: Initial base images $I_{base} = <span class="sc">\{</span>I_1, ..., I_k<span class="sc">\}</span>$ with camera parameters $C_{base}$ and depth maps $D_{base}$</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>**Objective**: Find next best views $C_{nbv} = <span class="sc">\{</span>q_1, ..., q_m<span class="sc">\}</span> \subseteq <span class="sc">\{</span>c | c \in SE(3) \land c_{\phi} = 0<span class="sc">\}</span> ^ m$ that maximize reconstruction quality:</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Reconstruction Quality Optimization**: First NBV method to directly maximize reconstruction quality (measured via Chamfer Distance) rather than coverage</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**View Introspection Network (VIN)**: Lightweight NN that predicts RRI of candidate views from current reconstruction state</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Imitation Learning Approach**: Trained using pre-computed ground truth RRI values</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Greedy Sequential Policy**: Simple sampling-based strategy that selects best view given n randomly sampled candidates</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**Performance**: 30% improvement over coverage-based baseline, 40% improvement over RL methods (GenNBV, ScanRL)</span>
 <span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="al">![VIN-NBV Architecture](../../figures/VIN_arch.png)</span>{#fig-vin-arch width=80%}</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="fu">### Problem Formulation and RRI Metric</span></span>
 <span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>**Relative Reconstruction Improvement (RRI)**:</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>For a query view $q$, RRI quantifies reconstruction improvement:</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>\mathcal{RRI}(q) = \frac{CD(\mathcal{P}_{base}, \mathcal{P}_{GT}) - CD(\mathcal{P}_{base \cup q}, \mathcal{P}_{GT})}{CD(\mathcal{P}_{base}, \mathcal{P}_{GT})}</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>**Properties**:</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Range: $<span class="co">[</span><span class="ot">0, 1</span><span class="co">]</span>$ where higher is better</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Normalized by current error $ \rightarrow $ scale/object-independent ??</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Requires ground truth only during training</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$CD(\mathcal{P}, \mathcal{P}_{GT})$ is Chamfer Distance between reconstruction $\mathcal{P}$ and ground truth $\mathcal{P}_{GT}$.</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Candidate poses are sampled randomly around the latest pose; roll is fixed to 0°, such that the cameras optical axis is parallel to the ground plane.</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a><span class="fu">### VIN Architecture</span></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>**Three-Stage Pipeline**:</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Scene Reconstruction**:</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Backproject RGB-D images to 3D point cloud $\mathcal{P}_{base}$</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Voxel downsample for efficiency</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>**Input**: Initial base images $I_{base} = <span class="sc">\{</span>I_1, ..., I_k<span class="sc">\}</span>$ with camera parameters $C_{base}$ and depth maps $D_{base}$</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>**Objective**: Find next best views $C_{nbv} = <span class="sc">\{</span>q_1, ..., q_m<span class="sc">\}</span> \subseteq <span class="sc">\{</span>c | c \in SE(3) \land c_{\phi} = 0<span class="sc">\}</span> ^ m$ that maximize reconstruction quality:</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>**Relative Reconstruction Improvement (RRI)**:</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>For a query view $q$, RRI quantifies reconstruction improvement:</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>\mathcal{RRI}(q) = \frac{CD(\mathcal{P}_{base}, \mathcal{P}_{GT}) - CD(\mathcal{P}_{base \cup q}, \mathcal{P}_{GT})}{CD(\mathcal{P}_{base}, \mathcal{P}_{GT})}</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>**Properties**:</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Range: $<span class="co">[</span><span class="ot">0, 1</span><span class="co">]</span>$ where higher is better</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Normalized by current error $ \rightarrow $ scale/object-independent ??</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Requires ground truth only during training</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$CD(\mathcal{P}, \mathcal{P}_{GT})$ is Chamfer Distance between reconstruction $\mathcal{P}$ and ground truth $\mathcal{P}_{GT}$.</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Candidate poses are sampled randomly around the latest pose; roll is fixed to 0°, such that the cameras optical axis is parallel to the ground plane.</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a><span class="fu">### VIN Architecture</span></span>
 <span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**3D-Aware Featurization**:</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>**Three-Stage Pipeline**:</span>
 <span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Surface Normals**: Variance indicates geometric complexity (high variance = complex surfaces needing more views)</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Visibility Count**: Tracks how many base views observe each point (low count = potentially informative)</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Depth Values**: Distance information for surface consistency</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Coverage Feature $F_{empty}$**: Empty pixel mask when projecting $\mathcal{P}_{base}$ to query view</span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**RRI Prediction**:</span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Convolutional Encoder**: 4 layers, hidden dimension 256</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Processes featurized point cloud projected to query view</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Ranking MLP**: 3 layers, hidden dimension 256</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Output**: CORAL layer for ordinal classification (15 bins)</span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>**Network Signature**:</span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>\widehat{\mathcal{RRI}}(q) = \text{VIN}_\theta(\mathcal{P}_{base}, C_{base}, C_q)</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Scene Reconstruction**:</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Backproject RGB-D images to 3D point cloud $\mathcal{P}_{base}$</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Voxel downsample for efficiency</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**3D-Aware Featurization**:</span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Surface Normals**: Variance indicates geometric complexity (high variance = complex surfaces needing more views)</span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Visibility Count**: Tracks how many base views observe each point (low count = potentially informative)</span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Depth Values**: Distance information for surface consistency</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Coverage Feature $F_{empty}$**: Empty pixel mask when projecting $\mathcal{P}_{base}$ to query view</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**RRI Prediction**:</span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Convolutional Encoder**: 4 layers, hidden dimension 256</span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>Processes featurized point cloud projected to query view</span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Ranking MLP**: 3 layers, hidden dimension 256</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a><span class="ss">   - </span>**Output**: CORAL layer for ordinal classification (15 bins)</span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>**Network Signature**:</span>
 <span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a><span class="fu">### VIN-NBV Policy (Algorithm)</span></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>\widehat{\mathcal{RRI}}(q) = \text{VIN}_\theta(\mathcal{P}_{base}, C_{base}, C_q)</span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>$$</span>
 <span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>**Greedy Sequential Strategy**:</span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a><span class="fu">### VIN-NBV Policy (Algorithm)</span></span>
 <span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a><span class="in">1. Start with k=2 base views (first random, second closest to first)</span></span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a><span class="in">2. Repeat until termination criterion:</span></span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a><span class="in">   a. Reconstruct R_base from current captures</span></span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a><span class="in">   b. Sample n query views around reconstruction</span></span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a><span class="in">   c. For each query q:</span></span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a><span class="in">      - Featurize reconstruction</span></span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a><span class="in">      - Predict RRI(q) using VIN</span></span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a><span class="in">   d. Select q* = argmax RRI(q)</span></span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a><span class="in">   e. Move to q*, capture image, update base views</span></span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="in">3. Return final reconstruction R_final</span></span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a><span class="fu">### Training Methodology</span></span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>**Greedy Sequential Strategy**:</span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a><span class="in">1. Start with k=2 base views (first random, second closest to first)</span></span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a><span class="in">2. Repeat until termination criterion:</span></span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a><span class="in">   a. Reconstruct R_base from current captures</span></span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a><span class="in">   b. Sample n query views around reconstruction</span></span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a><span class="in">   c. For each query q:</span></span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a><span class="in">      - Featurize reconstruction</span></span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a><span class="in">      - Predict RRI(q) using VIN</span></span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="in">   d. Select q* = argmax RRI(q)</span></span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a><span class="in">   e. Move to q*, capture image, update base views</span></span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a><span class="in">3. Return final reconstruction R_final</span></span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 <span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>**Dataset**:</span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a><span class="fu">### Training Methodology</span></span>
 <span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Train**: Modified subset of Houses3K</span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Test**: House category from OmniObject3D (generalization test)</span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>120 rendered views per object</span>
-<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>**Ground Truth RRI Computation**:</span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>**Dataset**:</span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Train**: Modified subset of Houses3K</span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Test**: House category from OmniObject3D (generalization test)</span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>120 rendered views per object</span>
 <span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>For each training scene, sample query views</span>
-<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Explicitly reconstruct scene with query view added</span>
-<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Compute actual RRI using Chamfer Distance</span>
-<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Normalize via z-scores within capture stage groups</span>
-<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>Soft-clip with tanh, bin into 15 ordinal classes</span>
-<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>**Training Details**:</span>
+<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>**Ground Truth RRI Computation**:</span>
+<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>For each training scene, sample query views</span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Explicitly reconstruct scene with query view added</span>
+<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Compute actual RRI using Chamfer Distance</span>
+<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Normalize via z-scores within capture stage groups</span>
+<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>Soft-clip with tanh, bin into 15 ordinal classes</span>
 <span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Loss**: CORAL loss for ordinal classification</span>
-<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Optimizer**: AdamW with learning rate 1e-3</span>
-<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Scheduler**: Cosine annealing</span>
-<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Epochs**: 60</span>
-<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Hardware**: 4× A6000 GPUs, ~24 hours</span>
-<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Batching**: By object (one point cloud per batch projected to all candidate views)</span>
-<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a>**Key Features**:</span>
-<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Flexible Constraints**: Can limit by number of captures, time, or distance</span>
-<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Collision-Free**: Sampling strategy can avoid obstacles</span>
-<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**No Prior Knowledge**: Works without scene CAD models or preliminary scans</span>
-<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Generalizable**: Trained on houses, tested on unseen categories (dinosaurs, trucks, animals)</span>
-<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a><span class="fu">### Experimental Results</span></span>
-<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a>**Limited Acquisitions (20 captures)**:</span>
-<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>VIN-NBV: **0.20 cm** Chamfer Distance (houses)</span>
-<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>GenNBV: **0.33 cm** (39% worse)</span>
-<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>ScanRL: **0.37 cm** (41% worse)</span>
-<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Coverage baseline (Cov-NBV): **~30% worse** than VIN-NBV</span>
-<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a>**Coverage vs Quality**:</span>
-<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Cov-NBV baseline uses same greedy strategy but scores views by empty pixel count:</span>
-<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a>  $$Cov(q) = W \times H - \sum_{u,v} \mathbb{1}(C_q(\mathcal{P}_{base})_{u,v})$$</span>
-<span id="cb2-133"><a href="#cb2-133" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>VIN-NBV achieves largest gains in early capture stages</span>
-<span id="cb2-134"><a href="#cb2-134" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Late stages: both converge (coverage becomes more important)</span>
-<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-136"><a href="#cb2-136" aria-hidden="true" tabindex="-1"></a>**Ablation - Coverage Feature $F_{empty}$**:</span>
+<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a>**Training Details**:</span>
+<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Loss**: CORAL loss for ordinal classification</span>
+<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Optimizer**: AdamW with learning rate 1e-3</span>
+<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Scheduler**: Cosine annealing</span>
+<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Epochs**: 60</span>
+<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Hardware**: 4× A6000 GPUs, ~24 hours</span>
+<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Batching**: By object (one point cloud per batch projected to all candidate views)</span>
+<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a>**Key Features**:</span>
+<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Flexible Constraints**: Can limit by number of captures, time, or distance</span>
+<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Collision-Free**: Sampling strategy can avoid obstacles</span>
+<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**No Prior Knowledge**: Works without scene CAD models or preliminary scans</span>
+<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Generalizable**: Trained on houses, tested on unseen categories (dinosaurs, trucks, animals)</span>
+<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a><span class="fu">### Experimental Results</span></span>
+<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>**Limited Acquisitions (20 captures)**:</span>
+<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>VIN-NBV: **0.20 cm** Chamfer Distance (houses)</span>
+<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>GenNBV: **0.33 cm** (39% worse)</span>
+<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>ScanRL: **0.37 cm** (41% worse)</span>
+<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Coverage baseline (Cov-NBV): **~30% worse** than VIN-NBV</span>
+<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a>**Coverage vs Quality**:</span>
+<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Cov-NBV baseline uses same greedy strategy but scores views by empty pixel count:</span>
+<span id="cb2-133"><a href="#cb2-133" aria-hidden="true" tabindex="-1"></a>  $$Cov(q) = W \times H - \sum_{u,v} \mathbb{1}(C_q(\mathcal{P}_{base})_{u,v})$$</span>
+<span id="cb2-134"><a href="#cb2-134" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>VIN-NBV achieves largest gains in early capture stages</span>
+<span id="cb2-136"><a href="#cb2-136" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Late stages: both converge (coverage becomes more important)</span>
 <span id="cb2-137"><a href="#cb2-137" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Removing $F_{empty}$ hurts performance in later stages</span>
-<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Early stages: RRI dominates</span>
-<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Late stages: Coverage information becomes helpful</span>
-<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a>**Generalization** (unseen categories):</span>
+<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a>**Ablation - Coverage Feature $F_{empty}$**:</span>
+<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Removing $F_{empty}$ hurts performance in later stages</span>
+<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Early stages: RRI dominates</span>
+<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Late stages: Coverage information becomes helpful</span>
 <span id="cb2-143"><a href="#cb2-143" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Dinosaurs: Slightly behind GenNBV</span>
-<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Toy animals: **Significantly outperforms** both baselines</span>
-<span id="cb2-146"><a href="#cb2-146" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Toy trucks: **Significantly outperforms** both baselines</span>
-<span id="cb2-147"><a href="#cb2-147" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-148"><a href="#cb2-148" aria-hidden="true" tabindex="-1"></a><span class="fu">### Comparison to Our NBV Research</span></span>
+<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a>**Generalization** (unseen categories):</span>
+<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-146"><a href="#cb2-146" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Dinosaurs: Slightly behind GenNBV</span>
+<span id="cb2-147"><a href="#cb2-147" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Toy animals: **Significantly outperforms** both baselines</span>
+<span id="cb2-148"><a href="#cb2-148" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Toy trucks: **Significantly outperforms** both baselines</span>
 <span id="cb2-149"><a href="#cb2-149" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-150"><a href="#cb2-150" aria-hidden="true" tabindex="-1"></a>**Similarities**:</span>
+<span id="cb2-150"><a href="#cb2-150" aria-hidden="true" tabindex="-1"></a><span class="fu">### Comparison to Our NBV Research</span></span>
 <span id="cb2-151"><a href="#cb2-151" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-152"><a href="#cb2-152" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Both use Chamfer Distance for reconstruction quality</span>
-<span id="cb2-153"><a href="#cb2-153" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Both require pre-computed ground truth for training</span>
-<span id="cb2-154"><a href="#cb2-154" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Both focus on maximizing reconstruction improvement</span>
-<span id="cb2-155"><a href="#cb2-155" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-156"><a href="#cb2-156" aria-hidden="true" tabindex="-1"></a>**Key Differences**:</span>
+<span id="cb2-152"><a href="#cb2-152" aria-hidden="true" tabindex="-1"></a>**Similarities**:</span>
+<span id="cb2-153"><a href="#cb2-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-154"><a href="#cb2-154" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Both use Chamfer Distance for reconstruction quality</span>
+<span id="cb2-155"><a href="#cb2-155" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Both require pre-computed ground truth for training</span>
+<span id="cb2-156"><a href="#cb2-156" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Both focus on maximizing reconstruction improvement</span>
 <span id="cb2-157"><a href="#cb2-157" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-158"><a href="#cb2-158" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**VIN-NBV**: Single objects, imitation learning, greedy sampling</span>
-<span id="cb2-159"><a href="#cb2-159" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Our Approach**: Multi-entity scenes, entity-aware RRI, SceneScript integration</span>
-<span id="cb2-160"><a href="#cb2-160" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**VIN-NBV**: Coverage-agnostic (though includes $F_{empty}$ feature)</span>
-<span id="cb2-161"><a href="#cb2-161" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Our Approach**: Hybrid visibility + Chamfer Distance, pre-computed occlusions from ASE</span>
-<span id="cb2-162"><a href="#cb2-162" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-163"><a href="#cb2-163" aria-hidden="true" tabindex="-1"></a>**Lessons for Our Work**:</span>
+<span id="cb2-158"><a href="#cb2-158" aria-hidden="true" tabindex="-1"></a>**Key Differences**:</span>
+<span id="cb2-159"><a href="#cb2-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-160"><a href="#cb2-160" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**VIN-NBV**: Single objects, imitation learning, greedy sampling</span>
+<span id="cb2-161"><a href="#cb2-161" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Our Approach**: Multi-entity scenes, entity-aware RRI, SceneScript integration</span>
+<span id="cb2-162"><a href="#cb2-162" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**VIN-NBV**: Coverage-agnostic (though includes $F_{empty}$ feature)</span>
+<span id="cb2-163"><a href="#cb2-163" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Our Approach**: Hybrid visibility + Chamfer Distance, pre-computed occlusions from ASE</span>
 <span id="cb2-164"><a href="#cb2-164" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-165"><a href="#cb2-165" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>✅ Direct quality optimization (RRI) beats coverage by ~30%</span>
-<span id="cb2-166"><a href="#cb2-166" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>✅ Imitation learning is simpler and more effective than RL</span>
-<span id="cb2-167"><a href="#cb2-167" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>✅ 3D-aware featurization (normals, visibility) is crucial</span>
-<span id="cb2-168"><a href="#cb2-168" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>✅ Coverage information still helps in later stages</span>
-<span id="cb2-169"><a href="#cb2-169" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>⚠️ Greedy strategy works well but leaves ~20% gap to oracle</span>
-<span id="cb2-170"><a href="#cb2-170" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-171"><a href="#cb2-171" aria-hidden="true" tabindex="-1"></a>**Integration Strategy**:</span>
+<span id="cb2-165"><a href="#cb2-165" aria-hidden="true" tabindex="-1"></a>**Lessons for Our Work**:</span>
+<span id="cb2-166"><a href="#cb2-166" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-167"><a href="#cb2-167" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>✅ Direct quality optimization (RRI) beats coverage by ~30%</span>
+<span id="cb2-168"><a href="#cb2-168" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>✅ Imitation learning is simpler and more effective than RL</span>
+<span id="cb2-169"><a href="#cb2-169" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>✅ 3D-aware featurization (normals, visibility) is crucial</span>
+<span id="cb2-170"><a href="#cb2-170" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>✅ Coverage information still helps in later stages</span>
+<span id="cb2-171"><a href="#cb2-171" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>⚠️ Greedy strategy works well but leaves ~20% gap to oracle</span>
 <span id="cb2-172"><a href="#cb2-172" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-173"><a href="#cb2-173" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Adopt VIN's RRI formulation for entity-level metrics</span>
-<span id="cb2-174"><a href="#cb2-174" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use ASE visibility data instead of VIN's visibility count</span>
-<span id="cb2-175"><a href="#cb2-175" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Extend to per-entity RRI: $\mathcal{RRI}_e$ for each entity $e$</span>
-<span id="cb2-176"><a href="#cb2-176" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Weighted combination: $\mathcal{RRI}_{total} = \sum_e w_e \cdot \mathcal{RRI}_e$</span>
-<span id="cb2-177"><a href="#cb2-177" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-178"><a href="#cb2-178" aria-hidden="true" tabindex="-1"></a><span class="fu">### Limitations</span></span>
+<span id="cb2-173"><a href="#cb2-173" aria-hidden="true" tabindex="-1"></a>**Integration Strategy**:</span>
+<span id="cb2-174"><a href="#cb2-174" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-175"><a href="#cb2-175" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Adopt VIN's RRI formulation for entity-level metrics</span>
+<span id="cb2-176"><a href="#cb2-176" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use ASE visibility data instead of VIN's visibility count</span>
+<span id="cb2-177"><a href="#cb2-177" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Extend to per-entity RRI: $\mathcal{RRI}_e$ for each entity $e$</span>
+<span id="cb2-178"><a href="#cb2-178" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Weighted combination: $\mathcal{RRI}_{total} = \sum_e w_e \cdot \mathcal{RRI}_e$</span>
 <span id="cb2-179"><a href="#cb2-179" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-180"><a href="#cb2-180" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Ground truth depth**: Uses noise-free depth maps (not realistic)</span>
-<span id="cb2-181"><a href="#cb2-181" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Real-world validation**: Not evaluated on real sensor data</span>
-<span id="cb2-182"><a href="#cb2-182" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Single objects**: Not designed for multi-room scenes</span>
-<span id="cb2-183"><a href="#cb2-183" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Gap to oracle**: ~20% performance gap in early stages indicates room for improvement</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<span id="cb2-180"><a href="#cb2-180" aria-hidden="true" tabindex="-1"></a><span class="fu">### Limitations</span></span>
+<span id="cb2-181"><a href="#cb2-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-182"><a href="#cb2-182" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Ground truth depth**: Uses noise-free depth maps (not realistic)</span>
+<span id="cb2-183"><a href="#cb2-183" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Real-world validation**: Not evaluated on real sensor data</span>
+<span id="cb2-184"><a href="#cb2-184" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Single objects**: Not designed for multi-room scenes</span>
+<span id="cb2-185"><a href="#cb2-185" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Gap to oracle**: ~20% performance gap in early stages indicates room for improvement</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

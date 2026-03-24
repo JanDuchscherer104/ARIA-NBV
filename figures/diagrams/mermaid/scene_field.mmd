@@ -1,0 +1,41 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+---
+flowchart LR
+  %% Scene field (compact): derive uncertainty/coverage channels, then project to a small field tensor.
+
+  VoxelHeads["EVL voxel heads<br/><br/><code>{occ_pr, occ_input, cent_pr, (free_input), counts}</code>"]
+
+  Derived["<b>Derived channels</b><br/><br/><code>counts_norm = log1p(counts) / log1p(max(counts))</code><br/><code>unknown = 1 - clamp(counts_norm, 0, 1)</code><br/><code>new_surface_prior = unknown * occ_pr</code><br/><code>observed = 1[counts &gt; 0]</code><br/><code>free_input = free_input or observed * (1 - occ_input)</code>"]
+
+  FieldIn["<b>Field input</b><br/><br/><code>field_in = cat([selected channels], dim=1)</code><br/><code>selection = scene_field_channels</code>"]
+
+  FieldProj["<b>Scene field projection</b> (192 params)<br/><br/><code>field = field_proj(field_in)</code><br/><code>nn.Conv3d -&gt; nn.GroupNorm -&gt; nn.GELU</code>"]
+
+  Field["field"]
+
+  %% Wiring (shapes only)
+  VoxelHeads -->|"FloatTensor[B, 1, V, V, V]<br/>IntTensor[B, V, V, V]"| Derived
+  Derived -->|"FloatTensor[B, 1, V, V, V]"| FieldIn
+  FieldIn -->|"FloatTensor[B, F_in, V, V, V]"| FieldProj
+  FieldProj -->|"FloatTensor[B, F_g, V, V, V]"| Field
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class VoxelHeads input;
+  class Derived,FieldIn,FieldProj compute;
+  class Field output;

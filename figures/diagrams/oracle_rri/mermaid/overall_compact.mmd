@@ -1,0 +1,42 @@
+flowchart LR
+  %% Overall oracle RRI label pipeline (paper-notation, compact)
+  %%
+  %% Paper notation (see `docs/typst/paper/sections/03-problem-formulation.typ` and `05-oracle-rri.typ`):
+  %% - candidates: \(q\in\mathcal{Q}\subset \mathrm{SE}(3)\)
+  %% - current reconstruction: \(\mathcal{P}_t\)
+  %% - candidate point set: \(\mathcal{P}_q\) from depth rendering + backprojection
+  %% - GT mesh: \(\mathcal{M}_{GT}\)
+  %% - depth: \(D_q\) with intrinsics \(C_q\)
+  %% - fusion: \(\mathcal{P}_{t\cup q}=\mathcal{P}_t\cup\mathcal{P}_q\)
+  %%
+  %% Symbols:
+  %% - B: snippet batch size (often 1 offline)
+  %% - T: snippet length (trajectory frames)
+  %% - N: number of candidates
+  %% - H,W: render resolution
+
+  sample["EfmSnippetView<br/>\(\mathbf{T}_{rig}^{w}(t)\in\mathrm{SE}(3)^{B\times T}\)<br/>\(\mathcal{P}_t\) + \(\mathcal{M}_{GT}\)"]
+  gen["Candidate sampling<br/>\(q\in\mathcal{Q}\subset\mathrm{SE}(3)\)"]
+  render["Depth rendering<br/>\(D_q=\mathcal{R}(\mathcal{M}_{GT},C_q,q)\)"]
+  backproj["Backproject<br/>\(\mathcal{P}_q=\Pi^{-1}(D_q,C_q,q)\)"]
+  score["Oracle RRI<br/>\(\mathrm{RRI}(q)=\frac{\mathrm{CD}(\mathcal{P}_t,\mathcal{M}_{GT})-\mathrm{CD}(\mathcal{P}_{t\cup q},\mathcal{M}_{GT})}{\mathrm{CD}(\mathcal{P}_t,\mathcal{M}_{GT})+\epsilon}\)"]
+  out["Labels<br/>\(\mathrm{RRI}(q)\in\mathbb{R}^{N}\)"]
+
+  sample -->|"\(\mathbf{T}_{rig}^{w}(t)\)"| gen
+  sample -->|"\(\mathcal{M}_{GT}\)"| render
+  gen -->|"\(q\in\mathcal{Q}\)"| render
+  render -->|"\(D_q\in\mathbb{R}^{N\times H\times W},\ C_q\)"| backproj
+  sample -->|"\(\mathcal{P}_t\)"| score
+  backproj -->|"\(\mathcal{P}_q\Rightarrow \mathcal{P}_{t\cup q}\)"| score
+  score -->|"\(\mathrm{RRI}(q)\)"| out
+
+  %% Styling
+  classDef input fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
+  classDef compute fill:#e1d5e7,stroke:#9673a6,stroke-width:2px;
+  classDef neutral fill:#f5f5f5,stroke:#666666,stroke-width:2px;
+  classDef output fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
+
+  class sample input;
+  class gen,render,backproj,score compute;
+  class out output;
+

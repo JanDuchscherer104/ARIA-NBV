@@ -1,0 +1,43 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+---
+flowchart LR
+  %% Scene field (compact): derive uncertainty/coverage channels, then project to a small field tensor.
+
+  VoxelHeads["$$\\begin{array}{c}\\textbf{EVL Voxel Heads}\\\\\\{\\mathbf{o}_{\\mathrm{pr}},\\ \\mathbf{o}_{\\mathrm{in}},\\ \\mathbf{c}_{\\mathrm{pr}},\\ \\mathbf{f}_{\\mathrm{in}},\\ \\mathbf{n}\\}\\end{array}$$"]
+
+  Norm["$$\\begin{array}{c}\\textbf{Counts Normalization}\\\\\\mathbf{c}=\\log(1+\\mathbf{n})/\\log(1+\\max(\\mathbf{n}))\\end{array}$$"]
+  Prior["$$\\begin{array}{c}\\textbf{New Surface Prior}\\\\\\mathbf{u}=1-\\mathbf{c}\\\\\\boldsymbol{\\pi}_{\\mathrm{new}}=\\mathbf{u}\\odot\\mathbf{o}_{\\mathrm{pr}}\\end{array}$$"]
+
+  FieldIn["$$\\begin{array}{c}\\textbf{Field Input}\\\\\\mathbf{F}_{\\mathrm{in}}=\\texttt{cat}(\\bullet,\\ \\text{dim}=1)\\\\\\texttt{scene\\_field\\_channels}\\end{array}$$"]
+
+  FieldProj["$$\\begin{array}{c}\\textbf{Scene Field Projection}\\\\(192\\ \\text{params})\\\\\\texttt{field\\_proj}(\\bullet)\\\\\\texttt{nn.Conv3d}\\rightarrow\\texttt{nn.GroupNorm}\\rightarrow\\texttt{nn.GELU}\\end{array}$$"]
+
+  Field["$$\\begin{array}{c}\\textbf{Scene Field}\\\\\\mathbf{F}\\end{array}$$"]
+
+  %% Wiring (shapes only)
+  VoxelHeads -->|"$$\\begin{array}{c}\\texttt{FloatTensor}[B,1,V,V,V]\\\\\\texttt{IntTensor}[B,V,V,V]\\end{array}$$"| Norm
+  Norm -->|"$$\\texttt{FloatTensor}[B,1,V,V,V]$$"| Prior
+  Prior -->|"$$\\texttt{FloatTensor}[B,1,V,V,V]$$"| FieldIn
+  FieldIn -->|"$$\\texttt{FloatTensor}[B,F_{\\mathrm{in}},V,V,V]$$"| FieldProj
+  FieldProj -->|"$$\\texttt{FloatTensor}[B,F_g,V,V,V]$$"| Field
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class VoxelHeads input;
+  class Norm,Prior,FieldIn,FieldProj compute;
+  class Field output;

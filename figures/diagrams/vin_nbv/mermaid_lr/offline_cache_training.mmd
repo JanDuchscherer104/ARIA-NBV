@@ -1,0 +1,88 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 10
+    rankSpacing: 10
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 19px; }
+    .edgeLabel { font-size: 19px; }
+    .cluster-label { font-size: 21px; font-weight: 700; }
+    .title { font-size: 18px; font-weight: 700; }
+---
+flowchart TB
+  DM["$$\\begin{array}{c}\\texttt{VinDataModule}\\end{array}$$"]
+  Out["$$\\begin{array}{c}\\texttt{VinOracleBatch}\\end{array}$$"]
+
+  subgraph Cache["Offline cache dataset"]
+    direction TB
+    CacheDs["$$\\begin{array}{c}\\texttt{OracleRriCacheDataset}\\\\\\texttt{}\\end{array}$$"]
+    CacheIdx["$$\\begin{array}{c}\\texttt{cache index + samples}\\end{array}$$"]
+    Decode["$$\\begin{array}{c}\\texttt{OracleRriCacheVinDataset}\\end{array}$$"]
+    %% CacheDs -->|"$$\\texttt{torch.load(.pt)}$$"| Decode
+  end
+
+  %% Bottom row: keep snippet providers next to batching.
+  subgraph Bottom[" "]
+    direction LR
+    subgraph Snip["Snippet Providers"]
+      direction TB
+      Providers["$$\\begin{array}{c}\\texttt{VinSnippetProviderChain}\\end{array}$$"]
+      CacheProv["$$\\begin{array}{c}\\texttt{VinSnippetCacheProvider}\\end{array}$$"]
+      LoaderEfm["$$\\begin{array}{c}\\texttt{EfmSnippetLoader}\\end{array}$$"]
+      Ase["$$\\begin{array}{c}\\texttt{AseEfmDataset}\\end{array}$$"]
+      VinSnipIdx["$$\\begin{array}{c}\\texttt{vin\\_snippet\\_cache}\\\\\\texttt{index.jsonl + *.pt}\\end{array}$$"]
+      AseData["$$\\begin{array}{c}\\texttt{Meshes + ATEK shards}\\end{array}$$"]
+    end
+
+
+    subgraph Batch["Batching"]
+      direction TB
+      Loader["$$\\begin{array}{c}\\texttt{DataLoader}\\end{array}$$"]
+      Collate["$$\\begin{array}{c}\\texttt{VinOracleBatch.collate}\\\\\\texttt{(pad + stack)}\\end{array}$$"]
+    end
+  end
+
+  DM -->|"$$\\texttt{train/val\\_dataloader()}$$"| Loader
+  DM -->|"$$\\texttt{setup()}$$"| CacheDs
+  CacheIdx -->|"$$\\texttt{index.jsonl + *.pt}$$"| CacheDs
+
+  CacheDs -->|"$$\\texttt{OracleRriCacheSample}$$"| Decode
+  CacheDs -->|"$$\\texttt{OracleRriCacheSample}$$"| StreamlitApp
+
+  CacheDs -->|"$$\\texttt{include-efm-snippet}$$"| Providers
+  Providers -->|"$$\\texttt{try cache}$$"| CacheProv
+  Providers -->|"$$\\texttt{fallback}$$"| LoaderEfm
+  CacheProv -->|"$$\\texttt{index lookup}$$"| VinSnipIdx
+  LoaderEfm -->|"$$\\texttt{iter/load}$$"| Ase
+  Ase -->|"$$\\texttt{load}$$"| AseData
+  Ase -->|"$$\\texttt{EfmSnippetView}$$"| LoaderEfm
+  Providers -->|"$$\\texttt{VinSnippetView}$$"| CacheDs
+
+
+
+
+  Decode -->|"$$\\texttt{VinOracleBatch}$$"| Loader
+  Loader -->|"$$\\texttt{collate-fn}$$"| Collate
+  Collate -->|"$$\\texttt{batch}$$"| Out
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class DM input;
+  class CacheIdx data;
+  class CacheDs,Decode,Providers,CacheProv,LoaderEfm,Ase,Loader,Collate compute;
+  class VinSnipIdx,AseData data;
+  class Out output;
+
+  %% Optional cluster styling (matches doc-classifier-config.mmd).
+  style Cache fill:#f7f3ff,stroke:#cdb2ff,stroke-width:2px,rx:12,ry:12
+  style Snip fill:#f1fff6,stroke:#97ddb5,stroke-width:2px,rx:12,ry:12
+  style Batch fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12
+  style Bottom fill:transparent,stroke:transparent

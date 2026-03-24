@@ -2,15 +2,18 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.8.25">
+<meta name="generator" content="quarto-1.9.36">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Jan Duchscherer, Munich University of Applied Sciences">
-<meta name="dcterms.date" content="2025-11-01">
+<meta name="dcterms.date" content="2026-03-24">
 
 <title>Next-Best-View Planning with Foundation Models – Semantic NBV Planning</title>
 <style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
 div.columns{display: flex; gap: min(4vw, 1.5em);}
@@ -89,19 +92,18 @@ div.csl-indent {
 <meta name="quarto:offset" content="./">
 <script src="site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/axe/axe-check.js" type="module"></script>
 <script src="site_libs/quarto-html/popper.min.js"></script>
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-707d8167ce6003fca903bfe2be84ab7f.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-f418161beb48e0141c760e455f12af2c.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-74ccc60397116b75c66017aca1c58e3c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark-8867f034249725ad380f9d6206564ba2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="site_libs/bootstrap/bootstrap-74ccc60397116b75c66017aca1c58e3c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-6cd23cb7756619bc0e9bdda1db2af307.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-bff151b320a95a122dd3cd8d05e7679b.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-6cd23cb7756619bc0e9bdda1db2af307.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -129,35 +131,6 @@ div.csl-indent {
   }
 }</script>
 
-  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
-
-<script type="text/javascript">
-const typesetMath = (el) => {
-  if (window.MathJax) {
-    // MathJax Typeset
-    window.MathJax.typeset([el]);
-  } else if (window.katex) {
-    // KaTeX Render
-    var mathElements = el.getElementsByClassName("math");
-    var macros = [];
-    for (var i = 0; i < mathElements.length; i++) {
-      var texText = mathElements[i].firstChild;
-      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
-        window.katex.render(texText.data, mathElements[i], {
-          displayMode: mathElements[i].classList.contains('display'),
-          throwOnError: false,
-          macros: macros,
-          fleqn: false
-        });
-      }
-    }
-  }
-}
-window.Quarto = {
-  typesetMath
-};
-</script>
 
 </head>
 
@@ -330,8 +303,6 @@ window.Quarto = {
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a href="./index.html" class="navbar-brand navbar-brand-logo">
-    </a>
     <a class="navbar-brand" href="./index.html">
     <span class="navbar-title">Semantic NBV Planning</span>
     </a>
@@ -343,17 +314,60 @@ window.Quarto = {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <span class="nav-link">
-<span class="menu-text">Home</span>
-    </span>
+    <a class="nav-link active" href="./contents/todos.html" aria-current="page"> 
+<span class="menu-text">TODOs</span></a>
   </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./contents/setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-project-state" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Project State</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-project-state">    
+        <li>
+    <a class="dropdown-item" href="./contents/roadmap.html">
+ <span class="dropdown-text">Roadmap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./contents/questions.html">
+ <span class="dropdown-text">Research Questions</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./contents/experiments/findings.html">
+ <span class="dropdown-text">Findings</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-resources" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Resources</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-resources">    
+        <li>
+    <a class="dropdown-item" href="./contents/resources.html">
+ <span class="dropdown-text">Resources (External Links, Repos, Docs, etc.)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./contents/ase_dataset.html">
+ <span class="dropdown-text">ASE Dataset</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./contents/glossary.html">
+ <span class="dropdown-text">Glossary</span></a>
+  </li>  
+    </ul>
+  </li>
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-bi-github" role="link" data-bs-toggle="dropdown" aria-expanded="false">
       <i class="bi bi-github" role="img">
 </i> 
  <span class="menu-text"></span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-bi-github">    
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="nav-menu-bi-github">    
         <li>
     <a class="dropdown-item" href="https://github.com/JanDuchscherer104/NBV">
  <span class="dropdown-text">View Source</span></a>
@@ -376,7 +390,7 @@ window.Quarto = {
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./index.html">Overview</a></li><li class="breadcrumb-item"><a href="./index.html">Next-Best-View Planning with Foundation Models</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./index.html">Home</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
       <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
@@ -389,10 +403,6 @@ window.Quarto = {
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
   <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
-    <div class="pt-lg-2 mt-2 text-left sidebar-header">
-      <a href="./index.html" class="sidebar-logo-link">
-      </a>
-      </div>
         <div class="mt-2 flex-shrink-0 align-items-center">
         <div class="sidebar-search">
         <div id="quarto-search" class="" title="Search"></div>
@@ -400,10 +410,16 @@ window.Quarto = {
         </div>
     <div class="sidebar-menu-container"> 
     <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Home</span></a>
+  </div>
+</li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
- <span class="menu-text">Overview</span></a>
+ <span class="menu-text">Literature</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
@@ -411,21 +427,10 @@ window.Quarto = {
       <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./index.html" class="sidebar-item-text sidebar-link active">
- <span class="menu-text">Next-Best-View Planning with Foundation Models</span></a>
+  <a href="./contents/literature/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Literature Review</span></a>
   </div>
 </li>
-      </ul>
-  </li>
-        <li class="sidebar-item sidebar-item-section">
-      <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
- <span class="menu-text">Literature</span></a>
-          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
-            <i class="bi bi-chevron-right ms-2"></i>
-          </a> 
-      </div>
-      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./contents/literature/vin_nbv.html" class="sidebar-item-text sidebar-link">
@@ -450,23 +455,23 @@ window.Quarto = {
  <span class="menu-text">EFM3D &amp; EVL</span></a>
   </div>
 </li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="./contents/glossary.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Glossary</span></a>
-  </div>
-</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
  <span class="menu-text">Project State</span></a>
-          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
-      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/experiments/findings.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Experimental Findings</span></a>
+  </div>
+</li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./contents/questions.html" class="sidebar-item-text sidebar-link">
@@ -489,8 +494,43 @@ window.Quarto = {
   </li>
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
  <span class="menu-text">Resources</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/setup.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Setup Instructions</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/resources.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Resources &amp; Tools</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/ase_dataset.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Aria Synthetic Environments (ASE) Dataset</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/glossary.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Glossary</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Theory</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
@@ -498,55 +538,91 @@ window.Quarto = {
       <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./contents/ase_dataset.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Aria Synthetic Environments (ASE) Dataset</span></a>
-  </div>
-</li>
-          <li class="sidebar-item sidebar-item-section">
-      <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false">
- <span class="menu-text">Metrics</span></a>
-          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="false" aria-label="Toggle section">
-            <i class="bi bi-chevron-right ms-2"></i>
-          </a> 
-      </div>
-      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth2 ">  
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="./contents/metrics/index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Reconstruction Quality Metrics &amp; RRI Computation</span></a>
+  <a href="./contents/theory/nbv_background.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">NBV Background</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./contents/metrics/surface_metrics.html" class="sidebar-item-text sidebar-link">
+  <a href="./contents/theory/rri_theory.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Relative Reconstruction Improvement (RRI) Theory</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/theory/surface_metrics.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Surface Reconstruction Metrics</span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./contents/metrics/atek_implementation.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">ATEK Implementation Details</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="./contents/metrics/efm3d_implementation.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">EFM3D Implementation Details</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="./contents/metrics/rri_computation.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Computing RRI with Ground Truth Meshes</span></a>
+  <a href="./contents/theory/semi-dense-pc.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Semi-Dense Point Clouds</span></a>
   </div>
 </li>
       </ul>
   </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Implementations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./contents/resources.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Resources &amp; Tools</span></a>
+  <a href="./contents/impl/overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Implementation Overview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/impl/aria_nbv_overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">aria_nbv Overview &amp; Architecture</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/impl/aria_nbv_package.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">aria_nbv Package (formerly oracle_rri)</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/impl/data_pipeline_overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ASE Data Pipeline &amp; Streamlit Usage</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/impl/oracle_rri_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">aria_nbv Implementation Overview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/impl/rri_computation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Computing RRI with Ground Truth Meshes</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/impl/coral_intergarion.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Implementing CORAL for Ordinal Regression to Continuous Targets</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/impl/vin_nbv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">View Introspection Network (VIN) on EVL</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/impl/vin_v2_feature_proposals.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">VIN v2 Feature + Encoding Proposals</span></a>
   </div>
 </li>
       </ul>
@@ -554,12 +630,64 @@ window.Quarto = {
         <li class="sidebar-item sidebar-item-section">
       <div class="sidebar-item-container"> 
             <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
- <span class="menu-text">Presentations</span></a>
+ <span class="menu-text">Architecture Diagrams</span></a>
           <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
             <i class="bi bi-chevron-right ms-2"></i>
           </a> 
       </div>
       <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/diagrams.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">VIN NBV Diagrams</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true">
+ <span class="menu-text">External Implementations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-7" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/ext-impl/atek_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ATEK Implementation Index</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/ext-impl/efm3d_implementation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D Implementation Index</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/ext-impl/prj_aria_tools_impl.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ProjectAria Tools: Complete Reference</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./contents/ext-impl/efm3d_symbol_index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">EFM3D Symbol Index</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="true">
+ <span class="menu-text">Presentations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-8" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-8" class="collapse list-unstyled sidebar-section depth1 show">  
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./typst/slides/slides_1.pdf" class="sidebar-item-text sidebar-link">
@@ -586,44 +714,17 @@ window.Quarto = {
   <ul>
   <li><a href="#abstract" id="toc-abstract" class="nav-link active" data-scroll-target="#abstract"><span class="header-section-number">1</span> Abstract</a></li>
   <li><a href="#project-vision-and-goals" id="toc-project-vision-and-goals" class="nav-link" data-scroll-target="#project-vision-and-goals"><span class="header-section-number">2</span> Project Vision and Goals</a></li>
-  <li><a href="#important-resources" id="toc-important-resources" class="nav-link" data-scroll-target="#important-resources"><span class="header-section-number">3</span> Important Resources</a>
+  <li><a href="#documentation-navigation" id="toc-documentation-navigation" class="nav-link" data-scroll-target="#documentation-navigation"><span class="header-section-number">3</span> Documentation Navigation</a>
   <ul class="collapse">
-  <li><a href="#papers" id="toc-papers" class="nav-link" data-scroll-target="#papers"><span class="header-section-number">3.1</span> Papers</a>
-  <ul class="collapse">
-  <li><a href="#core-nbv-methods" id="toc-core-nbv-methods" class="nav-link" data-scroll-target="#core-nbv-methods"><span class="header-section-number">3.1.1</span> Core NBV Methods</a></li>
-  <li><a href="#project-aria-ecosystem" id="toc-project-aria-ecosystem" class="nav-link" data-scroll-target="#project-aria-ecosystem"><span class="header-section-number">3.1.2</span> Project Aria Ecosystem</a></li>
+  <li><a href="#setup-installation" id="toc-setup-installation" class="nav-link" data-scroll-target="#setup-installation"><span class="header-section-number">3.1</span> Setup &amp; Installation</a></li>
+  <li><a href="#project-state" id="toc-project-state" class="nav-link" data-scroll-target="#project-state"><span class="header-section-number">3.2</span> Project State</a></li>
+  <li><a href="#theory-background" id="toc-theory-background" class="nav-link" data-scroll-target="#theory-background"><span class="header-section-number">3.3</span> Theory &amp; Background</a></li>
+  <li><a href="#dataset-resources" id="toc-dataset-resources" class="nav-link" data-scroll-target="#dataset-resources"><span class="header-section-number">3.4</span> Dataset &amp; Resources</a></li>
+  <li><a href="#literature-reviews" id="toc-literature-reviews" class="nav-link" data-scroll-target="#literature-reviews"><span class="header-section-number">3.5</span> Literature Reviews</a></li>
+  <li><a href="#implementation-guides" id="toc-implementation-guides" class="nav-link" data-scroll-target="#implementation-guides"><span class="header-section-number">3.6</span> Implementation Guides</a></li>
+  <li><a href="#external-implementations" id="toc-external-implementations" class="nav-link" data-scroll-target="#external-implementations"><span class="header-section-number">3.7</span> External Implementations</a></li>
+  <li><a href="#project-slides" id="toc-project-slides" class="nav-link" data-scroll-target="#project-slides"><span class="header-section-number">3.8</span> Project Slides</a></li>
   </ul></li>
-  <li><a href="#resources-tools-docs-and-datasets" id="toc-resources-tools-docs-and-datasets" class="nav-link" data-scroll-target="#resources-tools-docs-and-datasets"><span class="header-section-number">3.2</span> Resources, Tools, Docs and Datasets</a>
-  <ul class="collapse">
-  <li><a href="#project-aria-ecosystem-1" id="toc-project-aria-ecosystem-1" class="nav-link" data-scroll-target="#project-aria-ecosystem-1"><span class="header-section-number">3.2.1</span> Project Aria Ecosystem</a></li>
-  <li><a href="#development-tools" id="toc-development-tools" class="nav-link" data-scroll-target="#development-tools"><span class="header-section-number">3.2.2</span> Development Tools</a></li>
-  </ul></li>
-  </ul></li>
-  <li><a href="#nbv-background" id="toc-nbv-background" class="nav-link" data-scroll-target="#nbv-background"><span class="header-section-number">4</span> NBV Background</a>
-  <ul class="collapse">
-  <li><a href="#classical-methods-geometric-heuristics" id="toc-classical-methods-geometric-heuristics" class="nav-link" data-scroll-target="#classical-methods-geometric-heuristics"><span class="header-section-number">4.1</span> Classical Methods: Geometric Heuristics</a></li>
-  <li><a href="#coverage-based-learning-gennbv" id="toc-coverage-based-learning-gennbv" class="nav-link" data-scroll-target="#coverage-based-learning-gennbv"><span class="header-section-number">4.2</span> Coverage-Based Learning: GenNBV</a></li>
-  <li><a href="#direct-quality-optimization-vin-nbv" id="toc-direct-quality-optimization-vin-nbv" class="nav-link" data-scroll-target="#direct-quality-optimization-vin-nbv"><span class="header-section-number">4.3</span> Direct Quality Optimization: VIN-NBV</a></li>
-  </ul></li>
-  <li><a href="#relative-reconstruction-improvement-rri" id="toc-relative-reconstruction-improvement-rri" class="nav-link" data-scroll-target="#relative-reconstruction-improvement-rri"><span class="header-section-number">5</span> Relative Reconstruction Improvement (RRI)</a>
-  <ul class="collapse">
-  <li><a href="#rri-metric" id="toc-rri-metric" class="nav-link" data-scroll-target="#rri-metric"><span class="header-section-number">5.1</span> RRI Metric</a></li>
-  <li><a href="#nbv-task-formulation-using-rri" id="toc-nbv-task-formulation-using-rri" class="nav-link" data-scroll-target="#nbv-task-formulation-using-rri"><span class="header-section-number">5.2</span> NBV Task Formulation using RRI</a></li>
-  </ul></li>
-  <li><a href="#efm-backbone" id="toc-efm-backbone" class="nav-link" data-scroll-target="#efm-backbone"><span class="header-section-number">6</span> EFM Backbone</a>
-  <ul class="collapse">
-  <li><a href="#egocentric-voxel-lifting-evl" id="toc-egocentric-voxel-lifting-evl" class="nav-link" data-scroll-target="#egocentric-voxel-lifting-evl"><span class="header-section-number">6.1</span> Egocentric Voxel Lifting (EVL)</a></li>
-  <li><a href="#benchmark" id="toc-benchmark" class="nav-link" data-scroll-target="#benchmark"><span class="header-section-number">6.2</span> Benchmark</a></li>
-  </ul></li>
-  <li><a href="#integration-strategy" id="toc-integration-strategy" class="nav-link" data-scroll-target="#integration-strategy"><span class="header-section-number">7</span> Integration Strategy</a></li>
-  <li><a href="#documentation-navigation" id="toc-documentation-navigation" class="nav-link" data-scroll-target="#documentation-navigation"><span class="header-section-number">8</span> Documentation Navigation</a>
-  <ul class="collapse">
-  <li><a href="#dataset-resources" id="toc-dataset-resources" class="nav-link" data-scroll-target="#dataset-resources"><span class="header-section-number">8.1</span> Dataset &amp; Resources</a></li>
-  <li><a href="#literature-reviews" id="toc-literature-reviews" class="nav-link" data-scroll-target="#literature-reviews"><span class="header-section-number">8.2</span> Literature Reviews</a></li>
-  <li><a href="#metrics-evaluation" id="toc-metrics-evaluation" class="nav-link" data-scroll-target="#metrics-evaluation"><span class="header-section-number">8.3</span> Metrics &amp; Evaluation</a></li>
-  <li><a href="#project-slides" id="toc-project-slides" class="nav-link" data-scroll-target="#project-slides"><span class="header-section-number">8.4</span> Project Slides</a></li>
-  </ul></li>
-  <li><a href="#external-code-notebooks" id="toc-external-code-notebooks" class="nav-link" data-scroll-target="#external-code-notebooks"><span class="header-section-number">9</span> External Code &amp; Notebooks</a></li>
   </ul>
 </nav>
     </div>
@@ -631,7 +732,7 @@ window.Quarto = {
 <main class="content" id="quarto-document-content">
 
 
-<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./index.html">Overview</a></li><li class="breadcrumb-item"><a href="./index.html">Next-Best-View Planning with Foundation Models</a></li></ol></nav>
+<header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <div class="quarto-title-block"><div><h1 class="title">Next-Best-View Planning with Foundation Models</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
 <p class="subtitle lead">VCML Seminar: RRI based NBV Prediction using EFM3D Backbones</p>
@@ -651,7 +752,7 @@ window.Quarto = {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">November 1, 2025</p>
+      <p class="date">March 24, 2026</p>
     </div>
   </div>
   
@@ -679,7 +780,7 @@ window.Quarto = {
 <h1 data-number="2"><span class="header-section-number">2</span> Project Vision and Goals</h1>
 <ul>
 <li>Directly optimize reconstruction quality rather than surrogate coverage metrics, following RRI-based policies as per VIN-NBV.</li>
-<li>Develop an <a href="./contents/metrics/rri_computation.html">oracle RRI computation pipeline</a> using ASE visibility data, semi-dense point clouds and GT meshes.</li>
+<li>Develop an <a href="./contents/impl/rri_computation.html">oracle RRI computation pipeline</a> using ASE visibility data, semi-dense point clouds and GT meshes.</li>
 <li>Develop computational tools to efficiently simulate candidate viewpoints and their expected observations utilizing implementations in <a href="https://github.com/facebookresearch/efm3d">EFM3D</a> and <a href="https://github.com/facebookresearch/ATEK">ATEK</a>.</li>
 <li>Train an RRI predictor head on top of a frozen EFM backbone that introspects the current reconstruction and a candidate pose via imitation learning on oracle RRIs.</li>
 <li>Leverage EVL’s 3D foundation features—voxel occupancy, centerness, semantic channels, and OBB priors—as state embeddings for RRI estimation and NBV decision making.</li>
@@ -687,216 +788,85 @@ window.Quarto = {
 <li>Extend towards human-in-the-loop AR guidance, where entity-aware RRI weighting delivers task-specific view suggestions.</li>
 </ul>
 </section>
-<section id="important-resources" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> Important Resources</h1>
+<section id="documentation-navigation" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Documentation Navigation</h1>
+<section id="setup-installation" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="setup-installation"><span class="header-section-number">3.1</span> Setup &amp; Installation</h2>
 <ul>
-<li>see <a href="./contents/resources.html">Resources &amp; Tools</a> for libraries, tools, docs and datasets used in this project</li>
-</ul>
-<section id="papers" class="level2" data-number="3.1">
-<h2 data-number="3.1" class="anchored" data-anchor-id="papers"><span class="header-section-number">3.1</span> Papers</h2>
-<section id="core-nbv-methods" class="level3" data-number="3.1.1">
-<h3 data-number="3.1.1" class="anchored" data-anchor-id="core-nbv-methods"><span class="header-section-number">3.1.1</span> Core NBV Methods</h3>
-<ul>
-<li><strong><a href="https://arxiv.org/abs/2505.06219">VIN-NBV: A View Introspection Network for Next-Best-View Selection</a></strong> <span class="citation" data-cites="VIN-NBV-frahm2025"><a href="#ref-VIN-NBV-frahm2025" role="doc-biblioref">[2]</a></span> - Direct RRI optimization approach</li>
-<li><strong><a href="https://arxiv.org/abs/2402.16174">GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction</a></strong> <span class="citation" data-cites="GenNBV-chen2024"><a href="#ref-GenNBV-chen2024" role="doc-biblioref">[1]</a></span> - RL-based coverage optimization</li>
+<li><a href="./contents/setup.html">Setup Instructions</a>: Environment setup and dependencies</li>
 </ul>
 </section>
-<section id="project-aria-ecosystem" class="level3" data-number="3.1.2">
-<h3 data-number="3.1.2" class="anchored" data-anchor-id="project-aria-ecosystem"><span class="header-section-number">3.1.2</span> Project Aria Ecosystem</h3>
+<section id="project-state" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="project-state"><span class="header-section-number">3.2</span> Project State</h2>
 <ul>
-<li><strong><a href="https://arxiv.org/abs/2406.10224">EFM3D: A Benchmark for Measuring Progress Towards 3D Egocentric Foundation Models</a></strong> <span class="citation" data-cites="EFM3D-straub2024"><a href="#ref-EFM3D-straub2024" role="doc-biblioref">[3]</a></span> - EVL backbone and benchmarks</li>
-<li><strong><a href="https://arxiv.org/abs/2403.13064">SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model</a></strong> <span class="citation" data-cites="SceneScript-avetisyan2024"><a href="#ref-SceneScript-avetisyan2024" role="doc-biblioref">[4]</a></span> - Structured scene representation</li>
-<li><strong><a href="https://arxiv.org/abs/2308.13561">Project Aria: A New Tool for Egocentric Multi-Modal AI Research</a></strong> <span class="citation" data-cites="projectaria-engel2023"><a href="#ref-projectaria-engel2023" role="doc-biblioref">[5]</a></span> - ASE dataset foundation</li>
-<li><strong><a href="https://arxiv.org/abs/2503.11806">Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling</a></strong> <span class="citation" data-cites="HITL-SceneScript-xie2025"><a href="#ref-HITL-SceneScript-xie2025" role="doc-biblioref">[6]</a></span> - Interactive scene editing</li>
-</ul>
-</section>
-</section>
-<section id="resources-tools-docs-and-datasets" class="level2" data-number="3.2">
-<h2 data-number="3.2" class="anchored" data-anchor-id="resources-tools-docs-and-datasets"><span class="header-section-number">3.2</span> Resources, Tools, Docs and Datasets</h2>
-<section id="project-aria-ecosystem-1" class="level3" data-number="3.2.1">
-<h3 data-number="3.2.1" class="anchored" data-anchor-id="project-aria-ecosystem-1"><span class="header-section-number">3.2.1</span> Project Aria Ecosystem</h3>
-<ul>
-<li><strong><a href="https://www.projectaria.com/">Project Aria Homepage</a></strong> - Main portal for datasets and tools</li>
-<li><strong><a href="https://facebookresearch.github.io/projectaria_tools/docs/intro">Project Aria Documentation</a></strong> - APIs and utilities</li>
-<li><strong><a href="https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset">ASE Dataset Documentation</a></strong> - 100K synthetic scenes</li>
-<li><strong><a href="https://explorer.projectaria.com/">Project Aria Dataset Explorer</a></strong> - Interactive data browser</li>
-</ul>
-</section>
-<section id="development-tools" class="level3" data-number="3.2.2">
-<h3 data-number="3.2.2" class="anchored" data-anchor-id="development-tools"><span class="header-section-number">3.2.2</span> Development Tools</h3>
-<ul>
-<li><strong><a href="https://github.com/facebookresearch/ATEK">ATEK GitHub Repository</a></strong> - ML training and evaluation toolkit</li>
-<li><strong><a href="https://facebookresearch.github.io/projectaria_tools/docs/ATEK/about_ATEK">ATEK Documentation</a></strong> - Complete setup and usage guide</li>
-<li><strong><a href="https://github.com/facebookresearch/efm3d">EFM3D GitHub Repository</a></strong> - Foundation model implementation</li>
-<li><strong><a href="https://github.com/facebookresearch/scenescript">SceneScript GitHub Repository</a></strong> - Structured scene language</li>
-<li><strong><a href="https://github.com/facebookresearch/projectaria_tools">Project Aria Tools GitHub</a></strong> - Core data processing utilities</li>
-</ul>
-</section>
-</section>
-</section>
-<section id="nbv-background" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> NBV Background</h1>
-<section id="classical-methods-geometric-heuristics" class="level2" data-number="4.1">
-<h2 data-number="4.1" class="anchored" data-anchor-id="classical-methods-geometric-heuristics"><span class="header-section-number">4.1</span> Classical Methods: Geometric Heuristics</h2>
-<p>Hand-crafted criteria include:</p>
-<ul>
-<li><strong>Volumetric uncertainty</strong> (unseen voxels)</li>
-<li><strong>Information gain</strong> (entropy reduction)</li>
-<li><strong>Surface coverage</strong> <span class="citation" data-cites="VIN-NBV-frahm2025"><a href="#ref-VIN-NBV-frahm2025" role="doc-biblioref">[2]</a></span></li>
-</ul>
-</section>
-<section id="coverage-based-learning-gennbv" class="level2" data-number="4.2">
-<h2 data-number="4.2" class="anchored" data-anchor-id="coverage-based-learning-gennbv"><span class="header-section-number">4.2</span> Coverage-Based Learning: GenNBV</h2>
-<p><a href="./contents/literature/gen_nbv.html"><strong>GenNBV</strong></a> <span class="citation" data-cites="GenNBV-chen2024"><a href="#ref-GenNBV-chen2024" role="doc-biblioref">[1]</a></span> introduced learning-based NBV with:</p>
-<ul>
-<li>RL-based training with continuous 5DoF actions</li>
-<li>Coverage-focused rewards for geometric completeness</li>
-</ul>
-<p><strong>Limitation</strong>: Still optimizes geometric coverage, not reconstruction quality.</p>
-</section>
-<section id="direct-quality-optimization-vin-nbv" class="level2" data-number="4.3">
-<h2 data-number="4.3" class="anchored" data-anchor-id="direct-quality-optimization-vin-nbv"><span class="header-section-number">4.3</span> Direct Quality Optimization: VIN-NBV</h2>
-<p><a href="./contents/literature/vin_nbv.html"><strong>VIN-NBV</strong></a> <span class="citation" data-cites="VIN-NBV-frahm2025"><a href="#ref-VIN-NBV-frahm2025" role="doc-biblioref">[2]</a></span> directly optimizes <strong>Relative Reconstruction Improvement (RRI)</strong>:</p>
-<p><span class="math display">\[\text{RRI}(v) = \frac{\text{Quality}(R_{t+1}) - \text{Quality}(R_t)}{\text{Quality}(R_{\text{complete}})}\]</span></p>
-<ul>
-<li>Predicts actual reconstruction quality improvement</li>
-<li>Uses surface metrics (Chamfer distance, F-score) as quality measures</li>
-<li>Demonstrates ≈30% improvement over coverage-based methods</li>
-</ul>
-<p><strong>Limitation</strong>: Custom CNN backbone limits generalization to complex scenes.</p>
-</section>
-</section>
-<section id="relative-reconstruction-improvement-rri" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> Relative Reconstruction Improvement (RRI)</h1>
-<section id="rri-metric" class="level2" data-number="5.1">
-<h2 data-number="5.1" class="anchored" data-anchor-id="rri-metric"><span class="header-section-number">5.1</span> RRI Metric</h2>
-<p>The <a href="./contents/metrics/surface_metrics.html">RRI metric</a>, introduced by VIN-NBV, quantifies the expected reconstruction quality gain from capturing a new viewpoint:</p>
-<p><span class="math display">\[\text{RRI}(\mathbf{q}) = \frac{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}}) - \text{CD}(\mathcal{P}_{t \cup \mathbf{q}}, \mathcal{M}_{\text{GT}})}{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}})}\]</span></p>
-<p>Where:</p>
-<ul>
-<li><span class="math inline">\(\mathbf{q} \in SE(3)\)</span>: Candidate viewpoint (5DoF pose as roll typically fixed to 0°)</li>
-<li><span class="math inline">\(\mathcal{P}_t\)</span>: Current reconstruction point cloud from first <span class="math inline">\(t\)</span> views</li>
-<li><span class="math inline">\(\mathcal{P}_{t \cup \mathbf{q}}\)</span>: Updated reconstruction after capturing from viewpoint <span class="math inline">\(\mathbf{q}\)</span></li>
-<li><span class="math inline">\(\mathcal{M}_{\text{GT}}\)</span>: Ground truth mesh (available only during training)</li>
-<li><span class="math inline">\(\text{CD}(\cdot, \cdot)\)</span>: Chamfer distance (bidirectional surface similarity metric)</li>
-</ul>
-<p><strong>Properties</strong>:</p>
-<ul>
-<li>Range: [0, 1] where higher values indicate better viewpoints</li>
-<li>Normalized by current error $ $ limited scale/object-independence</li>
-<li>Requires ground truth RRI during training</li>
-<li>Directly correlates with reconstruction quality improvement</li>
-</ul>
-<p>For more information on see the pages under <a href="./contents/metrics/index.html"><em>Metrics</em></a>.</p>
-</section>
-<section id="nbv-task-formulation-using-rri" class="level2" data-number="5.2">
-<h2 data-number="5.2" class="anchored" data-anchor-id="nbv-task-formulation-using-rri"><span class="header-section-number">5.2</span> NBV Task Formulation using RRI</h2>
-<p>Given the current reconstruction state and a set of candidate viewpoints, the NBV task is formulated as:</p>
-<p><strong>Input</strong>:</p>
-<ul>
-<li>Current partial reconstruction <span class="math inline">\(\mathcal{P}_t\)</span> from <span class="math inline">\(t\)</span> captured views</li>
-<li>Set of candidate viewpoints at time <span class="math inline">\(t\)</span>: <span class="math inline">\(\mathcal{Q}_t = \{\mathbf{q}_1, \mathbf{q}_2, ..., \mathbf{q}_n\}\)</span></li>
-<li>Current camera trajectory <span class="math inline">\(\mathcal{T}_t = \{\mathbf{c}_1, \mathbf{c}_2, ..., \mathbf{c}_t\}\)</span></li>
-</ul>
-<p><strong>Objective</strong>: Find the next-best viewpoint that maximizes reconstruction improvement:</p>
-<p><span class="math display">\[\mathbf{q}^* = \underset{\mathbf{q} \in \mathcal{Q}_t}{\text{argmax}} \; \text{RRI}(\mathbf{q} \mid \mathcal{P}_t, \mathcal{T}_t)\]</span></p>
-<p><strong>Sequential Planning</strong>: For planning a sequence of <span class="math inline">\(k\)</span> views, the optimal camera trajectory <span class="math inline">\(\boldsymbol{\tau}^*_{t+k} = \{\mathbf{q}_1, \mathbf{q}_2, ..., \mathbf{q}_k\}\)</span> is:</p>
-<p><span class="math display">\[\boldsymbol{\tau}^*_{t+k} = \underset{\boldsymbol{\tau}_{t+k}}{\text{argmax}} \sum_{i=1}^{k} \text{RRI}(\mathbf{q}_i \mid \mathcal{P}_{t+i-1}, \boldsymbol{\tau}_{t+i-1})\]</span></p>
-<p>Subject to:</p>
-<ul>
-<li><strong>Collision constraints</strong>: <span class="math inline">\(\mathbf{q} \notin \mathcal{O}_{\text{occupied}}\)</span> (candidate poses must be in free space)</li>
-<li><strong>Kinematic constraints</strong>: <span class="math inline">\(\|\text{pos}(\mathbf{q}_i) - \text{pos}(\mathbf{q}_{i-1})\| \leq d_{\max}\)</span> (reachability limits)</li>
-<li><strong>Field-of-view constraints</strong>: <span class="math inline">\(\mathcal{V}(\mathbf{q}) \cap \mathcal{S} \neq \emptyset\)</span> (scene entities <span class="math inline">\(\mathcal{S}\)</span> must be visible from frustum <span class="math inline">\(\mathcal{V}(\mathbf{q})\)</span>)</li>
-<li><strong>Resource constraints</strong>: Total trajectory length, time, or number of views within budget</li>
-</ul>
-</section>
-</section>
-<section id="efm-backbone" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> EFM Backbone</h1>
-<section id="egocentric-voxel-lifting-evl" class="level2" data-number="6.1">
-<h2 data-number="6.1" class="anchored" data-anchor-id="egocentric-voxel-lifting-evl"><span class="header-section-number">6.1</span> <a href="./contents/literature/efm3d.html">Egocentric Voxel Lifting (EVL)</a></h2>
-<ul>
-<li><strong>3D voxel lifting</strong>: Frozen DinoV2.5 features from multi-stream egocentric snippets are lifted into gravity-aligned voxel grids (4 m³ crops with task-dependent resolution).</li>
-<li><strong>Multi-modal fusion</strong>: Inputs include calibrated and posed RGB and SLAM fisheye cameras, semi-dense points, visibility information, and derived point/free-space masks that are aggregated across time.</li>
-<li><strong>Outputs</strong>: EVL predicts voxel occupancy probs, centerness-scores, 7-DoF OBB regressions, and semantic class scores. Post-processing fuses dense predictions via tracking, NMS, and TSDF occupancy accumulation.</li>
-<li><strong>Training specifics</strong>: OBB head trained on 526K ASE snippets, surface head on 54K snippets, both optimized with Adam and task-specific loss weightings.</li>
-<li><strong>Limitations</strong>: Inference currently operates on fixed 4 m³ frustums, assumes static scenes with accurate calibration, and degrades on distant or highly dynamic content—considerations for NBV deployment.</li>
-</ul>
-</section>
-<section id="benchmark" class="level2" data-number="6.2">
-<h2 data-number="6.2" class="anchored" data-anchor-id="benchmark"><span class="header-section-number">6.2</span> Benchmark</h2>
-<ul>
-<li>EFM3D establishes two egocentric perception tasks: 3D oriented bounding box detection and 3D surface regression <span class="citation" data-cites="EFM3D-straub2024"><a href="#ref-EFM3D-straub2024" role="doc-biblioref">[3]</a></span>.</li>
-<li>Training uses the large-scale simulated ASE dataset (100K indoor sequences with GT meshes and annotations). Evaluation spans both ASE and real-world Project Aria datasets: ADT for surface regression and AEO for object detection.</li>
-<li>Benchmarked methods leverage synchronized egocentric video, precise camera poses, calibration data, and semi-dense SLAM points, emphasizing full-field-of-view processing.</li>
-</ul>
-</section>
-</section>
-<section id="integration-strategy" class="level1" data-number="7">
-<h1 data-number="7"><span class="header-section-number">7</span> Integration Strategy</h1>
-<ol type="1">
-<li>Use EVL’s <code>voxel/feat</code> tensor and occupancy logits as the scene representation.</li>
-<li>Project the candidate view frustum into the voxel grid to accumulate visible features, depth statistics, and free-space overlap or project features into the candidate view.</li>
-<li>Concatenate scene context, candidate embeddings, pose metadata, and uncertainty cues before passing them to a small RRI head trained with <a href="https://raschka-research-group.github.io/coral-pytorch/">CORAL ordinal loss</a> on binned RRIs.</li>
-<li>Enforce collision constraints by discarding candidates that intersect high-occupancy voxels or detected OBBs.</li>
-</ol>
-</section>
-<section id="documentation-navigation" class="level1" data-number="8">
-<h1 data-number="8"><span class="header-section-number">8</span> Documentation Navigation</h1>
-<section id="dataset-resources" class="level2" data-number="8.1">
-<h2 data-number="8.1" class="anchored" data-anchor-id="dataset-resources"><span class="header-section-number">8.1</span> Dataset &amp; Resources</h2>
-<ul>
-<li><strong><a href="./contents/resources.html">Technical Resources</a></strong>: External tools and APIs</li>
-<li><strong><a href="./contents/roadmap.html">Project Roadmap</a></strong>: Development phases and timeline</li>
+<li><strong><a href="./contents/todos.html">Action Items &amp; TODOs</a></strong>: Current priorities and open tasks</li>
+<li><strong><a href="./contents/roadmap.html">Project Roadmap</a></strong>: Milestones and timeline</li>
 <li><strong><a href="./contents/questions.html">Research Questions</a></strong>: Open problems and directions</li>
-<li><strong><a href="./contents/ase_dataset.html">ASE Dataset</a></strong>: 100K scenes, modalities, NBV suitability</li>
+<li><strong><a href="./contents/experiments/findings.html">Experimental Findings</a></strong>: Run logs and takeaways</li>
 </ul>
 </section>
-<section id="literature-reviews" class="level2" data-number="8.2">
-<h2 data-number="8.2" class="anchored" data-anchor-id="literature-reviews"><span class="header-section-number">8.2</span> Literature Reviews</h2>
+<section id="theory-background" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="theory-background"><span class="header-section-number">3.3</span> Theory &amp; Background</h2>
 <ul>
+<li><strong><a href="./contents/theory/nbv_background.html">NBV Background</a></strong>: Problem framing and prior work</li>
+<li><strong><a href="./contents/theory/rri_theory.html">RRI Theory</a></strong>: Mathematical formulation and properties of RRI</li>
+<li><strong><a href="./contents/theory/surface_metrics.html">Surface Reconstruction Metrics</a></strong>: Accuracy, completeness, Chamfer distance</li>
+<li><strong><a href="./contents/theory/semi-dense-pc.html">Semi-Dense Point Clouds</a></strong>: SLAM-based reconstruction signals</li>
+</ul>
+</section>
+<section id="dataset-resources" class="level2" data-number="3.4">
+<h2 data-number="3.4" class="anchored" data-anchor-id="dataset-resources"><span class="header-section-number">3.4</span> Dataset &amp; Resources</h2>
+<ul>
+<li><strong><a href="./contents/ase_dataset.html">Aria Synthetic Environments (ASE) Dataset</a></strong>: Modalities, splits, mesh availability</li>
+<li><strong><a href="./contents/resources.html">Resources &amp; Tools</a></strong>: External links to libraries, tools, datasets</li>
+<li><strong><a href="./contents/glossary.html">Glossary</a></strong>: Project terminology</li>
+</ul>
+</section>
+<section id="literature-reviews" class="level2" data-number="3.5">
+<h2 data-number="3.5" class="anchored" data-anchor-id="literature-reviews"><span class="header-section-number">3.5</span> Literature Reviews</h2>
+<ul>
+<li><strong><a href="./contents/literature/index.html">Literature Review</a></strong>: Entry point and local LaTeX corpus</li>
 <li><strong><a href="./contents/literature/vin_nbv.html">VIN-NBV</a></strong>: Direct quality optimization with RRI</li>
 <li><strong><a href="./contents/literature/gen_nbv.html">GenNBV</a></strong>: Continuous action spaces and RL approaches</li>
-<li><strong><a href="./contents/literature/efm3d.html">EFM3D/EVL</a></strong>: Egocentric foundation models and voxel lifting</li>
+<li><strong><a href="./contents/literature/efm3d.html">EFM3D &amp; EVL</a></strong>: Egocentric foundation models and voxel lifting</li>
 <li><strong><a href="./contents/literature/scene_script.html">SceneScript</a></strong>: Structured scene language and entity representation</li>
 </ul>
 </section>
-<section id="metrics-evaluation" class="level2" data-number="8.3">
-<h2 data-number="8.3" class="anchored" data-anchor-id="metrics-evaluation"><span class="header-section-number">8.3</span> Metrics &amp; Evaluation</h2>
+<section id="implementation-guides" class="level2" data-number="3.6">
+<h2 data-number="3.6" class="anchored" data-anchor-id="implementation-guides"><span class="header-section-number">3.6</span> Implementation Guides</h2>
 <ul>
-<li><strong><a href="./contents/metrics/surface_metrics.html">Surface Metrics</a></strong>: Accuracy, completeness, Chamfer distance</li>
-<li><strong><a href="./contents/metrics/atek_implementation.html">ATEK Implementation</a></strong>: Production-ready mesh evaluation</li>
-<li><strong><a href="./contents/metrics/efm3d_implementation.html">EFM3D Implementation</a></strong>: Point cloud and voxel utilities</li>
-<li><strong><a href="./contents/metrics/rri_computation.html">RRI Computation</a></strong>: Complete oracle implementation</li>
+<li><strong><a href="./contents/impl/overview.html">Implementation Overview</a></strong>: Metrics + RRI computation entry point</li>
+<li><strong><a href="./contents/impl/aria_nbv_overview.html">aria_nbv Overview &amp; Architecture</a></strong>: Package structure and components</li>
+<li><strong><a href="./contents/impl/aria_nbv_package.html">aria_nbv Package (formerly oracle_rri)</a></strong>: API map + module responsibilities</li>
+<li><strong><a href="./contents/impl/data_pipeline_overview.html">ASE Data Pipeline &amp; Streamlit Usage</a></strong>: Data ingestion and dashboards</li>
+<li><strong><a href="./contents/impl/oracle_rri_impl.html">aria_nbv Implementation Overview</a></strong>: Key modules and workflows</li>
+<li><strong><a href="./contents/impl/rri_computation.html">Computing RRI with Ground Truth Meshes</a></strong>: Oracle pipeline and labels</li>
+<li><strong><a href="./contents/impl/coral_intergarion.html">CORAL for Ordinal Regression</a></strong>: Ordinal binning and loss integration</li>
+<li><strong><a href="./contents/impl/vin_nbv.html">View Introspection Network (VIN) on EVL</a></strong>: Model design and training notes</li>
+<li><strong><a href="./contents/impl/vin_v2_feature_proposals.html">VIN v2 Feature + Encoding Proposals</a></strong>: Design space and ideas</li>
 </ul>
 </section>
-<section id="project-slides" class="level2" data-number="8.4">
-<h2 data-number="8.4" class="anchored" data-anchor-id="project-slides"><span class="header-section-number">8.4</span> Project Slides</h2>
+<section id="external-implementations" class="level2" data-number="3.7">
+<h2 data-number="3.7" class="anchored" data-anchor-id="external-implementations"><span class="header-section-number">3.7</span> External Implementations</h2>
 <ul>
-<li><a href="./docs/typst/slides/slides_1.pdf">Presentation 01</a>, <a href="./docs/typst/slides/slides_1.typ">typst-src</a></li>
-<li><a href="./docs/typst/slides/slides_2.pdf">Presentation 02</a>, <a href="./docs/typst/slides/slides_2.typ">typst-src</a></li>
+<li><strong><a href="./contents/ext-impl/atek_implementation.html">ATEK Implementation Index</a></strong>: Mesh evaluation reference</li>
+<li><strong><a href="./contents/ext-impl/efm3d_implementation.html">EFM3D Implementation Index</a></strong>: Voxel/point utilities</li>
+<li><strong><a href="./contents/ext-impl/prj_aria_tools_impl.html">ProjectAria Tools Reference</a></strong>: Dataset tooling</li>
+<li><strong><a href="./contents/ext-impl/efm3d_symbol_index.html">EFM3D Symbol Index</a></strong>: Keys and coordinate conventions</li>
 </ul>
 </section>
-</section>
-<section id="external-code-notebooks" class="level1" data-number="9">
-<h1 data-number="9"><span class="header-section-number">9</span> External Code &amp; Notebooks</h1>
-<pre><code>external/
-├── ATEK/                    # Aria toolkit for data processing
-├── efm3d/                   # EFM3D model implementation
-├── projectaria_tools/       # ASE dataset access utilities
-└── scenescript/             # Scene specification language tools
-
-notebooks/
-├── ase_atek_data_exploration.ipynb    # ASE dataset exploration
-├── download_ase_meshes.ipynb          # GT mesh acquisition
-├── ase_atek_exploration.ipynb         # ATEK integration testing
-├── ase_exploration.ipynb              # Basic ASE data analysis
-└── inference.ipynb                    # Model inference experiments</code></pre>
+<section id="project-slides" class="level2" data-number="3.8">
+<h2 data-number="3.8" class="anchored" data-anchor-id="project-slides"><span class="header-section-number">3.8</span> Project Slides</h2>
+<ul>
+<li><a href="typst/slides/slides_1.pdf">Presentation 01</a>, <a href="typst/slides/slides_1.typ">typst-src</a></li>
+<li><a href="typst/slides/slides_2.pdf">Presentation 02</a>, <a href="typst/slides/slides_2.typ">typst-src</a></li>
+</ul>
 
 
 <!-- -->
 
 
+</section>
 </section>
 
 <div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body" data-entry-spacing="0" role="list">
@@ -908,15 +878,6 @@ notebooks/
 </div>
 <div id="ref-EFM3D-straub2024" class="csl-entry" role="listitem">
 <div class="csl-left-margin">[3] </div><div class="csl-right-inline">J. Straub, D. DeTone, T. Shen, N. Yang, C. Sweeney, and R. Newcombe, <span>“EFM3D: A benchmark for measuring progress towards 3D egocentric foundation models.”</span> 2024. Available: <a href="https://arxiv.org/abs/2406.10224">https://arxiv.org/abs/2406.10224</a></div>
-</div>
-<div id="ref-SceneScript-avetisyan2024" class="csl-entry" role="listitem">
-<div class="csl-left-margin">[4] </div><div class="csl-right-inline">A. Avetisyan <em>et al.</em>, <span>“SceneScript: Reconstructing scenes with an autoregressive structured language model.”</span> 2024. Available: <a href="https://arxiv.org/abs/2403.13064">https://arxiv.org/abs/2403.13064</a></div>
-</div>
-<div id="ref-projectaria-engel2023" class="csl-entry" role="listitem">
-<div class="csl-left-margin">[5] </div><div class="csl-right-inline">J. Engel <em>et al.</em>, <span>“Project aria: A new tool for egocentric multi-modal AI research.”</span> 2023. Available: <a href="https://arxiv.org/abs/2308.13561">https://arxiv.org/abs/2308.13561</a></div>
-</div>
-<div id="ref-HITL-SceneScript-xie2025" class="csl-entry" role="listitem">
-<div class="csl-left-margin">[6] </div><div class="csl-right-inline">C. Xie <em>et al.</em>, <span>“Human-in-the-loop local corrections of 3D scene layouts via infilling.”</span> 2025. Available: <a href="https://arxiv.org/abs/2503.11806">https://arxiv.org/abs/2503.11806</a></div>
 </div>
 </div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
@@ -1388,229 +1349,99 @@ notebooks/
     }
   });
   </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Next-Best-View Planning with Foundation Models"</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "VCML Seminar: RRI based NBV Prediction using EFM3D Backbones"</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="an">author:</span><span class="co"> "Jan Duchscherer, Munich University of Applied Sciences"</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="an">date:</span><span class="co"> last-modified</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">    toc: true</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">    number-sections: true</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="an">bibliography:</span><span class="co"> references.bib</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-1: must provide concise collection of all important links to papers, resources and datasets, as well as a toc for of the entire project page --&gt;</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-2: must start with an abstract. abstract should be written in typst and included into the quarto page. use #resolve-library-id then #get-library-docs --&gt;</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-1: In the abstract describe general task of nbv, why rri based, why use EFM3D and briefly limitations of existing approaches, must be well structured flowing text --&gt;</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- After abstract have a more detailed introduction to NBV, RRI, EFM3D, --&gt;</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-X: Then Theory section --&gt;</span></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-3: Then mention tools like ATEK, Project Aria Project pages / docs --&gt;</span></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="fu"># Abstract</span></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>Next-Best-View (NBV) planning addresses the fundamental challenge of autonomous viewpoint selection in active 3D reconstruction, aiming to maximize the acquisition quality while minimizing the acquisition cost (i.e. number of views, traversed distance, capture time).</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>Classical NBV methods rely on hand-crafted criteria, limited action spaces, or per-scene optimized representations. While learning-based NBV methods like GenNBV <span class="co">[</span><span class="ot">@GenNBV-chen2024</span><span class="co">]</span> have improved generalization by leveraging reinforcement learning, they still optimize for geometric coverage as a proxy for reconstruction quality. Since coverage maximization does not necessarily correlate with improved reconstruction quality, these methods can struggle in complex scenes with occlusions and fine details. Diretly optimizing reconstruction quality, as pioneered by VIN-NBV <span class="co">[</span><span class="ot">@VIN-NBV-frahm2025</span><span class="co">]</span>, has shown significant improvements by predicting Relative Reconstruction Improvement (RRI) to quantify the fitness of candidate viewpoints. However, even VIN-NBV's generalization capabilities are rather limited to simple object-centric NBV scenarios as it does not leverage pre-tained foundation models with rich 3D spatial understanding.</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>This project aims to develop an NBV system that integrates VIN-NBV's key insight to directly optimize reconstruction quality rather than proxies like coverage, leveraging a pre-trained _egocentric foundation model_ as backbone to provide strong priors for 3D spatial reasoning in complex indoor scenes. We adapt the [EVL (_Egocentric Voxel Lifting_)](contents/literature/efm3d.qmd) 3D EFM <span class="co">[</span><span class="ot">@EFM3D-straub2024</span><span class="co">]</span> which is pre-trained on the <span class="co">[</span><span class="ot">Aria Synthetic Environments (ASE)</span><span class="co">](contents/ase_dataset.qmd)</span> dataset - a large-scale synthetic egocentric dataset with 100k indoor scenes, to provide rich 3D feature volumes that capture scene geometry, semantics, and free-space priors. On top of this frozen backbone, we train a lightweight RRI prediction head that introspects both the current scene representation and candidate viewpoints to express the fitness of given candidate views.</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="fu"># Project Vision and Goals</span></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Directly optimize reconstruction quality rather than surrogate coverage metrics, following RRI-based policies as per VIN-NBV.</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Develop an <span class="co">[</span><span class="ot">oracle RRI computation pipeline</span><span class="co">](contents/metrics/rri_computation.qmd)</span> using ASE visibility data, semi-dense point clouds  and GT meshes.</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Develop computational tools to efficiently simulate candidate viewpoints and their expected observations utilizing implementations in <span class="co">[</span><span class="ot">EFM3D</span><span class="co">](https://github.com/facebookresearch/efm3d)</span> and <span class="co">[</span><span class="ot">ATEK</span><span class="co">](https://github.com/facebookresearch/ATEK)</span>.</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Train an RRI predictor head on top of a frozen EFM backbone that introspects the current reconstruction and a candidate pose via imitation learning on oracle RRIs.</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Leverage EVL's 3D foundation features—voxel occupancy, centerness, semantic channels, and OBB priors—as state embeddings for RRI estimation and NBV decision making.</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Entity-aware reconstruction tracking through EVL's OBB detection capabilities.</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Extend towards human-in-the-loop AR guidance, where entity-aware RRI weighting delivers task-specific view suggestions.</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a><span class="fu"># Important Resources</span></span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>see <span class="co">[</span><span class="ot">Resources &amp; Tools</span><span class="co">](contents/resources.qmd)</span> for libraries, tools, docs and datasets used in this project</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="fu">## Papers</span></span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="fu">### Core NBV Methods</span></span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[VIN-NBV: A View Introspection Network for Next-Best-View Selection](https://arxiv.org/abs/2505.06219)** <span class="co">[</span><span class="ot">@VIN-NBV-frahm2025</span><span class="co">]</span> - Direct RRI optimization approach</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction](https://arxiv.org/abs/2402.16174)** <span class="co">[</span><span class="ot">@GenNBV-chen2024</span><span class="co">]</span> - RL-based coverage optimization</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a><span class="fu">### Project Aria Ecosystem</span></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D: A Benchmark for Measuring Progress Towards 3D Egocentric Foundation Models](https://arxiv.org/abs/2406.10224)** <span class="co">[</span><span class="ot">@EFM3D-straub2024</span><span class="co">]</span> - EVL backbone and benchmarks</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model](https://arxiv.org/abs/2403.13064)** <span class="co">[</span><span class="ot">@SceneScript-avetisyan2024</span><span class="co">]</span> - Structured scene representation</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Aria: A New Tool for Egocentric Multi-Modal AI Research](https://arxiv.org/abs/2308.13561)** <span class="co">[</span><span class="ot">@projectaria-engel2023</span><span class="co">]</span> - ASE dataset foundation</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling](https://arxiv.org/abs/2503.11806)** <span class="co">[</span><span class="ot">@HITL-SceneScript-xie2025</span><span class="co">]</span> - Interactive scene editing</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a><span class="fu">## Resources, Tools, Docs and Datasets</span></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="fu">### Project Aria Ecosystem</span></span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Aria Homepage](https://www.projectaria.com/)** - Main portal for datasets and tools</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Aria Documentation](https://facebookresearch.github.io/projectaria_tools/docs/intro)** - APIs and utilities</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ASE Dataset Documentation](https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset)** - 100K synthetic scenes</span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Aria Dataset Explorer](https://explorer.projectaria.com/)** - Interactive data browser</span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a><span class="fu">### Development Tools</span></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ATEK GitHub Repository](https://github.com/facebookresearch/ATEK)** - ML training and evaluation toolkit</span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ATEK Documentation](https://facebookresearch.github.io/projectaria_tools/docs/ATEK/about_ATEK)** - Complete setup and usage guide</span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D GitHub Repository](https://github.com/facebookresearch/efm3d)** - Foundation model implementation</span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript GitHub Repository](https://github.com/facebookresearch/scenescript)** - Structured scene language</span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Aria Tools GitHub](https://github.com/facebookresearch/projectaria_tools)** - Core data processing utilities</span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a><span class="fu"># NBV Background</span></span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a><span class="fu">## Classical Methods: Geometric Heuristics</span></span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>Hand-crafted criteria include:</span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Volumetric uncertainty** (unseen voxels)</span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Information gain** (entropy reduction)</span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Surface coverage**  <span class="co">[</span><span class="ot">@VIN-NBV-frahm2025</span><span class="co">]</span></span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a><span class="fu">## Coverage-Based Learning: GenNBV</span></span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="co">[</span><span class="ot">**GenNBV**</span><span class="co">](contents/literature/gen_nbv.qmd)</span> <span class="co">[</span><span class="ot">@GenNBV-chen2024</span><span class="co">]</span> introduced learning-based NBV with:</span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>RL-based training with continuous 5DoF actions</span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Coverage-focused rewards for geometric completeness</span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>**Limitation**: Still optimizes geometric coverage, not reconstruction quality.</span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a><span class="fu">## Direct Quality Optimization: VIN-NBV</span></span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a><span class="co">[</span><span class="ot">**VIN-NBV**</span><span class="co">](contents/literature/vin_nbv.qmd)</span> <span class="co">[</span><span class="ot">@VIN-NBV-frahm2025</span><span class="co">]</span> directly optimizes **Relative Reconstruction Improvement (RRI)**:</span>
-<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>$$\text{RRI}(v) = \frac{\text{Quality}(R_{t+1}) - \text{Quality}(R_t)}{\text{Quality}(R_{\text{complete}})}$$</span>
-<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Predicts actual reconstruction quality improvement</span>
-<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Uses surface metrics (Chamfer distance, F-score) as quality measures</span>
-<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Demonstrates ≈30% improvement over coverage-based methods</span>
-<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>**Limitation**: Custom CNN backbone limits generalization to complex scenes.</span>
-<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a><span class="fu"># Relative Reconstruction Improvement (RRI)</span></span>
-<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a><span class="fu">## RRI Metric</span></span>
-<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a>The <span class="co">[</span><span class="ot">RRI metric</span><span class="co">](contents/metrics/surface_metrics.qmd)</span>, introduced by VIN-NBV, quantifies the expected reconstruction quality gain from capturing a new viewpoint:</span>
-<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a>$$\text{RRI}(\mathbf{q}) = \frac{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}}) - \text{CD}(\mathcal{P}_{t \cup \mathbf{q}}, \mathcal{M}_{\text{GT}})}{\text{CD}(\mathcal{P}_t, \mathcal{M}_{\text{GT}})}$$</span>
-<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a>Where:</span>
-<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\mathbf{q} \in SE(3)$: Candidate viewpoint (5DoF pose as roll typically fixed to 0°)</span>
-<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\mathcal{P}_t$: Current reconstruction point cloud from first $t$ views</span>
-<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\mathcal{P}_{t \cup \mathbf{q}}$: Updated reconstruction after capturing from viewpoint $\mathbf{q}$</span>
-<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\mathcal{M}_{\text{GT}}$: Ground truth mesh (available only during training)</span>
-<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\text{CD}(\cdot, \cdot)$: Chamfer distance (bidirectional surface similarity metric)</span>
-<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a>**Properties**:</span>
-<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Range: <span class="co">[</span><span class="ot">0, 1</span><span class="co">]</span> where higher values indicate better viewpoints</span>
-<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Normalized by current error $ \rightarrow $ limited scale/object-independence</span>
-<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Requires ground truth RRI during training</span>
-<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Directly correlates with reconstruction quality improvement</span>
-<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a>For more information on see the pages under <span class="co">[</span><span class="ot">*Metrics*</span><span class="co">](contents/metrics/index.qmd)</span>.</span>
-<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a><span class="fu">## NBV Task Formulation using RRI</span></span>
-<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a>Given the current reconstruction state and a set of candidate viewpoints, the NBV task is formulated as:</span>
-<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-133"><a href="#cb2-133" aria-hidden="true" tabindex="-1"></a>**Input**:</span>
-<span id="cb2-134"><a href="#cb2-134" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Current partial reconstruction $\mathcal{P}_t$ from $t$ captured views</span>
-<span id="cb2-136"><a href="#cb2-136" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Set of candidate viewpoints at time $t$: $\mathcal{Q}_t = <span class="sc">\{</span>\mathbf{q}_1, \mathbf{q}_2, ..., \mathbf{q}_n<span class="sc">\}</span>$</span>
-<span id="cb2-137"><a href="#cb2-137" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Current camera trajectory $\mathcal{T}_t = <span class="sc">\{</span>\mathbf{c}_1, \mathbf{c}_2, ..., \mathbf{c}_t<span class="sc">\}</span>$</span>
-<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a>**Objective**: Find the next-best viewpoint that maximizes reconstruction improvement:</span>
-<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a>$$\mathbf{q}^* = \underset{\mathbf{q} \in \mathcal{Q}_t}{\text{argmax}} \; \text{RRI}(\mathbf{q} \mid \mathcal{P}_t, \mathcal{T}_t)$$</span>
-<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-143"><a href="#cb2-143" aria-hidden="true" tabindex="-1"></a>**Sequential Planning**: For planning a sequence of $k$ views, the optimal camera trajectory $\boldsymbol{\tau}^*_{t+k} = <span class="sc">\{</span>\mathbf{q}_1, \mathbf{q}_2, ..., \mathbf{q}_k<span class="sc">\}</span>$ is:</span>
-<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a>$$\boldsymbol{\tau}^*_{t+k} = \underset{\boldsymbol{\tau}_{t+k}}{\text{argmax}} \sum_{i=1}^{k} \text{RRI}(\mathbf{q}_i \mid \mathcal{P}_{t+i-1}, \boldsymbol{\tau}_{t+i-1})$$</span>
-<span id="cb2-146"><a href="#cb2-146" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-147"><a href="#cb2-147" aria-hidden="true" tabindex="-1"></a>Subject to:</span>
-<span id="cb2-148"><a href="#cb2-148" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-149"><a href="#cb2-149" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Collision constraints**: $\mathbf{q} \notin \mathcal{O}_{\text{occupied}}$ (candidate poses must be in free space)</span>
-<span id="cb2-150"><a href="#cb2-150" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Kinematic constraints**: $<span class="sc">\|</span>\text{pos}(\mathbf{q}_i) - \text{pos}(\mathbf{q}_{i-1})\| \leq d_{\max}$ (reachability limits)</span>
-<span id="cb2-151"><a href="#cb2-151" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Field-of-view constraints**: $\mathcal{V}(\mathbf{q}) \cap \mathcal{S} \neq \emptyset$ (scene entities $\mathcal{S}$ must be visible from frustum $\mathcal{V}(\mathbf{q})$)</span>
-<span id="cb2-152"><a href="#cb2-152" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Resource constraints**: Total trajectory length, time, or number of views within budget</span>
-<span id="cb2-153"><a href="#cb2-153" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-154"><a href="#cb2-154" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-155"><a href="#cb2-155" aria-hidden="true" tabindex="-1"></a><span class="fu"># EFM Backbone</span></span>
-<span id="cb2-156"><a href="#cb2-156" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-157"><a href="#cb2-157" aria-hidden="true" tabindex="-1"></a><span class="fu">## [Egocentric Voxel Lifting (EVL)](contents/literature/efm3d.qmd)</span></span>
-<span id="cb2-158"><a href="#cb2-158" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-159"><a href="#cb2-159" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**3D voxel lifting**: Frozen DinoV2.5 features from multi-stream egocentric snippets are lifted into gravity-aligned voxel grids (4 m³ crops with task-dependent resolution).</span>
-<span id="cb2-160"><a href="#cb2-160" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Multi-modal fusion**: Inputs include calibrated and posed RGB and SLAM fisheye cameras, semi-dense points, visibility information, and derived point/free-space masks that are aggregated across time.</span>
-<span id="cb2-161"><a href="#cb2-161" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Outputs**: EVL predicts voxel occupancy probs, centerness-scores, 7-DoF OBB regressions, and semantic class scores. Post-processing fuses dense predictions via tracking, NMS, and TSDF occupancy accumulation.</span>
-<span id="cb2-162"><a href="#cb2-162" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Training specifics**: OBB head trained on 526K ASE snippets, surface head on 54K snippets, both optimized with Adam and task-specific loss weightings.</span>
-<span id="cb2-163"><a href="#cb2-163" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Limitations**: Inference currently operates on fixed 4 m³ frustums, assumes static scenes with accurate calibration, and degrades on distant or highly dynamic content—considerations for NBV deployment.</span>
-<span id="cb2-164"><a href="#cb2-164" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-165"><a href="#cb2-165" aria-hidden="true" tabindex="-1"></a><span class="fu">## Benchmark</span></span>
-<span id="cb2-166"><a href="#cb2-166" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-167"><a href="#cb2-167" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>EFM3D establishes two egocentric perception tasks: 3D oriented bounding box detection and 3D surface regression <span class="co">[</span><span class="ot">@EFM3D-straub2024</span><span class="co">]</span>.</span>
-<span id="cb2-168"><a href="#cb2-168" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Training uses the large-scale simulated ASE dataset (100K indoor sequences with GT meshes and annotations). Evaluation spans both ASE and real-world Project Aria datasets: ADT for surface regression and AEO for object detection.</span>
-<span id="cb2-169"><a href="#cb2-169" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Benchmarked methods leverage synchronized egocentric video, precise camera poses, calibration data, and semi-dense SLAM points, emphasizing full-field-of-view processing.</span>
-<span id="cb2-170"><a href="#cb2-170" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-171"><a href="#cb2-171" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-172"><a href="#cb2-172" aria-hidden="true" tabindex="-1"></a><span class="fu"># Integration Strategy</span></span>
-<span id="cb2-173"><a href="#cb2-173" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-174"><a href="#cb2-174" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Use EVL's <span class="in">`voxel/feat`</span> tensor and occupancy logits as the scene representation.</span>
-<span id="cb2-175"><a href="#cb2-175" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Project the candidate view frustum into the voxel grid to accumulate visible features, depth statistics, and free-space overlap or project features into the candidate view.</span>
-<span id="cb2-176"><a href="#cb2-176" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Concatenate scene context, candidate embeddings, pose metadata, and uncertainty cues before passing them to a small RRI head trained with <span class="co">[</span><span class="ot">CORAL ordinal loss</span><span class="co">](https://raschka-research-group.github.io/coral-pytorch/)</span> on binned RRIs.</span>
-<span id="cb2-177"><a href="#cb2-177" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Enforce collision constraints by discarding candidates that intersect high-occupancy voxels or detected OBBs.</span>
-<span id="cb2-178"><a href="#cb2-178" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-179"><a href="#cb2-179" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-180"><a href="#cb2-180" aria-hidden="true" tabindex="-1"></a><span class="fu"># Documentation Navigation</span></span>
-<span id="cb2-181"><a href="#cb2-181" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-182"><a href="#cb2-182" aria-hidden="true" tabindex="-1"></a><span class="fu">## Dataset &amp; Resources</span></span>
-<span id="cb2-183"><a href="#cb2-183" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-184"><a href="#cb2-184" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Technical Resources](contents/resources.qmd)**: External tools and APIs</span>
-<span id="cb2-185"><a href="#cb2-185" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Roadmap](contents/roadmap.qmd)**: Development phases and timeline</span>
-<span id="cb2-186"><a href="#cb2-186" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Research Questions](contents/questions.qmd)**: Open problems and directions</span>
-<span id="cb2-187"><a href="#cb2-187" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ASE Dataset](contents/ase_dataset.qmd)**: 100K scenes, modalities, NBV suitability</span>
-<span id="cb2-188"><a href="#cb2-188" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-189"><a href="#cb2-189" aria-hidden="true" tabindex="-1"></a><span class="fu">## Literature Reviews</span></span>
-<span id="cb2-190"><a href="#cb2-190" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-191"><a href="#cb2-191" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[VIN-NBV](contents/literature/vin_nbv.qmd)**: Direct quality optimization with RRI</span>
-<span id="cb2-192"><a href="#cb2-192" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[GenNBV](contents/literature/gen_nbv.qmd)**: Continuous action spaces and RL approaches</span>
-<span id="cb2-193"><a href="#cb2-193" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D/EVL](contents/literature/efm3d.qmd)**: Egocentric foundation models and voxel lifting</span>
-<span id="cb2-194"><a href="#cb2-194" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript](contents/literature/scene_script.qmd)**: Structured scene language and entity representation</span>
-<span id="cb2-195"><a href="#cb2-195" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-196"><a href="#cb2-196" aria-hidden="true" tabindex="-1"></a><span class="fu">## Metrics &amp; Evaluation</span></span>
-<span id="cb2-197"><a href="#cb2-197" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-198"><a href="#cb2-198" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Surface Metrics](contents/metrics/surface_metrics.qmd)**: Accuracy, completeness, Chamfer distance</span>
-<span id="cb2-199"><a href="#cb2-199" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ATEK Implementation](contents/metrics/atek_implementation.qmd)**: Production-ready mesh evaluation</span>
-<span id="cb2-200"><a href="#cb2-200" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D Implementation](contents/metrics/efm3d_implementation.qmd)**: Point cloud and voxel utilities</span>
-<span id="cb2-201"><a href="#cb2-201" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[RRI Computation](contents/metrics/rri_computation.qmd)**: Complete oracle implementation</span>
-<span id="cb2-202"><a href="#cb2-202" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-203"><a href="#cb2-203" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project Slides</span></span>
-<span id="cb2-204"><a href="#cb2-204" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-205"><a href="#cb2-205" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 01</span><span class="co">](/docs/typst/slides/slides_1.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_1.typ)</span></span>
-<span id="cb2-206"><a href="#cb2-206" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 02</span><span class="co">](/docs/typst/slides/slides_2.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](/docs/typst/slides/slides_2.typ)</span></span>
-<span id="cb2-207"><a href="#cb2-207" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-208"><a href="#cb2-208" aria-hidden="true" tabindex="-1"></a><span class="fu"># External Code &amp; Notebooks</span></span>
-<span id="cb2-209"><a href="#cb2-209" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-210"><a href="#cb2-210" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb2-211"><a href="#cb2-211" aria-hidden="true" tabindex="-1"></a><span class="in">external/</span></span>
-<span id="cb2-212"><a href="#cb2-212" aria-hidden="true" tabindex="-1"></a><span class="in">├── ATEK/                    # Aria toolkit for data processing</span></span>
-<span id="cb2-213"><a href="#cb2-213" aria-hidden="true" tabindex="-1"></a><span class="in">├── efm3d/                   # EFM3D model implementation</span></span>
-<span id="cb2-214"><a href="#cb2-214" aria-hidden="true" tabindex="-1"></a><span class="in">├── projectaria_tools/       # ASE dataset access utilities</span></span>
-<span id="cb2-215"><a href="#cb2-215" aria-hidden="true" tabindex="-1"></a><span class="in">└── scenescript/             # Scene specification language tools</span></span>
-<span id="cb2-216"><a href="#cb2-216" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-217"><a href="#cb2-217" aria-hidden="true" tabindex="-1"></a><span class="in">notebooks/</span></span>
-<span id="cb2-218"><a href="#cb2-218" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_data_exploration.ipynb    # ASE dataset exploration</span></span>
-<span id="cb2-219"><a href="#cb2-219" aria-hidden="true" tabindex="-1"></a><span class="in">├── download_ase_meshes.ipynb          # GT mesh acquisition</span></span>
-<span id="cb2-220"><a href="#cb2-220" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_atek_exploration.ipynb         # ATEK integration testing</span></span>
-<span id="cb2-221"><a href="#cb2-221" aria-hidden="true" tabindex="-1"></a><span class="in">├── ase_exploration.ipynb              # Basic ASE data analysis</span></span>
-<span id="cb2-222"><a href="#cb2-222" aria-hidden="true" tabindex="-1"></a><span class="in">└── inference.ipynb                    # Model inference experiments</span></span>
-<span id="cb2-223"><a href="#cb2-223" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Next-Best-View Planning with Foundation Models"</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "VCML Seminar: RRI based NBV Prediction using EFM3D Backbones"</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="an">author:</span><span class="co"> "Jan Duchscherer, Munich University of Applied Sciences"</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="an">date:</span><span class="co"> last-modified</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">    toc: true</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">    number-sections: true</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="an">bibliography:</span><span class="co"> references.bib</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-1: must provide concise collection of all important links to papers, resources and datasets, as well as a toc for of the entire project page --&gt;</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-2: must start with an abstract. abstract should be written in typst and included into the quarto page. use #resolve-library-id then #get-library-docs --&gt;</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-1: In the abstract describe general task of nbv, why rri based, why use EFM3D and briefly limitations of existing approaches, must be well structured flowing text --&gt;</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- After abstract have a more detailed introduction to NBV, RRI, EFM3D, --&gt;</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-X: Then Theory section --&gt;</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">TODO</span><span class="co">-3: Then mention tools like ATEK, Project Aria Project pages / docs --&gt;</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="fu"># Abstract</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>Next-Best-View (NBV) planning addresses the fundamental challenge of autonomous viewpoint selection in active 3D reconstruction, aiming to maximize the acquisition quality while minimizing the acquisition cost (i.e. number of views, traversed distance, capture time).</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>Classical NBV methods rely on hand-crafted criteria, limited action spaces, or per-scene optimized representations. While learning-based NBV methods like GenNBV <span class="co">[</span><span class="ot">@GenNBV-chen2024</span><span class="co">]</span> have improved generalization by leveraging reinforcement learning, they still optimize for geometric coverage as a proxy for reconstruction quality. Since coverage maximization does not necessarily correlate with improved reconstruction quality, these methods can struggle in complex scenes with occlusions and fine details. Diretly optimizing reconstruction quality, as pioneered by VIN-NBV <span class="co">[</span><span class="ot">@VIN-NBV-frahm2025</span><span class="co">]</span>, has shown significant improvements by predicting Relative Reconstruction Improvement (RRI) to quantify the fitness of candidate viewpoints. However, even VIN-NBV's generalization capabilities are rather limited to simple object-centric NBV scenarios as it does not leverage pre-tained foundation models with rich 3D spatial understanding.</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>This project aims to develop an NBV system that integrates VIN-NBV's key insight to directly optimize reconstruction quality rather than proxies like coverage, leveraging a pre-trained _egocentric foundation model_ as backbone to provide strong priors for 3D spatial reasoning in complex indoor scenes. We adapt the [EVL (_Egocentric Voxel Lifting_)](contents/literature/efm3d.qmd) 3D EFM <span class="co">[</span><span class="ot">@EFM3D-straub2024</span><span class="co">]</span> which is pre-trained on the <span class="co">[</span><span class="ot">Aria Synthetic Environments (ASE)</span><span class="co">](contents/ase_dataset.qmd)</span> dataset - a large-scale synthetic egocentric dataset with 100k indoor scenes, to provide rich 3D feature volumes that capture scene geometry, semantics, and free-space priors. On top of this frozen backbone, we train a lightweight RRI prediction head that introspects both the current scene representation and candidate viewpoints to express the fitness of given candidate views.</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="fu"># Project Vision and Goals</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Directly optimize reconstruction quality rather than surrogate coverage metrics, following RRI-based policies as per VIN-NBV.</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Develop an <span class="co">[</span><span class="ot">oracle RRI computation pipeline</span><span class="co">](contents/impl/rri_computation.qmd)</span> using ASE visibility data, semi-dense point clouds  and GT meshes.</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Develop computational tools to efficiently simulate candidate viewpoints and their expected observations utilizing implementations in <span class="co">[</span><span class="ot">EFM3D</span><span class="co">](https://github.com/facebookresearch/efm3d)</span> and <span class="co">[</span><span class="ot">ATEK</span><span class="co">](https://github.com/facebookresearch/ATEK)</span>.</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Train an RRI predictor head on top of a frozen EFM backbone that introspects the current reconstruction and a candidate pose via imitation learning on oracle RRIs.</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Leverage EVL's 3D foundation features—voxel occupancy, centerness, semantic channels, and OBB priors—as state embeddings for RRI estimation and NBV decision making.</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Entity-aware reconstruction tracking through EVL's OBB detection capabilities.</span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Extend towards human-in-the-loop AR guidance, where entity-aware RRI weighting delivers task-specific view suggestions.</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="fu"># Documentation Navigation</span></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="fu">## Setup &amp; Installation</span></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Setup Instructions</span><span class="co">](contents/setup.qmd)</span>: Environment setup and dependencies</span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project State</span></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Action Items &amp; TODOs](contents/todos.qmd)**: Current priorities and open tasks</span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Project Roadmap](contents/roadmap.qmd)**: Milestones and timeline</span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Research Questions](contents/questions.qmd)**: Open problems and directions</span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Experimental Findings](contents/experiments/findings.qmd)**: Run logs and takeaways</span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a><span class="fu">## Theory &amp; Background</span></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[NBV Background](contents/theory/nbv_background.qmd)**: Problem framing and prior work</span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[RRI Theory](contents/theory/rri_theory.qmd)**: Mathematical formulation and properties of RRI</span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Surface Reconstruction Metrics](contents/theory/surface_metrics.qmd)**: Accuracy, completeness, Chamfer distance</span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Semi-Dense Point Clouds](contents/theory/semi-dense-pc.qmd)**: SLAM-based reconstruction signals</span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a><span class="fu">## Dataset &amp; Resources</span></span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Aria Synthetic Environments (ASE) Dataset](contents/ase_dataset.qmd)**: Modalities, splits, mesh availability</span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Resources &amp; Tools](contents/resources.qmd)**: External links to libraries, tools, datasets</span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Glossary](contents/glossary.qmd)**: Project terminology</span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a><span class="fu">## Literature Reviews</span></span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Literature Review](contents/literature/index.qmd)**: Entry point and local LaTeX corpus</span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[VIN-NBV](contents/literature/vin_nbv.qmd)**: Direct quality optimization with RRI</span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[GenNBV](contents/literature/gen_nbv.qmd)**: Continuous action spaces and RL approaches</span>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D &amp; EVL](contents/literature/efm3d.qmd)**: Egocentric foundation models and voxel lifting</span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[SceneScript](contents/literature/scene_script.qmd)**: Structured scene language and entity representation</span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a><span class="fu">## Implementation Guides</span></span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Implementation Overview](contents/impl/overview.qmd)**: Metrics + RRI computation entry point</span>
+<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[aria_nbv Overview &amp; Architecture](contents/impl/aria_nbv_overview.qmd)**: Package structure and components</span>
+<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[aria_nbv Package (formerly oracle_rri)](contents/impl/aria_nbv_package.qmd)**: API map + module responsibilities</span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ASE Data Pipeline &amp; Streamlit Usage](contents/impl/data_pipeline_overview.qmd)**: Data ingestion and dashboards</span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[aria_nbv Implementation Overview](contents/impl/oracle_rri_impl.qmd)**: Key modules and workflows</span>
+<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[Computing RRI with Ground Truth Meshes](contents/impl/rri_computation.qmd)**: Oracle pipeline and labels</span>
+<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[CORAL for Ordinal Regression](contents/impl/coral_intergarion.qmd)**: Ordinal binning and loss integration</span>
+<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[View Introspection Network (VIN) on EVL](contents/impl/vin_nbv.qmd)**: Model design and training notes</span>
+<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[VIN v2 Feature + Encoding Proposals](contents/impl/vin_v2_feature_proposals.qmd)**: Design space and ideas</span>
+<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a><span class="fu">## External Implementations</span></span>
+<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ATEK Implementation Index](contents/ext-impl/atek_implementation.qmd)**: Mesh evaluation reference</span>
+<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D Implementation Index](contents/ext-impl/efm3d_implementation.qmd)**: Voxel/point utilities</span>
+<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[ProjectAria Tools Reference](contents/ext-impl/prj_aria_tools_impl.qmd)**: Dataset tooling</span>
+<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**[EFM3D Symbol Index](contents/ext-impl/efm3d_symbol_index.qmd)**: Keys and coordinate conventions</span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a><span class="fu">## Project Slides</span></span>
+<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 01</span><span class="co">](typst/slides/slides_1.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](typst/slides/slides_1.typ)</span></span>
+<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="co">[</span><span class="ot">Presentation 02</span><span class="co">](typst/slides/slides_2.pdf)</span>, <span class="co">[</span><span class="ot">typst-src</span><span class="co">](typst/slides/slides_2.typ)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer">

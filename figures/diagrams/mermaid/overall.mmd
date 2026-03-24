@@ -1,0 +1,80 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 36
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+---
+flowchart TB
+  %% VINv3 overview (compact). Edges = shapes only.
+
+  %% Inputs
+  Poses["Poses + cameras"]
+  Snip["Snippet + EVL"]
+
+  subgraph Branches["<b>Per-candidate feature branches</b>"]
+    direction TB
+
+    PoseBranch["<b>Pose encoding</b> (12.7K params)<br/><code>R6dLffPoseEncoder</code>"]
+
+    FieldBranch["<b>Scene field</b> (192 params)<br/><code>nn.Conv3d + nn.GroupNorm + nn.GELU</code>"]
+
+    GlobalBranch["<b>Global feature</b> (7.3K + 336 params)<br/><code>PoseConditionedGlobalPool</code><br/><code>FiLM(s_vox)</code>"]
+
+    SemProjBranch["<b>Semidense projection stats</b><br/><code>Pi(&bull;) = transform_points_screen(C_q, &bull;)</code><br/><code>proj_stats(Pi(&bull;))</code>"]
+
+    SemGridBranch["<b>Semidense grid CNN</b> (optional, 1.3K params)<br/><code>scatter_add(Pi(&bull;))</code><br/><code>nn.Conv2d + nn.GELU</code>"]
+  end
+
+  VoxelValid["<b>Voxel coverage proxy</b><br/><br/><code>voxel_valid_frac = sample_center(counts_norm)</code><br/><code>voxel_valid_frac = clamp(voxel_valid_frac, 0, 1)</code>"]
+
+  Head["<b>Head + CORAL</b> (58.2K + 221 params)<br/><code>head_mlp</code> + <code>CoralLayer</code><br/><code>coral_logits_to_prob</code> + <code>coral_expected_from_logits</code>"]
+
+  Mask["<b>candidate_valid mask</b><br/><br/><code>idx = _semidense_proj_feature_index(&quot;semidense_candidate_vis_frac&quot;)</code><br/><code>semidense_candidate_vis_frac = semidense_proj[..., idx]</code><br/><br/><code>candidate_valid = pose_finite</code><br/><code>&amp; (voxel_valid_frac &gt; 0)</code><br/><code>&amp; (semidense_candidate_vis_frac &gt; 0)</code>"]
+
+  Pred["VinPrediction"]
+  CandValid["candidate_valid"]
+
+  %% Wiring (shapes only)
+  Poses -->|"PoseTW[B, N_q, 12]<br/>PoseTW[B, 12]"| PoseBranch
+
+  Snip -->|"FloatTensor[B, 1, V, V, V] (x4)<br/>IntTensor[B, V, V, V]"| FieldBranch
+  FieldBranch -->|"FloatTensor[B, F_g, V, V, V]"| GlobalBranch
+  PoseBranch -->|"FloatTensor[B, N_q, F_pose]"| GlobalBranch
+  Poses -->|"PerspectiveCameras[B*N_q]"| GlobalBranch
+
+  Snip -->|"FloatTensor[B, P, C_sem]"| SemProjBranch
+  Poses -->|"PerspectiveCameras[B*N_q]"| SemProjBranch
+
+  Snip -->|"FloatTensor[B, P, C_sem]"| SemGridBranch
+  Poses -->|"PerspectiveCameras[B*N_q]"| SemGridBranch
+
+  PoseBranch -->|"FloatTensor[B, N_q, F_pose]"| Head
+  GlobalBranch -->|"FloatTensor[B, N_q, F_g]"| Head
+  SemProjBranch -->|"FloatTensor[B, N_q, F_proj]"| Head
+  SemGridBranch -->|"FloatTensor[B, N_q, F_fr]"| Head
+
+  Snip -->|"FloatTensor[B, 1, V, V, V]"| VoxelValid
+  Poses -->|"PoseTW[B, N_q, 12]"| VoxelValid
+
+  Poses -->|"PoseTW[B, N_q, 12]"| Mask
+  VoxelValid -->|"FloatTensor[B, N_q]"| Mask
+  SemProjBranch -->|"FloatTensor[B, N_q, F_proj]"| Mask
+
+  Head --> Pred
+  Mask -->|"BoolTensor[B, N_q]"| CandValid
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+
+  class Poses,Snip input;
+  class PoseBranch,FieldBranch,GlobalBranch,SemProjBranch,SemGridBranch,VoxelValid,Head,Mask compute;
+  class Pred,CandValid output;

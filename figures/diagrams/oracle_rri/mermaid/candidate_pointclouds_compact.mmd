@@ -1,0 +1,37 @@
+flowchart LR
+  %% Stage: build_candidate_pointclouds (candidate_pointclouds.py) -> CandidatePointClouds
+  %%
+  %% Symbols:
+  %% - N: number of rendered candidates
+  %% - H,W: render resolution
+  %% - P_max: max backprojected points per candidate (stride-dependent)
+  %% - P_t: number of semi-dense SLAM points (collapsed)
+
+  sample["Input: EfmSnippetView<br/>\(\mathcal{P}_t\in\mathbb{R}^{P_t\times 3}\)<br/>\(\texttt{occupancy\_extend}\in\mathbb{R}^{6}\)"]
+  depths["Input: CandidateDepths<br/>\(D_q\in\mathbb{R}^{N\times H\times W}\)<br/>\(\texttt{p3d\_cameras}\Rightarrow C_q\)"]
+
+  backproj["Backproject depth (vectorised)<br/>\(\mathcal{P}_q=\Pi^{-1}(D_q,C_q,q)\)<br/>\(\texttt{PerspectiveCameras.unproject\_points}\)"]
+  collapse["Collapse semidense points<br/>\(\texttt{semidense.collapse\_points}\)"]
+  bounds["Union bounds<br/>\(\texttt{\_compute\_bounds}\)"]
+
+  out["Output: CandidatePointClouds<br/>\(\mathcal{P}_q\in\mathbb{R}^{N\times P_{max}\times 3}\)<br/>\(\texttt{lengths}\in\mathbb{N}^{N}\)<br/>\(\mathcal{P}_t\in\mathbb{R}^{P_t\times 3}\)"]
+
+  depths -->|"\(D_q,\ \texttt{valid\_mask}\)"| backproj
+  depths -->|"\(\texttt{p3d\_cameras}\)"| backproj
+  sample -->|"\(\mathcal{P}_t\)"| collapse
+  backproj -->|"\(\mathcal{P}_q,\ \texttt{lengths}\)"| bounds
+  collapse -->|"\(\mathcal{P}_t\)"| bounds
+  bounds -->|"\(\texttt{extend}\in\mathbb{R}^{6}\)"| out
+  backproj -->|"\(\mathcal{P}_q\)"| out
+  collapse -->|"\(\mathcal{P}_t\)"| out
+
+  %% Styling
+  classDef input fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
+  classDef compute fill:#e1d5e7,stroke:#9673a6,stroke-width:2px;
+  classDef neutral fill:#f5f5f5,stroke:#666666,stroke-width:2px;
+  classDef output fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
+
+  class sample,depths input;
+  class backproj compute;
+  class collapse,bounds neutral;
+  class out output;

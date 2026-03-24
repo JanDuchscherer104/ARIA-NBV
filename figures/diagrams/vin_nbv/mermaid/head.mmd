@@ -1,0 +1,74 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 34
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+---
+flowchart LR
+  %% VINv3 head: feature fusion + CORAL decoding (edges = shapes only).
+
+  subgraph Inputs["$$\\textbf{Inputs}$$"]
+    direction TB
+    PoseEnc["$$\\begin{array}{c}\\textbf{Pose Embedding}\\\\\\mathbf{e}_{\\mathrm{pose}}\\end{array}$$"]
+    GlobalFeat["$$\\begin{array}{c}\\textbf{Global Feature}\\\\\\tilde{\\mathbf{g}}\\end{array}$$"]
+    SemProj["$$\\begin{array}{c}\\textbf{Semidense Projection}\\\\\\mathbf{s}_{\\mathrm{proj}}\\end{array}$$"]
+    SemGrid["$$\\begin{array}{c}\\textbf{Semidense Grid}\\\\\\mathbf{s}_{\\mathrm{grid}}\\ (\\text{optional})\\end{array}$$"]
+    TrajCtx["$$\\begin{array}{c}\\textbf{Trajectory Context}\\\\\\mathbf{z}_{\\mathrm{traj}}\\ (\\text{optional})\\end{array}$$"]
+    ValidFrac["$$\\begin{array}{c}\\textbf{Validity Proxies}\\\\\\boldsymbol{\\nu}_{\\mathrm{vox}},\\boldsymbol{\\nu}_{\\mathrm{sem}}\\end{array}$$"]
+  end
+
+  Concat["$$\\begin{array}{c}\\textbf{Feature Concat}\\\\\\mathbf{f}=\\oplus\\{\\bullet\\}\\end{array}$$"]
+  Flatten["$$\\begin{array}{c}\\textbf{Flatten}\\\\\\texttt{reshape}(\\bullet,[B\\cdot N_q,-1])\\end{array}$$"]
+  HeadMLP["$$\\begin{array}{c}\\textbf{MLP Scorer}\\\\(58.2K\\ \\text{params})\\\\\\texttt{nn.Linear}\\rightarrow\\texttt{nn.GELU}\\rightarrow\\texttt{nn.Dropout}\\\\\\rightarrow\\texttt{nn.Linear}\\rightarrow\\texttt{nn.GELU}\\rightarrow\\texttt{nn.Dropout}\\end{array}$$"]
+  Coral["$$\\begin{array}{c}\\textbf{CORAL Logits}\\\\(221\\ \\text{params})\\\\\\boldsymbol{\\ell}=\\texttt{CoralLayer}(\\bullet)\\end{array}$$"]
+  Decode["$$\\begin{array}{c}\\textbf{Ordinal Decoding}\\\\\\mathbf{p}=\\texttt{coral\\_logits\\_to\\_prob}(\\boldsymbol{\\ell})\\\\\\hat{\\mathbf{r}}=\\sum_{k=0}^{K-2}\\sigma(\\boldsymbol{\\ell}_k)\\\\\\hat{\\mathbf{r}}_{\\mathrm{norm}}=\\hat{\\mathbf{r}}/(K-1)\\end{array}$$"]
+  Mask["$$\\begin{array}{c}\\textbf{Candidate Valid Mask}\\\\\\mathbf{m}=\\mathbb{1}[\\mathrm{finite}]\\wedge\\mathbb{1}[\\boldsymbol{\\nu}_{\\mathrm{vox}}>0]\\\\\\wedge\\mathbb{1}[\\boldsymbol{\\nu}_{\\mathrm{sem}}>0]\\end{array}$$"]
+
+  OutProb["$$\\begin{array}{c}\\textbf{Ordinal Prob}\\\\\\mathbf{p}\\end{array}$$"]
+  OutExpected["$$\\begin{array}{c}\\textbf{Expected RRI}\\\\\\hat{\\mathbf{r}}\\end{array}$$"]
+  OutExpectedNorm["$$\\begin{array}{c}\\textbf{Expected RRI (Norm)}\\\\\\hat{\\mathbf{r}}_{\\mathrm{norm}}\\end{array}$$"]
+  CandValid["$$\\begin{array}{c}\\textbf{Validity Mask}\\\\\\mathbf{m}\\end{array}$$"]
+  Pred["$$\\begin{array}{c}\\textbf{VinPrediction}\\\\\\{\\boldsymbol{\\ell},\\mathbf{p},\\hat{\\mathbf{r}},\\hat{\\mathbf{r}}_{\\mathrm{norm}},\\mathbf{m}\\}\\end{array}$$"]
+
+  PoseEnc -->|"$$\\texttt{FloatTensor}[B,N_q,F_{\\mathrm{pose}}]$$"| Concat
+  GlobalFeat -->|"$$\\texttt{FloatTensor}[B,N_q,F_g]$$"| Concat
+  SemProj -->|"$$\\texttt{FloatTensor}[B,N_q,F_{\\mathrm{proj}}]$$"| Concat
+  SemGrid -->|"$$\\texttt{FloatTensor}[B,N_q,F_{\\mathrm{fr}}]$$"| Concat
+  TrajCtx -->|"$$\\texttt{FloatTensor}[B,N_q,F_{\\mathrm{pose}}]$$"| Concat
+
+  Concat -->|"$$\\texttt{FloatTensor}[B,N_q,F_{\\mathrm{head}}]$$"| Flatten
+  Flatten -->|"$$\\texttt{FloatTensor}[B\\cdot N_q,F_{\\mathrm{head}}]$$"| HeadMLP
+  HeadMLP -->|"$$\\texttt{FloatTensor}[B\\cdot N_q,F_{\\mathrm{hid}}]$$"| Coral
+  Coral -->|"$$\\texttt{FloatTensor}[B,N_q,K-1]$$"| Decode
+
+  Decode -->|"$$\\texttt{FloatTensor}[B,N_q,K]$$"| OutProb
+  Decode -->|"$$\\texttt{FloatTensor}[B,N_q]$$"| OutExpected
+  Decode -->|"$$\\texttt{FloatTensor}[B,N_q]$$"| OutExpectedNorm
+
+  %% VinPrediction fields (edges = shapes only).
+  Coral -->|"$$\\texttt{FloatTensor}[B,N_q,K-1]$$"| Pred
+  OutProb -->|"$$\\texttt{FloatTensor}[B,N_q,K]$$"| Pred
+  OutExpected -->|"$$\\texttt{FloatTensor}[B,N_q]$$"| Pred
+  OutExpectedNorm -->|"$$\\texttt{FloatTensor}[B,N_q]$$"| Pred
+  CandValid -->|"$$\\texttt{BoolTensor}[B,N_q]$$"| Pred
+
+  ValidFrac -->|"$$\\texttt{FloatTensor}[B,N_q]$$"| Mask
+  Mask -->|"$$\\texttt{BoolTensor}[B,N_q]$$"| CandValid
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class PoseEnc,GlobalFeat,SemProj,SemGrid,TrajCtx,ValidFrac input;
+  class Concat,Flatten,HeadMLP,Coral,Decode,Mask compute;
+  class OutProb,OutExpected,OutExpectedNorm data;
+  class Pred,CandValid output;
