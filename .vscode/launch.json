@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "aria-nbv-cli",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/oracle_rri/oracle_rri/lightning/cli.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--run-mode",
+                "summarize-vin",
+                "--config-path",
+                "${workspaceFolder}/.configs/offline_only.toml"
+            ]
+        },
+        {
+            "name": "Python: Streamlit",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "streamlit",
+            "args": [
+                "run",
+                "${workspaceFolder}/oracle_rri/oracle_rri/streamlit_app.py",
+                "--server.port",
+                "8501"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}
