@@ -2,7 +2,15 @@
 
 = Appendix: VIN v3 Streamlining Rationale
 
+
 #import "../../shared/macros.typ": *
+
+// TODO(paper-cleanup): This appendix contains many hard-coded numeric comparisons between runs
+// (Spearman/top3/loss/LR/grad norms). Prefer importing these values from the same artifacts used
+// by slides_4.typ (e.g., `/typst/slides/data/vin_v3_01_vs_t41_summary.json`,
+// `/typst/slides/data/wandb_*_summary.json`, dynamics exports) to avoid drift.
+// TODO(paper-cleanup): Keep notation consistent with macros (`#symb`/`#eqs`; bold(...) for vectors)
+// and avoid mixing prose metrics with undefined symbols.
 
 #block[
   #smallcaps[Scope] This appendix documents the streamlining decisions proposed
@@ -35,6 +43,8 @@ We compare the first VIN v3 training run (#code-inline[vin-v3-01], W&B id
 #code-inline[jzddfu6u]) against the best optuna run (#code-inline[T41],
 #code-inline[wsfpssd8]). The comparison highlights a loss of candidate-specific
 signal and reduced candidate validity rather than issues in the voxel backbone.
+// TODO(paper-cleanup): Pull all compared metrics from a single export/JSON and cite the exact
+// run IDs + timestamped exports; avoid “about …” approximations when numbers are shown elsewhere.
 
 - *Ranking signal collapses.* #code-inline[train-aux/spearman] drops from 0.328
   to 0.025 and #code-inline[train-aux/top3_accuracy] drops from 0.285 to 0.201.
@@ -55,26 +65,21 @@ The following deltas are the most plausible architectural causes for the
 observed metric gaps. Each item maps directly to the v3 changes and the metric
 drift above.
 
-- *Semidense projection features are not fed into the head in v3.* In v2/T41,
-  semidense projection stats (and optionally frustum context) are concatenated
-  into the scorer input. In v3, they only drive candidate validity, leaving the
-  head with pose + global voxel context. This removes candidate-specific signal
-  and aligns with the spearman/top-3 collapse.
 - *Semidense frustum MHCA is removed.* T41 used candidate-conditioned frustum
   attention plus visibility embeddings. Removing it eliminates view-dependent
   cues that help rank candidates.
-- *Trajectory context is removed.* T41 encoded trajectory poses and attended
-  them with candidate pose queries. Eliminating this path removes temporal
-  context that correlated with higher ranking accuracy.
-- *Voxel validity is a gate (v3) instead of a feature (T41).* The hard gate
-  suppresses gradients for low-coverage candidates. T41 keeps the gate off and
-  appends voxel validity as a feature, which is more forgiving in early
-  training.
-- *Projection statistics are computed on a finer grid with heavier weighting.*
-  v3 uses a #code-inline[16x16] screen grid and log-weighted
-  $n_"obs"$ and $sigma_d^-1$ weighting, while T41 uses a #code-inline[12x12]
-  grid and no observation-count normalization. This reduces visibility
-  fractions and therefore candidate validity in v3.
+- *Trajectory context is disabled by default in v3.* T41 encoded trajectory
+  poses and attended them with candidate pose queries. Keeping this path off
+  removes temporal context that correlated with higher ranking accuracy.
+- *Voxel validity features are not appended in v3.* v3 keeps the voxel gate off
+  and uses validity only for diagnostics and candidate masking, whereas T41
+  appends voxel-validity features, which can stabilize early learning.
+- *Projection-weighting and grid-size differences across runs.* v3 uses a
+  configurable projection grid (often #code-inline[12x12] in current configs)
+  and reliability weights derived from #code-inline[n_obs] and
+  #code-inline[inv_dist_std]. Earlier runs (e.g., T41) used different grid sizes
+  and weighting/normalization settings, which can shift visibility fractions
+  and candidate validity.
 
 == Learning-rate and grad-norm diagnostics
 
@@ -83,6 +88,8 @@ We compared the logged #code-inline[lr-AdamW] schedule and
 best optuna run (#code-inline[T41]). The results highlight that v3 receives
 weaker gradient signals early, which aligns with the flat loss curve and
 mode-collapse.
+// TODO(paper-cleanup): Ensure LR-schedule statements match the actual scheduler used in each
+// run (one-cycle vs ReduceLROnPlateau etc). If different schedulers were used, clarify.
 
 - *One-cycle schedule differs in peak timing and amplitude.*
   T41 peaks at #code-inline[1.83e-4] by step 32 and decays to
@@ -218,26 +225,24 @@ the VIN-NBV paper design description. [@VIN-NBV-frahm2025]
   during projection, then summarize it (mean/max or a small histogram) and
   append to the projection feature vector. This approximates VIN-NBV's $F_v$
   without a full CNN.
-- #textbf[Optional: add a tiny 2D encoder over the projection grid.] If the compact
-  stats are still insufficient, add a shallow conv block (e.g., two 2D conv
-  layers + pooling) over the per-candidate grid before concatenation. Keep it
-  behind a config flag to preserve the streamlined default.
+- #textbf[Optional: tiny 2D encoder toggle.] A tiny CNN over the projection grid
+  is already implemented in v3; keep it behind a config flag and report when it
+  is enabled/disabled in ablations.
 
 == Streamlining adjustments that preserve signal (no PointNeXt)
 
 These are minimal changes that keep v3 streamlined and avoid the PointNeXt path
 while restoring candidate-specific cues.
 
-- *Append semidense projection stats to the head.* Concatenate the 5-dim
-  semidense projection features (optionally through a tiny MLP) with the
-  pose/global features. This is the smallest change that reintroduces view
-  specificity without heavy modules.
+- *Keep semidense projection stats in the head.* v3 already concatenates the
+  5-dim projection features; avoid ablations that remove this signal.
 - *Prefer validity features over gating.* Disable the voxel gate and append
   $(v, 1 - v)$ where $v$ is voxel-valid fraction to the head input.
-- *Match the sweep grid size.* Set semidense projection grid size to 12, which
-  consistently yielded higher visibility fractions in the optuna sweep.
+- *Match the sweep grid size.* Use #code-inline[semidense_proj_grid_size=12] to
+  match the stronger sweep regime, and always report grid size when comparing
+  runs.
 - *Provide a no-weighting mode for projection weights.* Allow the
-  $n_"obs"$ and $sigma_d^-1$ weights to default to 1.0 to match T41 behavior
+  $n_"obs"$ and $sigma_(rho)$ weights to default to 1.0 to match T41 behavior
   and avoid down-weighting sparse candidates.
 
 == Streamlining candidates for VIN v3
@@ -280,7 +285,7 @@ arguments and risks.
 To avoid silent degradation, VIN v3 should enforce the following:
 
 - Semidense inputs must exist and include 5-channel points
-  $(x, y, z, sigma_d^-1, n_"obs")$.
+  $(x, y, z, sigma_(rho), n_"obs")$, where $sigma_(rho)$ is `inv_dist_std`.
 - Camera intrinsics/extrinsics must be complete and batched consistently with
   the candidate poses.
 - If `apply_cw90_correction` is enabled, the caller must pass pre-corrected
@@ -289,3 +294,9 @@ To avoid silent degradation, VIN v3 should enforce the following:
 These constraints keep the streamlined baseline honest: if a dependency is
 missing, the model should fail loudly rather than degrade into a constant
 predictor.
+
+In the current offline-cache configuration (`.configs/offline_only.toml`),
+`semidense_include_obs_count=true` and the VIN snippet cache requires
+`include_inv_dist_std=true`, so collapsed semidense points include both
+`inv_dist_std` and `n_obs` (5-channel points). The fail-fast contract above
+matches the active training configuration.

@@ -11,7 +11,7 @@ current `VinModelV2` implementation.
 
 == Pose representation and rotation-6D
 
-VIN v2 represents candidate poses as $#(symb.vin.T)_(#fr_rig_ref <- #fr_cam) in "SE"(3)$.
+VIN v2 represents candidate poses as $#(symb.vin.T)_(#symb.frame.r <- #symb.frame.cq) in "SE"(3)$.
 We encode rotation via the continuous 6D representation obtained by taking the
 first two columns of the rotation matrix and flattening them into a 6-vector.
 This avoids discontinuities of Euler angles and improves learning stability
@@ -42,10 +42,11 @@ candidate $i$, even when voxel features are out-of-bounds.
 == Semi-dense frustum tokens and masking
 
 For the frustum attention block, we form tokens
-$bold(tau)_(i,k) = (u, v, z, nu, c)$ from the projected points, where $(u, v)$
-are normalized image coordinates, $z$ is depth, $nu$ is inverse-distance
-uncertainty, and $c$ is per-point observation count (track length). We support
-two candidate-dependent mechanisms:
+$bold(tau)_(i,k) = (u, v, z, sigma_(rho), n_"obs")$ from the projected points,
+where $(u, v)$ are normalized image coordinates, $z$ is depth,
+$sigma_(rho)$ is inverse-distance standard deviation (`inv_dist_std`), and
+$n_"obs"$ is per-point observation count (track length). We support two
+candidate-dependent mechanisms:
 
 - token-type embedding: add a learned embedding depending on whether the point
   is a valid projection,
@@ -53,4 +54,6 @@ two candidate-dependent mechanisms:
 
 Both toggles are treated as ablation knobs to understand whether the model
 benefits more from explicitly encoding *missing visibility* or from focusing
-compute on the subset of valid projected points.
+compute on the subset of valid projected points. These frustum-token features
+are v2-only; the current VIN v3 baseline disables them unless explicitly
+enabled for ablation.

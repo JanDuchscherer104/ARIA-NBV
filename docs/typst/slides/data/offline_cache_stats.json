@@ -1,0 +1,59 @@
+{
+  "offline_cache": {
+    "config_hash": "d9687bf1c776ee5cc8b746a935fc386a4ed8d986",
+    "created_at": "2026-01-03T11:57:52Z",
+    "dir": "/mnt/e/wsl-data/ase-atek-nbv/offline_cache",
+    "index_entries": 883,
+    "labeler": {
+      "backprojection_stride": 1,
+      "depth": {
+        "cull_backfaces": true,
+        "resolution_scale": 0.5,
+        "zfar": 20.0,
+        "znear": 0.001
+      },
+      "generator": {
+        "delta_azimuth_deg": 170.0,
+        "ensure_collision_free": true,
+        "ensure_free_space": true,
+        "kappa": 4.0,
+        "max_candidates_final": 60,
+        "max_elev_deg": 25.0,
+        "max_radius_m": 1.8,
+        "min_distance_to_mesh_m": 0.2,
+        "min_elev_deg": -20.0,
+        "min_radius_m": 0.5,
+        "num_candidates": 60,
+        "sampling_strategy": "uniform_sphere",
+        "view_direction_mode": "radial_away",
+        "view_kappa": 4.0
+      }
+    },
+    "meta_scenes_covered": 80,
+    "meta_scenes_covered_frac": 0.8,
+    "meta_scenes_total": 100,
+    "snippets_per_scene_max": 38,
+    "snippets_per_scene_mean": 11.0375,
+    "snippets_per_scene_p50": 10,
+    "train_entries": 706,
+    "unique_scene_snippet": 798,
+    "total_snippets": 4608,
+    "unique_scenes": 80,
+    "val_entries": 177,
+    "samples_size_gb": 263.0,
+    "vin_snippet_cache_gb": 0.809,
+    "full_coverage_samples_gb": 328.8,
+    "full_coverage_vin_snippet_cache_gb": 1.011,
+    "full_coverage_total_gb": 1372,
+    "sample_sizes_mb": {
+      "backbone": 304.9,
+      "candidate_pcs": 11.2,
+      "depths": 4.6,
+      "candidates": 0.03,
+      "rri": 0.002,
+      "vin_snippet": 1.0,
+      "total_with_backbone": 320.8,
+      "total_min_train": 1.1
+    }
+  }
+}

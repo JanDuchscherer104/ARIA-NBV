@@ -1,47 +1,92 @@
 #import "@preview/booktabs:0.0.4": *
 #show: booktabs-default-table-style
+#import "../../shared/macros.typ": *
 
-= WandB Run Analysis (Jan 3, 2026)
+= Training Dynamics <sec:wandb-analysis>
 
-We reviewed all WandB runs started on January 3, 2026 with more than 500 logged
-steps (based on the run summary metadata). Three runs met this criterion. Their
-key metrics are summarized in @tab:wandb-runs.
+// <rm>
+// This section is currently run-specific (W&B ids, “start→finish” plots) and reads like a
+// lab notebook. Prefer moving it to an appendix or to external artifacts, and keep the main
+// paper focused on (i) the oracle pipeline + dataset + metric contract and (ii) NBV-relevant
+// evaluation (e.g., greedy one-step rollouts vs baselines).
+// </rm>
 
+// <rm>
+This section summarizes training dynamics of the current best run and
+visualizes how validation ordinal performance evolves over training.
+
+The run shown here is `rtjvfyyp` (`v03-best`).
+
+We focus on the *within-run* improvement (start #sym.arrow finish) rather than
+attributing changes to specific architectural or optimization choices. A
+comparison against another near-identical run is discussed in
+@sec:ablation-plan.
+
+In particular, `rtjvfyyp` improves from validation relative CORAL loss
+$#(symb.vin.loss) _("rel") = 0.743$ to $0.666$ and from Spearman
+$rho = 0.254$ to $0.501$ over training.
+
+// TODO Include this figure in slides_4.typ
 #figure(
   kind: "table",
   supplement: [Table],
   placement: none,
-  caption: [Summary of January 3, 2026 WandB runs with >500 steps.],
+  caption: [Start #sym.arrow finish improvements for `rtjvfyyp` (first and last logged points).],
   text(size: 8.5pt)[
     #table(
-      columns: (8em, auto),
+      columns: (auto, auto),
       align: (left, left),
       toprule(),
-      table.header([Run], [Summary]),
-      midrule(),
-      [Run 1],
-      [Loss NaN from the start; optimizer loop likely never advanced.],
-      [Run 2],
-      [Train/val losses NaN; validation Spearman 0.004; top-3 bin accuracy 0.191.],
-      [Run 3],
-      [Finite losses (train 10.15, val 7.69); validation Spearman 0.127; top-3 bin accuracy 0.222.],
-      bottomrule(),
+      table.header([Metric], [Start #sym.arrow finish (delta)]),
+      midrule(), [$#(symb.vin.loss) _("rel")^"train"$],
+      [0.777 #sym.arrow 0.659 (-15.2%)], [$#(symb.vin.loss) _("rel")^"val"$],
+      [0.743 #sym.arrow 0.666 (-10.4%)], [$rho(r, hat(r))$],
+      [0.254 #sym.arrow 0.501 (+96.9%)], [$"Acc"@3$ (val)],
+      [0.248 #sym.arrow 0.329 (+32.8%)], bottomrule(),
     )
   ],
-) <tab:wandb-runs>
+) <tab:wandb-rtjvfyyp-improvement>
+
+#figure(
+  grid(
+    columns: (1fr, 1fr),
+    gutter: 10pt,
+    image("/figures/wandb/train-coral-rel-epoch.png", width: 100%),
+    image("/figures/wandb/train-corlal-rel-step.png", width: 100%),
+
+    image("/figures/wandb/val-coral-rel.png", width: 100%), image("/figures/wandb/val-top3-acc.png", width: 100%),
+  ),
+  caption: [CORAL loss (relative-to-random) and validation top-3 bin accuracy (shown for `rtjvfyyp`).],
+) <fig:wandb-coral>
+
+// TODO: move to 12b-appendix-extra
+#figure(
+  grid(
+    columns: (1fr, 1fr),
+    gutter: 10pt,
+    image("/figures/wandb/train-aux-reg.png", width: 100%), image("/figures/wandb/train-aux-weight.png", width: 100%),
+  ),
+  caption: [Auxiliary regression loss and weight schedule (shown for `rtjvfyyp`).],
+) <fig:wandb-aux>
+
+#figure(
+  grid(
+    columns: (1fr, 1fr),
+    rows: (auto, auto),
+    gutter: 10pt,
+    align(center)[text(weight: "bold")[`rtjvfyyp` (start)]], align(center)[text(weight: "bold")[`rtjvfyyp` (finish)]],
+    image("/figures/wandb/rtjvfyyp/val-figures/confusion_start.png", width: 100%),
+    image("/figures/wandb/rtjvfyyp/val-figures/confusion_end.png", width: 100%),
+  ),
+  caption: [Validation confusion matrices for `rtjvfyyp` (first and last logged).],
+) <fig:wandb-rtjvfyyp-conf>
 
 == Observations
 
-- Two runs reported NaN losses, indicating numerical instability or invalid
-  labels early in training. In one case, the optimizer update loop likely never
-  executed.
-- The stable run produced non-zero validation correlation (Spearman 0.127) and
-  a top-3 bin accuracy of 0.222. Balanced and focal threshold losses were logged
-  alongside the primary CORAL loss, suggesting that the imbalance-aware
-  variants remain well-behaved even when the main CORAL loss is large.
-- Monotonicity violation rates were 0 across runs, indicating that the ordinal
-  thresholds remained properly ordered when the loss was finite.
-
-These results support the emphasis on stronger candidate-specific signals
-(frustum MHCA, semi-dense projection features) and careful loss balancing to
-avoid collapse.
+- The run improves validation ordinal performance substantially over training
+  (Spearman and top-3 accuracy increase, and `val/coral_loss_rel_random`
+  decreases).
+- The *early* validation confusion matrices are highly collapsed (nearly
+  constant predictions), while the *final* matrices show a much richer
+  structure with fewer massed columns.
+// </rm>

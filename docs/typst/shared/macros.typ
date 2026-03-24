@@ -107,6 +107,8 @@
 #let SSL = "SSL"
 #let SSL_full = "Scene Script Structured Language"
 
+#let excl = "#text(size: 22pt)[_!_]"
+
 // ============================================================================
 // Paper notation (symbols used throughout the Typst paper)
 // ============================================================================
@@ -115,11 +117,7 @@
 // notation across sections.
 
 /// Frame labels used in transform subscripts (T_{A<-B}).
-#let fr_world = "w"
-#let fr_rig = "rig"
-#let fr_rig_ref = "r"
-#let fr_cam = "q"
-#let fr_voxel = "voxel"
+// Use the canonical `#symb.frame.*` entries below.
 
 /// Common short-hands for sets, tensors, and dimensions used in equations.
 ///
@@ -179,23 +177,35 @@
     // Relative Reconstruction Improvement scalar.
     rri: $RRI$,
   ),
+  entity: (
+    // Entity set (objects of interest).
+    E: $cal(E)$,
+    // Entity-weight vector; use components as `#(symb.entity.w)_e`.
+    w: $bold(w)$,
+    // Mixing weight for the scene-level term.
+    lambda_scene: $lambda_"scene"$,
+    // Weighted objective (global + entity-specific terms).
+    rri_total: $RRI_"total"$,
+  ),
   vin: (
     // Loss symbol.
     loss: $cal(L)$,
     // Pose embedding.
-    pose_emb: $bold(e)$,
+    pose_emb: $bold(E)_q$,
     // Token / feature vector.
     token: $bold(x)$,
+    // Pooled voxel token feature (used in pose-conditioned global attention).
+    vox_tok: $bold(t)$,
     // Positional encoding.
     pos: $bold(p)$,
     // Global context vector.
     global: $bold(g)$,
     // Attention query.
-    query: $bold(q)$,
+    query: $bold(Q)_q$,
     // Attention key.
-    key: $bold(k)$,
+    key: $bold(K)$,
     // Attention value.
-    value: $bold(v)$,
+    value: $bold(V)$,
     // SE(3) transform.
     T: $bold(T)$,
     // Weight matrix.
@@ -204,8 +214,45 @@
     gamma: $bold(gamma)$,
     // FiLM shift.
     beta: $bold(beta)$,
+    // Semi-dense observation count (track length).
+    n_obs: $n_"obs"$,
+    // Max observation count used for normalization.
+    n_obs_max: $n_"obs"^"max"$,
+    // Inverse-distance std (sigma_rho) from semi-dense tracks.
+    inv_dist_std: $sigma_(rho)$,
+    // Min / p95 of inverse-distance std for normalization.
+    inv_dist_std_min: $sigma_(rho,"min")$,
+    inv_dist_std_p95: $sigma_(rho,"p95")$,
+    // Distance std (sigma_d) for completeness.
+    dist_std: $sigma_d$,
+    // Continuous oracle RRI (per candidate).
+    rri: $r$,
+    // Predicted RRI proxy (expected CORAL value).
+    rri_hat: $hat(r)$,
+    // Coverage / visibility fraction (generic).
+    cov_frac: $c$,
+    // Coverage-based weight.
+    cov_weight: $w$,
+    // Coverage-weight blend strength.
+    cov_strength: $lambda$,
+    // Auxiliary regression weight.
+    aux_weight: $lambda_"reg"$,
+    // Voxel coverage proxy (candidate-level).
+    voxel_valid: $v$,
+    // Semi-dense visibility proxy (candidate-level).
+    sem_valid: $v^("sem")$,
+    // Semi-dense projection statistics (per candidate).
+    sem_proj: $bold(s)_"proj"$,
+    // Semi-dense grid CNN features (per candidate).
+    sem_grid: $bold(s)_"grid"$,
+    // Trajectory pooled feature (optional).
+    traj_feat: $bold(f)_"traj"$,
+    // Trajectory context per candidate (optional attention).
+    traj_ctx: $bold(c)_"traj"$,
+    // Candidate validity mask.
+    cand_valid: $m$,
     // -----------------------------------------------------------------------
-    // EVL voxel-field features (as used by VIN v3)
+    // EVL voxel-field features (as used by VINv3)
     //
     // Notes:
     // - The voxel grid lives in the voxel frame #symb.frame.v and is anchored
@@ -216,7 +263,7 @@
     // Occupancy prediction (sigmoid) on the voxel grid.
     occ_pr: $bold(V)_"occ"^"pr"$,
     // Occupied evidence (voxelized surface evidence from inputs).
-    occ_in: $bold(V)_"occ"^"in"$,
+    occ_in: $bold(V)_"surf"^"in"$,
     // Free-space evidence (optional; if provided by EVL).
     free_in: $bold(V)_"free"^"in"$,
     // Observation counts / coverage proxy per voxel.
@@ -225,7 +272,7 @@
     counts_norm: $bold(V)_"count"^"norm"$,
     // Centerness prediction (geometric prior).
     cent_pr: $bold(V)_"cent"^"pr"$,
-    // Centerness after NMS (used in VIN v3 field bundle).
+    // Centerness after NMS (used in VINv3 field bundle).
     cent_pr_nms: $bold(V)_"cent"^"pr,nms"$,
     // Observed mask (counts > 0).
     observed: $bold(V)_"obs"$,
@@ -249,6 +296,8 @@
     Tlen: $T$,
     // Point count.
     P: $P$,
+    // Max points after subsampling.
+    Pmax: $P_"max"$,
     // Projected points.
     Pproj: $P_"proj"$,
     // Frustum points.
@@ -259,12 +308,17 @@
     H: $H$,
     // Width.
     Wdim: $W$,
+    // Image height/width (pixel space).
+    Himg: $H_"img"$,
+    Wimg: $W_"img"$,
     // Voxel grid size.
     Vvox: $V$,
     // Global pooling dim.
     Gpool: $G_"pool"$,
     // Global projection dim.
     Gproj: $G_"proj"$,
+    // Semidense projection grid size.
+    Gsem: $G_"sem"$,
     // Mesh vertex count.
     M: $M$,
     // Ordinal bins.
@@ -273,12 +327,15 @@
     Csem: $C_"sem"$,
     // Feature channel / embedding dimensions.
     Fin: $F_"in"$,
+    // Scene-field channel dimension.
+    Ffield: $F_"field"$,
     Fpose: $F_"pose"$,
     Fpe: $F_"pe"$,
     Fq: $F_q$,
     Fg: $F_g$,
     Ftau: $F_tau$,
     Fproj: $F_"proj"$,
+    Fcnn: $F_"cnn"$,
     Ftok: $F_"tok"$,
     Ffr: $F_"fr"$,
     Fpt: $F_"pt"$,
@@ -327,11 +384,17 @@
     ratio: $ "CR"_t = (tilde(N)_t) / (N^*) dot 100% $,
     weight: $ w_i(t) = (1 - lambda_t) + lambda_t (f + (1 - f) c_i^p) $,
     weighted_loss: $ cal(L) = (sum_i w_i(t) ell_i) / (sum_i w_i(t)) $,
+    strength_linear: $
+      lambda_t = lambda_0 + (lambda_T - lambda_0) dot (t / T)
+    $,
+    strength_cosine: $
+      lambda_t = lambda_T + (lambda_0 - lambda_T) dot (1 + "cos"(pi t / T)) / 2
+    $,
   ),
   binning: (
     // Empirical quantile edges (equal-mass bins) for discretizing oracle RRI.
     edges: $
-      e_k = "Quantile"( {r_n}, k/K),
+      e_k = "Quantile"( {r_i}_(i=1)^N, k/K),
       quad k in {1, dots, K-1}
     $,
     // Ordinal class index via edge counting (equivalent to `torch.bucketize`).
@@ -347,11 +410,30 @@
   ),
   coral: (
     loss: $
-      cal(L)_"coral"(y, bold(p))
+      cal(L)_"coral" (y, bold(p))
       = - sum_(k=0)^(K-2) (t_k "log"(p_k) + (1 - t_k) "log"(1 - p_k))
+    $,
+    balanced_bce: $
+      cal(L)_"bal"
+      = -(1)/(K-1) sum_(k=0)^(K-2)
+      (w_k t_k "log"(p_k) + (1 - t_k) "log"(1 - p_k))
+    $,
+    balanced_bce_weight: $ w_k = (1 - pi_k^("th")) / pi_k^("th") $,
+    focal: $
+      cal(L)_"focal"
+      = -(1)/(K-1) sum_(k=0)^(K-2)
+      alpha_(t,k) (1 - p_(t,k))^gamma "log"(p_(t,k))
+    $,
+    focal_defs: $
+      p_(t,k) = p_k t_k + (1 - p_k) (1 - t_k),
+      quad alpha_(t,k) = alpha t_k + (1 - alpha) (1 - t_k)
     $,
     marginals: $ pi_k = p_(k-1) - p_k, quad p_(-1) = 1, quad p_(K-1) = 0 $,
     expected: $ hat(r) = sum_(k=0)^(K-1) pi_k dot u_k $,
+    bin_values: $
+      u_0 in bb(R),
+      quad u_k = u_0 + sum_(j=1)^k op("softplus")(delta_j)
+    $,
     // Fraction of rank-order violations in the cumulative probabilities.
     violation: $
       v =
@@ -361,18 +443,84 @@
     rel_random: $ cal(L)_("rel") = cal(L)_("coral") / ((K - 1) "log"(2)) $,
   ),
   vin: (
+    // Observation-count normalization used as a voxel-coverage proxy.
+    counts_norm: $
+      #symb.vin.counts_norm
+      = ("log"(1 + #symb.vin.counts)) / ("log"(1 + "max"(#symb.vin.counts)))
+    $,
+    // Unknown mask + new-surface prior derived from counts and occupancy.
+    new_surface_prior: $
+      #symb.vin.unknown = 1 - #symb.vin.counts_norm,
+      quad #symb.vin.new_surface_prior = #symb.vin.unknown dot.o #symb.vin.occ_pr
+    $,
     // Optional auxiliary regression combined with the CORAL loss.
     loss_total: $ #symb.vin.loss = #(symb.vin.loss) _"coral" + lambda dot #(symb.vin.loss) _"reg" $,
+    aux_reg_mse: $
+      #(symb.vin.loss) _"reg"
+      = (1)/(N) sum_i (#(symb.vin.rri_hat) _i - #(symb.vin.rri) _i)^2
+    $,
+    aux_reg_huber: $
+      #(symb.vin.loss) _"reg"
+      = (1)/(N) sum_i "Huber"_1(#(symb.vin.rri_hat) _i - #(symb.vin.rri) _i)
+    $,
+    huber: $
+      "Huber"_1(e) = { 0.5 e^2 "if" |e| <= 1; |e| - 0.5 "otherwise" }
+    $,
+    aux_weight: $
+      lambda_"reg" (t)
+      = max(lambda_0 dot gamma^t, lambda_"min")
+    $,
   ),
   metrics: (
-    spearman: $ rho = "corr"("rank"(hat(r)_i), "rank"(r_i)) $,
+    spearman: $
+      rho = "corr"("rank"(#(symb.vin.rri_hat) _i), "rank"(#(symb.vin.rri) _i))
+    $,
     topk_acc: $ "TopKAcc"(k) = (1) / N sum_i bb(1)[y_i in "TopK"(bold(pi)_i, k)] $,
     confusion: $ C_(a,b) = |{i : y_i = a, hat(y)_i = b}| $,
-    candidate_validity: $ m_i = bb(1)["finite"] dot bb(1)[v_i > 0] dot bb(1)[v_i^("sem") > 0] $,
+    label_hist: $ h_k = |{i : y_i = k}| $,
+    candidate_validity: $
+      #(symb.vin.cand_valid) _i
+      =
+      bb(1)["finite"]
+      dot bb(1)[#(symb.vin.voxel_valid) _i > 0]
+      dot bb(1)[#(symb.vin.sem_valid) _i > 0]
+    $,
+    rri_mean: $ bar(#symb.vin.rri) = (1)/(N) sum_i #(symb.vin.rri) _i $,
+    pred_rri_mean: $ bar(#symb.vin.rri_hat) = (1)/(N) sum_i #(symb.vin.rri_hat) _i $,
+    bias2: $ "bias"^2 = ((1)/(N) sum_i (#(symb.vin.rri_hat) _i - #(symb.vin.rri) _i))^2 $,
+    variance: $
+      "var"
+      =
+      (1)/(N) sum_i (#(symb.vin.rri_hat) _i - #(symb.vin.rri) _i)^2
+      - ((1)/(N) sum_i (#(symb.vin.rri_hat) _i - #(symb.vin.rri) _i))^2
+    $,
+    mean: $ bar(x) = (1)/(N) sum_i x_i $,
+    std: $ sigma_x = sqrt((1)/(N) sum_i (x_i - bar(x))^2) $,
+    voxel_valid_mean: $ bar(#symb.vin.voxel_valid) = (1)/(N) sum_i #(symb.vin.voxel_valid) _i $,
+    voxel_valid_std: $
+      sigma_(#symb.vin.voxel_valid) = sqrt((1)/(N) sum_i (#(symb.vin.voxel_valid) _i - bar(#symb.vin.voxel_valid))^2)
+    $,
+    sem_valid_mean: $ bar(#symb.vin.sem_valid) = (1)/(N) sum_i #(symb.vin.sem_valid) _i $,
+    sem_valid_std: $
+      sigma_(#symb.vin.sem_valid) = sqrt((1)/(N) sum_i (#(symb.vin.sem_valid) _i - bar(#symb.vin.sem_valid))^2)
+    $,
+    candidate_valid_frac: $ (1)/(N) sum_i #(symb.vin.cand_valid) _i $,
+    cov_weight_mean: $ bar(#symb.vin.cov_weight) = (1)/(N) sum_i #(symb.vin.cov_weight) _i $,
+    drop_nonfinite_logits_frac: $
+      (sum_i bb(1)["finite"(#(symb.vin.rri) _i)] dot bb(1)["nonfinite"(bold(ell)_i)])
+      / (sum_i bb(1)["finite"(#(symb.vin.rri) _i)])
+    $,
+    skip_nonfinite_logits: $
+      bb(1)[sum_i bb(1)["finite"(#(symb.vin.rri) _i)] > 0 dot sum_i #(symb.vin.cand_valid) _i = 0]
+    $,
+    skip_no_valid: $ bb(1)[sum_i bb(1)["finite"(#(symb.vin.rri) _i)] = 0] $,
     grad_norm: $ ||nabla_theta cal(L)||_2 $,
   ),
   features: (
-    film: $ bold(g)_i^("film") = (1 + bold(gamma)_i) dot.o bold(g)_i + bold(beta)_i $,
+    film: $
+      #(symb.vin.global) _i^("film")
+      = (1 + #(symb.vin.gamma) _i) dot.o #(symb.vin.global) _i + #(symb.vin.beta) _i
+    $,
     semidense_validity: $
       m_(i,j)
       =
@@ -387,6 +535,16 @@
   action: (
     space: $ cal(A) = bb(R)^3 times S O(2) $,
   ),
+  entity: (
+    objective: $
+      RRI_"total"(q)
+      =
+      sum_(e in #symb.entity.E)
+      #(symb.entity.w) _e dot #(symb.oracle.rri) _e
+      +
+      #symb.entity.lambda_scene dot #symb.oracle.rri
+    $,
+  ),
 )
 
 // ============================================================================
@@ -398,6 +556,12 @@
 
 /// Create a filename/path reference
 #let filepath(body) = raw(body, lang: none)
+
+/// Link to a file in the GitHub repo (shows only the filename).
+#let gh(path) = {
+  let base = path.split("/").last()
+  link("https://github.com/JanDuchscherer104/NBV/blob/main/" + path)[#code-inline(base)]
+}
 
 /// Create a citation-style reference
 #let paperref(title, authors) = [

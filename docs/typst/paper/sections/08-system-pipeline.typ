@@ -19,12 +19,11 @@ summarized in @tab:pipeline and visualized in @fig:candidate-poses.
   grid(
     columns: (1fr, 1fr),
     gutter: 10pt,
-    image("/figures/app/cand_frusta_kappa4_r06-29.png", width: 100%),
-    image("/figures/app/candidate_renders.png", width: 100%),
-
-    image("/figures/app/render_frusta.png", width: 100%), image("/figures/app/depth_hist.png", width: 100%),
+    image("/figures/app-paper/pos_ref.png", width: 100%),
+    image("/figures/app-paper/view_dirs_ref.png", width: 100%),
+    image("/figures/app-paper/orientation_jitter.png", width: 100%),
   ),
-  caption: [Streamlit pipeline diagnostics: candidate frusta (top-left), depth renders (top-right), rendered frusta (bottom-left), and per-candidate depth histograms (bottom-right).],
+  caption: [Candidate sampling diagnostics: candidate centers (reference frame), view-direction density, and orientation jitter.],
 ) <fig:candidate-poses>
 
 #figure(
@@ -35,19 +34,24 @@ summarized in @tab:pipeline and visualized in @fig:candidate-poses.
     columns: (14em, auto, auto),
     align: (left, left, left),
     toprule(),
-    table.header(
-      [
-        Module
-      ],
-      [Inputs],
-      [Outputs],
-    ),
-    midrule(), [Dataset loader], [ASE shards, mesh],
-    [Snippet window (streams, poses, semi-dense points, mesh)], [Candidate generation], [Rig pose, mesh, bounds],
-    [Candidate poses], [Depth rendering], [Candidates, mesh, cameras],
-    [Depth maps, masks], [Oracle RRI], [$#(symb.oracle.points) _t, #symb.oracle.points_q, #symb.ase.mesh$],
-    [RRI labels (continuous + ordinal)], [Future: learned scorer], [oracle labels, scene features],
-    [Predicted ordinal scores], bottomrule(),
+    table.header([Module], [Inputs], [Outputs]),
+    midrule(),
+    [Dataset loader],
+    [ASE shards, mesh],
+    [Snippet window (streams, poses, semi-dense points, mesh)],
+    [Candidate generation],
+    [Rig pose, mesh, bounds],
+    [Candidate poses],
+    [Depth rendering],
+    [Candidates, mesh, cameras],
+    [Depth maps, masks],
+    [Oracle RRI],
+    [$#(symb.oracle.points) _t, #symb.oracle.points_q, #symb.ase.mesh$],
+    [RRI labels (continuous + ordinal)],
+    [Future: learned scorer],
+    [oracle labels, scene features],
+    [Predicted ordinal scores],
+    bottomrule(),
   ),
 ) <tab:pipeline>
 
@@ -91,12 +95,14 @@ constraints using free-space and mesh intersection checks. The candidate set is
 kept discrete to enable reproducible oracle label computation and to match the
 candidate-ranking formulation of VIN-NBV @VIN-NBV-frahm2025.
 
-Trajectory and sampling diagnostics are summarized in the appendix.
+Candidate sampling diagnostics are shown in @fig:candidate-poses; Streamlit
+snippet context is shown in @fig:streamlit-diagnostics.
 
 == Rendering and backprojection
 
 We render candidate depth maps with PyTorch3D and backproject depths to world
-points using EFM3D camera utilities. These points are fused with the
+points by converting pixel centers to PyTorch3D NDC coordinates (to match the
+rasterizer) before unprojection. These points are fused with the
 semi-dense SLAM reconstruction to form the candidate-augmented point cloud. The
 rendering step is expensive but performed offline to generate oracle labels.
 
@@ -110,3 +116,15 @@ through walls or miss the mesh entirely.
 A Streamlit dashboard exposes the pipeline stages with cached intermediate
 results. We inspect candidate distributions, depth render quality, and oracle
 RRI behavior to identify failure modes and verify coordinate conventions.
+
+// NOTE: Formerly part of a slide-figure gallery appendix (removed); keep it
+// close to the pipeline implementation section where the dashboard is introduced.
+#figure(
+  grid(
+    columns: (1fr, 1fr),
+    gutter: 10pt,
+    image("/figures/app/traj.png", width: 100%),
+    image("/figures/app/semidense.png", width: 100%),
+  ),
+  caption: [Streamlit snippet diagnostics: trajectory and semi-dense overlay.],
+) <fig:streamlit-diagnostics>

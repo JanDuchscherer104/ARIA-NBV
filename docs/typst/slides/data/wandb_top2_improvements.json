@@ -1,0 +1,73 @@
+{
+  "entity_project": "traenslenzor/aria-nbv",
+  "keys": [
+    "train/coral_loss_rel_random_step",
+    "val/coral_loss_rel_random",
+    "val-aux/spearman",
+    "val-aux/top3_accuracy"
+  ],
+  "wandb_top2": {
+    "hq1how1j": {
+      "metrics": {
+        "train/coral_loss_rel_random_step": {
+          "delta": -0.2036672830581665,
+          "delta_pct": -26.527997336773748,
+          "end": 0.5640773773193359,
+          "start": 0.7677446603775024
+        },
+        "val-aux/spearman": {
+          "delta": 0.19405320286750793,
+          "delta_pct": 70.63408276778077,
+          "end": 0.4687834680080414,
+          "start": 0.27473026514053345
+        },
+        "val-aux/top3_accuracy": {
+          "delta": 0.043170392513275146,
+          "delta_pct": 15.969432521899625,
+          "end": 0.3135018050670624,
+          "start": 0.27033141255378723
+        },
+        "val/coral_loss_rel_random": {
+          "delta": -0.073097825050354,
+          "delta_pct": -9.746785664783399,
+          "end": 0.6768707036972046,
+          "start": 0.7499685287475586
+        }
+      },
+      "name": "R2026-01-27_13-08-02",
+      "run_id": "hq1how1j",
+      "url": "https://wandb.ai/traenslenzor/aria-nbv/runs/hq1how1j"
+    },
+    "rtjvfyyp": {
+      "metrics": {
+        "train/coral_loss_rel_random_step": {
+          "delta": -0.11817383766174316,
+          "delta_pct": -15.21208497378588,
+          "end": 0.6586679816246033,
+          "start": 0.7768418192863464
+        },
+        "val-aux/spearman": {
+          "delta": 0.24655988812446594,
+          "delta_pct": 96.94127696571975,
+          "end": 0.5008993148803711,
+          "start": 0.25433942675590515
+        },
+        "val-aux/top3_accuracy": {
+          "delta": 0.08122727274894714,
+          "delta_pct": 32.8168513300738,
+          "end": 0.32874423265457153,
+          "start": 0.2475169599056244
+        },
+        "val/coral_loss_rel_random": {
+          "delta": -0.07708919048309326,
+          "delta_pct": -10.378539165134505,
+          "end": 0.665685772895813,
+          "start": 0.7427749633789062
+        }
+      },
+      "name": "v03-best",
+      "run_id": "rtjvfyyp",
+      "url": "https://wandb.ai/traenslenzor/aria-nbv/runs/rtjvfyyp"
+    }
+  }
+}

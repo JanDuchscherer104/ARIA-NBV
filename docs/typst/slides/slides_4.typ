@@ -36,6 +36,7 @@
 #let cache = json("/typst/slides/data/offline_cache_stats.json").offline_cache
 #let wb = json("/typst/slides/data/wandb_rtjvfyyp_summary.json").wandb
 #let wb_dyn = json("/typst/slides/data/wandb_rtjvfyyp_dynamics.json").wandb_dynamics
+#let wb_top2 = json("/typst/slides/data/wandb_top2_improvements.json").wandb_top2
 #let v3_vs_t41 = json("/typst/slides/data/vin_v3_01_vs_t41_summary.json").vin_v3_01_vs_t41
 #let top_trials = csv("/typst/paper/data/optuna_v2_top_trials.csv", row-type: dictionary)
 #let labeler_cfg = toml("/typst/slides/data/paper_figures_oracle_labeler.toml")
@@ -496,9 +497,21 @@
       ]
     ],
     [
-      #figure(
-        image(fig_path + "app-paper/backproj+semi.png", width: 60%),
-        caption: [Backprojected candidate points + semi-dense SLAM points.],
+      #grid(
+        rows: (auto, auto),
+        gutter: 0.25cm,
+        [
+          #figure(
+            image(fig_path + "app-paper/backproj+semi.png", width: 75%),
+            caption: [Backprojected candidate points + semi-dense SLAM points.],
+          )
+        ],
+        [
+          #figure(
+            image(fig_path + "app-paper/semi-dense-pc-cand-vis.png", width: 75%),
+            caption: [Candidate visibility in semi-dense point cloud.],
+          )
+        ],
       )
     ],
   )
@@ -509,7 +522,7 @@
         x_"ndc" = - (u + 1/2 - #symb.shape.Wdim'/2) (2/s) quad
         y_"ndc" = - (v + 1/2 - #symb.shape.H'/2) (2/s)
       $
-    + Unproject: $bold(p)_"world" = "unproject"(x_"ndc", y_"ndc", d_q)$, where $d_q$ is sampled from #symb.oracle.depth_q.
+    + Unproject: $bold(p)_"world" = Pi^(-1)(x_"ndc", y_"ndc", d_q)$, where $d_q$ is sampled from #symb.oracle.depth_q.
     + Pad per-candidate PCs; fuse with $#(symb.ase.points_semi)$ for AABB cropping.
   ]
 ]
@@ -552,23 +565,23 @@
 ]
 
 
-#slide(title: [Oracle RRI distribution])[
-  #grid(
-    [
-      #color-block(title: [Skewed candidate gains])[
-        - Most candidates yield marginal improvements.
-        - A small fraction produce large RRI gains.
-        - Diagnostics log accuracy and completeness terms to catch failure cases early.
-      ]
-    ],
-    [
-      #figure(
-        image(fig_path + "app/rri_hist_81056_000022.png", width: 100%),
-        caption: [Oracle RRI histogram for one example snippet.],
-      )
-    ],
-  )
-]
+// #slide(title: [Oracle RRI distribution])[
+//   #grid(
+//     [
+//       #color-block(title: [Skewed candidate gains])[
+//         - Most candidates yield marginal improvements.
+//         - A small fraction produce large RRI gains.
+//         - Diagnostics log accuracy and completeness terms to catch failure cases early.
+//       ]
+//     ],
+//     [
+//       #figure(
+//         image(fig_path + "app/rri_hist_81056_000022.png", width: 100%),
+//         caption: [Oracle RRI histogram for one example snippet.],
+//       )
+//     ],
+//   )
+// ]
 
 // ---------------------------------------------------------------------------
 // Offline cache + batching
@@ -617,7 +630,7 @@
         - Full coverage estimate:
           #(round(cache.full_coverage_total_gb / 1000, digits: 2)) TB
       ]
-      #quote-block[Memory footprint dominated by voxel grid features in EVL backbone.]
+      #quote-block[Memory footprint dominated by voxel grid features in EVL backbone (> 90%).]
     ],
     [
       #figure(
@@ -665,13 +678,15 @@
 ]
 #slide(title: [VinOracleBatch + VinSnippetView])[
   #grid(
-    color-block(title: [Key typed tensors (padded + batched)])[
-      - Candidate poses: #code-inline[PoseTW[#(symb.shape.B), #(symb.shape.Nq), 12]].
-      - Reference pose: #code-inline[PoseTW[#(symb.shape.B), 12]].
-      - Labels: #code-inline[rri[#(symb.shape.B), #(symb.shape.Nq)]] + (#(symb.oracle.acc), #(symb.oracle.comp)) + lenghts.
-      - #code-inline[PerspectiveCameras[#(symb.shape.B), #(symb.shape.Nq)]].
-      - VinSnippetView: #code-inline[points_world[#(symb.shape.B), #(symb.shape.P), 3 + #(symb.shape.Csem)]] + #code-inline[lengths[#(symb.shape.B)]].
-      - Per-sample candidate shuffling to avoid ordering bias.
+    [
+      #color-block(title: [Key typed tensors (padded + batched)])[
+        - Candidate poses: #code-inline[PoseTW[#(symb.shape.B), #(symb.shape.Nq), 12]].
+        - Reference pose: #code-inline[PoseTW[#(symb.shape.B), 12]].
+        - Labels: #code-inline[rri[#(symb.shape.B), #(symb.shape.Nq)]] + (#(symb.oracle.acc), #(symb.oracle.comp)) + lenghts.
+        - #code-inline[PerspectiveCameras[#(symb.shape.B), #(symb.shape.Nq)]].
+        - VinSnippetView:\
+          #code-inline[points_world[#(symb.shape.B), #(symb.shape.P), 3 + #(symb.shape.Csem)]] + #code-inline[lengths[#(symb.shape.B)]].
+      ]
     ],
     [
       #figure(caption: [VinOracleBatch Sample.])[
@@ -688,15 +703,15 @@
     gutter: 0.35cm,
     [
       #color-block(title: [Pipeline (offline cache)], spacing: 0.5em)[
-        #set text(size: 15pt)
-        - #code-inline[VinDataModule] builds #code-inline[`OracleRriCacheVinDataset`].
-        - #code-inline[OracleRriCacheDataset] reads #code-inline[`samples/*.pt`] and decodes depths/rri (and optional backbone) into a #code-inline[`VinOracleBatch`].
-        - #code-inline[VinSnippetProviderChain] attaches a #code-inline[`VinSnippetView`]:
-          #code-inline[`VinSnippetCacheProvider`] #sym.arrow.r cache hit, else #code-inline[`EfmSnippetLoader`] (#code-inline[`AseEfmDataset`]) fallback.
-        - #code-inline[vin_snippet_cache_mode]: auto / required / disabled (#sym.arrow.r cache vs fallback policy).
-        - #code-inline[include_efm_snippet]: attach snippet views (#code-inline[`VinSnippetView`]) vs cache-only batches.
-        - #code-inline[load_backbone], #code-inline[load_depths], #code-inline[load_candidate_pcs]: trade off I/O size vs recomputation.
+        #text(size: 16pt)[
+          - #code-inline[VinDataModule] builds #code-inline[`OracleRriCacheVinDataset`].
+          - #code-inline[OracleRriCacheDataset] reads #code-inline[`samples/*.pt`] and decodes depths/rri (and optional backbone) into a #code-inline[`VinOracleBatch`].
+          - #code-inline[VinSnippetProviderChain] attaches a #code-inline[`VinSnippetView`].
+          - Batching + padding handled by #code-inline[`VinOracleBatch.collate_fn`].
+          - Per-sample candidate shuffling to avoid ordering bias.
+        ]
       ]
+      #quote-block[Streamline, simplify, keep only necessary components]
     ],
     [
 
@@ -714,20 +729,19 @@
 
 #section-slide(
   title: [CORAL & Ordinal Binning],
-  subtitle: [Skewed oracle RRI #sym.arrow.r quantile bins #sym.arrow.r ranking-aware loss + diagnostics],
+  subtitle: [Skewed RRI #sym.arrow.r Quantile Bins #sym.arrow.r CORAL],
 )
 
-#slide(title: [Why binning? (oracle RRI is heavy-tailed)])[
+#slide(title: [Ordinal Binning])[
   #grid(
     [
       // Keep this slide compact: move baselines inline and slightly reduce text size.
-      #set text(size: 15pt)
       #color-block(title: [Motivation (binning + CORAL)])[
-        - Oracle RRI is heavy-tailed / right-skewed (many near-zero improvements, few large gains).
-        - Direct regression is sensitive to outliers and stage effects (early steps tend to have larger gains). @VIN-NBV-frahm2025
-        - We discretize RRI into $K=15$ *ordered* quantile bins and train an ordinal head.
-        - CORAL: $K-1$ binary thresholds with shared weights, per-threshold biases; far mis-ranks flip many thresholds. @CORAL-cao2019
-        - Baselines: $cal(L)_("random") approx (K-1) dot "log"(2) = 9.70$, $hat(r)_("unif") approx 0.10$.
+        - Oracle RRI is heavy-tailed / right-skewed (many near-zero #symb.oracle.rri, few large gains).
+        - Direct regression is sensitive to outliers and scene effects. @VIN-NBV-frahm2025
+        - Use $K=15$ ordered quantile bins + CORAL thresholds. @CORAL-cao2019
+        - Random Classifier:\
+          $cal(L)_("rnd") approx (K-1) dot "log"(2)$ _?_
       ]
     ],
     [
@@ -749,12 +763,12 @@
 #slide(title: [Quantile binning (equal-mass ordinal classes)])[
   #grid(
     [
-      #color-block(title: [Binner in our code])[
+      #color-block(title: [Our Binner])[
+        - Bins define the target label $y in {0, dots, K-1}$.
         - Fit empirical quantiles on oracle RRIs (equal-mass bins):
           #block[#align(center)[#eqs.binning.edges]]
         - Assign ordinal label via edge counting (`torch.bucketize`):
           #block[#align(center)[#eqs.binning.label]]
-        - This yields non-uniform bin widths (dense near $0$), but near-uniform class counts.
       ]
     ],
     [
@@ -770,11 +784,11 @@
   #grid(
     [
       #color-block(title: [From labels to CORAL levels])[
-        - CORAL converts each label into $K-1$ binary level targets:
+        - CORAL converts each label $r$ into $K-1$ binary targets $y$:
           #block[#align(center)[#eqs.binning.levels]]
-        - Benefits:
-          + penalizes far mis-rankings more than near ones,
-          + supports monotonicity diagnostics on $p_k = P(y > k)$.
+        - Penalizes far mis-rankings more than near ones.
+        - Enables monotonicity diagnostics on $p_k = P(y > k)$.
+        - Non-uniform bin widths #sym.arrow near-uniform class counts.
       ]
     ],
     [
@@ -794,482 +808,329 @@
         - Convert to class marginals $pi_k$ and compute expectation:
           #block[#align(center)[#eqs.coral.marginals]]
           #block[#align(center)[#eqs.coral.expected]]
-        - We initialize $u_k$ from fitted *bin means* (monotone parameterization) and monitor calibration.
+        - We initialize $u_k$ (bin representatives) from fitted *bin means*.
       ]
     ],
     [
-      #grid(
-        columns: (1fr, 1fr),
-        rows: auto,
-        gutter: 0.35cm,
-        [
-          #figure(
-            image(fig_path + "coral/bin_means_vs_midpoints.png", width: 100%),
-            caption: [Bin means (+/- 1 std) vs midpoints (quantile bins are uneven width).],
-          )
-        ],
-        [
-          #figure(
-            image(fig_path + "coral/bin_stds_vs_uniform_baseline.png", width: 100%),
-            caption: [Per-bin std vs uniform baseline (width/12).],
-          )
-        ],
+      #figure(
+        image(fig_path + "coral/bin_means_vs_midpoints.png", width: 60%),
+        caption: [Bin means vs midpoints.],
+      )
+      #figure(
+        image(fig_path + "coral/bin_stds_vs_uniform_baseline.png", width: 60%),
+        caption: [Per-bin std vs uniform baseline (width/12).],
       )
     ],
   )
 ]
 
+#slide(title: [CORAL Implementation Deltas])[
+  #grid(
+    [
+      #color-block(title: [What we add on top of coral-pytorch])[
+        - Reference layer + loss from @coral-pytorch-2025[coral-pytorch].
+        - Learnable monotone bin values $u_k$ (softplus deltas) for learned expectation of RRI.
+        - Softplus enforces positive increments, keeping $u_k$ ordered.
+        - Diagnostics: monotonicity violations and relative-to-random loss.
+        - Learned params: CORAL $(w, b_k)$ and bin values $(u_0, delta_j)$.
+      ]
+    ],
+    [
+      #color-block(title: [Key equations])[
+        $
+          u_k = u_0 + sum_(j=1)^k op("softplus")(delta_j) quad u_k in bb(R) \
+          #eqs.coral.expected \
+          #eqs.coral.rel_random
+        $
+      ]
+      #good-note[
+        *TODO*: Test against baseline!
+      ]
+    ],
+  )
+]
+
+// TODO: UNTIL HERE!
 // ---------------------------------------------------------------------------
 // VIN v3 architecture
 // ---------------------------------------------------------------------------
 
 #section-slide(
-  title: [VIN v3 Scoring Architecture],
-  subtitle: [EVL voxel context + per-candidate evidence #sym.arrow.r ordinal RRI],
+  title: [VIN Scoring Architecture],
+  subtitle: [EVL voxel context #sym.arrow per-candidate evidence #sym.arrow.r ordinal RRI],
 )
 
-#slide(title: [Design intent])[
+#slide(title: [VIN Pipeline])[
   #grid(
     [
-      #color-block(title: [Baseline contract])[
-        - Keep the scorer small and explicit: no large point encoders (e.g., PointNeXt).
-        - Prefer view-conditioned evidence that we can diagnose:
-          + voxel coverage proxies,
-          + semidense projection validity and moments,
-          + (optional) trajectory context.
-      ]
-      #color-block(title: [Why view-conditioned evidence?])[
-        - Ranking must depend on candidate viewpoint, not only the current scene state.
-        - Pure global context can produce weak candidate separation and collapse.
+      //TODO: note all inputs using the notations / symbols from #symb.
+      #color-block(title: [Data Flow & Branches], spacing: 1em)[
+        - *Inputs*: Candidate Poses, EVL voxel field, semidense points, optional trajectory.
+        - *Pose branch* Candidate Poses #sym.arrow.r PoseEncodings #symb.vin.pose_emb.
+        - *Scene branch*: EVL Voxel Fields #sym.arrow.r global conditioned features.
+        - *Semidense branch*: #symb.ase.points_semi #sym.arrow.r #code-inline[semidense_proj] (+ grid CNN).
+        - Concat #sym.arrow.r MLP #sym.arrow.r CORAL logits #sym.arrow.r expected class score (ranking proxy).
+        - Continuous expected RRI uses bin reps $u_k$ (paper: Training Objective).
       ]
     ],
     [
       #figure(
-        image(fig_path + "impl/vin/vin_rich_summary.png", width: 100%),
-        caption: [VIN v3 module summary (implementation snapshot).],
+        image(fig_path + "app-paper/vin-geom-oc_pr-candfrusta-semi-dense.png", width: 110%),
+        caption: [Superposition of all VINv3 inputs.],
       )
     ],
   )
 ]
 
-#slide(title: [VIN-NBV (Frahm 2025) vs our VIN v3])[
-  #grid(
-    [
-      #color-block(title: [VIN-NBV feature construction])[
-        - Enrich a reconstructed point cloud with normals, visibility count, and depth.
-        - Per candidate view:
-          + project to a dense screen-space grid #code-inline[512x512x5] (then downsample to #code-inline[256x256]),
-          + compute per-pixel variance plus pooled grid features,
-          + compute an "emptiness" feature from empty pixels (inside/outside the hull).
-        - Add stage cue: number of base views.
-        - CNN encodes the grid to a global view feature; an MLP scores candidates.
-        - Candidate visibility enters explicitly (visibility count + empty-pixel counting). @VIN-NBV-frahm2025
-      ]
-    ],
-    [
-      #color-block(title: [VIN v3 (oracle_rri) design])[
-        - Use EVL voxel evidence as scene context (frozen backbone) plus semidense SLAM points.
-        - Per candidate view:
-          + rig-relative pose encoding (R6D + LFF),
-          + semidense projection stats (visibility, coverage, depth moments; reliability-weighted),
-          + coarse grid + tiny CNN for view-plane structure (#code-inline[G_sem] from config).
-        - Pose-conditioned global attention pools the voxel field to a per-candidate feature vector #symb.vin.global.
-        - CORAL ordinal head (fixed bins) instead of continuous regression.
-        - Candidate visibility enters as a feature; training can additionally reweight losses by visibility/coverage proxies.
-      ]
-    ],
-  )
-]
+// #slide(title: [Design intent])[
+//   #grid(
+//     [
+//       #color-block(title: [Baseline contract])[
+//         - Freeze EVL; build #code-inline[field_in] from voxel channels
+//           (occ_input, occ_pr, cent_pr, counts_norm, observed/unknown/free, new_surface_prior).
+//         - Add *candidate-conditioned* evidence to avoid collapse:
+//           + voxel validity/coverage proxies (#code-inline[voxel_valid_frac]),
+//           + semidense projection stats + grid CNN (visibility, depth mean/std, empty vs covered),
+//           + optional trajectory context for stage bias (rig history).
+//         - Every cue must be diagnosable (Streamlit overlays + W&B curves) and robust to frame bugs.
+//       ]
+//       #color-block(title: [Why view-conditioned evidence?])[
+//         - Ranking must vary with candidate pose, not only global scene context.
+//         - Pure global context often yields near-uniform scores across candidates.
+//         - View-conditioned cues encode *where* new surface might be revealed and
+//           drive coverage-weighted training schedules.
+//       ]
+//     ],
+//     [
 
-#slide(title: [VIN v3: input features])[
-  #grid(
-    [
-      #color-block(title: [Scene field (EVL)])[
-        - Build #code-inline[field_in] by selecting channels from:
-          occ_pr, occ_input, cent_pr_nms, counts_norm, observed, unknown, free_input, new_surface_prior.
-        - Channel selection is configured via #code-inline[scene_field_channels] (not hard-coded).
-        - Project to field_dim=#wb.vin_effective.field_dim channels with Conv3d+GN+GELU.
-      ]
-      #color-block(title: [Per-candidate cues])[
-        - Pose encoding: R6D + LFF in reference rig frame.
-        - Semidense projections:
-          + stats (visibility, coverage, depth moments),
-          + grid CNN (G=#wb.vin_effective.semidense_proj_grid_size).
-        - Optional trajectory encoder: #wb.vin_effective.use_traj_encoder (enabled in best run).
-      ]
-    ],
-    [
-      #figure(
-        image(fig_path + "efm3d/evl_output_summary.png", width: 100%),
-        caption: [EVL output summary used to build the scene field. @EFM3D-straub2024],
-      )
-    ],
-  )
-]
+//       #figure(
+//         image(fig_path + "app-paper/vin-geom-oc_pr-candfrusta-semi-dense.png", width: 100%),
+//         caption: [View-conditioned evidence: voxel occupancy context + candidate frusta + semidense points.],
+//       )
+
+//     ],
+//   )
+// ]
+
+// #slide(title: [VIN v3: input features])[
+//   #grid(
+//     [
+//       #color-block(title: [Scene field (EVL)])[
+//         - Build #code-inline[field_in] by selecting channels from:
+//           occ_pr, occ_input, cent_pr, counts_norm, observed, unknown, free_input, new_surface_prior.
+//         - Channel selection is configured via #code-inline[scene_field_channels] (not hard-coded).
+//         - Project to field_dim=#wb.vin_effective.field_dim channels with Conv3d+GN+GELU.
+//       ]
+//       #color-block(title: [Per-candidate cues])[
+//         - Pose encoding: R6D + LFF in reference rig frame.
+//         - Semidense projections:
+//           + stats (visibility, coverage, depth moments),
+//           + grid CNN (G=#wb.vin_effective.semidense_proj_grid_size).
+//         - Optional trajectory encoder: #wb.vin_effective.use_traj_encoder (enabled in best run).
+//       ]
+//     ],
+//     [
+//       #figure(
+//         image(fig_path + "efm3d/evl_output_summary.png", width: 100%),
+//         caption: [EVL output summary used to build the scene field. @EFM3D-straub2024],
+//       )
+//     ],
+//   )
+// ]
 
 // ---------------------------------------------------------------------------
 // EVL backbone features (what VIN v3 consumes)
 // ---------------------------------------------------------------------------
 
-#slide(title: [EVL backbone: voxel grid contract])[
-  #grid(
-    [
-      #color-block(title: [Voxel grid contract (frame + geometry)])[
-        - Grid pose: #code-inline[t_world_voxel: PoseTW[#(symb.shape.B), 12]] stores #T(fr_world, fr_voxel).
-        - Extent: #code-inline[voxel_extent: Tensor[#(symb.shape.B), 6]] in voxel frame (meters).
-        - Voxel centers (required in v3): #code-inline[pts_world: Tensor[#(symb.shape.B), #(symb.shape.Vvox), 3]] (world frame).
-        - Grid resolution in our runs: #symb.shape.D x #symb.shape.H x #symb.shape.Wdim (typically 48^3).
-      ]
-    ],
-    [
-      #figure(
-        evl-backbone-tree-grid(node-width: 15em, text-size: 8.5pt, spacing: (8pt, 12pt)),
-        caption: [EVL grid contract outputs (schematic).],
-      )
-    ],
-  )
-]
 
-#slide(title: [EVL backbone: evidence tensors])[
-  #grid(
-    [
-      #color-block(title: [Observation evidence (aligned with NBV intuition)])[
-        - Occupied evidence: #symb.vin.occ_in shape #code-inline[Tensor[#(symb.shape.B), 1, #(symb.shape.D), #(symb.shape.H), #(symb.shape.Wdim)]].
-        - Coverage proxy: #symb.vin.counts shape #code-inline[Tensor[#(symb.shape.B), #(symb.shape.D), #(symb.shape.H), #(symb.shape.Wdim)]].
-        - Optional free-space evidence: #code-inline[free_input] shape #code-inline[Tensor[#(symb.shape.B), 1, #(symb.shape.D), #(symb.shape.H), #(symb.shape.Wdim)]].
-        - VIN normalizes #code-inline[counts] #sym.arrow.r #code-inline[counts_norm in [0,1]] to derive observed/unknown priors.
-        - If #code-inline[free_input] is missing, VIN v3 derives it as #code-inline[observed * (1 - occ_input)].
-      ]
-    ],
-    [
-      #figure(
-        evl-backbone-tree-evidence(node-width: 15em, text-size: 8.5pt, spacing: (8pt, 12pt)),
-        caption: [EVL evidence tensors (schematic).],
-      )
-    ],
-  )
-]
-
-#slide(title: [EVL backbone: head outputs (available vs used)])[
-  #grid(
-    [
-      #color-block(title: [Head outputs (dense voxel heads)])[
-        - Occupancy probability: #symb.vin.occ_pr shape #code-inline[Tensor[#(symb.shape.B), 1, #(symb.shape.D), #(symb.shape.H), #(symb.shape.Wdim)]].
-        - Centerness: #symb.vin.cent_pr shape #code-inline[Tensor[#(symb.shape.B), 1, #(symb.shape.D), #(symb.shape.H), #(symb.shape.Wdim)]] (VIN v3 uses #symb.vin.cent_pr_nms).
-          - VIN v3 uses the NMS variant: #symb.vin.cent_pr_nms.
-        - Optional 3D detection heads:
-          + #code-inline[bbox_pr: Tensor[B, 7, D, H, W]] (OBB regression channels).
-          + #code-inline[clas_pr: Tensor[B, K, D, H, W]] (class logits/probabilities).
-          + #code-inline[obbs_pr_nms: ObbTW[B, M, 34]] (post-NMS boxes).
-      ]
-
-      #color-block(title: [What VIN v3 caches/uses])[
-        - Used to build #symb.vin.field_v: {#symb.vin.occ_pr, #symb.vin.occ_in, #symb.vin.counts_norm, #symb.vin.cent_pr_nms}
-          (+ optional #symb.vin.free_in, #symb.vin.unknown, #symb.vin.new_surface_prior via #code-inline[scene_field_channels]).
-        - Not used in the baseline scorer (for now): dense box/class heads and post-processed OBBs.
-        - Optional richer features (available in EVL but typically not cached): #code-inline[voxel_feat], #code-inline[occ_feat], #code-inline[obb_feat].
-      ]
-    ],
-    [
-      #figure(
-        evl-backbone-tree-heads(node-width: 15em, text-size: 8.5pt, spacing: (8pt, 12pt)),
-        caption: [EVL head voxel fields (occ vs obb).],
-      )
-    ],
-  )
-]
 
 // ---------------------------------------------------------------------------
 // VIN v3 forward: feature branches (tensors + frames + shapes)
 // ---------------------------------------------------------------------------
 
-#slide(title: [VIN v3 forward pass: frames + shape legend])[
-  #grid(
-    [
-      #color-block(title: [Frames used in v3])[
-        - #code-inline[w]: world (ASE global, meters).
-        - #code-inline[r]: reference rig frame at the snippet reference time (rig_ref).
-        - #code-inline[q]: candidate camera frame (one per candidate).
-        - #code-inline[v]: EVL voxel grid frame (axis-aligned metric grid).
-        - #code-inline[s]: screen/pixel space (PyTorch3D projection output).
-      ]
-      #color-block(title: [PoseTW convention])[
-        - Poses are stored as world #sym.arrow.l frame transforms, e.g.
-          #T(fr_world, fr_cam), #T(fr_world, fr_rig_ref), #T(fr_world, fr_voxel).
-        - Relative candidate pose:
-          $#T(fr_rig_ref, fr_cam) = #T(fr_world, fr_rig_ref)^(-1) dot #T(fr_world, fr_cam).$
-        - Points are always expressed explicitly as #code-inline[x_w], #code-inline[x_r], #code-inline[x_s].
-      ]
-    ],
-    [
-      #color-block(title: [Shape symbols (used below)])[
-        - Batch size: #symb.shape.B. Candidates: #symb.shape.Nq. Trajectory length: #symb.shape.Tlen.
-        - Voxel grid: #symb.shape.D x #symb.shape.H x #symb.shape.Wdim. Voxel centers: #symb.shape.Vvox = #symb.shape.D x #symb.shape.H x #symb.shape.Wdim.
-        - Pooled voxel points: #symb.shape.Pproj = #symb.shape.Gpool^3.
-        - Semidense points: #symb.shape.P (padded) and #symb.shape.Pfr (#sym.arrow.r subsampled for projection).
-      ]
-      #good-note(width: 100%)[
-        In code: see `oracle_rri/oracle_rri/vin/model_v3.py::_forward_impl` for the exact tensor flow.
-      ]
-    ],
-  )
-]
+// #slide(title: [VIN v3 forward pass: frames + shape legend])[
+//   #grid(
+//     [
+//       #color-block(title: [Frames used in v3])[
+//         - #code-inline[w]: world (ASE global, meters).
+//         - #code-inline[r]: reference rig frame at the snippet reference time (rig_ref).
+//         - #code-inline[q]: candidate camera frame (one per candidate).
+//         - #code-inline[v]: EVL voxel grid frame (axis-aligned metric grid).
+//         - #code-inline[s]: screen/pixel space (PyTorch3D projection output).
+//       ]
+//       #color-block(title: [PoseTW convention])[
+//         - Poses are stored as world #sym.arrow.l frame transforms, e.g.
+//           #T(symb.frame.w, symb.frame.cq), #T(symb.frame.w, symb.frame.r), #T(symb.frame.w, symb.frame.v).
+//         - Relative candidate pose:
+//           $#T(symb.frame.r, symb.frame.cq) = #T(symb.frame.w, symb.frame.r)^(-1) dot #T(symb.frame.w, symb.frame.cq).$
+//         - Points are always expressed explicitly as #code-inline[x_w], #code-inline[x_r], #code-inline[x_s].
+//       ]
+//     ],
+//     [
+//       #color-block(title: [Shape symbols (used below)])[
+//         - Batch size: #symb.shape.B. Candidates: #symb.shape.Nq. Trajectory length: #symb.shape.Tlen.
+//         - Voxel grid: #symb.shape.D x #symb.shape.H x #symb.shape.Wdim. Voxel centers: #symb.shape.Vvox = #symb.shape.D x #symb.shape.H x #symb.shape.Wdim.
+//         - Pooled voxel points: #symb.shape.Pproj = #symb.shape.Gpool^3.
+//         - Semidense points: #symb.shape.P (padded) and #symb.shape.Pfr (#sym.arrow.r subsampled for projection).
+//       ]
+//       #good-note(width: 100%)[
+//         In code: see `oracle_rri/oracle_rri/vin/model_v3.py::_forward_impl` for the exact tensor flow.
+//       ]
+//     ],
+//   )
+// ]
 
-#slide(title: [Branch 0: inputs #sym.arrow.r PreparedInputs])[
-  #grid(
-    [
-      #color-block(title: [Inputs (from VinOracleBatch)])[
-        - Candidate poses: #code-inline[PoseTW[#(symb.shape.B), #(symb.shape.Nq), 12]] (world #sym.arrow.l cam_q).
-        - Reference pose: #code-inline[PoseTW[#(symb.shape.B), 12]] (world #sym.arrow.l rig_ref).
-        - Cameras: #code-inline[PerspectiveCameras] with flat batch size #code-inline[B x N_q].
-          - Ex: #code-inline[R[B x N_q, 3, 3]], #code-inline[T[B x N_q, 3]], intrinsics, #code-inline[image_size[B x N_q, 2]].
-        - EVL backbone output (cached): #code-inline[t_world_voxel: PoseTW[#(symb.shape.B), 12]], #code-inline[voxel_extent[#(symb.shape.B), 6]], #code-inline[pts_world[#(symb.shape.B), #(symb.shape.Vvox), 3]].
-      ]
-    ],
-    [
-      #color-block(title: [PreparedInputs (after normalization)])[
-        - #code-inline[pose_world_cam: PoseTW[#(symb.shape.B), #(symb.shape.Nq), 12]] stores #T(fr_world, fr_cam).
-        - #code-inline[pose_world_rig_ref: PoseTW[#(symb.shape.B), 12]] stores #T(fr_world, fr_rig_ref).
-        - #code-inline[t_world_voxel: PoseTW[#(symb.shape.B), 12]] stores #T(fr_world, fr_voxel).
-        - Transforms/modules:
-          #code-inline[ensure_candidate_batch] + #code-inline[ensure_pose_batch] (broadcast to B),
-          optional #code-inline[rotate_yaw_cw90(undo=True)] for pose convention alignment.
-        - Optional CW90 undo (poses) must be consistent with #code-inline[p3d_cameras] correction.
-      ]
-    ],
-  )
-]
+// #slide(title: [Inputs #sym.arrow.r PreparedInputs])[
+//   #grid(
+//     [
+//       #color-block(title: [Inputs (from VinOracleBatch)])[
+//         - Candidate poses: #code-inline[PoseTW[#(symb.shape.B), #(symb.shape.Nq), 12]] (world #sym.arrow.l cam_q).
+//         - Reference pose: #code-inline[PoseTW[#(symb.shape.B), 12]] (world #sym.arrow.l rig_ref).
+//         - Cameras: #code-inline[PerspectiveCameras] with flat batch size #code-inline[B x N_q].
+//           - Ex: #code-inline[R[B x N_q, 3, 3]], #code-inline[T[B x N_q, 3]], intrinsics, #code-inline[image_size[B x N_q, 2]].
+//         - EVL backbone output (cached): #code-inline[t_world_voxel], #code-inline[voxel_extent], #code-inline[pts_world] (voxel centers in world).
+//         - Semidense snippet: #code-inline[points_world: Tensor[#(symb.shape.B), #(symb.shape.P), C_sem]] (padded) + #code-inline[lengths].
+//       ]
+//     ],
+//     [
+//       #color-block(title: [PreparedInputs (after normalization)])[
+//         - #code-inline[pose_world_cam: PoseTW[#(symb.shape.B), #(symb.shape.Nq), 12]] stores #T(symb.frame.w, symb.frame.cq).
+//         - #code-inline[pose_world_rig_ref: PoseTW[#(symb.shape.B), 12]] stores #T(symb.frame.w, symb.frame.r).
+//         - #code-inline[t_world_voxel: PoseTW[#(symb.shape.B), 12]] stores #T(symb.frame.w, symb.frame.v).
+//         - Transforms/modules:
+//           #code-inline[ensure_candidate_batch] + #code-inline[ensure_pose_batch] (broadcast to B),
+//           optional #code-inline[rotate_yaw_cw90(undo=True)] for pose convention alignment.
+//         - Optional CW90 undo (poses) must be consistent with #code-inline[p3d_cameras] correction.
+//         - Semidense points are required; missing data throws a hard error.
+//       ]
+//     ],
+//   )
+// ]
 
-#slide(title: [Branch 1: PoseFeatures (rig-relative pose encoding)])[
+#slide(title: [Candidate Pose Encoding])[
   #grid(
     [
-      #color-block(title: [Inputs])[
-        - #code-inline[pose_world_cam] stores #T(fr_world, fr_cam) and #code-inline[pose_world_rig_ref] stores #T(fr_world, fr_rig_ref).
-        - Frame transform: $#T(fr_rig_ref, fr_cam) = #T(fr_world, fr_rig_ref)^(-1) dot #T(fr_world, fr_cam)$.
-        - Transforms/modules: R6D + LFF + MLP, i.e. #code-inline[pose_vec] #sym.arrow.r #code-inline[LFF] #sym.arrow.r #code-inline[MLP].
-      ]
-      #color-block(title: [Outputs])[
-        - #code-inline[pose_vec: Tensor[#(symb.shape.B), #(symb.shape.Nq), 9]] (t_r_cq + R6D(R_r_cq)).
-        - #code-inline[pose_enc: Tensor[#(symb.shape.B), #(symb.shape.Nq), #(symb.shape.Fpose)]] (LFF + MLP).
-        - #code-inline[candidate_center_rig_m: Tensor[#(symb.shape.B), #(symb.shape.Nq), 3]] (camera center in rig_ref, meters).
+      #color-block(title: [Concept (R6D + LFF)])[
+        - Express each candidate in the reference rig frame #symb.frame.r:
+          $T_(#symb.frame.r,#symb.frame.cq) = T_(#symb.frame.w,#symb.frame.r)^(-1) dot T_(#symb.frame.w,#symb.frame.cq)$.
+        - *R6D SO(3) encoding* #sym.arrow stable pose vector $[bold(t)_(#symb.frame.cq)^(#symb.frame.r), "R6D"(bold(R)_(#symb.frame.cq)^(#symb.frame.r))]$.
+        - *LFF+MLP* map pose vector to a learned embedding #(symb.vin.pose_emb).
+        - #(symb.vin.pose_emb) conditions the global scene context #(symb.vin.global) and head.
       ]
     ],
     [
-      #color-block(title: [Frame summary])[
-        - Pose features are expressed in #code-inline[r] (reference rig frame).
-        - This removes global-frame drift and makes candidate comparisons stable.
-      ]
-    ],
-  )
-]
-
-#slide(title: [Branch 2: FieldBundle (EVL voxel scene field)])[
-  #grid(
-    [
-      #color-block(title: [Inputs (EVL tensors)])[
-        - #code-inline[occ_pr, occ_input, cent_pr_nms: Tensor[#(symb.shape.B), 1, #(symb.shape.D), #(symb.shape.H), #(symb.shape.Wdim)]].
-        - #code-inline[counts: Tensor[#(symb.shape.B), #(symb.shape.D), #(symb.shape.H), #(symb.shape.Wdim)]] (observation counts).
-        - #code-inline[free_input] if available else derived from observed/free evidence.
-        - Derived channels (scalars on voxel grid):
-          #code-inline[counts_norm = log1p(counts) / log1p(max(counts))],
-          #code-inline[unknown = 1 - counts_norm],
-          #code-inline[new_surface_prior = unknown dot.o occ_pr].
-        - Channel selection is configured via #code-inline[scene_field_channels].
-      ]
-      #color-block(title: [Outputs])[
-        - #code-inline[field_in: Tensor[#(symb.shape.B), #(symb.shape.Fin), #(symb.shape.D), #(symb.shape.H), #(symb.shape.Wdim)]] (selected channels).
-        - #code-inline[field: Tensor[#(symb.shape.B), #(symb.shape.Fg), #(symb.shape.D), #(symb.shape.H), #(symb.shape.Wdim)]] (Conv3d #sym.arrow.r GN #sym.arrow.r GELU).
-        - #code-inline[aux] dict includes #code-inline[counts_norm, observed, unknown, new_surface_prior].
-      ]
-    ],
-    [
-      #color-block(title: [Frame summary])[
-        - The scene field lives on the EVL voxel grid (#code-inline[v]) and is indexed by voxel cells.
-        - World-space voxel centers #code-inline[pts_world] provide geometry for positional keys and projections.
-      ]
-    ],
-  )
-]
-
-#slide(title: [Branch 3: voxel_valid_frac (candidate center coverage proxy)])[
-  #grid(
-    [
-      #color-block(title: [Inputs])[
-        - Candidate camera centers: #code-inline[x_w_cq = pose_world_cam.t] as #code-inline[Tensor[#(symb.shape.B), #(symb.shape.Nq), 3]] in world frame.
-        - #code-inline[counts_norm] from FieldBundle (normalized observation count per voxel).
-        - #code-inline[t_world_voxel] stores #T(fr_world, fr_voxel) and #code-inline[voxel_extent] maps voxel coords (metres) to grid indices.
-        - Transform: sample #code-inline[counts_norm] at x_w_cq via #code-inline[sample_voxel_field] (pc_to_vox + sample_voxels).
-      ]
-      #color-block(title: [Outputs])[
-        - #code-inline[voxel_valid_frac: Tensor[#(symb.shape.B), #(symb.shape.Nq)]] in [0, 1].
-        - Intuition: how much voxel evidence exists at the candidate camera center.
-      ]
-    ],
-    [
-      #color-block(title: [Frame summary])[
-        - Input centers are in #code-inline[w] and are sampled in the voxel grid (#code-inline[v]) via #T(fr_world, fr_voxel) and voxel_extent.
-        - Output is a scalar coverage proxy (no frame).
-      ]
-    ],
-  )
-]
-
-#slide(title: [Branch 4: GlobalContext (pos_grid + global_feat)])[
-  #grid(
-    [
-      #color-block(title: [Inputs])[
-        - #code-inline[field: Tensor[#(symb.shape.B), #(symb.shape.Fg), #(symb.shape.D), #(symb.shape.H), #(symb.shape.Wdim)]] (#code-inline[v] grid).
-        - #code-inline[pose_enc: Tensor[#(symb.shape.B), #(symb.shape.Nq), #(symb.shape.Fpose)]] (#code-inline[r] features).
-        - #code-inline[pts_world: Tensor[#(symb.shape.B), #(symb.shape.Vvox), 3]] voxel centers in world frame.
-        - Transform chain: voxel centers in #code-inline[w] are expressed in rig_ref via $#T(fr_world, fr_rig_ref)^(-1)$.
-        - Modules: #code-inline[pos_grid_from_pts_world] + #code-inline[PoseConditionedGlobalPool] (pool3d + MHA + MLP).
-      ]
-      #color-block(title: [Outputs])[
-        - #code-inline[pos_grid: Tensor[#(symb.shape.B), 3, #(symb.shape.D), #(symb.shape.H), #(symb.shape.Wdim)]] normalized voxel centers in rig_ref.
-        - #code-inline[global_feat: Tensor[#(symb.shape.B), #(symb.shape.Nq), #(symb.shape.Fg)]] pose-conditioned global vector per candidate.
-      ]
-    ],
-    [
-      #color-block(title: [Frame summary])[
-        - #code-inline[pos_grid] is in #code-inline[r] (rig_ref) and normalized by voxel extent.
-        - #code-inline[global_feat] is a per-candidate feature (no spatial frame) but conditioned on #code-inline[r] pose and #code-inline[r] positional keys.
-      ]
-    ],
-  )
-]
-
-#slide(title: [Branch 5: voxel_proj + FiLM (projection of voxel centers)])[
-  #grid(
-    [
-      #color-block(title: [Inputs])[
-        - Pooled voxel centers: #code-inline[voxel_points: Tensor[#(symb.shape.B), #(symb.shape.Pproj), 3]] in world frame.
-        - Cameras: #code-inline[p3d_cameras] aligned with candidates (flat #code-inline[B x N_q]).
-        - Modules: #code-inline[transform_points_screen] (projection) + #code-inline[\_encode_semidense_projection_features] (stats; uniform weights) + FiLM.
-      ]
-      #color-block(title: [Outputs])[
-        - Projection data: #code-inline[x_s, y_s, z_s, valid: Tensor[B x N_q, #(symb.shape.Pproj)]] in screen space.
-        - Scalar projection stats: #code-inline[voxel_proj: Tensor[#(symb.shape.B), #(symb.shape.Nq), #(symb.shape.Fproj)]] with
-          (#code-inline[coverage], #code-inline[empty_frac], #code-inline[valid_frac], #code-inline[depth_mean], #code-inline[depth_std]).
-        - FiLM modulation: #code-inline[(gamma, beta) = Linear(voxel_proj)] then #code-inline[global_feat] #sym.arrow.r #code-inline[global_feat_film]:
-          #block[#align(center)[#eqs.features.film]]
-      ]
-    ],
-    [
-      #color-block(title: [Frame summary])[
-        - #code-inline[voxel_points] are in #code-inline[w]; #code-inline[x_s, y_s, z_s] are in #code-inline[s] (pixels + depth).
-        - #code-inline[voxel_proj] is a per-candidate scalar summary (no frame).
-      ]
-    ],
-  )
-]
-
-#slide(title: [Branch 6: semidense_proj (scalar projection statistics)])[
-  #grid(
-    [
-      #color-block(title: [Inputs])[
-        - Semidense points: #code-inline[points_world: Tensor[#(symb.shape.B), #(symb.shape.Pfr), 3 + 2]] in world frame:
-          (#code-inline[x_w, y_w, z_w, 1/sigma_d, n_obs]).
-          - (code aliases: #code-inline[inv_dist_std], #code-inline[obs_count])
-        - Cameras: #code-inline[p3d_cameras] aligned with candidates.
-        - Modules:
-          + random subsampling with #code-inline[lengths] mask (#code-inline[semidense_proj_max_points] budget),
-          + projection (#code-inline[transform_points_screen]),
-          + reliability-weighted aggregation (uses #code-inline[n_obs] and #code-inline[1/sigma_d]).
-      ]
-      #color-block(title: [Outputs])[
-        - Projection data: #code-inline[x_s, y_s, z_s, valid: Tensor[B x N_q, #(symb.shape.Pfr)]].
-        - Scalar features: #code-inline[semidense_proj: Tensor[#(symb.shape.B), #(symb.shape.Nq), #(symb.shape.Fproj)]]:
-          (#code-inline[coverage], #code-inline[empty_frac], #code-inline[semidense_candidate_vis_frac], #code-inline[depth_mean], #code-inline[depth_std]).
-        - #code-inline[semidense_candidate_vis_frac] is also exported as a prediction field for diagnostics/weighting.
-        - Feature definitions:
-          + #code-inline[coverage] / #code-inline[empty_frac]: occupancy of a $G times G$ screen grid (G=#wb.vin_effective.semidense_proj_grid_size),
-          + #code-inline[semidense_candidate_vis_frac]: reliability-weighted valid/finite ratio (see #eqs.features.semidense_visibility),
-          + #code-inline[depth_mean], #code-inline[depth_std]: reliability-weighted moments of camera-axis depth $z$ over valid projections.
-      ]
-    ],
-    [
-      #color-block(title: [Frame summary])[
-        - Input points are in #code-inline[w]; intermediate projections are in #code-inline[s]; output is per-candidate scalar.
-        - Reliability weighting uses #code-inline[inv_dist_std] (1/sigma_d) and #code-inline[obs_count] (track length), normalized by
-          #code-inline[semidense_inv_dist_std_min/p95] and #code-inline[semidense_obs_count_max] (clamped to [0,1]).
-      ]
-    ],
-  )
-]
-
-#slide(title: [Semidense projection: transforms + grid maps])[
-  #grid(
-    columns: (1.25fr, 1fr),
-    gutter: 0.4cm,
-    [
-      #grid(
-        rows: (1fr, auto),
-        gutter: 0.25cm,
-        [
-          #color-block(title: [Transforms + aggregation], spacing: 0.45em)[
-            #set text(size: 15pt)
-            - Inputs:
-              + #code-inline[points_world: Tensor[#(symb.shape.B), #(symb.shape.Pfr), 5]].
-              + #code-inline[p3d_cameras: PerspectiveCameras] with #code-inline[image_size: Tensor[B x N_q, 2]] = (#(symb.shape.H), #(symb.shape.Wdim)).
-            - Projection (Pytorch3D #code-inline[transform_points_screen]):
-            #block[#align(center)[$
-              X_c = R X_w + T,
-              quad
-              u = f_x X_(c,x) / X_(c,z) + c_x,
-              quad
-              v = f_y X_(c,y) / X_(c,z) + c_y
-            $]]
-            - Validity mask:
-            #block[#align(center)[#eqs.features.semidense_validity]]
-            - Grid binning (G = #code-inline[semidense_proj_grid_size]):
-            #block[#align(center)[$
-              u_"bin" = "clamp"(u / W dot G, 0, G-1),
-              quad
-              v_"bin" = "clamp"(v / H dot G, 0, G-1)
-            $]]
-            - Per-cell maps (shape #code-inline[Tensor[B x N_q, G, G]]):
-            #block[#align(center)[$
-              "counts"_g = sum_j bb(1)["m"_(i,j)] dot bb(1)["bin"_(i,j) = g]
-            $]]
-            #block[#align(center)[$
-              "weights"_g = sum_j w_(i,j) dot bb(1)["m"_(i,j)] dot bb(1)["bin"_(i,j) = g]
-            $]]
-            #block[#align(center)[$
-              "depth_mean"_g =
-              (sum_j w_(i,j) z_(i,j) bb(1)["m"_(i,j)]) /
-              (sum_j w_(i,j) bb(1)["m"_(i,j)])
-            $]]
-            - Aggregation intuition: if H=W=120 and G=12 (offline_only), each cell covers ~10x10 pixels.
-          ]
-        ],
-        [
-          #color-block(title: [Reliability weights (per point)], spacing: 0.45em)[
-            #set text(size: 15pt)
-            #block[#align(center)[$
-              w_(i,j) = a_(i,j) dot b_(i,j)
-            $]]
-            #block[#align(center)[$
-              a_(i,j) =
-              "clamp"(("log"(1 + n_"obs")) / ("log"(1 + n_"obs,max")), 0, 1)
-            $]]
-            #block[#align(center)[$
-              b_(i,j) =
-              "clamp"(("inv"_"dist,std" - "inv"_"min") / ("inv"_"p95" - "inv"_"min"), 0, 1)
-            $]]
-            - #code-inline[n_obs,max] = #code-inline[semidense_obs_count_max],
-              #code-inline[inv_min] = #code-inline[semidense_inv_dist_std_min],
-              #code-inline[inv_p95] = #code-inline[semidense_inv_dist_std_p95].
-            - Coverage stats:
-            #block[#align(center)[$
-              "coverage" = "mean"("counts" > 0),
-              quad
-              "empty_frac" = 1 - "coverage"
-            $]]
-          ]
-        ],
+      #figure(
+        image(fig_path + "diagrams/vin_nbv/mermaid/pose_encoder.png", height: 100%),
+        caption: [Candidate Pose Encoding.],
       )
     ],
+  )
+]
+
+#slide(title: [Scene branch: FieldBundle (EVL voxel field)])[
+  #grid(
     [
+      #color-block(title: [Concept (EVL scene field)])[
+        - EVL evidence heads are stacked into the scene-field input $(#(symb.vin.field_v)^("in"))$:
+          (#symb.vin.occ_in, #symb.vin.counts_norm, #symb.vin.occ_pr, #symb.vin.cent_pr).
+        - Optional derived channels augment $(#(symb.vin.field_v)^("in"))$:
+          #symb.vin.free_in, #symb.vin.unknown, #symb.vin.new_surface_prior.
+        - Derived channel definitions:
+        #eqs.vin.counts_norm
+        #eqs.vin.new_surface_prior
+      ]
+    ],
+    [
+      #figure(
+        image(fig_path + "app-paper/field_occ_in.png", height: 100%),
+        caption: [EVL occupancy evidence slice (scene-field input).],
+      )
+    ],
+  )
+]
+
+#slide(title: [Scene branch: voxel_valid_frac (coverage proxy)])[
+  #grid(
+    [
+      #color-block(title: [Concept (coverage proxy)])[
+        - Project the input field $(#(symb.vin.field_v)^("in"))$ with #code-inline[Conv3d + GroupNorm + GELU] to the scene field #symb.vin.field_v.
+        - The same voxel context drives global pooling and voxel-projection statistics (for FiLM).
+        - Sample #symb.vin.counts_norm at each candidate center #symb.oracle.center to get per-candidate voxel validity #symb.vin.voxel_valid in $[0,1]$.
+        - Used for candidate validity #symb.vin.cand_valid and coverage scheduling.
+      ]
+    ],
+    [
+      #figure(
+        image(fig_path + "app-paper/field_counts_norm.png", height: 100%),
+        caption: [Normalized observation counts (coverage proxy).],
+      )
+    ],
+  )
+]
+
+#slide(title: [Scene Branch: Global Context + FiLM])[
+  #set text(size: 15pt)
+  #grid(
+    [
+      #color-block(title: [Concept (pose-conditioned pooling)], spacing: 0.4em)[
+        // TODO: refer to positional encodings used here - one bullet point to explain conceptualy
+        - From #symb.vin.field_v, build voxel tokens #symb.vin.vox_tok and pool with pose queries #(symb.vin.pose_emb) to get per-candidate global context #(symb.vin.global):
+          $
+            #(symb.vin.global) _i = "MHCA"(q=#(symb.vin.pose_emb), k=#symb.vin.vox_tok + phi(#symb.vin.pos), v=#symb.vin.vox_tok)
+          $
+        - In parallel, pool voxel centers and project into candidate cameras to get per-candidate projection stats (coverage/validity (visibility) + depth moments).
+        - FiLM uses these stats to modulate #(symb.vin.global): #eqs.features.film
+      ]
+    ],
+    [
+      #figure(
+        image(fig_path + "diagrams/vin_nbv/mermaid/global_pool.png", height: 80%),
+        caption: [Global context + voxel-projection FiLM.],
+      )
+    ],
+  )
+]
+
+#slide(title: [Semidense Branch: Scalar Stats])[
+  #set text(size: 15pt)
+  #grid(
+    [
+      #color-block(title: [Concept (projection stats)], spacing: 0.45em)[
+        - Project #symb.ase.points_semi into each candidate view.
+        - Compute coverage, visibility, and depth moments from valid projections.
+        - Reliability weights combine #symb.vin.n_obs and #symb.vin.inv_dist_std (inverse-distance std).
+        - Yields per-candidate scalar evidence #(symb.vin.sem_proj) for the head.
+      ]
+    ],
+    [
+      #figure(
+        image(fig_path + "diagrams/vin_nbv/mermaid/semidense_proj.png", height: 100%),
+        caption: [Semidense projection statistics branch.],
+      )
+    ],
+  )
+]
+
+//  DONE UNTILE HERE
+#slide(title: [Semidense Projections])[
+  #grid(
+    [
+      #text(size: 16pt)[
+        #color-block(title: [Projection])[
+          - Use #code-inline[transform_points_screen] to project points into the candidate camera.
+          - Valid points are finite, in front of the camera, and inside image bounds.
+        ]
+        #color-block(title: [Grid binning])[
+          - Bin valid projections into a $G_"sem" times G_"sem"$ screen grid.
+          - Compute per-bin visibility, mean depth, and depth std. \
+            #sym.arrow CNN inputs.
+        ]
+      ]
+    ],
+    [
+      #color-block(title: [Grid], spacing: 0.45em)[
+        - If H=W=120, G=12 #sym.arrow each cell covers ~10x10 pixels.
+      ]
       #figure(
         caption: [Semidense projection maps (counts / weights / depth std).],
       )[
@@ -1287,640 +1148,290 @@
           ],
         )
       ]
-    ],
-  )
-]
-
-#slide(title: [Branch 7: semidense_grid_feat (tiny CNN on a projection grid)])[
-  #grid(
-    [
-      #color-block(title: [How it differs from semidense_proj])[
-        - #code-inline[\_encode_semidense_projection_features]: reduces all points to 5 scalars per candidate (no spatial layout).
-        - #code-inline[\_encode_semidense_grid_features]: builds an explicit G x G grid in screen space and runs a tiny CNN.
-        - Motivation: capture *where* points land in the image plane (coarse structure), not only how many.
-      ]
-      #color-block(title: [Inputs / outputs])[
-        - Inputs: same #code-inline[proj_data] as above (#code-inline[x_s, y_s, z_s, valid]).
-        - Build grid channels: occupancy, depth_mean, depth_std:
-          #code-inline[grid: Tensor[B x N_q, 3, #(symb.shape.Gproj), #(symb.shape.Gproj)]] (screen-space bins).
-        - Modules: #code-inline[scatter_add] binning #sym.arrow.r Conv2d #sym.arrow.r GELU #sym.arrow.r Conv2d #sym.arrow.r GELU #sym.arrow.r GAP #sym.arrow.r Linear.
-        - CNN output: #code-inline[semidense_grid_feat: Tensor[#(symb.shape.B), #(symb.shape.Nq), F_cnn]] appended to the head.
-        - Config: enabled by #code-inline[semidense_cnn_enabled] with #code-inline[semidense_cnn_channels] and #code-inline[semidense_cnn_out_dim].
-      ]
-    ],
-    [
-      #color-block(title: [Frame summary])[
-        - The grid lives in #code-inline[s] (screen/pixels binned to a fixed grid).
-        - Output is a per-candidate vector (no frame).
-        - Current implementation uses #code-inline[valid] masking (no #code-inline[n_obs] / #code-inline[1/sigma_d] weighting inside the grid).
-        - The diagnostics UI renders the exact grid maps fed to the CNN (occupancy/mean/std).
+      #quote-block[
+        Why so coarse _!?_
       ]
     ],
   )
 ]
 
-#slide(title: [Branch 8: trajectory context (traj_feat + traj_ctx)])[
+#slide(title: [Semidense Branch: Grid CNN])[
+  #set text(size: 15pt)
   #grid(
     [
-      #color-block(title: [Inputs])[
-        - Trajectory: #code-inline[t_world_rig: PoseTW[#(symb.shape.B), #(symb.shape.Tlen), 12]] (world #sym.arrow.l rig_t).
-        - Reference rig pose stores #T(fr_world, fr_rig_ref).
-        - Convert per frame: $#T(fr_rig_ref, fr_rig) = #T(fr_world, fr_rig_ref)^(-1) dot #T(fr_world, fr_rig)$.
-        - Modules: #code-inline[TrajectoryEncoder] (R6D + LFF + MLP) and optional #code-inline[traj_attn] (MHA).
-      ]
-      #color-block(title: [Outputs])[
-        - Per-frame encodings: #code-inline[traj_pose_vec: Tensor[#(symb.shape.B), #(symb.shape.Tlen), D_v]] and #code-inline[traj_pose_enc: Tensor[#(symb.shape.B), #(symb.shape.Tlen), #(symb.shape.Ftau)]].
-        - Pooled embedding: #code-inline[traj_feat: Tensor[#(symb.shape.B), #(symb.shape.Ftau)]].
-        - Optional attention: #code-inline[traj_ctx: Tensor[#(symb.shape.B), #(symb.shape.Nq), #(symb.shape.Fpose)]] (pose queries attend to trajectory keys/values).
-      ]
-    ],
-    [
-      #color-block(title: [Frame summary])[
-        - All trajectory encodings are expressed relative to #code-inline[r] (rig_ref).
-        - This provides a "stage" signal: what has already been observed along the path.
-      ]
-    ],
-  )
-]
-
-#slide(title: [Branch 9: head input concat + VinPrediction outputs])[
-  #grid(
-    [
-      #color-block(title: [Final scorer input (per candidate)])[
-        - Concatenate:
-          #code-inline[pose_enc] (#code-inline[r]-relative),
-          #code-inline[global_feat] (scene context),
-          #code-inline[semidense_proj] (scalar view evidence),
-          optionally #code-inline[semidense_grid_feat] and #code-inline[traj_ctx].
-        - Result: #code-inline[feats: Tensor[#(symb.shape.B), #(symb.shape.Nq), #(symb.shape.Fhead)]].
-        - Modules: #code-inline[head_mlp] (Linear #sym.arrow.r GELU #sym.arrow.r Dropout) + #code-inline[CoralLayer].
-      ]
-      #color-block(title: [Outputs (VinPrediction)])[
-        - #code-inline[logits: Tensor[#(symb.shape.B), #(symb.shape.Nq), K-1]] (CORAL thresholds).
-        - #code-inline[prob: Tensor[#(symb.shape.B), #(symb.shape.Nq), #(symb.shape.K)]] (class marginals).
-        - #code-inline[expected, expected_normalized: Tensor[#(symb.shape.B), #(symb.shape.Nq)]] (ranking proxy).
-        - #code-inline[candidate_valid: Tensor[#(symb.shape.B), #(symb.shape.Nq)]] diagnostic mask (finite pose + nonzero coverage proxies).
-        - #code-inline[voxel_valid_frac] and #code-inline[semidense_candidate_vis_frac] are logged and can reweight loss (coverage schedule).
-      ]
-    ],
-    [
-      #good-note(width: 100%)[
-        Training uses CORAL loss on #code-inline[logits] and logs ranking metrics on #code-inline[expected_normalized].
-        Coverage-weight schedules (train only) can reweight per-candidate losses using #code-inline[voxel_valid_frac] or #code-inline[semidense_candidate_vis_frac].
-      ]
-    ],
-  )
-]
-
-#slide(title: [Pose encoding and rig-relative conditioning])[
-  #grid(
-    [
-      #color-block(title: [Rig-relative pose encoding])[
-        - Candidate pose in reference rig frame:
-          $#T(fr_rig_ref, fr_cam) = #T(fr_world, fr_rig_ref)^(-1) dot #T(fr_world, fr_cam).$
-        - Encode translation + rotation with 6D representation + Learnable Fourier Features.
-        - Motivation: continuity + stable gradients for view-conditioned ranking.
+      #color-block(title: [Concept (projection grid)], spacing: 0.45em)[
+        - Keep coarse view-plane structure that scalar stats discard.
+        - Bin valid projections into a $G_"sem" times G_"sem"$ grid.
+        - Tiny CNN encodes occupancy + depth moments into #(symb.vin.sem_grid).
+        - Appended to the head with #(symb.vin.sem_proj).
+        - Grid channels: $bold(H)_i in bb(R)^(3 times #symb.shape.Gsem times #symb.shape.Gsem)$ with $[O_i, mu_z_i, sigma_z_i]$.
       ]
     ],
     [
       #figure(
-        image(fig_path + "impl/vin/vin_pose_descriptor.png", width: 100%),
-        caption: [Pose descriptor diagnostics (implementation).],
+        image(fig_path + "diagrams/vin_nbv/mermaid/semidense_frustum.png", height: 100%),
+        caption: [Semidense grid CNN branch.],
       )
     ],
   )
 ]
 
-#slide(title: [Global context + FiLM modulation])[
+#slide(title: [MLP & Coral Head])[
   #grid(
     [
-      #color-block(title: [Pose-conditioned global context])[
-        - Pool the EVL scene field to $G_"pool"^3$ tokens (G_pool=#wb.vin_effective.global_pool_grid_size).
-        - Add positional encoding of voxel centers and cross-attend with pose embeddings as queries.
-        - Output a per-candidate global vector #symb.vin.global (candidate-conditioned scene evidence).
+      #color-block(title: [Concept (fusion + CORAL head)])[
+        - Concatenate features:
+          $
+            bold(h) =
+            [#(symb.vin.pose_emb) ;
+              #(symb.vin.global) ;
+              #(symb.vin.sem_proj) ;
+              #(symb.vin.sem_grid)]
+          $
+        - MLP scorer #sym.arrow.r CORAL logits #sym.arrow.r expected class score #(symb.vin.rri_hat) (regression proxy).
+        - Continuous expected RRI uses class probs with bin reps $u_k$ from learned $u_0$, $delta_k$.
+        - Naive candidate validity:
+        #eqs.metrics.candidate_validity
       ]
-      #color-block(title: [FiLM from projection stats])[
-        - Project pooled voxel centers into each candidate view and summarize screen-space coverage + depth stats.
-        - Predict per-channel $(#(symb.vin.gamma), #(symb.vin.beta))$ and modulate:
-        #block[#align(center)[#eqs.features.film]]
-      ]
+      #quote-block[
+        Candidate validity should be soft_!_]
     ],
     [
       #figure(
-        image(fig_path + "app/scene_field_occ_pr.png", width: 100%),
-        caption: [Scene-field diagnostics (EVL occupancy prior slice).],
+        image(fig_path + "diagrams/vin_nbv/mermaid/head_paper.png", height: 100%),
+        caption: [Feature fusion + CORAL head.],
       )
     ],
   )
 ]
 
-#slide(title: [Semidense projections: visibility + grid CNN])[
-  #grid(
-    [
-      #color-block(title: [Screen-space validity + visibility])[
-        - Project semidense points into each candidate camera.
-        - Valid if finite, $z>0$, and inside image bounds:
-        #block[#align(center)[#eqs.features.semidense_validity]]
-        - Visibility fraction is a reliability-weighted valid/finite ratio:
-        #block[#align(center)[#eqs.features.semidense_visibility]]
-        - Reliability weights $w_(i,j)$ combine per-point track length and depth uncertainty:
-        #block[#align(center)[$
-          w_(i,j) =
-          "clamp"(("log"(1 + n_"obs")) / ("log"(1 + n_"obs,max")), 0, 1)
-          dot
-          "clamp"(("inv"_"dist,std" - "inv"_"min") / ("inv"_"p95" - "inv"_"min"), 0, 1)
-        $]]
-        - In code: $n_"obs,max"$=#code-inline[semidense_obs_count_max], $"inv"_"min"$=#code-inline[semidense_inv_dist_std_min],
-          $"inv"_"p95"$=#code-inline[semidense_inv_dist_std_p95] (global cache summaries).
-        - The scalar semidense branch exports:
-          #code-inline[semidense_proj = (coverage, empty_frac, semidense_candidate_vis_frac, depth_mean, depth_std)].
-      ]
-      #color-block(title: [Grid features (local view-plane structure)])[
-        - Bin valid projections into a $G_"sem" times G_"sem"$ grid (G_sem=#wb.vin_effective.semidense_proj_grid_size).
-        - Per-bin maps (screen-space): occupancy, mean depth, depth std (unweighted; valid-only).
-        - Tiny CNN encodes these 3 maps into a compact per-candidate feature appended to the head.
-        - Diagnostics UI shows these same grids (“Semidense CNN grid inputs”).
-        - Diagnostics also renders per-cell maps with reliability weighting (counts/weights/depth_mean/depth_std) to interpret the scalar stats.
-      ]
-    ],
-    [
-      #figure(
-        image(fig_path + "impl/vin/vin_shell_descriptor_concept.png", width: 100%),
-        caption: [Concept: per-candidate semidense projection descriptor.],
-      )
-    ],
-  )
-]
 
-#slide(title: [Trajectory encoder (optional, but historically strong)])[
-  #let m = wb.metrics
-  #grid(
-    [
-      #color-block(title: [What it encodes])[
-        - Input: rig pose history #code-inline[PoseTW[#(symb.shape.B), #(symb.shape.Tlen), 12]] from `VinSnippetView.t_world_rig`.
-        - Output: a compact trajectory feature (#(symb.shape.Ftau)) appended to the scorer input.
-        - Motivation: RRI depends on "what has already been seen" (stage), not only the current scene field.
-      ]
-      #color-block(title: [Evidence from our runs])[
-        - Optuna top-trial pattern: trajectory encoder is enabled in many high-performing trials.
-        - In the best v3 run, the trajectory path carries non-trivial gradient energy:
-          #code-inline[grad_norm_traj_encoder]=#round(m.at("train-gradnorms/grad_norm_traj_encoder"), digits: 2),
-          #code-inline[grad_norm_traj_attn]=#round(m.at("train-gradnorms/grad_norm_traj_attn"), digits: 2).
-      ]
-    ],
-    [
-      #figure(
-        image(fig_path + "app/traj.png", width: 100%),
-        caption: [Trajectory diagnostics (Streamlit): historical rig poses and candidate views.],
-      )
-    ],
-  )
-]
 
-#slide(title: [Scoring head: feature concat + CORAL bins])[
-  #let v = wb.vin_effective
-  #grid(
-    [
-      #color-block(title: [Scorer input (per candidate)])[
-        - Concatenate candidate-specific and scene context features:
-          + pose encoding,
-          + global voxel context #symb.vin.global,
-          + semidense projection stats and grid CNN embedding,
-          + optional trajectory embedding (if enabled).
-        - Head MLP hyperparameters (effective config):
-          #code-inline[hidden_dim]=#v.at("head_hidden_dim"),
-          #code-inline[num_layers]=#v.at("head_num_layers"),
-          #code-inline[dropout]=#round(v.at("head_dropout"), digits: 3).
-      ]
-      #color-block(title: [Ordinal output])[
-        - Predict cumulative probabilities with CORAL and convert to class marginals / expectation:
-        #block[#align(center)[#eqs.coral.marginals]]
-        #block[#align(center)[#eqs.coral.expected]]
-      ]
-    ],
-    [
-      #figure(
-        image(fig_path + "impl/vin/vin_rri_binning.png", width: 100%),
-        caption: [RRI binning / thresholds used for ordinal supervision.],
-      )
-    ],
-  )
-]
+// #slide(title: [VIN-NBV (Frahm 2025) vs our VIN v3])[
+//   #grid(
+//     [
+//       #color-block(title: [VIN-NBV feature construction])[
+//         - Enrich a reconstructed point cloud with normals, visibility count, and depth.
+//         - Per candidate view:
+//           + project to a dense screen-space grid #code-inline[512x512x5] (then downsample to #code-inline[256x256]),
+//           + compute per-pixel variance plus pooled grid features,
+//           + compute an "emptiness" feature from empty pixels (inside/outside the hull).
+//         - Add stage cue: number of base views.
+//         - CNN encodes the grid to a global view feature; an MLP scores candidates.
+//         - Candidate visibility enters explicitly (visibility count + empty-pixel counting). @VIN-NBV-frahm2025
+//       ]
+//     ],
+//     [
+//       #color-block(title: [VIN v3 (oracle_rri) design])[
+//         - Use EVL voxel evidence as scene context (frozen backbone) plus semidense SLAM points.
+//         - Per candidate view:
+//           + rig-relative pose encoding (R6D + LFF),
+//           + semidense projection stats (visibility, coverage, depth moments; reliability-weighted),
+//           + coarse grid + tiny CNN for view-plane structure (#code-inline[G_sem] from config).
+//         - Pose-conditioned global attention pools the voxel field to a per-candidate feature vector #symb.vin.global.
+//         - CORAL ordinal head (fixed bins) instead of continuous regression.
+//         - Candidate visibility enters as a feature; training can additionally reweight losses by visibility/coverage proxies.
+//       ]
+//     ],
+//   )
+// ]
+
 
 // ---------------------------------------------------------------------------
-// Objective + metrics
+// Training: Objective, Metrics & Diagnostics
 // ---------------------------------------------------------------------------
 
 #section-slide(
-  title: [Objective and Metrics],
+  title: [Training: Objective, Metrics & Diagnostics],
   subtitle: [Ordinal supervision + diagnostics-first monitoring],
 )
 
-#slide(title: [Oracle target + CORAL objective])[
+// Ordering: (1) objective, (2) metric definitions + curves, (3) aux schedule,
+// (4) start→finish summary, (5) best-vs-baseline comparison.
+#slide(title: [Training objective (ordinal supervision)])[
   #grid(
+    columns: (1.25fr, 1fr),
+    gutter: 0.35cm,
     [
-      #color-block(title: [Oracle RRI definition])[
-        #block[#align(center)[#eqs.rri.rri]]
-        - RRI is the relative reduction in point-to-mesh error after adding a candidate view.
-        - We log accuracy (#symb.oracle.points #sym.arrow.r #symb.ase.mesh) and completeness (#symb.ase.mesh #sym.arrow.r #symb.oracle.points) components.
-      ]
-      #color-block(title: [CORAL ordinal loss])[
-        #block[#align(center)[#eqs.coral.loss]]
-        #block[#align(center)[#eqs.coral.marginals]]
-        #block[#align(center)[#eqs.coral.expected]]
+      #color-block(title: [Objective])[
+        - CORAL loss + aux. regression loss $#(symb.vin.loss) _("reg")$
+        #eqs.vin.loss_total
+        #eqs.vin.aux_reg_huber
+        #eqs.vin.aux_weight
+        #v(0.5em)
+        - Coverage/visibility curriculum: reweight per-candidate loss by evidence $w_i(t) = (1 - lambda_t) + lambda_t ( #symb.vin.voxel_valid _i dot #symb.vin.sem_valid _i )$ and anneal $lambda_t -> 0$ over training.
       ]
     ],
     [
-      #color-block(title: [Scheduled coverage reweighting (train only)])[
-        - Coverage proxy $c_i in [0, 1]$ from voxel validity or semidense visibility.
-        - Curriculum-style anneal of coverage strength to reduce early gradient variance.
-        #block[#align(center)[#eqs.coverage.weight]]
-        #block[#align(center)[#eqs.coverage.weighted_loss]]
-      ]
+      #figure(
+        image(fig_path + "wandb/train-corlal-rel-step.png", width: 80%),
+        caption: [Training CORAL relative loss.],
+      )
+      #figure(
+        image(fig_path + "wandb/train-coral-rel-epoch.png", width: 90%),
+        caption: [Epoch-level training CORAL relative loss.],
+      )
     ],
   )
 ]
 
-#slide(title: [Logged diagnostics (selected)])[
+#slide(title: [Best-run curves + Metrics])[
   #grid(
+    columns: (1fr, 1.2fr),
+    gutter: 0.35cm,
     [
-      #color-block(title: [Ranking quality])[
-        - Spearman correlation (pred expected RRI vs oracle RRI).
-        - Top-3 accuracy (does true label fall into top-3 predicted bins?).
-        - Confusion matrices and label histograms.
-      ]
-      #color-block(title: [Evidence + reliability])[
-        - Voxel validity fraction (coverage proxy).
-        - Semidense candidate visibility fraction (per-candidate projection validity).
-        - Candidate_valid fraction (finite pose and evidence present).
+      #color-block(title: [Metrics (definition + intuition)], spacing: 0.4em)[
+        - Relative CORAL loss:
+        #eqs.coral.rel_random
+        - Ranking agreement:
+        #eqs.metrics.spearman
+        - Top-3 bin accuracy:
+        #eqs.metrics.topk_acc
       ]
     ],
     [
-      #color-block(title: [Optimization diagnostics])[
-        - Learning rate (#code-inline[lr-AdamW]).
-        - Per-module grad norms (#code-inline[train-gradnorms/...] keys).
-        - CORAL monotonicity violation rate (ordinal sanity check).
-      ]
+      #figure(
+        image(fig_path + "wandb/val-coral-rel.png", width: 70%),
+        caption: [Relative CORAL loss.],
+      )
+      #figure(
+        image(fig_path + "wandb/val-top3-acc.png", width: 70%),
+        caption: [Top-3 bin accuracy.],
+      )
     ],
   )
 ]
 
-#slide(title: [Metric definitions (logged keys)])[
-  #grid(
-    [
-      #color-block(title: [Ranking metrics])[
-        - Spearman:
-        #block[#align(center)[#eqs.metrics.spearman]]
-        - Top-k accuracy:
-        #block[#align(center)[#eqs.metrics.topk_acc]]
-        - Confusion matrix:
-        #block[#align(center)[#eqs.metrics.confusion]]
-      ]
-      #color-block(title: [Evidence / validity])[
-        - Candidate validity (example predicate):
-        #block[#align(center)[#eqs.metrics.candidate_validity]]
-        - Voxel validity: coverage proxy derived from EVL observation counts.
-        - Semidense visibility: $v_i^("sem")$ (see previous projection slide).
-      ]
-    ],
-    [
-      #color-block(title: [Loss + optimization])[
-        - CORAL relative-to-random baseline:
-        #block[#align(center)[#eqs.coral.rel_random]]
-        - Module grad norms:
-        #block[#align(center)[#eqs.metrics.grad_norm]]
-      ]
-    ],
+// #slide(title: [Auxiliary regression: loss + schedule])[
+//   #grid(
+//     [
+//       #color-block(title: [Auxiliary Loss])[
+//         - Auxiliary loss $#(symb.vin.loss) _("reg")$ (Huber) stabilizes early training.
+//         - Weight schedule $#symb.vin.aux_weight (t)$ anneals over time.
+//         - As $#symb.vin.aux_weight (t)$ decays, the ordinal head dominates.
+//       ]
+//     ],
+//     [
+//       #grid(
+//         rows: (1fr, 1fr),
+//         gutter: 0.25cm,
+//         figure(
+//           image(fig_path + "wandb/train-aux-reg.png", width: 100%),
+//           caption: [Train auxiliary regression loss.],
+//         ),
+//         figure(
+//           image(fig_path + "wandb/train-aux-weight.png", width: 100%),
+//           caption: [Aux weight schedule.],
+//         ),
+//       )
+//     ],
+//   )
+// ]
+
+#slide(title: [Best run: start #sym.arrow.r finish summary])[
+  #let r = wb_top2.rtjvfyyp
+
+  #let fmt(m, key, digits: 3, pct_digits: 1) = {
+    let x = m.at(key)
+    let start = round(x.start, digits: digits)
+    let end = round(x.end, digits: digits)
+    let delta_pct = round(x.delta_pct, digits: pct_digits)
+    [#start #sym.arrow.r #end (#delta_pct%)]
+  }
+
+
+  #table(
+    columns: (auto, auto),
+    align: (left, left),
+    toprule(),
+    table.header([Metric], [Start #sym.arrow.r finish]),
+    midrule(), [Training $#(symb.vin.loss) _("rel")$],
+    [#fmt(r.metrics, "train/coral_loss_rel_random_step")], [Validation $#(symb.vin.loss) _("rel")$],
+    [#fmt(r.metrics, "val/coral_loss_rel_random")], [Spearman $rho$],
+    [#fmt(r.metrics, "val-aux/spearman")], [Top-3 $"TopKAcc"(3)$],
+    [#fmt(r.metrics, "val-aux/top3_accuracy")], bottomrule(),
   )
 ]
 
-// ---------------------------------------------------------------------------
-// Streamlit diagnostics (geometry-first)
-// ---------------------------------------------------------------------------
 
-#section-slide(
-  title: [Streamlit Diagnostics],
-  subtitle: [Geometry checks and failure-mode discovery],
-)
-
-#slide(title: [Diagnostics gallery])[
+#slide(title: [Calibration])[
   #figure(
-    grid(
-      rows: (1fr, 1fr),
-      image(fig_path + "app/render_frusta.png", width: 100%),
-      image(fig_path + "app/depth_hist.png", width: 100%),
-      image(fig_path + "app/semidense.png", width: 100%),
-      image(fig_path + "app/depth_render.png", width: 100%),
-    ),
-    caption: [Streamlit diagnostics: frusta, depth histograms, semi-dense overlays, and depth renders.],
-  )
-
-  #color-block(title: [Why diagnostics matter])[
-    - Validate coordinate conventions and candidate visibility.
-    - Catch render failures (empty z-buffers, wall look-through, degenerate poses).
-    - Inspect candidate distributions before training a scorer.
-  ]
-]
-
-#slide(title: [Common failure modes (and the checks we use)])[
-  #grid(
-    [
-      #color-block(title: [Geometry / frame consistency])[
-        - CW90 correction mismatch between poses and PyTorch3D cameras can destroy projections.
-          - For cached data: keep #code-inline[apply_cw90_correction]=false unless corrected in lockstep.
-        - Screen projection conventions (NDC vs pixel space, image_size ordering) can make almost all points invalid.
-        - Sanity checks: per-candidate valid ratios, visibility fractions, and frustum overlays.
-      ]
-      #color-block(title: [Data / padding pitfalls])[
-        - Padded semidense points must be masked using #code-inline[lengths] (avoid non-finite XYZ from padding).
-        - Label binning depends on candidate sampling; changing the distribution requires re-binning or re-training.
-      ]
-    ],
-    [
-      #color-block(title: [Training stability signals])[
-        - If candidate-specific features do not reach the head, the model collapses to a near-constant predictor.
-        - Overly strict masks (candidate_valid) reduce gradient signal; track #code-inline[candidate_valid_frac].
-        - Use confusion matrices, label histograms, and grad norms to detect collapse early.
-      ]
-      #color-block(title: [Why this matters])[
-        - Most "bad training runs" can be traced back to invalid geometry evidence rather than optimizer bugs.
-        - The Streamlit panel is the fastest way to localize these issues.
-      ]
-    ],
+    image(fig_path + "app-paper/pred_vs_oracle_scatter.png", width: 100%),
+    caption: [Predicted vs Oracle RRI scatter.],
   )
 ]
 
-// ---------------------------------------------------------------------------
-// Empirical evidence: Optuna + W&B
-// ---------------------------------------------------------------------------
-
-#section-slide(
-  title: [Empirical Evidence],
-  subtitle: [Optuna sweep patterns + best W&B run diagnostics],
-)
-
-#slide(title: [Optuna sweep: what correlates with good trials?])[
-  #let n_trials = top_trials.len()
-  #let n_traj = top_trials.filter(r => r.traj == "T").len()
-  #let n_frustum = top_trials.filter(r => r.frustum == "T").len()
-  #let n_vfeat = top_trials.filter(r => r.vfeat == "T").len()
-  #let n_vgate_off = top_trials.filter(r => r.vgate == "F").len()
+#slide(title: [Comparison: best run vs baseline run])[
+  #let r1 = wb_top2.hq1how1j
+  #let r2 = wb_top2.rtjvfyyp
 
   #grid(
+    columns: (1fr, 1.2fr),
+    gutter: 0.35cm,
     [
-      #color-block(title: [Top trials summary])[
-        Among the top #n_trials trials in #code-inline[vin-v2-sweep]:
-        - trajectory encoder enabled: #n_traj / #n_trials
-        - semidense frustum attention enabled: #n_frustum / #n_trials
-        - voxel-validity features included: #n_vfeat / #n_trials
-        - voxel gate disabled: #n_vgate_off / #n_trials
+      #color-block(title: [Ablation])[
+        + `OneCycleLR` #sym.arrow `ReduceOnPlateau`
+        + No trajectory encoder
+        + No auxiliary regression loss
+        + Batch size 8 #sym.arrow 16
       ]
-      #color-block(title: [Interpretation (caveat)])[
-        - The study is partly non-stationary (config corrections in early trials).
-        - Still, candidate-specific modules (traj/frustum) appear consistently helpful.
-      ]
-    ],
-    [
-      #figure(
-        image(fig_path + "vin_v2/optuna_objective_vs_trial.png", width: 100%),
-        caption: [Optuna objective vs trial index (vin-v2-sweep).],
-      )
-    ],
-  )
-]
+      #color-block(title: [Final validation metrics (last logged)])[
+        #set text(size: 13pt)
+        #table(
+          columns: (9em, 1fr, 1fr, 1fr),
+          align: (left, left, left, left),
+          toprule(),
+          table.header([Run], [$#(symb.vin.loss) _("rel")$], [$rho$], [$"TopKAcc"(3)$]),
+          midrule(),
+          [`base`],
+          [#round(r1.metrics.at("val/coral_loss_rel_random").end, digits: 3)],
+          [#round(r1.metrics.at("val-aux/spearman").end, digits: 3)],
 
-#slide(title: [Optuna toggle plots (phase-mixed; interpret cautiously)])[
-  #grid(
-    [
-      #figure(
-        image(fig_path + "vin_v2/optuna_objective_vs_use_point_encoder.png", width: 100%),
-        caption: [Objective vs `use_point_encoder` (phase-mixed).],
-      )
-    ],
-    [
-      #figure(
-        image(fig_path + "vin_v2/optuna_objective_vs_enable_semidense_frustum.png", width: 100%),
-        caption: [Objective vs `enable_semidense_frustum` (weak positive trend).],
-      )
-    ],
-  )
+          [#round(r1.metrics.at("val-aux/top3_accuracy").end, digits: 3)],
+          [`ablation`],
+          [#round(r2.metrics.at("val/coral_loss_rel_random").end, digits: 3)],
+          [#round(r2.metrics.at("val-aux/spearman").end, digits: 3)],
 
-  #color-block(title: [Interpretation])[
-    - Toggle evidence is confounded by phase mixing.
-    - Next sweep should be stationary: architectural toggles only (fixed training regime).
-  ]
-]
-
-#slide(title: [Mode collapse case study: vin-v3-01 vs T41])[
-  #let a = v3_vs_t41.vin_v3_01
-  #let b = v3_vs_t41.t41
-
-  #grid(
-    [
-      #color-block(title: [Symptom summary (imported)])[
-        #figure(
-          kind: "table",
-          supplement: [Table],
-          caption: [Selected metrics highlighting the collapse in #code-inline[vin-v3-01] vs the best optuna run #code-inline[T41].],
-          text(size: 9pt)[
-            #table(
-              columns: (15em, 1fr, 1fr),
-              align: (left, right, right),
-              toprule(),
-              table.header([Metric], [vin-v3-01], [T41]),
-              midrule(), [train spearman], [#round(a.train_spearman, digits: 3)],
-              [#round(b.train_spearman, digits: 3)], [train top-3 acc], [#round(a.train_top3_accuracy, digits: 3)],
-              [#round(b.train_top3_accuracy, digits: 3)],
-              [candidate_valid_frac],
-              [#round(a.candidate_valid_frac, digits: 3)],
-
-              [#round(b.candidate_valid_frac, digits: 3)],
-              [semidense vis (train)],
-              [#round(a.semidense_candidate_vis_frac_mean_train, digits: 3)],
-
-              [#round(b.semidense_candidate_vis_frac_mean_train, digits: 3)],
-              [coverage_weight_strength],
-              [#round(a.coverage_weight_strength, digits: 3)],
-
-              [#round(b.coverage_weight_strength, digits: 3)], bottomrule(),
-            )
-          ],
+          [#round(r2.metrics.at("val-aux/top3_accuracy").end, digits: 3)], bottomrule(),
         )
       ]
     ],
     [
-      #color-block(title: [Likely causes (from our analysis)])[
-        - Candidate-specific evidence did not reach the scorer in early v3 versions (semidense stats were computed but only used for masking).
-        - Overly strict validity masks and voxel gating reduce effective gradients and amplify collapse.
-        - Training regime differences (LR schedule and gradient energy) change how easily the model escapes a near-constant predictor.
-      ]
-      #color-block(title: [What is different in the current v3 baseline])[
-        - Semidense projection stats and grid CNN embedding are fed into the head (candidate-specific signal).
-        - Voxel validity is used as a feature (not a hard gate) in the best run config.
-        - Optional trajectory encoder is enabled in the best run and carries gradient signal.
-      ]
+      #figure(
+        grid(
+          columns: (1fr, 1fr),
+          rows: (auto, 1fr, 1fr),
+          gutter: 0.25cm,
+          align(center)[#text(weight: "bold")[`ablation`]], align(center)[#text(weight: "bold")[`base`]],
+          image(fig_path + "wandb/hq1how1j/val-figures/confusion_start.png", width: 100%),
+          image(fig_path + "wandb/rtjvfyyp/val-figures/confusion_start.png", width: 100%),
+
+          image(fig_path + "wandb/hq1how1j/val-figures/confusion_end.png", width: 100%),
+          image(fig_path + "wandb/rtjvfyyp/val-figures/confusion_end.png", width: 100%),
+        ),
+      )
     ],
   )
 ]
 
-#slide(title: [Best W&B run (v03-best)])[
-  #let m = wb.metrics
-  #let v = wb.vin_effective
-
-  #grid(
-    [
-      #color-block(title: [Run id + checkpoint])[
-        - W&B run: #code-inline[#wb.run_id]
-        - Checkpoint: #code-inline[#wb.checkpoint]
-        - Epoch: #m.at("epoch"), global step: #m.at("trainer/global_step")
-      ]
-      #color-block(title: [Key metrics (end of run)])[
-        - train loss (epoch): #round(m.at("train/loss_epoch"), digits: 3)
-        - val loss: #round(m.at("val/loss"), digits: 3)
-        - train spearman: #round(m.at("train-aux/spearman"), digits: 3)
-        - val spearman: #round(m.at("val-aux/spearman"), digits: 3)
-        - train top-3 acc: #round(m.at("train-aux/top3_accuracy_epoch"), digits: 3)
-        - val top-3 acc: #round(m.at("val-aux/top3_accuracy"), digits: 3)
-      ]
-    ],
-    [
-      #color-block(title: [Model config (effective)])[
-        - field_dim=#v.at("field_dim"), G_pool=#v.at("global_pool_grid_size"), G_sem=#v.at("semidense_proj_grid_size")
-        - semidense CNN: #v.at("semidense_cnn_enabled") (#v.at("semidense_cnn_channels") ch #sym.arrow.r #v.at("semidense_cnn_out_dim") dim)
-        - trajectory encoder: #v.at("use_traj_encoder")
-        - lr-AdamW (final): #m.at("lr-AdamW")
-      ]
-    ],
-  )
-]
-
-#slide(title: [Run dynamics: v03-best])[
-  #let d = wb_dyn
-  #grid(
-    [
-      #color-block(title: [Training length and plateau])[
-        - Stop criterion: #code-inline[max_epochs]=#d.max_epochs (not early stopping).
-        - Loss improves early but plateaus around epoch ~#d.plateau_epoch (shallow late slopes).
-      ]
-      #color-block(title: [LR schedule and noise])[
-        - #code-inline[lr-AdamW] decays from #d.lr_start to ~#d.lr_end.
-        - Step-loss vs LR correlation (Spearman): #d.loss_lr_spearman_rho.
-        - Late step-loss variability: CV ~#d.step_loss_cv_late (min #d.step_loss_min_late, max #d.step_loss_max_late).
-      ]
-    ],
-    [
-      #color-block(title: [CORAL loss trend (epoch means, imported)])[
-        - train: #d.train_coral_loss_rel_random_mean_early #sym.arrow.r #d.train_coral_loss_rel_random_mean_mid #sym.arrow.r #d.train_coral_loss_rel_random_mean_late
-        - val: #d.val_coral_loss_rel_random_mean_early #sym.arrow.r #d.val_coral_loss_rel_random_mean_mid #sym.arrow.r #d.val_coral_loss_rel_random_mean_late
-      ]
-      #color-block(title: [Interpretation])[
-        - Objective remains moderately noisy; larger batch size (or grad accumulation) may reduce variance.
-        - If the late-epoch slope stays near zero, schedule changes (constant LR or plateau-based decay) are a plausible next lever.
-      ]
-    ],
-  )
-]
-
-#slide(title: [Training regime: what to try next])[
-  #let d = wb_dyn
-  #grid(
-    [
-      #color-block(title: [Batch size vs objective noise])[
-        - Late-step loss CV ~#d.step_loss_cv_late suggests non-trivial stochasticity at the current batch size.
-        - Hypothesis: larger batches (or grad accumulation) reduce gradient variance and improve ranking signal stability.
-        - Practical test: double #code-inline[batch_size] until memory limit; scale LR if needed.
-      ]
-      #color-block(title: [LR schedule alternatives])[
-        - Current run plateaus around epoch ~#d.plateau_epoch with a decaying LR.
-        - Hypothesis: either (a) a higher early LR helps escape collapse, or (b) a plateau-aware scheduler helps late-stage refinement.
-        - Practical tests:
-          + constant LR (short warmup + fixed LR),
-          + ReduceLROnPlateau on val loss / spearman,
-          + shorter one-cycle with higher early peak (T41-style).
-      ]
-    ],
-    [
-      #color-block(title: [Keep the comparisons fair])[
-        - Fix the dataset split and candidate sampling config when comparing schedules.
-        - Always track: #code-inline[spearman], #code-inline[top3_accuracy], confusion matrices, and grad norms (not loss only).
-      ]
-      #color-block(title: [Success criteria])[
-        - Confusion matrices should progressively concentrate near the diagonal (no single-bin collapse).
-        - Spearman and top-3 accuracy should improve monotonically in the first few epochs.
-      ]
-    ],
-  )
-]
-
-// #conf-matrix-sequence(
-//   fig_path + "wandb/rtjvfyyp/train-figures",
-//   manifest: "frames.json",
-//   title: [Train confusion matrices (v03-best)],
-//   caption: [Ordinal bin confusion matrices during training],
-//   width: 70%,
-//   caption-style: (size: 12pt, weight: "medium"),
-// )
-
-// #conf-matrix-sequence(
-//   fig_path + "wandb/rtjvfyyp/val-figures",
-//   manifest: "frames.json",
-//   title: [Val confusion matrices (v03-best)],
-//   caption: [Ordinal bin confusion matrices during validation],
-//   width: 70%,
-//   caption-style: (size: 12pt, weight: "medium"),
-// )
-
-// ---------------------------------------------------------------------------
-// Summary + next steps
-// ---------------------------------------------------------------------------
-
-#section-slide(
-  title: [Summary and Next Steps],
-  subtitle: [What works, what fails, what to do next],
-)
-
-#slide(title: [Known limitations and open TODOs])[
-  #grid(
-    [
-      #color-block(title: [Dataset constraints (ASE)])[
-        - Each scene has one prerecorded egocentric trajectory (no arbitrary novel viewpoints).
-        - GT meshes are available for a subset of scenes; beyond that we rely on pseudo-GT or reduced supervision.
-        - Current offline cache covers only a fraction of the downloaded subset (coverage is the main scaling lever).
-      ]
-      #color-block(title: [Oracle pipeline / geometry tech debt])[
-        - Rendering correctness is critical: avoid frame mismatches (CW90 correction) and depth convention bugs.
-        - Candidate generation choices (filter vs penalize invalid views, allow backward views, roll jitter) affect the RRI distribution and CORAL bins.
-      ]
-    ],
-    [
-      #color-block(title: [Training and evaluation])[
-        - Candidate ordering bias: add optional per-sample candidate shuffling in the datamodule (TODO).
-        - CORAL thresholds depend on the empirical RRI distribution; changing candidate sampling changes the learning problem.
-        - Validation metrics are necessary but not sufficient; we still need NBV rollout evaluation beyond per-snippet ranking.
-      ]
-      #color-block(title: [Practical pitfall (cached data)])[
-        - For cached runs, keep #code-inline[apply_cw90_correction]=false unless cameras and reference poses are corrected in lockstep.
-      ]
-    ],
-  )
-]
 
 #slide(title: [Key takeaways])[
   #color-block(title: [What is solid now])[
-    - Oracle RRI pipeline is implemented end-to-end (candidates #sym.arrow.r renders #sym.arrow.r backprojection #sym.arrow.r RRI).
-    - Offline cache enables fast training/debug loops with a typed batching contract.
-    - Diagnostics are actionable (candidate validity, visibility, confusion matrices, grad norms).
+    - Oracle RRI pipeline is implemented end-to-end and fully functional.
+    - Offline cache enables fast training/debug loops with a typed batching.
+    - Rich training and post-hoc diagnostics.
   ]
   #color-block(title: [Main limitations])[
-    - Data scale: current cache covers #cache.unique_scenes scenes and #cache.unique_scene_snippet unique snippets.
-    - Training stability: mode collapse is still observed in some regimes; candidate-specific signal is fragile.
-    - Compute: oracle labeling cost motivates more efficient labeling or more compute budget for scaling.
+    - Data scale: Trained on #cache.unique_scenes scenes and #cache.train_entries / #cache.total_snippets snippets (#(round(cache.train_entries / cache.total_snippets))%).
+    - Weak component-level signals: Too many DoFs have been changed at once!
+    - EVL backbone's Voxel Fields are too narrow (4x4x4)m
   ]
   #color-block(title: [Master thesis next steps])[
-    - Scale dataset (more scenes, more snippets) and track coverage systematically.
-    - Run a clean Optuna sweep (stationary regime; architecture toggles only).
-    - Strengthen per-candidate evidence (visibility features + trajectory) and reduce collapse.
-    - Add evaluation protocol for NBV rollouts (beyond per-snippet ranking).
+    - Scale dataset (more scenes, more snippets, increase variety, *more compute*).
+    - Streamline OfflineCacheDataset (it's a mess)
+    - Run clean Optuna sweep (stationary regime; architecture toggles only).
+    - Strengthen evidences on different architectural choices.
+    - Entity-wise RRI should should be feasible now.
   ]
 ]
 

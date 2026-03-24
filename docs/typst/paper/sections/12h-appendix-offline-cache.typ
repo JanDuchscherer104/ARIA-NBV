@@ -11,12 +11,17 @@ approximate storage footprint per snippet and for the full ASE mesh subset.
 
 == Motivation
 
+// <rm>
+// Qualitative/unstated runtime + memory claims. Replace with measured numbers (sec/candidate,
+// sec/snippet, GPU mem) and a cache-throughput table in main text + appendix.
 The oracle pipeline combines candidate sampling, depth rendering, backprojection,
 and point-to-mesh scoring. Each step is GPU-heavy and hard to parallelize inside
 PyTorch. In practice, this results in per-snippet runtimes on the order of tens
 of seconds, while the EVL backbone alone can consume multiple GB of GPU memory
-per forward pass. Caching makes training a standard supervised learning problem
+per forward pass and hence limits us to batch sizes of one. Caching makes training a standard supervised learning problem
 and enables larger batch sizes for noisy ordinal supervision.
+// </rm>
+
 
 == Storage footprint
 

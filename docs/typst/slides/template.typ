@@ -209,7 +209,7 @@
       - Grid contract (geometry + frame) #group
         - Anchor + pose #group
           - [#symb.frame.v voxel grid anchored at #symb.ase.traj_final] #leaf
-          - [t_world_voxel: PoseTW(#symb.shape.B, 12) = #T(fr_world, fr_voxel)] #leaf
+          - [t_world_voxel: PoseTW(#symb.shape.B, 12) = #T(symb.frame.w, symb.frame.v)] #leaf
           - [voxel_select_t: Tensor(#symb.shape.B, 1) int64 (optional)] #leaf
         - Metric extent #group
           - [voxel_extent: Tensor(#symb.shape.B, 6) in meters (voxel frame)] #leaf
@@ -289,7 +289,7 @@
   tree[
     - Grid contract #group
       - [#symb.frame.v voxel grid anchored at #symb.ase.traj_final] #leaf
-      - [t_world_voxel: PoseTW(#symb.shape.B, 12) = #T(fr_world, fr_voxel)] #leaf
+      - [t_world_voxel: PoseTW(#symb.shape.B, 12) = #T(symb.frame.w, symb.frame.v)] #leaf
       - [voxel_extent: Tensor(#symb.shape.B, 6) in meters (voxel frame)] #leaf
       - [pts_world: Tensor(#symb.shape.B, #symb.shape.Vvox, 3) (optional)] #leaf
   ]
