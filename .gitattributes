@@ -1,0 +1,2 @@
+.logs/ckpts/** filter=lfs diff=lfs merge=lfs -text
+.logs/checkpoints/*.ckpt filter=lfs diff=lfs merge=lfs -text
