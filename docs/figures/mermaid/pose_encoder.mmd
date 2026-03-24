@@ -1,0 +1,43 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 18px; font-weight: 700; }
+---
+flowchart TB
+  %% Pose encoding branch (compact)
+
+  Inputs["$$\\begin{array}{c}\\textbf{Poses}\\end{array}$$"]
+
+  Rel["$$\\begin{array}{c}\\textbf{Rig-relative pose}\\\\\\mathbf{T}^{r}_{c_q}=(\\mathbf{T}^{w}_{r})^{-1}\\circ\\mathbf{T}^{w}_{c_q}\\end{array}$$"]
+
+  PoseVec["$$\\begin{array}{c}\\textbf{Pose vector}\\\\\\mathbf{v}=[\\mathbf{t}_{r c_q},\\ \\mathrm{R6D}(\\mathbf{R}_{r c_q})]\\end{array}$$"]
+
+  Encoder["$$\\begin{array}{c}\\textbf{Pose encoder}\\\\(12.7K\\ \\text{params})\\\\\\texttt{R6dLffPoseEncoder}(\\bullet)\\\\\\texttt{LearnableFourierFeatures}(\\bullet)\\rightarrow\\texttt{nn.Sequential}\\end{array}$$"]
+
+  PoseEmb["$$\\begin{array}{c}\\textbf{Pose embedding}\\\\\\mathbf{e}_{\\mathrm{pose}}\\end{array}$$"]
+  Center["$$\\begin{array}{c}\\textbf{Candidate center (rig)}\\\\\\mathbf{c}_q^{r}\\end{array}$$"]
+
+  Inputs -->|"$$\\begin{array}{c}\\texttt{PoseTW}[B,N_q,12]\\\\\\texttt{PoseTW}[B,12]\\end{array}$$"| Rel
+  Rel -->|"$$\\texttt{FloatTensor}[B,N_q,9]$$"| PoseVec
+  PoseVec -->|"$$\\texttt{FloatTensor}[B,N_q,9]$$"| Encoder
+  Encoder -->|"$$\\texttt{FloatTensor}[B,N_q,F_{\\mathrm{pose}}]$$"| PoseEmb
+  Rel -->|"$$\\texttt{FloatTensor}[B,N_q,3]$$"| Center
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Inputs input;
+  class Rel,PoseVec,Encoder compute;
+  class PoseEmb,Center output;

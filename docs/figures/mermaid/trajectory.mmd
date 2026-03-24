@@ -1,0 +1,42 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+---
+flowchart TB
+  %% Optional trajectory context (compact)
+
+  Traj["$$\\begin{array}{c}\\textbf{Trajectory poses}\\\\\\mathbf{T}^{w}_{r}(t)\\end{array}$$"]
+  PoseEmb["$$\\begin{array}{c}\\textbf{Pose embedding}\\\\\\mathbf{e}_{\\mathrm{pose}}\\end{array}$$"]
+
+  Rel["$$\\begin{array}{c}\\textbf{Rig-relative trajectory}\\\\\\mathbf{T}^{r}_{r}(t)=(\\mathbf{T}^{w}_{r})^{-1}\\circ\\mathbf{T}^{w}_{r}(t)\\end{array}$$"]
+  Enc["$$\\begin{array}{c}\\textbf{Trajectory encoder}\\\\(12.7K\\ \\text{params})\\\\\\texttt{TrajectoryEncoder}(\\bullet)\\end{array}$$"]
+  Attn["$$\\begin{array}{c}\\textbf{Cross-attention}\\\\(optional)\\ (4.2K\\ \\text{params})\\\\\\texttt{nn.MultiheadAttention}(q=\\mathbf{e}_{\\mathrm{pose}},\\ kv=\\mathbf{t})\\end{array}$$"]
+  Norm["$$\\begin{array}{c}\\textbf{Normalization}\\\\(optional)\\\\\\texttt{nn.GroupNorm}(\\bullet)\\end{array}$$"]
+
+  Out["$$\\begin{array}{c}\\textbf{Trajectory context}\\\\\\mathbf{z}_{\\mathrm{traj}}\\end{array}$$"]
+
+  Traj -->|"$$\\texttt{PoseTW}[B,T,12]$$"| Rel
+  Rel -->|"$$\\texttt{PoseTW}[B,T,12]$$"| Enc
+  Enc -->|"$$\\texttt{FloatTensor}[B,T,F_{\\mathrm{traj}}]$$"| Attn
+  PoseEmb -->|"$$\\texttt{FloatTensor}[B,N_q,F_{\\mathrm{pose}}]$$"| Attn
+  Attn -->|"$$\\texttt{FloatTensor}[B,N_q,F_{\\mathrm{pose}}]$$"| Norm
+  Norm -->|"$$\\texttt{FloatTensor}[B,N_q,F_{\\mathrm{pose}}]$$"| Out
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Traj,PoseEmb input;
+  class Rel,Enc,Attn,Norm compute;
+  class Out output;
