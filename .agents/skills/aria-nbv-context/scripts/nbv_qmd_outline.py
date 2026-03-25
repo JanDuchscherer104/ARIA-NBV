@@ -39,16 +39,21 @@ def _iter_headings(lines: list[str]) -> list[tuple[int, str]]:
     return headings
 
 
-def outline_qmd(path: Path, root: Path) -> str | None:
+def outline_qmd(path: Path, root: Path, compact: bool = False) -> str | None:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return None
     lines = _strip_front_matter(text.splitlines())
     headings = _iter_headings(lines)
+    rel = path.resolve().relative_to(root.resolve())
+    if compact:
+        if headings:
+            first_heading = headings[0][1]
+            return f"- {rel.as_posix()} :: {first_heading}"
+        return f"- {rel.as_posix()}"
     if not headings:
         return None
-    rel = path.resolve().relative_to(root.resolve())
     out_lines = [f"# {rel.as_posix()}"]
     for level, title in headings:
         indent = "  " * (level - 1)
@@ -63,6 +68,11 @@ def main() -> int:
         description="Outline headings in docs/**/*.qmd with nested ordering."
     )
     parser.add_argument("--root", default=str(repo_root / "docs"), help="Docs root dir")
+    parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Print one line per file with only the first heading.",
+    )
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -70,8 +80,10 @@ def main() -> int:
         raise SystemExit(f"error: docs root not found: {root}")
 
     outputs: list[str] = []
+    if args.compact:
+        outputs.append("# Quarto page outline (compact)\n")
     for path in sorted(root.rglob("*.qmd")):
-        outline = outline_qmd(path, root)
+        outline = outline_qmd(path, root, compact=args.compact)
         if outline:
             outputs.append(outline)
 

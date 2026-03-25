@@ -1,117 +1,151 @@
 ---
 name: aria-nbv-context
-description: Gather targeted context for Aria-NBV from Quarto docs (docs/**/*.qmd), Typst paper/slides (docs/typst/**), LaTeX literature (literature/**), and source code (oracle_rri/**). Use when the user asks for background, citations, paper/slide updates, or when you need to locate specific technical details across docs and code.
+description: Gather targeted context for Aria-NBV from the paper, agent memory, Quarto docs, literature, and source code. Use when the task spans multiple docs or code areas, needs citations or architecture context, or requires locating specific technical details across the repo. Do not trigger for already-localized one-file edits.
 ---
 
 # Aria NBV Context
 
 ## Overview
-Use this skill to rapidly collect *specific* context from NBV docs, Typst paper/slides, literature sources, and code. Start broad (context snapshot), then drill down with targeted lookups and search.
+Use this skill as the repo's discovery-and-routing layer. It should localize the task to the smallest relevant set of files, then hand off to the narrower workflow or skill that will do the actual work.
 
-## Quick Start (default)
-1. Run `scripts/nbv_context_index.sh` to generate a source index at `.codex/context_sources_index.md`.
-2. Run `make context` (writes to `.codex/codex_make_context.md` and embeds the source index).
-3. Use `rg` on the index file to pick exact files, then `rg` within those sources.
-4. Use the scripts below to list/outline relevant sources, then drill into files.
+Progressive disclosure order:
+1. Fixed ground truth: `docs/typst/paper/main.typ`
+2. Canonical current truth: `.agents/memory/state/`
+3. Agent-facing references in `.agents/references/`
+4. Routing maps and generated source indexes
+5. Source-specific outline or AST summary tools
+6. Raw file reads, targeted `rg`, and only then `make context` when UML, class docstrings, the package tree, or the contracts index are truly needed
 
-## Source index (first step)
-`scripts/nbv_context_index.sh` writes a single Markdown index of *all* source pools:
+## When To Use
+- The question spans paper, docs, literature, code, or canonical project state.
+- The task needs architectural, methodological, or citation context before editing.
+- The target file or symbol is not yet known.
 
-- Quarto docs (`docs/**/*.qmd`)
-- Typst paper/slides/shared (`docs/typst/**`)
-- Literature LaTeX/Bib (`literature/**`)
-- Python source (`oracle_rri/**`)
+## When Not To Use
+- The user already named the exact file to edit or review.
+- The task is a localized code change inside one module.
+- The task is pure formatting or renaming with no cross-doc or cross-code context need.
+- The task is already localized to Typst editing, scientific writing, or a single code module.
 
-This index is the entry point for compositional context gathering: search it first to find the smallest set of files, then `rg` inside those files.
+## Retrieval Ladder (default)
+1. Open `docs/typst/paper/main.typ` first; treat it as the highest-level project ground truth.
+2. Read the canonical state docs in `.agents/memory/state/`:
+   - `PROJECT_STATE.md`
+   - `DECISIONS.md`
+   - `OPEN_QUESTIONS.md`
+   - `GOTCHAS.md`
+3. Open agent-facing references in `.agents/references/` when the task needs conventions or external dependency lookup:
+   - `python_conventions.md`
+   - `context7_library_ids.md`
+4. Open `references/context_map.md` for the checked-in concept-to-source routing matrix.
+5. Run `scripts/nbv_context_index.sh` to generate `docs/_generated/context/source_index.md`.
+6. Pick the source family and use the lightest source-specific tool first:
+   - Quarto: `scripts/nbv_qmd_outline.sh --compact`
+   - Typst paper: `scripts/nbv_typst_includes.py --paper --mode outline`
+   - Literature: `scripts/nbv_literature_index.sh`
+   - Code: `oracle_rri/AGENTS.md` -> `.agents/references/python_conventions.md` -> `.agents/memory/state/GOTCHAS.md` -> `scripts/nbv_get_context.sh contracts` -> `scripts/nbv_get_context.sh modules` or `scripts/nbv_get_context.sh match <term>`
+7. Use targeted `rg` inside the narrowed file set.
+8. Run `make context` only when the answer still requires UML, class docstrings, tree-level structure, or the generated contracts artifact.
 
-## `.codex/codex_make_context.md` structure (what to search)
-The snapshot is a single Markdown file with stable section headers (includes the full source index):
+## Do Not Escalate Early
+- Do not run `make context` when the state docs, references, routing map, source index, outlines, or AST summaries already localize the answer.
+- Do not open entire paper sections, Quarto chapters, or literature trees until the outline or index step identifies the exact file.
+- Do not search `.agents/memory/history/` unless the question is historical, comparative, or explicitly asks for past debriefs.
 
-- **Header + Contents**: title, generated timestamp, and `## Contents`
-- **Section 0**: `## 0) Source index (all context pools)`
-- **Section 1**: `## 1) Environment` (python/venv info)
-- **Section 2**: `## 2) Mermaid UML (oracle_rri)` (UML class diagram)
-- **Section 3**: `## 3) Class docstrings (oracle_rri)` (full AST docs)
-- **Section 4**: `## 4) Directory tree (oracle_rri)` (tree output)
+## Canonical State (`.agents/memory/`)
+Treat `.agents/memory/state/` as current truth and `.agents/memory/history/` as optional historical evidence.
 
-Search examples:
-- `rg -n "^## 2\\) Mermaid UML" .codex/codex_make_context.md`
-- `rg -n "VinModelV3|CandidateDepthRenderer" .codex/codex_make_context.md`
-- `rg -n "^## 4\\) Directory tree" .codex/codex_make_context.md`
+Use cases:
+- `PROJECT_STATE.md`: current goals, architecture summary, stable conventions
+- `DECISIONS.md`: major design choices and resolved tradeoffs
+- `OPEN_QUESTIONS.md`: active uncertainties, pending experiments, unresolved design questions
+- `GOTCHAS.md`: maintained failure modes, environment pitfalls, and recurring verification traps
+- `.agents/memory/history/`: prior debriefs only when the task needs historical comparison or evidence
 
-## Context Sources
+## Routing Assets
+### 1) Checked-in routing map
+`references/context_map.md` maps major project concepts to exact entry files across:
+- `.agents/memory/`
+- `.agents/references/`
+- Typst paper
+- Quarto docs
+- Literature sources
+- `oracle_rri` code
 
-### 1) Quarto docs (docs/**/*.qmd)
-- Preferred entry points:
-  - `docs/index.qmd`
-  - `docs/contents/todos.qmd`
-- Use `make context-qmd-tree` for a high-level map.
-- Use `scripts/nbv_qmd_outline.sh` (wrapper) or `.codex/skills/aria-nbv-context/scripts/nbv_qmd_outline.sh` to list headings across docs with nested ordering.
+Use this before broad text search when the task topic is known but the files are not.
 
-### 2) Typst paper (docs/typst/paper)
-- Start with `docs/typst/paper/main.typ`.
-- Use `scripts/nbv_typst_includes.py` (wrapper) or `.codex/skills/aria-nbv-context/scripts/nbv_typst_includes.py` to expand include graphs with nested section headings.
-- Use `--mode includes` for include-only output.
-- Check `docs/typst/shared/macros.typ` and `docs/typst/paper/macros.typ` for symbols.
+### 2) Generated source index
+`scripts/nbv_context_index.sh` writes `docs/_generated/context/source_index.md` with:
+- fixed entrypoints and canonical state paths
+- agent-facing reference docs
+- source-family summaries and counts
+- repo-relative file lists for docs, Typst, literature, code, and memory
+- recommended search commands
 
-### 3) Typst slides (docs/typst/slides)
-- List slide sources via `scripts/nbv_typst_includes.py` (wrapper) or `.codex/skills/aria-nbv-context/scripts/nbv_typst_includes.py` (paper + slides).
-- Open only the slide file that matches the topic.
+Use the source index when the topic is still broad and you need to identify the right source family first.
 
-### 4) Literature LaTeX (literature/**)
-- Use `scripts/nbv_literature_search.sh "<query>"` (wrapper) or `.codex/skills/aria-nbv-context/scripts/nbv_literature_search.sh "<query>"` for targeted grep.
-- Focus on `.tex` and `.bib` sources; avoid loading large PDFs.
+## Source-Specific Reveal Stages
+### Quarto docs (`docs/**/*.qmd`)
+- Start with `scripts/nbv_qmd_outline.sh --compact`.
+- Use full outline mode only when you need nested section structure.
+- After narrowing, open the exact `.qmd` page and use `rg` within that page.
 
-### 5) Source code (oracle_rri/**)
-- Use `scripts/nbv_get_context.sh packages` (wrapper) or `.codex/skills/aria-nbv-context/scripts/nbv_get_context.sh packages` (or `classes`) to get AST-based summaries.
-- For focused code search, use `rg` or the code-index MCP tools.
+### Typst paper (`docs/typst/paper/**/*.typ`)
+- Start with `scripts/nbv_typst_includes.py --paper --mode outline`.
+- Use `--mode includes` when you only need the include graph.
+- Use `--with-slides` only when the task explicitly touches slides.
+- Treat `docs/typst/paper/main.typ` as the source of truth over Quarto summaries.
 
-## Targeted Search (rg + code-index)
-Use `rg` for fast, precise text search across sources. When searching code, the
-`code-index` MCP tools can provide symbol summaries and definitions without
-opening full files. Prefer the scripts in this skill for outlines and include
-graphs, then use `rg` to narrow further.
+### Literature (`literature/**`)
+- Start with `scripts/nbv_literature_index.sh` to identify the right paper family.
+- Use `scripts/nbv_literature_search.sh "<term>"` only after the paper family is known.
+- Use `.agents/references/context7_library_ids.md` when external library docs are part of the question.
+- Prefer `.tex` and `.bib` source reads over opening large PDFs.
 
-Suggested entry-point search:
-- `rg -n "<term>" .codex/context_sources_index.md`
+### Source code (`oracle_rri/**`)
+- Start with `oracle_rri/AGENTS.md` for binding local package rules.
+- Open `.agents/references/python_conventions.md` for long-form typing, docstring, and config examples.
+- Open `.agents/memory/state/GOTCHAS.md` for maintained failure modes.
+- Start structural discovery with `scripts/nbv_get_context.sh contracts` for data contracts and config contracts.
+- Use `scripts/nbv_get_context.sh modules` for a module-level map.
+- Use `scripts/nbv_get_context.sh match <term>` to narrow by symbol, module, field, or constant name.
+- Use `scripts/nbv_get_context.sh functions` or `classes` only after the module set is narrowed.
+- Use raw `rg` and file reads once the relevant module or symbol is known.
 
-Suggested patterns for `.codex/codex_make_context.md`:
-- `rg -n "^## 0\\) Source index" .codex/codex_make_context.md`
-- `rg -n "^## 2\\) Mermaid UML" .codex/codex_make_context.md`
-- `rg -n "^## 3\\) Class docstrings" .codex/codex_make_context.md`
-- `rg -n "VinModelV3|CandidateDepthRenderer" .codex/codex_make_context.md`
+## Heavyweight Fallback
+`make context` writes modular artifacts under `docs/_generated/context/`:
+- `context_snapshot.md`
+- `source_index.md`
+- `data_contracts.md`
+- `oracle_rri_uml.mmd`
+- `oracle_rri_filtered_uml.mmd`
+- `oracle_rri_class_docstrings.md`
+- `oracle_rri_tree.md`
 
-Cheat sheet (common lookups):
-```bash
-# Data views and snippet types
-rg -n "EfmSnippetView|EfmCameraView|EfmPointsView" .codex/codex_make_context.md
+Use these only when lighter retrieval failed to localize the answer.
 
-# Candidate generation + pose sampling
-rg -n "pose_generation\\.candidate_generation|CandidateSamplingResult" .codex/codex_make_context.md
+## Handoffs
+This skill should stop being the active surface once the task is localized.
 
-# Rendering pipeline (depth + point clouds)
-rg -n "rendering\\.candidate_depth_renderer|CandidateDepthRenderer" .codex/codex_make_context.md
-
-# Oracle labeling + cache
-rg -n "pipelines\\.oracle_rri_labeler|OracleRriLabeler|OracleRriCache" .codex/codex_make_context.md
-
-# VIN models + encoders
-rg -n "vin\\.model_v3|VinModelV3|pose_encoders|traj_encoder" .codex/codex_make_context.md
-```
+- Handoff to `typst-authoring` when the task becomes a Typst edit or paper/slides implementation.
+- Handoff to `scientific-writing` when the task becomes literature synthesis, section drafting, or citation-heavy prose.
+- Handoff to the direct code workflow once the target module or symbol set in `oracle_rri` is known.
 
 ## Bundled Scripts
 - Scripts are self-rooting and can be run from any working directory.
 - Convenience wrappers live in `scripts/` and delegate to the skill scripts.
-- `.codex/skills/aria-nbv-context/scripts/nbv_context_index.sh`:
-  - writes `.codex/context_sources_index.md` (full source index).
-- `.codex/skills/aria-nbv-context/scripts/nbv_get_context.sh`:
-  - wrapper around `oracle_rri/scripts/get_context.py` with the correct root.
-- `.codex/skills/aria-nbv-context/scripts/nbv_qmd_outline.sh`:
-  - list headings in all `docs/**/*.qmd`.
-- `.codex/skills/aria-nbv-context/scripts/nbv_typst_includes.py`:
-  - extract `#include` targets from Typst paper/slides.
-- `.codex/skills/aria-nbv-context/scripts/nbv_literature_search.sh`:
-  - grep across `literature/**` LaTeX/Bib sources.
+- `scripts/nbv_context_index.sh`
+  - writes `docs/_generated/context/source_index.md`
+- `scripts/nbv_qmd_outline.sh [--compact]`
+  - outlines Quarto pages; compact mode lists the first heading per page
+- `scripts/nbv_typst_includes.py --paper --mode outline|includes`
+  - outlines Typst paper includes with repo-relative paths; add `--with-slides` only when needed
+- `scripts/nbv_literature_index.sh`
+  - writes `docs/_generated/context/literature_index.md`
+- `scripts/nbv_literature_search.sh "<term>"`
+  - searches literature `.tex`, `.bib`, and `.sty` sources
+- `scripts/nbv_get_context.sh modules|packages|classes|functions|contracts|match <term>`
+  - AST-based code summaries for `oracle_rri`
 
 ## References
-- `references/context_map.md` provides topic-to-file routing for fast lookup.
+- `references/context_map.md` provides concept-to-source routing.

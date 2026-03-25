@@ -209,11 +209,22 @@ __marimo__/
 # Quarto
 .quarto/
 _site
-# Large download manifests (keep out of git)
+docs/_generated/context/*
+!docs/_generated/context/.gitignore
+
+# Legacy Codex scratch and generated artifacts
+.codex/_render/
+.codex/figures-*/
+.codex/wandb_configs/
+.codex/*.csv
+.codex/*.json
+.codex/*.png
+.codex/*.pdf
+.codex/*.patch
+.codex/*.skill
+# Large download manifests
 .data/aria_download_urls/
 .data
-.codex
-!.codex/AGENTS.md
 
 # Literature review - ignore non-documentation files
 literature/**

@@ -91,10 +91,21 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - **[ProjectAria Tools Reference](contents/ext-impl/prj_aria_tools_impl.qmd)**: Dataset tooling
 - **[EFM3D Symbol Index](contents/ext-impl/efm3d_symbol_index.qmd)**: Keys and coordinate conventions
 
+## Paper
+
+- [Seminar Project Paper](typst/paper/main.pdf), [Typst Source](typst/paper/main.typ): Ground turth for the project state at the end of the seminar in 01/2025.
+
 ## Project Slides
+
+### Main Seminar Presentations
 
 - [Presentation 01](typst/slides/slides_1.pdf), [typst-src](typst/slides/slides_1.typ)
 - [Presentation 02](typst/slides/slides_2.pdf), [typst-src](typst/slides/slides_2.typ)
+- [Presentation 04](typst/slides/slides_4.pdf), [typst-src](typst/slides/slides_4.typ): Final presentation of our seminar project.
+
+### Master's Thesis
+
+- [Outlook Presentation](typst/slides/slides_thesis_outlook.typ): Future research directions and thesis proposal presentation.
 
 # External Code & Notebooks
 

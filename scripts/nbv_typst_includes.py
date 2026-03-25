@@ -7,9 +7,9 @@ from pathlib import Path
 
 def main() -> int:
     script_dir = Path(__file__).resolve().parent
-    repo_root = script_dir.parents[3]
-    target = repo_root / "oracle_rri" / "scripts" / "get_context.py"
-    runpy.run_path(target.as_posix(), run_name="__main__")
+    root_dir = script_dir.parent
+    skill_script = root_dir / ".agents" / "skills" / "aria-nbv-context" / "scripts" / "nbv_typst_includes.py"
+    runpy.run_path(skill_script.as_posix(), run_name="__main__")
     return 0
 
 

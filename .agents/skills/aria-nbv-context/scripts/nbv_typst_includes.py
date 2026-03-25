@@ -14,7 +14,7 @@ def extract_includes(path: Path) -> list[str]:
     includes: list[str] = []
     try:
         text = path.read_text(encoding="utf-8")
-    except Exception:
+    except OSError:
         return includes
     for line in text.splitlines():
         match = INCLUDE_RE.match(line)
@@ -23,116 +23,120 @@ def extract_includes(path: Path) -> list[str]:
     return includes
 
 
-def _iter_headings(lines: list[str]) -> list[tuple[int, str]]:
-    headings: list[tuple[int, str]] = []
-    for line in lines:
-        if line.lstrip().startswith("//"):
-            continue
-        match = HEADING_RE.match(line)
-        if not match:
-            continue
-        level = len(match.group(1))
-        title = match.group(2).strip()
-        headings.append((level, title))
-    return headings
-
-
 def _resolve_include(source: Path, root: Path, inc: str) -> Path | None:
-    candidate = (source.parent / inc).resolve()
-    if candidate.exists():
-        return candidate
-    candidate = (root / inc).resolve()
-    if candidate.exists():
-        return candidate
+    for candidate in ((source.parent / inc).resolve(), (root / inc).resolve()):
+        if candidate.exists():
+            return candidate
     return None
 
 
-def _walk_outline(path: Path, root: Path, stack: list[Path]) -> None:
+def _repo_relative(path: Path, repo_root: Path) -> str:
+    return path.resolve().relative_to(repo_root.resolve()).as_posix()
+
+
+def _walk_outline(path: Path, typst_root: Path, repo_root: Path, stack: list[Path]) -> None:
     if path in stack:
         print(f"warning: include cycle detected: {path}", file=sys.stderr)
         return
     stack.append(path)
     try:
         text = path.read_text(encoding="utf-8")
-    except Exception:
+    except OSError:
         print(f"warning: failed to read: {path}", file=sys.stderr)
         stack.pop()
         return
 
-    rel = path.resolve().relative_to(root.resolve())
-    print(f"# {rel.as_posix()}")
-    lines = text.splitlines()
-    for line in lines:
-        match = INCLUDE_RE.match(line)
-        if match:
-            inc = match.group(1)
-            resolved = _resolve_include(path, root, inc)
+    print(f"# {_repo_relative(path, repo_root)}")
+    for line in text.splitlines():
+        include_match = INCLUDE_RE.match(line)
+        if include_match:
+            resolved = _resolve_include(path, typst_root, include_match.group(1))
             if resolved is None:
-                print(f"warning: include not found: {inc} (from {path})", file=sys.stderr)
+                print(
+                    f"warning: include not found: {include_match.group(1)} (from {path})",
+                    file=sys.stderr,
+                )
             else:
-                _walk_outline(resolved, root, stack)
+                _walk_outline(resolved, typst_root, repo_root, stack)
             continue
-
         heading_match = HEADING_RE.match(line)
-        if not heading_match:
+        if not heading_match or line.lstrip().startswith("//"):
             continue
         level = len(heading_match.group(1))
         title = heading_match.group(2).strip()
         indent = "  " * (level - 1)
         print(f"{indent}- {title}")
-
     print()
     stack.pop()
+
+
+def _print_includes(path: Path, typst_root: Path, repo_root: Path) -> None:
+    includes = extract_includes(path)
+    if not includes:
+        return
+    print(f"# {_repo_relative(path, repo_root)}")
+    for inc in includes:
+        resolved = _resolve_include(path, typst_root, inc)
+        if resolved is None:
+            print(f"- {inc} -> (missing)")
+        else:
+            print(f"- {inc} -> {_repo_relative(resolved, repo_root)}")
+    print()
 
 
 def main() -> int:
     script_dir = Path(__file__).resolve().parent
     repo_root = (script_dir / "../../../../").resolve()
-    default_root = (repo_root / "docs" / "typst").resolve()
+    default_typst_root = (repo_root / "docs" / "typst").resolve()
+    default_paper = default_typst_root / "paper" / "main.typ"
+    default_slides = default_typst_root / "slides"
 
-    parser = argparse.ArgumentParser(description="List Typst #include targets for paper/slides")
-    parser.add_argument("--root", default=str(default_root), help="Typst root directory")
-    parser.add_argument("--paper", default=None, help="Typst paper entry")
+    parser = argparse.ArgumentParser(
+        description="Outline Typst includes for the paper by default; opt into slides when needed."
+    )
+    parser.add_argument("--root", default=str(default_typst_root), help="Typst root directory")
     parser.add_argument(
-        "--slides", default=None, help="Directory containing slide .typ files"
+        "--paper",
+        nargs="?",
+        const=str(default_paper),
+        default=str(default_paper),
+        help="Paper entrypoint path. Defaults to docs/typst/paper/main.typ.",
+    )
+    parser.add_argument(
+        "--with-slides",
+        action="store_true",
+        help="Include slide entrypoints in addition to the paper.",
+    )
+    parser.add_argument(
+        "--slides-root",
+        default=str(default_slides),
+        help="Slides directory used when --with-slides is set.",
     )
     parser.add_argument(
         "--mode",
-        choices=["graph", "includes"],
-        default="graph",
-        help="graph: include outline with headings; includes: include list only",
+        choices=["outline", "includes"],
+        default="outline",
+        help="outline: recursive include outline with headings; includes: include edges only",
     )
     args = parser.parse_args()
 
-    root = Path(args.root).resolve()
-    paper = Path(args.paper).resolve() if args.paper else root / "paper" / "main.typ"
-    slides_dir = Path(args.slides).resolve() if args.slides else root / "slides"
+    typst_root = Path(args.root).resolve()
+    paper = Path(args.paper).resolve()
+    slides_root = Path(args.slides_root).resolve()
 
     targets: list[Path] = []
     if paper.exists():
         targets.append(paper)
-    if slides_dir.exists():
-        targets.extend(sorted(slides_dir.glob("*.typ")))
+    if args.with_slides and slides_root.exists():
+        targets.extend(sorted(slides_root.glob("*.typ")))
 
     if args.mode == "includes":
-        for source in targets:
-            rel_source = source.as_posix()
-            includes = extract_includes(source)
-            if not includes:
-                continue
-            print(f"# {rel_source}")
-            for inc in includes:
-                resolved = _resolve_include(source, root, inc)
-                if resolved is None:
-                    print(f"- {inc} -> (missing)")
-                else:
-                    print(f"- {inc} -> {resolved.as_posix()}")
-            print()
+        for target in targets:
+            _print_includes(target, typst_root, repo_root)
         return 0
 
-    for source in targets:
-        _walk_outline(source, root, [])
-
+    for target in targets:
+        _walk_outline(target, typst_root, repo_root, [])
     return 0
 
 
