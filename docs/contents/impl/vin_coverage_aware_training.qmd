@@ -70,6 +70,7 @@ weight      = (1 - alpha_t) * 1 + alpha_t * base_weight
 - If using `vin_snippet_cache`, rebuild it after toggling `include_obs_count` (cache hash changes).
 - When `vin_snippet_cache` is partial, set `vin_snippet_cache_allow_subset=true` in the offline cache dataset
   config to filter training entries to the cached subset.
+
 - To leverage obs-count features in PointNeXt, make sure the PointNeXt config’s `in_channels` accommodates the extra features.
 
 ## References

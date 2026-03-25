@@ -196,10 +196,12 @@ the semidense geometry *without* disrupting the interpretable voxel channels.
   summarizes **global geometry**. We want the global geometry to *shape* how the
   voxel context is interpreted rather than merely append another vector at the
   end.
+
 - FiLM-style modulation implements **content-aware gating**: the point cloud
   decides which global-context features should be amplified, suppressed, or
   shifted. This is analogous to conditional normalization, but keeps the base
   representation intact and interpretable.
+
 - It is **parameter-efficient** and stable: one linear layer produces scale/shift
   and can be paired with GroupNorm for controlled statistics.
 
@@ -231,6 +233,7 @@ global_feat = self.point_film_norm(global_feat.transpose(1, 2)).transpose(1, 2)
 
 - When the voxel grid misses geometry (out-of-bounds candidates), the point
   embedding can **down-weight unreliable global features**.
+
 - When semidense points indicate rich structure, the modulation **amplifies**
   the relevant global-context channels, improving RRI discrimination.
 

@@ -21,6 +21,7 @@ The Optuna database contains multiple “phases” mixed in one study:
 1. **Early trials** were effectively missing some suggested parameters (e.g. due to dependency gating and/or missing configs).
 2. **Later trials** include additional suggested params (e.g. OneCycleLR params and head/field dims), changing both the
    optimization landscape and the meaning of Optuna importances.
+
 3. A subset of trials includes a `config_correction` trial user attribute (written by the training code) indicating the
    runtime had to coerce certain options (most importantly: the PointNeXt encoder being forced off because its config was
    missing).
@@ -109,4 +110,3 @@ uv run nbv-optuna --config-path ./.configs/sweep_config.toml
 
 If we keep reusing the same Optuna study name, we should consider tagging new trials via Optuna `trial.set_user_attr`
 (e.g. `sweep_phase="arch_toggles_2026-01-07"`) to keep analysis clean.
-

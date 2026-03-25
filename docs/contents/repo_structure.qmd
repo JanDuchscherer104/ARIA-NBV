@@ -1,0 +1,90 @@
+---
+title: "Repository Structure"
+format: html
+---
+<!-- TODO: auto-generate this page based on the actual *.py source code. Provide the tree directory structure with concise descriptions of each module.
+
+- should we use some package to generate api docs from our module and the doc-strings?
+- what to include on this page?
+-->
+
+# External Code & Notebooks
+
+```text
+oracle_rri/                         # Project root (this repo)
+├── main.py                        # Builds default configs and diagnostics
+├── examples/simplified_dataset_usage.py
+├── scripts/
+│   ├── get_context.py             # AST-based symbol scanner (feeds docs)
+│   └── run_efm3d_on_ase.py        # Helper to invoke EVL on ASE shards
+├── oracle_rri/                    # Package code
+│   ├── analysis/depth_debugger.py # Depth→mesh distance + stats
+│   ├── configs/path_config.py     # Filesystem paths + helpers
+│   ├── data/                      # Typed views and dataset helpers
+│   │   ├── efm_dataset.py         # WebDataset→typed EFM snippets
+│   │   ├── efm_views.py           # Camera/trajectory/points/OBB typed wrappers
+│   │   ├── downloader.py          # ASE mesh + ATEK tar downloader
+│   │   ├── metadata.py            # Scene metadata parsing/filtering
+│   │   ├── plotting.py            # Plotly helpers for snippets/meshes
+│   │   └── utils.py               # Scene id parsing, validation
+│   ├── data_handling/             # New entrypoints and CLI over data
+│   │   ├── dataset.py             # Higher-level dataset wrapper + mesh pairing
+│   │   ├── downloader.py          # CLI-friendly download orchestrator
+│   │   ├── metadata.py            # Metadata cache/load utilities
+│   │   └── cli.py                 # Minimal CLI shims
+│   ├── pose_generation/           # Candidate pose sampling rules
+│   │   ├── candidate_generation.py
+│   │   ├── candidate_generation_rules.py
+│   │   ├── plotting.py
+│   │   └── types.py
+│   ├── rendering/                 # Candidate depth rendering backends
+│   │   ├── candidate_depth_renderer.py
+│   │   ├── efm3d_depth_renderer.py
+│   │   ├── pytorch3d_depth_renderer.py
+│   │   └── plotting.py
+│   ├── views/candidate_rendering.py # Point-cloud rendering from candidate poses
+│   ├── visualization/candidate_app.py # Streamlit UI for sampling/RRI inspection
+│   ├── viz/mesh_viz.py            # Trimesh/Plotly/Streamlit mesh + PC viz
+│   ├── utils/                     # Shared utilities
+│   │   ├── base_config.py         # Pydantic factory base + TOML IO
+│   │   ├── console.py             # Structured logging
+│   │   ├── frames.py              # Coordinate-frame helpers
+│   │   ├── rich_summary.py        # Rich-style summaries
+│   │   └── summary.py             # Text summaries
+│   └── streamlit_app.py           # Legacy Streamlit dashboard entrypoint
+├── tests/                         # Pytest suites
+│   ├── data_handling/             # Dataset/downloader/metadata tests
+│   ├── pose_generation/           # Sampling rule tests
+│   ├── rendering/                 # Depth rendering tests
+│   ├── views/                     # Candidate rendering tests
+│   ├── test_candidate_rendering.py
+│   ├── test_console.py
+│   ├── test_efm_dataset.py
+│   ├── test_mesh_cropping.py
+│   ├── test_plotting_semidense.py
+│   └── test_pose_generation.py
+├── SIMPLIFIED_DATA_HANDLING.md    # How-to for minimal data usage
+├── download_config.example.toml   # Downloader config template
+├── environment.yml                # Conda environment
+├── pyproject.toml / uv.lock       # Python packaging
+└── notebooks/ase_oracle_rri*.py   # Helper notebooks/scripts
+```
+
+```
+external/
+├── ATEK/                    # Aria toolkit for data processing
+├── efm3d/                   # EFM3D model implementation
+├── projectaria_tools/       # ASE dataset access utilities
+└── scenescript/             # Scene specification language tools
+```
+
+See an overview of the four utilized external codebases in [Resources & Tools](resources.qmd#resources-tools) and links to their repositories.
+
+```
+notebooks/
+├── ase_atek_data_exploration.ipynb    # ASE dataset exploration
+├── download_ase_meshes.ipynb          # GT mesh acquisition
+├── ase_atek_exploration.ipynb         # ATEK integration testing
+├── ase_exploration.ipynb              # Basic ASE data analysis
+└── inference.ipynb                    # Model inference experiments
+```

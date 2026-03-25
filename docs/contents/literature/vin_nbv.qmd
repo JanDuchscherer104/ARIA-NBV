@@ -18,7 +18,7 @@ VIN-NBV@VIN-NBV-frahm2025 presents a learning-based approach to NBV that directl
 4. **Greedy Sequential Policy**: Simple sampling-based strategy that selects best view given n randomly sampled candidates
 5. **Performance**: 30% improvement over coverage-based baseline, 40% improvement over RL methods (GenNBV, ScanRL)
 
-![VIN-NBV Architecture](../../figures/VIN_arch.png){#fig-vin-arch width=80%}
+![VIN-NBV Architecture](../../figures/arXiv-VIN-NBV/VIN_arch.png){#fig-vin-arch width=80%}
 
 ### Problem Formulation and RRI Metric
 

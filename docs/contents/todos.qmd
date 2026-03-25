@@ -14,12 +14,10 @@ Initial considerations and conceptual notes should be the first section of each 
 
 -->
 
-
 ## Master Thesis
 
 - find self-supervided objective for NBV pre-training
 - what would i render if i went to a candidate view?
--
 
 # Overview
 
@@ -74,6 +72,7 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 ## Training
 
 - [x] Create checkpoint on Ctrl+C exit during training loop.
+- [ ] Shuffle candidates and GT RRI values before each training step to avoid any ordering bias.
 
 ### Lightning
 
@@ -81,10 +80,8 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 - [ ] What other metrics should we log?
 
 ### DatamModule
+
 - [ ] Make the `OracleRriLabeler` compatible with `data_module.num_workers > 0`
-
-
-
 
 ## Metrics
 
@@ -134,6 +131,18 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
   **Root cause**: After we made `rotate_yaw_cw90(reference_pose)` part of the *physical* candidate-generation pipeline (rig-basis correction), the candidate frusta plot still applied `rotate_yaw_cw90` again for display. Since `rotate_yaw_cw90` is a **90° twist about the local +Z/forward axis** (i.e. a roll), this adds a constant extra roll offset on top of the random roll jitter, making the “up” axis cue swap with “left” once jitter is enabled.
 
   > **Done**: Candidate plots now default to `display_rotate=False` and `render_candidates_page` explicitly disables the extra display rotation for frusta + reference axes, so the plotted frusta match the physical pipeline.
+
+- [ ] `CandidateSamplingResult.reference_pose` is not gravity-aligned, even for `align_to_gravity=True`. Added a new field `sampling_pose` that is gravity-aligned when enabled. Downstream tasks and offline batches did not use the gravity aligned reference.
+  - **Downstream effects (concise)**:
+    - **Rendering**: unaffected (depths/point clouds use `poses_world_cam`; `reference_pose` is metadata only).
+    - **VIN pose encoding**: uses `reference_pose_world_rig` (physical rig frame) → relative pose frame includes a fixed roll/pitch offset when `align_to_gravity=True`, so pose encodings are *not* gravity-stable.
+    - **VINv3 frame consistency**: `model_v3.py` consumes `candidate_poses_world_cam`, `reference_pose_world_rig`, and `p3d_cameras`. As long as all three are in the **same physical rig frame**, learning is still possible. A **major issue** only arises if we mix frames (e.g., gravity‑aligned ref pose with unaligned `p3d_cameras` or candidate poses).
+      - **Offline cache check**: `candidate_poses_world_cam` and `p3d_cameras` match exactly (max abs R diff = 0, max abs T diff ~1e-6).
+      - **apply_cw90_correction pitfall**: undoing `rotate_yaw_cw90` on poses only (current behavior when `apply_cw90_correction=True`) breaks that alignment (max abs R diff ~1.25, max abs T diff ~12 for a cached sample), so semidense projection features are in a different camera frame than the pose/global context.
+      - **Actionable**: for cached data, keep `apply_cw90_correction=False` or rotate `p3d_cameras` (and `reference_pose_world_rig`) in lockstep with candidate poses.
+    - **Diagnostics**: “reference‑frame” pose histograms reflect the physical rig frame, not the gravity‑aligned sampling frame.
+    - **Offline cache**: stores only `reference_pose` (no `sampling_pose`), so cached datasets cannot be retrofitted without recompute (not possible right now).
+    - **Practical stance (no recompute)**: treat `align_to_gravity` as *sampling convenience* only; keep VIN inputs in the physical rig frame to avoid pose/camera mismatches.
 
 ::: {#fig-rpy-hists layout-ncol=2}
 
@@ -390,6 +399,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
   snippet_id: str
   backbone_out: EvlBackboneOutput # dict of tensors from EVL backbone!
   ```
+
   - save the enitre output of the EVL backbone instead of EvlBackboneOutput so that we can avoid recomputation if we decide to use different features anywhere down the line.
   -  dict full OracleRriLabeler results to an offline dataset for fast parallel reading to support multiple workers in the dataloader. Carry a full OracleRriLabelerConfig snapshot but exclude large path lists (e.g. tar URLs / mesh maps).
   - the metadata should carry all configuration settings
@@ -397,7 +407,6 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
   > **Done**: Added `oracle_rri/data/offline_cache.py` with cache writer/reader, config snapshots (sans tar_urls/scene_to_mesh), and `OracleRriCacheDataset` integration in `VinDataModule`.
 
 - [ ] Add option to compute new offline samples to [projects.scripts]! Ensure that it works correctly - that we can also switch easily in the datamodule - usage of concat dataset (offline -> online, switch from offline to offline extended with online when option to generate new offlines samples  is set in config. here we need to specify: per epoch (for both train and valied): how many new offline samples should be generated.
-
 - [ ] Offline cache metadata currently tracks a single config snapshot even if the cache directory contains samples from multiple runs/configs (samples embed the `config_hash` in their filenames, and append-time checks prevent mismatches, but load-time does not validate or filter).
   - We **do not** want to invalidate samples from other configs (treat them as augmentation), but we need an easy way to *identify* which cached samples belong to which config so we can drop subsets later.
   - Add lightweight bookkeeping (e.g., store `config_hash` per index entry or a summary map `config_hash -> {count, labeler_signature, backbone_signature, include_*}`) plus a small CLI/summary helper.
@@ -435,6 +444,7 @@ Show history data:
 print(run.history())
 ```
 **m3wwhhgv**:
+
   - Loss sits near the CORAL "uninformed" baseline (mean ~8.9 for K=15) -> little learning signal. (`.codex/vin_nbv_run_m3wwhhgv_analysis.md`)
   - `pred_rri_mean` is **ordinal expected** in [0,1], not metric RRI; plotting it against `rri_mean` is misleading.
   - Loss correlates with higher `rri_mean` (corr ~0.74): high-improvement batches are hardest.
@@ -444,6 +454,7 @@ print(run.history())
   - Identified potential error sources based on the above analysis `.codex/vin_model_error_sources.md`
 
 **hiiqoirw**:
+
   - Config: LFF-only pose encoding (no SH), `scene_field_channels=["occ_pr"]`, global_pool=attn, unknown_token=True.
   - Loss mean **9.37** (random CORAL baseline ~9.7) with minimal improvement over the run (early 9.23 -> late 9.18).
   - `pred_rri_mean_step` collapses to a narrow band **0.605-0.633** (std ~0.008); corr(pred_rri_mean, rri_mean) ~0.0.
@@ -467,10 +478,8 @@ print(run.history())
 - [ ] Add an explicit **frame-consistency** check for VIN inputs: if candidate generation applies `rotate_yaw_cw90` to the reference pose, ensure the **same** rotated reference pose is passed to VIN along with candidate poses and `p3d_cameras`. `backbone_out` stays in the world frame; only candidate/ref/camera must share the rotated basis.
   - *All* poses coming from the OracleRriLabeler have been rotated by 90 deg cw about their foward axis to allow correct candidate generation in the world frame. However, the poses produced by the EVL do not have this rotation applied.!
   - Poses with cw90 deg yaw: `candidate_poses_world_cam: PoseTW`, `reference_pose_world_rig: PoseTW`, extrinsics in `p3d_cameras: PerspectiveCameras`.
-
 - [ ] Add a different kind of leaned embedding for all points from semi-dence PC depending on their visibility from candidate pose
 - [ ] Add feature to the semi-dense: number of (historic) cameras in the efm snippet that saw this specific point.
-
 
 ### Feature Inventory (what VIN consumes)
 
@@ -613,14 +622,14 @@ Acceptance criteria:
   - Use **quantile edges** so bins have ~equal mass
   - Save binner to JSON (`num_classes` + `edges`) and reference it via `VinLightningModuleConfig.binner_path`
 
-  > **Done**: Implemented `oracle_rri/oracle_rri/vin/rri_binning.py` (`RriOrdinalBinner.fit_from_iterable/transform/save/load`) and wired it into the Lightning CLI (`nbv-fit-binner` / `nbv-train --fit-binner-only`).
+  > **Done**: Implemented `oracle_rri/oracle_rri/rri_metrics/rri_binning.py` (`RriOrdinalBinner.fit_from_iterable/transform/save/load`) and wired it into the Lightning CLI (`nbv-fit-binner` / `nbv-train --fit-binner-only`).
 
 - [x] Apply CORAL:
   - `logits: (N, K-1)`
   - `labels: (N,)` integer ordinal class
   - mask invalid candidates (`candidate_valid` ∧ `finite(rri)`)
 
-  > **Done**: Implemented `oracle_rri/oracle_rri/vin/coral.py` using `coral-pytorch` and trained with `coral_loss` in `oracle_rri/oracle_rri/lightning/lit_module.py`.
+  > **Done**: Implemented `oracle_rri/oracle_rri/rri_metrics/coral.py` using `coral-pytorch` and trained with `coral_loss` in `oracle_rri/oracle_rri/lightning/lit_module.py`.
 
 - [ ] Log metrics:
   - Spearman rank correlation between predicted score and oracle RRI
@@ -633,7 +642,6 @@ Acceptance criteria:
   - SH output dimension = (L+1)^2 for chosen L
   - voxel query pooling shapes + masking behavior
 
-
 #### 8 Documentation (implementation proposal)
 
 - [ ] Write `docs/contents/impl/vin_nbv.qmd`:
@@ -645,8 +653,6 @@ Acceptance criteria:
   - [ ] minimal ablations (occ only vs occ+obb; L=2 vs L=3; query depth/rays)
 
   > **Done**: Wrote the initial proposal and implementation notes in `docs/contents/impl/vin_nbv.qmd` (EVL interface, shell+SH descriptor, CORAL objective, and a minimal training loop example). Remaining doc items are the frustum query method + threshold versioning + ablations.
-
-
 
 ## Misc
 

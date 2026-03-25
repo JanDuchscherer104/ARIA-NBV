@@ -33,6 +33,22 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 
 `docs/typst/paper/main.typ` is the highest-level project ground truth. The Quarto pages below are secondary documentation surfaces and should stay aligned with the paper.
 
+## Paper
+
+- [Seminar Project Paper](typst/paper/main.pdf), [Typst Source](typst/paper/main.typ): Ground turth for the project state at the end of the seminar in 01/2025.
+
+## Project Slides
+
+### Main Seminar Presentations
+
+- [Presentation 01](typst/slides/slides_1.pdf), [typst-src](typst/slides/slides_1.typ)
+- [Presentation 02](typst/slides/slides_2.pdf), [typst-src](typst/slides/slides_2.typ)
+- [Presentation 04](typst/slides/slides_4.pdf), [typst-src](typst/slides/slides_4.typ): Final presentation of our seminar project.
+
+### Master's Thesis
+
+- [Outlook Presentation](typst/slides/slides_thesis_outlook.pdf), [typst-src](typst/slides/slides_thesis_outlook.typ): Future research directions and thesis proposal presentation.
+
 ## Setup & Installation
 
 - [Setup Instructions](contents/setup.qmd): Environment setup and dependencies
@@ -43,13 +59,6 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - **[Project Roadmap](contents/roadmap.qmd)**: Milestones and timeline
 - **[Research Questions](contents/questions.qmd)**: Open problems and directions
 - **[Experimental Findings](contents/experiments/findings.qmd)**: Run logs and takeaways
-
-## Agent Memory
-
-- Internal agent memory now lives under `.agents/memory/` and is not part of the published Quarto site.
-- Canonical state lives in `.agents/memory/state/` (`PROJECT_STATE.md`, `DECISIONS.md`, `OPEN_QUESTIONS.md`).
-- Episodic debriefs live in `.agents/memory/history/YYYY/MM/`.
-- The `.codex` migration inventory lives in `.agents/memory/index/codex_migration_manifest.md`.
 
 ## Theory & Background
 
@@ -91,165 +100,10 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - **[ProjectAria Tools Reference](contents/ext-impl/prj_aria_tools_impl.qmd)**: Dataset tooling
 - **[EFM3D Symbol Index](contents/ext-impl/efm3d_symbol_index.qmd)**: Keys and coordinate conventions
 
-## Paper
+- ## Agent Memory
 
-- [Seminar Project Paper](typst/paper/main.pdf), [Typst Source](typst/paper/main.typ): Ground turth for the project state at the end of the seminar in 01/2025.
+- Internal agent memory now lives under `.agents/memory/` and is not part of the published Quarto site.
+- Canonical state lives in `.agents/memory/state/` (`PROJECT_STATE.md`, `DECISIONS.md`, `OPEN_QUESTIONS.md`).
+- Episodic debriefs live in `.agents/memory/history/YYYY/MM/`.
+- The `.codex` migration inventory lives in `.agents/memory/index/codex_migration_manifest.md`.
 
-## Project Slides
-
-### Main Seminar Presentations
-
-- [Presentation 01](typst/slides/slides_1.pdf), [typst-src](typst/slides/slides_1.typ)
-- [Presentation 02](typst/slides/slides_2.pdf), [typst-src](typst/slides/slides_2.typ)
-- [Presentation 04](typst/slides/slides_4.pdf), [typst-src](typst/slides/slides_4.typ): Final presentation of our seminar project.
-
-### Master's Thesis
-
-- [Outlook Presentation](typst/slides/slides_thesis_outlook.typ): Future research directions and thesis proposal presentation.
-
-# External Code & Notebooks
-
-```
-external/
-├── ATEK/                    # Aria toolkit for data processing
-├── efm3d/                   # EFM3D model implementation
-├── projectaria_tools/       # ASE dataset access utilities
-└── scenescript/             # Scene specification language tools
-
-notebooks/
-├── ase_atek_data_exploration.ipynb    # ASE dataset exploration
-├── download_ase_meshes.ipynb          # GT mesh acquisition
-├── ase_atek_exploration.ipynb         # ATEK integration testing
-├── ase_exploration.ipynb              # Basic ASE data analysis
-└── inference.ipynb                    # Model inference experiments
-```
-
-# Codebase Trees with Module Notes
-
-```text
-oracle_rri/                         # Project root (this repo)
-├── main.py                        # Builds default configs and diagnostics
-├── examples/simplified_dataset_usage.py
-├── scripts/
-│   ├── get_context.py             # AST-based symbol scanner (feeds docs)
-│   └── run_efm3d_on_ase.py        # Helper to invoke EVL on ASE shards
-├── oracle_rri/                    # Package code
-│   ├── analysis/depth_debugger.py # Depth→mesh distance + stats
-│   ├── configs/path_config.py     # Filesystem paths + helpers
-│   ├── data/                      # Typed views and dataset helpers
-│   │   ├── efm_dataset.py         # WebDataset→typed EFM snippets
-│   │   ├── efm_views.py           # Camera/trajectory/points/OBB typed wrappers
-│   │   ├── downloader.py          # ASE mesh + ATEK tar downloader
-│   │   ├── metadata.py            # Scene metadata parsing/filtering
-│   │   ├── plotting.py            # Plotly helpers for snippets/meshes
-│   │   └── utils.py               # Scene id parsing, validation
-│   ├── data_handling/             # New entrypoints and CLI over data
-│   │   ├── dataset.py             # Higher-level dataset wrapper + mesh pairing
-│   │   ├── downloader.py          # CLI-friendly download orchestrator
-│   │   ├── metadata.py            # Metadata cache/load utilities
-│   │   └── cli.py                 # Minimal CLI shims
-│   ├── pose_generation/           # Candidate pose sampling rules
-│   │   ├── candidate_generation.py
-│   │   ├── candidate_generation_rules.py
-│   │   ├── plotting.py
-│   │   └── types.py
-│   ├── rendering/                 # Candidate depth rendering backends
-│   │   ├── candidate_depth_renderer.py
-│   │   ├── efm3d_depth_renderer.py
-│   │   ├── pytorch3d_depth_renderer.py
-│   │   └── plotting.py
-│   ├── views/candidate_rendering.py # Point-cloud rendering from candidate poses
-│   ├── visualization/candidate_app.py # Streamlit UI for sampling/RRI inspection
-│   ├── viz/mesh_viz.py            # Trimesh/Plotly/Streamlit mesh + PC viz
-│   ├── utils/                     # Shared utilities
-│   │   ├── base_config.py         # Pydantic factory base + TOML IO
-│   │   ├── console.py             # Structured logging
-│   │   ├── frames.py              # Coordinate-frame helpers
-│   │   ├── rich_summary.py        # Rich-style summaries
-│   │   └── summary.py             # Text summaries
-│   └── streamlit_app.py           # Legacy Streamlit dashboard entrypoint
-├── tests/                         # Pytest suites
-│   ├── data_handling/             # Dataset/downloader/metadata tests
-│   ├── pose_generation/           # Sampling rule tests
-│   ├── rendering/                 # Depth rendering tests
-│   ├── views/                     # Candidate rendering tests
-│   ├── test_candidate_rendering.py
-│   ├── test_console.py
-│   ├── test_efm_dataset.py
-│   ├── test_mesh_cropping.py
-│   ├── test_plotting_semidense.py
-│   └── test_pose_generation.py
-├── SIMPLIFIED_DATA_HANDLING.md    # How-to for minimal data usage
-├── download_config.example.toml   # Downloader config template
-├── environment.yml                # Conda environment
-├── pyproject.toml / uv.lock       # Python packaging
-└── notebooks/ase_oracle_rri*.py   # Helper notebooks/scripts
-```
-
-```text
-external/efm3d/
-├── data/
-│   ├── dataverse_url_parser.py      # Split/download helper for WDS tars + manifests
-│   └── download_ase_mesh.py         # Fetch ASE meshes (CLI stub)
-├── efm3d/
-│   ├── aria/
-│   │   ├── aria_constants.py        # Key names for all snippet tensors
-│   │   ├── camera.py                # CameraTW calibration tensors + projections
-│   │   ├── obb.py                   # ObbTW bounding-box tensor wrapper + ops
-│   │   ├── pose.py                  # PoseTW SE(3) math & interpolations
-│   │   ├── projection_utils.py      # Fisheye/pinhole project & unproject
-│   │   └── tensor_wrapper.py        # Smart tensor wrapper base + collate helpers
-│   ├── dataset/
-│   │   ├── atek_vrs_dataset.py      # Stream VRS into EVL-form snippets
-│   │   ├── atek_wds_dataset.py      # WDS stream → fixed-length snippets
-│   │   ├── augmentation.py          # Photometric/point jitter/drop augmentations
-│   │   ├── efm_model_adaptor.py     # Map ATEK fields into EVL schema + poses
-│   │   ├── vrs_dataset.py           # VRS reader dataset with configs
-│   │   └── wds_dataset.py           # WebDataset loader producing EVL tensors
-│   ├── inference/
-│   │   ├── eval.py                  # Accuracy/completeness AUC utilities
-│   │   ├── fuse.py                  # Depth/feature fusion into points/voxels
-│   │   ├── model.py                 # Load frozen EVL checkpoints for inference
-│   │   ├── pipeline.py              # End-to-end EVL inference driver
-│   │   ├── track.py                 # Trajectory utilities for snippets
-│   │   └── viz.py                   # Simple matplotlib plotting helpers
-│   ├── model/
-│   │   ├── cnn.py                   # Build EVL 2D CNN backbone
-│   │   ├── dinov2_utils.py          # DinoV2 backbone + schedulers/weight decay
-│   │   ├── dpt.py                   # DPT depth head backed by DinoV2
-│   │   ├── evl.py                   # EVL model wrapper
-│   │   ├── evl_train.py             # Training loop orchestration
-│   │   ├── image_tokenizer.py       # Image → DinoV2 tokens
-│   │   ├── lifter.py                # Lift 2D tokens into 3D volumes
-│   │   └── video_backbone.py        # Video backbones (DinoV2 variants)
-│   ├── thirdparty/mmdetection3d/
-│   │   └── iou3d.py                 # Rotated 3D IoU + CUDA NMS bindings
-│   └── utils/
-│       ├── common.py                # Nearest-neighbour helpers
-│       ├── depth.py                 # Depth → point cloud conversion
-│       ├── detection_utils.py       # Heatmap ⇄ OBB conversions + NMS
-│       ├── evl_loss.py              # OBB/occupancy loss assembly
-│       ├── file_utils.py            # Calibration/mesh/trajectory/file loaders
-│       ├── gravity.py               # Align gravity / fix orientation
-│       ├── image.py                 # Image color/resize/overlay utilities
-│       ├── image_sampling.py        # Patch extraction + feature sampling
-│       ├── marching_cubes.py        # Occupancy → mesh via marching cubes
-│       ├── mesh_utils.py            # Mesh IO + sampling + writing
-│       ├── obb_csv_writer.py        # Write OBBs to CSV/TSV
-│       ├── obb_io.py                # Load OBBs and convert to wrappers
-│       ├── obb_matchers.py          # IOU-based OBB matching
-│       ├── obb_metrics.py           # OBB IoU metrics and summaries
-│       ├── obb_trackers.py          # Track OBBs over time
-│       ├── obb_utils.py             # OBB validity, transforms, pruning
-│       ├── pointcloud.py            # PC downsample/visualise/save helpers
-│       ├── ray.py                   # Ray grids + intersections + sampling
-│       ├── reconstruction.py        # GT occupancy building + TV/occ loss
-│       ├── render.py                # OpenGL-based viz primitives
-│       ├── rescale.py               # Resize/rescale cameras, depth, OBBs
-│       ├── viz.py                   # EGL viewer + rendering utilities
-│       ├── voxel.py                 # Voxel grid creation/erosion helpers
-│       └── voxel_sampling.py        # Sample voxels / coordinate transforms
-├── eval.py                          # Top-level evaluation script stub
-├── infer.py                         # Inference entrypoint
-└── train.py                         # Training entrypoint + LR scheduler helper
-```

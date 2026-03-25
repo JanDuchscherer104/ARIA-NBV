@@ -54,6 +54,7 @@ Config fields surfaced from `CandidateViewGeneratorConfig`:
 Plot controls:
 
 - frustum scale, max frustums, option to plot only rejected poses
+- frame orthonormality expander reporting `R^T R - I` and `det(R)` for the reference and sampling poses
 
 Actions:
 

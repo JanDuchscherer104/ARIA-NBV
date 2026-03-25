@@ -295,6 +295,7 @@ how much the auxiliary objective shapes representation learning early on.
 
 - If CORAL ≈ 8 and aux ≈ 0.03, then values like $\lambda_{\text{aux}}\in[5,50]$
   make the aux signal meaningful without dominating.
+
 - Alternatively set $\lambda_{\text{aux}}\approx 0.1$ if aux should be a light
   calibrator only.
 
@@ -365,6 +366,7 @@ monitor = "val/coral_loss"
   thresholds, a rough random baseline is $(K-1)\log 2$ (for `K=15` this is
   $\approx 14\log 2 \approx 9.70$). Our code logs `coral_loss_rel_random` using
   `coral_random_loss(K)` so you can track progress relative to chance.
+
 - **Central-band confusion matrices:** often indicate “mean-optimal” predictions
   early, not necessarily a bug. They should widen over epochs as ordinal
   separation improves.

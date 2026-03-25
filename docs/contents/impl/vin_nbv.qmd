@@ -16,7 +16,7 @@ References:
 - CORAL ordinal regression (implementation): [coral-pytorch](https://raschka-research-group.github.io/coral-pytorch/) ([GitHub](https://github.com/Raschka-research-group/coral-pytorch))
 - Oracle label pipeline: [RRI computation](rri_computation.qmd) and `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`
 - VIN implementation: `oracle_rri/oracle_rri/vin/experimental/model.py` (`VinModel`), `oracle_rri/oracle_rri/vin/experimental/model_v2.py` (`VinModelV2`), `oracle_rri/oracle_rri/vin/model_v3.py` (`VinModelV3`, VIN-Core), and `oracle_rri/oracle_rri/lightning/lit_module.py` (`VinLightningModule.summarize_vin`)
-- Optional trajectory encoder: `oracle_rri/oracle_rri/vin/traj_encoder.py` (`TrajectoryEncoder`) for R6D+LFF encoding of `EfmTrajectoryView.t_world_rig`. In VIN v3, the pooled trajectory embedding can be appended to the candidate features (optional, no cross-attention).
+- Optional trajectory encoder: `oracle_rri/oracle_rri/vin/traj_encoder.py` (`TrajectoryEncoder`) for R6D+LFF encoding of `EfmTrajectoryView.t_world_rig`. In VINv3, the pooled trajectory embedding can be appended to the candidate features (optional, no cross-attention).
 
 # Problem statement
 
@@ -413,6 +413,7 @@ pose representation. We therefore recommend a simpler, continuous pose vector:
   stacked into a vector (continuous rotation representation). This yields:
   $x = [t, R_{6d}] \in \mathbb{R}^9$.
   See [Zhou et al. (2019)](https://arxiv.org/abs/1812.07035) [@zhou2019continuity].
+
 - **Scaling**: keep translation in meters, but normalize by a scene scale
   (e.g., 3 m) or learn per-group scaling before LFF to balance translation and
   rotation magnitudes.
@@ -491,6 +492,7 @@ Implementation details:
 - e3nn call: `e3nn.o3.spherical_harmonics(o3.Irreps.spherical_harmonics(lmax), d, normalize=True, normalization=...)`.
 - Default config (`ShellShPoseEncoderConfig`): `lmax=2` so $(L+1)^2=9$, and each direction is projected to
   `sh_out_dim=16` with `Linear(9→16) → GELU → Linear(16→16)`.
+
 - The `normalization` flag controls SH scaling (`"component"` or `"norm"`); see the
   [e3nn docs](https://docs.e3nn.org/en/stable/api/o3/o3_sh.html) [@e3nn-SphericalHarmonics-2025].
 
@@ -545,13 +547,16 @@ $$
 3. Project the field with a **1×1×1 Conv3d + GroupNorm + GELU** (default: `C_in=3 → field_dim=16`).
 4. Compute a **global context token** via pose-conditioned attention pooling over a coarse voxel grid
    (optional; `use_global_pool=True`, `global_pool_mode="attn"` by default; mean/mean+max are available).
+
 5. Encode the **voxel grid pose** (`voxel/T_world_voxel`) in the *reference rig frame* using the same
    `LearnableFourierFeatures` pose encoder. This is a global token shared by all candidates
    (`use_voxel_pose_encoding=True` by default).
+
 6. For each candidate:
    - pose token: `LearnableFourierFeatures([u,f,r,s])` → `pose_enc` (default: 64 dims),
    - local token: sample **K = grid_size² × len(depths)** frustum points in world coordinates (default: `4²×4=64`),
      sample the voxel field there, then pool with an **unknown-token mean** (or masked mean) → `local_feat` (default: 16 dims).
+
 7. Concatenate `[pose_enc, global_feat?, voxel_pose_enc?, local_feat, valid_frac?]` and score with
    `VinScorerHead` (MLP + CORAL logits). `valid_frac` exposes frustum coverage so low-coverage candidates can still
    score highly when they reveal unknown surfaces.
@@ -565,12 +570,15 @@ architecture toggles while exposing a **configurable pose encoder** via a discri
    We compute the relative pose
    $T_{\text{rig}\leftarrow\text{cam}} = T_{\text{world}\leftarrow\text{rig}}^{-1} T_{\text{world}\leftarrow\text{cam}}$
    and then encode it with the selected pose encoder:
+
    - **Default (`r6d_lff`)**: $x=[t/s_t,\; \mathrm{r6d}(R)/s_r] \in \mathbb{R}^9$, where $\mathrm{r6d}$ is the 6D
      rotation representation (first two columns of $R$) [@zhou2019continuity]. The per-group scales $(s_t,s_r)$ are
      **learned** to balance translation vs. rotation before the LFF encoder (see PyTorch3D transforms
      [@pytorch3d-transforms]).
+
    - **Optional (`shell_lff`, `shell_sh`)**: shell descriptors $(u,f,r,s)$ with forward direction only. These ignore
      roll about the forward axis, which is acceptable when roll jitter is small; use `r6d_lff` if roll matters.
+
 2. **Scene field (configurable channels).**
    The current implementation constructs a compact field from EVL heads/evidence and then projects it with
    `1×1×1 Conv3d + GroupNorm + GELU`. The **implemented** channels are:
@@ -580,26 +588,32 @@ architecture toggles while exposing a **configurable pose encoder** via a discri
 
    The default `scene_field_channels` list is
    `["occ_pr", "occ_input", "counts_norm", "cent_pr", "free_input", "new_surface_prior"]`.
+
 3. **Global context (pose-conditioned attention).**
    A coarse voxel grid is pooled and attended by the pose embeddings. Keys are augmented with an **LFF positional
    encoding over XYZ voxel centers** derived from `voxel/pts_world` (normalized voxel coordinates) before attention.
    The pooler now uses **separate keys and values**, plus a minimal **LayerNorm + residual + MLP** block for stability.
+
 4. **View-dependent semidense features (official).**
    For each candidate, we project semidense points into the candidate view and compute lightweight coverage/depth
    statistics (coverage, empty fraction, valid fraction, depth mean/std). In addition, the same projected points
    are summarized with **multi-head cross-attention (MHCA)** conditioned on the candidate pose, producing a
    view‑specific frustum descriptor. Both signals are appended to the head input and provide explicit VIN‑NBV‑style
    view conditioning.
+
 5. **Optional semidense point encoder (PointNeXt‑S).**
    A snippet‑level semidense embedding can be computed once and repeated for all candidates. This is useful as a
    global scene prior but is not view‑specific; it is therefore treated as an auxiliary signal. When enabled, the
    embedding can modulate `global_feat` via a FiLM‑style scale/shift
    (feature‑wise linear modulation [@FiLM-perez2018]) — currently an experimental option.
+
 6. **Optional trajectory context.**
    If enabled, a trajectory encoder summarizes the snippet’s rig poses and appends the context to each candidate.
+
 7. **CORAL head.**
    We concatenate `[pose_enc, global_feat, semidense_proj, semidense_frustum, semidense_feat?, traj_ctx?]` and
    score with the CORAL head.
+
 8. **Frame correction (cw90).**
    If candidates/poses were rotated by `rotate_yaw_cw90` in the labeler, the model **undoes** the rotation on
    the input poses (no camera rebuild is needed in v2).
@@ -616,6 +630,7 @@ This makes the model robust to early attention instability while still enabling 
 - **Candidate-relative positional encoding**: global attention still uses absolute voxel positions in the
   reference rig frame. Relative encodings often help in 3D attention; consider switching to candidate‑relative
   positions (see Point Transformer [@point-transformer-zhao2021]).
+
 - **Stage effects**: VIN‑NBV uses stage‑normalized binning to handle early vs late reconstruction phases
   [@VIN-NBV-frahm2025]. Adding a stage proxy scalar (e.g., mean coverage or point count) is a low‑cost improvement.
 
@@ -799,7 +814,7 @@ We follow the same structure:
 
 1. **Oracle labels**: for each snippet, generate candidates and compute oracle RRI using `OracleRriLabeler` (candidate → render depth → backproject PCs → mesh distance → RRI).
 2. **Binning (current implementation)**: convert oracle RRI values to ordinal labels $y\in\{0,\dots,K-1\}$ using
-   `oracle_rri/oracle_rri/vin/rri_binning.py` (`RriOrdinalBinner`).
+   `oracle_rri/oracle_rri/rri_metrics/rri_binning.py` (`RriOrdinalBinner`).
 
    We fit $K-1$ **empirical quantiles** (equal-mass bins) on a stream of oracle RRIs and store the edges
    $\mathbf{e}=(e_1,\dots,e_{K-1})$.
@@ -810,6 +825,7 @@ We follow the same structure:
    - Computes quantiles at $q_j = j/K$ via `torch.quantile`.
    - If edges collapse (duplicate quantiles), falls back to uniform edges between
      the observed min/max (or `[-1,1]` as a last resort).
+
    - Supports resumable fitting by saving `.pt` fit data and exporting the final binner as JSON.
 
    Then for an RRI value $r$ the label is computed via `torch.bucketize`:
@@ -822,8 +838,10 @@ We follow the same structure:
 
    - Fit data can be saved/resumed (`.pt` state with RRI chunks) and the fitted binner is saved as JSON (`num_classes`,
      `edges`, optional `bin_means`, `bin_stds`, and `bin_counts` for priors).
+
    - On training start, if `VinLightningModuleConfig.num_classes` differs from the saved binner JSON, the binner is
      automatically refit and the JSON is overwritten with the new class count.
+
    - If quantile edges collapse (degenerate quantiles), we fall back to uniform edges between the observed min/max (or
      `[-1,1]` as a last resort).
 
@@ -838,7 +856,7 @@ We follow the same structure:
    $$
 
    and predicts logits $\ell_k$ for each threshold. The loss is the sum of binary cross-entropies over thresholds
-   (see `oracle_rri/oracle_rri/vin/coral.py`).
+   (see `oracle_rri/oracle_rri/rri_metrics/coral.py`).
 
    Explicitly:
 
@@ -868,8 +886,10 @@ We follow the same structure:
 
    - `coral_bias_init="prior_logits"` initializes CORAL threshold biases from empirical priors (`bin_counts`),
      instead of a generic descending scheme.
+
    - `coral_loss_variant="balanced_bce"` applies per-threshold positive-class weighting using
      $P(y>k)$ (from the fitted binner or the current batch).
+
    - `coral_loss_variant="focal"` applies focal weighting to the per-threshold BCE to combat collapse
      under severe imbalance [@FocalLoss-lin2017].
 

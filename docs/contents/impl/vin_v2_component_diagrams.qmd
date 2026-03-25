@@ -171,4 +171,3 @@ flowchart LR
     mlp --> coral["CORAL layer<br/>(K-1 logits)"]
     coral --> out["prob + expected RRI"]
 ```
-
