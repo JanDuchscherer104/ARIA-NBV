@@ -35,8 +35,6 @@ This document covers all components essential for our **Next-Best-View (NBV)** p
 
 ## 1. Core Architecture & Classes
 
-![ProjectAria Tools Core Classes](../../figures/impl/prj_aria/projectaria_core_classes.svg){fig-align="center" width="100%"}
-
 **Key Packages:**
 
 - **`core.sophus`**: SE3/SO3 transformation groups (rotation + translation)

@@ -520,15 +520,11 @@ In the legacy `ShellShPoseEncoder`:
 We currently include the alignment scalar $s=\langle f,-u\rangle$ (one value per candidate) and project it with a small
 MLP: `Linear(1→32) → GELU → Linear(32→16)` (`scalar_out_dim=16`).
 
-## D) Legacy encoding visualizations (actual)
+## D) Legacy encoding visualizations
 
-::: {#fig-vin-sh-fourier layout-ncol=2}
-![Real SH components over azimuth/elevation (lmax=2, component normalization).](../../figures/impl/vin/vin_sh_components.png)
-![1D radius Fourier features with the default frequency bank.](../../figures/impl/vin/vin_radius_fourier_features.png)
-
-Actual encoding plots generated with `oracle_rri.vin.plotting.build_vin_encoding_figures` using the legacy
-`ShellShPoseEncoderConfig` (lmax=2, 6 frequencies, linear radius input) on a sample snippet.
-:::
+The old illustrative SH/Fourier plots were removed during the thesis cleanup because they reflected a legacy
+encoder configuration rather than the current VIN stack. If we want this section back, regenerate figures from the
+current implementation instead of restoring the outdated assets.
 
 ## Legacy output dimensionality (default)
 
@@ -894,12 +890,8 @@ We follow the same structure:
      under severe imbalance [@FocalLoss-lin2017].
 
 4. **Binning diagnostics (plots).** The script `oracle_rri/scripts/plot_vin_binning.py`
-   generates the RRI histogram with quantile edges and a dedicated edge plot (Seaborn):
-
-::: {#fig-vin-rri-binning layout-nrow=2}
-![Raw RRI distribution with quantile edges.](../../figures/impl/vin/vin_rri_binning.png)
-![Quantile thresholds $e_j$ (Seaborn).](../../figures/impl/vin/vin_rri_thresholds.png)
-:::
+   generates the RRI histogram with quantile edges and a dedicated edge plot (Seaborn). The legacy rendered
+   examples were removed during cleanup; regenerate them from the current script if we still want them embedded here.
 
 At inference time we use the expected ordinal value (normalized to $[0,1]$) as the candidate score. With
 $p_k=\sigma(\ell_k)=\mathbb{P}(y>k)$:
