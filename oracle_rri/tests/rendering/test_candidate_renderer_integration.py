@@ -23,7 +23,6 @@ from oracle_rri.data.efm_views import EfmSnippetView  # noqa: E402
 from oracle_rri.pose_generation.types import CandidateSamplingResult  # noqa: E402
 from oracle_rri.rendering import (  # noqa: E402
     CandidateDepthRendererConfig,
-    Efm3dDepthRendererConfig,
     Pytorch3DDepthRendererConfig,
 )
 
@@ -56,7 +55,7 @@ def efm_config(path_cfg):
         paths=path_cfg,
         scene_ids=["81283"],
         batch_size=None,
-        verbose=False,
+        verbosity=0,
         load_meshes=True,
         require_mesh=True,
         mesh_simplify_ratio=0.02,  # aggressive decimation for test speed
@@ -74,11 +73,24 @@ def _single_candidate(sample):
     base_cam = sample.camera_slam_left.calib
     calib_last = base_cam[-1] if base_cam.tensor().ndim > 1 else base_cam
     t_ref_cam = PoseTW.from_matrix3x4(torch.eye(3, 4).unsqueeze(0))
-    cam_data = torch.cat(
-        [calib_last.tensor()[..., :10], t_ref_cam.tensor(), calib_last.dist],
-        dim=-1,
+    size = calib_last.size.reshape(-1, 2)[0]
+    focals = calib_last.f.reshape(-1, 2)[0]
+    centers = calib_last.c.reshape(-1, 2)[0]
+    dist = calib_last.dist.reshape(1, -1)
+    cam = CameraTW.from_parameters(
+        width=torch.tensor([[float(size[0].item())]]),
+        height=torch.tensor([[float(size[1].item())]]),
+        fx=torch.tensor([[float(focals[0].item())]]),
+        fy=torch.tensor([[float(focals[1].item())]]),
+        cx=torch.tensor([[float(centers[0].item())]]),
+        cy=torch.tensor([[float(centers[1].item())]]),
+        gain=torch.zeros((1, 1)),
+        exposure_s=torch.zeros((1, 1)),
+        valid_radiusx=torch.tensor([[float(max(size[0].item(), size[1].item()))]]),
+        valid_radiusy=torch.tensor([[float(max(size[0].item(), size[1].item()))]]),
+        T_camera_rig=t_ref_cam,
+        dist_params=dist,
     )
-    cam = CameraTW(cam_data)
     return CandidateSamplingResult(
         views=cam,
         reference_pose=sample.trajectory.t_world_rig[-1],
@@ -92,8 +104,8 @@ def _single_candidate(sample):
 def test_integration_pytorch3d_backend(efm_sample):
     candidates = _single_candidate(efm_sample)
     cfg = CandidateDepthRendererConfig(
-        max_candidates=1,
-        renderer=Pytorch3DDepthRendererConfig(device="cpu", faces_per_pixel=1, verbose=False),
+        max_candidates_final=1,
+        renderer=Pytorch3DDepthRendererConfig(device="cpu", verbosity=0),
     )
     renderer = cfg.setup_target()
     batch = renderer.render(sample=efm_sample, candidates=candidates)
@@ -121,6 +133,8 @@ def test_integration_cpu_backend(efm_sample):
         scene_id=efm_sample.scene_id,
         snippet_id=efm_sample.snippet_id,
         mesh=efm_sample.mesh,
+        mesh_verts=efm_sample.mesh_verts,
+        mesh_faces=efm_sample.mesh_faces,
     )
 
     # Heavily decimate mesh for speed while keeping real-scene geometry.
@@ -133,12 +147,14 @@ def test_integration_cpu_backend(efm_sample):
         scene_id=sample_small.scene_id,
         snippet_id=sample_small.snippet_id,
         mesh=mesh_small,
+        mesh_verts=torch.from_numpy(mesh_small.vertices).to(dtype=torch.float32),
+        mesh_faces=torch.from_numpy(mesh_small.faces).to(dtype=torch.int64),
     )
 
     candidates = _single_candidate(sample_cpu)
     cfg = CandidateDepthRendererConfig(
-        max_candidates=1,
-        renderer=Efm3dDepthRendererConfig(device="cpu", add_proxy_walls=True, chunk_rays=150_000),
+        max_candidates_final=1,
+        renderer=Pytorch3DDepthRendererConfig(device="cpu", verbosity=0),
     )
     renderer = cfg.setup_target()
     batch = renderer.render(sample=sample_cpu, candidates=candidates)

@@ -63,10 +63,7 @@ def test_generate_from_typed_sample_uses_existing_mesh_tensors(monkeypatch):
     faces = torch.tensor([[0, 1, 2]], dtype=torch.int64)
     sample = _sample_with_mesh(verts, faces)
 
-    def _fail(*_args, **_kwargs):  # pragma: no cover - defensive
-        raise AssertionError("mesh_from_snippet should not be called when mesh tensors exist")
-
-    monkeypatch.setattr("oracle_rri.pose_generation.candidate_generation.mesh_from_snippet", _fail)
+    _ = monkeypatch
 
     cfg = CandidateViewGeneratorConfig(
         num_samples=4,

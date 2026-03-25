@@ -20,7 +20,7 @@ def _unit_square_mesh(device: torch.device, *, dtype: torch.dtype) -> tuple[torc
     return verts, faces
 
 
-def test_oracle_rri_chunk_size_matches_unchunked():
+def test_oracle_rri_score_matches_score_batch_alias():
     torch.manual_seed(0)
     device = torch.device("cpu")
     dtype = torch.float32
@@ -34,35 +34,28 @@ def test_oracle_rri_chunk_size_matches_unchunked():
     lengths_q = torch.full((num_candidates,), max_points_q, device=device, dtype=torch.long)
     extend = torch.tensor([-2, 2, -2, 2, -2, 2], device=device, dtype=dtype)
 
-    out_full = (
-        OracleRRIConfig(candidate_chunk_size=None)
-        .setup_target()
-        .score(
-            points_t=points_t,
-            points_q=points_q,
-            lengths_q=lengths_q,
-            gt_verts=gt_verts,
-            gt_faces=gt_faces,
-            extend=extend,
-        )
+    oracle = OracleRRIConfig().setup_target()
+    out_score = oracle.score(
+        points_t=points_t,
+        points_q=points_q,
+        lengths_q=lengths_q,
+        gt_verts=gt_verts,
+        gt_faces=gt_faces,
+        extend=extend,
     )
-    out_chunked = (
-        OracleRRIConfig(candidate_chunk_size=2)
-        .setup_target()
-        .score(
-            points_t=points_t,
-            points_q=points_q,
-            lengths_q=lengths_q,
-            gt_verts=gt_verts,
-            gt_faces=gt_faces,
-            extend=extend,
-        )
+    out_batch = oracle.score_batch(
+        points_t=points_t,
+        points_q=points_q,
+        lengths_q=lengths_q,
+        gt_verts=gt_verts,
+        gt_faces=gt_faces,
+        extend=extend,
     )
 
-    assert torch.allclose(out_full.rri, out_chunked.rri, atol=1e-6)
-    assert torch.allclose(out_full.pm_dist_after, out_chunked.pm_dist_after, atol=1e-6)
-    assert torch.allclose(out_full.pm_acc_after, out_chunked.pm_acc_after, atol=1e-6)
-    assert torch.allclose(out_full.pm_comp_after, out_chunked.pm_comp_after, atol=1e-6)
+    assert torch.allclose(out_score.rri, out_batch.rri, atol=1e-6)
+    assert torch.allclose(out_score.pm_dist_after, out_batch.pm_dist_after, atol=1e-6)
+    assert torch.allclose(out_score.pm_acc_after, out_batch.pm_acc_after, atol=1e-6)
+    assert torch.allclose(out_score.pm_comp_after, out_batch.pm_comp_after, atol=1e-6)
 
 
 def test_oracle_rri_handles_empty_candidate_pointclouds():
@@ -82,7 +75,7 @@ def test_oracle_rri_handles_empty_candidate_pointclouds():
     extend = torch.tensor([-2, 2, -2, 2, -2, 2], device=device, dtype=dtype)
 
     out = (
-        OracleRRIConfig(candidate_chunk_size=2)
+        OracleRRIConfig()
         .setup_target()
         .score(
             points_t=points_t,

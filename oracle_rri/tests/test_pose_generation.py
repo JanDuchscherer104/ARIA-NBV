@@ -40,7 +40,7 @@ def efm_sample(path_cfg):
         paths=path_cfg,
         scene_ids=["81283"],
         batch_size=None,
-        verbose=False,
+        verbosity=0,
         load_meshes=True,
         require_mesh=False,
         mesh_simplify_ratio=None,
@@ -61,16 +61,16 @@ def test_generator_runs_on_efm_sample(efm_sample):
     gen = CandidateViewGenerator(gen_cfg)
     result = gen.generate_from_typed_sample(efm_sample)
 
-    poses = result["poses"]
-    mask = result["mask_valid"]
-    shell = result["shell_poses"]
-    masks = result["masks"]
+    poses = result.poses_world_cam().tensor()
+    mask = result.mask_valid
+    shell = result.shell_poses
+    masks = result.masks
 
     assert poses.shape[-1] == 12
     assert isinstance(mask, torch.Tensor) and mask.dtype == torch.bool
     assert mask.numel() == poses.shape[0]
-    assert len(shell) > 0
-    assert isinstance(masks, torch.Tensor) and masks.shape[0] == len(gen.rules)
+    assert shell is not None and shell.tensor().shape[0] > 0
+    assert isinstance(masks, dict)
     # At least one valid candidate
     assert mask.sum() > 0
 

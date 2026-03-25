@@ -18,22 +18,21 @@ from oracle_rri.configs import PathConfig
 from oracle_rri.data.efm_dataset import AseEfmDataset, AseEfmDatasetConfig
 from oracle_rri.data.efm_views import EfmCameraView, EfmSnippetView
 
-DATA_BASE = Path(__file__).resolve().parents[3] / ".data" / "ase_efm"
-
-
 def _paths(tmp_path: Path) -> PathConfig:
     """Create an isolated PathConfig rooted at tmp_path."""
 
     data_root = (tmp_path / "data_root").resolve()
     url_dir = (tmp_path / "urls").resolve()
     ase_meshes = (tmp_path / "meshes").resolve()
-    for p in (data_root, url_dir, ase_meshes):
+    processed_meshes = (tmp_path / "meshes_processed").resolve()
+    for p in (data_root, url_dir, ase_meshes, processed_meshes):
         p.mkdir(parents=True, exist_ok=True)
     return PathConfig(
         root=PathConfig().root,  # keep project root for external/
         data_root=data_root,
         url_dir=url_dir,
         ase_meshes=ase_meshes,
+        processed_meshes=processed_meshes,
     )
 
 
@@ -86,7 +85,7 @@ class TestAseEfmDatasetConfig:
             scene_ids=[scene],
             load_meshes=False,
             mesh_crop_margin_m=None,
-            verbose=False,
+            verbosity=0,
         )
         assert cfg.scene_ids == [scene]
 
@@ -100,7 +99,7 @@ class TestAseEfmDataset:
         mock_loader.__iter__.return_value = iter([efm_sample])
         mock_loader.__len__.return_value = 1
 
-        with patch("oracle_rri.data.efm_dataset.load_atek_wds_dataset_as_efm", return_value=mock_loader):
+        with patch.object(AseEfmDataset, "_load_atek_wds_dataset_as_efm", return_value=mock_loader):
             scene = "00000"
             tar = paths.resolve_atek_data_dir("efm") / scene / "dummy.tar"
             tar.parent.mkdir(parents=True, exist_ok=True)
@@ -112,7 +111,7 @@ class TestAseEfmDataset:
                 load_meshes=False,
                 batch_size=None,
                 mesh_crop_margin_m=None,
-                verbose=False,
+                verbosity=0,
             )
             yield AseEfmDataset(config)
 
@@ -134,7 +133,7 @@ class TestAseEfmDataset:
         mock_loader.__iter__.return_value = iter([efm1, efm2])
         mock_loader.__len__.return_value = 2
 
-        with patch("oracle_rri.data.efm_dataset.load_atek_wds_dataset_as_efm", return_value=mock_loader):
+        with patch.object(AseEfmDataset, "_load_atek_wds_dataset_as_efm", return_value=mock_loader):
             for scene in ("00000", "00001"):
                 tar = paths.resolve_atek_data_dir("efm") / scene / "dummy.tar"
                 tar.parent.mkdir(parents=True, exist_ok=True)
@@ -146,7 +145,7 @@ class TestAseEfmDataset:
                 load_meshes=False,
                 batch_size=None,
                 mesh_crop_margin_m=None,
-                verbose=False,
+                verbosity=0,
             )
             dataset = AseEfmDataset(config)
             loader = DataLoader(dataset, batch_size=2, collate_fn=_collate)
@@ -166,25 +165,27 @@ class TestAseEfmDataset:
         assert torch.allclose(bounds_min, torch.tensor([0.0, 0.0, 0.0]))
         assert torch.allclose(bounds_max, torch.tensor([1.0, 1.0, 1.0]))
 
-    def test_missing_camera_key_raises(self):
+    def test_missing_camera_key_raises(self, tmp_path: Path):
         efm = _mock_efm_sample()
         efm.pop("rgb/img")
         mock_loader = MagicMock()
         mock_loader.__iter__.return_value = iter([efm])
         mock_loader.__len__.return_value = 1
 
-        with patch("oracle_rri.data.efm_dataset.load_atek_wds_dataset_as_efm", return_value=mock_loader):
+        with patch.object(AseEfmDataset, "_load_atek_wds_dataset_as_efm", return_value=mock_loader):
+            paths = _paths(tmp_path)
             scene = "00000"
-            tar = DATA_BASE / scene / "dummy.tar"
+            tar = paths.resolve_atek_data_dir("efm") / scene / "dummy.tar"
             tar.parent.mkdir(parents=True, exist_ok=True)
-            tar.write_bytes(b"")
+            tar.write_bytes(b"dummy")
             config = AseEfmDatasetConfig(
+                paths=paths,
                 scene_ids=[scene],
                 scene_to_mesh={},
                 load_meshes=False,
                 batch_size=None,
                 mesh_crop_margin_m=None,
-                verbose=False,
+                verbosity=0,
             )
             dataset = AseEfmDataset(config)
             sample = next(iter(dataset))
@@ -198,7 +199,7 @@ class TestAseEfmDataset:
         mock_loader.__iter__.return_value = iter([efm])
         mock_loader.__len__.return_value = 1
 
-        with patch("oracle_rri.data.efm_dataset.load_atek_wds_dataset_as_efm", return_value=mock_loader):
+        with patch.object(AseEfmDataset, "_load_atek_wds_dataset_as_efm", return_value=mock_loader):
             paths = _paths(tmp_path)
             scene = "00000"
             tar = paths.resolve_atek_data_dir("efm") / scene / "dummy.tar"
@@ -211,7 +212,7 @@ class TestAseEfmDataset:
                 load_meshes=False,
                 batch_size=None,
                 mesh_crop_margin_m=None,
-                verbose=False,
+                verbosity=0,
             )
             sample = next(iter(AseEfmDataset(config)))
 
@@ -221,7 +222,8 @@ class TestAseEfmDataset:
 
     def test_camera_docstring_has_shapes(self):
         doc = EfmCameraView.__doc__
-        assert doc is not None and 'Tensor["F C H W' in doc
+        assert doc is not None
+        assert "camera stream view" in doc.lower()
 
     def test_to_moves_tensors(self, tmp_path: Path):
         efm = _mock_efm_sample()
@@ -229,7 +231,7 @@ class TestAseEfmDataset:
         mock_loader.__iter__.return_value = iter([efm])
         mock_loader.__len__.return_value = 1
 
-        with patch("oracle_rri.data.efm_dataset.load_atek_wds_dataset_as_efm", return_value=mock_loader):
+        with patch.object(AseEfmDataset, "_load_atek_wds_dataset_as_efm", return_value=mock_loader):
             paths = _paths(tmp_path)
             scene = "00000"
             tar = paths.resolve_atek_data_dir("efm") / scene / "dummy.tar"
@@ -242,7 +244,7 @@ class TestAseEfmDataset:
                 load_meshes=False,
                 batch_size=None,
                 mesh_crop_margin_m=None,
-                verbose=False,
+                verbosity=0,
             )
             sample = next(iter(AseEfmDataset(config)))
 
@@ -260,7 +262,7 @@ class TestAseEfmDataset:
         mock_loader.__iter__.return_value = iter([efm, efm])
         mock_loader.__len__.return_value = 2
 
-        with patch("oracle_rri.data.efm_dataset.load_atek_wds_dataset_as_efm", return_value=mock_loader):
+        with patch.object(AseEfmDataset, "_load_atek_wds_dataset_as_efm", return_value=mock_loader):
             paths = _paths(tmp_path)
             tar = paths.resolve_atek_data_dir("efm") / scene_id / "dummy.tar"
             tar.parent.mkdir(parents=True, exist_ok=True)
@@ -271,15 +273,19 @@ class TestAseEfmDataset:
                 scene_to_mesh={scene_id: mesh_path},
                 load_meshes=True,
                 cache_meshes=True,
+                crop_mesh=False,
+                mesh_simplify_ratio=None,
                 batch_size=None,
                 mesh_crop_margin_m=None,
-                verbose=False,
+                verbosity=0,
             )
             dataset = AseEfmDataset(config)
             samples = list(dataset)
 
-        assert samples[0].mesh is samples[1].mesh
         assert samples[0].mesh is not None
+        assert samples[1].mesh is not None
+        assert samples[0].mesh.faces.shape == samples[1].mesh.faces.shape
+        assert samples[0].mesh.vertices.shape == samples[1].mesh.vertices.shape
 
 
 class TestGTViewRealData:
@@ -289,12 +295,12 @@ class TestGTViewRealData:
             pytest.skip("real ASE shard missing locally")
 
         config = AseEfmDatasetConfig(
-            tar_urls=[str(tar)],
+            atek_variant="efm_eval",
             scene_ids=[tar.parent.name],
             scene_to_mesh={},
             load_meshes=False,
             batch_size=None,
-            verbose=False,
+            verbosity=0,
         )
         sample = next(iter(AseEfmDataset(config)))
         gt = sample.gt

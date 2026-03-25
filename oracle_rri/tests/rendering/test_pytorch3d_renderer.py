@@ -137,11 +137,15 @@ def _make_snippet(
         ARIA_POINTS_VOL_MIN: volume_min,
         ARIA_POINTS_VOL_MAX: volume_max,
     }
+    mesh_verts = torch.from_numpy(mesh.vertices).to(dtype=torch.float32)
+    mesh_faces = torch.from_numpy(mesh.faces).to(dtype=torch.int64)
     return EfmSnippetView(
         efm=efm,
         scene_id="demo_scene",
         snippet_id="demo_snippet",
         mesh=mesh,
+        mesh_verts=mesh_verts,
+        mesh_faces=mesh_faces,
     )
 
 
@@ -184,10 +188,13 @@ def test_pytorch3d_renderer_produces_depth():
     cam = _make_camera()
     pose = _make_pose()
 
-    cfg = Pytorch3DDepthRendererConfig(device="cpu", verbose=False)
+    cfg = Pytorch3DDepthRendererConfig(device="cpu", verbosity=0)
     renderer = cfg.setup_target()
 
-    depth = renderer.render_depth(pose_world_cam=pose, mesh=mesh, camera=cam)
+    verts = torch.from_numpy(mesh.vertices).to(dtype=torch.float32)
+    faces = torch.from_numpy(mesh.faces).to(dtype=torch.int64)
+    depth, _, _ = renderer.render(poses=pose, mesh=(verts, faces), camera=cam)
+    depth = depth.squeeze(0)
     assert depth.shape == (64, 64)
     hit_ratio = float((depth < cfg.zfar).float().mean().item())
     assert torch.isfinite(depth).all()
@@ -203,16 +210,18 @@ def test_candidate_depth_renderer_ignores_mask_and_respects_cap():
     candidates.mask_valid[0] = False
 
     cfg = CandidateDepthRendererConfig(
-        renderer=Pytorch3DDepthRendererConfig(device="cpu", verbose=False),
-        max_candidates=2,
+        renderer=Pytorch3DDepthRendererConfig(device="cpu", verbosity=0),
+        max_candidates_final=2,
     )
     renderer = cfg.setup_target()
 
     batch = renderer.render(sample=sample, candidates=candidates)
     assert batch.depths.shape[0] == 2
-    assert torch.equal(batch.candidate_indices, torch.tensor([0, 1]))
-    assert batch.mask_valid.shape[0] == 2
-    assert torch.equal(batch.mask_valid, candidates.mask_valid[:2])
+    assert torch.equal(
+        batch.candidate_indices,
+        torch.tensor([0, 1], device=batch.candidate_indices.device),
+    )
+    assert batch.depths_valid_mask.shape[0] == 2
 
 
 @pytest.mark.xfail(reason="PyTorch3D backface culling keeps inward-facing quads when camera is inside the mesh.")

@@ -18,16 +18,16 @@ class TestSceneMetadata:
             has_gt_mesh=True,
             mesh_url="https://example.com/mesh.ply",
             mesh_sha="abc123",
-            snippet_count=3,
-            snippet_ids=["82832_seq_000", "82832_seq_001"],
+            shard_count=3,
+            shard_ids=["82832_seq_000", "82832_seq_001"],
             atek_config="efm",
             total_frames=200,
         )
 
         assert meta.scene_id == "82832"
         assert meta.has_gt_mesh is True
-        assert meta.snippet_count == 3
-        assert len(meta.snippet_ids) == 2
+        assert meta.shard_count == 3
+        assert len(meta.shard_ids) == 2
 
     def test_no_mesh(self):
         """Test SceneMetadata without GT mesh."""
@@ -36,8 +36,8 @@ class TestSceneMetadata:
             has_gt_mesh=False,
             mesh_url=None,
             mesh_sha=None,
-            snippet_count=1,
-            snippet_ids=["90000_seq_000"],
+            shard_count=1,
+            shard_ids=["90000_seq_000"],
             atek_config="efm",
             total_frames=100,
         )
@@ -90,8 +90,8 @@ class TestASEMetadata:
         scene_82832 = metadata.scenes["82832"]
         assert scene_82832.scene_id == "82832"
         assert scene_82832.has_gt_mesh is True
-        assert scene_82832.snippet_count == 3  # efm config has 3 snippets
-        assert len(scene_82832.snippet_ids) == 3
+        assert scene_82832.shard_count == 3  # efm config has 3 shards
+        assert len(scene_82832.shard_ids) == 3
 
         # Check scene without mesh
         scene_90000 = metadata.scenes["90000"]
@@ -122,11 +122,11 @@ class TestASEMetadata:
         metadata = ASEMetadata(tmp_url_dir)
 
         # Filter for scenes with ≥3 snippets
-        filtered = metadata.filter_scenes(min_snippets=3, require_mesh=False, config="efm")
+        filtered = metadata.filter_scenes(min_shards=3, require_mesh=False, config="efm")
 
         assert len(filtered) == 1
         assert filtered[0].scene_id == "82832"
-        assert filtered[0].snippet_count == 3
+        assert filtered[0].shard_count == 3
 
     def test_filter_scenes_require_mesh(
         self,
@@ -138,7 +138,7 @@ class TestASEMetadata:
         metadata = ASEMetadata(tmp_url_dir)
 
         # Filter for scenes with meshes
-        filtered = metadata.filter_scenes(min_snippets=0, require_mesh=True, config="efm")
+        filtered = metadata.filter_scenes(min_shards=0, require_mesh=True, config="efm")
 
         assert len(filtered) == 2
         scene_ids = {s.scene_id for s in filtered}
@@ -154,12 +154,12 @@ class TestASEMetadata:
         metadata = ASEMetadata(tmp_url_dir)
 
         # Filter for cubercnn config
-        filtered = metadata.filter_scenes(min_snippets=0, require_mesh=False, config="cubercnn")
+        filtered = metadata.filter_scenes(min_shards=0, require_mesh=False, config="cubercnn")
 
         # Only scene 82832 has cubercnn config
         assert len(filtered) == 1
         assert filtered[0].scene_id == "82832"
-        assert filtered[0].snippet_count == 1  # cubercnn has 1 snippet
+        assert filtered[0].shard_count == 1  # cubercnn has 1 shard
 
     def test_save_and_load(
         self,
@@ -212,4 +212,4 @@ class TestASEMetadata:
         # Should use efm (first in iteration order)
         scene = metadata.scenes["82832"]
         assert scene.atek_config == "efm"
-        assert scene.snippet_count == 3
+        assert scene.shard_count == 3

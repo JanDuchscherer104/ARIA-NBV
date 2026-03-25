@@ -45,14 +45,20 @@ def test_cli_list_prints_total_snippets(
         processed_meshes=tmp_path / "ase_meshes_processed",
         external_dir=tmp_path / "external",
     )
-    config = ASEDownloaderConfig(m="list", paths=paths, verbosity=Verbosity.NORMAL, is_debug=False)
+    config = ASEDownloaderConfig(
+        m="list",
+        paths=paths,
+        c="efm",
+        verbosity=Verbosity.NORMAL,
+        is_debug=False,
+    )
 
     cli_list(config=config)
 
     captured = capsys.readouterr()
     text = _strip_ansi(captured.out + captured.err)
 
-    assert "Total snippets (all GT-mesh scenes): 5" in text
+    assert "Total shards (all GT-mesh scenes): 5" in text
 
 
 def test_cli_list_prints_total_snippets_for_shown_scenes(
@@ -74,12 +80,18 @@ def test_cli_list_prints_total_snippets_for_shown_scenes(
         processed_meshes=tmp_path / "ase_meshes_processed",
         external_dir=tmp_path / "external",
     )
-    config = ASEDownloaderConfig(m="list", paths=paths, verbosity=Verbosity.NORMAL, is_debug=False)
+    config = ASEDownloaderConfig(
+        m="list",
+        paths=paths,
+        c="efm",
+        verbosity=Verbosity.NORMAL,
+        is_debug=False,
+    )
 
     cli_list(config=config, n=1)
 
     captured = capsys.readouterr()
     text = _strip_ansi(captured.out + captured.err)
 
-    assert "Total snippets (all GT-mesh scenes): 5" in text
-    assert "Total snippets (shown scenes): 3" in text
+    assert "Total shards (all GT-mesh scenes): 5" in text
+    assert "Total shards (shown scenes): 3" in text

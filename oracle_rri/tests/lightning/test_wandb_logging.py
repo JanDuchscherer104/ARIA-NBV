@@ -43,6 +43,7 @@ if "e3nn" not in sys.modules:
     sys.modules["e3nn.o3"] = o3
 
 from oracle_rri.lightning.lit_module import VinLightningModule
+import oracle_rri.lightning.lit_module as lit_module
 
 
 class DummyExperiment:
@@ -89,6 +90,7 @@ def _make_module(logger) -> VinLightningModule:
 
 def test_log_figure_wandb(monkeypatch) -> None:
     monkeypatch.setattr(pl.loggers, "WandbLogger", DummyWandbLogger, raising=True)
+    monkeypatch.setattr(lit_module, "WandbLogger", DummyWandbLogger, raising=True)
     monkeypatch.setitem(sys.modules, "wandb", DummyWandbModule())
     module = _make_module(DummyWandbLogger())
     fig = plt.figure()
@@ -101,6 +103,7 @@ def test_log_figure_wandb(monkeypatch) -> None:
 
 def test_log_figure_tensorboard_fallback(monkeypatch) -> None:
     monkeypatch.setattr(pl.loggers, "WandbLogger", DummyWandbLogger, raising=True)
+    monkeypatch.setattr(lit_module, "WandbLogger", DummyWandbLogger, raising=True)
     module = _make_module(DummyLogger())
     fig = plt.figure()
     module._log_figure("tag", fig)

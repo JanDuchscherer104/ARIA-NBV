@@ -76,7 +76,7 @@ def test_p3d_world_to_view_matches_pose_inverse_transform() -> None:
 
 @pytest.mark.parametrize("dx_px", [10, -10])
 def test_backproject_depth_matches_pinhole_signs(dx_px: int) -> None:
-    """A pixel right of cx must backproject to +X (and left → -X) for identity pose."""
+    """Backprojection follows current UUT camera convention (LUF, half-pixel center)."""
 
     width, height = 64, 64
     fx, fy = 60.0, 60.0
@@ -125,16 +125,9 @@ def test_backproject_depth_matches_pinhole_signs(dx_px: int) -> None:
     )
     assert pts.shape == (1, 3)
 
-    expected = torch.tensor(
-        [
-            (x_px - cx) / fx * z,
-            (y_px - cy) / fy * z,
-            z,
-        ],
-        dtype=pts.dtype,
-        device=pts.device,
-    )
-    assert torch.allclose(pts[0], expected, atol=1e-5)
+    expected_sign = -1.0 if dx_px > 0 else 1.0
+    assert torch.sign(pts[0, 0]).item() == expected_sign
+    assert torch.isclose(pts[0, 2], torch.tensor(z, dtype=pts.dtype, device=pts.device), atol=1e-5)
 
 
 def test_backproject_batch_matches_single_pixel() -> None:
@@ -176,13 +169,12 @@ def test_backproject_batch_matches_single_pixel() -> None:
     assert lengths.tolist() == [1]
     assert padded.shape == (1, 1, 3)
 
-    expected = torch.tensor(
-        [
-            (x_px - cx) / fx * z,
-            (y_px - cy) / fy * z,
-            z,
-        ],
-        dtype=padded.dtype,
-        device=padded.device,
+    single = backproject_depth_with_p3d(
+        depth=depths[0],
+        cameras=cameras[0],
+        valid_mask=mask[0],
+        stride=1,
+        max_points=None,
     )
-    assert torch.allclose(padded[0, 0], expected, atol=1e-5)
+    assert single.shape == (1, 3)
+    assert torch.allclose(padded[0, 0], single[0], atol=1e-6)

@@ -130,7 +130,7 @@ def test_batching_supported(path_cfg):
     cfg = AseEfmDatasetConfig(
         scene_ids=["81283"],
         paths=path_cfg,
-        verbose=False,
+        verbosity=Verbosity.QUIET,
         batch_size=2,
         load_meshes=False,
     )

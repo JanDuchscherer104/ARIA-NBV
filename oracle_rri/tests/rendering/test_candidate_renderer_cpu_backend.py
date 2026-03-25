@@ -99,11 +99,15 @@ def _make_snippet(mesh: trimesh.Trimesh, camera: CameraTW) -> EfmSnippetView:
         ARIA_POINTS_VOL_MIN: torch.tensor([-1.0, -1.0, -1.0]),
         ARIA_POINTS_VOL_MAX: torch.tensor([1.0, 1.0, 1.0]),
     }
+    mesh_verts = torch.from_numpy(mesh.vertices).to(dtype=torch.float32)
+    mesh_faces = torch.from_numpy(mesh.faces).to(dtype=torch.int64)
     return EfmSnippetView(
         efm=efm,
         scene_id="cpu_scene",
         snippet_id="cpu_snippet",
         mesh=mesh,
+        mesh_verts=mesh_verts,
+        mesh_faces=mesh_faces,
     )
 
 
@@ -148,8 +152,9 @@ def test_candidate_renderer_cpu_backend_runs():
     candidates = _make_candidates(num=2, z=1.0)
 
     cfg = CandidateDepthRendererConfig(
-        renderer=Pytorch3DDepthRendererConfig(device="cpu", verbose=False),
-        max_candidates=2,
+        renderer=Pytorch3DDepthRendererConfig(device="cpu", verbosity=0),
+        max_candidates_final=2,
+        resolution_scale=1.0,
     )
     renderer = cfg.setup_target()
 

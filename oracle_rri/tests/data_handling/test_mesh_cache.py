@@ -13,12 +13,11 @@ def test_processed_mesh_is_cached(tmp_path):
     mesh_raw = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
     spec = MeshProcessSpec(
         scene_id="123",
-        snippet_id="abc",
+        crop=True,
         bounds_min=[-1.0, -1.0, -1.0],
         bounds_max=[1.0, 1.0, 1.0],
         margin_m=0.1,
         simplify_ratio=0.5,
-        max_faces=None,
         crop_min_keep_ratio=0.1,
     )
 

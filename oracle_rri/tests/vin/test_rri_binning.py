@@ -77,3 +77,29 @@ def test_fit_binner_from_iterable_saves_fit_data_on_keyboard_interrupt(tmp_path:
     state = torch.load(save_path, map_location="cpu", weights_only=True)
     rri_loaded = torch.cat(state["rri_chunks"], dim=0)
     assert torch.allclose(rri_loaded, torch.tensor([0.1, 0.2, 0.3], dtype=torch.float32))
+
+
+def test_rri_ordinal_binner_fit_and_transform() -> None:
+    num_classes = 5
+    rri = torch.tensor(
+        [0.05, 0.10, 0.20, 0.30, 0.01, 0.02, 0.03, 0.04],
+        dtype=torch.float32,
+    )
+
+    binner = RriOrdinalBinner.fit_from_iterable([rri], num_classes=num_classes)
+    assert binner.edges.shape == (num_classes - 1,)
+    assert torch.all(binner.edges[1:] > binner.edges[:-1])
+
+    labels = binner.transform(rri)
+    assert labels.shape == (8,)
+    assert labels.dtype == torch.int64
+    assert int(labels.min()) >= 0
+    assert int(labels.max()) <= num_classes - 1
+
+
+def test_rri_ordinal_binner_degenerate_fallback() -> None:
+    num_classes = 5
+    rri = torch.zeros(32, dtype=torch.float32)
+    binner = RriOrdinalBinner.fit_from_iterable([rri], num_classes=num_classes)
+    assert binner.edges.shape == (num_classes - 1,)
+    assert torch.all(binner.edges[1:] > binner.edges[:-1])

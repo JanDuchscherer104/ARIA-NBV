@@ -40,11 +40,11 @@ def test_depth_to_mesh_distance_real_sample():
     console = Console.with_prefix("integration", scene_id)
 
     config = AseEfmDatasetConfig(
-        tar_urls=[str(scene_dir / "shards-*.tar")],
+        scene_ids=[scene_id],
         scene_to_mesh={scene_id: mesh_path},
         load_meshes=True,
         batch_size=None,
-        verbose=False,
+        verbosity=0,
     )
 
     ds = AseEfmDataset(config)
@@ -54,17 +54,30 @@ def test_depth_to_mesh_distance_real_sample():
     if cam_rgb.distance_m is None:
         pytest.skip("Depth channel not present in sample.")
     depth = cam_rgb.distance_m  # [T,1,H,W]
-    depth0 = depth[:1]
-    cams = cam_rgb.calib.tensor  # use stored CameraTW tensor
+    depth0 = depth[0, 0]  # [H,W] for a single frame
+    cam0 = cam_rgb.calib[0]
 
-    pts_w, _ = dist_im_to_point_cloud_im(depth0, cams[:1])
-    pts_w = pts_w.reshape(-1, 3)
+    pts_cam, valid = dist_im_to_point_cloud_im(depth0, cam0)
+    pts_cam = pts_cam[valid].reshape(-1, 3)
+    if pts_cam.numel() == 0:
+        pytest.skip("No valid backprojected points in first depth frame.")
+
+    # Convert camera points to world points: world<-rig @ rig<-cam @ p_cam.
+    t_world_rig = sample.trajectory.t_world_rig[0]
+    t_rig_cam = cam0.T_camera_rig.inverse()
+    pts_w = t_world_rig.transform(t_rig_cam.transform(pts_cam))
 
     mesh = sample.mesh
     assert mesh is not None
     verts = torch.from_numpy(mesh.vertices).float()
     faces = torch.from_numpy(mesh.faces).long()
-    dists = compute_pts_to_mesh_dist(pts_w, faces, verts)
+    if pts_w.shape[0] > 5_000:
+        pts_w = pts_w[:5_000]
+    if faces.shape[0] > 20_000:
+        keep = torch.linspace(0, faces.shape[0] - 1, 20_000, dtype=torch.int64)
+        faces = faces[keep]
+    dists_np = compute_pts_to_mesh_dist(pts_w, faces, verts, step=max(1, min(int(faces.shape[0]), 5_000)))
+    dists = torch.as_tensor(dists_np)
 
     console.log(f"points={pts_w.shape[0]}, dist_mean={dists.mean().item():.4f}m")
     assert pts_w.shape[0] > 0
