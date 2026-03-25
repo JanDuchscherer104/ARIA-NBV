@@ -42,7 +42,7 @@ from torch import Tensor
 from oracle_rri.data.efm_views import VinSnippetView
 from oracle_rri.utils import Console
 from oracle_rri.vin.arch_viz import VinV2ArchDotConfig, VinV2ArchInputShapes, build_vin_v2_arch_dot, write_dot
-from oracle_rri.vin.model_v2 import VinModelV2Config
+from oracle_rri.vin.experimental.model_v2 import VinModelV2Config
 from oracle_rri.vin.types import EvlBackboneOutput
 
 
