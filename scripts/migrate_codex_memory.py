@@ -77,10 +77,8 @@ def git_tracked(path: Path) -> bool:
     return result.returncode == 0
 
 
-
 def run_git(*args: str) -> None:
     subprocess.run(["git", *args], cwd=REPO_ROOT, check=True)
-
 
 
 def parse_date(name: str) -> str | None:
@@ -91,7 +89,6 @@ def parse_date(name: str) -> str | None:
     return None
 
 
-
 def strip_date_prefix(stem: str) -> str:
     value = stem
     for pattern in PREFIX_PATTERNS:
@@ -100,12 +97,10 @@ def strip_date_prefix(stem: str) -> str:
     return value or stem
 
 
-
 def slug_tokens(stem: str) -> list[str]:
     base = strip_date_prefix(stem)
     tokens = [token.lower() for token in re.split(r"[^a-zA-Z0-9]+", base) if token]
     return [token for token in tokens if token not in STOPWORDS][:5]
-
 
 
 def title_from_stem(stem: str) -> str:
@@ -114,13 +109,14 @@ def title_from_stem(stem: str) -> str:
     return " ".join(part.capitalize() for part in parts) or stem
 
 
-
 def classify(path: Path) -> MigrationRecord:
     name = path.name
     if name in GENERATED_NOTES:
         return MigrationRecord(path, "generated", None, None)
     if name in CANONICAL_INPUTS:
-        return MigrationRecord(path, "canonical_input", ARCHIVE_DIR / "canonical-inputs" / name, None)
+        return MigrationRecord(
+            path, "canonical_input", ARCHIVE_DIR / "canonical-inputs" / name, None
+        )
 
     date = parse_date(name)
     if date is not None:
@@ -131,10 +127,8 @@ def classify(path: Path) -> MigrationRecord:
     return MigrationRecord(path, "archive", ARCHIVE_DIR / "flat" / name, None)
 
 
-
 def ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-
 
 
 def move_path(src: Path, dst: Path) -> None:
@@ -145,13 +139,12 @@ def move_path(src: Path, dst: Path) -> None:
         shutil.move(src, dst)
 
 
-
 def render_history_note(record: MigrationRecord) -> str:
     source = record.source.read_text(encoding="utf-8", errors="ignore").strip()
     topics = slug_tokens(record.source.stem)
     topics_yaml = ", ".join(topics)
     title = title_from_stem(record.source.stem)
-    body = source if source else "No note body was preserved in the legacy file."
+    body = source or "No note body was preserved in the legacy file."
     return (
         "---\n"
         f"id: {record.date}_{record.source.stem}\n"
@@ -167,7 +160,6 @@ def render_history_note(record: MigrationRecord) -> str:
     )
 
 
-
 def write_history_record(record: MigrationRecord) -> None:
     assert record.target is not None
     ensure_parent(record.target)
@@ -178,7 +170,6 @@ def write_history_record(record: MigrationRecord) -> None:
         record.source.unlink()
     record.target.write_text(content, encoding="utf-8")
     run_git("add", str(record.target.relative_to(REPO_ROOT)))
-
 
 
 def write_manifest(records: list[MigrationRecord]) -> None:
@@ -202,19 +193,27 @@ def write_manifest(records: list[MigrationRecord]) -> None:
         "",
         "## Canonical Inputs",
     ]
-    lines.extend(f"- `{record.source.name}` -> `{record.target.relative_to(REPO_ROOT)}`" for record in canonical)
+    lines.extend(
+        f"- `{record.source.name}` -> `{record.target.relative_to(REPO_ROOT)}`"
+        for record in canonical
+    )
     lines.append("")
     lines.append("## History Imports")
-    lines.extend(f"- `{record.source.name}` -> `{record.target.relative_to(REPO_ROOT)}`" for record in history)
+    lines.extend(
+        f"- `{record.source.name}` -> `{record.target.relative_to(REPO_ROOT)}`"
+        for record in history
+    )
     lines.append("")
     lines.append("## Legacy Archive")
-    lines.extend(f"- `{record.source.name}` -> `{record.target.relative_to(REPO_ROOT)}`" for record in archive)
+    lines.extend(
+        f"- `{record.source.name}` -> `{record.target.relative_to(REPO_ROOT)}`"
+        for record in archive
+    )
     lines.append("")
     lines.append("## Removed Generated Notes")
     lines.extend(f"- `{record.source.name}`" for record in generated)
     lines.append("")
     MANIFEST_PATH.write_text("\n".join(lines), encoding="utf-8")
-
 
 
 def migrate(apply: bool) -> None:
@@ -240,10 +239,15 @@ def migrate(apply: bool) -> None:
         move_path(record.source, record.target)
 
 
-
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Migrate flat .codex notes into agent-memory and archive locations.")
-    parser.add_argument("--apply", action="store_true", help="Perform the migration instead of only writing the manifest.")
+    parser = argparse.ArgumentParser(
+        description="Migrate flat .codex notes into agent-memory and archive locations."
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Perform the migration instead of only writing the manifest.",
+    )
     args = parser.parse_args()
     migrate(apply=args.apply)
     return 0

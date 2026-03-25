@@ -1,3 +1,13 @@
+---
+id: 2026-03-25_deleted_docs_asset_reference_audit
+date: 2026-03-25
+title: "Deleted Docs Asset Reference Audit"
+status: done
+topics: [docs, cleanup, audit]
+confidence: high
+canonical_updates_needed: []
+---
+
 ## Task
 
 Investigated whether any files currently deleted in `git status` are still referenced by source docs, slides, or the Typst paper.
@@ -43,4 +53,4 @@ Confirmed non-issues:
 
 ## Canonical State
 
-No canonical state update was needed; this task only identified stale references during repo cleanup.
+This task only identified stale references during repo cleanup.

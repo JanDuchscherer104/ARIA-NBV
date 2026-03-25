@@ -4,6 +4,7 @@
 .PHONY: context-index context-get context-contracts context-modules context-classes context-functions
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory
+.PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory
 
 # Color codes
 BLUE := \033[0;34m
@@ -128,22 +129,40 @@ context-literature-search: ## 🗺️ Search literature sources (set LITERATURE_
 migrate-codex-memory: _check_python ## 🗺️ Migrate legacy .codex notes into .agents/memory
 	@$(PYTHON_INTERPRETER) scripts/migrate_codex_memory.py $(MIGRATE_CODEX_MEMORY_ARGS)
 
-context: _check_python ## 🗺️ Write modular context artifacts to docs/_generated/context
+check-agent-memory: _check_python ## 🗺️ Validate agent memory scaffolding and debrief hygiene
+	@$(PYTHON_INTERPRETER) scripts/validate_agent_memory.py
+
+context: _check_python ## 🗺️ Refresh lightweight context artifacts (source index, literature index, data contracts)
 	@bash -lc 'set -euo pipefail; \
 		context_dir="$(CONTEXT_DIR)"; \
-		out="$(CONTEXT_OUT)"; \
 		index_out="$(CONTEXT_INDEX_OUT)"; \
+		contracts_out="$(CONTEXT_CONTRACTS_OUT)"; \
+		lit_index_out="$(LITERATURE_INDEX_OUT)"; \
+		mkdir -p "$$context_dir"; \
+		mkdir -p "$$(dirname "$$index_out")"; \
+		scripts/nbv_context_index.sh "$$index_out" >/dev/null; \
+		scripts/nbv_literature_index.sh "$$lit_index_out" >/dev/null; \
+		{ \
+			echo "# Data Contracts (oracle_rri)"; \
+			echo ""; \
+			$(PYTHON_INTERPRETER) oracle_rri/scripts/get_context.py contracts --root oracle_rri/oracle_rri \
+				| sed "1{/^# Data Contracts$$/d;}"; \
+		} > "$$contracts_out"; \
+		echo "Wrote: $$index_out"; \
+		echo "Wrote: $$lit_index_out"; \
+		echo "Wrote: $$contracts_out"'
+	@echo "$(GREEN)Refreshed lightweight context artifacts in $(CONTEXT_DIR)$(NC)"
+	@echo "$(BLUE)Heavy fallback: make context-heavy$(NC)"
+	@echo "$(BLUE)Tip: rg -n \"<pattern>\" $(CONTEXT_INDEX_OUT)$(NC)"
+
+context-uml: _check_python ## 🗺️ Generate oracle_rri UML artifacts without printing them
+	@bash -lc 'set -euo pipefail; \
+		context_dir="$(CONTEXT_DIR)"; \
 		uml_out="$(CONTEXT_UML_OUT)"; \
 		uml_filtered_out="$(CONTEXT_UML_FILTERED_OUT)"; \
-		docstrings_out="$(CONTEXT_DOCSTRINGS_OUT)"; \
-		contracts_out="$(CONTEXT_CONTRACTS_OUT)"; \
-		tree_out="$(CONTEXT_TREE_OUT)"; \
 		mkdir -p "$$context_dir"; \
-		mkdir -p "$$(dirname "$$out")"; \
-		mkdir -p "$$(dirname "$$index_out")"; \
 		mermaid_tmp="$$(mktemp)"; \
 		mermaid_filtered="$$(mktemp)"; \
-		scripts/nbv_context_index.sh "$$index_out" >/dev/null; \
 		$(PYTHON_INTERPRETER) -m syrenka classdiagram oracle_rri/oracle_rri > "$$mermaid_tmp"; \
 		exclude_list="$(CONTEXT_MERMAID_EXCLUDE)"; \
 		if [[ -z "$$exclude_list" ]]; then \
@@ -156,17 +175,34 @@ context: _check_python ## 🗺️ Write modular context artifacts to docs/_gener
 		fi; \
 		cp "$$mermaid_tmp" "$$uml_out"; \
 		cp "$$mermaid_filtered" "$$uml_filtered_out"; \
+		rm -f "$$mermaid_tmp" "$$mermaid_filtered"; \
+		echo "Wrote: $$uml_out"; \
+		echo "Wrote: $$uml_filtered_out"'
+
+context-uml-preview: _check_python ## 🗺️ Print the filtered oracle_rri UML to stdout
+	@$(MAKE) --no-print-directory context-uml >/dev/null
+	@echo "# Mermaid UML Diagram of the oracle_rri:"
+	@echo "\`\`\`{mermaid}"
+	@cat "$(CONTEXT_UML_FILTERED_OUT)"
+	@echo "\`\`\`"
+
+context-docstrings: _check_python ## 🗺️ Generate full oracle_rri class docstrings artifact
+	@bash -lc 'set -euo pipefail; \
+		context_dir="$(CONTEXT_DIR)"; \
+		docstrings_out="$(CONTEXT_DOCSTRINGS_OUT)"; \
+		mkdir -p "$$context_dir"; \
 		{ \
 			echo "# Class Docstrings (oracle_rri)"; \
 			echo ""; \
 			$(PYTHON_INTERPRETER) oracle_rri/scripts/get_context.py classes --root oracle_rri/oracle_rri --full-doc; \
 		} > "$$docstrings_out"; \
-		{ \
-			echo "# Data Contracts (oracle_rri)"; \
-			echo ""; \
-			$(PYTHON_INTERPRETER) oracle_rri/scripts/get_context.py contracts --root oracle_rri/oracle_rri \
-				| sed "1{/^# Data Contracts$$/d;}"; \
-		} > "$$contracts_out"; \
+		echo "Wrote: $$docstrings_out"'
+
+context-tree: _check_python ## 🗺️ Generate oracle_rri directory tree artifact
+	@bash -lc 'set -euo pipefail; \
+		context_dir="$(CONTEXT_DIR)"; \
+		tree_out="$(CONTEXT_TREE_OUT)"; \
+		mkdir -p "$$context_dir"; \
 		{ \
 			echo "# Directory Tree (oracle_rri)"; \
 			echo ""; \
@@ -180,8 +216,23 @@ context: _check_python ## 🗺️ Write modular context artifacts to docs/_gener
 					| sort; \
 			fi; \
 		} > "$$tree_out"; \
+		echo "Wrote: $$tree_out"'
+
+context-heavy: _check_python ## 🗺️ Generate heavyweight fallback artifacts and combined context snapshot
+	@$(MAKE) --no-print-directory context
+	@$(MAKE) --no-print-directory context-uml
+	@$(MAKE) --no-print-directory context-docstrings
+	@$(MAKE) --no-print-directory context-tree
+	@bash -lc 'set -euo pipefail; \
+		out="$(CONTEXT_OUT)"; \
+		index_out="$(CONTEXT_INDEX_OUT)"; \
+		uml_out="$(CONTEXT_UML_OUT)"; \
+		docstrings_out="$(CONTEXT_DOCSTRINGS_OUT)"; \
+		contracts_out="$(CONTEXT_CONTRACTS_OUT)"; \
+		tree_out="$(CONTEXT_TREE_OUT)"; \
+		mkdir -p "$$(dirname "$$out")"; \
 		{ \
-			echo "# Context Snapshot (make context)"; \
+			echo "# Context Snapshot (make context-heavy)"; \
 			echo ""; \
 			echo "Generated: $$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")"; \
 			echo ""; \
@@ -231,14 +282,8 @@ context: _check_python ## 🗺️ Write modular context artifacts to docs/_gener
 				echo "(missing $$tree_out)"; \
 			fi; \
 		} > "$$out"; \
-		echo "# Mermaid UML Diagram of the oracle_rri:"; \
-		echo "\`\`\`{mermaid}"; \
-		cat "$$uml_filtered_out"; \
-		echo "\`\`\`"; \
-		rm -f "$$mermaid_tmp" "$$mermaid_filtered"'
-	@echo "$(GREEN)Wrote context snapshot to $(CONTEXT_OUT)$(NC)"
-	@echo "$(GREEN)Wrote modular context artifacts to $(CONTEXT_DIR)$(NC)"
-	@echo "$(BLUE)Tip: rg -n \"<pattern>\" $(CONTEXT_INDEX_OUT)$(NC)"
+		echo "Wrote: $$out"'
+	@echo "$(GREEN)Wrote heavyweight context snapshot to $(CONTEXT_OUT)$(NC)"
 
 context-external: _check_python ## 🗺️ List classes with full docstrings
 	@echo "# Mermaid UML Diagram of the external/efm3d:\n\`\`\`{mermaid}"

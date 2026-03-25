@@ -112,27 +112,7 @@ We are building an **active Next-Best-View planning system** for complex indoor 
 - **Python Environment**: Use the uv-managed virtualenv at `oracle_rri/.venv` (Python 3.11). If it is missing or stale, recreate it with
   `UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync --extra dev --extra notebook --extra pytorch3d`.
 
-### Agentic Behaviors
-
-## 0. Quickstart (Recommended)
-
-### Commands (use the uv-managed venv)
-
-- Context: `make context` (writes `.codex/codex_make_context.md`; search with `rg`)
-- Tests (avoid system python): `uv run pytest <path>` or `oracle_rri/.venv/bin/python -m pytest <path>`
-- Lint/format: `ruff format <file>` then `ruff check <file>`
-
-### Common gotchas (hit before)
-
-- **Validation is disabled by default**: set `trainer_config.enable_validation=true` (otherwise Lightning forces `limit_val_batches=0` and `check_val_every_n_epoch=0`).
-- **Pydantic defaults**: never set `Field(default=<callable>)` unless you intend to store the callable; use `Field(default_factory=...)` for computed defaults.
-- **Interpreter mismatch**: running `pytest` with the system python can miss deps (e.g. `power_spherical`); prefer `uv run` / `oracle_rri/.venv`.
-- **Offline cache splits are file-backed**: `train_index.jsonl` / `val_index.jsonl` may be created/updated when loading caches with `split="train"/"val"`.
-
-### Offline cache indexing / splitting
-
-- Rebuild indices from `samples/*.pt` (also rebuilds randomized split): call `rebuild_cache_index(cache_dir=..., train_val_split=..., rng_seed=...)` from `oracle_rri.data.offline_cache`.
-- Training/validation from cache uses `OracleRriCacheDatasetConfig.train_val_split` + `split="train"/"val"`; `VinDataModule` will auto-derive `val_cache` when split is active.
+## Agentic Behaviors
 
 - **On Initialization**:
   - **Always** run `make context` to generate the up-to-date snapshot in `.codex/codex_make_context.md`.
@@ -166,6 +146,24 @@ We are building an **active Next-Best-View planning system** for complex indoor 
 - **Before terminating**: replace any temporary citation placeholders of the form `cite…` with either (a) direct markdown links to authoritative sources, or (b) valid bib references already present in `references.bib`. Do not leave the placeholder markers in committed text.
 - **Always** add relevant references (optimally arxiv/bibtex entires) to `docs/references.bib` when mentioning key concepts, algorithms, or prior work in documentation or publications.
 - **Finally**, before terminating, summarize all important findings, changes made, and any open suggestions that remain in your final report. All crucial finfings and suggestions must be documented in `.codex/<label for tasks>.md` for future reference. Here include potential problems in the current implementation, suggestions for future improvements, and any other relevant insights gained during your work that could benefit future contributors.
+
+### Commands (use the uv-managed venv)
+
+- Context: `make context` (writes `.codex/codex_make_context.md`; search with `rg`)
+- Tests (avoid system python): `uv run pytest <path>` or `oracle_rri/.venv/bin/python -m pytest <path>`
+- Lint/format: `ruff format <file>` then `ruff check <file>`
+
+### Common gotchas (hit before)
+
+- **Validation is disabled by default**: set `trainer_config.enable_validation=true` (otherwise Lightning forces `limit_val_batches=0` and `check_val_every_n_epoch=0`).
+- **Pydantic defaults**: never set `Field(default=<callable>)` unless you intend to store the callable; use `Field(default_factory=...)` for computed defaults.
+- **Interpreter mismatch**: running `pytest` with the system python can miss deps (e.g. `power_spherical`); prefer `uv run` / `oracle_rri/.venv`.
+- **Offline cache splits are file-backed**: `train_index.jsonl` / `val_index.jsonl` may be created/updated when loading caches with `split="train"/"val"`.
+
+### Offline cache indexing / splitting
+
+- Rebuild indices from `samples/*.pt` (also rebuilds randomized split): call `rebuild_cache_index(cache_dir=..., train_val_split=..., rng_seed=...)` from `oracle_rri.data.offline_cache`.
+- Training/validation from cache uses `OracleRriCacheDatasetConfig.train_val_split` + `split="train"/"val"`; `VinDataModule` will auto-derive `val_cache` when split is active.
 
 ### Context7 library IDs (for diagrams/docs)
 
@@ -221,7 +219,7 @@ flowchart LR
 - ✓ Follow EFM3D/ATEK coordinate conventions (see `efm3d_symbol_index.qmd`)
 - ✓ Use ARIA constants from `efm3d.aria.aria_constants` for dataset keys
 - ✓ All poses must use `PoseTW` from `efm3d.aria.pose`
-- ✓ All cameras must use `CameraTW` from `efm3d.aria.camera`
+- ✓ All cameras must use `CameraTW` from `efm3d.aria.camera` or `PerspectiveCameras` from `pytorch3d`
 - ✓ Document tensor shapes and coordinate frames in comments
 - ✓ Use `Console` from `oracle_rri.utils` for structured logging
 - ✓ Perfer usage of existing utilities from `efm3d`, `atek`, and `projectaria_tools` over reimplementation

@@ -1,6 +1,6 @@
 ---
 id: project_state
-updated: 2026-03-24
+updated: 2026-03-25
 scope: repo
 owner: jan
 status: active
@@ -21,6 +21,9 @@ The current stack has three main layers: ASE and EFM-facing data access, oracle 
 - Use `PoseTW` and `CameraTW` instead of raw matrices.
 - Treat `docs/references.bib` as the only bibliography source of truth.
 - Keep repo guidance in `AGENTS.md`, repeatable workflows in `.agents/skills/`, and generated context in `docs/_generated/context/`.
+- Keep operator aids and long-form conventions in `.agents/references/`; canonical state docs should remain focused on current truth.
+- The default Codex bootstrap is `docs/typst/paper/main.typ` + `.agents/memory/state/` + the compact `docs/_generated/context/source_index.md`, with broader references retrieved on demand.
+- Treat `make context-contracts` / `scripts/nbv_get_context.sh contracts` as the preferred contract surface; heavy generated artifacts are fallback-only.
 
 ## Active Experiments
 The project is actively iterating on VIN variants, semidense projection cues, candidate generation behavior, and documentation alignment between code, paper, and slides.

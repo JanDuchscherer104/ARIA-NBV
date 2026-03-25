@@ -8,11 +8,13 @@ Use the documented Codex repo surfaces in this repository:
 - generated context lives in `docs/_generated/context/`
 
 ## Start Here
-- Run `make context`.
-- Use `docs/_generated/context/source_index.md` first and `docs/_generated/context/context_snapshot.md` only when you need UML, class docstrings, the package tree, or the generated contracts index.
-- Run `make context-dir-tree` only when you need the tree printed directly in the terminal.
-- Treat [docs/typst/paper/main.typ](/home/jandu/repos/NBV/docs/typst/paper/main.typ) as the highest-level project ground truth.
-- Read [docs/index.qmd](/home/jandu/repos/NBV/docs/index.qmd) and [docs/contents/todos.qmd](/home/jandu/repos/NBV/docs/contents/todos.qmd) at the start of non-trivial tasks; treat them as secondary documentation surfaces that should stay aligned with the paper.
+- Refresh lightweight routing artifacts with `make context` when the scaffold may be stale.
+- Default bootstrap: [docs/typst/paper/main.typ](/home/jandu/repos/NBV/docs/typst/paper/main.typ), the canonical state docs in `.agents/memory/state/`, and `docs/_generated/context/source_index.md`.
+- If `oracle_rri/.venv` is missing or stale, rebuild it with `UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync --extra dev --extra notebook --extra pytorch3d`.
+- Use `make context-contracts` or `scripts/nbv_get_context.sh contracts` before falling back to `docs/_generated/context/data_contracts.md`.
+- Use [docs/index.qmd](/home/jandu/repos/NBV/docs/index.qmd) and [docs/contents/todos.qmd](/home/jandu/repos/NBV/docs/contents/todos.qmd) only when the task is about project narrative, roadmap, or active work items.
+- Use `make context-heavy` or the specific `context-uml`, `context-docstrings`, `context-tree`, and `context-dir-tree` targets only for explicit heavy fallback work.
+- Use [operator_quick_reference.md](/home/jandu/repos/NBV/.agents/references/operator_quick_reference.md) when you need environment recovery, repo hygiene, or compact ASE/EFM quick references.
 - Prefer the `aria-nbv-context` skill for targeted cross-doc retrieval instead of loading large static dumps.
 
 ## Repo Map
@@ -25,10 +27,14 @@ Use the documented Codex repo surfaces in this repository:
 
 ## Commands
 - Python: `oracle_rri/.venv/bin/python`
+- Environment recovery: `UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync --extra dev --extra notebook --extra pytorch3d`
 - Format: `ruff format <file>`
 - Lint: `ruff check <file>`
 - Tests: `uv run pytest <path>` or `oracle_rri/.venv/bin/python -m pytest <path>`
-- Context: `make context`
+- Context refresh: `make context`
+- Contracts surface: `make context-contracts`
+- Heavy context fallback: `make context-heavy`
+- Memory hygiene: `make check-agent-memory`
 
 ## Agentic Behaviors
 - Read `docs/typst/paper/main.typ` first for the top-level project narrative.
@@ -55,24 +61,33 @@ Use the documented Codex repo surfaces in this repository:
 - Targeted tests or verification commands were run for the changed surface.
 - Real-data or integration-style checks were used when feasible for package behavior changes.
 - No temporary placeholders or stale path references remain.
+- For scaffold or debrief changes, `make check-agent-memory` passes.
 - If project truth changed, update the relevant files in `.agents/memory/state/`.
 
 ## Debriefs
 - For non-trivial work, write a debrief record under `.agents/memory/history/YYYY/MM/`.
-- If the task changes current truth, update one or more files in `.agents/memory/state/`; otherwise state that no canonical update was needed.
+- Native debriefs must follow `.agents/references/agent_memory_templates.md`.
+- Native debriefs must include `canonical_updates_needed: []` when no canonical state doc changed.
+- Existing `status: legacy-imported` records are archive evidence; do not backfill them unless a task explicitly requires it.
+- If the task changes current truth, update one or more files in `.agents/memory/state/`; otherwise record `canonical_updates_needed: []`.
 - Legacy `.codex` notes were migrated into `.agents/memory/history/` and `archive/codex-legacy/`. Do not recreate `.codex` as a task-notes bucket.
 
 ## Key References
+- [source_index.md](/home/jandu/repos/NBV/docs/_generated/context/source_index.md)
+- [operator_quick_reference.md](/home/jandu/repos/NBV/.agents/references/operator_quick_reference.md)
+- [python_conventions.md](/home/jandu/repos/NBV/.agents/references/python_conventions.md)
+- [context7_library_ids.md](/home/jandu/repos/NBV/.agents/references/context7_library_ids.md)
+- [agent_memory_templates.md](/home/jandu/repos/NBV/.agents/references/agent_memory_templates.md)
+- [GOTCHAS.md](/home/jandu/repos/NBV/.agents/memory/state/GOTCHAS.md)
+- `notebooks/ase_oracle_rri_simplified.ipynb`
+
+## Retrieve On Demand
 - [docs/index.qmd](/home/jandu/repos/NBV/docs/index.qmd)
 - [docs/contents/todos.qmd](/home/jandu/repos/NBV/docs/contents/todos.qmd)
 - [docs/contents/roadmap.qmd](/home/jandu/repos/NBV/docs/contents/roadmap.qmd)
 - [docs/contents/questions.qmd](/home/jandu/repos/NBV/docs/contents/questions.qmd)
-- [python_conventions.md](/home/jandu/repos/NBV/.agents/references/python_conventions.md)
-- [context7_library_ids.md](/home/jandu/repos/NBV/.agents/references/context7_library_ids.md)
-- [GOTCHAS.md](/home/jandu/repos/NBV/.agents/memory/state/GOTCHAS.md)
 - `docs/contents/impl/`
 - `docs/contents/ext-impl/`
-- `notebooks/ase_oracle_rri_simplified.ipynb`
 
 ## Recurring Gotchas
 - [GOTCHAS.md](/home/jandu/repos/NBV/.agents/memory/state/GOTCHAS.md) is the canonical maintained gotcha list.
