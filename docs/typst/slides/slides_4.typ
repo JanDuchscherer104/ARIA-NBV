@@ -19,7 +19,6 @@
 // - limitations + next steps
 
 #import "template.typ": *
-#import "notes.typ": *
 #import "@preview/muchpdf:0.1.1": muchpdf
 #import "@preview/booktabs:0.0.4": *
 #show: booktabs-default-table-style
@@ -98,80 +97,6 @@
 // ---------------------------------------------------------------------------
 
 #title-slide()
-
-// #slide(title: [Agenda])[
-//   #color-block(title: [What we cover])[
-//     - Oracle RRI pipeline: candidates, rendering, backprojection, point-to-mesh scoring.
-//     - Offline dataset + batching contract (cache, indices, `VinOracleBatch`, `VinSnippetView`).
-//     - VIN v3 architecture: EVL voxel context + per-candidate evidence + CORAL head.
-//     - Objective + metrics: what we log and why (diagnostics-first).
-//     - Evidence so far: Optuna sweep patterns + best W&B run (#code-inline[#wb.run_id]).
-//     - Limitations + master-thesis next steps (dataset scale, compute, stability).
-//   ]
-//   #good-note(width: 100%)[
-//     All numeric values are imported from artifacts under `docs/typst/slides/data/` and the offline cache metadata.
-//   ]
-// ]
-
-// // ---------------------------------------------------------------------------
-// // Motivation + scope
-// // ---------------------------------------------------------------------------
-
-// #section-slide(
-//   title: [Motivation and Scope],
-//   subtitle: [From expensive oracle supervision to a lightweight candidate scorer],
-// )
-
-// #slide(title: [Why oracle RRI?])[
-//   #grid(
-//     [
-//       #color-block(title: [Motivation])[
-//         - Proxy objectives (coverage, entropy, novelty) can miss occlusion and surface-detail effects.
-//         - Oracle RRI provides direct reconstruction-quality supervision for candidate ranking.
-//         - We treat oracle correctness as a first-class deliverable (diagnostics-first).
-//       ]
-//       #color-block(title: [Scope])[
-//         - Discrete candidate set around a reference rig pose.
-//         - Offline depth rendering + point-to-mesh evaluation to compute RRI labels.
-//         - Learned VIN v3 scorer predicts ordinal RRI from EVL + per-candidate evidence.
-//       ]
-//     ],
-//     [
-//       #figure(
-//         image(fig_path + "VIN-NBV_diagram.png", width: 100%),
-//         caption: [VIN-NBV reference pipeline. We retain view-conditioned projection bias while adapting to EVL. @VIN-NBV-frahm2025],
-//       )
-//     ],
-//   )
-// ]
-
-// #slide(title: [What is implemented (today)])[
-//   #grid(
-//     [
-//       #color-block(title: [Oracle label pipeline])[
-//         - Candidate view generation with collision / free-space checks.
-//         - Mesh depth rendering (PyTorch3D) and metric backprojection.
-//         - Point-to-mesh evaluation (accuracy + completeness) #sym.arrow.r per-candidate RRI.
-//       ]
-//       #color-block(title: [Offline data product])[
-//         - Offline cache with indices and train/val split.
-//         - Typed batching contract: `VinOracleBatch` + padded `VinSnippetView`.
-//         - Candidate shuffling toggle (TODO) to avoid ordering bias.
-//       ]
-//     ],
-//     [
-//       #color-block(title: [VIN v3 baseline scorer])[
-//         - EVL voxel field #sym.arrow.r pose-conditioned global context (#symb.vin.global).
-//         - Per-candidate semidense projection stats + small grid CNN.
-//         - Optional trajectory encoder (enabled in best run).
-//         - CORAL ordinal head and ranking diagnostics.
-//       ]
-//       #quote-block[
-//         Thesis direction: scale oracle-labeled data and stabilize training dynamics to unlock stronger learned NBV policies.
-//       ]
-//     ],
-//   )
-// ]
 
 // ---------------------------------------------------------------------------
 // Data + oracle pipeline
