@@ -10,7 +10,7 @@ Use the documented Codex repo surfaces in this repository:
 ## Start Here
 - Refresh lightweight routing artifacts with `make context` when the scaffold may be stale.
 - Default bootstrap: [docs/typst/paper/main.typ](/home/jandu/repos/NBV/docs/typst/paper/main.typ), the canonical state docs in `.agents/memory/state/`, and `docs/_generated/context/source_index.md`.
-- If `aria_nbv/.venv` is missing or stale, rebuild it with `UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync --extra dev --extra notebook --extra pytorch3d`.
+- If `aria_nbv/.venv` is missing or stale, rebuild it with `UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync --all-extras`.
 - Use `make context-contracts` or `scripts/nbv_get_context.sh contracts` before falling back to `docs/_generated/context/data_contracts.md`.
 - Use [docs/index.qmd](/home/jandu/repos/NBV/docs/index.qmd) and [docs/contents/todos.qmd](/home/jandu/repos/NBV/docs/contents/todos.qmd) only when the task is about project narrative, roadmap, or active work items.
 - Use `make context-heavy` or the specific `context-uml`, `context-docstrings`, `context-tree`, and `context-dir-tree` targets only for explicit heavy fallback work.
@@ -20,17 +20,17 @@ Use the documented Codex repo surfaces in this repository:
 ## Repo Map
 - `aria_nbv/`: package code, configs, CLIs, and tests.
 - `docs/`: Quarto docs, Typst paper/slides, and bibliography.
-- `.agents/memory/`: canonical state, gotchas, episodic debriefs, and migration indexes.
+- `.agents/memory/`: canonical state, gotchas, epis debriefs, and migration indexes.
 - `.agents/references/`: agent-readable reference docs such as Python conventions and Context7 IDs.
 - `scripts/`: repo-level helper wrappers and migration utilities.
 - `tests/` and `aria_nbv/tests/`: verification.
 
 ## Commands
 - Python: `aria_nbv/.venv/bin/python`
-- Environment recovery: `UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync --extra dev --extra notebook --extra pytorch3d`
+- Environment recovery: `UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync --all-extras`
 - Format: `ruff format <file>`
 - Lint: `ruff check <file>`
-- Tests: `uv run pytest <path>` or `aria_nbv/.venv/bin/python -m pytest <path>`
+- Tests: `uv run pytest <path>`
 - Context refresh: `make context`
 - Contracts surface: `make context-contracts`
 - Heavy context fallback: `make context-heavy`
