@@ -46,7 +46,7 @@ projection cues for out-of-bounds candidates.
 // </rm>
 
 #figure(
-  image("/figures/efm3d/efm3d_arch_v1.pdf", width: 100%),
+  image("/figures/external/arXiv-EFM3D/efm3d_arch_v1.pdf", width: 100%),
   caption: [EFM3D/EVL architecture overview (from the EFM3D release) @EFM3D-straub2024.],
 ) <fig:efm3d-arch>
 

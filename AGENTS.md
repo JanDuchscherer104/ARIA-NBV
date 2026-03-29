@@ -43,7 +43,6 @@ Use the documented Codex repo surfaces in this repository:
 - Inspect referenced files and symbols before editing; prefer `rg`, targeted file reads, and the repo skill over broad dumps.
 - Maintain a small task list for multi-step work and verify incrementally instead of batching untested changes.
 - Assume the environment works unless the user says otherwise, but confirm the exact interpreter and command path before diagnosing dependency problems.
-- Use available MCP and retrieval tools when they reduce guesswork; prefer targeted internal retrieval before broad web search.
 - Stay within the requested scope. If something adjacent looks wrong but was not requested, note it instead of silently changing it.
 - Keep documentation aligned with behavior changes.
 - Summarize important findings and leave a debrief for non-trivial work.

@@ -88,7 +88,7 @@
       #figure(
         [#image(fig_path + "scene-script/ase_primitives.jpg", width: 90%)
           #v(0.5em)
-          #image(fig_path + "efm3d/gt_mesh.jpg", width: 90%)],
+          #image(fig_path + "external/arXiv-EFM3D/gt_mesh.jpg", width: 90%)],
         caption: [@SceneScript-avetisyan2024],
       )
     ],
@@ -121,7 +121,7 @@
 // EFM3D Section
 #section-slide(title: [EFM3D Benchmark], subtitle: [3D Egocentric Foundation Model: \ Egocentric Voxel Lifting (EVL)
   #figure(
-    muchpdf(read(fig_path + "efm3d/EFM3D_teaser_v1.pdf", encoding: none), width: 27cm),
+    muchpdf(read(fig_path + "external/arXiv-EFM3D/EFM3D_teaser_v1.pdf", encoding: none), width: 27cm),
     caption: [@EFM3D-straub2024],
   )
 ])
@@ -147,7 +147,7 @@
     ],
     [
       #v(0.5em)
-      #figure(muchpdf(read(fig_path + "efm3d/efm3d_arch_v1.pdf", encoding: none)), caption: [@EFM3D-straub2024])
+      #figure(muchpdf(read(fig_path + "external/arXiv-EFM3D/efm3d_arch_v1.pdf", encoding: none)), caption: [@EFM3D-straub2024])
     ],
   )
 ]
@@ -219,7 +219,7 @@
   title: [ATEK Toolkit],
   subtitle: [
     Streamlined ML Workflows for Aria Datasets
-    #figure(image(fig_path + "atek/overview.png", width: 20cm), caption: [@ATEK-Repo])
+    #figure(image(fig_path + "external/atek/overview.png", width: 20cm), caption: [@ATEK-Repo])
   ],
 )//[
 // #align(center)[

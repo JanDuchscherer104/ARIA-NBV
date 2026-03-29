@@ -154,13 +154,13 @@
 //   #grid(
 //     [
 //       #figure(
-//         image(fig_path + "gt_mesh_manhattan_sample.png", width: 100%),
+//         image(fig_path + "dataset/gt_mesh_manhattan_sample.png", width: 100%),
 //         caption: [GT mesh example (oracle supervision target).],
 //       )
 //     ],
 //     [
 //       #figure(
-//         image(fig_path + "ase_efm_snippet_hist.png", width: 100%),
+//         image(fig_path + "dataset/ase_efm_snippet_hist.png", width: 100%),
 //         caption: [Snippet counts per scene in the current local snapshot.],
 //       )
 //     ],
@@ -856,7 +856,7 @@
 //     ],
 //     [
 //       #figure(
-//         image(fig_path + "efm3d/evl_output_summary.png", width: 100%),
+//         image(fig_path + "external/arXiv-EFM3D/evl_output_summary.png", width: 100%),
 //         caption: [EVL output summary used to build the scene field. @EFM3D-straub2024],
 //       )
 //     ],

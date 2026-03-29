@@ -234,6 +234,6 @@ We summarize the most salient training-dynamics signals from the logged
 
 #figure(
   placement: none,
-  image("/figures/efm3d/evl_output_summary.png", width: 60%),
+  image("/figures/external/arXiv-EFM3D/evl_output_summary.png", width: 60%),
   caption: [EVL output summary used to construct the VIN scene field.],
 ) <fig:evl-summary>
