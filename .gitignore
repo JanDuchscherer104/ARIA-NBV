@@ -242,7 +242,7 @@ docs/_freeze/**/*.html
 .logs/ckpts
 
 # Literature review - ignore non-documentation files
-literature/**
+docs/literature/**
 !literature/**/*.md
 !literature/**/*.tex
 !literature/**/*.bib
