@@ -52,8 +52,8 @@ class VinOfflineBlockSpec:
 
     Attributes:
         name: Logical block name, for example ``"vin.points_world"``.
-        kind: Storage kind such as ``"fixed_npy"`` or ``"pickle_records"``.
-        paths: Relative file paths that materialize the block.
+        kind: Storage kind such as ``"zarr_array"`` or ``"pickle_records"``.
+        paths: Relative array names or file paths that materialize the block.
         dtype: NumPy dtype name for numeric blocks.
         shape: Full stored array shape for numeric blocks.
         optional: Whether the block may be absent for some datasets.
@@ -66,7 +66,7 @@ class VinOfflineBlockSpec:
     """Storage kind used to decode the block."""
 
     paths: list[str]
-    """Relative file paths that materialize the block."""
+    """Relative array names or file paths that materialize the block."""
 
     dtype: str | None = None
     """NumPy dtype name for numeric blocks."""

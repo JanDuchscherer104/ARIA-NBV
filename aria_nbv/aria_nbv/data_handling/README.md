@@ -97,7 +97,7 @@ The new on-disk format is:
 
 Each shard stores:
 
-- fixed-size numeric blocks as `.npy`
+- fixed-size numeric blocks as `zarr` arrays inside the shard group
 - optional diagnostic per-row payloads as pickle record lists
 
 The training-critical path reads only the fixed blocks:

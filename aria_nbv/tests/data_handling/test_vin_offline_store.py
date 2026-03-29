@@ -11,6 +11,7 @@ import pytest
 import torch
 
 from aria_nbv.data_handling import (
+    OFFLINE_DATASET_VERSION,
     VinOfflineDatasetConfig,
     VinOfflineIndexRecord,
     VinOfflineManifest,
@@ -193,7 +194,7 @@ def _write_test_store(tmp_path: Path) -> VinOfflineStoreConfig:
         ),
     ]
     manifest = VinOfflineManifest(
-        version=1,
+        version=OFFLINE_DATASET_VERSION,
         created_at="2026-03-29T00:00:00Z",
         source={"dataset_config": {}},
         oracle={"max_candidates": 4},
@@ -273,7 +274,9 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     assert int(first.vin_snippet.lengths[0].item()) == 2  # noqa: S101
 
     stored_manifest = VinOfflineManifest.read(store_cfg.manifest_path)
+    assert stored_manifest.version == OFFLINE_DATASET_VERSION  # noqa: S101
     assert stored_manifest.shards[0].shard_id == "shard-000000"  # noqa: S101
+    assert stored_manifest.shards[0].blocks["vin.points_world"].kind == "zarr_array"  # noqa: S101
 
     sample_index_records = read_sample_index(store_cfg.sample_index_path)
     assert sample_index_records[0].split == "train"  # noqa: S101

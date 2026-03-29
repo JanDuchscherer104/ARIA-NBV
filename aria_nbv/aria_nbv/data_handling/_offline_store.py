@@ -5,7 +5,7 @@ This module owns the immutable on-disk layout of the VIN offline dataset:
 - path and split configuration,
 - per-shard block materialization helpers,
 - manifest and sample-index loading, and
-- mmap-based random-access reads for fixed-size tensor blocks.
+- Zarr-backed random-access reads for fixed-size tensor blocks.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import zarr
 from pydantic import Field, ValidationInfo, field_validator
 
 from ..configs import PathConfig
@@ -28,21 +29,49 @@ from ._offline_format import (
     read_sample_index,
 )
 
-OFFLINE_DATASET_VERSION = 1
+OFFLINE_DATASET_VERSION = 2
 """Version of the immutable VIN offline dataset format."""
 
 
-def _safe_block_name(name: str) -> str:
-    """Convert a logical block name into a filesystem-safe stem.
+def _safe_block_stem(name: str) -> str:
+    """Convert a logical block name into a filesystem-safe filename stem.
 
     Args:
         name: Logical block name, for example ``"vin.points_world"``.
 
     Returns:
-        Filesystem-safe block stem.
+        Filesystem-safe filename stem.
     """
 
     return name.replace("/", "__").replace(".", "__")
+
+
+def _zarr_array_name(name: str) -> str:
+    """Convert a logical block name into a hierarchical Zarr array path.
+
+    Args:
+        name: Logical block name, for example ``"oracle.p3d.R"``.
+
+    Returns:
+        Zarr array name relative to the shard root group.
+    """
+
+    return name.replace(".", "/")
+
+
+def _row_chunk_shape(array: np.ndarray) -> tuple[int, ...]:
+    """Choose a chunk shape aligned with row-wise random-access reads.
+
+    Args:
+        array: Stacked block array whose first axis is the sample row axis.
+
+    Returns:
+        Chunk shape used for the stored Zarr array.
+    """
+
+    if array.ndim <= 1:
+        return (min(int(array.shape[0]), 1024),)
+    return (1, *array.shape[1:])
 
 
 class VinOfflineStoreConfig(BaseConfig):
@@ -156,10 +185,10 @@ def read_split_indices(config: VinOfflineStoreConfig, split: str) -> np.ndarray:
 
 
 def write_fixed_block(shard_dir: Path, name: str, array: np.ndarray) -> VinOfflineBlockSpec:
-    """Write one fixed-size numeric block for a shard.
+    """Write one fixed-size numeric block into a shard-local Zarr group.
 
     Args:
-        shard_dir: Destination shard directory.
+        shard_dir: Destination shard directory that backs a Zarr group.
         name: Logical block name.
         array: NumPy array to store.
 
@@ -167,12 +196,19 @@ def write_fixed_block(shard_dir: Path, name: str, array: np.ndarray) -> VinOffli
         Block descriptor for the stored array.
     """
 
-    stem = _safe_block_name(name)
-    rel_path = f"{stem}.npy"
-    np.save(shard_dir / rel_path, array, allow_pickle=False)
+    group = zarr.open_group(str(shard_dir), mode="a")
+    rel_path = _zarr_array_name(name)
+    zarr_array = group.create_array(
+        name=rel_path,
+        shape=array.shape,
+        chunks=_row_chunk_shape(array),
+        dtype=array.dtype,
+        overwrite=True,
+    )
+    zarr_array[:] = array
     return VinOfflineBlockSpec(
         name=name,
-        kind="fixed_npy",
+        kind="zarr_array",
         paths=[rel_path],
         dtype=str(array.dtype),
         shape=list(array.shape),
@@ -192,7 +228,7 @@ def write_pickle_records(shard_dir: Path, name: str, records: list[Any]) -> VinO
         Block descriptor for the stored record list.
     """
 
-    stem = _safe_block_name(name)
+    stem = _safe_block_stem(name)
     rel_path = f"{stem}.pkl"
     with (shard_dir / rel_path).open("wb") as handle:
         pickle.dump(records, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -213,15 +249,15 @@ class OpenedShard:
     spec: VinOfflineShardSpec
     """Shard descriptor backing the opened state."""
 
-    arrays: dict[str, np.ndarray] = field(default_factory=dict)
-    """Memory-mapped numeric blocks keyed by logical block name."""
+    arrays: dict[str, Any] = field(default_factory=dict)
+    """Opened Zarr arrays keyed by logical block name."""
 
     record_lists: dict[str, list[Any]] = field(default_factory=dict)
     """Lazy-loaded diagnostic record lists keyed by logical block name."""
 
 
 class VinOfflineStoreReader:
-    """Read immutable VIN offline datasets with mmap-backed random access."""
+    """Read immutable VIN offline datasets with Zarr-backed random access."""
 
     def __init__(self, config: VinOfflineStoreConfig) -> None:
         """Load the manifest, sample index, and split metadata.
@@ -269,9 +305,10 @@ class VinOfflineStoreReader:
         spec = self._shards[shard_id]
         shard_dir = self.config.store_dir / spec.relative_dir
         opened = OpenedShard(spec=spec)
+        group = zarr.open_group(store=zarr.storage.LocalStore(str(shard_dir), read_only=True), mode="r")
         for block_name, block_spec in spec.blocks.items():
-            if block_spec.kind == "fixed_npy":
-                opened.arrays[block_name] = np.load(shard_dir / block_spec.paths[0], mmap_mode="r", allow_pickle=False)
+            if block_spec.kind == "zarr_array":
+                opened.arrays[block_name] = group[block_spec.paths[0]]
         self._opened[shard_id] = opened
         return opened
 
