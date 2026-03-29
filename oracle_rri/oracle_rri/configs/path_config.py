@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, ClassVar
 
 from pydantic import Field, ValidationInfo, field_validator
 
@@ -13,6 +14,20 @@ def _default_root() -> Path:
 
 class PathConfig(SingletonConfig):
     """Centralise all filesystem locations for the oracle_rri project."""
+
+    _ROOT_RELATIVE_DEFAULTS: ClassVar[dict[str, Path]] = {
+        "data_root": Path(".data"),
+        "checkpoints": Path(".logs") / "checkpoints",
+        "external_checkpoints": Path(".logs") / "ckpts",
+        "wandb": Path(".logs") / "wandb",
+        "optuna": Path(".logs") / "optuna",
+        "configs_dir": Path(".configs"),
+        "url_dir": Path(".data") / "aria_download_urls",
+        "metadata_cache": Path(".data") / "ase_metadata.json",
+        "ase_meshes": Path(".data") / "ase_meshes",
+        "processed_meshes": Path(".data") / "ase_meshes_processed",
+        "external_dir": Path("external"),
+    }
 
     root: Path = Field(
         default_factory=_default_root,
@@ -60,6 +75,42 @@ class PathConfig(SingletonConfig):
     """Directory for cropped/simplified meshes persisted for reuse."""
 
     external_dir: Path = Field(default=Path("external"))
+
+    @classmethod
+    def _rebase_root_relative_kwargs(
+        cls,
+        instance: "PathConfig",
+        kwargs: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Rebase omitted root-relative fields when updating a singleton root.
+
+        SingletonConfig only reassigns fields explicitly present in ``kwargs`` on
+        reinitialization. For PathConfig that leads to stale absolute paths after
+        ``root`` changes. We repair that here by rebasing omitted fields that are
+        still on their previous root-derived defaults.
+        """
+
+        if "root" not in kwargs or not getattr(instance, "_initialized", False):
+            return kwargs
+
+        new_root = Path(kwargs["root"]).expanduser().resolve()
+        old_root = instance.root
+        if new_root == old_root:
+            return kwargs
+
+        updated = dict(kwargs)
+        for field_name, rel_default in cls._ROOT_RELATIVE_DEFAULTS.items():
+            if field_name in updated:
+                continue
+            current_value = getattr(instance, field_name)
+            expected_old = (old_root / rel_default).expanduser().resolve()
+            if current_value == expected_old:
+                updated[field_name] = new_root / rel_default
+        return updated
+
+    def __init__(self, **kwargs: Any) -> None:
+        kwargs = type(self)._rebase_root_relative_kwargs(self, kwargs)
+        super().__init__(**kwargs)
 
     @classmethod
     def _resolve_path(cls, value: str | Path, info: ValidationInfo) -> Path:
