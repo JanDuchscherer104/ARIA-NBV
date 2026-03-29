@@ -211,6 +211,16 @@ __marimo__/
 _site
 docs/_generated/context/*
 !docs/_generated/context/.gitignore
+docs/_site/
+docs/site_libs/
+docs/index_files/
+docs/search.json
+docs/**/*.html
+docs/**/*_files/
+docs/**/.jupyter_cache/
+docs/typst/site_libs/
+docs/_freeze/site_libs/
+docs/_freeze/**/*.html
 
 # Legacy Codex scratch and generated artifacts
 .codex/_render/
@@ -225,6 +235,9 @@ docs/_generated/context/*
 # Large download manifests
 .data/aria_download_urls/
 .data
+
+.logs/*
+.logs/ckpts
 
 # Literature review - ignore non-documentation files
 literature/**
