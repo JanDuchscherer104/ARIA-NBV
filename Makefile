@@ -356,9 +356,12 @@ docs-lint: _check_python ## Format QMD lists, then run Quarto checks
 	@echo "$(BLUE)Running Quarto check…$(NC)"
 	@quarto check
 
-.PHONY: quarto-docs
-quarto-docs: ## Render Quarto docs (docs/uml_diagrams)
-	@quarto render docs/uml_diagrams
+.PHONY: quarto-docs quarto-preview
+quarto-docs: ## Render the Quarto website into docs/_site
+	@cd docs && quarto render .
+
+quarto-preview: ## Preview the Quarto website locally
+	@cd docs && quarto preview
 
 #  ═══════════════════════════════════════════════════════════════════════
 #  🧾 Typst builds

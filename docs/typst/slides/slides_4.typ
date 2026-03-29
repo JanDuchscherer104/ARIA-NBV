@@ -59,7 +59,7 @@
   slide-alignment: top,
   progress-bar: true,
   institute: [Munich University of Applied Sciences],
-  logo: [#image(fig_path + "hm-logo.svg", width: 2cm)],
+  logo: [#image(fig_path + "branding/hm-logo.svg", width: 2cm)],
   config-info(
     title: [Aria-NBV: Oracle RRI + VIN v3 Candidate Scoring],
     subtitle: [Offline oracle supervision, diagnostics, and learned NBV baseline],

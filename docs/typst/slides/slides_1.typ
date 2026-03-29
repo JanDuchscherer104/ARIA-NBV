@@ -11,7 +11,7 @@
   slide-alignment: top,
   progress-bar: true,
   institute: [HM],
-  logo: [#image(fig_path + "hm-logo.svg", width: 2cm)],
+  logo: [#image(fig_path + "branding/hm-logo.svg", width: 2cm)],
   config-info(
     title: [ASE, EFM3D & EVL: Datasets, Models & Tools for NBV],
     subtitle: [Towards Relative Reconstruction Metrics for Next-Best-View],

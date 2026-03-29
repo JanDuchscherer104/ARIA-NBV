@@ -18,7 +18,8 @@ Apply this file when working under `docs/`.
 
 ## Commands
 - Context refresh: `make context`
-- Quarto render: `quarto render <file>.qmd --to html`
+- Quarto render: `cd docs && quarto render .`
+- Quarto preview: `cd docs && quarto preview`
 - Quarto check: `quarto check`
 - Typst paper: `cd docs && typst compile typst/paper/main.typ --root .`
 - Typst slides: `cd docs && typst compile typst/slides/<file>.typ --root .`
@@ -37,5 +38,7 @@ Apply this file when working under `docs/`.
 - Add new references to `docs/references.bib` when introducing important concepts or papers.
 - Replace temporary citation placeholders such as `cite…` before finishing.
 - Use links to relevant internal docs or authoritative external references when introducing non-obvious concepts.
+- Keep Quarto source files (`*.qmd`) separate from rendered site output. Published HTML belongs under `docs/_site/`, not next to the sources.
+- Treat `docs/_freeze/` as tracked execution state for code-backed pages when needed; treat `docs/_site/`, `site_libs/`, `index_files/`, and `*_files/` as generated publish artifacts.
 - Do not store generated context or rendered artifacts in tracked docs paths unless the task explicitly requires it.
 - For larger doc changes, run `quarto render` and `quarto check` before finishing.

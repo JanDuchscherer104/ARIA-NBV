@@ -1,8 +1,12 @@
 project:
   type: website
-  output-dir: .
+  output-dir: _site
+  render:
+    - index.qmd
+    - contents/**/*.qmd
   resources:
     - figures/
+    - typst/
 
 # Global execution defaults (fast iterations; deterministic rebuilds)
 execute: # see https://quarto.org/docs/computations/execution-options.html

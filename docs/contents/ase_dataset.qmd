@@ -45,7 +45,7 @@ This repo includes a local ASE-ATEK WebDataset snapshot at `.data/ase_efm` (per-
 - Using avg file size 18.26 MiB → ~82.17 GiB (not including all efm outputs)
 - Using avg file size of 305 MiB → ~1.37 TiB including all efm outputs
 
-![Histogram of snippets per scene in the local `.data/ase_efm` snapshot.](../figures/ase_efm_snippet_hist.png){width=90%}
+![Histogram of snippets per scene in the local `.data/ase_efm` snapshot.](../figures/dataset/ase_efm_snippet_hist.png){width=90%}
 
 ## Ground Truth Annotations
 

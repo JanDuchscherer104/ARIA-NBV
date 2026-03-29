@@ -1,2 +1,14 @@
 /.quarto/
+/_site/
+/site_libs/
+/index_files/
+/search.json
+/**/*.html
+/**/*_files/
+/**/.jupyter_cache/
+/_generated/
+!/_generated/context/
+!/_generated/context/.gitignore
+/_freeze/site_libs/
+/_freeze/**/*.html
 **/*.quarto_ipynb

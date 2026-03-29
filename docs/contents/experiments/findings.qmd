@@ -3,13 +3,13 @@ title: Experimental Findings
 format: html
 ---
 
-![ASE Semi-Dense Point Cloud Visualization](../../figures/ase_semi_dense.png)
+![ASE Semi-Dense Point Cloud Visualization](../../figures/dataset/ase_semi_dense.png)
 
-![ASE GT Mesh Sample](../../figures/gt_mesh_manhattan_sample.png)
+![ASE GT Mesh Sample](../../figures/dataset/gt_mesh_manhattan_sample.png)
 
-![Candidate Pose Sampling Visualization](../../figures/candidate_pose.png)
+![Candidate Pose Sampling Visualization](../../figures/candidate_generation/candidate_pose.png)
 
-![Candidate Pose Sampling Visualization](../../figures/candidate_pose2.png)
+![Candidate Pose Sampling Visualization](../../figures/candidate_generation/candidate_pose2.png)
 
 ## EFM Snippet Visualizations
 
