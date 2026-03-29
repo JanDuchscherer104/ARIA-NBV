@@ -10,13 +10,22 @@ jupyter: python3
 # | output: false
 import sys
 from pathlib import Path
+import numpy as np
 
 repo_root = Path.cwd().resolve().parents[2]
 
 # Define data path
 DATA_PATH = repo_root / ".data" / "semidense_samples" / "ase" / "ase_examples" / "0"
-assert DATA_PATH.exists(), f"Data path not found: {DATA_PATH}"
-print(f"Using data from: {DATA_PATH}")
+HAS_SAMPLE_DATA = DATA_PATH.exists()
+
+trajectory = None
+Ts_world_device = []
+timestamps = np.array([])
+points = np.empty((0, 3), dtype=np.float32)
+entities = []
+
+if HAS_SAMPLE_DATA:
+    print(f"Using data from: {DATA_PATH}")
 ```
 
 ## Overview
@@ -100,31 +109,33 @@ print("See section 5.2 for ASE dataset loading with actual data")
 ```{python}
 #| echo: true
 from projectaria_tools.projects.ase import readers
-import numpy as np
 
-# Load camera trajectory (6DoF poses)
-trajectory = readers.read_trajectory_file(str(DATA_PATH / "trajectory.csv"))
-Ts_world_device = trajectory["Ts_world_from_device"]  # List[SE3]
-timestamps = trajectory["timestamps"]  # np.ndarray
-print(f"Trajectory keys: {list(trajectory.keys())}")
-print(f"Number of poses: {len(Ts_world_device)}")
-print(f"Timestamps shape: {timestamps.shape}, dtype: {timestamps.dtype}")
-print(f"First pose (4x4 matrix):\n{Ts_world_device[0].to_matrix()}")
+if not HAS_SAMPLE_DATA:
+    print(f"Skipping ASE sample loading; data path not found: {DATA_PATH}")
+else:
+    # Load camera trajectory (6DoF poses)
+    trajectory = readers.read_trajectory_file(str(DATA_PATH / "trajectory.csv"))
+    Ts_world_device = trajectory["Ts_world_from_device"]  # List[SE3]
+    timestamps = trajectory["timestamps"]  # np.ndarray
+    print(f"Trajectory keys: {list(trajectory.keys())}")
+    print(f"Number of poses: {len(Ts_world_device)}")
+    print(f"Timestamps shape: {timestamps.shape}, dtype: {timestamps.dtype}")
+    print(f"First pose (4x4 matrix):\n{Ts_world_device[0].to_matrix()}")
 
-# Load semi-dense point cloud
-points = readers.read_points_file(str(DATA_PATH / "semidense_points.csv.gz"))
-print(f"\nPoints shape: {points.shape}, dtype: {points.dtype}")
-print(f"Point coordinates range:")
-print(f"  X: [{points[:, 0].min():.2f}, {points[:, 0].max():.2f}]")
-print(f"  Y: [{points[:, 1].min():.2f}, {points[:, 1].max():.2f}]")
-print(f"  Z: [{points[:, 2].min():.2f}, {points[:, 2].max():.2f}]")
+    # Load semi-dense point cloud
+    points = readers.read_points_file(str(DATA_PATH / "semidense_points.csv.gz"))
+    print(f"\nPoints shape: {points.shape}, dtype: {points.dtype}")
+    print(f"Point coordinates range:")
+    print(f"  X: [{points[:, 0].min():.2f}, {points[:, 0].max():.2f}]")
+    print(f"  Y: [{points[:, 1].min():.2f}, {points[:, 1].max():.2f}]")
+    print(f"  Z: [{points[:, 2].min():.2f}, {points[:, 2].max():.2f}]")
 
-# Load SceneScript language (ground truth entities)
-entities = readers.read_language_file(str(DATA_PATH / "ase_scene_language.txt"))
-print(f"\nNumber of entities: {len(entities)}")
-print(f"First 3 entities:")
-for i, (cmd, params) in enumerate(entities[:3]):
-    print(f"  {i}: {cmd} - {list(params.keys())[:5]}")
+    # Load SceneScript language (ground truth entities)
+    entities = readers.read_language_file(str(DATA_PATH / "ase_scene_language.txt"))
+    print(f"\nNumber of entities: {len(entities)}")
+    print("First 3 entities:")
+    for i, (cmd, params) in enumerate(entities[:3]):
+        print(f"  {i}: {cmd} - {list(params.keys())[:5]}")
 ```
 
 **File Formats:**
@@ -139,29 +150,32 @@ for i, (cmd, params) in enumerate(entities[:3]):
 #| echo: true
 from projectaria_tools.projects.ase.interpreter import language_to_bboxes
 
-# Convert entities to 3D bounding boxes
-entity_boxes = language_to_bboxes(entities)
-print(f"Number of bounding boxes: {len(entity_boxes)}")
+if not HAS_SAMPLE_DATA:
+    print("Skipping entity interpretation; ASE sample data is not available.")
+else:
+    # Convert entities to 3D bounding boxes
+    entity_boxes = language_to_bboxes(entities)
+    print(f"Number of bounding boxes: {len(entity_boxes)}")
 
-# Each box contains:
-# - 'class': object category
-# - 'center': (3,) center position
-# - 'scale': (3,) dimensions
-# - 'rotation': (3, 3) rotation matrix
-if len(entity_boxes) > 0:
-    print(f"\nFirst bounding box:")
-    box = entity_boxes[0]
-    print(f"  Class: {box['class']}")
-    print(f"  Center: {box['center']}")
-    print(f"  Scale: {box['scale']}")
-    print(f"  Rotation shape: {box['rotation'].shape}")
+    # Each box contains:
+    # - 'class': object category
+    # - 'center': (3,) center position
+    # - 'scale': (3,) dimensions
+    # - 'rotation': (3, 3) rotation matrix
+    if len(entity_boxes) > 0:
+        print(f"\nFirst bounding box:")
+        box = entity_boxes[0]
+        print(f"  Class: {box['class']}")
+        print(f"  Center: {box['center']}")
+        print(f"  Scale: {box['scale']}")
+        print(f"  Rotation shape: {box['rotation'].shape}")
 
-    # Show statistics across all boxes
-    classes = [b['class'] for b in entity_boxes]
-    from collections import Counter
-    print(f"\nObject class distribution:")
-    for cls, count in Counter(classes).most_common(5):
-        print(f"  {cls}: {count}")
+        # Show statistics across all boxes
+        classes = [b['class'] for b in entity_boxes]
+        from collections import Counter
+        print(f"\nObject class distribution:")
+        for cls, count in Counter(classes).most_common(5):
+            print(f"  {cls}: {count}")
 ```
 
 ---
@@ -408,25 +422,28 @@ else:
 T_device_camera = camera_calib.get_transform_device_camera()
 print(f"Device-to-camera transform:\n{T_device_camera.to_matrix()}")
 
-# Use first pose from actual trajectory
-T_world_device = Ts_world_device[0]
-
-# Full transform chain: World → Device → Camera
-T_camera_world = (
-    T_device_camera.inverse() @ T_world_device.inverse()
-)
-print(f"\nFull transform chain (camera-from-world):\n{T_camera_world.to_matrix()[:3, :]}")
-
-# Project world point to image
-point_world = np.array([1, 2, 10])
-point_camera = T_camera_world @ point_world
-pixel = camera_calib.project(point_camera)
-print(f"\nWorld point: {point_world}")
-print(f"Camera frame point: {point_camera}")
-if pixel is not None:
-    print(f"Projected pixel: [{pixel[0]:.2f}, {pixel[1]:.2f}]")
+if not HAS_SAMPLE_DATA:
+    print("Skipping trajectory-dependent extrinsics example; ASE sample data is not available.")
 else:
-    print("Point not visible in camera")
+    # Use first pose from actual trajectory
+    T_world_device = Ts_world_device[0]
+
+    # Full transform chain: World → Device → Camera
+    T_camera_world = (
+        T_device_camera.inverse() @ T_world_device.inverse()
+    )
+    print(f"\nFull transform chain (camera-from-world):\n{T_camera_world.to_matrix()[:3, :]}")
+
+    # Project world point to image
+    point_world = np.array([1, 2, 10])
+    point_camera = T_camera_world @ point_world
+    pixel = camera_calib.project(point_camera)
+    print(f"\nWorld point: {point_world}")
+    print(f"Camera frame point: {point_camera}")
+    if pixel is not None:
+        print(f"Projected pixel: [{pixel[0]:.2f}, {pixel[1]:.2f}]")
+    else:
+        print("Point not visible in camera")
 ```
 
 ---
@@ -500,62 +517,68 @@ def depth_to_pointcloud(depth_map, camera_calib, T_world_device, subsample=4):
 #| echo: true
 from PIL import Image
 
-print(f"Loading scene from: {DATA_PATH}")
+if not HAS_SAMPLE_DATA:
+    print(f"Skipping ASE scene-loading example; data path not found: {DATA_PATH}")
+else:
+    print(f"Loading scene from: {DATA_PATH}")
 
-# Data already loaded in section 2.2, reuse it:
-# trajectory, Ts_world_device, timestamps, points, entities
+    # Data already loaded in section 2.2, reuse it:
+    # trajectory, Ts_world_device, timestamps, points, entities
 
-print(f"✓ Trajectory: {len(Ts_world_device)} poses")
-print(f"✓ Point cloud: {points.shape}")
-print(f"✓ Entities: {len(entities)}")
+    print(f"✓ Trajectory: {len(Ts_world_device)} poses")
+    print(f"✓ Point cloud: {points.shape}")
+    print(f"✓ Entities: {len(entities)}")
 
-# Get camera calibration
-width, height = camera_calib.get_image_size()
-print(f"✓ Camera: {width}x{height}")
+    # Get camera calibration
+    width, height = camera_calib.get_image_size()
+    print(f"✓ Camera: {width}x{height}")
 
-# Load depth/RGB images for frame 0
-frame_idx = 0
-frame_id = str(frame_idx).zfill(7)
-depth = np.array(Image.open(DATA_PATH / "depth" / f"depth{frame_id}.png"))
-rgb = np.array(Image.open(DATA_PATH / "rgb" / f"vignette{frame_id}.jpg"))
-print(f"✓ Frame {frame_idx}: RGB {rgb.shape}, Depth {depth.shape}")
-print(f"  Depth range: [{depth.min()}, {depth.max()}] mm")
-print(f"  RGB dtype: {rgb.dtype}, range: [{rgb.min()}, {rgb.max()}]")
+    # Load depth/RGB images for frame 0
+    frame_idx = 0
+    frame_id = str(frame_idx).zfill(7)
+    depth = np.array(Image.open(DATA_PATH / "depth" / f"depth{frame_id}.png"))
+    rgb = np.array(Image.open(DATA_PATH / "rgb" / f"vignette{frame_id}.jpg"))
+    print(f"✓ Frame {frame_idx}: RGB {rgb.shape}, Depth {depth.shape}")
+    print(f"  Depth range: [{depth.min()}, {depth.max()}] mm")
+    print(f"  RGB dtype: {rgb.dtype}, range: [{rgb.min()}, {rgb.max()}]")
 ```
 
 ### 5.3 Projecting 3D Points to Images
 
 ```{python}
 #| echo: true
-# Get pose for this frame
-T_world_device_frame = Ts_world_device[frame_idx]
-print(f"Device pose at frame {frame_idx}:")
-print(f"  Translation: {T_world_device_frame.to_matrix()[:3, 3]}")
+if not HAS_SAMPLE_DATA:
+    print("Skipping point-projection example; ASE sample data is not available.")
+else:
+    # Get pose for this frame
+    T_world_device_frame = Ts_world_device[frame_idx]
+    print(f"Device pose at frame {frame_idx}:")
+    print(f"  Translation: {T_world_device_frame.to_matrix()[:3, 3]}")
 
-# Transform chain
-T_device_camera = camera_calib.get_transform_device_camera()
-T_camera_world = T_device_camera.inverse() @ T_world_device_frame.inverse()
+    # Transform chain
+    T_device_camera = camera_calib.get_transform_device_camera()
+    T_camera_world = T_device_camera.inverse() @ T_world_device_frame.inverse()
 
-# Project subset of points (all points would be too many)
-sample_indices = np.linspace(0, len(points)-1, 500, dtype=int)
-sampled_points = points[sample_indices]
+    # Project subset of points (all points would be too many)
+    sample_indices = np.linspace(0, len(points)-1, 500, dtype=int)
+    sampled_points = points[sample_indices]
 
-pixels_list = []
-visible_count = 0
-for point_world in sampled_points:
-    point_camera = T_camera_world @ point_world
-    pixel = camera_calib.project(point_camera)
-    if pixel is not None:
-        # Check if pixel is within image bounds
-        if 0 <= pixel[0] < width and 0 <= pixel[1] < height:
-            pixels_list.append(pixel)
-            visible_count += 1
+    pixels_list = []
+    visible_count = 0
+    for point_world in sampled_points:
+        point_camera = T_camera_world @ point_world
+        pixel = camera_calib.project(point_camera)
+        if pixel is not None:
+            # Check if pixel is within image bounds
+            if 0 <= pixel[0] < width and 0 <= pixel[1] < height:
+                pixels_list.append(pixel)
+                visible_count += 1
 
-pixels_arr = np.array(pixels_list) if pixels_list else np.array([]).reshape(0, 2)
-print(f"\nProjected {visible_count}/{len(sampled_points)} sampled points visible in frame")
-if len(pixels_arr) > 0:
-    print(f"Pixel coordinates range: u[{pixels_arr[:, 0].min():.1f}, {pixels_arr[:, 0].max():.1f}], "
-          f"v[{pixels_arr[:, 1].min():.1f}, {pixels_arr[:, 1].max():.1f}]")
+    pixels_arr = np.array(pixels_list) if pixels_list else np.array([]).reshape(0, 2)
+    print(f"\nProjected {visible_count}/{len(sampled_points)} sampled points visible in frame")
+    if len(pixels_arr) > 0:
+        print(f"Pixel coordinates range: u[{pixels_arr[:, 0].min():.1f}, {pixels_arr[:, 0].max():.1f}], "
+              f"v[{pixels_arr[:, 1].min():.1f}, {pixels_arr[:, 1].max():.1f}]")
 ```
 
 ---
@@ -657,34 +680,37 @@ CameraCalibration --> SE3 : uses
 
 ```{python}
 #| echo: true
-print(f"Scene: {DATA_PATH}")
-print(f"Total frames: {len(Ts_world_device)}")
+if not HAS_SAMPLE_DATA:
+    print("Skipping multi-view fusion example; ASE sample data is not available.")
+else:
+    print(f"Scene: {DATA_PATH}")
+    print(f"Total frames: {len(Ts_world_device)}")
 
-# Select views to fuse (every 50th frame for speed)
-view_indices = [0, 50, 100, 150, 200]
-all_points_list = []
+    # Select views to fuse (every 50th frame for speed)
+    view_indices = [0, 50, 100, 150, 200]
+    all_points_list = []
 
-for idx in view_indices:
-    # Load depth
-    frame_id = str(idx).zfill(7)
-    depth_img = np.array(Image.open(DATA_PATH / "depth" / f"depth{frame_id}.png"))
+    for idx in view_indices:
+        # Load depth
+        frame_id = str(idx).zfill(7)
+        depth_img = np.array(Image.open(DATA_PATH / "depth" / f"depth{frame_id}.png"))
 
-    # Get pose
-    T_world_device_view = Ts_world_device[idx]
+        # Get pose
+        T_world_device_view = Ts_world_device[idx]
 
-    # Convert to point cloud
-    pc = depth_to_pointcloud(
-        depth_img, camera_calib, T_world_device_view, subsample=8
-    )
-    all_points_list.append(pc)
-    print(f"  View {idx}: {len(pc):,} points")
+        # Convert to point cloud
+        pc = depth_to_pointcloud(
+            depth_img, camera_calib, T_world_device_view, subsample=8
+        )
+        all_points_list.append(pc)
+        print(f"  View {idx}: {len(pc):,} points")
 
-# Fuse all views
-fused_pc = np.vstack(all_points_list)
-print(f"\n✓ Fused point cloud: {len(fused_pc):,} points from {len(view_indices)} views")
-print(f"  Bounds: X[{fused_pc[:, 0].min():.2f}, {fused_pc[:, 0].max():.2f}], "
-      f"Y[{fused_pc[:, 1].min():.2f}, {fused_pc[:, 1].max():.2f}], "
-      f"Z[{fused_pc[:, 2].min():.2f}, {fused_pc[:, 2].max():.2f}]")
+    # Fuse all views
+    fused_pc = np.vstack(all_points_list)
+    print(f"\n✓ Fused point cloud: {len(fused_pc):,} points from {len(view_indices)} views")
+    print(f"  Bounds: X[{fused_pc[:, 0].min():.2f}, {fused_pc[:, 0].max():.2f}], "
+          f"Y[{fused_pc[:, 1].min():.2f}, {fused_pc[:, 1].max():.2f}], "
+          f"Z[{fused_pc[:, 2].min():.2f}, {fused_pc[:, 2].max():.2f}]")
 ```
 
 ---
