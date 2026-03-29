@@ -13,37 +13,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Self
 
 import msgspec
-
-OfflineRecord = TypeVar("OfflineRecord")
-_JSON_ENCODER = msgspec.json.Encoder()
-
-
-def _read_typed_json(path: Path, *, record_type: type[OfflineRecord]) -> OfflineRecord:
-    """Read one typed JSON record from disk.
-
-    Args:
-        path: JSON file to read.
-        record_type: Target dataclass type.
-
-    Returns:
-        Decoded record instance.
-    """
-
-    return msgspec.json.decode(path.read_bytes(), type=record_type)
-
-
-def _write_json(path: Path, payload: Any) -> None:
-    """Write one JSON-serializable payload to disk.
-
-    Args:
-        path: Destination JSON path.
-        payload: Typed payload to persist.
-    """
-
-    path.write_bytes(_JSON_ENCODER.encode(payload))
 
 
 @dataclass(slots=True)
@@ -52,7 +24,7 @@ class VinOfflineBlockSpec:
 
     Attributes:
         name: Logical block name, for example ``"vin.points_world"``.
-        kind: Storage kind such as ``"zarr_array"`` or ``"pickle_records"``.
+        kind: Storage kind such as ``"zarr_array"`` or ``"msgpack_records"``.
         paths: Relative array names or file paths that materialize the block.
         dtype: NumPy dtype name for numeric blocks.
         shape: Full stored array shape for numeric blocks.
@@ -76,6 +48,95 @@ class VinOfflineBlockSpec:
 
     optional: bool = False
     """Whether the block may be absent in a valid dataset."""
+
+    @staticmethod
+    def zarr_array_path(name: str) -> str:
+        """Return the hierarchical Zarr path for a logical block name.
+
+        Args:
+            name: Logical block name, for example ``"oracle.p3d.R"``.
+
+        Returns:
+            Zarr array path relative to the shard root.
+        """
+
+        return name.replace(".", "/")
+
+    @staticmethod
+    def msgpack_records_path(name: str) -> str:
+        """Return the msgpack filename used for one logical record block.
+
+        Args:
+            name: Logical block name.
+
+        Returns:
+            Shard-local msgpack filename.
+        """
+
+        safe_stem = name.replace("/", "__").replace(".", "__")
+        return f"{safe_stem}.msgpack"
+
+    @classmethod
+    def for_zarr_array(
+        cls,
+        *,
+        name: str,
+        array_path: str,
+        dtype: str,
+        shape: list[int],
+        optional: bool = False,
+    ) -> Self:
+        """Build a block descriptor for one Zarr-backed numeric array.
+
+        Args:
+            name: Logical block name.
+            array_path: Relative Zarr array path inside the shard.
+            dtype: Stored NumPy dtype name.
+            shape: Full stored array shape.
+            optional: Whether the block is optional.
+
+        Returns:
+            Block descriptor for the stored array.
+        """
+
+        return cls(
+            name=name,
+            kind="zarr_array",
+            paths=[array_path],
+            dtype=dtype,
+            shape=shape,
+            optional=optional,
+        )
+
+    @classmethod
+    def for_msgpack_records(
+        cls,
+        *,
+        name: str,
+        relative_path: str,
+        num_records: int,
+        optional: bool = True,
+    ) -> Self:
+        """Build a block descriptor for one msgpack record list.
+
+        Args:
+            name: Logical block name.
+            relative_path: Shard-local msgpack filename.
+            num_records: Number of stored per-row records.
+            optional: Whether the block is optional.
+
+        Returns:
+            Block descriptor for the stored record list.
+        """
+
+        return cls(
+            name=name,
+            kind="msgpack_records",
+            paths=[relative_path],
+            dtype=None,
+            shape=[num_records],
+            optional=optional,
+        )
 
 
 @dataclass(slots=True)
@@ -197,7 +258,7 @@ class VinOfflineManifest:
             path: Destination manifest path.
         """
 
-        _write_json(path, self)
+        path.write_bytes(msgspec.json.encode(self))
 
     @classmethod
     def read(cls, path: Path) -> "VinOfflineManifest":
@@ -210,7 +271,7 @@ class VinOfflineManifest:
             Deserialized manifest.
         """
 
-        return _read_typed_json(path, record_type=cls)
+        return msgspec.json.decode(path.read_bytes(), type=cls)
 
 
 @dataclass(slots=True)
@@ -264,36 +325,36 @@ class VinOfflineIndexRecord:
     legacy_vin_path: str | None = None
     """Optional legacy VIN-cache payload path."""
 
+    @classmethod
+    def read_many(cls, path: Path) -> list[Self]:
+        """Read the global sample index.
 
-def read_sample_index(path: Path) -> list[VinOfflineIndexRecord]:
-    """Read the global sample index.
+        Args:
+            path: ``sample_index.jsonl`` path.
 
-    Args:
-        path: ``sample_index.jsonl`` path.
+        Returns:
+            Parsed sample-index records.
+        """
 
-    Returns:
-        Parsed sample-index records.
-    """
+        records: list[Self] = []
+        for line in path.read_bytes().splitlines():
+            if line.strip():
+                records.append(msgspec.json.decode(line, type=cls))
+        return records
 
-    records: list[VinOfflineIndexRecord] = []
-    for line in path.read_bytes().splitlines():
-        if line.strip():
-            records.append(msgspec.json.decode(line, type=VinOfflineIndexRecord))
-    return records
+    @classmethod
+    def write_many(cls, path: Path, records: list[Self]) -> None:
+        """Write the global sample index.
 
+        Args:
+            path: Destination ``sample_index.jsonl`` path.
+            records: Global sample-index records to persist.
+        """
 
-def write_sample_index(path: Path, records: list[VinOfflineIndexRecord]) -> None:
-    """Write the global sample index.
-
-    Args:
-        path: Destination ``sample_index.jsonl`` path.
-        records: Global sample-index records to persist.
-    """
-
-    payload = b"\n".join(_JSON_ENCODER.encode(record) for record in records)
-    if payload:
-        payload += b"\n"
-    path.write_bytes(payload)
+        payload = b"\n".join(msgspec.json.encode(record) for record in records)
+        if payload:
+            payload += b"\n"
+        path.write_bytes(payload)
 
 
 __all__ = [
@@ -303,6 +364,4 @@ __all__ = [
     "VinOfflineManifest",
     "VinOfflineMaterializedBlocks",
     "VinOfflineShardSpec",
-    "read_sample_index",
-    "write_sample_index",
 ]

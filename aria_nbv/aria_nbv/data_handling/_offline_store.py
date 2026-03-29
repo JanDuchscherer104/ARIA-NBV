@@ -10,11 +10,11 @@ This module owns the immutable on-disk layout of the VIN offline dataset:
 
 from __future__ import annotations
 
-import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import msgspec
 import numpy as np
 import zarr
 from pydantic import Field, ValidationInfo, field_validator
@@ -26,52 +26,10 @@ from ._offline_format import (
     VinOfflineIndexRecord,
     VinOfflineManifest,
     VinOfflineShardSpec,
-    read_sample_index,
 )
 
-OFFLINE_DATASET_VERSION = 2
+OFFLINE_DATASET_VERSION = 3
 """Version of the immutable VIN offline dataset format."""
-
-
-def _safe_block_stem(name: str) -> str:
-    """Convert a logical block name into a filesystem-safe filename stem.
-
-    Args:
-        name: Logical block name, for example ``"vin.points_world"``.
-
-    Returns:
-        Filesystem-safe filename stem.
-    """
-
-    return name.replace("/", "__").replace(".", "__")
-
-
-def _zarr_array_name(name: str) -> str:
-    """Convert a logical block name into a hierarchical Zarr array path.
-
-    Args:
-        name: Logical block name, for example ``"oracle.p3d.R"``.
-
-    Returns:
-        Zarr array name relative to the shard root group.
-    """
-
-    return name.replace(".", "/")
-
-
-def _row_chunk_shape(array: np.ndarray) -> tuple[int, ...]:
-    """Choose a chunk shape aligned with row-wise random-access reads.
-
-    Args:
-        array: Stacked block array whose first axis is the sample row axis.
-
-    Returns:
-        Chunk shape used for the stored Zarr array.
-    """
-
-    if array.ndim <= 1:
-        return (min(int(array.shape[0]), 1024),)
-    return (1, *array.shape[1:])
 
 
 class VinOfflineStoreConfig(BaseConfig):
@@ -156,90 +114,98 @@ class VinOfflineStoreConfig(BaseConfig):
 
         return self.splits_dir / f"{split}.npy"
 
+    def write_split_indices(self, split_to_indices: dict[str, np.ndarray]) -> None:
+        """Persist split membership arrays.
 
-def write_split_indices(config: VinOfflineStoreConfig, split_to_indices: dict[str, np.ndarray]) -> None:
-    """Persist split membership arrays.
+        Args:
+            split_to_indices: Split membership arrays keyed by split name.
+        """
 
-    Args:
-        config: Store configuration.
-        split_to_indices: Split membership arrays keyed by split name.
-    """
+        self.splits_dir.mkdir(parents=True, exist_ok=True)
+        for split, indices in split_to_indices.items():
+            np.save(self.split_path(split), np.asarray(indices, dtype=np.int64), allow_pickle=False)
 
-    config.splits_dir.mkdir(parents=True, exist_ok=True)
-    for split, indices in split_to_indices.items():
-        np.save(config.split_path(split), np.asarray(indices, dtype=np.int64), allow_pickle=False)
+    def read_split_indices(self, split: str) -> np.ndarray:
+        """Load the global sample indices for one split.
 
+        Args:
+            split: Split name such as ``"all"``, ``"train"``, or ``"val"``.
 
-def read_split_indices(config: VinOfflineStoreConfig, split: str) -> np.ndarray:
-    """Load the global sample indices for one split.
+        Returns:
+            Global sample indices for the requested split.
+        """
 
-    Args:
-        config: Store configuration.
-        split: Split name such as ``"all"``, ``"train"``, or ``"val"``.
-
-    Returns:
-        Global sample indices for the requested split.
-    """
-
-    return np.load(config.split_path(split), allow_pickle=False)
+        return np.load(self.split_path(split), allow_pickle=False)
 
 
-def write_fixed_block(shard_dir: Path, name: str, array: np.ndarray) -> VinOfflineBlockSpec:
-    """Write one fixed-size numeric block into a shard-local Zarr group.
+@dataclass(slots=True)
+class VinOfflineShardWriter:
+    """Materialize one immutable shard for the VIN offline dataset."""
 
-    Args:
-        shard_dir: Destination shard directory that backs a Zarr group.
-        name: Logical block name.
-        array: NumPy array to store.
+    shard_dir: Path
+    """Destination shard directory."""
 
-    Returns:
-        Block descriptor for the stored array.
-    """
+    @staticmethod
+    def _row_chunk_shape(array: np.ndarray) -> tuple[int, ...]:
+        """Choose a chunk shape aligned with row-wise random-access reads.
 
-    group = zarr.open_group(str(shard_dir), mode="a")
-    rel_path = _zarr_array_name(name)
-    zarr_array = group.create_array(
-        name=rel_path,
-        shape=array.shape,
-        chunks=_row_chunk_shape(array),
-        dtype=array.dtype,
-        overwrite=True,
-    )
-    zarr_array[:] = array
-    return VinOfflineBlockSpec(
-        name=name,
-        kind="zarr_array",
-        paths=[rel_path],
-        dtype=str(array.dtype),
-        shape=list(array.shape),
-        optional=False,
-    )
+        Args:
+            array: Stacked block array whose first axis is the sample row axis.
 
+        Returns:
+            Chunk shape used for the stored Zarr array.
+        """
 
-def write_pickle_records(shard_dir: Path, name: str, records: list[Any]) -> VinOfflineBlockSpec:
-    """Write one per-row diagnostic record list for a shard.
+        if array.ndim <= 1:
+            return (min(int(array.shape[0]), 1024),)
+        return (1, *array.shape[1:])
 
-    Args:
-        shard_dir: Destination shard directory.
-        name: Logical block name.
-        records: Per-row Python objects to pickle.
+    def write_numeric_block(self, name: str, array: np.ndarray) -> VinOfflineBlockSpec:
+        """Write one fixed-size numeric block into the shard Zarr group.
 
-    Returns:
-        Block descriptor for the stored record list.
-    """
+        Args:
+            name: Logical block name.
+            array: NumPy array to store.
 
-    stem = _safe_block_stem(name)
-    rel_path = f"{stem}.pkl"
-    with (shard_dir / rel_path).open("wb") as handle:
-        pickle.dump(records, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    return VinOfflineBlockSpec(
-        name=name,
-        kind="pickle_records",
-        paths=[rel_path],
-        dtype=None,
-        shape=[len(records)],
-        optional=True,
-    )
+        Returns:
+            Block descriptor for the stored array.
+        """
+
+        group = zarr.open_group(str(self.shard_dir), mode="a")
+        rel_path = VinOfflineBlockSpec.zarr_array_path(name)
+        zarr_array = group.create_array(
+            name=rel_path,
+            shape=array.shape,
+            chunks=self._row_chunk_shape(array),
+            dtype=array.dtype,
+            overwrite=True,
+        )
+        zarr_array[:] = array
+        return VinOfflineBlockSpec.for_zarr_array(
+            name=name,
+            array_path=rel_path,
+            dtype=str(array.dtype),
+            shape=list(array.shape),
+        )
+
+    def write_record_block(self, name: str, records: list[Any]) -> VinOfflineBlockSpec:
+        """Write one per-row diagnostic record list for the shard.
+
+        Args:
+            name: Logical block name.
+            records: Per-row msgspec-compatible payload objects.
+
+        Returns:
+            Block descriptor for the stored record list.
+        """
+
+        rel_path = VinOfflineBlockSpec.msgpack_records_path(name)
+        (self.shard_dir / rel_path).write_bytes(msgspec.msgpack.encode(records))
+        return VinOfflineBlockSpec.for_msgpack_records(
+            name=name,
+            relative_path=rel_path,
+            num_records=len(records),
+        )
 
 
 @dataclass(slots=True)
@@ -268,7 +234,7 @@ class VinOfflineStoreReader:
 
         self.config = config
         self.manifest = VinOfflineManifest.read(config.manifest_path)
-        self.sample_index = read_sample_index(config.sample_index_path)
+        self.sample_index = VinOfflineIndexRecord.read_many(config.sample_index_path)
         self._records_by_sample_index = {record.sample_index: record for record in self.sample_index}
         self._shards = {spec.shard_id: spec for spec in self.manifest.shards}
         self._opened: dict[str, OpenedShard] = {}
@@ -285,11 +251,11 @@ class VinOfflineStoreReader:
         """
 
         if split not in self._split_cache:
-            self._split_cache[split] = read_split_indices(self.config, split)
+            self._split_cache[split] = self.config.read_split_indices(split)
         return [self._records_by_sample_index[int(idx)] for idx in self._split_cache[split]]
 
     def _open_shard(self, shard_id: str) -> OpenedShard:
-        """Open one shard and cache its mmap-backed blocks.
+        """Open one shard and cache its Zarr-backed blocks.
 
         Args:
             shard_id: Stable shard identifier.
@@ -327,8 +293,7 @@ class VinOfflineStoreReader:
             return opened.record_lists[block_name]
         block = opened.spec.blocks[block_name]
         shard_dir = self.config.store_dir / opened.spec.relative_dir
-        with (shard_dir / block.paths[0]).open("rb") as handle:
-            opened.record_lists[block_name] = pickle.load(handle)
+        opened.record_lists[block_name] = msgspec.msgpack.decode((shard_dir / block.paths[0]).read_bytes())
         return opened.record_lists[block_name]
 
     def read_numeric_block(self, record: VinOfflineIndexRecord, block_name: str) -> np.ndarray:
@@ -365,11 +330,6 @@ class VinOfflineStoreReader:
 
 __all__ = [
     "OFFLINE_DATASET_VERSION",
-    "OpenedShard",
     "VinOfflineStoreConfig",
     "VinOfflineStoreReader",
-    "read_split_indices",
-    "write_fixed_block",
-    "write_pickle_records",
-    "write_split_indices",
 ]

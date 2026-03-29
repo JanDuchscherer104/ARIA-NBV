@@ -23,7 +23,9 @@ from torch.utils.data import Dataset
 
 from ..configs import PathConfig
 from ..pipelines.oracle_rri_labeler import OracleRriLabelerConfig, OracleRriSample
+from ..pose_generation.types import CandidateSamplingResult
 from ..rendering.candidate_depth_renderer import CandidateDepths
+from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..rri_metrics.types import RriResult
 from ..utils import BaseConfig, Console, Verbosity
 from ..vin.backbone_evl import EvlBackboneConfig
@@ -31,18 +33,6 @@ from ..vin.types import EvlBackboneOutput
 from .efm_dataset import AseEfmDatasetConfig
 from .efm_snippet_loader import EfmSnippetLoader
 from .efm_views import EfmSnippetView, VinSnippetView
-from .offline_cache_serialization import (
-    decode_backbone,
-    decode_candidate_pcs,
-    decode_candidates,
-    decode_depths,
-    decode_rri,
-    encode_backbone,
-    encode_candidate_pcs,
-    encode_candidates,
-    encode_depths,
-    encode_rri,
-)
 from .offline_cache_store import (
     _format_sample_key,
     _read_metadata,
@@ -70,6 +60,12 @@ if TYPE_CHECKING:
     from .vin_oracle_types import VinOracleBatch
 
 CACHE_VERSION = 1
+
+decode_candidates = CandidateSamplingResult.from_serializable
+decode_depths = CandidateDepths.from_serializable
+decode_candidate_pcs = CandidatePointClouds.from_serializable
+decode_rri = RriResult.from_serializable
+decode_backbone = EvlBackboneOutput.from_serializable
 
 
 # ----------------------------------------------------------------------------- Cache configs
@@ -407,17 +403,17 @@ def build_cache_payload(
     payload: dict[str, Any] = {
         "scene_id": label_batch.sample.scene_id,
         "snippet_id": label_batch.sample.snippet_id,
-        "candidates": encode_candidates(label_batch.candidates),
-        "depths": encode_depths(label_batch.depths) if include_depths else None,
-        "candidate_pcs": encode_candidate_pcs(label_batch.candidate_pcs) if include_pointclouds else None,
-        "rri": encode_rri(label_batch.rri),
+        "candidates": label_batch.candidates.to_serializable(),
+        "depths": label_batch.depths.to_serializable() if include_depths else None,
+        "candidate_pcs": label_batch.candidate_pcs.to_serializable() if include_pointclouds else None,
+        "rri": label_batch.rri.to_serializable(),
     }
     if include_backbone:
         if backbone_out is None:
             raise ValueError(
                 "include_backbone=True requires backbone_out to be provided.",
             )
-        payload["backbone"] = encode_backbone(backbone_out)
+        payload["backbone"] = backbone_out.to_serializable()
     return payload
 
 
@@ -724,7 +720,7 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
 
         candidates = None
         if self.config.load_candidates:
-            candidates = decode_candidates(payload["candidates"])
+            candidates = decode_candidates(payload["candidates"], device=None)
         depths = None
         if self.config.load_depths and payload.get("depths") is not None:
             depths = decode_depths(payload["depths"], device=device)
@@ -1037,16 +1033,6 @@ __all__ = [
     "OracleRriCacheSample",
     "OracleRriCacheWriter",
     "OracleRriCacheWriterConfig",
-    "decode_backbone",
-    "decode_candidate_pcs",
-    "decode_candidates",
-    "decode_depths",
-    "decode_rri",
-    "encode_backbone",
-    "encode_candidate_pcs",
-    "encode_candidates",
-    "encode_depths",
-    "encode_rri",
     "snapshot_config",
     "snapshot_dataset_config",
     "rebuild_cache_index",

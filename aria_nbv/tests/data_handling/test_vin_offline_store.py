@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -23,7 +25,6 @@ from aria_nbv.data_handling import (
     flush_prepared_samples_to_shard,
     prepare_vin_offline_sample,
 )
-from aria_nbv.data_handling._offline_format import read_sample_index, write_sample_index
 from aria_nbv.lightning.lit_datamodule import VinDataModuleConfig
 from aria_nbv.rendering.candidate_depth_renderer import CandidateDepths
 from aria_nbv.rri_metrics.types import RriResult
@@ -33,6 +34,23 @@ PoseTW = pytest.importorskip("efm3d.aria.pose").PoseTW
 PerspectiveCameras = pytest.importorskip(
     "pytorch3d.renderer.cameras",
 ).PerspectiveCameras
+
+
+def _write_sample_index(path: Path, records: list[VinOfflineIndexRecord]) -> None:
+    """Write a small sample index without importing internal helpers."""
+
+    payload = "\n".join(json.dumps(asdict(record), sort_keys=True) for record in records)
+    if payload:
+        payload += "\n"
+    path.write_text(payload, encoding="utf-8")
+
+
+def _read_sample_index_rows(path: Path) -> list[dict[str, object]]:
+    """Read the sample index into plain dictionaries for assertions."""
+
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 def _make_pose_batch(num: int, *, offset: float = 0.0) -> PoseTW:
@@ -210,7 +228,7 @@ def _write_test_store(tmp_path: Path) -> VinOfflineStoreConfig:
         shards=[shard_spec],
     )
     manifest.write(store_cfg.manifest_path)
-    write_sample_index(store_cfg.sample_index_path, index_records)
+    _write_sample_index(store_cfg.sample_index_path, index_records)
     store_cfg.splits_dir.mkdir(parents=True, exist_ok=True)
     np.save(
         store_cfg.split_path("all"),
@@ -278,10 +296,10 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     assert stored_manifest.shards[0].shard_id == "shard-000000"  # noqa: S101
     assert stored_manifest.shards[0].blocks["vin.points_world"].kind == "zarr_array"  # noqa: S101
 
-    sample_index_records = read_sample_index(store_cfg.sample_index_path)
-    assert sample_index_records[0].split == "train"  # noqa: S101
-    assert sample_index_records[1].split == "train"  # noqa: S101
-    assert sample_index_records[2].split == "val"  # noqa: S101
+    sample_index_rows = _read_sample_index_rows(store_cfg.sample_index_path)
+    assert sample_index_rows[0]["split"] == "train"  # noqa: S101
+    assert sample_index_rows[1]["split"] == "train"  # noqa: S101
+    assert sample_index_rows[2]["split"] == "val"  # noqa: S101
 
     batch_dataset = VinOfflineDatasetConfig(
         store=store_cfg,

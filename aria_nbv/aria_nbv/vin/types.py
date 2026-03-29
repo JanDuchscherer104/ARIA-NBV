@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Annotated, TypedDict
 import torch
 from typing_extensions import Doc
 
+from ..utils.typed_payloads import from_serializable, to_serializable
+
 if TYPE_CHECKING:
     from efm3d.aria.obb import ObbTW
     from efm3d.aria.pose import PoseTW
@@ -118,6 +120,37 @@ class EvlBackboneOutput:
 
     token2d: dict[str, Tensor] = field(default_factory=dict)
     """Per-stream 2D token maps keyed by stream name (e.g. "rgb")."""
+
+    def to_serializable(self) -> dict[str, object]:
+        """Serialize this backbone output into a cache-friendly CPU payload."""
+
+        return to_serializable(self)
+
+    @classmethod
+    def from_serializable(
+        cls,
+        payload: dict[str, object],
+        *,
+        device: torch.device,
+        include_fields: set[str] | None = None,
+    ) -> "EvlBackboneOutput":
+        """Reconstruct one backbone output from a serialized payload.
+
+        Args:
+            payload: Serialized payload produced by :meth:`to_serializable`.
+            device: Destination device for tensors and wrappers.
+            include_fields: Optional subset of fields to decode.
+
+        Returns:
+            Reconstructed backbone output.
+        """
+
+        return from_serializable(
+            cls,
+            payload,
+            device=device,
+            include_fields=include_fields,
+        )
 
     def to(self, device: torch.device) -> EvlBackboneOutput:
         """Move all tensors to the specified device."""

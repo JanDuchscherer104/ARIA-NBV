@@ -25,29 +25,21 @@ from efm3d.aria.aria_constants import (
 from efm3d.aria.pose import PoseTW
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 
-import aria_nbv.data_handling.efm_snippet_loader as efm_loader_mod
-import aria_nbv.data_handling.oracle_cache as oracle_cache_mod
-from aria_nbv.data_handling.cache_index import read_index
-from aria_nbv.data_handling.efm_views import EfmSnippetView, VinSnippetView
-from aria_nbv.data_handling.offline_cache_serialization import encode_rri
-from aria_nbv.data_handling.offline_cache_store import _write_metadata
-from aria_nbv.data_handling.oracle_cache import (
+from aria_nbv.data_handling import (
+    EfmSnippetView,
     OracleRriCacheConfig,
     OracleRriCacheDatasetConfig,
-    OracleRriCacheMetadata,
+    VinOracleBatch,
+    VinOracleCacheDatasetConfig,
+    VinSnippetCacheConfig,
+    VinSnippetCacheWriterConfig,
+    VinSnippetView,
+    build_vin_snippet_view,
+    read_vin_snippet_cache_metadata,
     rebuild_oracle_cache_index,
+    rebuild_vin_snippet_cache_index,
     repair_oracle_cache_indices,
 )
-from aria_nbv.data_handling.vin_adapter import build_vin_snippet_view
-from aria_nbv.data_handling.vin_cache import (
-    VinSnippetCacheConfig,
-    VinSnippetCacheEntry,
-    VinSnippetCacheWriterConfig,
-    read_vin_snippet_cache_metadata,
-    rebuild_vin_snippet_cache_index,
-)
-from aria_nbv.data_handling.vin_oracle_datasets import VinOracleCacheDatasetConfig
-from aria_nbv.data_handling.vin_oracle_types import VinOracleBatch
 from aria_nbv.lightning.lit_datamodule import VinDataModuleConfig
 from aria_nbv.rendering.candidate_depth_renderer import CandidateDepths
 from aria_nbv.rri_metrics.types import RriResult
@@ -164,21 +156,21 @@ def _write_oracle_metadata(
     num_samples: int | None,
     dataset_config: dict[str, Any] | None = None,
 ) -> None:
-    meta = OracleRriCacheMetadata(
-        version=1,
-        created_at="2026-03-29T00:00:00Z",
-        labeler_config={},
-        labeler_signature="stub",
-        dataset_config=dataset_config,
-        backbone_config=None,
-        backbone_signature=None,
-        config_hash="oracle-cache-test",
-        include_backbone=False,
-        include_depths=True,
-        include_pointclouds=False,
-        num_samples=num_samples,
-    )
-    _write_metadata(cache_dir / "metadata.json", meta)
+    payload = {
+        "version": 1,
+        "created_at": "2026-03-29T00:00:00Z",
+        "labeler_config": {},
+        "labeler_signature": "stub",
+        "dataset_config": dataset_config,
+        "backbone_config": None,
+        "backbone_signature": None,
+        "config_hash": "oracle-cache-test",
+        "include_backbone": False,
+        "include_depths": True,
+        "include_pointclouds": False,
+        "num_samples": num_samples,
+    }
+    (cache_dir / "metadata.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, str]]) -> None:
@@ -194,11 +186,25 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def _encode_rri_payload(rri: RriResult) -> dict[str, torch.Tensor]:
+    """Serialize an ``RriResult`` stub without importing internal codecs."""
+
+    return {
+        "rri": rri.rri.detach().cpu(),
+        "pm_dist_before": rri.pm_dist_before.detach().cpu(),
+        "pm_dist_after": rri.pm_dist_after.detach().cpu(),
+        "pm_acc_before": rri.pm_acc_before.detach().cpu(),
+        "pm_comp_before": rri.pm_comp_before.detach().cpu(),
+        "pm_acc_after": rri.pm_acc_after.detach().cpu(),
+        "pm_comp_after": rri.pm_comp_after.detach().cpu(),
+    }
+
+
 def _oracle_sample_payload(scene_id: str, snippet_id: str) -> dict[str, object]:
     return {
         "scene_id": scene_id,
         "snippet_id": snippet_id,
-        "rri": encode_rri(_make_stub_rri()),
+        "rri": _encode_rri_payload(_make_stub_rri()),
         "depths": {"num_candidates": 2},
     }
 
@@ -400,7 +406,7 @@ def test_vin_snippet_cache_writer_rewrites_index_for_resume_and_overwrite(
     def _load(self: object, *, scene_id: str, snippet_id: str) -> EfmSnippetView:
         return snippets[(scene_id, snippet_id)]
 
-    monkeypatch.setattr(efm_loader_mod.EfmSnippetLoader, "load", _load)
+    monkeypatch.setattr("aria_nbv.data_handling.efm_snippet_loader.EfmSnippetLoader.load", _load)
 
     vin_cache_dir = tmp_path / "vin_cache"
     cache_cfg = VinSnippetCacheConfig(cache_dir=vin_cache_dir, pad_points=6)
@@ -423,7 +429,7 @@ def test_vin_snippet_cache_writer_rewrites_index_for_resume_and_overwrite(
         .run()
     )
     assert len(first_entries) == 1  # noqa: S101
-    assert len(read_index(cache_cfg.index_path, entry_type=VinSnippetCacheEntry)) == 1  # noqa: S101
+    assert len(_read_jsonl(cache_cfg.index_path)) == 1  # noqa: S101
     assert read_vin_snippet_cache_metadata(cache_cfg.cache_dir).num_samples == 1  # noqa: S101
 
     second_entries = (
@@ -437,7 +443,7 @@ def test_vin_snippet_cache_writer_rewrites_index_for_resume_and_overwrite(
         .run()
     )
     assert len(second_entries) == 1  # noqa: S101
-    assert len(read_index(cache_cfg.index_path, entry_type=VinSnippetCacheEntry)) == 2  # noqa: S101
+    assert len(_read_jsonl(cache_cfg.index_path)) == 2  # noqa: S101
     assert read_vin_snippet_cache_metadata(cache_cfg.cache_dir).num_samples == 2  # noqa: S101
 
     overwrite_entries = (
@@ -451,7 +457,7 @@ def test_vin_snippet_cache_writer_rewrites_index_for_resume_and_overwrite(
         .run()
     )
     assert len(overwrite_entries) == 1  # noqa: S101
-    assert len(read_index(cache_cfg.index_path, entry_type=VinSnippetCacheEntry)) == 1  # noqa: S101
+    assert len(_read_jsonl(cache_cfg.index_path)) == 1  # noqa: S101
     assert len(list(cache_cfg.samples_dir.glob("*.pt"))) == 1  # noqa: S101
     assert read_vin_snippet_cache_metadata(cache_cfg.cache_dir).num_samples == 1  # noqa: S101
 
@@ -499,7 +505,7 @@ def test_rebuild_vin_snippet_cache_index_scans_payloads_and_updates_metadata(
     count = rebuild_vin_snippet_cache_index(cache_dir=cache_cfg.cache_dir, pad_points=7)
 
     assert count == 2  # noqa: S101
-    assert len(read_index(cache_cfg.index_path, entry_type=VinSnippetCacheEntry)) == 2  # noqa: S101
+    assert len(_read_jsonl(cache_cfg.index_path)) == 2  # noqa: S101
     meta = read_vin_snippet_cache_metadata(cache_cfg.cache_dir)
     assert meta.num_samples == 2  # noqa: S101
     assert meta.pad_points == 7  # noqa: S101
@@ -525,8 +531,8 @@ def test_oracle_cache_live_fallback_matches_vin_cache_direct(
     def _load(self: object, *, scene_id: str, snippet_id: str) -> EfmSnippetView:
         return snippets[(scene_id, snippet_id)]
 
-    monkeypatch.setattr(efm_loader_mod.EfmSnippetLoader, "load", _load)
-    monkeypatch.setattr(oracle_cache_mod, "decode_depths", _decode_depths_stub)
+    monkeypatch.setattr("aria_nbv.data_handling.efm_snippet_loader.EfmSnippetLoader.load", _load)
+    monkeypatch.setattr("aria_nbv.data_handling.oracle_cache.decode_depths", _decode_depths_stub)
 
     oracle_cache_cfg = OracleRriCacheConfig(cache_dir=oracle_cache_dir)
     vin_cache_cfg = VinSnippetCacheConfig(cache_dir=tmp_path / "vin_cache", pad_points=6)
@@ -556,7 +562,7 @@ def test_oracle_cache_live_fallback_matches_vin_cache_direct(
     def _raise_load(self: object, *, scene_id: str, snippet_id: str) -> EfmSnippetView:  # noqa: ARG001
         raise RuntimeError("live EFM loader should not be used when VIN cache is required")
 
-    monkeypatch.setattr(efm_loader_mod.EfmSnippetLoader, "load", _raise_load)
+    monkeypatch.setattr("aria_nbv.data_handling.efm_snippet_loader.EfmSnippetLoader.load", _raise_load)
 
     cached_dataset = OracleRriCacheDatasetConfig(
         cache=oracle_cache_cfg,
@@ -611,8 +617,8 @@ def test_v2_datamodule_matches_live_and_cached_paths(
     def _load(self: object, *, scene_id: str, snippet_id: str) -> EfmSnippetView:
         return snippets[(scene_id, snippet_id)]
 
-    monkeypatch.setattr(efm_loader_mod.EfmSnippetLoader, "load", _load)
-    monkeypatch.setattr(oracle_cache_mod, "decode_depths", _decode_depths_stub)
+    monkeypatch.setattr("aria_nbv.data_handling.efm_snippet_loader.EfmSnippetLoader.load", _load)
+    monkeypatch.setattr("aria_nbv.data_handling.oracle_cache.decode_depths", _decode_depths_stub)
 
     oracle_cache_cfg = OracleRriCacheConfig(cache_dir=oracle_cache_dir)
     vin_cache_cfg = VinSnippetCacheConfig(cache_dir=tmp_path / "vin_cache", pad_points=6)
@@ -639,7 +645,7 @@ def test_v2_datamodule_matches_live_and_cached_paths(
     def _raise_load(self: object, *, scene_id: str, snippet_id: str) -> EfmSnippetView:  # noqa: ARG001
         raise RuntimeError("VIN cache path should not fall back to live EFM loading")
 
-    monkeypatch.setattr(efm_loader_mod.EfmSnippetLoader, "load", _raise_load)
+    monkeypatch.setattr("aria_nbv.data_handling.efm_snippet_loader.EfmSnippetLoader.load", _raise_load)
 
     cached_cfg = _make_datamodule_cfg(
         oracle_cache=oracle_cache_cfg,

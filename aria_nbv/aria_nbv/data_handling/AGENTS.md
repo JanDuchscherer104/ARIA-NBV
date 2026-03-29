@@ -11,7 +11,7 @@ Apply this file when working under `aria_nbv/aria_nbv/data_handling/`.
 ## Public Contracts
 - Public package surface: `aria_nbv/aria_nbv/data_handling/__init__.py`
 - Raw snippet and typed container surface: `efm_dataset.py`, `efm_views.py`, `efm_snippet_loader.py`
-- Cache contracts and index helpers: `cache_contracts.py`, `cache_index.py`, `offline_cache_store.py`, `offline_cache_serialization.py`
+- Cache contracts and index helpers: `cache_contracts.py`, `cache_index.py`, `offline_cache_store.py`
 - Active cache readers and writers: `oracle_cache.py`, `vin_cache.py`, `vin_adapter.py`, `vin_oracle_datasets.py`, `vin_provider.py`
 - Narrative surfaces: `aria_nbv/aria_nbv/data_handling/README.md`, `docs/contents/impl/data_pipeline_overview.qmd`, `docs/typst/paper/sections/12h-appendix-offline-cache.typ`
 

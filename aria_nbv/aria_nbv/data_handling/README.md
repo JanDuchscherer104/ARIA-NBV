@@ -17,7 +17,7 @@ than from `aria_nbv.data_handling.*` submodules directly.
 - Keep the raw ASE/EFM contract unchanged.
 - Have one canonical VIN snippet representation for training.
 - Replace per-sample `torch.load` offline datasets with immutable indexed shards.
-- Keep training-critical tensors in mmap-backed fixed arrays for fast
+- Keep training-critical tensors in zarr-backed fixed arrays for fast
   multi-worker random access.
 - Keep richer diagnostic payloads lazy and optional.
 - Treat legacy oracle-cache and VIN-snippet-cache code as temporary
@@ -52,6 +52,14 @@ The most important groups are:
   - `VinSnippetCache*`
   - `repair_*` / `rebuild_*` helpers for the legacy caches
 
+- Migration entry points
+  - `scan_legacy_offline_data`
+  - `migrate_legacy_offline_data`
+  - `verify_migrated_offline_data`
+
+Low-level shard handles, serialization helpers, and migration plumbing remain
+internal. The package root intentionally does not export those helpers.
+
 ## Internal layout
 
 - `_raw.py`
@@ -68,7 +76,7 @@ The most important groups are:
   - Manifest, shard, block, and sample-index records for the immutable format.
 
 - `_offline_store.py`
-  - Store paths, shard block writers, split-array helpers, and mmap-backed readers.
+  - Store paths, shard block writers, split-array helpers, and zarr-backed readers.
 
 - `_offline_dataset.py`
   - Runtime reconstruction of `VinOfflineSample` and `VinOracleBatch` from the
@@ -79,7 +87,7 @@ The most important groups are:
     by migration.
 
 - `_migration.py`
-  - Legacy oracle/VIN cache scan, prepare, finalize, and verify helpers.
+  - Public scan/migrate/verify entry points plus private legacy-conversion plumbing.
 
 - `mesh_cache.py`
   - Standalone processed-mesh cache utilities.
@@ -98,7 +106,7 @@ The new on-disk format is:
 Each shard stores:
 
 - fixed-size numeric blocks as `zarr` arrays inside the shard group
-- optional diagnostic per-row payloads as pickle record lists
+- optional diagnostic per-row payloads as `msgspec` MessagePack record lists
 
 The training-critical path reads only the fixed blocks:
 
@@ -128,8 +136,10 @@ The intended workflow is:
 2. Convert the legacy data into the immutable VIN offline format.
 3. Verify sample counts, split membership, and `(scene_id, snippet_id)` coverage.
 
-The reusable migration logic is implemented in `_migration.py`, while the
-workspace scripts provide a convenient CLI for one-off conversion runs.
+The reusable migration logic is implemented in `_migration.py` behind the
+public `scan_legacy_offline_data`, `migrate_legacy_offline_data`, and
+`verify_migrated_offline_data` entry points. The workspace scripts provide a
+thin CLI around those functions for one-off conversion runs.
 
 ## Termination criteria for the redesign
 

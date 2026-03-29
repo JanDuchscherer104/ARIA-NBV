@@ -11,8 +11,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 import torch
+
+from ..utils.typed_payloads import from_serializable, to_serializable
 
 Tensor = torch.Tensor
 
@@ -67,6 +70,30 @@ class RriResult:
     """Tensor["C"] Mesh→point distance for ``P_t ∪ P_q``."""
     fscore_tau: Tensor | None = None
     """Optional F-score values at configured distance thresholds."""
+
+    def to_serializable(self) -> dict[str, Any]:
+        """Serialize this result into a cache-friendly CPU payload."""
+
+        return to_serializable(self)
+
+    @classmethod
+    def from_serializable(
+        cls,
+        payload: dict[str, Any],
+        *,
+        device: torch.device,
+    ) -> "RriResult":
+        """Reconstruct one result from a serialized payload.
+
+        Args:
+            payload: Serialized payload produced by :meth:`to_serializable`.
+            device: Destination device for tensors.
+
+        Returns:
+            Reconstructed RRI result.
+        """
+
+        return from_serializable(cls, payload, device=device)
 
     def to(self, device: torch.device) -> RriResult:
         """Move all tensors in this result to the specified device."""

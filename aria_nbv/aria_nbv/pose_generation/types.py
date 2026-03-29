@@ -10,6 +10,8 @@ import torch
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 
+from ..utils.typed_payloads import from_serializable, to_serializable
+
 if TYPE_CHECKING:
     from trimesh import Trimesh  # type: ignore[import-untyped]
 
@@ -110,6 +112,30 @@ class CandidateSamplingResult:
     sampling_pose: PoseTW | None = None
     """World <- sampling pose (gravity-aligned when enabled) used to generate candidate centers. FIXME: Previously we only provided reference_pose, which was *not* gravity-aligned."""
     extras: dict[str, Any] = field(default_factory=dict)
+
+    def to_serializable(self) -> dict[str, Any]:
+        """Serialize this result into a cache-friendly CPU payload."""
+
+        return to_serializable(self)
+
+    @classmethod
+    def from_serializable(
+        cls,
+        payload: dict[str, Any],
+        *,
+        device: torch.device | None = None,
+    ) -> "CandidateSamplingResult":
+        """Reconstruct one result from a serialized payload.
+
+        Args:
+            payload: Serialized payload produced by :meth:`to_serializable`.
+            device: Optional destination device for tensors and wrappers.
+
+        Returns:
+            Reconstructed candidate-sampling result.
+        """
+
+        return from_serializable(cls, payload, device=device)
 
     def poses_world_cam(self, *, device: torch.device | None = None) -> PoseTW:
         """World <- camera poses for **valid** candidates."""

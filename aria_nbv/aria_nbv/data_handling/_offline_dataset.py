@@ -7,9 +7,9 @@ dataset format:
 - ``VinOfflineDataset`` for map-style random access, and
 - ``VinOfflineDatasetConfig`` for config-as-factory instantiation.
 
-The training-critical path reads fixed-size blocks directly from mmap-backed
-NumPy arrays. Optional diagnostic blocks are loaded lazily from shard-local
-record lists only when requested.
+The training-critical path reads fixed-size blocks directly from shard-local
+Zarr arrays. Optional diagnostic blocks are loaded lazily from shard-local
+msgspec record lists only when requested.
 """
 
 from __future__ import annotations
@@ -35,12 +35,6 @@ from ..vin.types import EvlBackboneOutput
 from ._offline_format import VinOfflineIndexRecord
 from ._offline_store import VinOfflineStoreConfig, VinOfflineStoreReader
 from ._raw import EfmSnippetLoader, EfmSnippetView, VinSnippetView
-from .offline_cache_serialization import (
-    decode_backbone,
-    decode_candidate_pcs,
-    decode_candidates,
-    decode_depths,
-)
 from .vin_oracle_types import VinOracleBatch
 
 
@@ -475,7 +469,7 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
         payload = self._store.read_optional_record(record, "oracle.candidates")
         if payload is None:
             return None
-        return decode_candidates(payload)
+        return CandidateSamplingResult.from_serializable(payload, device=None)
 
     def _has_block(self, block_name: str) -> bool:
         """Return whether the dataset contains one stored block.
@@ -508,7 +502,11 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
             payload = self._store.read_optional_record(record, "backbone.payload")
             if payload is not None:
                 keep_fields = set(self.config.backbone_keep_fields) if self.config.backbone_keep_fields else None
-                return decode_backbone(payload, device=self.config.map_location, include_fields=keep_fields)
+                return EvlBackboneOutput.from_serializable(
+                    payload,
+                    device=self.config.map_location,
+                    include_fields=keep_fields,
+                )
 
         keep = set(self.config.backbone_keep_fields or [])
 
@@ -553,7 +551,7 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
         if self.config.return_format == "sample":
             payload = self._store.read_optional_record(record, "oracle.depths_payload")
             if payload is not None:
-                return decode_depths(payload, device=self.config.map_location)
+                return CandidateDepths.from_serializable(payload, device=self.config.map_location)
         candidate_count = oracle.rri.shape[0]
         depths = self._tensor(self._store.read_numeric_block(record, "oracle.depths"), dtype=torch.float32)[
             :candidate_count
@@ -595,7 +593,7 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
         payload = self._store.read_optional_record(record, "oracle.candidate_pcs")
         if payload is None:
             return None
-        return decode_candidate_pcs(payload, device=self.config.map_location)
+        return CandidatePointClouds.from_serializable(payload, device=self.config.map_location)
 
     def _build_counterfactuals(self, record: VinOfflineIndexRecord) -> dict[str, Any] | None:
         """Decode future counterfactual payloads when requested.

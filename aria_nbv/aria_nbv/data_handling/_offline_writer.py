@@ -10,8 +10,8 @@ provides:
 - shard flushing helpers reused by the migration tooling.
 
 The writer stores training-critical tensors as fixed-size NumPy arrays for
-memory-mapped random access, while keeping richer diagnostic payloads as
-per-row pickle records that are only decoded on demand.
+Zarr-backed random access, while keeping richer diagnostic payloads as safe
+per-row msgspec records that are only decoded on demand.
 """
 
 from __future__ import annotations
@@ -43,23 +43,14 @@ from ._offline_format import (
     VinOfflineManifest,
     VinOfflineMaterializedBlocks,
     VinOfflineShardSpec,
-    write_sample_index,
 )
 from ._offline_store import (
     OFFLINE_DATASET_VERSION,
+    VinOfflineShardWriter,
     VinOfflineStoreConfig,
-    write_fixed_block,
-    write_pickle_records,
-    write_split_indices,
 )
 from ._raw import AseEfmDatasetConfig, EfmSnippetView, VinSnippetView
 from ._vin_runtime import DEFAULT_VIN_SNIPPET_PAD_POINTS, build_vin_snippet_view
-from .offline_cache_serialization import (
-    encode_backbone,
-    encode_candidate_pcs,
-    encode_candidates,
-    encode_depths,
-)
 
 
 def _utc_now_iso() -> str:
@@ -190,8 +181,8 @@ class PreparedVinOfflineSample:
         sample_key: Stable sample key for the row.
         scene_id: ASE scene identifier.
         snippet_id: ASE snippet identifier.
-        numeric_blocks: Fixed-size numeric blocks stored as mmap-backed arrays.
-        record_blocks: Lazy diagnostic payloads stored as pickle records.
+        numeric_blocks: Fixed-size numeric blocks stored as Zarr arrays.
+        record_blocks: Lazy diagnostic payloads stored as msgspec records.
         legacy_oracle_key: Optional legacy oracle-cache key.
         legacy_oracle_path: Optional legacy oracle-cache payload path.
         legacy_vin_key: Optional legacy VIN-cache key.
@@ -211,7 +202,7 @@ class PreparedVinOfflineSample:
     """Fixed-size numeric blocks stored per row."""
 
     record_blocks: dict[str, Any] = field(default_factory=dict)
-    """Lazy per-row diagnostic payloads."""
+    """Lazy per-row diagnostic payloads stored in msgspec-compatible form."""
 
     legacy_oracle_key: str | None = None
     """Optional legacy oracle-cache key."""
@@ -406,13 +397,13 @@ def prepare_vin_offline_sample(
 
     record_blocks: dict[str, Any] = {}
     if include_depths:
-        record_blocks["oracle.depths_payload"] = encode_depths(depths)
+        record_blocks["oracle.depths_payload"] = depths.to_serializable()
     if candidates is not None:
-        record_blocks["oracle.candidates"] = encode_candidates(candidates)
+        record_blocks["oracle.candidates"] = candidates.to_serializable()
     if include_candidate_pcs and candidate_pcs is not None:
-        record_blocks["oracle.candidate_pcs"] = encode_candidate_pcs(candidate_pcs)
+        record_blocks["oracle.candidate_pcs"] = candidate_pcs.to_serializable()
     if include_backbone and backbone_out is not None:
-        record_blocks["backbone.payload"] = encode_backbone(backbone_out)
+        record_blocks["backbone.payload"] = backbone_out.to_serializable()
 
     return PreparedVinOfflineSample(
         sample_key=sample_key or legacy_oracle_key or _default_sample_key(scene_id, snippet_id),
@@ -448,6 +439,7 @@ def flush_prepared_samples_to_shard(
         raise ValueError("Cannot flush an empty shard.")
 
     shard_dir.mkdir(parents=True, exist_ok=True)
+    shard_writer = VinOfflineShardWriter(shard_dir=shard_dir)
     block_specs: dict[str, Any] = {}
     numeric_block_names = sorted({name for row in rows for name in row.numeric_blocks})
     for block_name in numeric_block_names:
@@ -456,13 +448,13 @@ def flush_prepared_samples_to_shard(
             [row.numeric_blocks.get(block_name, np.zeros_like(exemplar)) for row in rows],
             axis=0,
         )
-        block_specs[block_name] = write_fixed_block(shard_dir, block_name, stacked)
+        block_specs[block_name] = shard_writer.write_numeric_block(block_name, stacked)
 
     record_block_names = sorted({name for row in rows for name in row.record_blocks})
     for block_name in record_block_names:
         records = [row.record_blocks.get(block_name) for row in rows]
         if any(record is not None for record in records):
-            block_specs[block_name] = write_pickle_records(shard_dir, block_name, records)
+            block_specs[block_name] = shard_writer.write_record_block(block_name, records)
 
     shard_id = f"shard-{shard_index:06d}"
     relative_dir = str(Path("shards") / shard_id)
@@ -805,11 +797,8 @@ class VinOfflineWriter:
         )
 
         manifest.write(temp_dir / self.config.store.manifest_filename)
-        write_sample_index(temp_dir / self.config.store.sample_index_filename, index_records)
-        write_split_indices(
-            self.config.store.model_copy(update={"store_dir": temp_dir}),
-            split_indices,
-        )
+        VinOfflineIndexRecord.write_many(temp_dir / self.config.store.sample_index_filename, index_records)
+        self.config.store.model_copy(update={"store_dir": temp_dir}).write_split_indices(split_indices)
 
         if store_dir.exists():
             shutil.rmtree(store_dir)

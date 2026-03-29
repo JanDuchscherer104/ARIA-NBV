@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,30 +21,27 @@ import torch
 from efm3d.aria.pose import PoseTW
 
 from ..configs import PathConfig
+from ..pose_generation.types import CandidateSamplingResult
+from ..rendering.candidate_depth_renderer import CandidateDepths
+from ..rendering.candidate_pointclouds import CandidatePointClouds
+from ..rri_metrics.types import RriResult
 from ..utils import Console
+from ..vin.types import EvlBackboneOutput
 from ._offline_format import (
     VinOfflineIndexRecord,
     VinOfflineManifest,
     VinOfflineMaterializedBlocks,
-    read_sample_index,
-    write_sample_index,
 )
-from ._offline_store import OFFLINE_DATASET_VERSION, VinOfflineStoreConfig, write_split_indices
+from ._offline_store import OFFLINE_DATASET_VERSION, VinOfflineStoreConfig
 from ._offline_writer import (
     PreparedVinOfflineSample,
+    flush_prepared_samples_to_shard,
     prepare_vin_offline_sample,
 )
 from ._raw import EfmSnippetLoader, VinSnippetView
 from ._vin_runtime import build_vin_snippet_view
 from .cache_contracts import OracleRriCacheEntry, VinSnippetCacheEntry
 from .cache_index import read_index, repair_oracle_split_indices, validate_oracle_split_indices
-from .offline_cache_serialization import (
-    decode_backbone,
-    decode_candidate_pcs,
-    decode_candidates,
-    decode_depths,
-    decode_rri,
-)
 from .offline_cache_store import _read_metadata as read_legacy_oracle_metadata
 from .oracle_cache import OracleRriCacheConfig
 from .vin_cache import VinSnippetCacheConfig
@@ -275,15 +274,18 @@ def prepare_legacy_records(
     loader: EfmSnippetLoader | None = None
     for record in records:
         payload = torch.load(oracle_cache_dir / record.entry.path, map_location="cpu", weights_only=False)
-        candidates = decode_candidates(payload["candidates"])
-        depths = decode_depths(payload["depths"], device=torch.device("cpu"))
-        rri = decode_rri(payload["rri"], device=torch.device("cpu"))
+        candidates = CandidateSamplingResult.from_serializable(payload["candidates"], device=None)
+        depths = CandidateDepths.from_serializable(payload["depths"], device=torch.device("cpu"))
+        rri = RriResult.from_serializable(payload["rri"], device=torch.device("cpu"))
         candidate_pcs = None
         if include_pointclouds and payload.get("candidate_pcs") is not None:
-            candidate_pcs = decode_candidate_pcs(payload["candidate_pcs"], device=torch.device("cpu"))
+            candidate_pcs = CandidatePointClouds.from_serializable(
+                payload["candidate_pcs"],
+                device=torch.device("cpu"),
+            )
         backbone_out = None
         if include_backbone and payload.get("backbone") is not None:
-            backbone_out = decode_backbone(payload["backbone"], device=torch.device("cpu"))
+            backbone_out = EvlBackboneOutput.from_serializable(payload["backbone"], device=torch.device("cpu"))
 
         vin_snippet, legacy_vin_key, legacy_vin_path, loader = _load_legacy_vin_snippet(
             record=record,
@@ -316,6 +318,36 @@ def prepare_legacy_records(
             ),
         )
     return prepared
+
+
+def _convert_legacy_shard(job: dict[str, Any]) -> tuple[Any, list[VinOfflineIndexRecord]]:
+    """Convert one legacy-record slice into one immutable shard.
+
+    Args:
+        job: Pickle-friendly shard job payload.
+
+    Returns:
+        The written shard spec together with its shard-local sample-index rows.
+    """
+
+    rows = prepare_legacy_records(
+        records=job["records"],
+        oracle_cache_dir=Path(job["oracle_cache_dir"]),
+        vin_cache_dir=Path(job["vin_cache_dir"]) if job["vin_cache_dir"] is not None else None,
+        dataset_payload=job["dataset_payload"],
+        max_candidates=int(job["max_candidates"]),
+        include_backbone=bool(job["include_backbone"]),
+        include_depths=bool(job["include_depths"]),
+        include_pointclouds=bool(job["include_pointclouds"]),
+        semidense_max_points=job["semidense_max_points"],
+        semidense_include_obs_count=bool(job["semidense_include_obs_count"]),
+        pad_points=int(job["pad_points"]),
+    )
+    return flush_prepared_samples_to_shard(
+        shard_index=int(job["shard_index"]),
+        shard_dir=Path(job["shard_dir"]),
+        rows=rows,
+    )
 
 
 def finalize_migrated_store(
@@ -412,15 +444,138 @@ def finalize_migrated_store(
         shards=shard_specs,
     )
     manifest.write(store.manifest_path)
-    write_sample_index(store.sample_index_path, index_records)
-    write_split_indices(
-        store,
+    VinOfflineIndexRecord.write_many(store.sample_index_path, index_records)
+    store.write_split_indices(
         {
             "all": torch.arange(len(index_records), dtype=torch.long).numpy(),
             "train": torch.tensor(train_indices, dtype=torch.long).numpy(),
             "val": torch.tensor(val_indices, dtype=torch.long).numpy(),
         },
     )
+    return manifest
+
+
+def migrate_legacy_offline_data(
+    *,
+    oracle_cache: OracleRriCacheConfig,
+    store: VinOfflineStoreConfig,
+    vin_cache: VinSnippetCacheConfig | None = None,
+    workers: int = 0,
+    samples_per_shard: int = 64,
+    max_candidates: int = 60,
+    include_backbone: bool = True,
+    include_depths: bool = True,
+    include_pointclouds: bool = True,
+    semidense_max_points: int | None = None,
+    semidense_include_obs_count: bool = False,
+    pad_points: int = 50000,
+    overwrite: bool = False,
+    repair_splits: bool = False,
+    train_val_split: float = 0.2,
+    console: Console | None = None,
+) -> VinOfflineManifest:
+    """Convert legacy oracle/VIN caches into one immutable VIN offline store.
+
+    Args:
+        oracle_cache: Source legacy oracle-cache configuration.
+        store: Destination immutable-store configuration.
+        vin_cache: Optional source legacy VIN-cache configuration.
+        workers: Number of shard worker processes. Values below ``2`` keep the
+            conversion in-process.
+        samples_per_shard: Maximum number of samples flushed into one shard.
+        max_candidates: Candidate budget stored in fixed blocks.
+        include_backbone: Whether backbone outputs are materialized.
+        include_depths: Whether depth payloads are materialized.
+        include_pointclouds: Whether candidate point clouds are materialized.
+        semidense_max_points: Optional VIN collapse-time point cap.
+        semidense_include_obs_count: Whether rebuilt VIN points include
+            observation counts.
+        pad_points: Stored VIN padding budget.
+        overwrite: Whether an existing destination store may be replaced.
+        repair_splits: Whether to repair missing or stale legacy split files
+            before conversion.
+        train_val_split: Validation fraction used only when split repair is
+            required.
+        console: Optional logger.
+
+    Returns:
+        The written immutable-store manifest.
+    """
+
+    if int(samples_per_shard) <= 0:
+        raise ValueError("samples_per_shard must be >= 1.")
+    if int(workers) < 0:
+        raise ValueError("workers must be >= 0.")
+
+    console = console or Console.with_prefix("LegacyOfflineMigration")
+    plan = scan_legacy_offline_data(
+        oracle_cache=oracle_cache,
+        vin_cache=vin_cache,
+        train_val_split=train_val_split,
+        repair_splits=repair_splits,
+        console=console,
+    )
+
+    out_store = store.store_dir.expanduser().resolve()
+    temp_store = out_store.with_name(f"{out_store.name}.tmp")
+    if temp_store.exists():
+        shutil.rmtree(temp_store)
+    if out_store.exists():
+        if not overwrite:
+            raise FileExistsError(
+                f"Destination store already exists at {out_store}. Set overwrite=True to replace it.",
+            )
+        shutil.rmtree(out_store)
+    temp_store.mkdir(parents=True, exist_ok=True)
+    (temp_store / store.shards_dirname).mkdir(parents=True, exist_ok=True)
+
+    jobs: list[dict[str, Any]] = []
+    shard_size = int(samples_per_shard)
+    for offset in range(0, len(plan.records), shard_size):
+        shard_records = plan.records[offset : offset + shard_size]
+        shard_index = offset // shard_size
+        jobs.append(
+            {
+                "shard_index": shard_index,
+                "records": shard_records,
+                "oracle_cache_dir": plan.oracle_cache_dir.as_posix(),
+                "vin_cache_dir": plan.vin_cache_dir.as_posix() if plan.vin_cache_dir is not None else None,
+                "dataset_payload": plan.dataset_payload,
+                "max_candidates": int(max_candidates),
+                "include_backbone": bool(include_backbone),
+                "include_depths": bool(include_depths),
+                "include_pointclouds": bool(include_pointclouds),
+                "semidense_max_points": semidense_max_points,
+                "semidense_include_obs_count": bool(semidense_include_obs_count),
+                "pad_points": int(pad_points),
+                "shard_dir": (temp_store / store.shards_dirname / f"shard-{shard_index:06d}").as_posix(),
+            },
+        )
+
+    results: list[tuple[Any, list[VinOfflineIndexRecord]]]
+    if int(workers) > 1 and len(jobs) > 1:
+        with ProcessPoolExecutor(max_workers=int(workers)) as executor:
+            results = list(executor.map(_convert_legacy_shard, jobs))
+    else:
+        results = [_convert_legacy_shard(job) for job in jobs]
+
+    shard_specs = [result[0] for result in results]
+    index_records = [record for _, records in results for record in records]
+    manifest = finalize_migrated_store(
+        store=store.model_copy(update={"store_dir": temp_store}),
+        plan=plan,
+        shard_specs=shard_specs,
+        index_records=index_records,
+        max_candidates=int(max_candidates),
+        include_backbone=bool(include_backbone),
+        include_depths=bool(include_depths),
+        include_pointclouds=bool(include_pointclouds),
+        semidense_max_points=semidense_max_points,
+        semidense_include_obs_count=bool(semidense_include_obs_count),
+        pad_points=int(pad_points),
+    )
+    temp_store.rename(out_store)
+    console.log(f"Wrote migrated VIN offline dataset to {out_store}")
     return manifest
 
 
@@ -440,7 +595,7 @@ def verify_migrated_offline_data(
     """
 
     manifest = VinOfflineManifest.read(store.manifest_path)
-    records = read_sample_index(store.sample_index_path)
+    records = VinOfflineIndexRecord.read_many(store.sample_index_path)
     legacy_pairs = {(record.entry.scene_id, record.entry.snippet_id) for record in plan.records}
     migrated_pairs = {(record.scene_id, record.snippet_id) for record in records}
     train_count = sum(1 for record in records if record.split == "train")
@@ -465,10 +620,7 @@ def verify_migrated_offline_data(
 
 
 __all__ = [
-    "LegacyOfflinePlan",
-    "LegacyOfflineRecord",
-    "finalize_migrated_store",
-    "prepare_legacy_records",
+    "migrate_legacy_offline_data",
     "scan_legacy_offline_data",
     "verify_migrated_offline_data",
 ]

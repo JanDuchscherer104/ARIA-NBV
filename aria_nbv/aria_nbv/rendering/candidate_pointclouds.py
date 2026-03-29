@@ -15,6 +15,7 @@ from pytorch3d.renderer.cameras import (
 )
 
 from ..data_handling import EfmSnippetView
+from ..utils.typed_payloads import from_serializable, to_serializable
 from .candidate_depth_renderer import CandidateDepths
 
 Tensor = torch.Tensor
@@ -34,6 +35,30 @@ class CandidatePointClouds:
     """Tensor[1] number of valid semi-dense points."""
     occupancy_bounds: Tensor
     """Tensor[6] = [xmin, xmax, ymin, ymax, zmin, zmax] covering snippet + candidates."""
+
+    def to_serializable(self) -> dict[str, object]:
+        """Serialize this point-cloud batch into a cache-friendly CPU payload."""
+
+        return to_serializable(self)
+
+    @classmethod
+    def from_serializable(
+        cls,
+        payload: dict[str, object],
+        *,
+        device: torch.device,
+    ) -> "CandidatePointClouds":
+        """Reconstruct one point-cloud batch from a serialized payload.
+
+        Args:
+            payload: Serialized payload produced by :meth:`to_serializable`.
+            device: Destination device for tensors.
+
+        Returns:
+            Reconstructed candidate-pointcloud batch.
+        """
+
+        return from_serializable(cls, payload, device=device)
 
 
 def build_candidate_pointclouds(

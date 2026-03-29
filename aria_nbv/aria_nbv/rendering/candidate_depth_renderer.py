@@ -16,6 +16,7 @@ from pytorch3d.renderer.cameras import (
 from ..data_handling import EfmSnippetView
 from ..pose_generation.types import CandidateSamplingResult
 from ..utils import BaseConfig, Console, Verbosity
+from ..utils.typed_payloads import from_serializable, to_serializable
 from .pytorch3d_depth_renderer import (
     Pytorch3DDepthRenderer,
     Pytorch3DDepthRendererConfig,
@@ -46,6 +47,30 @@ class CandidateDepths:
 
     p3d_cameras: PerspectiveCameras
     """PyTorch3D PerspectiveCameras used for rendering. Same externals as ``camera``."""
+
+    def to_serializable(self) -> dict[str, object]:
+        """Serialize this batch into a cache-friendly CPU payload."""
+
+        return to_serializable(self)
+
+    @classmethod
+    def from_serializable(
+        cls,
+        payload: dict[str, object],
+        *,
+        device: torch.device,
+    ) -> "CandidateDepths":
+        """Reconstruct one batch from a serialized payload.
+
+        Args:
+            payload: Serialized payload produced by :meth:`to_serializable`.
+            device: Destination device for tensors and wrappers.
+
+        Returns:
+            Reconstructed candidate-depth batch.
+        """
+
+        return from_serializable(cls, payload, device=device)
 
 
 class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
