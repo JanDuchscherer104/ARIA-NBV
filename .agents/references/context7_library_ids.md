@@ -2,25 +2,25 @@
 
 Use these library IDs with the Context7 MCP tools when external library documentation is needed.
 
-- `/facebookresearch/atek` - Aria Training and Evaluation Kit
-- `/websites/facebookresearch_github_io_projectaria_tools` - Project Aria Tools docs
-- `/facebookresearch/efm3d` - Egocentric Foundation Models for 3D understanding
-- `/lightning-ai/pytorch-lightning` - PyTorch Lightning
-- `/mikedh/trimesh` - Mesh processing and analysis
-- `/wandb/wandb` - Weights & Biases
-- `/websites/optuna_readthedocs_io_en_stable` - Optuna
-- `/rocm/pytorch` - PyTorch
-- `/facebookresearch/pytorch3d` - PyTorch3D
-- `/plotly/plotly.py` - Plotly
-- `/dfki-ric/pytransform3d` - pytransform3d
-- `/isl-org/open3d` - Open3D
-- `/pydantic/pydantic` - Pydantic
-- `/jcrist/msgspec` - msgspec
-- `/websites/streamlit_io` - Streamlit
-- `/websites/typst_app` - Typst
-- `/websites/quarto` - Quarto
-- `/websites/astral_sh_uv` - uv
-- `/zarr-developers/zarr-python` - Zarr Python
+- `/facebookresearch/atek` - Aria Training and Evaluation Kit. Used for raw ASE/ATEK snippet semantics, dataset field conventions, and vendor-aligned loader behavior.
+- `/websites/facebookresearch_github_io_projectaria_tools` - Project Aria Tools docs. Used for Aria calibration, trajectory, and VRS/pose tooling behavior that surfaces through our data and rendering stacks.
+- `/facebookresearch/efm3d` - Egocentric Foundation Models for 3D understanding. Used for the vendored EFM3D backbone, tensor wrappers, and Aria snippet structures that our training/data pipeline builds on.
+- `/lightning-ai/pytorch-lightning` - PyTorch Lightning. Used for trainer/datamodule behavior, callback integration, and fit/validation loop semantics in the VIN training stack.
+- `/mikedh/trimesh` - Mesh processing and analysis. Used for processed ASE mesh loading, simplification, and geometric utilities in mesh-cache and rendering helpers.
+- `/wandb/wandb` - Weights & Biases. Used for experiment tracking, logging, and sweep integration in Lightning training workflows.
+- `/websites/optuna_readthedocs_io_en_stable` - Optuna. Used for hyperparameter search and trial orchestration around the Lightning training entrypoints.
+- `/rocm/pytorch` - PyTorch. Used for tensor semantics, dataset/dataloader behavior, serialization compatibility, and model execution throughout the package.
+- `/facebookresearch/pytorch3d` - PyTorch3D. Used for candidate depth rendering, camera representations, and geometric transforms in oracle labeling and diagnostics.
+- `/plotly/plotly.py` - Plotly. Used for interactive diagnostics and visualization in app/reporting surfaces.
+- `/dfki-ric/pytransform3d` - pytransform3d. Used for transform conversions and pose utilities where projectaria/EFM wrappers are not sufficient.
+- `/isl-org/open3d` - Open3D. Used for point-cloud visualization and geometry inspection utilities.
+- `/pydantic/pydantic` - Pydantic. Used for strongly typed configs, validation, and config-as-factory patterns across the runtime.
+- `/jcrist/msgspec` - msgspec. Used for typed manifest/index serialization and safe structured payload encoding in the new offline data stack.
+- `/websites/streamlit_io` - Streamlit. Used for the interactive dashboard/app surfaces that inspect cache, VIN, and attribution outputs.
+- `/websites/typst_app` - Typst. Used for paper/slides authoring and generated research artifacts under `docs/typst/`.
+- `/websites/quarto` - Quarto. Used for documentation/report generation in the `docs/contents/` workflow.
+- `/websites/astral_sh_uv` - uv. Used for environment synchronization, dependency locking, and local command execution conventions in the Python workspace.
+- `/zarr-developers/zarr-python` - Zarr Python. Used for dense numeric shard storage in the immutable VIN offline dataset format.
 
 ## Project-Specific Note
 For EFM3D, ATEK, and Project Aria tools, prefer the vendored source under `external/` and the symbol notes in `docs/contents/ext-impl/` / `docs/contents/impl/efm3d_symbol_index.qmd` before broad external lookup.
