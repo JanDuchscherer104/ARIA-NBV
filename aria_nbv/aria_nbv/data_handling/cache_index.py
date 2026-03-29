@@ -11,17 +11,18 @@ readers and writers:
 
 from __future__ import annotations
 
-import json
 import random
 from collections.abc import Iterable
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, TypeVar
+
+import msgspec
 
 from ..utils import Console
 from .cache_contracts import OracleRriCacheEntry, VinSnippetCacheEntry
 
 IndexEntry = TypeVar("IndexEntry", OracleRriCacheEntry, VinSnippetCacheEntry)
+_JSON_ENCODER = msgspec.json.Encoder()
 
 
 def read_index(
@@ -36,18 +37,9 @@ def read_index(
             return []
         raise FileNotFoundError(f"Missing cache index at {path}")
     entries: list[IndexEntry] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        item = json.loads(line)
-        entries.append(
-            entry_type(
-                key=item["key"],
-                scene_id=item["scene_id"],
-                snippet_id=item["snippet_id"],
-                path=item["path"],
-            ),
-        )
+    for line in path.read_bytes().splitlines():
+        if line.strip():
+            entries.append(msgspec.json.decode(line, type=entry_type))
     return entries
 
 
@@ -56,7 +48,7 @@ def serialize_index(entries: Iterable[IndexEntry]) -> str:
     rows = list(entries)
     if not rows:
         return ""
-    return "\n".join(json.dumps(asdict(entry)) for entry in rows) + "\n"
+    return b"\n".join(_JSON_ENCODER.encode(entry) for entry in rows).decode("utf-8") + "\n"
 
 
 def write_index(path: Path, entries: Iterable[IndexEntry]) -> None:
@@ -215,12 +207,15 @@ def rebuild_oracle_entries_from_samples(
 
 def load_json_metadata(path: Path) -> dict[str, Any]:
     """Read a JSON metadata file."""
-    return json.loads(path.read_text(encoding="utf-8"))
+    payload = msgspec.json.decode(path.read_bytes())
+    if not isinstance(payload, dict):
+        raise TypeError(f"Expected JSON object in metadata file {path}, got {type(payload)!r}.")
+    return payload
 
 
 def write_json_metadata(path: Path, payload: dict[str, Any]) -> None:
     """Write JSON metadata."""
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    path.write_bytes(_JSON_ENCODER.encode(payload))
 
 
 __all__ = [

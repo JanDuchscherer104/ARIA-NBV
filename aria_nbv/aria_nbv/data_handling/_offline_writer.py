@@ -45,8 +45,13 @@ from ._offline_format import (
     VinOfflineShardSpec,
     write_sample_index,
 )
-from ._offline_store import OFFLINE_DATASET_VERSION, VinOfflineStoreConfig
-from ._offline_store_io import write_fixed_block, write_pickle_records, write_split_indices
+from ._offline_store import (
+    OFFLINE_DATASET_VERSION,
+    VinOfflineStoreConfig,
+    write_fixed_block,
+    write_pickle_records,
+    write_split_indices,
+)
 from ._raw import AseEfmDatasetConfig, EfmSnippetView, VinSnippetView
 from ._vin_runtime import DEFAULT_VIN_SNIPPET_PAD_POINTS, build_vin_snippet_view
 from .offline_cache_serialization import (

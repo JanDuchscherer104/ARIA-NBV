@@ -11,34 +11,39 @@ records shared by the writer, migration tools, and runtime dataset reader:
 
 from __future__ import annotations
 
-import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
+
+import msgspec
+
+OfflineRecord = TypeVar("OfflineRecord")
+_JSON_ENCODER = msgspec.json.Encoder()
 
 
-def _load_json(path: Path) -> dict[str, Any]:
-    """Read a JSON file into a dictionary.
+def _read_typed_json(path: Path, *, record_type: type[OfflineRecord]) -> OfflineRecord:
+    """Read one typed JSON record from disk.
 
     Args:
         path: JSON file to read.
+        record_type: Target dataclass type.
 
     Returns:
-        Parsed JSON dictionary.
+        Decoded record instance.
     """
 
-    return json.loads(path.read_text(encoding="utf-8"))
+    return msgspec.json.decode(path.read_bytes(), type=record_type)
 
 
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    """Write a dictionary to JSON with stable formatting.
+def _write_json(path: Path, payload: Any) -> None:
+    """Write one JSON-serializable payload to disk.
 
     Args:
         path: Destination JSON path.
-        payload: JSON-serializable dictionary to persist.
+        payload: Typed payload to persist.
     """
 
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    path.write_bytes(_JSON_ENCODER.encode(payload))
 
 
 @dataclass(slots=True)
@@ -72,35 +77,6 @@ class VinOfflineBlockSpec:
     optional: bool = False
     """Whether the block may be absent in a valid dataset."""
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the block spec into a JSON-ready dictionary.
-
-        Returns:
-            JSON-serializable block-spec dictionary.
-        """
-
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "VinOfflineBlockSpec":
-        """Build a block spec from a JSON dictionary.
-
-        Args:
-            payload: Parsed block payload.
-
-        Returns:
-            Deserialized block descriptor.
-        """
-
-        return cls(
-            name=str(payload["name"]),
-            kind=str(payload["kind"]),
-            paths=[str(item) for item in payload["paths"]],
-            dtype=payload.get("dtype"),
-            shape=[int(item) for item in payload["shape"]] if payload.get("shape") is not None else None,
-            optional=bool(payload.get("optional", False)),
-        )
-
 
 @dataclass(slots=True)
 class VinOfflineShardSpec:
@@ -129,42 +105,6 @@ class VinOfflineShardSpec:
     blocks: dict[str, VinOfflineBlockSpec] = field(default_factory=dict)
     """Stored block descriptors keyed by logical block name."""
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the shard spec into a JSON-ready dictionary.
-
-        Returns:
-            JSON-serializable shard-spec dictionary.
-        """
-
-        return {
-            "shard_id": self.shard_id,
-            "relative_dir": self.relative_dir,
-            "row_start": self.row_start,
-            "num_rows": self.num_rows,
-            "blocks": {name: spec.to_dict() for name, spec in self.blocks.items()},
-        }
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "VinOfflineShardSpec":
-        """Build a shard descriptor from a JSON dictionary.
-
-        Args:
-            payload: Parsed shard payload.
-
-        Returns:
-            Deserialized shard descriptor.
-        """
-
-        return cls(
-            shard_id=str(payload["shard_id"]),
-            relative_dir=str(payload["relative_dir"]),
-            row_start=int(payload["row_start"]),
-            num_rows=int(payload["num_rows"]),
-            blocks={
-                str(name): VinOfflineBlockSpec.from_dict(spec) for name, spec in dict(payload.get("blocks", {})).items()
-            },
-        )
-
 
 @dataclass(slots=True)
 class VinOfflineMaterializedBlocks:
@@ -181,24 +121,6 @@ class VinOfflineMaterializedBlocks:
 
     counterfactuals: bool
     """Whether future counterfactual trajectory blocks are materialized."""
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "VinOfflineMaterializedBlocks":
-        """Build materialized-block flags from JSON.
-
-        Args:
-            payload: Parsed block-flag payload.
-
-        Returns:
-            Deserialized materialized-block record.
-        """
-
-        return cls(
-            backbone=bool(payload.get("backbone", False)),
-            depths=bool(payload.get("depths", False)),
-            candidate_pcs=bool(payload.get("candidate_pcs", False)),
-            counterfactuals=bool(payload.get("counterfactuals", False)),
-        )
 
 
 @dataclass(slots=True)
@@ -219,25 +141,6 @@ class VinOfflineCounterfactuals:
 
     materialized_modalities: list[str] = field(default_factory=list)
     """Optional modalities materialized for each counterfactual trajectory."""
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "VinOfflineCounterfactuals":
-        """Build counterfactual metadata from JSON.
-
-        Args:
-            payload: Parsed counterfactual payload.
-
-        Returns:
-            Deserialized counterfactual metadata.
-        """
-
-        return cls(
-            enabled=bool(payload.get("enabled", False)),
-            k=int(payload["k"]) if payload.get("k") is not None else None,
-            horizon=int(payload["horizon"]) if payload.get("horizon") is not None else None,
-            selection_policy=payload.get("selection_policy"),
-            materialized_modalities=[str(item) for item in payload.get("materialized_modalities", [])],
-        )
 
 
 @dataclass(slots=True)
@@ -287,54 +190,6 @@ class VinOfflineManifest:
     shards: list[VinOfflineShardSpec] = field(default_factory=list)
     """Immutable shard descriptors."""
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the manifest into a JSON-ready dictionary.
-
-        Returns:
-            JSON-serializable manifest dictionary.
-        """
-
-        payload = asdict(self)
-        payload["materialized_blocks"] = asdict(self.materialized_blocks)
-        payload["counterfactuals"] = asdict(self.counterfactuals)
-        payload["shards"] = [
-            {
-                "shard_id": shard.shard_id,
-                "relative_dir": shard.relative_dir,
-                "row_start": shard.row_start,
-                "num_rows": shard.num_rows,
-                "blocks": {name: asdict(spec) for name, spec in shard.blocks.items()},
-            }
-            for shard in self.shards
-        ]
-        return payload
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "VinOfflineManifest":
-        """Deserialize a manifest from a dictionary.
-
-        Args:
-            payload: Parsed manifest payload.
-
-        Returns:
-            Deserialized manifest object.
-        """
-
-        return cls(
-            version=int(payload["version"]),
-            created_at=str(payload["created_at"]),
-            source=dict(payload.get("source", {})),
-            oracle=dict(payload.get("oracle", {})),
-            vin=dict(payload.get("vin", {})),
-            materialized_blocks=VinOfflineMaterializedBlocks.from_dict(
-                dict(payload.get("materialized_blocks", {})),
-            ),
-            counterfactuals=VinOfflineCounterfactuals.from_dict(dict(payload.get("counterfactuals", {}))),
-            stats=dict(payload.get("stats", {})),
-            provenance=dict(payload.get("provenance", {})),
-            shards=[VinOfflineShardSpec.from_dict(item) for item in payload.get("shards", [])],
-        )
-
     def write(self, path: Path) -> None:
         """Persist the manifest to disk.
 
@@ -342,7 +197,7 @@ class VinOfflineManifest:
             path: Destination manifest path.
         """
 
-        _write_json(path, self.to_dict())
+        _write_json(path, self)
 
     @classmethod
     def read(cls, path: Path) -> "VinOfflineManifest":
@@ -355,7 +210,7 @@ class VinOfflineManifest:
             Deserialized manifest.
         """
 
-        return cls.from_dict(_load_json(path))
+        return _read_typed_json(path, record_type=cls)
 
 
 @dataclass(slots=True)
@@ -409,40 +264,6 @@ class VinOfflineIndexRecord:
     legacy_vin_path: str | None = None
     """Optional legacy VIN-cache payload path."""
 
-    def to_json(self) -> str:
-        """Serialize the index record to one JSON line.
-
-        Returns:
-            JSON representation of the record.
-        """
-
-        return json.dumps(asdict(self), sort_keys=True)
-
-    @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "VinOfflineIndexRecord":
-        """Build an index record from a parsed dictionary.
-
-        Args:
-            payload: Parsed JSON dictionary.
-
-        Returns:
-            Deserialized index record.
-        """
-
-        return cls(
-            sample_index=int(payload["sample_index"]),
-            sample_key=str(payload["sample_key"]),
-            scene_id=str(payload["scene_id"]),
-            snippet_id=str(payload["snippet_id"]),
-            split=str(payload["split"]),
-            shard_id=str(payload["shard_id"]),
-            row=int(payload["row"]),
-            legacy_oracle_key=payload.get("legacy_oracle_key"),
-            legacy_oracle_path=payload.get("legacy_oracle_path"),
-            legacy_vin_key=payload.get("legacy_vin_key"),
-            legacy_vin_path=payload.get("legacy_vin_path"),
-        )
-
 
 def read_sample_index(path: Path) -> list[VinOfflineIndexRecord]:
     """Read the global sample index.
@@ -455,10 +276,9 @@ def read_sample_index(path: Path) -> list[VinOfflineIndexRecord]:
     """
 
     records: list[VinOfflineIndexRecord] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        records.append(VinOfflineIndexRecord.from_dict(json.loads(line)))
+    for line in path.read_bytes().splitlines():
+        if line.strip():
+            records.append(msgspec.json.decode(line, type=VinOfflineIndexRecord))
     return records
 
 
@@ -470,10 +290,10 @@ def write_sample_index(path: Path, records: list[VinOfflineIndexRecord]) -> None
         records: Global sample-index records to persist.
     """
 
-    payload = "\n".join(record.to_json() for record in records)
+    payload = b"\n".join(_JSON_ENCODER.encode(record) for record in records)
     if payload:
-        payload += "\n"
-    path.write_text(payload, encoding="utf-8")
+        payload += b"\n"
+    path.write_bytes(payload)
 
 
 __all__ = [

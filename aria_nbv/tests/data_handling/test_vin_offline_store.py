@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -16,7 +15,6 @@ from aria_nbv.data_handling import (
     VinOfflineIndexRecord,
     VinOfflineManifest,
     VinOfflineMaterializedBlocks,
-    VinOfflineShardSpec,
     VinOfflineSourceConfig,
     VinOfflineStoreConfig,
     VinOracleBatch,
@@ -24,6 +22,7 @@ from aria_nbv.data_handling import (
     flush_prepared_samples_to_shard,
     prepare_vin_offline_sample,
 )
+from aria_nbv.data_handling._offline_format import read_sample_index, write_sample_index
 from aria_nbv.lightning.lit_datamodule import VinDataModuleConfig
 from aria_nbv.rendering.candidate_depth_renderer import CandidateDepths
 from aria_nbv.rri_metrics.types import RriResult
@@ -164,7 +163,6 @@ def _write_test_store(tmp_path: Path) -> VinOfflineStoreConfig:
         shard_dir=shard_dir,
         rows=prepared_rows,
     )
-    shard_spec = VinOfflineShardSpec.from_dict(shard_spec.to_dict())
     index_records = [
         VinOfflineIndexRecord(
             sample_index=0,
@@ -211,10 +209,7 @@ def _write_test_store(tmp_path: Path) -> VinOfflineStoreConfig:
         shards=[shard_spec],
     )
     manifest.write(store_cfg.manifest_path)
-    store_cfg.sample_index_path.write_text(
-        "".join(f"{record.to_json()}\n" for record in index_records),
-        encoding="utf-8",
-    )
+    write_sample_index(store_cfg.sample_index_path, index_records)
     store_cfg.splits_dir.mkdir(parents=True, exist_ok=True)
     np.save(
         store_cfg.split_path("all"),
@@ -277,14 +272,13 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     assert int(first.oracle.rri.shape[0]) == 2  # noqa: S101
     assert int(first.vin_snippet.lengths[0].item()) == 2  # noqa: S101
 
-    sample_index_records = [
-        json.loads(line)
-        for line in store_cfg.sample_index_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    assert sample_index_records[0]["split"] == "train"  # noqa: S101
-    assert sample_index_records[1]["split"] == "train"  # noqa: S101
-    assert sample_index_records[2]["split"] == "val"  # noqa: S101
+    stored_manifest = VinOfflineManifest.read(store_cfg.manifest_path)
+    assert stored_manifest.shards[0].shard_id == "shard-000000"  # noqa: S101
+
+    sample_index_records = read_sample_index(store_cfg.sample_index_path)
+    assert sample_index_records[0].split == "train"  # noqa: S101
+    assert sample_index_records[1].split == "train"  # noqa: S101
+    assert sample_index_records[2].split == "val"  # noqa: S101
 
     batch_dataset = VinOfflineDatasetConfig(
         store=store_cfg,

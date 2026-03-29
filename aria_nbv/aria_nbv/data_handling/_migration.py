@@ -24,6 +24,7 @@ from ._offline_format import (
     VinOfflineIndexRecord,
     VinOfflineManifest,
     VinOfflineMaterializedBlocks,
+    read_sample_index,
     write_sample_index,
 )
 from ._offline_store import OFFLINE_DATASET_VERSION, VinOfflineStoreConfig, write_split_indices
@@ -439,11 +440,7 @@ def verify_migrated_offline_data(
     """
 
     manifest = VinOfflineManifest.read(store.manifest_path)
-    records = [
-        VinOfflineIndexRecord.from_dict(json.loads(line))
-        for line in store.sample_index_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    records = read_sample_index(store.sample_index_path)
     legacy_pairs = {(record.entry.scene_id, record.entry.snippet_id) for record in plan.records}
     migrated_pairs = {(record.scene_id, record.snippet_id) for record in records}
     train_count = sum(1 for record in records if record.split == "train")
