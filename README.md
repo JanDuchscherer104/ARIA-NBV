@@ -37,7 +37,7 @@ a manifest of local train/val figure images under `.logs/wandb/analysis`.
 
 ## ASE downloader
 
-`nbv-downloader` is a thin CLI over `oracle_rri.data.downloader.ASEDownloaderConfig`.
+`nbv-downloader` is a thin CLI over `aria_nbv.data.downloader.ASEDownloaderConfig`.
 It supports two modes: `download` and `list`.
 
 ```sh

@@ -1,7 +1,7 @@
 """Tests for shared plotting helpers."""
 
 import numpy as np
-from oracle_rri.utils.plotting import _histogram_overlay
+from aria_nbv.utils.plotting import _histogram_overlay
 
 
 def test_histogram_overlay_log_x_axis() -> None:

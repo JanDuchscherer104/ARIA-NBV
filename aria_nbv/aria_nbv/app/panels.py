@@ -1,7 +1,7 @@
 """Dispatcher for Streamlit panel renderers.
 
 This module intentionally re-exports the dedicated panel modules in
-``oracle_rri.app.panels``. Panel logic and plotting helpers live in their
+``aria_nbv.app.panels``. Panel logic and plotting helpers live in their
 respective component modules (e.g., ``data.plotting`` or
 ``pose_generation.plotting``).
 """

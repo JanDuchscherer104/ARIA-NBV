@@ -24,7 +24,7 @@
       "cell_type": "code",
       "metadata": {},
       "source": [
-        "!python -m oracle_rri.data.downloader -m list -c efm -n 5"
+        "!python -m aria_nbv.data.downloader -m list -c efm -n 5"
       ],
       "id": "e54088ab",
       "execution_count": null,
@@ -37,7 +37,7 @@
         "This will download the top 5 scenes with the most snippets, but limit each scene to a maximum of 10 snippets. `-c {efm_eval|efm|cubercnn|cubercnn_eval}` specifies the configuration to use (here: EFM evaluation set).\n",
         "\n",
         "```sh\n",
-        "python -m oracle_rri.data.downloader -m download -c efm -n 5 --ms 10\n",
+        "python -m aria_nbv.data.downloader -m download -c efm -n 5 --ms 10\n",
         "```\n",
         "\n",
         "**Note**: While ATEK defines different options for both variants (EFM training and evaluation), the downloader will always download the full scenes. The splitting into training and evaluation sets is handeled based on\n",
@@ -60,7 +60,7 @@
       "cell_type": "code",
       "metadata": {},
       "source": [
-        "from oracle_rri.data.dataset import ASEDatasetConfig\n",
+        "from aria_nbv.data.dataset import ASEDatasetConfig\n",
         "\n",
         "\n",
         "cfg = ASEDatasetConfig(verbose=True, atek_variant=\"efm_eval\")\n",

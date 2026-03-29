@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oracle_rri.configs import PathConfig
+from aria_nbv.configs import PathConfig
 
 
 def test_a_data_handling_style_mutation_does_not_crash(tmp_path: Path) -> None:

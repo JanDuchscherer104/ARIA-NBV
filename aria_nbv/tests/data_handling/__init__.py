@@ -1,1 +1,1 @@
-"""Tests for oracle_rri.data module."""
+"""Tests for aria_nbv.data module."""

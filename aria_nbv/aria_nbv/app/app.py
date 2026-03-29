@@ -9,7 +9,7 @@ from typing import Any
 
 import streamlit as st
 
-from oracle_rri.app.panels.optuna_sweep import render_optuna_sweep_page
+from aria_nbv.app.panels.optuna_sweep import render_optuna_sweep_page
 
 from ..configs import PathConfig
 from ..data.offline_cache import OracleRriCacheConfig, OracleRriCacheDatasetConfig

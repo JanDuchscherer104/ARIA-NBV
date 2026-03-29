@@ -58,7 +58,7 @@ from pytorch3d.renderer.cameras import (  # type: ignore[import-untyped]
 )
 from torch import Tensor, nn
 
-from oracle_rri.utils.frames import rotate_yaw_cw90
+from aria_nbv.utils.frames import rotate_yaw_cw90
 
 from ...data.efm_views import EfmSnippetView, VinSnippetView
 from ...rri_metrics.coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
@@ -83,7 +83,7 @@ from .pose_encoding import LearnableFourierFeaturesConfig
 from .types import EvlBackboneOutput, VinPrediction, VinV2ForwardDiagnostics
 
 if TYPE_CHECKING:
-    from oracle_rri.data.vin_oracle_types import VinOracleBatch
+    from aria_nbv.data.vin_oracle_types import VinOracleBatch
 
     from .pose_encoding import LearnableFourierFeatures
 
@@ -1536,8 +1536,8 @@ class VinModelV2(nn.Module):
             ARIA_POSE_T_WORLD_RIG,
         )
 
-        from oracle_rri.utils import Console
-        from oracle_rri.utils.rich_summary import rich_summary, summarize
+        from aria_nbv.utils import Console
+        from aria_nbv.utils.rich_summary import rich_summary, summarize
 
         def _capture_tree(tree) -> str:
             console = Console()

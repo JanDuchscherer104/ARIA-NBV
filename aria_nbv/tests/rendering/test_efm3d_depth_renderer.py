@@ -3,7 +3,7 @@ import torch
 import trimesh
 from efm3d.aria import CameraTW, PoseTW
 
-from oracle_rri.rendering.efm3d_depth_renderer import Efm3dDepthRendererConfig
+from aria_nbv.rendering.efm3d_depth_renderer import Efm3dDepthRendererConfig
 
 
 def _make_camera(width: int = 32, height: int = 32) -> CameraTW:

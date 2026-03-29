@@ -1,6 +1,6 @@
 import torch
 
-from oracle_rri.rendering.plotting import depth_histogram
+from aria_nbv.rendering.plotting import depth_histogram
 
 
 def test_depth_histogram_returns_traces():

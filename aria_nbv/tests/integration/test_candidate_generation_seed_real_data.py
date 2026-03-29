@@ -8,10 +8,10 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "external" / "efm3d"))
 
 import pytest  # isort: split
 
-from oracle_rri.configs import PathConfig
-from oracle_rri.data import AseEfmDatasetConfig
-from oracle_rri.pose_generation import CandidateViewGeneratorConfig
-from oracle_rri.utils import Verbosity
+from aria_nbv.configs import PathConfig
+from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.pose_generation import CandidateViewGeneratorConfig
+from aria_nbv.utils import Verbosity
 
 
 def _skip_if_missing_data() -> None:

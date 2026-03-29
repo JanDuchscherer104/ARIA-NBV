@@ -1,4 +1,4 @@
-"""Configuration management for oracle_rri.
+"""Configuration management for aria_nbv.
 
 This module provides centralized configuration classes for managing
 paths, datasets, and other project-wide settings.

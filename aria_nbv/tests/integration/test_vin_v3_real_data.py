@@ -65,10 +65,10 @@ if "e3nn" not in sys.modules:
     sys.modules["e3nn"] = e3nn
     sys.modules["e3nn.o3"] = o3
 
-from oracle_rri.configs import PathConfig
-from oracle_rri.data import AseEfmDatasetConfig
-from oracle_rri.utils import Verbosity
-from oracle_rri.vin import EvlBackboneConfig, VinModelV3Config
+from aria_nbv.configs import PathConfig
+from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.utils import Verbosity
+from aria_nbv.vin import EvlBackboneConfig, VinModelV3Config
 
 
 def _find_first_scene_with_shards() -> str | None:

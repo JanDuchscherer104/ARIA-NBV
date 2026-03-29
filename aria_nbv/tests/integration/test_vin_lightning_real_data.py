@@ -25,19 +25,19 @@ except Exception:  # pragma: no cover - availability guard
 else:  # pragma: no cover - availability guard
     PYTORCH3D_AVAILABLE = True
 
-from oracle_rri.configs import PathConfig
-from oracle_rri.data import AseEfmDatasetConfig
-from oracle_rri.data.vin_oracle_datasets import VinOracleOnlineDatasetConfig
-from oracle_rri.pipelines import OracleRriLabelerConfig
-from oracle_rri.pose_generation import CandidateViewGeneratorConfig
-from oracle_rri.pose_generation.types import ViewDirectionMode
-from oracle_rri.rendering import (
+from aria_nbv.configs import PathConfig
+from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.data.vin_oracle_datasets import VinOracleOnlineDatasetConfig
+from aria_nbv.pipelines import OracleRriLabelerConfig
+from aria_nbv.pose_generation import CandidateViewGeneratorConfig
+from aria_nbv.pose_generation.types import ViewDirectionMode
+from aria_nbv.rendering import (
     CandidateDepthRendererConfig,
     Pytorch3DDepthRendererConfig,
 )
-from oracle_rri.rri_metrics.oracle_rri import OracleRRIConfig
-from oracle_rri.utils import Verbosity
-from oracle_rri.vin import EvlBackboneConfig, VinModelV3Config
+from aria_nbv.rri_metrics.oracle_rri import OracleRRIConfig
+from aria_nbv.utils import Verbosity
+from aria_nbv.vin import EvlBackboneConfig, VinModelV3Config
 
 
 def _skip_if_missing_assets() -> None:
@@ -66,13 +66,13 @@ _skip_if_missing_assets()
 
 @pytest.mark.integration
 def test_vin_lightning_fit_runs_real_data_smoke(tmp_path: Path):
-    from oracle_rri.lightning import (
+    from aria_nbv.lightning import (
         TrainerCallbacksConfig,
         TrainerFactoryConfig,
         VinDataModuleConfig,
         VinLightningModuleConfig,
     )
-    from oracle_rri.rri_metrics.rri_binning import RriOrdinalBinner
+    from aria_nbv.rri_metrics.rri_binning import RriOrdinalBinner
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

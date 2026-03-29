@@ -10,19 +10,19 @@ from types import SimpleNamespace
 import torch
 from efm3d.aria import CameraTW, PoseTW
 
-from oracle_rri.app.panels.vin_utils import (
+from aria_nbv.app.panels.vin_utils import (
     DEFAULT_BACKBONE_KEEP_FIELDS,
     _build_experiment_config,
     _has_backbone_obbs,
     _should_fetch_vin_snippet,
     _vin_oracle_batch_from_cache,
 )
-from oracle_rri.data.offline_cache_types import OracleRriCacheSample
-from oracle_rri.rendering.candidate_depth_renderer import CandidateDepths
-from oracle_rri.rendering.candidate_pointclouds import CandidatePointClouds
-from oracle_rri.rri_metrics.types import RriResult
-from oracle_rri.utils import Stage
-from oracle_rri.vin.types import EvlBackboneOutput
+from aria_nbv.data.offline_cache_types import OracleRriCacheSample
+from aria_nbv.rendering.candidate_depth_renderer import CandidateDepths
+from aria_nbv.rendering.candidate_pointclouds import CandidatePointClouds
+from aria_nbv.rri_metrics.types import RriResult
+from aria_nbv.utils import Stage
+from aria_nbv.vin.types import EvlBackboneOutput
 
 try:
     from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]

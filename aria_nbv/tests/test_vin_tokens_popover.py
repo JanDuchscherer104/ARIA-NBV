@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from oracle_rri.app.panels.vin_diag_tabs import tokens
+from aria_nbv.app.panels.vin_diag_tabs import tokens
 
 
 def test_semidense_projection_popover_text() -> None:

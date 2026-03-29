@@ -10,10 +10,10 @@ import torch
 
 pytest.importorskip("pytorch_lightning")
 
-from oracle_rri.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
-from oracle_rri.lightning.lit_module import VinLightningModuleConfig
-from oracle_rri.rri_metrics.rri_binning import RriOrdinalBinner
-from oracle_rri.vin import VinModelV3Config
+from aria_nbv.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
+from aria_nbv.lightning.lit_module import VinLightningModuleConfig
+from aria_nbv.rri_metrics.rri_binning import RriOrdinalBinner
+from aria_nbv.vin import VinModelV3Config
 
 
 @dataclass(slots=True)

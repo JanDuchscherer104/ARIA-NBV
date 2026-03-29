@@ -1,10 +1,10 @@
-"""Regression tests for :class:`oracle_rri.utils.base_config.BaseConfig`."""
+"""Regression tests for :class:`aria_nbv.utils.base_config.BaseConfig`."""
 
 import tomllib
 
 import torch
 
-from oracle_rri.utils import BaseConfig
+from aria_nbv.utils import BaseConfig
 
 
 class _DeviceConfig(BaseConfig[object]):

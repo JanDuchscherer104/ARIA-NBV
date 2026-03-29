@@ -1,6 +1,6 @@
 import torch
 
-from oracle_rri.rri_metrics.oracle_rri import OracleRRIConfig
+from aria_nbv.rri_metrics.oracle_rri import OracleRRIConfig
 
 
 def _unit_square_mesh(device: torch.device, *, dtype: torch.dtype) -> tuple[torch.Tensor, torch.Tensor]:

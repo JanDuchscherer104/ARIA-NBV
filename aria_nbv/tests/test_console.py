@@ -1,6 +1,6 @@
 """Unit tests for the Console utility."""
 
-from oracle_rri.utils import Console, Verbosity
+from aria_nbv.utils import Console, Verbosity
 
 
 def test_verbosity_is_global() -> None:

@@ -19,7 +19,7 @@ import numpy as np
 import torch
 
 
-def _ensure_oracle_rri_importable() -> None:
+def _ensure_aria_nbv_importable() -> None:
     project_root = Path(__file__).resolve().parents[1]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
@@ -228,12 +228,12 @@ def _plot_evl_features(*, backbone_out: Any, out_dir: Path, max_hist: int = 200_
 
 
 def main() -> None:
-    _ensure_oracle_rri_importable()
+    _ensure_aria_nbv_importable()
 
-    from oracle_rri.data import AseEfmDatasetConfig
-    from oracle_rri.pose_generation import CandidateViewGeneratorConfig
-    from oracle_rri.utils import Verbosity
-    from oracle_rri.vin import EvlBackboneConfig, VinModelConfig
+    from aria_nbv.data import AseEfmDatasetConfig
+    from aria_nbv.pose_generation import CandidateViewGeneratorConfig
+    from aria_nbv.utils import Verbosity
+    from aria_nbv.vin import EvlBackboneConfig, VinModelConfig
 
     parser = argparse.ArgumentParser(description="Plot VIN input features on a real snippet.")
     parser.add_argument("--scene-id", type=str, default="81283")

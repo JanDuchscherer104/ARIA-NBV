@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from oracle_rri.data.metadata import ASEMetadata, SceneMetadata
+from aria_nbv.data.metadata import ASEMetadata, SceneMetadata
 
 
 class TestSceneMetadata:

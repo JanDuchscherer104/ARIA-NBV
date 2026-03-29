@@ -1,12 +1,12 @@
 # Package Guidance
 
-Apply this file when working under `oracle_rri/`.
+Apply this file when working under `aria_nbv/`.
 
 ## Commands
-- Python: `oracle_rri/.venv/bin/python`
+- Python: `aria_nbv/.venv/bin/python`
 - Format: `ruff format <file>`
 - Lint: `ruff check <file>`
-- Tests: `uv run pytest <path>` or `oracle_rri/.venv/bin/python -m pytest <path>`
+- Tests: `uv run pytest <path>` or `aria_nbv/.venv/bin/python -m pytest <path>`
 - Context: `make context`
 
 ## Invariants
@@ -14,7 +14,7 @@ Apply this file when working under `oracle_rri/`.
 - Use `pathlib.Path` for filesystem paths.
 - Instantiate runtime objects through config `.setup_target()` methods.
 - Prefer `Field(default_factory=...)` for computed defaults.
-- Use `Console` from `oracle_rri.utils` for structured logging.
+- Use `Console` from `aria_nbv.utils` for structured logging.
 - Prefer existing utilities from `efm3d`, `atek`, and `projectaria_tools` over reimplementation.
 - Use ARIA constants from `efm3d.aria.aria_constants` for dataset keys.
 - Follow EFM3D / ATEK coordinate conventions and document tensor shapes plus coordinate frames where they are not obvious.

@@ -23,7 +23,7 @@ import seaborn as sns
 import torch
 
 
-def _ensure_oracle_rri_importable() -> None:
+def _ensure_aria_nbv_importable() -> None:
     project_root = Path(__file__).resolve().parents[1]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
@@ -63,15 +63,15 @@ def _load_from_logs(logs_dir: Path) -> tuple[np.ndarray, np.ndarray, int]:
 
 
 def main() -> None:
-    _ensure_oracle_rri_importable()
+    _ensure_aria_nbv_importable()
 
-    from oracle_rri.data import AseEfmDatasetConfig
-    from oracle_rri.pipelines.oracle_rri_labeler import OracleRriLabelerConfig
-    from oracle_rri.pose_generation import CandidateViewGeneratorConfig
-    from oracle_rri.rendering import CandidateDepthRendererConfig
-    from oracle_rri.rendering.pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig
-    from oracle_rri.rri_metrics.rri_binning import RriOrdinalBinner
-    from oracle_rri.utils import Verbosity
+    from aria_nbv.data import AseEfmDatasetConfig
+    from aria_nbv.pipelines.oracle_rri_labeler import OracleRriLabelerConfig
+    from aria_nbv.pose_generation import CandidateViewGeneratorConfig
+    from aria_nbv.rendering import CandidateDepthRendererConfig
+    from aria_nbv.rendering.pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig
+    from aria_nbv.rri_metrics.rri_binning import RriOrdinalBinner
+    from aria_nbv.utils import Verbosity
 
     parser = argparse.ArgumentParser(description="Plot RRI binning thresholds from a small oracle sample.")
     parser.add_argument("--scene-id", type=str, default="81283")

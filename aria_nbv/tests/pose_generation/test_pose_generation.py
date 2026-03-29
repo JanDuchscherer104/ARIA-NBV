@@ -9,20 +9,20 @@ import torch
 import trimesh
 from efm3d.aria import CameraTW, PoseTW
 
-from oracle_rri.data import AseEfmDatasetConfig
-from oracle_rri.pose_generation import (
+from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.pose_generation import (
     CandidateViewGenerator,
     CandidateViewGeneratorConfig,
     CollisionBackend,
     SamplingStrategy,
 )
-from oracle_rri.pose_generation.candidate_generation_rules import (
+from aria_nbv.pose_generation.candidate_generation_rules import (
     FreeSpaceRule,
     MinDistanceToMeshRule,
     PathCollisionRule,
 )
-from oracle_rri.pose_generation.types import CandidateContext
-from oracle_rri.utils.frames import world_up_tensor
+from aria_nbv.pose_generation.types import CandidateContext
+from aria_nbv.utils.frames import world_up_tensor
 
 
 def _identity_pose(batch: int = 1, device: torch.device | str = "cpu") -> PoseTW:

@@ -9,7 +9,7 @@ format:
 ---
 
 This page contains **Mermaid architecture diagrams** of the major components in
-`oracle_rri/oracle_rri/vin/experimental/model_v2.py` (VIN v2).
+`aria_nbv/aria_nbv/vin/experimental/model_v2.py` (VIN v2).
 
 The goal is to make it easy to cross-check the implementation against the paper
 and to reason about ablations (e.g., enabling/disabling semidense frustum MHCA,

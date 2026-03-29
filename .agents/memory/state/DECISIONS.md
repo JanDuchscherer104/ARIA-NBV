@@ -1,6 +1,6 @@
 ---
 id: decisions
-updated: 2026-03-25
+updated: 2026-03-29
 scope: repo
 owner: jan
 status: active
@@ -27,4 +27,5 @@ tags: [codex, workflow, architecture]
 - Runtime objects are instantiated through config `.setup_target()` factories.
 - Pose and camera representations use `PoseTW` and `CameraTW`.
 - Package verification uses `ruff format`, `ruff check`, and targeted `pytest`.
+- The tracked Python workspace and package root are `aria_nbv/` and `aria_nbv/aria_nbv`; repo tooling and docs should refer to that layout.
 - Documentation changes should update Quarto/Typst sources directly, not ad hoc notes under `.codex/`.

@@ -21,7 +21,7 @@ from matplotlib import colormaps
 from plotly import colors as plotly_colors
 from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 
-from oracle_rri.utils import Console, rotate_yaw_cw90
+from aria_nbv.utils import Console, rotate_yaw_cw90
 
 from .efm_views import EfmCameraView, EfmSnippetView
 
@@ -1121,8 +1121,8 @@ def plot_trajectory(
 
 
 if __name__ == "__main__":
-    from oracle_rri.data import AseEfmDatasetConfig
-    from oracle_rri.utils import Console
+    from aria_nbv.data import AseEfmDatasetConfig
+    from aria_nbv.utils import Console
 
     debug = True
     verbose = True

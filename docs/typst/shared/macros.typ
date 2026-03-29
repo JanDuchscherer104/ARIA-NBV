@@ -281,7 +281,7 @@
     // - The voxel grid lives in the voxel frame #symb.frame.v and is anchored
     //   at the final rig pose #symb.ase.traj_final (gravity-aligned).
     // - We keep notation head-centric: occupancy / evidence / counts, matching
-    //   `oracle_rri/oracle_rri/vin/model_v3.py`.
+    //   `aria_nbv/aria_nbv/vin/model_v3.py`.
     // -----------------------------------------------------------------------
     // Occupancy prediction (sigmoid) on the voxel grid.
     occ_pr: $bold(V)_"occ"^"pr"$,

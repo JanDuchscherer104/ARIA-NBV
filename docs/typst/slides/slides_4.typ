@@ -899,7 +899,7 @@
 //         - Semidense points: #symb.shape.P (padded) and #symb.shape.Pfr (#sym.arrow.r subsampled for projection).
 //       ]
 //       #good-note(width: 100%)[
-//         In code: see `oracle_rri/oracle_rri/vin/model_v3.py::_forward_impl` for the exact tensor flow.
+//         In code: see `aria_nbv/aria_nbv/vin/model_v3.py::_forward_impl` for the exact tensor flow.
 //       ]
 //     ],
 //   )

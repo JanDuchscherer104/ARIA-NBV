@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from oracle_rri.app import panels
-from oracle_rri.app.panels import candidates, data, depth, offline_stats, rri, rri_binning, vin_diagnostics, wandb
+from aria_nbv.app import panels
+from aria_nbv.app.panels import candidates, data, depth, offline_stats, rri, rri_binning, vin_diagnostics, wandb
 
 
 def test_panels_dispatcher_reexports() -> None:

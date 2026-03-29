@@ -29,7 +29,7 @@ def _require_optuna() -> Any:
 
 
 class OptunaConfig(BaseConfig):
-    """Configure an Optuna study used by :class:`~oracle_rri.lightning.AriaNBVExperimentConfig`."""
+    """Configure an Optuna study used by :class:`~aria_nbv.lightning.AriaNBVExperimentConfig`."""
 
     study_name: str = "aria-nbv"
     """Study name (used for Optuna storage and W&B grouping)."""

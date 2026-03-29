@@ -13,7 +13,7 @@ def _default_root() -> Path:
 
 
 class PathConfig(SingletonConfig):
-    """Centralise all filesystem locations for the oracle_rri project."""
+    """Centralise all filesystem locations for the aria_nbv project."""
 
     _ROOT_RELATIVE_DEFAULTS: ClassVar[dict[str, Path]] = {
         "data_root": Path(".data"),

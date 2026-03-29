@@ -7,7 +7,7 @@ format: html
 
 # EFM3D & ATEK Function Library Overview
 
-This document provides a comprehensive overview of all EFM3D and ATEK functions that are relevant for implementing the aria_nbv (formerly `oracle_rri`) Relative Reconstruction Improvement (RRI) computation for Next-Best-View planning.
+This document provides a comprehensive overview of all EFM3D and ATEK functions that are relevant for implementing the aria_nbv Relative Reconstruction Improvement (RRI) computation for Next-Best-View planning.
 
 ## EFM3D Core Utilities
 

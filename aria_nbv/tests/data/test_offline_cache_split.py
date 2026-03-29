@@ -67,7 +67,7 @@ def _unwrap_base_dataset(dataset: object) -> object:
 
 def test_rebuild_cache_index_random_split(tmp_path: Path) -> None:
     """Rebuild split indices using a deterministic RNG seed."""
-    offline_mod = importlib.import_module("oracle_rri.data.offline_cache")
+    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
     rebuild_cache_index = offline_mod.rebuild_cache_index
 
     cache_dir = tmp_path / "cache"
@@ -100,7 +100,7 @@ def test_rebuild_cache_index_random_split(tmp_path: Path) -> None:
 
 def test_cache_split_creates_train_val_indices(tmp_path: Path) -> None:
     """Create train/val index files and verify the split sizes."""
-    offline_mod = importlib.import_module("oracle_rri.data.offline_cache")
+    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
     OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
     OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
 
@@ -143,7 +143,7 @@ def test_cache_split_creates_train_val_indices(tmp_path: Path) -> None:
 
 def test_cache_split_preserves_existing_assignments(tmp_path: Path) -> None:
     """Keep existing train/val assignments when new entries are appended."""
-    offline_mod = importlib.import_module("oracle_rri.data.offline_cache")
+    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
     OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
     OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
 
@@ -189,7 +189,7 @@ def test_cache_split_preserves_existing_assignments(tmp_path: Path) -> None:
 
 def test_cache_split_real_data() -> None:
     """Exercise train/val split on an existing offline cache."""
-    offline_mod = importlib.import_module("oracle_rri.data.offline_cache")
+    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
     OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
     OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
 
@@ -215,10 +215,10 @@ def test_cache_split_real_data() -> None:
 
 def test_datamodule_applies_cache_split(tmp_path: Path) -> None:
     """VinDataModule should honor explicit train/val cache splits."""
-    offline_mod = importlib.import_module("oracle_rri.data.offline_cache")
-    dm_mod = importlib.import_module("oracle_rri.lightning.lit_datamodule")
-    datasets_mod = importlib.import_module("oracle_rri.data.vin_oracle_datasets")
-    utils_mod = importlib.import_module("oracle_rri.utils")
+    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
+    dm_mod = importlib.import_module("aria_nbv.lightning.lit_datamodule")
+    datasets_mod = importlib.import_module("aria_nbv.data.vin_oracle_datasets")
+    utils_mod = importlib.import_module("aria_nbv.utils")
 
     OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
     OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
@@ -262,7 +262,7 @@ def test_datamodule_applies_cache_split(tmp_path: Path) -> None:
 
 def test_cache_dataset_include_snippet_real_data() -> None:
     """Load an EFM snippet from the offline cache when enabled."""
-    offline_mod = importlib.import_module("oracle_rri.data.offline_cache")
+    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
     OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
     OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
 
@@ -292,7 +292,7 @@ def test_cache_dataset_include_snippet_real_data() -> None:
 
 def test_cache_dataset_returns_vin_batch_real_data() -> None:
     """Return VIN batch format directly from the cache dataset."""
-    offline_mod = importlib.import_module("oracle_rri.data.offline_cache")
+    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
     OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
     OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
 
@@ -319,7 +319,7 @@ def test_cache_dataset_returns_vin_batch_real_data() -> None:
 
 def test_cache_dataset_simplification(tmp_path: Path) -> None:
     """Simplification should reduce the exposed length."""
-    offline_mod = importlib.import_module("oracle_rri.data.offline_cache")
+    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
     OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
     OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
 

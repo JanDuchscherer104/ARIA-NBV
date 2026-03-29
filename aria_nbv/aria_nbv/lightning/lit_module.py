@@ -1,6 +1,6 @@
 """LightningModule for training VIN (View Introspection Network).
 
-This module implements the same core logic as `oracle_rri/scripts/train_vin.py`,
+This module implements the same core logic as `aria_nbv/scripts/train_vin.py`,
 but with PyTorch Lightning training loops and optional W&B logging via the
 trainer factory.
 """

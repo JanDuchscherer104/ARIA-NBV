@@ -1531,8 +1531,8 @@ class VinModel(nn.Module):
             ARIA_POSE_T_WORLD_RIG,
         )
 
-        from oracle_rri.utils import Console
-        from oracle_rri.utils.rich_summary import rich_summary, summarize
+        from aria_nbv.utils import Console
+        from aria_nbv.utils.rich_summary import rich_summary, summarize
 
         def _capture_tree(tree) -> str:
             console = Console()

@@ -1,13 +1,13 @@
-"""Optuna integration tests for oracle_rri."""
+"""Optuna integration tests for aria_nbv."""
 
 from __future__ import annotations
 
 # ruff: noqa: S101
 from typing import TYPE_CHECKING
 
-from oracle_rri.configs import OptunaConfig
-from oracle_rri.lightning.lit_trainer_callbacks import TrainerCallbacksConfig
-from oracle_rri.utils import BaseConfig, Optimizable, optimizable_field
+from aria_nbv.configs import OptunaConfig
+from aria_nbv.lightning.lit_trainer_callbacks import TrainerCallbacksConfig
+from aria_nbv.utils import BaseConfig, Optimizable, optimizable_field
 from pydantic import Field
 from pytorch_lightning.callbacks import Callback
 

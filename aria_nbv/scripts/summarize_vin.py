@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sys
 
-from oracle_rri.lightning.cli import main as cli_main
+from aria_nbv.lightning.cli import main as cli_main
 
 
 def main() -> None:

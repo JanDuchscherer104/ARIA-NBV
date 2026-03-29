@@ -43,7 +43,7 @@ def test_cache_dataset_prunes_candidate_pcs(
     """Skip candidate decoding when return_format is vin_batch."""
     if importlib.util.find_spec("power_spherical") is None:
         pytest.skip("Missing power_spherical dependency")
-    offline_mod = importlib.import_module("oracle_rri.data.offline_cache")
+    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
 
     cache_dir = tmp_path / "cache"
     samples_dir = cache_dir / "samples"

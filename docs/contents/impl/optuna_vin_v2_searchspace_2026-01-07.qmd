@@ -93,8 +93,8 @@ incorrectly gated on `use_point_encoder`), so Optuna can actually vary them in t
 
 Search space + dependency fixes:
 
-- `oracle_rri/oracle_rri/vin/experimental/model_v2.py`: simplify fixed knobs + fix `relies_on` for semidense params
-- `oracle_rri/oracle_rri/lightning/optimizers.py`: fix OneCycle/WD knobs for architecture-focused sweeps
+- `aria_nbv/aria_nbv/vin/experimental/model_v2.py`: simplify fixed knobs + fix `relies_on` for semidense params
+- `aria_nbv/aria_nbv/lightning/optimizers.py`: fix OneCycle/WD knobs for architecture-focused sweeps
 
 Baseline sweep config (kept compatible with the vin snippet cache + subset mode):
 

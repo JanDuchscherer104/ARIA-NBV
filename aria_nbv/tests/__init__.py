@@ -1,1 +1,1 @@
-"""Test package for oracle_rri."""
+"""Test package for aria_nbv."""

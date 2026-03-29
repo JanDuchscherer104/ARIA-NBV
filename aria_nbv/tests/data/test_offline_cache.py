@@ -34,16 +34,16 @@ def test_oracle_cache_roundtrip(tmp_path: Path) -> None:  # noqa: PLR0915
     if importlib.util.find_spec("power_spherical") is None:
         pytest.skip("Missing power_spherical dependency")
 
-    data_mod = importlib.import_module("oracle_rri.data")
-    offline_mod = importlib.import_module("oracle_rri.data.offline_cache")
-    labeler_mod = importlib.import_module("oracle_rri.pipelines.oracle_rri_labeler")
+    data_mod = importlib.import_module("aria_nbv.data")
+    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
+    labeler_mod = importlib.import_module("aria_nbv.pipelines.oracle_rri_labeler")
     pose_mod = importlib.import_module(
-        "oracle_rri.pose_generation.candidate_generation",
+        "aria_nbv.pose_generation.candidate_generation",
     )
-    depth_mod = importlib.import_module("oracle_rri.rendering.candidate_depth_renderer")
-    p3d_mod = importlib.import_module("oracle_rri.rendering.pytorch3d_depth_renderer")
-    utils_mod = importlib.import_module("oracle_rri.utils")
-    backbone_mod = importlib.import_module("oracle_rri.vin.backbone_evl")
+    depth_mod = importlib.import_module("aria_nbv.rendering.candidate_depth_renderer")
+    p3d_mod = importlib.import_module("aria_nbv.rendering.pytorch3d_depth_renderer")
+    utils_mod = importlib.import_module("aria_nbv.utils")
+    backbone_mod = importlib.import_module("aria_nbv.vin.backbone_evl")
 
     AseEfmDatasetConfig = data_mod.AseEfmDatasetConfig  # noqa: N806
     OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806

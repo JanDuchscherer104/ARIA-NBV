@@ -24,7 +24,7 @@ from pytorch3d.renderer.cameras import (
     PerspectiveCameras,  # type: ignore[import-untyped]
 )
 
-from oracle_rri.utils.frames import rotate_yaw_cw90
+from aria_nbv.utils.frames import rotate_yaw_cw90
 
 from ...data.efm_views import EfmSnippetView
 from ...data.plotting import SnippetPlotBuilder

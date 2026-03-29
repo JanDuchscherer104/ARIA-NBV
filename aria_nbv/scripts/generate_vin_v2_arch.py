@@ -4,7 +4,7 @@ This script is intended for an **iterative** workflow:
 
 1) run the script to generate `*.dot` + `*.svg`/`*.png`,
 2) inspect the render,
-3) tweak labels/layout in `oracle_rri/oracle_rri/vin/arch_viz.py`,
+3) tweak labels/layout in `aria_nbv/aria_nbv/vin/arch_viz.py`,
 4) re-run.
 
 The default mode runs VIN v2 on **synthetic inputs** to collect shapes without
@@ -39,11 +39,11 @@ from efm3d.aria.pose import PoseTW
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from torch import Tensor
 
-from oracle_rri.data.efm_views import VinSnippetView
-from oracle_rri.utils import Console
-from oracle_rri.vin.arch_viz import VinV2ArchDotConfig, VinV2ArchInputShapes, build_vin_v2_arch_dot, write_dot
-from oracle_rri.vin.experimental.model_v2 import VinModelV2Config
-from oracle_rri.vin.types import EvlBackboneOutput
+from aria_nbv.data.efm_views import VinSnippetView
+from aria_nbv.utils import Console
+from aria_nbv.vin.arch_viz import VinV2ArchDotConfig, VinV2ArchInputShapes, build_vin_v2_arch_dot, write_dot
+from aria_nbv.vin.experimental.model_v2 import VinModelV2Config
+from aria_nbv.vin.types import EvlBackboneOutput
 
 
 @dataclass(slots=True)

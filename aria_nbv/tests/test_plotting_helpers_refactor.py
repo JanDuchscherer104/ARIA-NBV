@@ -20,13 +20,13 @@ from efm3d.aria.aria_constants import (
 )
 from matplotlib import pyplot as plt
 
-from oracle_rri.data.efm_views import EfmCameraView, EfmSnippetView
-from oracle_rri.data.plotting import pose_world_cam, semidense_points_for_frame
-from oracle_rri.rendering.candidate_pointclouds import CandidatePointClouds
-from oracle_rri.rri_metrics import plotting as rri_plotting
-from oracle_rri.rri_metrics.types import RriResult
-from oracle_rri.utils import plotting as utils_plotting
-from oracle_rri.vin.plotting import _parameter_distribution
+from aria_nbv.data.efm_views import EfmCameraView, EfmSnippetView
+from aria_nbv.data.plotting import pose_world_cam, semidense_points_for_frame
+from aria_nbv.rendering.candidate_pointclouds import CandidatePointClouds
+from aria_nbv.rri_metrics import plotting as rri_plotting
+from aria_nbv.rri_metrics.types import RriResult
+from aria_nbv.utils import plotting as utils_plotting
+from aria_nbv.vin.plotting import _parameter_distribution
 
 
 def _make_camera(num_frames: int = 2) -> CameraTW:

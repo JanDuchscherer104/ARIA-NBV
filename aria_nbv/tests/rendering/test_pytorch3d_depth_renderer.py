@@ -1,6 +1,6 @@
 import torch
 from efm3d.aria import CameraTW, PoseTW
-from oracle_rri.rendering.pytorch3d_depth_renderer import (
+from aria_nbv.rendering.pytorch3d_depth_renderer import (
     Pytorch3DDepthRenderer,
     Pytorch3DDepthRendererConfig,
 )

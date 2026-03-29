@@ -231,7 +231,7 @@ def _ensure_unbatched_pose(pose: PoseTW) -> PoseTW:
 def _gravity_align_pose(reference_pose: PoseTW, *, eps: float = 1e-6) -> PoseTW:
     """Return a gravity-aligned variant of ``reference_pose`` with identical translation.
 
-    The aligned pose uses the VIO world-up axis (see :func:`oracle_rri.utils.frames.world_up_tensor`) and keeps
+    The aligned pose uses the VIO world-up axis (see :func:`aria_nbv.utils.frames.world_up_tensor`) and keeps
     the reference yaw by projecting the original forward axis onto the horizontal plane. This effectively removes
     pitch and roll so azimuth/elevation sampling caps behave as intended even when the reference camera is tilted.
 

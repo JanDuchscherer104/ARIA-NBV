@@ -49,7 +49,7 @@ Progressive disclosure order:
    - Quarto: `scripts/nbv_qmd_outline.sh --compact`
    - Typst paper: `scripts/nbv_typst_includes.py --paper --mode outline`
    - Literature: `scripts/nbv_literature_index.sh`
-   - Code: `oracle_rri/AGENTS.md` -> `.agents/references/python_conventions.md` -> `.agents/memory/state/GOTCHAS.md` -> `scripts/nbv_get_context.sh contracts` or `make context-contracts` -> `scripts/nbv_get_context.sh modules` or `scripts/nbv_get_context.sh match <term>`
+   - Code: `aria_nbv/AGENTS.md` -> `.agents/references/python_conventions.md` -> `.agents/memory/state/GOTCHAS.md` -> `scripts/nbv_get_context.sh contracts` or `make context-contracts` -> `scripts/nbv_get_context.sh modules` or `scripts/nbv_get_context.sh match <term>`
 8. Use targeted `rg` inside the narrowed file set.
 9. Run `make context-heavy` or the specific `context-uml`, `context-docstrings`, or `context-tree` targets only when the answer still requires heavyweight generated artifacts.
 
@@ -77,7 +77,7 @@ Use cases:
 - Typst paper
 - Quarto docs
 - Literature sources
-- `oracle_rri` code
+- `aria_nbv` code
 
 Use this before broad text search when the task topic is known but the files are not.
 
@@ -109,8 +109,8 @@ Use the source index when the topic is still broad and you need to identify the 
 - Use `.agents/references/context7_library_ids.md` when external library docs are part of the question.
 - Prefer `.tex` and `.bib` source reads over opening large PDFs.
 
-### Source code (`oracle_rri/**`)
-- Start with `oracle_rri/AGENTS.md` for binding local package rules.
+### Source code (`aria_nbv/**`)
+- Start with `aria_nbv/AGENTS.md` for binding local package rules.
 - Open `.agents/references/python_conventions.md` for long-form typing, docstring, and config examples.
 - Open `.agents/memory/state/GOTCHAS.md` for maintained failure modes.
 - Start structural discovery with `scripts/nbv_get_context.sh contracts` or `make context-contracts` for data contracts and config contracts.
@@ -122,10 +122,10 @@ Use the source index when the topic is still broad and you need to identify the 
 ## Heavyweight Fallback
 `make context-heavy` writes the bundled fallback artifacts under `docs/_generated/context/`:
 - `context_snapshot.md`
-- `oracle_rri_uml.mmd`
-- `oracle_rri_filtered_uml.mmd`
-- `oracle_rri_class_docstrings.md`
-- `oracle_rri_tree.md`
+- `aria_nbv_uml.mmd`
+- `aria_nbv_filtered_uml.mmd`
+- `aria_nbv_class_docstrings.md`
+- `aria_nbv_tree.md`
 
 Prefer the specific `make context-uml`, `make context-docstrings`, or `make context-tree` targets when you need only one heavy artifact. Use these only when lighter retrieval failed to localize the answer.
 
@@ -134,7 +134,7 @@ This skill should stop being the active surface once the task is localized.
 
 - Handoff to `typst-authoring` when the task becomes a Typst edit or paper/slides implementation.
 - Handoff to `scientific-writing` when the task becomes literature synthesis, section drafting, or citation-heavy prose.
-- Handoff to the direct code workflow once the target module or symbol set in `oracle_rri` is known.
+- Handoff to the direct code workflow once the target module or symbol set in `aria_nbv` is known.
 
 ## Bundled Scripts
 - Scripts are self-rooting and can be run from any working directory.
@@ -152,7 +152,7 @@ This skill should stop being the active surface once the task is localized.
 - `scripts/nbv_literature_search.sh "<term>"`
   - searches literature `.tex`, `.bib`, and `.sty` sources
 - `scripts/nbv_get_context.sh modules|packages|classes|functions|contracts|match <term>`
-  - AST-based code summaries for `oracle_rri`
+  - AST-based code summaries for `aria_nbv`
 
 ## References
 - `references/context_map.md` provides concept-to-source routing.

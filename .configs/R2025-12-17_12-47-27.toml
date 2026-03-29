@@ -11,7 +11,7 @@ seed = 0
 out_dir = ".logs/vin"
 # type: <class 'bool'>
 fit_binner_only = false
-# type: <class 'oracle_rri.configs.path_config.PathConfig'>
+# type: <class 'aria_nbv.configs.path_config.PathConfig'>
 
 [paths]
 # type: <class 'pathlib.Path'>
@@ -34,7 +34,7 @@ ase_meshes = "/home/jandu/repos/NBV/.data/ase_meshes"
 processed_meshes = "/home/jandu/repos/NBV/.data/ase_meshes_processed"
 # type: <class 'pathlib.Path'>
 external_dir = "/home/jandu/repos/NBV/external"
-# type: <class 'oracle_rri.lightning.lit_trainer_factory.TrainerFactoryConfig'>
+# type: <class 'aria_nbv.lightning.lit_trainer_factory.TrainerFactoryConfig'>
 
 [trainer_config]
 # type: <class 'bool'>
@@ -61,7 +61,7 @@ log_every_n_steps = 1
 check_val_every_n_epoch = 1
 # type: <class 'bool'>
 enable_model_summary = true
-# type: <class 'oracle_rri.lightning.lit_trainer_callbacks.TrainerCallbacksConfig'>
+# type: <class 'aria_nbv.lightning.lit_trainer_callbacks.TrainerCallbacksConfig'>
 use_wandb = true
 
     [trainer_config.callbacks]
@@ -112,21 +112,21 @@ use_wandb = true
     # type: <class 'str'>
     timer_interval = "step"
     # type: <class 'bool'>
-    # type: <class 'oracle_rri.configs.wandb_config.WandbConfig'>
+    # type: <class 'aria_nbv.configs.wandb_config.WandbConfig'>
 
     [trainer_config.wandb_config]
     # type: str | None
     name = "R2025-12-17_12-47-27"
     # type: <class 'str'>
-    project = "oracle-rri"
+    project = "aria-nbv"
     # type: <class 'bool'>
     offline = false
     # type: bool | str
     log_model = "all"
-    # type: <class 'oracle_rri.lightning.lit_datamodule.VinDataModuleConfig'>
+    # type: <class 'aria_nbv.lightning.lit_datamodule.VinDataModuleConfig'>
 
 [datamodule_config]
-# type: <class 'oracle_rri.data.efm_dataset.AseEfmDatasetConfig'>
+# type: <class 'aria_nbv.data.efm_dataset.AseEfmDatasetConfig'>
 max_attempts_per_batch = 50
 num_workers            = 0
 persistent_workers     = false
@@ -134,11 +134,11 @@ verbosity              = 1
 is_debug               = false
 
     [datamodule_config.train_dataset]
-    # type: <class 'oracle_rri.configs.path_config.PathConfig'>
+    # type: <class 'aria_nbv.configs.path_config.PathConfig'>
     atek_variant = "efm"
 
     [datamodule_config.labeler]
-    # type: <class 'oracle_rri.pose_generation.candidate_generation.CandidateViewGeneratorConfig'>
+    # type: <class 'aria_nbv.pose_generation.candidate_generation.CandidateViewGeneratorConfig'>
     backprojection_stride = 1
 
         [datamodule_config.labeler.generator]
@@ -202,10 +202,10 @@ is_debug               = false
         view_roll_jitter_deg = 0.0
         # type: int | None
         seed = 0
-        # type: <class 'oracle_rri.rendering.candidate_depth_renderer.CandidateDepthRendererConfig'>
+        # type: <class 'aria_nbv.rendering.candidate_depth_renderer.CandidateDepthRendererConfig'>
 
         [datamodule_config.labeler.depth]
-        # type: <class 'oracle_rri.rendering.pytorch3d_depth_renderer.Pytorch3DDepthRendererConfig'>
+        # type: <class 'aria_nbv.rendering.pytorch3d_depth_renderer.Pytorch3DDepthRendererConfig'>
         max_candidates_final = 16
         oversample_factor    = 1.0
         verbosity            = 2
@@ -232,7 +232,7 @@ is_debug               = false
             # type: <class 'float'>
             # type: <enum 'Verbosity'>
             # type: <class 'bool'>
-            # type: <class 'oracle_rri.rri_metrics.oracle_rri.OracleRRIConfig'>
+            # type: <class 'aria_nbv.rri_metrics.aria_nbv.OracleRRIConfig'>
 
         [datamodule_config.labeler.oracle]
         # type: <class 'int'>
@@ -245,10 +245,10 @@ is_debug               = false
         # type: <class 'bool'>
         # type: <enum 'Verbosity'>
         # type: <class 'bool'>
-        # type: <class 'oracle_rri.lightning.lit_module.VinLightningModuleConfig'>
+        # type: <class 'aria_nbv.lightning.lit_module.VinLightningModuleConfig'>
 
 [module_config]
-# type: <class 'oracle_rri.vin.model.VinModelConfig'>
+# type: <class 'aria_nbv.vin.model.VinModelConfig'>
 num_classes         = 15
 binner_fit_snippets = 2
 binner_tanh_scale   = 1.0
@@ -257,7 +257,7 @@ save_binner         = true
 binner_path         = "/home/jandu/repos/NBV/.logs/vin/rri_binner.json"
 
     [module_config.vin]
-    # type: <class 'oracle_rri.vin.backbone_evl.EvlBackboneConfig'>
+    # type: <class 'aria_nbv.vin.backbone_evl.EvlBackboneConfig'>
     pose_encoding_mode = "shell_sh"
     use_occ_feat       = true
     use_obb_feat       = true
@@ -265,7 +265,7 @@ binner_path         = "/home/jandu/repos/NBV/.logs/vin/rri_binner.json"
     use_local_sample   = true
 
         [module_config.vin.backbone]
-        # type: <class 'oracle_rri.configs.path_config.PathConfig'>
+        # type: <class 'aria_nbv.configs.path_config.PathConfig'>
         model_cfg  = "/home/jandu/repos/NBV/.configs/evl_inf_desktop.yaml"
         model_ckpt = "/home/jandu/repos/NBV/.logs/ckpts/model_lite.pth"
         device     = "cuda"
@@ -297,7 +297,7 @@ binner_path         = "/home/jandu/repos/NBV/.logs/vin/rri_binner.json"
             # type: <class 'torch.device'>
             # type: <class 'bool'>
             # type: Literal[shell_sh, lff6d]
-            # type: <class 'oracle_rri.vin.spherical_encoding.ShellShPoseEncoderConfig'>
+            # type: <class 'aria_nbv.vin.spherical_encoding.ShellShPoseEncoderConfig'>
 
         [module_config.vin.pose_encoder_sh]
         # type: <class 'int'>
@@ -328,7 +328,7 @@ binner_path         = "/home/jandu/repos/NBV/.logs/vin/rri_binner.json"
         normalization = "component"
         # type: <class 'bool'>
         include_scalars = true
-        # type: <class 'oracle_rri.vin.pose_encoding.LearnableFourierFeaturesConfig'>
+        # type: <class 'aria_nbv.vin.pose_encoding.LearnableFourierFeaturesConfig'>
 
         [module_config.vin.pose_encoder]
         # type: <class 'int'>
@@ -343,7 +343,7 @@ binner_path         = "/home/jandu/repos/NBV/.logs/vin/rri_binner.json"
         gamma = 1.0
         # type: <class 'bool'>
         include_input = false
-        # type: <class 'oracle_rri.vin.model.VinScorerHeadConfig'>
+        # type: <class 'aria_nbv.vin.model.VinScorerHeadConfig'>
 
         [module_config.vin.head]
         # type: <class 'int'>
@@ -360,7 +360,7 @@ binner_path         = "/home/jandu/repos/NBV/.logs/vin/rri_binner.json"
         # type: <class 'bool'>
         # type: <class 'bool'>
         # type: <class 'bool'>
-        # type: <class 'oracle_rri.lightning.lit_module.AdamWConfig'>
+        # type: <class 'aria_nbv.lightning.lit_module.AdamWConfig'>
 
     [module_config.optimizer]
     # type: <class 'float'>

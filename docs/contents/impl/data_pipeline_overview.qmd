@@ -8,7 +8,7 @@ format: html
 ```bash
 cd /home/jandu/repos/NBV
 source activate aria-nbv          # or conda activate aria-nbv
-streamlit run -m oracle_rri.streamlit_app
+streamlit run -m aria_nbv.streamlit_app
 ```
 
 Pages in the app:
@@ -82,16 +82,16 @@ Actions:
 
 ```bash
 # list top scenes by snippet count
-python -m oracle_rri.data.downloader -m list -c efm -n 5
+python -m aria_nbv.data.downloader -m list -c efm -n 5
 
 # download scenes (limit snippets to 10 each)
-python -m oracle_rri.data.downloader -m download -c efm -n 5 --ms 10
+python -m aria_nbv.data.downloader -m download -c efm -n 5 --ms 10
 ```
 
 # Programmatic dataset use
 
 ```python
-from oracle_rri.data_handling.dataset import ASEDatasetConfig
+from aria_nbv.data_handling.dataset import ASEDatasetConfig
 
 cfg = ASEDatasetConfig(atek_variant="efm", load_meshes=True, require_mesh=True)
 ds = cfg.setup_target()

@@ -1,9 +1,9 @@
 import torch
 import trimesh
 
-from oracle_rri.configs import PathConfig
-from oracle_rri.data.mesh_cache import MeshProcessSpec, load_or_process_mesh
-from oracle_rri.utils import Console
+from aria_nbv.configs import PathConfig
+from aria_nbv.data.mesh_cache import MeshProcessSpec, load_or_process_mesh
+from aria_nbv.utils import Console
 
 
 def test_processed_mesh_is_cached(tmp_path):

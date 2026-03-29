@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../../../../" && pwd)"
-DEFAULT_ROOT="${ROOT_DIR}/oracle_rri/oracle_rri"
+DEFAULT_ROOT="${ROOT_DIR}/aria_nbv/aria_nbv"
 
 mode="${1:-packages}"
 shift || true
@@ -11,7 +11,7 @@ shift || true
 root_override=""
 if [[ $# -gt 0 && "$1" != "--root" && "$mode" != "match" ]]; then
   case "$1" in
-    /*|./*|../*|oracle_rri/*)
+    /*|./*|../*|aria_nbv/*)
       root_override="$1"
       shift
       ;;
@@ -41,11 +41,11 @@ fi
 
 PYTHON="${PYTHON:-}"
 if [[ -z "$PYTHON" ]]; then
-  if [[ -x "${ROOT_DIR}/oracle_rri/.venv/bin/python" ]]; then
-    PYTHON="${ROOT_DIR}/oracle_rri/.venv/bin/python"
+  if [[ -x "${ROOT_DIR}/aria_nbv/.venv/bin/python" ]]; then
+    PYTHON="${ROOT_DIR}/aria_nbv/.venv/bin/python"
   else
     PYTHON="python"
   fi
 fi
 
-exec "$PYTHON" "${ROOT_DIR}/oracle_rri/scripts/get_context.py" "${args[@]}"
+exec "$PYTHON" "${ROOT_DIR}/aria_nbv/scripts/get_context.py" "${args[@]}"

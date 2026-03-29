@@ -2,7 +2,7 @@
 
 This module centralises lightweight utilities that are needed by multiple
 plotting modules. Functions previously defined in
-``oracle_rri.data.utils`` now live here and remain re-exported from their old
+``aria_nbv.data.utils`` now live here and remain re-exported from their old
 location for compatibility.
 """
 

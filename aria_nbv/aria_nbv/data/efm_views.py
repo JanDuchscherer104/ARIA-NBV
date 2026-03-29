@@ -1,6 +1,6 @@
 """Typed, zero-copy views over EFM-formatted ATEK samples.
 
-These classes mirror the style of :mod:`oracle_rri.data.views` but read the
+These classes mirror the style of :mod:`aria_nbv.data.views` but read the
 keys produced by ``efm3d.dataset.efm_model_adaptor.load_atek_wds_dataset_as_efm``.
 All properties surface rich shape/type information to make downstream use
 explicit and safe.
@@ -42,7 +42,7 @@ from efm3d.utils.pointcloud import collapse_pointcloud_time
 from torch import Tensor
 from trimesh import Trimesh  # type: ignore[import-untyped]
 
-from oracle_rri.data.mesh_cache import MeshProcessSpec
+from aria_nbv.data.mesh_cache import MeshProcessSpec
 
 from ..utils import summarize
 

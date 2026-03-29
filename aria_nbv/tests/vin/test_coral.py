@@ -5,7 +5,7 @@
 import math
 
 import torch
-from oracle_rri.rri_metrics import (
+from aria_nbv.rri_metrics import (
     coral_logits_to_prob,
     coral_loss,
     coral_random_loss,

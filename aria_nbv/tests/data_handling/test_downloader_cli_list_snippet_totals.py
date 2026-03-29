@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from oracle_rri.configs import PathConfig
-from oracle_rri.data.downloader import ASEDownloaderConfig, cli_list
-from oracle_rri.utils import Verbosity
+from aria_nbv.configs import PathConfig
+from aria_nbv.data.downloader import ASEDownloaderConfig, cli_list
+from aria_nbv.utils import Verbosity
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 

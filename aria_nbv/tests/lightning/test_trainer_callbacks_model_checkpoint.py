@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from oracle_rri.lightning.lit_trainer_callbacks import TrainerCallbacksConfig
+from aria_nbv.lightning.lit_trainer_callbacks import TrainerCallbacksConfig
 
 
 def _get_model_checkpoint(callbacks: list[object]) -> ModelCheckpoint:

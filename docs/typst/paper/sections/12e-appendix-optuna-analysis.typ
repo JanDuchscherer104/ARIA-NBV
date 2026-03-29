@@ -6,7 +6,7 @@
 
 #block[
   #smallcaps[Scope] This appendix formalises the evidence routines implemented in
-  our Streamlit Optuna Sweep Explorer (`oracle_rri/app/panels/optuna_sweep.py`).
+  our Streamlit Optuna Sweep Explorer (`aria_nbv/aria_nbv/app/panels/optuna_sweep.py`).
   The intent is to provide fast, decision-oriented signals for which
   hyper-parameters can be fixed and which require further exploration.
 ]

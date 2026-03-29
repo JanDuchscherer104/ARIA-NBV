@@ -1,9 +1,9 @@
 import pytest
 import torch
 
-from oracle_rri.data import AseEfmDatasetConfig
-from oracle_rri.utils import Verbosity
-from oracle_rri.utils.frames import view_axes_from_points, world_from_camera
+from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.utils import Verbosity
+from aria_nbv.utils.frames import view_axes_from_points, world_from_camera
 
 
 def _first_sample():

@@ -1,6 +1,6 @@
 # Python Conventions
 
-This file is the long-form reference for Python typing, docstring, and config conventions in `oracle_rri/`. Binding short-form rules live in [oracle_rri/AGENTS.md](/home/jandu/repos/NBV/oracle_rri/AGENTS.md).
+This file is the long-form reference for Python typing, docstring, and config conventions in `aria_nbv/`. Binding short-form rules live in [aria_nbv/AGENTS.md](/home/jandu/repos/NBV/aria_nbv/AGENTS.md).
 
 ## Core Rules
 - Config classes should inherit from `BaseConfig` where appropriate.
@@ -119,10 +119,10 @@ class MyComponentConfig(BaseConfig["MyComponent"]):
 ```
 
 ## Console Logging
-Use `Console` from `oracle_rri.utils` for structured logging.
+Use `Console` from `aria_nbv.utils` for structured logging.
 
 ```python
-from oracle_rri.utils import Console
+from aria_nbv.utils import Console
 
 console = Console.with_prefix(self.__class__.__name__, 'setup_target')
 console.set_verbose(self.verbose).set_debug(self.is_debug)

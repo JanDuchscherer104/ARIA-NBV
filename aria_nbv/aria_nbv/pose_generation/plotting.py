@@ -405,7 +405,7 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
 
         poses_world_cam = cand_results.poses_world_cam()
         if display_rotate:
-            from oracle_rri.utils import rotate_yaw_cw90
+            from aria_nbv.utils import rotate_yaw_cw90
 
             poses_world_cam = rotate_yaw_cw90(poses_world_cam)
 
@@ -701,7 +701,7 @@ def plot_euler_world(
     up_w = r_wc[:, :, 1]
     yaw = torch.atan2(fwd_w[:, 0], fwd_w[:, 1])
     pitch = torch.asin(_normalise(fwd_w)[:, 2].clamp(-1.0, 1.0))
-    from oracle_rri.utils.frames import world_up_tensor
+    from aria_nbv.utils.frames import world_up_tensor
 
     roll = _roll_about_forward(
         forward=fwd_w, up_cam=up_w, up_ref=world_up_tensor(device=fwd_w.device, dtype=fwd_w.dtype)

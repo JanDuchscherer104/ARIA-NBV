@@ -1,12 +1,12 @@
 ---
-title: aria_nbv Package (formerly oracle_rri)
+title: aria_nbv Package
 ---
 
 > **Note**: This page is superseded by `aria_nbv_overview.qmd` for the consolidated package map. Keep this one for finer module notes.
 
 # Name & Scope
 
-- `aria_nbv` is the in-repo package that powers our NBV research stack. The on-disk module is still imported as `oracle_rri`; the docs adopt the new name ahead of the eventual code rename.
+- `aria_nbv` is the in-repo package that powers our NBV research stack.
 - Purpose: typed, torch-friendly ingestion of ASE/ATEK snippets, candidate-view generation, rendering, fusion, and RRI computation utilities.
 
 # Module Stack (current code layout)
@@ -134,4 +134,4 @@ classDiagram
     PointCloudFusion --> OracleRRI : fused PC
 ```
 
-Use this layout to guide module additions under `aria_nbv/` (import path `oracle_rri` for now) while keeping current data-handling and config patterns.
+Use this layout to guide module additions under `aria_nbv/` while keeping current data-handling and config patterns.

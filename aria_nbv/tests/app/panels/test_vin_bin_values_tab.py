@@ -3,8 +3,8 @@
 # ruff: noqa: S101, D103, SLF001, PLR2004
 
 import torch
-from oracle_rri.app.panels.vin_diag_tabs import bin_values as bin_values_tab
-from oracle_rri.rri_metrics.rri_binning import RriOrdinalBinner
+from aria_nbv.app.panels.vin_diag_tabs import bin_values as bin_values_tab
+from aria_nbv.rri_metrics.rri_binning import RriOrdinalBinner
 
 
 def test_build_bin_value_payload_uses_bin_means_when_available() -> None:

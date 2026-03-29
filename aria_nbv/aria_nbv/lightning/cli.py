@@ -1,7 +1,7 @@
 """CLI entry points for `AriaNBVExperimentConfig` and offline cache tooling.
 
 This module exists so we can expose stable console scripts via `[project.scripts]`
-in `oracle_rri/pyproject.toml` (unlike `oracle_rri/scripts/*.py`, which are not
+in `aria_nbv/pyproject.toml` (unlike `aria_nbv/scripts/*.py`, which are not
 importable when the package is installed).
 """
 
@@ -18,19 +18,19 @@ from pydantic import AliasChoices, Field, field_validator
 from pydantic._internal._utils import deep_update
 from pydantic_settings import SettingsConfigDict
 
-from oracle_rri.configs import PathConfig
-from oracle_rri.data.offline_cache import (
+from aria_nbv.configs import PathConfig
+from aria_nbv.data.offline_cache import (
     OracleRriCacheConfig,
     OracleRriCacheDataset,
     OracleRriCacheDatasetConfig,
     OracleRriCacheWriter,
     OracleRriCacheWriterConfig,
 )
-from oracle_rri.data.vin_snippet_cache import VinSnippetCacheConfig, VinSnippetCacheWriterConfig
-from oracle_rri.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
-from oracle_rri.rri_metrics import RriOrdinalBinner
-from oracle_rri.utils import BaseConfig, Console, Verbosity
-from oracle_rri.utils.wandb_utils import (
+from aria_nbv.data.vin_snippet_cache import VinSnippetCacheConfig, VinSnippetCacheWriterConfig
+from aria_nbv.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
+from aria_nbv.rri_metrics import RriOrdinalBinner
+from aria_nbv.utils import BaseConfig, Console, Verbosity
+from aria_nbv.utils.wandb_utils import (
     WANDB_STEP_KEYS,
     _ensure_wandb_api,
     _get_run,

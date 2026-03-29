@@ -72,11 +72,11 @@ from efm3d.aria.aria_constants import (
 )
 from efm3d.aria.pose import PoseTW
 
-from oracle_rri.data.efm_views import EfmSnippetView, VinSnippetView
-from oracle_rri.data.vin_oracle_types import VinOracleBatch
-from oracle_rri.vin.model_v3 import SEMIDENSE_PROJ_DIM, VinModelV3, VinModelV3Config
-from oracle_rri.vin.traj_encoder import TrajectoryEncoderConfig
-from oracle_rri.vin.types import EvlBackboneOutput
+from aria_nbv.data.efm_views import EfmSnippetView, VinSnippetView
+from aria_nbv.data.vin_oracle_types import VinOracleBatch
+from aria_nbv.vin.model_v3 import SEMIDENSE_PROJ_DIM, VinModelV3, VinModelV3Config
+from aria_nbv.vin.traj_encoder import TrajectoryEncoderConfig
+from aria_nbv.vin.types import EvlBackboneOutput
 
 
 def _identity_pose(batch: int) -> PoseTW:

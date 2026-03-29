@@ -4,8 +4,8 @@
 
 from __future__ import annotations
 
-from oracle_rri.rri_metrics.logging import Loss, Metric
-from oracle_rri.utils import Stage
+from aria_nbv.rri_metrics.logging import Loss, Metric
+from aria_nbv.utils import Stage
 
 
 def test_loss_log_spec_train_progbar() -> None:

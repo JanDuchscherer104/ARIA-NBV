@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from oracle_rri.vin.types import EfmDict
+from aria_nbv.vin.types import EfmDict
 
 
 def test_efm_dict_contains_expected_keys() -> None:

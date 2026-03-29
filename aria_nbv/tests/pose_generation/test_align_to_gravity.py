@@ -9,9 +9,9 @@ import trimesh
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 
-from oracle_rri.pose_generation import CandidateViewGeneratorConfig
-from oracle_rri.pose_generation.types import ViewDirectionMode
-from oracle_rri.utils.frames import world_up_tensor
+from aria_nbv.pose_generation import CandidateViewGeneratorConfig
+from aria_nbv.pose_generation.types import ViewDirectionMode
+from aria_nbv.utils.frames import world_up_tensor
 
 
 def _local_roll_z(angle_rad: float, *, device: torch.device, dtype: torch.dtype) -> torch.Tensor:

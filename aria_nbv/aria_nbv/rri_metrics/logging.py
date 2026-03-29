@@ -278,7 +278,7 @@ class VinMetricsConfig(BaseConfig[VinMetrics]):
 
     @property
     def target(self) -> type[VinMetrics]:
-        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        """Factory target for :meth:`~aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return VinMetrics
 
     num_classes: int

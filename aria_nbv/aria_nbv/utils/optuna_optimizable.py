@@ -1,6 +1,6 @@
 """Optuna-friendly search space helpers.
 
-This mirrors the utility layer from ``external/doc_classifier`` so oracle_rri
+This mirrors the utility layer from ``external/doc_classifier`` so aria_nbv
 configs can declare Optuna search spaces declaratively via ``optimizable_field``.
 
 The core idea is:

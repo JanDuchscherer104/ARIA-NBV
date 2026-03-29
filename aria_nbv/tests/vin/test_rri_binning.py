@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from oracle_rri.rri_metrics.rri_binning import RriOrdinalBinner
+from aria_nbv.rri_metrics.rri_binning import RriOrdinalBinner
 
 
 def test_binner_save_does_not_overwrite(tmp_path: Path) -> None:

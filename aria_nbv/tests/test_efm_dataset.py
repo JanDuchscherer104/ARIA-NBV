@@ -7,15 +7,15 @@ import torch
 # Make vendored efm3d importable
 sys.path.append(str(Path(__file__).resolve().parents[2] / "external" / "efm3d"))
 
-from oracle_rri.configs import PathConfig  # noqa: E402
-from oracle_rri.data import (  # noqa: E402
+from aria_nbv.configs import PathConfig  # noqa: E402
+from aria_nbv.data import (  # noqa: E402
     AseEfmDatasetConfig,
     EfmCameraView,
     EfmPointsView,
     EfmSnippetView,
     EfmTrajectoryView,
 )
-from oracle_rri.utils import Verbosity
+from aria_nbv.utils import Verbosity
 
 
 def _skip_if_missing_data():

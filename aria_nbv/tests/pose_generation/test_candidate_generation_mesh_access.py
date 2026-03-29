@@ -14,8 +14,8 @@ from efm3d.aria.aria_constants import (
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 
-from oracle_rri.data.efm_views import EfmSnippetView
-from oracle_rri.pose_generation.candidate_generation import CandidateViewGenerator, CandidateViewGeneratorConfig
+from aria_nbv.data.efm_views import EfmSnippetView
+from aria_nbv.pose_generation.candidate_generation import CandidateViewGenerator, CandidateViewGeneratorConfig
 
 pytest.importorskip("power_spherical")
 

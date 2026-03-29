@@ -14,8 +14,8 @@ NC := \033[0m
 RED := \033[0;31m
 
 # Project directories
-PKG_DIR := oracle_rri
-SRC_DIR := oracle_rri
+PKG_DIR := aria_nbv
+SRC_DIR := aria_nbv
 TEST_DIR := tests
 DOCS_DIR := docs
 TYPST ?= typst
@@ -29,7 +29,7 @@ SLIDES_SRC := $(if $(findstring /,$(SLIDES_FILE)),$(SLIDES_FILE),$(TYPST_SLIDES_
 SLIDES_PDF ?= $(SLIDES_SRC:.typ=.pdf)
 
 # Python interpreter (uv-managed .venv by default)
-VENV_PYTHON ?= $(CURDIR)/oracle_rri/.venv/bin/python
+VENV_PYTHON ?= $(CURDIR)/aria_nbv/.venv/bin/python
 PYTHON_INTERPRETER ?= $(VENV_PYTHON)
 FORCE_ACTIV_CONDA_ENV ?= 0  # set to 1 only if you insist on the old conda env check
 CONDA_ENV_NAME ?= aria-nbv       # legacy: expected conda env name
@@ -37,11 +37,11 @@ QMD_FORMATTER := scripts/format_qmd_lists.py
 CONTEXT_DIR ?= docs/_generated/context
 CONTEXT_OUT ?= $(CONTEXT_DIR)/context_snapshot.md
 CONTEXT_INDEX_OUT ?= $(CONTEXT_DIR)/source_index.md
-CONTEXT_UML_OUT ?= $(CONTEXT_DIR)/oracle_rri_uml.mmd
-CONTEXT_UML_FILTERED_OUT ?= $(CONTEXT_DIR)/oracle_rri_filtered_uml.mmd
-CONTEXT_DOCSTRINGS_OUT ?= $(CONTEXT_DIR)/oracle_rri_class_docstrings.md
+CONTEXT_UML_OUT ?= $(CONTEXT_DIR)/aria_nbv_uml.mmd
+CONTEXT_UML_FILTERED_OUT ?= $(CONTEXT_DIR)/aria_nbv_filtered_uml.mmd
+CONTEXT_DOCSTRINGS_OUT ?= $(CONTEXT_DIR)/aria_nbv_class_docstrings.md
 CONTEXT_CONTRACTS_OUT ?= $(CONTEXT_DIR)/data_contracts.md
-CONTEXT_TREE_OUT ?= $(CONTEXT_DIR)/oracle_rri_tree.md
+CONTEXT_TREE_OUT ?= $(CONTEXT_DIR)/aria_nbv_tree.md
 CONTEXT_MERMAID_EXCLUDE ?= data.downloader,vin.experimental,app
 LITERATURE_INDEX_OUT ?= $(CONTEXT_DIR)/literature_index.md
 GET_CONTEXT_MODE ?= packages
@@ -72,7 +72,7 @@ _check_python:
 	@echo "$(GREEN)Using python: $(PYTHON_INTERPRETER)$(NC)"
 
 context-package: _check_python ## 🗺️ Summarize symbols per module (classes/functions/constants)
-	@$(PYTHON_INTERPRETER) oracle_rri/scripts/get_context.py packages --root oracle_rri/oracle_rri
+	@$(PYTHON_INTERPRETER) aria_nbv/scripts/get_context.py packages --root aria_nbv/aria_nbv
 
 context-index: ## 🗺️ Regenerate docs/_generated/context/source_index.md
 	@./scripts/nbv_context_index.sh "$(CONTEXT_INDEX_OUT)"
@@ -88,16 +88,16 @@ context-get: _check_python ## 🗺️ Run AST context helper (GET_CONTEXT_MODE, 
 		fi; \
 		./scripts/nbv_get_context.sh "$${args[@]}"'
 
-context-contracts: _check_python ## 🗺️ Show data/config contract index for oracle_rri
+context-contracts: _check_python ## 🗺️ Show data/config contract index for aria_nbv
 	@./scripts/nbv_get_context.sh contracts
 
-context-modules: _check_python ## 🗺️ Show oracle_rri module map
+context-modules: _check_python ## 🗺️ Show aria_nbv module map
 	@./scripts/nbv_get_context.sh modules
 
-context-classes: _check_python ## 🗺️ Show class summaries for oracle_rri
+context-classes: _check_python ## 🗺️ Show class summaries for aria_nbv
 	@./scripts/nbv_get_context.sh classes
 
-context-functions: _check_python ## 🗺️ Show public function summaries for oracle_rri
+context-functions: _check_python ## 🗺️ Show public function summaries for aria_nbv
 	@./scripts/nbv_get_context.sh functions
 
 context-match: _check_python ## 🗺️ Search AST summaries (set GET_CONTEXT_QUERY=<term>)
@@ -143,9 +143,9 @@ context: _check_python ## 🗺️ Refresh lightweight context artifacts (source 
 		scripts/nbv_context_index.sh "$$index_out" >/dev/null; \
 		scripts/nbv_literature_index.sh "$$lit_index_out" >/dev/null; \
 		{ \
-			echo "# Data Contracts (oracle_rri)"; \
+			echo "# Data Contracts (aria_nbv)"; \
 			echo ""; \
-			$(PYTHON_INTERPRETER) oracle_rri/scripts/get_context.py contracts --root oracle_rri/oracle_rri \
+			$(PYTHON_INTERPRETER) aria_nbv/scripts/get_context.py contracts --root aria_nbv/aria_nbv \
 				| sed "1{/^# Data Contracts$$/d;}"; \
 		} > "$$contracts_out"; \
 		echo "Wrote: $$index_out"; \
@@ -155,7 +155,7 @@ context: _check_python ## 🗺️ Refresh lightweight context artifacts (source 
 	@echo "$(BLUE)Heavy fallback: make context-heavy$(NC)"
 	@echo "$(BLUE)Tip: rg -n \"<pattern>\" $(CONTEXT_INDEX_OUT)$(NC)"
 
-context-uml: _check_python ## 🗺️ Generate oracle_rri UML artifacts without printing them
+context-uml: _check_python ## 🗺️ Generate aria_nbv UML artifacts without printing them
 	@bash -lc 'set -euo pipefail; \
 		context_dir="$(CONTEXT_DIR)"; \
 		uml_out="$(CONTEXT_UML_OUT)"; \
@@ -163,7 +163,7 @@ context-uml: _check_python ## 🗺️ Generate oracle_rri UML artifacts without 
 		mkdir -p "$$context_dir"; \
 		mermaid_tmp="$$(mktemp)"; \
 		mermaid_filtered="$$(mktemp)"; \
-		$(PYTHON_INTERPRETER) -m syrenka classdiagram oracle_rri/oracle_rri > "$$mermaid_tmp"; \
+		$(PYTHON_INTERPRETER) -m syrenka classdiagram aria_nbv/aria_nbv > "$$mermaid_tmp"; \
 		exclude_list="$(CONTEXT_MERMAID_EXCLUDE)"; \
 		if [[ -z "$$exclude_list" ]]; then \
 			cp "$$mermaid_tmp" "$$mermaid_filtered"; \
@@ -179,39 +179,39 @@ context-uml: _check_python ## 🗺️ Generate oracle_rri UML artifacts without 
 		echo "Wrote: $$uml_out"; \
 		echo "Wrote: $$uml_filtered_out"'
 
-context-uml-preview: _check_python ## 🗺️ Print the filtered oracle_rri UML to stdout
+context-uml-preview: _check_python ## 🗺️ Print the filtered aria_nbv UML to stdout
 	@$(MAKE) --no-print-directory context-uml >/dev/null
-	@echo "# Mermaid UML Diagram of the oracle_rri:"
+	@echo "# Mermaid UML Diagram of the aria_nbv:"
 	@echo "\`\`\`{mermaid}"
 	@cat "$(CONTEXT_UML_FILTERED_OUT)"
 	@echo "\`\`\`"
 
-context-docstrings: _check_python ## 🗺️ Generate full oracle_rri class docstrings artifact
+context-docstrings: _check_python ## 🗺️ Generate full aria_nbv class docstrings artifact
 	@bash -lc 'set -euo pipefail; \
 		context_dir="$(CONTEXT_DIR)"; \
 		docstrings_out="$(CONTEXT_DOCSTRINGS_OUT)"; \
 		mkdir -p "$$context_dir"; \
 		{ \
-			echo "# Class Docstrings (oracle_rri)"; \
+			echo "# Class Docstrings (aria_nbv)"; \
 			echo ""; \
-			$(PYTHON_INTERPRETER) oracle_rri/scripts/get_context.py classes --root oracle_rri/oracle_rri --full-doc; \
+			$(PYTHON_INTERPRETER) aria_nbv/scripts/get_context.py classes --root aria_nbv/aria_nbv --full-doc; \
 		} > "$$docstrings_out"; \
 		echo "Wrote: $$docstrings_out"'
 
-context-tree: _check_python ## 🗺️ Generate oracle_rri directory tree artifact
+context-tree: _check_python ## 🗺️ Generate aria_nbv directory tree artifact
 	@bash -lc 'set -euo pipefail; \
 		context_dir="$(CONTEXT_DIR)"; \
 		tree_out="$(CONTEXT_TREE_OUT)"; \
 		mkdir -p "$$context_dir"; \
 		{ \
-			echo "# Directory Tree (oracle_rri)"; \
+			echo "# Directory Tree (aria_nbv)"; \
 			echo ""; \
-			echo "Directory tree for oracle_rri/oracle_rri/:"; \
+			echo "Directory tree for aria_nbv/aria_nbv/:"; \
 			if command -v tree >/dev/null 2>&1; then \
-				tree oracle_rri/oracle_rri/ -I "__pycache__"; \
+				tree aria_nbv/aria_nbv/ -I "__pycache__"; \
 			else \
-				find oracle_rri/oracle_rri/ -path "*/__pycache__" -prune -o -print \
-					| sed "s#^oracle_rri/oracle_rri/##" \
+				find aria_nbv/aria_nbv/ -path "*/__pycache__" -prune -o -print \
+					| sed "s#^aria_nbv/aria_nbv/##" \
 					| sed "/^$$/d" \
 					| sort; \
 			fi; \
@@ -239,10 +239,10 @@ context-heavy: _check_python ## 🗺️ Generate heavyweight fallback artifacts 
 			echo "## Contents"; \
 			echo "0) Source index (all context pools)"; \
 			echo "1) Environment"; \
-			echo "2) Data contracts (oracle_rri)"; \
-			echo "3) Mermaid UML (oracle_rri)"; \
-			echo "4) Class docstrings (oracle_rri)"; \
-			echo "5) Directory tree (oracle_rri)"; \
+			echo "2) Data contracts (aria_nbv)"; \
+			echo "3) Mermaid UML (aria_nbv)"; \
+			echo "4) Class docstrings (aria_nbv)"; \
+			echo "5) Directory tree (aria_nbv)"; \
 			echo ""; \
 			echo "## 0) Source index (all context pools)"; \
 			if [[ -f "$$index_out" ]]; then \
@@ -256,28 +256,28 @@ context-heavy: _check_python ## 🗺️ Generate heavyweight fallback artifacts 
 			echo "Venv: $(VENV_PYTHON)"; \
 			echo "Recreate: UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync --extra dev --extra notebook --extra pytorch3d"; \
 			echo ""; \
-			echo "## 2) Data contracts (oracle_rri)"; \
+			echo "## 2) Data contracts (aria_nbv)"; \
 			if [[ -f "$$contracts_out" ]]; then \
-				sed "1{/^# Data Contracts (oracle_rri)$$/d;}" "$$contracts_out"; \
+				sed "1{/^# Data Contracts (aria_nbv)$$/d;}" "$$contracts_out"; \
 			else \
 				echo "(missing $$contracts_out)"; \
 			fi; \
 			echo ""; \
-			echo "## 3) Mermaid UML (oracle_rri)"; \
+			echo "## 3) Mermaid UML (aria_nbv)"; \
 			echo "\`\`\`{mermaid}"; \
 			cat "$$uml_out"; \
 			echo "\`\`\`"; \
 			echo ""; \
-			echo "## 4) Class docstrings (oracle_rri)"; \
+			echo "## 4) Class docstrings (aria_nbv)"; \
 			if [[ -f "$$docstrings_out" ]]; then \
-				sed "1{/^# Class Docstrings (oracle_rri)$$/d;}" "$$docstrings_out"; \
+				sed "1{/^# Class Docstrings (aria_nbv)$$/d;}" "$$docstrings_out"; \
 			else \
 				echo "(missing $$docstrings_out)"; \
 			fi; \
 			echo ""; \
-			echo "## 5) Directory tree (oracle_rri)"; \
+			echo "## 5) Directory tree (aria_nbv)"; \
 			if [[ -f "$$tree_out" ]]; then \
-				sed "1{/^# Directory Tree (oracle_rri)$$/d;}" "$$tree_out"; \
+				sed "1{/^# Directory Tree (aria_nbv)$$/d;}" "$$tree_out"; \
 			else \
 				echo "(missing $$tree_out)"; \
 			fi; \
@@ -289,21 +289,21 @@ context-external: _check_python ## 🗺️ List classes with full docstrings
 	@echo "# Mermaid UML Diagram of the external/efm3d:\n\`\`\`{mermaid}"
 	@$(PYTHON_INTERPRETER) -m syrenka classdiagram external/efm3d/efm3d
 	@echo "\`\`\`\n---\n"
-	@$(PYTHON_INTERPRETER) oracle_rri/scripts/get_context.py classes --root external/efm3d/efm3d --full-doc
+	@$(PYTHON_INTERPRETER) aria_nbv/scripts/get_context.py classes --root external/efm3d/efm3d --full-doc
 
 	@echo "\n\n"
 
 	echo "# Mermaid UML Diagram of the external/ATEK:\n\`\`\`{mermaid}"
 	@$(PYTHON_INTERPRETER) -m syrenka classdiagram external/ATEK/atek
 	echo "\`\`\`\n---\n"
-	@$(PYTHON_INTERPRETER) oracle_rri/scripts/get_context.py classes --root external/ATEK/atek --full-doc
+	@$(PYTHON_INTERPRETER) aria_nbv/scripts/get_context.py classes --root external/ATEK/atek --full-doc
 
-context-dir-tree: _check_python ## 🗺️ Print directory tree for `oracle_rri/oracle_rri/` (ignore __pycache__)
+context-dir-tree: _check_python ## 🗺️ Print directory tree for `aria_nbv/aria_nbv/` (ignore __pycache__)
 	@$(MAKE) --no-print-directory _context_dir_tree_print
 
 _context_dir_tree_print:
-	@echo "Directory tree for oracle_rri/oracle_rri/:"
-	@bash -lc 'tree oracle_rri/oracle_rri/ -I "__pycache__"'
+	@echo "Directory tree for aria_nbv/aria_nbv/:"
+	@bash -lc 'tree aria_nbv/aria_nbv/ -I "__pycache__"'
 
 context-dir-tree-external: _check_python ## 🗺️ Print directory tree for `external/efm3d/efm3d` (ignore __pycache__)
 	@echo "Directory tree for external/efm3d/efm3d/:"
@@ -324,7 +324,7 @@ context-qmd-tree: ## 🗺️ Print docs/ .qmd structure (ignore __pycache__)
 .PHONY: vin-v2-arch
 VIN_V2_ARCH_ARGS ?=
 vin-v2-arch: _check_python ## 📊 Generate VIN v2 architecture DOT/SVG/PNG (+ VDX via --drawio)
-	@$(PYTHON_INTERPRETER) oracle_rri/scripts/generate_vin_v2_arch.py $(VIN_V2_ARCH_ARGS)
+	@$(PYTHON_INTERPRETER) aria_nbv/scripts/generate_vin_v2_arch.py $(VIN_V2_ARCH_ARGS)
 
 .PHONY: mmdc-render
 mmdc-render: ## 📊 Render all .mmd files in a folder (MMD_DIR=..., MMD_OUT=..., MMD_FORMAT=png|svg, MMD_SCALE=4)

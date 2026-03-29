@@ -167,11 +167,11 @@ class EvlBackboneOutput:
 class VinPrediction:
     """VIN predictions for a candidate set.
 
-    This is the primary output of :class:`oracle_rri.vin.model_v3.VinModelV3`.
+    This is the primary output of :class:`aria_nbv.vin.model_v3.VinModelV3`.
     It is consumed by the Lightning training loop (loss + metrics) and by
     downstream NBV selection (ranking candidates by predicted improvement).
 
-    Typical usage in training (see ``oracle_rri/lightning/lit_module.py``):
+    Typical usage in training (see ``aria_nbv/lightning/lit_module.py``):
         - ``logits`` / ``prob``: CORAL ordinal loss and optional auxiliary losses.
         - ``expected_normalized``: correlation/top-k metrics and candidate ranking proxy.
         - ``voxel_valid_frac`` / ``semidense_candidate_vis_frac``: optional scheduled

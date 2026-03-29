@@ -23,7 +23,7 @@ from ...vin.experimental.types import VinForwardDiagnostics
 from ...vin.types import EvlBackboneOutput
 
 if TYPE_CHECKING:
-    from oracle_rri.lightning.lit_module import VinLightningModule
+    from aria_nbv.lightning.lit_module import VinLightningModule
 
 
 DEFAULT_BACKBONE_KEEP_FIELDS: list[str] = [

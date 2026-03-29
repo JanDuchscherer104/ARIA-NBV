@@ -8,7 +8,7 @@ format:
 # Scope
 
 This page documents the current `VinModelV3` implementation in
-`oracle_rri/oracle_rri/vin/model_v3.py`. It focuses on the model that is
+`aria_nbv/aria_nbv/vin/model_v3.py`. It focuses on the model that is
 actually trained in the repo today: a frozen EVL backbone, explicit
 view-conditioned geometry cues, and a compact CORAL head for ordinal
 RRI prediction.
@@ -312,11 +312,11 @@ AdamW together with OneCycleLR.
   `docs/typst/slides/slides_4.typ`
 - Oracle label pipeline:
   [RRI computation](rri_computation.qmd) and
-  `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`
+  `aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py`
 - Current VIN implementation surface:
-  `oracle_rri/oracle_rri/vin/model_v3.py`,
-  `oracle_rri/oracle_rri/vin/types.py`,
-  `oracle_rri/oracle_rri/vin/backbone_evl.py`,
-  `oracle_rri/oracle_rri/lightning/lit_module.py`
+  `aria_nbv/aria_nbv/vin/model_v3.py`,
+  `aria_nbv/aria_nbv/vin/types.py`,
+  `aria_nbv/aria_nbv/vin/backbone_evl.py`,
+  `aria_nbv/aria_nbv/lightning/lit_module.py`
 - Related literature summary:
   [VIN-NBV](../literature/vin_nbv.qmd)

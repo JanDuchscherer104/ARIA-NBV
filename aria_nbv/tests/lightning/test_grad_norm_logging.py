@@ -8,7 +8,7 @@ import pytest
 import torch
 from torch import nn
 
-from oracle_rri.utils.grad_norms import (
+from aria_nbv.utils.grad_norms import (
     GradNormLoggingConfig,
     _collect_grad_norm_targets,
     _grad_norm_from_params,

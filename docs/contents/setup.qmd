@@ -14,7 +14,7 @@ format: html
 ## Installation via separate uv envirnoment
 
 ```bash
-cd oracle_rri
+cd aria_nbv
 # create conda environment for cuda toolkit 12.1
 conda create -f environment.yml
 conda activate aria-nbv
@@ -24,14 +24,14 @@ uv sync --extra dev --extra notebook --extra pytorch3d
 uv sync --all-extras
 ```
 
-This will install all dependencies and create a new python environment in `oracle_rri/.venv`.
+This will install all dependencies and create a new python environment in `aria_nbv/.venv`.
 
 ## Optional: xFormers (Linux only)
 
 EFM3D's DinoV2 attention utilities can optionally use [xFormers](https://github.com/facebookresearch/xformers) for memory-efficient attention / nested tensor support. Install it via:
 
 ```bash
-cd oracle_rri
+cd aria_nbv
 uv sync --extra xformers
 ```
 

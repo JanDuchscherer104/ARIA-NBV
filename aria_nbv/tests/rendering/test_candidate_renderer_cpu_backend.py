@@ -30,9 +30,9 @@ from efm3d.aria.aria_constants import (
     ARIA_POSE_TIME_NS,
 )
 
-from oracle_rri.data.efm_views import EfmSnippetView
-from oracle_rri.pose_generation.types import CandidateSamplingResult
-from oracle_rri.rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
+from aria_nbv.data.efm_views import EfmSnippetView
+from aria_nbv.pose_generation.types import CandidateSamplingResult
+from aria_nbv.rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
 
 
 def _make_camera(width: int = 16, height: int = 16) -> CameraTW:

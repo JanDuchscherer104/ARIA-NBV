@@ -64,7 +64,7 @@ def read_cache_index_entries(index_path: Path) -> list[OracleRriCacheEntry]:
         index_path: Path to ``index.jsonl`` / ``train_index.jsonl`` / ``val_index.jsonl``.
 
     Returns:
-        List of parsed :class:`~oracle_rri.data.offline_cache_types.OracleRriCacheEntry`.
+        List of parsed :class:`~aria_nbv.data.offline_cache_types.OracleRriCacheEntry`.
     """
     if not index_path.exists():
         return []
@@ -131,7 +131,7 @@ def scan_dataset_snippets(
     Args:
         tar_paths: Iterable of tar shard paths.
         snippet_key_filter: Optional filter tokens applied to sample keys. Matching uses
-            the same semantics as :class:`~oracle_rri.data.efm_dataset.AseEfmDataset`:
+            the same semantics as :class:`~aria_nbv.data.efm_dataset.AseEfmDataset`:
             ``key == token or key.endswith(token)`` for any token.
         progress_cb: Optional callback invoked as ``progress_cb(done, total)``.
 

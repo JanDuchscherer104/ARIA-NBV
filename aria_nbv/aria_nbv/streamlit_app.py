@@ -1,12 +1,12 @@
 """Streamlit entrypoint (refactored app).
 
 This is the default entrypoint used by the `nbv-st` console script.
-The legacy dashboard remains available via `oracle_rri.streamlit_app_old`.
+The legacy dashboard remains available via `aria_nbv.streamlit_app_old`.
 """
 
 from __future__ import annotations
 
-from oracle_rri.app import NbvStreamlitApp, NbvStreamlitAppConfig
+from aria_nbv.app import NbvStreamlitApp, NbvStreamlitAppConfig
 
 __all__ = ["NbvStreamlitApp", "NbvStreamlitAppConfig", "main", "streamlit_entry"]
 

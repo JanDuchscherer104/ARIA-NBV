@@ -42,8 +42,8 @@ if "e3nn" not in sys.modules:
     sys.modules["e3nn"] = e3nn
     sys.modules["e3nn.o3"] = o3
 
-from oracle_rri.lightning.lit_module import VinLightningModule
-import oracle_rri.lightning.lit_module as lit_module
+from aria_nbv.lightning.lit_module import VinLightningModule
+import aria_nbv.lightning.lit_module as lit_module
 
 
 class DummyExperiment:

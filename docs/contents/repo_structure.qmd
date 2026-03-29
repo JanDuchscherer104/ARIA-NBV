@@ -11,13 +11,13 @@ format: html
 # External Code & Notebooks
 
 ```text
-oracle_rri/                         # Project root (this repo)
+aria_nbv/                           # Package workspace
 ├── main.py                        # Builds default configs and diagnostics
 ├── examples/simplified_dataset_usage.py
 ├── scripts/
 │   ├── get_context.py             # AST-based symbol scanner (feeds docs)
 │   └── run_efm3d_on_ase.py        # Helper to invoke EVL on ASE shards
-├── oracle_rri/                    # Package code
+├── aria_nbv/                      # Package code
 │   ├── analysis/depth_debugger.py # Depth→mesh distance + stats
 │   ├── configs/path_config.py     # Filesystem paths + helpers
 │   ├── data/                      # Typed views and dataset helpers

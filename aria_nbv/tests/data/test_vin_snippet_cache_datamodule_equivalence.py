@@ -16,21 +16,21 @@ from typing import TYPE_CHECKING
 
 import pytest
 import torch
-from oracle_rri.configs import PathConfig
-from oracle_rri.data import VinSnippetView
-from oracle_rri.data.offline_cache import (
+from aria_nbv.configs import PathConfig
+from aria_nbv.data import VinSnippetView
+from aria_nbv.data.offline_cache import (
     OracleRriCacheConfig,
     OracleRriCacheDatasetConfig,
 )
-from oracle_rri.data.vin_oracle_datasets import VinOracleCacheDatasetConfig
-from oracle_rri.data.vin_oracle_types import VinOracleBatch
-from oracle_rri.data.vin_snippet_cache import (
+from aria_nbv.data.vin_oracle_datasets import VinOracleCacheDatasetConfig
+from aria_nbv.data.vin_oracle_types import VinOracleBatch
+from aria_nbv.data.vin_snippet_cache import (
     VIN_SNIPPET_PAD_POINTS,
     VinSnippetCacheConfig,
     VinSnippetCacheWriterConfig,
 )
-from oracle_rri.lightning.lit_datamodule import VinDataModuleConfig
-from oracle_rri.utils import Verbosity
+from aria_nbv.lightning.lit_datamodule import VinDataModuleConfig
+from aria_nbv.utils import Verbosity
 
 if TYPE_CHECKING:
     from pathlib import Path

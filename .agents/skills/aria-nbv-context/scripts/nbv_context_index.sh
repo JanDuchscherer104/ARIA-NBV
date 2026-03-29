@@ -57,7 +57,7 @@ typst_shared_count="$(count_files '*.typ' "${ROOT_DIR}/docs/typst/shared")"
 lit_tex_count="$(count_files '*.tex' "${ROOT_DIR}/literature")"
 lit_bib_count="$(count_files '*.bib' "${ROOT_DIR}/literature")"
 lit_family_count="$(count_immediate_dirs "${ROOT_DIR}/literature/tex-src")"
-py_count="$(count_files '*.py' "${ROOT_DIR}/oracle_rri/oracle_rri")"
+py_count="$(count_files '*.py' "${ROOT_DIR}/aria_nbv/aria_nbv")"
 ref_count="$(count_files '*.md' "${ROOT_DIR}/.agents/references")"
 memory_state_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/state")"
 memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")"
@@ -134,7 +134,7 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "## Heavy fallback only"
   echo "- Prefer specific targets when possible: \`make context-uml\`, \`make context-docstrings\`, \`make context-tree\`."
   echo "- Bundled fallback: \`make context-heavy\`."
-  echo "- Heavy artifacts: \`context_snapshot.md\`, \`oracle_rri_uml.mmd\`, \`oracle_rri_filtered_uml.mmd\`, \`oracle_rri_class_docstrings.md\`, \`oracle_rri_tree.md\`."
+  echo "- Heavy artifacts: \`context_snapshot.md\`, \`aria_nbv_uml.mmd\`, \`aria_nbv_filtered_uml.mmd\`, \`aria_nbv_class_docstrings.md\`, \`aria_nbv_tree.md\`."
   echo
   echo "## Search recipes (rg)"
   echo 'rg -n "<term>" .agents/memory/state'
@@ -143,7 +143,7 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo 'rg -n "<term>" docs/**/*.qmd'
   echo 'rg -n "<term>" docs/typst/**/*.typ'
   echo 'rg -n "<term>" literature/**/*.{tex,bib,sty}'
-  echo 'rg -n "<term>" oracle_rri/oracle_rri'
+  echo 'rg -n "<term>" aria_nbv/aria_nbv'
   echo 'rg -n "VinPrediction|EfmSnippetView|BaseConfig" docs/_generated/context/data_contracts.md'
 } > "$tmp"
 

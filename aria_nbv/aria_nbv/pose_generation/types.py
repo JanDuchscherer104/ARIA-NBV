@@ -137,7 +137,7 @@ class CandidateSamplingResult:
 
         poses_cam_ref = self.views.T_camera_rig  # camera<-reference
         if display_rotate:
-            from oracle_rri.utils import rotate_yaw_cw90
+            from aria_nbv.utils import rotate_yaw_cw90
 
             poses_cam_ref = rotate_yaw_cw90(poses_cam_ref)
 

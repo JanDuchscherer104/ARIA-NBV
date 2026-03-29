@@ -51,7 +51,7 @@ class TrainerCallbacksConfig(BaseConfig[list]):
 
     @property
     def target(self) -> type[list]:
-        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        """Factory target for :meth:`~aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return list
 
     use_model_checkpoint: bool = True

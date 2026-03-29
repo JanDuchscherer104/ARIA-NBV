@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import torch
-from oracle_rri.vin.pose_encoding import LearnableFourierFeaturesConfig
+from aria_nbv.vin.pose_encoding import LearnableFourierFeaturesConfig
 
 
 def test_lff_wr_init_uses_gamma_scaling() -> None:

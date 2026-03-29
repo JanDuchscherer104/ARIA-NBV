@@ -1,4 +1,4 @@
-"""Extract lightweight AST-based context for the ``oracle_rri`` package.
+"""Extract lightweight AST-based context for the ``aria_nbv`` package.
 
 Modes
 -----
@@ -385,7 +385,7 @@ def print_matches(mods: list[ModuleInfo], query: str, root: Path, max_doc: int) 
 
 
 def main(argv: Iterable[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Extract oracle_rri source context (AST-based)")
+    parser = argparse.ArgumentParser(description="Extract aria_nbv source context (AST-based)")
     parser.add_argument(
         "mode",
         choices=["modules", "packages", "classes", "functions", "contracts", "match"],
@@ -394,7 +394,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser.add_argument("query", nargs="?", help="Query substring for match mode")
     parser.add_argument(
         "--root",
-        default=str(Path(__file__).resolve().parents[1] / "oracle_rri"),
+        default=str(Path(__file__).resolve().parents[1] / "aria_nbv"),
         help="Root package directory",
     )
     parser.add_argument("--max-doc", type=int, default=240, help="Max characters for doc summaries")

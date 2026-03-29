@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from oracle_rri.configs import wandb_config
+from aria_nbv.configs import wandb_config
 
 if TYPE_CHECKING:
     import pytest

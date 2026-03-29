@@ -14,9 +14,9 @@ from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 from torch.utils.data import DataLoader
 
-from oracle_rri.configs import PathConfig
-from oracle_rri.data.efm_dataset import AseEfmDataset, AseEfmDatasetConfig
-from oracle_rri.data.efm_views import EfmCameraView, EfmSnippetView
+from aria_nbv.configs import PathConfig
+from aria_nbv.data.efm_dataset import AseEfmDataset, AseEfmDatasetConfig
+from aria_nbv.data.efm_views import EfmCameraView, EfmSnippetView
 
 def _paths(tmp_path: Path) -> PathConfig:
     """Create an isolated PathConfig rooted at tmp_path."""

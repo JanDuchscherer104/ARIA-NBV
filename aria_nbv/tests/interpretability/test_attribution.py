@@ -3,7 +3,7 @@
 # ruff: noqa: S101, SLF001
 
 import torch
-from oracle_rri.interpretability.attribution import (
+from aria_nbv.interpretability.attribution import (
     AttributionEngine,
     AttributionMethod,
     InterpretabilityConfig,

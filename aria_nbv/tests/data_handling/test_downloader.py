@@ -5,10 +5,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from oracle_rri.data.downloader import ASEDownloader, ASEDownloaderConfig
-from oracle_rri.utils import Console, Verbosity
+from aria_nbv.data.downloader import ASEDownloader, ASEDownloaderConfig
+from aria_nbv.utils import Console, Verbosity
 
-pytest.skip("Downloader API deprecated for current oracle_rri; skipping.", allow_module_level=True)
+pytest.skip("Downloader API deprecated for current aria_nbv; skipping.", allow_module_level=True)
 
 
 class TestASEDownloaderConfig:
@@ -100,7 +100,7 @@ class TestASEDownloader:
         assert len(downloader.metadata.scenes) > 0
         assert downloader.mesh_dir.exists()
 
-    @patch("oracle_rri.data.downloader.requests.get")
+    @patch("aria_nbv.data.downloader.requests.get")
     def test_download_single_mesh(
         self,
         mock_get: MagicMock,

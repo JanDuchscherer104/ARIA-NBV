@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import pytest
-from oracle_rri.data.vin_oracle_datasets import (
+from aria_nbv.data.vin_oracle_datasets import (
     VinOracleCacheDatasetConfig,
     VinOracleOnlineDatasetConfig,
 )
-from oracle_rri.lightning.lit_datamodule import VinDataModuleConfig
+from aria_nbv.lightning.lit_datamodule import VinDataModuleConfig
 
 
 def test_source_online_requires_single_worker() -> None:

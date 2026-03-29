@@ -1,10 +1,10 @@
-"""Shared pytest fixtures for oracle_rri test suite."""
+"""Shared pytest fixtures for the aria_nbv test suite."""
 
 from __future__ import annotations
 
 import pytest
 
-from oracle_rri.configs import PathConfig
+from aria_nbv.configs import PathConfig
 
 
 @pytest.fixture(autouse=True)

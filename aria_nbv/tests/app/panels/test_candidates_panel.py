@@ -4,7 +4,7 @@
 
 import torch
 from efm3d.aria.pose import PoseTW
-from oracle_rri.app.panels import candidates as candidates_panel
+from aria_nbv.app.panels import candidates as candidates_panel
 
 ORTHO_TOL = 1e-6
 ORTHO_ERR = 1e-3

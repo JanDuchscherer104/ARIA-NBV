@@ -4,7 +4,7 @@ from enum import Enum
 
 import pytest
 
-from oracle_rri.utils.optuna_optimizable import Optimizable
+from aria_nbv.utils.optuna_optimizable import Optimizable
 
 
 def test_categorical_single_choice_is_treated_as_fixed() -> None:

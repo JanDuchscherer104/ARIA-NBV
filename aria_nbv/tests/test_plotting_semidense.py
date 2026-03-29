@@ -3,7 +3,7 @@
 import numpy as np
 import torch
 
-from oracle_rri.data import EfmPointsView, plotting
+from aria_nbv.data import EfmPointsView, plotting
 
 
 def test_semidense_points_respects_lengths_and_filters_nan() -> None:

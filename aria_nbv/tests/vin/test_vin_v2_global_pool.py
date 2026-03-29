@@ -3,8 +3,8 @@
 # ruff: noqa: S101
 
 import torch
-from oracle_rri.vin.pose_encoding import LearnableFourierFeaturesConfig
-from oracle_rri.vin.vin_modules import PoseConditionedGlobalPool
+from aria_nbv.vin.pose_encoding import LearnableFourierFeaturesConfig
+from aria_nbv.vin.vin_modules import PoseConditionedGlobalPool
 from torch import nn
 
 

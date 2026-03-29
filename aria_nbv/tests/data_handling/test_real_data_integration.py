@@ -10,8 +10,8 @@ import torch
 from efm3d.utils.depth import dist_im_to_point_cloud_im
 from efm3d.utils.mesh_utils import compute_pts_to_mesh_dist
 
-from oracle_rri.data import AseEfmDataset, AseEfmDatasetConfig
-from oracle_rri.utils import Console
+from aria_nbv.data import AseEfmDataset, AseEfmDatasetConfig
+from aria_nbv.utils import Console
 
 
 def _find_first_scene_with_data() -> tuple[str, Path, Path] | None:

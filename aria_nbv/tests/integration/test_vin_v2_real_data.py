@@ -7,11 +7,11 @@ import torch
 from efm3d.aria.pose import PoseTW
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 
-from oracle_rri.configs import PathConfig
-from oracle_rri.data import AseEfmDatasetConfig
-from oracle_rri.utils import Verbosity
-from oracle_rri.vin import EvlBackboneConfig
-from oracle_rri.vin.experimental.model_v2 import VinModelV2Config
+from aria_nbv.configs import PathConfig
+from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.utils import Verbosity
+from aria_nbv.vin import EvlBackboneConfig
+from aria_nbv.vin.experimental.model_v2 import VinModelV2Config
 
 
 def _find_first_scene_with_shards() -> str | None:

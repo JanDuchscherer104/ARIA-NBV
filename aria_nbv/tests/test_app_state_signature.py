@@ -1,10 +1,10 @@
 import torch
 
-from oracle_rri.app.state import config_signature
-from oracle_rri.data import AseEfmDatasetConfig
-from oracle_rri.pipelines import OracleRriLabelerConfig
-from oracle_rri.pose_generation import CandidateViewGeneratorConfig
-from oracle_rri.rendering import CandidateDepthRendererConfig
+from aria_nbv.app.state import config_signature
+from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.pipelines import OracleRriLabelerConfig
+from aria_nbv.pose_generation import CandidateViewGeneratorConfig
+from aria_nbv.rendering import CandidateDepthRendererConfig
 
 
 def test_config_signature_handles_torch_and_enums() -> None:

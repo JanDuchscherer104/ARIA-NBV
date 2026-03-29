@@ -6,8 +6,8 @@ ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../../../../" && pwd)"
 
 PYTHON="${PYTHON:-}"
 if [[ -z "$PYTHON" ]]; then
-  if [[ -x "${ROOT_DIR}/oracle_rri/.venv/bin/python" ]]; then
-    PYTHON="${ROOT_DIR}/oracle_rri/.venv/bin/python"
+  if [[ -x "${ROOT_DIR}/aria_nbv/.venv/bin/python" ]]; then
+    PYTHON="${ROOT_DIR}/aria_nbv/.venv/bin/python"
   else
     PYTHON="python"
   fi

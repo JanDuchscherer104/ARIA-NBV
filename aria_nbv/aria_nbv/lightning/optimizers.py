@@ -16,7 +16,7 @@ class AdamWConfig(BaseConfig[Optimizer]):
 
     @property
     def target(self) -> type[Optimizer]:
-        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        """Factory target for :meth:`~aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return AdamW
 
     learning_rate: float = optimizable_field(
@@ -55,7 +55,7 @@ class ReduceLrOnPlateauConfig(BaseConfig[ReduceLROnPlateau]):
 
     @property
     def target(self) -> type[ReduceLROnPlateau]:
-        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        """Factory target for :meth:`~aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return ReduceLROnPlateau
 
     mode: Literal["min", "max"] = "min"

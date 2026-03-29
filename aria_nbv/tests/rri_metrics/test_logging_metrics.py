@@ -39,7 +39,7 @@ if "e3nn" not in sys.modules:
     sys.modules["e3nn"] = e3nn
     sys.modules["e3nn.o3"] = o3
 
-from oracle_rri.rri_metrics.logging import (
+from aria_nbv.rri_metrics.logging import (
     LabelHistogram,
     Loss,
     Metric,
@@ -49,7 +49,7 @@ from oracle_rri.rri_metrics.logging import (
     metric_key,
     topk_accuracy_from_probs,
 )
-from oracle_rri.utils import Stage
+from aria_nbv.utils import Stage
 
 
 def test_label_histogram_counts() -> None:

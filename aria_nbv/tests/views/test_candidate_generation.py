@@ -1,7 +1,7 @@
 """Functional tests for candidate view generation (legacy).
 
 This module is kept for reference but the implementation it targets has been
-superseded. If the original `oracle_rri.views.candidate_generation` module is
+superseded. If the original `aria_nbv.views.candidate_generation` module is
 unavailable, the entire module is skipped.
 """
 
@@ -15,7 +15,7 @@ import trimesh
 
 
 try:
-    from oracle_rri.views.candidate_generation import (
+    from aria_nbv.views.candidate_generation import (
         CandidateViewGenerator,
         CandidateViewGeneratorConfig,
     )

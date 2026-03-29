@@ -3,7 +3,7 @@
 Use this file for practical operator aids that do not belong in canonical project state.
 
 ## Environment Recovery
-- Preferred interpreter: `oracle_rri/.venv/bin/python`
+- Preferred interpreter: `aria_nbv/.venv/bin/python`
 - If the venv is missing or stale, rebuild it with:
 
 ```bash
@@ -13,7 +13,7 @@ UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync --extra dev --
 - Verify the interpreter before diagnosing dependency issues:
 
 ```bash
-oracle_rri/.venv/bin/python --version
+aria_nbv/.venv/bin/python --version
 uv run python --version
 ```
 

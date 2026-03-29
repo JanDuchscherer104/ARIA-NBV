@@ -201,14 +201,14 @@ In short: this is a *principled ordinal-to-regression bridge*, not a hack.
 
 ## 9. Implementation details (NBV codebase)
 
-### Core utilities (`oracle_rri/oracle_rri/rri_metrics/coral.py`)
+### Core utilities (`aria_nbv/aria_nbv/rri_metrics/coral.py`)
 
 We implement monotone bin representatives in `MonotoneBinValues` and wire them
 into `CoralLayer` so the expected value can be computed **directly** from CORAL
 marginals:
 
 ```python
-from oracle_rri.rri_metrics.coral import CoralLayer, coral_logits_to_prob
+from aria_nbv.rri_metrics.coral import CoralLayer, coral_logits_to_prob
 
 logits = head_coral(feats)               # (..., K-1)
 probs = coral_logits_to_prob(logits)     # (..., K)
@@ -222,7 +222,7 @@ midpoints and optionally regularized with:
 u_reg = head_coral.bin_value_regularizer(target_values)
 ```
 
-### Initialization hook (`oracle_rri/oracle_rri/vin/experimental/model_v2.py`)
+### Initialization hook (`aria_nbv/aria_nbv/vin/experimental/model_v2.py`)
 
 `VinModelV2` exposes a lightweight hook to initialize the CORAL bin values:
 
@@ -231,7 +231,7 @@ model = VinModelV2(...)
 model.init_bin_values(bin_means)  # Tensor[K]
 ```
 
-### Fitting + training integration (`oracle_rri/oracle_rri/lightning/lit_module.py`)
+### Fitting + training integration (`aria_nbv/aria_nbv/lightning/lit_module.py`)
 
 After loading the fitted `RriOrdinalBinner`, the Lightning module calls
 `_maybe_init_bin_values()` to seed `u_k` from `bin_means` (or midpoints if
@@ -262,7 +262,7 @@ high-impact practical fixes.
 
 ### 10.1 Why the auxiliary loss drops so fast
 
-In `oracle_rri/oracle_rri/lightning/lit_module.py`, the combined objective is
+In `aria_nbv/aria_nbv/lightning/lit_module.py`, the combined objective is
 currently implemented as:
 
 ```python

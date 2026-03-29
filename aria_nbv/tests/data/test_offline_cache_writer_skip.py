@@ -12,7 +12,7 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from oracle_rri.data.offline_cache_types import OracleRriCacheEntry
+    from aria_nbv.data.offline_cache_types import OracleRriCacheEntry
 
 
 @dataclass(slots=True)
@@ -30,9 +30,9 @@ def test_cache_writer_skips_existing_entries(
     """Skip samples that already exist in the cache index."""
     if importlib.util.find_spec("power_spherical") is None:
         pytest.skip("Missing power_spherical dependency")
-    offline_mod = importlib.import_module("oracle_rri.data.offline_cache")
-    labeler_mod = importlib.import_module("oracle_rri.pipelines.oracle_rri_labeler")
-    utils_mod = importlib.import_module("oracle_rri.utils")
+    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
+    labeler_mod = importlib.import_module("aria_nbv.pipelines.oracle_rri_labeler")
+    utils_mod = importlib.import_module("aria_nbv.utils")
 
     dataset = [
         DummySample("scene_1", "snippet_1"),

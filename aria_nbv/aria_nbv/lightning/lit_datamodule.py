@@ -1,6 +1,6 @@
 """LightningDataModule for VIN training with online or cached oracle labels.
 
-The training data-flow mirrors `oracle_rri/scripts/train_vin.py`:
+The training data-flow mirrors `aria_nbv/scripts/train_vin.py`:
 
 EFM snippet → candidate generation → depth rendering → backprojection → oracle RRI → VIN (CORAL).
 

@@ -24,9 +24,9 @@ sys.path.append(str(Path(__file__).resolve().parents[3] / "external" / "efm3d"))
 
 from efm3d.aria import CameraTW, PoseTW  # noqa: E402
 
-from oracle_rri.rendering.candidate_pointclouds import _backproject_depths_p3d_batch  # noqa: E402
-from oracle_rri.rendering.pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig  # noqa: E402
-from oracle_rri.rendering.unproject import backproject_depth_with_p3d  # noqa: E402
+from aria_nbv.rendering.candidate_pointclouds import _backproject_depths_p3d_batch  # noqa: E402
+from aria_nbv.rendering.pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig  # noqa: E402
+from aria_nbv.rendering.unproject import backproject_depth_with_p3d  # noqa: E402
 
 
 def test_p3d_world_to_view_matches_pose_inverse_transform() -> None:

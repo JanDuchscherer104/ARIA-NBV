@@ -6,10 +6,10 @@ import pytorch_lightning as pl
 import torch
 from pytest import MonkeyPatch
 
-from oracle_rri.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
-from oracle_rri.lightning.lit_module import VinLightningModule, VinLightningModuleConfig
-from oracle_rri.utils import Console
-from oracle_rri.vin.model_v3 import VinModelV3Config
+from aria_nbv.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
+from aria_nbv.lightning.lit_module import VinLightningModule, VinLightningModuleConfig
+from aria_nbv.utils import Console
+from aria_nbv.vin.model_v3 import VinModelV3Config
 
 
 def _write_checkpoint(

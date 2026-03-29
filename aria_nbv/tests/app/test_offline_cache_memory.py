@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
-from oracle_rri.app.panels.offline_cache_utils import _estimate_nbytes, _p3d_cameras_nbytes
+from aria_nbv.app.panels.offline_cache_utils import _estimate_nbytes, _p3d_cameras_nbytes
 
 
 def test_estimate_nbytes_tensor() -> None:

@@ -11,7 +11,7 @@ Notes:
       pinned dataset snippet (scene + sample key filter).
 
 Example:
-    `uv run python oracle_rri/scripts/export_paper_figures.py \\
+    `uv run python aria_nbv/scripts/export_paper_figures.py \\
       --config-path .configs/paper_figures_oracle_labeler.toml \\
       --output-dir docs/figures/app \\
       --overwrite`
@@ -28,11 +28,11 @@ from plotly.subplots import make_subplots  # type: ignore[import]
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from oracle_rri.data import AseEfmDatasetConfig
-from oracle_rri.pipelines import OracleRriLabelerConfig
-from oracle_rri.pose_generation.plotting import CandidatePlotBuilder
-from oracle_rri.rendering.plotting import depth_grid
-from oracle_rri.utils import BaseConfig, Console
+from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.pipelines import OracleRriLabelerConfig
+from aria_nbv.pose_generation.plotting import CandidatePlotBuilder
+from aria_nbv.rendering.plotting import depth_grid
+from aria_nbv.utils import BaseConfig, Console
 
 
 def _extract_config_path(argv: list[str]) -> Path | None:

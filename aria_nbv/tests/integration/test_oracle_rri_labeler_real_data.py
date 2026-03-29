@@ -16,14 +16,14 @@ else:  # pragma: no cover - availability guard
 
 import pytest  # isort: split
 
-from oracle_rri.configs import PathConfig
-from oracle_rri.data import AseEfmDatasetConfig
-from oracle_rri.pipelines import OracleRriLabelerConfig
-from oracle_rri.pose_generation import CandidateViewGeneratorConfig
-from oracle_rri.pose_generation.types import ViewDirectionMode
-from oracle_rri.rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
-from oracle_rri.rri_metrics.oracle_rri import OracleRRIConfig
-from oracle_rri.utils import Verbosity
+from aria_nbv.configs import PathConfig
+from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.pipelines import OracleRriLabelerConfig
+from aria_nbv.pose_generation import CandidateViewGeneratorConfig
+from aria_nbv.pose_generation.types import ViewDirectionMode
+from aria_nbv.rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
+from aria_nbv.rri_metrics.oracle_rri import OracleRRIConfig
+from aria_nbv.utils import Verbosity
 
 
 def _skip_if_missing_data() -> None:

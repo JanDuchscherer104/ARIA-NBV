@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oracle_rri.configs import PathConfig
-from oracle_rri.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
+from aria_nbv.configs import PathConfig
+from aria_nbv.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 
 
 class DummyTrainer:

@@ -1,7 +1,7 @@
 """Unit tests for camera orientation jitter logic.
 
 These tests validate the *local* view-jitter controls in
-:class:`oracle_rri.pose_generation.orientations.OrientationBuilder`.
+:class:`aria_nbv.pose_generation.orientations.OrientationBuilder`.
 """
 
 # ruff: noqa: S101, D103, SLF001
@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import torch
 from efm3d.aria.pose import PoseTW
-from oracle_rri.pose_generation import orientations as orientations_module
-from oracle_rri.pose_generation.candidate_generation import CandidateViewGeneratorConfig
-from oracle_rri.pose_generation.orientations import OrientationBuilder
-from oracle_rri.pose_generation.types import ViewDirectionMode
+from aria_nbv.pose_generation import orientations as orientations_module
+from aria_nbv.pose_generation.candidate_generation import CandidateViewGeneratorConfig
+from aria_nbv.pose_generation.orientations import OrientationBuilder
+from aria_nbv.pose_generation.types import ViewDirectionMode
 
 
 def _ref_pose() -> PoseTW:

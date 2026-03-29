@@ -1,6 +1,6 @@
 """LightningModule for training VIN (View Introspection Network).
 
-This module implements the same core logic as `oracle_rri/scripts/train_vin.py`,
+This module implements the same core logic as `aria_nbv/scripts/train_vin.py`,
 but with PyTorch Lightning training loops and optional W&B logging via the
 trainer factory.
 """
@@ -44,7 +44,7 @@ class AdamWConfig(BaseConfig[Optimizer]):
 
     @property
     def target(self) -> type[Optimizer]:
-        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        """Factory target for :meth:`~aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return AdamW
 
     learning_rate: float = optimizable_field(
@@ -82,7 +82,7 @@ class ReduceLrOnPlateauConfig(BaseConfig[ReduceLROnPlateau]):
 
     @property
     def target(self) -> type[ReduceLROnPlateau]:
-        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        """Factory target for :meth:`~aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return ReduceLROnPlateau
 
     patience: int = 2
@@ -138,7 +138,7 @@ class OneCycleSchedulerConfig(BaseConfig[OneCycleLR]):
 
     @property
     def target(self) -> type[OneCycleLR]:
-        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        """Factory target for :meth:`~aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return OneCycleLR
 
     max_lr: float | None = None

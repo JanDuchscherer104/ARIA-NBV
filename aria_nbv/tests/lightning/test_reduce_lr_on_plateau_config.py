@@ -19,21 +19,21 @@ COOLDOWN_STEPS = 2
 
 def _load_optimizers_module() -> types.ModuleType:
     root = Path(__file__).resolve().parents[2]
-    pkg_root = root / "oracle_rri"
+    pkg_root = root / "aria_nbv"
     lightning_root = pkg_root / "lightning"
     module_path = lightning_root / "optimizers.py"
 
-    if "oracle_rri" not in sys.modules:
-        pkg = types.ModuleType("oracle_rri")
+    if "aria_nbv" not in sys.modules:
+        pkg = types.ModuleType("aria_nbv")
         pkg.__path__ = [str(pkg_root)]
-        sys.modules["oracle_rri"] = pkg
-    if "oracle_rri.lightning" not in sys.modules:
-        subpkg = types.ModuleType("oracle_rri.lightning")
+        sys.modules["aria_nbv"] = pkg
+    if "aria_nbv.lightning" not in sys.modules:
+        subpkg = types.ModuleType("aria_nbv.lightning")
         subpkg.__path__ = [str(lightning_root)]
-        sys.modules["oracle_rri.lightning"] = subpkg
+        sys.modules["aria_nbv.lightning"] = subpkg
 
     spec = importlib.util.spec_from_file_location(
-        "oracle_rri.lightning.optimizers",
+        "aria_nbv.lightning.optimizers",
         module_path,
     )
     if spec is None or spec.loader is None:

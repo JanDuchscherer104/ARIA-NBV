@@ -1,7 +1,7 @@
 """Streamlit application (refactored).
 
 This package contains the revised Streamlit UI that replaces the older
-`oracle_rri.dashboard` implementation. The app is intentionally split into:
+`aria_nbv.dashboard` implementation. The app is intentionally split into:
 
 - **state**: strongly typed session state + cache entries
 - **controller**: pipeline orchestration (data → candidates → renders → RRI)
@@ -18,7 +18,7 @@ __all__ = ["NbvStreamlitApp", "NbvStreamlitAppConfig"]
 def __getattr__(name: str) -> Any:
     """Lazily import Streamlit-heavy modules.
 
-    This keeps `oracle_rri.app.controller` and other non-UI helpers importable in
+    This keeps `aria_nbv.app.controller` and other non-UI helpers importable in
     environments where Streamlit isn't installed.
     """
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from oracle_rri import DatasetFactory, OracleConfig, OracleRRIService
+from aria_nbv import DatasetFactory, OracleConfig, OracleRRIService
 
 
 def main() -> None:

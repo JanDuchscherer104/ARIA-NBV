@@ -68,7 +68,7 @@ from pytorch3d.renderer.cameras import (  # type: ignore[import-untyped]
 from torch import Tensor, nn
 from torch.nn import functional as functional
 
-from oracle_rri.utils.frames import rotate_yaw_cw90
+from aria_nbv.utils.frames import rotate_yaw_cw90
 
 from ..data.efm_views import EfmSnippetView, VinSnippetView
 from ..data.vin_snippet_utils import build_vin_snippet_view
@@ -94,7 +94,7 @@ from .vin_utils import (
 )
 
 if TYPE_CHECKING:
-    from oracle_rri.data.vin_oracle_types import VinOracleBatch
+    from aria_nbv.data.vin_oracle_types import VinOracleBatch
 
     from .pose_encoding import LearnableFourierFeatures
 

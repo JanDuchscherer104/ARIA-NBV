@@ -31,11 +31,11 @@ class ASEDownloaderConfig(BaseConfig["ASEDownloader"]):
         2. List mode: List available scenes
 
     Example (CLI - Download):
-        $ python -m oracle_rri.data.downloader download --n_scenes=5 --max_shards=2
-        $ python -m oracle_rri.data.downloader download --ns=10 --skip_meshes
+        $ python -m aria_nbv.data.downloader download --n_scenes=5 --max_shards=2
+        $ python -m aria_nbv.data.downloader download --ns=10 --skip_meshes
 
     Example (CLI - List):
-        $ python -m oracle_rri.data.downloader list --n=10
+        $ python -m aria_nbv.data.downloader list --n=10
     """
 
     @property
@@ -397,8 +397,8 @@ def cli_download(config: ASEDownloaderConfig | None = None) -> None:
     """CLI entry point for downloading scenes.
 
     Usage:
-        python -m oracle_rri.data.downloader download --n_scenes=5 --max_shards=2
-        python -m oracle_rri.data.downloader download --ns=10 --skip_meshes
+        python -m aria_nbv.data.downloader download --n_scenes=5 --max_shards=2
+        python -m aria_nbv.data.downloader download --ns=10 --skip_meshes
     """
     config = config or ASEDownloaderConfig()
     console = Console.with_prefix("DownloaderCLI").set_verbosity(config.verbosity).set_debug(config.is_debug)
@@ -468,8 +468,8 @@ def cli_list(config: ASEDownloaderConfig, n: int | None = None) -> None:
         n: Number of scenes to list (None = all)
 
     Usage:
-        python -m oracle_rri.data.downloader list
-        python -m oracle_rri.data.downloader list --n=10
+        python -m aria_nbv.data.downloader list
+        python -m aria_nbv.data.downloader list --n=10
     """
     console = Console.with_prefix("DownloaderCLI").set_verbosity(config.verbosity).set_debug(config.is_debug)
     downloader = config.setup_target()

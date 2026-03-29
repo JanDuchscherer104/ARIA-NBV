@@ -22,7 +22,7 @@ This folder contains **flowchart-style** architecture diagrams for the **oracle 
   - `docs/diagrams/oracle_rri/mermaid/candidate_generation.mmd` (includes `positional_sampling.py`, `orientations.py`, `candidate_generation_rules.py`)
   - `docs/diagrams/oracle_rri/mermaid/candidate_depth_renderer.mmd`
   - `docs/diagrams/oracle_rri/mermaid/candidate_pointclouds.mmd`
-  - `docs/diagrams/oracle_rri/mermaid/oracle_rri.mmd`
+  - `docs/diagrams/oracle_rri/mermaid/aria_nbv.mmd`
 
 ## Render Mermaid diagrams
 

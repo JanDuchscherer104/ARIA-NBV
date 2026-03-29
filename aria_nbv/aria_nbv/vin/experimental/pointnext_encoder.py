@@ -9,7 +9,7 @@ import torch
 from pydantic import Field, field_validator
 from torch import Tensor, nn
 
-from oracle_rri.configs.path_config import PathConfig
+from aria_nbv.configs.path_config import PathConfig
 
 from ...utils import BaseConfig, Optimizable, optimizable_field
 
@@ -60,7 +60,7 @@ class PointNeXtSEncoderConfig(BaseConfig["PointNeXtSEncoder"]):
 
     @property
     def target(self) -> type["PointNeXtSEncoder"]:
-        """Factory target for :meth:`~oracle_rri.utils.base_config.BaseConfig.setup_target`."""
+        """Factory target for :meth:`~aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return PointNeXtSEncoder
 
     cfg_path: Path = Field(default_factory=lambda: Path("PointNeXt/cfgs/s3dis/pointnext-s.yaml"))  #

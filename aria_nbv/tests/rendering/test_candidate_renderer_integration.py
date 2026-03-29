@@ -17,11 +17,11 @@ else:  # pragma: no cover - availability guard
 from efm3d.aria import CameraTW, PoseTW  # noqa: E402
 from efm3d.aria.aria_constants import ARIA_CALIB, ARIA_IMG  # noqa: E402
 
-from oracle_rri.configs import PathConfig  # noqa: E402
-from oracle_rri.data import AseEfmDatasetConfig  # noqa: E402
-from oracle_rri.data.efm_views import EfmSnippetView  # noqa: E402
-from oracle_rri.pose_generation.types import CandidateSamplingResult  # noqa: E402
-from oracle_rri.rendering import (  # noqa: E402
+from aria_nbv.configs import PathConfig  # noqa: E402
+from aria_nbv.data import AseEfmDatasetConfig  # noqa: E402
+from aria_nbv.data.efm_views import EfmSnippetView  # noqa: E402
+from aria_nbv.pose_generation.types import CandidateSamplingResult  # noqa: E402
+from aria_nbv.rendering import (  # noqa: E402
     CandidateDepthRendererConfig,
     Pytorch3DDepthRendererConfig,
 )

@@ -76,7 +76,7 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 
 ### Lightning
 
-- [ ] Add `torchmetrics.Accuracy` to the LitModule (oracle_rri/oracle_rri/lightning/lit_module.py)
+- [ ] Add `torchmetrics.Accuracy` to the LitModule (aria_nbv/aria_nbv/lightning/lit_module.py)
 - [ ] What other metrics should we log?
 
 ### DatamModule
@@ -90,14 +90,14 @@ This page consolidates all open tasks, questions, and references for the ASE/ATE
 
     > **Done**: Just crop the mesh to a bounding box that contains both the semi-dense SLAM PC and all candidate PCs.
 
-- [ ] Provide theory and conceptual brakedown of `oracle_rri/oracle_rri/rri_metrics/metrics.py`::`chamfer_point_mesh_batched` in `docs/typst/slides/slides_3.typ`. The current contents of the file serves as a template - it was copied from `slides_2.typ` which was our second presentation. Maintain the general style. And use `get-library-docs "/websites/typst_app"` to retrieve typst documentation for the different commands that you might need.
-  - [ ] Provide formulas for the different loss components that we use in ``oracle_rri/oracle_rri/rri_metrics/metrics.py``::`chamfer_point_mesh_batched`.
+- [ ] Provide theory and conceptual brakedown of `aria_nbv/aria_nbv/rri_metrics/metrics.py`::`chamfer_point_mesh_batched` in `docs/typst/slides/slides_3.typ`. The current contents of the file serves as a template - it was copied from `slides_2.typ` which was our second presentation. Maintain the general style. And use `get-library-docs "/websites/typst_app"` to retrieve typst documentation for the different commands that you might need.
+  - [ ] Provide formulas for the different loss components that we use in ``aria_nbv/aria_nbv/rri_metrics/metrics.py``::`chamfer_point_mesh_batched`.
 
 # Candidate View Generation & Sampling
 
 ## Current status
 
-- Candidate center sampling (azimuth/elevation/radius caps) and rule-based pruning are implemented in `oracle_rri/oracle_rri/pose_generation/`.
+- Candidate center sampling (azimuth/elevation/radius caps) and rule-based pruning are implemented in `aria_nbv/aria_nbv/pose_generation/`.
 - [x] `align_to_gravity=True` stabilises the sampling shell when the reference pose has strong roll/pitch.
 
   > **Done**: `CandidateViewGeneratorConfig.align_to_gravity` uses a gravity-aligned sampling pose (yaw preserved, pitch/roll removed).
@@ -159,7 +159,7 @@ The candidate frusta diagram is now consistent with the physical pipeline (no ex
 
 **Previous Considerations:**
 
-- Implement `CandidateViewGenerator` and auxiliary modules in `oracle_rri/oracle_rri/pose_generation` that generate `N` candidate SE(3) poses (roll-free base orientation) around the latest camera position in the trajectory. Must generate poses of type `PoseTW` (`external/efm3d/efm3d/aria/pose.py`).
+- Implement `CandidateViewGenerator` and auxiliary modules in `aria_nbv/aria_nbv/pose_generation` that generate `N` candidate SE(3) poses (roll-free base orientation) around the latest camera position in the trajectory. Must generate poses of type `PoseTW` (`external/efm3d/efm3d/aria/pose.py`).
   - Strategies: uniform over half-sphere with min/max radius & elevation, free-space only, room-bounded (SSL for train, occupancy for eval).
   - Collision check: segment from last pose to candidate must not intersect mesh/voxels.
   - Modular strategy selection via enums/config that allows easy extension and combination of strategies / sampling rules.
@@ -177,7 +177,7 @@ The PositionalSampling now works as expected and I tried fixing the directional 
 
 # Rasterized Rendering to Generate Candidate Point Clouds
 
-- We now implement candidate rendering + backprojection fully in `oracle_rri/oracle_rri/rendering`:
+- We now implement candidate rendering + backprojection fully in `aria_nbv/aria_nbv/rendering`:
   - `CandidateDepthRenderer` (PyTorch3D rasteriser) renders metric z-depth maps from the GT mesh for candidate poses.
   - `build_candidate_pointclouds` (`CandidatePointClouds`) backprojects depths into world-frame point clouds and fuses them with the semi-dense SLAM point cloud.
 
@@ -200,7 +200,7 @@ The `CandidateDepthRenderer.render(...)` yields a `CandidateDepths` dataclass:
 - [x] Depth histograms no longer mislead (miss pixels are masked via `depths_valid_mask`).
 - [x] Reference axes in the frusta plot match the Aria UI convention (`rotate_yaw_cw90` applied for display only).
 - [x] Implement `DepthToPointCloud` module: for each candidate pose's depth map, backproject to point cloud $\mathcal{P}_{\mathbf{q}}$ in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC $\mathcal{P}_t$ with candidate-view PC $\mathcal{P}_{\mathbf{q}}$ → $\mathcal{P}_{t \cup \mathbf{q}}$.
-- [x] Backprojection implementation: `oracle_rri/oracle_rri/rendering/candidate_pointclouds.py`::{`build_candidate_pointclouds`, `_backproject_depths_p3d_batch`} and `oracle_rri/oracle_rri/rendering/unproject.py`::`backproject_depth_with_p3d`.
+- [x] Backprojection implementation: `aria_nbv/aria_nbv/rendering/candidate_pointclouds.py`::{`build_candidate_pointclouds`, `_backproject_depths_p3d_batch`} and `aria_nbv/aria_nbv/rendering/unproject.py`::`backproject_depth_with_p3d`.
 
 ## Previously observed issues
 
@@ -282,14 +282,14 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
 
 **Current implementation (refactored app):**
 
-- Entrypoint: `uv run nbv-st` → `oracle_rri/oracle_rri/streamlit_app.py`
-- Package: `oracle_rri/oracle_rri/app/`
+- Entrypoint: `uv run nbv-st` → `aria_nbv/aria_nbv/streamlit_app.py`
+- Package: `aria_nbv/aria_nbv/app/`
   - `app.py`: page wiring + run/refresh controls + navigation
   - `state.py`: typed `AppState` stored in `st.session_state`
   - `controller.py`: stage orchestration + typed caches (no `st.cache_*`)
   - `ui.py`: layout + widget helpers
   - `panels/`: plotting-only page renderers (UI + plots only)
-- Shared compute pipeline: `OracleRriLabeler` (`oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`) used by the RRI
+- Shared compute pipeline: `OracleRriLabeler` (`aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py`) used by the RRI
   page and reusable for training/CLI.
 
 ### Non-issues / Requirements Checklist
@@ -306,12 +306,12 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
 
 #### Issue: Dashboard was opaque and hard to reuse for training/CLI
 
-- **What was wrong:** The legacy app in `oracle_rri/oracle_rri/dashboard/` mixed UI, caching, and compute; this made the
+- **What was wrong:** The legacy app in `aria_nbv/aria_nbv/dashboard/` mixed UI, caching, and compute; this made the
   data-flow hard to reason about and prevented reusing the exact same code path for online label generation.
 
-- **Fix:** Rebuilt the app in `oracle_rri/oracle_rri/app/` with explicit separation of concerns:
+- **Fix:** Rebuilt the app in `aria_nbv/aria_nbv/app/` with explicit separation of concerns:
   - orchestration in `PipelineController`,
-  - compute in `OracleRriLabeler` (`oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`),
+  - compute in `OracleRriLabeler` (`aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py`),
   - plotting-only page functions in `panels/`,
   - typed session state (`AppState`) instead of “untyped cache blobs”.
 
@@ -321,7 +321,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
   results (especially when switching configs or sample indices).
 
 - **Fix:** Added explicit, typed stage caches keyed by `(cfg_sig, sample_key, ...)` and a `force=True` path for refresh
-  buttons in `PipelineController` (`oracle_rri/oracle_rri/app/controller.py`).
+  buttons in `PipelineController` (`aria_nbv/aria_nbv/app/controller.py`).
 
 #### Issue: Candidate Renders showed the wrong number of candidates
 
@@ -367,7 +367,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
   - moved dataset “resolved shards” logging from validators → `AseEfmDatasetConfig.setup_target()`,
   - replaced `use_container_width=True` with `width="stretch"` in `st.plotly_chart(...)`,
   - filtered the WebDataset `torch.load` warning in `AseEfmDataset.__init__`,
-  - enabled `tool.uv.preview = true` in `oracle_rri/pyproject.toml`.
+  - enabled `tool.uv.preview = true` in `aria_nbv/pyproject.toml`.
 
 ## Data Handling
 
@@ -404,7 +404,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
   -  dict full OracleRriLabeler results to an offline dataset for fast parallel reading to support multiple workers in the dataloader. Carry a full OracleRriLabelerConfig snapshot but exclude large path lists (e.g. tar URLs / mesh maps).
   - the metadata should carry all configuration settings
 
-  > **Done**: Added `oracle_rri/data/offline_cache.py` with cache writer/reader, config snapshots (sans tar_urls/scene_to_mesh), and `OracleRriCacheDataset` integration in `VinDataModule`.
+  > **Done**: Added `aria_nbv/aria_nbv/data/offline_cache.py` with cache writer/reader, config snapshots (sans tar_urls/scene_to_mesh), and `OracleRriCacheDataset` integration in `VinDataModule`.
 
 - [ ] Add option to compute new offline samples to [projects.scripts]! Ensure that it works correctly - that we can also switch easily in the datamodule - usage of concat dataset (offline -> online, switch from offline to offline extended with online when option to generate new offlines samples  is set in config. here we need to specify: per epoch (for both train and valied): how many new offline samples should be generated.
 - [ ] Offline cache metadata currently tracks a single config snapshot even if the cache directory contains samples from multiple runs/configs (samples embed the `config_hash` in their filenames, and append-time checks prevent mismatches, but load-time does not validate or filter).
@@ -413,7 +413,7 @@ candidate point clouds → RRI) and for debugging caching / coordinate-frame iss
 
 ## ViewIntrospectionNetwork
 
-Goal: Learn a **View Introspection Network (VIN)** that predicts per-candidate **RRI** from (i) frozen **EVL** scene features and (ii) a **shell-aware pose descriptor** computed in the **reference frame**. VIN is trained standalone using oracle labels from `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`.
+Goal: Learn a **View Introspection Network (VIN)** that predicts per-candidate **RRI** from (i) frozen **EVL** scene features and (ii) a **shell-aware pose descriptor** computed in the **reference frame**. VIN is trained standalone using oracle labels from `aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py`.
 
 ### External References (implementation sources)
 
@@ -432,7 +432,7 @@ Internal references:
 - EFM3D symbol index: `docs/contents/ext-impl/efm3d_symbol_index.qmd`
 - EFM3D impl overview: `docs/contents/ext-impl/efm3d_implementation.qmd`
 - Oracle pipeline + metric design: `docs/contents/impl/rri_computation.qmd`
-- Label pipeline implementation: `oracle_rri/oracle_rri/pipelines/oracle_rri_labeler.py`
+- Label pipeline implementation: `aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py`
 
 ### Recent Analysis & Debugging
 ```py
@@ -463,7 +463,7 @@ print(run.history())
 
 ### Action Items (summary checklist)
 
-- [x] Implement a VIN model (RRI predictor) in `oracle_rri/oracle_rri/vin` on top of the EFM3D ([EFM3D](../contents/literature/efm3d.qmd)) / EVL backbone (frozen).
+- [x] Implement a VIN model (RRI predictor) in `aria_nbv/aria_nbv/vin` on top of the EFM3D ([EFM3D](../contents/literature/efm3d.qmd)) / EVL backbone (frozen).
   - Input:
     - raw `efm_snippet_view.efm: efm: dict[str, Any]` as input to EVL backbone
     - candidate poses `PoseTW` (N candidates) as input to the view scorer head together with scene features from EVL as well as other potential candidate features.
@@ -471,9 +471,9 @@ print(run.history())
     - the candidate poses should be relative to the reference poses rig position and orientation.
     - loss and training objective same as in [VIN-NBV](../contents/literature/vin_nbv.qmd)
     - start with an implementation proposal of the model architecture and training procedure in `docs/contents/impl/vin_nbv.qmd`.
-    - For this do a comprehensive review of the EVL architecture to understand how to best integrate the view scorer head on top of it. Consider that we have a [simple script to infer EVL](../../oracle_rri/scripts/run_efm3d_on_ase.py). Another good starting point is our [EFM3D symbol index](../contents/ext-impl/efm3d_symbol_index.qmd) and [EFM3D implementation overview](../contents/ext-impl/efm3d_implementation.qmd).
+    - For this do a comprehensive review of the EVL architecture to understand how to best integrate the view scorer head on top of it. Consider that we have a [simple script to infer EVL](../../aria_nbv/scripts/run_efm3d_on_ase.py). Another good starting point is our [EFM3D symbol index](../contents/ext-impl/efm3d_symbol_index.qmd) and [EFM3D implementation overview](../contents/ext-impl/efm3d_implementation.qmd).
 
-    > **Done**: Implemented VIN package code in `oracle_rri/oracle_rri/vin/` (frozen EVL + CORAL head), shell+SH pose encoding via `e3nn` **plus 1D Fourier features for the radius**, and a Lightning-based training pipeline (`oracle_rri/oracle_rri/lightning/` + `nbv-train` / `nbv-fit-binner`) that uses `OracleRriLabeler`. Documented the architecture + training procedure in `docs/contents/impl/vin_nbv.qmd`.
+    > **Done**: Implemented VIN package code in `aria_nbv/aria_nbv/vin/` (frozen EVL + CORAL head), shell+SH pose encoding via `e3nn` **plus 1D Fourier features for the radius**, and a Lightning-based training pipeline (`aria_nbv/aria_nbv/lightning/` + `nbv-train` / `nbv-fit-binner`) that uses `OracleRriLabeler`. Documented the architecture + training procedure in `docs/contents/impl/vin_nbv.qmd`.
 
 - [ ] Add an explicit **frame-consistency** check for VIN inputs: if candidate generation applies `rotate_yaw_cw90` to the reference pose, ensure the **same** rotated reference pose is passed to VIN along with candidate poses and `p3d_cameras`. `backbone_out` stays in the world frame; only candidate/ref/camera must share the rotated basis.
   - *All* poses coming from the OracleRriLabeler have been rotated by 90 deg cw about their foward axis to allow correct candidate generation in the world frame. However, the poses produced by the EVL do not have this rotation applied.!
@@ -499,7 +499,7 @@ Optional (available via `EvlBackboneConfig.features_mode in {"neck","both"}`; no
 - `neck/occ_feat` (high-dim geometry/context volume; B×C×D×H×W)
 - `neck/obb_feat` (high-dim semantic/context volume; B×C×D×H×W)
 
-Processing strategy (current implementation in `oracle_rri/oracle_rri/vin/experimental/model.py`):
+Processing strategy (current implementation in `aria_nbv/aria_nbv/vin/experimental/model.py`):
 
 - **Channel compression**: `Conv3d(1×1×1) + GroupNorm + GELU` → `field_dim` (default: 16)
 - **Global pooling**: `mean(DHW)` (optional via `use_global_pool=True`)
@@ -513,7 +513,7 @@ Processing strategy (current implementation in `oracle_rri/oracle_rri/vin/experi
 **Source of truth (current VIN I/O contract):**
 
 - `candidate_poses_world_cam: PoseTW` (world←camera) and `reference_pose_world_rig: PoseTW` (world←rig_reference)
-  from `OracleRriLabelBatch.depths` (used in `oracle_rri/oracle_rri/lightning/lit_datamodule.py`).
+  from `OracleRriLabelBatch.depths` (used in `aria_nbv/aria_nbv/lightning/lit_datamodule.py`).
 
 Descriptor construction:
 
@@ -544,7 +544,7 @@ Encoding (must use e3nn):
 
 #### 1 EVL feature extractor wrapper (frozen, VIN-facing)
 
-- [x] Implement `oracle_rri/oracle_rri/vin/backbone_evl.py` as a clean adapter:
+- [x] Implement `aria_nbv/aria_nbv/vin/backbone_evl.py` as a clean adapter:
   - load EVL via Hydra YAML + checkpoint (strict load from `checkpoint["state_dict"]`)
   - run `torch.no_grad()` + `eval()` and optionally freeze params (`EvlBackboneConfig.freeze=True`)
   - robust `batchify` handling (incl. TensorWrapper images)
@@ -573,14 +573,14 @@ Acceptance criteria:
 
 - [x] Implement the shell-aware pose descriptor (`r, u, f, scalars`) in the reference rig frame.
 
-  > **Done**: Implemented in `oracle_rri/oracle_rri/vin/experimental/model.py` by consuming `reference_pose_world_rig` (world←rig) and `candidate_poses_world_cam` (world←cam), forming $T_{\mathrm{rig}\leftarrow\mathrm{cam}}$, and computing $(r, u, f, \mathrm{scalars})$ in the reference rig frame.
+  > **Done**: Implemented in `aria_nbv/aria_nbv/vin/experimental/model.py` by consuming `reference_pose_world_rig` (world←rig) and `candidate_poses_world_cam` (world←cam), forming $T_{\mathrm{rig}\leftarrow\mathrm{cam}}$, and computing $(r, u, f, \mathrm{scalars})$ in the reference rig frame.
 
-- [x] Implement `ShellShPoseEncoder` in `oracle_rri/oracle_rri/vin/spherical_encoding.py`:
+- [x] Implement `ShellShPoseEncoder` in `aria_nbv/aria_nbv/vin/spherical_encoding.py`:
   - uses `e3nn.o3.spherical_harmonics` for `u` and `f`
   - no `so3log`
   - outputs `E_pose` per candidate
 
-  > **Done**: Implemented as `oracle_rri/oracle_rri/vin/spherical_encoding.py` (`ShellShPoseEncoder` + config) using `e3nn.o3.spherical_harmonics`, with **1D Fourier features** for the radius (`r` by default; optionally $\log(r+\varepsilon)$ via config).
+  > **Done**: Implemented as `aria_nbv/aria_nbv/vin/spherical_encoding.py` (`ShellShPoseEncoder` + config) using `e3nn.o3.spherical_harmonics`, with **1D Fourier features** for the radius (`r` by default; optionally $\log(r+\varepsilon)$ via config).
 
 #### 4 VIN scorer head architecture (minimal MLP + CORAL)
 
@@ -597,22 +597,22 @@ Acceptance criteria:
   - outputs:
     - logits, expected score (normalized), candidate_valid mask
 
-  > **Done**: Implemented in `oracle_rri/oracle_rri/vin/experimental/model.py` with shell+SH pose encoding, a minimal voxel field (`occ_pr`, `occ_input`, `counts_norm`), mean-pooled global context, masked-mean frustum sampling for candidates using PyTorch3D `PerspectiveCameras`, and CORAL logits/expected score outputs.
+  > **Done**: Implemented in `aria_nbv/aria_nbv/vin/experimental/model.py` with shell+SH pose encoding, a minimal voxel field (`occ_pr`, `occ_input`, `counts_norm`), mean-pooled global context, masked-mean frustum sampling for candidates using PyTorch3D `PerspectiveCameras`, and CORAL logits/expected score outputs.
 
 - [x] Implement `VinPrediction` dataclass (logits, scores, masks)
 
-  > **Done**: Implemented in `oracle_rri/oracle_rri/vin/types.py`.
+  > **Done**: Implemented in `aria_nbv/aria_nbv/vin/types.py`.
 
 #### 5 Training data generation (must use OracleRriLabeler)
 
 - [x] Implement an online VIN training dataset wrapper using oracle labels:
-  - `oracle_rri/oracle_rri/lightning/lit_datamodule.py` (`VinOracleIterableDataset` + `VinDataModule`)
+  - `aria_nbv/aria_nbv/lightning/lit_datamodule.py` (`VinOracleIterableDataset` + `VinDataModule`)
   - iterates `AseEfmDataset`, runs `OracleRriLabeler.run(sample)`, and yields `VinOracleBatch` (efm, poses, p3d_cameras, oracle RRI + point↔mesh diagnostics)
-- [x] Add CLI entry points (installed via `oracle_rri/pyproject.toml`):
+- [x] Add CLI entry points (installed via `aria_nbv/pyproject.toml`):
   - `nbv-fit-binner` (fit + save `rri_binner.json`)
   - `nbv-train` (train/val/test; can also run `--fit-binner-only`)
   - `nbv-train --run-mode summarize-vin` / `nbv-train --run-mode plot-vin-encodings` (diagnostic summaries/plots on real oracle batches)
-  - (dev convenience) `oracle_rri/scripts/train_vin_lightning.py`
+  - (dev convenience) `aria_nbv/scripts/train_vin_lightning.py`
 - [ ] Add evaluation helpers (rank correlation + top-k recall; can be logged in Lightning or as a standalone script)
 
 #### 6 CORAL loss + bin thresholds (stable + easy)
@@ -622,14 +622,14 @@ Acceptance criteria:
   - Use **quantile edges** so bins have ~equal mass
   - Save binner to JSON (`num_classes` + `edges`) and reference it via `VinLightningModuleConfig.binner_path`
 
-  > **Done**: Implemented `oracle_rri/oracle_rri/rri_metrics/rri_binning.py` (`RriOrdinalBinner.fit_from_iterable/transform/save/load`) and wired it into the Lightning CLI (`nbv-fit-binner` / `nbv-train --fit-binner-only`).
+  > **Done**: Implemented `aria_nbv/aria_nbv/rri_metrics/rri_binning.py` (`RriOrdinalBinner.fit_from_iterable/transform/save/load`) and wired it into the Lightning CLI (`nbv-fit-binner` / `nbv-train --fit-binner-only`).
 
 - [x] Apply CORAL:
   - `logits: (N, K-1)`
   - `labels: (N,)` integer ordinal class
   - mask invalid candidates (`candidate_valid` ∧ `finite(rri)`)
 
-  > **Done**: Implemented `oracle_rri/oracle_rri/rri_metrics/coral.py` using `coral-pytorch` and trained with `coral_loss` in `oracle_rri/oracle_rri/lightning/lit_module.py`.
+  > **Done**: Implemented `aria_nbv/aria_nbv/rri_metrics/coral.py` using `coral-pytorch` and trained with `coral_loss` in `aria_nbv/aria_nbv/lightning/lit_module.py`.
 
 - [ ] Log metrics:
   - Spearman rank correlation between predicted score and oracle RRI

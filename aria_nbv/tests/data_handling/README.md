@@ -1,6 +1,6 @@
 # Data Handling Tests
 
-Comprehensive test suite for the `oracle_rri.data_handling` module.
+Comprehensive test suite for the `aria_nbv.data_handling` module.
 
 ## Test Structure
 
@@ -21,11 +21,11 @@ tests/data_handling/
 
 ```bash
 # From repository root
-cd oracle_rri
+cd aria_nbv
 pytest tests/data_handling/ -v
 
 # With coverage
-pytest tests/data_handling/ --cov=oracle_rri.data_handling --cov-report=html
+pytest tests/data_handling/ --cov=aria_nbv.data_handling --cov-report=html
 ```
 
 ### Run Specific Test Files
@@ -168,7 +168,7 @@ def test_config_to_instance():
 ### Mocking External Dependencies
 
 ```python
-@patch("oracle_rri.data_handling.downloader.requests.get")
+@patch("aria_nbv.data_handling.downloader.requests.get")
 def test_download(mock_get):
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -238,7 +238,7 @@ class TestNewFeature:
 
 ```bash
 # Ensure package installed in editable mode
-cd oracle_rri
+cd aria_nbv
 pip install -e .
 ```
 
@@ -250,8 +250,8 @@ Check that `conftest.py` is in the correct directory and properly imported.
 
 Verify the patch target path matches the actual import in the tested module:
 ```python
-# If module does: from oracle_rri.utils import Console
-# Patch as: @patch("oracle_rri.data_handling.downloader.Console")
+# If module does: from aria_nbv.utils import Console
+# Patch as: @patch("aria_nbv.data_handling.downloader.Console")
 ```
 
 ## Continuous Integration

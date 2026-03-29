@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import torch
 
-from oracle_rri.utils.base_config import BaseConfig
+from aria_nbv.utils.base_config import BaseConfig
 
 from .metrics import chamfer_point_mesh, chamfer_point_mesh_batched
 from .types import RriResult

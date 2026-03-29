@@ -21,8 +21,8 @@ from efm3d.aria.aria_constants import (
     ARIA_POSE_TIME_NS,
 )
 
-from oracle_rri.data.efm_views import EfmSnippetView
-from oracle_rri.vin.plotting import (
+from aria_nbv.data.efm_views import EfmSnippetView
+from aria_nbv.vin.plotting import (
     build_backbone_evidence_figures,
     build_field_slice_figures,
     build_geometry_overview_figure,
@@ -39,7 +39,7 @@ from oracle_rri.vin.plotting import (
     build_voxel_inbounds_figure,
     build_voxel_roundtrip_figure,
 )
-from oracle_rri.vin.types import EvlBackboneOutput
+from aria_nbv.vin.types import EvlBackboneOutput
 
 try:
     from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]

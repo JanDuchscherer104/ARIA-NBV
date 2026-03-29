@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from oracle_rri.app.panels import optuna_sweep
+from aria_nbv.app.panels import optuna_sweep
 
 
 def test_normalize_param_value_handles_paths_and_arrays() -> None:

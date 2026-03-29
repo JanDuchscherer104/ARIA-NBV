@@ -8,13 +8,13 @@ import plotly.graph_objects as go  # type: ignore[import-untyped]
 import torch
 from efm3d.aria import CameraTW, PoseTW
 
-from oracle_rri.pose_generation.plotting import (
+from aria_nbv.pose_generation.plotting import (
     plot_candidate_centers_simple,
     plot_candidate_frusta_simple,
     plot_position_sphere,
 )
-from oracle_rri.pose_generation.types import CandidateSamplingResult
-from oracle_rri.pose_generation.utils import rejected_pose_tensor
+from aria_nbv.pose_generation.types import CandidateSamplingResult
+from aria_nbv.pose_generation.utils import rejected_pose_tensor
 
 
 def _make_candidates(num: int = 2) -> CandidateSamplingResult:

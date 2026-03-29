@@ -18,7 +18,7 @@ from typing import Annotated
 import torch
 from pydantic import Field, field_validator
 
-from oracle_rri.utils.console import Verbosity
+from aria_nbv.utils.console import Verbosity
 
 from ..data.efm_views import EfmSnippetView
 from ..pose_generation import CandidateViewGeneratorConfig

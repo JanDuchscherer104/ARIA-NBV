@@ -7,22 +7,22 @@ from typing import TYPE_CHECKING
 
 import torch
 from efm3d.aria.pose import PoseTW
-from oracle_rri.configs import PathConfig
-from oracle_rri.data import VinSnippetView, offline_cache, vin_snippet_cache
-from oracle_rri.data.offline_cache import (
+from aria_nbv.configs import PathConfig
+from aria_nbv.data import VinSnippetView, offline_cache, vin_snippet_cache
+from aria_nbv.data.offline_cache import (
     OracleRriCacheConfig,
     OracleRriCacheDatasetConfig,
 )
-from oracle_rri.data.offline_cache_serialization import encode_rri
-from oracle_rri.data.offline_cache_store import _write_metadata
-from oracle_rri.data.offline_cache_types import OracleRriCacheMetadata
-from oracle_rri.data.vin_snippet_cache import (
+from aria_nbv.data.offline_cache_serialization import encode_rri
+from aria_nbv.data.offline_cache_store import _write_metadata
+from aria_nbv.data.offline_cache_types import OracleRriCacheMetadata
+from aria_nbv.data.vin_snippet_cache import (
     VinSnippetCacheConfig,
     VinSnippetCacheWriterConfig,
 )
-from oracle_rri.data.vin_snippet_utils import vin_snippet_cache_config_hash
-from oracle_rri.rendering.candidate_depth_renderer import CandidateDepths
-from oracle_rri.rri_metrics.types import RriResult
+from aria_nbv.data.vin_snippet_utils import vin_snippet_cache_config_hash
+from aria_nbv.rendering.candidate_depth_renderer import CandidateDepths
+from aria_nbv.rri_metrics.types import RriResult
 from pytorch3d.renderer.cameras import (
     PerspectiveCameras,  # type: ignore[import-untyped]
 )

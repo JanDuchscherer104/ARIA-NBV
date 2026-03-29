@@ -11,9 +11,9 @@ from __future__ import annotations
 import pytest
 import torch
 
-from oracle_rri.data import AseEfmDatasetConfig, EfmSnippetView
-from oracle_rri.rendering.pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig
-from oracle_rri.rendering.unproject import backproject_depth_with_p3d
+from aria_nbv.data import AseEfmDatasetConfig, EfmSnippetView
+from aria_nbv.rendering.pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig
+from aria_nbv.rendering.unproject import backproject_depth_with_p3d
 
 
 def _first_mesh_sample() -> EfmSnippetView:

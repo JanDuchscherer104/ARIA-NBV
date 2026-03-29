@@ -10,13 +10,13 @@ format:
 
 # What is `aria_nbv`?
 
-- In-repo NBV toolkit (import path currently `oracle_rri`, pending rename to `aria_nbv`) for ASE/ATEK + EFM3D experiments.
+- In-repo NBV toolkit (import path `aria_nbv`) for ASE/ATEK + EFM3D experiments.
 - Responsibilities: load typed ASE snippets, generate collision‑aware candidate views, render/raycast depth, fuse point clouds, and score Relative Reconstruction Improvement (RRI).
 
 # Directory layout (code)
 
 ```text
-oracle_rri/oracle_rri/
+aria_nbv/aria_nbv/
 ├── configs/              # PathConfig
 ├── utils/                # BaseConfig, Console, frames helpers
 ├── data/                 # Typed EFM views (cameras, traj, semidense, GT)

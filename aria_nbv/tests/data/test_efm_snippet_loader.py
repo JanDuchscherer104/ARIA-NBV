@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from oracle_rri.configs import PathConfig
-from oracle_rri.data.efm_snippet_loader import EfmSnippetLoader
+from aria_nbv.configs import PathConfig
+from aria_nbv.data.efm_snippet_loader import EfmSnippetLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

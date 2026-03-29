@@ -28,7 +28,7 @@ Typed, IDE-friendly wrappers around ATEK WebDatasets that pair ASE snippets with
 
 ```python
 from torch.utils.data import DataLoader
-from oracle_rri.data_handling import ASEDatasetConfig, ase_collate
+from aria_nbv.data_handling import ASEDatasetConfig, ase_collate
 
 config = ASEDatasetConfig(
     scene_ids=["81022", "81048"],       # optional; auto-resolves tars and meshes

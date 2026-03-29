@@ -11,8 +11,8 @@ sys.path.append(str(Path(__file__).resolve().parents[3] / "external" / "efm3d"))
 
 from efm3d.aria import CameraTW, PoseTW
 
-from oracle_rri.rendering.candidate_depth_renderer import CandidateDepthRenderer
-from oracle_rri.utils import Console, Verbosity
+from aria_nbv.rendering.candidate_depth_renderer import CandidateDepthRenderer
+from aria_nbv.utils import Console, Verbosity
 
 
 class _FakeCameras:

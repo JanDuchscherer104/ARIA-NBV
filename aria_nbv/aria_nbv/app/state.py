@@ -2,7 +2,7 @@
 
 This module wraps Streamlit's `st.session_state` and therefore depends on
 Streamlit. For Streamlit-free state types and cache key helpers, see
-:mod:`oracle_rri.app.state_types`.
+:mod:`aria_nbv.app.state_types`.
 """
 
 from __future__ import annotations

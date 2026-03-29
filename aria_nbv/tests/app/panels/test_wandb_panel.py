@@ -4,7 +4,7 @@
 
 import numpy as np
 import pandas as pd
-from oracle_rri.utils import wandb_utils
+from aria_nbv.utils import wandb_utils
 
 
 class _DummyRun:
