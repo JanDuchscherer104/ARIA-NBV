@@ -10,7 +10,7 @@ from efm3d.aria.pose import PoseTW
 from efm3d.utils.voxel_sampling import pc_to_vox, sample_voxels
 from torch import Tensor
 
-from ..data.efm_views import VinSnippetView
+from ..data_handling import VinSnippetView
 
 if TYPE_CHECKING:
     from efm3d.aria.pose import PoseTW as PoseTWT

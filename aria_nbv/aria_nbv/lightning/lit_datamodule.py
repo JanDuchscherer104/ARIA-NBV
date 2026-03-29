@@ -18,9 +18,13 @@ from pydantic import Field, model_validator
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 from ..configs import PathConfig
-from ..data import AseEfmDatasetConfig
-from ..data.vin_oracle_datasets import VinOracleDatasetConfig, VinOracleOnlineDatasetConfig
-from ..data.vin_oracle_types import VinOracleBatch, VinOracleDatasetBase
+from ..data_handling import (
+    AseEfmDatasetConfig,
+    VinOracleBatch,
+    VinOracleDatasetBase,
+    VinOracleDatasetConfig,
+    VinOracleOnlineDatasetConfig,
+)
 from ..utils import BaseConfig, Console, Stage, Verbosity
 
 
@@ -248,8 +252,11 @@ class VinDataModule(pl.LightningDataModule):
         return iter(plan.dataset)
 
     def _describe_dataset(self, dataset: VinOracleDatasetBase, *, stage: Stage) -> dict[str, object]:
-        from ..data.offline_cache import OracleRriCacheDatasetConfig
-        from ..data.vin_oracle_datasets import VinOracleOnlineDataset
+        from ..data_handling import (
+            OracleRriCacheDatasetConfig,
+            VinOfflineDatasetConfig,
+            VinOracleOnlineDataset,
+        )
 
         summary: dict[str, object] = {
             "stage": stage.value,
@@ -271,6 +278,24 @@ class VinDataModule(pl.LightningDataModule):
                     "load_depths": cfg.load_depths,
                     "load_candidates": cfg.load_candidates,
                     "load_candidate_pcs": cfg.load_candidate_pcs,
+                    "limit": cfg.limit,
+                }
+            )
+            return summary
+
+        if isinstance(cfg, VinOfflineDatasetConfig):
+            summary.update(
+                {
+                    "store_dir": str(cfg.store.store_dir),
+                    "split": cfg.split,
+                    "return_format": cfg.return_format,
+                    "include_efm_snippet": cfg.include_efm_snippet,
+                    "include_gt_mesh": cfg.include_gt_mesh,
+                    "load_backbone": cfg.load_backbone,
+                    "load_candidates": cfg.load_candidates,
+                    "load_depths": cfg.load_depths,
+                    "load_candidate_pcs": cfg.load_candidate_pcs,
+                    "load_counterfactuals": cfg.load_counterfactuals,
                     "limit": cfg.limit,
                 }
             )

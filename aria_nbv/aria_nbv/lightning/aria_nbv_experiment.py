@@ -25,7 +25,7 @@ import torch
 from pydantic import Field, field_validator, model_validator
 
 from ..configs import OptunaConfig, PathConfig
-from ..data.offline_cache import OracleRriCacheConfig, OracleRriCacheDatasetConfig
+from ..data_handling import OracleRriCacheConfig, OracleRriCacheDatasetConfig
 from ..utils import BaseConfig, Console, Stage
 from ..utils.console import Verbosity
 from .lit_datamodule import VinDataModule, VinDataModuleConfig
@@ -565,7 +565,7 @@ class AriaNBVExperimentConfig(BaseConfig):
         console: Console,
     ) -> None:
         """Enable offline cache for summary runs when available."""
-        from ..data.vin_oracle_datasets import VinOracleCacheDatasetConfig
+        from ..data_handling import VinOracleCacheDatasetConfig
 
         if isinstance(self.datamodule_config.source, VinOracleCacheDatasetConfig):
             return

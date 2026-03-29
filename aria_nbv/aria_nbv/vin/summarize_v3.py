@@ -1,3 +1,5 @@
+"""Summary helpers for VIN v3 inputs, predictions, and cached batch structure."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -10,13 +12,18 @@ from efm3d.aria.aria_constants import (
 )
 from torch.nn import functional as functional
 
-from ..data.efm_views import EfmSnippetView, VinSnippetView
+from ..data_handling import (
+    EfmSnippetView,
+    VinSnippetView,
+    is_efm_snippet_view_instance,
+    is_vin_snippet_view_instance,
+)
 from ..rri_metrics.coral import coral_monotonicity_violation_rate
 from ..utils import Console
 from ..utils.rich_summary import rich_summary, summarize
 
 if TYPE_CHECKING:
-    from ..data.vin_oracle_types import VinOracleBatch
+    from ..data_handling import VinOracleBatch
     from .model_v3 import VinModelV3
 
 
@@ -97,10 +104,10 @@ def summarize_vin_v3(
     snippet_view = batch.efm_snippet_view
     efm_dict: dict[str, Any] = {}
     efm_forward: EfmSnippetView | VinSnippetView
-    if isinstance(snippet_view, EfmSnippetView):
+    if is_efm_snippet_view_instance(snippet_view):
         efm_dict = snippet_view.efm
         efm_forward = snippet_view
-    elif isinstance(snippet_view, VinSnippetView):
+    elif is_vin_snippet_view_instance(snippet_view):
         efm_forward = snippet_view
     else:
         raise RuntimeError(
@@ -127,7 +134,7 @@ def summarize_vin_v3(
         )
     if snippet_view is None:
         efm_summary = {"note": "cached batch (raw EFM inputs unavailable)"}
-    elif isinstance(snippet_view, VinSnippetView):
+    elif is_vin_snippet_view_instance(snippet_view):
         points_world = snippet_view.points_world
         points_mask = torch.isfinite(points_world[..., :3]).all(dim=-1)
         valid_points = int(points_mask.sum().item())

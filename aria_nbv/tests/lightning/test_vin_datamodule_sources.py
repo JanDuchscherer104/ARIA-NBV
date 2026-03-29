@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from aria_nbv.data.vin_oracle_datasets import (
+
+from aria_nbv.data_handling import (
     VinOracleCacheDatasetConfig,
     VinOracleOnlineDatasetConfig,
 )

@@ -22,8 +22,11 @@ from torch import Tensor, nn
 from torch.nn import functional as functional
 
 from ..configs import PathConfig
-from ..data import EfmSnippetView, VinSnippetView
-from ..data.vin_oracle_types import VinOracleBatch
+from ..data_handling import (
+    VinOracleBatch,
+    is_efm_snippet_view_instance,
+    is_vin_snippet_view_instance,
+)
 from ..rri_metrics import (
     Loss,
     Metric,
@@ -362,14 +365,14 @@ class VinLightningModule(pl.LightningModule):
             )
 
         efm_snippet_view = batch.efm_snippet_view
-        if isinstance(efm_snippet_view, (EfmSnippetView, VinSnippetView)):
+        if is_efm_snippet_view_instance(efm_snippet_view) or is_vin_snippet_view_instance(efm_snippet_view):
             efm = efm_snippet_view
         else:
             raise RuntimeError(
                 "VIN batch missing semidense snippet view; VinModelV3 requires VinSnippetView or EfmSnippetView.",
             )
         backbone_out = batch.backbone_out
-        if backbone_out is None and not isinstance(efm_snippet_view, EfmSnippetView):
+        if backbone_out is None and not is_efm_snippet_view_instance(efm_snippet_view):
             raise RuntimeError(
                 "VIN batch missing both efm snippet view and cached backbone outputs.",
             )

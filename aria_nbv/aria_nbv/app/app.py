@@ -12,7 +12,7 @@ import streamlit as st
 from aria_nbv.app.panels.optuna_sweep import render_optuna_sweep_page
 
 from ..configs import PathConfig
-from ..data.offline_cache import OracleRriCacheConfig, OracleRriCacheDatasetConfig
+from ..data_handling import OracleRriCacheConfig, OracleRriCacheDatasetConfig
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..utils import Console, Verbosity
 from .config import NbvStreamlitAppConfig

@@ -19,14 +19,16 @@ from pydantic._internal._utils import deep_update
 from pydantic_settings import SettingsConfigDict
 
 from aria_nbv.configs import PathConfig
-from aria_nbv.data.offline_cache import (
+from aria_nbv.data_handling import (
     OracleRriCacheConfig,
     OracleRriCacheDataset,
     OracleRriCacheDatasetConfig,
     OracleRriCacheWriter,
     OracleRriCacheWriterConfig,
+    VinOracleCacheDatasetConfig,
+    VinSnippetCacheConfig,
+    VinSnippetCacheWriterConfig,
 )
-from aria_nbv.data.vin_snippet_cache import VinSnippetCacheConfig, VinSnippetCacheWriterConfig
 from aria_nbv.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from aria_nbv.rri_metrics import RriOrdinalBinner
 from aria_nbv.utils import BaseConfig, Console, Verbosity
@@ -552,8 +554,6 @@ def cache_vin_snippets_main(argv: list[str] | None = None) -> None:
             )
     config_path = paths.resolve_config_toml_path(config_path, must_exist=True)
     exp_cfg = AriaNBVExperimentConfig.from_toml(config_path)
-    from ..data.vin_oracle_datasets import VinOracleCacheDatasetConfig
-
     if not isinstance(exp_cfg.datamodule_config.source, VinOracleCacheDatasetConfig):
         raise ValueError("datamodule_config.source must be an offline cache to build a VIN snippet cache.")
 

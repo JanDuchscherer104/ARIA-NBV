@@ -9,7 +9,7 @@ from efm3d.aria.pose import PoseTW
 from pydantic import Field
 from torch import Tensor, nn
 
-from ..data.efm_views import EfmTrajectoryView
+from ..data_handling import EfmTrajectoryView
 from ..utils import BaseConfig
 from .pose_encoders import PoseEncodingOutput, R6dLffPoseEncoder, R6dLffPoseEncoderConfig
 

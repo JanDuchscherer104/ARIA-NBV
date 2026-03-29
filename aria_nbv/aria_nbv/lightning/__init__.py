@@ -1,6 +1,6 @@
 """PyTorch Lightning components for training VIN."""
 
-from ..data.vin_oracle_types import VinOracleBatch
+from ..data_handling import VinOracleBatch
 from .aria_nbv_experiment import AriaNBVExperimentConfig
 from .lit_datamodule import VinDataModule, VinDataModuleConfig
 from .lit_module import AdamWConfig, VinLightningModule, VinLightningModuleConfig

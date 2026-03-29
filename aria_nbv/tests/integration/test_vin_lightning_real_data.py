@@ -26,8 +26,7 @@ else:  # pragma: no cover - availability guard
     PYTORCH3D_AVAILABLE = True
 
 from aria_nbv.configs import PathConfig
-from aria_nbv.data import AseEfmDatasetConfig
-from aria_nbv.data.vin_oracle_datasets import VinOracleOnlineDatasetConfig
+from aria_nbv.data_handling import AseEfmDatasetConfig, VinOracleOnlineDatasetConfig
 from aria_nbv.pipelines import OracleRriLabelerConfig
 from aria_nbv.pose_generation import CandidateViewGeneratorConfig
 from aria_nbv.pose_generation.types import ViewDirectionMode

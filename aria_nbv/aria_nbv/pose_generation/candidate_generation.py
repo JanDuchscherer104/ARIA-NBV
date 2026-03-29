@@ -27,7 +27,7 @@ from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 from pydantic import AliasChoices, Field, field_validator, model_validator
 
-from ..data.efm_views import EfmSnippetView
+from ..data_handling import EfmSnippetView
 from ..utils import BaseConfig, Console, Verbosity
 from ..utils.frames import rotate_yaw_cw90, world_up_tensor
 from .candidate_generation_rules import (

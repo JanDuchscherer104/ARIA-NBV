@@ -7,8 +7,14 @@ from typing import TYPE_CHECKING
 
 import torch
 from efm3d.aria.pose import PoseTW
+from pytorch3d.renderer.cameras import (
+    PerspectiveCameras,  # type: ignore[import-untyped]
+)
+
+import aria_nbv.data.offline_cache as offline_cache
+import aria_nbv.data.vin_snippet_cache as vin_snippet_cache
 from aria_nbv.configs import PathConfig
-from aria_nbv.data import VinSnippetView, offline_cache, vin_snippet_cache
+from aria_nbv.data import VinSnippetView
 from aria_nbv.data.offline_cache import (
     OracleRriCacheConfig,
     OracleRriCacheDatasetConfig,
@@ -23,9 +29,6 @@ from aria_nbv.data.vin_snippet_cache import (
 from aria_nbv.data.vin_snippet_utils import vin_snippet_cache_config_hash
 from aria_nbv.rendering.candidate_depth_renderer import CandidateDepths
 from aria_nbv.rri_metrics.types import RriResult
-from pytorch3d.renderer.cameras import (
-    PerspectiveCameras,  # type: ignore[import-untyped]
-)
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -20,15 +20,11 @@ from pydantic import Field, field_validator
 
 from aria_nbv.utils.console import Verbosity
 
-from ..data.efm_views import EfmSnippetView
+from ..data_handling import EfmSnippetView
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..pose_generation.types import CandidateSamplingResult
-from ..rendering import (
-    CandidateDepthRendererConfig,
-    CandidateDepths,
-    CandidatePointClouds,
-    build_candidate_pointclouds,
-)
+from ..rendering.candidate_depth_renderer import CandidateDepthRendererConfig, CandidateDepths
+from ..rendering.candidate_pointclouds import CandidatePointClouds, build_candidate_pointclouds
 from ..rri_metrics.oracle_rri import OracleRRIConfig
 from ..rri_metrics.types import RriResult
 from ..utils import BaseConfig, Console

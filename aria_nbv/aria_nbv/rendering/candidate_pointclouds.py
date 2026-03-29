@@ -14,7 +14,7 @@ from pytorch3d.renderer.cameras import (
     PerspectiveCameras,  # type: ignore[import-untyped]
 )
 
-from ..data.efm_views import EfmSnippetView
+from ..data_handling import EfmSnippetView
 from .candidate_depth_renderer import CandidateDepths
 
 Tensor = torch.Tensor

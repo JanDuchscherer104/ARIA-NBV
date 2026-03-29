@@ -13,7 +13,7 @@ from pytorch3d.renderer.cameras import (
     PerspectiveCameras,  # type: ignore[import-untyped]
 )
 
-from ..data.efm_views import EfmSnippetView
+from ..data_handling import EfmSnippetView
 from ..pose_generation.types import CandidateSamplingResult
 from ..utils import BaseConfig, Console, Verbosity
 from .pytorch3d_depth_renderer import (

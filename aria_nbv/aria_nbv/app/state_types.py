@@ -15,8 +15,7 @@ from typing import Any
 
 import torch
 
-from ..data import AseEfmDatasetConfig, EfmSnippetView
-from ..data.vin_oracle_types import VinOracleBatch
+from ..data_handling import AseEfmDatasetConfig, EfmSnippetView, VinOracleBatch
 from ..lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ..pipelines import OracleRriLabelerConfig
 from ..pose_generation.types import CandidateSamplingResult

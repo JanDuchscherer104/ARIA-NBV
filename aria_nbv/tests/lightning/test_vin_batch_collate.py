@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 import torch
 from efm3d.aria.pose import PoseTW
-from aria_nbv.data.efm_views import VinSnippetView
-from aria_nbv.data.vin_oracle_types import VinOracleBatch
+
+from aria_nbv.data_handling import VinOracleBatch, VinSnippetView
 from aria_nbv.vin.types import EvlBackboneOutput
 
 pytorch3d_cameras = pytest.importorskip("pytorch3d.renderer.cameras")

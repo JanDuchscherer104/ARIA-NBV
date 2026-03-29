@@ -70,8 +70,13 @@ from torch.nn import functional as functional
 
 from aria_nbv.utils.frames import rotate_yaw_cw90
 
-from ..data.efm_views import EfmSnippetView, VinSnippetView
-from ..data.vin_snippet_utils import build_vin_snippet_view
+from ..data_handling import (
+    EfmSnippetView,
+    VinSnippetView,
+    build_vin_snippet_view,
+    is_efm_snippet_view_instance,
+    is_vin_snippet_view_instance,
+)
 from ..rri_metrics.coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
 from ..utils import BaseConfig
 from .backbone_evl import EvlBackboneConfig
@@ -94,7 +99,7 @@ from .vin_utils import (
 )
 
 if TYPE_CHECKING:
-    from aria_nbv.data.vin_oracle_types import VinOracleBatch
+    from aria_nbv.data_handling import VinOracleBatch
 
     from .pose_encoding import LearnableFourierFeatures
 
@@ -416,15 +421,16 @@ class VinModelV3(nn.Module):
         Returns:
             VinSnippetView: Padded snippet with points_world (Tensor["B, P, C_sem"]).
         """
-        if isinstance(efm, VinSnippetView):
+        if is_vin_snippet_view_instance(efm):
             return efm.to(device=device)
-        if isinstance(efm, EfmSnippetView):
+        if is_efm_snippet_view_instance(efm):
             return build_vin_snippet_view(
                 efm,
                 device=device,
                 max_points=self.config.semidense_proj_max_points,
                 include_inv_dist_std=True,
                 include_obs_count=True,
+                pad_points=self.config.semidense_proj_max_points,
             )
         raise TypeError(
             "VinModelV3 expects a VinSnippetView or EfmSnippetView for `efm`.",
@@ -570,9 +576,9 @@ class VinModelV3(nn.Module):
             return None, None, None
 
         traj_world_rig: PoseTW | None = None
-        if isinstance(snippet, VinSnippetView):
+        if is_vin_snippet_view_instance(snippet):
             traj_world_rig = snippet.t_world_rig
-        elif isinstance(snippet, EfmSnippetView):
+        elif is_efm_snippet_view_instance(snippet):
             try:
                 traj_world_rig = snippet.trajectory.t_world_rig
             except Exception:
@@ -1406,9 +1412,9 @@ class VinModelV3(nn.Module):
         # Inputs: candidate_poses_world_cam is PoseTW (B, N_q, 12),
         # reference_pose_world_rig is PoseTW (B, 12), p3d_cameras batch is B*N_q.
         efm_dict: dict[str, Any] | None
-        if isinstance(efm, EfmSnippetView):
+        if is_efm_snippet_view_instance(efm):
             efm_dict = efm.efm
-        elif isinstance(efm, VinSnippetView):
+        elif is_vin_snippet_view_instance(efm):
             efm_dict = None
         else:
             raise TypeError(

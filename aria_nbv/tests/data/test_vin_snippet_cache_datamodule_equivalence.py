@@ -16,18 +16,17 @@ from typing import TYPE_CHECKING
 
 import pytest
 import torch
+
 from aria_nbv.configs import PathConfig
-from aria_nbv.data import VinSnippetView
-from aria_nbv.data.offline_cache import (
+from aria_nbv.data_handling import (
+    VIN_SNIPPET_PAD_POINTS,
     OracleRriCacheConfig,
     OracleRriCacheDatasetConfig,
-)
-from aria_nbv.data.vin_oracle_datasets import VinOracleCacheDatasetConfig
-from aria_nbv.data.vin_oracle_types import VinOracleBatch
-from aria_nbv.data.vin_snippet_cache import (
-    VIN_SNIPPET_PAD_POINTS,
+    VinOracleBatch,
+    VinOracleCacheDatasetConfig,
     VinSnippetCacheConfig,
     VinSnippetCacheWriterConfig,
+    VinSnippetView,
 )
 from aria_nbv.lightning.lit_datamodule import VinDataModuleConfig
 from aria_nbv.utils import Verbosity

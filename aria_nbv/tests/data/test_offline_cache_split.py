@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 import random
 from pathlib import Path
 
 import pytest
+
+from aria_nbv.data_handling import (
+    OracleRriCacheConfig,
+    OracleRriCacheDatasetConfig,
+    VinOracleCacheDatasetConfig,
+    rebuild_cache_index,
+    repair_oracle_cache_indices,
+)
+from aria_nbv.lightning.lit_datamodule import VinDataModule, VinDataModuleConfig
+from aria_nbv.utils import Stage
 
 
 def _write_dummy_metadata(cache_dir: Path) -> None:
@@ -67,8 +76,6 @@ def _unwrap_base_dataset(dataset: object) -> object:
 
 def test_rebuild_cache_index_random_split(tmp_path: Path) -> None:
     """Rebuild split indices using a deterministic RNG seed."""
-    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
-    rebuild_cache_index = offline_mod.rebuild_cache_index
 
     cache_dir = tmp_path / "cache"
     samples_dir = cache_dir / "samples"
@@ -99,10 +106,7 @@ def test_rebuild_cache_index_random_split(tmp_path: Path) -> None:
 
 
 def test_cache_split_creates_train_val_indices(tmp_path: Path) -> None:
-    """Create train/val index files and verify the split sizes."""
-    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
-    OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
-    OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
+    """Repair train/val index files and verify the split sizes."""
 
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
@@ -115,6 +119,7 @@ def test_cache_split_creates_train_val_indices(tmp_path: Path) -> None:
     _write_index(cache_dir / "index.jsonl", entries)
 
     cache_cfg = OracleRriCacheConfig(cache_dir=cache_dir)
+    repair_oracle_cache_indices(cache=cache_cfg, train_val_split=val_fraction)
     train_cfg = OracleRriCacheDatasetConfig(
         cache=cache_cfg,
         split="train",
@@ -142,10 +147,7 @@ def test_cache_split_creates_train_val_indices(tmp_path: Path) -> None:
 
 
 def test_cache_split_preserves_existing_assignments(tmp_path: Path) -> None:
-    """Keep existing train/val assignments when new entries are appended."""
-    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
-    OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
-    OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
+    """Repair keeps existing assignments and readers reject stale split files."""
 
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
@@ -157,6 +159,7 @@ def test_cache_split_preserves_existing_assignments(tmp_path: Path) -> None:
     _write_index(cache_dir / "index.jsonl", entries)
 
     cache_cfg = OracleRriCacheConfig(cache_dir=cache_dir)
+    repair_oracle_cache_indices(cache=cache_cfg, train_val_split=val_fraction)
     train_cfg = OracleRriCacheDatasetConfig(
         cache=cache_cfg,
         split="train",
@@ -176,11 +179,14 @@ def test_cache_split_preserves_existing_assignments(tmp_path: Path) -> None:
     with (cache_dir / "index.jsonl").open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(new_entry) + "\n")
 
-    OracleRriCacheDatasetConfig(
-        cache=cache_cfg,
-        split="train",
-        train_val_split=0.2,
-    ).setup_target()
+    with pytest.raises(ValueError):
+        OracleRriCacheDatasetConfig(
+            cache=cache_cfg,
+            split="train",
+            train_val_split=0.2,
+        ).setup_target()
+
+    repair_oracle_cache_indices(cache=cache_cfg, train_val_split=val_fraction)
 
     val_keys_after = _index_keys(cache_cfg.val_index_path)
 
@@ -189,9 +195,6 @@ def test_cache_split_preserves_existing_assignments(tmp_path: Path) -> None:
 
 def test_cache_split_real_data() -> None:
     """Exercise train/val split on an existing offline cache."""
-    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
-    OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
-    OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
 
     repo_root = Path(__file__).resolve().parents[2]
     cache_dir = repo_root / ".data" / "oracle_rri_cache"
@@ -201,6 +204,7 @@ def test_cache_split_real_data() -> None:
         pytest.skip("Missing real offline cache metadata.json")
 
     cache_cfg = OracleRriCacheConfig(cache_dir=cache_dir)
+    repair_oracle_cache_indices(cache=cache_cfg, train_val_split=0.2)
     train_cfg = OracleRriCacheDatasetConfig(
         cache=cache_cfg,
         split="train",
@@ -215,17 +219,6 @@ def test_cache_split_real_data() -> None:
 
 def test_datamodule_applies_cache_split(tmp_path: Path) -> None:
     """VinDataModule should honor explicit train/val cache splits."""
-    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
-    dm_mod = importlib.import_module("aria_nbv.lightning.lit_datamodule")
-    datasets_mod = importlib.import_module("aria_nbv.data.vin_oracle_datasets")
-    utils_mod = importlib.import_module("aria_nbv.utils")
-
-    OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
-    OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
-    VinOracleCacheDatasetConfig = datasets_mod.VinOracleCacheDatasetConfig  # noqa: N806
-    VinDataModuleConfig = dm_mod.VinDataModuleConfig  # noqa: N806
-    VinDataModule = dm_mod.VinDataModule  # noqa: N806
-    Stage = utils_mod.Stage  # noqa: N806
 
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
@@ -234,6 +227,7 @@ def test_datamodule_applies_cache_split(tmp_path: Path) -> None:
     _write_index(cache_dir / "index.jsonl", _build_entries(6))
 
     cache_cfg = OracleRriCacheConfig(cache_dir=cache_dir)
+    repair_oracle_cache_indices(cache=cache_cfg, train_val_split=0.25)
     base_cache_cfg = OracleRriCacheDatasetConfig(
         cache=cache_cfg,
         split="all",
@@ -262,9 +256,6 @@ def test_datamodule_applies_cache_split(tmp_path: Path) -> None:
 
 def test_cache_dataset_include_snippet_real_data() -> None:
     """Load an EFM snippet from the offline cache when enabled."""
-    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
-    OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
-    OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
 
     repo_root = Path(__file__).resolve().parents[2]
     cache_dir = repo_root / ".data" / "oracle_rri_cache"
@@ -276,6 +267,7 @@ def test_cache_dataset_include_snippet_real_data() -> None:
         pytest.skip("Missing ASE EFM data directory")
 
     cache_cfg = OracleRriCacheConfig(cache_dir=cache_dir)
+    repair_oracle_cache_indices(cache=cache_cfg, train_val_split=0.2)
     cache_ds_cfg = OracleRriCacheDatasetConfig(
         cache=cache_cfg,
         split="train",
@@ -292,9 +284,6 @@ def test_cache_dataset_include_snippet_real_data() -> None:
 
 def test_cache_dataset_returns_vin_batch_real_data() -> None:
     """Return VIN batch format directly from the cache dataset."""
-    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
-    OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
-    OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
 
     repo_root = Path(__file__).resolve().parents[2]
     cache_dir = repo_root / ".data" / "oracle_rri_cache"
@@ -304,6 +293,7 @@ def test_cache_dataset_returns_vin_batch_real_data() -> None:
         pytest.skip("Missing real offline cache metadata.json")
 
     cache_cfg = OracleRriCacheConfig(cache_dir=cache_dir)
+    repair_oracle_cache_indices(cache=cache_cfg, train_val_split=0.2)
     cache_ds_cfg = OracleRriCacheDatasetConfig(
         cache=cache_cfg,
         split="train",
@@ -319,9 +309,6 @@ def test_cache_dataset_returns_vin_batch_real_data() -> None:
 
 def test_cache_dataset_simplification(tmp_path: Path) -> None:
     """Simplification should reduce the exposed length."""
-    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
-    OracleRriCacheConfig = offline_mod.OracleRriCacheConfig  # noqa: N806
-    OracleRriCacheDatasetConfig = offline_mod.OracleRriCacheDatasetConfig  # noqa: N806
 
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
@@ -334,6 +321,7 @@ def test_cache_dataset_simplification(tmp_path: Path) -> None:
     _write_index(cache_dir / "index.jsonl", entries)
 
     cache_cfg = OracleRriCacheConfig(cache_dir=cache_dir)
+    repair_oracle_cache_indices(cache=cache_cfg, train_val_split=val_fraction)
     ds_cfg = OracleRriCacheDatasetConfig(
         cache=cache_cfg,
         split="train",
