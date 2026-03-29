@@ -232,6 +232,8 @@ docs/_freeze/**/*.html
 .codex/*.pdf
 .codex/*.patch
 .codex/*.skill
+.agents/tmp/*
+
 # Large download manifests
 .data/aria_download_urls/
 .data
