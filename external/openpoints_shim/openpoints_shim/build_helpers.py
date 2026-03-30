@@ -101,7 +101,7 @@ def _run_setup_py(path: Path, env: dict[str, str]) -> None:
 
 
 def _infer_cuda_home_from_venv(repo_root: Path) -> Path | None:
-    venv_cfg = repo_root / "oracle_rri" / ".venv" / "pyvenv.cfg"
+    venv_cfg = repo_root / "aria_nbv" / ".venv" / "pyvenv.cfg"
     if not venv_cfg.is_file():
         return None
 

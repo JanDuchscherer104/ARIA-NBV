@@ -2,7 +2,7 @@
 title: "ProjectAria Tools: Complete Reference"
 subtitle: "Data Loading, Transforms, Calibration & Visualization"
 format: html
-jupyter: python3
+jupyter: aria_nbv
 ---
 
 ```{python}

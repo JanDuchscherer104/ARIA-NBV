@@ -1,6 +1,6 @@
 ---
 id: gotchas
-updated: 2026-03-25
+updated: 2026-03-30
 scope: repo
 owner: jan
 status: active
@@ -10,7 +10,7 @@ tags: [workflow, training, cache, frames]
 # Gotchas
 
 ## Environment and Tooling
-- Prefer `uv run pytest` or `oracle_rri/.venv/bin/python -m pytest`; the system interpreter may miss dependencies such as `power_spherical`.
+- Prefer `uv run --project aria_nbv pytest` or `aria_nbv/.venv/bin/python -m pytest`; the system interpreter may miss dependencies such as `power_spherical`.
 - Assume the environment is working unless the user indicates otherwise, but verify the exact interpreter before concluding a dependency problem.
 - `make context` refreshes the lightweight routing artifacts only; use targeted search on `source_index.md`, `literature_index.md`, and `data_contracts.md` instead of loading broad dumps.
 - `make context-heavy` and the `context-uml`, `context-docstrings`, or `context-tree` targets are explicit fallback tools for architecture or refactor tasks.
