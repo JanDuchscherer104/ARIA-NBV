@@ -2,392 +2,42 @@
 
 from __future__ import annotations
 
-import tarfile
 import warnings
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 import torch
 import trimesh
 from atek.data_loaders.atek_wds_dataloader import load_atek_wds_dataset
-from efm3d.aria.aria_constants import (
-    ARIA_POINTS_VOL_MAX,
-    ARIA_POINTS_VOL_MIN,
-    ARIA_POINTS_WORLD,
-)
 from efm3d.dataset.efm_model_adaptor import EfmModelAdaptor, pipelinefilter
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 from torch.utils.data import IterableDataset
 
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console, Verbosity
+from .efm_dataset_utils import (
+    _find_tar_for_sample,
+    _infer_ids,
+    _matches_snippet_token,
+    _resolve_tar_for_shard,
+    _resolve_tar_from_path,
+    _split_snippet_ids,
+    _unique_preserve_order,
+    infer_semidense_bounds,
+)
 from .efm_views import EfmSnippetView
 from .mesh_cache import MeshProcessSpec, load_or_process_mesh
 
 
-def _infer_ids(
-    efm_dict: Mapping[str, Any],
-    sequence_name: str | None = None,
-) -> tuple[str, str]:
-    """Infer scene and snippet ids from keys/url."""
-    scene_id = str(sequence_name or efm_dict.get("sequence_name", "unknown"))
-    snippet_id = efm_dict.get("__key__") or efm_dict.get("__url__")
-    if isinstance(snippet_id, str):
-        snippet_id = Path(snippet_id).stem
-    else:
-        snippet_id = "unknown"
-    if scene_id == "unknown" and "__url__" in efm_dict:
-        parent = Path(str(efm_dict["__url__"])).parent.name
-        if parent.isdigit():
-            scene_id = parent
-    return scene_id, str(snippet_id)
-
-
-def _unique_preserve_order(values: Iterable[str]) -> list[str]:
-    """Return unique values while preserving their first-seen order."""
-    seen: set[str] = set()
-    out: list[str] = []
-    for value in values:
-        if value in seen:
-            continue
-        seen.add(value)
-        out.append(value)
-    return out
-
-
-def _looks_like_sample_key(snippet_id: str) -> bool:
-    """Return whether a snippet identifier looks like a per-sample key."""
-    return any(token in snippet_id for token in ("AtekDataSample", "DataSample"))
-
-
-def _looks_like_shard_id(snippet_id: str) -> bool:
-    """Return whether a snippet identifier refers to a shard tar."""
-    stem = Path(snippet_id).name
-    return stem.startswith("shards-") or stem.endswith("_tar") or stem.endswith(".tar")
-
-
-def _normalize_shard_stem(snippet_id: str) -> str:
-    """Normalize shard identifiers into a tar-file stem."""
-    stem = Path(snippet_id).stem
-    if stem.endswith("_tar"):
-        stem = stem[: -len("_tar")]
-    return stem
-
-
-def _matches_snippet_token(prefix: str, token: str) -> bool:
-    """Return whether a shard member prefix matches the requested token."""
-    return prefix == token or prefix.endswith(token)
-
-
-def _tar_contains_snippet(tar_path: Path, snippet_token: str) -> bool:
-    """Return whether a shard tar contains the requested snippet token."""
-    with tarfile.open(tar_path, "r") as tar:
-        for member in tar:
-            prefix = member.name.split(".", 1)[0]
-            if _matches_snippet_token(prefix, snippet_token):
-                return True
-    return False
-
-
-def _resolve_tar_from_path(
-    *,
-    snippet_id: str,
-    paths: PathConfig,
-) -> Path | None:
-    """Resolve an explicit shard path or relative shard reference."""
-    candidate = Path(snippet_id)
-    if candidate.is_absolute():
-        if candidate.suffix != ".tar":
-            candidate = candidate.with_suffix(".tar")
-        return candidate if candidate.exists() else None
-    if candidate.parent != Path():
-        resolved = paths.resolve_under_root(candidate)
-        if resolved.suffix != ".tar":
-            resolved = resolved.with_suffix(".tar")
-        return resolved if resolved.exists() else None
-    return None
-
-
-def _resolve_tar_for_shard(
-    *,
-    shard_id: str,
-    scene_dirs: list[Path],
-) -> list[Path]:
-    """Resolve a shard identifier against the configured scene directories."""
-    stem = _normalize_shard_stem(shard_id)
-    matches: list[Path] = []
-    for scene_dir in scene_dirs:
-        candidate = scene_dir / f"{stem}.tar"
-        if candidate.exists():
-            matches.append(candidate)
-    return matches
-
-
-def _find_tar_for_sample(
-    *,
-    sample_key: str,
-    scene_dirs: list[Path],
-) -> Path | None:
-    """Find the shard tar that contains the requested sample key."""
-    for scene_dir in scene_dirs:
-        for tar_path in sorted(scene_dir.glob("*.tar")):
-            if _tar_contains_snippet(tar_path, sample_key):
-                return tar_path
-    return None
-
-
-def _split_snippet_ids(snippet_ids: Iterable[str]) -> tuple[list[str], list[str]]:
-    """Split mixed snippet identifiers into shard ids and sample keys."""
-    shard_ids: list[str] = []
-    sample_keys: list[str] = []
-    for snippet_id in snippet_ids:
-        if _looks_like_shard_id(snippet_id):
-            shard_ids.append(snippet_id)
-        else:
-            sample_keys.append(snippet_id)
-    return shard_ids, sample_keys
-
-
-def _tensor3(value: Any) -> torch.Tensor | None:
-    """Return ``value`` when it is a tensor with exactly three elements."""
-    if isinstance(value, torch.Tensor) and value.numel() == 3:
-        return value
-    return None
-
-
-def infer_semidense_bounds(
-    efm_dict: Mapping[str, Any],
-) -> tuple[torch.Tensor, torch.Tensor] | None:
-    """Infer snippet world-space AABB from semidense metadata or points.
-
-    Preference order:
-    1) ``ARIA_POINTS_VOL_MIN`` / ``ARIA_POINTS_VOL_MAX`` (or legacy keys ``points/vol_min``, ``points/vol_max``)
-    2) Axis-aligned bounds of finite semidense points (ignoring padded/NaN entries)
-
-    Returns:
-        Tuple of ``(min, max)`` tensors on CPU if finite bounds are available, otherwise ``None``.
-    """
-    vol_min = _tensor3(efm_dict.get(ARIA_POINTS_VOL_MIN))
-    if vol_min is None:
-        vol_min = _tensor3(efm_dict.get("points/vol_min"))
-
-    vol_max = _tensor3(efm_dict.get(ARIA_POINTS_VOL_MAX))
-    if vol_max is None:
-        vol_max = _tensor3(efm_dict.get("points/vol_max"))
-    vol_bounds: tuple[torch.Tensor, torch.Tensor] | None = None
-    if vol_min is not None and vol_max is not None and torch.isfinite(vol_min).all() and torch.isfinite(vol_max).all():
-        vol_bounds = (vol_min.detach().cpu(), vol_max.detach().cpu())
-
-    points = efm_dict.get(ARIA_POINTS_WORLD)
-    point_bounds: tuple[torch.Tensor, torch.Tensor] | None = None
-    if isinstance(points, torch.Tensor) and points.shape[-1] == 3:
-        lengths = efm_dict.get("msdpd#points_world_lengths") or efm_dict.get(
-            "points/lengths",
-        )
-        if isinstance(lengths, torch.Tensor):
-            lengths = lengths.to(dtype=torch.long)
-
-        mask_valid = torch.isfinite(points).all(dim=-1)
-        if isinstance(lengths, torch.Tensor) and lengths.shape[0] == points.shape[0]:
-            idx = torch.arange(points.shape[1], device=points.device).unsqueeze(
-                0,
-            ) < lengths.unsqueeze(-1)
-            mask_valid &= idx
-
-        if mask_valid.any():
-            valid_points = points[mask_valid]
-            min_vec = valid_points.min(dim=0).values.detach().cpu()
-            max_vec = valid_points.max(dim=0).values.detach().cpu()
-            if torch.isfinite(min_vec).all() and torch.isfinite(max_vec).all():
-                point_bounds = (min_vec, max_vec)
-
-    if vol_bounds is None and point_bounds is None:
-        base_bounds = None
-    elif vol_bounds is None:
-        base_bounds = point_bounds
-    elif point_bounds is None:
-        base_bounds = vol_bounds
-    else:
-        vol_extent = (vol_bounds[1] - vol_bounds[0]).clamp_min(1e-6)
-        point_extent = (point_bounds[1] - point_bounds[0]).clamp_min(1e-6)
-        vol_volume = torch.prod(vol_extent)
-        point_volume = torch.prod(point_extent)
-        base_bounds = point_bounds if point_volume < vol_volume else vol_bounds
-
-    return base_bounds
-
-
-class AseEfmDataset(IterableDataset[EfmSnippetView]):
-    """Iterable dataset yielding :class:`EfmSnippetView` with optional GT mesh."""
-
-    def __init__(self, config: AseEfmDatasetConfig):
-        """Initialize the dataset wrapper and its WebDataset source."""
-        warnings.filterwarnings(
-            "ignore",
-            message=r"You are using `torch\.load` with `weights_only=False`.*",
-            category=FutureWarning,
-        )
-
-        super().__init__()
-        self.config = config
-        self.console = Console.with_prefix(self.__class__.__name__).set_verbosity(
-            config.verbosity,
-        )
-
-        self.console.log(
-            f"Loading EFM-formatted ATEK WDS from {len(config.tar_urls)} shards",
-        )
-
-        self._efm_wds = self._load_atek_wds_dataset_as_efm()
-        self._mesh_cache: dict[str, trimesh.Trimesh] = {}
-        self._snippet_key_filter = {key for key in self.config.snippet_key_filter if key}
-        self.console.log("EFM loader ready")
-
-    def _load_atek_wds_dataset_as_efm(self):
-        """Build the underlying ATEK-to-EFM WebDataset pipeline."""
-        return load_atek_wds_dataset(
-            urls=self.config.tar_urls,
-            dict_key_mapping=EfmModelAdaptor.get_dict_key_mapping_all(),
-            data_transform_fn=pipelinefilter(
-                EfmModelAdaptor(
-                    freq=self.config.freq_hz,
-                    snippet_length_s=self.config.snippet_length_s,
-                    semidense_points_pad_to_num=self.config.semidense_points_pad,
-                    atek_to_efm_taxonomy_mapping_file=self.config.taxonomy_csv.as_posix()
-                    if self.config.taxonomy_csv
-                    else None,
-                ).atek_to_efm,
-            )(
-                train=False,
-            ),
-            batch_size=self.config.batch_size,
-            collation_fn=None,
-            repeat_flag=self.config.wds_repeat,
-            shuffle_flag=self.config.wds_shuffle,
-        )
-
-    def _load_mesh(self, scene_id: str) -> trimesh.Trimesh | None:
-        """Load and optionally memoize the GT mesh for a scene."""
-        if scene_id in self._mesh_cache:
-            return self._mesh_cache[scene_id]
-        mesh_path = self.config.scene_to_mesh.get(scene_id)
-        if mesh_path is None or not mesh_path.exists():
-            if self.config.require_mesh:
-                raise FileNotFoundError(
-                    f"GT mesh for scene {scene_id} not found (require_mesh=True).",
-                )
-            return None
-        mesh = trimesh.load(str(mesh_path), process=False)
-        if not isinstance(mesh, trimesh.Trimesh):
-            raise TypeError(f"Mesh for scene {scene_id} is not Trimesh")
-        if self.config.cache_meshes:
-            self._mesh_cache[scene_id] = mesh
-        return mesh
-
-    def _iter_efm_samples(self) -> Iterator[dict[str, Any]]:
-        """Yield per-snippet EFM dicts from the WebDataset loader.
-
-        ``load_atek_wds_dataset_as_efm`` already returns a list of snippet dicts
-        when ``batch_size`` is set, so we simply iterate that list and avoid any
-        further explosion along the frame dimension (which corrupted shapes).
-        """
-        for raw in self._efm_wds:
-            if isinstance(raw, Mapping):
-                yield dict(raw)
-                continue
-
-            if isinstance(raw, (list, tuple)):
-                for sample in raw:
-                    if not isinstance(sample, Mapping):
-                        raise TypeError(
-                            f"Unexpected sample type {type(sample)} from batched list",
-                        )
-                    yield dict(sample)
-                continue
-
-            raise TypeError(f"Unexpected sample type from loader: {type(raw)}")
-
-    def __iter__(self) -> Iterator[EfmSnippetView]:
-        """Yield raw snippet views together with optional processed meshes."""
-        for efm_dict in self._iter_efm_samples():
-            scene_id, snippet_id = _infer_ids(
-                efm_dict,
-                efm_dict.get("sequence_name", ""),
-            )
-            if self._snippet_key_filter and not any(
-                _matches_snippet_token(snippet_id, token) for token in self._snippet_key_filter
-            ):
-                continue
-            mesh_base = self._load_mesh(scene_id) if self.config.load_meshes else None
-            mesh = mesh_base
-            crop_bounds = None
-            mesh_verts = None
-            mesh_faces = None
-
-            bounds = infer_semidense_bounds(efm_dict)
-
-            mesh_specs = None
-            if mesh_base is not None:
-                if bounds is None:
-                    raise ValueError(
-                        f"Unable to infer crop bounds for snippet {snippet_id} (scene {scene_id}) with mesh present.",
-                    )
-
-                spec = MeshProcessSpec(
-                    scene_id=scene_id,
-                    crop=self.config.crop_mesh,
-                    bounds_min=bounds[0].tolist(),
-                    bounds_max=bounds[1].tolist(),
-                    margin_m=float(self.config.mesh_crop_margin_m or 0.0),
-                    simplify_ratio=self.config.mesh_simplify_ratio,
-                    crop_min_keep_ratio=self.config.mesh_crop_min_keep_ratio,
-                )
-
-                processed = load_or_process_mesh(
-                    mesh_base,
-                    spec,
-                    self.config.paths,
-                    console=self.console,
-                )
-                mesh = processed.mesh
-                crop_bounds = processed.bounds
-                mesh_verts = processed.verts
-                mesh_faces = processed.faces
-                mesh_cache_key = processed.spec_hash
-                mesh_specs = spec
-            else:
-                if bounds is None:
-                    raise ValueError(
-                        f"Unable to infer crop bounds for snippet {snippet_id} (scene {scene_id}).",
-                    )
-                margin = float(self.config.mesh_crop_margin_m or 0.0)
-                crop_bounds = (bounds[0] - margin, bounds[1] + margin)
-                mesh_cache_key = None
-
-            sample = EfmSnippetView(
-                efm=efm_dict,
-                scene_id=scene_id,
-                snippet_id=snippet_id,
-                mesh=mesh,
-                crop_bounds=crop_bounds,
-                mesh_verts=mesh_verts,
-                mesh_faces=mesh_faces,
-                mesh_cache_key=mesh_cache_key,
-                mesh_specs=mesh_specs,
-            )
-
-            yield sample
-
-
-class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
+class AseEfmDatasetConfig(BaseConfig):
     """Configuration for :class:`AseEfmDataset`."""
 
     cache_exclude_fields: ClassVar[set[str]] = {"tar_urls", "scene_to_mesh"}
     """Fields omitted from cache snapshots because they are large or derived."""
 
     @property
-    def target(self) -> type[AseEfmDataset]:
+    def target(self) -> type["AseEfmDataset"]:
         """Factory target for :meth:`BaseConfig.setup_target`."""
         return AseEfmDataset
 
@@ -679,4 +329,166 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
         return self.target(self)
 
 
-__all__ = ["AseEfmDataset", "AseEfmDatasetConfig", "infer_semidense_bounds"]
+class AseEfmDataset(IterableDataset[EfmSnippetView]):
+    """Iterable dataset yielding :class:`EfmSnippetView` with optional GT mesh."""
+
+    def __init__(self, config: AseEfmDatasetConfig):
+        """Initialize the dataset wrapper and its WebDataset source."""
+        warnings.filterwarnings(
+            "ignore",
+            message=r"You are using `torch\.load` with `weights_only=False`.*",
+            category=FutureWarning,
+        )
+
+        super().__init__()
+        self.config = config
+        self.console = Console.with_prefix(self.__class__.__name__).set_verbosity(
+            config.verbosity,
+        )
+
+        self.console.log(
+            f"Loading EFM-formatted ATEK WDS from {len(config.tar_urls)} shards",
+        )
+
+        self._efm_wds = self._load_atek_wds_dataset_as_efm()
+        self._mesh_cache: dict[str, trimesh.Trimesh] = {}
+        self._snippet_key_filter = {key for key in self.config.snippet_key_filter if key}
+        self.console.log("EFM loader ready")
+
+    def _load_atek_wds_dataset_as_efm(self):
+        """Build the underlying ATEK-to-EFM WebDataset pipeline."""
+        return load_atek_wds_dataset(
+            urls=self.config.tar_urls,
+            dict_key_mapping=EfmModelAdaptor.get_dict_key_mapping_all(),
+            data_transform_fn=pipelinefilter(
+                EfmModelAdaptor(
+                    freq=self.config.freq_hz,
+                    snippet_length_s=self.config.snippet_length_s,
+                    semidense_points_pad_to_num=self.config.semidense_points_pad,
+                    atek_to_efm_taxonomy_mapping_file=self.config.taxonomy_csv.as_posix()
+                    if self.config.taxonomy_csv
+                    else None,
+                ).atek_to_efm,
+            )(
+                train=False,
+            ),
+            batch_size=self.config.batch_size,
+            collation_fn=None,
+            repeat_flag=self.config.wds_repeat,
+            shuffle_flag=self.config.wds_shuffle,
+        )
+
+    def _load_mesh(self, scene_id: str) -> trimesh.Trimesh | None:
+        """Load and optionally memoize the GT mesh for a scene."""
+        if scene_id in self._mesh_cache:
+            return self._mesh_cache[scene_id]
+        mesh_path = self.config.scene_to_mesh.get(scene_id)
+        if mesh_path is None or not mesh_path.exists():
+            if self.config.require_mesh:
+                raise FileNotFoundError(
+                    f"GT mesh for scene {scene_id} not found (require_mesh=True).",
+                )
+            return None
+        mesh = trimesh.load(str(mesh_path), process=False)
+        if not isinstance(mesh, trimesh.Trimesh):
+            raise TypeError(f"Mesh for scene {scene_id} is not Trimesh")
+        if self.config.cache_meshes:
+            self._mesh_cache[scene_id] = mesh
+        return mesh
+
+    def _iter_efm_samples(self) -> Iterator[dict[str, Any]]:
+        """Yield per-snippet EFM dicts from the WebDataset loader.
+
+        ``load_atek_wds_dataset_as_efm`` already returns a list of snippet dicts
+        when ``batch_size`` is set, so we simply iterate that list and avoid any
+        further explosion along the frame dimension (which corrupted shapes).
+        """
+        for raw in self._efm_wds:
+            if isinstance(raw, Mapping):
+                yield dict(raw)
+                continue
+
+            if isinstance(raw, (list, tuple)):
+                for sample in raw:
+                    if not isinstance(sample, Mapping):
+                        raise TypeError(
+                            f"Unexpected sample type {type(sample)} from batched list",
+                        )
+                    yield dict(sample)
+                continue
+
+            raise TypeError(f"Unexpected sample type from loader: {type(raw)}")
+
+    def __iter__(self) -> Iterator[EfmSnippetView]:
+        """Yield raw snippet views together with optional processed meshes."""
+        for efm_dict in self._iter_efm_samples():
+            scene_id, snippet_id = _infer_ids(
+                efm_dict,
+                efm_dict.get("sequence_name", ""),
+            )
+            if self._snippet_key_filter and not any(
+                _matches_snippet_token(snippet_id, token) for token in self._snippet_key_filter
+            ):
+                continue
+            mesh_base = self._load_mesh(scene_id) if self.config.load_meshes else None
+            mesh = mesh_base
+            crop_bounds = None
+            mesh_verts = None
+            mesh_faces = None
+
+            bounds = infer_semidense_bounds(efm_dict)
+
+            mesh_specs = None
+            if mesh_base is not None:
+                if bounds is None:
+                    raise ValueError(
+                        f"Unable to infer crop bounds for snippet {snippet_id} (scene {scene_id}) with mesh present.",
+                    )
+
+                spec = MeshProcessSpec(
+                    scene_id=scene_id,
+                    crop=self.config.crop_mesh,
+                    bounds_min=bounds[0].tolist(),
+                    bounds_max=bounds[1].tolist(),
+                    margin_m=float(self.config.mesh_crop_margin_m or 0.0),
+                    simplify_ratio=self.config.mesh_simplify_ratio,
+                    crop_min_keep_ratio=self.config.mesh_crop_min_keep_ratio,
+                )
+
+                processed = load_or_process_mesh(
+                    mesh_base,
+                    spec,
+                    self.config.paths,
+                    console=self.console,
+                )
+                mesh = processed.mesh
+                crop_bounds = processed.bounds
+                mesh_verts = processed.verts
+                mesh_faces = processed.faces
+                mesh_cache_key = processed.spec_hash
+                mesh_specs = spec
+            else:
+                if bounds is None:
+                    raise ValueError(
+                        f"Unable to infer crop bounds for snippet {snippet_id} (scene {scene_id}).",
+                    )
+                margin = float(self.config.mesh_crop_margin_m or 0.0)
+                crop_bounds = (bounds[0] - margin, bounds[1] + margin)
+                mesh_cache_key = None
+
+            sample = EfmSnippetView(
+                efm=efm_dict,
+                scene_id=scene_id,
+                snippet_id=snippet_id,
+                mesh=mesh,
+                crop_bounds=crop_bounds,
+                mesh_verts=mesh_verts,
+                mesh_faces=mesh_faces,
+                mesh_cache_key=mesh_cache_key,
+                mesh_specs=mesh_specs,
+            )
+
+            yield sample
+
+
+__all__ = ["AseEfmDataset", "AseEfmDatasetConfig"]
