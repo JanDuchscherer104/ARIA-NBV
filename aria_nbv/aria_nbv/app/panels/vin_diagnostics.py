@@ -9,13 +9,13 @@ import streamlit as st
 import torch
 
 from ...configs import PathConfig
-from ...data import VinOracleBatch
-from ...data.vin_snippet_cache import (
+from ...data_handling import (
+    VinOracleBatch,
     VinSnippetCacheConfig,
     VinSnippetCacheDatasetConfig,
+    empty_vin_snippet,
     read_vin_snippet_cache_metadata,
 )
-from ...data.vin_snippet_utils import empty_vin_snippet
 from ...utils import Stage
 from ..state import VIN_DIAG_STATE_KEY, get_vin_state
 from ..state_types import config_signature

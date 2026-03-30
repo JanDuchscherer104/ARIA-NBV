@@ -6,7 +6,7 @@ import streamlit as st
 import torch
 from efm3d.aria.pose import PoseTW
 
-from ...data import EfmSnippetView
+from ...data_handling import EfmSnippetView
 from ...pose_generation import CandidateViewGeneratorConfig
 from ...pose_generation.plotting import (
     CandidatePlotBuilder,

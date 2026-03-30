@@ -329,6 +329,28 @@ class PathConfig(SingletonConfig):
             resolved = base / resolved
         return resolved.expanduser().resolve()
 
+    def resolve_cache_artifact_dir(self, path: str | Path) -> Path:
+        """Resolve a cache or store directory against the configured data roots.
+
+        Relative paths default to :attr:`offline_cache_dir` when available and
+        otherwise fall back to :attr:`data_root`. Paths that already start with
+        the data-root or offline-cache root name are instead interpreted
+        relative to :attr:`root` so callers can still pass repo-root-relative
+        paths such as ``offline_cache/foo``.
+        """
+
+        candidate = Path(path)
+        if candidate.is_absolute():
+            return candidate.expanduser().resolve()
+
+        base_dir = self.offline_cache_dir or self.data_root
+        if candidate.parts:
+            if candidate.parts[0] == self.data_root.name or (
+                self.offline_cache_dir is not None and candidate.parts[0] == self.offline_cache_dir.name
+            ):
+                base_dir = self.root
+        return self.resolve_under_root(candidate, base_dir=base_dir)
+
     def resolve_run_dir(self, out_dir: str | Path) -> Path:
         """Resolve a run output directory and ensure it exists."""
         resolved = self.resolve_under_root(out_dir)

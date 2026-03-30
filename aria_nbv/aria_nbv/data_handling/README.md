@@ -9,6 +9,10 @@ offline diagnostics. It owns:
 - the new immutable VIN offline dataset format, and
 - temporary migration and compatibility surfaces for the legacy oracle and VIN caches.
 
+Mirrored legacy module paths under `aria_nbv.data.*` are compatibility aliases
+that resolve to these canonical implementations so type identity stays unified
+while callers are migrated.
+
 Code outside this package should import from `aria_nbv.data_handling` rather
 than from `aria_nbv.data_handling.*` submodules directly.
 

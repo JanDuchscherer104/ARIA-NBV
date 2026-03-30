@@ -20,6 +20,14 @@ def _to_numpy(tensor: torch.Tensor) -> np.ndarray:
     return tensor.detach().cpu().numpy()
 
 
+def _pretty_label(text: str) -> str:
+    """Format labels by replacing underscores and title-casing words."""
+
+    if not text:
+        return text
+    return text.replace("_", " ").title()
+
+
 def _scalar_to_rgb(
     values: np.ndarray,
     *,
@@ -173,6 +181,7 @@ def _plot_hist_counts_mpl(
 __all__ = [
     "_histogram_overlay",
     "_plot_hist_counts_mpl",
+    "_pretty_label",
     "_plot_slice_grid",
     "_scalar_to_rgb",
     "_to_numpy",

@@ -87,3 +87,26 @@ def test_data_handling_has_no_legacy_data_imports() -> None:
                     offenders.append(path.relative_to(data_handling_root).as_posix())
                     break
     assert not offenders  # noqa: S101
+
+
+def test_legacy_data_modules_alias_canonical_owners() -> None:
+    """Ensure compatibility imports reuse the canonical module objects."""
+
+    pairs = {
+        "aria_nbv.data.efm_dataset": "aria_nbv.data_handling.efm_dataset",
+        "aria_nbv.data.efm_snippet_loader": "aria_nbv.data_handling.efm_snippet_loader",
+        "aria_nbv.data.efm_views": "aria_nbv.data_handling.efm_views",
+        "aria_nbv.data.mesh_cache": "aria_nbv.data_handling.mesh_cache",
+        "aria_nbv.data.offline_cache": "aria_nbv.data_handling.oracle_cache",
+        "aria_nbv.data.offline_cache_store": "aria_nbv.data_handling.offline_cache_store",
+        "aria_nbv.data.vin_oracle_datasets": "aria_nbv.data_handling.vin_oracle_datasets",
+        "aria_nbv.data.vin_oracle_types": "aria_nbv.data_handling.vin_oracle_types",
+        "aria_nbv.data.vin_snippet_cache": "aria_nbv.data_handling.vin_cache",
+        "aria_nbv.data.vin_snippet_provider": "aria_nbv.data_handling.vin_provider",
+        "aria_nbv.data.vin_snippet_utils": "aria_nbv.data_handling.vin_adapter",
+    }
+
+    for legacy_name, canonical_name in pairs.items():
+        legacy_module = importlib.import_module(legacy_name)
+        canonical_module = importlib.import_module(canonical_name)
+        assert legacy_module is canonical_module  # noqa: S101

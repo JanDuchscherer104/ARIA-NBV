@@ -109,16 +109,7 @@ class OracleRriCacheConfig(BaseConfig):
     def _resolve_cache_dir(cls, value: str | Path, info: ValidationInfo) -> Path:
         """Resolve relative cache directories against the configured data roots."""
         paths: PathConfig = info.data.get("paths") or PathConfig()
-        path = Path(value)
-        if path.is_absolute():
-            return path.expanduser().resolve()
-        base_dir = paths.offline_cache_dir or paths.data_root
-        if path.parts:
-            if path.parts[0] == paths.data_root.name or (
-                paths.offline_cache_dir is not None and path.parts[0] == paths.offline_cache_dir.name
-            ):
-                base_dir = paths.root
-        return paths.resolve_under_root(path, base_dir=base_dir)
+        return paths.resolve_cache_artifact_dir(value)
 
     @property
     def samples_dir(self) -> Path:

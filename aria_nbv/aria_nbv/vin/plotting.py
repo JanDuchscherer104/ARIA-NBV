@@ -19,7 +19,7 @@ from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import
 from ..data.plotting import SnippetPlotBuilder
 from ..data_handling import EfmSnippetView
 from ..utils.frames import rotate_yaw_cw90
-from ..utils.plotting import _histogram_overlay, _plot_slice_grid, _to_numpy
+from ..utils.plotting import _plot_slice_grid, _pretty_label
 
 Tensor = torch.Tensor
 
@@ -41,13 +41,6 @@ def _parameter_distribution(
     df = pd.DataFrame(rows)
     df = df.groupby("module", as_index=False)["num_params"].sum()
     return df.sort_values("num_params", ascending=False)
-
-
-def _pretty_label(text: str) -> str:
-    """Format labels by replacing underscores and title-casing words."""
-    if not text:
-        return text
-    return text.replace("_", " ").title()
 
 
 def _pca_2d(values: np.ndarray) -> np.ndarray:
@@ -2161,10 +2154,7 @@ def build_pos_grid_linearity_figure(
 
 
 __all__ = [
-    "_histogram_overlay",
     "_parameter_distribution",
-    "_plot_slice_grid",
-    "_to_numpy",
     "build_backbone_evidence_figures",
     "build_field_slice_figures",
     "build_geometry_overview_figure",

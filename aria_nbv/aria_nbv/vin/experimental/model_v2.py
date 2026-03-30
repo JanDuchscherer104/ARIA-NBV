@@ -60,7 +60,7 @@ from torch import Tensor, nn
 
 from aria_nbv.utils.frames import rotate_yaw_cw90
 
-from ...data.efm_views import EfmSnippetView, VinSnippetView
+from ...data_handling import EfmSnippetView, VinSnippetView
 from ...rri_metrics.coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
 from ...utils import BaseConfig, Optimizable, optimizable_field
 from ..backbone_evl import EvlBackboneConfig
@@ -83,7 +83,7 @@ from .pose_encoding import LearnableFourierFeaturesConfig
 from .types import EvlBackboneOutput, VinPrediction, VinV2ForwardDiagnostics
 
 if TYPE_CHECKING:
-    from aria_nbv.data.vin_oracle_types import VinOracleBatch
+    from aria_nbv.data_handling import VinOracleBatch
 
     from .pose_encoding import LearnableFourierFeatures
 

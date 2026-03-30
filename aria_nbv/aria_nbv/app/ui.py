@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 import torch
 
-from ..data import AseEfmDatasetConfig
+from ..data_handling import AseEfmDatasetConfig
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..pose_generation.types import CollisionBackend, SamplingStrategy, ViewDirectionMode
 from ..rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig

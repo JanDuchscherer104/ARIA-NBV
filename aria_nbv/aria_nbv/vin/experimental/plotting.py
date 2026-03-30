@@ -7,7 +7,7 @@ from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 import matplotlib as mpl
 import numpy as np
@@ -26,8 +26,9 @@ from pytorch3d.renderer.cameras import (
 
 from aria_nbv.utils.frames import rotate_yaw_cw90
 
-from ...data.efm_views import EfmSnippetView
 from ...data.plotting import SnippetPlotBuilder
+from ...utils.plotting import _pretty_label
+from ..plotting import _voxel_indices_to_world
 from .model import _build_frustum_points_world_p3d
 from .types import VinForwardDiagnostics
 
@@ -138,13 +139,6 @@ class PlottingConfig:
 
 
 DEFAULT_PLOT_CFG = PlottingConfig()
-
-
-def _pretty_label(text: str) -> str:
-    """Format labels by replacing underscores and title-casing words."""
-    if not text:
-        return text
-    return text.replace("_", " ").title()
 
 
 def _save_plotly_fig(fig: go.Figure, path: Path) -> None:

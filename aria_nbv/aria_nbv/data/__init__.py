@@ -1,4 +1,4 @@
-"""ASE dataset handling - simplified."""
+"""Legacy compatibility exports backed by :mod:`aria_nbv.data_handling`."""
 
 from .downloader import ASEDownloader, ASEDownloaderConfig
 from .efm_dataset import AseEfmDataset, AseEfmDatasetConfig
