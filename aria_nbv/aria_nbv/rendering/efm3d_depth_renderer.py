@@ -15,7 +15,7 @@ Key features:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -71,10 +71,7 @@ class Efm3dDepthRendererConfig(BaseConfig):
     is_debug: bool = False
     """Enable extra debug logging."""
 
-    @field_validator("verbosity", mode="before")
-    @classmethod
-    def _coerce_verbosity(cls, value: Any) -> Verbosity:
-        return Verbosity.from_any(value)
+    _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
 
 
 class Efm3dDepthRenderer:
@@ -87,21 +84,13 @@ class Efm3dDepthRenderer:
             .set_verbosity(self.config.verbosity)
             .set_debug(self.config.is_debug)
         )
-        self._device = self._resolve_device(self.config.device)
+        self._device = BaseConfig._resolve_device(self.config.device)
 
     @property
     def device(self) -> torch.device:
         """Torch device used for outputs."""
 
         return self._device
-
-    @staticmethod
-    def _resolve_device(value: str | torch.device) -> torch.device:
-        if isinstance(value, torch.device):
-            return value
-        if value is None or str(value).lower() == "auto":
-            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        return torch.device(value)
 
     # ------------------------------------------------------------------ #
     # Public API

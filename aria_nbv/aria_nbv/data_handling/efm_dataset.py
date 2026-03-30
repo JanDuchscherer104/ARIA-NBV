@@ -173,11 +173,7 @@ class AseEfmDatasetConfig(BaseConfig):
 
         return resolved_tar_urls
 
-    @field_validator("verbosity", mode="before")
-    @classmethod
-    def _coerce_verbosity(cls, value: Any) -> Verbosity:
-        """Normalize the configured verbosity value."""
-        return Verbosity.from_any(value)
+    _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
 
     @property
     def taxonomy_csv(self) -> Path:

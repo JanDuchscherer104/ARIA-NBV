@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
-from dataclasses import dataclass
 from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go  # type: ignore[import-untyped]
 import torch
-from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
@@ -19,7 +16,29 @@ from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import
 from ..data_handling import EfmSnippetView
 from ..utils.data_plotting import SnippetPlotBuilder
 from ..utils.frames import rotate_yaw_cw90
-from ..utils.plotting import _plot_slice_grid, _pretty_label
+from ..utils.plotting import _plot_slice_grid
+from ._plotting_common import (
+    BBOX_EDGE_IDX,
+    _as_pose_tw,
+    _camera_tw_from_p3d,
+    _candidate_valid_fraction,
+    _centers_rig_from_poses,
+    _collect_backbone_evidence_points,
+    _flatten_edges_for_plotly,
+    _frustum_builder_stub,
+    _histogram_bar,
+    _histogram_edges,
+    _line_trace,
+    _pca_2d,
+    _pca_2d_with_components,
+    _pose_first_batch,
+    _pose_from_p3d_camera,
+    _pretty_label,
+    _rotate_points_yaw_cw90,
+    _scatter3d,
+    _voxel_corners,
+    _voxel_indices_to_world,
+)
 
 Tensor = torch.Tensor
 
@@ -41,406 +60,6 @@ def _parameter_distribution(
     df = pd.DataFrame(rows)
     df = df.groupby("module", as_index=False)["num_params"].sum()
     return df.sort_values("num_params", ascending=False)
-
-
-def _pca_2d(values: np.ndarray) -> np.ndarray:
-    values = np.asarray(values, dtype=float)
-    if values.ndim != 2:
-        raise ValueError(f"Expected values with ndim=2, got {values.ndim}.")
-    values = values - values.mean(axis=0, keepdims=True)
-    _, _, vt = np.linalg.svd(values, full_matrices=False)
-    return values @ vt[:2].T
-
-
-def _pca_2d_with_components(values: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    values = np.asarray(values, dtype=float)
-    if values.ndim != 2:
-        raise ValueError(f"Expected values with ndim=2, got {values.ndim}.")
-    mean = values.mean(axis=0, keepdims=True)
-    centered = values - mean
-    _, _, vt = np.linalg.svd(centered, full_matrices=False)
-    components = vt[:2].T
-    proj = centered @ components
-    return proj, mean, components
-
-
-def _histogram_edges(values_list: Iterable[np.ndarray], *, bins: int) -> np.ndarray:
-    arrays: list[np.ndarray] = []
-    for arr in values_list:
-        vals = np.asarray(arr, dtype=float).reshape(-1)
-        vals = vals[np.isfinite(vals)]
-        if vals.size:
-            arrays.append(vals)
-    if not arrays:
-        return np.array([0.0, 1.0], dtype=float)
-    return np.histogram_bin_edges(np.concatenate(arrays, axis=0), bins=int(bins))
-
-
-def _histogram_bar(
-    values: np.ndarray,
-    *,
-    edges: np.ndarray,
-    name: str,
-    color: str | None = None,
-    opacity: float = 0.6,
-    log1p_counts: bool = False,
-) -> go.Bar:
-    vals = np.asarray(values, dtype=float).reshape(-1)
-    vals = vals[np.isfinite(vals)]
-    counts, _ = np.histogram(vals, bins=edges)
-    centers = 0.5 * (edges[:-1] + edges[1:])
-    y = np.log1p(counts) if log1p_counts else counts
-    marker: dict[str, Any] = {"opacity": opacity}
-    if color is not None:
-        marker["color"] = color
-    return go.Bar(x=centers, y=y, name=_pretty_label(name), marker=marker)
-
-
-BBOX_EDGE_IDX = np.array(
-    [
-        (0, 1),
-        (1, 2),
-        (2, 3),
-        (3, 0),
-        (4, 5),
-        (5, 6),
-        (6, 7),
-        (7, 4),
-        (0, 4),
-        (1, 5),
-        (2, 6),
-        (3, 7),
-    ],
-    dtype=np.int64,
-)
-
-
-def _flatten_edges_for_plotly(edges: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    edges = np.asarray(edges, dtype=float).reshape(-1, 2, 3)
-    edges_sep = np.concatenate(
-        [edges, np.full((edges.shape[0], 1, 3), np.nan, dtype=float)],
-        axis=1,
-    )
-    flat = edges_sep.reshape(-1, 3)
-    return flat[:, 0], flat[:, 1], flat[:, 2]
-
-
-def _voxel_corners(extent: np.ndarray) -> np.ndarray:
-    x_min, x_max, y_min, y_max, z_min, z_max = extent.tolist()
-    return np.array(
-        [
-            [x_min, y_min, z_min],
-            [x_max, y_min, z_min],
-            [x_max, y_max, z_min],
-            [x_min, y_max, z_min],
-            [x_min, y_min, z_max],
-            [x_max, y_min, z_max],
-            [x_max, y_max, z_max],
-            [x_min, y_max, z_max],
-        ],
-        dtype=float,
-    )
-
-
-def _pose_first_batch(pose: PoseTW) -> PoseTW:
-    if pose.ndim == 1:
-        return PoseTW(pose._data.unsqueeze(0))
-    if pose.ndim == 2 and pose.shape[0] > 1:
-        return PoseTW(pose._data[:1])
-    return pose
-
-
-def _as_pose_tw(pose: PoseTW | torch.Tensor) -> PoseTW:
-    """Convert a tensor pose representation into PoseTW if needed."""
-    if isinstance(pose, PoseTW):
-        return pose
-    if torch.is_tensor(pose):
-        data = pose
-        if data.shape[-1] == 12:
-            data = data.view(*data.shape[:-1], 3, 4)
-        return PoseTW.from_matrix3x4(data)
-    raise TypeError(f"Unsupported pose type: {type(pose)!s}")
-
-
-def _as_pose_batch(pose: PoseTW | torch.Tensor) -> PoseTW:
-    """Ensure poses are batched as ``(B, ..., 12)`` for plotting."""
-    pose_tw = _as_pose_tw(pose)
-    if pose_tw.ndim == 1:
-        return PoseTW(pose_tw._data.unsqueeze(0))
-    if pose_tw.ndim == 2 and pose_tw.shape[-1] == 12:
-        return PoseTW(pose_tw._data.unsqueeze(0))
-    return pose_tw
-
-
-def _broadcast_pose_batch(pose: PoseTW, *, batch_size: int, name: str) -> PoseTW:
-    """Broadcast a single pose to ``batch_size`` if needed."""
-    if pose.ndim != 2:
-        raise ValueError(f"{name} must have shape (B, 12), got ndim={pose.ndim}.")
-    if pose.shape[0] == 1 and batch_size > 1:
-        return PoseTW(pose._data.expand(batch_size, 12))
-    if pose.shape[0] != batch_size:
-        raise ValueError(f"{name} must have batch size 1 or match candidates.")
-    return pose
-
-
-def _centers_rig_from_poses(
-    reference_pose_world_rig: PoseTW,
-    candidate_poses_world_cam: PoseTW,
-) -> torch.Tensor:
-    """Compute candidate centers in the reference rig frame."""
-    pose_world_cam = _as_pose_batch(candidate_poses_world_cam)
-    pose_world_rig = _as_pose_batch(reference_pose_world_rig)
-    pose_world_rig = _broadcast_pose_batch(
-        pose_world_rig,
-        batch_size=int(pose_world_cam.shape[0]),
-        name="reference_pose_world_rig",
-    )
-    pose_rig_cam = pose_world_rig.inverse()[:, None] @ pose_world_cam
-    return pose_rig_cam.t
-
-
-def _candidate_valid_fraction(debug: Any) -> torch.Tensor:
-    """Return per-candidate validity fraction.
-
-    VIN v1 exposes per-token validity; VIN v2/v3 expose candidate validity.
-    """
-    token_valid = getattr(debug, "token_valid", None)
-    if isinstance(token_valid, torch.Tensor):
-        return token_valid.float().mean(dim=-1)
-
-    voxel_valid_frac = getattr(debug, "voxel_valid_frac", None)
-    if isinstance(voxel_valid_frac, torch.Tensor):
-        return voxel_valid_frac.float()
-
-    candidate_valid = getattr(debug, "candidate_valid", None)
-    if isinstance(candidate_valid, torch.Tensor):
-        return candidate_valid.float()
-
-    centers = debug.candidate_center_rig_m
-    return torch.ones(centers.shape[:-1], dtype=torch.float32, device=centers.device)
-
-
-def _rotate_points_yaw_cw90(
-    points: np.ndarray | torch.Tensor,
-    *,
-    pose_world_frame: PoseTW | None = None,
-    undo: bool = False,
-) -> np.ndarray | torch.Tensor:
-    """Rotate world points by the UI roll (+Z twist) used in display plots."""
-    if isinstance(points, np.ndarray):
-        if points.size == 0:
-            return points
-        pts = torch.as_tensor(points, dtype=torch.float32)
-        to_numpy = True
-    else:
-        pts = points
-        to_numpy = False
-    if pts.numel() == 0:
-        return points
-
-    angle = -np.pi / 2 if undo else np.pi / 2
-    c, s = float(np.cos(angle)), float(np.sin(angle))
-    r_roll = torch.tensor(
-        [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
-        device=pts.device,
-        dtype=pts.dtype,
-    )
-    if pose_world_frame is None:
-        rot = PoseTW.from_Rt(
-            r_roll,
-            torch.zeros(3, device=pts.device, dtype=pts.dtype),
-        )
-        rotated = rot.transform(pts)
-    else:
-        pose_rot = rotate_yaw_cw90(pose_world_frame, undo=undo)
-        pts_frame = pose_world_frame.inverse().transform(pts)
-        rotated = pose_rot.transform(pts_frame)
-    return rotated.detach().cpu().numpy() if to_numpy else rotated
-
-
-def _collect_backbone_evidence_points(
-    debug: Any,
-    *,
-    fields: list[str],
-    occ_threshold: float,
-    max_points: int,
-) -> list[tuple[str, np.ndarray, np.ndarray]]:
-    if not fields:
-        return []
-
-    out = debug.backbone_out
-    voxel_fields = {
-        "occ_pr": out.occ_pr,
-        "occ_input": out.occ_input,
-        "counts": out.counts,
-    }
-    selected = [name for name in fields if voxel_fields.get(name) is not None]
-    if not selected:
-        return []
-
-    pose = _pose_first_batch(out.t_world_voxel)
-    extent = out.voxel_extent.detach().cpu().numpy()
-    if extent.ndim == 2:
-        extent = extent[0]
-
-    samples: list[tuple[str, np.ndarray, np.ndarray]] = []
-    pts_world = out.pts_world
-    pts_world_np: np.ndarray | None = None
-    if isinstance(pts_world, torch.Tensor):
-        pts_world = pts_world.detach().cpu()
-        if pts_world.ndim == 3:
-            pts_world = pts_world[0]
-        if pts_world.ndim == 2 and pts_world.shape[1] == 3:
-            pts_world_np = pts_world.numpy()
-
-    for name in selected:
-        tensor = voxel_fields[name]
-        if tensor is None:
-            continue
-        field = tensor.detach().cpu()
-        if field.ndim == 5:
-            field = field[0, 0]
-        elif field.ndim == 4:
-            field = field[0]
-        if name == "occ_pr":
-            finite = field[torch.isfinite(field)]
-            if finite.numel() > 0:
-                min_val = float(finite.min().item())
-                max_val = float(finite.max().item())
-                if min_val < 0.0 or max_val > 1.0:
-                    field = torch.sigmoid(field)
-        d, h, w = field.shape
-
-        if name == "counts":
-            flat = field.reshape(-1)
-            if flat.numel() == 0:
-                continue
-            topk = min(int(max_points), flat.numel())
-            _, idx = torch.topk(flat, k=topk)
-            indices = np.stack(np.unravel_index(idx.numpy(), field.shape), axis=-1)
-            values = flat[idx].numpy()
-        else:
-            mask = field > float(occ_threshold)
-            indices = np.stack(np.nonzero(mask.numpy()), axis=-1)
-            values = field[mask].numpy()
-            if indices.size == 0:
-                flat = field.reshape(-1)
-                if flat.numel() == 0:
-                    continue
-                topk = min(int(max_points), flat.numel())
-                _, idx = torch.topk(flat, k=topk)
-                indices = np.stack(
-                    np.unravel_index(idx.numpy(), field.shape),
-                    axis=-1,
-                )
-                values = flat[idx].numpy()
-            if indices.shape[0] > max_points:
-                sel = np.random.choice(indices.shape[0], size=max_points, replace=False)
-                indices = indices[sel]
-                values = values[sel]
-
-        if indices.size == 0:
-            continue
-
-        points_world = None
-        if pts_world_np is not None:
-            flat_idx = indices[:, 0] * (h * w) + indices[:, 1] * w + indices[:, 2]
-            flat_idx = np.clip(flat_idx, 0, pts_world_np.shape[0] - 1)
-            points_world = pts_world_np[flat_idx]
-        if points_world is None:
-            points_world = _voxel_indices_to_world(
-                indices,
-                pose=pose,
-                extent=extent,
-                shape=(d, h, w),
-            )
-        values_np = np.asarray(values)
-        finite = np.isfinite(points_world).all(axis=1)
-        if values_np.shape[0] == points_world.shape[0]:
-            values_np = values_np[finite]
-        points_world = points_world[finite]
-        if points_world.size == 0:
-            continue
-        samples.append((name, points_world, values_np))
-
-    return samples
-
-
-def _segment_trace(
-    starts: np.ndarray,
-    ends: np.ndarray,
-    *,
-    color: str,
-    name: str,
-    width: int = 4,
-) -> go.Scatter3d:
-    starts = np.asarray(starts, dtype=float).reshape(-1, 3)
-    ends = np.asarray(ends, dtype=float).reshape(-1, 3)
-    segments = np.stack([starts, ends], axis=1)
-    x, y, z = _flatten_edges_for_plotly(segments)
-    return go.Scatter3d(
-        x=x,
-        y=y,
-        z=z,
-        mode="lines",
-        line={"color": color, "width": width},
-        name=name,
-        showlegend=True,
-    )
-
-
-def _line_trace(
-    start: np.ndarray,
-    end: np.ndarray,
-    *,
-    color: str,
-    name: str,
-) -> go.Scatter3d:
-    seg = np.stack([np.asarray(start, dtype=float), np.asarray(end, dtype=float)], axis=0)
-    x, y, z = _flatten_edges_for_plotly(seg)
-    return go.Scatter3d(
-        x=x,
-        y=y,
-        z=z,
-        mode="lines",
-        line={"color": color, "width": 3},
-        name=name,
-        showlegend=True,
-    )
-
-
-def _scatter3d(
-    points: np.ndarray,
-    *,
-    name: str,
-    color: str | None = None,
-    values: np.ndarray | None = None,
-    colorscale: str = "Viridis",
-    size: int = 3,
-    opacity: float = 0.7,
-) -> go.Scatter3d:
-    pts = np.asarray(points, dtype=float)
-    marker: dict[str, Any] = {"size": size, "opacity": opacity}
-    if values is not None:
-        marker.update(
-            {
-                "color": np.asarray(values, dtype=float),
-                "colorscale": colorscale,
-                "colorbar": {"title": _pretty_label(name)},
-            }
-        )
-    elif color is not None:
-        marker["color"] = color
-
-    return go.Scatter3d(
-        x=pts[:, 0],
-        y=pts[:, 1],
-        z=pts[:, 2],
-        mode="markers",
-        marker=marker,
-        name=_pretty_label(name),
-        showlegend=True,
-    )
 
 
 def _select_p3d_camera(cameras: PerspectiveCameras, index: int) -> PerspectiveCameras:
@@ -480,33 +99,6 @@ def _select_p3d_camera(cameras: PerspectiveCameras, index: int) -> PerspectiveCa
     return cameras
 
 
-def _voxel_indices_to_world(
-    indices: np.ndarray,
-    *,
-    pose: PoseTW,
-    extent: np.ndarray,
-    shape: tuple[int, int, int],
-) -> np.ndarray:
-    d, h, w = shape
-    x_min, x_max, y_min, y_max, z_min, z_max = extent.tolist()
-
-    dx = (x_max - x_min) / w
-    dy = (y_max - y_min) / h
-    dz = (z_max - z_min) / d
-
-    z_idx, y_idx, x_idx = indices[:, 0], indices[:, 1], indices[:, 2]
-    x = x_min + (x_idx + 0.5) * dx
-    y = y_min + (y_idx + 0.5) * dy
-    z = z_min + (z_idx + 0.5) * dz
-    points_vox = torch.tensor(
-        np.stack([x, y, z], axis=-1),
-        dtype=torch.float32,
-        device=pose.t.device,
-    )
-    points_world = pose.transform(points_vox)
-    return points_world.detach().cpu().numpy()
-
-
 def _voxel_indices_to_world_from_cache(
     indices: np.ndarray,
     *,
@@ -531,84 +123,6 @@ def _voxel_indices_to_world_from_cache(
         pose=pose,
         extent=extent,
         shape=shape,
-    )
-
-
-def _select_p3d_param(param: torch.Tensor | None, index: int) -> torch.Tensor | None:
-    if param is None:
-        return None
-    if param.ndim == 1:
-        return param
-    if param.shape[0] == 1:
-        return param[0]
-    return param[min(max(index, 0), param.shape[0] - 1)]
-
-
-def _camera_tw_from_p3d(cameras: PerspectiveCameras, index: int) -> CameraTW | None:
-    if int(cameras.R.shape[0]) == 0:
-        return None
-    focal = _select_p3d_param(cameras.focal_length, index)
-    principal = _select_p3d_param(cameras.principal_point, index)
-    image_size = _select_p3d_param(cameras.image_size, index)
-    if focal is None or principal is None or image_size is None:
-        return None
-
-    focal = focal.reshape(-1)
-    principal = principal.reshape(-1)
-    image_size = image_size.reshape(-1)
-    if focal.numel() != 2 or principal.numel() != 2 or image_size.numel() != 2:
-        return None
-
-    height = image_size[0].reshape(1)
-    width = image_size[1].reshape(1)
-    params = torch.stack((focal[0], focal[1], principal[0], principal[1]), dim=0)
-
-    return CameraTW.from_surreal(
-        width=width,
-        height=height,
-        type_str="Pinhole",
-        params=params,
-    )
-
-
-def _pose_from_p3d_camera(cameras: PerspectiveCameras, index: int) -> PoseTW | None:
-    if int(cameras.R.shape[0]) == 0:
-        return None
-    rot = _select_p3d_param(cameras.R, index)
-    trans = _select_p3d_param(cameras.T, index)
-    if rot is None or trans is None:
-        return None
-    rot = rot.reshape(3, 3)
-    trans = trans.reshape(3)
-    t_wc = -(rot @ trans.unsqueeze(-1)).squeeze(-1)
-    return PoseTW.from_Rt(rot, t_wc)
-
-
-@dataclass(slots=True)
-class _FrustumTrajectoryStub:
-    t_world_rig: PoseTW
-
-
-@dataclass(slots=True)
-class _FrustumSnippetStub:
-    trajectory: _FrustumTrajectoryStub
-    mesh: None = None
-    semidense: None = None
-
-
-def _frustum_builder_stub(
-    pose_world_cam: PoseTW | None,
-    *,
-    title: str,
-    height: int = 560,
-) -> SnippetPlotBuilder | None:
-    if pose_world_cam is None:
-        return None
-    snippet_stub = _FrustumSnippetStub(_FrustumTrajectoryStub(t_world_rig=pose_world_cam))
-    return SnippetPlotBuilder.from_snippet(
-        snippet_stub,  # type: ignore[arg-type]
-        title=title,
-        height=height,
     )
 
 

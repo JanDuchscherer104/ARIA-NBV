@@ -200,10 +200,7 @@ class CLIVinSnippetCacheBuildConfig(BaseConfig):
         env_prefix="ARIA_NBV_VIN_SNIPPET_CACHE_",
     )
 
-    @field_validator("map_location", mode="before")
-    @classmethod
-    def _validate_map_location(cls, value: str | torch.device) -> torch.device:
-        return cls._resolve_device(value)
+    _validate_map_location = field_validator("map_location", mode="before")(BaseConfig._resolve_device)
 
 
 class CLIWandbAnalysisConfig(BaseConfig):

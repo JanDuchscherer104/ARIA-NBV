@@ -17,7 +17,7 @@ from pydantic_settings import (
 from rich.text import Text
 from rich.tree import Tree
 
-from .console import Console
+from .console import Console, Verbosity
 
 
 class BaseConfig(BaseSettings):
@@ -80,6 +80,21 @@ class BaseConfig(BaseSettings):
         if value is None or str(value).lower() == "auto":
             return torch.device("cuda" if torch.cuda.is_available() else "cpu")
         return torch.device(value)
+
+    @staticmethod
+    def _coerce_verbosity(value: Any) -> Verbosity:
+        """Normalize verbosity values accepted across config models."""
+        return Verbosity.from_any(value)
+
+    @staticmethod
+    def _validate_non_negative_seed(value: Any) -> int | None:
+        """Validate optional RNG seeds shared across config models."""
+        if value is None:
+            return None
+        seed = int(value)
+        if seed < 0:
+            raise ValueError("seed must be >= 0 or None.")
+        return seed
 
     @classmethod
     def settings_customise_sources(

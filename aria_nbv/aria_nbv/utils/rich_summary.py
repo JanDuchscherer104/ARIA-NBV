@@ -5,6 +5,8 @@ from rich.text import Text
 from rich.tree import Tree
 from torch import Tensor
 
+from .summary import _extract_tensor, _tensor_summary
+
 
 def summarize(val: Tensor | Any, *, include_stats: bool = False) -> Any:
     """Small helper for succinct repr output."""
@@ -36,37 +38,6 @@ def summarize_shape(value: Any) -> str:
             return f"list(len={summary['len']})"
         return str(summary)
     return type(summary).__name__
-
-
-def _extract_tensor(val: Any) -> Tensor | None:
-    from efm3d.aria.camera import CameraTW
-    from efm3d.aria.obb import ObbTW
-    from efm3d.aria.pose import PoseTW
-    from efm3d.aria.tensor_wrapper import TensorWrapper
-
-    if isinstance(val, Tensor):
-        return val
-    if isinstance(val, PoseTW):
-        return val.matrix
-    if isinstance(val, (TensorWrapper, CameraTW, ObbTW)):
-        data = val.tensor() if callable(getattr(val, "tensor", None)) else val.tensor  # type: ignore[operator]
-        return data
-    return None
-
-
-def _tensor_summary(tensor: Tensor, *, include_stats: bool = False) -> dict[str, Any]:
-    summary: dict[str, Any] = {
-        "shape": tuple(tensor.shape),
-        "dtype": str(tensor.dtype),
-        "device": str(tensor.device),
-    }
-    if tensor.numel() and torch.is_floating_point(tensor) and include_stats:
-        finite = tensor[torch.isfinite(tensor)]
-        if finite.numel():
-            summary["min"] = float(finite.min())
-            summary["max"] = float(finite.max())
-            summary["mean"] = float(finite.mean())
-    return summary
 
 
 def _tensor_desc(tensor: Tensor) -> str:
@@ -169,7 +140,7 @@ def _format_tensor_summary(value: dict[str, Any]) -> str:
 def rich_summary(
     tree_dict: dict[str, Any],
     *,
-    path_map: dict[tuple[str, ...], str] = {},
+    path_map: dict[tuple[str, ...], str] | None = None,
     with_shape: bool = True,
     show_only_sample: list[str] | None = None,
     root_label: str = "",
@@ -187,6 +158,7 @@ def rich_summary(
 
     root = Tree(Text(root_label, style="config.name"))
     summary_data = tree_dict or {}
+    resolved_path_map = path_map or {}
     sample_only = set(show_only_sample or [])
 
     for k, v in summary_data.items():
@@ -195,7 +167,7 @@ def rich_summary(
             k,
             v,
             (k,),
-            path_map=path_map,
+            path_map=resolved_path_map,
             show_only_sample=sample_only,
             with_shape=with_shape,
         )
@@ -205,6 +177,22 @@ def rich_summary(
 
         Console().print(root, soft_wrap=False, highlight=True, markup=True, emoji=False)
     return root
+
+
+def capture_tree(tree: Tree) -> str:
+    """Render a rich tree into plain text using the project console settings."""
+    from .console import Console
+
+    console = Console()
+    with console.capture() as capture:
+        console.print(
+            tree,
+            soft_wrap=False,
+            highlight=True,
+            markup=True,
+            emoji=False,
+        )
+    return capture.get().rstrip()
 
 
 def build_nested(

@@ -63,11 +63,11 @@ class OracleRriCacheMetadata:
 
 
 @dataclass(slots=True)
-class OracleRriCacheEntry:
-    """Single index entry describing a cached oracle sample."""
+class CacheIndexEntry:
+    """Common index-entry fields shared by cache payload directories."""
 
     key: str
-    """Stable cache key for the sample payload."""
+    """Stable cache key for the payload."""
 
     scene_id: str
     """ASE scene identifier for the cached snippet."""
@@ -77,6 +77,11 @@ class OracleRriCacheEntry:
 
     path: str
     """Path to the payload file, relative to the cache directory."""
+
+
+@dataclass(slots=True)
+class OracleRriCacheEntry(CacheIndexEntry):
+    """Single index entry describing a cached oracle sample."""
 
 
 @dataclass(slots=True)
@@ -150,20 +155,8 @@ class VinSnippetCacheMetadata:
 
 
 @dataclass(slots=True)
-class VinSnippetCacheEntry:
+class VinSnippetCacheEntry(CacheIndexEntry):
     """Index entry describing a cached VIN snippet."""
-
-    key: str
-    """Stable cache key for the VIN snippet payload."""
-
-    scene_id: str
-    """ASE scene identifier for the cached VIN snippet."""
-
-    snippet_id: str
-    """ASE snippet identifier for the cached VIN snippet."""
-
-    path: str
-    """Path to the payload file, relative to the cache directory."""
 
 
 __all__ = [

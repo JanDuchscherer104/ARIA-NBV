@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import torch
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, field_validator
 from torch.utils.data import Dataset
 
 from ..configs import PathConfig
@@ -34,6 +34,8 @@ from ..rri_metrics.types import RriResult
 from ..utils import BaseConfig, Console, Verbosity
 from ..vin.backbone_evl import EvlBackboneConfig
 from ..vin.types import EvlBackboneOutput
+from ._config_utils import resolve_cache_artifact_dir
+from ._legacy_dataset_mixins import _ResolvedLenDatasetMixin
 from ._legacy_offline_cache_store import (
     _format_sample_key,
     _read_metadata,
@@ -108,12 +110,7 @@ class OracleRriCacheConfig(BaseConfig):
     samples_dirname: str = "samples"
     """Subdirectory name that stores sample payloads."""
 
-    @field_validator("cache_dir", mode="before")
-    @classmethod
-    def _resolve_cache_dir(cls, value: str | Path, info: ValidationInfo) -> Path:
-        """Resolve relative cache directories against the configured data roots."""
-        paths: PathConfig = info.data.get("paths") or PathConfig()
-        return paths.resolve_cache_artifact_dir(value)
+    _resolve_cache_dir = field_validator("cache_dir", mode="before")(resolve_cache_artifact_dir)
 
     @property
     def samples_dir(self) -> Path:
@@ -474,7 +471,7 @@ class OracleRriCacheWriter:
         )
 
 
-class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
+class OracleRriCacheDataset(_ResolvedLenDatasetMixin, Dataset[OracleRriCacheSample]):
     """Map-style dataset that reads cached oracle outputs."""
 
     def __init__(self, config: OracleRriCacheDatasetConfig) -> None:
@@ -583,10 +580,6 @@ class OracleRriCacheDataset(Dataset[OracleRriCacheSample]):
             return None
         self._vin_snippet_provider = VinSnippetProviderChain(providers=providers)
         return self._vin_snippet_provider
-
-    def __len__(self) -> int:
-        """Return the number of readable cache entries exposed by this dataset."""
-        return self._len
 
     def __getitem__(self, idx: int) -> OracleRriCacheSample | "VinOracleBatch":  # type: ignore[override]
         """Decode one cached oracle sample or VIN batch by positional index."""

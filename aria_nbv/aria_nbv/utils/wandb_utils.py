@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import numpy as np
 
+from .reporting import _linear_slope, _segment_indices
+
 if TYPE_CHECKING:
     import pandas as pd
     from matplotlib.axes import Axes
@@ -269,27 +271,6 @@ def _finite_mean(values: np.ndarray) -> float:
     if finite.size == 0:
         return float("nan")
     return float(finite.mean())
-
-
-def _linear_slope(x: np.ndarray, y: np.ndarray) -> float:
-    """Estimate a linear slope for the given x/y series."""
-    if x.size < 2 or np.allclose(x, x[0]):
-        return float("nan")
-    try:
-        return float(np.polyfit(x, y, 1)[0])
-    except Exception:  # pragma: no cover - numerical guard
-        return float("nan")
-
-
-def _segment_indices(num: int, frac: float) -> tuple[slice, slice, slice]:
-    """Compute early/mid/late segment slices for a series."""
-    size = max(2, int(num * frac))
-    early = slice(0, size)
-    late = slice(max(num - size, 0), num)
-    mid_start = size
-    mid_end = max(num - size, mid_start)
-    mid = slice(mid_start, mid_end)
-    return early, mid, late
 
 
 def _summarize_metric(
