@@ -11,6 +11,7 @@ import torch
 from matplotlib import colormaps
 
 from .data_plotting import FrameGridBuilder
+from .reporting import _pretty_label
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -18,14 +19,6 @@ import matplotlib.pyplot as plt
 
 def _to_numpy(tensor: torch.Tensor) -> np.ndarray:
     return tensor.detach().cpu().numpy()
-
-
-def _pretty_label(text: str) -> str:
-    """Format labels by replacing underscores and title-casing words."""
-
-    if not text:
-        return text
-    return text.replace("_", " ").title()
 
 
 def _scalar_to_rgb(

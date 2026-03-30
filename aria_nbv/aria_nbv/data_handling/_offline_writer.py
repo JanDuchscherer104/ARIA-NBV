@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import shutil
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -50,6 +49,7 @@ from ._offline_store import (
     VinOfflineStoreConfig,
 )
 from ._raw import AseEfmDatasetConfig, EfmSnippetView, VinSnippetView
+from ._sample_keys import sanitize_token
 from ._vin_runtime import DEFAULT_VIN_SNIPPET_PAD_POINTS, build_vin_snippet_view
 
 
@@ -79,19 +79,6 @@ def _split_membership_rank(sample_key: str) -> str:
     return hashlib.sha1(sample_key.encode("utf-8")).hexdigest()
 
 
-def _sanitize_token(value: str) -> str:
-    """Normalize a token so it is safe in sample identifiers.
-
-    Args:
-        value: Raw token.
-
-    Returns:
-        Filesystem-safe token.
-    """
-
-    return re.sub(r"[^0-9a-zA-Z._-]+", "_", value).strip("_")
-
-
 def _default_sample_key(scene_id: str, snippet_id: str) -> str:
     """Build the default stable sample key for one snippet.
 
@@ -103,7 +90,7 @@ def _default_sample_key(scene_id: str, snippet_id: str) -> str:
         Stable sample key.
     """
 
-    return f"{_sanitize_token(scene_id)}::{_sanitize_token(snippet_id)}"
+    return f"{sanitize_token(scene_id)}::{sanitize_token(snippet_id)}"
 
 
 def _to_numpy(

@@ -1,16 +1,21 @@
-"""VIN v3 helper dataclasses and utility functions."""
+"""Shared VIN helper dataclasses and utility functions."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal
 
 import torch
 from efm3d.aria.pose import PoseTW
 from efm3d.utils.voxel_sampling import pc_to_vox, sample_voxels
+from pytorch3d.renderer.cameras import (  # type: ignore[import-untyped]
+    PerspectiveCameras,
+)
 from torch import Tensor
+from torch.nn import functional as functional
 
 from ..data_handling import VinSnippetView
+from .pose_encoding import LearnableFourierFeaturesConfig
 
 if TYPE_CHECKING:
     from efm3d.aria.pose import PoseTW as PoseTWT
@@ -133,6 +138,31 @@ def largest_divisor_leq(n: int, max_divisor: int) -> int:
     return max(1, g)
 
 
+def validate_pos_grid_xyz_encoder(
+    value: LearnableFourierFeaturesConfig,
+) -> LearnableFourierFeaturesConfig:
+    """Validate that a position-grid encoder consumes XYZ coordinates."""
+    if value.input_dim != 3:
+        raise ValueError("pos_grid_encoder_lff.input_dim must be 3 for XYZ coordinates.")
+    return value
+
+
+def encode_pose_features(
+    *,
+    pose_encoder: Any,
+    pose_world_cam: PoseTW,
+    pose_world_rig_ref: PoseTW,
+) -> PoseFeatures:
+    """Encode candidate poses expressed in the reference rig frame."""
+    pose_rig_cam = pose_world_rig_ref.inverse()[:, None] @ pose_world_cam
+    pose_out = pose_encoder.encode(pose_rig_cam)
+    return PoseFeatures(
+        pose_enc=pose_out.pose_enc,
+        pose_vec=pose_out.pose_vec,
+        candidate_center_rig_m=pose_out.center_m,
+    )
+
+
 def sample_voxel_field(
     field: Tensor,
     *,
@@ -243,6 +273,224 @@ def sample_voxel_field(
     return tokens, valid
 
 
+def candidate_valid_from_token(
+    token_valid: Tensor,
+    *,
+    min_valid_frac: float,
+) -> Tensor:
+    """Convert per-token validity into a per-candidate mask."""
+    if token_valid.ndim < 1:
+        raise ValueError(f"Expected token_valid with ndim>=1, got {tuple(token_valid.shape)}.")
+    valid_frac = token_valid.float().mean(dim=-1)
+    return valid_frac >= min_valid_frac
+
+
+def build_frustum_points_world_p3d(
+    cameras: PerspectiveCameras,
+    *,
+    grid_size: int,
+    depths_m: list[float],
+) -> Tensor:
+    """Unproject a small frustum grid into world points at fixed metric depths."""
+    num_cams = int(cameras.R.shape[0])
+    device = cameras.R.device
+
+    image_size = cameras.image_size.to(device=device, dtype=torch.float32)
+    principal_point = cameras.principal_point.to(device=device, dtype=torch.float32)
+    if image_size.shape[0] == 1 and num_cams > 1:
+        image_size = image_size.expand(num_cams, -1)
+    if principal_point.shape[0] == 1 and num_cams > 1:
+        principal_point = principal_point.expand(num_cams, -1)
+
+    h = image_size[:, 0]
+    w = image_size[:, 1]
+    scale = torch.minimum(h, w)
+    half = 0.95 * 0.5 * scale
+    half_x = torch.minimum(
+        half,
+        torch.minimum(principal_point[:, 0] - 0.5, (w - 0.5) - principal_point[:, 0]),
+    )
+    half_y = torch.minimum(
+        half,
+        torch.minimum(principal_point[:, 1] - 0.5, (h - 0.5) - principal_point[:, 1]),
+    )
+    half_x = torch.clamp(half_x, min=0.0)
+    half_y = torch.clamp(half_y, min=0.0)
+
+    u_min = principal_point[:, 0] - half_x
+    u_max = principal_point[:, 0] + half_x
+    v_min = principal_point[:, 1] - half_y
+    v_max = principal_point[:, 1] + half_y
+
+    t = torch.linspace(0.0, 1.0, steps=grid_size, device=device, dtype=torch.float32)
+    us = u_min[:, None] + (u_max - u_min)[:, None] * t[None, :]
+    vs = v_min[:, None] + (v_max - v_min)[:, None] * t[None, :]
+
+    uu = us[:, None, :].expand(num_cams, grid_size, grid_size)
+    vv = vs[:, :, None].expand(num_cams, grid_size, grid_size)
+
+    u = uu.reshape(num_cams, -1)
+    v = vv.reshape(num_cams, -1)
+
+    x_ndc = -(u - w[:, None] * 0.5) * (2.0 / scale[:, None])
+    y_ndc = -(v - h[:, None] * 0.5) * (2.0 / scale[:, None])
+
+    depths = torch.tensor(depths_m, device=device, dtype=torch.float32)
+    num_depths = int(depths.shape[0])
+    num_rays = int(x_ndc.shape[1])
+
+    x_ndc = x_ndc[:, None, :].expand(num_cams, num_depths, num_rays)
+    y_ndc = y_ndc[:, None, :].expand(num_cams, num_depths, num_rays)
+    z = depths.view(1, num_depths, 1).expand(num_cams, num_depths, num_rays)
+
+    xy_depth = torch.stack([x_ndc, y_ndc, z], dim=-1).reshape(num_cams, -1, 3)
+    return cameras.unproject_points(xy_depth, world_coordinates=True, from_ndc=True)
+
+
+def frustum_points_world_from_cameras(
+    poses_world_cam: PoseTW,
+    *,
+    p3d_cameras: PerspectiveCameras,
+    grid_size: int,
+    depths_m: list[float],
+) -> Tensor:
+    """Generate frustum sample points in world coordinates for each candidate."""
+    if poses_world_cam.ndim != 3:
+        raise ValueError(
+            "poses_world_cam must have shape (B,N,12). Use ensure_candidate_batch before calling this helper.",
+        )
+    batch_size = int(poses_world_cam.t.shape[0])
+    num_candidates = int(poses_world_cam.t.shape[1])
+
+    cameras = p3d_cameras.to(device=poses_world_cam.t.device)
+    pts_world_flat = build_frustum_points_world_p3d(
+        cameras,
+        grid_size=grid_size,
+        depths_m=depths_m,
+    )
+    num_cams = int(pts_world_flat.shape[0])
+    if batch_size == 1 and num_cams == num_candidates:
+        return pts_world_flat.view(1, num_candidates, -1, 3)
+    if num_cams == (batch_size * num_candidates):
+        return pts_world_flat.view(batch_size, num_candidates, -1, 3)
+    raise ValueError(
+        "p3d_cameras batch size must be N (when B=1) or B*N; "
+        f"got {num_cams} for B={batch_size}, N={num_candidates}.",
+    )
+
+
+def build_scene_field(
+    out: Any,
+    *,
+    use_channels: list[str],
+    occ_input_threshold: float,
+    counts_norm_mode: Literal["log1p", "linear"],
+    occ_pr_is_logits: bool,
+) -> Tensor:
+    """Build a compact voxel-aligned scene field from EVL head/evidence tensors."""
+
+    def _require(name: str) -> Tensor:
+        value = getattr(out, name)
+        if not isinstance(value, torch.Tensor):
+            raise KeyError(
+                f"Missing backbone output '{name}'. Ensure EvlBackboneConfig.features_mode includes 'heads'.",
+            )
+        return value
+
+    parts: dict[str, Tensor] = {}
+
+    if "occ_pr" in use_channels or "new_surface_prior" in use_channels:
+        occ_pr = _require("occ_pr").to(dtype=torch.float32)
+        if occ_pr_is_logits:
+            occ_pr = torch.sigmoid(occ_pr)
+        parts["occ_pr"] = occ_pr
+
+    if "occ_input" in use_channels or "free_input" in use_channels:
+        parts["occ_input"] = _require("occ_input").to(dtype=torch.float32)
+
+    if "cent_pr" in use_channels:
+        parts["cent_pr"] = _require("cent_pr").to(dtype=torch.float32)
+
+    if "free_input" in use_channels:
+        if isinstance(out.free_input, torch.Tensor):
+            parts["free_input"] = out.free_input.to(dtype=torch.float32)
+        else:
+            counts = _require("counts")
+            observed = (counts > 0).to(dtype=torch.float32).unsqueeze(1)
+            occ_evidence = (parts["occ_input"] > occ_input_threshold).to(dtype=torch.float32)
+            parts["free_input"] = observed * (1.0 - occ_evidence)
+
+    if (
+        "counts_norm" in use_channels
+        or "observed" in use_channels
+        or "unknown" in use_channels
+        or "new_surface_prior" in use_channels
+        or "free_input" in use_channels
+    ):
+        counts = _require("counts")
+        observed = (counts > 0).to(dtype=torch.float32).unsqueeze(1)
+        parts["observed"] = observed
+        parts["unknown"] = 1.0 - observed
+
+        max_counts = counts.amax(dim=(-3, -2, -1), keepdim=True).clamp_min(1.0)
+        if counts_norm_mode == "log1p":
+            parts["counts_norm"] = torch.log1p(counts).unsqueeze(1) / torch.log1p(max_counts).unsqueeze(1)
+        else:
+            parts["counts_norm"] = (counts / max_counts).unsqueeze(1)
+
+    if "new_surface_prior" in use_channels:
+        parts["new_surface_prior"] = parts["unknown"] * parts["occ_pr"]
+
+    missing = [name for name in use_channels if name not in parts]
+    if missing:
+        raise KeyError(f"Unsupported scene-field channel(s): {missing}.")
+    return torch.cat([parts[name] for name in use_channels], dim=1)
+
+
+def infer_padded_grid_shape(
+    num_pts: int,
+    target_shape: tuple[int, int, int],
+) -> tuple[int, int, int]:
+    """Infer a symmetrically padded grid shape from a flattened voxel count."""
+    d_t, h_t, w_t = target_shape
+    if num_pts == d_t * h_t * w_t:
+        return target_shape
+    for pad in range(1, 4):
+        d_p, h_p, w_p = d_t + 2 * pad, h_t + 2 * pad, w_t + 2 * pad
+        if num_pts == d_p * h_p * w_p:
+            return (d_p, h_p, w_p)
+    raise ValueError(
+        "pts_world size mismatch: "
+        f"got {num_pts} points; expected {d_t * h_t * w_t} "
+        f"for grid_shape {target_shape} or a symmetric padding variant.",
+    )
+
+
+def center_crop_grid(
+    grid: Tensor,
+    target_shape: tuple[int, int, int],
+) -> Tensor:
+    """Center-crop a voxel grid or raise when the crop is impossible."""
+    d0, h0, w0 = int(grid.shape[1]), int(grid.shape[2]), int(grid.shape[3])
+    d_t, h_t, w_t = target_shape
+    if (d0, h0, w0) == target_shape:
+        return grid
+    if d0 < d_t or h0 < h_t or w0 < w_t:
+        raise ValueError(f"pts_world grid {d0, h0, w0} smaller than target {target_shape}.")
+    if (d0 - d_t) % 2 != 0 or (h0 - h_t) % 2 != 0 or (w0 - w_t) % 2 != 0:
+        raise ValueError(f"pts_world grid {d0, h0, w0} cannot be center-cropped to {target_shape}.")
+    d_start = (d0 - d_t) // 2
+    h_start = (h0 - h_t) // 2
+    w_start = (w0 - w_t) // 2
+    return grid[
+        :,
+        d_start : d_start + d_t,
+        h_start : h_start + h_t,
+        w_start : w_start + w_t,
+        :,
+    ]
+
+
 def pos_grid_from_pts_world(
     pts_world: Tensor,
     *,
@@ -257,50 +505,9 @@ def pos_grid_from_pts_world(
     Conv3d shrink), the grid is center-cropped to ``grid_shape``.
     """
 
-    def _infer_pts_shape(num_pts: int, target_shape: tuple[int, int, int]) -> tuple[int, int, int]:
-        d_t, h_t, w_t = target_shape
-        if num_pts == d_t * h_t * w_t:
-            return target_shape
-        for pad in range(1, 4):
-            d_p, h_p, w_p = d_t + 2 * pad, h_t + 2 * pad, w_t + 2 * pad
-            if num_pts == d_p * h_p * w_p:
-                return (d_p, h_p, w_p)
-        raise ValueError(
-            "pts_world size mismatch: "
-            f"got {num_pts} points; expected {d_t * h_t * w_t} "
-            f"for grid_shape {target_shape} or a symmetric padding variant.",
-        )
-
-    def _center_crop(
-        grid: Tensor,
-        target_shape: tuple[int, int, int],
-    ) -> Tensor:
-        d0, h0, w0 = int(grid.shape[1]), int(grid.shape[2]), int(grid.shape[3])
-        d_t, h_t, w_t = target_shape
-        if (d0, h0, w0) == target_shape:
-            return grid
-        if d0 < d_t or h0 < h_t or w0 < w_t:
-            raise ValueError(
-                f"pts_world grid {d0, h0, w0} smaller than target {target_shape}.",
-            )
-        if (d0 - d_t) % 2 != 0 or (h0 - h_t) % 2 != 0 or (w0 - w_t) % 2 != 0:
-            raise ValueError(
-                f"pts_world grid {d0, h0, w0} cannot be center-cropped to {target_shape}.",
-            )
-        d_start = (d0 - d_t) // 2
-        h_start = (h0 - h_t) // 2
-        w_start = (w0 - w_t) // 2
-        return grid[
-            :,
-            d_start : d_start + d_t,
-            h_start : h_start + h_t,
-            w_start : w_start + w_t,
-            :,
-        ]
-
     if pts_world.ndim == 3:
         batch_size, num_pts, _ = pts_world.shape
-        pts_shape = _infer_pts_shape(int(num_pts), grid_shape)
+        pts_shape = infer_padded_grid_shape(int(num_pts), grid_shape)
         pts_grid = pts_world.view(
             batch_size,
             pts_shape[0],
@@ -308,9 +515,9 @@ def pos_grid_from_pts_world(
             pts_shape[2],
             3,
         )
-        pts_grid = _center_crop(pts_grid, grid_shape)
+        pts_grid = center_crop_grid(pts_grid, grid_shape)
     elif pts_world.ndim == 5:
-        pts_grid = _center_crop(pts_world, grid_shape)
+        pts_grid = center_crop_grid(pts_world, grid_shape)
     else:
         raise ValueError(
             f"Expected pts_world with ndim 3 or 5, got {pts_world.ndim}.",
@@ -343,3 +550,58 @@ def pos_grid_from_pts_world(
         3,
     )
     return pts_norm.permute(0, 4, 1, 2, 3).contiguous()
+
+
+def compute_global_context(
+    *,
+    global_pooler: Any,
+    field: Tensor,
+    pose_enc: Tensor,
+    pts_world: Tensor,
+    t_world_voxel: PoseTW,
+    pose_world_rig_ref: PoseTW,
+    voxel_extent: Tensor,
+) -> GlobalContext:
+    """Compute pose-conditioned global features from the shared scene field."""
+    pos_grid = pos_grid_from_pts_world(
+        pts_world.to(device=field.device, dtype=field.dtype),
+        t_world_voxel=t_world_voxel,
+        pose_world_rig_ref=pose_world_rig_ref,
+        voxel_extent=voxel_extent,
+        grid_shape=(field.shape[-3], field.shape[-2], field.shape[-1]),
+    )
+    global_feat = global_pooler.forward(field, pose_enc, pos_grid=pos_grid).to(dtype=field.dtype)
+    return GlobalContext(pos_grid=pos_grid, global_feat=global_feat)
+
+
+def pool_voxel_points(
+    pts_world: Tensor,
+    *,
+    grid_shape: tuple[int, int, int],
+    pool_grid: int,
+) -> Tensor:
+    """Downsample voxel center points to match a pooled token grid."""
+    if pts_world.ndim == 3:
+        batch_size, num_pts, _ = pts_world.shape
+        pts_shape = infer_padded_grid_shape(int(num_pts), grid_shape)
+        pts_grid = pts_world.view(
+            batch_size,
+            pts_shape[0],
+            pts_shape[1],
+            pts_shape[2],
+            3,
+        )
+        pts_grid = center_crop_grid(pts_grid, grid_shape)
+    elif pts_world.ndim == 5 and pts_world.shape[-1] == 3:
+        pts_grid = center_crop_grid(pts_world, grid_shape)
+    else:
+        raise ValueError(
+            f"Expected pts_world shape (B,D,H,W,3) or (B,N,3), got {tuple(pts_world.shape)}.",
+        )
+    grid = int(pool_grid)
+    pts_grid = pts_grid.to(dtype=torch.float32).permute(0, 4, 1, 2, 3)
+    pts_pool = functional.adaptive_avg_pool3d(
+        pts_grid,
+        output_size=(grid, grid, grid),
+    )
+    return pts_pool.flatten(2).transpose(1, 2)

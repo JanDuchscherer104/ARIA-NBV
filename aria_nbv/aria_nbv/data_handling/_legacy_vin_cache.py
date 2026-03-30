@@ -24,11 +24,13 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import torch
 from efm3d.aria.pose import PoseTW
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, field_validator
 from torch.utils.data import DataLoader, Dataset
 
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console, Verbosity
+from ._config_utils import resolve_cache_artifact_dir
+from ._legacy_dataset_mixins import _ResolvedLenDatasetMixin
 from ._legacy_offline_cache_store import _extract_snippet_token, _format_sample_key, _unique_sample_path
 from ._legacy_offline_cache_store import _read_metadata as _read_oracle_metadata
 from .cache_contracts import OracleRriCacheEntry, VinSnippetCacheEntry, VinSnippetCacheMetadata
@@ -97,12 +99,7 @@ class VinSnippetCacheConfig(BaseConfig):
     pad_points: int = VIN_SNIPPET_PAD_POINTS
     """Fixed point count used for padded VIN cache samples."""
 
-    @field_validator("cache_dir", mode="before")
-    @classmethod
-    def _resolve_cache_dir(cls, value: str | Path, info: ValidationInfo) -> Path:
-        """Resolve relative VIN cache directories against the configured data roots."""
-        paths: PathConfig = info.data.get("paths") or PathConfig()
-        return paths.resolve_cache_artifact_dir(value)
+    _resolve_cache_dir = field_validator("cache_dir", mode="before")(resolve_cache_artifact_dir)
 
     @field_validator("pad_points")
     @classmethod
@@ -202,11 +199,7 @@ class VinSnippetCacheWriterConfig(BaseConfig):
             raise ValueError("VinSnippetView requires include_inv_dist_std=True.")
         return value
 
-    @field_validator("map_location", mode="before")
-    @classmethod
-    def _validate_map_location(cls, value: str | torch.device) -> torch.device:
-        """Normalize the configured torch device for snippet loading."""
-        return cls._resolve_device(value)
+    _validate_map_location = field_validator("map_location", mode="before")(BaseConfig._resolve_device)
 
     @field_validator("num_workers")
     @classmethod
@@ -244,11 +237,7 @@ class VinSnippetCacheDatasetConfig(BaseConfig):
     limit: int | None = None
     """Optional cap on number of cached samples loaded."""
 
-    @field_validator("map_location", mode="before")
-    @classmethod
-    def _validate_map_location(cls, value: str | torch.device) -> torch.device:
-        """Normalize the configured torch device for cache reads."""
-        return cls._resolve_device(value)
+    _validate_map_location = field_validator("map_location", mode="before")(BaseConfig._resolve_device)
 
 
 def _build_metadata(
@@ -756,7 +745,7 @@ class VinSnippetCacheWriter:
         return self._write_payload(entry, payload, samples_dir)
 
 
-class VinSnippetCacheDataset(Dataset[VinSnippetView]):
+class VinSnippetCacheDataset(_ResolvedLenDatasetMixin, Dataset[VinSnippetView]):
     """Map-style dataset that reads cached VIN snippet samples."""
 
     def __init__(self, config: VinSnippetCacheDatasetConfig) -> None:
@@ -776,10 +765,6 @@ class VinSnippetCacheDataset(Dataset[VinSnippetView]):
         if limit is not None:
             return min(len(self._index), int(limit))
         return len(self._index)
-
-    def __len__(self) -> int:
-        """Return the number of readable VIN snippets exposed by this dataset."""
-        return self._len
 
     def __getitem__(self, idx: int) -> VinSnippetView:
         """Return one cached VIN snippet by positional index."""

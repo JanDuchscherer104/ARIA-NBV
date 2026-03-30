@@ -13,7 +13,6 @@ avoid unnecessary synchronization overhead.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Literal
 
 import torch
@@ -22,7 +21,7 @@ from torchmetrics import Metric as MetricBase
 from torchmetrics.classification import MulticlassConfusionMatrix
 from torchmetrics.regression import SpearmanCorrCoef
 
-from ..utils import BaseConfig, Stage
+from ..utils import BaseConfig, Stage, ValueStrEnum
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,11 +41,8 @@ class LogSpec:
     enabled: bool = True
 
 
-class Logable(StrEnum):
+class Logable(ValueStrEnum):
     """Base class for loggable metric/loss names."""
-
-    def __str__(self) -> str:
-        return self.value
 
     def log_spec(self, stage: Stage) -> LogSpec:
         """Return logging settings for this metric/loss at the given stage."""

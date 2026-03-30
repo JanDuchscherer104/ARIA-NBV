@@ -102,7 +102,6 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import torch
 from efm3d.aria.pose import PoseTW
-from efm3d.utils.voxel_sampling import pc_to_vox, sample_voxels
 from pydantic import Field, field_validator, model_validator
 from pytorch3d.renderer.cameras import (
     PerspectiveCameras,  # type: ignore[import-untyped]
@@ -113,394 +112,30 @@ from torch.nn import functional as functional
 
 from ...data_handling import EfmSnippetView, VinSnippetView
 from ...rri_metrics.coral import (
-    CoralLayer,
     coral_expected_from_logits,
     coral_logits_to_prob,
 )
 from ...utils import BaseConfig
+from .._model_mixins import FrustumSamplingMixin
 from ..backbone_evl import EvlBackboneConfig
+from ..vin_utils import (
+    build_scene_field as _build_scene_field,
+)
+from ..vin_utils import (
+    candidate_valid_from_token as _candidate_valid_from_token,
+)
+from ..vin_utils import (
+    largest_divisor_leq as _largest_divisor_leq,
+)
+from ..vin_utils import (
+    sample_voxel_field as _sample_voxel_field,
+)
 from .pose_encoding import LearnableFourierFeaturesConfig
+from .scorer_head import VinScorerHeadConfig
 from .types import EvlBackboneOutput, VinForwardDiagnostics, VinPrediction
 
 if TYPE_CHECKING:
     from ...data_handling import VinOracleBatch
-
-
-def _largest_divisor_leq(n: int, max_divisor: int) -> int:
-    """Return the largest divisor of ``n`` that is <= ``max_divisor``.
-
-    This helper is used to choose a valid GroupNorm group count. GroupNorm
-    requires ``num_groups`` to divide ``num_channels`` exactly. We therefore
-    compute:
-
-        g = max { d : d <= max_divisor and n % d == 0 }.
-
-    Args:
-        n: Channel dimension to be normalized.
-        max_divisor: Upper bound for the group count.
-
-    Returns:
-        Largest valid group count (>=1).
-    """
-    g = min(max_divisor, n)
-    while g > 1 and (n % g) != 0:
-        g -= 1
-    return max(1, g)
-
-
-def _build_frustum_points_world_p3d(
-    cameras: PerspectiveCameras,
-    *,
-    grid_size: int,
-    depths_m: list[float],
-) -> Tensor:
-    """Unproject a small frustum grid into world points at fixed metric depths.
-
-    Conceptually, we build a sparse set of rays in the image plane and sample
-    points along each ray at a list of metric depths ``{d_i}``. The point set is
-    intentionally aligned with the PyTorch3D depth renderer so that:
-
-        - a rendered depth map at depth ``d`` corresponds to the same 3D ray
-          geometry used for VIN's voxel query, and
-        - the derived point clouds used in the oracle pipeline are consistent
-          with VIN's local feature sampling.
-
-    The procedure is:
-
-    1) Build a symmetric ``grid_size x grid_size`` pixel grid around the
-       principal point, clamped to valid pixel *centers*:
-
-           u in [0.5, W - 0.5],  v in [0.5, H - 0.5].
-
-    2) Convert to NDC coordinates (PyTorch3D uses +X left, +Y up):
-
-           x_ndc = -(u - 0.5 * W) * (2 / scale),
-           y_ndc = -(v - 0.5 * H) * (2 / scale),
-
-       where ``scale = min(H, W)`` ensures square normalization when the image
-       is not square.
-
-    3) Stack with metric depths ``z = d_i`` and call
-       ``cameras.unproject_points(..., from_ndc=True)`` to obtain world points.
-
-    Args:
-        cameras: PyTorch3D ``PerspectiveCameras`` (screen-space intrinsics).
-        grid_size: Number of samples per image axis (total rays = grid_size^2).
-        depths_m: List of metric depths in meters along each ray.
-
-    Returns:
-        ``Tensor["B (grid_size^2 * len(depths_m)) 3", float32]`` world points
-        for each camera in the batch.
-    """
-    num_cams = int(cameras.R.shape[0])
-    device = cameras.R.device
-
-    # Screen-space camera inputs are in pixels, but `unproject_points(..., from_ndc=True)`
-    # expects NDC coordinates (+X left, +Y up) where the conversion depends on `image_size`.
-    image_size = cameras.image_size.to(device=device, dtype=torch.float32)
-    principal_point = cameras.principal_point.to(device=device, dtype=torch.float32)
-    if image_size.shape[0] == 1 and num_cams > 1:
-        image_size = image_size.expand(num_cams, -1)
-    if principal_point.shape[0] == 1 and num_cams > 1:
-        principal_point = principal_point.expand(num_cams, -1)
-
-    h = image_size[:, 0]
-    w = image_size[:, 1]
-    scale = torch.minimum(h, w)
-
-    # Sample a small pixel grid around the principal point, then convert to NDC.
-    #
-    # Keep the sampling range symmetric around the principal point (important when the
-    # principal point is not exactly at the image center) while clamping to valid pixel
-    # *centers* in [0.5, W-0.5]×[0.5, H-0.5].
-    half = 0.95 * 0.5 * scale
-    half_x = torch.minimum(
-        half,
-        torch.minimum(principal_point[:, 0] - 0.5, (w - 0.5) - principal_point[:, 0]),
-    )
-    half_y = torch.minimum(
-        half,
-        torch.minimum(principal_point[:, 1] - 0.5, (h - 0.5) - principal_point[:, 1]),
-    )
-    half_x = torch.clamp(half_x, min=0.0)
-    half_y = torch.clamp(half_y, min=0.0)
-
-    u_min = principal_point[:, 0] - half_x
-    u_max = principal_point[:, 0] + half_x
-    v_min = principal_point[:, 1] - half_y
-    v_max = principal_point[:, 1] + half_y
-
-    t = torch.linspace(0.0, 1.0, steps=grid_size, device=device, dtype=torch.float32)
-    us = u_min[:, None] + (u_max - u_min)[:, None] * t[None, :]
-    vs = v_min[:, None] + (v_max - v_min)[:, None] * t[None, :]
-
-    uu = us[:, None, :].expand(num_cams, grid_size, grid_size)
-    vv = vs[:, :, None].expand(num_cams, grid_size, grid_size)
-
-    u = uu.reshape(num_cams, -1)
-    v = vv.reshape(num_cams, -1)
-
-    x_ndc = -(u - w[:, None] * 0.5) * (2.0 / scale[:, None])
-    y_ndc = -(v - h[:, None] * 0.5) * (2.0 / scale[:, None])
-
-    depths = torch.tensor(depths_m, device=device, dtype=torch.float32)
-    num_depths = int(depths.shape[0])
-    num_rays = int(x_ndc.shape[1])
-
-    x_ndc = x_ndc[:, None, :].expand(num_cams, num_depths, num_rays)
-    y_ndc = y_ndc[:, None, :].expand(num_cams, num_depths, num_rays)
-    z = depths.view(1, num_depths, 1).expand(num_cams, num_depths, num_rays)
-
-    xy_depth = torch.stack([x_ndc, y_ndc, z], dim=-1).reshape(num_cams, -1, 3)
-    return cameras.unproject_points(xy_depth, world_coordinates=True, from_ndc=True)
-
-
-def _build_scene_field(
-    out: EvlBackboneOutput,
-    *,
-    use_channels: list[str],
-    occ_input_threshold: float,
-    counts_norm_mode: Literal["log1p", "linear"],
-    occ_pr_is_logits: bool,
-) -> Tensor:
-    """Build a compact voxel-aligned scene field from EVL head/evidence tensors.
-
-    EVL exposes a set of voxel grids with different semantics. VIN collapses
-    those into a small channel tensor ``F(v)`` that can be sampled at candidate
-    frustum points. The supported channels are:
-
-    - ``occ_pr``: occupancy probability (or logits if ``occ_pr_is_logits=True``):
-
-          occ_pr = sigmoid(occ_pr_logits)  (if logits)
-
-    - ``occ_input``: binary occupancy evidence from the input points.
-    - ``counts_norm``: normalized observation counts:
-
-          counts_norm = log1p(counts) / log1p(max(counts))   (log1p mode)
-          counts_norm = counts / max(counts)                (linear mode)
-
-    - ``observed``: 1[counts > 0]
-    - ``unknown``: 1 - observed
-    - ``new_surface_prior``: unknown * occ_pr
-    - ``cent_pr``: EVL centerness probability (if provided by the backbone)
-    - ``free_input``: explicit free-space evidence if available; otherwise a
-      weak proxy:
-
-          free_input ~= observed * (1 - occ_input > threshold)
-
-    Args:
-        out: Backbone output bundle (must include head/evidence tensors).
-        use_channels: Ordered list of channel names to concatenate.
-        occ_input_threshold: Threshold used when deriving fallback free-space evidence.
-        counts_norm_mode: Normalization mode for counts ("log1p" or "linear").
-        occ_pr_is_logits: Whether `occ_pr` are logits (apply sigmoid) rather than
-            probabilities.
-
-    Returns:
-        ``Tensor["B C D H W", float32]`` scene field with channels in the
-        same order as ``use_channels``.
-    """
-
-    def _require(name: str) -> Tensor:
-        value = getattr(out, name)
-        if not isinstance(value, torch.Tensor):
-            raise KeyError(
-                f"Missing backbone output '{name}'. Ensure EvlBackboneConfig.features_mode includes 'heads'.",
-            )
-        return value
-
-    parts: dict[str, Tensor] = {}
-
-    if "occ_pr" in use_channels or "new_surface_prior" in use_channels:
-        occ_pr = _require("occ_pr").to(dtype=torch.float32)
-        if occ_pr_is_logits:
-            occ_pr = torch.sigmoid(occ_pr)
-        parts["occ_pr"] = occ_pr
-
-    if "occ_input" in use_channels or "free_input" in use_channels:
-        parts["occ_input"] = _require("occ_input").to(dtype=torch.float32)
-
-    if "cent_pr" in use_channels:
-        parts["cent_pr"] = _require("cent_pr").to(dtype=torch.float32)
-
-    if "free_input" in use_channels:
-        if isinstance(out.free_input, torch.Tensor):
-            parts["free_input"] = out.free_input.to(dtype=torch.float32)
-        else:
-            # Fallback: derive a weak free-space proxy from (counts, occ_input).
-            counts = _require("counts")
-            observed = (counts > 0).to(dtype=torch.float32).unsqueeze(1)
-            occ_evidence = (parts["occ_input"] > occ_input_threshold).to(
-                dtype=torch.float32,
-            )
-            parts["free_input"] = observed * (1.0 - occ_evidence)
-
-    if (
-        "counts_norm" in use_channels
-        or "observed" in use_channels
-        or "unknown" in use_channels
-        or "new_surface_prior" in use_channels
-    ):
-        counts = _require("counts").to(dtype=torch.float32)
-        observed = (counts > 0).to(dtype=torch.float32)
-        parts["observed"] = observed.unsqueeze(1)
-        parts["unknown"] = (1.0 - observed).unsqueeze(1)
-
-        max_counts = counts.amax(dim=(-3, -2, -1), keepdim=True).clamp_min(1.0)
-        if counts_norm_mode == "log1p":
-            parts["counts_norm"] = torch.log1p(counts).unsqueeze(1) / torch.log1p(
-                max_counts,
-            ).unsqueeze(1)
-        else:  # "linear"
-            parts["counts_norm"] = (counts / max_counts).unsqueeze(1)
-
-    if "new_surface_prior" in use_channels:
-        parts["new_surface_prior"] = parts["unknown"] * parts["occ_pr"]
-
-    field_parts: list[Tensor] = []
-    for name in use_channels:
-        field_parts.append(parts[name])
-    return torch.cat(field_parts, dim=1)
-
-
-def _sample_voxel_field(
-    field: Tensor,
-    *,
-    points_world: Tensor,
-    t_world_voxel: PoseTW,
-    voxel_extent: Tensor,
-) -> tuple[Tensor, Tensor]:
-    """Sample a voxel-aligned field at world points.
-
-    We map world-space points into EVL's voxel frame using the provided
-    ``voxel/T_world_voxel`` pose:
-
-        T_voxel_world = (T_world_voxel)^{-1}
-        p_voxel = T_voxel_world * p_world.
-
-    The voxel frame is **metric** (meters). We convert metric coordinates to
-    voxel indices via the extent bounds:
-
-        i_x = (x - x_min) / dx,  dx = (x_max - x_min) / W,
-        i_y = (y - y_min) / dy,  dy = (y_max - y_min) / H,
-        i_z = (z - z_min) / dz,  dz = (z_max - z_min) / D.
-
-    ``pc_to_vox`` returns both these indices and an *extent* validity mask.
-    ``sample_voxels`` then performs trilinear interpolation in grid coordinates
-    (``grid_sample`` under the hood) and returns a *grid* validity mask.
-
-    Args:
-        field: ``Tensor["B C D H W"]`` voxel-aligned feature field.
-        points_world: ``Tensor["B N K 3"]`` world points (K points per candidate).
-        t_world_voxel: ``PoseTW["B 12"]`` world<-voxel transform.
-        voxel_extent: ``Tensor["B 6"]`` voxel grid extent in voxel frame
-            ``[x_min,x_max,y_min,y_max,z_min,z_max]``.
-
-    Returns:
-        Tuple of:
-            - tokens: ``Tensor["B N K C", float32]`` sampled features.
-            - valid: ``Tensor["B N K", bool]`` mask of in-bounds samples
-              (extent AND grid validity).
-    """
-    if field.ndim != 5:
-        raise ValueError(f"Expected field shape (B,C,D,H,W), got {tuple(field.shape)}.")
-    if points_world.ndim != 4:
-        raise ValueError(
-            f"Expected points_world shape (B,N,K,3), got {tuple(points_world.shape)}.",
-        )
-    if int(points_world.shape[-1]) != 3:
-        raise ValueError(
-            f"Expected points_world[..., 3], got {tuple(points_world.shape)}.",
-        )
-
-    batch_size, field_channels, grid_d, grid_h, grid_w = field.shape
-    _, num_candidates, num_points, _ = points_world.shape
-
-    t_world_voxel_b = t_world_voxel
-    if t_world_voxel_b.ndim == 1:
-        t_world_voxel_b = PoseTW(t_world_voxel_b._data.unsqueeze(0))
-    if int(t_world_voxel_b.shape[0]) != int(batch_size):
-        if int(t_world_voxel_b.shape[0]) == 1:
-            t_world_voxel_b = PoseTW(t_world_voxel_b._data.expand(batch_size, 12))
-        else:
-            raise ValueError(
-                "t_world_voxel must have batch size 1 or match field batch size.",
-            )
-
-    vox_extent = voxel_extent.to(device=field.device, dtype=torch.float32)
-    if vox_extent.ndim == 1:
-        vox_extent = vox_extent.view(1, 6).expand(batch_size, 6)
-    if vox_extent.shape != (batch_size, 6):
-        raise ValueError(
-            f"Expected voxel_extent shape (B,6), got {tuple(vox_extent.shape)}.",
-        )
-
-    world_points_flat = points_world.to(device=field.device, dtype=field.dtype).reshape(
-        batch_size,
-        num_candidates * num_points,
-        3,
-    )
-
-    # NOTE: EVL's voxel field is defined in the *voxel frame* (metres), but our candidates/frustum points are in WORLD.
-    # EVL provides `voxel/T_world_voxel` (world←voxel). We invert it to get voxel←world and map points into voxel coords.
-    # NOTE: If you ever swap EVL conventions or change voxel-grid anchoring, re-verify this transform (sanity check:
-    # voxelized points should be stable under small candidate translations).
-    t_voxel_world = t_world_voxel_b.inverse()  # voxel<-world
-    voxel_points_m = t_voxel_world * world_points_flat  # B (N*K) 3 in voxel frame (metres)
-
-    pts_vox_id, valid_extent = pc_to_vox(
-        voxel_points_m.to(dtype=torch.float32),
-        vW=int(grid_w),
-        vH=int(grid_h),
-        vD=int(grid_d),
-        voxel_extent=vox_extent,
-    )
-    # sample_voxels does not support NaNs; replace invalid coords with 0 and rely on validity masks below.
-    pts_vox_id = torch.nan_to_num(pts_vox_id, nan=0.0, posinf=0.0, neginf=0.0)
-
-    samp, valid_grid = sample_voxels(
-        field,
-        pts_vox_id,
-        differentiable=False,
-    )  # B C (N*K), B (N*K)
-    valid = (valid_extent & valid_grid).reshape(batch_size, num_candidates, num_points)
-    tokens = samp.transpose(1, 2).reshape(
-        batch_size,
-        num_candidates,
-        num_points,
-        field_channels,
-    )
-    return tokens, valid
-
-
-def _candidate_valid_from_token(
-    token_valid: Tensor,
-    *,
-    min_valid_frac: float,
-) -> Tensor:
-    """Convert per-token validity into a per-candidate mask.
-
-    For each candidate we compute the fraction of in-bounds samples:
-
-        valid_frac = (1 / K) * sum_k 1[valid_k],
-
-    and keep the candidate if ``valid_frac >= min_valid_frac``. This prevents
-    degenerate candidates whose frustum points mostly fall outside the voxel
-    grid (e.g., due to camera pose mismatch or extreme viewpoints).
-
-    Args:
-        token_valid: ``Tensor["B N K", bool]`` validity per frustum sample.
-        min_valid_frac: Minimum fraction of valid samples to accept a candidate.
-
-    Returns:
-        ``Tensor["B N", bool]`` candidate validity mask.
-    """
-    if token_valid.ndim < 1:
-        raise ValueError(
-            f"Expected token_valid with ndim>=1, got {tuple(token_valid.shape)}.",
-        )
-    valid_frac = token_valid.float().mean(dim=-1)
-    return valid_frac >= min_valid_frac
 
 
 class PoseConditionedGlobalPool(nn.Module):
@@ -574,103 +209,6 @@ class PoseConditionedGlobalPool(nn.Module):
         queries = self.q_proj(pose_enc.to(dtype=keys.dtype))
         attn_out, _ = self.attn(queries, keys, keys, need_weights=False)
         return attn_out
-
-
-class VinScorerHead(nn.Module):
-    """Candidate scoring head producing CORAL ordinal logits.
-
-    VIN follows VIN-NBV by framing RRI prediction as **ordinal regression**.
-    The head maps per-candidate features to ``K-1`` threshold logits:
-
-        logit_k = w^T h + b_k,  k = 0..K-2,
-
-    which parameterize the probabilities:
-
-        P(y > k) = sigmoid(logit_k).
-
-    This structure preserves the ordering between bins and allows the CORAL
-    loss to penalize mis-ranked predictions more gracefully than MSE on raw
-    RRI values.
-    """
-
-    def __init__(
-        self,
-        config: VinScorerHeadConfig,
-        *,
-        in_dim: int | None = None,
-    ) -> None:
-        super().__init__()
-        self.config = config
-
-        act: nn.Module
-        match self.config.activation:
-            case "relu":
-                act = nn.ReLU()
-            case "gelu":
-                act = nn.GELU()
-
-        hidden_dim = self.config.hidden_dim
-        layers: list[nn.Module] = []
-        if in_dim is None:
-            layers.append(nn.LazyLinear(hidden_dim))
-        else:
-            layers.append(nn.Linear(in_dim, hidden_dim))
-        layers.append(act)
-        if self.config.dropout > 0:
-            layers.append(nn.Dropout(p=self.config.dropout))
-
-        for _ in range(self.config.num_layers - 1):
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(act)
-            if self.config.dropout > 0:
-                layers.append(nn.Dropout(p=self.config.dropout))
-
-        self.mlp = nn.Sequential(*layers)
-        self.coral = CoralLayer(in_dim=hidden_dim, num_classes=self.config.num_classes)
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Compute CORAL logits from per-candidate features.
-
-        Args:
-            x: ``Tensor["... F"]`` input features (flattened over batch/candidates).
-
-        Returns:
-            ``Tensor["... K-1"]`` CORAL threshold logits.
-        """
-        return self.coral(self.mlp(x))
-
-
-class VinScorerHeadConfig(BaseConfig):
-    """Configuration for :class:`VinScorerHead`.
-
-    The head is a shallow MLP followed by a CORAL layer. The MLP produces a
-    shared latent ``h`` for all thresholds, while CORAL adds independent biases
-    per threshold. This enforces monotonic ordering in the ordinal space and
-    reduces parameter count compared to a full K-way classifier.
-    """
-
-    @property
-    def target(self) -> type[VinScorerHead]:
-        """Factory target for :meth:`BaseConfig.setup_target`."""
-        return VinScorerHead
-
-    hidden_dim: int = Field(default=128, gt=0)
-    """Hidden dimension for MLP layers."""
-
-    num_layers: int = Field(default=1, ge=1)
-    """Number of MLP layers before the CORAL layer."""
-
-    dropout: float = Field(default=0.0, ge=0.0, lt=1.0)
-    """Dropout probability in the MLP."""
-
-    num_classes: int = Field(default=15, ge=2)
-    """Number of ordinal bins (VIN-NBV uses 15)."""
-
-    activation: Literal["gelu", "relu"] = "gelu"
-    """Activation function ('gelu' or 'relu')."""
-
-    def setup_target(self, *, in_dim: int | None = None) -> VinScorerHead:  # type: ignore[override]
-        return self.target(self, in_dim=in_dim)
 
 
 class VinModelConfig(BaseConfig):
@@ -859,7 +397,7 @@ class VinModelConfig(BaseConfig):
         return self
 
 
-class VinModel(nn.Module):
+class VinModel(FrustumSamplingMixin, nn.Module):
     """View Introspection Network (VIN) predicting RRI from EVL voxel features + pose.
 
     VIN is a light-weight head that queries frozen EVL voxel features to score
@@ -996,48 +534,6 @@ class VinModel(nn.Module):
             case _:
                 raise ValueError(f"Unknown global_pool_mode '{self.global_pool_mode}'.")
 
-    def _frustum_points_world(
-        self,
-        poses_world_cam: PoseTW,
-        *,
-        p3d_cameras: PerspectiveCameras,
-    ) -> Tensor:
-        """Generate frustum sample points in world coordinates for each candidate.
-
-        This is a thin wrapper around ``_build_frustum_points_world_p3d`` that
-        reshapes the returned points into ``(B, N, K, 3)``. The function assumes
-        that ``p3d_cameras`` is ordered to match the candidates:
-
-        - If ``B=1``, then ``p3d_cameras`` must have batch size ``N``.
-        - Otherwise it must have batch size ``B*N``.
-
-        Returns:
-            ``Tensor["B N K 3"]`` world points (K = grid_size^2 * len(depths_m)).
-        """
-        poses = poses_world_cam
-        if poses.ndim != 3:
-            raise ValueError(
-                "poses_world_cam must have shape (B,N,12). Use `_ensure_candidate_batch` before calling this helper.",
-            )
-        batch_size = int(poses.t.shape[0])
-        num_candidates = int(poses.t.shape[1])
-
-        cameras = p3d_cameras.to(device=poses.t.device)
-        pts_world_flat = _build_frustum_points_world_p3d(
-            cameras,
-            grid_size=self.config.frustum_grid_size,
-            depths_m=self.config.frustum_depths_m,
-        )
-        num_cams = int(pts_world_flat.shape[0])
-        if batch_size == 1 and num_cams == num_candidates:
-            return pts_world_flat.view(1, num_candidates, -1, 3)
-        if num_cams == (batch_size * num_candidates):
-            return pts_world_flat.view(batch_size, num_candidates, -1, 3)
-        raise ValueError(
-            "p3d_cameras batch size must be N (when B=1) or B*N; "
-            f"got {num_cams} for B={batch_size}, N={num_candidates}.",
-        )
-
     @staticmethod
     def _pool_candidates(
         *,
@@ -1081,18 +577,6 @@ class VinModel(nn.Module):
         mask = valid.to(dtype=tokens.dtype).unsqueeze(-1)
         denom = mask.sum(dim=-2).clamp_min(1.0)
         return (tokens * mask).sum(dim=-2) / denom
-
-    @staticmethod
-    def _ensure_candidate_batch(candidate_poses_world_cam: PoseTW) -> PoseTW:
-        """Ensure candidate poses are batched as ``(B,N,12)``.
-
-        VIN accepts candidates in shape ``(N,12)`` (single batch) or ``(B,N,12)``.
-        This helper promotes the unbatched form to ``(1,N,12)`` to simplify
-        downstream broadcasting of reference poses and voxel poses.
-        """
-        if candidate_poses_world_cam.ndim == 2:  # N x 12
-            return PoseTW(candidate_poses_world_cam._data.unsqueeze(0))
-        return candidate_poses_world_cam
 
     def _forward_impl(
         self,
@@ -1531,20 +1015,7 @@ class VinModel(nn.Module):
             ARIA_POSE_T_WORLD_RIG,
         )
 
-        from aria_nbv.utils import Console
-        from aria_nbv.utils.rich_summary import rich_summary, summarize
-
-        def _capture_tree(tree) -> str:
-            console = Console()
-            with console.capture() as capture:
-                console.print(
-                    tree,
-                    soft_wrap=False,
-                    highlight=True,
-                    markup=True,
-                    emoji=False,
-                )
-            return capture.get().rstrip()
+        from aria_nbv.utils.rich_summary import capture_tree, rich_summary, summarize
 
         if batch.efm_snippet_view is None and batch.backbone_out is None:
             raise RuntimeError(
@@ -1690,7 +1161,7 @@ class VinModel(nn.Module):
             with_shape=True,
             is_print=False,
         )
-        lines: list[str] = [_capture_tree(tree), ""]
+        lines: list[str] = [capture_tree(tree), ""]
 
         trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         total_params = sum(p.numel() for p in self.parameters())
