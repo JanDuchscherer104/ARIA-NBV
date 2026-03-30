@@ -7,13 +7,13 @@ import streamlit as st
 import torch
 
 from ....configs import PathConfig
-from ....data.efm_views import VinSnippetView
+from ....data_handling import VinSnippetView
 from ....rri_metrics.coral import coral_loss
 from ....vin.experimental.plotting import build_alignment_figures
 from ....vin.plotting import build_geometry_overview_figure, build_semidense_projection_figure
 from ..common import _info_popover
 from ..data import scene_plot_options_ui
-from ..offline_cache_utils import _load_efm_snippet_for_cache
+from ..offline_cache_utils import load_efm_snippet_for_cache
 from .context import VinDiagContext
 
 
@@ -44,7 +44,7 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
                     cache_ds = state.offline_cache
                     dataset_payload = cache_ds.metadata.dataset_config if cache_ds else None
                     paths = cfg.paths if isinstance(cfg.paths, PathConfig) else PathConfig()
-                    snippet_view = _load_efm_snippet_for_cache(
+                    snippet_view = load_efm_snippet_for_cache(
                         scene_id=batch.scene_id,
                         snippet_id=batch.snippet_id,
                         dataset_payload=dataset_payload,
@@ -83,7 +83,7 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
                         cache_ds = state.offline_cache
                         dataset_payload = cache_ds.metadata.dataset_config if cache_ds else None
                         paths = cfg.paths if isinstance(cfg.paths, PathConfig) else PathConfig()
-                        snippet_view = _load_efm_snippet_for_cache(
+                        snippet_view = load_efm_snippet_for_cache(
                             scene_id=batch.scene_id,
                             snippet_id=batch.snippet_id,
                             dataset_payload=dataset_payload,

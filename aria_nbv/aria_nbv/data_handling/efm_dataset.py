@@ -1,10 +1,14 @@
-"""EFM-formatted ASE dataset wrapper."""
+"""EFM-formatted ASE dataset wrapper.
+
+This module defines the raw `AseEfmDataset` iterable dataset, its config model,
+and the bounds inference used when optional mesh crops need snippet-local
+semidense extents.
+"""
 
 from __future__ import annotations
 
-import tarfile
 import warnings
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
@@ -22,6 +26,14 @@ from torch.utils.data import IterableDataset
 
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console, Verbosity
+from ._efm_selection import (
+    expand_tar_paths,
+    find_tar_for_sample,
+    matches_snippet_token,
+    resolve_tar_from_path,
+    resolve_tars_for_shard,
+    split_snippet_ids,
+)
 from .efm_views import EfmSnippetView
 from .mesh_cache import MeshProcessSpec, load_or_process_mesh
 
@@ -44,118 +56,6 @@ def _infer_ids(
     return scene_id, str(snippet_id)
 
 
-def _unique_preserve_order(values: Iterable[str]) -> list[str]:
-    """Return unique values while preserving their first-seen order."""
-    seen: set[str] = set()
-    out: list[str] = []
-    for value in values:
-        if value in seen:
-            continue
-        seen.add(value)
-        out.append(value)
-    return out
-
-
-def _looks_like_sample_key(snippet_id: str) -> bool:
-    """Return whether a snippet identifier looks like a per-sample key."""
-    return any(token in snippet_id for token in ("AtekDataSample", "DataSample"))
-
-
-def _looks_like_shard_id(snippet_id: str) -> bool:
-    """Return whether a snippet identifier refers to a shard tar."""
-    stem = Path(snippet_id).name
-    return stem.startswith("shards-") or stem.endswith("_tar") or stem.endswith(".tar")
-
-
-def _normalize_shard_stem(snippet_id: str) -> str:
-    """Normalize shard identifiers into a tar-file stem."""
-    stem = Path(snippet_id).stem
-    if stem.endswith("_tar"):
-        stem = stem[: -len("_tar")]
-    return stem
-
-
-def _matches_snippet_token(prefix: str, token: str) -> bool:
-    """Return whether a shard member prefix matches the requested token."""
-    return prefix == token or prefix.endswith(token)
-
-
-def _tar_contains_snippet(tar_path: Path, snippet_token: str) -> bool:
-    """Return whether a shard tar contains the requested snippet token."""
-    with tarfile.open(tar_path, "r") as tar:
-        for member in tar:
-            prefix = member.name.split(".", 1)[0]
-            if _matches_snippet_token(prefix, snippet_token):
-                return True
-    return False
-
-
-def _resolve_tar_from_path(
-    *,
-    snippet_id: str,
-    paths: PathConfig,
-) -> Path | None:
-    """Resolve an explicit shard path or relative shard reference."""
-    candidate = Path(snippet_id)
-    if candidate.is_absolute():
-        if candidate.suffix != ".tar":
-            candidate = candidate.with_suffix(".tar")
-        return candidate if candidate.exists() else None
-    if candidate.parent != Path():
-        resolved = paths.resolve_under_root(candidate)
-        if resolved.suffix != ".tar":
-            resolved = resolved.with_suffix(".tar")
-        return resolved if resolved.exists() else None
-    return None
-
-
-def _resolve_tar_for_shard(
-    *,
-    shard_id: str,
-    scene_dirs: list[Path],
-) -> list[Path]:
-    """Resolve a shard identifier against the configured scene directories."""
-    stem = _normalize_shard_stem(shard_id)
-    matches: list[Path] = []
-    for scene_dir in scene_dirs:
-        candidate = scene_dir / f"{stem}.tar"
-        if candidate.exists():
-            matches.append(candidate)
-    return matches
-
-
-def _find_tar_for_sample(
-    *,
-    sample_key: str,
-    scene_dirs: list[Path],
-) -> Path | None:
-    """Find the shard tar that contains the requested sample key."""
-    for scene_dir in scene_dirs:
-        for tar_path in sorted(scene_dir.glob("*.tar")):
-            if _tar_contains_snippet(tar_path, sample_key):
-                return tar_path
-    return None
-
-
-def _split_snippet_ids(snippet_ids: Iterable[str]) -> tuple[list[str], list[str]]:
-    """Split mixed snippet identifiers into shard ids and sample keys."""
-    shard_ids: list[str] = []
-    sample_keys: list[str] = []
-    for snippet_id in snippet_ids:
-        if _looks_like_shard_id(snippet_id):
-            shard_ids.append(snippet_id)
-        else:
-            sample_keys.append(snippet_id)
-    return shard_ids, sample_keys
-
-
-def _tensor3(value: Any) -> torch.Tensor | None:
-    """Return ``value`` when it is a tensor with exactly three elements."""
-    if isinstance(value, torch.Tensor) and value.numel() == 3:
-        return value
-    return None
-
-
 def infer_semidense_bounds(
     efm_dict: Mapping[str, Any],
 ) -> tuple[torch.Tensor, torch.Tensor] | None:
@@ -168,6 +68,12 @@ def infer_semidense_bounds(
     Returns:
         Tuple of ``(min, max)`` tensors on CPU if finite bounds are available, otherwise ``None``.
     """
+
+    def _tensor3(value: Any) -> torch.Tensor | None:
+        if isinstance(value, torch.Tensor) and value.numel() == 3:
+            return value
+        return None
+
     vol_min = _tensor3(efm_dict.get(ARIA_POINTS_VOL_MIN))
     if vol_min is None:
         vol_min = _tensor3(efm_dict.get("points/vol_min"))
@@ -316,7 +222,7 @@ class AseEfmDataset(IterableDataset[EfmSnippetView]):
                 efm_dict.get("sequence_name", ""),
             )
             if self._snippet_key_filter and not any(
-                _matches_snippet_token(snippet_id, token) for token in self._snippet_key_filter
+                matches_snippet_token(snippet_id, token) for token in self._snippet_key_filter
             ):
                 continue
             mesh_base = self._load_mesh(scene_id) if self.config.load_meshes else None
@@ -550,15 +456,17 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
         """Resolve shard URLs, scene ids, mesh paths, and snippet filters."""
         paths = self.paths
         tar_urls = list(self.tar_urls)
-        snippet_ids = _unique_preserve_order(self.snippet_ids)
-        snippet_key_filter = _unique_preserve_order(self.snippet_key_filter)
+        snippet_ids = list(dict.fromkeys(self.snippet_ids))
+        snippet_key_filter = list(dict.fromkeys(self.snippet_key_filter))
 
         scene_ids = list(self.scene_ids)
 
         if snippet_ids:
-            shard_ids, sample_keys = _split_snippet_ids(snippet_ids)
-            snippet_key_filter = _unique_preserve_order(
-                list(snippet_key_filter) + list(sample_keys),
+            shard_ids, sample_keys = split_snippet_ids(snippet_ids)
+            snippet_key_filter = list(
+                dict.fromkeys(
+                    list(snippet_key_filter) + list(sample_keys),
+                )
             )
 
             scene_dirs: list[Path] = []
@@ -568,7 +476,7 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
 
             resolved_tars: list[Path] = []
             for shard_id in shard_ids:
-                resolved = _resolve_tar_from_path(
+                resolved = resolve_tar_from_path(
                     snippet_id=shard_id,
                     paths=paths,
                 )
@@ -579,7 +487,7 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
                     raise ValueError(
                         "snippet_ids require scene_ids when using shard IDs without explicit paths.",
                     )
-                matches = _resolve_tar_for_shard(
+                matches = resolve_tars_for_shard(
                     shard_id=shard_id,
                     scene_dirs=scene_dirs,
                 )
@@ -594,7 +502,7 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
                     raise ValueError(
                         "snippet_ids require scene_ids when using sample keys.",
                     )
-                match = _find_tar_for_sample(
+                match = find_tar_for_sample(
                     sample_key=sample_key,
                     scene_dirs=scene_dirs,
                 )
@@ -604,7 +512,7 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
                     )
                 resolved_tars.append(match)
 
-            tar_urls = [str(p) for p in _unique_preserve_order(p.as_posix() for p in resolved_tars)]
+            tar_urls = [str(p) for p in dict.fromkeys(resolved_tars)]
 
         if not tar_urls:
             base = paths.resolve_atek_data_dir(self.atek_variant)
@@ -663,11 +571,7 @@ class AseEfmDatasetConfig(BaseConfig[AseEfmDataset]):
             self.__class__.__name__,
             "setup_target",
         ).set_verbosity(self.verbosity)
-        expanded_urls = [
-            str(path)
-            for url in self.tar_urls or []
-            for path in (sorted(Path().glob(url)) if any(ch in url for ch in "*?[]") else [Path(url)])
-        ]
+        expanded_urls = [str(path) for path in expand_tar_paths(self.tar_urls or [])]
         if not expanded_urls:
             raise FileNotFoundError("No tar files matched derived tar_urls")
         self.tar_urls = expanded_urls

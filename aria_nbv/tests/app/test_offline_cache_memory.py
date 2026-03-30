@@ -5,17 +5,17 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
-from aria_nbv.app.panels.offline_cache_utils import _estimate_nbytes, _p3d_cameras_nbytes
+from aria_nbv.utils.memory import estimate_nbytes, p3d_cameras_nbytes
 
 
 def test_estimate_nbytes_tensor() -> None:
     tensor = torch.zeros((10,), dtype=torch.float32)
-    assert _estimate_nbytes(tensor) == 10 * 4
+    assert estimate_nbytes(tensor) == 10 * 4
 
 
 def test_estimate_nbytes_numpy() -> None:
     arr = np.zeros((3, 4), dtype=np.float64)
-    assert _estimate_nbytes(arr) == 3 * 4 * 8
+    assert estimate_nbytes(arr) == 3 * 4 * 8
 
 
 def test_estimate_nbytes_tensor_method() -> None:
@@ -27,7 +27,7 @@ def test_estimate_nbytes_tensor_method() -> None:
             return self._t
 
     obj = _HasTensor()
-    assert _estimate_nbytes(obj) == 5 * 2
+    assert estimate_nbytes(obj) == 5 * 2
 
 
 def test_estimate_nbytes_nested_containers() -> None:
@@ -52,13 +52,13 @@ def test_estimate_nbytes_nested_containers() -> None:
     d0 = _HasTensor(torch.zeros((7,), dtype=torch.float16))  # 14 bytes
     bundle = _Bundle(a=a, b=[b0], c={"x": c0}, d=d0, e=1)
 
-    assert _estimate_nbytes(bundle) == 24 + 32 + 1 + 14
+    assert estimate_nbytes(bundle) == 24 + 32 + 1 + 14
 
 
 def test_estimate_nbytes_cycle_safe() -> None:
     items: list[object] = []
     items.append(items)
-    assert _estimate_nbytes(items) == 0
+    assert estimate_nbytes(items) == 0
 
 
 def test_p3d_cameras_nbytes() -> None:
@@ -78,4 +78,4 @@ def test_p3d_cameras_nbytes() -> None:
         + cams.principal_point.numel() * cams.principal_point.element_size()
         + cams.image_size.numel() * cams.image_size.element_size()
     )
-    assert _p3d_cameras_nbytes(cams) == expected
+    assert p3d_cameras_nbytes(cams) == expected

@@ -1,19 +1,29 @@
-"""Metadata and naming helpers for offline cache artifacts."""
+"""Metadata and naming helpers for offline cache artifacts.
+
+This module owns oracle-cache config snapshots plus the compatibility
+read/write helpers for oracle-cache metadata files. Low-level shared cache
+helpers live in :mod:`aria_nbv.data_handling._cache_utils`, while the metadata
+dataclass itself owns JSON encode/decode in :mod:`aria_nbv.data_handling.cache_contracts`.
+"""
 
 from __future__ import annotations
 
-import hashlib
-import json
-import re
-import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from ..pipelines.oracle_rri_labeler import OracleRriLabelerConfig
 from ..utils import BaseConfig
 from ..vin.backbone_evl import EvlBackboneConfig
+from ._cache_utils import (
+    extract_snippet_token,
+    format_sample_key,
+    json_signature,
+    sanitize_token,
+    unique_sample_path,
+    utc_now_iso,
+)
 from .cache_contracts import OracleRriCacheMetadata
+from .cache_index import load_json_metadata, write_json_metadata
 from .efm_dataset import AseEfmDatasetConfig
 
 
@@ -29,8 +39,7 @@ def snapshot_dataset_config(cfg: AseEfmDatasetConfig) -> dict[str, Any]:
 
 def _config_signature(payload: dict[str, Any]) -> str:
     """Compute a stable hash for a JSON-serializable config payload."""
-    serial = json.dumps(payload, sort_keys=True, ensure_ascii=True)
-    return hashlib.sha1(serial.encode("utf-8")).hexdigest()
+    return json_signature(payload)
 
 
 def _compute_config_hash(
@@ -78,78 +87,12 @@ def _ensure_config_hash(
 
 def _write_metadata(path: Path, meta: OracleRriCacheMetadata) -> None:
     """Write oracle-cache metadata to disk as JSON."""
-    payload = {
-        "version": meta.version,
-        "created_at": meta.created_at,
-        "labeler_config": meta.labeler_config,
-        "labeler_signature": meta.labeler_signature,
-        "dataset_config": meta.dataset_config,
-        "backbone_config": meta.backbone_config,
-        "backbone_signature": meta.backbone_signature,
-        "config_hash": meta.config_hash,
-        "include_backbone": meta.include_backbone,
-        "include_depths": meta.include_depths,
-        "include_pointclouds": meta.include_pointclouds,
-        "num_samples": meta.num_samples,
-    }
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    write_json_metadata(path, meta.to_json_payload())
 
 
 def _read_metadata(path: Path) -> OracleRriCacheMetadata:
     """Read oracle-cache metadata from disk."""
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    return OracleRriCacheMetadata(
-        version=int(payload["version"]),
-        created_at=str(payload["created_at"]),
-        labeler_config=payload["labeler_config"],
-        labeler_signature=payload["labeler_signature"],
-        dataset_config=payload.get("dataset_config"),
-        backbone_config=payload.get("backbone_config"),
-        backbone_signature=payload.get("backbone_signature"),
-        config_hash=payload.get("config_hash"),
-        include_backbone=payload.get("include_backbone"),
-        include_depths=payload.get("include_depths"),
-        include_pointclouds=payload.get("include_pointclouds"),
-        num_samples=payload.get("num_samples"),
-    )
-
-
-def _sanitize_token(value: str) -> str:
-    """Normalize a token so it is safe to embed in filenames."""
-    return re.sub(r"[^0-9a-zA-Z._-]+", "_", value).strip("_")
-
-
-def _extract_snippet_token(snippet_id: str) -> str:
-    """Extract the stable numeric sample token from a snippet identifier."""
-    match = re.search(r"(?:AtekDataSample|DataSample)_([0-9]+)$", snippet_id)
-    if match:
-        return match.group(1)
-    return snippet_id
-
-
-def _format_sample_key(scene_id: str, snippet_id: str, config_hash: str) -> str:
-    """Build a stable cache key for a sample payload."""
-    scene_safe = _sanitize_token(scene_id)
-    snippet_token = _extract_snippet_token(snippet_id)
-    snippet_safe = _sanitize_token(snippet_token)
-    key = f"ASE_NBV_SNIPPET_{scene_safe}_{snippet_safe}_{config_hash}"
-    if len(key) <= 200:
-        return key
-    snippet_digest = hashlib.sha1(snippet_id.encode("utf-8")).hexdigest()[:12]
-    return f"ASE_NBV_SNIPPET_{scene_safe}_{snippet_digest}_{config_hash}"
-
-
-def _unique_sample_path(samples_dir: Path, base_key: str) -> tuple[str, Path]:
-    """Return a collision-free payload path for the requested cache key."""
-    path = samples_dir / f"{base_key}.pt"
-    if not path.exists():
-        return base_key, path
-    while True:
-        suffix = hashlib.sha1(f"{base_key}-{time.time_ns()}".encode()).hexdigest()[:6]
-        key = f"{base_key}__{suffix}"
-        path = samples_dir / f"{key}.pt"
-        if not path.exists():
-            return key, path
+    return OracleRriCacheMetadata.from_json_payload(load_json_metadata(path))
 
 
 def build_cache_metadata(
@@ -168,7 +111,7 @@ def build_cache_metadata(
     dataset_snapshot = snapshot_dataset_config(dataset) if dataset is not None else None
     meta = OracleRriCacheMetadata(
         version=version,
-        created_at=datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        created_at=utc_now_iso(),
         labeler_config=labeler_snapshot,
         labeler_signature=_config_signature(labeler_snapshot),
         dataset_config=dataset_snapshot,
@@ -188,15 +131,23 @@ def build_cache_metadata(
     return meta
 
 
+compute_config_hash = _compute_config_hash
+config_signature = _config_signature
+ensure_config_hash = _ensure_config_hash
+read_metadata = _read_metadata
+write_metadata = _write_metadata
+
 __all__ = [
-    "_compute_config_hash",
-    "_config_signature",
-    "_ensure_config_hash",
-    "_format_sample_key",
-    "_read_metadata",
-    "_unique_sample_path",
-    "_write_metadata",
     "build_cache_metadata",
+    "compute_config_hash",
+    "config_signature",
+    "ensure_config_hash",
+    "extract_snippet_token",
+    "format_sample_key",
+    "read_metadata",
+    "sanitize_token",
     "snapshot_config",
     "snapshot_dataset_config",
+    "unique_sample_path",
+    "write_metadata",
 ]

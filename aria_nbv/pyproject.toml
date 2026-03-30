@@ -87,6 +87,7 @@ dependencies = [
     nbv-optuna             = "aria_nbv.lightning.cli:optuna_main"
     nbv-wandb              = "aria_nbv.lightning.cli:wandb_main"
     nbv-cli                = "aria_nbv.lightning.cli:main"
+    nbv-autoimprove        = "aria_nbv.utils.autoimprove:main"
 
 
     [project.optional-dependencies]

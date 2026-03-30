@@ -19,9 +19,11 @@ from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 from matplotlib import colormaps
 from plotly import colors as plotly_colors
-from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 
 from aria_nbv.utils import Console, rotate_yaw_cw90
+from aria_nbv.utils.plotly_helpers import flatten_edges_for_plotly as _flatten_edges_for_plotly
+from aria_nbv.utils.plotting import FrameGridBuilder
+from aria_nbv.utils.plotting import depth_to_color as _depth_to_color
 
 from .efm_views import EfmCameraView, EfmSnippetView
 
@@ -190,15 +192,6 @@ def bbox_edges(min_pt: np.ndarray, max_pt: np.ndarray) -> np.ndarray:
         dtype=float,
     )
     return corners[BBOX_EDGE_IDX]
-
-
-def _flatten_edges_for_plotly(edges: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Convert ``(N, 2, 3)`` edges to NaN-separated XYZ for a single Scatter3d trace."""
-
-    edges = np.asarray(edges, dtype=float).reshape(-1, 2, 3)
-    edges_sep = np.concatenate([edges, np.full((edges.shape[0], 1, 3), np.nan, dtype=float)], axis=1)
-    flat = edges_sep.reshape(-1, 3)
-    return flat[:, 0], flat[:, 1], flat[:, 2]
 
 
 def mesh_to_plotly(
@@ -849,43 +842,6 @@ def _to_uint8_image(img: torch.Tensor) -> np.ndarray:
     arr = arr.permute(1, 2, 0).clamp(0, 1).mul(255).to(torch.uint8).numpy()  # type: ignore
 
     return np.rot90(arr, k=ROTATE_90_CW)  # type: ignore
-
-
-def _depth_to_color(depth: torch.Tensor, *, percentile: float = 99.5) -> np.ndarray:
-    """Colorise a single depth/distance map to uint8 RGB using a perceptual colormap."""
-
-    depth_np = depth.detach().cpu().squeeze().numpy()
-    finite_mask = np.isfinite(depth_np)
-    if not finite_mask.any():
-        rgb = np.zeros(depth_np.shape + (3,), dtype=np.uint8)
-    else:
-        finite_vals = depth_np[finite_mask]
-        vmin = max(np.nanmin(finite_vals), 0.0)
-        vmax = np.nanpercentile(finite_vals, percentile)
-        if vmax <= vmin:
-            vmax = vmin + 1e-3
-        norm = np.clip((depth_np - vmin) / (vmax - vmin), 0.0, 1.0)
-        cmap = colormaps.get_cmap("viridis")
-        rgb = (cmap(norm)[..., :3] * 255).astype(np.uint8)
-    return np.rot90(rgb, k=ROTATE_90_CW)
-
-
-class FrameGridBuilder:
-    """Builder for image grids (2D modalities)."""
-
-    def __init__(self, rows: int, cols: int, *, titles: list[str], height: int, width: int, title: str):
-        self.fig = make_subplots(rows=rows, cols=cols, subplot_titles=titles, specs=[[{"type": "image"}] * cols] * rows)
-        self.height = height
-        self.width = width
-        self.title = title
-
-    def add_image(self, img: np.ndarray, *, row: int, col: int) -> "FrameGridBuilder":
-        self.fig.add_trace(go.Image(z=img), row=row, col=col)
-        return self
-
-    def finalize(self) -> go.Figure:
-        self.fig.update_layout(height=self.height, width=self.width, title_text=self.title)
-        return self.fig
 
 
 def collect_frame_modalities(

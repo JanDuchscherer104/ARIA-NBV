@@ -12,7 +12,6 @@ from aria_nbv.data_handling import (
     OracleRriCacheConfig,
     OracleRriCacheDatasetConfig,
     VinOracleCacheDatasetConfig,
-    rebuild_cache_index,
     repair_oracle_cache_indices,
 )
 from aria_nbv.lightning.lit_datamodule import VinDataModule, VinDataModuleConfig
@@ -88,7 +87,10 @@ def test_rebuild_cache_index_random_split(tmp_path: Path) -> None:
         (samples_dir / f"{key}.pt").write_text("x", encoding="utf-8")
 
     seed = 1234
-    rebuild_cache_index(cache_dir=cache_dir, train_val_split=0.3, rng_seed=seed)
+    OracleRriCacheConfig(cache_dir=cache_dir).rebuild_index(
+        train_val_split=0.3,
+        rng_seed=seed,
+    )
 
     train_path = cache_dir / "train_index.jsonl"
     val_path = cache_dir / "val_index.jsonl"

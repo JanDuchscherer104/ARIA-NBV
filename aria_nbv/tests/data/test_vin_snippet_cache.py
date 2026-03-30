@@ -231,8 +231,7 @@ def test_oracle_cache_uses_vin_snippet_cache(
     )
 
     monkeypatch.setattr(
-        offline_cache,
-        "decode_depths",
+        "aria_nbv.data_handling.oracle_cache.decode_depths",
         _decode_depths_stub,
     )
 
@@ -361,8 +360,7 @@ def test_oracle_cache_filters_to_vin_snippet_subset(
     )
 
     monkeypatch.setattr(
-        offline_cache,
-        "decode_depths",
+        "aria_nbv.data_handling.oracle_cache.decode_depths",
         _decode_depths_stub,
     )
 

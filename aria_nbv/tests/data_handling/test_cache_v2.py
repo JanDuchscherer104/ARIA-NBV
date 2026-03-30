@@ -36,7 +36,6 @@ from aria_nbv.data_handling import (
     VinSnippetView,
     build_vin_snippet_view,
     read_vin_snippet_cache_metadata,
-    rebuild_oracle_cache_index,
     rebuild_vin_snippet_cache_index,
     repair_oracle_cache_indices,
 )
@@ -374,8 +373,9 @@ def test_rebuild_oracle_cache_index_writes_base_and_split_indices(tmp_path: Path
         sample_path = samples_dir / f"ASE_NBV_SNIPPET_scene_00000{idx}_hash.pt"
         sample_path.write_text("x", encoding="utf-8")
 
-    count = rebuild_oracle_cache_index(
+    count = OracleRriCacheConfig(
         cache_dir=cache_dir,
+    ).rebuild_index(
         train_val_split=0.25,
         rng_seed=123,
     )
