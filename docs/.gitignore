@@ -2,6 +2,7 @@
 /_site/
 /site_libs/
 /index_files/
+/objects.json
 /search.json
 /**/*.html
 /**/*_files/

@@ -3,6 +3,8 @@ title: aria_nbv Package
 ---
 
 > **Note**: This page is superseded by `aria_nbv_overview.qmd` for the consolidated package map. Keep this one for finer module notes.
+>
+> For generated signatures and docstrings, see the [API Reference](../../reference/index.qmd).
 
 # Name & Scope
 

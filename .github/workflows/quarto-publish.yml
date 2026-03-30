@@ -5,7 +5,9 @@ on:
     branches:
       - main
     paths:
+      - "aria_nbv/**"
       - "docs/**"
+      - "scripts/quarto_generate_api_docs.sh"
       - ".github/workflows/quarto-publish.yml"
   workflow_dispatch:
 
@@ -25,11 +27,22 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install API docs generator
+        run: python -m pip install --upgrade pip quartodoc
+
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+
+      - name: Generate API reference
+        run: ./scripts/quarto_generate_api_docs.sh
 
       - name: Render docs site
         run: quarto render docs --no-execute

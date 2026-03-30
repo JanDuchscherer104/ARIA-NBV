@@ -18,6 +18,7 @@ Apply this file when working under `docs/`.
 
 ## Commands
 - Context refresh: `make context`
+- API reference refresh: `./scripts/quarto_generate_api_docs.sh`
 - Quarto render: `cd docs && quarto render .`
 - Quarto preview: `cd docs && quarto preview`
 - Quarto check: `quarto check`

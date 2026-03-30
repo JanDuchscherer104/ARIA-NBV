@@ -1,0 +1,6 @@
+*
+!.gitignore
+!index.qmd
+!_api_index.md
+!_sidebar.yml
+!_styles-quartodoc.css

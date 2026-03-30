@@ -1,0 +1,13 @@
+---
+title: "API Reference"
+toc: true
+---
+
+# `aria_nbv` API Reference
+
+This section is generated from Google-style docstrings in `aria_nbv/aria_nbv/`.
+The published GitHub Pages build refreshes these pages via `quartodoc` in `.github/workflows/quarto-publish.yml`.
+
+Prefer `aria_nbv.data_handling` for the stable typed data surface. The `VIN Core` entries document the model internals that sit behind training and inference.
+
+{{< include _api_index.md >}}

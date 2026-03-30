@@ -94,6 +94,7 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - **[Implementation Overview](contents/impl/overview.qmd)**: Metrics + RRI computation entry point
 - **[aria_nbv Overview & Architecture](contents/impl/aria_nbv_overview.qmd)**: Package structure and components
 - **[aria_nbv Package](contents/impl/aria_nbv_package.qmd)**: API map + module responsibilities
+- **[API Reference](reference/index.qmd)**: Auto-generated signatures and docstrings for the documented `aria_nbv` surfaces
 - **[ASE Data Pipeline & Streamlit Usage](contents/impl/data_pipeline_overview.qmd)**: Data ingestion and dashboards
 - **[aria_nbv Implementation Overview](contents/impl/oracle_rri_impl.qmd)**: Key modules and workflows
 - **[Computing RRI with Ground Truth Meshes](contents/impl/rri_computation.qmd)**: Oracle pipeline and labels

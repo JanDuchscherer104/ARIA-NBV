@@ -29,3 +29,4 @@ tags: [codex, workflow, architecture]
 - Package verification uses `ruff format`, `ruff check`, and targeted `pytest`.
 - The tracked Python workspace and package root are `aria_nbv/` and `aria_nbv/aria_nbv`; repo tooling and docs should refer to that layout.
 - Documentation changes should update Quarto/Typst sources directly, not ad hoc notes under `.codex/`.
+- The published Quarto site refreshes `aria_nbv` API reference pages from docstrings via `quartodoc` during the Pages workflow, with `docs/reference/index.qmd` as the human-authored landing page.

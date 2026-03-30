@@ -1,0 +1,29 @@
+website:
+  sidebar:
+  - collapse-level: 2
+    contents:
+    - reference/index.qmd
+    - contents:
+      - reference/data_handling.qmd
+      - reference/pose_generation.qmd
+      - reference/rendering.qmd
+      - reference/rri_metrics.qmd
+      - reference/lightning.qmd
+      - reference/configs.qmd
+      - reference/utils.qmd
+      section: Stable Package Surface
+    - contents:
+      - reference/vin.backbone_evl.qmd
+      - reference/vin.model_v3.qmd
+      - reference/vin.pose_encoders.qmd
+      - reference/vin.pose_encoding.qmd
+      - reference/vin.traj_encoder.qmd
+      - reference/vin.types.qmd
+      section: VIN Core
+    - contents:
+      - reference/pipelines.oracle_rri_labeler.qmd
+      section: Pipelines
+    id: reference
+    search: true
+    style: docked
+  - id: dummy-sidebar
