@@ -95,7 +95,7 @@ def candidate_config_ui(
         options=collision_opts,
         index=collision_opts.index(default.collision_backend),
         format_func=lambda c: c.value,
-        help="PyTorch3D for GPU, pyembree/trimesh for CPU.",
+        help="PyTorch3D for GPU, trimesh/pyembree for CPU, or Mojo for the experimental parallel CPU backend.",
     )
 
     num_samples = expander.slider("num_samples", 2, 512, num_samples_default, step=2)

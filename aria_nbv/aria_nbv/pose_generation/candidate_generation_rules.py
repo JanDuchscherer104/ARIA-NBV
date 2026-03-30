@@ -10,6 +10,11 @@ import trimesh  # type: ignore[import-untyped]
 
 from ..utils import Console
 from .geometry import point_mesh_distance
+from .mojo_backend import (
+    clearance_mask_mojo,
+    get_mojo_triangles,
+    point_mesh_distance_mojo,
+)
 from .types import CandidateContext, CollisionBackend
 
 if TYPE_CHECKING:
@@ -70,7 +75,19 @@ class MinDistanceToMeshRule(RuleBase):
         positions = ctx.centers_world
         backend = self.config.collision_backend
 
-        if backend == CollisionBackend.P3D and ctx.mesh_verts is not None and ctx.mesh_faces is not None:
+        if backend == CollisionBackend.MOJO:
+            triangles = get_mojo_triangles(ctx)
+            if ctx.cfg.collect_debug_stats:
+                dist_t = point_mesh_distance_mojo(positions, triangles)
+            else:
+                keep = clearance_mask_mojo(
+                    positions,
+                    triangles,
+                    min_distance=self.config.min_distance_to_mesh,
+                )
+                ctx.mask_valid = ctx.mask_valid & keep
+                return
+        elif backend == CollisionBackend.P3D and ctx.mesh_verts is not None and ctx.mesh_faces is not None:
             dist_t = point_mesh_distance(positions, ctx.mesh_verts, ctx.mesh_faces)
         else:
             try:
@@ -97,7 +114,8 @@ class PathCollisionRule(RuleBase):
     intersect the mesh, optionally with a configurable clearance.
 
     Depending on :class:`CollisionBackend`, collision checks are implemented either by discretised distance sampling
-    (PyTorch3D) or by analytic ray-mesh intersection tests (Trimesh / PyEmbree).
+    (PyTorch3D) or by analytic ray-mesh intersection tests (Trimesh / PyEmbree). The current Mojo backend keeps the
+    established ray engine path for path collisions and only accelerates mesh-clearance queries.
 
     The method:
 
@@ -108,9 +126,9 @@ class PathCollisionRule(RuleBase):
         * :data:`CollisionBackend.P3D`:
             discretise each segment into ``ray_subsample`` points, compute distances via :func:`point_mesh_distance`,
             and mark collisions where any sample falls below ``step_clearance``.
-        * :data:`CollisionBackend.TRIMESH` / :data:`CollisionBackend.PYEMBREE`:
+        * :data:`CollisionBackend.TRIMESH` / :data:`CollisionBackend.PYEMBREE` / :data:`CollisionBackend.MOJO`:
             cast rays with maximum distance equal to the segment length and use the ray engine's
-            :meth:`intersects_any` to identify collisions.
+            :meth:`intersects_any` semantics to identify collisions.
 
     4. Records the boolean collision mask in ``ctx.debug['path_collision_mask']`` when debug stats are enabled.
     5. Calls :meth:`CandidateContext.invalidate` to apply the collision mask as a rejection mask.
@@ -137,6 +155,9 @@ class PathCollisionRule(RuleBase):
         dirs_norm = dirs / dists.unsqueeze(1)
 
         backend = self.config.collision_backend
+
+        if backend == CollisionBackend.MOJO:
+            backend = CollisionBackend.TRIMESH
 
         if backend == CollisionBackend.P3D and ctx.mesh_verts is not None and ctx.mesh_faces is not None:
             steps = max(2, int(self.config.ray_subsample))

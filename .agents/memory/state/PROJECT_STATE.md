@@ -1,6 +1,6 @@
 ---
 id: project_state
-updated: 2026-03-29
+updated: 2026-03-30
 scope: repo
 owner: jan
 status: active
@@ -26,12 +26,13 @@ The current stack has three main layers: ASE and EFM-facing data access, oracle 
 - Treat `make context-contracts` / `scripts/nbv_get_context.sh contracts` as the preferred contract surface; heavy generated artifacts are fallback-only.
 
 ## Active Experiments
-The project is actively iterating on VIN variants, semidense projection cues, candidate generation behavior, and documentation alignment between code, paper, and slides.
+The project is actively iterating on VIN variants, semidense projection cues, candidate generation behavior, and documentation alignment between code, paper, and slides. Candidate generation now also has an experimental `CollisionBackend.MOJO` path for mesh-clearance queries; path-collision checks still delegate to the established Trimesh ray engine for equivalence while the parallel Mojo distance kernel is evaluated.
 
 ## Risks and Pitfalls
 - Validation can be disabled by config defaults if Lightning is misconfigured.
 - Interpreter mismatch can break tests when `uv run` or the repo venv is not used.
 - Candidate-pose frame consistency and CW90 corrections remain easy to misuse across rendering and VIN inputs.
+- The experimental Mojo backend requires the Mojo Python package to be reachable, either from `<repo>/.mojo-venv` or via `ARIA_NBV_MOJO_SITE_PACKAGES`.
 
 ## Pointers
 - `docs/index.qmd`
