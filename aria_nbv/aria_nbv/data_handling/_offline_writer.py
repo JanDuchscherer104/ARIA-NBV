@@ -73,6 +73,12 @@ def _json_signature(payload: dict[str, Any]) -> str:
     return hashlib.sha1(serial.encode("utf-8")).hexdigest()
 
 
+def _split_membership_rank(sample_key: str) -> str:
+    """Return the stable split-order rank for one sample key."""
+
+    return hashlib.sha1(sample_key.encode("utf-8")).hexdigest()
+
+
 def _sanitize_token(value: str) -> str:
     """Normalize a token so it is safe in sample identifiers.
 
@@ -506,15 +512,21 @@ def _assign_splits(
 
     val_target = int(round(float(val_fraction) * total))
     val_target = max(0, min(total, val_target))
-    val_indices = all_indices[:val_target]
-    train_indices = all_indices[val_target:]
+    val_members = set(
+        sorted(
+            range(total),
+            key=lambda idx: (_split_membership_rank(records[idx].sample_key), records[idx].sample_key),
+        )[:val_target]
+    )
+    val_indices = np.asarray([idx for idx in all_indices if int(idx) in val_members], dtype=np.int64)
+    train_indices = np.asarray([idx for idx in all_indices if int(idx) not in val_members], dtype=np.int64)
     for idx, record in enumerate(records):
         record.sample_index = idx
-        record.split = "val" if idx < val_target else "train"
+        record.split = "val" if idx in val_members else "train"
     return {"all": all_indices, "train": train_indices, "val": val_indices}
 
 
-class VinOfflineWriterConfig(BaseConfig["VinOfflineWriter"]):
+class VinOfflineWriterConfig(BaseConfig):
     """Configuration for building immutable VIN offline datasets from raw snippets."""
 
     @property
@@ -792,6 +804,7 @@ class VinOfflineWriter:
             provenance={
                 "writer": self.__class__.__name__,
                 "store_dir": store_dir.as_posix(),
+                "split_policy": "sha1(sample_key)",
             },
             shards=shard_specs,
         )

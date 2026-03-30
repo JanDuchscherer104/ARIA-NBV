@@ -10,6 +10,7 @@ This module centralizes the model-facing VIN runtime contracts:
 
 from __future__ import annotations
 
+from ._vin_sources import VinOracleOnlineDataset, VinOracleOnlineDatasetConfig
 from .vin_adapter import (
     DEFAULT_VIN_SNIPPET_PAD_POINTS,
     build_vin_snippet_view,
@@ -18,7 +19,6 @@ from .vin_adapter import (
     pad_vin_points,
     vin_snippet_cache_config_hash,
 )
-from .vin_oracle_datasets import VinOracleOnlineDataset, VinOracleOnlineDatasetConfig
 from .vin_oracle_types import VinOracleBatch, VinOracleDatasetBase
 
 VinOnlineDatasetConfig = VinOracleOnlineDatasetConfig

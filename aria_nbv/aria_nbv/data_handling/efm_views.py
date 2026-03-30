@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, fields, replace
-from inspect import cleandoc, getsource
+from inspect import cleandoc, getattr_static, getsource
 from pprint import pformat
 from typing import Any, Literal, TypedDict
 
@@ -833,12 +833,24 @@ def is_efm_snippet_view_instance(value: object) -> bool:
     The v2 stack accepts both the local data-handling view classes and legacy
     view objects that expose the same public attributes.
     """
-    return hasattr(value, "efm") and hasattr(value, "trajectory") and hasattr(value, "semidense")
+    try:
+        getattr_static(value, "efm")
+        getattr_static(value, "trajectory")
+        getattr_static(value, "semidense")
+    except AttributeError:
+        return False
+    return True
 
 
 def is_vin_snippet_view_instance(value: object) -> bool:
     """Return whether ``value`` behaves like a :class:`VinSnippetView`."""
-    return hasattr(value, "points_world") and hasattr(value, "lengths") and hasattr(value, "t_world_rig")
+    try:
+        getattr_static(value, "points_world")
+        getattr_static(value, "lengths")
+        getattr_static(value, "t_world_rig")
+    except AttributeError:
+        return False
+    return True
 
 
 __all__ = [

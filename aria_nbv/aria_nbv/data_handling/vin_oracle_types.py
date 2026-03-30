@@ -39,6 +39,8 @@ class VinOracleBatch:
         pm_acc_after: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` accuracy distance after.
         pm_comp_after: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` completeness distance after.
         p3d_cameras: PyTorch3D cameras used for depth rendering/unprojection (same ordering as candidates).
+        candidate_count: Number of valid candidates (scalar or batched vector). When
+            absent, runtime code falls back to the full candidate width.
         scene_id: ASE scene id for diagnostics (string or list when batched).
         snippet_id: Snippet id (tar key/url stem) for diagnostics (string or list when batched).
         backbone_out: Optional cached EVL backbone outputs.
@@ -73,17 +75,68 @@ class VinOracleBatch:
     pm_comp_after: Tensor
     """Post-observation point-map completeness metric per candidate."""
 
-    p3d_cameras: PerspectiveCameras
-    """PyTorch3D cameras aligned with the candidate set."""
-
     scene_id: str | list[str]
     """Scene identifier or batched list of identifiers."""
 
     snippet_id: str | list[str]
     """Snippet identifier or batched list of identifiers."""
 
+    p3d_cameras: PerspectiveCameras
+    """PyTorch3D cameras aligned with the candidate set."""
+
+    candidate_count: Tensor | None = None
+    """Number of valid candidates (scalar or batched vector)."""
+
     backbone_out: EvlBackboneOutput | None = None
     """Optional cached EVL backbone outputs (used to skip backbone inference)."""
+
+    def resolved_candidate_count(self, *, device: torch.device | None = None) -> Tensor:
+        """Return the valid candidate count as a scalar or batched vector."""
+
+        poses = self.candidate_poses_world_cam.tensor()
+        target_device = device or poses.device
+        max_candidates = int(poses.shape[-2])
+        counts = self.candidate_count
+        if counts is None:
+            if poses.ndim == 2:
+                return torch.tensor(max_candidates, device=target_device, dtype=torch.int64)
+            if poses.ndim == 3:
+                return torch.full(
+                    (int(poses.shape[0]),),
+                    max_candidates,
+                    device=target_device,
+                    dtype=torch.int64,
+                )
+            raise ValueError("candidate_poses_world_cam must have shape (N,12) or (B,N,12).")
+
+        counts = torch.as_tensor(counts, device=target_device, dtype=torch.int64)
+        if poses.ndim == 2:
+            if counts.numel() == 0:
+                return torch.tensor(0, device=target_device, dtype=torch.int64)
+            return counts.reshape(-1)[0].clamp(min=0, max=max_candidates)
+        if poses.ndim != 3:
+            raise ValueError("candidate_poses_world_cam must have shape (N,12) or (B,N,12).")
+
+        batch_size = int(poses.shape[0])
+        counts = counts.reshape(-1)
+        if counts.numel() == 1:
+            counts = counts.expand(batch_size)
+        if counts.numel() != batch_size:
+            raise ValueError(
+                f"candidate_count must have 1 or {batch_size} elements, got {counts.numel()}.",
+            )
+        return counts.clamp(min=0, max=max_candidates)
+
+    def candidate_valid_mask(self, *, device: torch.device | None = None) -> Tensor:
+        """Return a prefix mask that marks valid candidates."""
+
+        poses = self.candidate_poses_world_cam.tensor()
+        counts = self.resolved_candidate_count(device=device)
+        max_candidates = int(poses.shape[-2])
+        arange = torch.arange(max_candidates, device=counts.device)
+        if counts.ndim == 0:
+            return arange < counts
+        return arange.unsqueeze(0) < counts.unsqueeze(1)
 
     def shape_summary(self) -> dict[str, str]:
         """Summarize tensor shapes for diagnostics/logging."""
@@ -93,8 +146,9 @@ class VinOracleBatch:
                 return str(tuple(value.shape))  # type: ignore[attr-defined]
             return str(type(value).__name__)
 
+        poses = self.candidate_poses_world_cam.tensor()
         out: dict[str, str] = {
-            "candidate_poses_world_cam": str(tuple(self.candidate_poses_world_cam.tensor().shape)),
+            "candidate_poses_world_cam": str(tuple(poses.shape)),
             "reference_pose_world_rig": str(tuple(self.reference_pose_world_rig.tensor().shape)),
             "rri": _shape(self.rri),
             "pm_dist_before": _shape(self.pm_dist_before),
@@ -108,9 +162,8 @@ class VinOracleBatch:
             "p3d_cameras.focal_length": _shape(self.p3d_cameras.focal_length),
             "p3d_cameras.principal_point": _shape(self.p3d_cameras.principal_point),
             "p3d_cameras.image_size": _shape(self.p3d_cameras.image_size),
+            "candidate_count": _shape(self.resolved_candidate_count(device=poses.device)),
         }
-
-        poses = self.candidate_poses_world_cam.tensor()
         batch_size = None
         num_candidates = None
         if poses.ndim == 2:
@@ -171,13 +224,18 @@ class VinOracleBatch:
         else:
             raise ValueError("candidate_poses_world_cam must have shape (N,12) or (B,N,12).")
 
-        if num_candidates <= 1:
+        counts = self.resolved_candidate_count(device=poses.device)
+        if counts.ndim == 0:
+            counts = counts.view(1)
+        if num_candidates <= 1 or not torch.any(counts > 1):
             return self
 
-        if batch_size == 1:
-            perm = torch.randperm(num_candidates, device=poses.device, generator=generator).view(1, -1)
-        else:
-            perm = torch.rand((batch_size, num_candidates), device=poses.device, generator=generator).argsort(dim=1)
+        perm = torch.arange(num_candidates, device=poses.device).expand(batch_size, -1).clone()
+        for row, count_tensor in enumerate(counts.tolist()):
+            count = int(count_tensor)
+            if count <= 1:
+                continue
+            perm[row, :count] = torch.randperm(count, device=poses.device, generator=generator)
 
         def _gather_candidate(data: Tensor) -> Tensor:
             if data.ndim == 2 and not has_batch:
@@ -273,6 +331,7 @@ class VinOracleBatch:
             pm_acc_after=pm_acc_after,
             pm_comp_after=pm_comp_after,
             p3d_cameras=p3d_cameras,
+            candidate_count=self.resolved_candidate_count(device=poses.device),
             scene_id=self.scene_id,
             snippet_id=self.snippet_id,
             backbone_out=self.backbone_out,
@@ -303,6 +362,11 @@ class VinOracleBatch:
             pm_acc_after=rri.pm_acc_after,
             pm_comp_after=rri.pm_comp_after,
             p3d_cameras=label_batch.depths.p3d_cameras,
+            candidate_count=torch.tensor(
+                int(rri.rri.shape[0]),
+                device=rri.rri.device,
+                dtype=torch.int64,
+            ),
             scene_id=sample.scene_id,
             snippet_id=sample.snippet_id,
             backbone_out=None,
@@ -326,8 +390,8 @@ class VinOracleBatch:
                     "Batching with full EfmSnippetView is not supported. Use VinSnippetView from the offline cache.",
                 )
 
-        candidate_counts = [int(sample.candidate_poses_world_cam.shape[-2]) for sample in samples]
-        max_candidates = max(candidate_counts) if candidate_counts else 0
+        candidate_widths = [int(sample.candidate_poses_world_cam.shape[-2]) for sample in samples]
+        max_candidates = max(candidate_widths) if candidate_widths else 0
         if max_candidates <= 0:
             raise ValueError("Cannot batch empty candidate sets.")
 
@@ -427,6 +491,14 @@ class VinOracleBatch:
             )
             vin_snippet = VinSnippetView(points_world=points_world, lengths=lengths, t_world_rig=t_world_rig)
 
+        candidate_count = torch.stack(
+            [
+                sample.resolved_candidate_count(device=candidate_poses_world_cam.tensor().device).reshape(())
+                for sample in samples
+            ],
+            dim=0,
+        ).to(device=candidate_poses_world_cam.tensor().device, dtype=torch.int64)
+
         return cls(
             efm_snippet_view=vin_snippet,
             candidate_poses_world_cam=candidate_poses_world_cam,
@@ -439,6 +511,7 @@ class VinOracleBatch:
             pm_acc_after=pm_acc_after,
             pm_comp_after=pm_comp_after,
             p3d_cameras=p3d_cameras,
+            candidate_count=candidate_count,
             scene_id=scene_id,
             snippet_id=snippet_id,
             backbone_out=backbone_out,

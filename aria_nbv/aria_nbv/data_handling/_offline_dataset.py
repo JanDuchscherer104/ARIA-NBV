@@ -48,6 +48,9 @@ class VinOfflineOracleBlock:
     reference_pose_world_rig: PoseTW
     """Reference world←rig pose."""
 
+    candidate_count: int
+    """Number of valid candidates inside the fixed-width tensors."""
+
     rri: Tensor
     """Oracle RRI values per candidate."""
 
@@ -129,13 +132,18 @@ class VinOfflineSample:
             pm_acc_after=self.oracle.pm_acc_after,
             pm_comp_after=self.oracle.pm_comp_after,
             p3d_cameras=self.oracle.p3d_cameras,
+            candidate_count=torch.tensor(
+                int(self.oracle.candidate_count),
+                device=self.oracle.rri.device,
+                dtype=torch.int64,
+            ),
             scene_id=self.scene_id,
             snippet_id=self.snippet_id,
             backbone_out=self.backbone_out,
         )
 
 
-class VinOfflineDatasetConfig(BaseConfig["VinOfflineDataset"]):
+class VinOfflineDatasetConfig(BaseConfig):
     """Configuration for reading immutable VIN offline datasets."""
 
     @property
@@ -226,6 +234,7 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
         self._store = VinOfflineStoreReader(config.store)
         self.manifest = self._store.manifest
         self._records = self._select_records()
+        self._record_by_pair = {(record.scene_id, record.snippet_id): record for record in self._records}
         self._loader_by_device: dict[str, EfmSnippetLoader] = {}
 
     def __getstate__(self) -> dict[str, Any]:
@@ -288,10 +297,9 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
         """
 
         record = self._records[idx]
-        sample = self._build_sample(record)
         if self.config.return_format == "vin_batch":
-            return sample.to_vin_oracle_batch()
-        return sample
+            return self._build_vin_batch(record)
+        return self._build_sample(record)
 
     def __iter__(self) -> Iterator[VinOfflineSample | VinOracleBatch]:
         """Iterate samples in index order.
@@ -349,30 +357,61 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
         )
         return VinSnippetView(points_world=points_world, lengths=lengths, t_world_rig=t_world_rig)
 
+    @staticmethod
+    def _restore_padded_rows(values: Tensor, *, candidate_count: int) -> Tensor:
+        """Copy the last valid row across the padded tail to keep runtime tensors usable."""
+
+        if values.ndim == 0:
+            return values
+        total = int(values.shape[0])
+        if candidate_count <= 0 or candidate_count >= total:
+            return values
+        restored = values.clone()
+        restored[candidate_count:] = restored[candidate_count - 1 : candidate_count].expand_as(
+            restored[candidate_count:]
+        )
+        return restored
+
     def _build_cameras(self, record: VinOfflineIndexRecord, candidate_count: int) -> PerspectiveCameras:
         """Decode PyTorch3D camera parameters for one sample.
 
         Args:
             record: Sample-index record.
-            candidate_count: Number of valid candidates to keep.
+            candidate_count: Number of valid candidates.
 
         Returns:
             PyTorch3D cameras aligned with the candidate set.
         """
 
-        r = self._tensor(self._store.read_numeric_block(record, "oracle.p3d.R"), dtype=torch.float32)[:candidate_count]
-        t = self._tensor(self._store.read_numeric_block(record, "oracle.p3d.T"), dtype=torch.float32)[:candidate_count]
-        focal_length = self._tensor(
-            self._store.read_numeric_block(record, "oracle.p3d.focal_length"),
-            dtype=torch.float32,
-        )[:candidate_count]
-        principal_point = self._tensor(
-            self._store.read_numeric_block(record, "oracle.p3d.principal_point"),
-            dtype=torch.float32,
-        )[:candidate_count]
-        image_size = self._tensor(self._store.read_numeric_block(record, "oracle.p3d.image_size"), dtype=torch.float32)[
-            :candidate_count
-        ]
+        r = self._restore_padded_rows(
+            self._tensor(self._store.read_numeric_block(record, "oracle.p3d.R"), dtype=torch.float32),
+            candidate_count=candidate_count,
+        )
+        t = self._restore_padded_rows(
+            self._tensor(self._store.read_numeric_block(record, "oracle.p3d.T"), dtype=torch.float32),
+            candidate_count=candidate_count,
+        )
+        focal_length = self._restore_padded_rows(
+            self._tensor(
+                self._store.read_numeric_block(record, "oracle.p3d.focal_length"),
+                dtype=torch.float32,
+            ),
+            candidate_count=candidate_count,
+        )
+        principal_point = self._restore_padded_rows(
+            self._tensor(
+                self._store.read_numeric_block(record, "oracle.p3d.principal_point"),
+                dtype=torch.float32,
+            ),
+            candidate_count=candidate_count,
+        )
+        image_size = self._restore_padded_rows(
+            self._tensor(
+                self._store.read_numeric_block(record, "oracle.p3d.image_size"),
+                dtype=torch.float32,
+            ),
+            candidate_count=candidate_count,
+        )
         in_ndc = bool(self._store.read_numeric_block(record, "oracle.p3d.in_ndc").reshape(()))
         kwargs: dict[str, Any] = {
             "device": self.config.map_location,
@@ -410,11 +449,14 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
         """
 
         candidate_count = self._read_candidate_count(record)
-        candidate_poses = PoseTW(
+        candidate_poses_tensor = self._restore_padded_rows(
             self._tensor(
-                self._store.read_numeric_block(record, "oracle.candidate_poses_world_cam"), dtype=torch.float32
-            )[:candidate_count]
+                self._store.read_numeric_block(record, "oracle.candidate_poses_world_cam"),
+                dtype=torch.float32,
+            ),
+            candidate_count=candidate_count,
         )
+        candidate_poses = PoseTW(candidate_poses_tensor)
         reference_pose = PoseTW(
             self._tensor(
                 self._store.read_numeric_block(record, "oracle.reference_pose_world_rig"), dtype=torch.float32
@@ -424,33 +466,32 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
         return VinOfflineOracleBlock(
             candidate_poses_world_cam=candidate_poses,
             reference_pose_world_rig=reference_pose,
-            rri=self._tensor(self._store.read_numeric_block(record, "oracle.rri"), dtype=torch.float32)[
-                :candidate_count
-            ],
+            candidate_count=candidate_count,
+            rri=self._tensor(self._store.read_numeric_block(record, "oracle.rri"), dtype=torch.float32),
             pm_dist_before=self._tensor(
                 self._store.read_numeric_block(record, "oracle.pm_dist_before"),
                 dtype=torch.float32,
-            )[:candidate_count],
+            ),
             pm_dist_after=self._tensor(
                 self._store.read_numeric_block(record, "oracle.pm_dist_after"),
                 dtype=torch.float32,
-            )[:candidate_count],
+            ),
             pm_acc_before=self._tensor(
                 self._store.read_numeric_block(record, "oracle.pm_acc_before"),
                 dtype=torch.float32,
-            )[:candidate_count],
+            ),
             pm_comp_before=self._tensor(
                 self._store.read_numeric_block(record, "oracle.pm_comp_before"),
                 dtype=torch.float32,
-            )[:candidate_count],
+            ),
             pm_acc_after=self._tensor(
                 self._store.read_numeric_block(record, "oracle.pm_acc_after"),
                 dtype=torch.float32,
-            )[:candidate_count],
+            ),
             pm_comp_after=self._tensor(
                 self._store.read_numeric_block(record, "oracle.pm_comp_after"),
                 dtype=torch.float32,
-            )[:candidate_count],
+            ),
             p3d_cameras=cameras,
         )
 
@@ -552,20 +593,16 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
             payload = self._store.read_optional_record(record, "oracle.depths_payload")
             if payload is not None:
                 return CandidateDepths.from_serializable(payload, device=self.config.map_location)
-        candidate_count = oracle.rri.shape[0]
-        depths = self._tensor(self._store.read_numeric_block(record, "oracle.depths"), dtype=torch.float32)[
-            :candidate_count
-        ]
-        mask = self._tensor(self._store.read_numeric_block(record, "oracle.depths_valid_mask"), dtype=torch.bool)[
-            :candidate_count
-        ]
+        candidate_width = int(oracle.rri.shape[0])
+        depths = self._tensor(self._store.read_numeric_block(record, "oracle.depths"), dtype=torch.float32)
+        mask = self._tensor(self._store.read_numeric_block(record, "oracle.depths_valid_mask"), dtype=torch.bool)
         if self._has_block("oracle.candidate_indices"):
             indices = self._tensor(
                 self._store.read_numeric_block(record, "oracle.candidate_indices"),
                 dtype=torch.long,
-            )[:candidate_count]
+            )
         else:
-            indices = torch.arange(candidate_count, device=self.config.map_location, dtype=torch.long)
+            indices = torch.arange(candidate_width, device=self.config.map_location, dtype=torch.long)
         return CandidateDepths(
             depths=depths,
             depths_valid_mask=mask,
@@ -680,6 +717,34 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
         )
         return sample
 
+    def _build_vin_batch(self, record: VinOfflineIndexRecord) -> VinOracleBatch:
+        """Decode only the training-critical blocks required for a VIN batch."""
+
+        vin_snippet = self._build_vin_snippet(record)
+        oracle = self._build_oracle(record)
+        efm_snippet = self._attach_efm_snippet(record, vin_snippet)
+        return VinOracleBatch(
+            efm_snippet_view=vin_snippet if efm_snippet is None else efm_snippet,
+            candidate_poses_world_cam=oracle.candidate_poses_world_cam,
+            reference_pose_world_rig=oracle.reference_pose_world_rig,
+            rri=oracle.rri,
+            pm_dist_before=oracle.pm_dist_before,
+            pm_dist_after=oracle.pm_dist_after,
+            pm_acc_before=oracle.pm_acc_before,
+            pm_comp_before=oracle.pm_comp_before,
+            pm_acc_after=oracle.pm_acc_after,
+            pm_comp_after=oracle.pm_comp_after,
+            p3d_cameras=oracle.p3d_cameras,
+            candidate_count=torch.tensor(
+                int(oracle.candidate_count),
+                device=oracle.rri.device,
+                dtype=torch.int64,
+            ),
+            scene_id=record.scene_id,
+            snippet_id=record.snippet_id,
+            backbone_out=self._build_backbone(record),
+        )
+
     def get_by_scene_snippet(
         self,
         *,
@@ -696,10 +761,10 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
             Matching offline sample or ``None``.
         """
 
-        for record in self._records:
-            if record.scene_id == scene_id and record.snippet_id == snippet_id:
-                return self._build_sample(record)
-        return None
+        record = self._record_by_pair.get((scene_id, snippet_id))
+        if record is None:
+            return None
+        return self._build_sample(record)
 
 
 __all__ = [
