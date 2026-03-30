@@ -20,13 +20,15 @@ from efm3d.aria.aria_constants import (
 )
 from matplotlib import pyplot as plt
 
+from aria_nbv.data import plotting as data_plotting
 from aria_nbv.data.efm_views import EfmCameraView, EfmSnippetView
 from aria_nbv.data.plotting import pose_world_cam, semidense_points_for_frame
 from aria_nbv.rendering.candidate_pointclouds import CandidatePointClouds
 from aria_nbv.rri_metrics import plotting as rri_plotting
 from aria_nbv.rri_metrics.types import RriResult
 from aria_nbv.utils import plotting as utils_plotting
-from aria_nbv.vin.plotting import _parameter_distribution
+from aria_nbv.utils.plotly_helpers import flatten_edges_for_plotly, make_line_trace3d, make_scatter3d
+from aria_nbv.utils.vin_plotting import parameter_distribution
 
 
 def _make_camera(num_frames: int = 2) -> CameraTW:
@@ -129,11 +131,11 @@ def _make_candidate_pcs() -> CandidatePointClouds:
 
 def test_utils_plotting_helpers_smoke() -> None:
     values = np.array([[0.0, 1.0], [2.0, 3.0]], dtype=float)
-    rgb = utils_plotting._scalar_to_rgb(values, percentile=99.0, symmetric=False)
+    rgb = utils_plotting.scalar_to_rgb(values, percentile=99.0, symmetric=False)
     assert rgb.shape == values.shape + (3,)
     assert rgb.dtype == np.uint8
 
-    fig = utils_plotting._plot_slice_grid(
+    fig = utils_plotting.plot_slice_grid(
         [values, values + 1.0],
         titles=["a", "b"],
         title="grid",
@@ -141,7 +143,7 @@ def test_utils_plotting_helpers_smoke() -> None:
     assert isinstance(fig, go.Figure)
     assert len(fig.data) == 2
 
-    hist = utils_plotting._histogram_overlay(
+    hist = utils_plotting.histogram_overlay(
         [("a", values.reshape(-1)), ("b", (values + 1.0).reshape(-1))],
         bins=4,
         title="hist",
@@ -152,14 +154,46 @@ def test_utils_plotting_helpers_smoke() -> None:
     assert len(hist.data) == 2
 
     fig_mpl, ax = plt.subplots()
-    utils_plotting._plot_hist_counts_mpl(values, bins=4, log_y=True, ax=ax)
+    utils_plotting.plot_hist_counts_mpl(values, bins=4, log_y=True, ax=ax)
     assert ax.get_yscale() == "log"
     plt.close(fig_mpl)
 
 
+def test_data_plotting_reuses_shared_edge_flatten_helper() -> None:
+    assert data_plotting._flatten_edges_for_plotly is flatten_edges_for_plotly
+    assert utils_plotting.flatten_edges_for_plotly is flatten_edges_for_plotly
+
+
+def test_shared_plotly_trace_builders_smoke() -> None:
+    line = make_line_trace3d(
+        np.array([0.0, 0.0, 0.0]),
+        np.array([1.0, 2.0, 3.0]),
+        color="#123456",
+        name="edge",
+        width=5,
+    )
+    assert isinstance(line, go.Scatter3d)
+    assert line.line.width == 5
+    assert line.name == "edge"
+
+    scatter = make_scatter3d(
+        np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]),
+        name="pts",
+        values=np.array([0.1, 0.9]),
+        colorscale="Viridis",
+        colorbar_title="pts scale",
+        size=4,
+        opacity=0.6,
+    )
+    assert isinstance(scatter, go.Scatter3d)
+    assert scatter.marker.size == 4
+    assert scatter.marker.opacity == 0.6
+    assert scatter.marker.colorbar.title.text == "pts scale"
+
+
 def test_rri_plotting_reexports() -> None:
     vals = np.array([0.0, 1.0, 2.0], dtype=float)
-    fig = rri_plotting._histogram_overlay(
+    fig = rri_plotting.histogram_overlay(
         [("a", vals)],
         bins=3,
         title="rri",
@@ -169,7 +203,7 @@ def test_rri_plotting_reexports() -> None:
     assert isinstance(fig, go.Figure)
 
     fig_mpl, ax = plt.subplots()
-    rri_plotting._plot_hist_counts_mpl(vals, bins=3, log_y=False, ax=ax)
+    rri_plotting.plot_hist_counts_mpl(vals, bins=3, log_y=False, ax=ax)
     assert ax.get_yscale() == "linear"
     plt.close(fig_mpl)
 
@@ -226,7 +260,7 @@ def test_vin_parameter_distribution() -> None:
             self.frozen = torch.nn.Parameter(torch.zeros(2), requires_grad=False)
 
     model = Dummy()
-    df = _parameter_distribution(model, trainable_only=True)
+    df = parameter_distribution(model, trainable_only=True)
     assert "linear" in set(df["module"])
     assert "frozen" not in set(df["module"])
 

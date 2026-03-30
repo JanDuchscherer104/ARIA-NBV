@@ -1,6 +1,6 @@
 ---
 id: open_questions
-updated: 2026-03-24
+updated: 2026-03-29
 scope: repo
 owner: jan
 status: active
@@ -19,4 +19,3 @@ tags: [research, nbv, vin, training]
 ## System Questions
 - Where should gravity-aligned sampling convenience end and physical rig-frame supervision begin?
 - Which diagnostics and acceptance checks are strong enough to catch pose-frame mismatches early?
-- What is the minimum stable context bundle Codex needs for code, paper, and experiment tasks without reintroducing large static dumps?

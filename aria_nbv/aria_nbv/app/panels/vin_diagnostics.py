@@ -9,19 +9,19 @@ import streamlit as st
 import torch
 
 from ...configs import PathConfig
-from ...data import VinOracleBatch
-from ...data.vin_snippet_cache import (
+from ...data_handling import (
+    VinOracleBatch,
     VinSnippetCacheConfig,
     VinSnippetCacheDatasetConfig,
+    empty_vin_snippet,
     read_vin_snippet_cache_metadata,
 )
-from ...data.vin_snippet_utils import empty_vin_snippet
 from ...utils import Stage
 from ..state import VIN_DIAG_STATE_KEY, get_vin_state
 from ..state_types import config_signature
 from .offline_cache_utils import (
-    _load_efm_snippet_for_cache,
-    _prepare_offline_cache_dataset,
+    load_efm_snippet_for_cache,
+    prepare_offline_cache_dataset,
 )
 from .vin_diag_tabs import (
     VinDiagContext,
@@ -37,11 +37,11 @@ from .vin_diag_tabs import (
     render_transforms_tab,
 )
 from .vin_utils import (
-    _build_experiment_config,
-    _has_backbone_obbs,
-    _run_vin_debug,
-    _should_fetch_vin_snippet,
-    _vin_oracle_batch_from_cache,
+    build_experiment_config,
+    has_backbone_obbs,
+    run_vin_debug,
+    should_fetch_vin_snippet,
+    vin_oracle_batch_from_cache,
 )
 
 
@@ -156,7 +156,7 @@ def render_vin_diagnostics_page() -> None:
     if use_offline_cache:
         paths = PathConfig()
         try:
-            cache_ds = _prepare_offline_cache_dataset(
+            cache_ds = prepare_offline_cache_dataset(
                 cache_dir=cache_dir,
                 paths=paths,
                 state=state,
@@ -201,7 +201,7 @@ def render_vin_diagnostics_page() -> None:
     if run:
         try:
             include_efm_snippet = snippet_source == "OracleRriCacheDataset (EFM)"
-            cfg = _build_experiment_config(
+            cfg = build_experiment_config(
                 toml_path=toml_path,
                 stage=stage,
                 use_offline_cache=data_source == "offline cache",
@@ -247,12 +247,12 @@ def render_vin_diagnostics_page() -> None:
                     vin_snippet_ds = None
                     vin_snippet_extra_dim: int | None = None
                     use_vin_snippet_cache = snippet_source == "VinSnippetCacheDataset"
-                    should_fetch_vin_snippet = _should_fetch_vin_snippet(
+                    fetch_vin_snippet = should_fetch_vin_snippet(
                         use_vin_snippet_cache=use_vin_snippet_cache,
                         attach_snippet=attach_snippet,
                         require_vin_snippet=require_vin_snippet,
                     )
-                    if should_fetch_vin_snippet:
+                    if fetch_vin_snippet:
                         paths = cfg.paths if isinstance(cfg.paths, PathConfig) else PathConfig()
                         vin_cache_root = vin_snippet_cache_dir
                         if not vin_cache_root:
@@ -329,7 +329,7 @@ def render_vin_diagnostics_page() -> None:
                             ):
                                 try:
                                     paths = cfg.paths if isinstance(cfg.paths, PathConfig) else PathConfig()
-                                    snippet_view = _load_efm_snippet_for_cache(
+                                    snippet_view = load_efm_snippet_for_cache(
                                         scene_id=cache_sample.scene_id,
                                         snippet_id=cache_sample.snippet_id,
                                         dataset_payload=cache_ds.metadata.dataset_config,
@@ -352,7 +352,7 @@ def render_vin_diagnostics_page() -> None:
                                 state.offline_snippet_error = None
                             if step > 1 and snippet_view is None:
                                 paths = cfg.paths if isinstance(cfg.paths, PathConfig) else PathConfig()
-                                snippet_view = _load_efm_snippet_for_cache(
+                                snippet_view = load_efm_snippet_for_cache(
                                     scene_id=cache_sample.scene_id,
                                     snippet_id=cache_sample.snippet_id,
                                     dataset_payload=cache_ds.metadata.dataset_config,
@@ -366,13 +366,13 @@ def render_vin_diagnostics_page() -> None:
                             state.offline_snippet = None
                             state.offline_snippet_key = None
                         batches.append(
-                            _vin_oracle_batch_from_cache(
+                            vin_oracle_batch_from_cache(
                                 cache_sample,
                                 efm_snippet=snippet_view,
                                 drop_backbone_obbs=drop_backbone_obbs,
                             ),
                         )
-                        if drop_backbone_obbs and not stripped_obbs and _has_backbone_obbs(cache_sample.backbone_out):
+                        if drop_backbone_obbs and not stripped_obbs and has_backbone_obbs(cache_sample.backbone_out):
                             stripped_obbs = True
 
                     if stripped_obbs:
@@ -388,7 +388,7 @@ def render_vin_diagnostics_page() -> None:
                 else:
                     batch = next(datamodule.iter_oracle_batches(stage=stage))
 
-                pred, debug = _run_vin_debug(state.module, batch)
+                pred, debug = run_vin_debug(state.module, batch)
                 if use_offline_cache and not attach_snippet:
                     batch.efm_snippet_view = None
 

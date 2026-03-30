@@ -34,13 +34,13 @@ from aria_nbv.rri_metrics import RriOrdinalBinner
 from aria_nbv.utils import BaseConfig, Console, Verbosity
 from aria_nbv.utils.wandb_utils import (
     WANDB_STEP_KEYS,
-    _ensure_wandb_api,
-    _get_run,
-    _load_runs_filtered,
     build_dynamics_dataframe,
     build_run_dataframes,
     collect_run_media_images,
+    ensure_wandb_api,
+    get_run,
     load_run_histories,
+    load_runs_filtered,
 )
 
 
@@ -629,16 +629,16 @@ def wandb_main(argv: list[str] | None = None) -> None:
     project = cfg.project or os.environ.get("WANDB_PROJECT", "aria-nbv")
     api_key = os.environ.get("WANDB_API_KEY", "")
 
-    api = _ensure_wandb_api(api_key or None)
+    api = ensure_wandb_api(api_key or None)
 
     runs: list[Any] = []
     if cfg.run_paths:
         for run_path in cfg.run_paths:
-            runs.append(_get_run(api, run_path))
+            runs.append(get_run(api, run_path))
     else:
         if not entity:
             raise ValueError("Provide --entity or set WANDB_ENTITY for W&B run retrieval.")
-        runs = _load_runs_filtered(
+        runs = load_runs_filtered(
             api=api,
             entity=entity,
             project=project,

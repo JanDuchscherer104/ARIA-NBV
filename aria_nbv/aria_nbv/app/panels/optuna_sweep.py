@@ -19,16 +19,19 @@ except ImportError:  # pragma: no cover - optional dependency guard
     optuna = None
 
 from ...configs import OptunaConfig, PathConfig
+from ...utils.stats import bootstrap_diff, bootstrap_slope, cliffs_delta, spearman_rho
 from .common import _info_popover, _pretty_label, _report_exception
 
 _CACHE_TTL_S = 120
 
 
-def _safe_key(value: str) -> str:
+def safe_key(value: str) -> str:
+    """Normalize arbitrary labels into stable Streamlit widget keys."""
+
     return re.sub(r"[^a-zA-Z0-9_]+", "_", value).strip("_")
 
 
-def _normalize_param_value(value: Any) -> Any:
+def normalize_param_value(value: Any) -> Any:
     """Normalize Optuna param values for dataframe storage."""
     if isinstance(value, np.generic):
         return value.item()
@@ -39,7 +42,7 @@ def _normalize_param_value(value: Any) -> Any:
     return value
 
 
-def _infer_param_kind(series: pd.Series, *, max_categories: int = 12) -> str:
+def infer_param_kind(series: pd.Series, *, max_categories: int = 12) -> str:
     """Infer whether a parameter should be plotted as numeric or categorical."""
     data = series.dropna()
     if data.empty:
@@ -57,19 +60,15 @@ def _infer_param_kind(series: pd.Series, *, max_categories: int = 12) -> str:
     return "categorical"
 
 
-def _select_param_columns(df: pd.DataFrame) -> list[str]:
+def select_param_columns(df: pd.DataFrame) -> list[str]:
+    """Return all flattened Optuna parameter columns from a trials dataframe."""
+
     return sorted(col for col in df.columns if col.startswith("param."))
 
 
-def _coerce_numeric(series: pd.Series) -> pd.Series:
-    """Convert a series to numeric values when possible."""
-    numeric = pd.to_numeric(series, errors="coerce")
-    return numeric
-
-
-def _bin_numeric_series(series: pd.Series, *, bins: int) -> pd.Series:
+def bin_numeric_series(series: pd.Series, *, bins: int) -> pd.Series:
     """Bin numeric values into quantile-based bins for interaction plots."""
-    numeric = _coerce_numeric(series)
+    numeric = pd.to_numeric(series, errors="coerce")
     numeric = numeric[np.isfinite(numeric)]
     if numeric.empty:
         return pd.Series([], dtype=str)
@@ -78,23 +77,25 @@ def _bin_numeric_series(series: pd.Series, *, bins: int) -> pd.Series:
     if edges.size < 2:
         return pd.Series(["all"] * len(series), index=series.index, dtype=str)
     binned = pd.cut(
-        _coerce_numeric(series),
+        pd.to_numeric(series, errors="coerce"),
         bins=edges,
         include_lowest=True,
     )
     return binned.astype(str)
 
 
-def _bucket_param(series: pd.Series, *, bins: int) -> pd.Series:
+def bucket_param(series: pd.Series, *, bins: int) -> pd.Series:
     """Bucket a parameter series as numeric bins or categorical values."""
-    kind = _infer_param_kind(series)
+    kind = infer_param_kind(series)
     if kind == "numeric":
-        return _bin_numeric_series(series, bins=bins)
+        return bin_numeric_series(series, bins=bins)
     return series.astype(str)
 
 
 @st.cache_data(ttl=_CACHE_TTL_S)
-def _list_optuna_db_paths(optuna_dir: Path) -> list[Path]:
+def list_optuna_db_paths(optuna_dir: Path) -> list[Path]:
+    """List Optuna SQLite databases in newest-first order."""
+
     if not optuna_dir.exists():
         return []
     return sorted(
@@ -105,7 +106,9 @@ def _list_optuna_db_paths(optuna_dir: Path) -> list[Path]:
 
 
 @st.cache_data(ttl=_CACHE_TTL_S)
-def _list_study_names(storage_uri: str) -> list[str]:
+def list_study_names(storage_uri: str) -> list[str]:
+    """List available Optuna study names for a storage URI."""
+
     if optuna is None:
         return []
     try:
@@ -116,13 +119,15 @@ def _list_study_names(storage_uri: str) -> list[str]:
 
 
 @st.cache_data(ttl=_CACHE_TTL_S)
-def _load_trials(storage_uri: str, study_name: str) -> pd.DataFrame:
+def load_trials(storage_uri: str, study_name: str) -> pd.DataFrame:
+    """Load one Optuna study into a flat trials dataframe."""
+
     if optuna is None:
         return pd.DataFrame()
     study = optuna.load_study(study_name=study_name, storage=storage_uri)
     rows: list[dict[str, Any]] = []
     for trial in study.trials:
-        params = {f"param.{key}": _normalize_param_value(value) for key, value in (trial.params or {}).items()}
+        params = {f"param.{key}": normalize_param_value(value) for key, value in (trial.params or {}).items()}
         rows.append(
             {
                 "trial": trial.number,
@@ -143,20 +148,9 @@ def _load_trials(storage_uri: str, study_name: str) -> pd.DataFrame:
     return df
 
 
-def _objective_summary(df: pd.DataFrame, *, direction: str) -> dict[str, float]:
-    values = pd.to_numeric(df["value"], errors="coerce")
-    values = values[np.isfinite(values)]
-    if values.empty:
-        return {"best": float("nan"), "mean": float("nan"), "median": float("nan")}
-    best = float(values.min()) if direction == "minimize" else float(values.max())
-    return {
-        "best": best,
-        "mean": float(values.mean()),
-        "median": float(values.median()),
-    }
+def plot_objective_over_trials(df: pd.DataFrame) -> go.Figure:
+    """Plot objective values against trial index."""
 
-
-def _plot_objective_over_trials(df: pd.DataFrame) -> go.Figure:
     if df.empty:
         return go.Figure()
     values = pd.to_numeric(df["value"], errors="coerce")
@@ -193,11 +187,13 @@ def _plot_objective_over_trials(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def _plot_param_effect(
+def plot_param_effect(
     df: pd.DataFrame,
     *,
     param: str,
 ) -> tuple[go.Figure, pd.DataFrame, dict[str, float] | None]:
+    """Plot and summarize objective behavior against one parameter."""
+
     if df.empty or param not in df.columns:
         return go.Figure(), pd.DataFrame(), None
 
@@ -206,7 +202,7 @@ def _plot_param_effect(
     if data.empty:
         return go.Figure(), pd.DataFrame(), None
 
-    kind = _infer_param_kind(data[param])
+    kind = infer_param_kind(data[param])
     values = pd.to_numeric(data["value"], errors="coerce")
     mean_value = float(values[np.isfinite(values)].mean()) if np.isfinite(values).any() else float("nan")
 
@@ -290,71 +286,7 @@ def _plot_param_effect(
     return fig, summary, None
 
 
-def _cliffs_delta(a: np.ndarray, b: np.ndarray) -> float:
-    """Compute Cliff's delta effect size (positive if a > b)."""
-    if a.size == 0 or b.size == 0:
-        return float("nan")
-    a = a.reshape(-1, 1)
-    b = b.reshape(1, -1)
-    greater = np.sum(a > b)
-    less = np.sum(a < b)
-    denom = float(a.size * b.size)
-    return float((greater - less) / denom) if denom > 0 else float("nan")
-
-
-def _bootstrap_diff(
-    a: np.ndarray,
-    b: np.ndarray,
-    *,
-    stat_fn: Callable[[np.ndarray], float],
-    n_boot: int = 500,
-    rng: np.random.Generator | None = None,
-) -> np.ndarray:
-    """Bootstrap distribution of stat_fn(a) - stat_fn(b)."""
-    if a.size == 0 or b.size == 0:
-        return np.array([], dtype=float)
-    if rng is None:
-        rng = np.random.default_rng(0)
-    boot = np.empty(n_boot, dtype=float)
-    for i in range(n_boot):
-        a_sample = rng.choice(a, size=a.size, replace=True)
-        b_sample = rng.choice(b, size=b.size, replace=True)
-        boot[i] = stat_fn(a_sample) - stat_fn(b_sample)
-    return boot
-
-
-def _bootstrap_slope(
-    x: np.ndarray,
-    y: np.ndarray,
-    *,
-    n_boot: int = 500,
-    rng: np.random.Generator | None = None,
-) -> np.ndarray:
-    """Bootstrap distribution of linear slope."""
-    if x.size == 0 or y.size == 0 or x.size != y.size:
-        return np.array([], dtype=float)
-    if rng is None:
-        rng = np.random.default_rng(0)
-    n = x.size
-    boot = np.empty(n_boot, dtype=float)
-    for i in range(n_boot):
-        idx = rng.choice(n, size=n, replace=True)
-        boot[i] = np.polyfit(x[idx], y[idx], 1)[0]
-    return boot
-
-
-def _spearman_rho(x: np.ndarray, y: np.ndarray) -> float:
-    """Compute Spearman rank correlation without scipy."""
-    if x.size == 0 or y.size == 0 or x.size != y.size:
-        return float("nan")
-    rx = pd.Series(x).rank().to_numpy()
-    ry = pd.Series(y).rank().to_numpy()
-    if np.std(rx) == 0 or np.std(ry) == 0:
-        return float("nan")
-    return float(np.corrcoef(rx, ry)[0, 1])
-
-
-def _evidence_overview(
+def evidence_overview(
     df: pd.DataFrame,
     *,
     param_cols: list[str],
@@ -365,7 +297,7 @@ def _evidence_overview(
     direction = direction.lower()
     for param in param_cols:
         series = df[param]
-        kind = _infer_param_kind(series)
+        kind = infer_param_kind(series)
         data = df[["value", param]].copy()
         data = data[pd.notna(data[param])]
         if data.empty:
@@ -398,7 +330,7 @@ def _evidence_overview(
 
             a = pd.to_numeric(data.loc[data[param] == best_value, "value"], errors="coerce").dropna().to_numpy()
             b = pd.to_numeric(data.loc[data[param] == runner_value, "value"], errors="coerce").dropna().to_numpy()
-            cliff = _cliffs_delta(a, b)
+            cliff = cliffs_delta(a, b)
             if direction == "minimize":
                 cliff = -cliff
 
@@ -436,7 +368,7 @@ def _evidence_overview(
             z = slope_dir / slope_se if np.isfinite(slope_se) and slope_se > 0 else float("nan")
             ci_low = slope_dir - 1.96 * slope_se if np.isfinite(slope_se) else float("nan")
             ci_high = slope_dir + 1.96 * slope_se if np.isfinite(slope_se) else float("nan")
-            rho = _spearman_rho(x, y)
+            rho = spearman_rho(x, y)
             rho_dir = -rho if direction == "minimize" else rho
             rows.append(
                 {
@@ -459,7 +391,9 @@ def _evidence_overview(
     return pd.DataFrame(rows)
 
 
-def _plot_objective_distribution(df: pd.DataFrame) -> go.Figure:
+def plot_objective_distribution(df: pd.DataFrame) -> go.Figure:
+    """Plot the distribution of objective values across trial states."""
+
     if df.empty:
         return go.Figure()
     fig = px.violin(
@@ -475,7 +409,9 @@ def _plot_objective_distribution(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def _plot_param_importance(study: Any, df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+def plot_param_importance(study: Any, df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+    """Compute and plot Optuna parameter importances."""
+
     if optuna is None:
         return go.Figure(), pd.DataFrame()
     if df.empty:
@@ -502,7 +438,7 @@ def _plot_param_importance(study: Any, df: pd.DataFrame) -> tuple[go.Figure, pd.
     return fig, imp_df
 
 
-def _interaction_matrix(
+def interaction_matrix(
     df: pd.DataFrame,
     *,
     param_x: str,
@@ -510,14 +446,16 @@ def _interaction_matrix(
     bins: int,
     agg: Callable[[pd.Series], float],
 ) -> pd.DataFrame:
+    """Aggregate objective values over a 2D parameter interaction grid."""
+
     if df.empty or param_x not in df.columns or param_y not in df.columns:
         return pd.DataFrame()
     data = df[["value", param_x, param_y]].copy()
     data = data[pd.notna(data[param_x]) & pd.notna(data[param_y])]
     if data.empty:
         return pd.DataFrame()
-    data["x_bucket"] = _bucket_param(data[param_x], bins=bins)
-    data["y_bucket"] = _bucket_param(data[param_y], bins=bins)
+    data["x_bucket"] = bucket_param(data[param_x], bins=bins)
+    data["y_bucket"] = bucket_param(data[param_y], bins=bins)
     pivot = data.pivot_table(
         values="value",
         index="y_bucket",
@@ -528,7 +466,9 @@ def _interaction_matrix(
     return pivot
 
 
-def _plot_interaction_heatmap(pivot: pd.DataFrame, *, param_x: str, param_y: str) -> go.Figure:
+def plot_interaction_heatmap(pivot: pd.DataFrame, *, param_x: str, param_y: str) -> go.Figure:
+    """Render an interaction matrix as a Plotly heatmap."""
+
     if pivot.empty:
         return go.Figure()
     fig = px.imshow(
@@ -542,7 +482,9 @@ def _plot_interaction_heatmap(pivot: pd.DataFrame, *, param_x: str, param_y: str
     return fig
 
 
-def _duplicate_configs(df: pd.DataFrame, *, params: list[str]) -> pd.DataFrame:
+def duplicate_configs(df: pd.DataFrame, *, params: list[str]) -> pd.DataFrame:
+    """Summarize repeated parameter configurations across trials."""
+
     if df.empty or not params:
         return pd.DataFrame()
     subset = df[["trial", "value", *params]].copy()
@@ -574,7 +516,7 @@ def render_optuna_sweep_page() -> None:
 
     paths = PathConfig()
     default_study = OptunaConfig().study_name
-    db_paths = _list_optuna_db_paths(paths.optuna)
+    db_paths = list_optuna_db_paths(paths.optuna)
     db_labels = ["(custom)"] + [path.name for path in db_paths]
     default_db = db_paths[0].name if db_paths else "(custom)"
 
@@ -596,7 +538,7 @@ def render_optuna_sweep_page() -> None:
             db_path = (paths.optuna / db_choice).expanduser()
         storage_uri = f"sqlite:///{db_path.resolve().as_posix()}"
 
-        study_names = _list_study_names(storage_uri)
+        study_names = list_study_names(storage_uri)
         study_choice = st.selectbox(
             "Study name",
             options=study_names or [default_study],
@@ -625,14 +567,14 @@ def render_optuna_sweep_page() -> None:
             str(bool(show_non_finite)),
         ],
     )
-    key_prefix = _safe_key(cache_key or "optuna")
+    key_prefix = safe_key(cache_key or "optuna")
     cache_df_key = "optuna_sweep_df"
     cache_sig_key = "optuna_sweep_sig"
 
     df: pd.DataFrame | None = None
     if run_panel:
         try:
-            df = _load_trials(storage_uri, study_choice)
+            df = load_trials(storage_uri, study_choice)
         except Exception as exc:  # pragma: no cover - UI guard
             _report_exception(exc, context="Failed to load Optuna study")
             return
@@ -671,13 +613,22 @@ def render_optuna_sweep_page() -> None:
     except Exception:
         direction = "minimize"
 
-    param_cols = _select_param_columns(df)
+    param_cols = select_param_columns(df)
     param_cols_vary = [col for col in param_cols if df[col].nunique(dropna=True) > 1]
     if not param_cols:
         st.info("No parameter columns detected in this study.")
         return
 
-    summary = _objective_summary(df, direction=direction)
+    summary_values = pd.to_numeric(df["value"], errors="coerce")
+    summary_values = summary_values[np.isfinite(summary_values)]
+    if summary_values.empty:
+        summary = {"best": float("nan"), "mean": float("nan"), "median": float("nan")}
+    else:
+        summary = {
+            "best": float(summary_values.min()) if direction == "minimize" else float(summary_values.max()),
+            "mean": float(summary_values.mean()),
+            "median": float(summary_values.median()),
+        }
     tabs = st.tabs(
         [
             "Overview",
@@ -696,12 +647,12 @@ def render_optuna_sweep_page() -> None:
         col3.metric("Median objective", f"{summary['median']:.4f}" if np.isfinite(summary["median"]) else "n/a")
 
         st.plotly_chart(
-            _plot_objective_over_trials(df),
+            plot_objective_over_trials(df),
             width="stretch",
             key=f"{key_prefix}_objective",
         )
         st.plotly_chart(
-            _plot_objective_distribution(df),
+            plot_objective_distribution(df),
             width="stretch",
             key=f"{key_prefix}_distribution",
         )
@@ -729,7 +680,7 @@ def render_optuna_sweep_page() -> None:
             z_thresh = col_b.number_input("Evidence threshold (|z|)", min_value=0.5, max_value=5.0, value=2.0, step=0.5)
             show_only_strong = col_c.checkbox("Show only strong evidence", value=False)
 
-            evidence_df = _evidence_overview(df, param_cols=param_cols_vary, direction=direction)
+            evidence_df = evidence_overview(df, param_cols=param_cols_vary, direction=direction)
             if not evidence_df.empty:
                 evidence_df = evidence_df.copy()
                 evidence_df["ci_positive"] = evidence_df["ci_low"] > 0
@@ -771,7 +722,7 @@ def render_optuna_sweep_page() -> None:
                 index=0,
             )
         if selected_param is not None:
-            fig, summary_table, reg_stats = _plot_param_effect(df, param=selected_param)
+            fig, summary_table, reg_stats = plot_param_effect(df, param=selected_param)
             if reg_stats is not None:
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Slope", f"{reg_stats['slope']:.6f}")
@@ -781,7 +732,7 @@ def render_optuna_sweep_page() -> None:
             st.plotly_chart(
                 fig,
                 width="stretch",
-                key=f"{key_prefix}_param_{_safe_key(selected_param)}",
+                key=f"{key_prefix}_param_{safe_key(selected_param)}",
             )
             if not summary_table.empty:
                 st.dataframe(summary_table, width="stretch")
@@ -791,7 +742,7 @@ def render_optuna_sweep_page() -> None:
             boot_samples = st.slider("Bootstrap samples", min_value=200, max_value=2000, value=600, step=100)
             rng = np.random.default_rng(0)
             param_series = df[selected_param]
-            kind = _infer_param_kind(param_series)
+            kind = infer_param_kind(param_series)
             if kind == "categorical":
                 grouped = df[["value", selected_param]].copy()
                 grouped = grouped[pd.notna(grouped[selected_param])]
@@ -821,7 +772,7 @@ def render_optuna_sweep_page() -> None:
                         .dropna()
                         .to_numpy()
                     )
-                    diff_boot = _bootstrap_diff(
+                    diff_boot = bootstrap_diff(
                         runner_vals if direction == "minimize" else best_vals,
                         best_vals if direction == "minimize" else runner_vals,
                         stat_fn=np.mean,
@@ -833,7 +784,7 @@ def render_optuna_sweep_page() -> None:
                         diff_std = float(np.std(diff_boot, ddof=1)) if diff_boot.size > 1 else float("nan")
                         ci_low, ci_high = np.percentile(diff_boot, [2.5, 97.5])
                         z = diff_mean / diff_std if np.isfinite(diff_std) and diff_std > 0 else float("nan")
-                        cliff = _cliffs_delta(best_vals, runner_vals)
+                        cliff = cliffs_delta(best_vals, runner_vals)
                         if direction == "minimize":
                             cliff = -cliff
                         c1, c2, c3, c4 = st.columns(4)
@@ -851,7 +802,7 @@ def render_optuna_sweep_page() -> None:
                         st.plotly_chart(
                             fig,
                             width="stretch",
-                            key=f"{key_prefix}_boot_diff_{_safe_key(selected_param)}",
+                            key=f"{key_prefix}_boot_diff_{safe_key(selected_param)}",
                         )
             elif kind == "numeric":
                 numeric = pd.to_numeric(param_series, errors="coerce")
@@ -862,7 +813,7 @@ def render_optuna_sweep_page() -> None:
                 if x.size < 3:
                     st.info("Need at least three numeric samples for bootstrap evidence.")
                 else:
-                    slopes = _bootstrap_slope(x, y, n_boot=int(boot_samples), rng=rng)
+                    slopes = bootstrap_slope(x, y, n_boot=int(boot_samples), rng=rng)
                     if slopes.size > 0:
                         slope_raw = float(np.mean(slopes))
                         slope_dir = -slope_raw if direction == "minimize" else slope_raw
@@ -870,7 +821,7 @@ def render_optuna_sweep_page() -> None:
                         if direction == "minimize":
                             ci_low, ci_high = -ci_high, -ci_low
                         z = slope_dir / (np.std(slopes, ddof=1) if slopes.size > 1 else np.nan)
-                        rho = _spearman_rho(x, y)
+                        rho = spearman_rho(x, y)
                         rho_dir = -rho if direction == "minimize" else rho
                         c1, c2, c3, c4 = st.columns(4)
                         c1.metric("Slope (dir)", f"{slope_dir:.6f}")
@@ -887,7 +838,7 @@ def render_optuna_sweep_page() -> None:
                         st.plotly_chart(
                             fig,
                             width="stretch",
-                            key=f"{key_prefix}_boot_slope_{_safe_key(selected_param)}",
+                            key=f"{key_prefix}_boot_slope_{safe_key(selected_param)}",
                         )
 
     with tabs[2]:
@@ -898,10 +849,10 @@ def render_optuna_sweep_page() -> None:
         bins = col_c.slider("Numeric bins", min_value=3, max_value=8, value=4, step=1)
         agg_choice = st.selectbox("Aggregate", options=["median", "mean"], index=0)
         agg_fn = np.nanmedian if agg_choice == "median" else np.nanmean
-        pivot = _interaction_matrix(df, param_x=param_x, param_y=param_y, bins=int(bins), agg=agg_fn)
-        interaction_key = _safe_key(f"{param_x}_{param_y}_{bins}_{agg_choice}")
+        pivot = interaction_matrix(df, param_x=param_x, param_y=param_y, bins=int(bins), agg=agg_fn)
+        interaction_key = safe_key(f"{param_x}_{param_y}_{bins}_{agg_choice}")
         st.plotly_chart(
-            _plot_interaction_heatmap(pivot, param_x=param_x, param_y=param_y),
+            plot_interaction_heatmap(pivot, param_x=param_x, param_y=param_y),
             width="stretch",
             key=f"{key_prefix}_interaction_{interaction_key}",
         )
@@ -915,7 +866,7 @@ def render_optuna_sweep_page() -> None:
         except Exception as exc:  # pragma: no cover - UI guard
             _report_exception(exc, context="Failed to load Optuna study for importance")
         else:
-            fig, imp_df = _plot_param_importance(study, df)
+            fig, imp_df = plot_param_importance(study, df)
             if imp_df.empty:
                 st.info("Optuna importance unavailable for this study.")
             else:
@@ -934,7 +885,7 @@ def render_optuna_sweep_page() -> None:
             options=param_cols,
             default=default_sig,
         )
-        dup_df = _duplicate_configs(df, params=signature_params)
+        dup_df = duplicate_configs(df, params=signature_params)
         if dup_df.empty:
             st.info("No duplicate configurations detected for the selected signature.")
         else:
@@ -953,8 +904,22 @@ def render_optuna_sweep_page() -> None:
 
 
 __all__ = [
-    "_infer_param_kind",
-    "_normalize_param_value",
-    "_select_param_columns",
+    "bin_numeric_series",
+    "bucket_param",
+    "duplicate_configs",
+    "evidence_overview",
+    "infer_param_kind",
+    "interaction_matrix",
+    "list_optuna_db_paths",
+    "list_study_names",
+    "load_trials",
+    "normalize_param_value",
+    "plot_interaction_heatmap",
+    "plot_objective_distribution",
+    "plot_objective_over_trials",
+    "plot_param_effect",
+    "plot_param_importance",
     "render_optuna_sweep_page",
+    "safe_key",
+    "select_param_columns",
 ]

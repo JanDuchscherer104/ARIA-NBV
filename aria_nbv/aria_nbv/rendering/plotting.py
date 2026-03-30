@@ -14,9 +14,9 @@ from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from torch import Tensor
 
-from ..data.plotting import FrameGridBuilder, _depth_to_color
 from ..pose_generation.plotting import CandidatePlotBuilder
 from ..utils import rotate_yaw_cw90
+from ..utils.plotting import FrameGridBuilder, depth_to_color
 from .unproject import backproject_depth_with_p3d
 
 
@@ -48,7 +48,7 @@ def depth_grid(
         r = idx // cols + 1
         c = idx % cols + 1
         depth = depths[idx]
-        rgb = _depth_to_color(depth, percentile=99.5)
+        rgb = depth_to_color(depth, percentile=99.5)
         rgb = np.rot90(rgb, k=1)
         builder.add_image(rgb, row=r, col=c)
 
@@ -316,6 +316,5 @@ class RenderingPlotBuilder(CandidatePlotBuilder):
 __all__ = [
     "depth_grid",
     "depth_histogram",
-    "hit_ratio_bar",
     "RenderingPlotBuilder",
 ]

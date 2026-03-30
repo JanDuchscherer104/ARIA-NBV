@@ -5,29 +5,26 @@ from __future__ import annotations
 import re
 import traceback
 
-import numpy as np
 import streamlit as st
+
+from ...utils.plotting import pretty_label
+from ...utils.stats import linear_slope, segment_indices
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
-def _strip_ansi(text: str) -> str:
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape sequences from captured console text."""
     return _ANSI_RE.sub("", text)
 
 
-def _pretty_label(text: str) -> str:
-    """Format labels by replacing underscores and title-casing words."""
-    if not text:
-        return text
-    return text.replace("_", " ").title()
-
-
-def _info_popover(label: str, text: str) -> None:
+def info_popover(label: str, text: str) -> None:
+    """Render a small informational popover with Markdown content."""
     with st.popover(f"Info: {label.title()}", icon="ℹ️"):
         st.markdown(text, unsafe_allow_html=True)
 
 
-def _report_exception(exc: Exception, *, context: str) -> None:
+def report_exception(exc: Exception, *, context: str) -> None:
     """Render a full traceback in the UI and emit it to stdout."""
     trace = traceback.format_exc()
     print(trace, flush=True)
@@ -37,30 +34,18 @@ def _report_exception(exc: Exception, *, context: str) -> None:
         st.code(trace, language="text")
 
 
-def _linear_slope(x: np.ndarray, y: np.ndarray) -> float:
-    if x.size < 2 or np.allclose(x, x[0]):
-        return float("nan")
-    try:
-        return float(np.polyfit(x, y, 1)[0])
-    except Exception:
-        return float("nan")
-
-
-def _segment_indices(num: int, frac: float) -> tuple[slice, slice, slice]:
-    size = max(2, int(num * frac))
-    early = slice(0, size)
-    late = slice(max(num - size, 0), num)
-    mid_start = size
-    mid_end = max(num - size, mid_start)
-    mid = slice(mid_start, mid_end)
-    return early, mid, late
-
+_info_popover = info_popover
+_linear_slope = linear_slope
+_pretty_label = pretty_label
+_report_exception = report_exception
+_segment_indices = segment_indices
+_strip_ansi = strip_ansi
 
 __all__ = [
-    "_info_popover",
-    "_linear_slope",
-    "_pretty_label",
-    "_report_exception",
-    "_segment_indices",
-    "_strip_ansi",
+    "info_popover",
+    "linear_slope",
+    "pretty_label",
+    "report_exception",
+    "segment_indices",
+    "strip_ansi",
 ]

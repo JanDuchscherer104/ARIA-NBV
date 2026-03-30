@@ -1,6 +1,6 @@
 ---
 id: gotchas
-updated: 2026-03-25
+updated: 2026-03-29
 scope: repo
 owner: jan
 status: active
@@ -10,10 +10,8 @@ tags: [workflow, training, cache, frames]
 # Gotchas
 
 ## Environment and Tooling
-- Prefer `uv run pytest` or `oracle_rri/.venv/bin/python -m pytest`; the system interpreter may miss dependencies such as `power_spherical`.
+- Prefer `uv run pytest` or `aria_nbv/.venv/bin/python -m pytest`; the system interpreter may miss dependencies such as `power_spherical`.
 - Assume the environment is working unless the user indicates otherwise, but verify the exact interpreter before concluding a dependency problem.
-- `make context` refreshes the lightweight routing artifacts only; use targeted search on `source_index.md`, `literature_index.md`, and `data_contracts.md` instead of loading broad dumps.
-- `make context-heavy` and the `context-uml`, `context-docstrings`, or `context-tree` targets are explicit fallback tools for architecture or refactor tasks.
 
 ## Training and Validation
 - Validation is disabled by default unless `trainer_config.enable_validation=true`; otherwise Lightning forces `limit_val_batches=0` and `check_val_every_n_epoch=0`.
@@ -22,7 +20,7 @@ tags: [workflow, training, cache, frames]
 
 ## Offline Cache and Splits
 - Offline cache splits are file-backed; `train_index.jsonl` and `val_index.jsonl` may be created or updated when loading caches with `split="train"` or `split="val"`.
-- Rebuild indices from `samples/*.pt` with `rebuild_cache_index(cache_dir=..., train_val_split=..., rng_seed=...)` in `oracle_rri.data.offline_cache` when split state becomes stale.
+- Rebuild indices from `samples/*.pt` with `rebuild_cache_index(cache_dir=..., train_val_split=..., rng_seed=...)` in `aria_nbv.data.offline_cache` when split state becomes stale.
 - Training/validation from cache uses `OracleRriCacheDatasetConfig.train_val_split` together with `split="train"` / `split="val"`; `VinDataModule` auto-derives `val_cache` when split mode is active.
 - `VinOracleBatch.collate` expects cache-ready `VinSnippetView` instances rather than raw `EfmSnippetView` samples.
 

@@ -47,3 +47,23 @@ def test_root_update_preserves_explicit_custom_paths(tmp_path: Path) -> None:
     cfg = PathConfig(root=other_root)
 
     assert cfg.data_root == custom_data_root.resolve()
+
+
+def test_resolve_cache_dir_prefers_offline_cache_root(tmp_path: Path) -> None:
+    """Relative cache paths should resolve under the configured offline cache root."""
+    offline_cache_root = tmp_path / "offline_cache_root"
+    cfg = PathConfig(root=tmp_path, offline_cache_dir=offline_cache_root)
+
+    resolved = cfg.resolve_cache_dir("vin_snippets")
+
+    assert resolved == (offline_cache_root / "vin_snippets").resolve()
+
+
+def test_resolve_cache_dir_avoids_duplicating_cache_prefix(tmp_path: Path) -> None:
+    """Cache paths already rooted at the cache dir name should stay project-root-relative."""
+    offline_cache_root = tmp_path / "offline_cache"
+    cfg = PathConfig(root=tmp_path, offline_cache_dir=offline_cache_root)
+
+    resolved = cfg.resolve_cache_dir("offline_cache/vin_snippets")
+
+    assert resolved == (tmp_path / "offline_cache" / "vin_snippets").resolve()

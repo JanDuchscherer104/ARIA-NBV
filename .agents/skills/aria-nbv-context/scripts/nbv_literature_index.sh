@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../../../../" && pwd)"
-LIT_DIR="${ROOT_DIR}/literature"
+LIT_DIR="${ROOT_DIR}/docs/literature"
 TEX_SRC_DIR="${LIT_DIR}/tex-src"
 OUT="${1:-${ROOT_DIR}/docs/_generated/context/literature_index.md}"
 
@@ -62,7 +62,7 @@ relpath() {
     done < <(find "$TEX_SRC_DIR" -mindepth 1 -maxdepth 1 -type d | sort)
   else
     echo "## Paper families"
-    echo "- No literature/tex-src directory found."
+    echo "- No docs/literature/tex-src directory found."
   fi
   echo "## Search recipes"
   echo 'scripts/nbv_literature_search.sh "VIN-NBV"'

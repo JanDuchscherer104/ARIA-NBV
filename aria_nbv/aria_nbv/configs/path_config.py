@@ -1,3 +1,10 @@
+"""Canonical filesystem path resolution for the aria_nbv package.
+
+This module defines :class:`PathConfig`, the singleton-style configuration that
+owns project-relative directories and shared runtime path resolution helpers for
+datasets, caches, checkpoints, and other artifacts.
+"""
+
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -328,6 +335,32 @@ class PathConfig(SingletonConfig):
         if not resolved.is_absolute():
             resolved = base / resolved
         return resolved.expanduser().resolve()
+
+    def resolve_cache_dir(self, path: str | Path) -> Path:
+        """Resolve a cache directory against the configured data/cache roots.
+
+        Relative cache paths default to :attr:`offline_cache_dir` when present
+        and otherwise fall back to :attr:`data_root`. Paths already rooted at
+        the configured data or offline-cache directory names are treated as
+        project-root-relative to avoid duplicating those path segments.
+
+        Args:
+            path: Cache directory path to resolve.
+
+        Returns:
+            Absolute, expanded, resolved cache directory path.
+        """
+        candidate = Path(path)
+        if candidate.is_absolute():
+            return candidate.expanduser().resolve()
+        base_dir = self.offline_cache_dir or self.data_root
+        if candidate.parts:
+            first_part = candidate.parts[0]
+            if first_part == self.data_root.name or (
+                self.offline_cache_dir is not None and first_part == self.offline_cache_dir.name
+            ):
+                base_dir = self.root
+        return self.resolve_under_root(candidate, base_dir=base_dir)
 
     def resolve_run_dir(self, out_dir: str | Path) -> Path:
         """Resolve a run output directory and ensure it exists."""

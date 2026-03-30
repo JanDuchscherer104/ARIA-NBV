@@ -1,4 +1,4 @@
-"""Offline cache helpers for panels."""
+"""Shared offline-cache helper surfaces for Streamlit panels."""
 
 from __future__ import annotations
 
@@ -12,12 +12,25 @@ import streamlit as st
 import torch
 
 from ...configs import PathConfig
-from ...data import AseEfmDatasetConfig, EfmSnippetView, VinOracleCacheDatasetConfig
-from ...data.offline_cache import OracleRriCacheConfig, OracleRriCacheDataset, OracleRriCacheDatasetConfig
-from ...data.offline_cache_coverage import read_cache_index_entries
-from ...data.vin_snippet_cache import VinSnippetCacheConfig, VinSnippetCacheDatasetConfig
+from ...data_handling import (
+    AseEfmDatasetConfig,
+    EfmSnippetView,
+    OracleRriCacheConfig,
+    OracleRriCacheDataset,
+    OracleRriCacheDatasetConfig,
+    VinOracleCacheDatasetConfig,
+    VinSnippetCacheConfig,
+    VinSnippetCacheDatasetConfig,
+)
+from ...data_handling.cache_contracts import (
+    OracleRriCacheEntry,
+    OracleRriCacheMetadata,
+    VinSnippetCacheEntry,
+)
+from ...data_handling.cache_index import load_json_metadata, read_index
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...utils import Stage
+from ...utils.memory import estimate_nbytes, p3d_cameras_nbytes
 from ..state_types import config_signature
 
 BACKBONE_KEEP_FIELDS_FOR_STATS = [
@@ -32,64 +45,46 @@ BACKBONE_KEEP_FIELDS_FOR_STATS = [
 ]
 
 
-def _tensor_nbytes(value: torch.Tensor) -> int:
-    return int(value.numel()) * int(value.element_size())
+def read_oracle_cache_entries(index_path: Path) -> list[OracleRriCacheEntry]:
+    """Read oracle-cache index entries from disk.
+
+    Args:
+        index_path: Path to an oracle-cache JSONL index file.
+
+    Returns:
+        Parsed cache entries. Missing files return an empty list.
+    """
+
+    return read_index(index_path, entry_type=OracleRriCacheEntry, allow_missing=True)
 
 
-def _estimate_nbytes(value: Any, *, _seen: set[int] | None = None) -> int:
-    """Best-effort estimate of the memory footprint for nested tensor containers."""
-    if value is None:
-        return 0
+def read_vin_snippet_cache_entries(index_path: Path) -> list[VinSnippetCacheEntry]:
+    """Read VIN snippet-cache index entries from disk.
 
-    if _seen is None:
-        _seen = set()
+    Args:
+        index_path: Path to a VIN snippet-cache JSONL index file.
 
-    obj_id = id(value)
-    if obj_id in _seen:
-        return 0
-    _seen.add(obj_id)
+    Returns:
+        Parsed cache entries. Missing files return an empty list.
+    """
 
-    if torch.is_tensor(value):
-        return _tensor_nbytes(value)
-    if isinstance(value, np.ndarray):
-        return int(value.nbytes)
-
-    tensor_fn = getattr(value, "tensor", None)
-    if callable(tensor_fn):
-        try:
-            tensor = tensor_fn()
-        except Exception:
-            tensor = None
-        if torch.is_tensor(tensor):
-            return _tensor_nbytes(tensor)
-
-    if is_dataclass(value):
-        return sum(_estimate_nbytes(getattr(value, field.name), _seen=_seen) for field in fields(value))
-
-    if isinstance(value, dict):
-        return sum(_estimate_nbytes(item, _seen=_seen) for item in value.values())
-    if isinstance(value, (list, tuple, set)):
-        return sum(_estimate_nbytes(item, _seen=_seen) for item in value)
-
-    if hasattr(value, "__dict__"):
-        return sum(_estimate_nbytes(item, _seen=_seen) for item in vars(value).values())
-
-    return 0
+    return read_index(index_path, entry_type=VinSnippetCacheEntry, allow_missing=True)
 
 
-def _p3d_cameras_nbytes(value: Any) -> int:
-    """Estimate size of the commonly-used PerspectiveCameras tensor fields."""
-    if value is None:
-        return 0
-    total = 0
-    for name in ("R", "T", "focal_length", "principal_point", "image_size"):
-        tensor = getattr(value, name, None)
-        if torch.is_tensor(tensor):
-            total += _tensor_nbytes(tensor)
-    return total
+def read_oracle_cache_metadata(metadata_path: Path) -> OracleRriCacheMetadata:
+    """Read canonical oracle-cache metadata from disk.
+
+    Args:
+        metadata_path: Path to the oracle-cache metadata JSON file.
+
+    Returns:
+        Parsed oracle-cache metadata.
+    """
+
+    return OracleRriCacheMetadata.from_json_payload(load_json_metadata(metadata_path))
 
 
-def _load_efm_snippet_for_cache(
+def load_efm_snippet_for_cache(
     *,
     scene_id: str,
     snippet_id: str,
@@ -98,6 +93,8 @@ def _load_efm_snippet_for_cache(
     paths: PathConfig,
     include_gt_mesh: bool,
 ) -> EfmSnippetView:
+    """Load the raw EFM snippet that corresponds to a cached offline sample."""
+
     payload = dict(dataset_payload or {})
     payload["paths"] = payload.get("paths", paths)
     payload["scene_ids"] = [scene_id]
@@ -113,7 +110,7 @@ def _load_efm_snippet_for_cache(
     return next(iter(dataset))
 
 
-def _prepare_offline_cache_dataset(
+def prepare_offline_cache_dataset(
     *,
     cache_dir: str | None,
     paths: PathConfig,
@@ -122,6 +119,8 @@ def _prepare_offline_cache_dataset(
     include_efm_snippet: bool,
     include_gt_mesh: bool,
 ) -> OracleRriCacheDataset | None:
+    """Build or reuse the cached offline dataset for panel inspection."""
+
     _ = (include_efm_snippet, include_gt_mesh)
     if cache_dir is None:
         return None
@@ -152,7 +151,7 @@ def _prepare_offline_cache_dataset(
     return state.offline_cache
 
 
-def _collect_offline_cache_stats(
+def collect_offline_cache_stats(
     *,
     toml_path: str | None,
     stage: Stage,
@@ -405,9 +404,9 @@ def _collect_offline_cache_stats(
         pm_comp_mean, _, _ = _finite_stats(pm_comp_after)
         pm_acc_mean, _, _ = _finite_stats(pm_acc_after)
 
-        backbone_bytes = _estimate_nbytes(batch.backbone_out)
+        backbone_bytes = estimate_nbytes(batch.backbone_out)
         rri_bytes = sum(
-            _estimate_nbytes(getattr(batch, name, None))
+            estimate_nbytes(getattr(batch, name, None))
             for name in (
                 "rri",
                 "pm_dist_before",
@@ -418,11 +417,11 @@ def _collect_offline_cache_stats(
                 "pm_comp_after",
             )
         )
-        vin_snippet_bytes = _estimate_nbytes(getattr(batch, "efm_snippet_view", None))
+        vin_snippet_bytes = estimate_nbytes(getattr(batch, "efm_snippet_view", None))
         pose_camera_bytes = (
-            _estimate_nbytes(batch.candidate_poses_world_cam)
-            + _estimate_nbytes(batch.reference_pose_world_rig)
-            + _p3d_cameras_nbytes(batch.p3d_cameras)
+            estimate_nbytes(batch.candidate_poses_world_cam)
+            + estimate_nbytes(batch.reference_pose_world_rig)
+            + p3d_cameras_nbytes(batch.p3d_cameras)
         )
         total_bytes = backbone_bytes + rri_bytes + vin_snippet_bytes + pose_camera_bytes
         mem_backbone_bytes.append(backbone_bytes)
@@ -588,7 +587,7 @@ def _collect_offline_cache_stats(
     }
 
 
-def _collect_vin_snippet_cache_stats(
+def collect_vin_snippet_cache_stats(
     *,
     cache_dir: str | None,
     map_location: str,
@@ -607,7 +606,7 @@ def _collect_vin_snippet_cache_stats(
     )
     dataset = cache_cfg.setup_target()
 
-    entries = read_cache_index_entries(cache_cfg.cache.index_path)
+    entries = read_vin_snippet_cache_entries(cache_cfg.cache.index_path)
     if cache_cfg.limit is not None:
         entries = entries[: int(cache_cfg.limit)]
 
@@ -783,7 +782,7 @@ def _collect_vin_snippet_cache_stats(
     }
 
 
-def _collect_vin_batch_shape_preview(
+def collect_vin_batch_shape_preview(
     *,
     toml_path: str | None,
     stage: Stage,
@@ -861,9 +860,9 @@ def _collect_vin_batch_shape_preview(
 
 
 __all__ = [
-    "_collect_offline_cache_stats",
-    "_collect_vin_snippet_cache_stats",
-    "_collect_vin_batch_shape_preview",
-    "_load_efm_snippet_for_cache",
-    "_prepare_offline_cache_dataset",
+    "collect_offline_cache_stats",
+    "collect_vin_batch_shape_preview",
+    "collect_vin_snippet_cache_stats",
+    "load_efm_snippet_for_cache",
+    "prepare_offline_cache_dataset",
 ]

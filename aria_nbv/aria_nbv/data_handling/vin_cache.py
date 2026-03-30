@@ -5,7 +5,7 @@ payloads derived from raw EFM snippets.
 
 Contents:
 - config models for VIN cache readers and writers,
-- metadata read/write and migration helpers,
+- metadata helpers and migration utilities,
 - a build dataset and writer for generating VIN payloads from oracle indices,
 - a map-style dataset for loading cached VIN snippet views,
 - index repair and rebuild helpers.
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from operator import itemgetter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -25,11 +26,11 @@ from torch.utils.data import DataLoader, Dataset
 
 from ..configs import PathConfig
 from ..utils import BaseConfig, Console, Verbosity
+from ._cache_utils import extract_snippet_token, format_sample_key, unique_sample_path
 from .cache_contracts import OracleRriCacheEntry, VinSnippetCacheEntry, VinSnippetCacheMetadata
 from .cache_index import load_json_metadata, read_index, write_index, write_json_metadata
 from .efm_snippet_loader import EfmSnippetLoader
 from .efm_views import VinSnippetView
-from .offline_cache_store import _extract_snippet_token, _format_sample_key, _unique_sample_path
 from .offline_cache_store import _read_metadata as _read_oracle_metadata
 from .vin_adapter import (
     DEFAULT_VIN_SNIPPET_PAD_POINTS,
@@ -65,11 +66,6 @@ class VinSnippetCacheBuildResult:
     """Optional stringified build error captured for DataLoader workers."""
 
 
-def _single_item_collate(batch: list[VinSnippetCacheBuildResult]) -> VinSnippetCacheBuildResult:
-    """Collapse a unit-size DataLoader batch to its single build result."""
-    return batch[0]
-
-
 class VinSnippetCacheConfig(BaseConfig):
     """Filesystem configuration for VIN snippet cache artifacts."""
 
@@ -98,16 +94,7 @@ class VinSnippetCacheConfig(BaseConfig):
     def _resolve_cache_dir(cls, value: str | Path, info: ValidationInfo) -> Path:
         """Resolve relative VIN cache directories against the configured data roots."""
         paths: PathConfig = info.data.get("paths") or PathConfig()
-        path = Path(value)
-        if path.is_absolute():
-            return path.expanduser().resolve()
-        base_dir = paths.offline_cache_dir or paths.data_root
-        if path.parts:
-            if path.parts[0] == paths.data_root.name or (
-                paths.offline_cache_dir is not None and path.parts[0] == paths.offline_cache_dir.name
-            ):
-                base_dir = paths.root
-        return paths.resolve_under_root(path, base_dir=base_dir)
+        return paths.resolve_cache_dir(value)
 
     @field_validator("pad_points")
     @classmethod
@@ -256,82 +243,22 @@ class VinSnippetCacheDatasetConfig(BaseConfig["VinSnippetCacheDataset"]):
         return cls._resolve_device(value)
 
 
-def _build_metadata(
-    *,
-    dataset_config: dict[str, Any] | None,
-    source_cache_dir: Path | None,
-    source_cache_hash: str | None,
-    include_inv_dist_std: bool,
-    include_obs_count: bool,
-    semidense_max_points: int | None,
-    pad_points: int | None,
-    version: int,
-) -> VinSnippetCacheMetadata:
-    """Build VIN cache metadata for a new writer run."""
-    config_hash = vin_snippet_cache_config_hash(
-        dataset_config=dataset_config,
-        include_inv_dist_std=include_inv_dist_std,
-        include_obs_count=include_obs_count,
-        semidense_max_points=semidense_max_points,
-        pad_points=pad_points,
-    )
-    return VinSnippetCacheMetadata(
-        version=version,
-        created_at=datetime.utcnow().isoformat(timespec="seconds") + "Z",
-        source_cache_dir=str(source_cache_dir) if source_cache_dir is not None else None,
-        source_cache_hash=source_cache_hash,
-        dataset_config=dataset_config,
-        include_inv_dist_std=include_inv_dist_std,
-        include_obs_count=include_obs_count,
-        semidense_max_points=semidense_max_points,
-        pad_points=pad_points,
-        config_hash=config_hash,
-        num_samples=None,
-    )
-
-
-def _write_metadata(path: Path, meta: VinSnippetCacheMetadata) -> None:
+def _write_vin_metadata(path: Path, meta: VinSnippetCacheMetadata) -> None:
     """Serialize VIN cache metadata to ``metadata.json``."""
-    write_json_metadata(
-        path,
-        {
-            "version": meta.version,
-            "created_at": meta.created_at,
-            "source_cache_dir": meta.source_cache_dir,
-            "source_cache_hash": meta.source_cache_hash,
-            "dataset_config": meta.dataset_config,
-            "include_inv_dist_std": meta.include_inv_dist_std,
-            "include_obs_count": meta.include_obs_count,
-            "semidense_max_points": meta.semidense_max_points,
-            "pad_points": meta.pad_points,
-            "config_hash": meta.config_hash,
-            "num_samples": meta.num_samples,
-        },
-    )
+
+    write_json_metadata(path, meta.to_json_payload())
 
 
-def _read_metadata(path: Path) -> VinSnippetCacheMetadata:
+def _read_vin_metadata(path: Path) -> VinSnippetCacheMetadata:
     """Read VIN cache metadata from ``metadata.json``."""
-    payload = load_json_metadata(path)
-    return VinSnippetCacheMetadata(
-        version=int(payload["version"]),
-        created_at=str(payload["created_at"]),
-        source_cache_dir=payload.get("source_cache_dir"),
-        source_cache_hash=payload.get("source_cache_hash"),
-        dataset_config=payload.get("dataset_config"),
-        include_inv_dist_std=bool(payload.get("include_inv_dist_std", True)),
-        include_obs_count=bool(payload.get("include_obs_count", False)),
-        semidense_max_points=payload.get("semidense_max_points"),
-        pad_points=payload.get("pad_points"),
-        config_hash=payload.get("config_hash"),
-        num_samples=payload.get("num_samples"),
-    )
+
+    return VinSnippetCacheMetadata.from_json_payload(load_json_metadata(path))
 
 
 def read_vin_snippet_cache_metadata(path: Path) -> VinSnippetCacheMetadata:
     """Read VIN snippet cache metadata from a directory or metadata path."""
     meta_path = path / "metadata.json" if path.is_dir() else path
-    return _read_metadata(meta_path)
+    return _read_vin_metadata(meta_path)
 
 
 def migrate_vin_snippet_cache_inplace(
@@ -345,7 +272,7 @@ def migrate_vin_snippet_cache_inplace(
     if not meta_path.exists():
         raise FileNotFoundError(f"Missing VIN snippet metadata at {meta_path}")
 
-    meta = _read_metadata(meta_path)
+    meta = _read_vin_metadata(meta_path)
     target_pad_points = int(pad_points if pad_points is not None else cache.pad_points)
     console.log(f"Upgrading VIN snippet cache at {cache.cache_dir} to pad_points={target_pad_points}")
 
@@ -391,42 +318,8 @@ def migrate_vin_snippet_cache_inplace(
         semidense_max_points=meta.semidense_max_points,
         pad_points=target_pad_points,
     )
-    _write_metadata(meta_path, meta)
+    _write_vin_metadata(meta_path, meta)
     console.log("VIN snippet cache migration complete.")
-
-
-def _read_oracle_cache_index(path: Path) -> list[OracleRriCacheEntry]:
-    """Read oracle-cache index entries used to build VIN snippets."""
-    return read_index(path, entry_type=OracleRriCacheEntry)
-
-
-def _build_vin_payload(
-    *,
-    loader: EfmSnippetLoader,
-    entry: OracleRriCacheEntry,
-    device: torch.device,
-    max_points: int | None,
-    include_inv_dist_std: bool,
-    include_obs_count: bool,
-    pad_points: int | None,
-) -> dict[str, Any]:
-    """Build one serialized VIN payload from a raw EFM snippet load."""
-    efm_snippet = loader.load(scene_id=entry.scene_id, snippet_id=entry.snippet_id)
-    vin_snippet = build_vin_snippet_view(
-        efm_snippet,
-        device=device,
-        max_points=max_points,
-        include_inv_dist_std=include_inv_dist_std,
-        include_obs_count=include_obs_count,
-        pad_points=pad_points,
-    )
-    return {
-        "scene_id": entry.scene_id,
-        "snippet_id": entry.snippet_id,
-        "points_world": vin_snippet.points_world.detach().cpu(),
-        "points_length": vin_snippet.lengths.detach().cpu().reshape(-1),
-        "t_world_rig": vin_snippet.t_world_rig.tensor().detach().cpu(),
-    }
 
 
 class VinSnippetCacheBuildDataset(Dataset[VinSnippetCacheBuildResult]):
@@ -490,15 +383,22 @@ class VinSnippetCacheBuildDataset(Dataset[VinSnippetCacheBuildResult]):
     def _build_payload(self, entry: OracleRriCacheEntry) -> dict[str, Any]:
         """Materialize one VIN payload from the requested oracle entry."""
         loader = self._ensure_loader()
-        return _build_vin_payload(
-            loader=loader,
-            entry=entry,
+        efm_snippet = loader.load(scene_id=entry.scene_id, snippet_id=entry.snippet_id)
+        vin_snippet = build_vin_snippet_view(
+            efm_snippet,
             device=self._device,
             max_points=self._semidense_max_points,
             include_inv_dist_std=self._include_inv_dist_std,
             include_obs_count=self._include_obs_count,
             pad_points=self._pad_points,
         )
+        return {
+            "scene_id": entry.scene_id,
+            "snippet_id": entry.snippet_id,
+            "points_world": vin_snippet.points_world.detach().cpu(),
+            "points_length": vin_snippet.lengths.detach().cpu().reshape(-1),
+            "t_world_rig": vin_snippet.t_world_rig.tensor().detach().cpu(),
+        }
 
 
 class VinSnippetCacheWriter:
@@ -545,7 +445,7 @@ class VinSnippetCacheWriter:
                     "(set overwrite=True to replace or resume=True to append).",
                 )
             if not self.config.overwrite and self.config.cache.metadata_path.exists():
-                existing_meta = _read_metadata(self.config.cache.metadata_path)
+                existing_meta = _read_vin_metadata(self.config.cache.metadata_path)
                 expected_hash = self._meta.config_hash
                 if existing_meta.config_hash and expected_hash and existing_meta.config_hash != expected_hash:
                     raise ValueError("VIN snippet cache config hash mismatch; set overwrite=True to rebuild.")
@@ -567,7 +467,7 @@ class VinSnippetCacheWriter:
                     f"Found {len(existing_entries)} existing snippets; skipping duplicates by scene/snippet.",
                 )
 
-        _write_metadata(self.config.cache.metadata_path, self._meta)
+        _write_vin_metadata(self.config.cache.metadata_path, self._meta)
         entries: list[VinSnippetCacheEntry] = []
         max_samples = self.config.max_samples
         count = len(existing_entries)
@@ -600,7 +500,7 @@ class VinSnippetCacheWriter:
             )
             loader_kwargs: dict[str, Any] = {
                 "batch_size": 1,
-                "collate_fn": _single_item_collate,
+                "collate_fn": itemgetter(0),
                 "num_workers": self.config.num_workers,
                 "shuffle": False,
             }
@@ -670,7 +570,7 @@ class VinSnippetCacheWriter:
         if missing:
             self.console.log(f"Skipped {missing} snippets missing from the source dataset.")
         self._meta.num_samples = count
-        _write_metadata(self.config.cache.metadata_path, self._meta)
+        _write_vin_metadata(self.config.cache.metadata_path, self._meta)
         self.console.log(
             f"VIN snippet cache now contains {count} samples (added {len(entries)} new) in {cache_dir}",
         )
@@ -694,15 +594,24 @@ class VinSnippetCacheWriter:
         meta = _read_oracle_metadata(self.config.source_cache.metadata_path)
         source_hash = getattr(meta, "config_hash", None)
         dataset_cfg = self._dataset_payload
-        return _build_metadata(
-            dataset_config=dataset_cfg,
-            source_cache_dir=self.config.source_cache.cache_dir,
+        return VinSnippetCacheMetadata(
+            version=VIN_SNIPPET_CACHE_VERSION,
+            created_at=datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            source_cache_dir=str(self.config.source_cache.cache_dir),
             source_cache_hash=source_hash,
+            dataset_config=dataset_cfg,
             include_inv_dist_std=self.config.include_inv_dist_std,
             include_obs_count=self.config.include_obs_count,
             semidense_max_points=self.config.semidense_max_points,
             pad_points=self.config.cache.pad_points,
-            version=VIN_SNIPPET_CACHE_VERSION,
+            config_hash=vin_snippet_cache_config_hash(
+                dataset_config=dataset_cfg,
+                include_inv_dist_std=self.config.include_inv_dist_std,
+                include_obs_count=self.config.include_obs_count,
+                semidense_max_points=self.config.semidense_max_points,
+                pad_points=self.config.cache.pad_points,
+            ),
+            num_samples=None,
         )
 
     def _load_oracle_entries(self) -> list[OracleRriCacheEntry]:
@@ -713,7 +622,7 @@ class VinSnippetCacheWriter:
             index_path = self.config.source_cache.val_index_path
         else:
             index_path = self.config.source_cache.index_path
-        return _read_oracle_cache_index(index_path)
+        return read_index(index_path, entry_type=OracleRriCacheEntry)
 
     def _build_payload(self, entry: OracleRriCacheEntry) -> dict[str, Any]:
         """Build one VIN payload using the writer-owned loader instance."""
@@ -724,15 +633,22 @@ class VinSnippetCacheWriter:
                 paths=self.config.paths,
                 include_gt_mesh=False,
             )
-        return _build_vin_payload(
-            loader=self._loader,
-            entry=entry,
+        efm_snippet = self._loader.load(scene_id=entry.scene_id, snippet_id=entry.snippet_id)
+        vin_snippet = build_vin_snippet_view(
+            efm_snippet,
             device=torch.device(str(self.config.map_location)),
             max_points=self.config.semidense_max_points,
             include_inv_dist_std=self.config.include_inv_dist_std,
             include_obs_count=self.config.include_obs_count,
             pad_points=self.config.cache.pad_points,
         )
+        return {
+            "scene_id": entry.scene_id,
+            "snippet_id": entry.snippet_id,
+            "points_world": vin_snippet.points_world.detach().cpu(),
+            "points_length": vin_snippet.lengths.detach().cpu().reshape(-1),
+            "t_world_rig": vin_snippet.t_world_rig.tensor().detach().cpu(),
+        }
 
     def _write_payload(
         self,
@@ -741,8 +657,8 @@ class VinSnippetCacheWriter:
         samples_dir: Path,
     ) -> VinSnippetCacheEntry:
         """Persist one VIN payload and return its new index entry."""
-        base_key = _format_sample_key(entry.scene_id, entry.snippet_id, self._config_hash)
-        sample_key, sample_path = _unique_sample_path(samples_dir, base_key)
+        base_key = format_sample_key(entry.scene_id, entry.snippet_id, self._config_hash)
+        sample_key, sample_path = unique_sample_path(samples_dir, base_key)
         torch.save(payload, sample_path)
         return VinSnippetCacheEntry(
             key=sample_key,
@@ -803,7 +719,7 @@ class VinSnippetCacheDataset(Dataset[VinSnippetView]):
         """Look up a cached VIN snippet by ``(scene_id, snippet_id)``."""
         entry = self._by_scene_snippet.get((scene_id, snippet_id))
         if entry is None:
-            snippet_token = _extract_snippet_token(snippet_id)
+            snippet_token = extract_snippet_token(snippet_id)
             entry = self._by_scene_snippet.get((scene_id, snippet_token))
         if entry is None:
             return None
@@ -856,11 +772,11 @@ def repair_vin_snippet_cache_index(*, cache: VinSnippetCacheConfig) -> int:
     write_index(cache.index_path, entries)
     meta_path = cache.metadata_path
     if meta_path.exists():
-        meta = _read_metadata(meta_path)
+        meta = _read_vin_metadata(meta_path)
         meta.num_samples = len(entries)
         if meta.pad_points is None:
             meta.pad_points = cache.pad_points
-        _write_metadata(meta_path, meta)
+        _write_vin_metadata(meta_path, meta)
     return len(entries)
 
 

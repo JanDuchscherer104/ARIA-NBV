@@ -833,12 +833,26 @@ def is_efm_snippet_view_instance(value: object) -> bool:
     The v2 stack accepts both the local data-handling view classes and legacy
     view objects that expose the same public attributes.
     """
-    return hasattr(value, "efm") and hasattr(value, "trajectory") and hasattr(value, "semidense")
+    if isinstance(value, EfmSnippetView):
+        return True
+    for attr in ("efm", "trajectory", "semidense"):
+        try:
+            getattr(value, attr)
+        except Exception:
+            return False
+    return True
 
 
 def is_vin_snippet_view_instance(value: object) -> bool:
     """Return whether ``value`` behaves like a :class:`VinSnippetView`."""
-    return hasattr(value, "points_world") and hasattr(value, "lengths") and hasattr(value, "t_world_rig")
+    if isinstance(value, VinSnippetView):
+        return True
+    for attr in ("points_world", "lengths", "t_world_rig"):
+        try:
+            getattr(value, attr)
+        except Exception:
+            return False
+    return True
 
 
 __all__ = [

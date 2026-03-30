@@ -10,9 +10,10 @@ import torch
 from efm3d.aria.pose import PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import]
 
-from ..data.efm_views import EfmSnippetView
 from ..data.plotting import SnippetPlotBuilder, get_frustum_segments
+from ..data_handling import EfmSnippetView
 from ..utils import Console
+from .math_utils import normalize_last_dim as _normalise
 
 if TYPE_CHECKING:
     from .candidate_generation import CandidateViewGeneratorConfig
@@ -614,10 +615,6 @@ def plot_radius_hist(
         yaxis_title="count",
     )
     return fig
-
-
-def _normalise(v: torch.Tensor, *, eps: float = 1e-6) -> torch.Tensor:
-    return v / v.norm(dim=-1, keepdim=True).clamp_min(eps)
 
 
 def _roll_about_forward(

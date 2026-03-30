@@ -13,22 +13,21 @@ import streamlit as st
 import torch
 
 from ...configs import PathConfig
-from ...data.efm_dataset import AseEfmDatasetConfig
-from ...data.offline_cache import OracleRriCacheDatasetConfig, rebuild_cache_index
-from ...data.offline_cache_coverage import (
+from ...data_handling import (
+    AseEfmDatasetConfig,
+    OracleRriCacheConfig,
+    OracleRriCacheDatasetConfig,
+    VinOracleCacheDatasetConfig,
+    VinOracleOnlineDatasetConfig,
+    read_vin_snippet_cache_metadata,
+)
+from ...data_handling.cache_coverage import (
     compute_cache_coverage,
     expand_tar_urls,
-    read_cache_index_entries,
     scan_dataset_snippets,
     snippets_by_scene,
 )
-from ...data.offline_cache_store import _extract_snippet_token
-from ...data.offline_cache_store import _read_metadata as _read_cache_metadata
-from ...data.vin_oracle_datasets import (
-    VinOracleCacheDatasetConfig,
-    VinOracleOnlineDatasetConfig,
-)
-from ...data.vin_snippet_cache import read_vin_snippet_cache_metadata
+from ...data_handling.offline_cache_store import extract_snippet_token
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...pose_generation.plotting import plot_position_polar
 from ...rri_metrics.plotting import _histogram_overlay, _plot_hist_counts_mpl
@@ -37,9 +36,12 @@ from ...utils import Stage
 from ...vin.experimental.plotting import DEFAULT_PLOT_CFG
 from .common import _info_popover, _pretty_label, _report_exception
 from .offline_cache_utils import (
-    _collect_offline_cache_stats,
-    _collect_vin_batch_shape_preview,
-    _collect_vin_snippet_cache_stats,
+    collect_offline_cache_stats,
+    collect_vin_batch_shape_preview,
+    collect_vin_snippet_cache_stats,
+    read_oracle_cache_entries,
+    read_oracle_cache_metadata,
+    read_vin_snippet_cache_entries,
 )
 
 matplotlib.use("Agg")
@@ -164,10 +166,14 @@ def render_offline_stats_page() -> None:
         train_index_path = cache_path / "train_index.jsonl"
         val_index_path = cache_path / "val_index.jsonl"
         samples_dir = cache_path / "samples"
-        index_entries = read_cache_index_entries(index_path)
+        index_entries = (
+            read_oracle_cache_entries(index_path)
+            if cache_kind == "oracle_rri_cache"
+            else read_vin_snippet_cache_entries(index_path)
+        )
         if cache_kind == "oracle_rri_cache":
-            train_entries = read_cache_index_entries(train_index_path)
-            val_entries = read_cache_index_entries(val_index_path)
+            train_entries = read_oracle_cache_entries(train_index_path)
+            val_entries = read_oracle_cache_entries(val_index_path)
         else:
             train_entries = index_entries
             val_entries = []
@@ -194,8 +200,9 @@ def render_offline_stats_page() -> None:
             )
             if st.button("Rebuild index from samples", key="vin_offline_rebuild_index"):
                 with st.spinner("Rebuilding cache index..."):
-                    rebuilt = rebuild_cache_index(
+                    rebuilt = OracleRriCacheConfig(
                         cache_dir=cache_path,
+                    ).rebuild_index(
                         train_val_split=float(train_val_split),
                         rng_seed=None if split_seed < 0 else int(split_seed),
                     )
@@ -338,7 +345,7 @@ def render_offline_stats_page() -> None:
                         meta_path = cache_root / "metadata.json"
                         if not meta_path.exists():
                             raise FileNotFoundError(f"Missing cache metadata: {meta_path}")
-                        meta = _read_cache_metadata(meta_path)
+                        meta = read_oracle_cache_metadata(meta_path)
                         if meta.dataset_config is None:
                             raise ValueError("Cache metadata does not include dataset_config.")
                         dataset_cfg = AseEfmDatasetConfig(**meta.dataset_config)
@@ -401,7 +408,7 @@ def render_offline_stats_page() -> None:
         try:
             with st.spinner("Collecting offline cache statistics..."):
                 if cache_kind == "oracle_rri_cache":
-                    stats_cache = _collect_offline_cache_stats(
+                    stats_cache = collect_offline_cache_stats(
                         toml_path=toml_path.strip() or None,
                         stage=stage,
                         cache_dir=cache_dir.as_posix().strip() or None,
@@ -410,7 +417,7 @@ def render_offline_stats_page() -> None:
                         train_val_split=float(train_val_split),
                     )
                 else:
-                    stats_cache = _collect_vin_snippet_cache_stats(
+                    stats_cache = collect_vin_snippet_cache_stats(
                         cache_dir=cache_dir.as_posix().strip() or None,
                         map_location=map_location,
                         max_samples=int(max_samples),
@@ -421,7 +428,7 @@ def render_offline_stats_page() -> None:
                     if vin_cache_dir:
                         parent = Path(vin_cache_dir).parent
                         oracle_cache_dir = str(parent) if (parent / "index.jsonl").exists() else None
-                    stats_cache["vin_batch_shapes"] = _collect_vin_batch_shape_preview(
+                    stats_cache["vin_batch_shapes"] = collect_vin_batch_shape_preview(
                         toml_path=toml_path.strip() or None,
                         stage=stage,
                         oracle_cache_dir=oracle_cache_dir,
@@ -567,7 +574,7 @@ def render_offline_stats_page() -> None:
             snippet_id = str(getattr(entry, "snippet_id", ""))
             if not scene_id:
                 continue
-            pairs.add((scene_id, _extract_snippet_token(snippet_id)))
+            pairs.add((scene_id, extract_snippet_token(snippet_id)))
         return pairs
 
     def _render_cache_discrepancies(
@@ -584,8 +591,8 @@ def render_offline_stats_page() -> None:
             st.info("Cache discrepancy check skipped: missing index.jsonl.")
             return
 
-        oracle_entries = read_cache_index_entries(oracle_index)
-        vin_entries = read_cache_index_entries(vin_index)
+        oracle_entries = read_oracle_cache_entries(oracle_index)
+        vin_entries = read_vin_snippet_cache_entries(vin_index)
         oracle_pairs = _pairs_from_entries(oracle_entries)
         vin_pairs = _pairs_from_entries(vin_entries)
 

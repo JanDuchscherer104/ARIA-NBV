@@ -12,10 +12,10 @@ from efm3d.aria import CameraTW, PoseTW
 
 from aria_nbv.app.panels.vin_utils import (
     DEFAULT_BACKBONE_KEEP_FIELDS,
-    _build_experiment_config,
-    _has_backbone_obbs,
-    _should_fetch_vin_snippet,
-    _vin_oracle_batch_from_cache,
+    build_experiment_config,
+    has_backbone_obbs,
+    should_fetch_vin_snippet,
+    vin_oracle_batch_from_cache,
 )
 from aria_nbv.data.offline_cache_types import OracleRriCacheSample
 from aria_nbv.rendering.candidate_depth_renderer import CandidateDepths
@@ -120,9 +120,9 @@ def _make_cache_sample() -> OracleRriCacheSample:
 
 def test_vin_utils_strip_backbone_obbs() -> None:
     cache_sample = _make_cache_sample()
-    assert _has_backbone_obbs(cache_sample.backbone_out)
+    assert has_backbone_obbs(cache_sample.backbone_out)
 
-    batch = _vin_oracle_batch_from_cache(
+    batch = vin_oracle_batch_from_cache(
         cache_sample,
         efm_snippet=None,
         drop_backbone_obbs=True,
@@ -132,7 +132,7 @@ def test_vin_utils_strip_backbone_obbs() -> None:
 
 
 def test_build_experiment_config_sets_backbone_keep_fields() -> None:
-    cfg = _build_experiment_config(
+    cfg = build_experiment_config(
         toml_path=None,
         stage=Stage.TRAIN,
         use_offline_cache=True,
@@ -147,7 +147,7 @@ def test_build_experiment_config_sets_backbone_keep_fields() -> None:
 
 def test_build_experiment_config_preserves_toml_keep_fields() -> None:
     toml_path = Path(__file__).resolve().parents[3] / ".configs" / "offline_only.toml"
-    cfg = _build_experiment_config(
+    cfg = build_experiment_config(
         toml_path=str(toml_path),
         stage=Stage.TRAIN,
         use_offline_cache=True,
@@ -162,17 +162,17 @@ def test_build_experiment_config_preserves_toml_keep_fields() -> None:
 
 
 def test_should_fetch_vin_snippet() -> None:
-    assert _should_fetch_vin_snippet(
+    assert should_fetch_vin_snippet(
         use_vin_snippet_cache=True,
         attach_snippet=False,
         require_vin_snippet=False,
     )
-    assert _should_fetch_vin_snippet(
+    assert should_fetch_vin_snippet(
         use_vin_snippet_cache=True,
         attach_snippet=True,
         require_vin_snippet=True,
     )
-    assert not _should_fetch_vin_snippet(
+    assert not should_fetch_vin_snippet(
         use_vin_snippet_cache=False,
         attach_snippet=True,
         require_vin_snippet=True,

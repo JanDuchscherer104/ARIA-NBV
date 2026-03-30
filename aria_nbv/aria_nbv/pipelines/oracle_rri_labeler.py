@@ -38,11 +38,6 @@ class OracleRriSample:
     candidate_pcs: CandidatePointClouds
     rri: RriResult
 
-
-def _target_cls():
-    return OracleRriLabeler
-
-
 class OracleRriLabelerConfig(BaseConfig["OracleRriLabeler"]):
     """Config-as-factory wrapper for :class:`OracleRriLabeler`.
 
@@ -52,7 +47,7 @@ class OracleRriLabelerConfig(BaseConfig["OracleRriLabeler"]):
 
     @property
     def target(self) -> type[OracleRriLabeler]:
-        return _target_cls()
+        return OracleRriLabeler
 
     device: Annotated[torch.device, Field(default="auto")]
 

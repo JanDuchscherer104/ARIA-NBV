@@ -1,5 +1,7 @@
 """Immutable writer for the VIN offline dataset format.
 
+# TODO: This module is way to massive (for this amount of module-level code)
+
 This module owns creation of the new shard-based VIN offline dataset. It
 provides:
 
@@ -16,18 +18,13 @@ per-row msgspec records that are only decoded on demand.
 
 from __future__ import annotations
 
-import hashlib
-import json
-import re
 import shutil
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import torch
-from efm3d.aria.pose import PoseTW
 from pydantic import Field, field_validator
 
 from ..configs import PathConfig
@@ -38,6 +35,24 @@ from ..rri_metrics.types import RriResult
 from ..utils import BaseConfig, Console, Verbosity
 from ..vin.backbone_evl import EvlBackboneConfig
 from ..vin.types import EvlBackboneOutput
+from ._cache_utils import (
+    default_sample_key as _default_sample_key,
+)
+from ._cache_utils import (
+    json_signature as _json_signature,
+)
+from ._cache_utils import (
+    pad_first_axis as _pad_first_axis,
+)
+from ._cache_utils import (
+    pose_to_numpy as _pose_to_numpy,
+)
+from ._cache_utils import (
+    to_numpy as _to_numpy,
+)
+from ._cache_utils import (
+    utc_now_iso as _utc_now_iso,
+)
 from ._offline_format import (
     VinOfflineIndexRecord,
     VinOfflineManifest,
@@ -53,117 +68,6 @@ from ._raw import AseEfmDatasetConfig, EfmSnippetView, VinSnippetView
 from ._vin_runtime import DEFAULT_VIN_SNIPPET_PAD_POINTS, build_vin_snippet_view
 
 
-def _utc_now_iso() -> str:
-    """Return the current UTC time in stable ISO-8601 form."""
-
-    return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
-
-
-def _json_signature(payload: dict[str, Any]) -> str:
-    """Return a stable hash for a JSON-serializable payload.
-
-    Args:
-        payload: JSON-serializable dictionary.
-
-    Returns:
-        Stable SHA-1 hex digest.
-    """
-
-    serial = json.dumps(payload, sort_keys=True, ensure_ascii=True)
-    return hashlib.sha1(serial.encode("utf-8")).hexdigest()
-
-
-def _sanitize_token(value: str) -> str:
-    """Normalize a token so it is safe in sample identifiers.
-
-    Args:
-        value: Raw token.
-
-    Returns:
-        Filesystem-safe token.
-    """
-
-    return re.sub(r"[^0-9a-zA-Z._-]+", "_", value).strip("_")
-
-
-def _default_sample_key(scene_id: str, snippet_id: str) -> str:
-    """Build the default stable sample key for one snippet.
-
-    Args:
-        scene_id: ASE scene identifier.
-        snippet_id: ASE snippet identifier.
-
-    Returns:
-        Stable sample key.
-    """
-
-    return f"{_sanitize_token(scene_id)}::{_sanitize_token(snippet_id)}"
-
-
-def _to_numpy(
-    value: torch.Tensor | np.ndarray | bool | int | float,
-    *,
-    dtype: np.dtype[Any] | None = None,
-) -> np.ndarray:
-    """Convert a scalar or tensor-like value into a NumPy array.
-
-    Args:
-        value: Value to convert.
-        dtype: Optional target dtype.
-
-    Returns:
-        Converted NumPy array.
-    """
-
-    if isinstance(value, np.ndarray):
-        array = value
-    elif isinstance(value, torch.Tensor):
-        array = value.detach().cpu().numpy()
-    else:
-        array = np.asarray(value)
-    if dtype is not None:
-        array = array.astype(dtype, copy=False)
-    return array
-
-
-def _pose_to_numpy(pose: PoseTW) -> np.ndarray:
-    """Convert a ``PoseTW`` into a CPU float32 NumPy array."""
-
-    array = _to_numpy(pose.tensor(), dtype=np.float32)
-    if array.ndim == 3 and array.shape[0] == 1:
-        return array[0]
-    return array
-
-
-def _pad_first_axis(
-    array: np.ndarray,
-    *,
-    target_len: int,
-    fill_value: float | int | bool,
-) -> np.ndarray:
-    """Pad or truncate the first axis of an array.
-
-    Args:
-        array: Input array.
-        target_len: Requested size along axis 0.
-        fill_value: Padding value for short arrays.
-
-    Returns:
-        Array padded or truncated along the first axis.
-    """
-
-    if array.ndim == 0:
-        return array
-    current = int(array.shape[0])
-    if current == target_len:
-        return array
-    if current > target_len:
-        return array[:target_len]
-    pad_shape = (target_len - current, *array.shape[1:])
-    pad = np.full(pad_shape, fill_value, dtype=array.dtype)
-    return np.concatenate([array, pad], axis=0)
-
-
 def _camera_param_to_numpy(param: Any, *, dtype: np.dtype[Any]) -> np.ndarray:
     """Convert one PyTorch3D camera parameter into a NumPy array."""
 
@@ -173,6 +77,8 @@ def _camera_param_to_numpy(param: Any, *, dtype: np.dtype[Any]) -> np.ndarray:
     return array
 
 
+# TODO: @autoimprove agent: number of todos resolved successfully is also a good signal to trach, all parsed todos must be maintained in interal registry on codeowner level
+# TODO: make everything that is
 @dataclass(slots=True)
 class PreparedVinOfflineSample:
     """Normalized offline row before shard materialization.
@@ -378,6 +284,7 @@ def prepare_vin_offline_sample(
             fill_value=False,
         )
 
+    # TODO: can't we just loop over fields here?
     if include_backbone and backbone_out is not None:
         numeric_blocks["backbone.t_world_voxel"] = _pose_to_numpy(backbone_out.t_world_voxel).astype(
             np.float32, copy=False

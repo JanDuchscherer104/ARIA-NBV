@@ -12,7 +12,7 @@ from torch import nn
 from torch.nn import functional as functional
 
 from ...configs import PathConfig
-from ...data.offline_cache import OracleRriCacheConfig, OracleRriCacheDatasetConfig
+from ...data_handling import OracleRriCacheConfig, OracleRriCacheDatasetConfig
 from ...interpretability.attribution import (
     AttributionEngine,
     AttributionMethod,
@@ -24,8 +24,8 @@ from ...rri_metrics.coral import coral_expected_from_logits, coral_logits_to_pro
 from ...vin.experimental.pose_encoders import infer_pose_vec_groups
 from ..state import get_vin_state
 from .common import _info_popover
-from .offline_cache_utils import _load_efm_snippet_for_cache
-from .vin_utils import _load_vin_module_from_checkpoint
+from .offline_cache_utils import load_efm_snippet_for_cache
+from .vin_utils import load_vin_module_from_checkpoint
 
 
 class _VinAttributionHead(nn.Module):
@@ -238,7 +238,7 @@ def render_testing_attribution_page() -> None:
     module_key = (str(resolved_ckpt) if resolved_ckpt else "", device_choice)
     if resolved_ckpt is not None and attr_state.get("module_key") != module_key:
         try:
-            module = _load_vin_module_from_checkpoint(
+            module = load_vin_module_from_checkpoint(
                 checkpoint_path=resolved_ckpt,
                 device=torch.device(device_choice),
             )
@@ -452,7 +452,7 @@ def render_testing_attribution_page() -> None:
                             cache_sample.efm_snippet_view = snippet_cache[snippet_key]  # type: ignore[assignment]
                         else:
                             try:
-                                efm_snippet = _load_efm_snippet_for_cache(
+                                efm_snippet = load_efm_snippet_for_cache(
                                     scene_id=cache_sample.scene_id,
                                     snippet_id=cache_sample.snippet_id,
                                     dataset_payload=cache_ds.metadata.dataset_config,

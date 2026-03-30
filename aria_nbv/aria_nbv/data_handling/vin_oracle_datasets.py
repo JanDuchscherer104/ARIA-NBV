@@ -24,7 +24,8 @@ from ..pipelines.oracle_rri_labeler import OracleRriLabeler, OracleRriLabelerCon
 from ..utils import BaseConfig, Console, Stage, Verbosity
 from ._offline_dataset import VinOfflineDataset, VinOfflineDatasetConfig
 from ._raw import AseEfmDatasetConfig, EfmSnippetView
-from .oracle_cache import OracleRriCacheDatasetConfig, OracleRriCacheVinDataset
+from .oracle_cache import OracleRriCacheDatasetConfig
+from .oracle_cache_datasets import OracleRriCacheVinDataset
 from .vin_oracle_types import VinOracleBatch
 
 

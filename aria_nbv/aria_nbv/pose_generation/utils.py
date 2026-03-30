@@ -1,6 +1,6 @@
 import torch
 
-
+# TODO: All of these free functions belong into a shared geometry utils namespace!
 def project_horizontal(v: torch.Tensor, wup: torch.Tensor) -> torch.Tensor:
     """Project vectors `v` onto the horizontal plane defined by world up `wup`."""
     dot = (v * wup).sum(dim=-1, keepdim=True)

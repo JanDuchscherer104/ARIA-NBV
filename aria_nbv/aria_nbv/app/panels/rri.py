@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ...data import EfmSnippetView
+from ...data_handling import EfmSnippetView
 from ...rendering.candidate_depth_renderer import CandidateDepths
 from ...rendering.candidate_pointclouds import CandidatePointClouds
 from ...rri_metrics import plotting as rri_plotting

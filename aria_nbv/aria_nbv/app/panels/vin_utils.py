@@ -9,11 +9,16 @@ from typing import TYPE_CHECKING
 import torch
 
 from ...configs import PathConfig
-from ...data import EfmSnippetView, VinOracleOnlineDatasetConfig, VinSnippetView
-from ...data.offline_cache import OracleRriCacheConfig, OracleRriCacheDatasetConfig
-from ...data.offline_cache_types import OracleRriCacheSample
-from ...data.vin_oracle_datasets import VinOracleCacheDatasetConfig
-from ...data.vin_oracle_types import VinOracleBatch
+from ...data_handling import (
+    EfmSnippetView,
+    OracleRriCacheConfig,
+    OracleRriCacheDatasetConfig,
+    OracleRriCacheSample,
+    VinOracleBatch,
+    VinOracleCacheDatasetConfig,
+    VinOracleOnlineDatasetConfig,
+    VinSnippetView,
+)
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...lightning.lit_module import VinLightningModule, VinLightningModuleConfig
 from ...rri_metrics.rri_binning import RriOrdinalBinner
@@ -39,7 +44,7 @@ DEFAULT_BACKBONE_KEEP_FIELDS: list[str] = [
 """Default backbone fields for VIN diagnostics (OBB outputs excluded)."""
 
 
-def _build_experiment_config(
+def build_experiment_config(
     *,
     toml_path: str | None,
     stage: Stage,
@@ -84,7 +89,7 @@ def _build_experiment_config(
     return cfg
 
 
-def _load_vin_module_from_checkpoint(
+def load_vin_module_from_checkpoint(
     *,
     checkpoint_path: Path,
     device: torch.device | str,
@@ -128,7 +133,7 @@ def _load_vin_module_from_checkpoint(
     return module
 
 
-def _run_vin_debug(
+def run_vin_debug(
     module: "VinLightningModule",
     batch: VinOracleBatch,
 ) -> tuple[VinPrediction, VinForwardDiagnostics]:
@@ -173,7 +178,7 @@ def _run_vin_debug(
     return pred, debug
 
 
-def _vin_oracle_batch_from_cache(
+def vin_oracle_batch_from_cache(
     cache_sample: OracleRriCacheSample,
     *,
     efm_snippet: EfmSnippetView | VinSnippetView | None,
@@ -183,7 +188,7 @@ def _vin_oracle_batch_from_cache(
     depths = cache_sample.depths
     backbone_out = cache_sample.backbone_out
     if drop_backbone_obbs and backbone_out is not None:
-        backbone_out = _strip_backbone_obbs(backbone_out)
+        backbone_out = strip_backbone_obbs(backbone_out)
     return VinOracleBatch(
         efm_snippet_view=efm_snippet,
         candidate_poses_world_cam=depths.poses,
@@ -202,7 +207,7 @@ def _vin_oracle_batch_from_cache(
     )
 
 
-def _has_backbone_obbs(backbone_out: EvlBackboneOutput | None) -> bool:
+def has_backbone_obbs(backbone_out: EvlBackboneOutput | None) -> bool:
     if backbone_out is None:
         return False
     return any(
@@ -218,7 +223,7 @@ def _has_backbone_obbs(backbone_out: EvlBackboneOutput | None) -> bool:
     )
 
 
-def _strip_backbone_obbs(backbone_out: EvlBackboneOutput) -> EvlBackboneOutput:
+def strip_backbone_obbs(backbone_out: EvlBackboneOutput) -> EvlBackboneOutput:
     return replace(
         backbone_out,
         obbs_pr_nms=None,
@@ -230,7 +235,7 @@ def _strip_backbone_obbs(backbone_out: EvlBackboneOutput) -> EvlBackboneOutput:
     )
 
 
-def _should_fetch_vin_snippet(
+def should_fetch_vin_snippet(
     *,
     use_vin_snippet_cache: bool,
     attach_snippet: bool,
@@ -243,9 +248,11 @@ def _should_fetch_vin_snippet(
 
 
 __all__ = [
-    "_build_experiment_config",
-    "_load_vin_module_from_checkpoint",
-    "_run_vin_debug",
-    "_should_fetch_vin_snippet",
-    "_vin_oracle_batch_from_cache",
+    "build_experiment_config",
+    "has_backbone_obbs",
+    "load_vin_module_from_checkpoint",
+    "run_vin_debug",
+    "should_fetch_vin_snippet",
+    "strip_backbone_obbs",
+    "vin_oracle_batch_from_cache",
 ]

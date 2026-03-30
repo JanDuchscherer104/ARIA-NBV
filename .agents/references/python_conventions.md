@@ -135,7 +135,6 @@ console.plog(complex_obj)
 ```
 
 ## Do Not
-- Do not use `Field(default=<callable>)` when you mean `default_factory`.
 - Do not pass raw matrices where `PoseTW` or `CameraTW` are expected.
 - Do not leave public signatures untyped.
 - Do not hide shape or frame assumptions in implicit conventions when a short field docstring can state them directly.

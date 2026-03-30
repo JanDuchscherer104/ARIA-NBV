@@ -27,6 +27,12 @@ canonical_updates_needed: []
 ---
 ```
 
+```md
+## Prompt Follow-Through
+
+No durable owner prompt items were present beyond the task-specific request.
+```
+
 ## Native Debrief With Canonical Updates
 
 ```yaml
@@ -43,6 +49,13 @@ canonical_updates_needed:
 ---
 ```
 
+```md
+## Prompt Follow-Through
+
+- Captured durable owner prompt guidance and promoted it into `.agents/memory/state/OWNER_DIRECTIVES.md`.
+- Recorded any additional canonical state updates in `canonical_updates_needed`.
+```
+
 ## Optional Fields
 - `files_touched`
 - `source_legacy_path`
@@ -54,4 +67,5 @@ Keep the body concise:
 - method or commands
 - findings or outputs
 - verification
+- prompt follow-through
 - canonical state impact

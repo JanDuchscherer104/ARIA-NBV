@@ -1,4 +1,4 @@
-"""Lightning-adjacent utilities for Document Classifier."""
+"""Shared utility surface for the Aria-NBV Python package."""
 
 from .base_config import BaseConfig, NoTarget, SingletonConfig
 from .console import Console, Verbosity

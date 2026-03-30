@@ -7,9 +7,10 @@ import plotly.express as px
 import streamlit as st
 import torch
 
-from ....data.efm_views import VinSnippetView
+from ....data_handling import VinSnippetView
+from ....utils.plotting import _histogram_overlay, _to_numpy
+from ....utils.vin_plotting import parameter_distribution
 from ....vin.experimental.model_v2 import FIELD_CHANNELS_V2
-from ....vin.plotting import _histogram_overlay, _parameter_distribution, _to_numpy
 from ..common import _info_popover, _pretty_label, _strip_ansi
 from .context import VinDiagContext
 
@@ -268,7 +269,7 @@ def render_summary_tab(ctx: VinDiagContext) -> None:
 
     vin_model = state.module.vin if state.module is not None else None
     if vin_model is not None:
-        params_df = _parameter_distribution(vin_model, trainable_only=True)
+        params_df = parameter_distribution(vin_model, trainable_only=True)
         if not params_df.empty:
             _info_popover(
                 "param counts",

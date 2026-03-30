@@ -64,6 +64,7 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 ## Project State
 
 - **[Action Items & TODOs](contents/todos.qmd)**: Current priorities and open tasks
+- **[Resolved TODOs](contents/resolved-todos.qmd)**: Archived completed work and major fixes
 - **[Project Roadmap](contents/roadmap.qmd)**: Milestones and timeline
 - **[Research Questions](contents/questions.qmd)**: Open problems and directions
 - **[Experimental Findings](contents/experiments/findings.qmd)**: Run logs and takeaways

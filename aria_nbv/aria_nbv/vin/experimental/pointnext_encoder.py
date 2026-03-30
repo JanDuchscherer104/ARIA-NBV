@@ -14,8 +14,8 @@ from aria_nbv.configs.path_config import PathConfig
 from ...utils import BaseConfig, Optimizable, optimizable_field
 
 
-def _extract_tensor(output: Any) -> Tensor:
-    """Best-effort extractor for tensors returned by external point encoders."""
+def _extract_feature_tensor(output: Any) -> Tensor:
+    """Extract the primary tensor payload returned by external point encoders."""
     if isinstance(output, torch.Tensor):
         return output
     if isinstance(output, dict):
@@ -172,7 +172,7 @@ class PointNeXtSEncoder(nn.Module):
             with torch.no_grad():
                 dummy = torch.zeros((1, 32, 3), dtype=torch.float32, device="cuda")
                 self.model.to(dummy.device)
-                raw = _extract_tensor(self._forward_features(dummy))
+                raw = _extract_feature_tensor(self._forward_features(dummy))
                 raw_dim = int(raw.shape[-1])
 
         self.out_dim = int(self.config.out_dim)
@@ -241,9 +241,9 @@ class PointNeXtSEncoder(nn.Module):
                     dtype=features.dtype,
                 )
                 features = torch.cat([features, pad], dim=-1)
-            raw = _extract_tensor(self._forward_features(xyz, features.transpose(1, 2).contiguous()))
+            raw = _extract_feature_tensor(self._forward_features(xyz, features.transpose(1, 2).contiguous()))
         else:
-            raw = _extract_tensor(self._forward_features(xyz))
+            raw = _extract_feature_tensor(self._forward_features(xyz))
         if raw.ndim > 2:
             reduce_dims = tuple(range(2, raw.ndim))
             raw = raw.mean(dim=reduce_dims)

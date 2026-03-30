@@ -67,15 +67,13 @@ from ._migration import (
 from .mesh_cache import MeshProcessSpec, ProcessedMesh, load_or_process_mesh
 from .oracle_cache import (
     OracleRriCacheConfig,
-    OracleRriCacheDataset,
     OracleRriCacheDatasetConfig,
-    OracleRriCacheVinDataset,
+    OracleRriCacheSample,
     OracleRriCacheWriter,
     OracleRriCacheWriterConfig,
-    rebuild_cache_index,
-    rebuild_oracle_cache_index,
     repair_oracle_cache_indices,
 )
+from .oracle_cache_datasets import OracleRriCacheDataset, OracleRriCacheVinDataset
 from .vin_cache import (
     VIN_SNIPPET_CACHE_VERSION,
     VIN_SNIPPET_PAD_POINTS,
@@ -110,6 +108,7 @@ __all__ = [
     "OracleRriCacheConfig",
     "OracleRriCacheDataset",
     "OracleRriCacheDatasetConfig",
+    "OracleRriCacheSample",
     "OracleRriCacheVinDataset",
     "OracleRriCacheWriter",
     "OracleRriCacheWriterConfig",
@@ -150,8 +149,6 @@ __all__ = [
     "migrate_legacy_offline_data",
     "prepare_vin_offline_sample",
     "read_vin_snippet_cache_metadata",
-    "rebuild_cache_index",
-    "rebuild_oracle_cache_index",
     "rebuild_vin_snippet_cache_index",
     "repair_oracle_cache_indices",
     "repair_vin_snippet_cache_index",

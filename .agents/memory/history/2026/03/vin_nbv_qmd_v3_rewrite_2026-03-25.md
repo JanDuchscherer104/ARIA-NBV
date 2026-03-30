@@ -50,3 +50,7 @@ shared architecture figures already used by the paper and slides.
 
 No canonical state files changed. This was a documentation-alignment update for
 an existing model surface.
+
+## Prompt Follow-Through
+
+This note predates the privileged owner-directive memory contract. No additional durable owner prompt items were backfilled here beyond any canonical state updates already recorded in this debrief.

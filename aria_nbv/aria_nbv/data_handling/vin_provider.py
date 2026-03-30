@@ -14,9 +14,9 @@ import torch
 
 from ..configs import PathConfig
 from ..utils import Console
+from ._cache_utils import extract_snippet_token
 from .efm_snippet_loader import EfmSnippetLoader
 from .efm_views import VinSnippetView
-from .offline_cache_store import _extract_snippet_token
 from .vin_adapter import (
     DEFAULT_VIN_SNIPPET_PAD_POINTS,
     build_vin_snippet_view,
@@ -55,13 +55,25 @@ class VinSnippetCacheProvider:
         console: Console,
     ) -> None:
         """Initialize a provider that serves VIN snippets from a cache directory."""
-        self._cache = cache
+        self._cache = self._normalize_cache_config(cache)
         self._expected_config_hash = expected_config_hash
         self._mode = mode
         self._console = console
         self._datasets: dict[str, VinSnippetCacheDataset] = {}
         self._disabled = mode == "disabled"
         self._validated = False
+
+    @staticmethod
+    def _normalize_cache_config(cache: VinSnippetCacheConfig | Any) -> VinSnippetCacheConfig:
+        """Normalize legacy cache-config objects into the canonical config type."""
+        if isinstance(cache, VinSnippetCacheConfig):
+            return cache
+        if hasattr(cache, "model_dump"):
+            return VinSnippetCacheConfig(**cache.model_dump())
+        if isinstance(cache, dict):
+            return VinSnippetCacheConfig(**cache)
+        msg = "vin_snippet_cache must be a VinSnippetCacheConfig-compatible object."
+        raise TypeError(msg)
 
     def _ensure_dataset(self, map_location: str) -> VinSnippetCacheDataset | None:
         """Create or reuse the per-device VIN cache dataset."""
@@ -130,7 +142,7 @@ class VinSnippetCacheProvider:
             map_location=map_location,
         )
         if result is None:
-            snippet_token = _extract_snippet_token(snippet_id)
+            snippet_token = extract_snippet_token(snippet_id)
             if snippet_token != snippet_id:
                 result = dataset.get_by_scene_snippet(
                     scene_id=scene_id,
@@ -138,7 +150,7 @@ class VinSnippetCacheProvider:
                     map_location=map_location,
                 )
         if result is None and self._mode == "required":
-            snippet_token = _extract_snippet_token(snippet_id)
+            snippet_token = extract_snippet_token(snippet_id)
             token_suffix = ""
             if snippet_token != snippet_id:
                 token_suffix = f" (token={snippet_token})"

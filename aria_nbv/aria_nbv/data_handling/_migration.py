@@ -10,7 +10,6 @@ dataset against the legacy sources.
 from __future__ import annotations
 
 import json
-import re
 import shutil
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -27,6 +26,7 @@ from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..rri_metrics.types import RriResult
 from ..utils import Console
 from ..vin.types import EvlBackboneOutput
+from ._cache_utils import extract_snippet_token
 from ._offline_format import (
     VinOfflineIndexRecord,
     VinOfflineManifest,
@@ -45,13 +45,6 @@ from .cache_index import read_index, repair_oracle_split_indices, validate_oracl
 from .offline_cache_store import _read_metadata as read_legacy_oracle_metadata
 from .oracle_cache import OracleRriCacheConfig
 from .vin_cache import VinSnippetCacheConfig
-
-
-def _extract_snippet_token(snippet_id: str) -> str:
-    """Extract the stable numeric snippet token when present."""
-
-    match = re.search(r"(?:AtekDataSample|DataSample)_([0-9]+)$", snippet_id)
-    return match.group(1) if match else snippet_id
 
 
 @dataclass(slots=True)
@@ -161,7 +154,7 @@ def scan_legacy_offline_data(
         pair = (entry.scene_id, entry.snippet_id)
         vin_entry = vin_entries_by_pair.get(pair)
         if vin_entry is None:
-            vin_entry = vin_entries_by_pair.get((entry.scene_id, _extract_snippet_token(entry.snippet_id)))
+            vin_entry = vin_entries_by_pair.get((entry.scene_id, extract_snippet_token(entry.snippet_id)))
         if vin_cache is not None and vin_entry is None:
             missing_vin_pairs.append(pair)
         records.append(

@@ -18,21 +18,13 @@ relpath() {
   sed "s#^${ROOT_DIR}/##"
 }
 
-has_rg() {
-  command -v rg >/dev/null 2>&1
-}
-
 list_files() {
   local pattern="$1"
   local root="$2"
   if [[ ! -d "$root" ]]; then
     return 0
   fi
-  if has_rg; then
-    rg --files -g "$pattern" "$root" 2>/dev/null || true
-  else
-    find "$root" -type f -name "$pattern" 2>/dev/null || true
-  fi
+  find "$root" -type f -name "$pattern" 2>/dev/null || true
 }
 
 count_files() {
@@ -54,9 +46,9 @@ qmd_count="$(count_files '*.qmd' "${ROOT_DIR}/docs")"
 typst_paper_count="$(count_files '*.typ' "${ROOT_DIR}/docs/typst/paper")"
 typst_slides_count="$(count_files '*.typ' "${ROOT_DIR}/docs/typst/slides")"
 typst_shared_count="$(count_files '*.typ' "${ROOT_DIR}/docs/typst/shared")"
-lit_tex_count="$(count_files '*.tex' "${ROOT_DIR}/literature")"
-lit_bib_count="$(count_files '*.bib' "${ROOT_DIR}/literature")"
-lit_family_count="$(count_immediate_dirs "${ROOT_DIR}/literature/tex-src")"
+lit_bib_count="$(count_files '*.bib' "${ROOT_DIR}/docs/literature")"
+lit_family_count="$(count_immediate_dirs "${ROOT_DIR}/docs/literature/tex-src")"
+lit_tex_count="$(count_files '*.tex' "${ROOT_DIR}/docs/literature")"
 py_count="$(count_files '*.py' "${ROOT_DIR}/aria_nbv/aria_nbv")"
 ref_count="$(count_files '*.md' "${ROOT_DIR}/.agents/references")"
 memory_state_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/state")"
@@ -70,20 +62,29 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo
   echo "## Retrieval ladder"
   echo "1. Fixed ground truth: docs/typst/paper/main.typ"
-  echo "2. Canonical current truth: .agents/memory/state/{PROJECT_STATE,DECISIONS,OPEN_QUESTIONS,GOTCHAS}.md"
-  echo "3. Compact routing index: docs/_generated/context/source_index.md"
-  echo "4. On-demand references: .agents/references/{operator_quick_reference,python_conventions,agent_memory_templates,context7_library_ids}.md"
-  echo "5. Checked-in routing map: .agents/skills/aria-nbv-context/references/context_map.md"
-  echo "6. Lightweight refresh: make context"
-  echo "7. Heavyweight fallback: make context-heavy"
+  echo "2. Default current-state read: .agents/memory/state/PROJECT_STATE.md"
+  echo "3. Durable owner directives: .agents/memory/state/OWNER_DIRECTIVES.md"
+  echo "4. Compact routing index: docs/_generated/context/source_index.md"
+  echo '5. Deepest relevant path-local `AGENTS.md` once the task is localized'
+  echo "6. On-demand state docs: .agents/memory/state/{DECISIONS,OPEN_QUESTIONS,GOTCHAS}.md"
+  echo "7. On-demand references: .agents/references/{operator_quick_reference,python_conventions,agent_memory_templates,context7_library_ids,tooling_skill_governance}.md"
+  echo "8. Checked-in routing map: .agents/skills/aria-nbv-context/references/context_map.md"
+  echo "9. Lightweight refresh: make context"
+  echo "10. Heavyweight fallback: make context-heavy"
   echo
   echo "## Hot-path bundle"
   echo "- docs/typst/paper/main.typ"
   echo "- .agents/memory/state/PROJECT_STATE.md"
-  echo "- .agents/memory/state/DECISIONS.md"
-  echo "- .agents/memory/state/OPEN_QUESTIONS.md"
-  echo "- .agents/memory/state/GOTCHAS.md"
+  echo "- .agents/memory/state/OWNER_DIRECTIVES.md"
   echo "- docs/_generated/context/source_index.md"
+  echo
+  echo "## Path-local boundary guides"
+  echo "- aria_nbv/AGENTS.md"
+  echo "- aria_nbv/aria_nbv/vin/AGENTS.md"
+  echo "- aria_nbv/aria_nbv/data_handling/AGENTS.md"
+  echo "- aria_nbv/aria_nbv/rri_metrics/AGENTS.md"
+  echo "- docs/AGENTS.md"
+  echo "- docs/typst/paper/AGENTS.md"
   echo
   echo "## Lightweight refresh"
   echo "- \`make context\` refreshes \`source_index.md\`, \`literature_index.md\`, and \`data_contracts.md\`."
@@ -94,7 +95,7 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "| Family | Count | Use when | First reveal |"
   echo "|---|---:|---|---|"
   echo "| Canonical state | ${memory_state_count} docs | You need current truth, conventions, or decisions | Open the relevant doc in \`.agents/memory/state/\` |"
-  echo "| Agent history | ${memory_history_count} docs | The task is historical, comparative, or evidence-driven | \`rg -n \"<term>\" .agents/memory/history\` |"
+  echo "| Agent history | ${memory_history_count} docs | Historical evidence only; open only after current state docs are insufficient | \`rg -n \"<term>\" .agents/memory/history\` |"
   echo "| Agent references | ${ref_count} docs | You need conventions, templates, or external-doc lookup ids | Open \`python_conventions.md\` or the specific reference doc |"
   echo "| Quarto docs | ${qmd_count} files | You need implementation narrative, roadmap, or explainer docs | \`scripts/nbv_qmd_outline.sh --compact\` |"
   echo "| Typst paper | ${typst_paper_count} files | You need the authoritative research narrative | \`scripts/nbv_typst_includes.py --paper --mode outline\` |"
@@ -118,8 +119,10 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "- .agents/skills/aria-nbv-context/references/context_map.md"
   echo "- .agents/references/agent_memory_templates.md"
   echo "- .agents/references/context7_library_ids.md"
-  echo "- docs/index.qmd"
-  echo "- docs/contents/todos.qmd"
+  echo "- .agents/references/tooling_skill_governance.md"
+  echo "- .agents/memory/state/DECISIONS.md"
+  echo "- .agents/memory/state/OPEN_QUESTIONS.md"
+  echo "- .agents/memory/state/GOTCHAS.md"
   echo
   echo "## Preferred reveal commands"
   echo '- scripts/nbv_qmd_outline.sh --compact'
@@ -142,7 +145,7 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo 'rg -n "<term>" .agents/references'
   echo 'rg -n "<term>" docs/**/*.qmd'
   echo 'rg -n "<term>" docs/typst/**/*.typ'
-  echo 'rg -n "<term>" literature/**/*.{tex,bib,sty}'
+  echo 'rg -n "<term>" docs/literature/**/*.{tex,bib,sty}'
   echo 'rg -n "<term>" aria_nbv/aria_nbv'
   echo 'rg -n "VinPrediction|EfmSnippetView|BaseConfig" docs/_generated/context/data_contracts.md'
 } > "$tmp"

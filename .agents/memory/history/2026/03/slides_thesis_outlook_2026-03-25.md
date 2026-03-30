@@ -56,3 +56,7 @@ canonical_updates_needed: []
 
 - Kept the deck text-first and self-contained: no new data imports, no reference slide.
 - This change adds a presentation artifact rather than changing project truth.
+
+## Prompt Follow-Through
+
+This note predates the privileged owner-directive memory contract. No additional durable owner prompt items were backfilled here beyond any canonical state updates already recorded in this debrief.

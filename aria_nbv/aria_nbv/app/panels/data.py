@@ -8,15 +8,15 @@ import streamlit as st
 import torch
 from efm3d.aria.pose import PoseTW
 
-from ...data import EfmSnippetView
 from ...data.plotting import (
     SnippetPlotBuilder,
     collect_frame_modalities,
-    pose_world_cam,
     plot_first_last_frames,
+    pose_world_cam,
     project_pointcloud_on_frame,
     semidense_points_for_frame,
 )
+from ...data_handling import EfmSnippetView
 from .common import _info_popover, _pretty_label
 
 

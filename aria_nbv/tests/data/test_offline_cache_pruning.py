@@ -114,10 +114,16 @@ def test_cache_dataset_prunes_candidate_pcs(
     def _decode_candidates(_payload: dict[str, object]) -> NoReturn:
         raise AssertionError("decode_candidates should not be called")
 
-    monkeypatch.setattr(offline_mod, "decode_depths", _decode_depths)
-    monkeypatch.setattr(offline_mod, "decode_rri", _decode_rri)
-    monkeypatch.setattr(offline_mod, "decode_candidate_pcs", _decode_candidate_pcs)
-    monkeypatch.setattr(offline_mod, "decode_candidates", _decode_candidates)
+    monkeypatch.setattr("aria_nbv.data_handling.oracle_cache.decode_depths", _decode_depths)
+    monkeypatch.setattr("aria_nbv.data_handling.oracle_cache.decode_rri", _decode_rri)
+    monkeypatch.setattr(
+        "aria_nbv.data_handling.oracle_cache.decode_candidate_pcs",
+        _decode_candidate_pcs,
+    )
+    monkeypatch.setattr(
+        "aria_nbv.data_handling.oracle_cache.decode_candidates",
+        _decode_candidates,
+    )
 
     cache_cfg = offline_mod.OracleRriCacheDatasetConfig(
         cache=offline_mod.OracleRriCacheConfig(cache_dir=cache_dir),

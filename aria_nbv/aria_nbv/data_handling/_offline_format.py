@@ -336,11 +336,13 @@ class VinOfflineIndexRecord:
             Parsed sample-index records.
         """
 
-        records: list[Self] = []
-        for line in path.read_bytes().splitlines():
-            if line.strip():
-                records.append(msgspec.json.decode(line, type=cls))
-        return records
+        payload = path.read_bytes().strip()
+        if not payload:
+            return []
+        return msgspec.json.decode(
+            b"[" + payload.replace(b"\n", b",") + b"]",
+            type=list[cls],
+        )
 
     @classmethod
     def write_many(cls, path: Path, records: list[Self]) -> None:
