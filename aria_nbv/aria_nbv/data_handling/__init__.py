@@ -1,22 +1,22 @@
-"""Public root API for raw snippets, VIN runtime types, and offline storage.
+"""Canonical public API for raw snippets, VIN runtime types, and offline storage.
 
-This package is the stable public contract for the training-data core:
+This package root intentionally exposes the supported *canonical* data-handling
+surface:
 
 - raw ASE/EFM snippets and typed views,
 - VIN-facing runtime helpers and batch types,
 - the immutable VIN offline dataset format and writer, and
-- temporary compatibility exports for the legacy oracle-cache and VIN-snippet
-  cache surfaces during migration.
+- migration entry points for converting legacy cache artifacts.
 
-Code outside ``aria_nbv.data_handling`` should import from this module rather
-than reaching into package submodules directly. Low-level shard handles,
-serialization helpers, and migration plumbing stay internal even when they are
-implemented in sibling modules inside this package.
+Legacy oracle-cache, VIN-snippet-cache, and coverage utilities now live behind
+dedicated ``_legacy_*`` compatibility modules. Old direct submodule imports
+such as ``aria_nbv.data_handling.oracle_cache`` still resolve, but new code
+should not rely on them through the package root.
 """
 
-# ruff: noqa: I001
-
 from __future__ import annotations
+
+from importlib import import_module
 
 from ._raw import (
     AseEfmDataset,
@@ -32,85 +32,54 @@ from ._raw import (
     is_efm_snippet_view_instance,
     is_vin_snippet_view_instance,
 )
-from ._vin_runtime import (
-    DEFAULT_VIN_SNIPPET_PAD_POINTS,
-    VinOnlineDatasetConfig,
-    VinOracleBatch,
-    VinOracleDatasetBase,
-    VinOracleOnlineDataset,
-    VinOracleOnlineDatasetConfig,
-    build_vin_snippet_view,
-    empty_vin_snippet,
-)
-from ._offline_format import (
-    VinOfflineIndexRecord,
-    VinOfflineManifest,
-    VinOfflineMaterializedBlocks,
-)
-from ._offline_store import OFFLINE_DATASET_VERSION, VinOfflineStoreConfig
-from ._offline_dataset import (
-    VinOfflineDataset,
-    VinOfflineDatasetConfig,
-    VinOfflineSample,
-)
-from ._offline_writer import (
-    VinOfflineWriter,
-    VinOfflineWriterConfig,
-    flush_prepared_samples_to_shard,
-    prepare_vin_offline_sample,
-)
-from ._migration import (
-    migrate_legacy_offline_data,
-    scan_legacy_offline_data,
-    verify_migrated_offline_data,
-)
-from .cache_contracts import OracleRriCacheSample  # noqa: F401
-from .mesh_cache import MeshProcessSpec, ProcessedMesh, load_or_process_mesh
-from .offline_cache_coverage import (
-    CacheCoverageReport,
-    SceneCoverage,
-    compute_cache_coverage,
-    expand_tar_urls,
-    read_cache_index_entries,
-    scan_dataset_snippets,
-    scan_tar_sample_keys,
-    snippets_by_scene,
-)
-from .offline_cache_store import extract_snippet_token, read_oracle_cache_metadata
-from .oracle_cache import (
-    OracleRriCacheConfig,
-    OracleRriCacheDataset,
-    OracleRriCacheDatasetConfig,
-    OracleRriCacheVinDataset,
-    OracleRriCacheWriter,
-    OracleRriCacheWriterConfig,
-    rebuild_cache_index,
-    rebuild_oracle_cache_index,
-    repair_oracle_cache_indices,
-)
-from .vin_cache import (
-    VIN_SNIPPET_CACHE_VERSION,
-    VIN_SNIPPET_PAD_POINTS,
-    VinSnippetCacheConfig,
-    VinSnippetCacheDataset,
-    VinSnippetCacheDatasetConfig,
-    VinSnippetCacheWriter,
-    VinSnippetCacheWriterConfig,
-    read_vin_snippet_cache_metadata,
-    rebuild_vin_snippet_cache_index,
-    repair_vin_snippet_cache_index,
-)
-from .vin_oracle_datasets import (
-    VinDatasetSourceConfig,
-    VinOfflineSourceConfig,
-    VinOracleCacheDatasetConfig,
-    VinOracleDatasetConfig,
-)
+
+_LAZY_EXPORTS = {
+    "DEFAULT_VIN_SNIPPET_PAD_POINTS": "._vin_runtime",
+    "MeshProcessSpec": ".mesh_cache",
+    "OFFLINE_DATASET_VERSION": "._offline_store",
+    "ProcessedMesh": ".mesh_cache",
+    "VinDatasetSourceConfig": "._vin_sources",
+    "VinOfflineDataset": "._offline_dataset",
+    "VinOfflineDatasetConfig": "._offline_dataset",
+    "VinOfflineIndexRecord": "._offline_format",
+    "VinOfflineManifest": "._offline_format",
+    "VinOfflineMaterializedBlocks": "._offline_format",
+    "VinOfflineSample": "._offline_dataset",
+    "VinOfflineSourceConfig": "._vin_sources",
+    "VinOfflineStoreConfig": "._offline_store",
+    "VinOfflineWriter": "._offline_writer",
+    "VinOfflineWriterConfig": "._offline_writer",
+    "VinOnlineDatasetConfig": "._vin_runtime",
+    "VinOracleBatch": "._vin_runtime",
+    "VinOracleDatasetBase": ".vin_oracle_types",
+    "VinOracleOnlineDataset": "._vin_runtime",
+    "VinOracleOnlineDatasetConfig": "._vin_runtime",
+    "build_vin_snippet_view": "._vin_runtime",
+    "empty_vin_snippet": "._vin_runtime",
+    "flush_prepared_samples_to_shard": "._offline_writer",
+    "load_or_process_mesh": ".mesh_cache",
+    "migrate_legacy_offline_data": "._migration",
+    "prepare_vin_offline_sample": "._offline_writer",
+    "scan_legacy_offline_data": "._migration",
+    "verify_migrated_offline_data": "._migration",
+}
+
+
+def __getattr__(name: str) -> object:
+    """Lazily resolve non-raw exports to avoid package-root import cycles."""
+
+    module_name = _LAZY_EXPORTS.get(name)
+    if module_name is None:
+        msg = f"module {__name__!r} has no attribute {name!r}"
+        raise AttributeError(msg)
+    value = getattr(import_module(module_name, __name__), name)
+    globals()[name] = value
+    return value
+
 
 __all__ = [
     "AseEfmDataset",
     "AseEfmDatasetConfig",
-    "CacheCoverageReport",
     "DEFAULT_VIN_SNIPPET_PAD_POINTS",
     "EfmCameraView",
     "EfmGTView",
@@ -120,16 +89,7 @@ __all__ = [
     "EfmTrajectoryView",
     "MeshProcessSpec",
     "OFFLINE_DATASET_VERSION",
-    "OracleRriCacheConfig",
-    "OracleRriCacheDataset",
-    "OracleRriCacheDatasetConfig",
-    "OracleRriCacheVinDataset",
-    "OracleRriCacheWriter",
-    "OracleRriCacheWriterConfig",
     "ProcessedMesh",
-    "SceneCoverage",
-    "VIN_SNIPPET_CACHE_VERSION",
-    "VIN_SNIPPET_PAD_POINTS",
     "VinDatasetSourceConfig",
     "VinOfflineDataset",
     "VinOfflineDatasetConfig",
@@ -143,22 +103,12 @@ __all__ = [
     "VinOfflineWriterConfig",
     "VinOnlineDatasetConfig",
     "VinOracleBatch",
-    "VinOracleCacheDatasetConfig",
     "VinOracleDatasetBase",
-    "VinOracleDatasetConfig",
     "VinOracleOnlineDataset",
     "VinOracleOnlineDatasetConfig",
-    "VinSnippetCacheConfig",
-    "VinSnippetCacheDataset",
-    "VinSnippetCacheDatasetConfig",
-    "VinSnippetCacheWriter",
-    "VinSnippetCacheWriterConfig",
     "VinSnippetView",
     "build_vin_snippet_view",
-    "compute_cache_coverage",
     "empty_vin_snippet",
-    "expand_tar_urls",
-    "extract_snippet_token",
     "flush_prepared_samples_to_shard",
     "infer_semidense_bounds",
     "is_efm_snippet_view_instance",
@@ -166,17 +116,6 @@ __all__ = [
     "load_or_process_mesh",
     "migrate_legacy_offline_data",
     "prepare_vin_offline_sample",
-    "read_cache_index_entries",
-    "read_oracle_cache_metadata",
-    "read_vin_snippet_cache_metadata",
-    "rebuild_cache_index",
-    "rebuild_oracle_cache_index",
-    "rebuild_vin_snippet_cache_index",
-    "repair_oracle_cache_indices",
-    "repair_vin_snippet_cache_index",
-    "scan_dataset_snippets",
-    "scan_tar_sample_keys",
     "scan_legacy_offline_data",
-    "snippets_by_scene",
     "verify_migrated_offline_data",
 ]

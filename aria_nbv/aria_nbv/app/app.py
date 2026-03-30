@@ -12,7 +12,7 @@ import streamlit as st
 from aria_nbv.app.panels.optuna_sweep import render_optuna_sweep_page
 
 from ..configs import PathConfig
-from ..data_handling import OracleRriCacheConfig, OracleRriCacheDatasetConfig
+from ..data_handling._legacy_cache_api import OracleRriCacheConfig, OracleRriCacheDatasetConfig
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..utils import Console, Verbosity
 from .config import NbvStreamlitAppConfig
@@ -56,6 +56,8 @@ def _candidate_cfg_from_cache(labeler_payload: dict[str, Any] | None) -> Candida
 def _load_offline_cache_dataset(
     cache_cfg: OracleRriCacheDatasetConfig,
 ) -> tuple[Any | None, int, str | None]:
+    # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: Streamlit adapter
+    # for the legacy oracle-cache reader.
     cfg_sig = config_signature(cache_cfg)
     cache_state = st.session_state.setdefault("cand_offline_cache", {})
     cache_ds = cache_state.get("cache_ds")
@@ -176,6 +178,8 @@ class NbvStreamlitApp:
                 index=0,
                 key="cand_data_source",
             )
+            # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: the "offline
+            # cache" branch is the legacy oracle-cache UI path.
             use_offline_cache = data_source == "offline cache"
 
             cand_cfg_prev = state.labeler_cfg.generator

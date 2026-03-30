@@ -19,16 +19,16 @@ from pydantic._internal._utils import deep_update
 from pydantic_settings import SettingsConfigDict
 
 from aria_nbv.configs import PathConfig
-from aria_nbv.data_handling import (
+from aria_nbv.data_handling._legacy_cache_api import (
     OracleRriCacheConfig,
     OracleRriCacheDataset,
     OracleRriCacheDatasetConfig,
     OracleRriCacheWriter,
     OracleRriCacheWriterConfig,
-    VinOracleCacheDatasetConfig,
     VinSnippetCacheConfig,
     VinSnippetCacheWriterConfig,
 )
+from aria_nbv.data_handling._legacy_vin_source import VinOracleCacheDatasetConfig
 from aria_nbv.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from aria_nbv.rri_metrics import RriOrdinalBinner
 from aria_nbv.utils import BaseConfig, Console, Verbosity
@@ -376,6 +376,8 @@ def _iter_cached_rri(
     *,
     limit: int | None,
 ) -> tuple[OracleRriCacheDataset, Iterator[tuple[torch.Tensor, dict[str, str]]]]:
+    # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: helper for the
+    # legacy oracle-cache CLI flow.
     dataset_cfg = OracleRriCacheDatasetConfig(
         cache=cache_cfg,
         load_backbone=False,
@@ -483,6 +485,8 @@ def optuna_main() -> None:
 
 def cache_main(argv: list[str] | None = None) -> None:
     """Build an offline oracle cache from the configured dataset."""
+    # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: remove this CLI once
+    # operators write only immutable vin_offline stores.
 
     argv = list(sys.argv[1:] if argv is None else argv)
     paths = PathConfig()
@@ -530,6 +534,8 @@ def cache_main(argv: list[str] | None = None) -> None:
 
 def cache_vin_snippets_main(argv: list[str] | None = None) -> None:
     """Build a VIN snippet cache from the configured offline oracle cache."""
+    # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: remove this CLI once
+    # the legacy VIN snippet cache is no longer needed.
 
     argv = list(sys.argv[1:] if argv is None else argv)
     paths = PathConfig()

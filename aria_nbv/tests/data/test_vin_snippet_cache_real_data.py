@@ -1,4 +1,8 @@
-"""Integration test for VIN snippet cache on real data."""
+"""Integration test for VIN snippet cache on real data.
+
+NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION:
+Delete this test with the legacy VIN snippet cache runtime.
+"""
 
 from __future__ import annotations
 
@@ -7,12 +11,12 @@ from pathlib import Path
 
 import pytest
 
-from aria_nbv.data_handling import (
+from aria_nbv.data_handling._legacy_cache_api import (
+    OracleRriCacheConfig,
     VinSnippetCacheConfig,
     VinSnippetCacheDatasetConfig,
     VinSnippetCacheWriterConfig,
 )
-from aria_nbv.data_handling.oracle_cache import OracleRriCacheConfig
 
 
 def _skip_if_missing_real_cache(cache_dir: Path) -> None:

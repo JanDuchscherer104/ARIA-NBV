@@ -1,4 +1,8 @@
-"""Tests for skipping duplicates in offline cache generation."""
+"""Tests for skipping duplicates in offline cache generation.
+
+NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION:
+Delete this test with the legacy oracle-cache writer.
+"""
 
 from __future__ import annotations
 

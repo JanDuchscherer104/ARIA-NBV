@@ -1,4 +1,9 @@
-"""Offline cache statistics panel."""
+"""Offline cache statistics panel.
+
+NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION:
+This panel targets the legacy oracle/VIN cache layout. Remove or replace it
+when stats move to the immutable VIN offline store.
+"""
 
 from __future__ import annotations
 
@@ -15,9 +20,10 @@ import torch
 from ...configs import PathConfig
 from ...data_handling import (
     AseEfmDatasetConfig,
-    OracleRriCacheDatasetConfig,
-    VinOracleCacheDatasetConfig,
     VinOracleOnlineDatasetConfig,
+)
+from ...data_handling._legacy_cache_api import (
+    OracleRriCacheDatasetConfig,
     compute_cache_coverage,
     expand_tar_urls,
     extract_snippet_token,
@@ -28,6 +34,7 @@ from ...data_handling import (
     scan_dataset_snippets,
     snippets_by_scene,
 )
+from ...data_handling._legacy_vin_source import VinOracleCacheDatasetConfig
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...pose_generation.plotting import plot_position_polar
 from ...rri_metrics.plotting import _histogram_overlay, _plot_hist_counts_mpl

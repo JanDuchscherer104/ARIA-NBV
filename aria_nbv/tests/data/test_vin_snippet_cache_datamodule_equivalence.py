@@ -1,5 +1,8 @@
 """Integration tests comparing OfflineCache vs VinSnippetCache via VinDataModule.
 
+NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION:
+Delete this test with the legacy oracle/VIN cache runtime.
+
 We exercise both code paths *through VinDataModule*:
 - Offline oracle cache + on-demand EFM snippet load → VinSnippetView
   (built at read time)
@@ -19,15 +22,17 @@ import torch
 
 from aria_nbv.configs import PathConfig
 from aria_nbv.data_handling import (
+    VinOracleBatch,
+    VinSnippetView,
+)
+from aria_nbv.data_handling._legacy_cache_api import (
     VIN_SNIPPET_PAD_POINTS,
     OracleRriCacheConfig,
     OracleRriCacheDatasetConfig,
-    VinOracleBatch,
-    VinOracleCacheDatasetConfig,
     VinSnippetCacheConfig,
     VinSnippetCacheWriterConfig,
-    VinSnippetView,
 )
+from aria_nbv.data_handling._legacy_vin_source import VinOracleCacheDatasetConfig
 from aria_nbv.lightning.lit_datamodule import VinDataModuleConfig
 from aria_nbv.utils import Verbosity
 

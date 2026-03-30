@@ -1,4 +1,8 @@
-"""Tests for train/val index splitting in the offline cache dataset."""
+"""Tests for train/val index splitting in the offline cache dataset.
+
+NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION:
+Delete this test with the legacy oracle-cache runtime.
+"""
 
 from __future__ import annotations
 
@@ -8,13 +12,13 @@ from pathlib import Path
 
 import pytest
 
-from aria_nbv.data_handling import (
+from aria_nbv.data_handling._legacy_cache_api import (
     OracleRriCacheConfig,
     OracleRriCacheDatasetConfig,
-    VinOracleCacheDatasetConfig,
     rebuild_cache_index,
     repair_oracle_cache_indices,
 )
+from aria_nbv.data_handling._legacy_vin_source import VinOracleCacheDatasetConfig
 from aria_nbv.lightning.lit_datamodule import VinDataModule, VinDataModuleConfig
 from aria_nbv.utils import Stage
 

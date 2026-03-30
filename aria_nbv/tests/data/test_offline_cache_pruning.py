@@ -1,4 +1,8 @@
-"""Tests for pruned offline cache loading in vin_batch mode."""
+"""Tests for pruned offline cache loading in vin_batch mode.
+
+NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION:
+Delete this test with the legacy oracle-cache runtime.
+"""
 
 from __future__ import annotations
 

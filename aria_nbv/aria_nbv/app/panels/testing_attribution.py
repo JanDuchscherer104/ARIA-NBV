@@ -12,7 +12,7 @@ from torch import nn
 from torch.nn import functional as functional
 
 from ...configs import PathConfig
-from ...data_handling import OracleRriCacheConfig, OracleRriCacheDatasetConfig
+from ...data_handling._legacy_cache_api import OracleRriCacheConfig, OracleRriCacheDatasetConfig
 from ...interpretability.attribution import (
     AttributionEngine,
     AttributionMethod,
@@ -196,6 +196,8 @@ def render_testing_attribution_page() -> None:
         index=0,
         key="vin_attr_source",
     )
+    # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: attribution support
+    # for legacy oracle-cache samples.
 
     cache_root = paths.offline_cache_dir or (paths.data_root / "oracle_rri_cache")
     cache_dir = ""

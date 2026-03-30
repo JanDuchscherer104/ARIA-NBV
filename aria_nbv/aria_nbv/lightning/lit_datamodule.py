@@ -22,13 +22,14 @@ from ..data_handling import (
     AseEfmDatasetConfig,
     VinOracleBatch,
     VinOracleDatasetBase,
-    VinOracleDatasetConfig,
     VinOracleOnlineDatasetConfig,
 )
+from ..data_handling._legacy_cache_api import OracleRriCacheDatasetConfig
+from ..data_handling._legacy_vin_source import LegacyVinDatasetSourceConfig
 from ..utils import BaseConfig, Console, Stage, Verbosity
 
 
-def _default_source() -> VinOracleDatasetConfig:
+def _default_source() -> LegacyVinDatasetSourceConfig:
     return VinOracleOnlineDatasetConfig(
         dataset=AseEfmDatasetConfig(
             load_meshes=True,
@@ -41,7 +42,7 @@ def _default_source() -> VinOracleDatasetConfig:
     )
 
 
-class VinDataModuleConfig(BaseConfig["VinDataModule"]):
+class VinDataModuleConfig(BaseConfig):
     """Configuration for :class:`VinDataModule`."""
 
     @property
@@ -51,8 +52,8 @@ class VinDataModuleConfig(BaseConfig["VinDataModule"]):
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver."""
 
-    source: VinOracleDatasetConfig = Field(default_factory=_default_source)
-    """Config-as-factory dataset source (split-aware)."""
+    source: LegacyVinDatasetSourceConfig = Field(default_factory=_default_source)
+    """Config-as-factory dataset source, including the temporary legacy cache branch."""
 
     shuffle: bool = True
     """Whether to shuffle the train dataset at each epoch (only applies to offline caches)."""
@@ -252,11 +253,7 @@ class VinDataModule(pl.LightningDataModule):
         return iter(plan.dataset)
 
     def _describe_dataset(self, dataset: VinOracleDatasetBase, *, stage: Stage) -> dict[str, object]:
-        from ..data_handling import (
-            OracleRriCacheDatasetConfig,
-            VinOfflineDatasetConfig,
-            VinOracleOnlineDataset,
-        )
+        from ..data_handling import VinOfflineDatasetConfig, VinOracleOnlineDataset
 
         summary: dict[str, object] = {
             "stage": stage.value,
@@ -265,6 +262,8 @@ class VinDataModule(pl.LightningDataModule):
 
         cfg = getattr(dataset, "config", None)
         if isinstance(cfg, OracleRriCacheDatasetConfig):
+            # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: legacy cache
+            # summary branch for datamodule introspection.
             summary.update(
                 {
                     "cache_dir": str(cfg.cache.cache_dir),

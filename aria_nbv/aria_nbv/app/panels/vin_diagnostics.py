@@ -11,9 +11,11 @@ import torch
 from ...configs import PathConfig
 from ...data_handling import (
     VinOracleBatch,
+    empty_vin_snippet,
+)
+from ...data_handling._legacy_cache_api import (
     VinSnippetCacheConfig,
     VinSnippetCacheDatasetConfig,
-    empty_vin_snippet,
     read_vin_snippet_cache_metadata,
 )
 from ...utils import Stage
@@ -84,6 +86,8 @@ def render_vin_diagnostics_page() -> None:
             options=["offline cache", "online (oracle labeler)"],
             index=0,
         )
+        # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: diagnostics UI
+        # for the legacy oracle/VIN cache path.
         use_offline_cache = data_source == "offline cache"
         cache_dir = None
         if use_offline_cache:

@@ -1,4 +1,9 @@
-"""Tests for the v2 cache/data pipeline under ``aria_nbv.data_handling``."""
+"""Tests for the v2 cache/data pipeline under ``aria_nbv.data_handling``.
+
+NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION:
+Delete the legacy-cache portions of this test module once the immutable store
+fully replaces the oracle/VIN cache path.
+"""
 
 from __future__ import annotations
 
@@ -27,19 +32,21 @@ from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import
 
 from aria_nbv.data_handling import (
     EfmSnippetView,
-    OracleRriCacheConfig,
-    OracleRriCacheDatasetConfig,
     VinOracleBatch,
-    VinOracleCacheDatasetConfig,
-    VinSnippetCacheConfig,
-    VinSnippetCacheWriterConfig,
     VinSnippetView,
     build_vin_snippet_view,
+)
+from aria_nbv.data_handling._legacy_cache_api import (
+    OracleRriCacheConfig,
+    OracleRriCacheDatasetConfig,
+    VinSnippetCacheConfig,
+    VinSnippetCacheWriterConfig,
     read_vin_snippet_cache_metadata,
     rebuild_oracle_cache_index,
     rebuild_vin_snippet_cache_index,
     repair_oracle_cache_indices,
 )
+from aria_nbv.data_handling._legacy_vin_source import VinOracleCacheDatasetConfig
 from aria_nbv.lightning.lit_datamodule import VinDataModuleConfig
 from aria_nbv.rendering.candidate_depth_renderer import CandidateDepths
 from aria_nbv.rri_metrics.types import RriResult

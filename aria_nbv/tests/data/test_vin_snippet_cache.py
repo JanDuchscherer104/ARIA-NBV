@@ -1,4 +1,8 @@
-"""Tests for VIN snippet cache integration."""
+"""Tests for VIN snippet cache integration.
+
+NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION:
+Delete this test with the legacy VIN snippet cache runtime.
+"""
 
 from __future__ import annotations
 

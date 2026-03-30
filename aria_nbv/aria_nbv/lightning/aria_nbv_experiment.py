@@ -25,7 +25,8 @@ import torch
 from pydantic import Field, field_validator, model_validator
 
 from ..configs import OptunaConfig, PathConfig
-from ..data_handling import OracleRriCacheConfig, OracleRriCacheDatasetConfig
+from ..data_handling._legacy_cache_api import OracleRriCacheConfig, OracleRriCacheDatasetConfig
+from ..data_handling._legacy_vin_source import VinOracleCacheDatasetConfig
 from ..utils import BaseConfig, Console, Stage
 from ..utils.console import Verbosity
 from .lit_datamodule import VinDataModule, VinDataModuleConfig
@@ -565,8 +566,8 @@ class AriaNBVExperimentConfig(BaseConfig):
         console: Console,
     ) -> None:
         """Enable offline cache for summary runs when available."""
-        from ..data_handling import VinOracleCacheDatasetConfig
-
+        # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: summary fallback
+        # for the legacy oracle cache. Delete once summaries read vin_offline.
         if isinstance(self.datamodule_config.source, VinOracleCacheDatasetConfig):
             return
 

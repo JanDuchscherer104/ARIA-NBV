@@ -25,6 +25,8 @@ The current stack has three main layers: ASE and EFM-facing data access, oracle 
 - The default Codex bootstrap is `docs/typst/paper/main.typ` + `.agents/memory/state/` + the compact `docs/_generated/context/source_index.md`, with broader references retrieved on demand.
 - Treat `make context-contracts` / `scripts/nbv_get_context.sh contracts` as the preferred contract surface; heavy generated artifacts are fallback-only.
 - Treat `aria_nbv.data_handling` as the canonical owner of raw snippet, oracle-cache, VIN-cache, and cache-coverage contracts, and `aria_nbv.utils.data_plotting` as the canonical owner of shared snippet plotting; mirrored `aria_nbv.data` compatibility modules were removed.
+- Remaining legacy oracle-cache / VIN-snippet-cache runtime, UI, CLI, and dedicated test surfaces are tagged with `NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION` so the final removal sweep can be done via one grep query.
+- The `aria_nbv.data_handling` package root is now canonical-only; remaining legacy cache APIs live behind dedicated `_legacy_cache_api.py` and `_legacy_vin_source.py` modules, while the old public submodule names (`oracle_cache.py`, `vin_cache.py`, `vin_oracle_datasets.py`, etc.) are thin compatibility wrappers over those `_legacy_*` owners.
 
 ## Active Experiments
 The project is actively iterating on VIN variants, semidense projection cues, candidate generation behavior, and documentation alignment between code, paper, and slides.

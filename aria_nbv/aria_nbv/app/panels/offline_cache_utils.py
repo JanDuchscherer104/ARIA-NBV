@@ -1,4 +1,9 @@
-"""Offline cache helpers for panels."""
+"""Offline cache helpers for panels.
+
+NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION:
+This panel-helper module exists for the legacy oracle/VIN cache UI path.
+Remove it once diagnostics switch to the immutable VIN offline store.
+"""
 
 from __future__ import annotations
 
@@ -15,14 +20,16 @@ from ...configs import PathConfig
 from ...data_handling import (
     AseEfmDatasetConfig,
     EfmSnippetView,
+)
+from ...data_handling._legacy_cache_api import (
     OracleRriCacheConfig,
     OracleRriCacheDataset,
     OracleRriCacheDatasetConfig,
-    VinOracleCacheDatasetConfig,
     VinSnippetCacheConfig,
     VinSnippetCacheDatasetConfig,
     read_cache_index_entries,
 )
+from ...data_handling._legacy_vin_source import VinOracleCacheDatasetConfig
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...utils import Stage
 from ..state_types import config_signature

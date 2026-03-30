@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -34,19 +35,68 @@ def test_public_api_omits_internal_helper_exports() -> None:
         "vin_snippet_cache_config_hash",
         "LegacyOfflinePlan",
         "LegacyOfflineRecord",
+        "OracleRriCacheConfig",
+        "OracleRriCacheDataset",
+        "OracleRriCacheDatasetConfig",
+        "OracleRriCacheVinDataset",
+        "OracleRriCacheWriter",
+        "OracleRriCacheWriterConfig",
+        "VinOracleDatasetConfig",
         "prepare_legacy_records",
         "finalize_migrated_store",
+        "VinOracleCacheDatasetConfig",
+        "VIN_SNIPPET_CACHE_VERSION",
+        "VIN_SNIPPET_PAD_POINTS",
+        "VinSnippetCacheConfig",
+        "VinSnippetCacheDataset",
+        "VinSnippetCacheDatasetConfig",
+        "VinSnippetCacheWriter",
+        "VinSnippetCacheWriterConfig",
+        "compute_cache_coverage",
+        "expand_tar_urls",
+        "extract_snippet_token",
+        "read_cache_index_entries",
+        "read_oracle_cache_metadata",
+        "read_vin_snippet_cache_metadata",
+        "rebuild_cache_index",
+        "rebuild_oracle_cache_index",
+        "rebuild_vin_snippet_cache_index",
+        "repair_oracle_cache_indices",
+        "repair_vin_snippet_cache_index",
+        "scan_dataset_snippets",
+        "scan_tar_sample_keys",
+        "snippets_by_scene",
     }
     assert not (unexpected & set(module.__all__))  # noqa: S101
+
+
+def test_public_api_omits_legacy_vin_oracle_dataset_alias() -> None:
+    """Keep the ambiguous legacy source alias off the canonical package root."""
+
+    module = importlib.import_module("aria_nbv.data_handling")
+    assert not hasattr(module, "VinOracleDatasetConfig")  # noqa: S101
+
+
+def test_pyproject_retains_legacy_cache_entrypoint_until_cutover() -> None:
+    """The legacy cache CLI should stay wired until the offline cutover is complete."""
+
+    pyproject_path = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    payload = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    scripts = payload["project"]["scripts"]
+    assert scripts["nbv-cache-samples"] == "aria_nbv.lightning.cli:cache_main"  # noqa: S101
 
 
 def test_runtime_modules_do_not_import_data_handling_submodules() -> None:
     """Keep direct ``data_handling`` submodule imports tightly constrained."""
 
     package_root = Path(__file__).resolve().parents[2] / "aria_nbv"
-    allowlist = {
-        "vin/model_v3.py",
+    allowed_modules = {
+        "aria_nbv.data_handling._legacy_cache_api",
+        "aria_nbv.data_handling._legacy_vin_source",
+        "data_handling._legacy_cache_api",
+        "data_handling._legacy_vin_source",
     }
+    allowlist = {"vin/model_v3.py"}
     offenders: list[str] = []
     for path in package_root.rglob("*.py"):
         if "data_handling" in path.parts:
@@ -57,8 +107,13 @@ def test_runtime_modules_do_not_import_data_handling_submodules() -> None:
             if isinstance(node, ast.Import):
                 if any(alias.name.startswith("aria_nbv.data_handling.") for alias in node.names):
                     rel = rel_path.as_posix()
-                    if rel not in allowlist:
-                        offenders.append(rel)
+                    bad = [
+                        alias.name
+                        for alias in node.names
+                        if alias.name.startswith("aria_nbv.data_handling.") and alias.name not in allowed_modules
+                    ]
+                    if rel not in allowlist and bad:
+                        offenders.append(f"{rel}: {', '.join(bad)}")
                     break
             if isinstance(node, ast.ImportFrom):
                 module = node.module or ""
@@ -68,8 +123,8 @@ def test_runtime_modules_do_not_import_data_handling_submodules() -> None:
                     or (node.level > 0 and module.startswith("data_handling."))
                 ):
                     rel = rel_path.as_posix()
-                    if rel not in allowlist:
-                        offenders.append(rel)
+                    if rel not in allowlist and module not in allowed_modules:
+                        offenders.append(f"{rel}: {module}")
                     break
     assert not offenders  # noqa: S101
 

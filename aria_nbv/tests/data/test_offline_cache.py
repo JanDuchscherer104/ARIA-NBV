@@ -1,4 +1,8 @@
-"""Integration test for oracle cache round-trip on real data."""
+"""Integration test for oracle cache round-trip on real data.
+
+NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION:
+Delete this test with the legacy oracle-cache runtime.
+"""
 
 from __future__ import annotations
 

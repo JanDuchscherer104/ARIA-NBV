@@ -11,14 +11,16 @@ import torch
 from ...configs import PathConfig
 from ...data_handling import (
     EfmSnippetView,
-    OracleRriCacheConfig,
-    OracleRriCacheDatasetConfig,
-    OracleRriCacheSample,
     VinOracleBatch,
-    VinOracleCacheDatasetConfig,
     VinOracleOnlineDatasetConfig,
     VinSnippetView,
 )
+from ...data_handling._legacy_cache_api import (
+    OracleRriCacheConfig,
+    OracleRriCacheDatasetConfig,
+    OracleRriCacheSample,
+)
+from ...data_handling._legacy_vin_source import VinOracleCacheDatasetConfig
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...lightning.lit_module import VinLightningModule, VinLightningModuleConfig
 from ...rri_metrics.rri_binning import RriOrdinalBinner
@@ -62,6 +64,8 @@ def _build_experiment_config(
     cfg.trainer_config.use_wandb = False
 
     if use_offline_cache:
+        # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: diagnostics
+        # branch that swaps the datamodule to the legacy oracle cache.
         keep_fields: list[str] | None = None
         source_cfg = getattr(cfg.datamodule_config, "source", None)
         if isinstance(source_cfg, VinOracleCacheDatasetConfig):
