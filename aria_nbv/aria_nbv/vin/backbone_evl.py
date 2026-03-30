@@ -35,7 +35,7 @@ def _target_cls() -> type["EvlBackbone"]:
     return EvlBackbone
 
 
-class EvlBackboneConfig(BaseConfig["EvlBackbone"]):
+class EvlBackboneConfig(BaseConfig):
     """Configuration for :class:`EvlBackbone`."""
 
     @property

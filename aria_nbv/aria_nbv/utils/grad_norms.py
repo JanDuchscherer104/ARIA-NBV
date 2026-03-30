@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import Field, field_validator
 from torch import nn
 
-from .base_config import BaseConfig, NoTarget
+from .base_config import BaseConfig
 
 GradNormType = Literal["L1", "L2", "Linf"]
 
@@ -80,7 +80,7 @@ def _collect_grad_norm_targets(
     return [(name, targets[name]) for name in names]
 
 
-class GradNormLoggingConfig(BaseConfig[NoTarget]):
+class GradNormLoggingConfig(BaseConfig):
     """Configuration for gradient norm logging."""
 
     enabled: bool = True

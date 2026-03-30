@@ -162,7 +162,7 @@ class ShellShPoseEncoder(nn.Module):
         return torch.cat(parts, dim=-1)
 
 
-class ShellShPoseEncoderConfig(BaseConfig[ShellShPoseEncoder]):
+class ShellShPoseEncoderConfig(BaseConfig):
     """Config-as-factory wrapper for :class:`ShellShPoseEncoder`."""
 
     @property

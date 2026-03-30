@@ -47,7 +47,7 @@ from .types import (
 )
 
 
-class CandidateViewGeneratorConfig(BaseConfig["CandidateViewGenerator"]):
+class CandidateViewGeneratorConfig(BaseConfig):
     """Configuration for sampling and pruning candidate camera poses around a reference frame.
 
     Encapsulates the radii/angle sampling envelope, orientation jitter options, collision and free-space

@@ -58,7 +58,7 @@ class FourierFeatures(nn.Module):
         return torch.cat([x, fourier], dim=-1)
 
 
-class FourierFeaturesConfig(BaseConfig[FourierFeatures]):
+class FourierFeaturesConfig(BaseConfig):
     """Config-as-factory wrapper for :class:`FourierFeatures`."""
 
     @property

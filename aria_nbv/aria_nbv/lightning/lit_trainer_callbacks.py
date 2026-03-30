@@ -46,7 +46,7 @@ class CustomRichProgressBar(RichProgressBar):
         return items
 
 
-class TrainerCallbacksConfig(BaseConfig[list]):
+class TrainerCallbacksConfig(BaseConfig):
     """Configuration for standard trainer callbacks."""
 
     @property

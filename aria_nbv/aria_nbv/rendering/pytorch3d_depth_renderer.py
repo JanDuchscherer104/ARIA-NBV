@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from efm3d.aria import CameraTW, PoseTW
 
 
-class Pytorch3DDepthRendererConfig(BaseConfig["Pytorch3DDepthRenderer"]):
+class Pytorch3DDepthRendererConfig(BaseConfig):
     """Configuration for :class:`Pytorch3DDepthRenderer`."""
 
     @property

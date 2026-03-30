@@ -30,7 +30,7 @@ class TrajectoryEncodingOutput:
     """``Tensor["B E", float32]`` pooled trajectory embedding (or None)."""
 
 
-class TrajectoryEncoderConfig(BaseConfig["TrajectoryEncoder"]):
+class TrajectoryEncoderConfig(BaseConfig):
     """Configuration for :class:`TrajectoryEncoder`."""
 
     @property
@@ -97,7 +97,7 @@ class TrajectoryEncoder(nn.Module):
         """Encode a trajectory's world←rig poses.
 
         Args:
-            trajectory: :class:`~aria_nbv.data.efm_views.EfmTrajectoryView`.
+            trajectory: :class:`~aria_nbv.data_handling.efm_views.EfmTrajectoryView`.
 
         Returns:
             TrajectoryEncodingOutput with per-frame encodings and pooled embedding.

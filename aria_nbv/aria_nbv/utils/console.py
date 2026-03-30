@@ -161,6 +161,11 @@ class Console(RichConsole):
         parts = (module_name, frame_info.function, *extra_parts)
         return cls().set_prefix(*parts)
 
+    @classmethod
+    def from_callsite(cls, *parts: str, stack_offset: int = 0) -> "Console":
+        """Compatibility constructor mirroring the PRML VSLAM console API."""
+        return cls.with_caller_prefix(*parts, stack_depth=stack_offset + 1)
+
     def set_prefix(self, *parts: str) -> "Console":
         """Set a custom prefix for all log messages.
 

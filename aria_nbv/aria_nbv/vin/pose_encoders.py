@@ -110,7 +110,7 @@ class R6dLffPoseEncoder(PoseEncoder):
         return PoseEncodingOutput(center_m=center_m, pose_vec=pose_vec, pose_enc=pose_enc)
 
 
-class R6dLffPoseEncoderConfig(BaseConfig[R6dLffPoseEncoder]):
+class R6dLffPoseEncoderConfig(BaseConfig):
     """Config for :class:`R6dLffPoseEncoder`."""
 
     @property

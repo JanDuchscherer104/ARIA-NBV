@@ -2,7 +2,7 @@ import tomllib
 from enum import Enum
 from pathlib import Path
 from threading import Lock
-from typing import Any, ClassVar, ForwardRef, Generic, Self, TypeVar
+from typing import Any, ClassVar, ForwardRef, Self
 
 import tomli_w
 import torch
@@ -19,16 +19,8 @@ from rich.tree import Tree
 
 from .console import Console
 
-TargetType = TypeVar("TargetType")
 
-
-class NoTarget:
-    @staticmethod
-    def setup_target(config: "BaseConfig", **kwargs: Any) -> None:
-        return None
-
-
-class BaseConfig(BaseSettings, Generic[TargetType]):
+class BaseConfig(BaseSettings):
     cache_exclude_fields: ClassVar[set[str]] = set()
     """Field names to exclude from cache snapshots."""
 
@@ -36,12 +28,29 @@ class BaseConfig(BaseSettings, Generic[TargetType]):
     """json_schema_extra key for marking fields excluded from cache snapshots."""
 
     @property
-    def target(self) -> Any:
-        """Callable target used by `setup_target`.
+    def target(self) -> type[Any] | None:
+        """Callable target used by `setup_target`. Type of the runtime object or factory method to prodcuce it.
 
-        Defaults to ``NoTarget``; subclasses should override as a property.
+        Defaults to ``None``; subclasses should override as a property or field.
         """
-        return NoTarget
+        return None
+
+    def setup_target(self, **kwargs: Any) -> Any | None:
+        """Instantiate or return the target object for this config, if applicable.
+        Prioritizes a 'setup_target' method on the target itself and falls back to calling the init method."""
+        if (target := self.target) is None:
+            return None
+        factory = getattr(target, "setup_target", target)
+
+        if not callable(factory):
+            msg = (
+                f"Target '{target}' of type {factory.__class__.__name__} is not callable / does not have a "
+                "'setup_target' or '__init__' method."
+            )
+            Console.from_callsite(stack_offset=1).error(msg)
+            raise ValueError(msg)
+
+        return factory(self, **kwargs)  # type: ignore[return-value]
 
     model_config = SettingsConfigDict(
         arbitrary_types_allowed=True,
@@ -55,6 +64,10 @@ class BaseConfig(BaseSettings, Generic[TargetType]):
 
     _propagated_fields: dict[str, Any] = PrivateAttr(default_factory=dict)
 
+    def __class_getitem__(cls, _item: Any) -> type["BaseConfig"]:
+        """Keep legacy ``BaseConfig[T]`` subclass declarations working."""
+        return cls
+
     @property
     def propagated_fields(self) -> dict[str, Any]:
         """Track which fields were propagated from a parent config."""
@@ -67,20 +80,6 @@ class BaseConfig(BaseSettings, Generic[TargetType]):
         if value is None or str(value).lower() == "auto":
             return torch.device("cuda" if torch.cuda.is_available() else "cpu")
         return torch.device(value)
-
-    def setup_target(self, **kwargs: Any) -> TargetType:
-        target = getattr(self, "target", NoTarget)
-        factory = getattr(target, "setup_target", target)
-
-        if not callable(factory):
-            Console().print(
-                f"Target '[bold yellow]{target}[/bold yellow]' of type [bold yellow]{factory.__class__.__name__}[/bold yellow] is not callable."
-            )
-            raise ValueError(
-                f"Target '{target}' of type {factory.__class__.__name__} is not callable / does not have a 'setup_target' or '__init__' method."
-            )
-
-        return factory(self, **kwargs)  # type: ignore[return-value]
 
     @classmethod
     def settings_customise_sources(

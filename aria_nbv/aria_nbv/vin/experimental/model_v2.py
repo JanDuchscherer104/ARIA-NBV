@@ -122,7 +122,7 @@ SEMIDENSE_FRUSTUM_TOKEN_FEATURES: tuple[str, ...] = (
 SEMIDENSE_FRUSTUM_TOKEN_DIM = len(SEMIDENSE_FRUSTUM_TOKEN_FEATURES)
 
 
-class VinModelV2Config(BaseConfig["VinModelV2"]):
+class VinModelV2Config(BaseConfig):
     """Configuration for :class:`VinModelV2` (minimal, configurable)."""
 
     @property

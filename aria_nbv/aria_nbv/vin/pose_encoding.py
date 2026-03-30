@@ -74,7 +74,7 @@ class LearnableFourierFeatures(nn.Module):
         return torch.cat([x, enc], dim=-1)
 
 
-class LearnableFourierFeaturesConfig(BaseConfig[LearnableFourierFeatures]):
+class LearnableFourierFeaturesConfig(BaseConfig):
     """Config-as-factory wrapper for :class:`LearnableFourierFeatures`."""
 
     @property

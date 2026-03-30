@@ -23,6 +23,7 @@ from .pytorch3d_depth_renderer import (
 )
 
 
+# TODO: Wouldn't it make sense to derive all of these dataclasses from a common base data class?
 @dataclass(slots=True)
 class CandidateDepths:
     """Typed result for candidate depth rendering."""
@@ -73,7 +74,7 @@ class CandidateDepths:
         return from_serializable(cls, payload, device=device)
 
 
-class CandidateDepthRendererConfig(BaseConfig["CandidateDepthRenderer"]):
+class CandidateDepthRendererConfig(BaseConfig):
     @property
     def target(self) -> type["CandidateDepthRenderer"]:
         return CandidateDepthRenderer

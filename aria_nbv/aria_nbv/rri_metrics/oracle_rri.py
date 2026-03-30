@@ -23,7 +23,7 @@ from .metrics import chamfer_point_mesh, chamfer_point_mesh_batched
 from .types import RriResult
 
 
-class OracleRRIConfig(BaseConfig["OracleRRI"]):
+class OracleRRIConfig(BaseConfig):
     """Config-as-factory wrapper for oracle RRI computation."""
 
     @property

@@ -325,7 +325,7 @@ class AttributionResult:
     target: Tensor | int | None
 
 
-class InterpretabilityConfig(BaseConfig["AttributionEngine"]):
+class InterpretabilityConfig(BaseConfig):
     """Factory config that builds an :class:`AttributionEngine`."""
 
     @property

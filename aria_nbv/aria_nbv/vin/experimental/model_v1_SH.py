@@ -504,7 +504,7 @@ class VinScorerHead(nn.Module):
         return self.coral(self.mlp(x))
 
 
-class VinScorerHeadConfig(BaseConfig[VinScorerHead]):
+class VinScorerHeadConfig(BaseConfig):
     """Configuration for :class:`VinScorerHead`.
 
     The head is a shallow MLP followed by a CORAL layer. The MLP produces a
@@ -537,7 +537,7 @@ class VinScorerHeadConfig(BaseConfig[VinScorerHead]):
         return self.target(self, in_dim=in_dim)
 
 
-class VinModelConfig(BaseConfig["VinModel"]):
+class VinModelConfig(BaseConfig):
     """Configuration for :class:`VinModel`.
 
     This config collects all architectural choices that determine how VIN

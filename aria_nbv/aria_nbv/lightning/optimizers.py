@@ -11,7 +11,7 @@ from torch.optim.lr_scheduler import OneCycleLR, ReduceLROnPlateau
 from ..utils import BaseConfig, Optimizable, optimizable_field
 
 
-class AdamWConfig(BaseConfig[Optimizer]):
+class AdamWConfig(BaseConfig):
     """AdamW optimizer configuration for VIN."""
 
     @property
@@ -50,7 +50,7 @@ class AdamWConfig(BaseConfig[Optimizer]):
         )
 
 
-class ReduceLrOnPlateauConfig(BaseConfig[ReduceLROnPlateau]):
+class ReduceLrOnPlateauConfig(BaseConfig):
     """ReduceLROnPlateau scheduler configuration."""
 
     @property
@@ -133,7 +133,7 @@ class ReduceLrOnPlateauConfig(BaseConfig[ReduceLROnPlateau]):
         }
 
 
-class OneCycleSchedulerConfig(BaseConfig[OneCycleLR]):
+class OneCycleSchedulerConfig(BaseConfig):
     """OneCycle learning-rate scheduler configuration."""
 
     @property

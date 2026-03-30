@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from trimesh import Trimesh
 
 
-class Efm3dDepthRendererConfig(BaseConfig["Efm3dDepthRenderer"]):
+class Efm3dDepthRendererConfig(BaseConfig):
     """Configuration for :class:`Efm3dDepthRenderer`."""
 
     @property

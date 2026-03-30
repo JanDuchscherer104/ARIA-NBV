@@ -23,7 +23,7 @@ from .download_stats import compute_downloaded_atek_stats
 from .metadata import ASEMetadata, SceneMetadata
 
 
-class ASEDownloaderConfig(BaseConfig["ASEDownloader"]):
+class ASEDownloaderConfig(BaseConfig):
     """Configuration for ASE downloader with CLI support.
 
     Supports two CLI modes (explicitly selected via positional `mode`):

@@ -1,6 +1,6 @@
 """Lightning-adjacent utilities for Document Classifier."""
 
-from .base_config import BaseConfig, NoTarget, SingletonConfig
+from .base_config import BaseConfig, SingletonConfig
 from .console import Console, Verbosity
 from .frames import rotate_yaw_cw90
 from .optuna_optimizable import Optimizable, optimizable_field
@@ -14,7 +14,6 @@ __all__ = [
     "Optimizable",
     "Stage",
     "Verbosity",
-    "NoTarget",
     "SingletonConfig",
     "optimizable_field",
     "rich_summary",

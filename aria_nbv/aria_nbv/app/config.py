@@ -20,7 +20,7 @@ def _target_cls():
     return NbvStreamlitApp
 
 
-class NbvStreamlitAppConfig(BaseConfig["NbvStreamlitApp"]):
+class NbvStreamlitAppConfig(BaseConfig):
     """Top-level config for the refactored Streamlit app."""
 
     @property

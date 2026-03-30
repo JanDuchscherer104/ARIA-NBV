@@ -117,7 +117,7 @@ class ShellLffPoseEncoder(PoseEncoder):
         )
 
 
-class ShellLffPoseEncoderConfig(BaseConfig[ShellLffPoseEncoder]):
+class ShellLffPoseEncoderConfig(BaseConfig):
     """Config for :class:`ShellLffPoseEncoder`."""
 
     @property
@@ -145,7 +145,7 @@ class ShellLffPoseEncoderConfig(BaseConfig[ShellLffPoseEncoder]):
         return value
 
 
-class ShellShPoseEncoderAdapterConfig(BaseConfig[ShellShPoseEncoderAdapter]):
+class ShellShPoseEncoderAdapterConfig(BaseConfig):
     """Config for :class:`ShellShPoseEncoderAdapter`."""
 
     @property

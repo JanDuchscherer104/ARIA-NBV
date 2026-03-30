@@ -55,7 +55,7 @@ def _load_checkpoint_strict(model: nn.Module, checkpoint_path: Path) -> None:
     model.load_state_dict(state, strict=True)
 
 
-class PointNeXtSEncoderConfig(BaseConfig["PointNeXtSEncoder"]):
+class PointNeXtSEncoderConfig(BaseConfig):
     """Configuration for the optional PointNeXt-S semidense encoder."""
 
     @property

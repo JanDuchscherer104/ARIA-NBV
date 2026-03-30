@@ -273,7 +273,7 @@ class VinMetrics(MetricBase):
         self.has_updates.fill_(False)
 
 
-class VinMetricsConfig(BaseConfig[VinMetrics]):
+class VinMetricsConfig(BaseConfig):
     """Configuration for VIN torchmetrics bundles."""
 
     @property
