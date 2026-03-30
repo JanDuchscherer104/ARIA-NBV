@@ -2,7 +2,7 @@ import torch
 import trimesh
 
 from aria_nbv.configs import PathConfig
-from aria_nbv.data.mesh_cache import MeshProcessSpec, load_or_process_mesh
+from aria_nbv.data_handling.mesh_cache import MeshProcessSpec, load_or_process_mesh
 from aria_nbv.utils import Console
 
 

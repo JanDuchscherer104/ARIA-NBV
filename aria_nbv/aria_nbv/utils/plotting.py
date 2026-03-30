@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import torch
 from matplotlib import colormaps
 
-from ..data.plotting import FrameGridBuilder
+from .data_plotting import FrameGridBuilder
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -18,6 +18,14 @@ import matplotlib.pyplot as plt
 
 def _to_numpy(tensor: torch.Tensor) -> np.ndarray:
     return tensor.detach().cpu().numpy()
+
+
+def _pretty_label(text: str) -> str:
+    """Format labels by replacing underscores and title-casing words."""
+
+    if not text:
+        return text
+    return text.replace("_", " ").title()
 
 
 def _scalar_to_rgb(
@@ -173,6 +181,7 @@ def _plot_hist_counts_mpl(
 __all__ = [
     "_histogram_overlay",
     "_plot_hist_counts_mpl",
+    "_pretty_label",
     "_plot_slice_grid",
     "_scalar_to_rgb",
     "_to_numpy",

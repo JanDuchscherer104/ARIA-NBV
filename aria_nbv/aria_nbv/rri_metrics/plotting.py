@@ -9,7 +9,7 @@ import plotly.graph_objects as go  # type: ignore[import-untyped]
 import torch
 from efm3d.aria import CameraTW, PoseTW
 
-from ..data import EfmSnippetView
+from ..data_handling import EfmSnippetView
 from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..rendering.plotting import RenderingPlotBuilder
 from ..utils.plotting import _histogram_overlay, _plot_hist_counts_mpl
@@ -195,6 +195,7 @@ def _as_list(values: Sequence[float] | torch.Tensor) -> list[float]:
     if isinstance(values, torch.Tensor):
         return values.detach().cpu().flatten().tolist()
     return [float(v) for v in values]
+
 
 __all__ = [
     "plot_pm_accuracy",

@@ -46,13 +46,13 @@ from ..utils.grad_norms import (
     _collect_grad_norm_targets,
     _grad_norm_from_params,
 )
-from ..vin import VinModelV3Config
 from ..vin.experimental.plotting import plot_vin_encodings_from_debug
+from ..vin.model_v3 import VinModelV3Config
 from ..vin.vin_utils import largest_divisor_leq
 from .optimizers import AdamWConfig, OneCycleSchedulerConfig, ReduceLrOnPlateauConfig
 
 
-class VinLightningModuleConfig(BaseConfig["VinLightningModule"]):
+class VinLightningModuleConfig(BaseConfig):
     """Configuration for :class:`VinLightningModule`."""
 
     @property
@@ -394,10 +394,9 @@ class VinLightningModule(pl.LightningModule):
             p3d_cameras=p3d_cameras,
             backbone_out=backbone_out,
         )
-        num_candidates = int(batch.candidate_poses_world_cam.shape[-2])
-        batch_dim = int(batch.candidate_poses_world_cam.shape[0]) if batch.candidate_poses_world_cam.ndim == 3 else 1
-        log_batch_size = max(batch_dim * num_candidates, 1)
         log_enabled = not getattr(self.trainer, "sanity_checking", False)
+        candidate_mask = batch.candidate_valid_mask(device=self.device).reshape(-1)
+        log_batch_size = max(int(candidate_mask.sum().item()), 1)
         logits = pred.logits
         if logits.ndim == 2:
             logits = logits.unsqueeze(0)
@@ -406,11 +405,13 @@ class VinLightningModule(pl.LightningModule):
 
         rri = batch.rri.to(device=logits.device)
         rri_flat = rri.reshape(-1)
+        candidate_mask = candidate_mask.to(device=logits.device)
         mask_rri = torch.isfinite(rri_flat)
-        mask = mask_rri & logits_finite
-        if log_enabled and (~logits_finite & mask_rri).any():
-            denom = mask_rri.to(dtype=torch.float32).sum().clamp_min(1.0)
-            frac = (~logits_finite & mask_rri).to(dtype=torch.float32).sum() / denom
+        valid_targets = candidate_mask & mask_rri
+        mask = valid_targets & logits_finite
+        if log_enabled and (~logits_finite & valid_targets).any():
+            denom = valid_targets.to(dtype=torch.float32).sum().clamp_min(1.0)
+            frac = (~logits_finite & valid_targets).to(dtype=torch.float32).sum() / denom
             self.log(
                 f"{stage.value}/drop_nonfinite_logits_frac",
                 frac,
@@ -421,7 +422,7 @@ class VinLightningModule(pl.LightningModule):
 
         if not mask.any():
             if log_enabled:
-                if mask_rri.any():
+                if valid_targets.any():
                     self.log(
                         f"{stage.value}/skip_nonfinite_logits",
                         1.0,
@@ -445,7 +446,7 @@ class VinLightningModule(pl.LightningModule):
 
         # Avoid NaNs propagating through label conversion; masked values are ignored downstream.
         rri_for_labels = torch.nan_to_num(
-            rri_flat,
+            torch.where(candidate_mask, rri_flat, torch.zeros_like(rri_flat)),
             nan=0.0,
             posinf=0.0,
             neginf=0.0,

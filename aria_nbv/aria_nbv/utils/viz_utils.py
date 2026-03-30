@@ -1,9 +1,8 @@
 """Shared visualization-friendly helpers.
 
 This module centralises lightweight utilities that are needed by multiple
-plotting modules. Functions previously defined in
-``aria_nbv.data.utils`` now live here and remain re-exported from their old
-location for compatibility.
+plotting modules. Functions that previously lived under the deprecated
+``aria_nbv.data.utils`` path now live here directly.
 """
 
 from __future__ import annotations

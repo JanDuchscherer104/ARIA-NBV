@@ -10,9 +10,9 @@ import torch
 from efm3d.aria.pose import PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import]
 
-from ..data.efm_views import EfmSnippetView
-from ..data.plotting import SnippetPlotBuilder, get_frustum_segments
+from ..data_handling import EfmSnippetView
 from ..utils import Console
+from ..utils.data_plotting import SnippetPlotBuilder, get_frustum_segments
 
 if TYPE_CHECKING:
     from .candidate_generation import CandidateViewGeneratorConfig

@@ -1,6 +1,6 @@
 import torch
 
-from aria_nbv.data.efm_views import EfmPointsView
+from aria_nbv.data_handling.efm_views import EfmPointsView
 from aria_nbv.vin.experimental.model_v2 import VinModelV2, VinModelV2Config
 
 

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .offline_cache_types import OracleRriCacheEntry
+from .cache_contracts import OracleRriCacheEntry
 
 _SCENE_KEY_RE = re.compile(r"^AriaSyntheticEnvironment_(\d+)_")
 
@@ -64,7 +64,7 @@ def read_cache_index_entries(index_path: Path) -> list[OracleRriCacheEntry]:
         index_path: Path to ``index.jsonl`` / ``train_index.jsonl`` / ``val_index.jsonl``.
 
     Returns:
-        List of parsed :class:`~aria_nbv.data.offline_cache_types.OracleRriCacheEntry`.
+        List of parsed :class:`~aria_nbv.data_handling.cache_contracts.OracleRriCacheEntry`.
     """
     if not index_path.exists():
         return []
@@ -131,7 +131,7 @@ def scan_dataset_snippets(
     Args:
         tar_paths: Iterable of tar shard paths.
         snippet_key_filter: Optional filter tokens applied to sample keys. Matching uses
-            the same semantics as :class:`~aria_nbv.data.efm_dataset.AseEfmDataset`:
+            the same semantics as :class:`~aria_nbv.data_handling.efm_dataset.AseEfmDataset`:
             ``key == token or key.endswith(token)`` for any token.
         progress_cb: Optional callback invoked as ``progress_cb(done, total)``.
 

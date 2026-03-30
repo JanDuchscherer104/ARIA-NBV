@@ -1,7 +1,7 @@
 import torch
 
 from aria_nbv.app.state import config_signature
-from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.data_handling import AseEfmDatasetConfig
 from aria_nbv.pipelines import OracleRriLabelerConfig
 from aria_nbv.pose_generation import CandidateViewGeneratorConfig
 from aria_nbv.rendering import CandidateDepthRendererConfig

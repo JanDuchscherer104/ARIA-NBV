@@ -111,7 +111,7 @@ from pytorch3d.transforms import matrix_to_rotation_6d  # type: ignore[import-un
 from torch import Tensor, nn
 from torch.nn import functional as functional
 
-from ...data.efm_views import EfmSnippetView, VinSnippetView
+from ...data_handling import EfmSnippetView, VinSnippetView
 from ...rri_metrics.coral import (
     CoralLayer,
     coral_expected_from_logits,
@@ -123,7 +123,7 @@ from .pose_encoding import LearnableFourierFeaturesConfig
 from .types import EvlBackboneOutput, VinForwardDiagnostics, VinPrediction
 
 if TYPE_CHECKING:
-    from ...data.vin_oracle_types import VinOracleBatch
+    from ...data_handling import VinOracleBatch
 
 
 def _largest_divisor_leq(n: int, max_divisor: int) -> int:
@@ -640,7 +640,7 @@ class VinScorerHead(nn.Module):
         return self.coral(self.mlp(x))
 
 
-class VinScorerHeadConfig(BaseConfig[VinScorerHead]):
+class VinScorerHeadConfig(BaseConfig):
     """Configuration for :class:`VinScorerHead`.
 
     The head is a shallow MLP followed by a CORAL layer. The MLP produces a
@@ -673,7 +673,7 @@ class VinScorerHeadConfig(BaseConfig[VinScorerHead]):
         return self.target(self, in_dim=in_dim)
 
 
-class VinModelConfig(BaseConfig["VinModel"]):
+class VinModelConfig(BaseConfig):
     """Configuration for :class:`VinModel`.
 
     This config collects all architectural choices that determine how VIN

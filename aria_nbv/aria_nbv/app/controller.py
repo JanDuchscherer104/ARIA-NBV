@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 
-from ..data import EfmSnippetView
+from ..data_handling import EfmSnippetView
 from ..pose_generation.types import CandidateSamplingResult
 from ..rendering import CandidateDepths, build_candidate_pointclouds
 from ..rendering.candidate_pointclouds import CandidatePointClouds

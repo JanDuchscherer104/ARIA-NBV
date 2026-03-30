@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from aria_nbv.data.utils import (
+from aria_nbv.utils.viz_utils import (
     extract_scene_id_from_sequence_name,
     validate_scene_data,
 )

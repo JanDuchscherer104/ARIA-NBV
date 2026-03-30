@@ -9,7 +9,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "external" / "efm3d"))
 import pytest  # isort: split
 
 from aria_nbv.configs import PathConfig
-from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.data_handling import AseEfmDatasetConfig
 from aria_nbv.pose_generation import CandidateViewGeneratorConfig
 from aria_nbv.utils import Verbosity
 

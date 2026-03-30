@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from ..data import AseEfmDatasetConfig
+from ..data_handling import AseEfmDatasetConfig
 from ..pipelines import OracleRriLabelerConfig
 from ..utils import BaseConfig
 

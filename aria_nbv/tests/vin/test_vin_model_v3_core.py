@@ -63,7 +63,7 @@ if "seaborn" not in sys.modules:
 
 from efm3d.aria.pose import PoseTW
 
-from aria_nbv.data.efm_views import VinSnippetView
+from aria_nbv.data_handling.efm_views import VinSnippetView
 from aria_nbv.vin.backbone_evl import EvlBackboneConfig
 from aria_nbv.vin.model_v3 import SEMIDENSE_PROJ_DIM, VinModelV3, VinModelV3Config
 from aria_nbv.vin.types import EvlBackboneOutput

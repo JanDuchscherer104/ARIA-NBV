@@ -114,6 +114,12 @@ def _read_metadata(path: Path) -> OracleRriCacheMetadata:
     )
 
 
+def read_oracle_cache_metadata(path: Path) -> OracleRriCacheMetadata:
+    """Public wrapper for reading oracle-cache metadata from disk."""
+
+    return _read_metadata(path)
+
+
 def _sanitize_token(value: str) -> str:
     """Normalize a token so it is safe to embed in filenames."""
     return re.sub(r"[^0-9a-zA-Z._-]+", "_", value).strip("_")
@@ -125,6 +131,12 @@ def _extract_snippet_token(snippet_id: str) -> str:
     if match:
         return match.group(1)
     return snippet_id
+
+
+def extract_snippet_token(snippet_id: str) -> str:
+    """Public wrapper for the stable numeric sample token extraction."""
+
+    return _extract_snippet_token(snippet_id)
 
 
 def _format_sample_key(scene_id: str, snippet_id: str, config_hash: str) -> str:
@@ -197,6 +209,8 @@ __all__ = [
     "_unique_sample_path",
     "_write_metadata",
     "build_cache_metadata",
+    "extract_snippet_token",
+    "read_oracle_cache_metadata",
     "snapshot_config",
     "snapshot_dataset_config",
 ]

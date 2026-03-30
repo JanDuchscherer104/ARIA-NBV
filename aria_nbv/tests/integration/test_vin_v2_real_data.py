@@ -8,7 +8,7 @@ from efm3d.aria.pose import PoseTW
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 
 from aria_nbv.configs import PathConfig
-from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.data_handling import AseEfmDatasetConfig
 from aria_nbv.utils import Verbosity
 from aria_nbv.vin import EvlBackboneConfig
 from aria_nbv.vin.experimental.model_v2 import VinModelV2Config

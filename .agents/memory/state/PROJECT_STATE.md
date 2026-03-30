@@ -1,6 +1,6 @@
 ---
 id: project_state
-updated: 2026-03-29
+updated: 2026-03-30
 scope: repo
 owner: jan
 status: active
@@ -24,6 +24,7 @@ The current stack has three main layers: ASE and EFM-facing data access, oracle 
 - Keep operator aids and long-form conventions in `.agents/references/`; canonical state docs should remain focused on current truth.
 - The default Codex bootstrap is `docs/typst/paper/main.typ` + `.agents/memory/state/` + the compact `docs/_generated/context/source_index.md`, with broader references retrieved on demand.
 - Treat `make context-contracts` / `scripts/nbv_get_context.sh contracts` as the preferred contract surface; heavy generated artifacts are fallback-only.
+- Treat `aria_nbv.data_handling` as the canonical owner of raw snippet, oracle-cache, VIN-cache, and cache-coverage contracts, and `aria_nbv.utils.data_plotting` as the canonical owner of shared snippet plotting; mirrored `aria_nbv.data` compatibility modules were removed.
 
 ## Active Experiments
 The project is actively iterating on VIN variants, semidense projection cues, candidate generation behavior, and documentation alignment between code, paper, and slides.

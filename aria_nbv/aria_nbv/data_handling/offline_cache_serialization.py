@@ -1,9 +1,9 @@
-"""Legacy compatibility wrappers for offline-cache payload serialization.
+"""Offline-cache payload serialization helpers.
 
-The active serialization logic now lives on the shared data models themselves
-via ``to_serializable`` / ``from_serializable`` methods backed by
-``aria_nbv.utils.typed_payloads``. This module remains only as a thin
-compatibility surface for legacy imports under ``aria_nbv.data``.
+The active serialization logic lives on the shared data models themselves via
+``to_serializable`` / ``from_serializable`` methods backed by
+``aria_nbv.utils.typed_payloads``. This module exposes the canonical helper
+functions used by the legacy oracle-cache and VIN-cache tests.
 """
 
 from __future__ import annotations

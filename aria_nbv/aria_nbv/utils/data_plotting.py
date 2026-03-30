@@ -21,9 +21,9 @@ from matplotlib import colormaps
 from plotly import colors as plotly_colors
 from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 
-from aria_nbv.utils import Console, rotate_yaw_cw90
-
-from .efm_views import EfmCameraView, EfmSnippetView
+from ..data_handling import EfmCameraView, EfmSnippetView
+from .console import Console
+from .frames import rotate_yaw_cw90
 
 console = Console.with_prefix("plotting")
 ROTATE_90_CW = -1
@@ -1121,7 +1121,7 @@ def plot_trajectory(
 
 
 if __name__ == "__main__":
-    from aria_nbv.data import AseEfmDatasetConfig
+    from aria_nbv.data_handling import AseEfmDatasetConfig
     from aria_nbv.utils import Console
 
     debug = True

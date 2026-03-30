@@ -66,7 +66,7 @@ if "e3nn" not in sys.modules:
     sys.modules["e3nn.o3"] = o3
 
 from aria_nbv.configs import PathConfig
-from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.data_handling import AseEfmDatasetConfig
 from aria_nbv.utils import Verbosity
 from aria_nbv.vin import EvlBackboneConfig, VinModelV3Config
 

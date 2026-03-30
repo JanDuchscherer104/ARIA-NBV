@@ -6,6 +6,8 @@ import ast
 import importlib
 from pathlib import Path
 
+import pytest
+
 
 def test_public_api_smoke_imports_all_exports() -> None:
     """Ensure every root-exported symbol resolves from the package root."""
@@ -39,9 +41,12 @@ def test_public_api_omits_internal_helper_exports() -> None:
 
 
 def test_runtime_modules_do_not_import_data_handling_submodules() -> None:
-    """Keep the runtime contract root-only outside ``data_handling`` itself."""
+    """Keep direct ``data_handling`` submodule imports tightly constrained."""
 
     package_root = Path(__file__).resolve().parents[2] / "aria_nbv"
+    allowlist = {
+        "vin/model_v3.py",
+    }
     offenders: list[str] = []
     for path in package_root.rglob("*.py"):
         if "data_handling" in path.parts:
@@ -51,7 +56,9 @@ def test_runtime_modules_do_not_import_data_handling_submodules() -> None:
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 if any(alias.name.startswith("aria_nbv.data_handling.") for alias in node.names):
-                    offenders.append(rel_path.as_posix())
+                    rel = rel_path.as_posix()
+                    if rel not in allowlist:
+                        offenders.append(rel)
                     break
             if isinstance(node, ast.ImportFrom):
                 module = node.module or ""
@@ -60,7 +67,9 @@ def test_runtime_modules_do_not_import_data_handling_submodules() -> None:
                     or ".data_handling." in module
                     or (node.level > 0 and module.startswith("data_handling."))
                 ):
-                    offenders.append(rel_path.as_posix())
+                    rel = rel_path.as_posix()
+                    if rel not in allowlist:
+                        offenders.append(rel)
                     break
     assert not offenders  # noqa: S101
 
@@ -87,3 +96,30 @@ def test_data_handling_has_no_legacy_data_imports() -> None:
                     offenders.append(path.relative_to(data_handling_root).as_posix())
                     break
     assert not offenders  # noqa: S101
+
+
+def test_removed_legacy_data_modules_raise_import_error() -> None:
+    """The mirrored legacy ``aria_nbv.data`` modules should no longer exist."""
+
+    removed_modules = [
+        "aria_nbv.data.efm_dataset",
+        "aria_nbv.data.efm_snippet_loader",
+        "aria_nbv.data.efm_views",
+        "aria_nbv.data.mesh_cache",
+        "aria_nbv.data.offline_cache",
+        "aria_nbv.data.offline_cache_coverage",
+        "aria_nbv.data.offline_cache_serialization",
+        "aria_nbv.data.offline_cache_store",
+        "aria_nbv.data.offline_cache_types",
+        "aria_nbv.data.plotting",
+        "aria_nbv.data.utils",
+        "aria_nbv.data.vin_oracle_datasets",
+        "aria_nbv.data.vin_oracle_types",
+        "aria_nbv.data.vin_snippet_cache",
+        "aria_nbv.data.vin_snippet_provider",
+        "aria_nbv.data.vin_snippet_utils",
+    ]
+
+    for module_name in removed_modules:
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(module_name)

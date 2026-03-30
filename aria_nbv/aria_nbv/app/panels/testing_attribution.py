@@ -12,7 +12,7 @@ from torch import nn
 from torch.nn import functional as functional
 
 from ...configs import PathConfig
-from ...data.offline_cache import OracleRriCacheConfig, OracleRriCacheDatasetConfig
+from ...data_handling import OracleRriCacheConfig, OracleRriCacheDatasetConfig
 from ...interpretability.attribution import (
     AttributionEngine,
     AttributionMethod,

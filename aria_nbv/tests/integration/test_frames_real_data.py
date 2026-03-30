@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.data_handling import AseEfmDatasetConfig
 from aria_nbv.utils import Verbosity
 from aria_nbv.utils.frames import view_axes_from_points, world_from_camera
 

@@ -14,7 +14,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "external" / "efm3d"))
 from efm3d.aria import PoseTW  # noqa: E402
 from efm3d.aria.camera import get_aria_camera  # noqa: E402
 
-from aria_nbv.data.plotting import get_frustum_segments  # noqa: E402
+from aria_nbv.utils.data_plotting import get_frustum_segments  # noqa: E402
 
 
 def _dummy_camera(device: torch.device):

@@ -10,7 +10,7 @@ import torch
 from efm3d.utils.depth import dist_im_to_point_cloud_im
 from efm3d.utils.mesh_utils import compute_pts_to_mesh_dist
 
-from aria_nbv.data import AseEfmDataset, AseEfmDatasetConfig
+from aria_nbv.data_handling import AseEfmDataset, AseEfmDatasetConfig
 from aria_nbv.utils import Console
 
 

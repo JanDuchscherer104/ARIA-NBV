@@ -70,13 +70,13 @@ from torch.nn import functional as functional
 
 from aria_nbv.utils.frames import rotate_yaw_cw90
 
-from ..data_handling import (
+from ..data_handling._raw import (
     EfmSnippetView,
     VinSnippetView,
-    build_vin_snippet_view,
     is_efm_snippet_view_instance,
     is_vin_snippet_view_instance,
 )
+from ..data_handling.vin_adapter import build_vin_snippet_view
 from ..rri_metrics.coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
 from ..utils import BaseConfig
 from .backbone_evl import EvlBackboneConfig
@@ -135,7 +135,7 @@ SEMIDENSE_PROJ_FEATURE_ALIASES: dict[str, str] = {
 }
 
 
-class VinModelV3Config(BaseConfig["VinModelV3"]):
+class VinModelV3Config(BaseConfig):
     """Configuration for :class:`VinModelV3` (streamlined VIN baseline)."""
 
     @property

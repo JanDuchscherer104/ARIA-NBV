@@ -12,7 +12,7 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from aria_nbv.data.offline_cache_types import OracleRriCacheEntry
+    from aria_nbv.data_handling.cache_contracts import OracleRriCacheEntry
 
 
 @dataclass(slots=True)
@@ -30,7 +30,7 @@ def test_cache_writer_skips_existing_entries(
     """Skip samples that already exist in the cache index."""
     if importlib.util.find_spec("power_spherical") is None:
         pytest.skip("Missing power_spherical dependency")
-    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
+    offline_mod = importlib.import_module("aria_nbv.data_handling.oracle_cache")
     labeler_mod = importlib.import_module("aria_nbv.pipelines.oracle_rri_labeler")
     utils_mod = importlib.import_module("aria_nbv.utils")
 
@@ -109,9 +109,7 @@ def test_cache_writer_skips_existing_entries(
     assert entries[0].scene_id == "scene_2"  # noqa: S101
 
     index_entries = [
-        json.loads(line)
-        for line in cache_cfg.index_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
+        json.loads(line) for line in cache_cfg.index_path.read_text(encoding="utf-8").splitlines() if line.strip()
     ]
     index_pairs = {(entry["scene_id"], entry["snippet_id"]) for entry in index_entries}
     assert index_pairs == {("scene_1", "snippet_1"), ("scene_2", "snippet_2")}  # noqa: S101

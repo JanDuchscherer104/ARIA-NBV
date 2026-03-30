@@ -7,7 +7,7 @@ import streamlit as st
 import torch
 
 from ....configs import PathConfig
-from ....data.efm_views import VinSnippetView
+from ....data_handling import VinSnippetView
 from ....rri_metrics.coral import coral_loss
 from ....vin.experimental.plotting import build_alignment_figures
 from ....vin.plotting import build_geometry_overview_figure, build_semidense_projection_figure
