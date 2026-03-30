@@ -31,17 +31,13 @@ from ..utils import BaseConfig, Console
 from .types import EfmDict, EvlBackboneOutput
 
 
-def _target_cls() -> type["EvlBackbone"]:
-    return EvlBackbone
-
-
 class EvlBackboneConfig(BaseConfig["EvlBackbone"]):
     """Configuration for :class:`EvlBackbone`."""
 
     @property
     def target(self) -> type["EvlBackbone"]:
         """Factory target for :meth:`BaseConfig.setup_target`."""
-        return _target_cls()
+        return EvlBackbone
 
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver."""

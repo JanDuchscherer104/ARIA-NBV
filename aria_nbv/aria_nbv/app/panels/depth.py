@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 import torch
 
-from ...data import EfmSnippetView
+from ...data_handling import EfmSnippetView
 from ...rendering.candidate_depth_renderer import CandidateDepths
 from ...rendering.candidate_pointclouds import CandidatePointClouds
 from ...rendering.plotting import RenderingPlotBuilder, depth_grid, depth_histogram

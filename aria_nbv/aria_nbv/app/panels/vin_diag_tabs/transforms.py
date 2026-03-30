@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import streamlit as st
 
+from ....utils.plotting import _to_numpy
 from ....vin.experimental.plotting import build_prediction_alignment_figure
 from ....vin.plotting import (
-    _to_numpy,
     build_pos_grid_linearity_figure,
     build_se3_closure_figure,
     build_voxel_inbounds_figure,

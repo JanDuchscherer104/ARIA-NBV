@@ -9,15 +9,140 @@ import numpy as np
 import plotly.graph_objects as go
 import torch
 from matplotlib import colormaps
+from plotly.subplots import make_subplots  # type: ignore[import-untyped]
 
-from ..data.plotting import FrameGridBuilder
+from .plotly_helpers import flatten_edges_for_plotly
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
+def depth_to_color(depth: torch.Tensor, *, percentile: float = 99.5) -> np.ndarray:
+    """Colorize a depth or distance map for display.
+
+    Args:
+        depth: Depth map tensor.
+        percentile: Upper percentile used to clamp the color range.
+
+    Returns:
+        Rotated uint8 RGB image for display.
+    """
+
+    depth_np = depth.detach().cpu().squeeze().numpy()
+    finite_mask = np.isfinite(depth_np)
+    if not finite_mask.any():
+        rgb = np.zeros(depth_np.shape + (3,), dtype=np.uint8)
+    else:
+        finite_vals = depth_np[finite_mask]
+        vmin = max(np.nanmin(finite_vals), 0.0)
+        vmax = np.nanpercentile(finite_vals, percentile)
+        if vmax <= vmin:
+            vmax = vmin + 1e-3
+        norm = np.clip((depth_np - vmin) / (vmax - vmin), 0.0, 1.0)
+        cmap = colormaps.get_cmap("viridis")
+        rgb = (cmap(norm)[..., :3] * 255).astype(np.uint8)
+    return np.rot90(rgb, k=-1)
+
+
+class FrameGridBuilder:
+    """Builder for simple image grids backed by Plotly subplots."""
+
+    def __init__(self, rows: int, cols: int, *, titles: list[str], height: int, width: int, title: str):
+        """Initialize the image-grid figure layout.
+
+        Args:
+            rows: Number of grid rows.
+            cols: Number of grid columns.
+            titles: Subplot titles in row-major order.
+            height: Final figure height in pixels.
+            width: Final figure width in pixels.
+            title: Figure title.
+        """
+
+        self.fig = make_subplots(rows=rows, cols=cols, subplot_titles=titles, specs=[[{"type": "image"}] * cols] * rows)
+        self.height = height
+        self.width = width
+        self.title = title
+
+    def add_image(self, img: np.ndarray, *, row: int, col: int) -> "FrameGridBuilder":
+        """Add one image subplot and return the builder for chaining."""
+
+        self.fig.add_trace(go.Image(z=img), row=row, col=col)
+        return self
+
+    def finalize(self) -> go.Figure:
+        """Finalize the figure layout and return the Plotly figure."""
+
+        self.fig.update_layout(height=self.height, width=self.width, title_text=self.title)
+        return self.fig
+
+
 def _to_numpy(tensor: torch.Tensor) -> np.ndarray:
     return tensor.detach().cpu().numpy()
+
+
+def _pretty_label(text: str) -> str:
+    """Format labels by replacing underscores and title-casing words."""
+    if not text:
+        return text
+    return text.replace("_", " ").title()
+
+
+def _pca_2d(values: np.ndarray) -> np.ndarray:
+    """Project a 2D feature matrix to its first two PCA directions."""
+    values = np.asarray(values, dtype=float)
+    if values.ndim != 2:
+        raise ValueError(f"Expected values with ndim=2, got {values.ndim}.")
+    values = values - values.mean(axis=0, keepdims=True)
+    _, _, vt = np.linalg.svd(values, full_matrices=False)
+    return values @ vt[:2].T
+
+
+def _pca_2d_with_components(values: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Project a 2D feature matrix and return the PCA mean and components."""
+    values = np.asarray(values, dtype=float)
+    if values.ndim != 2:
+        raise ValueError(f"Expected values with ndim=2, got {values.ndim}.")
+    mean = values.mean(axis=0, keepdims=True)
+    centered = values - mean
+    _, _, vt = np.linalg.svd(centered, full_matrices=False)
+    components = vt[:2].T
+    proj = centered @ components
+    return proj, mean, components
+
+
+def _histogram_edges(values_list: list[np.ndarray] | tuple[np.ndarray, ...], *, bins: int) -> np.ndarray:
+    """Return shared histogram bin edges across multiple numeric arrays."""
+    arrays: list[np.ndarray] = []
+    for arr in values_list:
+        vals = np.asarray(arr, dtype=float).reshape(-1)
+        vals = vals[np.isfinite(vals)]
+        if vals.size:
+            arrays.append(vals)
+    if not arrays:
+        return np.array([0.0, 1.0], dtype=float)
+    return np.histogram_bin_edges(np.concatenate(arrays, axis=0), bins=int(bins))
+
+
+def _histogram_bar(
+    values: np.ndarray,
+    *,
+    edges: np.ndarray,
+    name: str,
+    color: str | None = None,
+    opacity: float = 0.6,
+    log1p_counts: bool = False,
+) -> go.Bar:
+    """Build a histogram bar trace using a shared set of bin edges."""
+    vals = np.asarray(values, dtype=float).reshape(-1)
+    vals = vals[np.isfinite(vals)]
+    counts, _ = np.histogram(vals, bins=edges)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    y = np.log1p(counts) if log1p_counts else counts
+    marker: dict[str, Any] = {"opacity": opacity}
+    if color is not None:
+        marker["color"] = color
+    return go.Bar(x=centers, y=y, name=_pretty_label(name), marker=marker)
 
 
 def _scalar_to_rgb(
@@ -171,9 +296,31 @@ def _plot_hist_counts_mpl(
 
 
 __all__ = [
-    "_histogram_overlay",
-    "_plot_hist_counts_mpl",
-    "_plot_slice_grid",
-    "_scalar_to_rgb",
-    "_to_numpy",
+    "FrameGridBuilder",
+    "depth_to_color",
+    "flatten_edges_for_plotly",
+    "histogram_bar",
+    "histogram_edges",
+    "histogram_overlay",
+    "pca_2d",
+    "pca_2d_with_components",
+    "plot_hist_counts_mpl",
+    "plot_slice_grid",
+    "pretty_label",
+    "scalar_to_rgb",
+    "to_numpy",
 ]
+
+histogram_bar = _histogram_bar
+histogram_edges = _histogram_edges
+histogram_overlay = _histogram_overlay
+pca_2d = _pca_2d
+pca_2d_with_components = _pca_2d_with_components
+plot_hist_counts_mpl = _plot_hist_counts_mpl
+plot_slice_grid = _plot_slice_grid
+pretty_label = _pretty_label
+scalar_to_rgb = _scalar_to_rgb
+to_numpy = _to_numpy
+
+_depth_to_color = depth_to_color
+_flatten_edges_for_plotly = flatten_edges_for_plotly

@@ -385,7 +385,7 @@ def render_rri_binning_page() -> None:
     if not train_index_path.exists() or not val_index_path.exists():
         st.info(
             "Missing `train_index.jsonl` / `val_index.jsonl` under the cache dir. "
-            "Create them (e.g. via `rebuild_cache_index(...)`) to enable split histograms.",
+            "Create them by rebuilding the cache index to enable split histograms.",
         )
         return
 

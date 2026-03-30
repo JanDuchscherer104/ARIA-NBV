@@ -64,8 +64,23 @@ def config_signature(cfg: Any) -> str:
 
 
 @dataclass(slots=True)
-class DataCache:
+class ConfiguredCache:
+    """Base cache invalidated by a config signature."""
+
     cfg_sig: str | None = None
+
+
+@dataclass(slots=True)
+class SampleScopedCache(ConfiguredCache):
+    """Base cache scoped to one sample identity key."""
+
+    sample_key: str | None = None
+
+
+@dataclass(slots=True)
+class DataCache(ConfiguredCache):
+    """Cached dataset iteration state for the selected sample."""
+
     sample_idx: int | None = None
     dataset_iter: Iterator[EfmSnippetView] | None = None
     last_iter_idx: int | None = None
@@ -73,29 +88,32 @@ class DataCache:
 
 
 @dataclass(slots=True)
-class CandidatesCache:
-    cfg_sig: str | None = None
-    sample_key: str | None = None
+class CandidatesCache(SampleScopedCache):
+    """Cached candidate set for one sample and generator config."""
+
     candidates: CandidateSamplingResult | None = None
 
 
 @dataclass(slots=True)
-class DepthCache:
-    cfg_sig: str | None = None
-    sample_key: str | None = None
+class DepthCache(SampleScopedCache):
+    """Cached rendered depths for one sample/candidate combination."""
+
     candidates_key: str | None = None
     depths: CandidateDepths | None = None
 
 
 @dataclass(slots=True)
 class PointCloudCache:
+    """Cached backprojected candidate point clouds keyed by depth identity."""
+
     depth_key: str | None = None
     by_stride: dict[int, CandidatePointClouds] | None = None
 
 
 @dataclass(slots=True)
-class RriCache:
-    cfg_sig: str | None = None
+class RriCache(ConfiguredCache):
+    """Cached oracle RRI result for the current rendered point clouds."""
+
     pcs_key: str | None = None
     result: RriResult | None = None
 

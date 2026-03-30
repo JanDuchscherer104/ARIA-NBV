@@ -14,6 +14,9 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import numpy as np
 
+from .stats import linear_slope as _linear_slope
+from .stats import segment_indices as _segment_indices
+
 if TYPE_CHECKING:
     import pandas as pd
     from matplotlib.axes import Axes
@@ -269,27 +272,6 @@ def _finite_mean(values: np.ndarray) -> float:
     if finite.size == 0:
         return float("nan")
     return float(finite.mean())
-
-
-def _linear_slope(x: np.ndarray, y: np.ndarray) -> float:
-    """Estimate a linear slope for the given x/y series."""
-    if x.size < 2 or np.allclose(x, x[0]):
-        return float("nan")
-    try:
-        return float(np.polyfit(x, y, 1)[0])
-    except Exception:  # pragma: no cover - numerical guard
-        return float("nan")
-
-
-def _segment_indices(num: int, frac: float) -> tuple[slice, slice, slice]:
-    """Compute early/mid/late segment slices for a series."""
-    size = max(2, int(num * frac))
-    early = slice(0, size)
-    late = slice(max(num - size, 0), num)
-    mid_start = size
-    mid_end = max(num - size, mid_start)
-    mid = slice(mid_start, mid_end)
-    return early, mid, late
 
 
 def _summarize_metric(
@@ -749,39 +731,62 @@ def plot_dynamics_bar(
     return fig, ax
 
 
+ensure_wandb_api = _ensure_wandb_api
+extract_run_steps = _extract_run_steps
+filter_runs = _filter_runs
+flatten_mapping = _flatten_mapping
+format_timestamp = _format_timestamp
+get_run = _get_run
+linear_slope = _linear_slope
+list_entities = _list_entities
+list_projects = _list_projects
+list_runs = _list_runs
+load_runs_filtered = _load_runs_filtered
+load_wandb_history = _load_wandb_history
+load_wandb_history_clean = _load_wandb_history_clean
+metric_pairs = _metric_pairs
+metric_pairs_with_pattern = _metric_pairs_with_pattern
+resolve_x_key = _resolve_x_key
+run_metadata = _run_metadata
+safe_mapping = _safe_mapping
+segment_indices = _segment_indices
+select_metric_key = _select_metric_key
+summarize_gap = _summarize_gap
+summarize_metric = _summarize_metric
+
 __all__ = [
     "WANDB_STEP_KEYS",
     "WandbApi",
     "WandbRun",
-    "_ensure_wandb_api",
-    "_extract_run_steps",
-    "_filter_runs",
-    "_flatten_mapping",
-    "_format_timestamp",
-    "_get_run",
-    "_linear_slope",
-    "_list_entities",
-    "_list_projects",
-    "_list_runs",
-    "_load_runs_filtered",
-    "_load_wandb_history",
-    "_load_wandb_history_clean",
-    "_metric_pairs",
-    "_metric_pairs_with_pattern",
-    "_resolve_x_key",
-    "_run_metadata",
-    "_safe_mapping",
-    "_segment_indices",
-    "_select_metric_key",
-    "_summarize_gap",
-    "_summarize_metric",
     "build_dynamics_dataframe",
     "build_run_dataframes",
     "collect_run_media_images",
+    "ensure_wandb_api",
+    "extract_run_steps",
+    "filter_runs",
+    "flatten_mapping",
+    "format_timestamp",
+    "get_run",
+    "linear_slope",
+    "list_entities",
+    "list_projects",
     "list_run_dirs",
+    "list_runs",
     "load_run_histories",
+    "load_runs_filtered",
+    "load_wandb_history",
+    "load_wandb_history_clean",
+    "metric_pairs",
+    "metric_pairs_with_pattern",
     "plot_dynamics_bar",
     "plot_dynamics_scatter",
     "plot_metric_curves",
     "prepare_history_long_dataframe",
+    "resolve_x_key",
+    "run_metadata",
+    "safe_mapping",
+    "segment_indices",
+    "select_metric_key",
+    "summarize_gap",
+    "summarize_metric",
 ]

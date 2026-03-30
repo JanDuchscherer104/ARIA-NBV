@@ -9,10 +9,10 @@ import plotly.graph_objects as go  # type: ignore[import-untyped]
 import torch
 from efm3d.aria import CameraTW, PoseTW
 
-from ..data import EfmSnippetView
+from ..data_handling import EfmSnippetView
 from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..rendering.plotting import RenderingPlotBuilder
-from ..utils.plotting import _histogram_overlay, _plot_hist_counts_mpl
+from ..utils.plotting import histogram_overlay, plot_hist_counts_mpl
 from .types import RriResult
 
 
@@ -196,13 +196,16 @@ def _as_list(values: Sequence[float] | torch.Tensor) -> list[float]:
         return values.detach().cpu().flatten().tolist()
     return [float(v) for v in values]
 
+_histogram_overlay = histogram_overlay
+_plot_hist_counts_mpl = plot_hist_counts_mpl
+
 __all__ = [
+    "histogram_overlay",
     "plot_pm_accuracy",
     "plot_pm_completeness",
     "plot_pm_distances",
+    "plot_hist_counts_mpl",
     "plot_rri_scene",
     "plot_rri_scores",
     "rri_color_map",
-    "_histogram_overlay",
-    "_plot_hist_counts_mpl",
 ]

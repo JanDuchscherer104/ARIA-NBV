@@ -11,6 +11,7 @@ from power_spherical import HypersphericalUniform, PowerSpherical  # type: ignor
 from ..utils import Console
 from ..utils.frames import view_axes_from_poses, world_up_tensor
 from .geometry import DEVICE_FWD
+from .math_utils import normalize_last_dim as _normalise
 from .types import SamplingStrategy, ViewDirectionMode
 
 if TYPE_CHECKING:
@@ -205,10 +206,6 @@ def _roll_rotation(roll: torch.Tensor) -> torch.Tensor:
         ],
         dim=-2,
     )
-
-
-def _normalise(v: torch.Tensor) -> torch.Tensor:
-    return v / v.norm(dim=-1, keepdim=True).clamp_min(torch.finfo(v.dtype).eps)
 
 
 __all__ = ["OrientationBuilder"]

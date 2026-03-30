@@ -14,7 +14,7 @@ from ....pose_generation.plotting import (
     plot_direction_sphere,
     plot_radius_hist,
 )
-from ....vin.plotting import _histogram_overlay, _to_numpy
+from ....utils.plotting import _histogram_overlay, _to_numpy
 from ..common import _info_popover, _pretty_label
 from .context import VinDiagContext
 

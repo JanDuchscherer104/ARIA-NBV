@@ -19,21 +19,21 @@ except ImportError:  # pragma: no cover - optional dependency guard
 
 from ...utils.wandb_utils import (
     WANDB_STEP_KEYS,
-    _ensure_wandb_api,
-    _linear_slope,
-    _list_entities,
-    _list_projects,
-    _load_runs_filtered,
-    _metric_pairs,
-    _resolve_x_key,
-    _safe_mapping,
     build_dynamics_dataframe,
     build_run_dataframes,
     collect_run_media_images,
+    ensure_wandb_api,
+    linear_slope,
+    list_entities,
+    list_projects,
     load_run_histories,
+    load_runs_filtered,
+    metric_pairs,
     plot_dynamics_bar,
     plot_dynamics_scatter,
     plot_metric_curves,
+    resolve_x_key,
+    safe_mapping,
 )
 from .common import _info_popover, _pretty_label, _report_exception
 
@@ -49,10 +49,10 @@ def _cached_entities(api_key: str) -> list[str]:
     if wandb is None:
         return []
     try:
-        api = _ensure_wandb_api(api_key)
+        api = ensure_wandb_api(api_key)
     except Exception:  # pragma: no cover - API guard
         return []
-    return _list_entities(api)
+    return list_entities(api)
 
 
 @st.cache_data(ttl=_ENTITY_CACHE_TTL_S)
@@ -61,10 +61,10 @@ def _cached_projects(api_key: str, entity: str) -> list[str]:
     if wandb is None or not entity:
         return []
     try:
-        api = _ensure_wandb_api(api_key)
+        api = ensure_wandb_api(api_key)
     except Exception:  # pragma: no cover - API guard
         return []
-    return _list_projects(api, entity=entity)
+    return list_projects(api, entity=entity)
 
 
 def _select_with_custom(
@@ -209,9 +209,9 @@ def render_wandb_analysis_page() -> None:
             if step_error:
                 st.warning(step_error)
             try:
-                api = _ensure_wandb_api(api_key)
+                api = ensure_wandb_api(api_key)
                 with st.spinner("Loading runs from W&B..."):
-                    runs = _load_runs_filtered(
+                    runs = load_runs_filtered(
                         api=api,
                         entity=entity.strip(),
                         project=project.strip(),
@@ -360,7 +360,7 @@ def render_wandb_analysis_page() -> None:
 
     base_counts: dict[str, int] = {}
     for history in selected_histories.values():
-        pairs = _metric_pairs(list(history.columns))
+        pairs = metric_pairs(list(history.columns))
         for base in pairs:
             base_counts[base] = base_counts.get(base, 0) + 1
     base_choices = sorted(base_counts)
@@ -453,7 +453,7 @@ def render_wandb_analysis_page() -> None:
             if history is None or metric_choice not in history.columns:
                 continue
             history = history.copy()
-            x_key, history = _resolve_x_key(history, prefer_keys)
+            x_key, history = resolve_x_key(history, prefer_keys)
             df_metric = history[[x_key, metric_choice]].dropna().sort_values(x_key)
             if df_metric.empty:
                 continue
@@ -591,7 +591,7 @@ def render_wandb_analysis_page() -> None:
                     title=_pretty_label(f"{target_metric} vs {config_key}"),
                 )
                 if len(plot_df) >= 2:
-                    slope = _linear_slope(
+                    slope = linear_slope(
                         plot_df[config_key].to_numpy(dtype=float),
                         plot_df[target_metric].to_numpy(dtype=float),
                     )
@@ -669,10 +669,10 @@ def render_wandb_analysis_page() -> None:
         col_f1, col_f2 = st.columns(2)
         with col_f1:
             st.markdown("**Config**")
-            st.json(_safe_mapping(getattr(focus_run, "config", None)))
+            st.json(safe_mapping(getattr(focus_run, "config", None)))
         with col_f2:
             st.markdown("**Summary**")
-            st.json(_safe_mapping(getattr(focus_run, "summary", None)))
+            st.json(safe_mapping(getattr(focus_run, "summary", None)))
 
         st.subheader("Local W&B figures")
         max_images = st.slider(

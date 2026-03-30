@@ -5,11 +5,9 @@ from __future__ import annotations
 import streamlit as st
 import torch
 
+from ....utils.plotting import _histogram_overlay, _plot_slice_grid, _to_numpy
 from ....vin.experimental.plotting import build_frustum_samples_figure
 from ....vin.plotting import (
-    _histogram_overlay,
-    _plot_slice_grid,
-    _to_numpy,
     build_semidense_cnn_grid_figure,
     build_semidense_projection_feature_figure,
     build_semidense_projection_figure,
