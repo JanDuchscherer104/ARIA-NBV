@@ -26,9 +26,14 @@ Apply this file when working under `aria_nbv/`.
 - Follow EFM3D / ATEK coordinate conventions and document tensor shapes plus coordinate frames where they are not obvious.
 - Never let package behavior fail silently; raise actionable errors or log explicit failure context.
 
-## Ownership Boundaries
+## Progressive Disclosure
+- Stay at this file for shared Python, config-as-factory, and verification rules across `aria_nbv/`.
+- Open one deeper module guide only after the touched contract is clear:
+  - `aria_nbv/aria_nbv/data_handling/AGENTS.md` for raw snippets, cache flows, datasets, and cache contracts
+  - `aria_nbv/aria_nbv/rri_metrics/AGENTS.md` for oracle labels, binning, ordinal loss, and reported metric semantics
+  - `aria_nbv/aria_nbv/vin/AGENTS.md` for scorer, candidate-context, training batch, and VIN model contracts
+- If a task spans multiple modules, start with the owner of the main contract, then open adjacent guides only for crossed boundaries.
 - New raw-snippet or cache pipeline work should target `aria_nbv.data_handling`; treat `aria_nbv.data` as the compatibility surface and only extend it when the task explicitly requires backward compatibility.
-- Once the task localizes to scorer, cache/data, or oracle-metric internals, open the deeper guide in `aria_nbv/aria_nbv/vin/AGENTS.md`, `aria_nbv/aria_nbv/data_handling/AGENTS.md`, or `aria_nbv/aria_nbv/rri_metrics/AGENTS.md`.
 
 ## Config-As-Factory
 - Config classes should inherit `BaseConfig` and remain the main construction surface for runtime objects.
@@ -50,16 +55,17 @@ Apply this file when working under `aria_nbv/`.
 - Use `TYPE_CHECKING` guards for type-only imports.
 - Use `Literal` for constrained string values.
 - Public methods, functions, classes and modules must have Google-style docstrings. Each module doc-string must give a high-level overview of the module's purpose and contents.
-- When shapes, coordinate frames, or transform directionality are non-obvious, document them explicitly in code and docstrings.
+- When shapes, coordinate frames, or transform directionality are non-obvious, document them explicitly in code and docstrings by providing all relevsant equations, references.
 - See [python_conventions.md](../.agents/references/python_conventions.md) for full examples and anti-patterns.
 
 
 ## Verification
 - For package changes, run format -> lint -> targeted pytest on the changed surface.
-- Every new feature or behavior change should come with targeted pytest coverage.
+- Every new feature or behavior change must come with targeted pytest coverage.
 - Prefer real-data or integration-style tests when feasible.
 - Update docs when behavior or user-facing workflows change.
 - Keep public signatures typed and public methods documented.
+- Work in a test-driven manner when possible - start by planning interfaces and writing tests before implementation.
 
 ## Completion Criteria
 - Changed Python files are formatted and lint-clean.

@@ -4,11 +4,21 @@ Use this file for practical operator aids that do not belong in canonical projec
 
 ## Environment Recovery
 - Preferred interpreter: `aria_nbv/.venv/bin/python`
-- If the venv is missing or stale, rebuild it with:
+- If the venv is missing or stale, rebuild it from `aria_nbv/` with:
 
 ```bash
-UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync --extra dev --extra notebook --extra pytorch3d
+cd aria_nbv
+uv sync --all-extras
 ```
+
+- If `uv` does not resolve Python 3.11 automatically on this machine, rerun with an explicit local interpreter path:
+
+```bash
+cd aria_nbv
+UV_PYTHON=/path/to/python3.11 uv sync --all-extras
+```
+
+- Replace `/path/to/python3.11` with a machine-local interpreter path. Keep host-specific paths here or in user-local notes, not in shared repo guidance.
 
 - Verify the interpreter before diagnosing dependency issues:
 
