@@ -1,6 +1,6 @@
 # Seminar: Next Best View Estimation (NBV)
 
-See the [GitHub Pages](https://janduchscherer104.github.io/NBV/) for more information.
+See the [GitHub Pages](https://janduchscherer104.github.io/ARIA-NBV/) for more information.
 
 # Important CLI Commands
 
