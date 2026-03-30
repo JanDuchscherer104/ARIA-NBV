@@ -13,6 +13,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
+import msgspec
 import numpy as np
 import pytest
 import torch
@@ -33,6 +34,8 @@ from aria_nbv.data_handling import (
 )
 from aria_nbv.data_handling._legacy_cache_api import OracleRriCacheConfig
 from aria_nbv.data_handling._migration import LegacyOfflinePlan, LegacyOfflineRecord
+from aria_nbv.data_handling._offline_format import VinOfflineBlockSpec
+from aria_nbv.data_handling._offline_store import VinOfflineStoreReader
 from aria_nbv.data_handling._offline_writer import _assign_splits
 from aria_nbv.data_handling.cache_contracts import (
     OracleRriCacheEntry,
@@ -791,6 +794,81 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     assert int(batch.rri.shape[0]) == 4  # noqa: S101
     assert int(batch.resolved_candidate_count().item()) == 2  # noqa: S101
     assert batch.candidate_valid_mask().tolist() == [True, True, False, False]  # noqa: S101
+
+
+def test_vin_offline_store_writes_indexed_record_blocks(tmp_path: Path) -> None:
+    """Optional record blocks should use indexed payload blobs plus offsets."""
+
+    store_cfg = _write_test_store(tmp_path)
+    manifest = VinOfflineManifest.read(store_cfg.manifest_path)
+    block = manifest.shards[0].blocks["oracle.depths_payload"]
+
+    assert block.kind == "msgpack_indexed_records"  # noqa: S101
+    assert block.paths == [  # noqa: S101
+        VinOfflineBlockSpec.msgpack_records_path("oracle.depths_payload"),
+        VinOfflineBlockSpec.msgpack_records_offsets_path("oracle.depths_payload"),
+    ]
+    shard_dir = store_cfg.store_dir / manifest.shards[0].relative_dir
+    assert (shard_dir / block.paths[0]).is_file()  # noqa: S101
+    assert (shard_dir / block.paths[1]).is_file()  # noqa: S101
+    offsets = np.load(shard_dir / block.paths[1], allow_pickle=False)
+    assert offsets.tolist()[0] == 0  # noqa: S101
+    assert offsets.shape == (4,)  # noqa: S101
+    assert np.all(np.diff(offsets) > 0)  # noqa: S101
+
+
+def test_vin_offline_store_reads_indexed_record_blocks_without_legacy_decoder(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Indexed record blocks should not require the legacy whole-list decoder."""
+
+    store_cfg = _write_test_store(tmp_path)
+    reader = VinOfflineStoreReader(store_cfg)
+    record = reader.get_split_records("all")[1]
+
+    def _raise_if_called(*_: object, **__: object) -> None:
+        raise AssertionError("indexed record blocks should not call _load_record_list")
+
+    monkeypatch.setattr(reader, "_load_record_list", _raise_if_called)
+    payload = reader.read_optional_record(record, "oracle.depths_payload")
+    assert payload is not None  # noqa: S101
+    decoded = CandidateDepths.from_serializable(payload, device=torch.device("cpu"))
+    assert decoded.candidate_indices.tolist() == [0, 1, 2]  # noqa: S101
+    assert tuple(decoded.depths.shape) == (3, 4, 4)  # noqa: S101
+
+
+def test_vin_offline_store_reads_legacy_record_lists(tmp_path: Path) -> None:
+    """Reader compatibility should cover pre-v4 list-encoded record blocks."""
+
+    store_cfg = _write_test_store(tmp_path)
+    manifest = VinOfflineManifest.read(store_cfg.manifest_path)
+    shard_spec = manifest.shards[0]
+    block_name = "oracle.depths_payload"
+    payload_rel_path = VinOfflineBlockSpec.msgpack_records_path(block_name)
+    offsets_rel_path = VinOfflineBlockSpec.msgpack_records_offsets_path(block_name)
+    shard_dir = store_cfg.store_dir / shard_spec.relative_dir
+    legacy_records = [
+        _make_stub_depths(2, offset=0.0).to_serializable(),
+        _make_stub_depths(3, offset=10.0).to_serializable(),
+        _make_stub_depths(2, offset=20.0).to_serializable(),
+    ]
+    (shard_dir / payload_rel_path).write_bytes(msgspec.msgpack.encode(legacy_records))
+    (shard_dir / offsets_rel_path).unlink()
+    shard_spec.blocks[block_name] = VinOfflineBlockSpec.for_msgpack_records(
+        name=block_name,
+        relative_path=payload_rel_path,
+        num_records=len(legacy_records),
+    )
+    manifest.write(store_cfg.manifest_path)
+
+    reader = VinOfflineStoreReader(store_cfg)
+    record = reader.get_split_records("all")[1]
+    payload = reader.read_optional_record(record, block_name)
+    assert payload is not None  # noqa: S101
+    decoded = CandidateDepths.from_serializable(payload, device=torch.device("cpu"))
+    assert decoded.candidate_indices.tolist() == [0, 1, 2]  # noqa: S101
+    assert tuple(decoded.depths.shape) == (3, 4, 4)  # noqa: S101
 
 
 def test_vin_offline_dataset_vin_batch_skips_optional_record_reads(

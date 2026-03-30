@@ -6,6 +6,7 @@ This module owns the immutable on-disk layout of the VIN offline dataset:
 - per-shard block materialization helpers,
 - manifest and sample-index loading, and
 - Zarr-backed random-access reads for fixed-size tensor blocks.
+- indexed per-row MessagePack reads for optional diagnostic payloads.
 """
 
 from __future__ import annotations
@@ -17,10 +18,11 @@ from typing import Any
 import msgspec
 import numpy as np
 import zarr
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, field_validator
 
 from ..configs import PathConfig
 from ..utils import BaseConfig
+from ._config_utils import resolve_cache_artifact_dir
 from ._offline_format import (
     VinOfflineBlockSpec,
     VinOfflineIndexRecord,
@@ -28,7 +30,7 @@ from ._offline_format import (
     VinOfflineShardSpec,
 )
 
-OFFLINE_DATASET_VERSION = 3
+OFFLINE_DATASET_VERSION = 4
 """Version of the immutable VIN offline dataset format."""
 
 
@@ -53,21 +55,7 @@ class VinOfflineStoreConfig(BaseConfig):
     splits_dirname: str = "splits"
     """Directory containing split membership arrays."""
 
-    @field_validator("store_dir", mode="before")
-    @classmethod
-    def _resolve_store_dir(cls, value: str | Path, info: ValidationInfo) -> Path:
-        """Resolve relative dataset directories against project data roots.
-
-        Args:
-            value: Raw path value.
-            info: Pydantic validation context.
-
-        Returns:
-            Resolved absolute dataset directory.
-        """
-
-        paths: PathConfig = info.data.get("paths") or PathConfig()
-        return paths.resolve_cache_artifact_dir(value)
+    _resolve_store_dir = field_validator("store_dir", mode="before")(resolve_cache_artifact_dir)
 
     @property
     def manifest_path(self) -> Path:
@@ -180,23 +168,56 @@ class VinOfflineShardWriter:
         )
 
     def write_record_block(self, name: str, records: list[Any]) -> VinOfflineBlockSpec:
-        """Write one per-row diagnostic record list for the shard.
+        """Write one indexed per-row diagnostic record block for the shard.
 
         Args:
             name: Logical block name.
             records: Per-row msgspec-compatible payload objects.
 
         Returns:
-            Block descriptor for the stored record list.
+            Block descriptor for the stored indexed record block.
         """
 
-        rel_path = VinOfflineBlockSpec.msgpack_records_path(name)
-        (self.shard_dir / rel_path).write_bytes(msgspec.msgpack.encode(records))
-        return VinOfflineBlockSpec.for_msgpack_records(
+        payload_rel_path = VinOfflineBlockSpec.msgpack_records_path(name)
+        offsets_rel_path = VinOfflineBlockSpec.msgpack_records_offsets_path(name)
+        offsets = np.zeros((len(records) + 1,), dtype=np.int64)
+        with (self.shard_dir / payload_rel_path).open("wb") as handle:
+            for index, record in enumerate(records, start=1):
+                payload = msgspec.msgpack.encode(record)
+                handle.write(payload)
+                offsets[index] = offsets[index - 1] + len(payload)
+        np.save(self.shard_dir / offsets_rel_path, offsets, allow_pickle=False)
+        return VinOfflineBlockSpec.for_indexed_msgpack_records(
             name=name,
-            relative_path=rel_path,
+            relative_payload_path=payload_rel_path,
+            relative_offsets_path=offsets_rel_path,
             num_records=len(records),
         )
+
+
+@dataclass(slots=True)
+class IndexedMsgpackRecordBlock:
+    """Indexed per-row MessagePack record block stored for one shard."""
+
+    payload_path: Path
+    """Shard-local concatenated payload blob path."""
+
+    offsets: np.ndarray
+    """Byte offsets with shape ``(num_rows + 1,)``."""
+
+    def read(self, row: int) -> Any:
+        """Read and decode one record by row index."""
+
+        if row < 0 or row + 1 >= int(self.offsets.shape[0]):
+            raise IndexError("Record row out of range.")
+        start = int(self.offsets[row])
+        end = int(self.offsets[row + 1])
+        if end < start:
+            raise ValueError("Indexed record offsets are invalid.")
+        with self.payload_path.open("rb") as handle:
+            handle.seek(start)
+            payload = handle.read(end - start)
+        return msgspec.msgpack.decode(payload)
 
 
 @dataclass(slots=True)
@@ -211,6 +232,9 @@ class OpenedShard:
 
     record_lists: dict[str, list[Any]] = field(default_factory=dict)
     """Lazy-loaded diagnostic record lists keyed by logical block name."""
+
+    indexed_record_blocks: dict[str, IndexedMsgpackRecordBlock] = field(default_factory=dict)
+    """Indexed per-row MessagePack blocks keyed by logical block name."""
 
 
 class VinOfflineStoreReader:
@@ -266,6 +290,11 @@ class VinOfflineStoreReader:
         for block_name, block_spec in spec.blocks.items():
             if block_spec.kind == "zarr_array":
                 opened.arrays[block_name] = group[block_spec.paths[0]]
+            elif block_spec.kind == "msgpack_indexed_records":
+                opened.indexed_record_blocks[block_name] = IndexedMsgpackRecordBlock(
+                    payload_path=shard_dir / block_spec.paths[0],
+                    offsets=np.load(shard_dir / block_spec.paths[1], allow_pickle=False),
+                )
         self._opened[shard_id] = opened
         return opened
 
@@ -315,6 +344,9 @@ class VinOfflineStoreReader:
         opened = self._open_shard(record.shard_id)
         if block_name not in opened.spec.blocks:
             return None
+        block = opened.spec.blocks[block_name]
+        if block.kind == "msgpack_indexed_records":
+            return opened.indexed_record_blocks[block_name].read(record.row)
         records = self._load_record_list(opened, block_name)
         return records[record.row]
 

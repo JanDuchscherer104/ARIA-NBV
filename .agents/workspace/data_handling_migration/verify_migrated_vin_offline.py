@@ -8,12 +8,22 @@ import json
 from pathlib import Path
 
 from aria_nbv.data_handling import (
-    OracleRriCacheConfig,
     VinOfflineStoreConfig,
-    VinSnippetCacheConfig,
     scan_legacy_offline_data,
     verify_migrated_offline_data,
 )
+from aria_nbv.data_handling._legacy_cache_api import (
+    OracleRriCacheConfig,
+    VinSnippetCacheConfig,
+)
+
+
+def _parse_scene_ids(raw: str | None) -> list[str] | None:
+    """Parse a comma-separated scene-id argument into a normalized list."""
+    if raw is None:
+        return None
+    scene_ids = [token.strip() for token in raw.split(",") if token.strip()]
+    return scene_ids or None
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -30,6 +40,24 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Optional legacy VIN-cache directory.",
+    )
+    parser.add_argument(
+        "--scene-ids",
+        type=str,
+        default=None,
+        help="Optional comma-separated scene IDs to compare against.",
+    )
+    parser.add_argument(
+        "--split",
+        choices=("all", "train", "val"),
+        default="all",
+        help="Optional legacy split selector used before max-records truncation.",
+    )
+    parser.add_argument(
+        "--max-records",
+        type=int,
+        default=None,
+        help="Optional cap applied after split and scene filtering.",
     )
     parser.add_argument(
         "--store",
@@ -59,6 +87,9 @@ def main() -> None:
     plan = scan_legacy_offline_data(
         oracle_cache=oracle_cfg,
         vin_cache=vin_cfg,
+        scene_ids=_parse_scene_ids(args.scene_ids),
+        split=args.split,
+        max_records=args.max_records,
         repair_splits=args.repair_splits,
     )
     result = verify_migrated_offline_data(

@@ -7,11 +7,19 @@ import argparse
 import json
 from pathlib import Path
 
-from aria_nbv.data_handling import (
+from aria_nbv.data_handling import scan_legacy_offline_data
+from aria_nbv.data_handling._legacy_cache_api import (
     OracleRriCacheConfig,
     VinSnippetCacheConfig,
-    scan_legacy_offline_data,
 )
+
+
+def _parse_scene_ids(raw: str | None) -> list[str] | None:
+    """Parse a comma-separated scene-id argument into a normalized list."""
+    if raw is None:
+        return None
+    scene_ids = [token.strip() for token in raw.split(",") if token.strip()]
+    return scene_ids or None
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -28,6 +36,24 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Optional legacy VIN-cache directory.",
+    )
+    parser.add_argument(
+        "--scene-ids",
+        type=str,
+        default=None,
+        help="Optional comma-separated scene IDs to include in the scan.",
+    )
+    parser.add_argument(
+        "--split",
+        choices=("all", "train", "val"),
+        default="all",
+        help="Optional legacy split selector used before max-records truncation.",
+    )
+    parser.add_argument(
+        "--max-records",
+        type=int,
+        default=None,
+        help="Optional cap applied after split and scene filtering.",
     )
     parser.add_argument(
         "--train-val-split",
@@ -55,6 +81,9 @@ def main() -> None:
     plan = scan_legacy_offline_data(
         oracle_cache=oracle_cfg,
         vin_cache=vin_cfg,
+        scene_ids=_parse_scene_ids(args.scene_ids),
+        split=args.split,
+        max_records=args.max_records,
         train_val_split=args.train_val_split,
         repair_splits=args.repair_splits,
     )
@@ -68,6 +97,9 @@ def main() -> None:
         "val_count": plan.val_count,
         "missing_vin_pairs": [list(pair) for pair in plan.missing_vin_pairs],
         "has_dataset_payload": plan.dataset_payload is not None,
+        "selected_scene_ids": _parse_scene_ids(args.scene_ids),
+        "selected_split": args.split,
+        "selected_max_records": args.max_records,
     }
     print(json.dumps(summary, indent=2, sort_keys=True))
 

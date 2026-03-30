@@ -76,21 +76,21 @@ dependencies = [
     "zarr>=3.1.5",
 ]
 
-    [project.scripts]
-    nbv-summary            = "aria_nbv.lightning.cli:summarize_main"
-    nbv-downloader         = "aria_nbv.data.downloader:main"
-    nbv-cache-samples      = "aria_nbv.lightning.cli:cache_main"
-    nbv-cache-vin-snippets = "aria_nbv.lightning.cli:cache_vin_snippets_main"
-    nbv-st                 = "aria_nbv.streamlit_app:streamlit_entry"
-    nbv-fit-binner         = "aria_nbv.lightning.cli:fit_binner_main"
-    nbv-train              = "aria_nbv.lightning.cli:train_main"
-    nbv-optuna             = "aria_nbv.lightning.cli:optuna_main"
-    nbv-wandb              = "aria_nbv.lightning.cli:wandb_main"
-    nbv-cli                = "aria_nbv.lightning.cli:main"
+[project.scripts]
+nbv-summary            = "aria_nbv.lightning.cli:summarize_main"
+nbv-downloader         = "aria_nbv.data.downloader:main"
+nbv-cache-samples      = "aria_nbv.lightning.cli:cache_main"
+nbv-cache-vin-snippets = "aria_nbv.lightning.cli:cache_vin_snippets_main"
+nbv-st                 = "aria_nbv.streamlit_app:streamlit_entry"
+nbv-fit-binner         = "aria_nbv.lightning.cli:fit_binner_main"
+nbv-train              = "aria_nbv.lightning.cli:train_main"
+nbv-optuna             = "aria_nbv.lightning.cli:optuna_main"
+nbv-wandb              = "aria_nbv.lightning.cli:wandb_main"
+nbv-cli                = "aria_nbv.lightning.cli:main"
 
 
-    [project.optional-dependencies]
-    dev = [
+[project.optional-dependencies]
+dev = [
         "pytest>=8.4.2",
         "pytest-cov>=7.0.0",
         "ruff>=0.1.0",

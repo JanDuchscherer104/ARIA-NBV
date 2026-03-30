@@ -8,15 +8,23 @@ This temporary operator tool follows the repo's typed CLI pattern via
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
-from aria_nbv.data_handling import (
+from aria_nbv.data_handling import VinOfflineStoreConfig, migrate_legacy_offline_data
+from aria_nbv.data_handling._legacy_cache_api import (
     OracleRriCacheConfig,
-    VinOfflineStoreConfig,
     VinSnippetCacheConfig,
-    migrate_legacy_offline_data,
 )
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _parse_scene_ids(raw: str | None) -> list[str] | None:
+    """Parse a comma-separated scene-id CLI value into a normalized list."""
+    if raw is None:
+        return None
+    scene_ids = [token.strip() for token in raw.split(",") if token.strip()]
+    return scene_ids or None
 
 
 class CLIMigrateLegacyOfflineData(BaseSettings):
@@ -27,6 +35,15 @@ class CLIMigrateLegacyOfflineData(BaseSettings):
 
     vin_cache: Path | None = None
     """Optional legacy VIN-cache directory."""
+
+    scene_ids: str | None = None
+    """Optional comma-separated scene IDs to migrate."""
+
+    split: Literal["all", "train", "val"] = "all"
+    """Optional legacy split selector used before max-records truncation."""
+
+    max_records: int | None = Field(default=None, ge=1)
+    """Optional cap applied after split and scene filtering."""
 
     out_store: Path = Field(...)
     """Destination immutable VIN offline store."""
@@ -85,6 +102,9 @@ def main() -> None:
         oracle_cache=oracle_cfg,
         store=VinOfflineStoreConfig(store_dir=args.out_store),
         vin_cache=vin_cfg,
+        scene_ids=_parse_scene_ids(args.scene_ids),
+        split=args.split,
+        max_records=args.max_records,
         workers=int(args.workers),
         samples_per_shard=int(args.samples_per_shard),
         max_candidates=int(args.max_candidates),

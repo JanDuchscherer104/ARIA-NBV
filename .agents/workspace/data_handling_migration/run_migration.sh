@@ -27,7 +27,26 @@ else
 fi
 
 EXTRA_ARGS=("$@")
+SUBSET_ARGS=()
 
-python "$SCRIPT_DIR/scan_legacy_offline_data.py" "${SCAN_ARGS[@]}"
+idx=0
+while [[ $idx -lt ${#EXTRA_ARGS[@]} ]]; do
+  arg="${EXTRA_ARGS[$idx]}"
+  case "$arg" in
+    --scene-ids|--split|--max-records|--train-val-split)
+      SUBSET_ARGS+=("$arg")
+      ((idx += 1))
+      if [[ $idx -lt ${#EXTRA_ARGS[@]} ]]; then
+        SUBSET_ARGS+=("${EXTRA_ARGS[$idx]}")
+      fi
+      ;;
+    --repair-splits)
+      SUBSET_ARGS+=("$arg")
+      ;;
+  esac
+  ((idx += 1))
+done
+
+python "$SCRIPT_DIR/scan_legacy_offline_data.py" "${SCAN_ARGS[@]}" "${SUBSET_ARGS[@]}"
 python "$SCRIPT_DIR/convert_legacy_to_vin_offline.py" "${CONVERT_ARGS[@]}" "${EXTRA_ARGS[@]}"
-python "$SCRIPT_DIR/verify_migrated_vin_offline.py" "${VERIFY_ARGS[@]}"
+python "$SCRIPT_DIR/verify_migrated_vin_offline.py" "${VERIFY_ARGS[@]}" "${SUBSET_ARGS[@]}"

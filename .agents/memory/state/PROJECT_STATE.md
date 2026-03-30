@@ -27,6 +27,9 @@ The current stack has three main layers: ASE and EFM-facing data access, oracle 
 - Treat `aria_nbv.data_handling` as the canonical owner of raw snippet, oracle-cache, VIN-cache, and cache-coverage contracts, and `aria_nbv.utils.data_plotting` as the canonical owner of shared snippet plotting; mirrored `aria_nbv.data` compatibility modules were removed.
 - Remaining legacy oracle-cache / VIN-snippet-cache runtime, UI, CLI, and dedicated test surfaces are tagged with `NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION` so the final removal sweep can be done via one grep query.
 - The `aria_nbv.data_handling` package root is now canonical-only; remaining legacy cache APIs live behind dedicated `_legacy_cache_api.py` and `_legacy_vin_source.py` modules, while the old public submodule names (`oracle_cache.py`, `vin_cache.py`, `vin_oracle_datasets.py`, etc.) are thin compatibility wrappers over those `_legacy_*` owners.
+- The canonical package root now exports `VinDatasetSourceConfig` rather than the ambiguous compatibility alias `VinOracleDatasetConfig`; that alias remains only on the dedicated legacy wrapper surface.
+- The workspace migration CLIs now import legacy cache configs explicitly from `_legacy_cache_api.py`, support subset-first migration via `scene_ids` / `split` / `max_records`, and migrated-store verification compares migrated provenance plus core numeric blocks against the legacy oracle/VIN payloads instead of only checking counts and `(scene_id, snippet_id)` coverage.
+- The immutable VIN offline store now writes optional diagnostic payloads as indexed MessagePack blobs plus `.offsets.npy` sidecars (format version 4), while the runtime still reads older single-file `msgpack_records` shards for backward compatibility.
 
 ## Active Experiments
 The project is actively iterating on VIN variants, semidense projection cues, candidate generation behavior, and documentation alignment between code, paper, and slides.

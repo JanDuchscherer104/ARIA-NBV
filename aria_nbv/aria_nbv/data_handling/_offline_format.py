@@ -24,7 +24,8 @@ class VinOfflineBlockSpec:
 
     Attributes:
         name: Logical block name, for example ``"vin.points_world"``.
-        kind: Storage kind such as ``"zarr_array"`` or ``"msgpack_records"``.
+        kind: Storage kind such as ``"zarr_array"``, ``"msgpack_records"``,
+            or ``"msgpack_indexed_records"``.
         paths: Relative array names or file paths that materialize the block.
         dtype: NumPy dtype name for numeric blocks.
         shape: Full stored array shape for numeric blocks.
@@ -76,6 +77,20 @@ class VinOfflineBlockSpec:
         safe_stem = name.replace("/", "__").replace(".", "__")
         return f"{safe_stem}.msgpack"
 
+    @staticmethod
+    def msgpack_records_offsets_path(name: str) -> str:
+        """Return the offsets filename used for indexed record blocks.
+
+        Args:
+            name: Logical block name.
+
+        Returns:
+            Shard-local NumPy offsets filename.
+        """
+
+        safe_stem = name.replace("/", "__").replace(".", "__")
+        return f"{safe_stem}.offsets.npy"
+
     @classmethod
     def for_zarr_array(
         cls,
@@ -117,7 +132,7 @@ class VinOfflineBlockSpec:
         num_records: int,
         optional: bool = True,
     ) -> Self:
-        """Build a block descriptor for one msgpack record list.
+        """Build a legacy block descriptor for one msgpack record list.
 
         Args:
             name: Logical block name.
@@ -133,6 +148,38 @@ class VinOfflineBlockSpec:
             name=name,
             kind="msgpack_records",
             paths=[relative_path],
+            dtype=None,
+            shape=[num_records],
+            optional=optional,
+        )
+
+    @classmethod
+    def for_indexed_msgpack_records(
+        cls,
+        *,
+        name: str,
+        relative_payload_path: str,
+        relative_offsets_path: str,
+        num_records: int,
+        optional: bool = True,
+    ) -> Self:
+        """Build a block descriptor for indexed per-row MessagePack records.
+
+        Args:
+            name: Logical block name.
+            relative_payload_path: Shard-local concatenated payload blob path.
+            relative_offsets_path: Shard-local NumPy offsets path.
+            num_records: Number of stored per-row records.
+            optional: Whether the block is optional.
+
+        Returns:
+            Block descriptor for the indexed record block.
+        """
+
+        return cls(
+            name=name,
+            kind="msgpack_indexed_records",
+            paths=[relative_payload_path, relative_offsets_path],
             dtype=None,
             shape=[num_records],
             optional=optional,

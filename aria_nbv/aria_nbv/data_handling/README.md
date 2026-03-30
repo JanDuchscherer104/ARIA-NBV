@@ -192,19 +192,20 @@ Conceptually:
     range.
   - The shard root has its own `zarr.json`.
   - Numeric tensor blocks are stored as nested Zarr arrays.
-  - Optional rich per-row payloads are stored as MessagePack record lists.
+  - Optional rich per-row payloads are stored as indexed MessagePack blobs.
 
 Each shard mixes two storage kinds:
 
 - fixed-size numeric blocks as Zarr arrays for fast row-wise random access
-- optional diagnostic payload lists as `msgspec` MessagePack files
+- optional diagnostic payload blobs as `msgspec` MessagePack plus
+  `.offsets.npy` sidecars for row-wise reads
 
 The path mapping is deterministic:
 
 - logical block name `vin.points_world` becomes Zarr path `vin/points_world/`
 - logical block name `oracle.p3d.R` becomes Zarr path `oracle/p3d/R/`
 - logical record block `oracle.depths_payload` becomes
-  `oracle__depths_payload.msgpack`
+  `oracle__depths_payload.msgpack` plus `oracle__depths_payload.offsets.npy`
 
 Zarr-backed blocks contain:
 
@@ -248,6 +249,7 @@ vin_offline_subset/
 │       │       ├── c/
 │       │       └── zarr.json
 │       ├── backbone__payload.msgpack
+│       ├── backbone__payload.offsets.npy
 │       ├── oracle/
 │       │   ├── zarr.json
 │       │   ├── candidate_count/
@@ -309,8 +311,11 @@ vin_offline_subset/
 │       │       ├── c/
 │       │       └── zarr.json
 │       ├── oracle__candidate_pcs.msgpack
+│       ├── oracle__candidate_pcs.offsets.npy
 │       ├── oracle__candidates.msgpack
+│       ├── oracle__candidates.offsets.npy
 │       ├── oracle__depths_payload.msgpack
+│       ├── oracle__depths_payload.offsets.npy
 │       ├── vin/
 │       │   ├── zarr.json
 │       │   ├── lengths/
@@ -344,10 +349,14 @@ The training-critical path reads only the numeric Zarr blocks:
 
 Optional sample-mode diagnostics can additionally decode:
 
-- `oracle__candidates.msgpack` for candidate-sampling metadata
-- `oracle__depths_payload.msgpack` for full depth payload objects
-- `oracle__candidate_pcs.msgpack` for candidate point clouds
-- `backbone__payload.msgpack` for full backbone payload objects
+- `oracle__candidates.msgpack` + `oracle__candidates.offsets.npy` for
+  candidate-sampling metadata
+- `oracle__depths_payload.msgpack` + `oracle__depths_payload.offsets.npy` for
+  full depth payload objects
+- `oracle__candidate_pcs.msgpack` + `oracle__candidate_pcs.offsets.npy` for
+  candidate point clouds
+- `backbone__payload.msgpack` + `backbone__payload.offsets.npy` for full
+  backbone payload objects
 - future counterfactual payloads when `materialized_blocks.counterfactuals=true`
 
 Two practical implications:
@@ -357,6 +366,9 @@ Two practical implications:
 - Large optional diagnostics can dominate disk usage. In real stores,
   `backbone__payload.msgpack` is often much larger than the fixed Zarr arrays,
   while the Zarr blocks remain the fast path for training and random access.
+- The runtime still accepts older stores whose optional records were written as
+  single legacy `*.msgpack` lists. New writers emit indexed payload blobs with
+  `*.offsets.npy` sidecars so one sample read no longer decodes the full shard.
 
 ## Migration workflow
 
