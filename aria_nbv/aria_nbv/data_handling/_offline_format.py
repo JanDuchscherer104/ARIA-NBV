@@ -24,8 +24,8 @@ class VinOfflineBlockSpec:
 
     Attributes:
         name: Logical block name, for example ``"vin.points_world"``.
-        kind: Storage kind such as ``"zarr_array"``, ``"msgpack_records"``,
-            or ``"msgpack_indexed_records"``.
+        kind: Storage kind such as ``"zarr_array"`` or
+            ``"msgpack_indexed_records"``.
         paths: Relative array names or file paths that materialize the block.
         dtype: NumPy dtype name for numeric blocks.
         shape: Full stored array shape for numeric blocks.
@@ -120,36 +120,6 @@ class VinOfflineBlockSpec:
             paths=[array_path],
             dtype=dtype,
             shape=shape,
-            optional=optional,
-        )
-
-    @classmethod
-    def for_msgpack_records(
-        cls,
-        *,
-        name: str,
-        relative_path: str,
-        num_records: int,
-        optional: bool = True,
-    ) -> Self:
-        """Build a legacy block descriptor for one msgpack record list.
-
-        Args:
-            name: Logical block name.
-            relative_path: Shard-local msgpack filename.
-            num_records: Number of stored per-row records.
-            optional: Whether the block is optional.
-
-        Returns:
-            Block descriptor for the stored record list.
-        """
-
-        return cls(
-            name=name,
-            kind="msgpack_records",
-            paths=[relative_path],
-            dtype=None,
-            shape=[num_records],
             optional=optional,
         )
 

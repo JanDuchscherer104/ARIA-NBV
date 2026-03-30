@@ -13,7 +13,6 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-import msgspec
 import numpy as np
 import pytest
 import torch
@@ -819,18 +818,12 @@ def test_vin_offline_store_writes_indexed_record_blocks(tmp_path: Path) -> None:
 
 def test_vin_offline_store_reads_indexed_record_blocks_without_legacy_decoder(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Indexed record blocks should not require the legacy whole-list decoder."""
+    """Indexed record blocks should load one row directly from the shard blob."""
 
     store_cfg = _write_test_store(tmp_path)
     reader = VinOfflineStoreReader(store_cfg)
     record = reader.get_split_records("all")[1]
-
-    def _raise_if_called(*_: object, **__: object) -> None:
-        raise AssertionError("indexed record blocks should not call _load_record_list")
-
-    monkeypatch.setattr(reader, "_load_record_list", _raise_if_called)
     payload = reader.read_optional_record(record, "oracle.depths_payload")
     assert payload is not None  # noqa: S101
     decoded = CandidateDepths.from_serializable(payload, device=torch.device("cpu"))
@@ -838,37 +831,30 @@ def test_vin_offline_store_reads_indexed_record_blocks_without_legacy_decoder(
     assert tuple(decoded.depths.shape) == (3, 4, 4)  # noqa: S101
 
 
-def test_vin_offline_store_reads_legacy_record_lists(tmp_path: Path) -> None:
-    """Reader compatibility should cover pre-v4 list-encoded record blocks."""
+def test_vin_offline_store_rejects_unsupported_manifest_version(tmp_path: Path) -> None:
+    """Runtime readers should only accept the current immutable store version."""
 
     store_cfg = _write_test_store(tmp_path)
     manifest = VinOfflineManifest.read(store_cfg.manifest_path)
-    shard_spec = manifest.shards[0]
-    block_name = "oracle.depths_payload"
-    payload_rel_path = VinOfflineBlockSpec.msgpack_records_path(block_name)
-    offsets_rel_path = VinOfflineBlockSpec.msgpack_records_offsets_path(block_name)
-    shard_dir = store_cfg.store_dir / shard_spec.relative_dir
-    legacy_records = [
-        _make_stub_depths(2, offset=0.0).to_serializable(),
-        _make_stub_depths(3, offset=10.0).to_serializable(),
-        _make_stub_depths(2, offset=20.0).to_serializable(),
-    ]
-    (shard_dir / payload_rel_path).write_bytes(msgspec.msgpack.encode(legacy_records))
-    (shard_dir / offsets_rel_path).unlink()
-    shard_spec.blocks[block_name] = VinOfflineBlockSpec.for_msgpack_records(
-        name=block_name,
-        relative_path=payload_rel_path,
-        num_records=len(legacy_records),
-    )
+    manifest.version = OFFLINE_DATASET_VERSION - 1
+    manifest.write(store_cfg.manifest_path)
+
+    with pytest.raises(ValueError, match="Unsupported VIN offline dataset version"):
+        VinOfflineStoreReader(store_cfg)
+
+
+def test_vin_offline_store_rejects_legacy_record_block_kind(tmp_path: Path) -> None:
+    """Runtime readers should reject older optional-record block encodings."""
+
+    store_cfg = _write_test_store(tmp_path)
+    manifest = VinOfflineManifest.read(store_cfg.manifest_path)
+    manifest.shards[0].blocks["oracle.depths_payload"].kind = "msgpack_records"
     manifest.write(store_cfg.manifest_path)
 
     reader = VinOfflineStoreReader(store_cfg)
     record = reader.get_split_records("all")[1]
-    payload = reader.read_optional_record(record, block_name)
-    assert payload is not None  # noqa: S101
-    decoded = CandidateDepths.from_serializable(payload, device=torch.device("cpu"))
-    assert decoded.candidate_indices.tolist() == [0, 1, 2]  # noqa: S101
-    assert tuple(decoded.depths.shape) == (3, 4, 4)  # noqa: S101
+    with pytest.raises(ValueError, match="Unsupported VIN offline block kind"):
+        reader.read_optional_record(record, "oracle.depths_payload")
 
 
 def test_vin_offline_dataset_vin_batch_skips_optional_record_reads(

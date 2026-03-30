@@ -366,9 +366,9 @@ Two practical implications:
 - Large optional diagnostics can dominate disk usage. In real stores,
   `backbone__payload.msgpack` is often much larger than the fixed Zarr arrays,
   while the Zarr blocks remain the fast path for training and random access.
-- The runtime still accepts older stores whose optional records were written as
-  single legacy `*.msgpack` lists. New writers emit indexed payload blobs with
-  `*.offsets.npy` sidecars so one sample read no longer decodes the full shard.
+- Version 4 is the only supported immutable-store runtime format. Older stores
+  should be rebuilt with the migration tooling rather than loaded through
+  runtime fallback branches.
 
 ## Migration workflow
 

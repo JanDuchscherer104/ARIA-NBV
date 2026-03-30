@@ -230,9 +230,6 @@ class OpenedShard:
     arrays: dict[str, Any] = field(default_factory=dict)
     """Opened Zarr arrays keyed by logical block name."""
 
-    record_lists: dict[str, list[Any]] = field(default_factory=dict)
-    """Lazy-loaded diagnostic record lists keyed by logical block name."""
-
     indexed_record_blocks: dict[str, IndexedMsgpackRecordBlock] = field(default_factory=dict)
     """Indexed per-row MessagePack blocks keyed by logical block name."""
 
@@ -249,6 +246,12 @@ class VinOfflineStoreReader:
 
         self.config = config
         self.manifest = VinOfflineManifest.read(config.manifest_path)
+        if self.manifest.version != OFFLINE_DATASET_VERSION:
+            raise ValueError(
+                "Unsupported VIN offline dataset version "
+                f"{self.manifest.version}; expected {OFFLINE_DATASET_VERSION}. "
+                "Rebuild the store with the current migration tooling.",
+            )
         self.sample_index = VinOfflineIndexRecord.read_many(config.sample_index_path)
         self._records_by_sample_index = {record.sample_index: record for record in self.sample_index}
         self._shards = {spec.shard_id: spec for spec in self.manifest.shards}
@@ -295,26 +298,14 @@ class VinOfflineStoreReader:
                     payload_path=shard_dir / block_spec.paths[0],
                     offsets=np.load(shard_dir / block_spec.paths[1], allow_pickle=False),
                 )
+            else:
+                raise ValueError(
+                    "Unsupported VIN offline block kind "
+                    f"{block_spec.kind!r} for {block_name!r} in shard {shard_id!r}. "
+                    "Rebuild the store with the current migration tooling.",
+                )
         self._opened[shard_id] = opened
         return opened
-
-    def _load_record_list(self, opened: OpenedShard, block_name: str) -> list[Any]:
-        """Load a per-row diagnostic record list for one shard.
-
-        Args:
-            opened: Worker-local opened shard handle.
-            block_name: Logical block name to load.
-
-        Returns:
-            Per-row record list for the block.
-        """
-
-        if block_name in opened.record_lists:
-            return opened.record_lists[block_name]
-        block = opened.spec.blocks[block_name]
-        shard_dir = self.config.store_dir / opened.spec.relative_dir
-        opened.record_lists[block_name] = msgspec.msgpack.decode((shard_dir / block.paths[0]).read_bytes())
-        return opened.record_lists[block_name]
 
     def read_numeric_block(self, record: VinOfflineIndexRecord, block_name: str) -> np.ndarray:
         """Read one numeric block row for a sample.
@@ -344,11 +335,7 @@ class VinOfflineStoreReader:
         opened = self._open_shard(record.shard_id)
         if block_name not in opened.spec.blocks:
             return None
-        block = opened.spec.blocks[block_name]
-        if block.kind == "msgpack_indexed_records":
-            return opened.indexed_record_blocks[block_name].read(record.row)
-        records = self._load_record_list(opened, block_name)
-        return records[record.row]
+        return opened.indexed_record_blocks[block_name].read(record.row)
 
 
 __all__ = [
