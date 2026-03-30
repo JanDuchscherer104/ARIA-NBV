@@ -74,7 +74,13 @@ from efm3d.aria.pose import PoseTW
 
 from aria_nbv.data.efm_views import EfmSnippetView, VinSnippetView
 from aria_nbv.data.vin_oracle_types import VinOracleBatch
-from aria_nbv.vin.model_v3 import SEMIDENSE_PROJ_DIM, VinModelV3, VinModelV3Config
+from aria_nbv.vin.model_v3 import (
+    SEMIDENSE_PROJ_DIM,
+    SemidenseProjectionBackend,
+    VinModelV3,
+    VinModelV3Config,
+)
+from aria_nbv.vin.mojo_backend import is_mojo_available as is_semidense_mojo_available
 from aria_nbv.vin.traj_encoder import TrajectoryEncoderConfig
 from aria_nbv.vin.types import EvlBackboneOutput
 
@@ -111,13 +117,17 @@ def _make_backbone_out(*, batch: int, grid: int) -> EvlBackboneOutput:
     )
 
 
-def _make_model() -> VinModelV3:
+def _make_model(
+    *,
+    projection_backend: SemidenseProjectionBackend = SemidenseProjectionBackend.TORCH,
+) -> VinModelV3:
     config = VinModelV3Config(
         field_dim=4,
         field_gn_groups=2,
         global_pool_grid_size=2,
         semidense_proj_grid_size=4,
         semidense_proj_max_points=16,
+        semidense_projection_backend=projection_backend,
         head_hidden_dim=8,
         head_num_layers=1,
         head_dropout=0.0,
@@ -135,6 +145,7 @@ def _make_model_with_traj() -> VinModelV3:
         global_pool_grid_size=2,
         semidense_proj_grid_size=4,
         semidense_proj_max_points=16,
+        semidense_projection_backend=SemidenseProjectionBackend.TORCH,
         head_hidden_dim=8,
         head_num_layers=1,
         head_dropout=0.0,
@@ -200,6 +211,10 @@ def _make_candidate_poses(*, num_candidates: int, offset: float = 0.0) -> PoseTW
     trans = torch.zeros((num_candidates, 3), device=device, dtype=dtype)
     trans[:, 0] = torch.linspace(0.0, 0.2, num_candidates, device=device, dtype=dtype) + float(offset)
     return PoseTW.from_Rt(rot, trans)
+
+
+def _clone_proj_data(proj_data: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    return {key: value.clone() if isinstance(value, torch.Tensor) else value for key, value in proj_data.items()}
 
 
 def test_pose_encoder_lff_property() -> None:
@@ -425,6 +440,45 @@ def test_encode_semidense_projection_features() -> None:
         )
 
 
+def test_semidense_projection_backend_enum() -> None:
+    assert SemidenseProjectionBackend.MOJO.value == "mojo"
+    assert SemidenseProjectionBackend.TORCH.value == "torch"
+
+
+def test_encode_semidense_projection_features_mojo_matches_torch() -> None:
+    if not is_semidense_mojo_available():
+        pytest.skip("Mojo runtime not available")
+
+    model_torch = _make_model(projection_backend=SemidenseProjectionBackend.TORCH)
+    model_mojo = _make_model(projection_backend=SemidenseProjectionBackend.MOJO)
+    snippet = _make_vin_snippet(num_points=12)
+    cameras = _make_cameras(2)
+    proj = model_torch._project_semidense_points(
+        snippet.points_world,
+        cameras,
+        batch_size=1,
+        num_candidates=2,
+        device=torch.device("cpu"),
+    )
+    assert proj is not None
+
+    feats_torch = model_torch._encode_semidense_projection_features(
+        _clone_proj_data(proj),
+        batch_size=1,
+        num_candidates=2,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+    feats_mojo = model_mojo._encode_semidense_projection_features(
+        _clone_proj_data(proj),
+        batch_size=1,
+        num_candidates=2,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+    assert torch.allclose(feats_torch, feats_mojo, atol=1e-5, rtol=1e-5)
+
+
 def test_encode_semidense_grid_features() -> None:
     model = _make_model()
     snippet = _make_vin_snippet(num_points=6)
@@ -445,6 +499,43 @@ def test_encode_semidense_grid_features() -> None:
     )
     assert feats.shape == (1, 1, model.config.semidense_cnn_out_dim)
     assert torch.isfinite(feats).all()
+
+
+def test_encode_semidense_grid_features_mojo_matches_torch() -> None:
+    if not is_semidense_mojo_available():
+        pytest.skip("Mojo runtime not available")
+
+    torch.manual_seed(0)
+    model_torch = _make_model(projection_backend=SemidenseProjectionBackend.TORCH)
+    model_mojo = _make_model(projection_backend=SemidenseProjectionBackend.MOJO)
+    model_mojo.load_state_dict(model_torch.state_dict())
+
+    snippet = _make_vin_snippet(num_points=14)
+    cameras = _make_cameras(2)
+    proj = model_torch._project_semidense_points(
+        snippet.points_world,
+        cameras,
+        batch_size=1,
+        num_candidates=2,
+        device=torch.device("cpu"),
+    )
+    assert proj is not None
+
+    feats_torch = model_torch._encode_semidense_grid_features(
+        _clone_proj_data(proj),
+        batch_size=1,
+        num_candidates=2,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+    feats_mojo = model_mojo._encode_semidense_grid_features(
+        _clone_proj_data(proj),
+        batch_size=1,
+        num_candidates=2,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+    assert torch.allclose(feats_torch, feats_mojo, atol=1e-5, rtol=1e-5)
 
 
 def test_semidense_proj_feature_index_aliases() -> None:
@@ -501,6 +592,51 @@ def test_forward_and_debug_paths() -> None:
     assert debug is not None
     assert debug.semidense_proj is not None
     assert pred_debug.logits.shape == pred.logits.shape
+
+
+def test_forward_and_debug_paths_mojo_matches_torch() -> None:
+    if not is_semidense_mojo_available():
+        pytest.skip("Mojo runtime not available")
+
+    torch.manual_seed(0)
+    model_torch = _make_model(projection_backend=SemidenseProjectionBackend.TORCH)
+    model_mojo = _make_model(projection_backend=SemidenseProjectionBackend.MOJO)
+    model_mojo.load_state_dict(model_torch.state_dict())
+
+    snippet = _make_vin_snippet()
+    backbone_out = _make_backbone_out(batch=1, grid=2)
+    candidates = _make_candidate_poses(num_candidates=2)
+    reference_pose = _identity_pose(1)
+    cameras = _make_cameras(2)
+
+    pred_torch, debug_torch = model_torch.forward_with_debug(
+        snippet,
+        candidate_poses_world_cam=candidates,
+        reference_pose_world_rig=reference_pose,
+        p3d_cameras=cameras,
+        backbone_out=backbone_out,
+    )
+    pred_mojo, debug_mojo = model_mojo.forward_with_debug(
+        snippet,
+        candidate_poses_world_cam=candidates,
+        reference_pose_world_rig=reference_pose,
+        p3d_cameras=cameras,
+        backbone_out=backbone_out,
+    )
+
+    assert torch.allclose(pred_torch.logits, pred_mojo.logits, atol=1e-5, rtol=1e-5)
+    assert torch.allclose(pred_torch.expected, pred_mojo.expected, atol=1e-5, rtol=1e-5)
+    assert torch.allclose(
+        pred_torch.expected_normalized,
+        pred_mojo.expected_normalized,
+        atol=1e-5,
+        rtol=1e-5,
+    )
+    assert debug_torch is not None
+    assert debug_mojo is not None
+    assert debug_torch.semidense_proj is not None
+    assert debug_mojo.semidense_proj is not None
+    assert torch.allclose(debug_torch.semidense_proj, debug_mojo.semidense_proj, atol=1e-5, rtol=1e-5)
 
 
 def test_forward_with_traj_context() -> None:

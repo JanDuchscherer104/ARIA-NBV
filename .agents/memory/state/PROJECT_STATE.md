@@ -19,6 +19,7 @@ The current stack has three main layers: ASE and EFM-facing data access, oracle 
 - Treat `docs/typst/paper/main.typ` as the highest-level project narrative and sync Quarto docs to it.
 - Use the uv-managed environment in `aria_nbv/.venv`.
 - Use `PoseTW` and `CameraTW` instead of raw matrices.
+- Keep experimental Mojo acceleration behind explicit config selectors and preserve the Torch / PyTorch3D defaults. The current optional backends cover candidate-generation mesh clearance and VIN semidense projection accumulation, with Mojo site-packages resolved from the repo-local install or `ARIA_NBV_MOJO_SITE_PACKAGES`.
 - Treat `docs/references.bib` as the only bibliography source of truth.
 - Keep repo guidance in `AGENTS.md`, repeatable workflows in `.agents/skills/`, and generated context in `docs/_generated/context/`.
 - Keep operator aids and long-form conventions in `.agents/references/`; canonical state docs should remain focused on current truth.

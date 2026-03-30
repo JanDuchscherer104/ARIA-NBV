@@ -57,6 +57,7 @@ TODO: Do we differentiate between semi-dense points based on their visibility fr
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal
 
 import torch
@@ -80,6 +81,12 @@ from ..data_handling import (
 from ..rri_metrics.coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
 from ..utils import BaseConfig
 from .backbone_evl import EvlBackboneConfig
+from .mojo_backend import (
+    accumulate_projection_bins_mojo,
+)
+from .mojo_backend import (
+    is_mojo_available as is_semidense_mojo_available,
+)
 from .pose_encoders import PoseEncoder, R6dLffPoseEncoderConfig
 from .pose_encoding import LearnableFourierFeaturesConfig
 from .summarize_v3 import summarize_vin_v3
@@ -135,6 +142,13 @@ SEMIDENSE_PROJ_FEATURE_ALIASES: dict[str, str] = {
 }
 
 
+class SemidenseProjectionBackend(StrEnum):
+    """Backend for semidense screen-space accumulation."""
+
+    MOJO = "mojo"
+    TORCH = "torch"
+
+
 class VinModelV3Config(BaseConfig["VinModelV3"]):
     """Configuration for :class:`VinModelV3` (streamlined VIN baseline)."""
 
@@ -185,6 +199,14 @@ class VinModelV3Config(BaseConfig["VinModelV3"]):
 
     semidense_proj_max_points: int = Field(default=4096, gt=0)
     """Maximum semidense points used for projection stats (sweep best used 4096)."""
+
+    semidense_projection_backend: SemidenseProjectionBackend = Field(default=SemidenseProjectionBackend.TORCH)
+    """Reducer backend for semidense projection stats and grid accumulation.
+
+    ``torch`` keeps the existing scatter-add implementation. ``mojo`` keeps the
+    current PyTorch3D projection path but replaces the per-camera accumulation
+    with an experimental CPU Mojo kernel.
+    """
 
     semidense_cnn_enabled: bool = True
     """Whether to encode a tiny 2D CNN over the semidense projection grid."""
@@ -290,6 +312,12 @@ class VinModelV3(nn.Module):
     def __init__(self, config: VinModelV3Config) -> None:
         super().__init__()
         self.config = config
+        if self.config.semidense_projection_backend == SemidenseProjectionBackend.MOJO:
+            if not is_semidense_mojo_available():
+                raise ModuleNotFoundError(
+                    "VinModelV3 semidense Mojo backend is unavailable. Install Mojo into "
+                    "`<repo>/.mojo-venv` or set `ARIA_NBV_MOJO_SITE_PACKAGES`."
+                )
 
         # Optional modules (may be None)
         self.voxel_proj_film: nn.Module | None = None
@@ -1081,6 +1109,164 @@ class VinModelV3(nn.Module):
             "num_cams": torch.tensor(num_cams, device=device),
         }
 
+    def _compute_semidense_reliability_weights(
+        self,
+        proj_data: dict[str, Tensor] | None,
+        *,
+        device: torch.device,
+    ) -> tuple[Tensor, Tensor, Tensor]:
+        """Return finite/valid masks plus per-point reliability weights."""
+
+        if proj_data is None:
+            raise RuntimeError("Semidense projection data is missing.")
+
+        x = proj_data["x"]
+        y = proj_data["y"]
+        z = proj_data["z"]
+        finite = proj_data.get("finite")
+        if finite is None:
+            finite = torch.isfinite(torch.stack([x, y, z], dim=-1)).all(dim=-1)
+        valid = proj_data["valid"]
+        inv_dist_std = proj_data.get("inv_dist_std")
+        obs_count = proj_data.get("obs_count")
+        if inv_dist_std is not None and inv_dist_std.numel() == 0:
+            inv_dist_std = None
+        if obs_count is not None and obs_count.numel() == 0:
+            obs_count = None
+
+        finite = finite.to(device=device)
+        valid = valid.to(device=device)
+        valid_f = valid.to(dtype=torch.float32)
+        eps = 1e-6
+
+        if obs_count is not None:
+            obs = obs_count.to(device=device, dtype=torch.float32).clamp_min(0.0)
+            obs = torch.nan_to_num(obs, nan=0.0, posinf=0.0, neginf=0.0)
+            obs_log = torch.log1p(obs)
+            obs_log = torch.where(finite, obs_log, torch.zeros_like(obs_log))
+            denom = torch.log1p(
+                torch.tensor(float(self.config.semidense_obs_count_max), device=device, dtype=torch.float32)
+            ).clamp_min(eps)
+            a = (obs_log / denom).clamp(0.0, 1.0)
+        else:
+            a = torch.ones_like(valid_f)
+
+        if inv_dist_std is not None:
+            inv = inv_dist_std.to(device=device, dtype=torch.float32).clamp_min(0.0)
+            inv = torch.nan_to_num(inv, nan=0.0, posinf=0.0, neginf=0.0)
+            inv_min = float(self.config.semidense_inv_dist_std_min)
+            inv_p95 = max(float(self.config.semidense_inv_dist_std_p95), inv_min + eps)
+            denom = torch.tensor(inv_p95 - inv_min, device=device, dtype=torch.float32).clamp_min(eps)
+            b = ((inv - inv_min) / denom).clamp(0.0, 1.0)
+        else:
+            b = torch.ones_like(valid_f)
+
+        w_rel = (a * b).clamp(0.0, 1.0)
+        return finite, valid, w_rel
+
+    def _accumulate_semidense_projection_torch(
+        self,
+        proj_data: dict[str, Tensor] | None,
+        *,
+        device: torch.device,
+    ) -> dict[str, Tensor]:
+        """Accumulate per-camera screen-space bins with the existing Torch path."""
+
+        if proj_data is None:
+            raise RuntimeError("Semidense projection data is missing.")
+
+        x = proj_data["x"]
+        y = proj_data["y"]
+        z = proj_data["z"]
+        image_size = proj_data["image_size"]
+        finite, valid, w_rel = self._compute_semidense_reliability_weights(
+            proj_data,
+            device=device,
+        )
+        num_cams = int(proj_data["num_cams"].item())
+        grid_size = int(self.config.semidense_proj_grid_size)
+        num_bins = grid_size * grid_size
+
+        h = image_size[:, 0].unsqueeze(1).clamp_min(1.0)
+        w = image_size[:, 1].unsqueeze(1).clamp_min(1.0)
+        x_safe = torch.where(valid, x, torch.zeros_like(x))
+        y_safe = torch.where(valid, y, torch.zeros_like(y))
+        z_safe = torch.where(valid, z, torch.zeros_like(z))
+        x_safe = torch.nan_to_num(x_safe, nan=0.0, posinf=0.0, neginf=0.0)
+        y_safe = torch.nan_to_num(y_safe, nan=0.0, posinf=0.0, neginf=0.0)
+        z_safe = torch.nan_to_num(z_safe, nan=0.0, posinf=0.0, neginf=0.0)
+        x_bin = torch.clamp((x_safe / w) * grid_size, 0.0, float(grid_size - 1)).to(dtype=torch.long)
+        y_bin = torch.clamp((y_safe / h) * grid_size, 0.0, float(grid_size - 1)).to(dtype=torch.long)
+        bin_idx = torch.where(valid, y_bin * grid_size + x_bin, torch.zeros_like(x_bin))
+
+        counts = torch.zeros((num_cams, num_bins), device=device, dtype=torch.float32)
+        sum_z = torch.zeros_like(counts)
+        sum_z2 = torch.zeros_like(counts)
+        valid_f = valid.to(dtype=counts.dtype)
+        counts.scatter_add_(1, bin_idx, valid_f)
+        sum_z.scatter_add_(1, bin_idx, z_safe * valid_f)
+        sum_z2.scatter_add_(1, bin_idx, z_safe.square() * valid_f)
+
+        finite_f = finite.to(dtype=counts.dtype)
+        weight_valid = w_rel * valid_f
+        return {
+            "counts": counts,
+            "sum_z": sum_z,
+            "sum_z2": sum_z2,
+            "weight_valid_sum": weight_valid.sum(dim=1),
+            "weight_finite_sum": (w_rel * finite_f).sum(dim=1),
+            "weight_z_sum": (z_safe * weight_valid).sum(dim=1),
+            "weight_z2_sum": (z_safe.square() * weight_valid).sum(dim=1),
+        }
+
+    def _get_semidense_projection_accumulation(
+        self,
+        proj_data: dict[str, Tensor] | None,
+        *,
+        device: torch.device,
+    ) -> dict[str, Tensor]:
+        """Return cached semidense accumulation for the configured backend."""
+
+        if proj_data is None:
+            raise RuntimeError("Semidense projection data is missing.")
+
+        backend = self.config.semidense_projection_backend.value
+        cached = proj_data.get("_semidense_projection_accumulation")
+        cached_backend = proj_data.get("_semidense_projection_accumulation_backend")
+        if isinstance(cached, dict) and cached_backend == backend:
+            return cached
+
+        if self.config.semidense_projection_backend == SemidenseProjectionBackend.MOJO:
+            if device.type != "cpu":
+                raise RuntimeError(
+                    "VinModelV3 semidense Mojo backend currently supports CPU tensors only. "
+                    "Keep `semidense_projection_backend='torch'` for GPU execution."
+                )
+            finite, valid, w_rel = self._compute_semidense_reliability_weights(
+                proj_data,
+                device=device,
+            )
+            accumulation = accumulate_projection_bins_mojo(
+                x=proj_data["x"],
+                y=proj_data["y"],
+                z=proj_data["z"],
+                finite=finite,
+                valid=valid,
+                w_rel=w_rel,
+                image_size=proj_data["image_size"],
+                grid_size=int(self.config.semidense_proj_grid_size),
+                device=device,
+            )
+        else:
+            accumulation = self._accumulate_semidense_projection_torch(
+                proj_data,
+                device=device,
+            )
+
+        proj_data["_semidense_projection_accumulation"] = accumulation
+        proj_data["_semidense_projection_accumulation_backend"] = backend
+        return accumulation
+
     def _encode_semidense_projection_features(
         self,
         proj_data: dict[str, Tensor] | None,
@@ -1131,91 +1317,29 @@ class VinModelV3(nn.Module):
         if proj_data is None:
             raise RuntimeError("Semidense projection data is missing.")
 
-        x = proj_data["x"]  # (B*N_q, P_proj)
-        y = proj_data["y"]  # (B*N_q, P_proj)
-        z = proj_data["z"]  # (B*N_q, P_proj)
-        finite = proj_data.get("finite")
-        if finite is None:
-            finite = torch.isfinite(torch.stack([x, y, z], dim=-1)).all(dim=-1)
-        valid = proj_data["valid"]  # (B*N_q, P_proj)
-        image_size = proj_data["image_size"]  # (B*N_q, 2) as (H, W)
-        inv_dist_std = proj_data.get("inv_dist_std")  # (B*N_q, P_proj) or empty
-        obs_count = proj_data.get("obs_count")  # (B*N_q, P_proj) or empty
-        if inv_dist_std is not None and inv_dist_std.numel() == 0:
-            inv_dist_std = None
-        if obs_count is not None and obs_count.numel() == 0:
-            obs_count = None
         num_cams = int(proj_data["num_cams"].item())
-        h = image_size[:, 0].unsqueeze(1).clamp_min(1.0)
-        w = image_size[:, 1].unsqueeze(1).clamp_min(1.0)
+        accumulation = self._get_semidense_projection_accumulation(
+            proj_data,
+            device=device,
+        )
+        counts = accumulation["counts"]
 
         # ------------------------------------------------------------------
         # 1) Coverage proxy: bin projected points onto a GxG grid (screen space).
-        grid_size = self.config.semidense_proj_grid_size
-        num_bins = grid_size * grid_size
-        x_safe = torch.where(valid, x, torch.zeros_like(x))
-        y_safe = torch.where(valid, y, torch.zeros_like(y))
-        z_safe = torch.where(valid, z, torch.zeros_like(z))
-        x_safe = torch.nan_to_num(x_safe, nan=0.0, posinf=0.0, neginf=0.0)
-        y_safe = torch.nan_to_num(y_safe, nan=0.0, posinf=0.0, neginf=0.0)
-        z_safe = torch.nan_to_num(z_safe, nan=0.0, posinf=0.0, neginf=0.0)
-        x_bin = torch.clamp((x_safe / w) * grid_size, 0.0, float(grid_size - 1)).to(dtype=torch.long)
-        y_bin = torch.clamp((y_safe / h) * grid_size, 0.0, float(grid_size - 1)).to(dtype=torch.long)
-        bin_idx = y_bin * grid_size + x_bin
-
-        counts = torch.zeros((num_cams, num_bins), device=device, dtype=torch.float32)
-        bin_idx = torch.where(valid, bin_idx, torch.zeros_like(bin_idx))
-        valid_f = valid.to(dtype=counts.dtype)
-        counts.scatter_add_(1, bin_idx, valid_f)
         coverage = (counts > 0).to(dtype=counts.dtype).mean(dim=1)
         empty_frac = 1.0 - coverage
 
-        finite_f = finite.to(dtype=counts.dtype)
         eps = 1e-6
         # ------------------------------------------------------------------
-        # 2) Reliability weights: combine n_obs (track length) and inv_dist_std.
-        if obs_count is not None:
-            obs = obs_count.to(device=device, dtype=counts.dtype).clamp_min(0.0)
-            obs = torch.nan_to_num(obs, nan=0.0, posinf=0.0, neginf=0.0)
-            obs_log = torch.log1p(obs)
-            obs_log = torch.where(finite, obs_log, torch.zeros_like(obs_log))
-            denom = torch.log1p(
-                torch.tensor(float(self.config.semidense_obs_count_max), device=device, dtype=counts.dtype)
-            ).clamp_min(eps)
-            a = (obs_log / denom).clamp(0.0, 1.0)
-        else:
-            # If n_obs is unavailable, treat all points as equally reliable.
-            a = torch.ones_like(valid_f)
-
-        if inv_dist_std is not None:
-            inv = inv_dist_std.to(device=device, dtype=counts.dtype).clamp_min(0.0)
-            inv = torch.nan_to_num(
-                inv,
-                nan=0.0,
-                posinf=0.0,
-                neginf=0.0,
-            )
-            inv_min = float(self.config.semidense_inv_dist_std_min)
-            inv_p95 = max(float(self.config.semidense_inv_dist_std_p95), inv_min + eps)
-            denom = torch.tensor(inv_p95 - inv_min, device=device, dtype=counts.dtype).clamp_min(eps)
-            b = ((inv - inv_min) / denom).clamp(0.0, 1.0)
-        else:
-            # If 1/sigma_d is unavailable, treat all points as equally reliable.
-            b = torch.ones_like(valid_f)
-        w_rel = (a * b).clamp(0.0, 1.0)
-
-        # ------------------------------------------------------------------
         # 3) Visibility proxy: weighted valid fraction among finite projections.
-        weight_valid = w_rel * valid_f
-        weight_finite = w_rel * finite_f
-        weight_sum = weight_valid.sum(dim=1).clamp_min(eps)
-        finite_sum = weight_finite.sum(dim=1).clamp_min(eps)
-        semidense_candidate_vis_frac = weight_valid.sum(dim=1) / finite_sum
+        weight_sum = accumulation["weight_valid_sum"].clamp_min(eps)
+        finite_sum = accumulation["weight_finite_sum"].clamp_min(eps)
+        semidense_candidate_vis_frac = accumulation["weight_valid_sum"] / finite_sum
 
         # ------------------------------------------------------------------
         # 4) Depth stats: weighted mean/std of z over valid points.
-        depth_mean = (z_safe * weight_valid).sum(dim=1) / weight_sum
-        depth_var = ((z_safe - depth_mean.unsqueeze(1)) ** 2 * weight_valid).sum(dim=1) / weight_sum
+        depth_mean = accumulation["weight_z_sum"] / weight_sum
+        depth_var = (accumulation["weight_z2_sum"] / weight_sum) - depth_mean.square()
         depth_std = torch.sqrt(depth_var.clamp_min(0.0))
 
         feats = torch.stack(
@@ -1270,40 +1394,15 @@ class VinModelV3(nn.Module):
             raise RuntimeError("Semidense CNN is disabled.")
         if proj_data is None:
             raise RuntimeError("Semidense projection data is missing.")
-
-        x = proj_data["x"]  # (B*N_q, P_proj)
-        y = proj_data["y"]  # (B*N_q, P_proj)
-        z = proj_data["z"]  # (B*N_q, P_proj)
-        valid = proj_data["valid"]  # (B*N_q, P_proj)
-        image_size = proj_data["image_size"]  # (B*N_q, 2) as (H, W)
         num_cams = int(proj_data["num_cams"].item())
-
+        accumulation = self._get_semidense_projection_accumulation(
+            proj_data,
+            device=device,
+        )
         grid_size = int(self.config.semidense_proj_grid_size)
-        num_bins = grid_size * grid_size
-        h = image_size[:, 0].unsqueeze(1).clamp_min(1.0)
-        w = image_size[:, 1].unsqueeze(1).clamp_min(1.0)
-
-        x_safe = torch.where(valid, x, torch.zeros_like(x))
-        y_safe = torch.where(valid, y, torch.zeros_like(y))
-        z_safe = torch.where(valid, z, torch.zeros_like(z))
-        x_safe = torch.nan_to_num(x_safe, nan=0.0, posinf=0.0, neginf=0.0)
-        y_safe = torch.nan_to_num(y_safe, nan=0.0, posinf=0.0, neginf=0.0)
-        z_safe = torch.nan_to_num(z_safe, nan=0.0, posinf=0.0, neginf=0.0)
-
-        x_bin = torch.clamp((x_safe / w) * grid_size, 0.0, float(grid_size - 1)).to(dtype=torch.long)
-        y_bin = torch.clamp((y_safe / h) * grid_size, 0.0, float(grid_size - 1)).to(dtype=torch.long)
-        bin_idx = y_bin * grid_size + x_bin
-
-        counts = torch.zeros((num_cams, num_bins), device=device, dtype=torch.float32)
-        sum_z = torch.zeros_like(counts)
-        sum_z2 = torch.zeros_like(counts)
-        bin_idx = torch.where(valid, bin_idx, torch.zeros_like(bin_idx))
-        valid_f = valid.to(dtype=counts.dtype)
-
-        counts.scatter_add_(1, bin_idx, valid_f)
-        sum_z.scatter_add_(1, bin_idx, z_safe * valid_f)
-        sum_z2.scatter_add_(1, bin_idx, (z_safe**2) * valid_f)
-
+        counts = accumulation["counts"]
+        sum_z = accumulation["sum_z"]
+        sum_z2 = accumulation["sum_z2"]
         denom = counts.clamp_min(1.0)
         depth_mean = sum_z / denom
         depth_var = (sum_z2 / denom) - depth_mean**2
