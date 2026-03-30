@@ -9,6 +9,13 @@ This section provides an overview of the libraries, tools, and documentation use
 
 ---
 
+## Agent Scaffolding
+
+- [Agent Scaffolding Index](resources/agent_scaffold/index.qmd): Published mirror of the maintained Codex guidance and scaffold docs.
+- The pages in that section are generated from the canonical markdown sources in `AGENTS.md`, `.agents/`, and the nested package `AGENTS.md` files via `./scripts/quarto_generate_agent_docs.py`.
+
+---
+
 ## Papers
 
 - **[VIN-NBV: A View Introspection Network for Next-Best-View Selection](https://arxiv.org/abs/2505.06219)** [@VIN-NBV-frahm2025] - Direct RRI optimization approach

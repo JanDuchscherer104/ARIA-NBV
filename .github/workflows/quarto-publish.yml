@@ -5,9 +5,15 @@ on:
     branches:
       - main
     paths:
+      - "AGENTS.md"
       - "aria_nbv/**"
+      - ".agents/memory/README.md"
+      - ".agents/memory/state/**"
+      - ".agents/references/**"
+      - ".agents/skills/**"
       - "docs/**"
       - "scripts/quarto_generate_api_docs.sh"
+      - "scripts/quarto_generate_agent_docs.py"
       - ".github/workflows/quarto-publish.yml"
   workflow_dispatch:
 
@@ -43,6 +49,9 @@ jobs:
 
       - name: Generate API reference
         run: ./scripts/quarto_generate_api_docs.sh
+
+      - name: Generate agent scaffolding pages
+        run: ./scripts/quarto_generate_agent_docs.py
 
       - name: Render docs site
         run: quarto render docs --no-execute

@@ -247,3 +247,6 @@ docs/literature/**
 !literature/**/*.tex
 !literature/**/*.bib
 !literature/**/
+
+/.quarto/
+**/*.quarto_ipynb

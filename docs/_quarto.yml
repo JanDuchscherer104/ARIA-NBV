@@ -73,6 +73,8 @@ website:
         menu:
         - text: Resources (External Links, Repos, Docs, etc.)
           href: contents/resources.qmd
+        - text: Agent Scaffolding
+          href: contents/resources/agent_scaffold/index.qmd
         - text: ASE Dataset
           href: contents/ase_dataset.qmd
         - text: Glossary
@@ -109,6 +111,34 @@ website:
           contents:
             - contents/setup.qmd
             - contents/resources.qmd
+            - section: "Agent Scaffolding"
+              contents:
+                - contents/resources/agent_scaffold/index.qmd
+                - section: "Instructions"
+                  contents:
+                    - contents/resources/agent_scaffold/instructions/repo_guidance.qmd
+                    - contents/resources/agent_scaffold/instructions/docs_guidance.qmd
+                    - contents/resources/agent_scaffold/instructions/package_guidance.qmd
+                    - contents/resources/agent_scaffold/instructions/data_handling_boundary.qmd
+                    - contents/resources/agent_scaffold/instructions/rri_metrics_boundary.qmd
+                    - contents/resources/agent_scaffold/instructions/vin_boundary.qmd
+                - section: "Canonical State"
+                  contents:
+                    - contents/resources/agent_scaffold/state/memory_readme.qmd
+                    - contents/resources/agent_scaffold/state/project_state.qmd
+                    - contents/resources/agent_scaffold/state/decisions.qmd
+                    - contents/resources/agent_scaffold/state/open_questions.qmd
+                    - contents/resources/agent_scaffold/state/gotchas.qmd
+                - section: "References"
+                  contents:
+                    - contents/resources/agent_scaffold/references/operator_quick_reference.qmd
+                    - contents/resources/agent_scaffold/references/python_conventions.qmd
+                    - contents/resources/agent_scaffold/references/context7_library_ids.qmd
+                    - contents/resources/agent_scaffold/references/agent_memory_templates.qmd
+                - section: "Skills & Routing"
+                  contents:
+                    - contents/resources/agent_scaffold/skills/aria_nbv_context_skill.qmd
+                    - contents/resources/agent_scaffold/skills/context_map.qmd
             - contents/ase_dataset.qmd
             - contents/glossary.qmd
         - section: Theory

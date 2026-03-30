@@ -19,6 +19,7 @@ Apply this file when working under `docs/`.
 ## Commands
 - Context refresh: `make context`
 - API reference refresh: `./scripts/quarto_generate_api_docs.sh`
+- Agent scaffold refresh: `./scripts/quarto_generate_agent_docs.py`
 - Quarto render: `cd docs && quarto render .`
 - Quarto preview: `cd docs && quarto preview`
 - Quarto check: `quarto check`
@@ -42,4 +43,5 @@ Apply this file when working under `docs/`.
 - Keep Quarto source files (`*.qmd`) separate from rendered site output. Published HTML belongs under `docs/_site/`, not next to the sources.
 - Treat `docs/_freeze/` as tracked execution state for code-backed pages when needed; treat `docs/_site/`, `site_libs/`, `index_files/`, and `*_files/` as generated publish artifacts.
 - Do not store generated context or rendered artifacts in tracked docs paths unless the task explicitly requires it.
+- Treat `docs/contents/resources/agent_scaffold/` as generated-from-source content. The local `.gitignore` keeps those mirrored pages out of Git; regenerate them before rendering when that subtree is missing or stale.
 - For larger doc changes, run `quarto render` and `quarto check` before finishing.

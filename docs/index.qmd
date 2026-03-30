@@ -111,7 +111,7 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 
 ## Agent Memory
 
-- Internal agent memory now lives under `.agents/memory/` and is not part of the published Quarto site.
-- Canonical state lives in `.agents/memory/state/` (`PROJECT_STATE.md`, `DECISIONS.md`, `OPEN_QUESTIONS.md`).
-- Episodic debriefs live in `.agents/memory/history/YYYY/MM/`.
-- The `.codex` migration inventory lives in `.agents/memory/index/codex_migration_manifest.md`.
+- The maintained agent scaffold is published under [Agent Scaffolding](contents/resources/agent_scaffold/index.qmd).
+- Canonical state lives in `.agents/memory/state/` and is mirrored there as Quarto pages.
+- Repo guidance and scoped package guides are mirrored from `AGENTS.md`, `docs/AGENTS.md`, and the nested package `AGENTS.md` files.
+- Episodic debriefs under `.agents/memory/history/YYYY/MM/` and archive notes remain internal and are not part of the published site.
