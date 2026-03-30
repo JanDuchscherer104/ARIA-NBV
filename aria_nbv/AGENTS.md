@@ -26,6 +26,15 @@ Apply this file when working under `aria_nbv/`.
 - Follow EFM3D / ATEK coordinate conventions and document tensor shapes plus coordinate frames where they are not obvious.
 - Never let package behavior fail silently; raise actionable errors or log explicit failure context.
 
+## Plotting
+- Treat `aria_nbv.utils.data_plotting` as the canonical owner of shared snippet, frustum, mesh, and 3D scene plotting helpers.
+- Keep plotting logic out of Streamlit panels. Panels should compose shared helpers and builders instead of implementing plotting math inline.
+- Prefer Plotly for interactive diagnostics, 3D scene views, and Streamlit-facing figures. Use Matplotlib only when a backend-safe static path or logger integration specifically needs it.
+- Reuse the shared builder hierarchy (`SnippetPlotBuilder`, `CandidatePlotBuilder`, `RenderingPlotBuilder`) and common helpers such as `FrameGridBuilder`, `_histogram_overlay`, and `_plot_slice_grid` before adding new ad hoc plotting code.
+- Preserve plotting frame conventions explicitly: Aria camera frame is LUF, world is Z-up, and display-only yaw or roll corrections must remain visual-only and must not leak back into model, rendering, or cache semantics.
+- Place new plotting helpers in the owning domain module (`utils.data_plotting`, `pose_generation.plotting`, `rendering.plotting`, `rri_metrics.plotting`, `vin.plotting`) rather than in notebooks or app panels.
+- New plotting helpers should come with focused smoke tests that assert figure construction plus key layout or trace invariants instead of relying only on manual UI inspection.
+
 ## Progressive Disclosure
 - Stay at this file for shared Python, config-as-factory, and verification rules across `aria_nbv/`.
 - Open one deeper module guide only after the touched contract is clear:
