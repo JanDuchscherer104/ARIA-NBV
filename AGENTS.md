@@ -62,6 +62,7 @@ Use the documented Codex repo surfaces in this repository:
 - Inspect referenced and potentially affected files and modules before editing.
 - Maintain a small task list for multi-step work and verify incrementally instead of batching untested changes.
 - Stay within the requested scope. If something adjacent looks wrong but was not requested, note it instead of silently changing it.
+- Before staging or committing, diff the candidate files explicitly and stage only the files that belong to the current task.
 - Keep documentation aligned with behavior changes.
 - Summarize important findings and leave a debrief for non-trivial work. If the scope of the work appears too broad and criteria, constraints, or verification steps are unclear, clarify them with the user before proceeding.
 

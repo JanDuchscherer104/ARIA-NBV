@@ -55,3 +55,7 @@ Keep the body concise:
 - findings or outputs
 - verification
 - canonical state impact
+
+Useful additions when they materially clarify the work:
+- mention staged scope or commit scope when the worktree was dirty
+- note whether compatibility was preserved deliberately or removed deliberately

@@ -43,6 +43,7 @@ Apply this file when working under `aria_nbv/`.
   - `aria_nbv/aria_nbv/vin/AGENTS.md` for scorer, candidate-context, training batch, and VIN model contracts
 - If a task spans multiple modules, start with the owner of the main contract, then open adjacent guides only for crossed boundaries.
 - New raw-snippet or cache pipeline work should target `aria_nbv.data_handling`; treat `aria_nbv.data` as the compatibility surface and only extend it when the task explicitly requires backward compatibility.
+- Keep canonical package roots clean. Put backward compatibility only in dedicated wrapper modules such as `_legacy_*` or `_compat_*`, not mixed into canonical owners.
 
 ## Config-As-Factory
 - Config classes should inherit `BaseConfig` and remain the main construction surface for runtime objects.
@@ -58,6 +59,7 @@ Apply this file when working under `aria_nbv/`.
 - Do not bypass a nested config object to construct one of its targets manually.
 - Do not use `Field(..., description=...)` as the primary documentation for config fields; prefer attribute or field docstrings.
 - Do not add compatibility wrappers or silent fallbacks when removing obsolete internal interfaces unless the task explicitly asks for compatibility.
+- Do not extract shared helpers into new modules without ensuring the new helper files are tracked and included in the same change.
 
 ## Code Quality
 - All interfaces must be fully typed and use modern builtins such as `list[str]` and `dict[str, Any]`.

@@ -17,15 +17,18 @@ Apply this file when working under `aria_nbv/aria_nbv/data_handling/`.
 
 ## Boundary Rules
 - `aria_nbv.data_handling` is the active owner of the raw snippet, oracle cache, and VIN cache flow. Treat `aria_nbv.data` as a compatibility surface unless the task explicitly requires backward-compatible changes there.
+- Keep `aria_nbv.data_handling` canonical-only where possible. Put backward compatibility only in dedicated wrapper modules instead of mixing it into canonical owners.
 - Writers own index and split maintenance. Readers should validate or repair via explicit helpers rather than by implicit mutation or manual file edits.
 - Do not hand-edit cache metadata, `index.jsonl`, `train_index.jsonl`, `val_index.jsonl`, or sample payloads to silence failing tests; fix the writer, reader, or generator instead.
 - Keep one canonical path from `EfmSnippetView` to `VinSnippetView`; do not duplicate VIN-adapter logic in unrelated modules.
 - When cache payload, metadata, or split semantics change, update the public surface, docs, and targeted tests together.
+- When an on-disk cache or dataset format changes, decide explicitly whether runtime support for old formats is required. Prefer one strict runtime format plus a dedicated migration path, and fail fast with rebuild guidance instead of adding silent fallback branches by default.
 
 ## Verification
 - Run `ruff format` and `ruff check` on touched data-handling files.
 - Run the most direct targeted pytest from `aria_nbv/tests/data_handling/`, plus compatibility or split coverage such as `aria_nbv/tests/data/test_offline_cache_split.py`, `aria_nbv/tests/data/test_vin_snippet_cache.py`, and `aria_nbv/tests/data/test_vin_snippet_cache_datamodule_equivalence.py` when those surfaces are affected.
 - Run the relevant Lightning datamodule or integration coverage when the change affects dataset selection, live fallback, or training-facing batch assembly.
+- Temporary operator CLIs and migration scripts outside the package should get at least a `--help` smoke test when their interface or imports change.
 
 ## Completion Criteria
 - Index, split, and payload semantics are validated by targeted tests.
