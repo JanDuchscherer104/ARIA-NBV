@@ -6,12 +6,13 @@ import json
 from pathlib import Path
 
 import pytest
-from aria_nbv.data import (
+
+from aria_nbv.data_handling import (
     VinSnippetCacheConfig,
     VinSnippetCacheDatasetConfig,
     VinSnippetCacheWriterConfig,
 )
-from aria_nbv.data.offline_cache import OracleRriCacheConfig
+from aria_nbv.data_handling.oracle_cache import OracleRriCacheConfig
 
 
 def _skip_if_missing_real_cache(cache_dir: Path) -> None:

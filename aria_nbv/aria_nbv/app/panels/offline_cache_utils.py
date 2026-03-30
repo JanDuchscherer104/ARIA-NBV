@@ -12,7 +12,6 @@ import streamlit as st
 import torch
 
 from ...configs import PathConfig
-from ...data.offline_cache_coverage import read_cache_index_entries
 from ...data_handling import (
     AseEfmDatasetConfig,
     EfmSnippetView,
@@ -22,6 +21,7 @@ from ...data_handling import (
     VinOracleCacheDatasetConfig,
     VinSnippetCacheConfig,
     VinSnippetCacheDatasetConfig,
+    read_cache_index_entries,
 )
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...utils import Stage

@@ -17,7 +17,7 @@ else:  # pragma: no cover - availability guard
 import pytest  # isort: split
 
 from aria_nbv.configs import PathConfig
-from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.data_handling import AseEfmDatasetConfig
 from aria_nbv.pipelines import OracleRriLabelerConfig
 from aria_nbv.pose_generation import CandidateViewGeneratorConfig
 from aria_nbv.pose_generation.types import ViewDirectionMode

@@ -8,7 +8,7 @@ import torch
 sys.path.append(str(Path(__file__).resolve().parents[2] / "external" / "efm3d"))
 
 from aria_nbv.configs import PathConfig  # noqa: E402
-from aria_nbv.data import AseEfmDatasetConfig  # noqa: E402
+from aria_nbv.data_handling import AseEfmDatasetConfig  # noqa: E402
 from aria_nbv.pose_generation import (  # noqa: E402
     CandidateViewGenerator,
     CandidateViewGeneratorConfig,

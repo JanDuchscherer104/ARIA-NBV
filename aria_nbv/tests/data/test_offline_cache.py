@@ -34,8 +34,8 @@ def test_oracle_cache_roundtrip(tmp_path: Path) -> None:  # noqa: PLR0915
     if importlib.util.find_spec("power_spherical") is None:
         pytest.skip("Missing power_spherical dependency")
 
-    data_mod = importlib.import_module("aria_nbv.data")
-    offline_mod = importlib.import_module("aria_nbv.data.offline_cache")
+    data_mod = importlib.import_module("aria_nbv.data_handling")
+    offline_mod = importlib.import_module("aria_nbv.data_handling.oracle_cache")
     labeler_mod = importlib.import_module("aria_nbv.pipelines.oracle_rri_labeler")
     pose_mod = importlib.import_module(
         "aria_nbv.pose_generation.candidate_generation",
@@ -139,9 +139,7 @@ def test_oracle_cache_roundtrip(tmp_path: Path) -> None:  # noqa: PLR0915
     entries_again = writer_cfg.setup_target().run()
     assert entries_again == []  # noqa: S101
     index_entries = [
-        json.loads(line)
-        for line in cache_cfg.index_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
+        json.loads(line) for line in cache_cfg.index_path.read_text(encoding="utf-8").splitlines() if line.strip()
     ]
     assert len(index_entries) == 1  # noqa: S101
     meta_payload = json.loads(cache_cfg.metadata_path.read_text(encoding="utf-8"))

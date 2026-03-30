@@ -8,7 +8,8 @@ import streamlit as st
 import torch
 from efm3d.aria.pose import PoseTW
 
-from ...data.plotting import (
+from ...data_handling import EfmSnippetView
+from ...utils.data_plotting import (
     SnippetPlotBuilder,
     collect_frame_modalities,
     plot_first_last_frames,
@@ -16,7 +17,6 @@ from ...data.plotting import (
     project_pointcloud_on_frame,
     semidense_points_for_frame,
 )
-from ...data_handling import EfmSnippetView
 from .common import _info_popover, _pretty_label
 
 

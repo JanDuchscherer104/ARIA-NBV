@@ -6,12 +6,9 @@ offline diagnostics. It owns:
 - the raw ASE/EFM snippet dataset,
 - the canonical `EfmSnippetView -> VinSnippetView` adapter,
 - the model-facing `VinOracleBatch` contract,
+- cache coverage utilities for offline diagnostics,
 - the new immutable VIN offline dataset format, and
-- temporary migration and compatibility surfaces for the legacy oracle and VIN caches.
-
-Mirrored legacy module paths under `aria_nbv.data.*` are compatibility aliases
-that resolve to these canonical implementations so type identity stays unified
-while callers are migrated.
+- migration entry points for legacy oracle and VIN caches.
 
 Code outside this package should import from `aria_nbv.data_handling` rather
 than from `aria_nbv.data_handling.*` submodules directly.
@@ -24,8 +21,8 @@ than from `aria_nbv.data_handling.*` submodules directly.
 - Keep training-critical tensors in zarr-backed fixed arrays for fast
   multi-worker random access.
 - Keep richer diagnostic payloads lazy and optional.
-- Treat legacy oracle-cache and VIN-snippet-cache code as temporary
-  compatibility layers while the new store becomes the primary offline path.
+- Keep the legacy oracle-cache and VIN-snippet-cache readers in one canonical
+  package while the immutable store becomes the primary offline path.
 
 ## Public surface
 
@@ -51,7 +48,7 @@ The most important groups are:
   - `VinOfflineDatasetConfig`, `VinOfflineDataset`
   - `VinOfflineSample`, `VinOfflineManifest`
 
-- Temporary compatibility exports
+- Canonical legacy-cache exports
   - `OracleRriCache*`
   - `VinSnippetCache*`
   - `repair_*` / `rebuild_*` helpers for the legacy caches
@@ -149,9 +146,10 @@ thin CLI around those functions for one-off conversion runs.
 
 The redesign is considered complete when:
 
-- `aria_nbv.data_handling` can be imported without pulling in `aria_nbv.data`.
+- `aria_nbv.data_handling` can be imported without pulling in deprecated
+  `aria_nbv.data` mirror modules.
 - the new immutable offline dataset can be written and read end to end,
 - Lightning can consume `VinOfflineSourceConfig` for offline training,
 - legacy oracle/VIN caches can be migrated into the new format,
-- and legacy app/training paths continue to work through compatibility surfaces
-  until they are fully switched over.
+- and app/training paths import the canonical `aria_nbv.data_handling` or
+  `aria_nbv.utils` owners directly.

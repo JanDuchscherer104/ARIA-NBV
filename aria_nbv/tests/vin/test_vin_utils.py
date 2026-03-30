@@ -17,7 +17,7 @@ from aria_nbv.app.panels.vin_utils import (
     _should_fetch_vin_snippet,
     _vin_oracle_batch_from_cache,
 )
-from aria_nbv.data.offline_cache_types import OracleRriCacheSample
+from aria_nbv.data_handling.cache_contracts import OracleRriCacheSample
 from aria_nbv.rendering.candidate_depth_renderer import CandidateDepths
 from aria_nbv.rendering.candidate_pointclouds import CandidatePointClouds
 from aria_nbv.rri_metrics.types import RriResult

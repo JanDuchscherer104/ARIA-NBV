@@ -72,8 +72,9 @@ from efm3d.aria.aria_constants import (
 )
 from efm3d.aria.pose import PoseTW
 
-from aria_nbv.data.efm_views import EfmSnippetView, VinSnippetView
-from aria_nbv.data.vin_oracle_types import VinOracleBatch
+from aria_nbv.data_handling import is_vin_snippet_view_instance
+from aria_nbv.data_handling.efm_views import EfmSnippetView, VinSnippetView
+from aria_nbv.data_handling.vin_oracle_types import VinOracleBatch
 from aria_nbv.vin.model_v3 import SEMIDENSE_PROJ_DIM, VinModelV3, VinModelV3Config
 from aria_nbv.vin.traj_encoder import TrajectoryEncoderConfig
 from aria_nbv.vin.types import EvlBackboneOutput
@@ -211,7 +212,7 @@ def test_ensure_vin_snippet_from_vin() -> None:
     model = _make_model()
     snippet = _make_vin_snippet()
     ensured = model._ensure_vin_snippet(snippet, device=torch.device("cpu"))
-    assert isinstance(ensured, VinSnippetView)
+    assert is_vin_snippet_view_instance(ensured)
 
 
 def test_ensure_vin_snippet_from_efm() -> None:
@@ -227,7 +228,7 @@ def test_ensure_vin_snippet_from_efm() -> None:
     }
     snippet = EfmSnippetView.from_cache_efm(efm)
     ensured = model._ensure_vin_snippet(snippet, device=torch.device("cpu"))
-    assert isinstance(ensured, VinSnippetView)
+    assert is_vin_snippet_view_instance(ensured)
     assert ensured.points_world.shape[-1] == 5
 
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from aria_nbv.data import AseEfmDatasetConfig, EfmSnippetView
+from aria_nbv.data_handling import AseEfmDatasetConfig, EfmSnippetView
 from aria_nbv.rendering.pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig
 from aria_nbv.rendering.unproject import backproject_depth_with_p3d
 

@@ -13,22 +13,20 @@ import streamlit as st
 import torch
 
 from ...configs import PathConfig
-from ...data.offline_cache_coverage import (
-    compute_cache_coverage,
-    expand_tar_urls,
-    read_cache_index_entries,
-    scan_dataset_snippets,
-    snippets_by_scene,
-)
-from ...data.offline_cache_store import _extract_snippet_token
-from ...data.offline_cache_store import _read_metadata as _read_cache_metadata
 from ...data_handling import (
     AseEfmDatasetConfig,
     OracleRriCacheDatasetConfig,
     VinOracleCacheDatasetConfig,
     VinOracleOnlineDatasetConfig,
+    compute_cache_coverage,
+    expand_tar_urls,
+    extract_snippet_token,
+    read_cache_index_entries,
+    read_oracle_cache_metadata,
     read_vin_snippet_cache_metadata,
     rebuild_cache_index,
+    scan_dataset_snippets,
+    snippets_by_scene,
 )
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...pose_generation.plotting import plot_position_polar
@@ -339,7 +337,7 @@ def render_offline_stats_page() -> None:
                         meta_path = cache_root / "metadata.json"
                         if not meta_path.exists():
                             raise FileNotFoundError(f"Missing cache metadata: {meta_path}")
-                        meta = _read_cache_metadata(meta_path)
+                        meta = read_oracle_cache_metadata(meta_path)
                         if meta.dataset_config is None:
                             raise ValueError("Cache metadata does not include dataset_config.")
                         dataset_cfg = AseEfmDatasetConfig(**meta.dataset_config)
@@ -568,7 +566,7 @@ def render_offline_stats_page() -> None:
             snippet_id = str(getattr(entry, "snippet_id", ""))
             if not scene_id:
                 continue
-            pairs.add((scene_id, _extract_snippet_token(snippet_id)))
+            pairs.add((scene_id, extract_snippet_token(snippet_id)))
         return pairs
 
     def _render_cache_discrepancies(

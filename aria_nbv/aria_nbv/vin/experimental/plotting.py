@@ -26,7 +26,7 @@ from pytorch3d.renderer.cameras import (
 
 from aria_nbv.utils.frames import rotate_yaw_cw90
 
-from ...data.plotting import SnippetPlotBuilder
+from ...utils.data_plotting import SnippetPlotBuilder
 from ...utils.plotting import _pretty_label
 from ..plotting import _voxel_indices_to_world
 from .model import _build_frustum_points_world_p3d

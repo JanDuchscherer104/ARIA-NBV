@@ -5,7 +5,8 @@ from __future__ import annotations
 import tarfile
 from typing import TYPE_CHECKING
 
-from aria_nbv.data.offline_cache_coverage import (
+from aria_nbv.data_handling.cache_contracts import OracleRriCacheEntry
+from aria_nbv.data_handling.offline_cache_coverage import (
     compute_cache_coverage,
     expand_tar_urls,
     read_cache_index_entries,
@@ -13,7 +14,6 @@ from aria_nbv.data.offline_cache_coverage import (
     scan_tar_sample_keys,
     snippets_by_scene,
 )
-from aria_nbv.data.offline_cache_types import OracleRriCacheEntry
 
 if TYPE_CHECKING:
     from pathlib import Path

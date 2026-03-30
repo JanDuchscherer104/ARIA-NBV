@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import torch
 from matplotlib import colormaps
 
-from ..data.plotting import FrameGridBuilder
+from .data_plotting import FrameGridBuilder
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

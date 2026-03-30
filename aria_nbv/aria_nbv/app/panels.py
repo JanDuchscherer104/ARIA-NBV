@@ -2,7 +2,7 @@
 
 This module intentionally re-exports the dedicated panel modules in
 ``aria_nbv.app.panels``. Panel logic and plotting helpers live in their
-respective component modules (e.g., ``data.plotting`` or
+respective component modules (e.g., ``utils.data_plotting`` or
 ``pose_generation.plotting``).
 """
 

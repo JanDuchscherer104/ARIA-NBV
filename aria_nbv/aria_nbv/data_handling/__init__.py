@@ -64,7 +64,19 @@ from ._migration import (
     scan_legacy_offline_data,
     verify_migrated_offline_data,
 )
+from .cache_contracts import OracleRriCacheSample  # noqa: F401
 from .mesh_cache import MeshProcessSpec, ProcessedMesh, load_or_process_mesh
+from .offline_cache_coverage import (
+    CacheCoverageReport,
+    SceneCoverage,
+    compute_cache_coverage,
+    expand_tar_urls,
+    read_cache_index_entries,
+    scan_dataset_snippets,
+    scan_tar_sample_keys,
+    snippets_by_scene,
+)
+from .offline_cache_store import extract_snippet_token, read_oracle_cache_metadata
 from .oracle_cache import (
     OracleRriCacheConfig,
     OracleRriCacheDataset,
@@ -98,6 +110,7 @@ from .vin_oracle_datasets import (
 __all__ = [
     "AseEfmDataset",
     "AseEfmDatasetConfig",
+    "CacheCoverageReport",
     "DEFAULT_VIN_SNIPPET_PAD_POINTS",
     "EfmCameraView",
     "EfmGTView",
@@ -114,6 +127,7 @@ __all__ = [
     "OracleRriCacheWriter",
     "OracleRriCacheWriterConfig",
     "ProcessedMesh",
+    "SceneCoverage",
     "VIN_SNIPPET_CACHE_VERSION",
     "VIN_SNIPPET_PAD_POINTS",
     "VinDatasetSourceConfig",
@@ -141,7 +155,10 @@ __all__ = [
     "VinSnippetCacheWriterConfig",
     "VinSnippetView",
     "build_vin_snippet_view",
+    "compute_cache_coverage",
     "empty_vin_snippet",
+    "expand_tar_urls",
+    "extract_snippet_token",
     "flush_prepared_samples_to_shard",
     "infer_semidense_bounds",
     "is_efm_snippet_view_instance",
@@ -149,12 +166,17 @@ __all__ = [
     "load_or_process_mesh",
     "migrate_legacy_offline_data",
     "prepare_vin_offline_sample",
+    "read_cache_index_entries",
+    "read_oracle_cache_metadata",
     "read_vin_snippet_cache_metadata",
     "rebuild_cache_index",
     "rebuild_oracle_cache_index",
     "rebuild_vin_snippet_cache_index",
     "repair_oracle_cache_indices",
     "repair_vin_snippet_cache_index",
+    "scan_dataset_snippets",
+    "scan_tar_sample_keys",
     "scan_legacy_offline_data",
+    "snippets_by_scene",
     "verify_migrated_offline_data",
 ]

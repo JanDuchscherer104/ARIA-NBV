@@ -9,7 +9,7 @@ import torch
 import trimesh
 from efm3d.aria import CameraTW, PoseTW
 
-from aria_nbv.data import AseEfmDatasetConfig
+from aria_nbv.data_handling import AseEfmDatasetConfig
 from aria_nbv.pose_generation import (
     CandidateViewGenerator,
     CandidateViewGeneratorConfig,
