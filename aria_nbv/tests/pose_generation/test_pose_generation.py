@@ -25,6 +25,13 @@ from aria_nbv.pose_generation.types import CandidateContext
 from aria_nbv.utils.frames import world_up_tensor
 
 
+def _require_mojo_backend() -> None:
+    from aria_nbv.pose_generation.mojo_backend import is_mojo_available
+
+    if not is_mojo_available():
+        pytest.skip("Mojo backend not available locally.")
+
+
 def _identity_pose(batch: int = 1, device: torch.device | str = "cpu") -> PoseTW:
     data = torch.tensor([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], device=device)
     if batch > 1:
@@ -54,6 +61,30 @@ def _mesh_triplet(device: torch.device | str = "cpu") -> tuple[trimesh.Trimesh, 
 
 def _default_extent(device: torch.device | str = "cpu") -> torch.Tensor:
     return torch.tensor([-10.0, 10.0, -10.0, 10.0, -10.0, 10.0], dtype=torch.float32, device=device)
+
+
+def _context_from_points(
+    cfg: CandidateViewGeneratorConfig,
+    mesh: trimesh.Trimesh,
+    verts: torch.Tensor,
+    faces: torch.Tensor,
+    points: torch.Tensor,
+) -> CandidateContext:
+    poses = PoseTW.from_Rt(torch.eye(3).repeat(points.shape[0], 1, 1), points)
+    return CandidateContext(
+        cfg=cfg,
+        reference_pose=_identity_pose(device=points.device),
+        sampling_pose=_identity_pose(device=points.device),
+        gt_mesh=mesh,
+        mesh_verts=verts,
+        mesh_faces=faces,
+        occupancy_extent=_default_extent(points.device),
+        camera_calib_template=_dummy_camera(points.device),
+        shell_poses=poses,
+        centers_world=points,
+        shell_offsets_ref=points,
+        mask_valid=torch.ones(points.shape[0], dtype=torch.bool, device=points.device),
+    )
 
 
 def _run_generate(cfg: CandidateViewGeneratorConfig, reference_pose: PoseTW | None = None):
@@ -198,6 +229,70 @@ def test_path_collision_rule_blocks_intersecting_ray():
     )
     rule(ctx)
     assert torch.equal(ctx.mask_valid, torch.tensor([False, True]))
+
+
+def test_min_distance_rule_mojo_matches_trimesh():
+    _require_mojo_backend()
+
+    mesh, verts, faces = _mesh_triplet()
+    points = torch.tensor(
+        [
+            [0.8, 0.0, 0.0],
+            [0.0, 0.0, 1.2],
+            [0.6, 0.6, 0.6],
+        ],
+        dtype=torch.float32,
+    )
+    cfg_trimesh = CandidateViewGeneratorConfig(
+        min_distance_to_mesh=0.25,
+        ensure_collision_free=False,
+        ensure_free_space=False,
+        collision_backend=CollisionBackend.TRIMESH,
+        collect_debug_stats=True,
+        verbosity=0,
+        is_debug=True,
+    )
+    cfg_mojo = cfg_trimesh.model_copy(update={"collision_backend": CollisionBackend.MOJO})
+
+    ctx_trimesh = _context_from_points(cfg_trimesh, mesh, verts, faces, points)
+    ctx_mojo = _context_from_points(cfg_mojo, mesh, verts, faces, points)
+
+    MinDistanceToMeshRule(cfg_trimesh)(ctx_trimesh)
+    MinDistanceToMeshRule(cfg_mojo)(ctx_mojo)
+
+    assert torch.equal(ctx_mojo.mask_valid, ctx_trimesh.mask_valid)
+    assert torch.allclose(
+        ctx_mojo.debug["min_distance_to_mesh"],
+        ctx_trimesh.debug["min_distance_to_mesh"],
+        atol=1e-4,
+    )
+
+
+def test_path_collision_rule_mojo_matches_trimesh():
+    _require_mojo_backend()
+
+    mesh = trimesh.creation.box(extents=(0.5, 0.5, 0.5))
+    mesh.apply_translation([0.5, 0.0, 0.0])
+    verts = torch.from_numpy(mesh.vertices).float()
+    faces = torch.from_numpy(mesh.faces).long()
+    points = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], dtype=torch.float32)
+
+    cfg_trimesh = CandidateViewGeneratorConfig(
+        ensure_free_space=False,
+        min_distance_to_mesh=0.0,
+        collision_backend=CollisionBackend.TRIMESH,
+        verbosity=0,
+        is_debug=True,
+    )
+    cfg_mojo = cfg_trimesh.model_copy(update={"collision_backend": CollisionBackend.MOJO})
+
+    ctx_trimesh = _context_from_points(cfg_trimesh, mesh, verts, faces, points)
+    ctx_mojo = _context_from_points(cfg_mojo, mesh, verts, faces, points)
+
+    PathCollisionRule(cfg_trimesh)(ctx_trimesh)
+    PathCollisionRule(cfg_mojo)(ctx_mojo)
+
+    assert torch.equal(ctx_mojo.mask_valid, ctx_trimesh.mask_valid)
 
 
 def test_free_space_rule_bounds_candidates():

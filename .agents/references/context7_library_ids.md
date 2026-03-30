@@ -5,6 +5,7 @@ Use these library IDs with the Context7 MCP tools when external library document
 - `/facebookresearch/atek` - Aria Training and Evaluation Kit. Used for raw ASE/ATEK snippet semantics, dataset field conventions, and vendor-aligned loader behavior.
 - `/websites/facebookresearch_github_io_projectaria_tools` - Project Aria Tools docs. Used for Aria calibration, trajectory, and VRS/pose tooling behavior that surfaces through our data and rendering stacks.
 - `/facebookresearch/efm3d` - Egocentric Foundation Models for 3D understanding. Used for the vendored EFM3D backbone, tensor wrappers, and Aria snippet structures that our training/data pipeline builds on.
+- `/websites/modular_mojo` - Mojo language docs from Modular. Used for official guidance on Python interop, Python-importable Mojo modules, FFI, and GPU kernel primitives when evaluating targeted acceleration work for `aria_nbv`.
 - `/lightning-ai/pytorch-lightning` - PyTorch Lightning. Used for trainer/datamodule behavior, callback integration, and fit/validation loop semantics in the VIN training stack.
 - `/mikedh/trimesh` - Mesh processing and analysis. Used for processed ASE mesh loading, simplification, and geometric utilities in mesh-cache and rendering helpers.
 - `/wandb/wandb` - Weights & Biases. Used for experiment tracking, logging, and sweep integration in Lightning training workflows.

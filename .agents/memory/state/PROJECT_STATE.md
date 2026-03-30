@@ -29,12 +29,13 @@ The current stack has three main layers: ASE and EFM-facing data access, oracle 
 - The `aria_nbv.data_handling` package root is now canonical-only; remaining legacy cache APIs live behind dedicated `_legacy_cache_api.py` and `_legacy_vin_source.py` modules, while the old public submodule names (`oracle_cache.py`, `vin_cache.py`, `vin_oracle_datasets.py`, etc.) are thin compatibility wrappers over those `_legacy_*` owners.
 
 ## Active Experiments
-The project is actively iterating on VIN variants, semidense projection cues, candidate generation behavior, and documentation alignment between code, paper, and slides.
+The project is actively iterating on VIN variants, semidense projection cues, candidate generation behavior, and documentation alignment between code, paper, and slides. Candidate generation now also has an experimental `CollisionBackend.MOJO` path for mesh-clearance queries; path-collision checks still delegate to the established Trimesh ray engine for equivalence while the parallel Mojo distance kernel is evaluated.
 
 ## Risks and Pitfalls
 - Validation can be disabled by config defaults if Lightning is misconfigured.
 - Interpreter mismatch can break tests when `uv run` or the repo venv is not used.
 - Candidate-pose frame consistency and CW90 corrections remain easy to misuse across rendering and VIN inputs.
+- The experimental Mojo backend requires the Mojo Python package to be reachable, either from `<repo>/.mojo-venv` or via `ARIA_NBV_MOJO_SITE_PACKAGES`.
 
 ## Pointers
 - `docs/index.qmd`

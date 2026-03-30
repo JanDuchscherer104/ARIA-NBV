@@ -81,3 +81,7 @@ def test_occupancy_extent_has_expected_shape(efm_sample):
 
 def test_collision_backend_trimesh_enum():
     assert CollisionBackend.TRIMESH.value == "trimesh"
+
+
+def test_collision_backend_mojo_enum():
+    assert CollisionBackend.MOJO.value == "mojo"
