@@ -37,3 +37,7 @@ Verification:
 
 Canonical state impact:
 - updated project state and decisions to reflect the `aria_nbv/aria_nbv` workspace layout and `aria_nbv/.venv` environment path
+
+## Prompt Follow-Through
+
+This note predates the privileged owner-directive memory contract. No additional durable owner prompt items were backfilled here beyond any canonical state updates already recorded in this debrief.

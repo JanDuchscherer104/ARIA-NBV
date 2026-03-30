@@ -240,6 +240,7 @@ flowchart LR
         datamodule_config: DocDataModuleConfig
         """Configuration for data ingestion (datasets, transforms, batch sizing)."""
 
+
         def setup_target(self) -> tuple[Trainer, LightningModule, LightningDataModule]:
             trainer = self.trainer_config.setup_target()
             module = self.module_config.setup_target()

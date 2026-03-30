@@ -1,0 +1,75 @@
+---
+title: "Resolved TODOs"
+format: html
+---
+
+# Resolved Work Archive
+
+This page archives selected completed work that used to live in the active backlog.
+
+- The active queue now lives in [Action Items & TODOs](todos.qmd).
+- This archive is intentionally selective: it keeps the major completed themes and the most important fixes, not every historical note.
+
+## Oracle RRI Pipeline
+
+- [x] Implement oracle RRI supervision based on candidate rendering, backprojection, and point-cloud to mesh distance metrics.
+  - **Done**: The repo now has a working oracle pipeline built around candidate generation, GT-mesh rendering, backprojection, and Chamfer-derived RRI supervision.
+- [x] Add an offline cache for expensive oracle-labelled samples.
+  - **Done**: The project supports cached oracle-labelled snippets for batched training instead of recomputing the full oracle path inside each training loop.
+
+## Candidate Generation, Rendering, and Backprojection
+
+- [x] Stabilize candidate sampling with gravity alignment.
+  - **Done**: `align_to_gravity=True` now uses a gravity-aligned sampling pose while preserving the intended sampling behavior.
+- [x] Fix the candidate frusta / rendering / backprojection mismatch.
+  - **Done**: PoseTW to PyTorch3D extrinsics and NDC unprojection were corrected so rendered depths and backprojected point clouds align with candidate poses again.
+- [x] Keep `rotate_yaw_cw90` as a display-time convention rather than a physical-geometry transform.
+  - **Done**: Rendering and backprojection stay in the physical Aria frame; display rotation is applied only in visualization code.
+
+## VIN v2 / VIN Runtime Alignment
+
+- [x] Fix `VinPrediction` field mismatches across call sites.
+  - **Done**: Missing `candidate_valid` and `valid_frac` fields were added and aligned with the active model/pipeline usage.
+- [x] Validate and normalize constructed VIN field channels correctly.
+  - **Done**: Derived channels were implemented or rejected explicitly, and `counts_norm` normalization was fixed.
+- [x] Separate keys and values in `PoseConditionedGlobalPool`.
+  - **Done**: The attention path now uses distinct key/value tensors instead of coupling positional embeddings into both.
+
+## Streamlit App Refactor
+
+- [x] Replace the older mixed dashboard surface with a typed app/controller/panel structure.
+  - **Done**: The app now lives under `aria_nbv/aria_nbv/app/` with clearer ownership between orchestration, state, UI helpers, and plotting-only panels.
+- [x] Fix stale stage reuse in the app.
+  - **Done**: Explicit typed stage caches and forced refresh paths were added so reruns recompute the intended stages.
+- [x] Treat candidate renders as one shared stage across the app.
+  - **Done**: Depth rendering and candidate point-cloud generation are now computed and cached together for reuse across render and RRI pages.
+
+## Training Pipeline Foundations
+
+- [x] Build a Lightning-based VIN training path on top of the frozen EVL backbone.
+  - **Done**: The repo has a working VIN package, Lightning module/datamodule, training CLI, and associated implementation notes.
+- [x] Create checkpoints on interrupted training runs.
+  - **Done**: Training now writes a checkpoint on `Ctrl+C` exit instead of discarding the current run state.
+
+## Codebase Simplification
+
+- [x] Collapse the duplicated raw/view/provider/store surfaces in `aria_nbv.data` into compatibility wrappers over `aria_nbv.data_handling`.
+  - **Done**: The duplicated `efm_*`, `mesh_cache`, `vin_oracle_*`, `vin_snippet_provider`, `vin_snippet_utils`, and `offline_cache_store` implementations no longer exist in parallel owners.
+- [x] Refresh the repo-wide simplification audit after the first deletion-heavy wrapper pass.
+  - **Done**: The active `autoimprove` baseline now reflects the post-wrapper state instead of the older pre-simplification counts.
+- [x] Start consolidating duplicated plotting helpers into `aria_nbv.utils.plotting`.
+  - **Done**: Shared label, PCA, histogram, and Plotly edge-flattening helpers now live in `aria_nbv.utils.plotting`, with VIN plotting and app panel code importing the canonical implementations.
+- [x] Collapse duplicated cache-dir resolution logic into one canonical `PathConfig` helper.
+  - **Done**: Oracle/VIN cache configs now share `PathConfig.resolve_cache_dir()` instead of carrying four copy-pasted validators.
+- [x] Move duplicated generic trend helpers into one shared stats owner.
+  - **Done**: Linear slope and early/mid/late segment helpers now live in `aria_nbv.utils.stats`, with both app panels and W&B utilities importing the same implementation.
+- [x] Improve the `autoimprove` reward to prioritize real simplification over cosmetic shrinkage.
+  - **Done**: The ground-truth autoimprove spec now penalizes repeated contracts, helper collisions, and private helper sprawl more aggressively than raw net line count.
+- [x] Collapse repeated pose-generation normalization helpers into one owner.
+  - **Done**: Pose-generation orientation and plotting code now share `normalize_last_dim()` from a surface-local helper module instead of carrying duplicate `_normalise` functions.
+- [x] Move shared Plotly edge-flattening into a neutral helper owner.
+  - **Done**: `data.plotting` and `utils.plotting` now share one `flatten_edges_for_plotly()` implementation from a small Plotly helper module, avoiding both duplication and cross-module import cycles.
+- [x] Consolidate shared cache naming and metadata encode/decode helpers under canonical owners.
+  - **Done**: `data_handling` cache naming/hash/timestamp helpers now live in `_cache_utils`, oracle/VIN metadata JSON encode/decode lives on the metadata dataclasses, the VIN cache dropped its duplicate generic `_read_metadata` / `_write_metadata` helpers, and the legacy `data.offline_cache_store` wrapper now points at the canonical helper owner instead of reintroducing copied logic.
+- [x] Remove the duplicated low-level geometry/frustum plotting helpers from `vin.experimental.plotting`.
+  - **Done**: `vin.experimental.plotting` now reuses the canonical camera/frustum helper owner in `vin.plotting` and deletes the copied pose/frustum helper block, which cut the simplification audit from `24` helper collisions / `8` repeated contract groups down to `9` helper collisions / `8` repeated contract groups.

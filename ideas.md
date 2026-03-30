@@ -1,3 +1,10 @@
+---
+id: ideas_and_future_directions
+status: active
+read_only: true
+description: A scratchpad for ideas, future directions, and longer-term notes that don't fit into the more structured files. This document is maintained by the human owner and must not be edited by agents. It is intended for the owner's personal use and may contain unfiltered thoughts, brainstorming.
+---
+
 # Ideas and Future Directions
 
 ## Highest Priority
@@ -46,6 +53,10 @@ val confusion matrix indicates that it never predicts the lowest two classes!
     > **RGB**: We could use something like Gaussian splatting or world models to generate the full modalities for counterfactual poses that are not part of the original ego-trajectory. Weren't there one-shot reconstruction methods in the aria ecosystem: [egocentric_splats](https://github.com/facebookresearch/egocentric_splats)
 
     > **SLAM PC**: We could emulate their slam algorithm or we simply generate own slam pc for ASE.
+
+- Given that we'll need multi-step trajectories for RL, we need to update the our data_handling to be able to generate and maintian those multi-step trajectories, where we have rri labels, depth renderings, and point clouds from each of the counterfactual views.
+- Also, we cannot maintain trajectories for all candidate views, here we shoudl choose a (noisy) top-k of the candidate views (DECIDE: or should we sample them randomly?, i.e. random walk with N_c candidate views each step and K sampled views that we maintain trajectories for?).
+
 
 
 **Questions**:

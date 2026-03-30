@@ -50,3 +50,7 @@ Simplified the active Codex scaffold so the hot path uses only routing and canon
 - Updated `.agents/memory/state/DECISIONS.md` to capture the lightweight vs heavy context split and the native debrief contract.
 - Updated `.agents/memory/state/PROJECT_STATE.md` to document the new default bootstrap and command-first contract surface.
 - Updated `.agents/memory/state/GOTCHAS.md` to distinguish lightweight `make context` refresh from heavy fallback targets.
+
+## Prompt Follow-Through
+
+This note predates the privileged owner-directive memory contract. No additional durable owner prompt items were backfilled here beyond any canonical state updates already recorded in this debrief.

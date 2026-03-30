@@ -32,3 +32,7 @@ Regenerated lightweight context after the script changes and ran scaffold verifi
 
 ## Canonical State Impact
 Updated `DECISIONS.md` and `PROJECT_STATE.md` to record the tightened bootstrap and the role of `.agents/references/`.
+
+## Prompt Follow-Through
+
+This note predates the privileged owner-directive memory contract. No additional durable owner prompt items were backfilled here beyond any canonical state updates already recorded in this debrief.

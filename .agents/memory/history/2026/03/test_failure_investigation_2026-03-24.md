@@ -109,3 +109,7 @@ Investigated all current failures in `oracle_rri/tests` against current UUT cont
 3. Fix test-internal migration breakages (Cluster D).
 4. Rebaseline behavioral assertions against canonical UUT (Cluster C).
 5. Decide keep/rewrite/drop policy for legacy `data_handling/*` tests (Cluster E), then apply consistently.
+
+## Prompt Follow-Through
+
+This note predates the privileged owner-directive memory contract. No additional durable owner prompt items were backfilled here beyond any canonical state updates already recorded in this debrief.

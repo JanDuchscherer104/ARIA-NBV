@@ -3,8 +3,8 @@
 .PHONY: context-qmd-tree
 .PHONY: context-index context-get context-contracts context-modules context-classes context-functions
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
-.PHONY: context-literature-index context-literature-search migrate-codex-memory
-.PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory
+.PHONY: context-literature-index context-literature-search
+.PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory check-agent-scaffold
 
 # Color codes
 BLUE := \033[0;34m
@@ -51,7 +51,6 @@ QMD_OUTLINE_ARGS ?= --compact
 TYPST_OUTLINE_ARGS ?= --paper --mode outline
 TYPST_INCLUDES_ARGS ?= --paper --mode includes
 LITERATURE_SEARCH_QUERY ?=
-MIGRATE_CODEX_MEMORY_ARGS ?=
 MMDC ?= mmdc
 MMD_DIR ?= external/mmdc-examples
 MMD_OUT ?= $(MMD_DIR)
@@ -126,10 +125,10 @@ context-literature-search: ## 🗺️ Search literature sources (set LITERATURE_
 	fi
 	@./scripts/nbv_literature_search.sh "$(LITERATURE_SEARCH_QUERY)"
 
-migrate-codex-memory: _check_python ## 🗺️ Migrate legacy .codex notes into .agents/memory
-	@$(PYTHON_INTERPRETER) scripts/migrate_codex_memory.py $(MIGRATE_CODEX_MEMORY_ARGS)
+check-agent-scaffold: _check_python ## 🗺️ Validate scaffold routing, generated indices, and stale-path drift
+	@$(PYTHON_INTERPRETER) scripts/validate_agent_memory.py --scaffold-only
 
-check-agent-memory: _check_python ## 🗺️ Validate agent memory scaffolding and debrief hygiene
+check-agent-memory: _check_python ## 🗺️ Validate scaffold routing plus debrief hygiene
 	@$(PYTHON_INTERPRETER) scripts/validate_agent_memory.py
 
 context: _check_python ## 🗺️ Refresh lightweight context artifacts (source index, literature index, data contracts)

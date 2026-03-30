@@ -4,37 +4,53 @@ updated: 2026-03-29
 scope: repo
 owner: jan
 status: active
-tags: [nbv, rri, efm3d, ase, codex]
+tags: [nbv, rri, efm3d, ase, thesis]
 ---
 
 # Project State
 
-## Goal and Claims
-This repository develops an active next-best-view planner for egocentric indoor scenes. The core claim is that ranking candidate viewpoints by relative reconstruction improvement can outperform proxy objectives such as pure coverage, especially when combined with frozen egocentric foundation-model features from EFM3D or EVL.
+## Mission
+This repository develops a quality-driven next-best-view system for egocentric indoor scenes in the Aria ecosystem. Instead of optimizing proxy objectives such as coverage, the project uses Relative Reconstruction Improvement (RRI) to rank candidate views by their expected effect on reconstruction quality. The strategic motive is to use expensive oracle supervision in simulation to train a lightweight scorer that can later support stronger planning, broader supervision, and sim-to-real transfer.
 
-## Current Architecture
-The current stack has three main layers: ASE and EFM-facing data access, oracle label generation for candidate views, and VIN-style learned scoring on top of frozen backbone features. Candidate viewpoints are sampled around the reference trajectory pose, rendered against ground-truth meshes, fused with semi-dense SLAM points, and scored with RRI-derived labels. Training and diagnostics live in the `aria_nbv` package under `aria_nbv/aria_nbv`, while Quarto and Typst document theory, implementation, and experiments.
+## Current System
+- Offline oracle label pipeline on ASE/EFM snippets: sample discrete candidate poses around the latest rig pose, prune invalid views, render metric depth from GT meshes, backproject candidate point clouds, fuse them with semi-dense SLAM points, and score candidates with Chamfer-derived RRI plus accuracy/completeness terms.
+- Reproducible offline cache of oracle-labelled snippets, candidate metadata, optional candidate renders and point clouds, and frozen EVL/EFM features for batched training.
+- Implemented VIN v3 baseline: frozen EVL voxel backbone, rig-relative pose encoding, pose-conditioned global context, candidate-specific semidense projection evidence, optional projection-grid features, and a CORAL ordinal head for RRI prediction.
+- Research tooling around the pipeline: Lightning experiment configs, cache builders, CLIs, W&B/Optuna hooks, and Streamlit diagnostics for candidate generation, rendering, projection, and oracle-label behavior.
 
-## Stable Conventions
-- Treat `docs/typst/paper/main.typ` as the highest-level project narrative and sync Quarto docs to it.
-- Use the uv-managed environment in `aria_nbv/.venv`.
-- Use `PoseTW` and `CameraTW` instead of raw matrices.
-- Treat `docs/references.bib` as the only bibliography source of truth.
-- Keep repo guidance in `AGENTS.md`, repeatable workflows in `.agents/skills/`, and generated context in `docs/_generated/context/`.
-- Keep operator aids and long-form conventions in `.agents/references/`; canonical state docs should remain focused on current truth.
-- The default Codex bootstrap is `docs/typst/paper/main.typ` + `.agents/memory/state/` + the compact `docs/_generated/context/source_index.md`, with broader references retrieved on demand.
-- Treat `make context-contracts` / `scripts/nbv_get_context.sh contracts` as the preferred contract surface; heavy generated artifacts are fallback-only.
+## Current Research Position
+- The project currently solves one-step discrete candidate ranking, not end-to-end NBV control.
+- The learned model predicts offline oracle supervision; it is not yet a continuous action policy or a multi-step planner.
+- EVL is currently used as a frozen backbone. The main learning effort is in the candidate scorer, feature design, and label representation.
+- The present baseline is useful and trained, but still exploratory. It supports diagnostics and ablations more than final deployment claims.
 
-## Active Experiments
-The project is actively iterating on VIN variants, semidense projection cues, candidate generation behavior, and documentation alignment between code, paper, and slides.
+## Implemented Ground Truth
+- Oracle RRI computation is the canonical supervision signal.
+- Candidate rendering and backprojection are implemented with PyTorch3D plus Aria/EFM geometric primitives.
+- Semi-dense SLAM points, GT meshes, candidate cameras, and typed Aria poses are the key geometric inputs for oracle scoring.
+- Offline cache generation and inspection are first-class parts of the workflow because oracle labels are too expensive to recompute inside normal training loops.
 
-## Risks and Pitfalls
-- Validation can be disabled by config defaults if Lightning is misconfigured.
-- Interpreter mismatch can break tests when `uv run` or the repo venv is not used.
-- Candidate-pose frame consistency and CW90 corrections remain easy to misuse across rendering and VIN inputs.
+## Active Work
+- Improve the VIN scorer: stronger candidate-specific features, better calibration, candidate shuffling, CORAL/binning refinements, and updated architectures.
+- Scale oracle supervision: cover more mesh-supervised ASE data, generate broader candidate distributions, and clean up data handling.
+- Keep coordinate and frame handling correct across sampling, rendering, caching, and visualization, especially around gravity alignment and `rotate_yaw_cw90`.
+- Keep Quarto docs aligned with the current codebase, `docs/typst/paper/main.typ`, and the thesis slides.
+
+## Current Constraints and Risks
+- GT-mesh supervision covers only a limited mesh-supervised subset of ASE, not the full dataset.
+- Oracle labels remain expensive because each snippet requires many candidate renders and point-to-mesh evaluations.
+- EVL's voxel extent is local around the latest pose, so far-away candidates need extra candidate-specific evidence.
+- Candidate-frame consistency is easy to break; display-time Aria rotations must not leak into physical geometry or cached training inputs.
+- Overfitting, calibration drift, and stage-dependent RRI distributions remain open concerns for the current VIN setup.
+
+## Thesis-Driven Next Directions
+- Decide how much to invest in an updated VIN versus moving sooner toward multi-step RL.
+- Explore multi-step, non-myopic planning where the learned RRI scorer can serve as a surrogate objective or critic.
+- Investigate richer counterfactual modalities for non-trajectory poses, including simulator-generated signals or one-shot reconstruction methods.
+- Extend from scene-level reconstruction quality toward entity-aware or task-aware NBV objectives.
 
 ## Pointers
-- `docs/index.qmd`
-- `docs/contents/todos.qmd`
-- `docs/contents/impl/`
-- `docs/contents/ext-impl/`
+- Paper ground truth: `docs/typst/paper/main.typ`
+- Immediate implementation tasks and unresolved issues: `docs/contents/todos.qmd`
+- Open research questions: `.agents/memory/state/OPEN_QUESTIONS.md`
+- Longer-horizon scratchpad and thesis ideas: `ideas.md`
