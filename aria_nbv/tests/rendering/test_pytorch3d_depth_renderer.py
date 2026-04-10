@@ -1,5 +1,6 @@
 import torch
 from efm3d.aria import CameraTW, PoseTW
+
 from aria_nbv.rendering.pytorch3d_depth_renderer import (
     Pytorch3DDepthRenderer,
     Pytorch3DDepthRendererConfig,
@@ -34,9 +35,7 @@ def test_depth_renderer_plane_constant_depth_cpu():
     faces = torch.tensor([[0, 1, 2], [0, 2, 3]], dtype=torch.int64)
 
     cam = _test_camera()
-    pose_wc_single = PoseTW.from_Rt(
-        torch.eye(3), torch.zeros(3)
-    )  # cam at origin, looking +Z.
+    pose_wc_single = PoseTW.from_Rt(torch.eye(3), torch.zeros(3))  # cam at origin, looking +Z.
     pose_wc = PoseTW(pose_wc_single._data.unsqueeze(0))  # batchify
 
     cfg = Pytorch3DDepthRendererConfig(device="cpu", is_debug=True, zfar=10.0)

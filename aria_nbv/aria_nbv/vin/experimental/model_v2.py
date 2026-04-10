@@ -63,20 +63,22 @@ from aria_nbv.utils.frames import rotate_yaw_cw90
 from ...data_handling import EfmSnippetView, VinSnippetView
 from ...rri_metrics.coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
 from ...utils import BaseConfig, Optimizable, optimizable_field
+from .._model_mixins import PoseFeatureGlobalContextMixin
 from ..backbone_evl import EvlBackboneConfig
 from ..pose_encoders import R6dLffPoseEncoderConfig
+from ..semidense_projection import SEMIDENSE_PROJ_DIM
 from ..traj_encoder import TrajectoryEncoder, TrajectoryEncoderConfig
 from ..vin_modules import PoseConditionedGlobalPool
 from ..vin_utils import (
     FieldBundle,
     GlobalContext,
-    PoseFeatures,
     PreparedInputs,
     ensure_candidate_batch,
     ensure_pose_batch,
-    pos_grid_from_pts_world,
+    largest_divisor_leq,
+    sample_voxel_field,
+    validate_pos_grid_xyz_encoder,
 )
-from .model import _largest_divisor_leq, _sample_voxel_field
 from .pointnext_encoder import PointNeXtSEncoder, PointNeXtSEncoderConfig
 from .pose_encoders import PoseEncoder, PoseEncoderConfig
 from .pose_encoding import LearnableFourierFeaturesConfig
@@ -97,20 +99,6 @@ FIELD_CHANNELS_V2: tuple[str, ...] = (
     "unknown",
     "new_surface_prior",
 )
-
-SEMIDENSE_PROJ_FEATURES: tuple[str, ...] = (
-    "coverage",
-    "empty_frac",
-    "semidense_candidate_vis_frac",
-    "depth_mean",
-    "depth_std",
-)
-SEMIDENSE_PROJ_DIM = len(SEMIDENSE_PROJ_FEATURES)
-
-SEMIDENSE_PROJ_FEATURE_ALIASES: dict[str, str] = {
-    "valid_frac": "semidense_candidate_vis_frac",
-    "semidense_valid_frac": "semidense_candidate_vis_frac",
-}
 
 SEMIDENSE_FRUSTUM_TOKEN_FEATURES: tuple[str, ...] = (
     "x_norm",
@@ -417,17 +405,7 @@ class VinModelV2Config(BaseConfig):
     Deprecated: kept to load older configs; not currently implemented.
     """
 
-    @field_validator("pos_grid_encoder_lff")
-    @classmethod
-    def _validate_pos_grid_encoder_lff(
-        cls,
-        value: LearnableFourierFeaturesConfig,
-    ) -> LearnableFourierFeaturesConfig:
-        if value.input_dim != 3:
-            raise ValueError(
-                "pos_grid_encoder_lff.input_dim must be 3 for XYZ coordinates.",
-            )
-        return value
+    _validate_pos_grid_encoder_lff = field_validator("pos_grid_encoder_lff")(validate_pos_grid_xyz_encoder)
 
     @model_validator(mode="after")
     def _apply_candidate_min_valid_frac(self) -> "VinModelV2Config":
@@ -441,7 +419,7 @@ class VinModelV2Config(BaseConfig):
         return self
 
 
-class VinModelV2(nn.Module):
+class VinModelV2(PoseFeatureGlobalContextMixin, nn.Module):
     """Simplified VIN head for RRI prediction with configurable pose encoding."""
 
     def __init__(self, config: VinModelV2Config) -> None:
@@ -475,7 +453,7 @@ class VinModelV2(nn.Module):
         self.sem_frustum_vis_embed: nn.Embedding | None = None
 
         field_dim = self.config.field_dim
-        gn_groups = _largest_divisor_leq(field_dim, self.config.field_gn_groups)
+        gn_groups = largest_divisor_leq(field_dim, self.config.field_gn_groups)
         self.field_proj = nn.Sequential(
             nn.Conv3d(
                 len(self.config.scene_field_channels),
@@ -488,7 +466,7 @@ class VinModelV2(nn.Module):
         )
 
         pose_dim = self.pose_encoder.out_dim
-        num_heads = _largest_divisor_leq(field_dim, 4)
+        num_heads = largest_divisor_leq(field_dim, 4)
         self.global_pooler = PoseConditionedGlobalPool(
             field_dim=field_dim,
             pose_dim=pose_dim,
@@ -505,13 +483,13 @@ class VinModelV2(nn.Module):
         point_dim = int(self.point_encoder.out_dim) if self.point_encoder is not None else 0
         if self.point_encoder is not None:
             self.point_film = nn.Linear(point_dim, 2 * field_dim, bias=True)
-            film_groups = _largest_divisor_leq(field_dim, 4)
+            film_groups = largest_divisor_leq(field_dim, 4)
             self.point_film_norm = nn.GroupNorm(
                 num_groups=film_groups,
                 num_channels=field_dim,
             )
         self.sem_proj_film = nn.Linear(SEMIDENSE_PROJ_DIM, 2 * field_dim, bias=True)
-        sem_proj_groups = _largest_divisor_leq(field_dim, 4)
+        sem_proj_groups = largest_divisor_leq(field_dim, 4)
         self.sem_proj_film_norm = nn.GroupNorm(
             num_groups=sem_proj_groups,
             num_channels=field_dim,
@@ -565,7 +543,7 @@ class VinModelV2(nn.Module):
         )
         if self.traj_encoder is not None:
             traj_dim = int(self.traj_encoder.out_dim)
-            traj_heads = _largest_divisor_leq(pose_dim, 4)
+            traj_heads = largest_divisor_leq(pose_dim, 4)
             self.traj_attn = nn.MultiheadAttention(
                 embed_dim=pose_dim,
                 num_heads=traj_heads,
@@ -573,7 +551,7 @@ class VinModelV2(nn.Module):
                 vdim=traj_dim,
                 batch_first=True,
             )
-            traj_gn_groups = _largest_divisor_leq(traj_dim, 4)
+            traj_gn_groups = largest_divisor_leq(traj_dim, 4)
             self.traj_attn_norm = nn.GroupNorm(
                 num_groups=traj_gn_groups,
                 num_channels=traj_dim,
@@ -640,20 +618,6 @@ class VinModelV2(nn.Module):
             snippet=self._maybe_snippet_view(efm),
         )
 
-    def _encode_pose_features(
-        self,
-        pose_world_cam: PoseTW,
-        pose_world_rig_ref: PoseTW,
-    ) -> PoseFeatures:
-        """Encode candidate poses in the reference rig frame."""
-        pose_rig_cam = pose_world_rig_ref.inverse()[:, None] @ pose_world_cam
-        pose_out = self.pose_encoder.encode(pose_rig_cam)
-        return PoseFeatures(
-            pose_enc=pose_out.pose_enc,
-            pose_vec=pose_out.pose_vec,
-            candidate_center_rig_m=pose_out.center_m,
-        )
-
     def _build_field_bundle(self, backbone_out: EvlBackboneOutput) -> FieldBundle:
         """Construct the scene field and its projection."""
 
@@ -694,29 +658,6 @@ class VinModelV2(nn.Module):
         field_in = field_in.to(device=backbone_out.voxel_extent.device)
         field = self.field_proj(field_in)
         return FieldBundle(field_in=field_in, field=field, aux=field_aux)
-
-    def _compute_global_context(
-        self,
-        field: Tensor,
-        pose_enc: Tensor,
-        *,
-        pts_world: Tensor,
-        t_world_voxel: PoseTW,
-        pose_world_rig_ref: PoseTW,
-        voxel_extent: Tensor,
-    ) -> GlobalContext:
-        """Compute pose-conditioned global features from the scene field."""
-        pos_grid = pos_grid_from_pts_world(
-            pts_world.to(device=field.device, dtype=field.dtype),
-            t_world_voxel=t_world_voxel,
-            pose_world_rig_ref=pose_world_rig_ref,
-            voxel_extent=voxel_extent,
-            grid_shape=(field.shape[-3], field.shape[-2], field.shape[-1]),
-        )  # B
-        global_feat = self.global_pooler.forward(field, pose_enc, pos_grid=pos_grid).to(
-            dtype=field.dtype,
-        )
-        return GlobalContext(pos_grid=pos_grid, global_feat=global_feat)
 
     def _normalize_obs_count(self, obs_count: Tensor) -> Tensor:
         """Normalize observation counts according to configuration."""
@@ -1043,15 +984,6 @@ class VinModelV2(nn.Module):
             proj_feat = feats.view(batch_size, num_candidates, -1)
         return proj_feat.to(device=device, dtype=dtype)
 
-    @staticmethod
-    def _semidense_proj_feature_index(name: str) -> int:
-        if name in SEMIDENSE_PROJ_FEATURES:
-            return SEMIDENSE_PROJ_FEATURES.index(name)
-        alias = SEMIDENSE_PROJ_FEATURE_ALIASES.get(name)
-        if alias is not None and alias in SEMIDENSE_PROJ_FEATURES:
-            return SEMIDENSE_PROJ_FEATURES.index(alias)
-        raise ValueError(f"Unknown semidense projection feature '{name}'.")
-
     def _encode_semidense_frustum_context(
         self,
         proj_data: dict[str, Tensor] | None,
@@ -1280,7 +1212,7 @@ class VinModelV2(nn.Module):
         counts_norm = field_bundle.aux.get("counts_norm")
         if counts_norm is None:
             raise KeyError("Missing counts_norm in field bundle.")
-        center_tokens, center_valid = _sample_voxel_field(
+        center_tokens, center_valid = sample_voxel_field(
             counts_norm,
             points_world=candidate_centers_world.unsqueeze(2),
             t_world_voxel=prepared.t_world_voxel,
@@ -1536,20 +1468,7 @@ class VinModelV2(nn.Module):
             ARIA_POSE_T_WORLD_RIG,
         )
 
-        from aria_nbv.utils import Console
-        from aria_nbv.utils.rich_summary import rich_summary, summarize
-
-        def _capture_tree(tree) -> str:
-            console = Console()
-            with console.capture() as capture:
-                console.print(
-                    tree,
-                    soft_wrap=False,
-                    highlight=True,
-                    markup=True,
-                    emoji=False,
-                )
-            return capture.get().rstrip()
+        from aria_nbv.utils.rich_summary import capture_tree, rich_summary, summarize
 
         if batch.efm_snippet_view is None and batch.backbone_out is None:
             raise RuntimeError(
@@ -1731,7 +1650,7 @@ class VinModelV2(nn.Module):
             with_shape=True,
             is_print=False,
         )
-        lines: list[str] = [_capture_tree(tree), ""]
+        lines: list[str] = [capture_tree(tree), ""]
 
         trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         total_params = sum(p.numel() for p in self.parameters())

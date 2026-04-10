@@ -1,4 +1,4 @@
-"""Small shared enums used by Lightning-based training utilities."""
+"""Small shared enums used by training and reporting utilities."""
 
 from __future__ import annotations
 
@@ -6,7 +6,14 @@ from enum import StrEnum
 from typing import Self
 
 
-class Stage(StrEnum):
+class ValueStrEnum(StrEnum):
+    """StrEnum variant whose string form is always its underlying value."""
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class Stage(ValueStrEnum):
     """Stages of the training lifecycle.
 
     Members:
@@ -18,9 +25,6 @@ class Stage(StrEnum):
     TRAIN = "train"
     VAL = "val"
     TEST = "test"
-
-    def __str__(self) -> str:
-        return self.value
 
     @classmethod
     def from_str(cls, value: str | Self) -> Self:
@@ -41,4 +45,4 @@ class Stage(StrEnum):
             raise ValueError(f"Unknown stage value '{value}' of type {type(value)}.") from exc
 
 
-__all__ = ["Stage"]
+__all__ = ["Stage", "ValueStrEnum"]

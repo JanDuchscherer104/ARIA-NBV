@@ -79,9 +79,14 @@ from ..data_handling._raw import (
 from ..data_handling.vin_adapter import build_vin_snippet_view
 from ..rri_metrics.coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
 from ..utils import BaseConfig
+from ._model_mixins import PoseFeatureGlobalContextMixin
 from .backbone_evl import EvlBackboneConfig
 from .pose_encoders import PoseEncoder, R6dLffPoseEncoderConfig
 from .pose_encoding import LearnableFourierFeaturesConfig
+from .semidense_projection import (
+    SEMIDENSE_GRID_CHANNELS,
+    SEMIDENSE_PROJ_DIM,
+)
 from .summarize_v3 import summarize_vin_v3
 from .traj_encoder import TrajectoryEncoder, TrajectoryEncoderConfig
 from .types import EvlBackboneOutput, VinPrediction, VinV3ForwardDiagnostics
@@ -89,13 +94,13 @@ from .vin_modules import PoseConditionedGlobalPool
 from .vin_utils import (
     FieldBundle,
     GlobalContext,
-    PoseFeatures,
     PreparedInputs,
     ensure_candidate_batch,
     ensure_pose_batch,
     largest_divisor_leq,
-    pos_grid_from_pts_world,
+    pool_voxel_points,
     sample_voxel_field,
+    validate_pos_grid_xyz_encoder,
 )
 
 if TYPE_CHECKING:
@@ -113,26 +118,6 @@ FIELD_CHANNELS_V3: tuple[str, ...] = (
     "unknown",
     "new_surface_prior",
 )
-
-SEMIDENSE_PROJ_FEATURES: tuple[str, ...] = (
-    "coverage",
-    "empty_frac",
-    "semidense_candidate_vis_frac",
-    "depth_mean",
-    "depth_std",
-)
-SEMIDENSE_PROJ_DIM = len(SEMIDENSE_PROJ_FEATURES)
-SEMIDENSE_GRID_FEATURES: tuple[str, ...] = (
-    "occupancy",
-    "depth_mean",
-    "depth_std",
-)
-SEMIDENSE_GRID_CHANNELS = len(SEMIDENSE_GRID_FEATURES)
-
-SEMIDENSE_PROJ_FEATURE_ALIASES: dict[str, str] = {
-    "valid_frac": "semidense_candidate_vis_frac",
-    "semidense_valid_frac": "semidense_candidate_vis_frac",
-}
 
 
 class VinModelV3Config(BaseConfig):
@@ -263,22 +248,12 @@ class VinModelV3Config(BaseConfig):
     evidence favoring coverage- and prior-aware features.
     """
 
-    @field_validator("pos_grid_encoder_lff")
-    @classmethod
-    def _validate_pos_grid_encoder_lff(
-        cls,
-        value: LearnableFourierFeaturesConfig,
-    ) -> LearnableFourierFeaturesConfig:
-        if value.input_dim != 3:
-            raise ValueError(
-                "pos_grid_encoder_lff.input_dim must be 3 for XYZ coordinates.",
-            )
-        return value
+    _validate_pos_grid_encoder_lff = field_validator("pos_grid_encoder_lff")(validate_pos_grid_xyz_encoder)
 
     # NOTE: No additional model validators; VIN-Core keeps a fixed surface area.
 
 
-class VinModelV3(nn.Module):
+class VinModelV3(PoseFeatureGlobalContextMixin, nn.Module):
     """VIN-Core head for RRI prediction with a minimal evidence-backed feature set.
 
     The vin-v2 optuna sweep showed weak or confounded gains for heavy modules
@@ -502,40 +477,6 @@ class VinModelV3(nn.Module):
             snippet=snippet,
         )
 
-    def _encode_pose_features(
-        self,
-        pose_world_cam: PoseTW,
-        pose_world_rig_ref: PoseTW,
-    ) -> PoseFeatures:
-        """Encode candidate poses in the reference rig frame.
-
-        Args:
-            pose_world_cam (PoseTW["B, Nq, 12"]): SE(3) candidate camera poses ``T_w_cq`` (world <- cam_q).
-            pose_world_rig_ref (PoseTW["B, 12"]): SE(3) reference rig pose ``T_w_r`` (world <- rig_ref).
-
-        Returns:
-            PoseFeatures (dataclass):
-                pose_enc (Tensor["B, Nq, F_pose"]): Encoded pose features.
-                pose_vec (Tensor["B, Nq, 9"]): Pose vector (t + R6D).
-                candidate_center_rig_m (Tensor["B, Nq, 3"]): Candidate centers in rig frame (meters).
-
-        We work in the reference rig frame to remove global-frame drift:
-
-        - Relative pose: ``T_r_cq = (T_w_r)^-1 @ T_w_cq``.
-        - Pose vector: ``[t_r_cq, R6D(R_r_cq)]`` with translation in metres.
-        - ``candidate_center_rig_m`` is the camera center ``t_r_cq`` in rig_ref.
-
-        Relative pose encoding (R6D + LFF) was the most stable pose representation
-        in the vin-v2 sweep.
-        """
-        pose_rig_cam = pose_world_rig_ref.inverse()[:, None] @ pose_world_cam
-        pose_out = self.pose_encoder.encode(pose_rig_cam)
-        return PoseFeatures(
-            pose_enc=pose_out.pose_enc,
-            pose_vec=pose_out.pose_vec,
-            candidate_center_rig_m=pose_out.center_m,
-        )
-
     def _encode_traj_features(
         self,
         snippet: EfmSnippetView | VinSnippetView,
@@ -687,57 +628,6 @@ class VinModelV3(nn.Module):
         field = self.field_proj(field_in)
         return FieldBundle(field_in=field_in, field=field, aux=field_aux)
 
-    def _compute_global_context(
-        self,
-        field: Tensor,  # (B, F_g, D, H, W)
-        pose_enc: Tensor,  # (B, Nq, F_pose)
-        *,
-        pts_world: Tensor,  # (B, V, 3)
-        t_world_voxel: PoseTW,
-        pose_world_rig_ref: PoseTW,
-        voxel_extent: Tensor,
-    ) -> GlobalContext:
-        """Compute pose-conditioned global features from the scene field.
-
-        A pooled voxel grid is attended by pose embeddings with LFF positional
-        keys, replacing heavier frustum attention that showed weak gains.
-
-        Args:
-            field (Tensor["B, F_g, D, H, W"]): Projected voxel field.
-            pose_enc (Tensor["B, Nq, F_pose"]): Pose embeddings per candidate.
-            pts_world (Tensor["B, V, 3"]): Voxel center positions ``x_w_v`` in world frame (metres).
-            t_world_voxel (PoseTW["B, 12"]): Voxel grid pose ``T_w_v`` (world <- voxel).
-            pose_world_rig_ref (PoseTW["B, 12"]): Reference rig pose ``T_w_r`` (world <- rig_ref).
-            voxel_extent (Tensor["B, 6"]): Voxel extent in voxel frame:
-                ``[x_min,x_max,y_min,y_max,z_min,z_max]`` (metres).
-
-        Returns:
-            GlobalContext:
-                pos_grid (Tensor["B, 3, D, H, W"]): Normalized voxel centers in rig_ref frame.
-                global_feat (Tensor["B, Nq, F_g"]): Pose-conditioned global tokens.
-
-        Notes:
-            ``pos_grid`` is computed from world-space voxel centers by:
-
-            - Convert voxel centers into rig_ref: ``x_r = (T_w_r)^-1 * x_w``.
-            - Normalize by half-extent of the EVL voxel grid (in metres). The center used for
-              normalization is the voxel-grid center expressed in rig_ref.
-
-            This keeps positional keys in a consistent metric frame tied to the snippet.
-        """
-        # pos_grid is normalized XYZ in the reference rig frame, scaled by voxel extent.
-        pos_grid = pos_grid_from_pts_world(
-            pts_world.to(device=field.device, dtype=field.dtype),
-            t_world_voxel=t_world_voxel,
-            pose_world_rig_ref=pose_world_rig_ref,
-            voxel_extent=voxel_extent,
-            grid_shape=(field.shape[-3], field.shape[-2], field.shape[-1]),
-        )  # B
-        global_feat = self.global_pooler.forward(field, pose_enc, pos_grid=pos_grid).to(
-            dtype=field.dtype,
-        )
-        return GlobalContext(pos_grid=pos_grid, global_feat=global_feat)
-
     def _pool_voxel_points(
         self,
         pts_world: Tensor,
@@ -797,31 +687,11 @@ class VinModelV3(nn.Module):
                 :,
             ]
 
-        if pts_world.ndim == 3:
-            batch_size, num_pts, _ = pts_world.shape
-            pts_shape = _infer_pts_shape(int(num_pts), grid_shape)
-            pts_grid = pts_world.view(
-                batch_size,
-                pts_shape[0],
-                pts_shape[1],
-                pts_shape[2],
-                3,
-            )
-            pts_grid = _center_crop(pts_grid, grid_shape)
-        elif pts_world.ndim == 5 and pts_world.shape[-1] == 3:
-            pts_grid = _center_crop(pts_world, grid_shape)
-        else:
-            raise ValueError(
-                f"Expected pts_world shape (B,D,H,W,3) or (B,N,3), got {tuple(pts_world.shape)}.",
-            )
-        grid = int(pool_grid)
-        pts_grid = pts_grid.to(dtype=torch.float32).permute(0, 4, 1, 2, 3)
-        pts_pool = functional.adaptive_avg_pool3d(
-            pts_grid,
-            output_size=(grid, grid, grid),
+        return pool_voxel_points(
+            pts_world,
+            grid_shape=grid_shape,
+            pool_grid=pool_grid,
         )
-        pts_tokens = pts_pool.flatten(2).transpose(1, 2)
-        return pts_tokens
 
     @staticmethod
     def _apply_film(
@@ -1323,15 +1193,6 @@ class VinModelV3(nn.Module):
         if batch_size == 1 and num_cams == num_candidates:
             return feats.view(1, num_candidates, -1)
         return feats.view(batch_size, num_candidates, -1)
-
-    @staticmethod
-    def _semidense_proj_feature_index(name: str) -> int:
-        if name in SEMIDENSE_PROJ_FEATURES:
-            return SEMIDENSE_PROJ_FEATURES.index(name)
-        alias = SEMIDENSE_PROJ_FEATURE_ALIASES.get(name)
-        if alias is not None and alias in SEMIDENSE_PROJ_FEATURES:
-            return SEMIDENSE_PROJ_FEATURES.index(alias)
-        raise ValueError(f"Unknown semidense projection feature '{name}'.")
 
     def _forward_impl(
         self,

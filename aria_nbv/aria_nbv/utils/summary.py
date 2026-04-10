@@ -14,22 +14,24 @@ def summarize(
     """Small helper for succinct repr output."""
     if val is None:
         return None
-    if isinstance(val, Tensor):
-        return _tensor_summary(val, include_stats=include_stats)
-    if isinstance(val, TensorWrapper):
-        data = val.tensor() if callable(getattr(val, "tensor", None)) else val.tensor  # type: ignore[operator]
-        return _tensor_summary(data, include_stats=include_stats)
-    if isinstance(val, PoseTW):
-        return _tensor_summary(val.matrix, include_stats=include_stats)
-    if isinstance(val, CameraTW):
-        data = val.tensor() if callable(getattr(val, "tensor", None)) else val.tensor  # type: ignore[operator]
-        return _tensor_summary(data, include_stats=include_stats)
-    if isinstance(val, ObbTW):
-        data = val.tensor() if callable(getattr(val, "tensor", None)) else val.tensor  # type: ignore[operator]
-        return _tensor_summary(data, include_stats=include_stats)
     if isinstance(val, list):
         return {"len": len(val)}
+    tensor = _extract_tensor(val)
+    if tensor is not None:
+        return _tensor_summary(tensor, include_stats=include_stats)
     return val
+
+
+def _extract_tensor(val: Any) -> Tensor | None:
+    """Return a tensor view for common tensor-wrapper types when possible."""
+    if isinstance(val, Tensor):
+        return val
+    if isinstance(val, PoseTW):
+        return val.matrix
+    if isinstance(val, (TensorWrapper, CameraTW, ObbTW)):
+        data = val.tensor() if callable(getattr(val, "tensor", None)) else val.tensor  # type: ignore[operator]
+        return data
+    return None
 
 
 def _tensor_summary(tensor: Tensor, *, include_stats: bool = False) -> dict[str, Any]:

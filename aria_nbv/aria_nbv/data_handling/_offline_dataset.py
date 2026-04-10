@@ -200,19 +200,7 @@ class VinOfflineDatasetConfig(BaseConfig):
     verbosity: Verbosity = Verbosity.NORMAL
     """Verbosity level for dataset diagnostics."""
 
-    @field_validator("map_location", mode="before")
-    @classmethod
-    def _validate_map_location(cls, value: str | torch.device) -> torch.device:
-        """Normalize the tensor device used for returned samples.
-
-        Args:
-            value: Raw device value.
-
-        Returns:
-            Normalized torch device.
-        """
-
-        return cls._resolve_device(value)
+    _validate_map_location = field_validator("map_location", mode="before")(BaseConfig._resolve_device)
 
 
 class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):

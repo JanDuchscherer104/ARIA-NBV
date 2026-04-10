@@ -173,24 +173,12 @@ class AseEfmDatasetConfig(BaseConfig):
 
         return resolved_tar_urls
 
-    @field_validator("verbosity", mode="before")
-    @classmethod
-    def _coerce_verbosity(cls, value: Any) -> Verbosity:
-        """Normalize the configured verbosity value."""
-        return Verbosity.from_any(value)
+    _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
 
     @property
     def taxonomy_csv(self) -> Path:
         """Resolved taxonomy mapping CSV path."""
-        taxonomy_pth = (
-            self.paths.root
-            / self.paths.external_dir
-            / "efm3d"
-            / "efm3d"
-            / "config"
-            / "taxonomy"
-            / self.taxonomy_csv_filename
-        )
+        taxonomy_pth = self.paths.external_dir / "efm3d" / "efm3d" / "config" / "taxonomy" / self.taxonomy_csv_filename
         if not taxonomy_pth.exists():
             raise FileNotFoundError(f"Taxonomy CSV not found at {taxonomy_pth}")
         return taxonomy_pth

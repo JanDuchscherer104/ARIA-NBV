@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import torch
 from efm3d.aria.pose import PoseTW
+
 from aria_nbv.pose_generation import orientations as orientations_module
 from aria_nbv.pose_generation.candidate_generation import CandidateViewGeneratorConfig
 from aria_nbv.pose_generation.orientations import OrientationBuilder
@@ -113,11 +114,7 @@ def test_roll_jitter_keeps_forward_fixed() -> None:
 
     assert delta is not None
     fwd = poses.R[:, :, 2]
-    expected = (
-        torch.tensor([0.0, 0.0, 1.0], device=fwd.device, dtype=fwd.dtype)
-        .view(1, 3)
-        .expand_as(fwd)
-    )
+    expected = torch.tensor([0.0, 0.0, 1.0], device=fwd.device, dtype=fwd.dtype).view(1, 3).expand_as(fwd)
     assert torch.allclose(fwd, expected, atol=1e-6)
 
     fwd_d = delta.R[:, :, 2]

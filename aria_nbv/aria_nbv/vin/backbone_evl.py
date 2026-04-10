@@ -75,14 +75,7 @@ class EvlBackboneConfig(BaseConfig):
             path = (paths.root / path).resolve()
         return path.expanduser().resolve()
 
-    @field_validator("device", mode="before")
-    @classmethod
-    def _resolve_device(cls, value: str | torch.device) -> torch.device:
-        if isinstance(value, torch.device):
-            return value
-        if value is None or str(value).lower() == "auto":
-            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        return torch.device(value)
+    _resolve_device = field_validator("device", mode="before")(BaseConfig._resolve_device)
 
 
 class EvlBackbone:

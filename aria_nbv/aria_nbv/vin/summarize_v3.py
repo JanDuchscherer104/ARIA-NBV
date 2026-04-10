@@ -19,8 +19,7 @@ from ..data_handling import (
     is_vin_snippet_view_instance,
 )
 from ..rri_metrics.coral import coral_monotonicity_violation_rate
-from ..utils import Console
-from ..utils.rich_summary import rich_summary, summarize
+from ..utils.rich_summary import capture_tree, rich_summary, summarize
 
 if TYPE_CHECKING:
     from ..data_handling import VinOracleBatch
@@ -83,18 +82,6 @@ def summarize_vin_v3(
             "p95": float(qs[2].item()),
             "mean": float(x_f.mean().item()),
         }
-
-    def _capture_tree(tree) -> str:
-        console = Console()
-        with console.capture() as capture:
-            console.print(
-                tree,
-                soft_wrap=False,
-                highlight=True,
-                markup=True,
-                emoji=False,
-            )
-        return capture.get().rstrip()
 
     if batch.efm_snippet_view is None and batch.backbone_out is None:
         raise RuntimeError(
@@ -303,7 +290,7 @@ def summarize_vin_v3(
         with_shape=True,
         is_print=False,
     )
-    lines: list[str] = [_capture_tree(tree), ""]
+    lines: list[str] = [capture_tree(tree), ""]
 
     trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
     total_params = sum(p.numel() for p in self.parameters())

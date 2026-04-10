@@ -115,7 +115,7 @@ def _format_signature(fn_node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
     elif fn_node.args.kwonlyargs:
         args.append("*")
 
-    for kw_arg, kw_default in zip(fn_node.args.kwonlyargs, fn_node.args.kw_defaults):
+    for kw_arg, kw_default in zip(fn_node.args.kwonlyargs, fn_node.args.kw_defaults, strict=True):
         name = kw_arg.arg
         if kw_default is not None:
             name = f"{name}=..."
@@ -188,7 +188,9 @@ def parse_module(py_path: Path, root: Path) -> ModuleInfo | None:
         if isinstance(stmt, ast.ClassDef):
             methods: list[FunctionInfo] = []
             for class_stmt in stmt.body:
-                if isinstance(class_stmt, (ast.FunctionDef, ast.AsyncFunctionDef)) and not class_stmt.name.startswith("_"):
+                if isinstance(class_stmt, (ast.FunctionDef, ast.AsyncFunctionDef)) and not class_stmt.name.startswith(
+                    "_"
+                ):
                     methods.append(
                         FunctionInfo(
                             name=class_stmt.name,

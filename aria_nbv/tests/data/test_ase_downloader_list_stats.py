@@ -39,9 +39,7 @@ def _write_atek_urls(
         for scene_id, shard_count in scene_to_count.items():
             wds_file_urls[scene_id] = {
                 f"shards-{idx:04d}_tar": {
-                    "filename": (
-                        f"AriaSyntheticEnvironment_1_0_ATEK_{cfg_name}_{scene_id}_shards-{idx:04d}.tar"
-                    ),
+                    "filename": (f"AriaSyntheticEnvironment_1_0_ATEK_{cfg_name}_{scene_id}_shards-{idx:04d}.tar"),
                     "sha1sum": "dummy",
                     "file_size_bytes": 1,
                     "download_url": "https://example.com/file.tar",
@@ -63,10 +61,7 @@ def _write_tar_safe(path: Path, *, snippet_count: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(path, "w") as tf:
         for idx in range(snippet_count):
-            name = (
-                f"AriaSyntheticEnvironment_00000_AtekDataSample_{idx:06d}."
-                "sequence_name.txt"
-            )
+            name = f"AriaSyntheticEnvironment_00000_AtekDataSample_{idx:06d}.sequence_name.txt"
             data = b"00000\n"
             info = tarfile.TarInfo(name=name)
             info.size = len(data)

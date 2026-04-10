@@ -18,6 +18,7 @@ from typing import Any
 from ..pipelines.oracle_rri_labeler import OracleRriLabelerConfig
 from ..utils import BaseConfig
 from ..vin.backbone_evl import EvlBackboneConfig
+from ._sample_keys import sanitize_token
 from .cache_contracts import OracleRriCacheMetadata
 from .efm_dataset import AseEfmDatasetConfig
 
@@ -125,11 +126,6 @@ def read_oracle_cache_metadata(path: Path) -> OracleRriCacheMetadata:
     return _read_metadata(path)
 
 
-def _sanitize_token(value: str) -> str:
-    """Normalize a token so it is safe to embed in filenames."""
-    return re.sub(r"[^0-9a-zA-Z._-]+", "_", value).strip("_")
-
-
 def _extract_snippet_token(snippet_id: str) -> str:
     """Extract the stable numeric sample token from a snippet identifier."""
     match = re.search(r"(?:AtekDataSample|DataSample)_([0-9]+)$", snippet_id)
@@ -146,9 +142,9 @@ def extract_snippet_token(snippet_id: str) -> str:
 
 def _format_sample_key(scene_id: str, snippet_id: str, config_hash: str) -> str:
     """Build a stable cache key for a sample payload."""
-    scene_safe = _sanitize_token(scene_id)
+    scene_safe = sanitize_token(scene_id)
     snippet_token = _extract_snippet_token(snippet_id)
-    snippet_safe = _sanitize_token(snippet_token)
+    snippet_safe = sanitize_token(snippet_token)
     key = f"ASE_NBV_SNIPPET_{scene_safe}_{snippet_safe}_{config_hash}"
     if len(key) <= 200:
         return key
