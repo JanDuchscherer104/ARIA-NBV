@@ -8,6 +8,7 @@ This section contains detailed reviews of key papers and methods related to Next
 
 - **[VIN-NBV](vin_nbv.qmd)**: Learning-based RRI prediction for quality-driven view planning
 - **[GenNBV](gen_nbv.qmd)**: Continuous action spaces and reinforcement learning approaches
+- **[Hestia](hesita.qmd)**: Face-aware hierarchical continuous NBV with look-at-point decomposition
 
 ### Foundation Models & Scene Understanding  
 
@@ -20,6 +21,7 @@ The full source of every referenced paper is mirrored under `literature/tex-src/
 
 - [`arXiv-EFM3D/main.tex`](../../literature/tex-src/arXiv-EFM3D/main.tex)
 - [`arXiv-GenNBV/main.tex`](../../literature/tex-src/arXiv-GenNBV/main.tex)
+- [`arXiv-hesita/main.tex`](../../literature/tex-src/arXiv-hesita/main.tex)
 - [`arXiv-VIN-NBV/main.tex`](../../literature/tex-src/arXiv-VIN-NBV/main.tex)
 - [`arXiv-project-aria/main.tex`](../../literature/tex-src/arXiv-project-aria/main.tex)
 - [`arXiv-scene-script/main.tex`](../../literature/tex-src/arXiv-scene-script/main.tex)

@@ -101,6 +101,7 @@ website:
             - contents/literature/gen_nbv.qmd
             - contents/literature/scene_script.qmd
             - contents/literature/efm3d.qmd
+            - contents/literature/hesita.qmd
         - section: "Project State"
           contents:
             - contents/experiments/findings.qmd

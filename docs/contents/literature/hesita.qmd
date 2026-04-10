@@ -1,0 +1,100 @@
+## Hestia: Voxel-Face-Aware Hierarchical Next-Best-View Acquisition for Efficient 3D Reconstruction {#hestia}
+
+Hestia [@Hestia-lu2026] is the most relevant continuous-policy NBV paper in our current literature stack because it tackles the same gap that shows up in our roadmap: how to move from discrete candidate ranking toward continuous control without collapsing back to a weak geometric coverage proxy. Relative to [VIN-NBV](vin_nbv.qmd), Hestia is not quality-driven, but it contributes a stronger planning decomposition. Relative to [GenNBV](gen_nbv.qmd), it replaces monolithic 5-DoF policy prediction with a hierarchical "where to look, then where to fly" controller and augments occupancy with directional face visibility. That makes it especially relevant for the directional observation encoding, continuous policy, and multi-step planning ideas already noted in our [scratchpad](../ideas.qmd) and in the future-extensions sections of the paper.
+
+### Local \LaTeX{} Sources
+
+- [`main.tex`](../../literature/tex-src/arXiv-hesita/main.tex) - WACV 2026 manuscript entry point.
+- [`sec/3_method.tex`](../../literature/tex-src/arXiv-hesita/sec/3_method.tex) - core MDP, face-aware state, hierarchical policy, and training losses.
+- [`sec/4_result.tex`](../../literature/tex-src/arXiv-hesita/sec/4_result.tex) - quantitative results, ablations, and real-world application.
+- [`sec/supp.tex`](../../literature/tex-src/arXiv-hesita/sec/supp.tex) - theory note, dataset construction, training details, and limitations.
+- [`figures/arch.png`](../../literature/tex-src/arXiv-hesita/figures/arch.png) - canonical architecture figure for the hierarchical planner.
+- [`figures/voxel_ray.png`](../../literature/tex-src/arXiv-hesita/figures/voxel_ray.png) - visual explanation of the voxel-face idea.
+
+### Core Idea
+
+The central claim of Hestia is that prior RL-based generalizable NBV planners leave performance on the table for four linked reasons: they train on limited and shape-biased data, search a hard continuous action space monolithically, optimize rewards that induce spurious long-horizon correlations, and represent occupancy too coarsely. Hestia answers with four design choices that work together rather than independently: a much more diverse Objaverse-based training set, a hierarchical controller, a close-greedy reward design with a very small discount factor, and a face-aware voxel state that tracks directional observability rather than plain occupancy alone @Hestia-lu2026.
+
+The representational shift is the most important contribution for us. Instead of treating each voxel as a single occupied point, Hestia tracks whether each of the six outward-facing voxel faces has been observed. The cumulative face-visibility tensor is updated as
+
+$$
+F_t = f_t \lor F_{t-1},
+$$
+
+where $f_t$ is the current face visibility inferred from the viewing direction. For a voxel center $p_{v_i}$ and collision-free camera position $a'_t$, Hestia defines the viewing direction
+
+$$
+\mathbf{d}_{v_i} = \frac{a'_t - p_{v_i}}{\lVert a'_t - p_{v_i}\rVert},
+$$
+
+and marks face $j$ of voxel $v_i$ as visible when
+
+$$
+f_t(v_i, j) = \mathbb{1}\!\left(\mathbf{d}_{v_i}\cdot n_{i,j} > 0\right).
+$$
+
+This is only a coarse approximation to full directional coverage, but it gives the policy a notion of which geometry has been seen from which side rather than only whether a cell was hit at all @Hestia-lu2026.
+
+### State, Action, and Reward Design
+
+Hestia formulates NBV as an MDP with state
+
+$$
+s_t = \{I_t, M_t, G_t, L_t\},
+$$
+
+where $I_t$ is the current grayscale image, $M_t$ contains pose and maximum flyable height, $G_t$ is a $g \times g \times g \times 10$ grid carrying occupancy, positional encoding, and cumulative face visibility, and $L_t$ is the look-at point predicted by the proposal branch. The policy predicts only a 3-DoF position action,
+
+$$
+\mathcal{A} = \{a_t \mid a_t \in [-1,1]^3\},
+$$
+
+while yaw and pitch are derived from the look-at point and the collision-free adjusted position $a'_t$. This factorization is the paper's second major contribution: instead of directly regressing a full 5-DoF viewpoint, it first decides where attention should go and then chooses a feasible camera location that realizes that observation @Hestia-lu2026.
+
+The reward is deliberately close-greedy. Hestia uses a very small discount factor, $\gamma = 0.1$, to bias learning toward immediate geometric gain and reduce the spurious correlations that arise when weak current actions inherit large future rewards. The instantaneous reward decomposes into a face-coverage term and a constraint penalty,
+
+$$
+r_t = r_{\text{coverage}}(s_t, a_t) + r_{\text{constraint}}(s_t, a_t),
+$$
+
+with coverage reward proportional to the increment in newly visible voxel faces and a fixed penalty of $-0.01$ for unsafe or invalid actions. This is still a coverage-driven objective, not a reconstruction-quality objective like our oracle RRI, but the reward structure is sharper than plain occupancy gain because it is incremental, directional, and tightly coupled to action validity @Hestia-lu2026.
+
+### Hierarchical Architecture and Supervision
+
+The network is explicitly split into a proposal stage and a viewpoint stage. The proposal network is a small 3D CNN with self-attention that predicts a distribution over the look-at point $L_t$ from the grid state. The viewpoint branch separately encodes the grid with a shallow 3D CNN, performs trilinear interpolation at the predicted look-at point across multiple feature levels, concatenates those target-conditioned features with a grayscale image embedding and pose metadata, and then predicts the camera position $a_t$. The predicted position is not used directly: Hestia projects it to the nearest collision-free point $a'_t$, and the final viewpoint is the pair $\{a'_t, L_t\}$ @Hestia-lu2026.
+
+This hierarchy is paired with intermediate supervision. Rather than relying on pure RL to learn both stages jointly, the paper detaches the gradient flow between the look-at proposal and the viewpoint policy, then supervises the proposal branch with a geometric target computed from the ground-truth uncaptured surface:
+
+$$
+L_t^{\text{gt}} = \frac{\sum_{v_i \in U} w_{v_i} \, p_{v_i}}{\sum_{v_i \in U} w_{v_i}},
+\qquad
+w_{v_i} = \sum_{f \in F^{\text{gt}}_{v_i}} 1.
+$$
+
+The full training objective becomes
+
+$$
+\mathcal{L}_{\text{all}} = \mathcal{L}_{\text{RL}} + 0.5\,\mathcal{L}_{\text{aux}} + \mathcal{L}_{\text{proposal}},
+$$
+
+where $\mathcal{L}_{\text{aux}} = \lVert a_t - a'_t \rVert^2$ encourages the raw policy output to remain close to a feasible position. For our purposes, this is one of the strongest ideas in the paper: it shows how a continuous NBV controller can benefit from a supervised intermediate target even when the final motion is optimized with RL @Hestia-lu2026.
+
+### Experimental Claims
+
+Hestia is trained with PPO in stable-baselines3 on 256 IsaacLab scenes in parallel, using a $20^3$ voxel grid, 5 million training iterations, and roughly 24 hours on a single RTX A6000. The main model is lightweight at about 4.9M parameters and still runs at roughly 25 FPS, which matters because the paper's argument depends on direct policy prediction being operationally faster than candidate sampling at deployment time @Hestia-lu2026.
+
+Quantitatively, the paper reports that Hestia improves overall coverage ratio by at least 4 percentage points and AUC by at least 6 points over the baselines while nearly halving Chamfer Distance. With 30 images per object, the reported overall results are 97 CR / 6 cm CD / 93 AUC for the Objaverse-trained Hestia model, compared with 93 / 12 / 87 for reproduced GenNBV and 81 / 30 / 76 for ScanRL. Under limited-view budgets, Hestia reaches 92% mean coverage with only five images, whereas reproduced GenNBV reaches 80% at five images and 91% only by fifteen images. The paper also reports robustness to object translation, gains from each of its three core design ideas in ablations, and a real-world drone demonstration that uses RGB-only capture plus MASt3R or DUSt3R-style depth prediction to emulate the needed geometry inputs @Hestia-lu2026.
+
+The data story is also important. Hestia argues that robustness is not only architectural: it comes from processing a much larger and more diverse Objaverse training corpus than the Houses3K-style datasets used by earlier RL baselines. The supplement claims a processed set of roughly 120k shapes filtered from Objaverse and emphasizes that this training set is two orders of magnitude larger and materially more diverse than prior datasets for generalizable NBV @Hestia-lu2026.
+
+### Why Hestia Matters for Aria-NBV
+
+For our current Aria-VIN-NBV framing in [main.typ](../../typst/paper/main.typ), Hestia is best interpreted as a planning and representation blueprint rather than as a replacement objective. Our paper is quality-driven and egocentric: we compute oracle RRI labels in ASE and train a candidate scorer on EVL-derived voxel evidence. Hestia is coverage-driven and object-centric: it learns a continuous controller that maximizes directional face coverage. The main thing to borrow is therefore not the reward target but the decomposition of the control problem and the observation contract @Hestia-lu2026.
+
+The most direct transfer is the directional observation idea. The [ideas scratchpad](../ideas.qmd) already suggests encoding, for each point, the directions from which it has been observed, potentially as an incidence-angle histogram. Hestia provides the simplest working version of that idea: a six-bin directional visibility code attached to each voxel. In our setting, that suggests enriching semi-dense points, EVL voxels, or entity tokens with directional observation histograms or normal-aligned bins instead of relying only on occupancy, visibility counts, or free-space masks.
+
+The second transfer is action factorization. Hestia suggests a path from our current discrete VIN-style candidate ranking toward a continuous policy without removing structure: first predict a target point or region of interest, then predict a feasible relative translation conditioned on that target. That maps cleanly onto our future directions around continuous action policies, object-centric or entity-aware NBV, and query-centric architectures. A natural Aria-NBV analogue would be to predict a target point, object center, or missing-surface hotspot from EVL or SceneScript context, then condition a viewpoint policy on that latent target rather than on a hand-sampled candidate set.
+
+The third transfer is supervised intermediate targets. Hestia's proposal branch is not learned only through sparse RL reward; it is directly supervised from the currently uncaptured ground-truth surface. For us, that suggests several higher-signal supervision targets that stay aligned with our quality objective: a centroid of expected RRI gain, an entity-specific missing-surface target, or a peak in a learned uncertainty or completeness-deficit field. This is a promising bridge between our current oracle-labeled imitation setup and the long-term goal of non-myopic policy learning.
+
+Finally, Hestia is a useful warning about what not to copy blindly. Its face-coverage reward is still a proxy, and our own paper motivation remains valid: geometric coverage can diverge from actual reconstruction quality in cluttered, occluded indoor scenes. The right synthesis for Aria-NBV is therefore to keep the RRI-centered objective and the stronger egocentric representation, while borrowing Hestia's directional observability, hierarchical target-then-pose control, feasibility projection, and low-discount receding-horizon training philosophy.
