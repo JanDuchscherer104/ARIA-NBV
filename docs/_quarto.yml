@@ -170,10 +170,14 @@ website:
             - contents/ext-impl/efm3d_symbol_index.qmd
         - section: "Presentations"
           contents:
-            - text: "Typst Slides 1"
+            - text: "Seminar Slides 1"
               file: typst/slides/slides_1.pdf
-            - text: "Typst Slides 2"
+            - text: "Seminar Slides 2"
               file: typst/slides/slides_2.pdf
+            - text: "Seminar Slides 4 (final)"
+              file: typst/slides/slides_4.pdf
+            - text: "MSc Slides 01 (outlook)"
+              file: typst/slides/slides_thesis_outlook.pdf
 
   page-footer:
     left: ""
