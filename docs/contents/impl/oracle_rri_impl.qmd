@@ -3,253 +3,70 @@ title: "aria_nbv Implementation Overview"
 format: html
 ---
 
-> **Note**: High-level package navigation now lives in `aria_nbv_overview.qmd`. This page keeps the detailed function/library pointers for reference.
+> **Note**: High-level package navigation now lives in `aria_nbv_overview.qmd`. This page is the current owner map for the oracle labeling stack that produces RRI supervision.
 
-# EFM3D & ATEK Function Library Overview
+::: {.callout-note title="Source anchors"}
+- Orchestrator: [`OracleRriLabelerConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L46), [`OracleRriLabeler`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L80)
+- Candidate generation: [`CandidateViewGeneratorConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L50), [`CandidateViewGenerator`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L319), [`candidate_generation_rules.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py#L1)
+- Rendering and backprojection: [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108), [`Pytorch3DDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L79), [`build_candidate_pointclouds`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_pointclouds.py#L64)
+- Scoring and post-processing: [`OracleRRIConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L26), [`OracleRRI`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L34), [`RriOrdinalBinner`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/rri_binning.py#L88)
+- Mesh preprocessing: [`MeshProcessSpec`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/mesh_cache.py#L27), [`load_or_process_mesh`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/mesh_cache.py#L132)
+:::
 
-This document provides a comprehensive overview of all EFM3D and ATEK functions that are relevant for implementing the aria_nbv Relative Reconstruction Improvement (RRI) computation for Next-Best-View planning.
+# Current internal pipeline
 
-## EFM3D Core Utilities
+The repo does not implement oracle RRI as a single monolith. The live pipeline
+is a thin orchestrator around four owners:
 
-### Ray Operations (`efm3d.utils.ray`)
+1. [`OracleRriLabeler`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L80) pulls a typed [`EfmSnippetView`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_views.py#L479), resolves mesh preprocessing, and wires the rest of the stages together.
+2. [`CandidateViewGenerator`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L319) samples shell candidates and delegates geometric rejection to the rule objects in [`candidate_generation_rules.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py#L1).
+3. [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108) selects valid candidates and uses [`Pytorch3DDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L79) to render candidate depth maps.
+4. [`build_candidate_pointclouds`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_pointclouds.py#L64) backprojects those depths, and [`OracleRRI`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L34) turns the before/after point sets into per-candidate RRI diagnostics.
 
-**Purpose**: Generate and transform camera rays for 3D reconstruction and novel view synthesis.
-
-- `grid_ray(pixel_grid: torch.Tensor, camera: CameraTW) -> tuple[torch.Tensor, torch.Tensor]`
-  - **Description**: Unprojects pixel grid coordinates to 3D ray directions
-  - **Usage**: Converting image coordinates to world-space rays for rendering candidate views
-  - **Theory**: Essential for computing what each camera pixel "sees" in 3D space
-- `ray_grid(cam: CameraTW) -> tuple[torch.Tensor, torch.Tensor]`
-  - **Description**: Generates rays for all pixels in a camera's image grid
-  - **Usage**: Batch ray generation for efficient candidate view rendering
-  - **Theory**: Creates the complete ray bundle for a virtual camera
-- `transform_rays(rays_old: torch.Tensor, T_new_old: PoseTW) -> torch.Tensor`
-  - **Description**: Transforms rays between coordinate systems using pose transformations
-  - **Usage**: Moving rays from candidate camera poses to world coordinates
-  - **Theory**: Enables coordinate system alignment for multi-view geometry
-- `ray_obb_intersection(rays_v: torch.Tensor, voxel_extent: torch.Tensor, ...) -> torch.Tensor | tuple[...]`
-  - **Description**: Computes ray intersections with oriented bounding boxes
-  - **Usage**: Determining which voxels are intersected by candidate view rays
-  - **Theory**: Critical for efficient ray-voxel intersection tests in 3D reconstruction
-- `sample_depths_in_grid(rays_v: torch.Tensor, ds_max: torch.Tensor, ...) -> tuple[...]`
-  - **Description**: Samples depth values along rays within voxel grids
-  - **Usage**: Generating sample points for volume rendering and reconstruction
-  - **Theory**: Implements stratified sampling for neural radiance field-style rendering
-
-### Point Cloud Processing (`efm3d.utils.pointcloud`)
-
-**Purpose**: Handle point cloud operations for 3D reconstruction and occupancy mapping.
-
-- `get_points_world(batch: dict, batch_idx: int | None = None, ...) -> tuple[torch.Tensor, torch.Tensor]`
-  - **Description**: Extracts world-coordinate point clouds from ASE dataset batches
-  - **Usage**: Converting depth images and semi-dense SLAM points to 3D coordinates
-  - **Theory**: Foundation for creating the current reconstruction P_t
-- `collapse_pointcloud_time(pc_w: torch.Tensor) -> torch.Tensor`
-  - **Description**: Merges point clouds across time, removing duplicates and NaN values
-  - **Usage**: Combining temporal observations into a single reconstruction
-  - **Theory**: Temporal fusion for more complete scene representations
-- `pointcloud_to_voxel_ids(pc_v: torch.Tensor, vW: int, vH: int, vD: int, voxel_extent: torch.Tensor) -> tuple[...]`
-  - **Description**: Maps 3D points to voxel grid indices with validity checking
-  - **Usage**: Converting continuous point clouds to discrete voxel representations
-  - **Theory**: Spatial discretization for efficient 3D processing
-- `pointcloud_occupancy_samples(p3s_w: torch.Tensor, Ts_wc: torch.Tensor, ...) -> tuple[...]`
-  - **Description**: Samples occupied, surface, and free space points from point clouds
-  - **Usage**: Creating training data for occupancy field learning
-  - **Theory**: Generates diverse 3D samples for learning scene geometry
-
-### Voxel Operations (`efm3d.utils.voxel`)
-
-**Purpose**: Handle 3D voxel grid operations and coordinate transformations.
-
-- `tensor_wrap_voxel_extent(voxel_extent, B=None, device="cpu") -> torch.Tensor`
-  - **Description**: Normalizes voxel extent representations across batches
-  - **Usage**: Ensuring consistent voxel coordinate systems
-  - **Theory**: Standardizes 3D bounding box representations
-- `create_voxel_grid(vW: int, vH: int, vD: int, voxel_extent, device="cpu") -> torch.Tensor`
-  - **Description**: Creates 3D coordinate grids for voxel centers
-  - **Usage**: Generating sampling coordinates for 3D reconstruction
-  - **Theory**: Establishes regular 3D sampling patterns
-
-### Voxel Sampling (`efm3d.utils.voxel_sampling`)
-
-**Purpose**: Sample from 3D voxel grids with interpolation and coordinate conversion.
-
-- `pc_to_vox(pc_v: torch.Tensor, vW: int, vH: int, vD: int, voxel_extent) -> tuple[...]`
-  - **Description**: Converts point cloud coordinates to voxel grid coordinates
-  - **Usage**: Mapping between continuous and discrete 3D representations
-  - **Theory**: Essential for sampling from learned 3D representations
-- `sample_voxels(feat3d: torch.Tensor, pts_v: torch.Tensor, differentiable=False) -> tuple[...]`
-  - **Description**: Samples features from 3D voxel grids using trilinear interpolation
-  - **Usage**: Querying learned 3D features at arbitrary points
-  - **Theory**: Enables continuous sampling from discrete 3D representations
-
-### Depth Processing (`efm3d.utils.depth`)
-
-**Purpose**: Convert between depth representations and 3D point clouds.
-
-- `dist_im_to_point_cloud_im(dist_m: torch.Tensor, cams: CameraTW) -> tuple[...]`
-  - **Description**: Converts distance images to 3D point clouds using camera calibration
-  - **Usage**: Processing ASE dataset depth maps into 3D points
-  - **Theory**: Fundamental unprojection operation for 3D reconstruction
-
-### Reconstruction Utilities (`efm3d.utils.reconstruction`)
-
-**Purpose**: Core functions for 3D scene reconstruction and occupancy field learning.
-
-- `build_gt_occupancy(occ, visible, p3s_w, Ts_wc, cams, T_wv, voxel_extent) -> tuple[...]`
-  - **Description**: Creates ground truth occupancy grids from point clouds
-  - **Usage**: Generating supervision signals for 3D reconstruction
-  - **Theory**: Converts sparse points to dense occupancy representations
-- `compute_occupancy_loss_subvoxel(occ, visible, p3s_w_all, ...) -> torch.Tensor`
-  - **Description**: Computes reconstruction loss using subvoxel sampling
-  - **Usage**: Training occupancy networks with point cloud supervision
-  - **Theory**: Implements differentiable 3D reconstruction loss
-
-### Mesh Processing (`efm3d.utils.mesh_utils`)
-
-**Purpose**: Evaluate mesh reconstruction quality and compute geometric distances.
-
-- `eval_mesh_to_mesh(pred: str | trimesh.Trimesh, gt: str | trimesh.Trimesh, ...) -> tuple[...]`
-  - **Description**: Computes accuracy/completeness metrics between predicted and ground truth meshes
-  - **Usage**: **CRITICAL for RRI computation** - this is the Chamfer Distance calculation we need
-  - **Theory**: Implements bidirectional distance evaluation for mesh quality assessment
-- `compute_pts_to_mesh_dist(pts: torch.Tensor, faces: torch.Tensor, verts: torch.Tensor, step: int) -> np.ndarray`
-  - **Description**: Computes distances from point cloud to mesh surface
-  - **Usage**: Core component of Chamfer Distance computation
-  - **Theory**: Point-to-surface distance for reconstruction evaluation
-
-## Camera and Pose Systems (`efm3d.aria`)
-
-### Camera Calibration (`efm3d.aria.camera`)
-
-**Purpose**: Handle camera calibration, projection, and coordinate transformations.
-
-- `CameraTW` class: Wrapper for camera calibrations with projection/unprojection methods
-  - `project(self, p3d: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]`: 3D to 2D projection
-  - `unproject(self, p2d: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]`: 2D to 3D ray generation
-  - **Usage**: Converting between 2D image coordinates and 3D world coordinates
-  - **Theory**: Essential for multi-view geometry and novel view synthesis
-
-### Pose Transformations (`efm3d.aria.pose`)
-
-**Purpose**: Handle SE(3) pose transformations and coordinate system conversions.
-
-- `PoseTW` class: SE(3) pose transformations with composition and inversion
-  - `transform(self, p3d: torch.Tensor) -> torch.Tensor`: Apply pose transformation to 3D points
-  - `compose(self, other) -> PoseTW`: Chain pose transformations
-  - `inverse(self) -> PoseTW`: Invert pose transformation
-  - **Usage**: Managing coordinate transformations between camera poses and world coordinates
-  - **Theory**: Foundation for multi-view geometry and coordinate system alignment
-
-## ATEK Evaluation Framework
-
-### Surface Reconstruction Metrics
-
-**Purpose**: Standardized evaluation of 3D reconstruction quality.
-
-- `evaluate_single_mesh_pair(pred_mesh_filename, gt_mesh_filename, ...) -> tuple[...]`
-  - **Description**: **CORE FUNCTION for RRI** - computes Chamfer Distance and reconstruction metrics
-  - **Usage**: This is exactly what we need for computing RRI = Chamfer(P_{t∪q}, GT) - Chamfer(P_t, GT)
-  - **Theory**: Implements the standard surface reconstruction evaluation protocol
-- `evaluate_mesh_over_a_dataset(input_folder, pred_mesh_filename, gt_mesh_filename, ...) -> dict`
-  - **Description**: Batch evaluation across multiple scenes
-  - **Usage**: Evaluating NBV performance across the ASE validation set
-  - **Theory**: Dataset-level performance assessment
-
-## Implementation Plan
-
-### Core Classes to Implement
-
-#### 1. `OracleRRI` Class
-```python
-class OracleRRI:
-    def __init__(self, gt_mesh_path: str, voxel_extent: torch.Tensor, device: str):
-        """Initialize with ground truth mesh for oracle computation"""
-
-    def compute_rri(self, current_pointcloud: torch.Tensor, candidate_pointcloud: torch.Tensor) -> float:
-        """
-        Compute RRI = Chamfer(P_{t∪q}, GT) - Chamfer(P_t, GT)
-        Uses ATEK's evaluate_single_mesh_pair internally
-        """
-
-    def batch_compute_rri(self, current_pc: torch.Tensor, candidate_pcs: list[torch.Tensor]) -> torch.Tensor:
-        """Efficiently compute RRI for multiple candidate views"""
+```{mermaid}
+flowchart LR
+    A[EfmSnippetView] --> B[OracleRriLabeler]
+    B --> C[CandidateViewGenerator]
+    C --> D[CandidateDepthRenderer]
+    D --> E[build_candidate_pointclouds]
+    E --> F[OracleRRI]
+    F --> G[RriOrdinalBinner]
 ```
 
-#### 2. `CandidateViewGenerator` Class
-```python
-class CandidateViewGenerator:
-    def __init__(self, camera_calibration: CameraTW, sampling_strategy: str):
-        """Generate candidate camera poses around current position"""
+# Owner map
 
-    def generate_spherical_candidates(self, center_pose: PoseTW, radius: float, n_samples: int) -> list[PoseTW]:
-        """Sample poses on sphere around current position"""
+## Dataset and mesh preparation
 
-    def generate_hemisphere_candidates(self, center_pose: PoseTW, radius: float, n_samples: int) -> list[PoseTW]:
-        """Sample poses on hemisphere (avoiding ground/ceiling)"""
-```
+- Typed snippet payloads come from [`AseEfmDataset`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_dataset.py#L320) and [`EfmSnippetView`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_views.py#L479).
+- GT mesh cropping, simplification, and caching are owned by [`MeshProcessSpec`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/mesh_cache.py#L27) and [`load_or_process_mesh`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/mesh_cache.py#L132), not by the renderer itself.
+- This separation matters: the same processed mesh is reused for collision checks, rendering, and scoring, so doc links should point to the mesh cache surface when discussing snippet-local GT preprocessing.
 
-#### 3. `CandidateViewRenderer` Class
-```python
-class CandidateViewRenderer:
-    def __init__(self, voxel_extent: torch.Tensor, resolution: tuple[int, int, int]):
-        """Render synthetic observations from candidate poses"""
+## Candidate sampling
 
-    def render_depth_from_pose(self, pose: PoseTW, camera: CameraTW, current_reconstruction: torch.Tensor) -> torch.Tensor:
-        """
-        Generate synthetic depth image from candidate viewpoint
-        Uses EFM3D ray casting and voxel sampling
-        """
+- [`CandidateViewGeneratorConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L50) owns the shell geometry and runtime toggles.
+- [`PositionSampler`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/positional_sampling.py#L20) handles center sampling, while [`OrientationBuilder`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/orientations.py#L21) converts sampled centers into candidate camera poses.
+- The rejection rules are intentionally factored into [`MinDistanceToMeshRule`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py#L39), [`PathCollisionRule`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py#L93), and [`FreeSpaceRule`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py#L171).
 
-    def depth_to_pointcloud(self, depth: torch.Tensor, pose: PoseTW, camera: CameraTW) -> torch.Tensor:
-        """Convert rendered depth to world-coordinate point cloud"""
-```
+## Depth rendering and candidate point clouds
 
-### Integration with EFM3D Pipeline
+- [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108) is the contract that the app and labeler both call.
+- [`Pytorch3DDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L79) owns the actual rasterization path and camera slicing logic.
+- [`build_candidate_pointclouds`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_pointclouds.py#L64) performs the NDC-aware backprojection and returns candidate-local point clouds plus per-candidate lengths for downstream scoring.
 
-#### Memory-Efficient Implementation
+## RRI scoring and label post-processing
 
-- Use `sample_voxels` for efficient point cloud querying
-- Batch candidate view processing to avoid memory crashes
-- Implement progressive sampling for large scenes
+- [`OracleRRI`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L34) computes the before/after point-to-mesh distances and forms the normalized improvement value.
+- The scorer emits [`RriResult`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/types.py#L39), which keeps the scalar RRI together with the accuracy/completeness diagnostics used elsewhere in the repo.
+- Ordinal post-processing is handled by [`RriOrdinalBinner`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/rri_binning.py#L88), which owns fit/transform/save/load behavior for CORAL-ready labels.
 
-#### Data Flow
+# External dependencies we lean on
 
-1. **Input**: ASE dataset batch with GT depth and camera poses
-2. **Current Reconstruction**: Use `get_points_world` + `collapse_pointcloud_time`
-3. **Candidate Generation**: `CandidateViewGenerator` around latest pose
-4. **Synthetic Rendering**: Use EFM3D ray casting to simulate candidate observations
-5. **Point Cloud Fusion**: Merge current + candidate point clouds
-6. **RRI Computation**: ATEK `evaluate_single_mesh_pair` for Chamfer Distance
-7. **Best View Selection**: argmax(RRI scores) for next-best-view
+- **EFM3D** provides `PoseTW`, `CameraTW`, typed batch conventions, and depth/point-cloud helpers that the pipeline reuses rather than reimplementing.
+- **PyTorch3D** provides the GPU depth-rendering path and point/mesh distance kernels used by the current scorer.
+- **trimesh** is used for GT mesh IO, coarse preprocessing, and geometry utilities before the tensors move into the rendering and scoring stages.
 
-### Theoretical Foundation
+# Where to dive deeper
 
-The core insight is that RRI measures reconstruction improvement:
-
-- **P_t**: Current point cloud reconstruction from first t views
-- **P_{t∪q}**: Enhanced reconstruction after adding candidate view q
-- **RRI(q) = Chamfer(P_{t∪q}, GT) - Chamfer(P_t, GT)**
-- **Negative RRI = improvement** (lower Chamfer distance is better)
-
-The challenge is ensuring **consistent point cloud sampling** between P_t and P_{t∪q} for valid Chamfer Distance comparison. This requires:
-
-1. Unified voxel discretization using EFM3D utilities
-2. Consistent density sampling to avoid bias
-3. Memory-efficient batching for large scenes
-
-### Key Technical Challenges
-
-1. **Point Cloud Density Consistency**: Ensure P_t and P_{t∪q} have comparable point densities
-2. **Memory Management**: Avoid GPU crashes during large-scale ray casting
-3. **Coordinate System Alignment**: Proper use of PoseTW transformations
-4. **Synthetic View Realism**: Generate plausible depth observations from candidate poses
-
-### Success Metrics
-
-- **Correctness**: RRI correlates with actual reconstruction improvement
-- **Efficiency**: Can process 100+ candidate views per scene within memory limits
-- **Integration**: Works end-to-end with ASE dataset and EFM3D inference pipeline
-- **Validation**: Produces sensible next-best-view selections on validation scenes
-
-This implementation will leverage the mature EFM3D and ATEK libraries while focusing on the specific challenge of consistent point cloud sampling for valid RRI computation.
+- [Computing RRI with Ground Truth Meshes](rri_computation.qmd) for the mathematical pipeline description.
+- [ASE Data Pipeline & Streamlit Usage](data_pipeline_overview.qmd) for the interactive path through the same surfaces.
+- [View Introspection Network (VIN) on EVL](vin_nbv.qmd) for the consumer of the resulting oracle labels.

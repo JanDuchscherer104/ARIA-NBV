@@ -40,6 +40,9 @@ Apply this file when working under `docs/`.
 - Add new references to `docs/references.bib` when introducing important concepts or papers.
 - Replace temporary citation placeholders such as `cite…` before finishing.
 - Use links to relevant internal docs or authoritative external references when introducing non-obvious concepts.
+- Implementation-focused Quarto pages that describe repo-owned code should open with a short `Source anchors` callout that links to the dominant current entrypoints on GitHub.
+- Use inline GitHub `blob/main#Lx` links only for concrete current classes, functions, or config models; for module-level discussion, prefer one owner anchor instead of linking every mention.
+- Keep source-link density sparse and stable. Do not introduce a shortcode, Lua filter, or other docs extension when plain Markdown links are sufficient.
 - Keep Quarto source files (`*.qmd`) separate from rendered site output. Published HTML belongs under `docs/_site/`, not next to the sources.
 - Treat `docs/_freeze/` as tracked execution state for code-backed pages when needed; treat `docs/_site/`, `site_libs/`, `index_files/`, and `*_files/` as generated publish artifacts.
 - Do not store generated context or rendered artifacts in tracked docs paths unless the task explicitly requires it.

@@ -53,15 +53,35 @@ website:
   navbar:
     search: true
     left:
-      - text: TODOs
-        href: contents/todos.qmd
+      - text: Architecture
+        menu:
+          - text: Overview
+            href: contents/impl/aria_nbv_overview.qmd
+          - text: Repository Structure
+            href: contents/repo_structure.qmd
+          - text: Data Pipeline
+            href: contents/impl/data_pipeline_overview.qmd
+          - text: Oracle Pipeline
+            href: contents/impl/oracle_rri_impl.qmd
+      - text: Model
+        menu:
+          - text: VINv3
+            href: contents/impl/vin_nbv.qmd
+          - text: CORAL
+            href: contents/impl/coral_intergarion.qmd
+          - text: API Reference
+            href: reference/index.qmd
+      - text: Ideas
+        href: contents/ideas.qmd
       - text: Setup
         href: contents/setup.qmd
       - text: Project State
         menu:
-          - text: Roadmap
+          - text: Current Priorities
+            href: contents/todos.qmd
+          - text: Project Status
             href: contents/roadmap.qmd
-          - text: Ideas (Brainstorming)
+          - text: Ideas / Future Work
             href: contents/ideas.qmd
           - text: Research Questions
             href: contents/questions.qmd
@@ -105,9 +125,10 @@ website:
         - section: "Project State"
           contents:
             - contents/experiments/findings.qmd
+            - contents/ideas.qmd
             - contents/questions.qmd
-            - contents/roadmap.qmd
             - contents/todos.qmd
+            - contents/roadmap.qmd
         - section: "Resources"
           contents:
             - contents/setup.qmd
@@ -152,13 +173,12 @@ website:
           contents:
             - contents/impl/overview.qmd
             - contents/impl/aria_nbv_overview.qmd
-            - contents/impl/aria_nbv_package.qmd
+            - contents/repo_structure.qmd
             - contents/impl/data_pipeline_overview.qmd
             - contents/impl/oracle_rri_impl.qmd
             - contents/impl/rri_computation.qmd
             - contents/impl/coral_intergarion.qmd
             - contents/impl/vin_nbv.qmd
-            - contents/impl/vin_v2_feature_proposals.qmd
         - section: "Architecture Diagrams"
           contents:
             - contents/diagrams.qmd

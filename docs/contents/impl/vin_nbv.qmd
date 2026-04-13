@@ -17,9 +17,16 @@ The page is intentionally not a model-history note. Older design branches are
 omitted so this document stays aligned with the Typst paper, the current slide
 deck, and the best-performing VINv3 run.
 
+::: {.callout-note title="Source anchors"}
+- Core model: [`VinModelV3Config`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L123), [`VinModelV3`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L256), [`VinModelV3.forward`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L1531)
+- Encoders: [`R6dLffPoseEncoder`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/pose_encoders.py#L73), [`LearnableFourierFeatures`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/pose_encoding.py#L25), [`TrajectoryEncoder`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/traj_encoder.py#L48)
+- Backbone and typed outputs: [`EvlBackbone`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/backbone_evl.py#L81), [`EvlBackboneOutput`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L21), [`VinPrediction`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L200)
+- Projection and CORAL: [`semidense_proj_feature_index`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/semidense_projection.py#L34), [`CoralLayer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/coral.py#L220), [`MonotoneBinValues`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/coral.py#L111)
+:::
+
 # What VINv3 Does
 
-Given one egocentric snippet and a set of candidate next-view poses, VINv3
+Given one egocentric snippet and a set of candidate next-view poses, [`VinModelV3`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L256)
 predicts per-candidate ordinal RRI scores so that ranking by the predicted
 expected score approximates ranking by oracle RRI. The model keeps the EVL
 backbone frozen and learns only the candidate scorer on top of compact voxel
@@ -37,7 +44,7 @@ signals:
 
 # Model Contract
 
-The current forward interface is:
+The current forward interface of [`VinModelV3.forward`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L1531) is:
 
 ```python
 forward(
@@ -87,7 +94,7 @@ path explicit instead of hiding it inside the baseline description.
 
 ## 1. Frozen EVL Backbone and Compact Scene Field
 
-The scorer consumes a frozen EVL backbone through `EvlBackboneOutput`. In the
+The scorer consumes a frozen EVL backbone through [`EvlBackboneOutput`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L21). In the
 current setup this is the EVL "heads" feature surface, not the heavy neck or
 raw 2D artifacts. The model requires:
 
@@ -125,7 +132,8 @@ and a simple prior for unseen but likely occupied regions.
 
 ## 2. Pose Encoding in the Reference Rig Frame
 
-Each candidate pose is re-expressed in the reference rig frame:
+Each candidate pose is re-expressed in the reference rig frame and encoded by
+[`R6dLffPoseEncoder`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/pose_encoders.py#L73) on top of [`LearnableFourierFeatures`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/pose_encoding.py#L25):
 
 $$
 T_{\mathrm{rig\_ref,cam}} = T_{\mathrm{world,rig\_ref}}^{-1} \; T_{\mathrm{world,cam}}
@@ -210,7 +218,7 @@ view-plane structure without turning the model into an image encoder.
 
 ## 6. Optional Trajectory Context
 
-`VinModelV3` can also encode the snippet rig trajectory in the same reference
+[`VinModelV3`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L256) can also encode the snippet rig trajectory in the same reference
 rig frame and attend it with the candidate pose embeddings. This path is
 optional:
 

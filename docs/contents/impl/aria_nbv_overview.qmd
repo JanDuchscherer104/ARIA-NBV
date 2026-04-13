@@ -13,27 +13,37 @@ format:
 - In-repo NBV toolkit (import path `aria_nbv`) for ASE/ATEK + EFM3D experiments.
 - Responsibilities: load typed ASE snippets, generate collision‑aware candidate views, render/raycast depth, fuse point clouds, and score Relative Reconstruction Improvement (RRI).
 
+::: {.callout-note title="Source anchors"}
+- Data surface: [`AseEfmDatasetConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_dataset.py#L33), [`AseEfmDataset`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_dataset.py#L320), [`EfmSnippetView`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_views.py#L479), [`VinSnippetView`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_views.py#L796)
+- App orchestration: [`NbvStreamlitAppConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/config.py#L23), [`NbvStreamlitApp`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/app.py#L79), [`PipelineController`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/controller.py#L34)
+- Oracle pipeline: [`OracleRriLabeler`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L80), [`CandidateViewGenerator`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L319), [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108), [`OracleRRI`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L34)
+- VIN surface: [`VinModelV3Config`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L123), [`VinModelV3`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L256), [`EvlBackboneOutput`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L21), [`VinPrediction`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L200)
+:::
+
 # Directory layout (code)
 
 ```text
 aria_nbv/aria_nbv/
-├── configs/              # PathConfig
-├── utils/                # BaseConfig, Console, frames helpers
-├── data/                 # Typed EFM views (cameras, traj, semidense, GT)
-├── data_handling/        # ATEK WDS loader, metadata, downloader CLI
-├── pose_generation/      # CandidateViewGenerator + rules + types
-├── rendering/            # Pytorch3D + trimesh depth renderers
-├── views/                # Candidate point-cloud rendering
-├── viz/ & visualization/ # Mesh/trajectory viz + Streamlit app
-├── analysis/             # DepthDebugger
-└── streamlit_app.py      # Minimal dashboard entry
+├── app/                  # Streamlit shell, controller, state, and page panels
+├── configs/              # PathConfig, Optuna, and W&B config surfaces
+├── data/                 # Download stats and metadata compatibility helpers
+├── data_handling/        # Typed snippet views, dataset loading, mesh/offline-cache contracts
+├── interpretability/     # Attribution utilities for VIN diagnostics
+├── lightning/            # Training loop, datamodule, and optimizer orchestration
+├── pipelines/            # Oracle labeler orchestration
+├── pose_generation/      # CandidateViewGenerator + pruning rules
+├── rendering/            # Candidate depth and point-cloud rendering
+├── rri_metrics/          # Oracle RRI, CORAL, logging, and binning
+├── utils/                # BaseConfig, Console, frames, plotting, and schemas
+├── vin/                  # VINv3 scorer, encoders, and typed outputs
+└── streamlit_app.py      # CLI/Streamlit entrypoint
 ```
 
 # End-to-end NBV loop
 
 ```{mermaid}
 flowchart LR
-    A[ASE/ATEK shard<br/>+ GT mesh] --> B[data_handling.dataset<br/>EfmSnippetView]
+    A[ASE/ATEK shard<br/>+ GT mesh] --> B[data_handling.efm_dataset<br/>EfmSnippetView]
     B --> C[pose_generation<br/>CandidateViewGenerator]
     C -->|"PoseTW batch + masks"| D[rendering<br/>CandidateDepthRenderer]
     D -->|"Depth to PC (EFM3D utils)"| E[Fused reconstruction P_t+q]
@@ -44,14 +54,12 @@ flowchart LR
 
 # Core modules (shortcuts)
 
-- **Config/Logging**: `configs.path_config.PathConfig`, `utils.base_config.BaseConfig`, `utils.console.Console`.
-- **Data views**: `data.efm_views` (`EfmSnippetView`, cameras, trajectory, semidense, GT/OBBs).
-- **Dataset handling**: `data_handling.dataset.ASEDataset`, `data_handling.downloader.ASEDownloader`, metadata parsers.
-- **Candidate generation**: `pose_generation.candidate_generation` + rules (shell sampling, min-distance, path collision, free-space).
-- **Rendering**: `rendering.candidate_depth_renderer` (wraps PyTorch3D backend), `rendering.efm3d_depth_renderer` (CPU raycast).
-- **Metrics/RRI**: see `rri_computation.qmd`; uses Chamfer components against GT mesh.
-- **Visualisation**: `viz.mesh_viz`, `visualization.candidate_app`, `streamlit_app.py`.
-- **Debugging**: `analysis.depth_debugger.DepthDebugger`.
+- **Config and runtime wiring**: [`PathConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/configs/path_config.py#L21), [`BaseConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/utils/base_config.py#L27), and [`Console`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/utils/console.py#L18) keep the repo on the config-as-factory path.
+- **Typed data views**: [`EfmSnippetView`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_views.py#L479) and [`VinSnippetView`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_views.py#L796) are the current typed payloads consumed by rendering, labeling, and VIN.
+- **Dataset handling**: [`AseEfmDataset`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_dataset.py#L320) and [`load_or_process_mesh`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/mesh_cache.py#L132) own snippet loading and mesh preprocessing.
+- **Oracle labeling**: [`OracleRriLabeler`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L80) coordinates [`CandidateViewGenerator`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L319), [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108), and [`OracleRRI`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L34).
+- **App surface**: [`NbvStreamlitApp`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/app.py#L79) and [`PipelineController`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/controller.py#L34) drive the interactive diagnostics UI.
+- **VIN surface**: [`VinModelV3`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L256) consumes [`EvlBackboneOutput`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L21) and emits [`VinPrediction`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L200).
 
 # RRI essentials (used by metrics)
 
@@ -76,26 +84,22 @@ with small \(\varepsilon\) for stability. Positive RRI ⇒ candidate improves re
 ```{mermaid}
 classDiagram
     class PathConfig
-    class BaseConfig
-    class Console
-    class ASEDataset
     class AseEfmDataset
+    class PipelineController
+    class OracleRriLabeler
     class CandidateViewGenerator
     class CandidateDepthRenderer
-    class DepthDebugger
-    class MeshViz
+    class OracleRRI
+    class VinModelV3
 
-    PathConfig <|-- ASEDataset
-    BaseConfig <|-- CandidateViewGenerator
-    BaseConfig <|-- CandidateDepthRenderer
-    BaseConfig <|-- AseEfmDataset
-    Console <.. CandidateViewGenerator
-    Console <.. CandidateDepthRenderer
-    Console <.. ASEDataset
-    ASEDataset --> AseEfmDataset : typed view export
-    CandidateViewGenerator --> CandidateDepthRenderer : PoseTW candidates
-    CandidateDepthRenderer --> MeshViz : depth/PC viz
-    DepthDebugger --> MeshViz
+    PathConfig <.. AseEfmDataset
+    PipelineController --> AseEfmDataset : loads snippets
+    PipelineController --> CandidateViewGenerator : samples candidates
+    PipelineController --> CandidateDepthRenderer : renders depth
+    OracleRriLabeler --> CandidateViewGenerator : candidate shells
+    OracleRriLabeler --> CandidateDepthRenderer : rendered candidates
+    CandidateDepthRenderer --> OracleRRI : candidate point clouds
+    OracleRRI --> VinModelV3 : oracle labels / training targets
 ```
 
 # Where to dive deeper

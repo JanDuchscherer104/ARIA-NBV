@@ -1,69 +1,30 @@
 ---
-title: "Project Roadmap"
+title: "Project Status"
 format: html
 ---
 
-# Project Roadmap
+This page is no longer a semester-by-semester thesis timeline. The old phased
+roadmap was pruned because it had drifted too far from the current code, paper,
+and ideas surfaces.
 
-## Seminar Phase (6 ECTS, ~180 hours)
+## Current state
 
-### Phase 1: Foundation & Familiarization
+- The repo has a working single-step oracle labeling pipeline on ASE / EFM3D surfaces.
+- The current learned scorer surface is VINv3, documented in [View Introspection Network (VIN) on EVL](impl/vin_nbv.qmd).
+- The docs are being consolidated around current architecture pages, current model docs, and the living ideas scratchpad.
 
-**Goal**:
+## Next decision gates
 
-- Get familiar with the NBV problem domain and read relevant literature
-- Understand the Aria ecosystem — ASE data, SceneScript, Project Aria Tools, ATEK, EFM3D/ EVL
+- Stay with the current dataset and ecosystem, or explicitly pivot the research scope.
+- Keep investing in the current VINv3 scorer, or redirect effort toward multi-step RL and planning.
+- Decide how to model or synthesize the missing counterfactual modalities required for non-myopic planning.
+- Decide how to scale supervision beyond the GT-mesh subset without collapsing back to weak geometric proxies.
 
-### Phase 2: Oracle RRI
+## Longer-horizon themes
 
-**Goal**: Implement an "oracle" Relative Reconstruction Improvement (RRI) computation method based on the GT meshes and semi-dense point clouds or compute dense PC from GT depth maps (problem: they are only covering actual trajectory)
+- Multi-step, non-myopic RL
+- Entity-aware NBV objectives
+- Counterfactual view synthesis / richer intermediate state representations
+- Human-in-the-loop guidance and deployment surfaces
 
-### Phase 3: RRI Prediction Network w/ EVL or Scene-Script backbone
-
-**Goal**:
-
-- Use pre-trained SceneScript or EFM3D/ EVL model to predict RRI for candidate views based on previous observations (partial point cloud, previous poses and calibrated video frames).
-- Define training procedures and loss functions.
-
-#### Architecture
-
-- **Encoder**: SceneScript encoder or EVL backbone (frozen or fine-tuned)
-- **Candidate Encoder**: View pose + frustum features, projection of partial PC into candidate view -> learnable encoder
-- **Predictor**: MLP regressing RRI score
-
----
-
-## Master Thesis Phase (30 ECTS, ~900 hours)
-
-### Phase 4: Entity-Aware RRI
-### Phase 5: View Synthesis Integration
-
-### Phase 6: Learning-Based NBV Prediction
-
-### Phase 7: Fine-Tune EFM for NBV on Target Platform
-
-- **Project Aria Glasses**: High-fidelity egocentric data
-- **Meta Quest 3**: Inside-out tracking, depth sensor
-- **iPhone LiDAR**: Portable, high-quality depth
-
-### Phase 8: Human-in-the-Loop System
-
-**Goal**: Develop interactive AR interface for real-time NBV guidance
-
-#### Components
-
-1. **Entity Selection UI**
-   - Tap entities in AR view
-   - Set importance weights
-2. **Real-Time NBV Computation**
-   - Streaming point cloud input
-   - Incremental updates of the scene representation
-   - Fast RRI and pose prediction
-3. **View Guidance Overlay**
-   - AR arrows/markers showing optimal viewpoints
-   - Distance and quality indicators
-   - Real-time voice2voice feedback
-
-### Phase 9: Real-World Deployment & Evaluation (Months 7-8, ~200 hours)
-
-**Goal**: Deploy on mobile devices and validate in real environments
+For the detailed forward-looking scratchpad, use [Ideas and Future Directions](ideas.qmd).

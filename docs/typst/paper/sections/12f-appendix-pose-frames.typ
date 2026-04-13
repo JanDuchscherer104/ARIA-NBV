@@ -6,7 +6,8 @@
 #import "@preview/booktabs:0.0.4": *
 #show: booktabs-default-table-style
 
-This appendix summarizes the SE(3) frames provided to `VinModelV3.forward`,
+This appendix summarizes the SE(3) frames provided to
+#gh("aria_nbv/aria_nbv/vin/model_v3.py", lines: "1531", label: "VinModelV3.forward"),
 using the notation from the coordinate conventions section.
 // <rm>
 // Internal dev setup references (debug launcher, VSCode). Remove from paper.
@@ -30,7 +31,8 @@ apply the same twist purely for display; do not apply it again to already-correc
 poses. If the rotation is undone for learning or diagnostics (e.g.,
 `apply_cw90_correction=True`), the same undo must be reflected in the associated
 PyTorch3D cameras; otherwise pose encoding and projection features desynchronize
-(see checks below).
+(see checks below). The current guard lives in
+#gh("aria_nbv/aria_nbv/vin/model_v3.py", lines: "1531", label: "VinModelV3.forward").
 
 == Inputs to `forward`
 
@@ -125,5 +127,6 @@ Using cached batches (same config as the debug launcher), we verified:
   and `p3d_cameras` (plus a `cw90_corrected` tag) before entering `forward`.
 // </rm>
 
-The CW90 consistency guard is implemented in `VinModelV3.forward`: it raises
+The CW90 consistency guard is implemented in
+#gh("aria_nbv/aria_nbv/vin/model_v3.py", lines: "1531", label: "VinModelV3.forward"): it raises
 if `apply_cw90_correction=True` without a `p3d_cameras.cw90_corrected` tag.
