@@ -32,7 +32,7 @@ Pages in the app:
 - **Optuna Sweeps**: inspect Optuna study results and visualize parameter effects across trials.
 - **Testing & Attribution**: load checkpoints and compute VIN head attributions on cached samples.
 
-The app caches configs + results in `st.session_state`. “Run previous” auto-runs earlier stages with cached settings; background threads keep the UI responsive.
+The app caches configs + results in `st.session_state`. “Run previous” auto-runs earlier stages with cached settings, and the staged controller flow keeps reruns manageable without separate worker threads.
 
 # Dataset loading (Data page)
 
@@ -68,7 +68,7 @@ Plot controls:
 Actions:
 
 - **Run previous**: re-run Data stage with cached config
-- **Run / refresh candidates**: background thread; results cached under `STATE_KEYS["candidates"]`
+- **Run / refresh candidates**: rerun the candidate stage; results cached under `STATE_KEYS["candidates"]`
 
 # Depth rendering (Candidate Renders page)
 
@@ -80,7 +80,7 @@ Config mirrors [`CandidateDepthRendererConfig`](https://github.com/JanDuchschere
 Actions:
 
 - **Run previous**: ensures data + candidates exist
-- **Run / refresh renders**: background thread; stores `CandidateDepthBatch`
+- **Run / refresh renders**: rerun the render stage; stores `CandidateDepthBatch`
 
 # Logging & scratchpad
 

@@ -9,7 +9,7 @@ format:
 
 This page documents the current `VinModelV3` implementation in
 `aria_nbv/aria_nbv/vin/model_v3.py`. It focuses on the model that is
-actually trained in the repo today: a frozen EVL backbone, explicit
+currently trained in the repo: a frozen EVL backbone, explicit
 view-conditioned geometry cues, and a compact CORAL head for ordinal
 RRI prediction.
 

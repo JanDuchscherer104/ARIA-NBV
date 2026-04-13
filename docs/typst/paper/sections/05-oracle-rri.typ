@@ -254,7 +254,7 @@ with the jitter rotation.
 === Candidate pruning rules
 
 Candidates are oversampled and then filtered by modular rule objects
-(#gh("aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py", lines: "39", label: "candidate_generation_rules.py")). Let
+(#gh("aria_nbv/aria_nbv/pose_generation/candidate_generation.py", lines: "469", label: "CandidateViewGenerator._build_default_rules")). Let
 #symb.ase.mesh be the GT mesh and $cal(B)$ be the snippet occupancy AABB.
 
 #figure(
@@ -490,10 +490,9 @@ and use an $epsilon$ stabilizer in the RRI denominator.
   caption: [Oracle RRI values across candidates for a representative snippet (skewed distribution).],
 )
 
-// <rm>
-// Devlog-style commentary (and typo “reaveals”). Prefer a single neutral sentence or remove.
-Inspecting this single-snippet candidate RRI bar plot reaveals a highly skewed distribution with many extremely small values and a few strong candidates. This motivates our choice of quantile-based binning for CORAL (next section).
-// </rm>
+The candidate RRI distribution for a representative snippet is highly skewed,
+with many small improvements and a small number of strong candidates. This
+motivates the quantile-based binning used for CORAL in the next section.
 
 
 == Ordinal binning for CORAL (label post-processing)

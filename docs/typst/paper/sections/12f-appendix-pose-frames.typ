@@ -9,11 +9,6 @@
 This appendix summarizes the SE(3) frames provided to
 #gh("aria_nbv/aria_nbv/vin/model_v3.py", lines: "1531", label: "VinModelV3.forward"),
 using the notation from the coordinate conventions section.
-// <rm>
-// Internal dev setup references (debug launcher, VSCode). Remove from paper.
-We verify the conventions with offline-cache data loaded via `.configs/offline_only.toml`
-(the debug config in `.vscode/launch.json`).
-// </rm>
 // TODO(paper-cleanup): Keep this appendix as the canonical “CW90 consistency” reference and
 // ensure other sections (coordinate conventions / architecture) do not restate it differently.
 
@@ -92,7 +87,7 @@ Semidense and voxel projections are evaluated in camera frames derived from
 
 == Offline-cache consistency checks
 
-Using cached batches (same config as the debug launcher), we verified:
+Using cached batches, we verified:
 
 - `candidate_poses_world_cam` and `p3d_cameras` are consistent:
   $#T(symb.frame.cq, symb.frame.w)$ reconstructed from `candidate_poses_world_cam`
@@ -100,32 +95,6 @@ Using cached batches (same config as the debug launcher), we verified:
 - Undoing the CW90 display correction on poses *without* rotating
   `p3d_cameras` breaks that alignment (max abs error approx 1.2 in R,
   approx 10 in t), which corrupts semidense projection features.
-
-== Current issues
-
-// <rm>
-// Internal issue tracker / implementation notes; move to repo docs or issues.
-- #textbf[CW90 correction mismatch]: `apply_cw90_correction=True` in
-  `VinModelV3` only adjusts poses unless the caller pre-corrects
-  `p3d_cameras`. This can desynchronize pose encoding and projection
-  features.
-- #textbf[Missing gravity-aligned reference in cache]: offline cache stores only
-  `reference_pose_world_rig` (physical rig). The gravity-aligned sampling pose
-  is not available, so cached datasets cannot be retrofitted without recompute.
-- #textbf[Mixed display vs. physical frames]: display-only rotations (CW90) should
-  not leak into model inputs.
-// </rm>
-
-== Recommended streamlining
-
-// <rm>
-// Internal refactor plan; move to repo docs.
-1. #textbf[Single canonical frame per batch]: treat all cached inputs as physical
-  rig frames; disable CW90 inside the model for cached datasets.
-2. #textbf[Batch-level normalization helper]: if we want to undo CW90, apply it
-  consistently to `candidate_poses_world_cam`, `reference_pose_world_rig`,
-  and `p3d_cameras` (plus a `cw90_corrected` tag) before entering `forward`.
-// </rm>
 
 The CW90 consistency guard is implemented in
 #gh("aria_nbv/aria_nbv/vin/model_v3.py", lines: "1531", label: "VinModelV3.forward"): it raises

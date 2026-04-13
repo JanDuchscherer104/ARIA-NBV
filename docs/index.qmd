@@ -50,8 +50,6 @@ future-work page.
 - [Ideas and Future Directions](contents/ideas.qmd)
 - [Current Priorities](contents/todos.qmd)
 - [Project Status](contents/roadmap.qmd)
-- [Research Questions](contents/questions.qmd)
-- [Experimental Findings](contents/experiments/findings.qmd)
 
 ## Setup and resources
 
@@ -59,6 +57,11 @@ future-work page.
 - [Aria Synthetic Environments (ASE) Dataset](contents/ase_dataset.qmd)
 - [Resources & Tools](contents/resources.qmd)
 - [Glossary](contents/glossary.qmd)
+
+## Supporting notes
+
+- [Research Questions](contents/questions.qmd)
+- [Experimental Findings](contents/experiments/findings.qmd)
 
 # What is intentionally de-emphasized
 

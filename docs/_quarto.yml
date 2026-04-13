@@ -83,16 +83,14 @@ website:
             href: contents/roadmap.qmd
           - text: Ideas / Future Work
             href: contents/ideas.qmd
-          - text: Research Questions
-            href: contents/questions.qmd
-          - text: Findings
-            href: contents/experiments/findings.qmd
       - text: Aria NBV API
         file: reference/index.qmd
       - text: Resources
         menu:
         - text: Resources (External Links, Repos, Docs, etc.)
           href: contents/resources.qmd
+        - text: KG Benchmark Catalog
+          href: contents/resources/kg_benchmark_catalog.qmd
         - text: Agent Scaffolding
           href: contents/resources/agent_scaffold/index.qmd
         - text: ASE Dataset
@@ -124,15 +122,18 @@ website:
             - contents/literature/hesita.qmd
         - section: "Project State"
           contents:
-            - contents/experiments/findings.qmd
             - contents/ideas.qmd
-            - contents/questions.qmd
             - contents/todos.qmd
             - contents/roadmap.qmd
+        - section: "Research Notes"
+          contents:
+            - contents/questions.qmd
+            - contents/experiments/findings.qmd
         - section: "Resources"
           contents:
             - contents/setup.qmd
             - contents/resources.qmd
+            - contents/resources/kg_benchmark_catalog.qmd
             - section: "Agent Scaffolding"
               contents:
                 - contents/resources/agent_scaffold/index.qmd

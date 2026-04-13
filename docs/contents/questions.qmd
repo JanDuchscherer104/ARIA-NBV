@@ -6,113 +6,41 @@ bibliography: ../references.bib
 
 # Research Questions
 
-This section documents key research questions that guide our investigation into semantic Next-Best-View planning.
+This page keeps the longer-lived research questions that sit underneath the
+current implementation work. For the actively changing forward-looking
+scratchpad, use [Ideas and Future Directions](ideas.qmd).
 
-## 1. RRI Computation Strategies
+## Oracle supervision
 
-**1.1**: Which oracle RRI formulation is most predictive of actual reconstruction improvement?
+- Which oracle RRI formulation best predicts meaningful reconstruction improvement in ASE?
+- How should candidate-view point clouds be sampled so they remain comparable to the semi-dense SLAM state?
+- Where does Chamfer distance remain good enough, and where do we need better point-to-surface metrics?
 
-- How can we effectively compute the RRI for candidate views in the ASE dataset given its limitations?
-- Which metrics should be used to quantify the similarity between point clouds?
-- What metrics might be more suitable than Chamfer Distance for this task?
-- How can we sample point clouds from candidate views that are comparable to the existing semi-dense SLAM point clouds in ASE such that we can compute the RRI in a meaningful way?
+## RRI prediction models
 
----
+- Which candidate-conditioning strategy works best: explicit projection features, learned positional encodings, or a hybrid?
+- Which EVL-derived signals are truly necessary for high-quality RRI ranking?
+- How should the scorer represent uncertainty, coverage, and out-of-bounds candidates without collapsing back to weak coverage proxies?
 
-## 2. RRI prediction Model Architectures
+## EFMs as the NBV backbone
 
-- Should we explicity project features into the frame of the candidate view, or rather use learnable fourier features or other positional encodigns?
-- Maybe initialize weights such that they correspond to the projection operation, but then allow finetuning? This is certainly a TODO for the master thesis.
-- What Input and Output formulations could work best for the RRI prediction model? There are many features from the EFM pipeline that could be useful:
-  - Occupancy probabilities, centerness scores, visibility scores for known points in the semi-dense SLAM point cloud...
+- Can EVL remain an effective frozen encoder for NBV, or do we eventually need partial fine-tuning or a different backbone?
+- How can we update scene state incrementally as new observations arrive without recomputing the full stack?
+- Which previously computed features or intermediate states can be reused cheaply across sequential decisions?
 
----
+## Entity-aware objectives
 
-## 2. EFMs as NBV Backbone
+- Can RRI be decomposed into scene-level and entity-level terms in a way that is useful for view selection?
+- Which entity signals are most helpful: GT/predicted OBBs, semantic segmentation, or object-centric visibility cues?
+- How should user intent or task weights enter an entity-aware NBV objective?
 
-**Q2.1**: Can EFMs like EVL serve as effective encoders for NBV planning?
+## Continuous and multi-step planning
 
-**Rationale**: EFMs provide semantic understanding that presentmethods lack. This should enable better generalization to complex scenes. Egocentric platforms like Aria glasses or even an iPhone with LiDAR offer rich multi-modal data tha can be leveraged to obtain a better scene representation.
+- When should the project stay with discrete candidate ranking, and when is it worth moving to continuous pose prediction?
+- How can we formulate multi-step RL when counterfactual views do not have the full modality set of the recorded ego-trajectory?
+- Which state, reward, and transition abstractions make actor-critic or planner-style methods realistic for this setting?
 
-**Q2.2**:
+## Human-facing systems
 
-- How do we efficiently handle streaming point cloud updates using an EFM backbone?
-- How can we incrementally update the scene representation as new observations arrive?
-- How can we re-use previously computed features to avoid redundant computations?
-
----
-
-## 3. Entity-Aware NBV
-
-**Q3.1**:
-
-- Can we compute something like a reconstruction completeness score per entity to guide NBV selection?
-- Can RRI be expressed both per entity and per scene to improve NBV selection?
-- Can the NBV selection be conditioned on the std. per-pose RRI as well as the reconstruction score per entity of interest?
-- **Multi‑modal data:** How does integrating other modalities (encoded bboxes, object semantics like segmentation maps) alongside the PC / RGB-D embeddings improve NBV policy performance?
-
-**Hypothesis**: Entity-aware NBV allows task-specific prioritization and should outperform allow the model to pay attention to the objects of interest and hence improve the reconstruction quality for those. This is especially useful in human-in-the-loop scenarios, allowing the user to spcify "I want this table scanned well". This should allow to leverage pre-trained semantic and geometric understanding; Entity-level representations come with rich priors about typical shapes.
-
-**Proposed Formulation**:
-
-$$
-\text{Fitness}_{\text{total}}(c, \mathcal{E}) = \sum_{e \in \mathcal{E}} w_e \cdot \text{RRI}_e(c) + \lambda \cdot \text{RRI}_{\text{scene}}(c)
-$$
-
-- $\text{RRI}_e$: Reconstruction score for entity $e$
-- $w_e$: Importance weight (user-specified or uncertainty-based)
-
----
-
-## 4. Continuous vs. Discrete Action Spaces
-
-**Q4.1**: Should NBV prediction output discrete view selection or continuous pose regression?
-
-- How can we combine the benefits of both approaches? i.e. by sampling a batch of candidate views from a continous distribution whose parameters are regressed, followed by discrete selection among these candidates.
-- How can we ensure collision-free views in a continuous action space? Usage of free space
-
-### VIN-NBV: Classification Over Discrete Candidates
-
-**Approach:**
-
-- Sample $N$ random candidate poses (e.g., $N=100$)
-- Compute RRI for each
-- Select argmax
-
-**Why they did this:**
-
-- Avoids regression difficulties (multi-modal distributions)
-- Easier to train (classification > regression for complex distributions)
-- Guarantees collision-free poses (if sampled carefully)
-
-**Limitations:**
-
-- Requires many samples for good coverage
-- May miss optimal view between samples
-- No smooth trajectory planning
-
-### GenNBV: Continuous 5-DoF Regression
-
-**Approach:**
-
-- Predict $(x, y, z, \theta, \phi)$ directly via regression
-- Use RL (PPO) to handle multi-modal distributions
-
-**Advantages:**
-
-- Smooth, continuous trajectories
-- Theoretically optimal (not limited by sampling)
-- Suitable for real-time robotics
-
-**Challenges:**
-
-- Harder to train (regression on multi-modal targets)
-- May predict colliding poses (need explicit constraints)
-
----
-
-## LLM Integration for NBV
-
-- **LLM integration:** How can language models translate coverage maps and semantic annotations into natural language explanations or high‑level navigation strategies to allow for an easier human machine (NBV-agent) interaction?  Could state of the art VLAs like Gemini be employed to get OBBs for entity level representations of the scene?
-  - Might this also allow high‑level planning and getting qualitative feedback on the current reconstruction status?
-  - Could the LLMs high-level planning capabilities be used to guide the NBV policy towards task-relevant areas?
+- How can the system explain why a view is recommended?
+- What role, if any, should language or multimodal assistants play in user interaction, high-level planning, or entity selection?

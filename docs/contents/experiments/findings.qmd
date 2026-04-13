@@ -3,6 +3,10 @@ title: Experimental Findings
 format: html
 ---
 
+This page is an evidence gallery, not a current-state overview. The figures
+below remain useful as concrete visual references, but the maintained narrative
+surfaces are the implementation pages, the paper, and [Ideas and Future Directions](../ideas.qmd).
+
 ![ASE Semi-Dense Point Cloud Visualization](../../figures/dataset/ase_semi_dense.png)
 
 ![ASE GT Mesh Sample](../../figures/dataset/gt_mesh_manhattan_sample.png)
