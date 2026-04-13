@@ -6,6 +6,10 @@ This section describes the currently implemented VINv3 candidate scorer that
 we train against oracle RRI labels. The design emphasizes explicit
 _view-conditioned_ evidence and a lightweight CORAL head, with EVL providing the
 voxel backbone @EFM3D-straub2024.
+The implementation anchors for this section are
+#gh("aria_nbv/aria_nbv/vin/model_v3.py", lines: "256", label: "VinModelV3"),
+#gh("aria_nbv/aria_nbv/vin/types.py", lines: "21", label: "EvlBackboneOutput"), and
+#gh("aria_nbv/aria_nbv/vin/types.py", lines: "200", label: "VinPrediction").
 
 == Core design and optional ablations
 
@@ -19,7 +23,8 @@ optional modules evaluated via ablations.
 - *View-conditioned evidence*: candidate-specific cues obtained by projecting
   both semi-dense points and pooled voxel centers into each candidate view.
 - *Optional ablations*: trajectory-context encoder and alternative feature
-  fusion mechanisms are not part of this section, even though they might have been part of our "baseline" model.
+  fusion mechanisms are not part of this section, even though they might have been part of our "baseline" model. The current optional trajectory path is implemented by
+  #gh("aria_nbv/aria_nbv/vin/traj_encoder.py", lines: "48", label: "TrajectoryEncoder").
 
 We denote the core _per-candidate_ features as the pose embedding
 $#(symb.vin.pose_emb)$, global context $#(symb.vin.global) _q$, and semidense
@@ -38,6 +43,11 @@ and CORAL head*).
 EVL lifts multi-view observations into a local voxel grid centered near the
 latest rig pose and outputs multiple dense heads (occupancy probability,
 centerness, free-space evidence, and observation counts) @EFM3D-straub2024. We
+consume these tensors through
+#gh("aria_nbv/aria_nbv/vin/types.py", lines: "21", label: "EvlBackboneOutput"),
+typically produced by
+#gh("aria_nbv/aria_nbv/vin/backbone_evl.py", lines: "81", label: "EvlBackbone").
+We
 assemble an input voxel field $#(symb.vin.field_v)^("in") in bb(R)^(#symb.shape.B times #symb.shape.Fin times #symb.shape.Vvox times #symb.shape.Vvox times #symb.shape.Vvox)$
 by concatenating selected EVL head channels plus derived cues. In the current
 VINv3 baseline, the default channel set is
@@ -85,8 +95,11 @@ and representative input-channel slices are provided in @fig:evl-field-slices.
 
 Each candidate pose is expressed in the reference rig frame via
 $#T(symb.frame.r, symb.frame.cq) = #T(symb.frame.w, symb.frame.r)^(-1) dot #T(symb.frame.w, symb.frame.cq)$.
-We encode translation and rotation using a 6D rotation representation
-@zhou2019continuity and Learnable Fourier Features (LFF) @LFF-li2021.
+We encode translation and rotation using
+#gh("aria_nbv/aria_nbv/vin/pose_encoders.py", lines: "73", label: "R6dLffPoseEncoder")
+and
+#gh("aria_nbv/aria_nbv/vin/pose_encoding.py", lines: "25", label: "LearnableFourierFeatures"),
+following the 6D rotation representation @zhou2019continuity and LFF @LFF-li2021.
 For each candidate $i$ the pose encoder yields:
 
 - a low-dimensional pose vector in $bb(R)^9$ (translation + rotation-6D),
@@ -197,7 +210,11 @@ inverse-distance uncertainty #symb.vin.inv_dist_std when available and clamp
 the normalized values to $[0,1]$. The resulting projection statistics
 #symb.vin.sem_proj are concatenated to the head input.
 We subsample the padded semi-dense point cloud using the per-snippet
-`lengths` field to avoid including invalid padding in the projection.
+`lengths` field to avoid including invalid padding in the projection. The
+projection utilities are implemented in
+#gh("aria_nbv/aria_nbv/vin/model_v3.py", lines: "822", label: "_project_semidense_points")
+and
+#gh("aria_nbv/aria_nbv/vin/model_v3.py", lines: "954", label: "_encode_semidense_projection_features").
 
 Figure @fig:vin-semidense-proj summarizes the semidense projection-statistics
 branch, while @fig:app-paper-semidense-proj shows example diagnostic maps for
@@ -304,9 +321,13 @@ The head MLP produces $#symb.shape.K - 1$ logits per candidate. CORAL interprets
 cumulative probabilities and yields class probabilities and an expected ordinal
 score $#symb.vin.rri_hat$ (used as a ranking proxy) @CORAL-cao2019. When we
 need a continuous RRI estimate, we combine the class probabilities with
-representative bin values (Section *Training Objective*).
+representative bin values (Section *Training Objective*). The ordinal head is
+implemented by #gh("aria_nbv/aria_nbv/rri_metrics/coral.py", lines: "220", label: "CoralLayer"),
+with monotone representative values from
+#gh("aria_nbv/aria_nbv/rri_metrics/coral.py", lines: "111", label: "MonotoneBinValues").
 
-Figure @fig:vin-head summarizes the head computation and the `VinPrediction`
+Figure @fig:vin-head summarizes the head computation and the
+#gh("aria_nbv/aria_nbv/vin/types.py", lines: "200", label: "VinPrediction")
 outputs produced by our implementation.
 
 #figure(

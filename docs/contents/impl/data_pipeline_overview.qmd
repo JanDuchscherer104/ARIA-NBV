@@ -3,12 +3,21 @@ title: "ASE Data Pipeline & Streamlit Usage"
 format: html
 ---
 
+::: {.callout-note title="Source anchors"}
+- App shell: [`NbvStreamlitApp`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/app.py#L79), [`PipelineController`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/controller.py#L34)
+- App panels: [`render_data_page`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/panels/data.py#L148), [`render_candidates_page`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/panels/candidates.py#L121), [`render_depth_page`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/panels/depth.py#L15), [`render_rri_page`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/panels/rri.py#L15), [`render_vin_diagnostics_page`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/panels/vin_diagnostics.py#L50)
+- Data contracts: [`AseEfmDatasetConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_dataset.py#L33), [`AseEfmDataset`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_dataset.py#L320), [`EfmSnippetView`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_views.py#L479), [`load_or_process_mesh`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/mesh_cache.py#L132)
+- Rendering surface: [`CandidateViewGeneratorConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L50), [`CandidateDepthRendererConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L77), [`Pytorch3DDepthRendererConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L27)
+:::
+
 # Quickstart (Streamlit UI)
 
 ```bash
-cd /home/jandu/repos/NBV
-source activate aria-nbv          # or conda activate aria-nbv
-streamlit run -m aria_nbv.streamlit_app
+cd aria_nbv
+nbv-st
+
+# or launch the module file directly through Streamlit
+streamlit run aria_nbv/streamlit_app.py
 ```
 
 Pages in the app:
@@ -23,11 +32,11 @@ Pages in the app:
 - **Optuna Sweeps**: inspect Optuna study results and visualize parameter effects across trials.
 - **Testing & Attribution**: load checkpoints and compute VIN head attributions on cached samples.
 
-The app caches configs + results in `st.session_state`. “Run previous” auto-runs earlier stages with cached settings; background threads keep the UI responsive.
+The app caches configs + results in `st.session_state`. “Run previous” auto-runs earlier stages with cached settings, and the staged controller flow keeps reruns manageable without separate worker threads.
 
 # Dataset loading (Data page)
 
-Sidebar controls map to `AseEfmDatasetConfig` (defaults baked in streamlit_app):
+Sidebar controls map to [`AseEfmDatasetConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_dataset.py#L33), with page orchestration handled by [`NbvStreamlitApp`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/app.py#L79) and [`PipelineController`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/controller.py#L34):
 
 - `scene_ids`: `[]` (auto-discover shards under `.data/ase_efm*`)
 - `atek_variant`: `"efm"` (fixed)
@@ -44,7 +53,7 @@ Buttons:
 
 # Candidate generation (Candidate Poses page)
 
-Config fields surfaced from `CandidateViewGeneratorConfig`:
+Config fields surfaced from [`CandidateViewGeneratorConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L50):
 
 - `num_samples`, `min_radius`, `max_radius`, `min_elev_deg`, `max_elev_deg`
 - `ensure_collision_free`, `min_distance_to_mesh`
@@ -59,11 +68,11 @@ Plot controls:
 Actions:
 
 - **Run previous**: re-run Data stage with cached config
-- **Run / refresh candidates**: background thread; results cached under `STATE_KEYS["candidates"]`
+- **Run / refresh candidates**: rerun the candidate stage; results cached under `STATE_KEYS["candidates"]`
 
 # Depth rendering (Candidate Renders page)
 
-Config mirrors `CandidateDepthRendererConfig` + nested `Pytorch3DDepthRendererConfig`:
+Config mirrors [`CandidateDepthRendererConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L77) and nested [`Pytorch3DDepthRendererConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L27):
 
 - `max_candidates` (subset render), renderer `device`, `zfar`, `faces_per_pixel`, `is_debug`
 - Checkbox: “Compute depth renders”
@@ -71,7 +80,7 @@ Config mirrors `CandidateDepthRendererConfig` + nested `Pytorch3DDepthRendererCo
 Actions:
 
 - **Run previous**: ensures data + candidates exist
-- **Run / refresh renders**: background thread; stores `CandidateDepthBatch`
+- **Run / refresh renders**: rerun the render stage; stores `CandidateDepthBatch`
 
 # Logging & scratchpad
 
@@ -91,9 +100,9 @@ python -m aria_nbv.data.downloader -m download -c efm -n 5 --ms 10
 # Programmatic dataset use
 
 ```python
-from aria_nbv.data_handling.dataset import ASEDatasetConfig
+from aria_nbv.data_handling.efm_dataset import AseEfmDatasetConfig
 
-cfg = ASEDatasetConfig(atek_variant="efm", load_meshes=True, require_mesh=True)
+cfg = AseEfmDatasetConfig(atek_variant="efm", load_meshes=True, require_mesh=True)
 ds = cfg.setup_target()
 sample = next(iter(ds))  # EfmSnippetView
 ```

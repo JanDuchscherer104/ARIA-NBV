@@ -48,16 +48,18 @@ binning for CORAL training.
 For efficiency, we preprocess the GT mesh #symb.ase.mesh at most once per
 snippet: we optionally crop it to snippet bounds and simplify it via quadric
 decimation, then cache the processed mesh for reuse across collision checks and
-depth rendering (see #gh("aria_nbv/aria_nbv/data/mesh_cache.py")).
+depth rendering (see #gh("aria_nbv/aria_nbv/data_handling/mesh_cache.py", lines: "132", label: "load_or_process_mesh")).
 
 The end-to-end oracle labeler is implemented in
-#gh("aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py").
+#gh("aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py", lines: "80", label: "OracleRriLabeler").
 
 == Candidate generation
 
 Given the reference rig pose #T(symb.frame.w, symb.frame.r) at the final
 trajectory time step, we sample #symb.shape.Nq candidate camera poses in a
-constrained shell around the reference and prune invalid proposals.
+constrained shell around the reference and prune invalid proposals. The live
+sampling contract is owned by
+#gh("aria_nbv/aria_nbv/pose_generation/candidate_generation.py", lines: "319", label: "CandidateViewGenerator").
 
 #figure(
   kind: "table",
@@ -96,7 +98,7 @@ constrained shell around the reference and prune invalid proposals.
 Candidate centers are sampled by drawing a direction $bold(s)_q$ on the unit
 sphere $bb(S)^2 subset bb(R)^3$ and a radius $r_q in (r_"min", r_"max")$, then
 rescaling the direction into $(psi, theta)$ caps *without rejection* (see
-#gh("aria_nbv/aria_nbv/pose_generation/positional_sampling.py")).
+#gh("aria_nbv/aria_nbv/pose_generation/positional_sampling.py", lines: "20", label: "PositionSampler")).
 
 Here $bold(s)_q in bb(S)^2$ is a unit direction parameterized in spherical
 coordinates by azimuth $psi$ and elevation $theta$.
@@ -156,7 +158,7 @@ We use standard spherical coordinate relations for the angle/vector conversions
 
 For each sampled center $#(symb.oracle.center) _q$, we construct a base camera orientation
 according to the configured `ViewDirectionMode`
-(#gh("aria_nbv/aria_nbv/pose_generation/orientations.py")). The most common mode
+(#gh("aria_nbv/aria_nbv/pose_generation/orientations.py", lines: "21", label: "OrientationBuilder")). The most common mode
 is radial "look-away", which points the camera optical axis away from the
 reference rig translation.
 
@@ -252,7 +254,7 @@ with the jitter rotation.
 === Candidate pruning rules
 
 Candidates are oversampled and then filtered by modular rule objects
-(#gh("aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py")). Let
+(#gh("aria_nbv/aria_nbv/pose_generation/candidate_generation.py", lines: "469", label: "CandidateViewGenerator._build_default_rules")). Let
 #symb.ase.mesh be the GT mesh and $cal(B)$ be the snippet occupancy AABB.
 
 #figure(
@@ -317,7 +319,8 @@ are masked out and do not contribute to the fused point cloud. This ensures
 that the oracle computation respects the same geometric visibility constraints
 as the candidate camera.
 
-Depth rendering is implemented in #gh("aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py") using PyTorch3D's
+The app and labeler call #gh("aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py", lines: "108", label: "CandidateDepthRenderer"),
+which delegates rasterization to #gh("aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py", lines: "79", label: "Pytorch3DDepthRenderer") using PyTorch3D's
 `PerspectiveCameras`, `RasterizationSettings`, and `MeshRasterizer`
 @PyTorch3D-Cameras-2025. We use hard z-buffering with `faces_per_pixel=1` and
 `blur_radius=0`, clip triangles closer than `znear`, and expose performance
@@ -377,7 +380,7 @@ triangles.
 
 We convert each depth image to a point cloud via
 `_backproject_depths_p3d_batch` in
-#gh("aria_nbv/aria_nbv/rendering/candidate_pointclouds.py"). For pixel centers
+#gh("aria_nbv/aria_nbv/rendering/candidate_pointclouds.py", lines: "64", label: "build_candidate_pointclouds"). For pixel centers
 $(u + 1/2, v + 1/2)$ we first map to PyTorch3D's *normalized device coordinates*
 (NDC) using the convention (+X left, +Y up) and the scale
 $s = min(#symb.shape.H, #symb.shape.Wdim)$ @PyTorch3D-Cameras-2025:
@@ -487,16 +490,15 @@ and use an $epsilon$ stabilizer in the RRI denominator.
   caption: [Oracle RRI values across candidates for a representative snippet (skewed distribution).],
 )
 
-// <rm>
-// Devlog-style commentary (and typo “reaveals”). Prefer a single neutral sentence or remove.
-Inspecting this single-snippet candidate RRI bar plot reaveals a highly skewed distribution with many extremely small values and a few strong candidates. This motivates our choice of quantile-based binning for CORAL (next section).
-// </rm>
+The candidate RRI distribution for a representative snippet is highly skewed,
+with many small improvements and a small number of strong candidates. This
+motivates the quantile-based binning used for CORAL in the next section.
 
 
 == Ordinal binning for CORAL (label post-processing)
 
 To train with CORAL, we discretize continuous RRIs into $K$ ordered bins using
-empirical quantile edges (#gh("aria_nbv/aria_nbv/rri_metrics/rri_binning.py")).
+empirical quantile edges (#gh("aria_nbv/aria_nbv/rri_metrics/rri_binning.py", lines: "88", label: "RriOrdinalBinner")).
 Given a stream of oracle RRIs $\{r_n\}_{n=1}^N$, we compute $K-1$ edges at the
 quantiles $k/K$:
 

@@ -701,10 +701,23 @@
 /// Create a filename/path reference
 #let filepath(body) = raw(body, lang: none)
 
-/// Link to a file in the GitHub repo (shows only the filename).
-#let gh(path) = {
-  let base = path.split("/").last()
-  link("https://github.com/JanDuchscherer104/NBV/blob/main/" + path)[#code-inline(base)]
+/// Link to a file in the GitHub repo (shows only the filename by default).
+///
+/// Examples:
+/// - `#gh("aria_nbv/aria_nbv/vin/model_v3.py")`
+/// - `#gh("aria_nbv/aria_nbv/vin/model_v3.py", lines: "1531", label: "VinModelV3.forward")`
+#let gh(path, lines: none, label: auto) = {
+  let base = if label == auto { path.split("/").last() } else { label }
+  let anchor = if lines == none {
+    ""
+  } else if type(lines) == int {
+    "#L" + str(lines)
+  } else if type(lines) == str {
+    "#L" + lines
+  } else {
+    panic("gh(lines:) expects none, int, or string")
+  }
+  link("https://github.com/JanDuchscherer104/NBV/blob/main/" + path + anchor)[#code-inline(base)]
 }
 
 /// Create a citation-style reference

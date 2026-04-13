@@ -2,89 +2,93 @@
 title: "Repository Structure"
 format: html
 ---
-<!-- TODO: auto-generate this page based on the actual *.py source code. Provide the tree directory structure with concise descriptions of each module.
 
-- should we use some package to generate api docs from our module and the doc-strings?
-- what to include on this page?
--->
+# Repository map
 
-# External Code & Notebooks
+This page is a current-owner map for the repo surfaces that explain, execute,
+and validate Aria-NBV. It is intentionally narrower than a full directory dump:
+the goal is to point you at the files that own the live contracts.
+
+::: {.callout-note title="Source anchors"}
+- App shell: [`NbvStreamlitApp`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/app.py#L79), [`PipelineController`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/controller.py#L34)
+- Data surface: [`AseEfmDataset`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_dataset.py#L320), [`EfmSnippetView`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_views.py#L479), [`VinSnippetView`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_views.py#L796)
+- Oracle pipeline: [`OracleRriLabeler`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L80), [`CandidateViewGenerator`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L319), [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108), [`OracleRRI`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L34)
+- VIN surface: [`VinModelV3`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L256), [`EvlBackboneOutput`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L21), [`VinPrediction`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L200)
+:::
+
+## Workspace roots
 
 ```text
-aria_nbv/                           # Package workspace
-├── main.py                        # Builds default configs and diagnostics
-├── examples/simplified_dataset_usage.py
-├── scripts/
-│   ├── get_context.py             # AST-based symbol scanner (feeds docs)
-│   └── run_efm3d_on_ase.py        # Helper to invoke EVL on ASE shards
-├── aria_nbv/                      # Package code
-│   ├── analysis/depth_debugger.py # Depth→mesh distance + stats
-│   ├── configs/path_config.py     # Filesystem paths + helpers
-│   ├── data/                      # Typed views and dataset helpers
-│   │   ├── efm_dataset.py         # WebDataset→typed EFM snippets
-│   │   ├── efm_views.py           # Camera/trajectory/points/OBB typed wrappers
-│   │   ├── downloader.py          # ASE mesh + ATEK tar downloader
-│   │   ├── metadata.py            # Scene metadata parsing/filtering
-│   │   ├── plotting.py            # Plotly helpers for snippets/meshes
-│   │   └── utils.py               # Scene id parsing, validation
-│   ├── data_handling/             # New entrypoints and CLI over data
-│   │   ├── dataset.py             # Higher-level dataset wrapper + mesh pairing
-│   │   ├── downloader.py          # CLI-friendly download orchestrator
-│   │   ├── metadata.py            # Metadata cache/load utilities
-│   │   └── cli.py                 # Minimal CLI shims
-│   ├── pose_generation/           # Candidate pose sampling rules
-│   │   ├── candidate_generation.py
-│   │   ├── candidate_generation_rules.py
-│   │   ├── plotting.py
-│   │   └── types.py
-│   ├── rendering/                 # Candidate depth rendering backends
-│   │   ├── candidate_depth_renderer.py
-│   │   ├── efm3d_depth_renderer.py
-│   │   ├── pytorch3d_depth_renderer.py
-│   │   └── plotting.py
-│   ├── views/candidate_rendering.py # Point-cloud rendering from candidate poses
-│   ├── visualization/candidate_app.py # Streamlit UI for sampling/RRI inspection
-│   ├── viz/mesh_viz.py            # Trimesh/Plotly/Streamlit mesh + PC viz
-│   ├── utils/                     # Shared utilities
-│   │   ├── base_config.py         # Pydantic factory base + TOML IO
-│   │   ├── console.py             # Structured logging
-│   │   ├── frames.py              # Coordinate-frame helpers
-│   │   ├── rich_summary.py        # Rich-style summaries
-│   │   └── summary.py             # Text summaries
-│   └── streamlit_app.py           # Legacy Streamlit dashboard entrypoint
-├── tests/                         # Pytest suites
-│   ├── data_handling/             # Dataset/downloader/metadata tests
-│   ├── pose_generation/           # Sampling rule tests
-│   ├── rendering/                 # Depth rendering tests
-│   ├── views/                     # Candidate rendering tests
-│   ├── test_candidate_rendering.py
-│   ├── test_console.py
-│   ├── test_efm_dataset.py
-│   ├── test_mesh_cropping.py
-│   ├── test_plotting_semidense.py
-│   └── test_pose_generation.py
-├── SIMPLIFIED_DATA_HANDLING.md    # How-to for minimal data usage
-├── download_config.example.toml   # Downloader config template
-├── environment.yml                # Conda environment
-├── pyproject.toml / uv.lock       # Python packaging
-└── notebooks/ase_oracle_rri*.py   # Helper notebooks/scripts
+.
+├── AGENTS.md                    # Repo-wide guidance and bootstrap order
+├── .agents/                     # Canonical state, debriefs, references, and skills
+├── aria_nbv/                    # Python workspace, package code, tests, and scripts
+├── docs/                        # Quarto site, Typst paper/slides, bibliography
+├── external/                    # Vendor checkouts / shims expected by the workspace
+├── scripts/                     # Repo-level helper wrappers and generators
+└── Makefile                     # Context, docs, and operator entrypoints
 ```
 
+## Current package layout
+
+```text
+aria_nbv/
+├── pyproject.toml / uv.lock     # Packaging and dependency graph
+├── main.py                      # Local CLI/bootstrap entrypoint
+├── scripts/                     # Context helpers, training helpers, figure export
+├── tests/                       # Pytest coverage by subsystem
+└── aria_nbv/
+    ├── app/                     # Streamlit shell, state, controller, page panels
+    ├── configs/                 # PathConfig, W&B, Optuna config surfaces
+    ├── data/                    # Download stats and metadata compatibility helpers
+    ├── data_handling/           # Typed views, dataset loading, mesh/offline-cache contracts
+    ├── interpretability/        # Attribution utilities
+    ├── lightning/               # Training loop, datamodule, optimizer orchestration
+    ├── pipelines/               # Oracle labeler orchestration
+    ├── pose_generation/         # Candidate sampling and pruning rules
+    ├── rendering/               # Candidate depth and point-cloud rendering
+    ├── rri_metrics/             # Oracle RRI, CORAL, metrics, and binning
+    ├── utils/                   # BaseConfig, Console, frames, plotting, schemas
+    ├── vin/                     # VINv3 scorer, encoders, and typed outputs
+    └── streamlit_app.py         # Streamlit/console entrypoint
 ```
+
+## High-signal owners
+
+- **App flow**: [`aria_nbv.app.app`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/app.py#L1) wires the UI; [`aria_nbv.app.controller`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/controller.py#L1) owns cache-aware stage execution.
+- **Data contracts**: [`aria_nbv.data_handling.efm_dataset`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_dataset.py#L1), [`efm_views`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_views.py#L1), and [`mesh_cache`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/mesh_cache.py#L1) own live snippet and mesh payloads.
+- **Oracle pipeline**: [`aria_nbv.pipelines.oracle_rri_labeler`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L1) coordinates candidate generation, rendering, point-cloud construction, and RRI scoring.
+- **VIN prediction**: [`aria_nbv.vin.model_v3`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L1) and [`aria_nbv.vin.types`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L1) own the scorer and typed outputs.
+- **VIN diagnostics**: [`aria_nbv.app.panels.vin_diagnostics`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/app/panels/vin_diagnostics.py#L1) and [`aria_nbv.vin.summarize_v3`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/summarize_v3.py#L1) own the current diagnostic surfaces.
+- **VIN training**: [`aria_nbv.lightning.lit_module`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/lightning/lit_module.py#L1) owns training orchestration and loss logging.
+- **Context and routing**: [`scripts/nbv_context_index.sh`](https://github.com/JanDuchscherer104/NBV/blob/main/scripts/nbv_context_index.sh), [`scripts/nbv_get_context.sh`](https://github.com/JanDuchscherer104/NBV/blob/main/scripts/nbv_get_context.sh), and [`aria_nbv/scripts/get_context.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/scripts/get_context.py#L1) produce the lightweight discovery artifacts used by agents.
+
+## Verification surfaces
+
+```text
+aria_nbv/tests/
+├── app/                         # Streamlit panel and state tests
+├── data/                        # Legacy compatibility data tests
+├── data_handling/               # Dataset, cache, downloader, and contract tests
+├── integration/                 # Real-data and end-to-end pipeline tests
+├── lightning/                   # Training and scheduler tests
+├── pose_generation/             # Candidate sampling and rule tests
+├── rendering/                   # Depth renderer and backprojection tests
+├── rri_metrics/                 # Metrics, logging, and binning tests
+└── vin/                         # VIN core, utilities, and plotting tests
+```
+
+## External code and notebooks
+
+```text
 external/
-├── ATEK/                    # Aria toolkit for data processing
-├── efm3d/                   # EFM3D model implementation
-├── projectaria_tools/       # ASE dataset access utilities
-└── scenescript/             # Scene specification language tools
+├── ATEK/                        # Expected ATEK checkout
+├── efm3d/                       # Expected EFM3D checkout
+├── openpoints_shim/             # Local shim package tracked in-repo
+├── projectaria_tools/           # Expected Project Aria Tools checkout
+└── scenescript/                 # Expected SceneScript checkout
 ```
 
-See an overview of the four utilized external codebases in [Resources & Tools](resources.qmd#resources-tools) and links to their repositories.
-
-```
-notebooks/
-├── ase_atek_data_exploration.ipynb    # ASE dataset exploration
-├── download_ase_meshes.ipynb          # GT mesh acquisition
-├── ase_atek_exploration.ipynb         # ATEK integration testing
-├── ase_exploration.ipynb              # Basic ASE data analysis
-└── inference.ipynb                    # Model inference experiments
-```
+- Use [Resources & Tools](resources.qmd#resources-tools) for vendor docs and repository links.
+- Use the Typst paper and `docs/contents/impl/*.qmd` pages for current internal architecture.
+- Keep notebooks as exploratory artifacts, not the source of truth for package behavior.

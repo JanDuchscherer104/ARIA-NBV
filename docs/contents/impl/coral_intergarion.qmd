@@ -2,6 +2,13 @@
 title: "Implementing CORAL for Ordinal Regression to Continuous Targets"
 ---
 
+::: {.callout-note title="Source anchors"}
+- CORAL core: [`MonotoneBinValues`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/coral.py#L111), [`CoralLayer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/coral.py#L220), [`coral_logits_to_prob`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/coral.py#L58)
+- Binning: [`RriOrdinalBinner`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/rri_binning.py#L88)
+- VIN integration: [`VinModelV3.init_bin_values`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L1596), [`VinPrediction`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L200)
+- Training integration: [`VinLightningModuleConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/lightning/lit_module.py#L55), [`VinLightningModule._maybe_init_bin_values`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/lightning/lit_module.py#L941), [`ReduceLrOnPlateauConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/lightning/optimizers.py#L53)
+:::
+
 ## 1. Correcting the probabilistic mistake (core insight)
 
 **CORAL does not output class probabilities.**
@@ -199,13 +206,11 @@ In short: this is a *principled ordinal-to-regression bridge*, not a hack.
 
 ---
 
-## 9. Implementation details (NBV codebase)
+## 9. Current implementation details (NBV codebase)
 
 ### Core utilities (`aria_nbv/aria_nbv/rri_metrics/coral.py`)
 
-We implement monotone bin representatives in `MonotoneBinValues` and wire them
-into `CoralLayer` so the expected value can be computed **directly** from CORAL
-marginals:
+The current implementation lives in [`rri_metrics/coral.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/coral.py#L1). [`MonotoneBinValues`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/coral.py#L111) parameterizes monotone learnable bin representatives, and [`CoralLayer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/coral.py#L220) uses them to recover calibrated expectations from CORAL marginals:
 
 ```python
 from aria_nbv.rri_metrics.coral import CoralLayer, coral_logits_to_prob
@@ -222,21 +227,18 @@ midpoints and optionally regularized with:
 u_reg = head_coral.bin_value_regularizer(target_values)
 ```
 
-### Initialization hook (`aria_nbv/aria_nbv/vin/experimental/model_v2.py`)
+### Initialization hook (`aria_nbv/aria_nbv/vin/model_v3.py`)
 
-`VinModelV2` exposes a lightweight hook to initialize the CORAL bin values:
+[`VinModelV3.init_bin_values`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/model_v3.py#L1596) forwards fitted bin representatives into the current scorer head:
 
 ```python
-model = VinModelV2(...)
+model = VinModelV3(...)
 model.init_bin_values(bin_means)  # Tensor[K]
 ```
 
 ### Fitting + training integration (`aria_nbv/aria_nbv/lightning/lit_module.py`)
 
-After loading the fitted `RriOrdinalBinner`, the Lightning module calls
-`_maybe_init_bin_values()` to seed `u_k` from `bin_means` (or midpoints if
-means are unavailable). During training, the auxiliary regression loss uses
-these values to compute a **calibrated** scalar prediction:
+After loading the fitted [`RriOrdinalBinner`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/rri_binning.py#L88), [`VinLightningModule._maybe_init_bin_values`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/lightning/lit_module.py#L941) seeds `u_k` from `bin_means` (or midpoints if means are unavailable). During training, [`VinPrediction.prob`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/vin/types.py#L200) is converted back into a calibrated scalar via `head_coral.expected_from_probs(...)`:
 
 ```python
 probs = pred.prob.squeeze(0)
@@ -249,7 +251,7 @@ lets the bin representatives adapt while remaining monotone.
 
 ---
 
-## 10. Training dynamics, monitoring, and two practical fixes
+## 10. Training dynamics and current tuning knobs
 
 During offline training runs we repeatedly observed the same signature:
 
@@ -257,76 +259,47 @@ During offline training runs we repeatedly observed the same signature:
 - **CORAL loss** improves more slowly.
 - Early confusion matrices show a **central-band** pattern (many samples predicted into a narrow set of middle bins).
 
-This is expected given the current implementation, and it leads directly to two
-high-impact practical fixes.
+This is expected given the current implementation, and the current training code
+already exposes the main stabilization knobs.
 
 ### 10.1 Why the auxiliary loss drops so fast
 
-In `aria_nbv/aria_nbv/lightning/lit_module.py`, the combined objective is
-currently implemented as:
+In [`VinLightningModule`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/lightning/lit_module.py#L185), the auxiliary term is scaled explicitly before it is added to the CORAL loss:
 
 ```python
-combined_loss = coral_loss_value + aux_loss
+aux_weight = self._aux_regression_weight()
+combined_loss = coral_loss_value + aux_weight * aux_loss
 ```
 
-This implicitly sets the auxiliary weight to **λ = 1**, even though CORAL loss
-and auxiliary regression loss typically live on very different numeric scales:
+Even with an explicit weight, CORAL loss and auxiliary regression loss live on
+very different numeric scales:
 
 - CORAL loss with `K=15` bins starts around ~7–10.
 - Huber on a normalized-ish scalar target can quickly drop to ~1e-2.
 
-So the auxiliary term provides a clean early calibration gradient and then
-rapidly becomes negligible. The “central-band” confusion matrix is consistent
-with the model initially learning a conservative **conditional-mean / median**
-proxy before it has learned sharp ordinal separation.
+The auxiliary term therefore provides a clean early calibration gradient and
+then rapidly becomes small relative to the ordinal objective. The “central-band”
+confusion matrix is consistent with the model initially learning a conservative
+conditional-mean proxy before it has learned sharp ordinal separation.
 
-### 10.2 Fix #1: add an explicit auxiliary weight λ
+### 10.2 Auxiliary-weight schedule (implemented)
 
-Make the combined loss explicit:
+The current config surface in [`VinLightningModuleConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/lightning/lit_module.py#L55) exposes the weight and its decay parameters directly:
 
 $$
-\mathcal{L} = \mathcal{L}_{\text{CORAL}} + \lambda_{\text{aux}}\,\mathcal{L}_{\text{aux}}(\hat r, r)
+\mathcal{L} = \mathcal{L}_{\text{CORAL}} + \lambda_{\text{aux}}(t)\,\mathcal{L}_{\text{aux}}(\hat r, r)
 $$
 
-Even if $\mathcal{L}_{\text{aux}}$ becomes small, $\lambda_{\text{aux}}$ controls
-how much the auxiliary objective shapes representation learning early on.
-
-**Rule of thumb from the observed magnitudes**:
-
-- If CORAL ≈ 8 and aux ≈ 0.03, then values like $\lambda_{\text{aux}}\in[5,50]$
-  make the aux signal meaningful without dominating.
-
-- Alternatively set $\lambda_{\text{aux}}\approx 0.1$ if aux should be a light
-  calibrator only.
-
-Implementation-wise, this is best exposed as a config field (e.g.
-`aux_regression_weight`) and applied as:
-
-```python
-combined_loss = coral_loss_value + aux_regression_weight * aux_loss
-```
-
-#### Exponential decay schedule (recommended)
-
-Given the training dynamics we observed, make $\lambda_{\text{aux}}$ decay
-exponentially over time while keeping a small nonzero floor:
+The default implementation computes `\lambda_{\text{aux}}(t)` with an exponential
+decay and a floor:
 
 $$
 \lambda_{\text{aux}}(t) = \max(\lambda_{\min}, \lambda_0 \cdot \gamma^{t})
 $$
 
-where $t$ is either epoch or global step, and $\gamma \in (0, 1]$ controls the
-decay speed. This preserves the early calibration signal but gradually shifts
-focus to ordinal separation.
-
-**Theory intuition.** The combined objective is a weighted sum of two signals
-with very different curvature scales. Early in training, the aux term provides
-a strong gradient toward a reasonable conditional mean, but once it enters the
-quadratic (Huber) regime it quickly becomes small. An exponential schedule
-implements a *smooth continuation* from a calibrated-regression objective to an
-ordinal-ranking objective, without abruptly removing the auxiliary signal. The
-nonzero floor prevents drift of learnable bin values and keeps mild calibration
-pressure late in training.
+where `t` is epoch or global step, depending on `aux_regression_weight_interval`.
+This keeps the early calibration signal without letting the auxiliary term hide
+ordinal plateaus for the entire run.
 
 In code/config:
 
@@ -338,9 +311,9 @@ aux_regression_weight_min = 0.5
 aux_regression_weight_interval = "epoch" # or "step"
 ```
 
-### 10.3 Fix #2: schedule LR on the hard metric, not the easy one
+### 10.3 Scheduler monitoring
 
-The default `ReduceLrOnPlateauConfig` monitors:
+[`ReduceLrOnPlateauConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/lightning/optimizers.py#L53) still defaults to:
 
 ```python
 monitor: str = "train/loss"
@@ -364,8 +337,7 @@ monitor = "val/coral_loss"
 
 - **Chance-level baseline:** if CORAL loss is the sum over `K-1` binary
   thresholds, a rough random baseline is $(K-1)\log 2$ (for `K=15` this is
-  $\approx 14\log 2 \approx 9.70$). Our code logs `coral_loss_rel_random` using
-  `coral_random_loss(K)` so you can track progress relative to chance.
+  $\approx 14\log 2 \approx 9.70$). The implementation exposes [`coral_random_loss`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/coral.py#L89) so you can compare live runs against chance.
 
 - **Central-band confusion matrices:** often indicate “mean-optimal” predictions
   early, not necessarily a bug. They should widen over epochs as ordinal

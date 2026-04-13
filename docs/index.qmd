@@ -1,7 +1,6 @@
-
 ---
 title: "Next-Best-View Planning with Foundation Models"
-subtitle: "VCML Seminar: RRI based NBV Prediction using EFM3D Backbones"
+subtitle: "Current docs entrypoint for Aria-NBV"
 author: "Jan Duchscherer, Munich University of Applied Sciences"
 date: last-modified
 format:
@@ -13,105 +12,69 @@ bibliography: references.bib
 
 # Abstract
 
-Next-Best-View (NBV) planning addresses the fundamental challenge of autonomous viewpoint selection in active 3D reconstruction, aiming to maximize the acquisition quality while minimizing the acquisition cost (i.e. number of views, traversed distance, capture time).
+This repository studies quality-driven next-best-view planning for egocentric
+indoor scenes. The current stack combines oracle RRI supervision from ASE
+ground-truth meshes with a frozen EVL backbone and a compact VINv3 scorer that
+ranks candidate views by predicted reconstruction improvement rather than pure
+coverage.
 
-Classical NBV methods rely on hand-crafted criteria, limited action spaces, or per-scene optimized representations. While learning-based NBV methods like GenNBV [@GenNBV-chen2024] have improved generalization by leveraging reinforcement learning, they still optimize for geometric coverage as a proxy for reconstruction quality. Since coverage maximization does not necessarily correlate with improved reconstruction quality, these methods can struggle in complex scenes with occlusions and fine details. Diretly optimizing reconstruction quality, as pioneered by VIN-NBV [@VIN-NBV-frahm2025], has shown significant improvements by predicting Relative Reconstruction Improvement (RRI) to quantify the fitness of candidate viewpoints. However, even VIN-NBV's generalization capabilities are rather limited to simple object-centric NBV scenarios as it does not leverage pre-tained foundation models with rich 3D spatial understanding.
+The docs site is intentionally pruned around current surfaces. The paper remains
+the highest-level project truth, the implementation pages document the live
+codebase, and [Ideas and Future Directions](contents/ideas.qmd) is the living
+future-work page.
 
-This project aims to develop an NBV system that integrates VIN-NBV's key insight to directly optimize reconstruction quality rather than proxies like coverage, leveraging a pre-trained _egocentric foundation model_ as backbone to provide strong priors for 3D spatial reasoning in complex indoor scenes. We adapt the [EVL (_Egocentric Voxel Lifting_)](contents/literature/efm3d.qmd) 3D EFM [@EFM3D-straub2024] which is pre-trained on the [Aria Synthetic Environments (ASE)](contents/ase_dataset.qmd) dataset - a large-scale synthetic egocentric dataset with 100k indoor scenes, to provide rich 3D feature volumes that capture scene geometry, semantics, and free-space priors. On top of this frozen backbone, we train a lightweight RRI prediction head that introspects both the current scene representation and candidate viewpoints to express the fitness of given candidate views.
+# Start Here
 
-# Project Vision and Goals
+## Highest-level project truth
 
-## Done
+- [Seminar Project Paper](typst/paper/main.pdf)
+- [Typst paper source](typst/paper/main.typ)
+- [Outlook presentation](typst/slides/slides_thesis_outlook.pdf)
 
-- Develop an [oracle RRI computation pipeline](contents/impl/rri_computation.qmd) using ASE visibility data, semi-dense point clouds  and GT meshes.
-- Directly optimize reconstruction quality rather than surrogate coverage metrics, following RRI-based policies as per VIN-NBV.
-- Develop computational tools to efficiently simulate candidate viewpoints and their expected observations utilizing [`PyTorch3d`](https://pytorch3d.org/), [EFM3D](https://github.com/facebookresearch/efm3d) and [ATEK](https://github.com/facebookresearch/ATEK).
+## Current architecture
 
-## WIP
+- [aria_nbv Overview & Architecture](contents/impl/aria_nbv_overview.qmd)
+- [Repository Structure](contents/repo_structure.qmd)
+- [ASE Data Pipeline & Streamlit Usage](contents/impl/data_pipeline_overview.qmd)
+- [aria_nbv Implementation Overview](contents/impl/oracle_rri_impl.qmd)
+- [Computing RRI with Ground Truth Meshes](contents/impl/rri_computation.qmd)
 
-- Train an RRI predictor head on top of a frozen EFM backbone that introspects the current reconstruction and a candidate pose via imitation learning on oracle RRIs.
-- Leverage EVL's 3D foundation features—voxel occupancy, centerness, semantic channels, and OBB priors—as state embeddings for RRI estimation and NBV decision making.
+## Current model and training docs
 
-## Future Work
+- [View Introspection Network (VIN) on EVL](contents/impl/vin_nbv.qmd)
+- [CORAL for Ordinal Regression](contents/impl/coral_intergarion.qmd)
+- [API Reference](reference/index.qmd)
 
-- Entity-aware reconstruction tracking through EVL's OBB detection capabilities.
-- Extend towards human-in-the-loop AR guidance, where entity-aware RRI weighting delivers task-specific view suggestions.
+## Current direction
 
-# Documentation Navigation
+- [Ideas and Future Directions](contents/ideas.qmd)
+- [Current Priorities](contents/todos.qmd)
+- [Project Status](contents/roadmap.qmd)
 
-`docs/typst/paper/main.typ` is the highest-level project ground truth. The Quarto pages below are secondary documentation surfaces and should stay aligned with the paper.
+## Setup and resources
 
-## Paper
+- [Setup Instructions](contents/setup.qmd)
+- [Aria Synthetic Environments (ASE) Dataset](contents/ase_dataset.qmd)
+- [Resources & Tools](contents/resources.qmd)
+- [Glossary](contents/glossary.qmd)
 
-- [Seminar Project Paper](typst/paper/main.pdf), [Typst Source](typst/paper/main.typ): Ground turth for the project state at the end of the seminar in 01/2025.
+## Supporting notes
 
-## Project Slides
+- [Research Questions](contents/questions.qmd)
+- [Experimental Findings](contents/experiments/findings.qmd)
 
-### Main Seminar Presentations
+# What is intentionally de-emphasized
 
-- [Presentation 01](typst/slides/slides_1.pdf), [typst-src](typst/slides/slides_1.typ)
-- [Presentation 02](typst/slides/slides_2.pdf), [typst-src](typst/slides/slides_2.typ)
-- [Presentation 04](typst/slides/slides_4.pdf), [typst-src](typst/slides/slides_4.typ): Final presentation of our seminar project.
+- Old phase-by-phase roadmap material was collapsed into a short status page.
+- The legacy `aria_nbv Package` page is kept only as a compatibility stub.
+- Historical VIN v2 proposal pages are still available but are not treated as
+  current implementation docs.
 
-### Master's Thesis
+# Notes on scope
 
-- [Outlook Presentation](typst/slides/slides_thesis_outlook.pdf), [typst-src](typst/slides/slides_thesis_outlook.typ): Future research directions and thesis proposal presentation.
-
-## Setup & Installation
-
-- [Setup Instructions](contents/setup.qmd): Environment setup and dependencies
-
-## Project State
-
-- **[Action Items & TODOs](contents/todos.qmd)**: Current priorities and open tasks
-- **[Project Roadmap](contents/roadmap.qmd)**: Milestones and timeline
-- **[Research Questions](contents/questions.qmd)**: Open problems and directions
-- **[Experimental Findings](contents/experiments/findings.qmd)**: Run logs and takeaways
-
-## Theory & Background
-
-- **[NBV Background](contents/theory/nbv_background.qmd)**: Problem framing and prior work
-- **[RRI Theory](contents/theory/rri_theory.qmd)**: Mathematical formulation and properties of RRI
-- **[Surface Reconstruction Metrics](contents/theory/surface_metrics.qmd)**: Accuracy, completeness, Chamfer distance
-- **[Semi-Dense Point Clouds](contents/theory/semi-dense-pc.qmd)**: SLAM-based reconstruction signals
-
-## Dataset & Resources
-
-- **[Aria Synthetic Environments (ASE) Dataset](contents/ase_dataset.qmd)**: Modalities, splits, mesh availability
-- **[Resources & Tools](contents/resources.qmd)**: External links to libraries, tools, datasets
-- **[Glossary](contents/glossary.qmd)**: Project terminology
-
-## Literature Reviews
-
-- **[Literature Review](contents/literature/index.qmd)**: Entry point and local LaTeX corpus
-- **[VIN-NBV](contents/literature/vin_nbv.qmd)**: Direct quality optimization with RRI
-- **[GenNBV](contents/literature/gen_nbv.qmd)**: Continuous action spaces and RL approaches
-- **[EFM3D & EVL](contents/literature/efm3d.qmd)**: Egocentric foundation models and voxel lifting
-- **[SceneScript](contents/literature/scene_script.qmd)**: Structured scene language and entity representation
-
-## Implementation Guides
-
-- **[Implementation Overview](contents/impl/overview.qmd)**: Metrics + RRI computation entry point
-- **[aria_nbv Overview & Architecture](contents/impl/aria_nbv_overview.qmd)**: Package structure and components
-- **[aria_nbv Package](contents/impl/aria_nbv_package.qmd)**: API map + module responsibilities
-- **[API Reference](reference/index.qmd)**: Auto-generated signatures and docstrings for the documented `aria_nbv` surfaces
-- **[ASE Data Pipeline & Streamlit Usage](contents/impl/data_pipeline_overview.qmd)**: Data ingestion and dashboards
-- **[aria_nbv Implementation Overview](contents/impl/oracle_rri_impl.qmd)**: Key modules and workflows
-- **[Computing RRI with Ground Truth Meshes](contents/impl/rri_computation.qmd)**: Oracle pipeline and labels
-- **[CORAL for Ordinal Regression](contents/impl/coral_intergarion.qmd)**: Ordinal binning and loss integration
-- **[View Introspection Network (VIN) on EVL](contents/impl/vin_nbv.qmd)**: Model design and training notes
-- **[VIN v2 Feature + Encoding Proposals](contents/impl/vin_v2_feature_proposals.qmd)**: Design space and ideas
-
-## External Implementations
-
-- **[ATEK Implementation Index](contents/ext-impl/atek_implementation.qmd)**: Mesh evaluation reference
-- **[EFM3D Implementation Index](contents/ext-impl/efm3d_implementation.qmd)**: Voxel/point utilities
-- **[ProjectAria Tools Reference](contents/ext-impl/prj_aria_tools_impl.qmd)**: Dataset tooling
-- **[EFM3D Symbol Index](contents/ext-impl/efm3d_symbol_index.qmd)**: Keys and coordinate conventions
-
-## Agent Memory
-
-- The maintained agent scaffold is published under [Agent Scaffolding](contents/resources/agent_scaffold/index.qmd).
-- Canonical state lives in `.agents/memory/state/` and is mirrored there as Quarto pages.
-- Repo guidance and scoped package guides are mirrored from `AGENTS.md`, `docs/AGENTS.md`, and the nested package `AGENTS.md` files.
-- Episodic debriefs under `.agents/memory/history/YYYY/MM/` and archive notes remain internal and are not part of the published site.
+- `docs/typst/paper/main.typ` remains the authoritative narrative surface when
+  Quarto summaries drift.
+- Implementation-heavy Quarto pages describe the current repo-owned code and use
+  source anchors to map prose back to `aria_nbv/`.
+- `ideas.qmd` is the preferred place for forward-looking scratchpad material;
+  it is more current than the old roadmap/TODO surfaces.
