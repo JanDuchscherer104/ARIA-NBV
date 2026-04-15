@@ -30,7 +30,7 @@ tags: [codex, workflow, architecture]
 - Verification in shared repo guidance is selected by touched surface rather than by a single global checklist.
 - `make check-agent-scaffold` is the broad scaffold health check. `make check-agent-memory` remains the narrower debrief/history hygiene check.
 - GitNexus is optional in the Codex scaffold and is documented in `.agents/references/gitnexus_optional.md`; root guidance must not require unavailable GitNexus tooling.
-- Codex hook examples are inactive templates under `.agents/references/codex_hook_templates/`; no active `.codex/hooks.json` is tracked by default.
+- `.codex/hooks.json` tracks the active startup hook that runs `make context` for new Codex sessions; guardrail hook examples remain inactive templates under `.agents/references/codex_hook_templates/`.
 
 ## Technical Decisions
 - Runtime objects are instantiated through config `.setup_target()` factories.

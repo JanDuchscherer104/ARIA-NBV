@@ -30,7 +30,8 @@ validation, hook templates, and `.agents` DB work.
   changes.
 
 ## Hooks
-- Hook templates are inactive by default and live under
+- `.codex/hooks.json` owns the active startup hook that refreshes lightweight
+  context with `make context` for new Codex sessions.
+- Inactive guardrail templates live under
   `.agents/references/codex_hook_templates/`.
-- Do not add active `.codex/hooks.json` unless a task explicitly asks to enable
-  hooks.
+- Keep hook output concise, plain text, and useful as agent-facing context.

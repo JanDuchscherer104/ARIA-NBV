@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -29,6 +31,7 @@ SCAN_FILES = [
 
 PATH_PREFIXES = (
     ".agents/",
+    ".codex/",
     ".github/",
     "AGENTS.md",
     "Makefile",
@@ -96,12 +99,20 @@ def _resolve_target(source_file: Path, target: str) -> Path | None:
 
 
 def _scaffold_markdown_files() -> list[Path]:
-    files = list(SCAN_FILES)
-    files.extend(sorted(REPO_ROOT.glob("aria_nbv/**/AGENTS.md")))
-    files.extend(sorted(REPO_ROOT.glob("docs/**/AGENTS.md")))
-    files.extend(sorted(SKILLS_ROOT.glob("*/SKILL.md")))
-    files.extend(sorted((REPO_ROOT / ".agents" / "references").glob("*.md")))
-    files.extend(sorted(SKILLS_ROOT.glob("*/references/*.md")))
+    tracked = {
+        REPO_ROOT / line
+        for line in subprocess.check_output(
+            ["git", "ls-files"],
+            cwd=REPO_ROOT,
+            text=True,
+        ).splitlines()
+    }
+    files = [path for path in SCAN_FILES if path in tracked]
+    files.extend(path for path in tracked if path.match("aria_nbv/**/AGENTS.md"))
+    files.extend(path for path in tracked if path.match("docs/**/AGENTS.md"))
+    files.extend(path for path in tracked if path.match(".agents/skills/*/SKILL.md"))
+    files.extend(path for path in tracked if path.match(".agents/references/*.md"))
+    files.extend(path for path in tracked if path.match(".agents/skills/*/references/*.md"))
     return sorted({path for path in files if path.exists()})
 
 
@@ -131,7 +142,15 @@ def check_markdown_paths() -> list[str]:
 def check_skill_frontmatter() -> list[str]:
     """Validate required skill metadata."""
     errors: list[str] = []
-    for skill_path in sorted(SKILLS_ROOT.glob("*/SKILL.md")):
+    skill_paths = [
+        REPO_ROOT / line
+        for line in subprocess.check_output(
+            ["git", "ls-files", ".agents/skills/*/SKILL.md"],
+            cwd=REPO_ROOT,
+            text=True,
+        ).splitlines()
+    ]
+    for skill_path in sorted(skill_paths):
         rel = skill_path.relative_to(REPO_ROOT).as_posix()
         text = skill_path.read_text(encoding="utf-8")
         match = FRONTMATTER_RE.match(text)
@@ -241,12 +260,40 @@ def check_expected_scripts() -> list[str]:
         "scripts/validate_agent_memory.py",
         "scripts/validate_agent_scaffold.py",
         ".agents/scripts/agents_db.py",
+        ".codex/config.toml",
+        ".codex/hooks.json",
+        ".codex/hooks/run_make_context_clean.sh",
     ]
     return [
         f"missing expected helper: {path}"
         for path in required
         if not (REPO_ROOT / path).exists()
     ]
+
+
+def check_codex_hooks() -> list[str]:
+    """Validate active Codex hook config files."""
+    errors: list[str] = []
+    config_path = REPO_ROOT / ".codex" / "config.toml"
+    hooks_path = REPO_ROOT / ".codex" / "hooks.json"
+    try:
+        config = _load_db(config_path)
+    except tomllib.TOMLDecodeError as exc:
+        errors.append(f".codex/config.toml: invalid TOML: {exc}")
+    else:
+        features = config.get("features", {})
+        if not isinstance(features, dict) or features.get("codex_hooks") is not True:
+            errors.append(".codex/config.toml: expected [features].codex_hooks = true")
+
+    try:
+        data = json.loads(hooks_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        errors.append(f".codex/hooks.json: invalid JSON: {exc}")
+    else:
+        hooks = data.get("hooks")
+        if not isinstance(hooks, dict) or "SessionStart" not in hooks:
+            errors.append(".codex/hooks.json: expected a SessionStart hook")
+    return errors
 
 
 def main() -> int:
@@ -257,6 +304,7 @@ def main() -> int:
         *check_markdown_paths(),
         *check_skill_frontmatter(),
         *check_agent_db(),
+        *check_codex_hooks(),
     ]
     if not errors:
         print("agent scaffold validation passed")

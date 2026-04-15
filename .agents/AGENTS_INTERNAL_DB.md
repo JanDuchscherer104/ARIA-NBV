@@ -20,8 +20,10 @@ package documentation.
 - Durable subsystem ownership belongs in local README/REQUIREMENTS files when
   that prevents `AGENTS.md` bloat.
 - GitNexus is optional; mandatory GitNexus policy belongs outside root guidance.
-- Codex hook examples are inactive templates under
-  `.agents/references/codex_hook_templates/`, not active `.codex/hooks.json`.
+- `.codex/hooks.json` owns the active startup hook that runs `make context` for
+  new Codex sessions.
+- Guardrail hook examples remain inactive templates under
+  `.agents/references/codex_hook_templates/`.
 - Published agent-scaffold docs are generated from canonical markdown by
   `scripts/quarto_generate_agent_docs.py`.
 

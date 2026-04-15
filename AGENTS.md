@@ -31,7 +31,9 @@ scoring, and advisor-facing Quarto/Typst reporting.
 - `aria_nbv/`: Python package workspace, configs, CLIs, and tests.
 - `docs/`: Quarto docs, Typst paper/slides, figures, and bibliography.
 - `.agents/`: repo-local skills, memory, references, active agent DB, and
-  inactive hook templates.
+  inactive guardrail hook templates.
+- `.codex/`: trusted-project Codex config and startup hook that refreshes
+  lightweight context for new sessions.
 - `scripts/`: stable repo-level helper wrappers and validators.
 - `docs/_generated/context/`: generated routing artifacts; refresh instead of
   editing by hand.
@@ -94,8 +96,9 @@ scoring, and advisor-facing Quarto/Typst reporting.
   `.agents/references/agent_memory_templates.md`.
 - Agent/tooling debt is tracked in `.agents/issues.toml`, `.agents/todos.toml`,
   and `.agents/resolved.toml`; inspect it with `make agents-db`.
-- Do not recreate `.codex` as a task-notes bucket. Inactive Codex hook templates
-  live under `.agents/references/codex_hook_templates/`.
+- Do not recreate `.codex` as a task-notes bucket. The tracked `.codex` surface
+  is reserved for repo-local Codex config and startup hooks. Inactive guardrail
+  hook templates live under `.agents/references/codex_hook_templates/`.
 
 ## Optional Tools
 - GitNexus is optional in this Codex scaffold. If available, use the optional
