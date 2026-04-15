@@ -59,8 +59,18 @@ lit_bib_count="$(count_files '*.bib' "${ROOT_DIR}/literature")"
 lit_family_count="$(count_immediate_dirs "${ROOT_DIR}/literature/tex-src")"
 py_count="$(count_files '*.py' "${ROOT_DIR}/aria_nbv/aria_nbv")"
 ref_count="$(count_files '*.md' "${ROOT_DIR}/.agents/references")"
+skill_count="$(count_files 'SKILL.md' "${ROOT_DIR}/.agents/skills")"
 memory_state_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/state")"
 memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")"
+local_agents_count="$(
+  find "${ROOT_DIR}" \
+    -path "${ROOT_DIR}/.git" -prune -o \
+    -path "${ROOT_DIR}/.agents/archive" -prune -o \
+    -path "${ROOT_DIR}/aria_nbv/.venv" -prune -o \
+    -name AGENTS.md -type f -print \
+    | wc -l \
+    | tr -d ' '
+)"
 
 {
   echo "# Context Sources Index"
@@ -72,10 +82,12 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "1. Fixed ground truth: docs/typst/paper/main.typ"
   echo "2. Canonical current truth: .agents/memory/state/{PROJECT_STATE,DECISIONS,OPEN_QUESTIONS,GOTCHAS}.md"
   echo "3. Compact routing index: docs/_generated/context/source_index.md"
-  echo "4. On-demand references: .agents/references/{operator_quick_reference,python_conventions,agent_memory_templates,context7_library_ids}.md"
-  echo "5. Checked-in routing map: .agents/skills/aria-nbv-context/references/context_map.md"
-  echo "6. Lightweight refresh: make context"
-  echo "7. Heavyweight fallback: make context-heavy"
+  echo "4. Deepest relevant path-local AGENTS.md once the task is localized"
+  echo "5. On-demand references: .agents/references/{operator_quick_reference,python_conventions,agent_memory_templates,context7_library_ids}.md"
+  echo "6. Narrow skills: aria-nbv-docs-context, aria-nbv-code-context, aria-nbv-scaffold-maintenance"
+  echo "7. Checked-in routing map: .agents/skills/aria-nbv-context/references/context_map.md"
+  echo "8. Lightweight refresh: make context"
+  echo "9. Heavyweight fallback: make context-heavy"
   echo
   echo "## Hot-path bundle"
   echo "- docs/typst/paper/main.typ"
@@ -84,6 +96,16 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "- .agents/memory/state/OPEN_QUESTIONS.md"
   echo "- .agents/memory/state/GOTCHAS.md"
   echo "- docs/_generated/context/source_index.md"
+  echo
+  echo "## Path-local boundary guides"
+  find "${ROOT_DIR}" \
+    -path "${ROOT_DIR}/.git" -prune -o \
+    -path "${ROOT_DIR}/.agents/archive" -prune -o \
+    -path "${ROOT_DIR}/aria_nbv/.venv" -prune -o \
+    -name AGENTS.md -type f -print \
+    | relpath \
+    | sort \
+    | sed 's#^#- #'
   echo
   echo "## Lightweight refresh"
   echo "- \`make context\` refreshes \`source_index.md\`, \`literature_index.md\`, and \`data_contracts.md\`."
@@ -96,6 +118,8 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "| Canonical state | ${memory_state_count} docs | You need current truth, conventions, or decisions | Open the relevant doc in \`.agents/memory/state/\` |"
   echo "| Agent history | ${memory_history_count} docs | The task is historical, comparative, or evidence-driven | \`rg -n \"<term>\" .agents/memory/history\` |"
   echo "| Agent references | ${ref_count} docs | You need conventions, templates, or external-doc lookup ids | Open \`python_conventions.md\` or the specific reference doc |"
+  echo "| Repo skills | ${skill_count} skills | You need a workflow beyond nearest AGENTS guidance | Open the relevant \`.agents/skills/*/SKILL.md\` |"
+  echo "| Path-local AGENTS | ${local_agents_count} files | You are editing a localized subtree | Open the deepest matching \`AGENTS.md\` |"
   echo "| Quarto docs | ${qmd_count} files | You need implementation narrative, roadmap, or explainer docs | \`scripts/nbv_qmd_outline.sh --compact\` |"
   echo "| Typst paper | ${typst_paper_count} files | You need the authoritative research narrative | \`scripts/nbv_typst_includes.py --paper --mode outline\` |"
   echo "| Typst slides/shared | $((typst_slides_count + typst_shared_count)) files | The task explicitly touches slides or shared macros | \`scripts/nbv_typst_includes.py --with-slides --mode outline\` |"
@@ -118,6 +142,11 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "- .agents/skills/aria-nbv-context/references/context_map.md"
   echo "- .agents/references/agent_memory_templates.md"
   echo "- .agents/references/context7_library_ids.md"
+  echo "- .agents/references/gitnexus_optional.md"
+  echo "- .agents/references/codex_hooks.md"
+  echo "- .agents/AGENTS_INTERNAL_DB.md"
+  echo "- .agents/issues.toml"
+  echo "- .agents/todos.toml"
   echo "- docs/index.qmd"
   echo "- docs/contents/todos.qmd"
   echo

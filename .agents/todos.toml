@@ -1,0 +1,31 @@
+[[todos]]
+id = "TODO-0001"
+title = "Validate whether inactive Codex hook templates should be activated"
+status = "pending"
+priority = "low"
+issue_ids = [
+    "ISSUE-0001",
+]
+loc_min = 15
+loc_expected = 40
+loc_max = 90
+files = [
+    ".agents/references/codex_hook_templates/",
+    ".agents/references/codex_hooks.md",
+]
+acceptance = [
+    "Hook templates have been exercised in a trusted Codex session.",
+    "Noise level and false-positive behavior are documented.",
+    "A decision is recorded to keep templates inactive, revise them, or activate them through `.codex/hooks.json`.",
+]
+sources = [
+    "https://developers.openai.com/codex/hooks",
+]
+
+[meta]
+schema_version = 2
+repo = "NBV"
+updated_on = "2026-04-15"
+source = "Seeded during the first Aria-NBV agent scaffold refactor."
+active_collection = "todos"
+loc_unit = "lines"

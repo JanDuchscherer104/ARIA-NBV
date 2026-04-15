@@ -3,8 +3,8 @@
 .PHONY: context-qmd-tree
 .PHONY: context-index context-get context-contracts context-modules context-classes context-functions
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
-.PHONY: context-literature-index context-literature-search migrate-codex-memory
-.PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory
+.PHONY: context-literature-index context-literature-search
+.PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory check-agent-scaffold agents-db
 
 # Color codes
 BLUE := \033[0;34m
@@ -33,7 +33,6 @@ VENV_PYTHON ?= $(CURDIR)/aria_nbv/.venv/bin/python
 PYTHON_INTERPRETER ?= $(VENV_PYTHON)
 FORCE_ACTIV_CONDA_ENV ?= 0  # set to 1 only if you insist on the old conda env check
 CONDA_ENV_NAME ?= aria-nbv       # legacy: expected conda env name
-QMD_FORMATTER := scripts/format_qmd_lists.py
 CONTEXT_DIR ?= docs/_generated/context
 CONTEXT_OUT ?= $(CONTEXT_DIR)/context_snapshot.md
 CONTEXT_INDEX_OUT ?= $(CONTEXT_DIR)/source_index.md
@@ -51,7 +50,8 @@ QMD_OUTLINE_ARGS ?= --compact
 TYPST_OUTLINE_ARGS ?= --paper --mode outline
 TYPST_INCLUDES_ARGS ?= --paper --mode includes
 LITERATURE_SEARCH_QUERY ?=
-MIGRATE_CODEX_MEMORY_ARGS ?=
+AGENTS_DB_ARGS ?= rank
+PRE_COMMIT ?= pre-commit
 MMDC ?= mmdc
 MMD_DIR ?= external/mmdc-examples
 MMD_OUT ?= $(MMD_DIR)
@@ -111,10 +111,10 @@ context-qmd-outline: _check_python ## 🗺️ Outline Quarto pages (QMD_OUTLINE_
 	@./scripts/nbv_qmd_outline.sh $(QMD_OUTLINE_ARGS)
 
 context-typst-outline: _check_python ## 🗺️ Outline Typst paper/slides (TYPST_OUTLINE_ARGS='--paper --mode outline')
-	@$(PYTHON_INTERPRETER) ./scripts/nbv_typst_includes.py $(TYPST_OUTLINE_ARGS)
+	@$(PYTHON_INTERPRETER) scripts/nbv_typst_includes.py $(TYPST_OUTLINE_ARGS)
 
 context-typst-includes: _check_python ## 🗺️ Print Typst include edges (TYPST_INCLUDES_ARGS='--paper --mode includes')
-	@$(PYTHON_INTERPRETER) ./scripts/nbv_typst_includes.py $(TYPST_INCLUDES_ARGS)
+	@$(PYTHON_INTERPRETER) scripts/nbv_typst_includes.py $(TYPST_INCLUDES_ARGS)
 
 context-literature-index: ## 🗺️ Regenerate docs/_generated/context/literature_index.md
 	@./scripts/nbv_literature_index.sh "$(LITERATURE_INDEX_OUT)"
@@ -126,11 +126,14 @@ context-literature-search: ## 🗺️ Search literature sources (set LITERATURE_
 	fi
 	@./scripts/nbv_literature_search.sh "$(LITERATURE_SEARCH_QUERY)"
 
-migrate-codex-memory: _check_python ## 🗺️ Migrate legacy .codex notes into .agents/memory
-	@$(PYTHON_INTERPRETER) scripts/migrate_codex_memory.py $(MIGRATE_CODEX_MEMORY_ARGS)
-
 check-agent-memory: _check_python ## 🗺️ Validate agent memory scaffolding and debrief hygiene
 	@$(PYTHON_INTERPRETER) scripts/validate_agent_memory.py
+
+check-agent-scaffold: _check_python ## 🗺️ Validate maintained agent scaffold surfaces
+	@$(PYTHON_INTERPRETER) scripts/validate_agent_scaffold.py
+
+agents-db: _check_python ## 🗺️ Inspect or resolve local agent/tooling debt (AGENTS_DB_ARGS='rank')
+	@$(PYTHON_INTERPRETER) .agents/scripts/agents_db.py $(AGENTS_DB_ARGS)
 
 context: _check_python ## 🗺️ Refresh lightweight context artifacts (source index, literature index, data contracts)
 	@bash -lc 'set -euo pipefail; \
@@ -164,15 +167,7 @@ context-uml: _check_python ## 🗺️ Generate aria_nbv UML artifacts without pr
 		mermaid_tmp="$$(mktemp)"; \
 		mermaid_filtered="$$(mktemp)"; \
 		$(PYTHON_INTERPRETER) -m syrenka classdiagram aria_nbv/aria_nbv > "$$mermaid_tmp"; \
-		exclude_list="$(CONTEXT_MERMAID_EXCLUDE)"; \
-		if [[ -z "$$exclude_list" ]]; then \
 			cp "$$mermaid_tmp" "$$mermaid_filtered"; \
-		else \
-			$(PYTHON_INTERPRETER) scripts/filter_mermaid.py \
-				--input "$$mermaid_tmp" \
-				--output "$$mermaid_filtered" \
-				--exclude "$$exclude_list"; \
-		fi; \
 		cp "$$mermaid_tmp" "$$uml_out"; \
 		cp "$$mermaid_filtered" "$$uml_filtered_out"; \
 		rm -f "$$mermaid_tmp" "$$mermaid_filtered"; \
@@ -350,9 +345,7 @@ mmdc-render: ## 📊 Render all .mmd files in a folder (MMD_DIR=..., MMD_OUT=...
 #  ═══════════════════════════════════════════════════════════════════════
 
 .PHONY: docs-lint
-docs-lint: _check_python ## Format QMD lists, then run Quarto checks
-	@echo "$(BLUE)Formatting QMD list spacing…$(NC)"
-	@$(PYTHON_INTERPRETER) $(QMD_FORMATTER) $(DOCS_DIR)
+docs-lint: _check_python ## Run Quarto checks
 	@echo "$(BLUE)Running Quarto check…$(NC)"
 	@quarto check
 

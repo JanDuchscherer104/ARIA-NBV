@@ -1,6 +1,6 @@
 ---
 id: gotchas
-updated: 2026-03-30
+updated: 2026-04-15
 scope: repo
 owner: jan
 status: active
@@ -14,6 +14,8 @@ tags: [workflow, training, cache, frames]
 - Assume the environment is working unless the user indicates otherwise, but verify the exact interpreter before concluding a dependency problem.
 - `make context` refreshes the lightweight routing artifacts only; use targeted search on `source_index.md`, `literature_index.md`, and `data_contracts.md` instead of loading broad dumps.
 - `make context-heavy` and the `context-uml`, `context-docstrings`, or `context-tree` targets are explicit fallback tools for architecture or refactor tasks.
+- Use `make check-agent-scaffold` for agent guidance, skill, hook-template, context-helper, publication-generator, or `.agents` DB changes. `make check-agent-memory` is intentionally narrower.
+- Codex hook templates in `.agents/references/codex_hook_templates/` are inactive examples. Do not assume they run unless copied into an active `.codex/hooks.json` and enabled in a trusted Codex config.
 
 ## Training and Validation
 - Validation is disabled by default unless `trainer_config.enable_validation=true`; otherwise Lightning forces `limit_val_batches=0` and `check_val_every_n_epoch=0`.

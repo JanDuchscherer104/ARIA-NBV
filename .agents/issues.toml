@@ -1,0 +1,25 @@
+[[issues]]
+id = "ISSUE-0001"
+title = "Codex hook templates are inactive until validated"
+status = "open"
+priority = "low"
+category = "hooks"
+summary = "NBV now carries inactive Codex hook templates, but they should remain opt-in until a future pass validates noise level and behavior in trusted sessions."
+files = [
+    ".agents/references/codex_hooks.md",
+    ".agents/references/codex_hook_templates/hooks.template.json",
+]
+notes = [
+    "Hooks are experimental and Bash-focused today.",
+    "The repo intentionally does not add active `.codex/hooks.json` in the first scaffold refactor wave.",
+]
+sources = [
+    "https://developers.openai.com/codex/hooks",
+]
+
+[meta]
+schema_version = 2
+repo = "NBV"
+updated_on = "2026-04-15"
+source = "Seeded during the first Aria-NBV agent scaffold refactor."
+active_collection = "issues"

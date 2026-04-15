@@ -1,0 +1,28 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: trailing-whitespace
+        exclude: ^(\.agents/archive/|\.agents/memory/history/2026/01/|docs/literature/|docs/contents/ext-impl/|docs/contents/literature/)
+
+  - repo: local
+    hooks:
+      - id: check-agent-scaffold
+        name: check agent scaffold
+        entry: make check-agent-scaffold
+        language: system
+        pass_filenames: false
+      - id: ruff-check
+        name: ruff check aria_nbv
+        entry: uv run --project aria_nbv --extra dev ruff check
+        language: system
+        files: ^aria_nbv/.*\.py$
+        exclude: ^aria_nbv/(aria_nbv/data_handling/efm_dataset_utils\.py|aria_nbv/vin/vin_utils\.py|scripts/fix_vin_snippet_lengths\.py|tests/app/panels/test_optuna_sweep_panel\.py|tests/app/panels/test_vin_bin_values_tab\.py|tests/app/panels/test_wandb_panel\.py|tests/interpretability/test_attribution\.py|tests/lightning/test_optuna_integration\.py|tests/lightning/test_wandb_logging\.py|tests/utils/test_plotting_utils\.py|tests/views/test_candidate_generation\.py|tests/vin/test_coral\.py|tests/vin/test_learnable_fourier_features\.py|tests/vin/test_vin_v2_global_pool\.py)$
+      - id: ruff-format
+        name: ruff format aria_nbv
+        entry: uv run --project aria_nbv --extra dev ruff format --check
+        language: system
+        files: ^aria_nbv/.*\.py$
+        exclude: ^aria_nbv/aria_nbv/vin/vin_utils\.py$
