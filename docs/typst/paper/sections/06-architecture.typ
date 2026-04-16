@@ -58,7 +58,7 @@ derive the unknown mask and a new-surface prior as
 #block[#align(center)[#eqs.vin.new_surface_prior]]
 
 When EVL does not provide free-space evidence, we derive it as
-$ #symb.vin.free_in = #symb.vin.observed dot.o (1 - #symb.vin.occ_in) $
+$ #symb.vin.free_in = #symb.vin.observed dot.op (1 - #symb.vin.occ_in) $
 (observed mask times empty occupancy). The final scene field is then
 $#symb.vin.field_v = phi("Conv"_(1 times 1 times 1)(#(symb.vin.field_v)^("in"))) in bb(R)^(#symb.shape.B times #symb.shape.Ffield times #symb.shape.Vvox times #symb.shape.Vvox times #symb.shape.Vvox)$,
 implemented as `Conv3d + GroupNorm + GELU` @GroupNorm-wu2018.
