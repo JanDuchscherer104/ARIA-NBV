@@ -25,7 +25,9 @@ the nearest `AGENTS.md` or narrower skill.
   `aria-nbv-scaffold-maintenance`.
 
 ## Commands
-- Refresh lightweight context: `make context`
+- Startup hook normally refreshes lightweight context via `make context`.
+- Run `make context` manually only after changing routing or scaffold inputs, or
+  when the generated context appears stale.
 - Inspect source families: `docs/_generated/context/source_index.md`
 - Heavy fallback only when needed: `make context-heavy`
 

@@ -86,8 +86,9 @@ local_agents_count="$(
   echo "5. On-demand references: .agents/references/{operator_quick_reference,python_conventions,agent_memory_templates,context7_library_ids}.md"
   echo "6. Narrow skills: aria-nbv-docs-context, aria-nbv-code-context, aria-nbv-scaffold-maintenance"
   echo "7. Checked-in routing map: .agents/skills/aria-nbv-context/references/context_map.md"
-  echo "8. Lightweight refresh: make context"
-  echo "9. Heavyweight fallback: make context-heavy"
+  echo "8. Startup hook refreshes the lightweight context bundle for new trusted Codex sessions"
+  echo "9. Manual refresh after scaffold or routing edits: make context"
+  echo "10. Heavyweight fallback: make context-heavy"
   echo
   echo "## Hot-path bundle"
   echo "- docs/typst/paper/main.typ"
@@ -96,6 +97,8 @@ local_agents_count="$(
   echo "- .agents/memory/state/OPEN_QUESTIONS.md"
   echo "- .agents/memory/state/GOTCHAS.md"
   echo "- docs/_generated/context/source_index.md"
+  echo "- docs/_generated/context/literature_index.md"
+  echo "- docs/_generated/context/data_contracts.md"
   echo
   echo "## Path-local boundary guides"
   find "${ROOT_DIR}" \
@@ -108,7 +111,8 @@ local_agents_count="$(
     | sed 's#^#- #'
   echo
   echo "## Lightweight refresh"
-  echo "- \`make context\` refreshes \`source_index.md\`, \`literature_index.md\`, and \`data_contracts.md\`."
+  echo "- New trusted Codex sessions normally start with hook-refreshed \`source_index.md\`, \`literature_index.md\`, and \`data_contracts.md\`."
+  echo "- Run \`make context\` manually after routing or scaffold edits, when hooks are disabled, or when generated context appears stale."
   echo "- Prefer \`make context-contracts\` or \`scripts/nbv_get_context.sh contracts\` before opening \`docs/_generated/context/data_contracts.md\`."
   echo "- Use \`make context-heavy\` only for bundled heavy fallback artifacts."
   echo

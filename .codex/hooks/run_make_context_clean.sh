@@ -12,8 +12,7 @@ output="$(make context 2>&1 | strip_ansi)"
 cat <<'EOF'
 Aria-NBV startup context refresh completed.
 
-The hook ran `make context` and refreshed the lightweight generated context
-bundle under `docs/_generated/context/`:
+Refreshed files under `docs/_generated/context/`:
 
 - `source_index.md`: source-family routing map, hot-path files, local AGENTS.md
   guide inventory, preferred reveal commands, and search recipes.
@@ -21,10 +20,11 @@ bundle under `docs/_generated/context/`:
   families, TeX/BibTeX inputs, and literature-search entrypoints.
 - `data_contracts.md`: generated AST summary of Aria-NBV data/config contract
   surfaces, typed containers, factories, and key package-boundary objects.
-
-Use these files to localize tasks before opening broad docs, source trees, or
-heavy generated context. Use `make context-heavy` only when lightweight routing
-is insufficient.
 EOF
 
-printf '\nRaw refresh output:\n%s\n' "$output"
+if grep -q "^Wrote:" <<<"$output"; then
+  exit 0
+fi
+
+printf 'Context refresh produced unexpected output:\n%s\n' "$output" >&2
+exit 1

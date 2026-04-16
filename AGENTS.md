@@ -2,7 +2,7 @@
 
 This repository develops Aria-NBV: an active next-best-view research stack for
 egocentric indoor reconstruction, RRI oracle supervision, VIN-style candidate
-scoring, and advisor-facing Quarto/Typst reporting.
+scoring.
 
 ## Sources Of Truth
 - `AGENTS.md`: repo-wide agent policy and routing only. Nested `AGENTS.md`
@@ -17,10 +17,15 @@ scoring, and advisor-facing Quarto/Typst reporting.
 - The nearest nested `AGENTS.md` overrides this file for its subtree.
 
 ## Start Here
-- If scaffold routing may be stale, run `make context`.
+- New trusted Codex sessions run the repo startup hook, which refreshes the
+  lightweight generated context bundle under `docs/_generated/context/`.
 - Default bootstrap is `docs/typst/paper/main.typ`,
-  `.agents/memory/state/PROJECT_STATE.md`, and
-  `docs/_generated/context/source_index.md`.
+  `.agents/memory/state/PROJECT_STATE.md`, and the refreshed generated context:
+  `docs/_generated/context/source_index.md`,
+  `docs/_generated/context/literature_index.md`, and
+  `docs/_generated/context/data_contracts.md`.
+- Run `make context` manually only after changing routing or scaffold inputs,
+  when hooks are disabled, or when the generated context appears stale.
 - Use `aria_nbv/AGENTS.md` for Python package work and `docs/AGENTS.md` for
   documentation work.
 - Use a narrower repo skill when discovery is not already localized:
@@ -82,7 +87,7 @@ scoring, and advisor-facing Quarto/Typst reporting.
   `make check-agent-scaffold`.
 - Canonical memory or debrief-only changes: run `make check-agent-memory`.
 - Context routing changes: run `make context` and the specific touched context
-  target when applicable.
+  target after edits when applicable.
 - Python/package changes under `aria_nbv/`: run `ruff format <file>`,
   `ruff check <file>`, and targeted `uv run pytest <path>` from the package
   workspace.
