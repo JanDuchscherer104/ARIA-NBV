@@ -1,0 +1,40 @@
+name: Backlog Item
+description: Structured ARIA-NBV issue for backlog-driven work
+title: "[ISSUE-xxxx] "
+labels:
+  - backlog
+body:
+  - type: textarea
+    id: target
+    attributes:
+      label: Target
+    validations:
+      required: true
+  - type: textarea
+    id: current_problem
+    attributes:
+      label: Current problem
+    validations:
+      required: true
+  - type: textarea
+    id: required_change
+    attributes:
+      label: Required change
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Test expectations
+    validations:
+      required: true
+  - type: textarea
+    id: local_ids
+    attributes:
+      label: Related local IDs

@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Issue Lifecycle"
+  short_description: "Create, sync, and resolve ARIA-NBV GitHub issues"
+  default_prompt: "Use $gh-issue-lifecycle to create, sync, triage, or resolve ARIA-NBV GitHub issues from the local .agents backlog."

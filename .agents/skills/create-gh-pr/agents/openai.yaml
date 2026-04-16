@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create GitHub PR"
+  short_description: "Write or update ARIA-NBV pull requests"
+  default_prompt: "Use $create-gh-pr to write or update an ARIA-NBV pull request with reviewer-friendly work packages and explicit validation notes."
