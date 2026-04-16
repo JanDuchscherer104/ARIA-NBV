@@ -6,6 +6,7 @@ from .candidates import render_candidates_page
 from .data import render_data_page
 from .depth import render_depth_page
 from .offline_stats import render_offline_stats_page
+from .rl import render_rl_page
 from .rri import render_rri_page
 from .rri_binning import render_rri_binning_page
 from .testing_attribution import render_testing_attribution_page
@@ -17,6 +18,7 @@ __all__ = [
     "render_data_page",
     "render_depth_page",
     "render_offline_stats_page",
+    "render_rl_page",
     "render_rri_binning_page",
     "render_rri_page",
     "render_vin_diagnostics_page",

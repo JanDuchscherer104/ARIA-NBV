@@ -22,6 +22,7 @@ from .panels import (
     render_data_page,
     render_depth_page,
     render_offline_stats_page,
+    render_rl_page,
     render_rri_binning_page,
     render_rri_page,
     render_testing_attribution_page,
@@ -359,6 +360,15 @@ class NbvStreamlitApp:
 
             render_rri_page(sample, depths, pcs, rri)
 
+        def _page_rl() -> None:
+            sample = controller.get_sample(force=False)
+            store_state(state)
+            render_rl_page(
+                sample,
+                labeler_cfg=state.labeler_cfg,
+                panel_cfg=self.config.rl,
+            )
+
         def _page_vin() -> None:
             render_vin_diagnostics_page()
 
@@ -377,21 +387,25 @@ class NbvStreamlitApp:
         def _page_optuna_sweep() -> None:
             render_optuna_sweep_page()
 
-        st.navigation(
+        pages = [
+            st.Page(_page_data, title="Data", default=True),
+            st.Page(_page_candidates, title="Candidate Poses"),
+            st.Page(_page_renders, title="Candidate Renders"),
+            st.Page(_page_rri, title="RRI"),
+        ]
+        if self.config.rl.enabled:
+            pages.append(st.Page(_page_rl, title="RL Inspector"))
+        pages.extend(
             [
-                st.Page(_page_data, title="Data", default=True),
-                st.Page(_page_candidates, title="Candidate Poses"),
-                st.Page(_page_renders, title="Candidate Renders"),
-                st.Page(_page_rri, title="RRI"),
                 st.Page(_page_vin, title="VIN Diagnostics"),
                 st.Page(_page_wandb, title="W&B Analysis"),
                 st.Page(_page_optuna_sweep, title="Optuna Sweep"),
                 st.Page(_page_testing_attr, title="Testing & Attribution"),
                 st.Page(_page_rri_binning, title="RRI Binning"),
                 st.Page(_page_offline_stats, title="Offline Stats"),
-            ],
-            position="top",
-        ).run()
+            ]
+        )
+        st.navigation(pages, position="top").run()
 
 
 # Resolve forward refs now that NbvStreamlitApp is defined
