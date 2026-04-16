@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.agents/references/codex_hook_templates/pre_tool_use_policy.py\"",
+            "statusMessage": "Checking NBV shell guardrails"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.agents/references/codex_hook_templates/post_tool_use_scaffold.py\"",
+            "statusMessage": "Reviewing NBV scaffold command"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.agents/references/codex_hook_templates/stop_scaffold_check.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

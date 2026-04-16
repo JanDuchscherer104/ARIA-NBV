@@ -23,4 +23,4 @@ Use these library IDs with the Context7 MCP tools when external library document
 - `/zarr-developers/zarr-python` - Zarr Python. Used for dense numeric shard storage in the immutable VIN offline dataset format.
 
 ## Project-Specific Note
-For EFM3D, ATEK, and Project Aria tools, prefer the vendored source under `external/` and the symbol notes in `docs/contents/ext-impl/` / `docs/contents/impl/efm3d_symbol_index.qmd` before broad external lookup.
+For EFM3D, ATEK, and Project Aria tools, prefer the vendored source under `external/` and the symbol notes in `docs/contents/ext-impl/` before broad external lookup.

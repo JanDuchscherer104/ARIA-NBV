@@ -56,12 +56,68 @@ DOC_SPECS: tuple[DocSpec, ...] = (
         summary="Package-level implementation, verification, and config-factory rules.",
     ),
     DocSpec(
+        source="aria_nbv/aria_nbv/app/AGENTS.md",
+        output="contents/resources/agent_scaffold/instructions/app_guidance.qmd",
+        title="App Guidance",
+        section="Instructions",
+        nav_label="App Guidance",
+        summary="Streamlit app, panel, state, and UI guidance.",
+    ),
+    DocSpec(
+        source="aria_nbv/aria_nbv/configs/AGENTS.md",
+        output="contents/resources/agent_scaffold/instructions/configs_guidance.qmd",
+        title="Config Guidance",
+        section="Instructions",
+        nav_label="Config Guidance",
+        summary="Persistent config, path, W&B, and Optuna guidance.",
+    ),
+    DocSpec(
         source="aria_nbv/aria_nbv/data_handling/AGENTS.md",
         output="contents/resources/agent_scaffold/instructions/data_handling_boundary.qmd",
         title="Data Handling Boundary",
         section="Instructions",
         nav_label="Data Handling Boundary",
         summary="Contracts and verification rules for the typed data-handling surface.",
+    ),
+    DocSpec(
+        source="aria_nbv/aria_nbv/lightning/AGENTS.md",
+        output="contents/resources/agent_scaffold/instructions/lightning_guidance.qmd",
+        title="Lightning Guidance",
+        section="Instructions",
+        nav_label="Lightning Guidance",
+        summary="Training experiment, datamodule, module, trainer, and CLI guidance.",
+    ),
+    DocSpec(
+        source="aria_nbv/aria_nbv/pipelines/AGENTS.md",
+        output="contents/resources/agent_scaffold/instructions/pipelines_guidance.qmd",
+        title="Pipeline Guidance",
+        section="Instructions",
+        nav_label="Pipeline Guidance",
+        summary="Pipeline entrypoint and oracle-labeler orchestration guidance.",
+    ),
+    DocSpec(
+        source="aria_nbv/aria_nbv/pose_generation/AGENTS.md",
+        output="contents/resources/agent_scaffold/instructions/pose_generation_guidance.qmd",
+        title="Pose Generation Guidance",
+        section="Instructions",
+        nav_label="Pose Generation Guidance",
+        summary="Candidate generation, feasibility, orientation, and counterfactual pose guidance.",
+    ),
+    DocSpec(
+        source="aria_nbv/aria_nbv/rendering/AGENTS.md",
+        output="contents/resources/agent_scaffold/instructions/rendering_guidance.qmd",
+        title="Rendering Guidance",
+        section="Instructions",
+        nav_label="Rendering Guidance",
+        summary="Depth rendering, unprojection, point-cloud, and diagnostic guidance.",
+    ),
+    DocSpec(
+        source="aria_nbv/aria_nbv/rl/AGENTS.md",
+        output="contents/resources/agent_scaffold/instructions/rl_guidance.qmd",
+        title="RL Guidance",
+        section="Instructions",
+        nav_label="RL Guidance",
+        summary="Discrete-shell RL and counterfactual environment guidance.",
     ),
     DocSpec(
         source="aria_nbv/aria_nbv/rri_metrics/AGENTS.md",
@@ -78,6 +134,14 @@ DOC_SPECS: tuple[DocSpec, ...] = (
         section="Instructions",
         nav_label="VIN Boundary",
         summary="Guidance for scorer inputs, batch contracts, and VIN-facing frame semantics.",
+    ),
+    DocSpec(
+        source="docs/typst/paper/AGENTS.md",
+        output="contents/resources/agent_scaffold/instructions/typst_paper_guidance.qmd",
+        title="Typst Paper Guidance",
+        section="Instructions",
+        nav_label="Typst Paper Guidance",
+        summary="Paper-specific Typst and manuscript guidance.",
     ),
     DocSpec(
         source=".agents/memory/README.md",
@@ -152,12 +216,52 @@ DOC_SPECS: tuple[DocSpec, ...] = (
         summary="Canonical frontmatter and body templates for native debrief records.",
     ),
     DocSpec(
+        source=".agents/references/gitnexus_optional.md",
+        output="contents/resources/agent_scaffold/references/gitnexus_optional.qmd",
+        title="Optional GitNexus Workflow",
+        section="References",
+        nav_label="Optional GitNexus Workflow",
+        summary="Optional GitNexus workflow and fallback impact-analysis guidance.",
+    ),
+    DocSpec(
+        source=".agents/references/codex_hooks.md",
+        output="contents/resources/agent_scaffold/references/codex_hooks.qmd",
+        title="Codex Hook Templates",
+        section="References",
+        nav_label="Codex Hook Templates",
+        summary="Inactive hook-template guidance and activation notes.",
+    ),
+    DocSpec(
         source=".agents/skills/aria-nbv-context/SKILL.md",
         output="contents/resources/agent_scaffold/skills/aria_nbv_context_skill.qmd",
         title="aria-nbv-context Skill",
         section="Skills & Routing",
         nav_label="aria-nbv-context Skill",
-        summary="Discovery-and-routing skill for localizing tasks across paper, docs, memory, and code.",
+        summary="Lightweight repo-routing entrypoint for broad tasks.",
+    ),
+    DocSpec(
+        source=".agents/skills/aria-nbv-docs-context/SKILL.md",
+        output="contents/resources/agent_scaffold/skills/aria_nbv_docs_context_skill.qmd",
+        title="aria-nbv-docs-context Skill",
+        section="Skills & Routing",
+        nav_label="aria-nbv-docs-context Skill",
+        summary="Docs, Typst, Quarto, bibliography, and literature context workflow.",
+    ),
+    DocSpec(
+        source=".agents/skills/aria-nbv-code-context/SKILL.md",
+        output="contents/resources/agent_scaffold/skills/aria_nbv_code_context_skill.qmd",
+        title="aria-nbv-code-context Skill",
+        section="Skills & Routing",
+        nav_label="aria-nbv-code-context Skill",
+        summary="Python package contract and symbol-localization workflow.",
+    ),
+    DocSpec(
+        source=".agents/skills/aria-nbv-scaffold-maintenance/SKILL.md",
+        output="contents/resources/agent_scaffold/skills/aria_nbv_scaffold_maintenance_skill.qmd",
+        title="aria-nbv-scaffold-maintenance Skill",
+        section="Skills & Routing",
+        nav_label="aria-nbv-scaffold-maintenance Skill",
+        summary="Agent scaffold maintenance, validation, hooks, and DB workflow.",
     ),
     DocSpec(
         source=".agents/skills/aria-nbv-context/references/context_map.md",
@@ -167,6 +271,38 @@ DOC_SPECS: tuple[DocSpec, ...] = (
         nav_label="Context Map",
         summary="Concept-to-source routing map for the maintained scaffold surfaces.",
     ),
+    DocSpec(
+        source=".agents/AGENTS_INTERNAL_DB.md",
+        output="contents/resources/agent_scaffold/db/agents_internal_db.qmd",
+        title="AGENTS Internal Database",
+        section="Agent DB",
+        nav_label="AGENTS Internal DB",
+        summary="Stable agent-scaffold facts and DB scope.",
+    ),
+    DocSpec(
+        source=".agents/issues.toml",
+        output="contents/resources/agent_scaffold/db/issues.qmd",
+        title="Agent Issues",
+        section="Agent DB",
+        nav_label="Agent Issues",
+        summary="Active agent/tooling issues tracked by the local DB.",
+    ),
+    DocSpec(
+        source=".agents/todos.toml",
+        output="contents/resources/agent_scaffold/db/todos.qmd",
+        title="Agent Todos",
+        section="Agent DB",
+        nav_label="Agent Todos",
+        summary="Active agent/tooling todos tracked by the local DB.",
+    ),
+    DocSpec(
+        source=".agents/resolved.toml",
+        output="contents/resources/agent_scaffold/db/resolved.qmd",
+        title="Resolved Agent DB",
+        section="Agent DB",
+        nav_label="Resolved Agent DB",
+        summary="Resolved or retired agent/tooling DB records.",
+    ),
 )
 
 SECTION_ORDER = (
@@ -174,6 +310,7 @@ SECTION_ORDER = (
     "Canonical State",
     "References",
     "Skills & Routing",
+    "Agent DB",
 )
 
 SITE_ASSET_SUFFIXES = {".qmd", ".pdf", ".png", ".jpg", ".jpeg", ".svg", ".gif"}
@@ -293,17 +430,23 @@ def rewrite_links(
 def render_page(spec: DocSpec, source_map: dict[str, DocSpec]) -> None:
     source_file = REPO_ROOT / spec.source
     output_file = DOCS_ROOT / spec.output
-    metadata, text = split_frontmatter(source_file.read_text(encoding="utf-8"))
-    source_heading, body = split_heading(text)
-    body = rewrite_links(
-        body,
-        source_file=source_file,
-        output_file=output_file,
-        source_map=source_map,
-    )
+    raw_text = source_file.read_text(encoding="utf-8")
+    if source_file.suffix == ".toml":
+        metadata: dict[str, str] = {}
+        source_heading = spec.title
+        body = f"```toml\n{raw_text.rstrip()}\n```"
+    else:
+        metadata, text = split_frontmatter(raw_text)
+        source_heading, body = split_heading(text)
+        body = rewrite_links(
+            body,
+            source_file=source_file,
+            output_file=output_file,
+            source_map=source_map,
+        )
 
     callout_lines = [
-        "::: {.callout-note collapse=\"true\"}",
+        '::: {.callout-note collapse="true"}',
         "## Canonical Source",
         f"- Source file: [`{spec.source}`]({GITHUB_BLOB_BASE}/{spec.source})",
         f"- Published page: `{spec.output}`",
@@ -356,7 +499,7 @@ def render_index() -> None:
         "surfaces from the repository under Quarto `Resources`.",
         "",
         "It includes the active `AGENTS.md` files, canonical memory state, agent",
-        "references, and the `aria-nbv-context` routing skill. It intentionally",
+        "references, repo-local skills, and the active agent DB. It intentionally",
         "excludes episodic history, `.agents/archive/`, and temporary workpads.",
         "",
         "Refresh these pages with `./scripts/quarto_generate_agent_docs.py`. The",
@@ -372,8 +515,12 @@ def render_index() -> None:
             ]
         )
         for spec in grouped[section]:
-            output_path = Path(spec.output).relative_to("contents/resources/agent_scaffold")
-            lines.append(f"- [{spec.nav_label}]({output_path.as_posix()}): {spec.summary}")
+            output_path = Path(spec.output).relative_to(
+                "contents/resources/agent_scaffold"
+            )
+            lines.append(
+                f"- [{spec.nav_label}]({output_path.as_posix()}): {spec.summary}"
+            )
         lines.append("")
 
     index_file = OUTPUT_ROOT / "index.qmd"
