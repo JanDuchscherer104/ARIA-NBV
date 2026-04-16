@@ -64,6 +64,9 @@ dependencies = [
     "optuna>=4.6.0",
     "optuna-integration[pytorch-lightning]>=4.5.0",
     "captum>=0.8.0",
+    # Reinforcement learning
+    "gymnasium>=1.2.1",
+    "stable-baselines3>=2.7.0",
     # Openpoints
     "openpoints-shim; sys_platform == 'linux'",
     "pyyaml>=6.0; sys_platform == 'linux'",
