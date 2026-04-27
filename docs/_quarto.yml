@@ -270,7 +270,7 @@ quartodoc:
           member_options: *embedded_members
 
 
-# export QUARTO_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python  # put in your shell rc if you like
+# export QUARTO_PYTHON=/home/jd/.local/share/mamba/envs/aria-nbv/bin/python # put in your shell rc if you like
 
 # # 2) Install the Jupyter stack + cache into that env
-# conda install -n aria-nbv -c conda-forge jupyter-cache nbclient nbformat ipykernel jupyter
+# mamba install -n aria-nbv -c conda-forge jupyter-cache nbclient nbformat ipykernel jupyter

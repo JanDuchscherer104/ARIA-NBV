@@ -29,7 +29,7 @@
 // ============================================================================
 // Abbreviations (short + long forms)
 // ============================================================================
-// Short and long forms are kept together for consistent usage in prose.
+// Short and long forms are kept together for consistent usage in prose.P
 
 /// Relative Reconstruction Improvement
 #let RRI = "RRI"
@@ -597,7 +597,7 @@
         #symb.obs.pose,
         #symb.obs.points_semi,
         #(symb.vin.field_v)^"ego"
-      ) _(1:t)
+      )_(1:t)
     $,
     hist_cf: $
       #symb.rl.hist_cf
@@ -608,7 +608,7 @@
           #(symb.obs.depth)^"cf",
           #(symb.obs.vis)^"cf",
           #symb.obs.points_cf
-        ) _(1:t)
+        )_(1:t)
       )
     $,
     state_ego: $
