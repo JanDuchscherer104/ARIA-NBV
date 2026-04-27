@@ -48,7 +48,7 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Generate API reference
-        run: ./scripts/quarto_generate_api_docs.sh
+        run: make api-docs
 
       - name: Generate agent scaffolding pages
         run: ./scripts/quarto_generate_agent_docs.py

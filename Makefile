@@ -349,6 +349,10 @@ mmdc-render: ## 📊 Render all .mmd files in a folder (MMD_DIR=..., MMD_OUT=...
 #  📚 Documentation hygiene
 #  ═══════════════════════════════════════════════════════════════════════
 
+.PHONY: api-docs docs-lint
+api-docs: ## Generate API reference pages via Quartodoc (hard alias failures fail, warnings are non-blocking)
+	@./scripts/quarto_generate_api_docs.sh
+
 .PHONY: docs-lint
 docs-lint: _check_python ## Format QMD lists, then run Quarto checks
 	@echo "$(BLUE)Formatting QMD list spacing…$(NC)"
