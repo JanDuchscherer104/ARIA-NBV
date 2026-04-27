@@ -5,9 +5,21 @@ format: html
 
 # Dependencies
 
-- conda or mamba
+- [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) or conda
 - uv
 - `git submodule --init --update` to clone the external dependencies (EFM3D is installed from local source)
+- For [`efm3d`](https://github.com/facebookresearch/efm3d), our [fork](https://github.com/JanDuchscherer104/efm3d/tree/main)
+  needs to be used. After cloning and updating submodules, ensure that `git remote -v` in `external/efm3d` points to
+  our fork, not the original repo. If it does not, add the fork as remote.
+  and pull.
+
+  ```bash
+  cd aria_nbv/external/efm3d
+  git remote -v
+  # If the fork is not listed, add it:
+  git remote add fork git remote add fork https://github.com/JanDuchscherer104/efm3d/tree/main
+  git pull fork main
+  ```
 
 # Setup Instructions
 
@@ -16,8 +28,8 @@ format: html
 ```bash
 cd aria_nbv
 # create conda environment for cuda toolkit 12.1
-conda create -f environment.yml
-conda activate aria-nbv
+mamba create -f environment.yml
+mamba activate aria-nbv
 
 uv sync --extra dev --extra notebook --extra pytorch3d
 # or simply
@@ -46,16 +58,33 @@ git submodule update --init --recursive external/PointNeXt
 uv sync --all-extras
 
 # Optional toggles (re-run uv sync to rebuild):
-OPENPOINTS_BUILD_POINTOPS=1 uv sync --all-extras
-OPENPOINTS_BUILD_SUBSAMPLING=1 uv sync --all-extras
-# Chamfer is enabled by default; override only if you want to skip it:
-OPENPOINTS_BUILD_CHAMFER_DIST=0 uv sync --all-extras
-OPENPOINTS_BUILD_EMD=1 uv sync --all-extras
+  OPENPOINTS_BUILD_POINTOPS=1 uv sync --all-extras
+  OPENPOINTS_BUILD_SUBSAMPLING=1 uv sync --all-extras
+  # Chamfer is enabled by default; override only if you want to skip it:
+  OPENPOINTS_BUILD_CHAMFER_DIST=0 uv sync --all-extras
+  OPENPOINTS_BUILD_EMD=1 uv sync --all-extras
 ```
 
 The build uses the CUDA toolkit found on `PATH` (aria-nbv provides CUDA 12.1). If `nvcc` is not found, set `CUDA_HOME` or `OPENPOINTS_TORCH_CUDA_ARCH_LIST` explicitly.
 
+
 # Data Setup
+
+## Aria Synthetic Environments
+
+- Go to [ASE Downloads](https://www.projectaria.com/datasets/ase/#download-dataset), enter your email, and download the
+  following scene manifests and move them to `.data/aria_download_urls`:
+  - EFM3D Eval Meshes: `ase_mesh_download_urls.json`
+  - Aria Synthetic Environments in ATEK format (PyTorch ready): `AriaSyntheticEnvironment_ATEK_download_urls.json`
+
+The ATEK subset for which GT meshes are available can be downloaded as follows:
+
+```bash
+uv run nbv-downloader -m download -c efm
+```
+
+
+# Model Weights
 
 - download the [Dinov2 ViTB14 checkpoint](https://huggingface.co/zgcr654321/pretrained_models/blob/cc2e7aace55d6f06716dcf444c29d97bac0a99da/dinov2_pretrain_official_pytorch_weights/dinov2_vitb14_reg4_pretrain.pth) and place it in `.logs/ckpts/`
 - PointNeXt-S checkpoint:
