@@ -230,7 +230,7 @@ quartodoc:
           children: separate
           member_options: *embedded_members
         - name: lightning
-          include_imports: true
+          include_imports: false
           children: separate
           member_options: *embedded_members
         - name: configs
