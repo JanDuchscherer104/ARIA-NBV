@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Review litkg-rs"
+  short_description: "Working tree, PR, and autoresearch review gate"
+  default_prompt: "Use $code-review-litkg-rs to review litkg-rs changes in the working tree or on a pull request, report severity-ranked findings with file and line references, and gate autoresearch winner branches before promotion."

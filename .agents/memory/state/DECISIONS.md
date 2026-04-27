@@ -34,3 +34,10 @@ tags: [codex, workflow, architecture]
 - Documentation changes should update Quarto/Typst sources directly, not ad hoc notes under `.codex/`.
 - The published Quarto site refreshes `aria_nbv` API reference pages from docstrings via `quartodoc` during the Pages workflow, with `docs/reference/index.qmd` as the human-authored landing page.
 - The published Quarto site also regenerates maintained agent-scaffold pages from canonical markdown under `AGENTS.md`, `.agents/memory/state/`, `.agents/references/`, and `.agents/skills/aria-nbv-context/`, while keeping history and archive surfaces out of the site.
+
+## Working Project Decisions
+- RRI is the primary project objective for next-best-view research in this repo. Coverage-style objectives remain baselines or diagnostics, not the main thesis target.
+- The canonical training and evaluation surface remains discrete candidate ranking anchored on prerecorded ASE trajectory snippets with oracle supervision derived from GT meshes where available.
+- Non-myopic work is being introduced incrementally through multi-step counterfactual rollouts, structured evaluator metrics, cumulative-RRI accounting, and a discrete-shell RL scaffold before any continuous-control claim.
+- Counterfactual reasoning is currently geometry-first: logged ego-trajectory modalities are the trustworthy historical state, while counterfactual views default to mesh-, depth-, and visibility-derived quantities plus accumulated selected observations until richer synthesis exists.
+- Entity-aware objectives, hierarchical control, and semantic-global planning are treated as extensions on top of the current scene-level RRI baseline rather than replacements for it.
