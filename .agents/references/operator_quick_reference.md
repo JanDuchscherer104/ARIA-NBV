@@ -1,6 +1,6 @@
 # Operator Quick Reference
 
-Use this file for practical operator aids that do not belong in canonical project state.
+Use this file for practical operator aids and repo-wide execution hygiene that do not belong in canonical project state.
 
 ## Environment Recovery
 - Preferred interpreter: `aria_nbv/.venv/bin/python`
@@ -38,9 +38,19 @@ git diff --name-only
 
 Workflow:
 - Classify untracked files as keep, ignore, or delete before staging.
+- Diff the candidate files explicitly before staging and stage only the files that belong to the current task.
 - Add ignores for logs, renders, caches, and other generated artifacts instead of committing them.
 - Stage by intent so code, docs, and assets remain reviewable as separate changes.
 - Do not revert unrelated worktree changes unless the user explicitly asks.
+
+## Task Execution
+- Start by condensing the task, defining acceptance criteria, and identifying the exact files or symbols involved.
+- Inspect referenced and potentially affected files and modules before editing.
+- Maintain a small task list for multi-step work and verify incrementally instead of batching untested changes.
+- Treat explicit user termination criteria as binding; expand verification until they are satisfied or explain precisely what remains blocked.
+- Stay within the requested scope. If something adjacent looks wrong but was not requested, note it instead of silently changing it.
+- Keep documentation aligned with behavior changes.
+- If the scope, constraints, or verification expectations remain unclear after the surface is localized, clarify before proceeding.
 
 ## Frame and Key Conventions
 - Frame hierarchy: world -> rig/device -> camera; use `PoseTW` for poses and `CameraTW` for cameras.

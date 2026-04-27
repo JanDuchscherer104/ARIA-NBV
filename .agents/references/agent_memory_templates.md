@@ -2,6 +2,8 @@
 
 Use these templates for native debriefs under `.agents/memory/history/YYYY/MM/`.
 
+For non-trivial work, write a debrief record under `.agents/memory/history/YYYY/MM/`.
+
 Existing records with `status: legacy-imported` are grandfathered archive evidence and do not need to be backfilled unless a task explicitly asks for it.
 
 ## Required Frontmatter
@@ -12,6 +14,8 @@ Existing records with `status: legacy-imported` are grandfathered archive eviden
 - `topics`
 - `confidence`
 - `canonical_updates_needed`
+
+If no canonical state document changed, set `canonical_updates_needed: []`.
 
 ## Native Debrief With No Canonical Updates
 
@@ -48,6 +52,12 @@ canonical_updates_needed:
 - `source_legacy_path`
 - `artifacts`
 - `assumptions`
+
+## Canonical State and Legacy Notes
+- If the task changes current truth, update one or more files in `.agents/memory/state/` and list them in `canonical_updates_needed`.
+- Otherwise keep `canonical_updates_needed: []`.
+- Existing `status: legacy-imported` records are archive evidence; do not backfill them unless a task explicitly requires it.
+- Legacy `.codex` notes were migrated into `.agents/memory/history/` and `archive/codex-legacy/`. Do not recreate `.codex` as a task-notes bucket.
 
 Keep the body concise:
 - task

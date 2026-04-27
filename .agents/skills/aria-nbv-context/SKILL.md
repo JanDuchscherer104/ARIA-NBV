@@ -59,6 +59,12 @@ Progressive disclosure order:
 - Do not open `docs/index.qmd` or `docs/contents/todos.qmd` until the task specifically needs project narrative, priorities, or open work items.
 - Do not search `.agents/memory/history/` unless the question is historical, comparative, or explicitly asks for past debriefs.
 
+## On-Demand Entry Points
+- Open `docs/index.qmd`, `docs/contents/todos.qmd`, `docs/contents/roadmap.qmd`, and `docs/contents/questions.qmd` only when the task is about project narrative, priorities, roadmap, or open work items.
+- Open `docs/contents/ideas.qmd` only when the task is about future directions or uncommitted proposals.
+- Open `docs/contents/impl/` and `docs/contents/ext-impl/` only after the exact implementation topic is known.
+- Use `notebooks/ase_oracle_rri_simplified.ipynb` only when the task needs notebook parity or explanatory context for ASE oracle RRI.
+
 ## Canonical State (`.agents/memory/`)
 Treat `.agents/memory/state/` as current truth and `.agents/memory/history/` as optional historical evidence.
 
