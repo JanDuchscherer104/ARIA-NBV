@@ -1,9 +1,18 @@
+---
+id: ideas
+updated: 2026-04-11
+scope: repo
+owner: jan (CODEOWNER)
+status: active
+tags: [read-only, project-ideas, future-directions, multi-step rri based rl]
+---
+
 # Ideas and Future Directions
 
-## Highest Priority
+## Highest Priority (to resolve in next meeting)
 
 - Decide: can we stick with the current eco-system and dataset?
-- Decide: how much time to invest into an updated VIN?
+- Decide: how much time to invest into an updated VIN? How much ablation and architecture search for single step vs going directly to multistep?
 - apply for Aria Gen2 research kit and simulator that was used for generating the ASE dataset.
 - clean up data handling.
 - move to university workstation.
@@ -19,6 +28,9 @@
 - perspective / philosophy: what would be helpful to me as a human trying do next best view prediction?
 - why do we choose azimuth and elevation bounds? wouldn't it be leading to to better generalization if no bounds have higher variances.
 
+    > Allowing full azimuth ranges would lead to more diverse candidate views, but given the strong directivity in the 20 views per historic trajectory, the agent might prioritize making 180 degree turns as most rewarding action.
+    > Allowing full elevation ranges would lead to unrealistic candidate views.
+
 ---
 
 request acees to ASE simulator to do RL based data collection
@@ -30,6 +42,8 @@ val confusion matrix indicates that it never predicts the lowest two classes!
 
 - First predict relative movement, encode new relative pose, then predict look at (shell).
 - or idea as described in .agents/tmp/image.png or hesita paper.
+- supervise an intermediate target / look-at proposal head (entity center, uncertainty peak, expected-RRI centroid), then predict the continuous camera translation conditioned on that target.
+- for continuous policies: project the predicted pose to the nearest feasible / collision-free pose instead of relying on penalties only.
 - How can we encode trespasses to new areas that will yield really high rri?
 - Explicit 3D gaussian state representations instead of voxel fields?
 
@@ -43,10 +57,11 @@ val confusion matrix indicates that it never predicts the lowest two classes!
 - Trajectory: (i.e. >= 2 minutes per scene), single snippet / training sample is two seconds long and consists of 20 frames with temporal stride of 10 frames until the next snippet starts.
 
 - So far we only tried to predict the RRI for a single next best view, anchored at the last frame of the snippet / ego-trajectory. If we wanted to do multi-step prediction, we would not have modalities like:
-    > **RGB**: We could use something like Gaussian splatting or world models to generate the full modalities for counterfactual poses that are not part of the original ego-trajectory. Weren't there one-shot reconstruction methods in the aria ecosystem: [egocentric_splats](https://github.com/facebookresearch/egocentric_splats)
+    > **RGB**: We could use something like Gaussian splatting or world models to generate the full modalities for counterfactual poses that are not part of the original ego-trajectory. Weren't there one-shot reconstruction methods in the aria ecosystem: [egocentric_splats](https://github.com/facebookresearch/egocentric_splats). We only have 100 scenes with GT meshes, we could easily train 3D GS on those and the offline trajectories and then resue them to train our RRI prediction model.
 
     > **SLAM PC**: We could emulate their slam algorithm or we simply generate own slam pc for ASE.
 
+- Once we have a solid mutli-step RRI scorer we we can use it as reward function for all the scenes without GT meshes.
 
 **Questions**:
 
@@ -58,6 +73,16 @@ val confusion matrix indicates that it never predicts the lowest two classes!
 - How could the MDP look like for our task?
 - Can the Critic network use GT information as input during training? I.e. GT OBBs, GT Segmentation Masks
 - Generate synthetic offline multi-step trajectories (with same transition dymanics as currently present for single step)
+- Should the first RL variant be close-greedy / low-discount receding-horizon control rather than full long-horizon RL?
+- Can we factor planning into semantic-global planning + local geometric execution, i.e. VLM/VLA chooses grounded subgoals like `cross_portal`, `inspect_entity`, or `approach_frontier`, and the NBV controller executes them?
+- What compact world-memory / descriptor schema do we need for portals, frontiers, entities, and regions so the semantic planner reasons over grounded IDs instead of free-form text?
+- Do we need a verifier / replanner after each executed subgoal to reduce hallucinated drift?
+
+### Object Centric Multi-Step Oracle-RRI Planning
+
+future iterations of the multi-step oracle rri pipeline will be "object" centric - i.e. the rri will be computed only for subsets of the pointcloud / mesh that are part of an object of interest. that means that we will have to include a policy to select suited objects for each of the ATEK snippets, adapt the rri computation such that only backprojected points that belong to the object of interest are considered for the objective.
+we will need to define the branching and selection policy more rigourously (i.e. we might want to avoid a gemoetric groth in the number of branches, such that after a horizon of N steps, we have only K counterfactual trajectories all of which are distinct chains rather than generating a tree with ever increasing number of leave nodes...).
+here we also need to consider how to generate the multi-step samples in a way such that batching stays efficient - i.e. all multi-step samples must be easily paddable to the same horizon and number of branches.
 
 ## Scaling up
 
@@ -82,11 +107,12 @@ val confusion matrix indicates that it never predicts the lowest two classes!
 - How can we implement vin v4 as pure transformer? Let projections (with *all* information that correspond to a certain frustum or unit of space attend to each other)?
   - (scene tokens: voxels / splats / entities, candidate query tokens, projection / frustum tokens, history tokens, entity tokens)
 - Maybe early fusion into tokens than one QA branch?
-- Tiny **pre-trained** cnn for projection features (i.e. small resnet)? Maybe pretrain on OBB detection?
+- Tiny **pre-trained** cnn for projection features (i.e. small resnet)? Maybe pretrain on OBB detection? Would be optimal if the model was pre-trained on depth images.
 - Let different modalities from the same sample modulate its cosignals.
 - Look at network from video analysis - query-centric-attention - i.e. [QCNet](https://openaccess.thecvf.com/content/CVPR2023/papers/Zhou_Query-Centric_Trajectory_Prediction_CVPR_2023_paper.pdf) and [LMFormer](https://arxiv.org/abs/2504.10275)
 - do iterative layer refinement - residual learning similar to LMFormer.
 - For each point we can encode from which direction they have been observed - similarly to how [hesita](https://arxiv.org/abs/2508.01014) did it. Here we can average over the different observations or we encode them as incidence-angle histogram.
+- add target-conditioned local feature reads from EVL / voxel state at predicted target points, entity centers, or surface-deficit peaks.
 
 
 ### Objective and Optimization
@@ -97,3 +123,26 @@ val confusion matrix indicates that it never predicts the lowest two classes!
 - perspective: presence of bboxes might indicate presence of high complexity regions.
 - When using a continous action policy, predict relative translation before or after the relative rotation and condition the later on the former?
 - Transition to "object-centric" views where the RRI of certain objects (with existing GT and pred OBBs) needs to be maximized could offer a greater variety of different counterfactual views (trajectories).
+
+## Concise pointers from recent reports
+
+### Hestia / hierarchical planning
+
+- treat Hestia as a planning-and-control pattern, not as a replacement for the RRI objective.
+- add directional observability bookkeeping: six-face bins, incidence-angle histograms, normal-aligned bins, or learned directional descriptors for points / voxels / entity tokens.
+- factor control into target selection (`look-at` point, entity center, uncertainty peak, expected-RRI centroid) and view realization.
+- supervise a target proposal head from missing-surface / expected-RRI / uncertainty geometry, then predict continuous relative translation conditioned on that target.
+- add target-conditioned local feature reads / multiscale interpolation at predicted target points, entity centers, or surface-deficit peaks.
+- use feasibility projection and possibly an auxiliary feasibility loss so predicted poses are snapped to collision-free states instead of relying only on penalties.
+- start continuous RL with close-greedy, low-discount, receding-horizon control before attempting full long-horizon RL.
+- scale more through training diversity: broader scene coverage, more anchor poses, wider candidate distributions, positional shifts, and entity-centric supervision.
+
+### VLM / VLA semantic-global planning
+
+- use VLM / VLA for semantic-global planning only; keep local metric motion, NBV scoring, and collision handling in the geometric controller.
+- model the high-level planner as a semantic POMDP over grounded portals, frontiers, entities, and regions.
+- restrict planner outputs to grounded subgoals such as `CROSS_PORTAL(portal_id)`, `INSPECT_ENTITY(entity_id)`, `APPROACH_FRONTIER(frontier_id)`, `COMPLETE_ENTITY(entity_id)`, and `COMPLETE_REGION(region_id)`.
+- build a compact structured scene memory from recent RGB views, topological graph, entity memory, uncertainty / quality map, directional coverage summaries, and the task / mission query.
+- define compact descriptor tokens for portals, frontiers, entities, regions, and local geometry summaries; use retrieval over the top-k candidates instead of dumping the full scene.
+- portal selection is a strong first use case because portals are both topological bottlenecks and semantic transitions.
+- reduce hallucination risk with grounded IDs, a restricted action vocabulary, verifier / replanner loops after each executed chunk, and never letting the VLM emit raw continuous poses.

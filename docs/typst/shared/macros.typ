@@ -177,6 +177,36 @@
     // Relative Reconstruction Improvement scalar.
     rri: $RRI$,
   ),
+  obs: (
+    // Logged RGB image stream.
+    img_rgb: $bold(I)^"rgb"$,
+    // Optional grayscale image stream (used by Hestia-style formulations).
+    img_gray: $bold(I)^"gray"$,
+    // Depth image / rendered depth observation.
+    depth: $bold(D)$,
+    // Pose stream along the trajectory.
+    pose: $bold(X)$,
+    // Pose / camera metadata bundle.
+    meta: $bold(M)$,
+    // Semidense point-cloud observation stream.
+    points_semi: $bold(cal(P))^"semi"$,
+    // Counterfactual / rendered geometry point-cloud stream.
+    points_cf: $bold(cal(P))^"cf"$,
+    // Geometry / voxel-grid observation bundle.
+    grid: $bold(G)$,
+    // Generic visibility / directional-observability cue.
+    vis: $bold(V)$,
+    // Target / look-at latent.
+    lookat: $bold(L)$,
+    // Cumulative face visibility tensor (Hestia-style).
+    face_vis: $bold(F)$,
+    // Instantaneous face visibility tensor (Hestia-style).
+    face_vis_step: $bold(f)$,
+    // Voxel center position.
+    voxel_center: $bold(p)_v$,
+    // Face normal vector.
+    face_normal: $bold(n)$,
+  ),
   entity: (
     // Entity set (objects of interest).
     E: $cal(E)$,
@@ -474,7 +504,7 @@
     // Unknown mask + new-surface prior derived from counts and occupancy.
     new_surface_prior: $
       #symb.vin.unknown = 1 - #symb.vin.counts_norm,
-      quad #symb.vin.new_surface_prior = #symb.vin.unknown dot.o #symb.vin.occ_pr
+      quad #symb.vin.new_surface_prior = #symb.vin.unknown dot.op #symb.vin.occ_pr
     $,
     // Optional auxiliary regression combined with the CORAL loss.
     loss_total: $ #symb.vin.loss = #(symb.vin.loss) _"coral" + lambda dot #(symb.vin.loss) _"reg" $,
@@ -542,7 +572,7 @@
   features: (
     film: $
       #(symb.vin.global) _i^("film")
-      = (1 + #(symb.vin.gamma) _i) dot.o #(symb.vin.global) _i + #(symb.vin.beta) _i
+      = (1 + #(symb.vin.gamma) _i) dot.op #(symb.vin.global) _i + #(symb.vin.beta) _i
     $,
     semidense_validity: $
       m_(i,j)
@@ -558,6 +588,28 @@
   rl: (
     mdp: $
       cal(M) = (cal(S), cal(A), P, #symb.rl.r, gamma)
+    $,
+    hist_ego: $
+      #symb.rl.hist_ego
+      =
+      (
+        #symb.obs.img_rgb,
+        #symb.obs.pose,
+        #symb.obs.points_semi,
+        #(symb.vin.field_v)^"ego"
+      ) _(1:t)
+    $,
+    hist_cf: $
+      #symb.rl.hist_cf
+      =
+      (
+        #symb.rl.hist_ego,
+        (
+          #(symb.obs.depth)^"cf",
+          #(symb.obs.vis)^"cf",
+          #symb.obs.points_cf
+        ) _(1:t)
+      )
     $,
     state_ego: $
       #(symb.rl.s) _t^"ego"
