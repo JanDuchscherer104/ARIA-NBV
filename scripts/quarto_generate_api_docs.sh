@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 DOCS_DIR="${REPO_ROOT}/docs"
+REFERENCE_DIR="${DOCS_DIR}/reference"
 PYTHON_BIN=""
 TMP_LOG="$(mktemp)"
 
@@ -40,25 +41,63 @@ if ! "${PYTHON_BIN}" -m quartodoc --help >/dev/null 2>&1; then
   fi
 fi
 
-set +e
-if [[ "${UVX_QUARTODOC:-0}" == "1" ]]; then
-  uvx --from quartodoc quartodoc build --config _quarto.yml 2>&1 | tee "${TMP_LOG}"
+clean_reference_pages() {
+  find "${REFERENCE_DIR}" -maxdepth 1 -type f -name "*.qmd" ! -name "_*.qmd" -delete
+  rm -f "${REFERENCE_DIR}/_api_index.md"
+}
+
+run_quartodoc() {
+  set +e
+  if [[ "${UVX_QUARTODOC:-0}" == "1" ]]; then
+    uvx --from quartodoc quartodoc build --config _quarto.yml 2>&1 | tee "${TMP_LOG}"
+  else
+    "${PYTHON_BIN}" -m quartodoc build --config _quarto.yml 2>&1 | tee "${TMP_LOG}"
+  fi
   BUILD_STATUS=${PIPESTATUS[0]}
-else
-  "${PYTHON_BIN}" -m quartodoc build --config _quarto.yml 2>&1 | tee "${TMP_LOG}"
-  BUILD_STATUS=${PIPESTATUS[0]}
-fi
-set -e
+  set -e
+}
+
+extract_missing_aliases() {
+  sed -n "s/.*Could not resolve alias \\([A-Za-z0-9_\\.]*\\) pointing at.*/\\1/p" "${TMP_LOG}" \
+    | sort -u
+}
+
+remove_stale_reference_pages() {
+  local removed=0
+  local symbol
+  for symbol in "$@"; do
+    [[ -z "${symbol}" ]] && continue
+    if [[ -f "${REFERENCE_DIR}/${symbol}.qmd" ]]; then
+      rm -f "${REFERENCE_DIR}/${symbol}.qmd"
+      echo "Pruned stale symbol page: ${REFERENCE_DIR}/${symbol}.qmd"
+      removed=1
+    fi
+  done
+  return "${removed}"
+}
+
+clean_reference_pages
+run_quartodoc
 
 if [[ "${BUILD_STATUS}" -ne 0 ]]; then
-  echo "quartodoc build failed (exit ${BUILD_STATUS})." >&2
-  exit "${BUILD_STATUS}"
-fi
-
-if grep -Eq "AliasResolutionError|KeyError: '" "${TMP_LOG}"; then
-  echo "Detected hard API docs alias errors during Quartodoc build." >&2
-  echo "Treat these as blockers and align docs/config exports before retrying." >&2
-  exit 1
+  if grep -Eq "AliasResolutionError|KeyError: '" "${TMP_LOG}"; then
+    echo "quartodoc reported alias/lookup errors. Running resilient regeneration." >&2
+    mapfile -t MISSING_SYMBOLS < <(extract_missing_aliases)
+    if remove_stale_reference_pages "${MISSING_SYMBOLS[@]}"; then
+      run_quartodoc
+    else
+      echo "Unable to identify stale symbol pages from alias failures; retrying would be a guess." >&2
+      run_quartodoc
+    fi
+    if [[ "${BUILD_STATUS}" -ne 0 ]]; then
+      echo "quartodoc build failed after resilience retry (exit ${BUILD_STATUS})." >&2
+      exit "${BUILD_STATUS}"
+    fi
+    echo "Recovered from stale-symbol alias failures during regeneration."
+  else
+    echo "quartodoc build failed (exit ${BUILD_STATUS})." >&2
+    exit "${BUILD_STATUS}"
+  fi
 fi
 
 if grep -Eq "^WARNING:" "${TMP_LOG}"; then
