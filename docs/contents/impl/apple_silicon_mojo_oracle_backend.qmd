@@ -1,0 +1,144 @@
+---
+title: "Apple-Silicon Mojo Oracle Backend"
+format: html
+---
+
+::: {.callout-note title="Source anchors"}
+- Orchestrator: [`OracleRriLabelerConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L46), [`OracleRriLabeler`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L80)
+- Candidate generation: [`CandidateViewGeneratorConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L50), [`candidate_generation_rules.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py#L1), [`geometry.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/geometry.py#L1)
+- Rendering: [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108), [`candidate_pointclouds.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_pointclouds.py#L1), [`pytorch3d_depth_renderer.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L1)
+- RRI scoring: [`OracleRRI`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L34), [`metrics.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/metrics.py#L1)
+- Mojo donor branch surfaces: `.agents/skills/mojo-nbv-acceleration/`, `pose_generation/mojo/`, and future `rendering/mojo/`, `rri_metrics/mojo/`
+:::
+
+# Intent
+
+This page describes the explicit Apple-Silicon Mojo oracle profile. The goal is
+to accelerate the repo-owned oracle kernels while preserving the PyTorch3D/CUDA
+workstation path as the default and parity baseline.
+
+# Baseline and non-goals
+
+- **Baseline**: `pytorch3d_cuda`, the workstation profile using PyTorch3D for
+  collision, depth rendering, point-cloud backprojection, and oracle distance
+  with CUDA tensors.
+- **Apple opt-in**: `apple_mps_mojo`, which uses Torch MPS for regular tensor
+  storage/ops where stable, keeps candidate sampling on an explicit CPU
+  fallback, and uses Mojo for stages that replace PyTorch3D or custom
+  CUDA-style kernels.
+- **Non-goal**: broad trainer or cache rewrites.
+- **Non-goal**: changing oracle RRI semantics, candidate ordering rules, or
+  `PoseTW` / `CameraTW` contracts to make the custom kernels easier.
+- **Non-goal**: silently selecting Mojo when PyTorch3D is missing or broken.
+
+# Kernel inventory
+
+The concrete kernels that must move behind backend seams are:
+
+1. candidate collision distance in `pose_generation/geometry.py`
+2. path collision in `candidate_generation_rules.py`
+3. depth rendering in `rendering/pytorch3d_depth_renderer.py`
+4. depth backprojection, compaction, and bounds reduction in
+   `rendering/candidate_pointclouds.py`
+5. point-to-mesh and mesh-to-point reductions in `rri_metrics/metrics.py`
+
+# Staged design
+
+## Backend seams
+
+- `CollisionBackend` already owns pose-generation backend selection.
+- Rendering will gain:
+  - `DepthRendererBackend`
+  - `PointCloudBackend`
+- RRI scoring will gain:
+  - `OracleDistanceBackend`
+
+Each of these remains a `StrEnum` and defaults to the existing PyTorch3D path.
+Normal app/offline use does not set them independently; `OracleBackendProfile`
+resolves them atomically.
+
+## Canonical contracts
+
+- `CandidateDepths` stays canonical for rendered depth payloads.
+- `CandidatePointClouds` stays canonical for backprojected candidate clouds.
+- `RriResult` stays canonical for oracle output.
+- PyTorch3D-specific runtime objects become optional backend state rather than
+  required contract fields.
+
+## Execution model
+
+- Python orchestrates all stages.
+- The first Mojo implementation may copy stage-local buffers between Torch and
+  Mojo in order to keep interface churn small.
+- The Apple path remains opt-in. If the selected profile is unavailable, the
+  app and offline writer report a setup error instead of changing profiles.
+
+## User-facing profiles
+
+- CUDA workstation setup: `uv sync --extra dev --extra pytorch3d`
+- Apple Silicon setup: `uv sync --extra dev` plus Mojo setup
+- Default config: `OracleRriLabelerConfig().backend_profile == "pytorch3d_cuda"`
+- Apple config: `OracleRriLabelerConfig(backend_profile="apple_mps_mojo", torch_accelerator="mps")`
+
+# Architecture
+
+```{mermaid}
+flowchart LR
+    A["EfmSnippetView"] --> B["OracleRriLabeler"]
+    B --> C["CandidateViewGenerator"]
+    C --> C0{"CollisionBackend"}
+    C0 -->|pytorch3d / trimesh / pyembree| C1["Current rule kernels"]
+    C0 -->|mojo| C2["Mojo collision kernels"]
+    B --> D["CandidateDepthRenderer"]
+    D --> D0{"DepthRendererBackend"}
+    D0 -->|pytorch3d| D1["PyTorch3D rasterization"]
+    D0 -->|mojo| D2["Mojo Metal depth kernel"]
+    B --> E["CandidatePointCloudBuilder"]
+    E --> E0{"PointCloudBackend"}
+    E0 -->|pytorch3d| E1["Current backprojection + compaction"]
+    E0 -->|mojo| E2["Mojo unprojection + compaction"]
+    B --> F["OracleRRI"]
+    F --> F0{"OracleDistanceBackend"}
+    F0 -->|pytorch3d| F1["Current point↔mesh reductions"]
+    F0 -->|mojo| F2["Mojo point↔mesh reductions"]
+    C1 --> G["Parity tests"]
+    C2 --> G
+    D1 --> G
+    D2 --> G
+    E1 --> G
+    E2 --> G
+    F1 --> G
+    F2 --> G
+```
+
+```{mermaid}
+flowchart TD
+    A["PyTorch3D default"] --> B["Docs + requirements + tests"]
+    B --> C["Backend enums and config seams"]
+    C --> D["Mojo collision path"]
+    D --> E["Mojo depth path"]
+    E --> F["Mojo point-cloud path"]
+    F --> G["Mojo RRI distance path"]
+    G --> H["Parity + benchmark gates"]
+    H --> I{"Passes on Apple Silicon?"}
+    I -->|No| J["Keep Mojo opt-in and iterate"]
+    I -->|Yes| K["Consider promoting default later"]
+```
+
+# Parity policy
+
+- Candidate validity masks and candidate ordering must match exactly.
+- Depth valid masks must match exactly.
+- Numeric tensors are allowed `atol=1e-4`, `rtol=1e-4`.
+- Final candidate ranking by RRI must match exactly.
+
+# Implementation order
+
+1. docs and requirements
+2. parity tests
+3. backend enums and config seams
+4. custom collision kernels
+5. custom depth kernels
+6. custom point-cloud kernels
+7. custom RRI distance kernels
+8. benchmark and verification

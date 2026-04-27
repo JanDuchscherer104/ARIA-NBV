@@ -6,15 +6,53 @@ import streamlit as st
 import torch
 
 from ..data_handling import AseEfmDatasetConfig
+from ..pipelines import OracleBackendProfile, OracleRriLabelerConfig, accelerator_options_for_profile
 from ..pose_generation import CandidateViewGeneratorConfig
-from ..pose_generation.types import CollisionBackend, SamplingStrategy, ViewDirectionMode
-from ..rendering import CandidateDepthRendererConfig, Pytorch3DDepthRendererConfig
+from ..pose_generation.types import SamplingStrategy, ViewDirectionMode
+from ..rendering import CandidateDepthRendererConfig
 from ..rri_metrics.oracle_rri import OracleRRIConfig
-from ..utils import Verbosity
+from ..utils import TorchAccelerator, Verbosity
+
+
+def backend_profile_ui(
+    default: OracleRriLabelerConfig, ui: st.delta_generator.DeltaGenerator
+) -> OracleRriLabelerConfig:
+    """Render the global oracle backend controls."""
+
+    ui.subheader("Oracle backend")
+    profile_options = list(OracleBackendProfile)
+    current_profile = default.backend_profile
+    if current_profile not in profile_options:
+        current_profile = OracleBackendProfile.PYTORCH3D_CUDA
+    profile_choice = ui.selectbox(
+        "Oracle backend profile",
+        profile_options,
+        index=profile_options.index(current_profile),
+        format_func=lambda p: p.value,
+        help="Selects all oracle geometry backends atomically.",
+    )
+
+    accelerator_options = list(accelerator_options_for_profile(profile_choice))
+    current_accelerator = default.torch_accelerator
+    if current_accelerator not in accelerator_options:
+        current_accelerator = TorchAccelerator.AUTO
+    accelerator_choice = ui.selectbox(
+        "Torch accelerator",
+        accelerator_options,
+        index=accelerator_options.index(current_accelerator),
+        format_func=lambda accelerator: accelerator.value,
+        help="AUTO keeps the selected profile's default accelerator.",
+    )
+    return default.model_copy(
+        update={
+            "backend_profile": profile_choice,
+            "torch_accelerator": accelerator_choice,
+        },
+    )
 
 
 def dataset_config_ui(
-    ui: st.delta_generator.DeltaGenerator, *, verbosity: Verbosity, is_debug: bool
+    ui: st.delta_generator.DeltaGenerator, *, device: str, verbosity: Verbosity, is_debug: bool
 ) -> AseEfmDatasetConfig:
     ui.subheader("Dataset")
     mesh_ratio = ui.slider("mesh decimation ratio", 0.0, 1.0, 0.1, step=0.02)
@@ -23,14 +61,7 @@ def dataset_config_ui(
     mesh_keep_ratio = ui.slider("min keep ratio (after crop)", 0.0, 1.0, 0.7, step=0.05)
     require_mesh = ui.checkbox("require mesh", value=True)
     debug_flag = ui.checkbox("Debug (data)", value=is_debug)
-    device_opts = ["cpu", "cuda"]
-    default_device_idx = 1 if torch.cuda.is_available() else 0
-    device_choice = ui.selectbox(
-        "Dataset device",
-        device_opts,
-        index=default_device_idx,
-        help="Move snippet tensors to this device immediately after loading.",
-    )
+    ui.caption(f"Dataset device: {device}")
 
     return AseEfmDatasetConfig(
         atek_variant="efm",
@@ -42,7 +73,7 @@ def dataset_config_ui(
         batch_size=None,
         verbosity=verbosity,
         is_debug=debug_flag,
-        device=device_choice,
+        device=device,
     )
 
 
@@ -74,28 +105,12 @@ def candidate_config_ui(
     )
     seed = int(seed_value) if seed_enabled else None
 
-    device_mode = expander.selectbox(
-        "Generator device",
-        ["cpu", "cuda"],
-        index=1 if torch.cuda.is_available() else 0,
-        help="Device to run candidate sampling on.",
-    )
-
     sampling_opts = list(SamplingStrategy)
     sampling_choice = expander.selectbox(
         "sampling_strategy",
         options=sampling_opts,
         index=sampling_opts.index(default.sampling_strategy),
         format_func=lambda s: s.name.lower(),
-    )
-
-    collision_opts = list(CollisionBackend)
-    collision_choice = expander.selectbox(
-        "collision_backend",
-        options=collision_opts,
-        index=collision_opts.index(default.collision_backend),
-        format_func=lambda c: c.value,
-        help="PyTorch3D for GPU, pyembree/trimesh for CPU.",
     )
 
     num_samples = expander.slider("num_samples", 2, 512, num_samples_default, step=2)
@@ -231,9 +246,7 @@ def candidate_config_ui(
             "view_target_point_world": target_point_world,
             "min_distance_to_mesh": float(min_distance),
             "ensure_collision_free": ensure_collision_free,
-            "collision_backend": collision_choice,
             "ensure_free_space": ensure_free_space,
-            "device": device_mode,
             "is_debug": debug_flag,
             "verbosity": verbosity,
             "reference_frame_index": reference_frame_index,
@@ -241,7 +254,7 @@ def candidate_config_ui(
             "collect_debug_stats": collect_debug_stats,
         }
     )
-    return CandidateViewGeneratorConfig.model_validate(updated.model_dump())
+    return updated
 
 
 def renderer_config_ui(
@@ -259,24 +272,16 @@ def renderer_config_ui(
         "Render resolution scale (xH, xW)",
         0.1,
         4.0,
-        1.0,
+        float(default.resolution_scale if default.resolution_scale is not None else 1.0),
         step=0.05,
         help="Scales both height and width before rendering; >1 upsamples, <1 downsamples.",
     )
-    renderer_device_options = ["cpu", "cuda"]
-    default_device = str(getattr(default.renderer, "device", "cuda" if torch.cuda.is_available() else "cpu"))
-    default_device_idx = renderer_device_options.index(default_device if default_device in ("cpu", "cuda") else "cuda")
-    renderer_device_sel = ui.selectbox("renderer device", renderer_device_options, index=default_device_idx)
     debug_flag = ui.checkbox("Debug (renderer)", value=is_debug)
-    renderer_cfg = Pytorch3DDepthRendererConfig(
-        device=renderer_device_sel,
-        is_debug=debug_flag,
-        verbosity=verbosity,
-    )
     return default.model_copy(
         update={
             "max_candidates_final": int(max_candidates),
-            "renderer": renderer_cfg,
+            "pytorch3d": default.pytorch3d.model_copy(update={"is_debug": debug_flag, "verbosity": verbosity}),
+            "mojo": default.mojo.model_copy(update={"is_debug": debug_flag, "verbosity": verbosity}),
             "is_debug": debug_flag,
             "resolution_scale": float(res_scale),
             "verbosity": verbosity,
@@ -299,6 +304,7 @@ def oracle_config_ui(default: OracleRRIConfig, ui: st.delta_generator.DeltaGener
 
 __all__ = [
     "candidate_config_ui",
+    "backend_profile_ui",
     "dataset_config_ui",
     "oracle_config_ui",
     "renderer_config_ui",

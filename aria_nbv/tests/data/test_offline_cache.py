@@ -95,6 +95,7 @@ def test_oracle_cache_roundtrip(tmp_path: Path) -> None:  # noqa: PLR0915
     )
 
     labeler_cfg = OracleRriLabelerConfig(
+        allow_backend_overrides=True,
         device=torch.device("cpu"),
         generator=generator_cfg,
         depth=depth_cfg,

@@ -14,14 +14,21 @@
 #let oracle_cfg = toml(oracle_cfg_src)
 #let dataset_cfg = oracle_cfg.dataset
 #let labeler_cfg = oracle_cfg.labeler
+#let backend_profile = labeler_cfg.backend_profile
+#let torch_accelerator = labeler_cfg.torch_accelerator
 #let gen_cfg = labeler_cfg.generator
 #let depth_cfg = labeler_cfg.depth
-#let renderer_cfg = depth_cfg.renderer
+#let renderer_cfg = depth_cfg.pytorch3d
 
 Oracle RRI labels are computed offline by rendering candidate depth maps from
 ground-truth meshes and fusing these points with the current reconstruction.
-The pipeline is implemented with PyTorch3D rasterization and EFM3D utilities
-for unprojection, point fusion, and Chamfer evaluation.
+The default backend profile is #backend_profile, which preserves the
+PyTorch3D/CUDA workstation path as the parity baseline. Apple-Silicon execution
+is selected explicitly via the `apple_mps_mojo` profile, using Torch MPS where
+stable, an explicit CPU fallback for candidate sampling, and Mojo kernels for
+stages that replace PyTorch3D or custom CUDA-style geometry dependencies. The
+configured torch accelerator for the paper figure pipeline is
+#torch_accelerator.
 
 #figure(
   image("/figures/diagrams/oracle_rri/oracle_rri_compact.pdf", width: 100%),

@@ -2,6 +2,7 @@
 
 from .base_config import BaseConfig, SingletonConfig
 from .console import Console, Verbosity
+from .devices import TorchAccelerator
 from .frames import rotate_yaw_cw90
 from .optuna_optimizable import Optimizable, optimizable_field
 from .rich_summary import build_nested, rich_summary, summarize, summarize_shape
@@ -13,6 +14,7 @@ __all__ = [
     "Console",
     "Optimizable",
     "Stage",
+    "TorchAccelerator",
     "ValueStrEnum",
     "Verbosity",
     "SingletonConfig",

@@ -8,9 +8,16 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import torch
 from efm3d.aria.pose import PoseTW
-from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from torch import Tensor
 
+from ..rendering.camera_batches import (
+    CameraBatchLike,
+    NativeCameraBatch,
+    camera_batch_size,
+    is_native_camera_batch,
+    is_pytorch3d_camera_batch,
+)
+from ..utils.pytorch3d_compat import PerspectiveCameras
 from ..vin.types import EvlBackboneOutput
 from .efm_views import (
     EfmSnippetView,
@@ -38,7 +45,7 @@ class VinOracleBatch:
         pm_comp_before: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` completeness distance before.
         pm_acc_after: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` accuracy distance after.
         pm_comp_after: ``Tensor["N", float32]`` or ``Tensor["B N", float32]`` completeness distance after.
-        p3d_cameras: PyTorch3D cameras used for depth rendering/unprojection (same ordering as candidates).
+        p3d_cameras: Camera batch used for depth rendering/unprojection (same ordering as candidates).
         candidate_count: Number of valid candidates (scalar or batched vector). When
             absent, runtime code falls back to the full candidate width.
         scene_id: ASE scene id for diagnostics (string or list when batched).
@@ -81,8 +88,8 @@ class VinOracleBatch:
     snippet_id: str | list[str]
     """Snippet identifier or batched list of identifiers."""
 
-    p3d_cameras: PerspectiveCameras
-    """PyTorch3D cameras aligned with the candidate set."""
+    p3d_cameras: CameraBatchLike
+    """Camera batch aligned with the candidate set."""
 
     candidate_count: Tensor | None = None
     """Number of valid candidates (scalar or batched vector)."""
@@ -157,13 +164,18 @@ class VinOracleBatch:
             "pm_comp_before": _shape(self.pm_comp_before),
             "pm_acc_after": _shape(self.pm_acc_after),
             "pm_comp_after": _shape(self.pm_comp_after),
-            "p3d_cameras.R": _shape(self.p3d_cameras.R),
-            "p3d_cameras.T": _shape(self.p3d_cameras.T),
-            "p3d_cameras.focal_length": _shape(self.p3d_cameras.focal_length),
-            "p3d_cameras.principal_point": _shape(self.p3d_cameras.principal_point),
-            "p3d_cameras.image_size": _shape(self.p3d_cameras.image_size),
             "candidate_count": _shape(self.resolved_candidate_count(device=poses.device)),
         }
+        if is_pytorch3d_camera_batch(self.p3d_cameras):
+            out["p3d_cameras.R"] = _shape(self.p3d_cameras.R)
+            out["p3d_cameras.T"] = _shape(self.p3d_cameras.T)
+            out["p3d_cameras.focal_length"] = _shape(self.p3d_cameras.focal_length)
+            out["p3d_cameras.principal_point"] = _shape(self.p3d_cameras.principal_point)
+            out["p3d_cameras.image_size"] = _shape(self.p3d_cameras.image_size)
+        else:
+            out["camera_batch.camera_tw"] = _shape(self.p3d_cameras.camera_tw.tensor())
+            out["camera_batch.pose_world_cam"] = _shape(self.p3d_cameras.pose_world_cam.tensor())
+            out["camera_batch.image_size"] = _shape(self.p3d_cameras.image_size)
         batch_size = None
         num_candidates = None
         if poses.ndim == 2:
@@ -173,14 +185,10 @@ class VinOracleBatch:
             batch_size = int(poses.shape[0])
             num_candidates = int(poses.shape[1])
         if batch_size is not None and num_candidates is not None:
-            cam_count = int(self.p3d_cameras.R.shape[0])
+            cam_count = camera_batch_size(self.p3d_cameras)
             if cam_count == batch_size * num_candidates:
-                out["p3d_cameras.batch_mode"] = "flat (B*N)"
-                out["p3d_cameras.R_grouped"] = str((batch_size, num_candidates, 3, 3))
-                out["p3d_cameras.T_grouped"] = str((batch_size, num_candidates, 3))
-                out["p3d_cameras.focal_length_grouped"] = str((batch_size, num_candidates, 2))
-                out["p3d_cameras.principal_point_grouped"] = str((batch_size, num_candidates, 2))
-                out["p3d_cameras.image_size_grouped"] = str((batch_size, num_candidates, 2))
+                out["camera_batch.batch_mode"] = "flat (B*N)"
+                out["camera_batch.image_size_grouped"] = str((batch_size, num_candidates, 2))
 
         if is_vin_snippet_view_instance(self.efm_snippet_view):
             out["vin_snippet.points_world"] = _shape(self.efm_snippet_view.points_world)
@@ -290,34 +298,46 @@ class VinOracleBatch:
         pm_acc_after = _gather_1d(self.pm_acc_after)
         pm_comp_after = _gather_1d(self.pm_comp_after)
 
-        in_ndc = getattr(self.p3d_cameras, "in_ndc", False)
-        if callable(in_ndc):
-            in_ndc = in_ndc()
-        znear = getattr(self.p3d_cameras, "znear", None)
-        zfar = getattr(self.p3d_cameras, "zfar", None)
-        cam_kwargs = {
-            "device": self.p3d_cameras.R.device,
-            "R": _shuffle_camera_param(self.p3d_cameras.R, name="R"),
-            "T": _shuffle_camera_param(self.p3d_cameras.T, name="T"),
-            "focal_length": _shuffle_camera_param(self.p3d_cameras.focal_length, name="focal_length"),
-            "principal_point": _shuffle_camera_param(self.p3d_cameras.principal_point, name="principal_point"),
-            "image_size": _shuffle_camera_param(self.p3d_cameras.image_size, name="image_size"),
-            "in_ndc": bool(in_ndc),
-        }
-        if znear is not None:
-            cam_kwargs["znear"] = znear
-        if zfar is not None:
-            cam_kwargs["zfar"] = zfar
-        try:
-            p3d_cameras = PerspectiveCameras(**cam_kwargs)
-        except TypeError:
-            cam_kwargs.pop("znear", None)
-            cam_kwargs.pop("zfar", None)
-            p3d_cameras = PerspectiveCameras(**cam_kwargs)
+        if is_pytorch3d_camera_batch(self.p3d_cameras):
+            in_ndc = getattr(self.p3d_cameras, "in_ndc", False)
+            if callable(in_ndc):
+                in_ndc = in_ndc()
+            znear = getattr(self.p3d_cameras, "znear", None)
+            zfar = getattr(self.p3d_cameras, "zfar", None)
+            cam_kwargs = {
+                "device": self.p3d_cameras.R.device,
+                "R": _shuffle_camera_param(self.p3d_cameras.R, name="R"),
+                "T": _shuffle_camera_param(self.p3d_cameras.T, name="T"),
+                "focal_length": _shuffle_camera_param(self.p3d_cameras.focal_length, name="focal_length"),
+                "principal_point": _shuffle_camera_param(self.p3d_cameras.principal_point, name="principal_point"),
+                "image_size": _shuffle_camera_param(self.p3d_cameras.image_size, name="image_size"),
+                "in_ndc": bool(in_ndc),
+            }
             if znear is not None:
-                p3d_cameras.znear = znear
+                cam_kwargs["znear"] = znear
             if zfar is not None:
-                p3d_cameras.zfar = zfar
+                cam_kwargs["zfar"] = zfar
+            try:
+                p3d_cameras: CameraBatchLike = PerspectiveCameras(**cam_kwargs)
+            except TypeError:
+                cam_kwargs.pop("znear", None)
+                cam_kwargs.pop("zfar", None)
+                p3d_cameras = PerspectiveCameras(**cam_kwargs)
+                if znear is not None:
+                    p3d_cameras.znear = znear
+                if zfar is not None:
+                    p3d_cameras.zfar = zfar
+        else:
+            camera_tw = self.p3d_cameras.camera_tw
+            if camera_tw.tensor().ndim == 1:
+                camera_tw_shuffled = camera_tw
+            else:
+                camera_tw_data = camera_tw.tensor()
+                camera_tw_shuffled = type(camera_tw)(_gather_candidate(camera_tw_data))
+            pose_world_cam = self.p3d_cameras.pose_world_cam
+            pose_batch = pose_world_cam.tensor()
+            pose_shuffled = PoseTW(_gather_candidate(pose_batch))
+            p3d_cameras = NativeCameraBatch(camera_tw=camera_tw_shuffled, pose_world_cam=pose_shuffled)
 
         return VinOracleBatch(
             efm_snippet_view=self.efm_snippet_view,
@@ -452,10 +472,18 @@ class VinOracleBatch:
             dim=0,
         )
 
-        p3d_cameras = cls._stack_p3d_cameras(
-            [sample.p3d_cameras for sample in samples],
-            target_len=max_candidates,
-        )
+        if all(is_pytorch3d_camera_batch(sample.p3d_cameras) for sample in samples):
+            p3d_cameras = cls._stack_p3d_cameras(
+                [sample.p3d_cameras for sample in samples],
+                target_len=max_candidates,
+            )
+        elif all(is_native_camera_batch(sample.p3d_cameras) for sample in samples):
+            p3d_cameras = cls._stack_native_camera_batches(
+                [sample.p3d_cameras for sample in samples],
+                target_len=max_candidates,
+            )
+        else:
+            raise ValueError("Mixed camera batch types in VinOracleBatch.collate are not supported.")
 
         scene_id = [sample.scene_id for sample in samples]
         snippet_id = [sample.snippet_id for sample in samples]
@@ -705,6 +733,46 @@ class VinOracleBatch:
             if zfar is not None:
                 cameras_out.zfar = zfar
             return cameras_out
+
+    @classmethod
+    def _stack_native_camera_batches(
+        cls,
+        cameras: list[NativeCameraBatch],
+        *,
+        target_len: int,
+    ) -> NativeCameraBatch:
+        """Stack padded native camera batches into one batched native batch."""
+
+        if not cameras:
+            raise ValueError("No native camera batches provided for collation.")
+        camera_tw_tensors: list[Tensor] = []
+        pose_tensors: list[Tensor] = []
+        for cam in cameras:
+            cam_data = cam.camera_tw.tensor()
+            if cam_data.ndim == 1:
+                cam_data = cam_data.unsqueeze(0)
+            cam_data = cls._pad_candidate_poses(PoseTW(cam.pose_world_cam.tensor()), target_len=target_len)
+            pose_data = cam.pose_world_cam.tensor()
+            if pose_data.ndim == 1:
+                pose_data = pose_data.unsqueeze(0)
+            pose_data = cls._pad_candidate_poses(PoseTW(pose_data), target_len=target_len)
+            camera_data = cam.camera_tw.tensor()
+            if camera_data.ndim == 1:
+                camera_data = camera_data.unsqueeze(0).expand(target_len, -1).clone()
+            elif camera_data.shape[0] != target_len:
+                if camera_data.shape[0] > target_len:
+                    camera_data = camera_data[:target_len]
+                else:
+                    camera_data = torch.cat(
+                        [camera_data, camera_data[-1:].expand(target_len - camera_data.shape[0], -1).clone()],
+                        dim=0,
+                    )
+            camera_tw_tensors.append(camera_data)
+            pose_tensors.append(pose_data)
+        return NativeCameraBatch(
+            camera_tw=type(cameras[0].camera_tw)(torch.cat(camera_tw_tensors, dim=0)),
+            pose_world_cam=PoseTW(torch.cat(pose_tensors, dim=0)),
+        )
 
     @classmethod
     def _stack_tensor_field(cls, values: list[Tensor | None], *, name: str) -> Tensor | None:

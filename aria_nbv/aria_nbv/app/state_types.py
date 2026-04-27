@@ -11,19 +11,21 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 
 from ..data_handling import AseEfmDatasetConfig, EfmSnippetView, VinOracleBatch
-from ..lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ..pipelines import OracleRriLabelerConfig
 from ..pose_generation.types import CandidateSamplingResult
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..rri_metrics.types import RriResult
-from ..vin.experimental.types import VinForwardDiagnostics
-from ..vin.types import VinPrediction
+
+if TYPE_CHECKING:
+    from ..lightning.aria_nbv_experiment import AriaNBVExperimentConfig
+    from ..vin.experimental.types import VinForwardDiagnostics
+    from ..vin.types import VinPrediction
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -90,6 +92,7 @@ class DepthCache:
 @dataclass(slots=True)
 class PointCloudCache:
     depth_key: str | None = None
+    cfg_sig: str | None = None
     by_stride: dict[int, CandidatePointClouds] | None = None
 
 
@@ -105,7 +108,7 @@ class VinDiagnosticsState:
     """Session-scoped cache for VIN diagnostics."""
 
     cfg_sig: str | None = None
-    experiment: AriaNBVExperimentConfig | None = None
+    experiment: "AriaNBVExperimentConfig" | None = None
     module: Any | None = None
     datamodule: Any | None = None
     offline_cache_sig: str | None = None
@@ -119,8 +122,8 @@ class VinDiagnosticsState:
     offline_snippet: EfmSnippetView | None = None
     offline_snippet_error: str | None = None
     batch: VinOracleBatch | None = None
-    pred: VinPrediction | None = None
-    debug: VinForwardDiagnostics | None = None
+    pred: "VinPrediction" | None = None
+    debug: "VinForwardDiagnostics" | None = None
     error: str | None = None
     summary_key: str | None = None
     summary_text: str | None = None

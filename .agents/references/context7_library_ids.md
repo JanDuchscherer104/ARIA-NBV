@@ -16,6 +16,7 @@ Use these library IDs with the Context7 MCP tools when external library document
 - `/isl-org/open3d` - Open3D. Used for point-cloud visualization and geometry inspection utilities.
 - `/pydantic/pydantic` - Pydantic. Used for strongly typed configs, validation, and config-as-factory patterns across the runtime.
 - `/jcrist/msgspec` - msgspec. Used for typed manifest/index serialization and safe structured payload encoding in the new offline data stack.
+- `/websites/modular_mojo` - Modular Mojo docs. Used for Python interop, raw-pointer buffer access, CPU SIMD and parallelization, GPU and Metal APIs, and Apple-Silicon kernel work.
 - `/websites/streamlit_io` - Streamlit. Used for the interactive dashboard/app surfaces that inspect cache, VIN, and attribution outputs.
 - `/websites/typst_app` - Typst. Used for paper/slides authoring and generated research artifacts under `docs/typst/`.
 - `/websites/quarto` - Quarto. Used for documentation/report generation in the `docs/contents/` workflow.

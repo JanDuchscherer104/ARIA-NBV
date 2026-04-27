@@ -22,7 +22,6 @@ import numpy as np
 import torch
 from efm3d.aria.pose import PoseTW
 from pydantic import Field, field_validator
-from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from torch import Tensor
 from torch.utils.data import Dataset
 
@@ -31,6 +30,7 @@ from ..pose_generation.types import CandidateSamplingResult
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..utils import BaseConfig, Console, Verbosity
+from ..utils.pytorch3d_compat import PerspectiveCameras
 from ..vin.types import EvlBackboneOutput
 from ._offline_format import VinOfflineIndexRecord
 from ._offline_store import VinOfflineStoreConfig, VinOfflineStoreReader

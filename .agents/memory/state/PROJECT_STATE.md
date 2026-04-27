@@ -15,6 +15,12 @@ This repository develops an active next-best-view planner for egocentric indoor 
 ## Current Architecture
 The current stack has three main layers: ASE and EFM-facing data access, oracle label generation for candidate views, and VIN-style learned scoring on top of frozen backbone features. Candidate viewpoints are sampled around the reference trajectory pose, rendered against ground-truth meshes, fused with semi-dense SLAM points, and scored with RRI-derived labels. Training and diagnostics live in the `aria_nbv` package under `aria_nbv/aria_nbv`, while Quarto and Typst document theory, implementation, and experiments.
 
+## Toolchain and Dependencies
+- Python 3.11 package in `aria_nbv/`, managed with `uv`.
+- ML and geometry core: PyTorch, PyTorch3D, PyTorch Lightning, NumPy, SciPy, Pydantic, Open3D, trimesh, zarr, Optuna, Weights & Biases, and an experimental Mojo toolchain for Apple-Silicon oracle kernels.
+- Aria / EFM stack: `projectaria-tools`, `projectaria-atek`, and local `efm3d`.
+- Quality and verification: Ruff, MyPy, and Pytest.
+
 ## Stable Conventions
 - Treat `docs/typst/paper/main.typ` as the highest-level project narrative and sync Quarto docs to it.
 - Use the uv-managed environment in `aria_nbv/.venv`.
@@ -23,6 +29,7 @@ The current stack has three main layers: ASE and EFM-facing data access, oracle 
 - Keep the repo-root `AGENTS.md` thin and policy-only, keep surface-specific guidance in nested `AGENTS.md`, keep repeatable workflows in `.agents/skills/`, and keep generated context in `docs/_generated/context/`.
 - Keep operator aids and long-form conventions in `.agents/references/`; canonical state docs should remain focused on current truth.
 - The default Codex bootstrap is `docs/typst/paper/main.typ` + `.agents/memory/state/` + the compact `docs/_generated/context/source_index.md`, with broader references retrieved on demand.
+- Oracle RRI backend selection is profile-driven: `OracleRriLabelerConfig` defaults to `pytorch3d_cuda` even on Apple hosts, and `apple_mps_mojo` must be selected explicitly. Core configs must not silently switch to Mojo because a local PyTorch3D install is missing or broken.
 - Treat `make context-contracts` / `scripts/nbv_get_context.sh contracts` as the preferred contract surface; heavy generated artifacts are fallback-only.
 - Treat `aria_nbv.data_handling` as the canonical owner of raw snippet, oracle-cache, VIN-cache, and cache-coverage contracts, and `aria_nbv.utils.data_plotting` as the canonical owner of shared snippet plotting; mirrored `aria_nbv.data` compatibility modules were removed.
 - Remaining legacy oracle-cache / VIN-snippet-cache runtime, UI, CLI, and dedicated test surfaces are tagged with `NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION` so the final removal sweep can be done via one grep query.
@@ -32,7 +39,7 @@ The current stack has three main layers: ASE and EFM-facing data access, oracle 
 - The immutable VIN offline store now uses a strict version-4 runtime contract: optional diagnostic payloads are indexed MessagePack blobs plus `.offsets.npy` sidecars, and older immutable-store layouts must be rebuilt through the migration tooling instead of being loaded via runtime compatibility branches.
 
 ## Active Experiments
-The project is actively iterating on VIN variants, semidense projection cues, candidate generation behavior, and documentation alignment between code, paper, and slides.
+The project is actively iterating on VIN variants, semidense projection cues, candidate generation behavior, and an explicit `apple_mps_mojo` backend profile for oracle collision, rendering, point-cloud, and RRI kernels on Apple Silicon, while keeping `pytorch3d_cuda` as the default parity baseline. The Apple profile keeps candidate sampling on a profile-owned CPU fallback because the current EFM/PoseTW-heavy sampling path is not stable on MPS in the Streamlit workflow.
 
 ## Risks and Pitfalls
 - Validation can be disabled by config defaults if Lightning is misconfigured.

@@ -6,15 +6,18 @@ controller methods and remain responsible only for UI and plotting.
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 
 from ..data_handling import EfmSnippetView
+from ..pipelines import OracleBackendProfile, OracleRriLabelerConfig
 from ..pose_generation.types import CandidateSamplingResult
-from ..rendering import CandidateDepths, build_candidate_pointclouds
+from ..rendering import CandidateDepths
 from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..rri_metrics.types import RriResult
 from ..utils import Console
+from .stage_subprocess import run_stage_subprocess
 from .state_types import (
     AppState,
     candidates_key,
@@ -102,7 +105,8 @@ class PipelineController:
         """Generate and cache candidates for the current sample."""
 
         sample = self.get_sample(force=False)
-        cfg = self.state.labeler_cfg.generator
+        resolved_labeler_cfg = self.state.labeler_cfg.resolved(require_available=True)
+        cfg = resolved_labeler_cfg.generator
         cfg_sig = config_signature(cfg)
         skey = sample_key(sample)
         cache = self.state.candidates
@@ -110,9 +114,18 @@ class PipelineController:
         if not force and cache.candidates is not None and cache.cfg_sig == cfg_sig and cache.sample_key == skey:
             return cache.candidates
 
-        generator = cfg.setup_target()
         with self.progress("Generating candidates..."):
-            candidates = generator.generate_from_typed_sample(sample)
+            if self._use_stage_subprocess(resolved_labeler_cfg):
+                result = run_stage_subprocess(
+                    "generate_candidates",
+                    self._stage_payload(resolved_labeler_cfg),
+                )
+                candidates = CandidateSamplingResult.from_serializable(
+                    result["candidates"],
+                    device=cfg.device,
+                )
+            else:
+                candidates = cfg.setup_target().generate_from_typed_sample(sample)
 
         cache.cfg_sig = cfg_sig
         cache.sample_key = skey
@@ -126,7 +139,8 @@ class PipelineController:
 
         sample = self.get_sample(force=False)
         candidates = self.get_candidates(force=False)
-        cfg = self.state.labeler_cfg.depth
+        resolved_labeler_cfg = self.state.labeler_cfg.resolved(require_available=True)
+        cfg = resolved_labeler_cfg.depth
         cfg_sig = config_signature(cfg)
         skey = sample_key(sample)
         ckey = candidates_key(candidates)
@@ -141,16 +155,35 @@ class PipelineController:
         ):
             return cache.depths
 
-        renderer = cfg.setup_target()
         with self.progress("Rendering depth maps..."):
-            depths = renderer.render(sample=sample, candidates=candidates)
+            if self._use_stage_subprocess(resolved_labeler_cfg):
+                depths, pcs = self._compute_renders_subprocess(
+                    resolved_labeler_cfg=resolved_labeler_cfg,
+                    candidates=candidates,
+                    stride=int(self.state.labeler_cfg.backprojection_stride),
+                )
+                self._store_pointcloud_cache(
+                    depths=depths,
+                    pcs=pcs,
+                    pointcloud_cfg_sig=config_signature(
+                        resolved_labeler_cfg.pointcloud.model_copy(
+                            update={"backprojection_stride": int(self.state.labeler_cfg.backprojection_stride)},
+                        ),
+                    ),
+                    stride=int(self.state.labeler_cfg.backprojection_stride),
+                )
+            else:
+                depths = cfg.setup_target().render(sample=sample, candidates=candidates)
 
         cache.cfg_sig = cfg_sig
         cache.sample_key = skey
         cache.candidates_key = ckey
         cache.depths = depths
 
-        self._invalidate_after_depths()
+        if self._use_stage_subprocess(resolved_labeler_cfg):
+            self.state.rri = type(self.state.rri)()
+        else:
+            self._invalidate_after_depths()
         return depths
 
     def get_renders(self, *, force: bool) -> tuple[CandidateDepths, CandidatePointClouds]:
@@ -172,9 +205,15 @@ class PipelineController:
         sample = self.get_sample(force=False)
         depths = self.get_depths(force=False)
         depth_key = depths_key(depths)
+        resolved_labeler_cfg = self.state.labeler_cfg.resolved(require_available=True)
+        cfg = resolved_labeler_cfg.pointcloud.model_copy(
+            update={"backprojection_stride": int(stride)},
+        )
+        cfg_sig = config_signature(cfg)
         pcs_cache = self.state.pcs
-        if pcs_cache.by_stride is None or pcs_cache.depth_key != depth_key:
+        if pcs_cache.by_stride is None or pcs_cache.depth_key != depth_key or pcs_cache.cfg_sig != cfg_sig:
             pcs_cache.depth_key = depth_key
+            pcs_cache.cfg_sig = cfg_sig
             pcs_cache.by_stride = {}
 
         assert pcs_cache.by_stride is not None
@@ -182,7 +221,19 @@ class PipelineController:
             return pcs_cache.by_stride[stride]
 
         with self.progress("Backprojecting depth maps..."):
-            pcs = build_candidate_pointclouds(sample, depths, stride=stride)
+            if self._use_stage_subprocess(resolved_labeler_cfg):
+                candidates = self.get_candidates(force=False)
+                depths_sub, pcs = self._compute_renders_subprocess(
+                    resolved_labeler_cfg=resolved_labeler_cfg,
+                    candidates=candidates,
+                    stride=int(stride),
+                )
+                self.state.depth.depths = depths_sub
+                self.state.depth.cfg_sig = config_signature(resolved_labeler_cfg.depth)
+                self.state.depth.sample_key = sample_key(sample)
+                self.state.depth.candidates_key = candidates_key(candidates)
+            else:
+                pcs = cfg.setup_target().build(sample, depths)
 
         pcs_cache.by_stride[stride] = pcs
         # Only invalidate RRI if we potentially overwrote the stride used by the oracle labeler.
@@ -191,16 +242,16 @@ class PipelineController:
         return pcs
 
     def run_labeler(self, *, force: bool) -> tuple[CandidateDepths, CandidatePointClouds, RriResult]:
-        """Run the full oracle label pipeline and cache the outputs.
+        """Run or refresh oracle RRI from the current resolved stage configs.
 
-        Uses :class:`~aria_nbv.pipelines.OracleRriLabeler` under the hood so the
-        dashboard and training-time labeling share the exact same execution path.
+        The app reuses cached candidates, renders, and candidate point clouds
+        when available so the RRI page does not unnecessarily rerun earlier
+        stages that the user already inspected on the candidate or render pages.
         """
 
         sample = self.get_sample(force=False)
-        cfg = self.state.labeler_cfg
+        cfg = self.state.labeler_cfg.resolved(require_available=True)
         cfg_sig = config_signature(cfg)
-        skey = sample_key(sample)
 
         cache = self.state.rri
         if (
@@ -216,32 +267,48 @@ class PipelineController:
             if pcs_cached is not None:
                 return self.state.depth.depths, pcs_cached, cache.result
 
-        labeler = cfg.setup_target()
+        depths = self.get_depths(force=False)
+        pcs = self.get_candidate_pointclouds(stride=int(cfg.backprojection_stride), force=False)
+        if sample.mesh_verts is None or sample.mesh_faces is None:
+            raise ValueError("Oracle RRI scoring requires mesh_verts and mesh_faces on the sample.")
         with self.progress("Running oracle label pipeline..."):
-            batch = labeler.run(sample)
+            if self._use_stage_subprocess(cfg):
+                result = run_stage_subprocess(
+                    "score_rri",
+                    {
+                        **self._stage_payload(cfg),
+                        "pcs": pcs.to_serializable(),
+                    },
+                )
+                rri = RriResult.from_serializable(result["rri"], device=cfg.device)
+            else:
+                rri = cfg.oracle.setup_target().score(
+                    points_t=pcs.semidense_points,
+                    points_q=pcs.points,
+                    lengths_q=pcs.lengths,
+                    gt_verts=sample.mesh_verts.to(device=pcs.points.device, dtype=pcs.points.dtype),
+                    gt_faces=sample.mesh_faces.to(device=pcs.points.device),
+                    extend=pcs.occupancy_bounds,
+                )
 
-        # Update caches from the returned batch.
-        self.state.candidates.candidates = batch.candidates
-        self.state.candidates.cfg_sig = config_signature(cfg.generator)
-        self.state.candidates.sample_key = skey
-
-        self.state.depth.depths = batch.depths
-        self.state.depth.cfg_sig = config_signature(cfg.depth)
-        self.state.depth.sample_key = skey
-        self.state.depth.candidates_key = candidates_key(batch.candidates)
-
-        dkey = depths_key(batch.depths)
-        if self.state.pcs.by_stride is None or self.state.pcs.depth_key != dkey:
+        dkey = depths_key(depths)
+        pointcloud_cfg_sig = config_signature(cfg.pointcloud)
+        if (
+            self.state.pcs.by_stride is None
+            or self.state.pcs.depth_key != dkey
+            or self.state.pcs.cfg_sig != pointcloud_cfg_sig
+        ):
             self.state.pcs.depth_key = dkey
+            self.state.pcs.cfg_sig = pointcloud_cfg_sig
             self.state.pcs.by_stride = {}
         assert self.state.pcs.by_stride is not None
-        self.state.pcs.by_stride[int(cfg.backprojection_stride)] = batch.candidate_pcs
+        self.state.pcs.by_stride[int(cfg.backprojection_stride)] = pcs
 
         cache.cfg_sig = cfg_sig
-        cache.pcs_key = pcs_key(batch.candidate_pcs)
-        cache.result = batch.rri
+        cache.pcs_key = pcs_key(pcs)
+        cache.result = rri
 
-        return batch.depths, batch.candidate_pcs, batch.rri
+        return depths, pcs, rri
 
     # ------------------------------------------------------------------ invalidation
     def _invalidate_after_data(self) -> None:
@@ -261,6 +328,60 @@ class PipelineController:
 
     def _invalidate_after_pcs(self) -> None:
         self.state.rri = type(self.state.rri)()
+
+    def _use_stage_subprocess(self, resolved_labeler_cfg: OracleRriLabelerConfig) -> bool:
+        return (
+            resolved_labeler_cfg.backend_profile == OracleBackendProfile.APPLE_MPS_MOJO
+            and threading.current_thread() is not threading.main_thread()
+        )
+
+    def _stage_payload(self, resolved_labeler_cfg: OracleRriLabelerConfig) -> dict[str, object]:
+        dataset_payload = self.state.dataset_cfg.model_dump(mode="python", round_trip=True)
+        dataset_payload["device"] = str(resolved_labeler_cfg.device)
+        return {
+            "dataset_cfg": dataset_payload,
+            "sample_idx": int(self.state.sample_idx),
+            "labeler_cfg": self.state.labeler_cfg.model_dump(mode="python", round_trip=True),
+        }
+
+    def _compute_renders_subprocess(
+        self,
+        *,
+        resolved_labeler_cfg: OracleRriLabelerConfig,
+        candidates: CandidateSamplingResult,
+        stride: int,
+    ) -> tuple[CandidateDepths, CandidatePointClouds]:
+        result = run_stage_subprocess(
+            "render_depths_and_pcs",
+            {
+                **self._stage_payload(resolved_labeler_cfg),
+                "candidates": candidates.to_serializable(),
+                "stride": int(stride),
+            },
+        )
+        depths = CandidateDepths.from_serializable(result["depths"], device=resolved_labeler_cfg.depth.device)
+        pcs = CandidatePointClouds.from_serializable(result["pcs"], device=resolved_labeler_cfg.device)
+        return depths, pcs
+
+    def _store_pointcloud_cache(
+        self,
+        *,
+        depths: CandidateDepths,
+        pcs: CandidatePointClouds,
+        pointcloud_cfg_sig: str,
+        stride: int,
+    ) -> None:
+        dkey = depths_key(depths)
+        if (
+            self.state.pcs.by_stride is None
+            or self.state.pcs.depth_key != dkey
+            or self.state.pcs.cfg_sig != pointcloud_cfg_sig
+        ):
+            self.state.pcs.depth_key = dkey
+            self.state.pcs.cfg_sig = pointcloud_cfg_sig
+            self.state.pcs.by_stride = {}
+        assert self.state.pcs.by_stride is not None
+        self.state.pcs.by_stride[int(stride)] = pcs
 
 
 __all__ = ["PipelineController"]

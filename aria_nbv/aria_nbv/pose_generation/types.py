@@ -52,6 +52,7 @@ class ViewDirectionMode(StrEnum):
 class CollisionBackend(StrEnum):
     """Backend for collision tests."""
 
+    MOJO = "mojo"
     P3D = "pytorch3d"
     PYEMBREE = "pyembree"
     TRIMESH = "trimesh"
@@ -78,6 +79,7 @@ class CandidateContext:
 
     rule_masks: dict[str, torch.Tensor] = field(default_factory=dict)
     debug: dict[str, Any] = field(default_factory=dict)
+    runtime_cache: dict[str, Any] = field(default_factory=dict)
 
     def record_mask(self, name: str, mask: torch.Tensor) -> None:
         """Store a copy of the cumulative validity mask for diagnostics."""

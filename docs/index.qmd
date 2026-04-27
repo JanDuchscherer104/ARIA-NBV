@@ -38,6 +38,7 @@ future-work page.
 - [ASE Data Pipeline & Streamlit Usage](contents/impl/data_pipeline_overview.qmd)
 - [aria_nbv Implementation Overview](contents/impl/oracle_rri_impl.qmd)
 - [Computing RRI with Ground Truth Meshes](contents/impl/rri_computation.qmd)
+- [Apple-Silicon Mojo Oracle Backend](contents/impl/apple_silicon_mojo_oracle_backend.qmd)
 
 ## Current model and training docs
 

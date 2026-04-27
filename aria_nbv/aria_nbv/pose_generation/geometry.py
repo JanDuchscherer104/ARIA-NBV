@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import torch
 
+from ..utils.pytorch3d_compat import import_point_mesh_distance_ops
+
 DEVICE_FWD = [0.0, 0.0, 1.0]
 
 
@@ -19,10 +21,7 @@ def point_mesh_distance(points: torch.Tensor, verts: torch.Tensor, faces: torch.
         ``(N,)`` distances in metres on the same device/dtype as ``points``.
     """
 
-    from pytorch3d.loss.point_mesh_distance import (  # type: ignore[import-untyped]
-        _DEFAULT_MIN_TRIANGLE_AREA,
-        point_face_distance,
-    )
+    default_min_triangle_area, _, point_face_distance = import_point_mesh_distance_ops()
 
     device = points.device
     points = points.to(device)
@@ -40,7 +39,7 @@ def point_mesh_distance(points: torch.Tensor, verts: torch.Tensor, faces: torch.
         tris,
         tris_first_idx,
         max_points,
-        _DEFAULT_MIN_TRIANGLE_AREA,
+        default_min_triangle_area,
     )
     return torch.sqrt(dist_sq)
 

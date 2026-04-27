@@ -7,8 +7,9 @@ format: html
 
 ::: {.callout-note title="Source anchors"}
 - Orchestrator: [`OracleRriLabelerConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L46), [`OracleRriLabeler`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L80)
+- Backend profiles: [`oracle_backend_profile.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_backend_profile.py#L1)
 - Candidate generation: [`CandidateViewGeneratorConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L50), [`CandidateViewGenerator`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L319), [`candidate_generation_rules.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py#L1)
-- Rendering and backprojection: [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108), [`Pytorch3DDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L79), [`build_candidate_pointclouds`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_pointclouds.py#L64)
+- Rendering and backprojection: [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108), [`Pytorch3DDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L79), [`CandidatePointCloudBuilder`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_pointclouds.py#L77)
 - Scoring and post-processing: [`OracleRRIConfig`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L26), [`OracleRRI`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L34), [`RriOrdinalBinner`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/rri_binning.py#L88)
 - Mesh preprocessing: [`MeshProcessSpec`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/mesh_cache.py#L27), [`load_or_process_mesh`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/mesh_cache.py#L132)
 :::
@@ -16,19 +17,20 @@ format: html
 # Current internal pipeline
 
 The repo does not implement oracle RRI as a single monolith. The live pipeline
-is a thin orchestrator around four owners:
+is a thin orchestrator around four owners, with backend selection controlled by
+one top-level profile:
 
 1. [`OracleRriLabeler`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py#L80) pulls a typed [`EfmSnippetView`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/data_handling/efm_views.py#L479), resolves mesh preprocessing, and wires the rest of the stages together.
 2. [`CandidateViewGenerator`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation.py#L319) samples shell candidates and delegates geometric rejection to the rule objects in [`candidate_generation_rules.py`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py#L1).
-3. [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108) selects valid candidates and uses [`Pytorch3DDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L79) to render candidate depth maps.
-4. [`build_candidate_pointclouds`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_pointclouds.py#L64) backprojects those depths, and [`OracleRRI`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L34) turns the before/after point sets into per-candidate RRI diagnostics.
+3. [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108) selects valid candidates and dispatches either to the default [`Pytorch3DDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L79) path or the explicit Apple/Mojo profile.
+4. [`CandidatePointCloudBuilder`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_pointclouds.py#L77) backprojects those depths, and [`OracleRRI`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rri_metrics/oracle_rri.py#L34) turns the before/after point sets into per-candidate RRI diagnostics through backend-selectable distance kernels.
 
 ```{mermaid}
 flowchart LR
     A[EfmSnippetView] --> B[OracleRriLabeler]
     B --> C[CandidateViewGenerator]
     C --> D[CandidateDepthRenderer]
-    D --> E[build_candidate_pointclouds]
+    D --> E[CandidatePointCloudBuilder]
     E --> F[OracleRRI]
     F --> G[RriOrdinalBinner]
 ```
@@ -47,11 +49,18 @@ flowchart LR
 - [`PositionSampler`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/positional_sampling.py#L20) handles center sampling, while [`OrientationBuilder`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/orientations.py#L21) converts sampled centers into candidate camera poses.
 - The rejection rules are intentionally factored into [`MinDistanceToMeshRule`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py#L39), [`PathCollisionRule`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py#L93), and [`FreeSpaceRule`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py#L171).
 
+## Backend profiles
+
+- `OracleRriLabelerConfig.backend_profile` defaults to `pytorch3d_cuda`, even on Apple machines. This preserves the workstation/CUDA path as the baseline and may fail locally if PyTorch3D or CUDA is unavailable.
+- `apple_mps_mojo` is explicit opt-in. It uses Torch MPS for render/scoring tensors, an explicit CPU fallback for candidate sampling, and Mojo replacements for the PyTorch3D/custom-kernel stages: collision, depth rendering, point-cloud backprojection, and oracle distance.
+- The resolver applies `CollisionBackend`, `DepthRendererBackend`, `PointCloudBackend`, `OracleDistanceBackend`, and stage devices together. Mixed production combinations are rejected; per-stage overrides are reserved for tests and diagnostics.
+- Streamlit exposes the same global profile and accelerator selectors as the offline writer and direct `OracleRriLabelerConfig` path. The app reports missing CUDA/PyTorch3D or MPS/Mojo prerequisites instead of silently changing profiles.
+
 ## Depth rendering and candidate point clouds
 
 - [`CandidateDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py#L108) is the contract that the app and labeler both call.
-- [`Pytorch3DDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L79) owns the actual rasterization path and camera slicing logic.
-- [`build_candidate_pointclouds`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_pointclouds.py#L64) performs the NDC-aware backprojection and returns candidate-local point clouds plus per-candidate lengths for downstream scoring.
+- [`Pytorch3DDepthRenderer`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/pytorch3d_depth_renderer.py#L79) remains the default rasterization path, while the optional Mojo path is reserved for Apple-Silicon acceleration work.
+- [`CandidatePointCloudBuilder`](https://github.com/JanDuchscherer104/NBV/blob/main/aria_nbv/aria_nbv/rendering/candidate_pointclouds.py#L77) owns the backend-driven backprojection stage and returns candidate-local point clouds plus per-candidate lengths for downstream scoring.
 
 ## RRI scoring and label post-processing
 
@@ -62,7 +71,8 @@ flowchart LR
 # External dependencies we lean on
 
 - **EFM3D** provides `PoseTW`, `CameraTW`, typed batch conventions, and depth/point-cloud helpers that the pipeline reuses rather than reimplementing.
-- **PyTorch3D** provides the GPU depth-rendering path and point/mesh distance kernels used by the current scorer.
+- **PyTorch3D** provides the default CUDA workstation profile and the reference point/mesh distance kernels used for parity.
+- **Mojo** provides the Apple-Silicon profile kernels for collision, rendering, point-cloud, and oracle distance work. It is never selected implicitly by PyTorch3D import failure.
 - **trimesh** is used for GT mesh IO, coarse preprocessing, and geometry utilities before the tensors move into the rendering and scoring stages.
 
 # Where to dive deeper

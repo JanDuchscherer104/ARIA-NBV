@@ -19,8 +19,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import torch
-from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 
+from ..utils.pytorch3d_compat import PerspectiveCameras
+from .camera_batches import require_pytorch3d_camera_batch
 from .candidate_depth_renderer import CandidateDepths
 
 # def backproject_depth(
@@ -183,12 +184,13 @@ def backproject_batch(
 
     depths = batch.depths
     valid_masks = batch.depths_valid_mask
-    cameras = batch.p3d_cameras
+    camera_batch = batch.resolved_camera_batch()
 
     if depths.ndim != 3:
         raise ValueError(f"Expected (B,H,W) depths, got {tuple(depths.shape)}")
-    if cameras is None:
-        raise ValueError("CandidateDepths.p3d_cameras is required for backprojection.")
+    if camera_batch is None:
+        raise ValueError("CandidateDepths camera batch is required for backprojection.")
+    cameras = require_pytorch3d_camera_batch(camera_batch)
 
     num = depths.shape[0]
     use_idxs = list(candidate_indices) if candidate_indices is not None else list(range(num))

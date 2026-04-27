@@ -12,13 +12,9 @@ expose the accuracy/completeness split described in ``surface_metrics.qmd``.
 from __future__ import annotations
 
 import torch
-from pytorch3d.loss.point_mesh_distance import (  # type: ignore[import-untyped]
-    _DEFAULT_MIN_TRIANGLE_AREA,
-    face_point_distance,
-    point_face_distance,
-)
 from torch import Tensor
 
+from ..utils.pytorch3d_compat import import_point_mesh_distance_ops
 from .types import DistanceBreakdown
 
 
@@ -54,6 +50,7 @@ def chamfer_point_mesh_batched(
 
     if points.ndim != 3:
         raise ValueError(f"Expected batched points of shape (C,P,3); got {tuple(points.shape)}")
+    default_min_triangle_area, face_point_distance, point_face_distance = import_point_mesh_distance_ops()
 
     bsz, max_p, _ = points.shape
     lengths = lengths.clamp(max=max_p)
@@ -78,7 +75,7 @@ def chamfer_point_mesh_batched(
     num_tris_per_mesh = torch.full((bsz,), f, device=points.device, dtype=points.dtype)
 
     point_to_face = point_face_distance(
-        points_packed, points_first_idx, tris, tris_first_idx, max_points, _DEFAULT_MIN_TRIANGLE_AREA
+        points_packed, points_first_idx, tris, tris_first_idx, max_points, default_min_triangle_area
     )
     num_points_per_cloud = lengths.to(points.dtype).clamp(min=1)
     weights_p = 1.0 / num_points_per_cloud.gather(0, point_to_cloud_idx).float()
@@ -86,7 +83,7 @@ def chamfer_point_mesh_batched(
     acc.scatter_add_(0, point_to_cloud_idx, point_to_face * weights_p)
 
     face_to_point = face_point_distance(
-        points_packed, points_first_idx, tris, tris_first_idx, max_tris, _DEFAULT_MIN_TRIANGLE_AREA
+        points_packed, points_first_idx, tris, tris_first_idx, max_tris, default_min_triangle_area
     )
     weights_t = 1.0 / num_tris_per_mesh.gather(0, tri_to_mesh_idx).float()
     comp = torch.zeros(bsz, device=points.device, dtype=points.dtype)

@@ -8,17 +8,53 @@ semi-dense SLAM reconstruction, and a combined occupancy extent for cropping.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 import torch
-from pytorch3d.renderer.cameras import (
-    PerspectiveCameras,  # type: ignore[import-untyped]
-)
+from efm3d.aria import PoseTW
+from pydantic import Field
 
 from ..data_handling import EfmSnippetView
+from ..utils import BaseConfig
+from ..utils.mojo_subprocess import run_mojo_subprocess
+from ..utils.pytorch3d_compat import PerspectiveCameras
 from ..utils.typed_payloads import from_serializable, to_serializable
+from .camera_batches import NativeCameraBatch, is_native_camera_batch, require_pytorch3d_camera_batch
 from .candidate_depth_renderer import CandidateDepths
+from .mojo_backend import is_mojo_thread_context_supported, unproject_candidate_points_mojo
 
 Tensor = torch.Tensor
+
+
+class PointCloudBackend(StrEnum):
+    """Backend selector for candidate point-cloud construction."""
+
+    PYTORCH3D = "pytorch3d"
+    MOJO = "mojo"
+
+
+class MojoPointCloudBuilderConfig(BaseConfig):
+    """Nested config for the Mojo point-cloud builder path."""
+
+    workers: int | None = None
+    """Optional worker override for the Mojo point-cloud kernel."""
+
+
+class CandidatePointCloudBuilderConfig(BaseConfig):
+    """Config-as-factory wrapper for :class:`CandidatePointCloudBuilder`."""
+
+    @property
+    def target(self) -> type["CandidatePointCloudBuilder"]:
+        return CandidatePointCloudBuilder
+
+    backend: PointCloudBackend = PointCloudBackend.PYTORCH3D
+    """Backend used for depth backprojection and compaction."""
+
+    backprojection_stride: int = 1
+    """Pixel stride used when backprojecting depth maps."""
+
+    mojo: MojoPointCloudBuilderConfig = Field(default_factory=MojoPointCloudBuilderConfig)
+    """Nested config for the Mojo path."""
 
 
 @dataclass(slots=True)
@@ -61,41 +97,88 @@ class CandidatePointClouds:
         return from_serializable(cls, payload, device=device)
 
 
+class CandidatePointCloudBuilder:
+    """Backend-driven builder for candidate point clouds."""
+
+    config: CandidatePointCloudBuilderConfig
+
+    def __init__(self, config: CandidatePointCloudBuilderConfig) -> None:
+        self.config = config
+
+    def build(
+        self,
+        sample: EfmSnippetView,
+        batch: CandidateDepths,
+    ) -> CandidatePointClouds:
+        """Convert stacked depth maps into batched point clouds and fuse with SLAM."""
+
+        depths = batch.depths
+        if depths.ndim != 3:
+            raise ValueError(f"Expected depths of shape (B,H,W), got {tuple(depths.shape)}")
+
+        if self.config.backend == PointCloudBackend.PYTORCH3D:
+            camera_batch = batch.resolved_camera_batch()
+            if camera_batch is None:
+                raise ValueError("PyTorch3D point-cloud backend requires a camera batch.")
+            cameras = require_pytorch3d_camera_batch(camera_batch)
+            padded, lengths = _backproject_depths_p3d_batch(
+                depths=depths,
+                mask_valid=batch.depths_valid_mask,
+                cameras=cameras,
+                stride=int(self.config.backprojection_stride),
+            )
+        else:
+            camera_batch = batch.resolved_camera_batch()
+            if camera_batch is None:
+                raise ValueError("Mojo point-cloud backend requires a camera batch.")
+            if not is_mojo_thread_context_supported():
+                if not is_native_camera_batch(camera_batch):
+                    raise TypeError("Thread-compatible Mojo point-cloud fallback requires a native camera batch.")
+                payload = {
+                    "depths": depths.detach().to(device="cpu"),
+                    "mask_valid": batch.depths_valid_mask.detach().to(device="cpu"),
+                    "poses": batch.poses.tensor().detach().to(device="cpu"),
+                    "camera": camera_batch.camera_tw.tensor().detach().to(device="cpu"),
+                    "stride": int(self.config.backprojection_stride),
+                }
+                result = run_mojo_subprocess("unproject_points", payload)
+                padded = result["points"].to(device=depths.device, dtype=depths.dtype)
+                lengths = result["lengths"].to(device=depths.device)
+            else:
+                padded, lengths = _backproject_depths_mojo_batch(
+                    depths=depths,
+                    mask_valid=batch.depths_valid_mask,
+                    poses=batch.poses,
+                    camera_batch=camera_batch,
+                    stride=int(self.config.backprojection_stride),
+                )
+
+        device, dtype = padded.device, padded.dtype
+        semidense_pts = sample.semidense.collapse_points()
+        semidense_pts_t = torch.as_tensor(semidense_pts, device=device, dtype=dtype)
+        semidense_len = torch.tensor([semidense_pts_t.shape[0]], device=device, dtype=torch.long)
+
+        occupancy_bounds = _compute_bounds(sample.get_occupancy_extend(), padded, lengths, semidense_pts_t)
+
+        return CandidatePointClouds(
+            points=padded,
+            lengths=lengths,
+            semidense_points=semidense_pts_t,
+            semidense_length=semidense_len,
+            occupancy_bounds=occupancy_bounds,
+        )
+
+
 def build_candidate_pointclouds(
     sample: EfmSnippetView,
     batch: CandidateDepths,
     *,
     stride: int = 1,
 ) -> CandidatePointClouds:
-    """Convert stacked depth maps into batched point clouds and fuse with SLAM."""
-    depths = batch.depths
-    cameras = batch.p3d_cameras
+    """Compatibility helper that defaults to the current PyTorch3D backend."""
 
-    if depths.ndim != 3:
-        raise ValueError(f"Expected depths of shape (B,H,W), got {tuple(depths.shape)}")
-
-    padded, lengths = _backproject_depths_p3d_batch(
-        depths=depths,
-        mask_valid=batch.depths_valid_mask,
-        cameras=cameras,
-        stride=stride,
-    )
-
-    device, dtype = padded.device, padded.dtype
-
-    semidense_pts = sample.semidense.collapse_points()
-    semidense_pts_t = torch.as_tensor(semidense_pts, device=device, dtype=dtype)
-    semidense_len = torch.tensor([semidense_pts_t.shape[0]], device=device, dtype=torch.long)
-
-    occupancy_bounds = _compute_bounds(sample.get_occupancy_extend(), padded, lengths, semidense_pts_t)
-
-    return CandidatePointClouds(
-        points=padded,
-        lengths=lengths,
-        semidense_points=semidense_pts_t,
-        semidense_length=semidense_len,
-        occupancy_bounds=occupancy_bounds,
-    )
+    cfg = CandidatePointCloudBuilderConfig(backprojection_stride=int(stride))
+    return cfg.setup_target().build(sample, batch)
 
 
 def _backproject_depths_p3d_batch(
@@ -160,6 +243,51 @@ def _backproject_depths_p3d_batch(
     padded[batch_idx, pos_idx] = pts_world[batch_idx, flat_idx]
 
     return padded, lengths
+
+
+def _backproject_depths_mojo_batch(
+    depths: Tensor,
+    mask_valid: Tensor,
+    poses: PoseTW,
+    camera_batch: PerspectiveCameras | NativeCameraBatch,
+    *,
+    stride: int = 1,
+) -> tuple[Tensor, Tensor]:
+    """Backproject stacked depth maps via the Mojo point-cloud kernel."""
+
+    bsz = int(depths.shape[0])
+    points_all: list[Tensor] = []
+    lengths: list[int] = []
+    for idx in range(bsz):
+        pose_i = poses if poses.tensor().ndim == 1 else poses[idx]
+        if is_native_camera_batch(camera_batch):
+            camera_i = (
+                camera_batch.camera_tw if camera_batch.camera_tw.tensor().ndim == 1 else camera_batch.camera_tw[idx]
+            )
+        else:
+            raise TypeError("Mojo point-cloud backend requires a native camera batch.")
+        points_i, _ = unproject_candidate_points_mojo(
+            depths[idx],
+            mask_valid[idx],
+            pose_world_cam=pose_i,
+            camera=camera_i,
+            stride=stride,
+            device=depths.device,
+        )
+        points_all.append(points_i)
+        lengths.append(int(points_i.shape[0]))
+
+    lengths_t = torch.tensor(lengths, device=depths.device, dtype=torch.long)
+    max_len = int(lengths_t.max().item()) if lengths_t.numel() > 0 else 0
+    if max_len == 0:
+        return torch.empty((bsz, 0, 3), device=depths.device, dtype=depths.dtype), lengths_t
+
+    padded = torch.full((bsz, max_len, 3), torch.nan, device=depths.device, dtype=depths.dtype)
+    for idx, points_i in enumerate(points_all):
+        if points_i.numel() == 0:
+            continue
+        padded[idx, : points_i.shape[0]] = points_i.to(device=depths.device, dtype=depths.dtype)
+    return padded, lengths_t
 
 
 # def _backproject_depths_p3d_batch(
@@ -253,4 +381,11 @@ def _compute_bounds(
     return torch.stack([x_min, x_max, y_min, y_max, z_min, z_max], dim=0)
 
 
-__all__ = ["CandidatePointClouds", "build_candidate_pointclouds"]
+__all__ = [
+    "CandidatePointCloudBuilder",
+    "CandidatePointCloudBuilderConfig",
+    "CandidatePointClouds",
+    "MojoPointCloudBuilderConfig",
+    "PointCloudBackend",
+    "build_candidate_pointclouds",
+]

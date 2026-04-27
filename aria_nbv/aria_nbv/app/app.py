@@ -9,28 +9,17 @@ from typing import Any
 
 import streamlit as st
 
-from aria_nbv.app.panels.optuna_sweep import render_optuna_sweep_page
-
 from ..configs import PathConfig
 from ..data_handling._legacy_cache_api import OracleRriCacheConfig, OracleRriCacheDatasetConfig
+from ..pipelines import OracleBackendProfileError
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..utils import Console, Verbosity
 from .config import NbvStreamlitAppConfig
 from .controller import PipelineController
-from .panels import (
-    render_candidates_page,
-    render_data_page,
-    render_depth_page,
-    render_offline_stats_page,
-    render_rri_binning_page,
-    render_rri_page,
-    render_testing_attribution_page,
-    render_vin_diagnostics_page,
-    render_wandb_analysis_page,
-)
 from .state import clear_state, get_state, safe_rerun, store_state
 from .state_types import config_signature
 from .ui import (
+    backend_profile_ui,
     candidate_config_ui,
     dataset_config_ui,
     oracle_config_ui,
@@ -75,6 +64,24 @@ def _load_offline_cache_dataset(
     return cache_ds, cache_len, None
 
 
+def _render_page_import_error(page_name: str, exc: Exception) -> None:
+    """Render a page-local import/runtime error without crashing the whole app."""
+
+    trace = traceback.format_exc()
+    st.error(f"{page_name} is unavailable: {type(exc).__name__}: {exc}")
+    with st.expander("Full traceback", expanded=False):
+        st.code(trace, language="text")
+
+
+def _run_safe_page(page_name: str, fn: Any) -> None:
+    """Run one page callback and contain page-local failures."""
+
+    try:
+        fn()
+    except Exception as exc:
+        _render_page_import_error(page_name, exc)
+
+
 @dataclass(slots=True)
 class NbvStreamlitApp:
     config: NbvStreamlitAppConfig
@@ -107,6 +114,18 @@ class NbvStreamlitApp:
                 index=2,
             ),
         )
+        st.sidebar.divider()
+        state.labeler_cfg = backend_profile_ui(state.labeler_cfg, st.sidebar)
+        try:
+            resolved_labeler_cfg = state.labeler_cfg.resolved(require_available=True)
+        except OracleBackendProfileError as exc:
+            store_state(state)
+            st.error(str(exc))
+            st.info(
+                "Use `uv sync --extra dev --extra pytorch3d` on CUDA workstations, "
+                "or select `apple_mps_mojo` after completing the Mojo setup on Apple Silicon.",
+            )
+            st.stop()
 
         controller = PipelineController(
             state,
@@ -146,10 +165,17 @@ class NbvStreamlitApp:
 
         # Pages ----------------------------------------------------------
         def _page_data() -> None:
+            try:
+                from .panels import render_data_page
+            except Exception as exc:
+                _render_page_import_error("Data page", exc)
+                return
+
             with st.sidebar.form("data_form"):
                 dataset_cfg_prev = state.dataset_cfg
                 dataset_cfg = dataset_config_ui(
                     st.sidebar,
+                    device=str(resolved_labeler_cfg.device),
                     verbosity=console.verbosity,
                     is_debug=dataset_cfg_prev.is_debug,
                 )
@@ -172,6 +198,12 @@ class NbvStreamlitApp:
             render_data_page(sample, crop_margin=dataset_cfg.mesh_crop_margin_m)
 
         def _page_candidates() -> None:
+            try:
+                from .panels import render_candidates_page
+            except Exception as exc:
+                _render_page_import_error("Candidate Poses page", exc)
+                return
+
             data_source = st.sidebar.selectbox(
                 "Candidate source",
                 options=["online (oracle labeler)", "offline cache"],
@@ -284,7 +316,13 @@ class NbvStreamlitApp:
                     update={"generator": cand_cfg},
                 )
                 sample = controller.get_sample(force=False)
-                candidates = controller.get_candidates(force=refresh_cand)
+                if refresh_cand or state.candidates.candidates is not None:
+                    candidates = controller.get_candidates(force=refresh_cand)
+                else:
+                    store_state(state)
+                    st.header("Candidate Poses")
+                    st.info("No candidate batch in the session.")
+                    return
 
             store_state(state)
 
@@ -297,6 +335,12 @@ class NbvStreamlitApp:
             )
 
         def _page_renders() -> None:
+            try:
+                from .panels import render_depth_page
+            except Exception as exc:
+                _render_page_import_error("Candidate Renders page", exc)
+                return
+
             with st.sidebar.form("depth_form"):
                 depth_cfg_prev = state.labeler_cfg.depth
                 depth_cfg = renderer_config_ui(
@@ -329,6 +373,12 @@ class NbvStreamlitApp:
             render_depth_page(sample, depth_batch, pcs=pcs)
 
         def _page_rri() -> None:
+            try:
+                from .panels import render_rri_page
+            except Exception as exc:
+                _render_page_import_error("RRI page", exc)
+                return
+
             with st.sidebar.form("rri_form"):
                 labeler_cfg_prev = state.labeler_cfg
                 oracle_cfg_prev = labeler_cfg_prev.oracle
@@ -360,35 +410,133 @@ class NbvStreamlitApp:
             render_rri_page(sample, depths, pcs, rri)
 
         def _page_vin() -> None:
+            try:
+                from .panels import render_vin_diagnostics_page
+            except Exception as exc:
+                _render_page_import_error("VIN Diagnostics page", exc)
+                return
+
             render_vin_diagnostics_page()
 
         def _page_offline_stats() -> None:
+            try:
+                from .panels import render_offline_stats_page
+            except Exception as exc:
+                _render_page_import_error("Offline Stats page", exc)
+                return
+
             render_offline_stats_page()
 
         def _page_rri_binning() -> None:
+            try:
+                from .panels import render_rri_binning_page
+            except Exception as exc:
+                _render_page_import_error("RRI Binning page", exc)
+                return
+
             render_rri_binning_page()
 
         def _page_wandb() -> None:
+            try:
+                from .panels import render_wandb_analysis_page
+            except Exception as exc:
+                _render_page_import_error("W&B Analysis page", exc)
+                return
+
             render_wandb_analysis_page()
 
         def _page_testing_attr() -> None:
+            try:
+                from .panels import render_testing_attribution_page
+            except Exception as exc:
+                _render_page_import_error("Testing & Attribution page", exc)
+                return
+
             render_testing_attribution_page()
 
         def _page_optuna_sweep() -> None:
+            try:
+                from aria_nbv.app.panels.optuna_sweep import render_optuna_sweep_page
+            except Exception as exc:
+                _render_page_import_error("Optuna Sweep page", exc)
+                return
+
             render_optuna_sweep_page()
+
+        def _page_data_safe() -> None:
+            _run_safe_page("Data page", _page_data)
+
+        def _page_candidates_safe() -> None:
+            _run_safe_page("Candidate Poses page", _page_candidates)
+
+        def _page_renders_safe() -> None:
+            _run_safe_page("Candidate Renders page", _page_renders)
+
+        def _page_rri_safe() -> None:
+            _run_safe_page("RRI page", _page_rri)
+
+        def _page_vin_safe() -> None:
+            _run_safe_page("VIN Diagnostics page", _page_vin)
+
+        def _page_wandb_safe() -> None:
+            _run_safe_page("W&B Analysis page", _page_wandb)
+
+        def _page_optuna_sweep_safe() -> None:
+            _run_safe_page("Optuna Sweep page", _page_optuna_sweep)
+
+        def _page_testing_attr_safe() -> None:
+            _run_safe_page("Testing & Attribution page", _page_testing_attr)
+
+        def _page_rri_binning_safe() -> None:
+            _run_safe_page("RRI Binning page", _page_rri_binning)
+
+        def _page_offline_stats_safe() -> None:
+            _run_safe_page("Offline Stats page", _page_offline_stats)
 
         st.navigation(
             [
-                st.Page(_page_data, title="Data", default=True),
-                st.Page(_page_candidates, title="Candidate Poses"),
-                st.Page(_page_renders, title="Candidate Renders"),
-                st.Page(_page_rri, title="RRI"),
-                st.Page(_page_vin, title="VIN Diagnostics"),
-                st.Page(_page_wandb, title="W&B Analysis"),
-                st.Page(_page_optuna_sweep, title="Optuna Sweep"),
-                st.Page(_page_testing_attr, title="Testing & Attribution"),
-                st.Page(_page_rri_binning, title="RRI Binning"),
-                st.Page(_page_offline_stats, title="Offline Stats"),
+                st.Page(_page_data_safe, title="Data", default=True),
+                st.Page(
+                    _page_candidates_safe,
+                    title="Candidate Poses",
+                    url_path="candidate-poses",
+                ),
+                st.Page(
+                    _page_renders_safe,
+                    title="Candidate Renders",
+                    url_path="candidate-renders",
+                ),
+                st.Page(_page_rri_safe, title="RRI", url_path="rri"),
+                st.Page(
+                    _page_vin_safe,
+                    title="VIN Diagnostics",
+                    url_path="vin-diagnostics",
+                ),
+                st.Page(
+                    _page_wandb_safe,
+                    title="W&B Analysis",
+                    url_path="wandb-analysis",
+                ),
+                st.Page(
+                    _page_optuna_sweep_safe,
+                    title="Optuna Sweep",
+                    url_path="optuna-sweep",
+                ),
+                st.Page(
+                    _page_testing_attr_safe,
+                    title="Testing & Attribution",
+                    url_path="testing-attribution",
+                ),
+                st.Page(
+                    _page_rri_binning_safe,
+                    title="RRI Binning",
+                    url_path="rri-binning",
+                ),
+                st.Page(
+                    _page_offline_stats_safe,
+                    title="Offline Stats",
+                    url_path="offline-stats",
+                ),
             ],
             position="top",
         ).run()

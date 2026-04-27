@@ -11,12 +11,12 @@ import plotly.graph_objects as go  # type: ignore[import-untyped]
 import torch
 from efm3d.aria import CameraTW, PoseTW
 from plotly.subplots import make_subplots  # type: ignore[import-untyped]
-from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 from torch import Tensor
 
 from ..pose_generation.plotting import CandidatePlotBuilder
 from ..utils import rotate_yaw_cw90
 from ..utils.data_plotting import FrameGridBuilder, _depth_to_color
+from ..utils.pytorch3d_compat import PerspectiveCameras
 from .unproject import backproject_depth_with_p3d
 
 

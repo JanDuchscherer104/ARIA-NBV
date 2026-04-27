@@ -3,24 +3,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from math import ceil
 from typing import Annotated
 
 import torch
 from efm3d.aria import CameraTW, PoseTW
-from pydantic import Field, field_validator
-from pytorch3d.renderer.cameras import (
-    PerspectiveCameras,  # type: ignore[import-untyped]
-)
+from pydantic import Field, field_validator, model_validator
 
 from ..data_handling import EfmSnippetView
 from ..pose_generation.types import CandidateSamplingResult
 from ..utils import BaseConfig, Console, Verbosity
+from ..utils.pytorch3d_compat import PerspectiveCameras
 from ..utils.typed_payloads import from_serializable, to_serializable
+from .camera_batches import CameraBatchLike, NativeCameraBatch
+from .mojo_depth_renderer import MojoDepthRenderer, MojoDepthRendererConfig
 from .pytorch3d_depth_renderer import (
     Pytorch3DDepthRenderer,
     Pytorch3DDepthRendererConfig,
 )
+
+
+class DepthRendererBackend(StrEnum):
+    """Backend selector for candidate depth rendering."""
+
+    PYTORCH3D = "pytorch3d"
+    MOJO = "mojo"
 
 
 # TODO: Wouldn't it make sense to derive all of these dataclasses from a common base data class?
@@ -43,11 +51,21 @@ class CandidateDepths:
     candidate_indices: torch.Tensor
     """Indices (long) into the **full** candidate array (pre-render filtering)."""
 
-    camera: CameraTW
+    camera: CameraTW | None
     """Camera calibration (and ref2camera extrinsics) for the rendered subset, same order as ``depths``."""
 
-    p3d_cameras: PerspectiveCameras
-    """PyTorch3D PerspectiveCameras used for rendering. Same externals as ``camera``."""
+    camera_batch: CameraBatchLike | None = None
+    """Backend-agnostic camera batch aligned with the candidate set."""
+
+    p3d_cameras: PerspectiveCameras | None = None
+    """Optional PyTorch3D camera batch retained for compatibility with existing consumers."""
+
+    def resolved_camera_batch(self) -> CameraBatchLike | None:
+        """Return the preferred camera batch representation for this payload."""
+
+        if self.camera_batch is not None:
+            return self.camera_batch
+        return self.p3d_cameras
 
     def to_serializable(self) -> dict[str, object]:
         """Serialize this batch into a cache-friendly CPU payload."""
@@ -81,10 +99,24 @@ class CandidateDepthRendererConfig(BaseConfig):
 
     device: Annotated[torch.device, Field(default="auto")]
 
-    renderer: Pytorch3DDepthRendererConfig = Field(
+    backend: DepthRendererBackend = DepthRendererBackend.PYTORCH3D
+    """Backend used to produce candidate depth maps."""
+
+    pytorch3d: Pytorch3DDepthRendererConfig = Field(
         default_factory=Pytorch3DDepthRendererConfig,
     )
-    """Nested config describing the underlying renderer (PyTorch3D or CPU)."""
+    """Nested config for the current PyTorch3D renderer path."""
+
+    mojo: MojoDepthRendererConfig = Field(
+        default_factory=MojoDepthRendererConfig,
+    )
+    """Nested config for the Mojo depth renderer path."""
+
+    renderer: Pytorch3DDepthRendererConfig | None = Field(
+        default=None,
+        exclude=True,
+    )
+    """Compatibility alias for older callers that still pass `renderer=`."""
 
     max_candidates_final: int = 60
     """Number of valid candidates after oversampling and filtering."""
@@ -104,6 +136,18 @@ class CandidateDepthRendererConfig(BaseConfig):
 
     _resolve_device = field_validator("device", mode="before")(BaseConfig._resolve_device)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _apply_legacy_renderer_alias(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        if data.get("renderer") is None:
+            return data
+        normalized = dict(data)
+        normalized.setdefault("pytorch3d", normalized["renderer"])
+        normalized["renderer"] = None
+        return normalized
+
 
 class CandidateDepthRenderer:
     """High-level wrapper that renders depth for candidate poses."""
@@ -115,7 +159,14 @@ class CandidateDepthRenderer:
             .set_verbosity(self.config.verbosity)
             .set_debug(self.config.is_debug)
         )
-        self.renderer = self.config.renderer.setup_target()
+        self.renderer = self._build_renderer()
+
+    def _build_renderer(self) -> Pytorch3DDepthRenderer | MojoDepthRenderer:
+        if self.config.backend == DepthRendererBackend.PYTORCH3D:
+            return self.config.pytorch3d.setup_target()
+        if self.config.backend == DepthRendererBackend.MOJO:
+            return self.config.mojo.setup_target()
+        raise ValueError(f"Unsupported depth backend: {self.config.backend}")
 
     def render(
         self,
@@ -153,23 +204,30 @@ class CandidateDepthRenderer:
 
         self.console.dbg_summary("camera_calib_batch", camera_calib)
         self.console.dbg_summary("pose_batch_tensor", pose_batch)
-        if not isinstance(self.renderer, Pytorch3DDepthRenderer):
-            raise TypeError(
-                f"Unsupported renderer type: {self.renderer.__class__.__name__}",
+        depths: torch.Tensor
+        depths_valid_mask: torch.Tensor
+        cameras: PerspectiveCameras | None
+        if isinstance(self.renderer, Pytorch3DDepthRenderer):
+            depths, pix_to_face, cameras = self.renderer.render(
+                poses=pose_batch,
+                mesh=(sample.mesh_verts, sample.mesh_faces),  # type: ignore[arg-type]
+                camera=camera_calib,
+                frame_index=None,
             )
-
-        depths, pix_to_face, cameras = self.renderer.render(
-            poses=pose_batch,
-            mesh=(sample.mesh_verts, sample.mesh_faces),  # type: ignore[arg-type]
-            camera=camera_calib,
-            frame_index=None,
-        )
-
-        depths_valid_mask = (
-            (pix_to_face >= 0)
-            & (depths > self.renderer.config.znear * 1.01)
-            & (depths < self.renderer.config.zfar * 0.99)
-        )
+            depths_valid_mask = (
+                (pix_to_face >= 0)
+                & (depths > self.renderer.config.znear * 1.01)
+                & (depths < self.renderer.config.zfar * 0.99)
+            )
+        elif isinstance(self.renderer, MojoDepthRenderer):
+            depths, depths_valid_mask = self.renderer.render_depths(
+                poses=pose_batch,
+                mesh=(sample.mesh_verts, sample.mesh_faces),  # type: ignore[arg-type]
+                camera=camera_calib,
+            )
+            cameras = None
+        else:
+            raise TypeError(f"Unsupported renderer type: {self.renderer.__class__.__name__}")
 
         self.console.dbg(
             f"Rendered {depths.shape[0]} candidates | depth shape {tuple(depths.shape)} | "
@@ -183,6 +241,9 @@ class CandidateDepthRenderer:
             reference_pose=candidates.reference_pose.to(device=pose_batch.device),
             candidate_indices=candidate_indices,
             camera=camera_calib,
+            camera_batch=(
+                cameras if cameras is not None else NativeCameraBatch(camera_tw=camera_calib, pose_world_cam=pose_batch)
+            ),
             p3d_cameras=cameras,
         )
 
@@ -323,6 +384,7 @@ class CandidateDepthRenderer:
 
 
 __all__ = [
+    "DepthRendererBackend",
     "CandidateDepthRenderer",
     "CandidateDepthRendererConfig",
     "CandidateDepths",

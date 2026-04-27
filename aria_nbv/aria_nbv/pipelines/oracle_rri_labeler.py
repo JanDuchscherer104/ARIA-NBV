@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import torch
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from aria_nbv.utils.console import Verbosity
 
@@ -24,10 +24,15 @@ from ..data_handling import EfmSnippetView
 from ..pose_generation import CandidateViewGeneratorConfig
 from ..pose_generation.types import CandidateSamplingResult
 from ..rendering.candidate_depth_renderer import CandidateDepthRendererConfig, CandidateDepths
-from ..rendering.candidate_pointclouds import CandidatePointClouds, build_candidate_pointclouds
+from ..rendering.candidate_pointclouds import (
+    CandidatePointCloudBuilderConfig,
+    CandidatePointClouds,
+)
 from ..rri_metrics.oracle_rri import OracleRRIConfig
 from ..rri_metrics.types import RriResult
 from ..utils import BaseConfig, Console
+from ..utils.devices import TorchAccelerator
+from .oracle_backend_profile import OracleBackendProfile, resolve_oracle_backend_profile
 
 
 @dataclass(slots=True)
@@ -54,6 +59,15 @@ class OracleRriLabelerConfig(BaseConfig):
     def target(self) -> type[OracleRriLabeler]:
         return _target_cls()
 
+    backend_profile: OracleBackendProfile = OracleBackendProfile.PYTORCH3D_CUDA
+    """Mutually exclusive production backend profile for all oracle stages."""
+
+    torch_accelerator: TorchAccelerator = TorchAccelerator.AUTO
+    """Global torch accelerator used by the selected backend profile."""
+
+    allow_backend_overrides: bool = False
+    """Permit mixed per-stage backend/device overrides for tests and diagnostics only."""
+
     device: Annotated[torch.device, Field(default="auto")]
 
     generator: CandidateViewGeneratorConfig = Field(
@@ -66,6 +80,11 @@ class OracleRriLabelerConfig(BaseConfig):
     )
     """Depth rendering configuration."""
 
+    pointcloud: CandidatePointCloudBuilderConfig = Field(
+        default_factory=CandidatePointCloudBuilderConfig,
+    )
+    """Candidate point-cloud builder configuration."""
+
     oracle: OracleRRIConfig = Field(default_factory=OracleRRIConfig)
     """Oracle RRI scoring configuration."""
 
@@ -75,6 +94,30 @@ class OracleRriLabelerConfig(BaseConfig):
     verbosity: Verbosity = Verbosity.QUIET
 
     _resolve_device = field_validator("device", mode="before")(BaseConfig._resolve_device)
+
+    @model_validator(mode="after")
+    def _sync_backprojection_stride(self) -> "OracleRriLabelerConfig":
+        if "backprojection_stride" in self.model_fields_set:
+            object.__setattr__(
+                self,
+                "pointcloud",
+                self.pointcloud.model_copy(
+                    update={"backprojection_stride": int(self.backprojection_stride)},
+                ),
+            )
+        else:
+            object.__setattr__(self, "backprojection_stride", int(self.pointcloud.backprojection_stride))
+        return self
+
+    def resolved(self, *, require_available: bool = True) -> "OracleRriLabelerConfig":
+        """Return a deep-copied config with the selected backend profile applied."""
+
+        return resolve_oracle_backend_profile(self, require_available=require_available)
+
+    def setup_target(self, **kwargs: object) -> "OracleRriLabeler":
+        """Instantiate the labeler from the profile-resolved config."""
+
+        return self.target(self.resolved(require_available=True), **kwargs)
 
 
 class OracleRriLabeler:
@@ -86,6 +129,7 @@ class OracleRriLabeler:
 
         self._generator = self.config.generator.setup_target()
         self._depth_renderer = self.config.depth.setup_target()
+        self._pointcloud_builder = self.config.pointcloud.setup_target()
         self._oracle = self.config.oracle.setup_target()
 
     def run(self, sample: EfmSnippetView) -> OracleRriSample:
@@ -125,11 +169,7 @@ class OracleRriLabeler:
             f"Rendered depths for {int(depths.depths.shape[0])} candidates.",
         )
 
-        candidate_pcs = build_candidate_pointclouds(
-            sample,
-            depths,
-            stride=int(self.config.backprojection_stride),
-        )
+        candidate_pcs = self._pointcloud_builder.build(sample, depths)
         device = candidate_pcs.points.device
         dtype = candidate_pcs.points.dtype
 

@@ -111,6 +111,7 @@ def test_oracle_rri_labeler_runs_real_data(efm_sample):
     oracle_cfg = OracleRRIConfig()
 
     cfg = OracleRriLabelerConfig(
+        allow_backend_overrides=True,
         generator=generator_cfg,
         depth=depth_cfg,
         oracle=oracle_cfg,

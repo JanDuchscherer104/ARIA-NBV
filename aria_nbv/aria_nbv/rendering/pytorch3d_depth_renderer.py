@@ -13,12 +13,10 @@ from typing import TYPE_CHECKING, Annotated, Literal
 
 import torch
 from pydantic import Field, field_validator
-from pytorch3d.renderer import MeshRasterizer, RasterizationSettings  # type: ignore[import-untyped]
-from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
-from pytorch3d.structures import Meshes  # type: ignore[import-untyped]
 from torch import Tensor
 
 from ..utils import BaseConfig, Console, Verbosity
+from ..utils.pytorch3d_compat import PerspectiveCameras, import_renderer_classes, require_pytorch3d
 
 if TYPE_CHECKING:
     from efm3d.aria import CameraTW, PoseTW
@@ -80,6 +78,7 @@ class Pytorch3DDepthRenderer:
     """Depth rendering backend based on PyTorch3D."""
 
     def __init__(self, config: Pytorch3DDepthRendererConfig) -> None:
+        require_pytorch3d("PyTorch3D depth rendering")
         self.config = config
         self.console = (
             Console.with_prefix(self.__class__.__name__)
@@ -137,8 +136,9 @@ class Pytorch3DDepthRenderer:
 
         # Build (and cache) PyTorch3D mesh structure
         verts_t, faces_t = mesh
+        mesh_rasterizer_cls, rasterization_settings_cls, meshes_cls = import_renderer_classes()
 
-        mesh_struct_single = Meshes(verts=[verts_t.to(self.device)], faces=[faces_t.to(self.device)])
+        mesh_struct_single = meshes_cls(verts=[verts_t.to(self.device)], faces=[faces_t.to(self.device)])
         mesh_struct = mesh_struct_single.extend(rotations.shape[0])
 
         cameras = PerspectiveCameras(
@@ -150,7 +150,7 @@ class Pytorch3DDepthRenderer:
             image_size=image_size,
             in_ndc=False,
         )
-        raster_settings = RasterizationSettings(
+        raster_settings = rasterization_settings_cls(
             image_size=(int(height), int(width)),
             blur_radius=self.config.blur_radius,
             faces_per_pixel=1,  # Closest simplex only
@@ -160,7 +160,7 @@ class Pytorch3DDepthRenderer:
             cull_to_frustum=False,
             z_clip_value=self.config.znear,
         )
-        rasterizer = MeshRasterizer(cameras=cameras, raster_settings=raster_settings)
+        rasterizer = mesh_rasterizer_cls(cameras=cameras, raster_settings=raster_settings)
         autocast_enable = dtype != torch.float32 and self.device.type == "cuda"
         with torch.autocast(device_type=self.device.type, dtype=dtype, enabled=autocast_enable):
             fragments = rasterizer.forward(mesh_struct)

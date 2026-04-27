@@ -25,7 +25,8 @@ from efm3d.aria.camera import CameraTW
 from efm3d.aria.obb import ObbTW
 from efm3d.aria.pose import PoseTW
 from efm3d.aria.tensor_wrapper import TensorWrapper
-from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
+
+from .pytorch3d_compat import PerspectiveCameras, is_perspective_cameras_instance
 
 Tensor = torch.Tensor
 SerializableType = TypeVar("SerializableType")
@@ -198,7 +199,7 @@ def to_serializable(value: Any, *, exclude: set[str] | None = None) -> Any:
         return value
     if isinstance(value, torch.Tensor):
         return msgspec.to_builtins(TensorPayload.from_tensor(value))
-    if isinstance(value, PerspectiveCameras):
+    if is_perspective_cameras_instance(value):
         return msgspec.to_builtins(PerspectiveCameraPayload.from_cameras(value))
     if isinstance(value, (PoseTW, CameraTW, ObbTW)):
         return msgspec.to_builtins(TensorPayload.from_tensor(value.tensor()))
@@ -425,6 +426,18 @@ def _decode_value(
     expected_type = _strip_optional(expected_type)
     origin = get_origin(expected_type)
 
+    union_types = {Union}
+    union_type = getattr(types, "UnionType", None)
+    if union_type is not None:
+        union_types.add(union_type)
+    if origin in union_types:
+        for candidate_type in [arg for arg in get_args(expected_type) if arg is not type(None)]:
+            try:
+                return _decode_value(value, candidate_type, device=device, include_fields=include_fields)
+            except Exception:
+                continue
+        return value
+
     if expected_type in (torch.Tensor, Tensor):
         if isinstance(value, torch.Tensor):
             return _move_tensor(value, device=device)
@@ -434,6 +447,8 @@ def _decode_value(
             return expected_type(_move_tensor(value, device=device))
         tensor = msgspec.convert(_normalize_payload_value(value), type=TensorPayload).to_tensor(device=device)
         return expected_type(tensor)
+    if getattr(expected_type, "__name__", None) == "NativeCameraBatch":
+        return _decode_dataclass(expected_type, value, device=device, include_fields=include_fields)
     if isinstance(expected_type, type) and issubclass(expected_type, TensorWrapper):
         if isinstance(value, torch.Tensor):
             return expected_type(_move_tensor(value, device=device))
@@ -441,7 +456,7 @@ def _decode_value(
         return expected_type(tensor)
     if expected_type is PerspectiveCameras:
         target_device = device or torch.device("cpu")
-        if isinstance(value, PerspectiveCameras):
+        if is_perspective_cameras_instance(value):
             return value.to(device=target_device)
         if isinstance(value, dict) and {
             "R",

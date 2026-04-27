@@ -42,6 +42,12 @@ This section provides an overview of the libraries, tools, and documentation use
 - **[Project Aria Tools GitHub](https://github.com/facebookresearch/projectaria_tools)** - Core data processing utilities
   - [ADT depth maps to point cloud example notebook](https://github.com/facebookresearch/projectaria_tools/blob/main/projects/AriaDigitalTwinDatasetTools/examples/adt_depth_maps_to_pointcloud_tutorial.ipynb)
 
+## Oracle Backend Setups
+
+- CUDA workstation profile (`pytorch3d_cuda`): `uv sync --extra dev --extra pytorch3d`
+- Apple Silicon profile (`apple_mps_mojo`): `uv sync --extra dev` plus the local Mojo setup described in the Apple-Silicon backend notes
+- The CUDA profile is the default even on Apple machines; select the Apple profile explicitly when running the Mojo path.
+
 ## Aria Training and Evaluation Toolkit (ATEK)
 
 **The primary toolkit for ML training and evaluation on Aria datasets.** ATEK provides a complete pipeline from raw VRS data to PyTorch-ready datasets, standardized evaluation metrics, and pre-trained model support.

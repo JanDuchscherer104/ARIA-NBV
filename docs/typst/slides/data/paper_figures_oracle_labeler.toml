@@ -27,6 +27,8 @@ snippet_key_filter = ["000024"]
 
 [labeler]
 device                = "auto"
+backend_profile       = "pytorch3d_cuda"
+torch_accelerator     = "auto"
 backprojection_stride = 1
 
   [labeler.generator]
@@ -60,7 +62,7 @@ backprojection_stride = 1
   oversample_factor    = 1.0
   resolution_scale     = 0.5
 
-    [labeler.depth.renderer]
+    [labeler.depth.pytorch3d]
     device = "auto"
     znear  = 0.001
     zfar   = 20.0

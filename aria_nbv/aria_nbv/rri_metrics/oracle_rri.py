@@ -15,12 +15,35 @@ kept modular:
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 import torch
+from pydantic import Field
 
 from aria_nbv.utils.base_config import BaseConfig
+from aria_nbv.utils.mojo_subprocess import run_mojo_subprocess
 
 from .metrics import chamfer_point_mesh, chamfer_point_mesh_batched
+from .mojo_backend import (
+    chamfer_point_mesh_batched_mojo,
+    chamfer_point_mesh_mojo,
+    is_mojo_thread_context_supported,
+)
 from .types import RriResult
+
+
+class OracleDistanceBackend(StrEnum):
+    """Backend selector for oracle point↔mesh distance evaluation."""
+
+    PYTORCH3D = "pytorch3d"
+    MOJO = "mojo"
+
+
+class MojoOracleDistanceConfig(BaseConfig):
+    """Nested config for the Mojo oracle distance path."""
+
+    workers: int | None = None
+    """Optional worker override for the Mojo distance kernels."""
 
 
 class OracleRRIConfig(BaseConfig):
@@ -29,6 +52,12 @@ class OracleRRIConfig(BaseConfig):
     @property
     def target(self) -> type["OracleRRI"]:
         return OracleRRI
+
+    backend: OracleDistanceBackend = OracleDistanceBackend.PYTORCH3D
+    """Backend used for point↔mesh distance evaluation."""
+
+    mojo: MojoOracleDistanceConfig = Field(default_factory=MojoOracleDistanceConfig)
+    """Nested config for the Mojo backend path."""
 
 
 class OracleRRI:
@@ -74,13 +103,57 @@ class OracleRRI:
         gt_verts_crop, gt_faces_crop = _crop_mesh_to_aabb(gt_verts, gt_faces, extend)
         lengths_q = lengths_q.to(device=points_q.device)
 
-        dist_before = chamfer_point_mesh(points_t, gt_verts_crop, gt_faces_crop)
+        if self.config.backend == OracleDistanceBackend.PYTORCH3D:
+            dist_before = chamfer_point_mesh(points_t, gt_verts_crop, gt_faces_crop)
+        else:
+            if not is_mojo_thread_context_supported():
+                result = run_mojo_subprocess(
+                    "oracle_score",
+                    {
+                        "points_t": points_t.detach().to(device="cpu"),
+                        "points_q": points_q.detach().to(device="cpu"),
+                        "lengths_q": lengths_q.detach().to(device="cpu"),
+                        "gt_verts": gt_verts_crop.detach().to(device="cpu"),
+                        "gt_faces": gt_faces_crop.detach().to(device="cpu"),
+                        "extend": extend.detach().to(device="cpu"),
+                        "workers": self.config.mojo.workers,
+                    },
+                )
+                return RriResult(
+                    rri=result["rri"].to(device=points_q.device, dtype=points_q.dtype),
+                    pm_dist_before=result["pm_dist_before"].to(device=points_q.device, dtype=points_q.dtype),
+                    pm_dist_after=result["pm_dist_after"].to(device=points_q.device, dtype=points_q.dtype),
+                    pm_acc_before=result["pm_acc_before"].to(device=points_q.device, dtype=points_q.dtype),
+                    pm_comp_before=result["pm_comp_before"].to(device=points_q.device, dtype=points_q.dtype),
+                    pm_acc_after=result["pm_acc_after"].to(device=points_q.device, dtype=points_q.dtype),
+                    pm_comp_after=result["pm_comp_after"].to(device=points_q.device, dtype=points_q.dtype),
+                    fscore_tau=(
+                        result["fscore_tau"].to(device=points_q.device, dtype=points_q.dtype)
+                        if result["fscore_tau"] is not None
+                        else None
+                    ),
+                )
+            dist_before = chamfer_point_mesh_mojo(
+                points_t,
+                gt_verts_crop,
+                gt_faces_crop,
+                workers=self.config.mojo.workers,
+            )
         num_t = points_t.shape[0]
         points_t_exp = points_t.unsqueeze(0).expand(points_q.shape[0], num_t, 3)
         points_tq = torch.cat([points_t_exp, points_q], dim=1)
         lengths_tq = lengths_q + num_t
 
-        dist_after = chamfer_point_mesh_batched(points_tq, lengths_tq, gt_verts_crop, gt_faces_crop)
+        if self.config.backend == OracleDistanceBackend.PYTORCH3D:
+            dist_after = chamfer_point_mesh_batched(points_tq, lengths_tq, gt_verts_crop, gt_faces_crop)
+        else:
+            dist_after = chamfer_point_mesh_batched_mojo(
+                points_tq,
+                lengths_tq,
+                gt_verts_crop,
+                gt_faces_crop,
+                workers=self.config.mojo.workers,
+            )
 
         denom = dist_before.bidirectional.clamp_min(1e-12)
         rri_all = (dist_before.bidirectional - dist_after.bidirectional) / denom
@@ -149,4 +222,9 @@ def _crop_mesh_to_aabb(
     return verts_crop, faces_crop
 
 
-__all__ = ["OracleRRI", "OracleRRIConfig"]
+__all__ = [
+    "MojoOracleDistanceConfig",
+    "OracleDistanceBackend",
+    "OracleRRI",
+    "OracleRRIConfig",
+]

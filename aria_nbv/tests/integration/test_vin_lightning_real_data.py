@@ -114,6 +114,7 @@ def test_vin_lightning_fit_runs_real_data_smoke(tmp_path: Path):
     )
     oracle_cfg = OracleRRIConfig()
     labeler_cfg = OracleRriLabelerConfig(
+        allow_backend_overrides=True,
         generator=generator_cfg,
         depth=depth_cfg,
         oracle=oracle_cfg,

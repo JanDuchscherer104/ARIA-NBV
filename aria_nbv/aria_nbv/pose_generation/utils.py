@@ -9,6 +9,13 @@ def project_horizontal(v: torch.Tensor, wup: torch.Tensor) -> torch.Tensor:
 
 
 def _axis_stats(x: torch.Tensor) -> dict[str, float]:
+    if x.numel() == 0:
+        return {
+            "min": float("nan"),
+            "max": float("nan"),
+            "mean": float("nan"),
+            "std": float("nan"),
+        }
     return {
         "min": float(x.min()),
         "max": float(x.max()),
