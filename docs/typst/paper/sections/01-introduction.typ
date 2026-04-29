@@ -73,7 +73,7 @@ trained VIN v3 baseline for quality-driven NBV on Aria Synthetic Environments:
   views, renders metric depth from ground-truth meshes, backprojects candidate
   point clouds, and evaluates reconstruction quality against the ground-truth
   mesh.
-2. Reproducible offline cache of oracle samples (candidates,
+2. Reproducible immutable VIN offline store of oracle samples (candidates,
   renders/point clouds, labels, and frozen EVL features) to enable batched training without re-running the expensive oracle computations.
 3. Trained VIN v3 candidate scorer on frozen EVL voxel features
   with view-conditioned evidence (pose encoding, voxel coverage proxies,

@@ -295,8 +295,7 @@ These constraints keep the streamlined baseline honest: if a dependency is
 missing, the model should fail loudly rather than degrade into a constant
 predictor.
 
-In the current offline-cache configuration (`.configs/offline_only.toml`),
-`semidense_include_obs_count=true` and the VIN snippet cache requires
-`include_inv_dist_std=true`, so collapsed semidense points include both
-`inv_dist_std` and `n_obs` (5-channel points). The fail-fast contract above
-matches the active training configuration.
+In the current VIN offline-store configuration (`.configs/offline_only.toml`),
+`VinOfflineDataset` returns collapsed semidense points with both `inv_dist_std`
+and `n_obs` (5-channel points). The fail-fast contract above matches the active
+training configuration.

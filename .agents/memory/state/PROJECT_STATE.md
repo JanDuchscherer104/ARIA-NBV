@@ -46,6 +46,7 @@ This repository develops an active next-best-view planner for egocentric indoor 
 - *Current truth / active direction:* Keep VIN improvements bounded and evidence-driven: ablate surface reconstruction, CORAL modifications, and auxiliary losses before committing to larger architectural rewrites.
 - *Current truth / active direction:* Preserve the current geometry-first interpretation of counterfactual state while clarifying which missing modalities should be synthesized later.
 - *Current truth / active direction:* Keep docs, Streamlit surfaces, and canonical memory aligned with code so advisor meetings stay grounded in the actual repo state.
+- *Current truth / active direction:* Literature/code knowledge graph work is routed through the `.agents/external/litkg-rs` submodule and the `semantic-scholar-litkg` skill, with ARIA-NBV-specific ingestion controlled by TOML rather than toolkit hard-coding.
 
 ## Deferred but Important Extensions
 - *Deferred extension:* Hestia-style hierarchical control that separates target selection from view realization and later introduces continuous motion.

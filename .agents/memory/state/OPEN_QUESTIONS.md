@@ -28,7 +28,7 @@ tags: [research, nbv, vin, training]
 
 ## Data, Supervision, and Robustness
 - Should fine-detail oracle experiments ban aggressive mesh or point-cloud downsampling outright?
-- How much of the 4608 mesh-supervised snippets should be brought into the offline cache before model complexity increases further?
+- How much of the 4608 mesh-supervised snippets should be brought into the immutable VIN offline store before model complexity increases further?
 - Is broader candidate generation more valuable right now than deeper VIN changes: more than 60 candidates, more anchor poses, wider azimuth coverage, or roll / backward-view variants?
 - How should stage dependence and label-distribution drift be handled: stage-aware features, dynamic binning, calibration analysis, or some combination?
 - What exactly caused the apparent overfitting or calibration-failure signals, including collapse in the lowest ordinal classes?

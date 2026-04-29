@@ -28,7 +28,7 @@ loc_min = 80
 loc_expected = 180
 loc_max = 360
 context = ["README.md should stay concise, while setup details need a stable place for uv sync, Project Aria/ATEK/EFM dependencies, cache roots, and offline-only smoke tests.", ".agents/references/operator_quick_reference.md can be used for machine-specific recovery details, but shared setup docs must stay portable."]
-implementation_notes = ["Create root SETUP.md or a docs/contents/setup.qmd-aligned root pointer without duplicating host-specific paths.", "Include uv sync --all-extras from aria_nbv/, offline cache expectations, and Streamlit/VIN summary smoke commands.", "Link from README.md and docs/index.qmd."]
+implementation_notes = ["Create root SETUP.md or a docs/contents/setup.qmd-aligned root pointer without duplicating host-specific paths.", "Include uv sync --all-extras from aria_nbv/, VIN offline-store expectations, and Streamlit/VIN summary smoke commands.", "Link from README.md and docs/index.qmd."]
 acceptance = ["A new contributor can find environment setup, cache prerequisites, and the first smoke commands from the README.", "No shared setup text contains operator-specific interpreter paths."]
 verification = ["rg -n \"/home/jandu|/home/jd|miniforge\" README.md SETUP.md docs/contents/setup.qmd", "cd docs && quarto render index.qmd contents/setup.qmd"]
 
@@ -51,7 +51,7 @@ verification = ["rg -n \"PRML|litkg-rs|Rust\" .agents/skills/oracle-rri-contract
 [[todo]]
 id = "todo-004"
 title = "Implement vin-training-diagnostics skill"
-description = "Create a skill for VIN scorer experiments, offline cache training, diagnostics, and W&B/Optuna logging."
+description = "Create a skill for VIN scorer experiments, offline-store training, diagnostics, and W&B/Optuna logging."
 priority = "medium"
 status = "todo"
 labels = ["agent", "research"]
@@ -114,16 +114,16 @@ verification = ["make context-contracts", "cd aria_nbv && uv run pytest tests/da
 
 [[todo]]
 id = "todo-008"
-title = "Validate offline_only.toml single migrated scene in VIN diagnostics"
-description = "Smoke the single migrated VIN offline store through the Streamlit VIN diagnostics and summary path."
+title = "Validate offline_only.toml VIN offline store in VIN diagnostics"
+description = "Smoke the available VIN offline store through the Streamlit VIN diagnostics and summary path."
 priority = "high"
 status = "todo"
-labels = ["m0", "vin", "diagnostics", "offline-cache"]
+labels = ["m0", "vin", "diagnostics", "offline-store"]
 issue_ids = ["issue-007"]
 loc_min = 40
 loc_expected = 120
 loc_max = 260
-context = ["Roadmap M0 requires validating that offline_only.toml can load the single migrated scene into the VIN diagnostics page.", "aria_nbv/tests/vin/test_vin_utils.py already checks that the diagnostics config preserves the offline source and disables W&B."]
+context = ["Roadmap M0 requires validating that offline_only.toml can load the available VIN offline store into the VIN diagnostics page.", "aria_nbv/tests/vin/test_vin_utils.py already checks that the diagnostics config preserves the offline source and disables W&B."]
 implementation_notes = ["Prefer nbv-summary as a non-interactive smoke before manual Streamlit inspection.", "Do not change offline store payloads to silence failures; fix reader/config wiring or record a blocker.", "Keep apply_cw90_correction=false unless candidate poses, p3d_cameras, and reference pose are rotated in lockstep."]
 acceptance = ["nbv-summary or an equivalent diagnostics helper loads at least one train/val batch from offline_only.toml.", "Streamlit VIN diagnostics can point at offline_only.toml without falling back to online data.", "Any failure has an issue with exact command, traceback summary, and affected contract."]
 verification = ["cd aria_nbv && uv run nbv-summary --config-path ../.configs/offline_only.toml", "cd aria_nbv && uv run pytest tests/vin/test_vin_utils.py"]

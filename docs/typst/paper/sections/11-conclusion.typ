@@ -10,14 +10,14 @@ surface-error behavior. We also outlined an ordinal label representation
 (CORAL) and trained a preliminary VIN v3 candidate scorer on frozen EVL
 features. Learning a full next-best-view policy on top of these labels remains
 future work, including entity-aware objectives and learning more expressive view-conditioned representations.
-Furthermore, we have implemented a rich ML experiment management and development suite with offline caching, W&B + Optuna integration, various helpful cli functionalites and a comprehensive Streamlit app for data inspection and debugging.
+Furthermore, we have implemented a rich ML experiment management and development suite with immutable VIN offline stores, W&B + Optuna integration, various helpful CLI utilities, and a comprehensive Streamlit app for data inspection and debugging.
 
 #let cache = json("/typst/slides/data/offline_cache_stats.json").offline_cache
 #let wb = json("/typst/slides/data/wandb_rtjvfyyp_summary.json").wandb
 #let m = wb.metrics
 // </rm>
 
-Quantitatively, our current offline cache covers #cache.unique_scenes ASE-EFM GT
+Quantitatively, our current VIN offline store covers #cache.unique_scenes ASE-EFM GT
 scenes with #cache.index_entries oracle-labelled snippets (train/val
 #cache.train_entries/#cache.val_entries) drawn from #cache.total_snippets
 snippet windows. The best VIN v3 run (#code-inline[v03-best], W&B id

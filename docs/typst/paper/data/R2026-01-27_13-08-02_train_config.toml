@@ -1,7 +1,7 @@
 run_mode  = "train"
 ckpt_path = "epoch=20-step=1869-train-loss=6.2684.ckpt"
 [datamodule_config]
-# Offline cache usage
+# VIN offline store usage
 num_workers        = 16
 batch_size         = 16
 persistent_workers = false
@@ -10,32 +10,18 @@ use_train_as_val   = false
 shuffle_candidates = true
 
     [datamodule_config.source]
-    kind        = "offline_cache"
+    kind        = "offline"
     train_split = "train"
     val_split   = "val"
 
-        [datamodule_config.source.cache]
-        load_backbone = true
+        [datamodule_config.source.offline]
         include_efm_snippet = true
         include_gt_mesh = false
+        load_backbone = true
         load_candidates = false
         load_depths = true
         load_candidate_pcs = false
-        semidense_include_obs_count = true
-        efm_keep_keys = [
-            # EfmTrajectory
-            'pose/t_world_rig',
-            'pose/time_ns',
-            'pose/gravity_in_world',
-            # SemiDense Point Cloud
-            'points/p3s_world',
-            'points/dist_std',
-            'points/inv_dist_std',
-            'points/time_ns',
-            'scene/points/vol_min',
-            'scene/points/vol_max',
-            'points/lengths',
-        ]
+        map_location = "cpu"
         backbone_keep_fields = [
             "t_world_voxel",
             "voxel_extent",
@@ -47,11 +33,8 @@ shuffle_candidates = true
             "pts_world",
         ]
 
-            [datamodule_config.source.cache.vin_snippet_cache]
-            # Precomputed minimal VinSnippetView cache (collapsed semidense + trajectory).
-            # Build via: `uv run nbv-cache-vin-snippets` (defaults to `.configs/offline_only.toml`)
-            # or explicitly: `uv run nbv-cache-vin-snippets --config-path ./.configs/offline_only.toml`
-            cache_dir = "vin_snippet_cache"
+            [datamodule_config.source.offline.store]
+            store_dir = "vin_offline"
 
 [trainer_config]
 # Make sure validation runs

@@ -530,7 +530,7 @@
     - Single EVL forward-pass requires:
       + 8+ GB VRAM
       + >60s per sample
-    - Offline cache enables:
+    - VIN offline store enables:
       + batching ($nabla$ stablization)
       + reproducible splits & validation monitoring
       + >180x speedup (8 min vs >24 h)
@@ -538,20 +538,20 @@
   ]
 ]
 
-#slide(title: [Offline cache: coverage + footprint])[
+#slide(title: [VIN offline store: coverage + footprint])[
   #grid(
     columns: (1.1fr, 1fr),
     gutter: 0.35cm,
     [
       #color-block(title: [Coverage numbers])[
-        - Cached scenes: #cache.unique_scenes / #cache.meta_scenes_total (#pct(cache.meta_scenes_covered_frac)%)
-        - Cached samples: #cache.index_entries / #cache.total_snippets (_#pct(cache.index_entries / cache.total_snippets)%_)
+        - Stored scenes: #cache.unique_scenes / #cache.meta_scenes_total (#pct(cache.meta_scenes_covered_frac)%)
+        - Stored samples: #cache.index_entries / #cache.total_snippets (_#pct(cache.index_entries / cache.total_snippets)%_)
         - Split: (train: #cache.train_entries, val: #cache.val_entries)
       ]
       #color-block(title: [Storage snapshot])[
         - EFM ATEK: 49 GB
-        - Cached samples: #cache.samples_size_gb GB (current subset).
-        - VinSnippet cache: #cache.vin_snippet_cache_gb GB.
+        - Oracle/backbone payloads: #cache.samples_size_gb GB (current subset).
+        - Minimal VIN snippets: #cache.vin_snippet_cache_gb GB.
         - Full coverage estimate:
           #(round(cache.full_coverage_total_gb / 1000, digits: 2)) TB
       ]

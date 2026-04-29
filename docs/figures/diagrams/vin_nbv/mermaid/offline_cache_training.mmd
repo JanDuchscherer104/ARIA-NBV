@@ -18,25 +18,21 @@ flowchart TB
   DM["$$\\begin{array}{c}\\texttt{VinDataModule}\\end{array}$$"]
   Out["$$\\begin{array}{c}\\texttt{VinOracleBatch}\\end{array}$$"]
 
-  subgraph Cache["Offline cache dataset"]
+  subgraph Cache["Immutable VIN offline store"]
     direction TB
-    CacheDs["$$\\begin{array}{c}\\texttt{OracleRriCacheDataset}\\\\\\texttt{}\\end{array}$$"]
-    CacheIdx["$$\\begin{array}{c}\\texttt{cache index + samples}\\end{array}$$"]
-    Decode["$$\\begin{array}{c}\\texttt{OracleRriCacheVinDataset}\\end{array}$$"]
-    %% CacheDs -->|"$$\\texttt{torch.load(.pt)}$$"| Decode
+    Manifest["$$\\begin{array}{c}\\texttt{manifest.json}\\\\\\texttt{sample\\_index.jsonl}\\end{array}$$"]
+    Shards["$$\\begin{array}{c}\\texttt{Zarr shards}\\\\\\texttt{+ msgpack diagnostics}\\end{array}$$"]
+    Dataset["$$\\begin{array}{c}\\texttt{VinOfflineDataset}\\end{array}$$"]
   end
 
-  %% Bottom row: keep snippet providers next to batching.
+  %% Bottom row: keep immutable reads next to batching.
   subgraph Bottom[" "]
     direction LR
-    subgraph Snip["Snippet Providers"]
+    subgraph Snip["Store Blocks"]
       direction TB
-      Providers["$$\\begin{array}{c}\\texttt{VinSnippetProviderChain}\\end{array}$$"]
-      CacheProv["$$\\begin{array}{c}\\texttt{VinSnippetCacheProvider}\\end{array}$$"]
-      LoaderEfm["$$\\begin{array}{c}\\texttt{EfmSnippetLoader}\\end{array}$$"]
-      Ase["$$\\begin{array}{c}\\texttt{AseEfmDataset}\\end{array}$$"]
-      VinSnipIdx["$$\\begin{array}{c}\\texttt{vin\\_snippet\\_cache}\\\\\\texttt{index.jsonl + *.pt}\\end{array}$$"]
-      AseData["$$\\begin{array}{c}\\texttt{Meshes + ATEK shards}\\end{array}$$"]
+      OracleBlocks["$$\\begin{array}{c}\\texttt{oracle.*}\\\\\\texttt{RRI + cameras + poses}\\end{array}$$"]
+      VinBlocks["$$\\begin{array}{c}\\texttt{vin.*}\\\\\\texttt{points + lengths + poses}\\end{array}$$"]
+      OptionalBlocks["$$\\begin{array}{c}\\texttt{optional diagnostics}\\\\\\texttt{depths/backbone/pcs}\\end{array}$$"]
     end
 
 
@@ -48,25 +44,14 @@ flowchart TB
   end
 
   DM -->|"$$\\texttt{train/val\\_dataloader()}$$"| Loader
-  DM -->|"$$\\texttt{setup()}$$"| CacheDs
-  CacheIdx -->|"$$\\texttt{index.jsonl + *.pt}$$"| CacheDs
+  DM -->|"$$\\texttt{setup()}$$"| Dataset
+  Manifest -->|"$$\\texttt{split rows}$$"| Dataset
+  Shards -->|"$$\\texttt{random access}$$"| Dataset
 
-  CacheDs -->|"$$\\texttt{OracleRriCacheSample}$$"| Decode
-  CacheDs -->|"$$\\texttt{OracleRriCacheSample}$$"| StreamlitApp
-
-  CacheDs -->|"$$\\texttt{include-efm-snippet}$$"| Providers
-  Providers -->|"$$\\texttt{try cache}$$"| CacheProv
-  Providers -->|"$$\\texttt{fallback}$$"| LoaderEfm
-  CacheProv -->|"$$\\texttt{index lookup}$$"| VinSnipIdx
-  LoaderEfm -->|"$$\\texttt{iter/load}$$"| Ase
-  Ase -->|"$$\\texttt{load}$$"| AseData
-  Ase -->|"$$\\texttt{EfmSnippetView}$$"| LoaderEfm
-  Providers -->|"$$\\texttt{VinSnippetView}$$"| CacheDs
-
-
-
-
-  Decode -->|"$$\\texttt{VinOracleBatch}$$"| Loader
+  Dataset -->|"$$\\texttt{read}$$"| OracleBlocks
+  Dataset -->|"$$\\texttt{read}$$"| VinBlocks
+  Dataset -->|"$$\\texttt{on demand}$$"| OptionalBlocks
+  Dataset -->|"$$\\texttt{VinOracleBatch}$$"| Loader
   Loader -->|"$$\\texttt{collate-fn}$$"| Collate
   Collate -->|"$$\\texttt{batch}$$"| Out
 
@@ -76,8 +61,8 @@ flowchart TB
   classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
 
   class DM input;
-  class CacheIdx data;
-  class CacheDs,Decode,Providers,CacheProv,LoaderEfm,Ase,Loader,Collate compute;
+  class Manifest,Shards data;
+  class Dataset,OracleBlocks,VinBlocks,OptionalBlocks,Loader,Collate compute;
   class VinSnipIdx,AseData data;
   class Out output;
 

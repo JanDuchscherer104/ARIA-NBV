@@ -31,7 +31,7 @@ VINv3 baseline training run.
 #let train_cfg = toml(train_cfg_src)
 #let module_cfg = train_cfg.module_config
 #let vin_cfg = module_cfg.vin
-#let cache_cfg = train_cfg.datamodule_config.source.cache
+#let offline_cfg = train_cfg.datamodule_config.source.offline
 
 #let bool_state(flag) = if flag { [enabled] } else { [off] }
 #let aux_loss = module_cfg.aux_regression_loss
@@ -63,7 +63,7 @@ VINv3 baseline training run.
   ([Field dim], [#vin_cfg.field_dim]),
   ([Global pool grid], pool_grid_cell),
   ([Semidense proj CNN], bool_state(sem_proj_enabled)),
-  ([Semidense obs. count], bool_state(cache_cfg.semidense_include_obs_count)),
+  ([Semidense obs. count], bool_state(offline_cfg.at("semidense_include_obs_count", default: false))),
   ([Trajectory encoder], [off]),
   ([Point encoder (PointNeXt)], [off]),
   ([Voxel valid-frac gate], bool_state(vin_cfg.use_voxel_valid_frac_gate)),

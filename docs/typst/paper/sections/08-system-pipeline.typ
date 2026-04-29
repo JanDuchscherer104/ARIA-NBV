@@ -58,7 +58,7 @@ summarized in @tab:pipeline and visualized in @fig:candidate-poses.
 #figure(
   kind: "table",
   supplement: [Table],
-  caption: [Oracle label configuration used for the offline cache (nbv-cache-samples).],
+  caption: [Oracle label configuration used when building the VIN offline store.],
   table(
     columns: (18em, auto),
     align: (left, left),

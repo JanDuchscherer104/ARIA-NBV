@@ -41,7 +41,7 @@ training and more reliable conclusions.
 - Address dataset constraints explicitly: each ASE scene provides only one
   prerecorded trajectory (no arbitrary novel viewpoints), GT meshes are limited
   to a subset of scenes, and beyond that we must rely on pseudo-GT or reduced
-- Extend the offline cache to cover the full mesh-supervised ASE subset.
+- Extend the immutable VIN offline store to cover the full mesh-supervised ASE subset.
 - While the number of scenes with GT meshes is limited to 4608 (of which we have been using 19.2%), we can increase variability by:
   - Choosing subsequences of the pre-recorded trajectories
   - Generating multiple candidate sets per snippet and altering the candidate

@@ -1,12 +1,12 @@
 #import "@preview/booktabs:0.0.4": *
 #show: booktabs-default-table-style
 
-= Offline cache and batching
+= VIN offline store and batching
 
 #let cache = json("/typst/slides/data/offline_cache_stats.json").offline_cache
 #let s = cache.sample_sizes_mb
 
-This appendix summarizes why we cache oracle outputs, what is stored, and the
+This appendix summarizes why we materialize oracle outputs, what is stored, and the
 approximate storage footprint per snippet and for the full ASE mesh subset.
 
 == Motivation
@@ -18,7 +18,7 @@ The oracle pipeline combines candidate sampling, depth rendering, backprojection
 and point-to-mesh scoring. Each step is GPU-heavy and hard to parallelize inside
 PyTorch. In practice, this results in per-snippet runtimes on the order of tens
 of seconds, while the EVL backbone alone can consume multiple GB of GPU memory
-per forward pass and hence limits us to batch sizes of one. Caching makes training a standard supervised learning problem
+per forward pass and hence limits us to batch sizes of one. The immutable VIN offline store makes training a standard supervised learning problem
 and enables larger batch sizes for noisy ordinal supervision.
 // </rm>
 
@@ -30,10 +30,10 @@ scene coverage fraction. We estimate the full-coverage size as:
 
 $ S_"full" approx S_"cur" / f_"cover" $.
 
-For the current cache we observe:
+For the current materialized subset we observe:
 
-- $S_"cur" = #cache.samples_size_gb$ GB for `samples/*.pt`.
-- $S_"vin" = #cache.vin_snippet_cache_gb$ GB for `vin_snippet_cache`.
+- $S_"cur" = #cache.samples_size_gb$ GB for materialized oracle/backbone payloads.
+- $S_"vin" = #cache.vin_snippet_cache_gb$ GB for minimal VIN snippet tensors.
 - $S_"full" approx #cache.full_coverage_total_gb$ GB for 100 mesh scenes.
 
 #figure(
