@@ -5,6 +5,7 @@
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory
 .PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory
+.PHONY: memory-mine agents-db kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-papers
 
 # Color codes
 BLUE := \033[0;34m
@@ -131,6 +132,34 @@ migrate-codex-memory: _check_python ## 🗺️ Migrate legacy .codex notes into 
 
 check-agent-memory: _check_python ## 🗺️ Validate agent memory scaffolding and debrief hygiene
 	@$(PYTHON_INTERPRETER) scripts/validate_agent_memory.py
+
+agents-db: _check_python ## 🧠 Inspect or maintain .agents/issues,todos,refactors,resolved (set AGENTS_ARGS='validate')
+	@$(PYTHON_INTERPRETER) scripts/agents_db.py $(AGENTS_ARGS)
+
+memory-mine: _check_python ## 🧠 Mine current repo state (docs, code, history) into repo-local MemPalace
+	@echo "$(BLUE)Mining project into MemPalace...$(NC)"
+	@mkdir -p .artifacts/mempalace/palace
+	@$(PYTHON_INTERPRETER) -m mempalace --palace .artifacts/mempalace/palace mine .
+	@$(PYTHON_INTERPRETER) -m mempalace --palace .artifacts/mempalace/palace mine .agents/memory --mode convos
+	@echo "$(GREEN)MemPalace mining complete.$(NC)"
+
+kg-sync: ## 📚 Sync literature registry from docs/references.bib
+	@./scripts/kg/ingest_papers.sh
+
+kg-materialize: ## 📚 Materialize literature into Markdown for agent consumption
+	@echo "$(BLUE)Materializing literature...$(NC)"
+	@# This would call the materialize step in scripts/kg/ingest_papers.sh
+	@./scripts/kg/ingest_papers.sh
+	@echo "$(GREEN)Literature materialized to docs/literature/.$(NC)"
+
+kg-index-code: ## 🏗️ Index aria_nbv code into Neo4j
+	@./scripts/kg/index_code.sh
+
+kg-ingest-docs: ## 📝 Ingest docs/ into Neo4j/Graphiti
+	@./scripts/kg/ingest_docs.sh
+
+kg-ingest-papers: ## 📚 Full literature pipeline (sync, download, parse, materialize)
+	@./scripts/kg/ingest_papers.sh
 
 context: _check_python ## 🗺️ Refresh lightweight context artifacts (source index, literature index, data contracts)
 	@bash -lc 'set -euo pipefail; \

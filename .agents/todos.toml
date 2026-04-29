@@ -1,0 +1,145 @@
+# ARIA-NBV TODOs
+
+[[todo]]
+id = "todo-001"
+title = "Classify and prune docs/"
+description = "Inventory docs/ and triage pages into public thesis narrative, paper/slides source, generated context, internal agent material, or archive."
+priority = "high"
+status = "todo"
+labels = ["docs", "hygiene"]
+issue_ids = ["issue-003"]
+loc_min = 200
+loc_expected = 700
+loc_max = 1600
+context = ["Current docs expose roadmap, TODOs, ideas, generated agent scaffold mirrors, literature notes, implementation guides, and scratchpad-like pages in the same public tree.", "docs/AGENTS.md says docs/typst/paper/main.typ is ground truth and Quarto should not introduce competing top-level narratives."]
+implementation_notes = ["Start with scripts/nbv_qmd_outline.sh --compact and docs/_quarto.yml navigation instead of broad manual browsing.", "Keep source pages until there is an explicit archive/move decision; first remove public navigation pressure and stale links.", "Do not delete history records under .agents/memory/history/."]
+acceptance = ["Each docs subtree has an explicit role: public, paper, slides, generated, internal mirror, or archive.", "Public nav no longer surfaces internal agent scaffolding or stale work-management pages as primary project content.", "Stale typo links such as coral_intergarion and hesita are either renamed or intentionally documented."]
+verification = ["scripts/nbv_qmd_outline.sh --compact", "cd docs && quarto render index.qmd contents/roadmap.qmd contents/questions.qmd", "rg -n \"Seminar|hesita|coral_intergarion|JanDuchscherer104/NBV\" README.md docs"]
+
+[[todo]]
+id = "todo-002"
+title = "Add SETUP.md"
+description = "Create a dedicated SETUP.md for environment, CUDA, dataset access, cache paths, and first-run smoke commands."
+priority = "high"
+status = "todo"
+labels = ["scaffold", "dev-ergonomics"]
+issue_ids = ["issue-005"]
+loc_min = 80
+loc_expected = 180
+loc_max = 360
+context = ["README.md should stay concise, while setup details need a stable place for uv sync, Project Aria/ATEK/EFM dependencies, cache roots, and offline-only smoke tests.", ".agents/references/operator_quick_reference.md can be used for machine-specific recovery details, but shared setup docs must stay portable."]
+implementation_notes = ["Create root SETUP.md or a docs/contents/setup.qmd-aligned root pointer without duplicating host-specific paths.", "Include uv sync --all-extras from aria_nbv/, offline cache expectations, and Streamlit/VIN summary smoke commands.", "Link from README.md and docs/index.qmd."]
+acceptance = ["A new contributor can find environment setup, cache prerequisites, and the first smoke commands from the README.", "No shared setup text contains operator-specific interpreter paths."]
+verification = ["rg -n \"/home/jandu|/home/jd|miniforge\" README.md SETUP.md docs/contents/setup.qmd", "cd docs && quarto render index.qmd contents/setup.qmd"]
+
+[[todo]]
+id = "todo-003"
+title = "Implement oracle-rri-contracts skill"
+description = "Create a skill to protect technical layers: poses, cameras, RRI binning semantics, and oracle reporting."
+priority = "medium"
+status = "todo"
+labels = ["agent", "research"]
+issue_ids = ["issue-007"]
+loc_min = 80
+loc_expected = 180
+loc_max = 360
+context = ["RRI semantics are contract changes, not local refactors.", "aria_nbv/aria_nbv/rri_metrics/AGENTS.md already defines the boundary for oracle labels, binning, ordinal loss, and reported metric meaning."]
+implementation_notes = ["Base the skill on rri_metrics/AGENTS.md, GOTCHAS.md frame notes, and docs/contents/impl/rri_computation.qmd.", "Require tensor shapes, frames, units, and metric interpretation in any public RRI docstrings."]
+acceptance = ["The skill routes RRI/oracle tasks to the right docs, tests, and gotchas.", "No copied wrong-repo text remains."]
+verification = ["rg -n \"PRML|litkg-rs|Rust\" .agents/skills/oracle-rri-contracts .agents/skills || true", "make check-agent-memory"]
+
+[[todo]]
+id = "todo-004"
+title = "Implement vin-training-diagnostics skill"
+description = "Create a skill for VIN scorer experiments, offline cache training, diagnostics, and W&B/Optuna logging."
+priority = "medium"
+status = "todo"
+labels = ["agent", "research"]
+issue_ids = ["issue-007"]
+loc_min = 80
+loc_expected = 180
+loc_max = 360
+context = ["M2 requires a reproducible one-step VIN baseline, calibration/ranking plots, and a fixed ablation matrix.", "The current app and Lightning stack already expose VIN diagnostics, summary, W&B, and Optuna surfaces."]
+implementation_notes = ["Route to aria_nbv/aria_nbv/vin/AGENTS.md, app VIN diagnostics helpers, Lightning CLI, and docs/contents/impl/vin_nbv.qmd.", "Capture validation gotcha: trainer_config.enable_validation must be true for validation to run."]
+acceptance = ["The skill gives a compact experiment workflow for offline_only.toml, nbv-summary, targeted VIN tests, and diagnostics interpretation.", "The skill names current ARIA-NBV surfaces only."]
+verification = ["make check-agent-memory", "rg -n \"PRML|litkg-rs|Rust\" .agents/skills/vin-training-diagnostics .agents/skills || true"]
+
+[[todo]]
+id = "todo-005"
+title = "Build entity-aware oracle RRI"
+description = "Implement GT-OBB-cropped oracle RRI as defined in the thesis system."
+priority = "high"
+status = "todo"
+labels = ["research", "core"]
+issue_ids = ["issue-007"]
+loc_min = 350
+loc_expected = 900
+loc_max = 1800
+context = ["Thesis RQ3/RQ4 require target-specific RRI before target-conditioned VIN can be evaluated.", "GOTCHAS.md notes EVL OBB outputs are not batch-collatable yet, so first runs may need batch_size=None or OBB outputs disabled outside the target-aware path."]
+implementation_notes = ["Start with GT OBBs and a small trusted subset; do not begin with predicted OBB realism ablations.", "Keep target mesh/point support, invalid target reasons, and scene-level-vs-target-level diagnostics explicit.", "Use existing PoseTW and CameraTW contracts; do not introduce raw matrix interfaces."]
+acceptance = ["GT-OBB cropped RRI runs on a small subset with side-by-side target RRI and scene RRI diagnostics.", "Unsupported targets have explicit invalid reasons rather than being encoded as low RRI.", "Docs and tests describe target frames, crop margin, units, and failure modes."]
+verification = ["cd aria_nbv && uv run pytest tests/rri_metrics tests/data_handling/test_vin_offline_store.py", "cd docs && quarto render contents/questions.qmd contents/roadmap.qmd"]
+
+[[todo]]
+id = "todo-006"
+title = "Aria-NBV Gym simulator setup"
+description = "Build a Gym-style simulator using PyTorch3D and ASE GT meshes for discrete rollouts after M1/M2 contracts are stable."
+priority = "medium"
+status = "todo"
+labels = ["research", "sim"]
+issue_ids = ["issue-007"]
+loc_min = 300
+loc_expected = 900
+loc_max = 1800
+context = ["The roadmap places multi-step rollout comparison in August and the value/RL gate after rollout evidence, so simulator work should not outrun data/RRI contract stabilization.", "Current canonical state frames full continuous RL as a stretch direction rather than the thesis core."]
+implementation_notes = ["Begin with discrete candidate shell rollouts and hard masks; avoid full continuous control until the gate evidence exists.", "Keep oracle reward, VIN surrogate reward, state modalities, and invalid action handling separated."]
+acceptance = ["Simulator API can replay bounded discrete rollouts with cumulative target or scene RRI accounting.", "Invalid actions are masked or reported with reasons, not silently treated as low-RRI candidates."]
+verification = ["cd aria_nbv && uv run pytest tests/pose_generation tests/rl", "make context-contracts"]
+
+[[todo]]
+id = "todo-007"
+title = "M1 data/cache/oracle contract audit and stabilization"
+description = "Freeze the offline store, split, frame/CW90, and oracle RRI contract before new target-conditioned model work."
+priority = "high"
+status = "todo"
+labels = ["data", "rri", "contracts", "thesis"]
+issue_ids = ["issue-007"]
+loc_min = 160
+loc_expected = 420
+loc_max = 1000
+context = ["Roadmap M1 exit criteria require stable offline store and RRI contracts, documented frame/CW90 risks, and measured oracle throughput.", "data_handling/AGENTS.md says readers should validate strictly and fail with rebuild guidance rather than mutate derived artifacts.", "rri_metrics/AGENTS.md says metric semantics, binning definitions, and reported metric meanings are contract changes."]
+implementation_notes = ["Run make context-contracts and targeted data/RRI tests first; record failures in issues/todos before changing package semantics.", "Confirm offline_only.toml uses apply_cw90_correction=false and that pose/camera frame alignment tests cover this setting.", "Collect oracle throughput on representative snippets only after correctness checks pass."]
+acceptance = ["Targeted data_handling and rri_metrics tests pass or DB records identify exact blockers.", "Frame/CW90 contract is documented in active docs or gotchas.", "A throughput command/report path is identified for representative snippets."]
+verification = ["make context-contracts", "cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py tests/data_handling/test_public_api_contract.py", "cd aria_nbv && uv run pytest tests/rri_metrics"]
+
+[[todo]]
+id = "todo-008"
+title = "Validate offline_only.toml single migrated scene in VIN diagnostics"
+description = "Smoke the single migrated VIN offline store through the Streamlit VIN diagnostics and summary path."
+priority = "high"
+status = "todo"
+labels = ["m0", "vin", "diagnostics", "offline-cache"]
+issue_ids = ["issue-007"]
+loc_min = 40
+loc_expected = 120
+loc_max = 260
+context = ["Roadmap M0 requires validating that offline_only.toml can load the single migrated scene into the VIN diagnostics page.", "aria_nbv/tests/vin/test_vin_utils.py already checks that the diagnostics config preserves the offline source and disables W&B."]
+implementation_notes = ["Prefer nbv-summary as a non-interactive smoke before manual Streamlit inspection.", "Do not change offline store payloads to silence failures; fix reader/config wiring or record a blocker.", "Keep apply_cw90_correction=false unless candidate poses, p3d_cameras, and reference pose are rotated in lockstep."]
+acceptance = ["nbv-summary or an equivalent diagnostics helper loads at least one train/val batch from offline_only.toml.", "Streamlit VIN diagnostics can point at offline_only.toml without falling back to online data.", "Any failure has an issue with exact command, traceback summary, and affected contract."]
+verification = ["cd aria_nbv && uv run nbv-summary --config-path ../.configs/offline_only.toml", "cd aria_nbv && uv run pytest tests/vin/test_vin_utils.py"]
+
+[[todo]]
+id = "todo-010"
+title = "Classify dirty worktree for M0 handoff"
+description = "Group current dirty worktree changes into data migration, app diagnostics, RL scaffold, docs cleanup, agent-memory updates, and unrelated operator work."
+priority = "high"
+status = "todo"
+labels = ["repo-hygiene", "m0", "handoff"]
+issue_ids = ["issue-009"]
+loc_min = 40
+loc_expected = 140
+loc_max = 360
+context = ["The current worktree contains large tracked deletions, modified configs, app changes, RL scaffold files, docs edits, and untracked .agents DB files.", "Roadmap M0 explicitly requires dirty worktree classification before larger thesis implementation work."]
+implementation_notes = ["Use git status --short and targeted git diff --stat by subsystem.", "Do not stage, revert, or delete unrelated user changes.", "Produce a handoff note that identifies which changes belong to the current slice and which need owner review."]
+acceptance = ["A concise worktree classification exists in .agents/memory/history or a canonical handoff doc.", "Current-task files are separable from unrelated pending work.", "No destructive git commands are used."]
+verification = ["git status --short", "git diff --stat -- . ':!docs/_site'"]

@@ -2,14 +2,10 @@
 
 Hestia [@Hestia-lu2026] is the most relevant continuous-policy NBV paper in our current literature stack because it tackles the same gap that shows up in our roadmap: how to move from discrete candidate ranking toward continuous control without collapsing back to a weak geometric coverage proxy. Relative to [VIN-NBV](vin_nbv.qmd), Hestia is not quality-driven, but it contributes a stronger planning decomposition. Relative to [GenNBV](gen_nbv.qmd), it replaces monolithic 5-DoF policy prediction with a hierarchical "where to look, then where to fly" controller and augments occupancy with directional face visibility. That makes it especially relevant for the directional observation encoding, continuous policy, and multi-step planning ideas already noted in our [scratchpad](../ideas.qmd) and in the future-extensions sections of the paper.
 
-### Local \LaTeX{} Sources
+### Source Status
 
-- [`main.tex`](../../literature/tex-src/arXiv-hesita/main.tex) - WACV 2026 manuscript entry point.
-- [`sec/3_method.tex`](../../literature/tex-src/arXiv-hesita/sec/3_method.tex) - core MDP, face-aware state, hierarchical policy, and training losses.
-- [`sec/4_result.tex`](../../literature/tex-src/arXiv-hesita/sec/4_result.tex) - quantitative results, ablations, and real-world application.
-- [`sec/supp.tex`](../../literature/tex-src/arXiv-hesita/sec/supp.tex) - theory note, dataset construction, training details, and limitations.
-- [`figures/arch.png`](../../literature/tex-src/arXiv-hesita/figures/arch.png) - canonical architecture figure for the hierarchical planner.
-- [`figures/voxel_ray.png`](../../literature/tex-src/arXiv-hesita/figures/voxel_ray.png) - visual explanation of the voxel-face idea.
+The bibliography entry `@Hestia-lu2026` is the citation source of truth. A
+local paper-source mirror is not currently part of the tracked public docs.
 
 ### Core Idea
 

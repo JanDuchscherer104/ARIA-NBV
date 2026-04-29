@@ -41,7 +41,7 @@ val confusion matrix indicates that it never predicts the lowest two classes!
 ---
 
 - First predict relative movement, encode new relative pose, then predict look at (shell).
-- or idea as described in .agents/tmp/image.png or hesita paper.
+- or idea as described in .agents/tmp/image.png or Hestia paper.
 - supervise an intermediate target / look-at proposal head (entity center, uncertainty peak, expected-RRI centroid), then predict the continuous camera translation conditioned on that target.
 - for continuous policies: project the predicted pose to the nearest feasible / collision-free pose instead of relying on penalties only.
 - How can we encode trespasses to new areas that will yield really high rri?
@@ -111,7 +111,7 @@ here we also need to consider how to generate the multi-step samples in a way su
 - Let different modalities from the same sample modulate its cosignals.
 - Look at network from video analysis - query-centric-attention - i.e. [QCNet](https://openaccess.thecvf.com/content/CVPR2023/papers/Zhou_Query-Centric_Trajectory_Prediction_CVPR_2023_paper.pdf) and [LMFormer](https://arxiv.org/abs/2504.10275)
 - do iterative layer refinement - residual learning similar to LMFormer.
-- For each point we can encode from which direction they have been observed - similarly to how [hesita](https://arxiv.org/abs/2508.01014) did it. Here we can average over the different observations or we encode them as incidence-angle histogram.
+- For each point we can encode from which direction they have been observed - similarly to how [Hestia](https://arxiv.org/abs/2508.01014) did it. Here we can average over the different observations or we encode them as incidence-angle histogram.
 - add target-conditioned local feature reads from EVL / voxel state at predicted target points, entity centers, or surface-deficit peaks.
 
 
@@ -162,7 +162,6 @@ here we also need to consider how to generate the multi-step samples in a way su
   - Should this be a normal CORAL neuron (i.e. the lowest class)
 - Selection of the candidate views to roll out?
   - Gumbel-Top-k / Stochastic Beam Search w.r.t. the oracle RRIs?
-  -
 
 
 ### Open Questions

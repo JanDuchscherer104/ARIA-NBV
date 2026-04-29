@@ -1,118 +1,245 @@
 ---
-title: "Research Questions"
+title: "Master Thesis Research Questions"
 format: html
 bibliography: ../references.bib
 ---
 
-# Research Questions
+# Master Thesis Research Questions {#research-questions}
 
-This section documents key research questions that guide our investigation into semantic Next-Best-View planning.
+This page states the research questions for the master's thesis phase of
+Aria-NBV. The central question is:
 
-## 1. RRI Computation Strategies
+> Can we train a target-conditioned NBV model that produces
+> acquisition-cost-efficient trajectories maximizing Relative Reconstruction
+> Improvement (RRI) for a target of interest?
 
-**1.1**: Which oracle RRI formulation is most predictive of actual reconstruction improvement?
+The questions are tied to the dated [roadmap](roadmap.qmd), the
+[RRI theory page](theory/rri_theory.qmd), the
+[oracle/RRI implementation notes](impl/rri_computation.qmd), the
+[VIN implementation notes](impl/vin_nbv.qmd), and the current ASE/EVL stack
+[@ProjectAria-ASE-2025; @EFM3D-straub2024]. The thesis builds on VIN-NBV's
+quality-driven candidate-ranking objective [@VIN-NBV-frahm2025], while treating
+GenNBV [@GenNBV-chen2024], Hestia [@Hestia-lu2026], and SceneScript
+[@SceneScript-avetisyan2024] as comparison and extension references.
 
-- How can we effectively compute the RRI for candidate views in the ASE dataset given its limitations?
-- Which metrics should be used to quantify the similarity between point clouds?
-- What metrics might be more suitable than Chamfer Distance for this task?
-- How can we sample point clouds from candidate views that are comparable to the existing semi-dense SLAM point clouds in ASE such that we can compute the RRI in a meaningful way?
+## Definitions {#rq-definitions}
 
----
+**Target of interest.** A selected entity, object crop, point, region, or
+surface-deficit hypothesis whose reconstruction quality should be improved.
+Aliases: target entity, object of interest, inspection target, task target.
 
-## 2. RRI prediction Model Architectures
+**Target-specific RRI.** Relative Reconstruction Improvement computed on the
+subset of the ground-truth mesh and reconstructed points associated with the
+target. Aliases: entity RRI, object RRI, target RRI.
 
-- Should we explicity project features into the frame of the candidate view, or rather use learnable fourier features or other positional encodigns?
-- Maybe initialize weights such that they correspond to the projection operation, but then allow finetuning? This is certainly a TODO for the master thesis.
-- What Input and Output formulations could work best for the RRI prediction model? There are many features from the EFM pipeline that could be useful:
-  - Occupancy probabilities, centerness scores, visibility scores for known points in the semi-dense SLAM point cloud...
+**Acquisition cost.** The budget consumed to acquire observations, measured by
+number of views, path length, time, invalid-action rate, or a weighted
+combination. Aliases: capture budget, view budget, motion cost.
 
----
+**Target-conditioned scorer.** A VIN-style candidate scorer that receives the
+current scene state, a candidate view, and an encoding of the target of
+interest. Related nodes: [VINv3](impl/vin_nbv.qmd),
+[EVL literature notes](literature/efm3d.qmd), and
+[candidate generation](../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd).
 
-## 2. EFMs as NBV Backbone
+## RQ1 - Objective {#rq1-objective}
 
-**Q2.1**: Can EFMs like EVL serve as effective encoders for NBV planning?
+**Question.** How should target-specific RRI and acquisition cost be combined
+into a trajectory objective?
 
-**Rationale**: EFMs provide semantic understanding that presentmethods lack. This should enable better generalization to complex scenes. Egocentric platforms like Aria glasses or even an iPhone with LiDAR offer rich multi-modal data tha can be leveraged to obtain a better scene representation.
+**Working hypothesis.** The thesis should optimize cumulative target RRI first
+and report acquisition cost separately before introducing a weighted scalarized
+objective. This keeps metric interpretation clear while still allowing
+cost-aware trajectory comparison.
 
-**Q2.2**:
-
-- How do we efficiently handle streaming point cloud updates using an EFM backbone?
-- How can we incrementally update the scene representation as new observations arrive?
-- How can we re-use previously computed features to avoid redundant computations?
-
----
-
-## 3. Entity-Aware NBV
-
-**Q3.1**:
-
-- Can we compute something like a reconstruction completeness score per entity to guide NBV selection?
-- Can RRI be expressed both per entity and per scene to improve NBV selection?
-- Can the NBV selection be conditioned on the std. per-pose RRI as well as the reconstruction score per entity of interest?
-- **Multi‑modal data:** How does integrating other modalities (encoded bboxes, object semantics like segmentation maps) alongside the PC / RGB-D embeddings improve NBV policy performance?
-
-**Hypothesis**: Entity-aware NBV allows task-specific prioritization and should outperform allow the model to pay attention to the objects of interest and hence improve the reconstruction quality for those. This is especially useful in human-in-the-loop scenarios, allowing the user to spcify "I want this table scanned well". This should allow to leverage pre-trained semantic and geometric understanding; Entity-level representations come with rich priors about typical shapes.
-
-**Proposed Formulation**:
+**Concrete formulation.** For a target $e$, trajectory $\tau$, and acquisition
+cost $C(\tau)$:
 
 $$
-\text{Fitness}_{\text{total}}(c, \mathcal{E}) = \sum_{e \in \mathcal{E}} w_e \cdot \text{RRI}_e(c) + \lambda \cdot \text{RRI}_{\text{scene}}(c)
+J_e(\tau) =
+\sum_{t=1}^{T} \operatorname{RRI}_e(q_t \mid P_{t-1}, M_e)
+- \lambda C(\tau)
 $$
 
-- $\text{RRI}_e$: Reconstruction score for entity $e$
-- $w_e$: Importance weight (user-specified or uncertainty-based)
+where $P_{t-1}$ is the accumulated reconstruction state before selecting
+candidate view $q_t$, and $M_e$ is the target-specific ground-truth surface used
+only for oracle supervision and evaluation.
 
----
+**Evaluation nodes.**
 
-## 4. Continuous vs. Discrete Action Spaces
+- target RRI, scene RRI, and cumulative target RRI;
+- view count, path length, invalid-action rate, and runtime;
+- comparison to one-step greedy selection under equal budget.
 
-**Q4.1**: Should NBV prediction output discrete view selection or continuous pose regression?
+## RQ2 - Target Encoding {#rq2-target-encoding}
 
-- How can we combine the benefits of both approaches? i.e. by sampling a batch of candidate views from a continous distribution whose parameters are regressed, followed by discrete selection among these candidates.
-- How can we ensure collision-free views in a continuous action space? Usage of free space
+**Question.** Which target representation works best for conditioning the NBV
+model: GT OBB, predicted OBB, crop descriptor, entity token, or target point?
 
-### VIN-NBV: Classification Over Discrete Candidates
+**Working hypothesis.** Start with GT OBB plus category and relative geometry
+because it is inspectable, stable, and directly available in ASE/EFM-derived
+data. Predicted OBBs and learned entity tokens are later realism ablations.
 
-**Approach:**
+**Candidate encodings.**
 
-- Sample $N$ random candidate poses (e.g., $N=100$)
-- Compute RRI for each
-- Select argmax
+- GT OBB: center, extents, orientation, class, confidence placeholder, and
+  pose relative to the reference rig.
+- Predicted OBB: same contract as GT OBB, but sourced from EVL predictions.
+- Crop descriptor: pooled EVL/voxel features or point statistics inside the
+  target crop.
+- Entity token: learned token for target identity, class, and geometry.
+- Target point: look-at point, object center, missing-surface centroid, or
+  expected-RRI centroid.
 
-**Why they did this:**
+**Connected implementation surfaces.** Target fields should enter through
+data-handling containers, then flow into the
+[VIN model API](../reference/aria_nbv.vin.model_v3.VinModelV3.qmd) and
+diagnostics rather than through ad hoc dictionaries.
 
-- Avoids regression difficulties (multi-modal distributions)
-- Easier to train (classification > regression for complex distributions)
-- Guarantees collision-free poses (if sampled carefully)
+## RQ3 - Candidate and Action Space {#rq3-candidates}
 
-**Limitations:**
+**Question.** Do object-centric candidates plus default exploration candidates
+outperform generic shell sampling?
 
-- Requires many samples for good coverage
-- May miss optimal view between samples
-- No smooth trajectory planning
+**Working hypothesis.** A mixed sampler should outperform a pure generic shell:
+object-centric candidates focus on the target, while default candidates preserve
+exploration and reduce overfitting to a single view pattern.
 
-### GenNBV: Continuous 5-DoF Regression
+**Candidate families.**
 
-**Approach:**
+- Object look-at candidates around the target OBB, target point, or
+  missing-surface centroid.
+- Default shell candidates around the current reference pose.
+- Frontier or deficit candidates based on uncovered surfaces, directional
+  observability, or expected-RRI heatmaps.
 
-- Predict $(x, y, z, \theta, \phi)$ directly via regression
-- Use RL (PPO) to handle multi-modal distributions
+**Evaluation nodes.** Candidate realism, valid fraction, target visibility,
+target RRI distribution, scene RRI distribution, and selected-view diversity.
 
-**Advantages:**
+## RQ4 - Target-Conditioned Model {#rq4-model}
 
-- Smooth, continuous trajectories
-- Theoretically optimal (not limited by sampling)
-- Suitable for real-time robotics
+**Question.** Can a target-conditioned VIN-style scorer rank candidates by
+target RRI better than a scene-level scorer?
 
-**Challenges:**
+**Working hypothesis.** Target conditioning should improve ranking for selected
+objects and regions, especially when scene-level RRI would prefer walls, floors,
+or large background surfaces.
 
-- Harder to train (regression on multi-modal targets)
-- May predict colliding poses (need explicit constraints)
+**Baselines.**
 
----
+- Scene-level VIN scorer trained on scene RRI.
+- Target-conditioned scorer trained on target RRI.
+- Oracle target RRI ranking.
+- Simple geometric target-visibility heuristic.
 
-## LLM Integration for NBV
+**Success criteria.** The target-conditioned scorer should improve target-level
+rank correlation, top-k oracle hit rate, and selected-target RRI without causing
+unacceptable scene-level regressions.
 
-- **LLM integration:** How can language models translate coverage maps and semantic annotations into natural language explanations or high‑level navigation strategies to allow for an easier human machine (NBV-agent) interaction?  Could state of the art VLAs like Gemini be employed to get OBBs for entity level representations of the scene?
-  - Might this also allow high‑level planning and getting qualitative feedback on the current reconstruction status?
-  - Could the LLMs high-level planning capabilities be used to guide the NBV policy towards task-relevant areas?
+## RQ5 - Multi-Step Planning {#rq5-planning}
+
+**Question.** Do multi-step target-aware rollouts beat one-step greedy selection
+under equal acquisition budget?
+
+**Working hypothesis.** Bounded multi-step rollouts should improve cumulative
+target RRI when the first best target view is not locally obvious or when a
+short path must move around occlusion.
+
+**Planning variants.**
+
+- one-step greedy oracle and one-step model scoring;
+- random valid selection;
+- stochastic softmax rollout;
+- Gumbel-Top-k or stochastic-beam roots;
+- model-scored rollout with oracle evaluation;
+- optional value or Q scorer after the August gate.
+
+**Connected implementation surfaces.** Use the
+[CounterfactualPoseGenerator](../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd)
+and keep horizon, branch factor, and beam width explicit so planning complexity
+stays bounded.
+
+## RQ6 - Feasibility and Invalid Actions {#rq6-feasibility}
+
+**Question.** How should invalid actions be handled: hard mask first, then
+validity head or penalty as an ablation?
+
+**Working hypothesis.** Hard masking is the first trusted baseline because it
+preserves label semantics. A validity head or penalty should be added only after
+the oracle and candidate generator expose invalid reasons consistently.
+
+**Invalidity is not a low RRI class.** Collision, out-of-bounds poses,
+insufficient target support, and missing candidate evidence are different from a
+valid candidate with low target improvement. Treating all invalid actions as the
+lowest ordinal RRI bin would blur feasibility and reconstruction quality.
+
+**Evaluation nodes.** Invalid fraction, invalid reason distribution,
+target-visible fraction, rank metrics with and without masks, and penalty/head
+ablation once labels are reliable.
+
+## RQ7 - Scaling and Ablations {#rq7-scaling}
+
+**Question.** Does more supervision coverage buy more than architecture changes?
+
+**Working hypothesis.** Before large VIN rewrites, scale within the current
+mesh-supervised ASE subset: more snippets, more anchor poses, broader candidate
+sets, and target-aware labels. Architecture changes should be justified by
+controlled ablations.
+
+**Scale axes.**
+
+- more of the 100 GT-mesh ASE scenes and available snippets;
+- more anchor poses per trajectory;
+- more candidates and broader candidate distributions;
+- target-aware labels for multiple objects per snippet;
+- stage-aware calibration and binning analysis.
+
+**Ablation axes.** Surface reconstruction input, CORAL variant, auxiliary
+regression, candidate-relative pose encoding, target encoding, candidate sampler
+mixture, and invalid-action handling.
+
+## RQ8 - Extensions and Boundaries {#rq8-extensions}
+
+**Question.** Which ambitious directions are extensions rather than thesis-core
+requirements?
+
+**Working boundary.** The thesis core is target-conditioned RRI plus
+multi-step rollouts. The following remain stretch work unless they become
+necessary and feasible before the roadmap gate:
+
+- VLM/global planning over grounded portals, frontiers, entities, and regions;
+- continuous target-then-pose control inspired by Hestia;
+- simulator-backed online RL with Habitat, Isaac, or an ASE-native simulator;
+- SceneScript or open-vocabulary entity memory as a global semantic layer;
+- real-device deployment and human-in-the-loop AR guidance.
+
+These extensions should be written as future work unless they receive
+experiment-grade evidence before the thesis freeze.
+
+## Research Matrix {#rq-matrix}
+
+| Question | Roadmap gate | Primary evidence | Main linked surface |
+|---|---|---|---|
+| [RQ1](#rq1-objective) | M1, M5 | target RRI and acquisition-cost curves | [RRI theory](theory/rri_theory.qmd) |
+| [RQ2](#rq2-target-encoding) | M3, M4 | target-encoding ablation | [EVL notes](literature/efm3d.qmd) |
+| [RQ3](#rq3-candidates) | M3, M5 | candidate sampler ablation | [Candidate API](../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd) |
+| [RQ4](#rq4-model) | M4 | scene vs target scorer ranking metrics | [VIN API](../reference/aria_nbv.vin.model_v3.VinModelV3.qmd) |
+| [RQ5](#rq5-planning) | M5 | one-step vs multi-step cumulative RRI | [Rollout API](../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd) |
+| [RQ6](#rq6-feasibility) | M3, M6 | invalid-action ablation | [Candidate API](../reference/aria_nbv.pose_generation.CandidateSamplingResult.qmd) |
+| [RQ7](#rq7-scaling) | M2 to M7 | scale and ablation tables | [Data pipeline](impl/data_pipeline_overview.qmd) |
+| [RQ8](#rq8-extensions) | M6 | gate decision and future-work text | [Roadmap](roadmap.qmd#roadmap-m6) |
+
+## KG-Friendly Question Writing {#rq-kg-writing}
+
+Each research question is written as a graph node with:
+
+- a stable section anchor;
+- a one-sentence definition or hypothesis;
+- aliases when terminology can drift;
+- links to internal docs, API surfaces, and roadmap gates;
+- citations through `docs/references.bib` when a question depends on prior
+  work.
+
+New thesis docs and public docstrings should follow the same pattern so later
+KG extraction can connect concepts, code, experiments, and evidence without
+inferring relationships from prose alone.

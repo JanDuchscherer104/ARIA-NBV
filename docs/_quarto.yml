@@ -46,15 +46,13 @@ csl: ieee.csl                             # choose a style now or later
 link-citations: true                      # clickable in-text cites
 
 website:
-  title: "Semantic NBV Planning"
+  title: "ARIA-NBV"
   search:
     location: navbar
     type: overlay
   navbar:
     search: true
     left:
-      - text: TODOs
-        href: contents/todos.qmd
       - text: Setup
         href: contents/setup.qmd
       - text: Project State
@@ -73,8 +71,6 @@ website:
         menu:
         - text: Resources (External Links, Repos, Docs, etc.)
           href: contents/resources.qmd
-        - text: Agent Scaffolding
-          href: contents/resources/agent_scaffold/index.qmd
         - text: ASE Dataset
           href: contents/ase_dataset.qmd
         - text: Glossary
@@ -83,9 +79,9 @@ website:
       - icon: github
         menu:
           - text: "View Source"
-            href: https://github.com/JanDuchscherer104/NBV
+            href: https://github.com/JanDuchscherer104/ARIA-NBV
           - text: "Open Issue"
-            href: https://github.com/JanDuchscherer104/NBV/issues
+            href: https://github.com/JanDuchscherer104/ARIA-NBV/issues
   sidebar:
     - id: docs
       style: "docked"
@@ -101,45 +97,16 @@ website:
             - contents/literature/gen_nbv.qmd
             - contents/literature/scene_script.qmd
             - contents/literature/efm3d.qmd
-            - contents/literature/hesita.qmd
+            - contents/literature/hestia.qmd
         - section: "Project State"
           contents:
             - contents/experiments/findings.qmd
             - contents/questions.qmd
             - contents/roadmap.qmd
-            - contents/todos.qmd
         - section: "Resources"
           contents:
             - contents/setup.qmd
             - contents/resources.qmd
-            - section: "Agent Scaffolding"
-              contents:
-                - contents/resources/agent_scaffold/index.qmd
-                - section: "Instructions"
-                  contents:
-                    - contents/resources/agent_scaffold/instructions/repo_guidance.qmd
-                    - contents/resources/agent_scaffold/instructions/docs_guidance.qmd
-                    - contents/resources/agent_scaffold/instructions/package_guidance.qmd
-                    - contents/resources/agent_scaffold/instructions/data_handling_boundary.qmd
-                    - contents/resources/agent_scaffold/instructions/rri_metrics_boundary.qmd
-                    - contents/resources/agent_scaffold/instructions/vin_boundary.qmd
-                - section: "Canonical State"
-                  contents:
-                    - contents/resources/agent_scaffold/state/memory_readme.qmd
-                    - contents/resources/agent_scaffold/state/project_state.qmd
-                    - contents/resources/agent_scaffold/state/decisions.qmd
-                    - contents/resources/agent_scaffold/state/open_questions.qmd
-                    - contents/resources/agent_scaffold/state/gotchas.qmd
-                - section: "References"
-                  contents:
-                    - contents/resources/agent_scaffold/references/operator_quick_reference.qmd
-                    - contents/resources/agent_scaffold/references/python_conventions.qmd
-                    - contents/resources/agent_scaffold/references/context7_library_ids.qmd
-                    - contents/resources/agent_scaffold/references/agent_memory_templates.qmd
-                - section: "Skills & Routing"
-                  contents:
-                    - contents/resources/agent_scaffold/skills/aria_nbv_context_skill.qmd
-                    - contents/resources/agent_scaffold/skills/context_map.qmd
             - contents/ase_dataset.qmd
             - contents/glossary.qmd
         - section: Theory
@@ -156,7 +123,7 @@ website:
             - contents/impl/data_pipeline_overview.qmd
             - contents/impl/oracle_rri_impl.qmd
             - contents/impl/rri_computation.qmd
-            - contents/impl/coral_intergarion.qmd
+            - contents/impl/coral_integration.qmd
             - contents/impl/vin_nbv.qmd
             - contents/impl/vin_v2_feature_proposals.qmd
         - section: "Architecture Diagrams"
@@ -170,11 +137,11 @@ website:
             - contents/ext-impl/efm3d_symbol_index.qmd
         - section: "Presentations"
           contents:
-            - text: "Seminar Slides 1"
+            - text: "Project Slides 1"
               file: typst/slides/slides_1.pdf
-            - text: "Seminar Slides 2"
+            - text: "Project Slides 2"
               file: typst/slides/slides_2.pdf
-            - text: "Seminar Slides 4 (final)"
+            - text: "Project Slides 4"
               file: typst/slides/slides_4.pdf
             - text: "MSc Slides 01 (outlook)"
               file: typst/slides/slides_thesis_outlook.pdf

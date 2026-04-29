@@ -756,7 +756,7 @@
 /// Link to a file in the GitHub repo (shows only the filename).
 #let gh(path) = {
   let base = path.split("/").last()
-  link("https://github.com/JanDuchscherer104/NBV/blob/main/" + path)[#code-inline(base)]
+  link("https://github.com/JanDuchscherer104/ARIA-NBV/blob/main/" + path)[#code-inline(base)]
 }
 
 /// Create a citation-style reference

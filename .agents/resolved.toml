@@ -1,0 +1,56 @@
+# ARIA-NBV Resolved Items
+
+[[issue]]
+id = "issue-001"
+title = "Stale agents-db skill and missing helper"
+description = "The agents-db skill referenced PRML VSLAM, pointed at docs/Questions.md, and promised make agents-db even though no helper target existed."
+type = "bug"
+priority = "high"
+status = "resolved"
+labels = ["scaffold", "agent", "backlog"]
+resolved_at = "2026-04-29"
+resolution_note = "Replaced PRML wording, added scripts/agents_db.py, wired make agents-db, validated schema, and updated the skill prompt."
+resolved_from = ".agents/issues.toml"
+
+[[issue]]
+id = "issue-002"
+title = "Wrong code-review skill"
+description = "The code-review skill references litkg-rs and Rust instead of ARIA-NBV and Python."
+type = "bug"
+priority = "high"
+status = "resolved"
+labels = ["scaffold", "agent"]
+resolved_at = "2026-04-29"
+resolution_note = "Rewrote the copied code-review skill and prompt for ARIA-NBV Python/docs/config review surfaces; remaining PR/issue lifecycle work is tracked by refactor-002."
+resolved_from = ".agents/issues.toml"
+
+[[issue]]
+id = "issue-008"
+title = "Public docs identity and navigation leaks stale project state"
+description = "Public docs exposed outdated project naming, old GitHub repo links, top-level TODOs, and generated agent scaffold navigation that should not be first-line public thesis content."
+type = "maintenance"
+priority = "high"
+status = "resolved"
+labels = ["docs", "identity", "nav"]
+resolved_at = "2026-04-29"
+resolution_note = "Bounded public identity/nav cleanup completed; broader docs role mixing remains tracked by issue-003 and refactor-004."
+resolved_from = ".agents/issues.toml"
+
+[[todo]]
+id = "todo-009"
+title = "Bounded public docs identity cleanup"
+description = "Update public README/docs identity, stale GitHub links, generated-agent nav leaks, and typo-facing Quarto links without full docs-tree restructuring."
+priority = "high"
+status = "resolved"
+labels = ["docs", "identity", "bounded-cleanup"]
+issue_ids = ["issue-003", "issue-005", "issue-008"]
+loc_min = 80
+loc_expected = 220
+loc_max = 520
+context = ["README.md still opens with seminar-era naming.", "docs/_quarto.yml points GitHub links to JanDuchscherer104/NBV and exposes TODOs plus Agent Scaffolding in primary nav.", "docs/index.qmd links to typo pages coral_intergarion and generated agent scaffold mirrors."]
+implementation_notes = ["Keep docs/contents/todos.qmd source in place but remove it from primary public navigation.", "Remove public Agent Scaffolding nav exposure without deleting generated mirror sources.", "Rename typo-facing pages and links only where bounded and renderable."]
+acceptance = ["README and docs home use ARIA-NBV / thesis-era naming.", "Active docs links use JanDuchscherer104/ARIA-NBV.", "Top-level nav no longer exposes TODOs or Agent Scaffolding as primary public pages.", "coral_intergarion and hesita typo-facing links are replaced or intentionally absent from active nav."]
+verification = ["cd docs && quarto render index.qmd contents/roadmap.qmd contents/questions.qmd", "scripts/nbv_qmd_outline.sh --compact", "rg -n \"Seminar|hesita|coral_intergarion|JanDuchscherer104/NBV|PRML VSLAM|litkg-rs\" README.md docs .agents/skills"]
+resolved_at = "2026-04-29"
+resolution_note = "Completed bounded public docs cleanup: README/docs identity updated, old repo links fixed, TODO and generated scaffold nav exposure removed, and typo-facing Quarto pages renamed."
+resolved_from = ".agents/todos.toml"

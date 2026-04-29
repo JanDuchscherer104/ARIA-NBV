@@ -5,14 +5,9 @@ format: html
 
 # Resources & Tools
 
-This section provides an overview of the libraries, tools, and documentation used in this project - all of which stem from the Project Aria ecosystem.
-
----
-
-## Agent Scaffolding
-
-- [Agent Scaffolding Index](resources/agent_scaffold/index.qmd): Published mirror of the maintained Codex guidance and scaffold docs.
-- The pages in that section are generated from the canonical markdown sources in `AGENTS.md`, `.agents/`, and the nested package `AGENTS.md` files via `./scripts/quarto_generate_agent_docs.py`.
+This section provides an overview of the libraries, tools, and documentation
+used in this project. Internal agent guidance lives under `.agents/` and is not
+part of the public documentation front door.
 
 ---
 

@@ -1,7 +1,7 @@
 
 ---
-title: "Next-Best-View Planning with Foundation Models"
-subtitle: "VCML Seminar: RRI based NBV Prediction using EFM3D Backbones"
+title: "ARIA-NBV: Target-Aware Next-Best-View Planning"
+subtitle: "Quality-driven NBV with ASE, EFM3D, Relative Reconstruction Improvement, and VIN-style candidate scoring"
 author: "Jan Duchscherer, Munich University of Applied Sciences"
 date: last-modified
 format:
@@ -15,7 +15,7 @@ bibliography: references.bib
 
 Next-Best-View (NBV) planning addresses the fundamental challenge of autonomous viewpoint selection in active 3D reconstruction, aiming to maximize the acquisition quality while minimizing the acquisition cost (i.e. number of views, traversed distance, capture time).
 
-Classical NBV methods rely on hand-crafted criteria, limited action spaces, or per-scene optimized representations. While learning-based NBV methods like GenNBV [@GenNBV-chen2024] have improved generalization by leveraging reinforcement learning, they still optimize for geometric coverage as a proxy for reconstruction quality. Since coverage maximization does not necessarily correlate with improved reconstruction quality, these methods can struggle in complex scenes with occlusions and fine details. Diretly optimizing reconstruction quality, as pioneered by VIN-NBV [@VIN-NBV-frahm2025], has shown significant improvements by predicting Relative Reconstruction Improvement (RRI) to quantify the fitness of candidate viewpoints. However, even VIN-NBV's generalization capabilities are rather limited to simple object-centric NBV scenarios as it does not leverage pre-tained foundation models with rich 3D spatial understanding.
+Classical NBV methods rely on hand-crafted criteria, limited action spaces, or per-scene optimized representations. While learning-based NBV methods like GenNBV [@GenNBV-chen2024] have improved generalization by leveraging reinforcement learning, they still optimize for geometric coverage as a proxy for reconstruction quality. Since coverage maximization does not necessarily correlate with improved reconstruction quality, these methods can struggle in complex scenes with occlusions and fine details. Directly optimizing reconstruction quality, as pioneered by VIN-NBV [@VIN-NBV-frahm2025], has shown significant improvements by predicting Relative Reconstruction Improvement (RRI) to quantify the fitness of candidate viewpoints. However, even VIN-NBV's generalization capabilities are limited to simpler object-centric NBV scenarios because it does not leverage pre-trained foundation models with rich 3D spatial understanding.
 
 This project aims to develop an NBV system that integrates VIN-NBV's key insight to directly optimize reconstruction quality rather than proxies like coverage, leveraging a pre-trained _egocentric foundation model_ as backbone to provide strong priors for 3D spatial reasoning in complex indoor scenes. We adapt the [EVL (_Egocentric Voxel Lifting_)](contents/literature/efm3d.qmd) 3D EFM [@EFM3D-straub2024] which is pre-trained on the [Aria Synthetic Environments (ASE)](contents/ase_dataset.qmd) dataset - a large-scale synthetic egocentric dataset with 100k indoor scenes, to provide rich 3D feature volumes that capture scene geometry, semantics, and free-space priors. On top of this frozen backbone, we train a lightweight RRI prediction head that introspects both the current scene representation and candidate viewpoints to express the fitness of given candidate views.
 
@@ -43,15 +43,15 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 
 ## Paper
 
-- [Seminar Project Paper](typst/paper/main.pdf), [Typst Source](typst/paper/main.typ): Ground turth for the project state at the end of the seminar in 01/2025.
+- [Project Paper](typst/paper/main.pdf), [Typst Source](typst/paper/main.typ): Ground truth for the project narrative and technical framing.
 
 ## Project Slides
 
-### Main Seminar Presentations
+### Project Presentations
 
 - [Presentation 01](typst/slides/slides_1.pdf), [typst-src](typst/slides/slides_1.typ)
 - [Presentation 02](typst/slides/slides_2.pdf), [typst-src](typst/slides/slides_2.typ)
-- [Presentation 04](typst/slides/slides_4.pdf), [typst-src](typst/slides/slides_4.typ): Final presentation of our seminar project.
+- [Presentation 04](typst/slides/slides_4.pdf), [typst-src](typst/slides/slides_4.typ): Final presentation of the earlier project phase.
 
 ### Master's Thesis
 
@@ -63,7 +63,6 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 
 ## Project State
 
-- **[Action Items & TODOs](contents/todos.qmd)**: Current priorities and open tasks
 - **[Project Roadmap](contents/roadmap.qmd)**: Milestones and timeline
 - **[Research Questions](contents/questions.qmd)**: Open problems and directions
 - **[Experimental Findings](contents/experiments/findings.qmd)**: Run logs and takeaways
@@ -98,7 +97,7 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - **[ASE Data Pipeline & Streamlit Usage](contents/impl/data_pipeline_overview.qmd)**: Data ingestion and dashboards
 - **[aria_nbv Implementation Overview](contents/impl/oracle_rri_impl.qmd)**: Key modules and workflows
 - **[Computing RRI with Ground Truth Meshes](contents/impl/rri_computation.qmd)**: Oracle pipeline and labels
-- **[CORAL for Ordinal Regression](contents/impl/coral_intergarion.qmd)**: Ordinal binning and loss integration
+- **[CORAL for Ordinal Regression](contents/impl/coral_integration.qmd)**: Ordinal binning and loss integration
 - **[View Introspection Network (VIN) on EVL](contents/impl/vin_nbv.qmd)**: Model design and training notes
 - **[VIN v2 Feature + Encoding Proposals](contents/impl/vin_v2_feature_proposals.qmd)**: Design space and ideas
 
@@ -108,10 +107,3 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - **[EFM3D Implementation Index](contents/ext-impl/efm3d_implementation.qmd)**: Voxel/point utilities
 - **[ProjectAria Tools Reference](contents/ext-impl/prj_aria_tools_impl.qmd)**: Dataset tooling
 - **[EFM3D Symbol Index](contents/ext-impl/efm3d_symbol_index.qmd)**: Keys and coordinate conventions
-
-## Agent Memory
-
-- The maintained agent scaffold is published under [Agent Scaffolding](contents/resources/agent_scaffold/index.qmd).
-- Canonical state lives in `.agents/memory/state/` and is mirrored there as Quarto pages.
-- Repo guidance and scoped package guides are mirrored from `AGENTS.md`, `docs/AGENTS.md`, and the nested package `AGENTS.md` files.
-- Episodic debriefs under `.agents/memory/history/YYYY/MM/` and archive notes remain internal and are not part of the published site.

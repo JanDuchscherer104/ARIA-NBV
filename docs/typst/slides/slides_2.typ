@@ -19,13 +19,13 @@
     title: [ASE, EFM3D & EVL: Datasets, Models & Tools for NBV],
     subtitle: [Towards Relative Reconstruction Metrics for Next-Best-View],
     authors: [*Jan Duchscherer*],
-    extra: [VCML Seminar WS24/25],
+    extra: [VCML Project WS24/25],
     footer: [
       #grid(
         columns: (1fr, auto, 1fr),
         align: bottom,
         align(left)[Jan Duchscherer],
-        align(center)[VCML Seminar WS24/25],
+        align(center)[VCML Project WS24/25],
         align(right)[#datetime.today().display("[day padding:none]. [month repr:short] [year]")],
       )
     ],

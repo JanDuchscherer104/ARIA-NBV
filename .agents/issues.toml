@@ -1,0 +1,55 @@
+# ARIA-NBV Issues
+
+[[issue]]
+id = "issue-003"
+title = "Documentation role mixing"
+description = "The docs/ tree mixes public thesis narrative, scratchpad notes, generated context, and agent scaffold mirrors."
+type = "maintenance"
+priority = "high"
+status = "open"
+labels = ["docs", "hygiene"]
+
+[[issue]]
+id = "issue-004"
+title = "Missing root CI and pre-commit"
+description = "The repository lacks a root-level pre-commit configuration and a comprehensive CI workflow; the visible workflow coverage is Quarto-oriented."
+type = "feature"
+priority = "medium"
+status = "open"
+labels = ["ci", "dev-ergonomics"]
+
+[[issue]]
+id = "issue-005"
+title = "Dedicated setup guide missing"
+description = "The README now provides a concise project front door, but setup details still need a dedicated portable guide for environment, CUDA, dataset access, cache paths, and first-run smoke commands."
+type = "maintenance"
+priority = "medium"
+status = "open"
+labels = ["docs", "identity"]
+
+[[issue]]
+id = "issue-006"
+title = "Dense root AGENTS.md"
+description = "The root AGENTS.md is too dense and should eventually become a thin dispatcher into scoped guides, skills, and references."
+type = "refactor"
+priority = "medium"
+status = "open"
+labels = ["agent", "guidance"]
+
+[[issue]]
+id = "issue-007"
+title = "M1 data/cache/oracle contract gate is not yet frozen"
+description = "The May milestone requires stable offline-store, split, frame/CW90, and oracle RRI contracts before target-conditioned VIN or rollout claims."
+type = "research-debt"
+priority = "high"
+status = "open"
+labels = ["data", "rri", "thesis", "contracts"]
+
+[[issue]]
+id = "issue-009"
+title = "Dirty worktree classification blocks M0 handoff"
+description = "The active worktree contains large unrelated data, app, RL, docs, and agent-memory changes; thesis work needs a classified handoff before larger implementation slices."
+type = "maintenance"
+priority = "high"
+status = "open"
+labels = ["repo-hygiene", "handoff", "m0"]

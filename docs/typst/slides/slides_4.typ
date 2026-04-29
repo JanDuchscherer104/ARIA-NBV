@@ -64,13 +64,13 @@
     title: [Aria-NBV: Oracle RRI + VIN v3 Candidate Scoring],
     subtitle: [Offline oracle supervision, diagnostics, and learned NBV baseline],
     authors: [*Jan Duchscherer*],
-    extra: [VCML Seminar WS24/25],
+    extra: [VCML Project WS24/25],
     footer: [
       #grid(
         columns: (1fr, auto, 1fr),
         align: bottom,
         align(left)[Jan Duchscherer],
-        align(center)[VCML Seminar WS24/25],
+        align(center)[VCML Project WS24/25],
         align(right)[#datetime.today().display("[day padding:none]. [month repr:short] [year]")],
       )
     ],
@@ -622,18 +622,18 @@
 ]
 
 
-#slide(title: [Data Flow: VinDataModule + VinSnippetCache])[
+#slide(title: [Data Flow: VinDataModule + VinOfflineDataset])[
   #grid(
     columns: (1.1fr, 1fr),
     gutter: 0.35cm,
     [
-      #color-block(title: [Pipeline (offline cache)], spacing: 0.5em)[
+      #color-block(title: [Pipeline (immutable VIN offline store)], spacing: 0.5em)[
         #text(size: 16pt)[
-          - #code-inline[VinDataModule] builds #code-inline[`OracleRriCacheVinDataset`].
-          - #code-inline[OracleRriCacheDataset] reads #code-inline[`samples/*.pt`] and decodes depths/rri (and optional backbone) into a #code-inline[`VinOracleBatch`].
-          - #code-inline[VinSnippetProviderChain] attaches a #code-inline[`VinSnippetView`].
-          - Batching + padding handled by #code-inline[`VinOracleBatch.collate_fn`].
-          - Per-sample candidate shuffling to avoid ordering bias.
+          - #code-inline[VinDataModule] builds a map-style #code-inline[`VinOfflineDataset`].
+          - #code-inline[manifest.json] + #code-inline[sample_index.jsonl] route train/val rows into immutable shards.
+          - Zarr blocks provide fixed tensor reads; indexed MessagePack blocks preserve diagnostics on demand.
+          - Each row reconstructs a #code-inline[`VinOracleBatch`] with padded candidates, oracle RRI, cameras, and a minimal #code-inline[`VinSnippetView`].
+          - Legacy oracle/VIN caches are removed; rebuild immutable stores with #code-inline[`VinOfflineWriter`] when data is available.
         ]
       ]
       #quote-block[Streamline, simplify, keep only necessary components]
@@ -642,7 +642,7 @@
 
       #figure(
         image(fig_path + "diagrams/vin_nbv/mermaid/offline_cache_training.png", width: 105%),
-        caption: [Data Flow: OfflineChache #sym.arrow.r VinOracleBatch.],
+        caption: [Data Flow: immutable VIN offline store #sym.arrow.r VinOracleBatch.],
       )
     ],
   )

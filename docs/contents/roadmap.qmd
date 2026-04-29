@@ -1,69 +1,252 @@
 ---
-title: "Project Roadmap"
+title: "Master Thesis Roadmap"
 format: html
+bibliography: ../references.bib
 ---
 
-# Project Roadmap
+# Master Thesis Roadmap {#roadmap}
 
-## Seminar Phase (6 ECTS, ~180 hours)
+This roadmap covers full-time thesis work from **2026-04-29** through
+**2026-09-30**. The planned capacity is approximately 40 hours per week, with
+the final claim centered on target-conditioned, quality-driven
+Next-Best-View (NBV) planning:
 
-### Phase 1: Foundation & Familiarization
+> Can we train a target-conditioned NBV model that produces
+> acquisition-cost-efficient trajectories maximizing Relative Reconstruction
+> Improvement (RRI) for a target of interest?
 
-**Goal**:
+The technical spine follows the current Aria-NBV system: ASE snippets and
+ground-truth meshes [@ProjectAria-ASE-2025], frozen EVL/EFM3D features
+[@EFM3D-straub2024], oracle RRI supervision inspired by VIN-NBV
+[@VIN-NBV-frahm2025], and bounded multi-step planning before any full
+continuous-RL claim. See the [research questions](questions.qmd), the
+[RRI theory page](theory/rri_theory.qmd), the
+[VIN implementation note](impl/vin_nbv.qmd), and the
+[Typst paper source](../typst/paper/main.typ) for the main connected nodes.
 
-- Get familiar with the NBV problem domain and read relevant literature
-- Understand the Aria ecosystem — ASE data, SceneScript, Project Aria Tools, ATEK, EFM3D/ EVL
+## Thesis Outcome {#roadmap-thesis-outcome}
 
-### Phase 2: Oracle RRI
+The September deliverable is a reproducible target-aware NBV stack:
 
-**Goal**: Implement an "oracle" Relative Reconstruction Improvement (RRI) computation method based on the GT meshes and semi-dense point clouds or compute dense PC from GT depth maps (problem: they are only covering actual trajectory)
+- a trusted oracle for scene-level and target-specific RRI;
+- a one-step VIN-style scorer that can be conditioned on a target encoding;
+- a multi-step rollout evaluator comparing greedy, stochastic/beam, and
+  model-scored target-aware trajectories;
+- final figures, ablations, and failure cases that report cumulative target
+  RRI together with acquisition cost.
 
-### Phase 3: RRI Prediction Network w/ EVL or Scene-Script backbone
+Full continuous control, simulator-backed online RL, VLM/global planning, and
+real-device deployment remain stretch work unless the August evidence gate is
+passed. Hestia-style hierarchy [@Hestia-lu2026], GenNBV-style continuous
+control [@GenNBV-chen2024], and SceneScript-style semantic memory
+[@SceneScript-avetisyan2024] are treated as design references, not thesis-core
+claims.
 
-**Goal**:
+## Milestone Timeline {#roadmap-milestones}
 
-- Use pre-trained SceneScript or EFM3D/ EVL model to predict RRI for candidate views based on previous observations (partial point cloud, previous poses and calibrated video frames).
-- Define training procedures and loss functions.
+| Dates | Milestone | Exit criteria |
+|---|---|---|
+| 2026-04-29 to 2026-05-10 | **M0 - Scope, repo, docs foundation** | Dirty worktree classified; available VIN offline store smoke-checked; KG-friendly doc and docstring rules documented. |
+| 2026-05-11 to 2026-05-31 | **M1 - Data, cache, oracle correctness** | Offline store and RRI contracts stable; frame/CW90 risks documented; oracle throughput measured. |
+| 2026-06-01 to 2026-06-21 | **M2 - VIN baseline and diagnostics** | One-step VIN baseline reproducible; calibration and ranking plots available; ablation matrix fixed. |
+| 2026-06-22 to 2026-07-12 | **M3 - Entity/target-aware RRI** | GT-OBB cropped RRI implemented and trusted on a small subset; target selection policy defined. |
+| 2026-07-13 to 2026-08-09 | **M4 - Target-conditioned VIN** | Model accepts a target encoding and predicts target-specific RRI; scene-level and target-level scorers compared. |
+| 2026-08-10 to 2026-08-30 | **M5 - Multi-step target-aware rollouts** | Greedy, stochastic/beam, and model-scored rollouts compared by cumulative target RRI and acquisition cost. |
+| 2026-08-31 to 2026-09-13 | **M6 - Value/RL gate** | If rollout evidence is strong, add masked discrete Q or close-greedy RL; otherwise deepen rollout/entity ablations. |
+| 2026-09-14 to 2026-09-27 | **M7 - Thesis experiments and writing** | Final tables, figures, failure cases, and thesis narrative frozen. |
+| 2026-09-28 to 2026-09-30 | **M8 - Release freeze** | Reproducible configs, docs, demo path, and final smoke checks complete. |
 
-#### Architecture
+## Milestone Details {#roadmap-details}
 
-- **Encoder**: SceneScript encoder or EVL backbone (frozen or fine-tuned)
-- **Candidate Encoder**: View pose + frustum features, projection of partial PC into candidate view -> learnable encoder
-- **Predictor**: MLP regressing RRI score
+### M0 - Scope, Repo, Docs Foundation {#roadmap-m0}
 
----
+**Primary question:** Which work is thesis-critical, and which work is support
+infrastructure?
 
-## Master Thesis Phase (30 ECTS, ~900 hours)
+**Implementation surfaces:** root README, `docs/contents/roadmap.qmd`,
+`docs/contents/questions.qmd`, the Streamlit VIN diagnostics page, and the
+available VIN offline store.
 
-### Phase 4: Entity-Aware RRI
-### Phase 5: View Synthesis Integration
+**Exit checks:**
 
-### Phase 6: Learning-Based NBV Prediction
+- classify existing worktree changes into data/cache cleanup, RL/rollout
+  scaffold, docs cleanup, and unrelated operator work;
+- validate that `offline_only.toml` can load the available VIN offline store into the
+  [VIN diagnostics page](../reference/aria_nbv.lightning.VinDataModule.qmd);
+- record KG-friendly authoring rules in this roadmap and use them in new public
+  docstrings;
+- keep thesis scope aligned with [RQ1](questions.qmd#rq1-objective) through
+  [RQ8](questions.qmd#rq8-extensions).
 
-### Phase 7: Fine-Tune EFM for NBV on Target Platform
+### M1 - Data, Cache, Oracle Correctness {#roadmap-m1}
 
-- **Project Aria Glasses**: High-fidelity egocentric data
-- **Meta Quest 3**: Inside-out tracking, depth sensor
-- **iPhone LiDAR**: Portable, high-quality depth
+**Primary question:** Is the supervision substrate trustworthy enough for model
+and planning claims?
 
-### Phase 8: Human-in-the-Loop System
+**Implementation surfaces:** the
+[data-handling API](../reference/data_handling.qmd), the
+[offline store contracts](../reference/aria_nbv.data_handling.VinSnippetView.qmd),
+the [RRI metric API](../reference/rri_metrics.qmd), and the
+[data pipeline overview](impl/data_pipeline_overview.qmd).
 
-**Goal**: Develop interactive AR interface for real-time NBV guidance
+**Exit checks:**
 
-#### Components
+- one canonical offline store path, manifest, sample index, and split contract;
+- explicit frame semantics for candidate poses, rig poses, and display-only
+  CW90 corrections;
+- oracle throughput report on representative snippets;
+- no aggressive mesh or point-cloud downsampling in fine-detail oracle runs.
 
-1. **Entity Selection UI**
-   - Tap entities in AR view
-   - Set importance weights
-2. **Real-Time NBV Computation**
-   - Streaming point cloud input
-   - Incremental updates of the scene representation
-   - Fast RRI and pose prediction
-3. **View Guidance Overlay**
-   - AR arrows/markers showing optimal viewpoints
-   - Distance and quality indicators
-   - Real-time voice2voice feedback
+### M2 - VIN Baseline and Diagnostics {#roadmap-m2}
 
-### Phase 9: Real-World Deployment & Evaluation (Months 7-8, ~200 hours)
+**Primary question:** What is the reproducible one-step baseline before adding
+target conditioning?
 
-**Goal**: Deploy on mobile devices and validate in real environments
+**Implementation surfaces:** the [VIN implementation note](impl/vin_nbv.qmd),
+the [VIN model API](../reference/aria_nbv.vin.model_v3.VinModelV3.qmd), the
+Lightning training surface, W&B/Optuna reports, and Streamlit diagnostics.
+
+**Exit checks:**
+
+- fixed train/val split, seed set, checkpoint naming, and `offline_only.toml`
+  baseline run;
+- calibration, ordinal-bin, rank-correlation, and top-k selection diagnostics;
+- controlled ablation matrix for surface reconstruction inputs, CORAL variants,
+  auxiliary regression, and candidate features.
+
+### M3 - Entity/Target-Aware RRI {#roadmap-m3}
+
+**Primary question:** Can the oracle measure improvement for a selected target,
+not only the whole scene?
+
+**Implementation surfaces:** GT OBBs from ASE/EFM views, target selection logic,
+cropped point/mesh RRI, and diagnostics linking target-level and scene-level
+metrics.
+
+**Exit checks:**
+
+- target entity eligibility policy based on visibility, distance, crop size,
+  and mesh/point support;
+- GT-OBB cropped RRI on a small trusted subset;
+- diagnostics showing current points, candidate points, cropped mesh, target
+  OBB, target RRI, and scene RRI side by side;
+- clear handling of invalid or unsupported targets.
+
+### M4 - Target-Conditioned VIN {#roadmap-m4}
+
+**Primary question:** Can a VIN-style scorer rank candidates by target-specific
+RRI when conditioned on a target encoding?
+
+**Implementation surfaces:** VIN target encoder, target-aware batch fields,
+offline-store payload extensions, and model diagnostics.
+
+**Exit checks:**
+
+- target encoding selected for the first controlled run: GT OBB plus class and
+  relative pose fields by default;
+- target-specific RRI labels loaded through the data-handling surface;
+- baseline comparison: scene-level scorer, target-conditioned scorer, and oracle
+  target RRI;
+- failure cases grouped by occlusion, small target, invalid candidates, and
+  poor target encoding.
+
+### M5 - Multi-Step Target-Aware Rollouts {#roadmap-m5}
+
+**Primary question:** Does planning beyond one step improve cumulative target
+RRI under the same acquisition budget?
+
+**Implementation surfaces:** the
+[counterfactual rollout API](../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd),
+candidate generation, target-aware scorer backends, and rollout diagnostics.
+
+**Exit checks:**
+
+- compare one-step greedy, random, oracle rollout, stochastic/beam rollout, and
+  model-scored rollout;
+- report cumulative target RRI, scene RRI, number of views, path length, invalid
+  action rate, and runtime;
+- keep rollout complexity bounded by explicit horizon, branch factor, and beam
+  width;
+- visualize representative successes and failures.
+
+### M6 - Value/RL Gate {#roadmap-m6}
+
+**Primary question:** Is a learned value or policy baseline necessary and
+credible before thesis freeze?
+
+**Implementation surfaces:** the
+[counterfactual RL API](../reference/aria_nbv.pose_generation.CounterfactualRolloutResult.qmd),
+transition datasets, masked discrete Q, and optional close-greedy PPO/SB3
+experiments.
+
+**Exit checks:**
+
+- if M5 shows meaningful headroom, add a masked discrete Q or close-greedy
+  low-discount policy baseline;
+- if M5 does not show enough headroom, defer RL and spend the window on
+  target-aware ablations and rollout robustness;
+- do not claim full continuous RL unless online interaction, reward speed, and
+  evaluation are all thesis-grade.
+
+### M7 - Thesis Experiments and Writing {#roadmap-m7}
+
+**Primary question:** What evidence supports the final thesis claim?
+
+**Implementation surfaces:** final configs, W&B/Optuna export, Typst paper,
+Quarto docs, and defense figures.
+
+**Exit checks:**
+
+- final experiment table for one-step vs multi-step and scene-level vs
+  target-aware scoring;
+- final ablations for target encoding, candidate generation, invalid handling,
+  and supervision scale;
+- final failure-case catalog;
+- paper, docs, and slides use the same terminology and claims.
+
+### M8 - Release Freeze {#roadmap-m8}
+
+**Primary question:** Can the thesis result be reproduced and demonstrated?
+
+**Implementation surfaces:** tagged configs, smoke tests, final docs, and demo
+script.
+
+**Exit checks:**
+
+- final smoke matrix passes on the intended machine;
+- all final figures trace back to configs and run IDs;
+- public docs link to the final thesis narrative and not to stale scratchpad
+  claims;
+- no release-critical placeholder, stale path, or wrong repo link remains.
+
+## KG-Friendly Authoring Rules {#kg-authoring-rules}
+
+These rules apply to new roadmap, research-question, docstring, and thesis
+writing so the repository can support later knowledge-graph construction.
+
+- Give every major concept a stable anchor, a one-sentence definition, known
+  aliases, and links to related internal nodes.
+- Prefer internal links to Quarto pages, Typst sections, API reference pages,
+  configs, and canonical memory over repeating the same explanation.
+- Prefer BibTeX citations from `docs/references.bib` for papers and datasets;
+  use raw external URLs only for tools or libraries without bibliography keys.
+- Public Python docstrings should state tensor shapes, coordinate frames, units,
+  related config classes, and related data containers when those are part of the
+  contract.
+- Each milestone should point to its research questions, implementation
+  surfaces, expected tests, and thesis figures once those artifacts exist.
+
+## Standing Verification {#roadmap-verification}
+
+Docs changes should render the touched pages and preserve the context index:
+
+```sh
+cd docs
+quarto render contents/roadmap.qmd
+quarto render contents/questions.qmd
+cd ..
+scripts/nbv_qmd_outline.sh --compact
+```
+
+For package work, use the verification row in the nearest `AGENTS.md`; for
+roadmap or canonical-memory changes, run the matching memory or docs checks.

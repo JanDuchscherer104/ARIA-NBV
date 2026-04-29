@@ -1,13 +1,13 @@
 ---
 name: agents-db
-description: Use when working with PRML VSLAM's internal agent memory (`.agents/AGENTS_INTERNAL_DB.md`, `.agents/issues.toml`, `.agents/todos.toml`, `.agents/refactors.toml`, `.agents/resolved.toml`) or triaging, resolving, and maintaining the backlog with `make agents-db`.
+description: Use when working with ARIA-NBV's internal agent memory (`.agents/AGENTS_INTERNAL_DB.md`, `.agents/issues.toml`, `.agents/todos.toml`, `.agents/refactors.toml`, `.agents/resolved.toml`) or triaging, resolving, and maintaining the backlog with `make agents-db`.
 ---
 
 # AGENTS DB
 
 ## When To Use
 
-Use this skill when work in this repo depends on any of these:
+Use this skill when work in ARIA-NBV depends on any of these:
 
 - reading or updating the internal agent-memory surfaces under `.agents/`
 - triaging or resolving issues, todos, and refactor candidates with `make agents-db`
@@ -30,7 +30,7 @@ This skill is not the canonical source for general package style or architecture
 
 Before DB work:
 
-1. Read `README.md`, `docs/Questions.md`, and the nearest `AGENTS.md`.
+1. Read `README.md`, `docs/contents/questions.qmd`, and the nearest `AGENTS.md`.
 2. Read `.agents/AGENTS_INTERNAL_DB.md` for mission, configuration, ownership, and stable repo facts.
 3. Use `rg` and narrow file reads instead of bulk-loading the repository.
 4. Keep the change scoped to the requested task; record validated debt instead of opportunistically editing unrelated code.
@@ -43,10 +43,10 @@ Use the repo-local files under `.agents/` as follows:
   - active validated defects, integration gaps, and architectural debt
 - `.agents/todos.toml`
   - active actionable follow-up work linked to issue IDs
-  - every todo must define `loc_min`, `loc_expected`, and `loc_max`
+  - every todo must define `loc_min`, `loc_expected`, `loc_max`, `issue_ids`, `context`, `implementation_notes`, `acceptance`, and `verification`
 - `.agents/refactors.toml`
   - active suggested refactors and simplifications that are worth considering but are not necessarily defect-driven
-  - every refactor must define `loc_min`, `loc_expected`, and `loc_max`
+  - every refactor must define `loc_min`, `loc_expected`, `loc_max`, `issue_ids`, `context`, `implementation_notes`, `acceptance`, and `verification`
 - `.agents/resolved.toml`
   - resolved or intentionally retired issues, todos, and refactors
   - move completed work here instead of deleting records
@@ -62,11 +62,13 @@ Use the backlog helper through `make agents-db`:
 
 - `make agents-db`
   - prints the ranked active issues, todos, and refactors
-- `make agents-db AGENTS_ARGS='resolve issue ISSUE-XXXX --note "..."'`
+- `make agents-db AGENTS_ARGS='validate'`
+  - validates DB schema, required fields, and active issue references
+- `make agents-db AGENTS_ARGS='resolve issue issue-XXXX --note "..."'`
   - moves an issue into `.agents/resolved.toml`
-- `make agents-db AGENTS_ARGS='resolve todo TODO-XXXX --note "..."'`
+- `make agents-db AGENTS_ARGS='resolve todo todo-XXXX --note "..."'`
   - moves a todo into `.agents/resolved.toml`
-- `make agents-db AGENTS_ARGS='resolve refactor REFACTOR-XXXX --note "..."'`
+- `make agents-db AGENTS_ARGS='resolve refactor refactor-XXXX --note "..."'`
   - moves a refactor into `.agents/resolved.toml`
 
 Ranking rules:
