@@ -1,10 +1,31 @@
 {
+    "editor.formatOnSave": true,
     "python-envs.defaultEnvManager": "ms-python.python:venv",
-    "python-envs.defaultPackageManager": "ms-python.python:pip",
+    "python-envs.defaultPackageManager": "ms-python.python:uv",
     "python-envs.pythonProjects": [],
+    "python.defaultInterpreterPath": "${workspaceFolder}/aria_nbv/.venv/bin/python",
+    "python.terminal.activateEnvironment": true,
     "python.analysis.extraPaths": [
         "${workspaceFolder}/external/PointNeXt"
     ],
+    "ruff.configuration": "${workspaceFolder}/aria_nbv/pyproject.toml",
+    "ruff.format.preview": true,
+    "notebook.formatOnSave.enabled": true,
+    "notebook.codeActionsOnSave": {
+        "notebook.source.fixAll": "explicit",
+        "notebook.source.organizeImports": "explicit"
+    },
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        }
+    },
+    "[markdown]": {
+        "editor.formatOnSave": true,
+    },
     "tinymist.rootPath": "${workspaceFolder}/docs",
-    "chatgpt.openOnStartup": false,
+    "chatgpt.openOnStartup": false
 }

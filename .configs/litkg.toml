@@ -1,0 +1,17 @@
+[project]
+name = "ARIA-NBV"
+root = "."
+
+[literature]
+bibliography = "docs/references.bib"
+storage = ".artifacts/litkg/literature"
+materialize_path = "docs/literature"
+
+[kg]
+neo4j_uri = "bolt://localhost:7687"
+neo4j_user = "neo4j"
+neo4j_password = "password"
+
+[ingestion]
+code_root = "aria_nbv"
+docs_root = "docs"

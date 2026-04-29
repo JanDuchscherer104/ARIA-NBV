@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "MCP_DOCKER": {
+      "command": "docker",
+      "args": [
+        "mcp",
+        "gateway",
+        "run",
+        "--profile",
+        "codex"
+      ],
+      "startup_timeout_sec": 30,
+      "tool_timeout_sec": 120
+    },
+    "code-index": {
+      "command": "uvx",
+      "args": [
+        "code-index-mcp"
+      ]
+    },
+    "mempalace": {
+      "command": "bash",
+      "args": [
+        "-lc",
+        "cd \"$(git rev-parse --show-toplevel)\" && exec aria_nbv/.venv/bin/python -m mempalace.mcp_server --palace .artifacts/mempalace/palace"
+      ]
+    }
+  },
+  "general": {
+    "defaultApprovalMode": "auto_edit"
+  }
+}

@@ -40,6 +40,7 @@ Use the documented Codex repo surfaces in this repository:
 - `docs/`: Quarto docs, Typst paper/slides, and bibliography.
 - `.agents/memory/`: canonical state, gotchas, epis debriefs, and migration indexes.
 - `.agents/references/`: agent-readable reference docs such as Python conventions and Context7 IDs.
+- `.agents/external/litkg-rs/`: agent-owned submodule for the repo-independent literature/code KG toolkit; use `.agents/skills/semantic-scholar-litkg/` for ARIA-NBV Semantic Scholar and KG ingestion workflow.
 - `scripts/`: repo-level helper wrappers, context entrypoints, and migration utilities. Keep reusable repository entrypoints here; place agent-only implementation details under `.agents/`.
 - `tests/` and `aria_nbv/tests/`: verification.
 

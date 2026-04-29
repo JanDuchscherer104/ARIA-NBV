@@ -250,3 +250,7 @@ docs/literature/**
 
 /.quarto/
 **/*.quarto_ipynb
+.gitnexus
+
+# Artifacts
+.artifacts/
