@@ -24,9 +24,8 @@ sys.path.append(str(Path(__file__).resolve().parents[3] / "external" / "efm3d"))
 
 from efm3d.aria import CameraTW, PoseTW  # noqa: E402
 
-from aria_nbv.rendering.candidate_pointclouds import _backproject_depths_p3d_batch  # noqa: E402
 from aria_nbv.rendering.pytorch3d_depth_renderer import Pytorch3DDepthRendererConfig  # noqa: E402
-from aria_nbv.rendering.unproject import backproject_depth_with_p3d  # noqa: E402
+from aria_nbv.rendering.unproject import backproject_depth_with_p3d, backproject_depths_p3d_batch  # noqa: E402
 
 
 def test_p3d_world_to_view_matches_pose_inverse_transform() -> None:
@@ -165,7 +164,7 @@ def test_backproject_batch_matches_single_pixel() -> None:
     depths[0, y_px, x_px] = z
     mask[0, y_px, x_px] = True
 
-    padded, lengths = _backproject_depths_p3d_batch(depths=depths, mask_valid=mask, cameras=cameras, stride=1)
+    padded, lengths = backproject_depths_p3d_batch(depths=depths, mask_valid=mask, cameras=cameras, stride=1)
     assert lengths.tolist() == [1]
     assert padded.shape == (1, 1, 3)
 

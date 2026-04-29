@@ -25,7 +25,6 @@ def test_effective_rl_env_config_uses_active_labeler_subconfigs() -> None:
     assert env_cfg.reward.oracle == labeler_cfg.oracle
     assert env_cfg.reward.backprojection_stride == labeler_cfg.backprojection_stride
     assert env_cfg.reward.depth.renderer == labeler_cfg.depth.renderer
-    assert env_cfg.reward.depth.oversample_factor == labeler_cfg.depth.oversample_factor
     assert env_cfg.reward.depth.resolution_scale == labeler_cfg.depth.resolution_scale
     assert env_cfg.reward.depth.max_candidates_final >= shell_capacity
 

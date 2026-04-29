@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import ceil
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import torch
 from efm3d.aria import CameraTW, PoseTW
@@ -14,13 +13,15 @@ from pytorch3d.renderer.cameras import (
 )
 
 from ..data_handling import EfmSnippetView
-from ..pose_generation.types import CandidateSamplingResult
 from ..utils import BaseConfig, Console, Verbosity
 from ..utils.typed_payloads import from_serializable, to_serializable
 from .pytorch3d_depth_renderer import (
     Pytorch3DDepthRenderer,
     Pytorch3DDepthRendererConfig,
 )
+
+if TYPE_CHECKING:
+    from ..pose_generation.types import CandidateSamplingResult
 
 
 # TODO: Wouldn't it make sense to derive all of these dataclasses from a common base data class?
@@ -87,9 +88,7 @@ class CandidateDepthRendererConfig(BaseConfig):
     """Nested config describing the underlying renderer (PyTorch3D or CPU)."""
 
     max_candidates_final: int = 60
-    """Number of valid candidates after oversampling and filtering."""
-
-    oversample_factor: float = 1.0
+    """Maximum number of already-pruned candidate views to render."""
 
     resolution_scale: float | None = 0.5
     """Optional uniform scale (0<scale<=1) applied to H,W for rendering. """
@@ -228,10 +227,7 @@ class CandidateDepthRenderer:
 
         num_render = min(
             num_candidates,
-            max(
-                1,
-                ceil(self.config.oversample_factor * self.config.max_candidates_final),
-            ),
+            max(1, int(self.config.max_candidates_final)),
         )
 
         candidate_idx = torch.arange(num_render, device=device, dtype=torch.long)
@@ -240,86 +236,6 @@ class CandidateDepthRenderer:
         poses_world_cam = candidates.poses_world_cam(device=device)[candidate_idx]
 
         return poses_world_cam, selected_views, valid_global_idx[candidate_idx]
-
-    def _filter_valid_candidates(
-        self,
-        *,
-        depths: torch.Tensor,
-        depths_valid_mask: torch.Tensor,
-        pose_batch: PoseTW,
-        camera_calib: CameraTW,
-        cameras: PerspectiveCameras,
-        candidate_indices: torch.Tensor,
-    ) -> tuple[
-        torch.Tensor,
-        torch.Tensor,
-        PoseTW,
-        CameraTW,
-        PerspectiveCameras,
-        torch.Tensor,
-    ]:
-        """Filter/cap rendered candidates using valid depth pixel counts.
-
-        We render an oversampled candidate batch, then keep the top
-        ``max_candidates_final`` candidates ranked by the number of valid depth
-        pixels. This avoids returning more candidates than requested while
-        preferring renders that see more geometry.
-        """
-        num_total = int(depths.shape[0])
-        max_final = min(int(self.config.max_candidates_final), num_total)
-        valid_pixels = depths_valid_mask.view(num_total, -1).sum(dim=1).to(dtype=torch.int64)
-        invalid_mask = valid_pixels <= 0
-        num_invalid_total = int(invalid_mask.sum().item())
-        if int(valid_pixels.max().item()) <= 0:
-            msg = (
-                "No valid candidate renders: discarded "
-                f"{num_total}/{num_total} candidates because all have zero valid depth pixels."
-            )
-            self.console.error(msg)
-            raise ValueError(msg)
-
-        if num_total <= max_final:
-            self.console.log(
-                f"Discarded 0 candidates (kept {num_total}/{num_total}; invalid_zero_hit={num_invalid_total}).",
-            )
-            return (
-                depths,
-                depths_valid_mask,
-                pose_batch,
-                camera_calib,
-                cameras,
-                candidate_indices,
-            )
-
-        # Sort by (valid_pixels desc, candidate_indices asc) for deterministic output.
-        scale = int(candidate_indices.max().item()) + 1 if candidate_indices.numel() else num_total
-        score = valid_pixels * scale + (scale - 1 - candidate_indices.to(dtype=torch.int64))
-        keep_idx = torch.argsort(score, descending=True)[:max_final]
-
-        num_kept = int(keep_idx.numel())
-        num_discarded = num_total - num_kept
-        kept_mask = torch.zeros(num_total, device=keep_idx.device, dtype=torch.bool)
-        kept_mask[keep_idx] = True
-        num_invalid_discarded = int((invalid_mask & (~kept_mask)).sum().item())
-        num_capped_discarded = num_discarded - num_invalid_discarded
-        if keep_idx.numel() < int(self.config.max_candidates_final):
-            self.console.warn(
-                f"Only {int(keep_idx.numel())} renders available; requested max_candidates_final={self.config.max_candidates_final}.",
-            )
-        self.console.log(
-            f"Discarded {num_discarded} candidates (invalid_zero_hit={num_invalid_discarded}, "
-            f"capped={num_capped_discarded} due to max_candidates_final={self.config.max_candidates_final}; "
-            f"kept {num_kept}/{num_total}).",
-        )
-
-        return (
-            depths[keep_idx],
-            depths_valid_mask[keep_idx],
-            pose_batch[keep_idx],
-            camera_calib[keep_idx],
-            cameras[keep_idx],
-            candidate_indices[keep_idx],
-        )
 
 
 __all__ = [

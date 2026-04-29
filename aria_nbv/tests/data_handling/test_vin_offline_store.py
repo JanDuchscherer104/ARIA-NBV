@@ -125,7 +125,7 @@ def _make_vin_snippet(*, offset: float = 0.0) -> VinSnippetView:
     )
 
 
-def _write_test_store(tmp_path: Path) -> VinOfflineStoreConfig:
+def _write_test_store(tmp_path: Path, *, include_diagnostic_payloads: bool = False) -> VinOfflineStoreConfig:
     """Create a small immutable VIN offline store for reader tests."""
 
     store_cfg = VinOfflineStoreConfig(store_dir=tmp_path / "vin_offline")
@@ -146,6 +146,7 @@ def _write_test_store(tmp_path: Path) -> VinOfflineStoreConfig:
             include_depths=True,
             include_candidate_pcs=False,
             include_backbone=False,
+            include_diagnostic_payloads=include_diagnostic_payloads,
             sample_key="sample-0",
         ),
         prepare_vin_offline_sample(
@@ -161,6 +162,7 @@ def _write_test_store(tmp_path: Path) -> VinOfflineStoreConfig:
             include_depths=True,
             include_candidate_pcs=False,
             include_backbone=False,
+            include_diagnostic_payloads=include_diagnostic_payloads,
             sample_key="sample-1",
         ),
         prepare_vin_offline_sample(
@@ -176,6 +178,7 @@ def _write_test_store(tmp_path: Path) -> VinOfflineStoreConfig:
             include_depths=True,
             include_candidate_pcs=False,
             include_backbone=False,
+            include_diagnostic_payloads=include_diagnostic_payloads,
             sample_key="sample-2",
         ),
     ]
@@ -371,6 +374,7 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     assert stored_manifest.version == OFFLINE_DATASET_VERSION  # noqa: S101
     assert stored_manifest.shards[0].shard_id == "shard-000000"  # noqa: S101
     assert stored_manifest.shards[0].blocks["vin.points_world"].kind == "zarr_array"  # noqa: S101
+    assert "oracle.depths_payload" not in stored_manifest.shards[0].blocks  # noqa: S101
 
     sample_index_rows = _read_sample_index_rows(store_cfg.sample_index_path)
     assert sample_index_rows[0]["split"] == "train"  # noqa: S101
@@ -393,7 +397,7 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
 def test_vin_offline_store_writes_indexed_record_blocks(tmp_path: Path) -> None:
     """Optional record blocks should use indexed payload blobs plus offsets."""
 
-    store_cfg = _write_test_store(tmp_path)
+    store_cfg = _write_test_store(tmp_path, include_diagnostic_payloads=True)
     manifest = VinOfflineManifest.read(store_cfg.manifest_path)
     block = manifest.shards[0].blocks["oracle.depths_payload"]
 
@@ -416,7 +420,7 @@ def test_vin_offline_store_reads_indexed_record_blocks(
 ) -> None:
     """Indexed record blocks should load one row directly from the shard blob."""
 
-    store_cfg = _write_test_store(tmp_path)
+    store_cfg = _write_test_store(tmp_path, include_diagnostic_payloads=True)
     reader = VinOfflineStoreReader(store_cfg)
     record = reader.get_split_records("all")[1]
     payload = reader.read_optional_record(record, "oracle.depths_payload")
@@ -429,7 +433,7 @@ def test_vin_offline_store_reads_indexed_record_blocks(
 def test_vin_offline_store_rejects_unsupported_manifest_version(tmp_path: Path) -> None:
     """Runtime readers should only accept the current immutable store version."""
 
-    store_cfg = _write_test_store(tmp_path)
+    store_cfg = _write_test_store(tmp_path, include_diagnostic_payloads=True)
     manifest = VinOfflineManifest.read(store_cfg.manifest_path)
     manifest.version = OFFLINE_DATASET_VERSION - 1
     manifest.write(store_cfg.manifest_path)
@@ -441,7 +445,7 @@ def test_vin_offline_store_rejects_unsupported_manifest_version(tmp_path: Path) 
 def test_vin_offline_store_rejects_unsupported_record_block_kind(tmp_path: Path) -> None:
     """Runtime readers should reject unsupported optional-record block encodings."""
 
-    store_cfg = _write_test_store(tmp_path)
+    store_cfg = _write_test_store(tmp_path, include_diagnostic_payloads=True)
     manifest = VinOfflineManifest.read(store_cfg.manifest_path)
     manifest.shards[0].blocks["oracle.depths_payload"].kind = "msgpack_records"
     manifest.write(store_cfg.manifest_path)

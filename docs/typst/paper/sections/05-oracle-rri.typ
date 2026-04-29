@@ -376,8 +376,8 @@ triangles.
 == Backprojection and NDC alignment
 
 We convert each depth image to a point cloud via
-`_backproject_depths_p3d_batch` in
-#gh("aria_nbv/aria_nbv/rendering/candidate_pointclouds.py"). For pixel centers
+`backproject_depths_p3d_batch` in
+#gh("aria_nbv/aria_nbv/rendering/unproject.py"). For pixel centers
 $(u + 1/2, v + 1/2)$ we first map to PyTorch3D's *normalized device coordinates*
 (NDC) using the convention (+X left, +Y up) and the scale
 $s = min(#symb.shape.H, #symb.shape.Wdim)$ @PyTorch3D-Cameras-2025:
@@ -455,7 +455,8 @@ quality.
 In practice, candidate scoring is batched on GPU: the ground-truth mesh is
 cropped to an occupancy-aligned bounding box shared across candidates and the
 point↔mesh distances are evaluated for all candidates in a single forward pass
-whenever memory permits.
+whenever memory permits. A crop that contains no mesh faces is treated as an
+invalid oracle input rather than falling back to full-scene scoring.
 
 Conceptually, the *accuracy* term #symb.oracle.acc measures how well the point
 set #symb.oracle.points lies on the GT surface: it averages the squared

@@ -1,6 +1,7 @@
+import pytest
 import torch
 
-from aria_nbv.rri_metrics.oracle_rri import OracleRRIConfig
+from aria_nbv.rri_metrics.oracle_rri import OracleRRIConfig, _crop_mesh_to_aabb
 
 
 def _unit_square_mesh(device: torch.device, *, dtype: torch.dtype) -> tuple[torch.Tensor, torch.Tensor]:
@@ -92,3 +93,41 @@ def test_oracle_rri_handles_empty_candidate_pointclouds():
     assert torch.allclose(out.pm_dist_after[1], out.pm_dist_before[1], atol=1e-6)
     assert torch.allclose(out.pm_acc_after[1], out.pm_acc_before[1], atol=1e-6)
     assert torch.allclose(out.pm_comp_after[1], out.pm_comp_before[1], atol=1e-6)
+
+
+def test_crop_mesh_to_aabb_preserves_device_dtype_and_reindexes_faces() -> None:
+    device = torch.device("cpu")
+    dtype = torch.float32
+    verts = torch.tensor(
+        [
+            [-1.0, -1.0, 0.0],
+            [0.0, -1.0, 0.0],
+            [-1.0, 0.0, 0.0],
+            [10.0, 10.0, 0.0],
+            [11.0, 10.0, 0.0],
+            [10.0, 11.0, 0.0],
+        ],
+        device=device,
+        dtype=dtype,
+    )
+    faces = torch.tensor([[0, 1, 2], [3, 4, 5]], device=device, dtype=torch.int64)
+    aabb = torch.tensor([-1.1, 0.1, -1.1, 0.1, -0.1, 0.1], device=device, dtype=dtype)
+
+    verts_crop, faces_crop = _crop_mesh_to_aabb(verts, faces, aabb)
+
+    assert verts_crop.device == verts.device
+    assert verts_crop.dtype == verts.dtype
+    assert faces_crop.device == faces.device
+    assert faces_crop.dtype == faces.dtype
+    assert int(faces_crop.max().item()) < verts_crop.shape[0]
+    assert verts_crop.shape[0] < verts.shape[0]
+
+
+def test_crop_mesh_to_aabb_rejects_empty_crop() -> None:
+    device = torch.device("cpu")
+    dtype = torch.float32
+    verts, faces = _unit_square_mesh(device, dtype=dtype)
+    aabb = torch.tensor([10.0, 11.0, 10.0, 11.0, 10.0, 11.0], device=device, dtype=dtype)
+
+    with pytest.raises(ValueError, match="no mesh faces"):
+        _crop_mesh_to_aabb(verts, faces, aabb)

@@ -39,19 +39,19 @@ Run package commands from `aria_nbv/` with the uv-managed environment.
 uv run nbv-st
 
 # Train the VIN model
-uv run nbv-train --config-path ../.configs/offline_only.toml
+uv run nbv-train --config-path offline_only.toml
 
 # Single forward pass that summarizes VIN outputs
-uv run nbv-summary --config-path ../.configs/offline_only.toml
+uv run nbv-summary --config-path offline_only.toml
 
 # Hyperparameter sweep with Optuna
 uv run nbv-optuna --config-path ../.configs/sweep_config.toml
 
 # Fit and save the ordinal binner only
-uv run nbv-fit-binner --config-path ../.configs/offline_only.toml
+uv run nbv-fit-binner --config-path offline_only.toml
 
 # Dump resolved config to stdout
-uv run nbv-cli --run-mode dump-config --config-path ../.configs/offline_only.toml
+uv run nbv-cli --run-mode dump-config --config-path offline_only.toml
 ```
 
 ## Offline Data

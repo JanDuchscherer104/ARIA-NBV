@@ -62,3 +62,12 @@ type = "refactor"
 priority = "high"
 status = "open"
 labels = ["oracle", "rri", "rendering", "data", "performance", "simplification"]
+
+[[issue]]
+id = "issue-014"
+title = "offline_only.toml points to a missing local vin_offline store"
+description = "`cd aria_nbv && uv run nbv-summary --config-path offline_only.toml` resolves the config and reaches the offline reader, but fails because `.data/offline_cache/vin_offline/manifest.json` is absent; no VIN diagnostics batch can be loaded until the store is materialized or the config points at an existing store."
+type = "data-blocker"
+priority = "high"
+status = "open"
+labels = ["data", "offline-store", "vin", "m0"]

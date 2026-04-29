@@ -54,3 +54,79 @@ verification = ["cd docs && quarto render index.qmd contents/roadmap.qmd content
 resolved_at = "2026-04-29"
 resolution_note = "Completed bounded public docs cleanup: README/docs identity updated, old repo links fixed, TODO and generated scaffold nav exposure removed, and typo-facing Quarto pages renamed."
 resolved_from = ".agents/todos.toml"
+
+[[refactor]]
+id = "refactor-005"
+title = "Remove second oracle-render oversampling stage"
+description = "Delete the rendering-layer oversampling and dead post-render filtering path so candidate budgets have one owner."
+priority = "high"
+status = "resolved"
+labels = ["oracle", "rendering", "simplification", "performance"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 40
+loc_expected = 120
+loc_max = 260
+context = ["CandidateViewGeneratorConfig already owns candidate oversampling before pruning.", "CandidateDepthRendererConfig.oversample_factor adds a second budget and _filter_valid_candidates is only exercised by direct logging tests.", "When rendering oversampling exceeds max_candidates_final, prepare_vin_offline_sample can receive more rendered candidates than the writer max_candidates budget."]
+implementation_notes = ["Remove CandidateDepthRendererConfig.oversample_factor and render at min(num_candidates, max_candidates_final).", "Delete CandidateDepthRenderer._filter_valid_candidates and tests/rendering/test_candidate_depth_renderer_filter_logging.py unless a real render call path starts using it.", "Update configs, app signature expectations, and docs/reference generation inputs if they mention the depth renderer oversample field."]
+acceptance = ["Candidate generation remains the only oversampling stage in the online oracle path.", "CandidateDepthRenderer.render never returns more rows than max_candidates_final.", "No tests rely on invoking a private unused post-render filter."]
+verification = ["cd aria_nbv && uv run pytest tests/rendering/test_candidate_renderer_integration.py tests/rendering/test_pytorch3d_renderer.py tests/data_handling/test_vin_offline_store.py", "rg -n \"depth\\.oversample_factor|CandidateDepthRendererConfig\\(.*oversample_factor|_filter_valid_candidates\" aria_nbv .configs docs"]
+resolved_at = "2026-04-29"
+resolution_note = "Removed CandidateDepthRendererConfig.oversample_factor and the unused post-render filter; renderer now caps directly at max_candidates_final."
+resolved_from = ".agents/refactors.toml"
+
+[[refactor]]
+id = "refactor-006"
+title = "Collapse duplicate depth backprojection implementations"
+description = "Move to one public PyTorch3D depth-unprojection implementation and remove looped or commented-out duplicates."
+priority = "high"
+status = "resolved"
+labels = ["oracle", "rendering", "frames", "simplification"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 120
+loc_expected = 320
+loc_max = 700
+context = ["rendering/candidate_pointclouds.py owns a vectorized private _backproject_depths_p3d_batch path used by the oracle pipeline.", "rendering/unproject.py owns a looped backproject_depth_with_p3d/backproject_batch path used by plotting and integration tests.", "tests currently import the private batch helper directly, which makes the frame contract harder to stabilize."]
+implementation_notes = ["Create one public batched unprojection function in rendering/unproject.py and have build_candidate_pointclouds call it.", "Keep the existing PyTorch3D NDC/pixel-center convention and tests that assert sign/frame behavior.", "Delete commented-out old backprojection functions and stop tests from importing private helpers."]
+acceptance = ["There is one canonical implementation for depth-to-world backprojection.", "Candidate point-cloud construction, plotting, and integration tests use the same unprojection code path.", "Frame-convention tests remain explicit and pass."]
+verification = ["cd aria_nbv && uv run pytest tests/rendering/test_depth_backprojection_conventions.py tests/rendering/test_rendering_plotting_helpers.py tests/rendering/test_candidate_renderer_integration.py", "rg -n \"# def backproject_depth|# def _backproject_depths_p3d_batch|_backproject_depths_p3d_batch\" aria_nbv/aria_nbv aria_nbv/tests"]
+resolved_at = "2026-04-29"
+resolution_note = "Moved vectorized PyTorch3D depth unprojection to rendering.unproject.backproject_depths_p3d_batch and updated callers/tests to use the public path."
+resolved_from = ".agents/refactors.toml"
+
+[[refactor]]
+id = "refactor-007"
+title = "Default-off redundant VIN offline diagnostic payloads"
+description = "Stop writing duplicate rich diagnostic payloads by default when numeric blocks already reconstruct the required offline sample state."
+priority = "high"
+status = "resolved"
+labels = ["data", "offline-store", "oracle", "performance", "simplification"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 100
+loc_expected = 300
+loc_max = 700
+context = ["VinOfflineWriter stores numeric depth/camera/oracle blocks and can also store oracle.depths_payload, oracle.candidate_pcs, and backbone.payload.", "VIN training disables most diagnostic loads through VinOfflineSourceConfig, so the duplicated payloads mainly increase build size and maintenance surface.", "Diagnostics should rebuild from numeric blocks unless a deliberate rich-payload mode is enabled."]
+implementation_notes = ["Make rich payload materialization explicit and default-off, or remove payloads that are fully reconstructible from numeric blocks.", "Keep training-critical Zarr numeric blocks stable and bump OFFLINE_DATASET_VERSION if on-disk format semantics change.", "Update tests to assert that diagnostics still work through numeric reconstruction."]
+acceptance = ["A default offline store does not duplicate candidate depths, candidate point clouds, or full backbone payloads unless requested.", "VIN diagnostics can still inspect candidates, depths, RRI, and basic backbone availability from canonical blocks.", "Store versioning and rebuild guidance are explicit if payload layout changes."]
+verification = ["cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py tests/data_handling/test_public_api_contract.py", "cd aria_nbv && uv run pytest tests/app/panels/test_vin_bin_values_tab.py tests/vin/test_vin_utils.py"]
+resolved_at = "2026-04-29"
+resolution_note = "Made rich offline diagnostic payload records opt-in via include_diagnostic_payloads; default writer stores numeric training blocks without duplicate DTO payloads."
+resolved_from = ".agents/refactors.toml"
+
+[[refactor]]
+id = "refactor-009"
+title = "Make oracle mesh cropping strict and tensor-native"
+description = "Replace silent full-mesh fallback and CPU scalar conversion in oracle mesh cropping with an explicit crop contract."
+priority = "high"
+status = "resolved"
+labels = ["rri", "oracle", "geometry", "contracts"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 80
+loc_expected = 220
+loc_max = 520
+context = ["_crop_mesh_to_aabb calls aabb.tolist(), which forces scalar CPU synchronization on GPU tensors.", "The current empty-crop fallback silently scores the full mesh, which would corrupt target-specific RRI when an entity crop misses.", "Entity-aware RRI needs a trusted crop rule before GT-OBB labels are used as thesis evidence."]
+implementation_notes = ["Keep the crop calculation tensor-native and document whether faces are kept by any-vertex, all-vertex, or triangle-AABB intersection.", "Return an explicit empty-crop result or raise a clear invalid-target error instead of falling back to full-scene scoring.", "Add tests covering empty crops, partial crops, and device preservation."]
+acceptance = ["Empty target crops are visible as invalid crop failures, not scene-level RRI.", "Cropping preserves device/dtype and does not call .tolist() on hot-path tensors.", "The chosen crop semantics are documented in code and RRI docs if metric meaning changes."]
+verification = ["cd aria_nbv && uv run pytest tests/rri_metrics/test_oracle_rri_chunking.py tests/rri_metrics", "rg -n \"tolist\\(|fallback to full mesh|_crop_mesh_to_aabb\" aria_nbv/aria_nbv/rri_metrics docs/contents/impl"]
+resolved_at = "2026-04-29"
+resolution_note = "Changed oracle mesh AABB cropping to tensor-native bounds and explicit empty-crop failure instead of full-mesh fallback."
+resolved_from = ".agents/refactors.toml"

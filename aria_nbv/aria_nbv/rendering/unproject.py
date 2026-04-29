@@ -17,76 +17,80 @@ All functions assume:
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import torch
 from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
 
-from .candidate_depth_renderer import CandidateDepths
+if TYPE_CHECKING:
+    from .candidate_depth_renderer import CandidateDepths
 
-# def backproject_depth(
-#     depth: torch.Tensor,
-#     pose_world_cam: PoseTW,
-#     camera: PerspectiveCameras,
-#     *,
-#     stride: int = 1,
-#     zfar: float | None = None,
-#     max_points: int | None = None,
-# ) -> torch.Tensor:
-#     """Back-project a single depth map into world-frame 3D points.
 
-#     Args:
-#         depth: ``Tensor["H", "W"]`` metric z-depth in metres.
-#         pose_world_cam: ``PoseTW`` (world ← cam) matching ``depth``.
-#         camera: ``CameraTW`` (single entry) whose intrinsics were used for
-#             rendering this depth map.
-#         stride: Optional subsampling stride in pixel space to thin points.
-#         zfar: Optional max depth; values >= ``zfar`` are discarded.
-#         max_points: Optional cap on returned points (random subset).
+def backproject_depths_p3d_batch(
+    depths: torch.Tensor,
+    mask_valid: torch.Tensor,
+    cameras: PerspectiveCameras,
+    *,
+    stride: int = 1,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Back-project a batch of PyTorch3D depth maps to world-frame points.
 
-#     Returns:
-#         ``Tensor["N", 3"]`` of 3D points in world coordinates. ``N`` may be
-#         zero if no valid hits remain.
-#     """
+    Args:
+        depths: ``Tensor["B", "H", "W"]`` metric z-depth maps in metres.
+        mask_valid: ``Tensor["B", "H", "W"]`` boolean masks for usable pixels.
+        cameras: One :class:`~pytorch3d.renderer.PerspectiveCameras` entry per
+            depth map, carrying world-from-camera extrinsics.
+        stride: Pixel subsampling stride.
 
-#     if depth.ndim != 2:
-#         raise ValueError(f"Expected (H,W) depth, got {tuple(depth.shape)}")
-#     if stride < 1:
-#         raise ValueError(f"stride must be >=1, got {stride}")
+    Returns:
+        Pair ``(padded, lengths)`` where ``padded`` is
+        ``Tensor["B", "Pmax", 3]`` in world coordinates and ``lengths`` is
+        ``Tensor["B"]`` with the valid count per candidate.
+    """
+    if depths.ndim != 3:
+        raise ValueError(f"Expected depths of shape (B,H,W), got {tuple(depths.shape)}")
+    if mask_valid.shape != depths.shape:
+        raise ValueError(f"mask_valid shape {tuple(mask_valid.shape)} must match depths {tuple(depths.shape)}")
+    if stride < 1:
+        raise ValueError(f"stride must be >=1, got {stride}")
 
-#     h, w = depth.shape
-#     yy = torch.arange(0, h, stride, device=depth.device, dtype=depth.dtype)
-#     xx = torch.arange(0, w, stride, device=depth.device, dtype=depth.dtype)
-#     gy, gx = torch.meshgrid(yy, xx, indexing="ij")
+    bsz, height, width = depths.shape
+    yy = torch.arange(0, height, stride, device=depths.device)
+    xx = torch.arange(0, width, stride, device=depths.device)
+    gy, gx = torch.meshgrid(yy, xx, indexing="ij")
+    num_pixels = gy.numel()
 
-#     depth_samples = depth[gy.long(), gx.long()].reshape(-1)
-#     coords = torch.stack([gx.reshape(-1), gy.reshape(-1)], dim=-1)
+    depth_sub = depths[:, gy, gx].reshape(bsz, num_pixels)
+    mask = torch.isfinite(depth_sub) & mask_valid[:, gy, gx].reshape(bsz, num_pixels)
+    depth_filtered = torch.where(mask, depth_sub, torch.zeros_like(depth_sub))
 
-#     finite_mask = torch.isfinite(depth_samples)
-#     if zfar is not None:
-#         finite_mask &= depth_samples < float(zfar) * 0.99
-#     depth_samples = depth_samples[finite_mask]
-#     coords = coords[finite_mask]
+    gx_flat = gx.reshape(-1).to(depths.dtype) + 0.5
+    gy_flat = gy.reshape(-1).to(depths.dtype) + 0.5
+    scale = float(min(height, width))
+    x_ndc = -(gx_flat - (width * 0.5)) * (2.0 / scale)
+    y_ndc = -(gy_flat - (height * 0.5)) * (2.0 / scale)
 
-#     if depth_samples.numel() == 0:
-#         return torch.empty(0, 3, device=depth.device, dtype=depth.dtype)
+    xy_depth = torch.stack(
+        [
+            x_ndc.unsqueeze(0).expand(bsz, -1),
+            y_ndc.unsqueeze(0).expand(bsz, -1),
+            depth_filtered.to(depths.dtype),
+        ],
+        dim=-1,
+    )
+    pts_world = cameras.unproject_points(xy_depth, world_coordinates=True, from_ndc=True)
 
-#     # Use pinhole intrinsics (matching PyTorch3D render path; distortion ignored).
-#     cam_single = camera if camera.tensor().ndim == 1 else camera[0]
-#     fx, fy, cx, cy = _scalar_intrinsics(cam_single)
-#     print(f"fx: {fx}, fy: {fy}, cx: {cx}, cy: {cy}")
-#     fx_t = torch.tensor(fx, device=depth.device, dtype=depth.dtype)
-#     fy_t = torch.tensor(fy, device=depth.device, dtype=depth.dtype)
-#     cx_t = torch.tensor(cx, device=depth.device, dtype=depth.dtype)
-#     cy_t = torch.tensor(cy, device=depth.device, dtype=depth.dtype)
+    lengths = mask.sum(dim=1)
+    max_len = int(lengths.max().item()) if lengths.numel() > 0 else 0
+    if max_len == 0:
+        return torch.empty(bsz, 0, 3, device=depths.device, dtype=depths.dtype), lengths
 
-#     x_cam = -(coords[:, 0] - cx_t + 0.5) / fx_t * depth_samples
-#     y_cam = -(coords[:, 1] - cy_t + 0.5) / fy_t * depth_samples
-#     z_cam = depth_samples
-#     pts_cam = torch.stack([x_cam, y_cam, z_cam], dim=1)
+    padded = torch.full((bsz, max_len, 3), torch.nan, device=depths.device, dtype=depths.dtype)
+    cumsum = mask.cumsum(dim=1) - 1
+    batch_idx, flat_idx = torch.nonzero(mask, as_tuple=True)
+    padded[batch_idx, cumsum[batch_idx, flat_idx]] = pts_world[batch_idx, flat_idx]
 
-#     pts_world = pose_world_cam.transform(pts_cam)
-
-#     return pts_world
+    return padded, lengths
 
 
 def backproject_depth_with_p3d(
@@ -118,40 +122,13 @@ def backproject_depth_with_p3d(
     if stride < 1:
         raise ValueError(f"stride must be >=1, got {stride}")
 
-    h, w = depth.shape
-
-    yy = torch.arange(0, h, stride, device=depth.device)
-    xx = torch.arange(0, w, stride, device=depth.device)
-    gy, gx = torch.meshgrid(yy, xx, indexing="ij")
-
-    depth_sub = depth[gy.long(), gx.long()]
-    mask = torch.isfinite(depth_sub) & valid_mask[gy.long(), gx.long()]
-    # if zfar is not None:
-    #     mask &= depth_sub < float(zfar) * 0.99
-    # if zclose is not None:
-    #     mask &= depth_sub > float(zclose)
-
-    flat_mask = mask.reshape(-1)
-    if not flat_mask.any():
-        return torch.empty(0, 3, device=depth.device, dtype=depth.dtype)
-
-    depth_flat = depth_sub.reshape(-1)
-    coords_x = gx.reshape(-1)[flat_mask]
-    coords_y = gy.reshape(-1)[flat_mask]
-    depth_samples = depth_flat[flat_mask]
-    coords_x = coords_x.to(dtype=depth.dtype)
-    coords_y = coords_y.to(dtype=depth.dtype)
-
-    # Convert pixel centers to PyTorch3D NDC coordinates (+X left, +Y up) before
-    # calling ``unproject_points``. See also `_backproject_depths_p3d_batch`.
-    u = coords_x + 0.5
-    v = coords_y + 0.5
-    scale = float(min(h, w))
-    x_ndc = -(u - (w * 0.5)) * (2.0 / scale)
-    y_ndc = -(v - (h * 0.5)) * (2.0 / scale)
-
-    xy_depth = torch.stack([x_ndc, y_ndc, depth_samples], dim=1)  # (N, 3)
-    pts_world = cameras.unproject_points(xy_depth, world_coordinates=True, from_ndc=True)
+    padded, lengths = backproject_depths_p3d_batch(
+        depths=depth.unsqueeze(0),
+        mask_valid=valid_mask.unsqueeze(0),
+        cameras=cameras,
+        stride=stride,
+    )
+    pts_world = padded[0, : int(lengths[0].item())]
 
     if max_points is not None and pts_world.shape[0] > max_points:
         idx = torch.randperm(pts_world.shape[0], device=pts_world.device)[:max_points]
@@ -221,4 +198,4 @@ def backproject_batch(
     return pts_concat
 
 
-__all__ = ["backproject_depth_with_p3d", "backproject_batch"]
+__all__ = ["backproject_depth_with_p3d", "backproject_depths_p3d_batch", "backproject_batch"]

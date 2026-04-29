@@ -122,26 +122,32 @@ def _crop_mesh_to_aabb(
     faces: torch.Tensor,
     aabb: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Crop mesh to an AABB; keeps faces whose all vertices lie inside."""
+    """Crop a mesh to an AABB with explicit empty-crop failure.
+
+    The current crop contract keeps faces whose **any** vertex lies inside the
+    world-frame box ``[xmin, xmax, ymin, ymax, zmin, zmax]``. Empty crops raise
+    instead of silently falling back to full-scene scoring, because target-aware
+    RRI must not turn a missing object crop into a scene-level label.
+    """
 
     if aabb.numel() != 6:
         raise ValueError("extend must be Tensor[6] = [xmin, xmax, ymin, ymax, zmin, zmax]")
 
-    xmin, xmax, ymin, ymax, zmin, zmax = aabb.tolist()
-    vmask = (
-        (verts[:, 0] >= xmin)
-        & (verts[:, 0] <= xmax)
-        & (verts[:, 1] >= ymin)
-        & (verts[:, 1] <= ymax)
-        & (verts[:, 2] >= zmin)
-        & (verts[:, 2] <= zmax)
-    )
+    bounds = aabb.reshape(6).to(device=verts.device, dtype=verts.dtype)
+    lower = bounds[[0, 2, 4]]
+    upper = bounds[[1, 3, 5]]
+    if bool(torch.any(lower > upper).item()):
+        raise ValueError("extend min bounds must be <= max bounds for x/y/z.")
+
+    vmask = torch.all((verts >= lower) & (verts <= upper), dim=1)
 
     # Keep faces that intersect the AABB (coarse test via any-vertex-inside).
     fmask = vmask[faces].any(dim=1)
     faces_kept = faces[fmask]
     if faces_kept.numel() == 0:
-        return verts, faces  # fallback to full mesh
+        raise ValueError(
+            "AABB crop produced no mesh faces; refusing to fall back to full-scene RRI.",
+        )
 
     unique_idx, new_idx = torch.unique(faces_kept.reshape(-1), sorted=True, return_inverse=True)
     verts_crop = verts[unique_idx]

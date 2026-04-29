@@ -57,7 +57,6 @@ backprojection_stride = 1
 
   [labeler.depth]
   max_candidates_final = 60
-  oversample_factor    = 1.0
   resolution_scale     = 0.5
 
     [labeler.depth.renderer]

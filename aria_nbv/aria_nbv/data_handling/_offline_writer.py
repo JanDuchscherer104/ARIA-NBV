@@ -5,13 +5,13 @@ provides:
 
 - ``VinOfflineWriterConfig`` and ``VinOfflineWriter`` for raw-dataset builds,
 - ``PreparedVinOfflineSample`` as the normalized in-memory row representation,
-- helpers for turning oracle-label outputs into fixed numeric blocks plus lazy
-  diagnostic record blocks, and
+- helpers for turning oracle-label outputs into fixed numeric blocks plus
+  optional lazy diagnostic record blocks, and
 - shard flushing helpers reused by tests and alternate builders.
 
 The writer stores training-critical tensors as fixed-size NumPy arrays for
-Zarr-backed random access, while keeping richer diagnostic payloads as safe
-per-row msgspec records that are only decoded on demand.
+Zarr-backed random access. Rich per-row msgspec records are opt-in diagnostics
+because the numeric blocks are the canonical offline training contract.
 """
 
 from __future__ import annotations
@@ -208,6 +208,7 @@ def prepare_vin_offline_sample(
     include_depths: bool = True,
     include_candidate_pcs: bool = True,
     include_backbone: bool = True,
+    include_diagnostic_payloads: bool = False,
     sample_key: str | None = None,
 ) -> PreparedVinOfflineSample:
     """Normalize one oracle-labelled snippet into offline row blocks.
@@ -222,9 +223,14 @@ def prepare_vin_offline_sample(
         candidate_pcs: Optional candidate point clouds for diagnostics.
         backbone_out: Optional backbone outputs for training or diagnostics.
         max_candidates: Maximum number of candidates stored in fixed blocks.
-        include_depths: Whether to materialize depth payloads.
-        include_candidate_pcs: Whether to materialize candidate point clouds.
+        include_depths: Whether to materialize numeric depth blocks.
+        include_candidate_pcs: Whether candidate point clouds may be written
+            when rich diagnostic payloads are enabled.
         include_backbone: Whether to materialize backbone outputs.
+        include_diagnostic_payloads: Whether to write rich msgpack records such
+            as full depth DTOs, candidate DTOs, candidate point clouds, and
+            full backbone payloads. Defaults off because numeric blocks are the
+            canonical training contract.
         sample_key: Optional explicit sample key.
 
     Returns:
@@ -365,13 +371,13 @@ def prepare_vin_offline_sample(
                 numeric_blocks[f"backbone.{field_name}"] = _to_numpy(value, dtype=dtype)
 
     record_blocks: dict[str, Any] = {}
-    if include_depths:
+    if include_diagnostic_payloads and include_depths:
         record_blocks["oracle.depths_payload"] = depths.to_serializable()
-    if candidates is not None:
+    if include_diagnostic_payloads and candidates is not None:
         record_blocks["oracle.candidates"] = candidates.to_serializable()
-    if include_candidate_pcs and candidate_pcs is not None:
+    if include_diagnostic_payloads and include_candidate_pcs and candidate_pcs is not None:
         record_blocks["oracle.candidate_pcs"] = candidate_pcs.to_serializable()
-    if include_backbone and backbone_out is not None:
+    if include_diagnostic_payloads and include_backbone and backbone_out is not None:
         record_blocks["backbone.payload"] = backbone_out.to_serializable()
 
     return PreparedVinOfflineSample(
@@ -511,8 +517,11 @@ class VinOfflineWriterConfig(BaseConfig):
     include_depths: bool = True
     """Whether to materialize candidate depths."""
 
-    include_pointclouds: bool = True
-    """Whether to materialize candidate point clouds."""
+    include_pointclouds: bool = False
+    """Whether rich diagnostic payloads may include candidate point clouds."""
+
+    include_diagnostic_payloads: bool = False
+    """Whether to write rich msgpack diagnostic records alongside numeric blocks."""
 
     include_counterfactuals: bool = False
     """Whether to materialize future counterfactual payloads."""
@@ -644,6 +653,7 @@ class VinOfflineWriter:
             include_depths=self.config.include_depths,
             include_candidate_pcs=self.config.include_pointclouds,
             include_backbone=self.config.include_backbone,
+            include_diagnostic_payloads=self.config.include_diagnostic_payloads,
         )
 
     def run(self) -> VinOfflineManifest:
@@ -747,7 +757,7 @@ class VinOfflineWriter:
             materialized_blocks=VinOfflineMaterializedBlocks(
                 backbone=bool(self.config.include_backbone),
                 depths=bool(self.config.include_depths),
-                candidate_pcs=bool(self.config.include_pointclouds),
+                candidate_pcs=bool(self.config.include_diagnostic_payloads and self.config.include_pointclouds),
                 counterfactuals=bool(self.config.include_counterfactuals),
             ),
             stats={

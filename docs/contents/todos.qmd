@@ -200,7 +200,7 @@ The `CandidateDepthRenderer.render(...)` yields a `CandidateDepths` dataclass:
 - [x] Depth histograms no longer mislead (miss pixels are masked via `depths_valid_mask`).
 - [x] Reference axes in the frusta plot match the Aria UI convention (`rotate_yaw_cw90` applied for display only).
 - [x] Implement `DepthToPointCloud` module: for each candidate pose's depth map, backproject to point cloud $\mathcal{P}_{\mathbf{q}}$ in the global frame, using the known camera paramaters from ASE and and then fuse semi-dense SLAM PC $\mathcal{P}_t$ with candidate-view PC $\mathcal{P}_{\mathbf{q}}$ → $\mathcal{P}_{t \cup \mathbf{q}}$.
-- [x] Backprojection implementation: `aria_nbv/aria_nbv/rendering/candidate_pointclouds.py`::{`build_candidate_pointclouds`, `_backproject_depths_p3d_batch`} and `aria_nbv/aria_nbv/rendering/unproject.py`::`backproject_depth_with_p3d`.
+- [x] Backprojection implementation: `aria_nbv/aria_nbv/rendering/candidate_pointclouds.py`::`build_candidate_pointclouds` and `aria_nbv/aria_nbv/rendering/unproject.py`::{`backproject_depths_p3d_batch`, `backproject_depth_with_p3d`}.
 
 ## Previously observed issues
 

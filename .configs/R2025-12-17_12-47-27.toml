@@ -207,7 +207,6 @@ is_debug               = false
         [datamodule_config.labeler.depth]
         # type: <class 'aria_nbv.rendering.pytorch3d_depth_renderer.Pytorch3DDepthRendererConfig'>
         max_candidates_final = 16
-        oversample_factor    = 1.0
         verbosity            = 2
         is_debug             = false
 

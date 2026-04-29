@@ -119,14 +119,14 @@ description = "Smoke the available VIN offline store through the Streamlit VIN d
 priority = "high"
 status = "todo"
 labels = ["m0", "vin", "diagnostics", "offline-store"]
-issue_ids = ["issue-007"]
+issue_ids = ["issue-007", "issue-014"]
 loc_min = 40
 loc_expected = 120
 loc_max = 260
-context = ["Roadmap M0 requires validating that offline_only.toml can load the available VIN offline store into the VIN diagnostics page.", "aria_nbv/tests/vin/test_vin_utils.py already checks that the diagnostics config preserves the offline source and disables W&B."]
-implementation_notes = ["Prefer nbv-summary as a non-interactive smoke before manual Streamlit inspection.", "Do not change offline store payloads to silence failures; fix reader/config wiring or record a blocker.", "Keep apply_cw90_correction=false unless candidate poses, p3d_cameras, and reference pose are rotated in lockstep."]
+context = ["Roadmap M0 requires validating that offline_only.toml can load the available VIN offline store into the VIN diagnostics page.", "aria_nbv/tests/vin/test_vin_utils.py already checks that the diagnostics config preserves the offline source and disables W&B.", "2026-04-29 smoke reached VinOfflineStoreReader and failed on missing `.data/offline_cache/vin_offline/manifest.json`; no manifest/sample_index exists under the repo."]
+implementation_notes = ["Prefer nbv-summary as a non-interactive smoke before manual Streamlit inspection.", "Use `--config-path offline_only.toml`; bare config names resolve under `.configs/`.", "Do not change offline store payloads to silence failures; materialize the store or point the config at an existing immutable store.", "Keep apply_cw90_correction=false unless candidate poses, p3d_cameras, and reference pose are rotated in lockstep."]
 acceptance = ["nbv-summary or an equivalent diagnostics helper loads at least one train/val batch from offline_only.toml.", "Streamlit VIN diagnostics can point at offline_only.toml without falling back to online data.", "Any failure has an issue with exact command, traceback summary, and affected contract."]
-verification = ["cd aria_nbv && uv run nbv-summary --config-path ../.configs/offline_only.toml", "cd aria_nbv && uv run pytest tests/vin/test_vin_utils.py"]
+verification = ["cd aria_nbv && uv run nbv-summary --config-path offline_only.toml", "cd aria_nbv && uv run pytest tests/vin/test_vin_utils.py"]
 
 [[todo]]
 id = "todo-010"

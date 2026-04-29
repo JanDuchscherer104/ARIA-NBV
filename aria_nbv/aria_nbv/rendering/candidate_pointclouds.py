@@ -10,13 +10,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import torch
-from pytorch3d.renderer.cameras import (
-    PerspectiveCameras,  # type: ignore[import-untyped]
-)
 
 from ..data_handling import EfmSnippetView
 from ..utils.typed_payloads import from_serializable, to_serializable
 from .candidate_depth_renderer import CandidateDepths
+from .unproject import backproject_depths_p3d_batch
 
 Tensor = torch.Tensor
 
@@ -74,7 +72,7 @@ def build_candidate_pointclouds(
     if depths.ndim != 3:
         raise ValueError(f"Expected depths of shape (B,H,W), got {tuple(depths.shape)}")
 
-    padded, lengths = _backproject_depths_p3d_batch(
+    padded, lengths = backproject_depths_p3d_batch(
         depths=depths,
         mask_valid=batch.depths_valid_mask,
         cameras=cameras,
@@ -96,131 +94,6 @@ def build_candidate_pointclouds(
         semidense_length=semidense_len,
         occupancy_bounds=occupancy_bounds,
     )
-
-
-def _backproject_depths_p3d_batch(
-    depths: Tensor,
-    mask_valid: Tensor,
-    cameras: PerspectiveCameras,
-    *,
-    stride: int = 1,
-) -> tuple[Tensor, Tensor]:
-    """Vectorised backprojection of stacked depth maps via PyTorch3D.
-
-    Args:
-        depths: Tensor['B', 'H', 'W'] depth maps.
-        mask_valid: Tensor['B', 'H', 'W'] boolean valid pixel masks.
-        cameras: PerspectiveCameras for each depth map.
-        stride: Subsampling stride for pixels.
-
-    Returns:
-        padded: Tensor['B', 'Pmax', 3] world-frame points.
-        lengths: Tensor['B'] valid point counts per candidate.
-    """
-    bsz, h, w = depths.shape
-    yy = torch.arange(0, h, stride, device=depths.device)
-    xx = torch.arange(0, w, stride, device=depths.device)
-    gy, gx = torch.meshgrid(yy, xx, indexing="ij")
-    p = gy.numel()
-
-    depth_sub = depths[:, gy, gx].reshape(bsz, p)  # (B, P)
-    mask = torch.isfinite(depth_sub) & mask_valid[:, gy, gx].reshape(bsz, p)
-
-    depth_filtered = torch.where(mask, depth_sub, torch.zeros_like(depth_sub))
-
-    # Convert pixel centers to PyTorch3D NDC coordinates (+X left, +Y up) and
-    # unproject in that space. This matches the convention used by the
-    # PyTorch3D rasterizer for ``in_ndc=False`` cameras with non-square images.
-    #
-    # Using pixel coordinates directly (``from_ndc=False``) produces points in a
-    # different screen convention and does *not* match the rasterizer, which
-    # leads to backprojected points that do not lie on the rendered mesh.
-    gx_flat = gx.reshape(-1).to(depths.dtype) + 0.5
-    gy_flat = gy.reshape(-1).to(depths.dtype) + 0.5
-    scale = float(min(h, w))
-    x_ndc = -(gx_flat - (w * 0.5)) * (2.0 / scale)
-    y_ndc = -(gy_flat - (h * 0.5)) * (2.0 / scale)
-
-    x_ndc = x_ndc.unsqueeze(0).expand(bsz, -1)
-    y_ndc = y_ndc.unsqueeze(0).expand(bsz, -1)
-
-    xy_depth = torch.stack([x_ndc, y_ndc, depth_filtered.to(depths.dtype)], dim=-1)  # (B, P, 3)
-    pts_world = cameras.unproject_points(xy_depth, world_coordinates=True, from_ndc=True)  # (B, P, 3)
-
-    lengths = mask.sum(dim=1)
-    max_len = int(lengths.max().item()) if lengths.numel() > 0 else 0
-    if max_len == 0:
-        return torch.empty(bsz, 0, 3, device=depths.device, dtype=depths.dtype), lengths
-
-    # Compact valid points per batch without sorting; use running counts.
-    padded = torch.full((bsz, max_len, 3), torch.nan, device=depths.device, dtype=depths.dtype)
-    cumsum = mask.cumsum(dim=1) - 1  # positions of each valid point within its batch
-    batch_idx, flat_idx = torch.nonzero(mask, as_tuple=True)
-    pos_idx = cumsum[batch_idx, flat_idx]
-    padded[batch_idx, pos_idx] = pts_world[batch_idx, flat_idx]
-
-    return padded, lengths
-
-
-# def _backproject_depths_p3d_batch(
-#     depths: Tensor,
-#     mask_valid: Tensor,
-#     cameras: PerspectiveCameras,
-#     *,
-#     stride: int = 1,
-# ) -> tuple[Tensor, Tensor]:
-#     """Vectorised backprojection of stacked depth maps via PyTorch3D.
-#     Args:
-#         depths: Tensor['B', 'H', 'W'] depth maps.
-#         mask_valid: Tensor['B', 'H', 'W'] boolean valid pixel masks.
-#         cameras: PerspectiveCameras for each depth map.
-#         stride: Subsampling stride for pixels.
-
-#     Returns:
-#         padded: Tensor['B', 'Pmax', 3] world-frame points.
-#         lengths: Tensor['B'] valid point counts per candidate.
-#     """
-
-#     bsz, h, w = depths.shape
-#     yy = torch.arange(0, h, stride, device=depths.device)
-#     xx = torch.arange(0, w, stride, device=depths.device)
-#     gy, gx = torch.meshgrid(yy, xx, indexing="ij")
-#     p = gy.numel()
-
-#     depth_sub = depths[:, gy, gx].reshape(bsz, p)  # (B, P)
-#     mask = torch.isfinite(depth_sub) & mask_valid[:, gy, gx].reshape(bsz, p)
-
-#     depth_filtered = torch.where(mask, depth_sub, torch.zeros_like(depth_sub))
-
-#     u = gx.reshape(-1).to(depths.dtype) + 0.5
-#     v = gy.reshape(-1).to(depths.dtype) + 0.5
-
-#     # convert to NDC (PyTorch3D convention: +X left, +Y up)
-#     s = float(min(h, w))
-#     x_ndc = -(u - (w * 0.5)) * (2.0 / s)
-#     y_ndc = -(v - (h * 0.5)) * (2.0 / s)
-
-#     x_ndc = x_ndc.unsqueeze(0).expand(bsz, -1)
-#     y_ndc = y_ndc.unsqueeze(0).expand(bsz, -1)
-
-#     # build xy_depth in NDC
-#     xy_depth = torch.stack([x_ndc, y_ndc, depth_filtered], dim=-1)  # (B,P,3
-
-#     pts_world = cameras.unproject_points(xy_depth, world_coordinates=True, from_ndc=True)  # (B,P,3)
-
-#     lengths = mask.sum(dim=1)
-#     max_len = int(lengths.max().item()) if lengths.numel() > 0 else 0
-#     if max_len == 0:
-#         return torch.empty(bsz, 0, 3, device=depths.device, dtype=depths.dtype), lengths
-
-#     # Compact valid points per batch without sorting; use running counts.
-#     padded = torch.full((bsz, max_len, 3), torch.nan, device=depths.device, dtype=depths.dtype)
-#     cumsum = mask.cumsum(dim=1) - 1  # positions of each valid point within its batch
-#     batch_idx, flat_idx = torch.nonzero(mask, as_tuple=True)
-#     pos_idx = cumsum[batch_idx, flat_idx]
-#     padded[batch_idx, pos_idx] = pts_world[batch_idx, flat_idx]
-
-#     return padded, lengths
 
 
 def _compute_bounds(
