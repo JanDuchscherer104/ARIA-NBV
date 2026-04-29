@@ -13,7 +13,6 @@ single TOML file.
 
 from __future__ import annotations
 
-import json
 import math
 from copy import deepcopy
 from datetime import datetime
@@ -25,8 +24,6 @@ import torch
 from pydantic import Field, field_validator, model_validator
 
 from ..configs import OptunaConfig, PathConfig
-from ..data_handling._legacy_cache_api import OracleRriCacheConfig, OracleRriCacheDatasetConfig
-from ..data_handling._legacy_vin_source import VinOracleCacheDatasetConfig
 from ..utils import BaseConfig, Console, Stage
 from ..utils.console import Verbosity
 from .lit_datamodule import VinDataModule, VinDataModuleConfig
@@ -529,7 +526,6 @@ class AriaNBVExperimentConfig(BaseConfig):
         """Run VIN summary on a real oracle batch from the datamodule."""
         stage = self.summary_stage
         console = Console.with_prefix(self.__class__.__name__, "summarize_vin")
-        self._maybe_use_offline_cache_for_summary(stage=stage, console=console)
         _, module, datamodule = self.setup_target(setup_stage=stage)
 
         plan = datamodule._build_stage_plan(stage)
@@ -545,7 +541,7 @@ class AriaNBVExperimentConfig(BaseConfig):
             if batch is None:
                 raise RuntimeError(
                     "VIN summary requested but no oracle batches were yielded. "
-                    "Check that the oracle cache is populated or that the online labeler can produce batches.",
+                    "Check that the VIN offline store is populated or that the online labeler can produce batches.",
                 )
             header = (
                 f"VIN summary batch {idx + 1}/{self.summary_num_batches} "
@@ -558,52 +554,6 @@ class AriaNBVExperimentConfig(BaseConfig):
                 torchsummary_depth=self.summary_torchsummary_depth,
             )
             print(summary)
-
-    def _maybe_use_offline_cache_for_summary(
-        self,
-        *,
-        stage: Stage,
-        console: Console,
-    ) -> None:
-        """Enable offline cache for summary runs when available."""
-        # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: summary fallback
-        # for the legacy oracle cache. Delete once summaries read vin_offline.
-        if isinstance(self.datamodule_config.source, VinOracleCacheDatasetConfig):
-            return
-
-        cache_cfg = OracleRriCacheConfig(paths=self.paths)
-        if not cache_cfg.index_path.exists() or not cache_cfg.metadata_path.exists():
-            console.log("No oracle cache found; using online oracle labeler.")
-            return
-
-        try:
-            payload = json.loads(cache_cfg.metadata_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            console.warn(f"Invalid cache metadata at {cache_cfg.metadata_path}: {exc}")
-            return
-
-        include_backbone = payload.get("include_backbone")
-        include_depths = payload.get("include_depths")
-        include_pointclouds = payload.get("include_pointclouds")
-        if not include_backbone:
-            console.warn(
-                "Offline cache missing backbone outputs; using online oracle labeler.",
-            )
-            return
-        if include_depths is False or include_pointclouds is False:
-            console.warn(
-                "Offline cache missing depths/pointclouds; using online oracle labeler.",
-            )
-            return
-
-        cache_dataset_cfg = OracleRriCacheDatasetConfig(
-            cache=cache_cfg,
-            load_backbone=True,
-        )
-        cache_source_cfg = VinOracleCacheDatasetConfig(cache=cache_dataset_cfg)
-
-        object.__setattr__(self.datamodule_config, "source", cache_source_cfg)
-        console.log(f"Using offline oracle cache at {cache_cfg.cache_dir} (map_location=cpu).")
 
     def _interrupt_checkpoint_path(self, trainer: pl.Trainer) -> Path:
         """Build the checkpoint path used when training is interrupted.

@@ -2,17 +2,27 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import streamlit as st
 import torch
 from efm3d.aria.pose import PoseTW
 
 from ...data_handling import EfmSnippetView
-from ...pose_generation import CandidateViewGeneratorConfig
+from ...pose_generation import (
+    CandidateViewGeneratorConfig,
+    CounterfactualPoseGeneratorConfig,
+    CounterfactualSelectionPolicy,
+)
+from ...pose_generation.counterfactuals import CounterfactualRolloutResult
 from ...pose_generation.plotting import (
     CandidatePlotBuilder,
+    CounterfactualPlotBuilder,
     _euler_histogram,
     plot_candidate_centers_simple,
     plot_candidate_frusta_simple,
+    plot_counterfactual_paths_simple,
+    plot_counterfactual_step_simple,
     plot_direction_marginals,
     plot_direction_polar,
     plot_direction_sphere,
@@ -33,8 +43,10 @@ from ...pose_generation.utils import (
     summarise_dirs_ref,
     summarise_offsets_ref,
 )
+from ...utils import Console
 from ...utils.frames import world_up_tensor
-from .common import _info_popover, _pretty_label
+from ..state_types import config_signature, sample_key
+from .common import _info_popover, _pretty_label, _report_exception, _strip_ansi
 
 
 def _shell_offsets_dirs_ref(
@@ -116,6 +128,65 @@ def _render_pose_orthonormality(label: str, pose: PoseTW | None) -> None:
         f"[{stats['det_min']:.6f}, {stats['det_max']:.6f}] · "
         f"mean |axis_norm - 1|: {stats['axis_norm_mean']:.2e}",
     )
+
+
+def _counterfactual_cache_key(
+    sample: EfmSnippetView | SimpleNamespace | None,
+    cand_cfg: CandidateViewGeneratorConfig | None,
+    rollout_cfg: CounterfactualPoseGeneratorConfig,
+) -> str:
+    """Return a stable cache key for panel-scoped counterfactual rollouts."""
+
+    sample_sig = "no-sample"
+    if sample is not None and hasattr(sample, "scene_id") and hasattr(sample, "snippet_id"):
+        sample_sig = f"{sample.scene_id}:{sample.snippet_id}"
+        if isinstance(sample, EfmSnippetView):
+            sample_sig = sample_key(sample)
+    cand_sig = "no-candidate-config" if cand_cfg is None else config_signature(cand_cfg)
+    rollout_sig = config_signature(rollout_cfg)
+    return f"{sample_sig}|{cand_sig}|{rollout_sig}"
+
+
+def _counterfactual_trajectory_rows(
+    rollouts: CounterfactualRolloutResult,
+) -> list[dict[str, int | float | bool | None]]:
+    """Summarize rollout trajectories for compact panel tables."""
+
+    rows: list[dict[str, int | float | bool | None]] = []
+    for traj_idx, trajectory in enumerate(rollouts.trajectories):
+        final_pos = trajectory.final_pose_world().t.detach().cpu().reshape(-1).tolist()
+        rows.append(
+            {
+                "trajectory": traj_idx,
+                "steps": len(trajectory.steps),
+                "cumulative_score": float(trajectory.cumulative_score),
+                "cumulative_rri": (None if trajectory.cumulative_rri is None else float(trajectory.cumulative_rri)),
+                "terminated_early": bool(trajectory.terminated_early),
+                "final_x": float(final_pos[0]),
+                "final_y": float(final_pos[1]),
+                "final_z": float(final_pos[2]),
+            }
+        )
+    return rows
+
+
+def _run_counterfactual_rollouts(
+    sample: EfmSnippetView,
+    rollout_cfg: CounterfactualPoseGeneratorConfig,
+) -> tuple[CounterfactualRolloutResult, str]:
+    """Execute rollouts while capturing Console output for the UI."""
+
+    lines: list[str] = []
+
+    def _sink(message: str) -> None:
+        lines.append(_strip_ansi(message))
+
+    Console.set_sink(_sink)
+    try:
+        rollouts = rollout_cfg.setup_target().generate_from_typed_sample(sample)
+    finally:
+        Console.set_sink(None)
+    return rollouts, "\n".join(lines)
 
 
 def render_candidates_page(
@@ -529,6 +600,193 @@ def render_candidates_page(
                     st.plotly_chart(rej_fig, width="stretch")
                 else:
                     st.info("Attach an EFM snippet to render rejected poses in 3D.")
+
+    with st.expander("Counterfactual Rollouts", expanded=False):
+        _info_popover(
+            "counterfactual rollouts",
+            "Generates multi-step candidate expansions by reusing the current one-step "
+            "candidate generator at every step. This is an exploratory planning view: "
+            "the rollout paths and per-step shell plots help diagnose branching behavior, "
+            "beam pruning, and the selected continuation under simple geometric policies.",
+        )
+
+        if sample is None:
+            st.info("Counterfactual rollouts require an attached EFM snippet.")
+        elif cand_cfg is None:
+            st.info("Counterfactual rollouts require a candidate generator config.")
+        elif sample.mesh is None or sample.mesh_verts is None or sample.mesh_faces is None:
+            st.info("Counterfactual rollouts require the sample's GT mesh, vertices, and faces.")
+        else:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                cf_horizon = st.slider("Horizon", min_value=1, max_value=5, value=3, step=1, key="cf_horizon")
+                cf_branch = st.slider(
+                    "Branch factor",
+                    min_value=1,
+                    max_value=4,
+                    value=2,
+                    step=1,
+                    key="cf_branch_factor",
+                )
+            with col2:
+                cf_beam_enabled = st.checkbox("Cap beam width", value=True, key="cf_beam_enabled")
+                cf_beam = st.slider("Beam width", min_value=1, max_value=8, value=4, step=1, key="cf_beam_width")
+                cf_policy = st.selectbox(
+                    "Selection policy",
+                    options=list(CounterfactualSelectionPolicy),
+                    format_func=lambda policy: policy.value.replace("_", " "),
+                    index=0,
+                    key="cf_policy",
+                )
+            with col3:
+                cf_hist_dist = st.slider(
+                    "Min history distance (m)",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=0.0,
+                    step=0.05,
+                    key="cf_min_history_distance",
+                )
+                cf_sibling_dist = st.slider(
+                    "Min sibling distance (m)",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=0.15,
+                    step=0.05,
+                    key="cf_min_sibling_distance",
+                )
+
+            cf_candidate_cfg = cand_cfg.model_copy(
+                update={
+                    "verbosity": int(cand_cfg.verbosity),
+                    "is_debug": bool(cand_cfg.is_debug),
+                }
+            )
+            cf_cfg = CounterfactualPoseGeneratorConfig(
+                candidate_config=cf_candidate_cfg,
+                horizon=int(cf_horizon),
+                branch_factor=int(cf_branch),
+                beam_width=int(cf_beam) if cf_beam_enabled else None,
+                selection_policy=cf_policy,
+                min_history_distance_m=float(cf_hist_dist),
+                min_sibling_distance_m=float(cf_sibling_dist),
+                verbosity=int(cand_cfg.verbosity),
+                is_debug=bool(cand_cfg.is_debug),
+            )
+
+            run_key = _counterfactual_cache_key(sample, cand_cfg, cf_cfg)
+            cache = st.session_state.setdefault("cand_counterfactual_cache", {})
+            run_counterfactuals = st.button("Run / refresh counterfactual rollouts", key="cand_run_counterfactuals")
+
+            if run_counterfactuals:
+                try:
+                    with st.spinner("Generating counterfactual rollouts..."):
+                        rollouts, log_text = _run_counterfactual_rollouts(sample, cf_cfg)
+                    cache[run_key] = {"rollouts": rollouts, "logs": log_text}
+                except Exception as exc:  # pragma: no cover - UI guard
+                    _report_exception(exc, context="Counterfactual rollout generation failed")
+
+            cached_payload = cache.get(run_key)
+            if cached_payload is None:
+                st.caption("Configure the rollout settings above, then click run to materialize trajectories.")
+            else:
+                rollouts = cached_payload["rollouts"]
+                log_text = cached_payload["logs"]
+                rows = _counterfactual_trajectory_rows(rollouts)
+
+                metric_col1, metric_col2, metric_col3 = st.columns(3)
+                with metric_col1:
+                    st.metric("Trajectories", len(rollouts.trajectories))
+                with metric_col2:
+                    st.metric("Horizon", rollouts.horizon)
+                with metric_col3:
+                    best_score = max((traj.cumulative_score for traj in rollouts.trajectories), default=0.0)
+                    st.metric("Best cumulative score", f"{best_score:.3f}")
+
+                st.dataframe(rows, width="stretch", hide_index=True)
+
+                plot_tab, step_tab, log_tab = st.tabs(["Paths", "Step Shell", "Logs"])
+
+                with plot_tab:
+                    show_selected_frusta = st.checkbox(
+                        "Overlay selected frusta",
+                        value=True,
+                        key="cf_show_selected_frusta",
+                    )
+                    if sample is not None:
+                        builder = (
+                            CounterfactualPlotBuilder.from_rollouts(
+                                sample,
+                                rollouts,
+                                title=_pretty_label("Counterfactual rollout paths"),
+                            )
+                            .add_mesh()
+                            .add_counterfactual_paths(show_step_markers=True)
+                        )
+                        if show_selected_frusta:
+                            builder = builder.add_counterfactual_selected_frusta(scale=0.45)
+                        st.plotly_chart(builder.finalize(), width="stretch")
+                    else:
+                        st.plotly_chart(
+                            plot_counterfactual_paths_simple(rollouts),
+                            width="stretch",
+                        )
+
+                with step_tab:
+                    trajectory_index = st.selectbox(
+                        "Trajectory",
+                        options=list(range(len(rollouts.trajectories))),
+                        format_func=lambda idx: (
+                            f"traj {idx} · steps={rows[idx]['steps']} · score={rows[idx]['cumulative_score']:.3f}"
+                        ),
+                        key="cf_step_traj_idx",
+                    )
+                    trajectory = rollouts.trajectories[int(trajectory_index)]
+                    if not trajectory.steps:
+                        st.info("Selected trajectory terminated before choosing any rollout step.")
+                    else:
+                        max_step = len(trajectory.steps)
+                        step_display_index = st.slider(
+                            "Step",
+                            min_value=1,
+                            max_value=max_step,
+                            value=min(2, max_step),
+                            step=1,
+                            key="cf_step_idx",
+                        )
+                        include_rejected = st.checkbox(
+                            "Show rejected candidates",
+                            value=False,
+                            key="cf_step_include_rejected",
+                        )
+                        if sample is not None:
+                            step_fig = (
+                                CounterfactualPlotBuilder.from_rollouts(
+                                    sample,
+                                    rollouts,
+                                    title=_pretty_label(f"Counterfactual step {step_display_index}"),
+                                )
+                                .add_mesh()
+                                .add_counterfactual_step_shell(
+                                    trajectory_index=int(trajectory_index),
+                                    step_index=int(step_display_index - 1),
+                                    include_rejected=include_rejected,
+                                    show_frusta=True,
+                                )
+                                .finalize()
+                            )
+                        else:
+                            step_fig = plot_counterfactual_step_simple(
+                                trajectory,
+                                step_index=int(step_display_index - 1),
+                            )
+                        st.plotly_chart(step_fig, width="stretch")
+
+                with log_tab:
+                    if log_text.strip():
+                        st.code(log_text, language="text")
+                    else:
+                        st.caption("No Console output was emitted during this rollout run.")
 
 
 __all__ = ["render_candidates_page"]

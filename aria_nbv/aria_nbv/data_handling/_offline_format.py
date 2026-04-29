@@ -2,7 +2,7 @@
 
 The new offline dataset format is an immutable indexed-shard layout optimized
 for multi-worker random access. This module defines the normalized metadata
-records shared by the writer, migration tools, and runtime dataset reader:
+records shared by the writer and runtime dataset reader:
 
 - the top-level dataset manifest,
 - per-shard block descriptors, and
@@ -234,7 +234,7 @@ class VinOfflineManifest:
         materialized_blocks: Flags for optional stored blocks.
         counterfactuals: Reserved future counterfactual trajectory metadata.
         stats: Aggregate dataset statistics.
-        provenance: Legacy source provenance and migration hints.
+        provenance: Writer provenance and build hints.
         shards: Immutable shard descriptors.
     """
 
@@ -263,7 +263,7 @@ class VinOfflineManifest:
     """Aggregate dataset statistics."""
 
     provenance: dict[str, Any] = field(default_factory=dict)
-    """Legacy source provenance and migration hints."""
+    """Writer provenance and build hints."""
 
     shards: list[VinOfflineShardSpec] = field(default_factory=list)
     """Immutable shard descriptors."""
@@ -303,10 +303,6 @@ class VinOfflineIndexRecord:
         split: Canonical split membership: ``all``, ``train``, or ``val``.
         shard_id: Shard that stores the sample.
         row: Zero-based row offset inside the shard.
-        legacy_oracle_key: Optional legacy oracle-cache key used during migration.
-        legacy_oracle_path: Optional legacy oracle-cache payload path.
-        legacy_vin_key: Optional legacy VIN-cache key used during migration.
-        legacy_vin_path: Optional legacy VIN-cache payload path.
     """
 
     sample_index: int
@@ -329,18 +325,6 @@ class VinOfflineIndexRecord:
 
     row: int
     """Zero-based row offset inside the shard."""
-
-    legacy_oracle_key: str | None = None
-    """Optional legacy oracle-cache key used during migration."""
-
-    legacy_oracle_path: str | None = None
-    """Optional legacy oracle-cache payload path."""
-
-    legacy_vin_key: str | None = None
-    """Optional legacy VIN-cache key used during migration."""
-
-    legacy_vin_path: str | None = None
-    """Optional legacy VIN-cache payload path."""
 
     @classmethod
     def read_many(cls, path: Path) -> list[Self]:

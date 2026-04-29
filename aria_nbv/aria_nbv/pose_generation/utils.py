@@ -1,4 +1,21 @@
+"""Shared pose-generation helpers used across sampling and rollout modules."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import torch
+from efm3d.aria.pose import PoseTW
+
+if TYPE_CHECKING:
+    from .types import CandidateSamplingResult
+
+
+def ensure_unbatched_pose(pose: PoseTW) -> PoseTW:
+    """Squeeze a singleton batch from ``PoseTW`` while preserving unbatched poses."""
+    if pose._data.ndim == 2 and pose._data.shape[0] == 1:
+        return PoseTW(pose._data.squeeze(0))
+    return pose
 
 
 def project_horizontal(v: torch.Tensor, wup: torch.Tensor) -> torch.Tensor:
@@ -59,7 +76,7 @@ def stats_to_markdown_table(stats: dict[str, dict[str, float]], *, header: str |
     return "\n".join(lines)
 
 
-def rejected_pose_tensor(candidates: "CandidateSamplingResult") -> torch.Tensor | None:
+def rejected_pose_tensor(candidates: CandidateSamplingResult) -> torch.Tensor | None:
     """Return rejected candidate poses as a tensor (or None if none rejected)."""
     mask_valid = candidates.mask_valid
     shell_poses = candidates.shell_poses

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 import numpy as np
 import plotly.express as px
 import streamlit as st
 import torch
 
-from ....data_handling import VinSnippetView
+from ....data_handling import VinOfflineSourceConfig, VinSnippetView, collect_vin_offline_dataset_stats
 from ....utils.plotting import _histogram_overlay, _to_numpy
 from ....vin.experimental.model_v2 import FIELD_CHANNELS_V2
 from ....vin.plotting import _parameter_distribution
@@ -27,23 +29,56 @@ def render_summary_tab(ctx: VinDiagContext) -> None:
     batch = ctx.batch
     cfg = ctx.cfg
 
-    cache_label = "online (oracle labeler)"
+    cache_label = "online oracle labeler"
     if ctx.use_offline_cache:
-        cache_label = "offline: Oracle RRI cache"
+        cache_label = "VIN offline store"
         if isinstance(batch.efm_snippet_view, VinSnippetView):
-            cache_label = "offline: VIN snippet cache"
-        else:
-            offline_cache = getattr(state, "offline_cache", None)
-            if offline_cache is not None:
-                cache_cfg = getattr(offline_cache, "config", None)
-                if cache_cfg is not None:
-                    has_vin_cache = cache_cfg.vin_snippet_cache is not None
-                    mode = getattr(cache_cfg, "vin_snippet_cache_mode", "auto")
-                    if has_vin_cache and mode != "disabled":
-                        cache_label = "offline: VIN snippet cache"
+            cache_label = "VIN offline store (minimal snippet)"
         if batch.efm_snippet_view is None:
             cache_label = f"{cache_label} (snippet detached)"
     st.caption(f"Data source: {cache_label}")
+
+    source = ctx.cfg.datamodule_config.source
+    if ctx.use_offline_cache and isinstance(source, VinOfflineSourceConfig):
+        with st.expander("VIN offline store diagnostics", expanded=False):
+            sample_limit = int(
+                st.number_input(
+                    "Diagnostic sample limit",
+                    min_value=1,
+                    max_value=10000,
+                    value=512,
+                    step=128,
+                    key="vin_offline_stats_sample_limit",
+                )
+            )
+            try:
+                stats = collect_vin_offline_dataset_stats(source.offline.store, max_samples=sample_limit)
+                col_a, col_b, col_c, col_d = st.columns(4)
+                col_a.metric("Samples", stats.num_samples)
+                col_b.metric("Scenes", stats.num_scenes)
+                col_c.metric("Snippets", stats.num_snippets)
+                col_d.metric("Numeric blocks", f"{stats.numeric_bytes / (1024**2):.1f} MiB")
+                st.dataframe(
+                    [
+                        {"metric": "candidate_count", **asdict(stats.candidate_count)},
+                        {"metric": "rri", **asdict(stats.rri)},
+                        {"metric": "vin_points", **asdict(stats.vin_points)},
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+                st.json(
+                    {
+                        "store_dir": stats.store_dir,
+                        "version": stats.version,
+                        "sampled_samples": stats.sampled_samples,
+                        "split_counts": stats.split_counts,
+                        "materialized_blocks": stats.materialized_blocks,
+                    },
+                    expanded=False,
+                )
+            except Exception as exc:  # pragma: no cover - diagnostics guard
+                st.warning(f"Could not inspect VIN offline store: {type(exc).__name__}: {exc}")
 
     if batch.rri is not None:
         _info_popover(

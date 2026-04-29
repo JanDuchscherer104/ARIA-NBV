@@ -1,11 +1,4 @@
-"""Canonical VIN dataset-source configs for online and immutable offline data.
-
-This module intentionally excludes the legacy oracle-cache-backed training
-source. The old cached source remains available through
-``aria_nbv.data_handling._legacy_vin_source`` and the compatibility wrapper
-module ``aria_nbv.data_handling.vin_oracle_datasets`` until the cutover is
-complete.
-"""
+"""Canonical VIN dataset-source configs for online and immutable offline data."""
 
 from __future__ import annotations
 

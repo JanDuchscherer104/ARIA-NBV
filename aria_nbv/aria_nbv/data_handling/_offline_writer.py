@@ -7,7 +7,7 @@ provides:
 - ``PreparedVinOfflineSample`` as the normalized in-memory row representation,
 - helpers for turning oracle-label outputs into fixed numeric blocks plus lazy
   diagnostic record blocks, and
-- shard flushing helpers reused by the migration tooling.
+- shard flushing helpers reused by tests and alternate builders.
 
 The writer stores training-critical tensors as fixed-size NumPy arrays for
 Zarr-backed random access, while keeping richer diagnostic payloads as safe
@@ -176,10 +176,6 @@ class PreparedVinOfflineSample:
         snippet_id: ASE snippet identifier.
         numeric_blocks: Fixed-size numeric blocks stored as Zarr arrays.
         record_blocks: Lazy diagnostic payloads stored as msgspec records.
-        legacy_oracle_key: Optional legacy oracle-cache key.
-        legacy_oracle_path: Optional legacy oracle-cache payload path.
-        legacy_vin_key: Optional legacy VIN-cache key.
-        legacy_vin_path: Optional legacy VIN-cache payload path.
     """
 
     sample_key: str
@@ -197,18 +193,6 @@ class PreparedVinOfflineSample:
     record_blocks: dict[str, Any] = field(default_factory=dict)
     """Lazy per-row diagnostic payloads stored in msgspec-compatible form."""
 
-    legacy_oracle_key: str | None = None
-    """Optional legacy oracle-cache key."""
-
-    legacy_oracle_path: str | None = None
-    """Optional legacy oracle-cache payload path."""
-
-    legacy_vin_key: str | None = None
-    """Optional legacy VIN-cache key."""
-
-    legacy_vin_path: str | None = None
-    """Optional legacy VIN-cache payload path."""
-
 
 def prepare_vin_offline_sample(
     *,
@@ -225,10 +209,6 @@ def prepare_vin_offline_sample(
     include_candidate_pcs: bool = True,
     include_backbone: bool = True,
     sample_key: str | None = None,
-    legacy_oracle_key: str | None = None,
-    legacy_oracle_path: str | None = None,
-    legacy_vin_key: str | None = None,
-    legacy_vin_path: str | None = None,
 ) -> PreparedVinOfflineSample:
     """Normalize one oracle-labelled snippet into offline row blocks.
 
@@ -246,10 +226,6 @@ def prepare_vin_offline_sample(
         include_candidate_pcs: Whether to materialize candidate point clouds.
         include_backbone: Whether to materialize backbone outputs.
         sample_key: Optional explicit sample key.
-        legacy_oracle_key: Optional legacy oracle-cache key.
-        legacy_oracle_path: Optional legacy oracle-cache payload path.
-        legacy_vin_key: Optional legacy VIN-cache key.
-        legacy_vin_path: Optional legacy VIN-cache payload path.
 
     Returns:
         Prepared row ready for shard materialization.
@@ -399,15 +375,11 @@ def prepare_vin_offline_sample(
         record_blocks["backbone.payload"] = backbone_out.to_serializable()
 
     return PreparedVinOfflineSample(
-        sample_key=sample_key or legacy_oracle_key or _default_sample_key(scene_id, snippet_id),
+        sample_key=sample_key or _default_sample_key(scene_id, snippet_id),
         scene_id=scene_id,
         snippet_id=snippet_id,
         numeric_blocks=numeric_blocks,
         record_blocks=record_blocks,
-        legacy_oracle_key=legacy_oracle_key,
-        legacy_oracle_path=legacy_oracle_path,
-        legacy_vin_key=legacy_vin_key,
-        legacy_vin_path=legacy_vin_path,
     )
 
 
@@ -467,10 +439,6 @@ def flush_prepared_samples_to_shard(
             split="all",
             shard_id=shard_id,
             row=local_row,
-            legacy_oracle_key=row.legacy_oracle_key,
-            legacy_oracle_path=row.legacy_oracle_path,
-            legacy_vin_key=row.legacy_vin_key,
-            legacy_vin_path=row.legacy_vin_path,
         )
         for local_row, row in enumerate(rows)
     ]

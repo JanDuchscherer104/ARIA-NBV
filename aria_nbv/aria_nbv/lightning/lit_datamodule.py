@@ -1,11 +1,11 @@
-"""LightningDataModule for VIN training with online or cached oracle labels.
+"""LightningDataModule for VIN training with online or immutable offline labels.
 
 The training data-flow mirrors `aria_nbv/scripts/train_vin.py`:
 
 EFM snippet → candidate generation → depth rendering → backprojection → oracle RRI → VIN (CORAL).
 
 This module keeps the expensive oracle labeler in the data pipeline by default,
-but can switch to cached oracle outputs for fast parallel reading.
+but can switch to immutable VIN offline stores for fast parallel reading.
 """
 
 from __future__ import annotations
@@ -20,16 +20,15 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 from ..configs import PathConfig
 from ..data_handling import (
     AseEfmDatasetConfig,
+    VinDatasetSourceConfig,
     VinOracleBatch,
     VinOracleDatasetBase,
     VinOracleOnlineDatasetConfig,
 )
-from ..data_handling._legacy_cache_api import OracleRriCacheDatasetConfig
-from ..data_handling._legacy_vin_source import LegacyVinDatasetSourceConfig
 from ..utils import BaseConfig, Console, Stage, Verbosity
 
 
-def _default_source() -> LegacyVinDatasetSourceConfig:
+def _default_source() -> VinDatasetSourceConfig:
     return VinOracleOnlineDatasetConfig(
         dataset=AseEfmDatasetConfig(
             load_meshes=True,
@@ -52,19 +51,19 @@ class VinDataModuleConfig(BaseConfig):
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver."""
 
-    source: LegacyVinDatasetSourceConfig = Field(default_factory=_default_source)
-    """Config-as-factory dataset source, including the temporary legacy cache branch."""
+    source: VinDatasetSourceConfig = Field(default_factory=_default_source)
+    """Config-as-factory dataset source."""
 
     shuffle: bool = True
-    """Whether to shuffle the train dataset at each epoch (only applies to offline caches)."""
+    """Whether to shuffle the train dataset at each epoch (only applies to offline stores)."""
 
     shuffle_candidates: bool = True
-    """Whether to shuffle candidate views and corresponding labels with each sample (only applies to offline caches)."""
+    """Whether to shuffle candidate views and corresponding labels with each sample (offline stores only)."""
 
     num_workers: int = 16
-    """Number of DataLoader worker processes (use >0 for offline caches; keep 0 for online labeler)."""
+    """Number of DataLoader worker processes (use >0 for offline stores; keep 0 for online labeler)."""
     batch_size: int | None = None
-    """Optional DataLoader batch size (offline-cache only; requires custom collation)."""
+    """Optional DataLoader batch size (offline-store only; requires custom collation)."""
 
     persistent_workers: bool = False
     """Whether to keep DataLoader workers alive between epochs (ignored when num_workers=0)."""
@@ -102,7 +101,7 @@ class VinDataModuleConfig(BaseConfig):
 
 
 class VinDataModule(pl.LightningDataModule):
-    """LightningDataModule that yields online or cached oracle-labelled VIN batches."""
+    """LightningDataModule that yields online or offline oracle-labelled VIN batches."""
 
     _train_source: VinOracleDatasetBase | None
     """Optional config-selected dataset for training."""
@@ -261,27 +260,6 @@ class VinDataModule(pl.LightningDataModule):
         }
 
         cfg = getattr(dataset, "config", None)
-        if isinstance(cfg, OracleRriCacheDatasetConfig):
-            # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: legacy cache
-            # summary branch for datamodule introspection.
-            summary.update(
-                {
-                    "cache_dir": str(cfg.cache.cache_dir),
-                    "split": cfg.split,
-                    "include_efm_snippet": cfg.include_efm_snippet,
-                    "vin_snippet_cache_mode": cfg.vin_snippet_cache_mode,
-                    "vin_snippet_cache": str(cfg.vin_snippet_cache.cache_dir)
-                    if cfg.vin_snippet_cache is not None
-                    else None,
-                    "load_backbone": cfg.load_backbone,
-                    "load_depths": cfg.load_depths,
-                    "load_candidates": cfg.load_candidates,
-                    "load_candidate_pcs": cfg.load_candidate_pcs,
-                    "limit": cfg.limit,
-                }
-            )
-            return summary
-
         if isinstance(cfg, VinOfflineDatasetConfig):
             summary.update(
                 {

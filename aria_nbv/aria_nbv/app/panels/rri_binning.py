@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import json
 import math
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -15,6 +13,7 @@ import streamlit as st
 import torch
 
 from ...configs import PathConfig
+from ...data_handling import VinOfflineDatasetConfig, VinOfflineStoreConfig
 from ...rri_metrics.plotting import _histogram_overlay
 from ...rri_metrics.rri_binning import RriOrdinalBinner
 from .common import _info_popover, _pretty_label, _report_exception
@@ -196,6 +195,7 @@ def render_rri_binning_page() -> None:
     if normalize_x and cdf_sorter is not None and cdf_values is not None:
         tick_levels = np.linspace(0.0, 1.0, num=11, endpoint=True)
         tick_labels = np.interp(tick_levels, cdf_values, cdf_sorter)
+
         def _format_tick_label(value: float) -> str:
             return f"{value:.2e}"
 
@@ -348,15 +348,15 @@ def render_rri_binning_page() -> None:
 
     st.subheader("Ordinal labels by split")
     st.caption(
-        "Compute label distributions for the offline cache train/val splits. "
-        "This loads cached samples from disk and may take a while.",
+        "Compute label distributions for the VIN offline store train/val splits. "
+        "This loads offline samples from disk and may take a while.",
     )
     default_cache_dir = PathConfig().offline_cache_dir
     cache_col_a, cache_col_b, cache_col_c = st.columns([2.5, 1.0, 1.2])
     with cache_col_a:
         cache_dir_str = st.text_input(
-            "Offline cache dir",
-            value=str(default_cache_dir) if default_cache_dir is not None else "offline_cache",
+            "VIN offline store dir",
+            value=str((default_cache_dir / "vin_offline") if default_cache_dir is not None else "vin_offline"),
             key="rri_binner_cache_dir",
         )
     with cache_col_b:
@@ -379,20 +379,17 @@ def render_rri_binning_page() -> None:
     cache_dir = Path(cache_dir_str).expanduser()
     if not cache_dir.is_absolute():
         cache_dir = PathConfig().resolve_under_root(cache_dir)
-    train_index_path = cache_dir / "train_index.jsonl"
-    val_index_path = cache_dir / "val_index.jsonl"
+    manifest_path = cache_dir / "manifest.json"
+    sample_index_path = cache_dir / "sample_index.jsonl"
 
-    if not train_index_path.exists() or not val_index_path.exists():
-        st.info(
-            "Missing `train_index.jsonl` / `val_index.jsonl` under the cache dir. "
-            "Create them (e.g. via `rebuild_cache_index(...)`) to enable split histograms.",
-        )
+    if not manifest_path.exists() or not sample_index_path.exists():
+        st.info("Missing `manifest.json` / `sample_index.jsonl` under the VIN offline store dir.")
         return
 
     split_cache_key = (
         str(cache_dir),
-        float(train_index_path.stat().st_mtime),
-        float(val_index_path.stat().st_mtime),
+        float(manifest_path.stat().st_mtime),
+        float(sample_index_path.stat().st_mtime),
         str(edges_path),
         int(max_snippets),
         int(num_classes),
@@ -402,45 +399,28 @@ def render_rri_binning_page() -> None:
         if compute_split or st.session_state.get("rri_binner_split_cache_key") != split_cache_key:
             edges_cpu = edges.detach().cpu().reshape(-1).to(dtype=torch.float32)
 
-            def _read_paths(index_path: Path) -> list[Path]:
-                paths: list[Path] = []
-                with index_path.open("r", encoding="utf-8") as handle:
-                    for line in handle:
-                        if not line.strip():
-                            continue
-                        item = json.loads(line)
-                        paths.append(Path(item["path"]))
-                        if max_snippets > 0 and len(paths) >= max_snippets:
-                            break
-                return paths
-
-            def _load_payload(sample_path: Path) -> dict:
-                try:
-                    return torch.load(sample_path, map_location="cpu", weights_only=True)
-                except Exception:
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore", category=FutureWarning)
-                        return torch.load(sample_path, map_location="cpu", weights_only=False)
-
-            def _count_labels(split_name: str, index_path: Path) -> tuple[np.ndarray, int, int]:
-                sample_rel_paths = _read_paths(index_path)
-                total = len(sample_rel_paths)
+            def _count_labels(split_name: str) -> tuple[np.ndarray, int, int]:
+                dataset = VinOfflineDatasetConfig(
+                    store=VinOfflineStoreConfig(store_dir=cache_dir),
+                    split=split_name,
+                    limit=max_snippets or None,
+                    return_format="sample",
+                    map_location="cpu",
+                    load_backbone=False,
+                    load_candidates=False,
+                    load_depths=False,
+                    load_candidate_pcs=False,
+                ).setup_target()
+                total = len(dataset)
                 if total == 0:
                     return np.zeros((int(num_classes),), dtype=np.int64), 0, 0
 
                 counts_t = torch.zeros((int(num_classes),), dtype=torch.int64)
                 total_candidates = 0
                 progress = st.progress(0.0, text=f"Scanning {split_name} split…")
-                for idx, rel_path in enumerate(sample_rel_paths, start=1):
-                    sample_path = cache_dir / rel_path
-                    payload = _load_payload(sample_path)
-                    rri_payload = payload.get("rri") if isinstance(payload, dict) else None
-                    if not isinstance(rri_payload, dict):
-                        continue
-                    rri_vals = rri_payload.get("rri")
-                    if rri_vals is None:
-                        continue
-                    rri_t = torch.as_tensor(rri_vals, dtype=torch.float32).reshape(-1)
+                for idx in range(total):
+                    sample = dataset[idx]
+                    rri_t = sample.oracle.rri.to(dtype=torch.float32).reshape(-1)
                     rri_t = rri_t[torch.isfinite(rri_t)]
                     if rri_t.numel() == 0:
                         continue
@@ -449,12 +429,12 @@ def render_rri_binning_page() -> None:
                     counts_t += torch.bincount(labels_t, minlength=int(num_classes))
                     total_candidates += int(rri_t.numel())
 
-                    progress.progress(idx / total, text=f"Scanning {split_name}: {idx}/{total} snippets")
+                    progress.progress((idx + 1) / total, text=f"Scanning {split_name}: {idx + 1}/{total} snippets")
                 progress.empty()
                 return counts_t.cpu().numpy(), total, total_candidates
 
-            train_counts, train_snippets, train_candidates = _count_labels("train", train_index_path)
-            val_counts, val_snippets, val_candidates = _count_labels("val", val_index_path)
+            train_counts, train_snippets, train_candidates = _count_labels("train")
+            val_counts, val_snippets, val_candidates = _count_labels("val")
 
             st.session_state["rri_binner_split_cache_key"] = split_cache_key
             st.session_state["rri_binner_split_train_counts"] = train_counts

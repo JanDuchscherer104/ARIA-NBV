@@ -37,7 +37,7 @@ class PathConfig(SingletonConfig):
     """Root directory for all data (downloaded datasets, meshes, etc.)."""
 
     data_root_massive: Path | None = Field(
-        default_factory=lambda: Path("/mnt/e/wsl-data/ase-atek-nbv"),
+        default=None,
     )
     """Optional root directory for storing further large datasets, caches or artifacts."""
 
@@ -122,10 +122,15 @@ class PathConfig(SingletonConfig):
 
     @classmethod
     def _ensure_dir(cls, path: Path, field_name: str | None) -> Path:
-        if not path.exists():
-            path.mkdir(parents=True, exist_ok=True)
+        try:
+            if not path.exists():
+                path.mkdir(parents=True, exist_ok=True)
+                Console.with_prefix(cls.__name__, field_name or "").log(
+                    f"Created directory: {path}",
+                )
+        except (PermissionError, OSError) as e:
             Console.with_prefix(cls.__name__, field_name or "").log(
-                f"Created directory: {path}",
+                f"[yellow]WARNING: Could not check or create directory {path}: {e}[/yellow]",
             )
         return path
 
@@ -179,8 +184,13 @@ class PathConfig(SingletonConfig):
     ) -> Path | None:
         if value is None:
             return None
+
+        massive_root = info.data.get("data_root_massive")
+        if massive_root is None:
+            massive_root = info.data.get("data_root", Path(".data"))
+
         path = cls._resolve_path(
-            Path(info.data.get("data_root_massive", "")) / value,
+            Path(massive_root) / value,
             info,
         )
         return path

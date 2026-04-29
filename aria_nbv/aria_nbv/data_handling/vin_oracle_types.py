@@ -387,7 +387,7 @@ class VinOracleBatch:
                 )
             if not all(is_vin_snippet_view_instance(view) for view in snippet_views):
                 raise NotImplementedError(
-                    "Batching with full EfmSnippetView is not supported. Use VinSnippetView from the offline cache.",
+                    "Batching with full EfmSnippetView is not supported. Use VinSnippetView from the VIN offline store.",
                 )
 
         candidate_widths = [int(sample.candidate_poses_world_cam.shape[-2]) for sample in samples]

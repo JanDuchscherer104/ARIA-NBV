@@ -8,34 +8,18 @@ shuffle            = true
 use_train_as_val   = false
 
     [datamodule_config.source]
-    kind        = "offline_cache"
+    kind        = "offline"
     train_split = "train"
     val_split   = "val"
 
-        [datamodule_config.source.cache]
-        load_backbone = true
+        [datamodule_config.source.offline]
         include_efm_snippet = true
         include_gt_mesh = false
+        load_backbone = true
         load_candidates = false
         load_depths = true
         load_candidate_pcs = false
-        vin_snippet_cache_mode = "required"
-        vin_snippet_cache_allow_subset = true
-        semidense_include_obs_count = true
-        efm_keep_keys = [
-            # EfmTrajectory
-            "pose/t_world_rig",
-            "pose/time_ns",
-            "pose/gravity_in_world",
-            # SemiDense Point Cloud
-            "points/p3s_world",
-            "points/dist_std",
-            "points/inv_dist_std",
-            "points/time_ns",
-            "scene/points/vol_min",
-            "scene/points/vol_max",
-            "points/lengths",
-        ]
+        map_location = "cpu"
         backbone_keep_fields = [
             "t_world_voxel",
             "voxel_extent",
@@ -47,8 +31,8 @@ use_train_as_val   = false
             "pts_world",
         ]
 
-            [datamodule_config.source.cache.vin_snippet_cache]
-            cache_dir = "vin_snippet_cache"
+            [datamodule_config.source.offline.store]
+            store_dir = "vin_offline"
 
 [optuna_config]
 study_name = "vin-v2-sweep-2"
@@ -97,7 +81,6 @@ aux_regression_weight          = 10.0
 aux_regression_weight_gamma    = 0.90
 aux_regression_weight_min      = 0.1
 aux_regression_weight_interval = "epoch"
-log_grad_norms                 = true
 coral_bias_init                = "prior_logits"
 coral_loss_variant             = "coral"
 coral_balance_source           = "binner"
@@ -127,15 +110,11 @@ coverage_weight_apply_aux      = true
     head_hidden_dim = 192
     head_num_layers = 3
     head_dropout = 0.05
-    head_activation = "gelu"
     coral_preinit_bias = true
     field_dim = 16
     field_gn_groups = 4
     apply_cw90_correction = true
     global_pool_grid_size = 6
-    enable_semidense_frustum = true
-    semidense_include_obs_count = true
-    use_voxel_valid_frac_feature = true
     scene_field_channels = [
         "occ_pr",
         "occ_input",
@@ -173,14 +152,6 @@ coverage_weight_apply_aux      = true
         output_dim    = 12
         gamma         = 1.0
         include_input = false
-
-        [module_config.vin.point_encoder]
-        cfg_path        = "PointNeXt/cfgs/s3dis/pointnext-s.yaml"
-        checkpoint_path = "s3dis-train-pointnext-s-ngpus1-seed1742-20220525-162639-Gz4ViiL95b6KP9MMH2ytG3_ckpt_best.pth"
-        out_dim         = 128
-        max_points      = 3000
-        freeze          = true
-        strict_load     = false
 
         [module_config.vin.traj_encoder]
         pool_mode = "mean"

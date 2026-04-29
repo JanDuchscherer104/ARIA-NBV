@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import importlib
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -77,25 +76,20 @@ def test_public_api_omits_legacy_vin_oracle_dataset_alias() -> None:
     assert not hasattr(module, "VinOracleDatasetConfig")  # noqa: S101
 
 
-def test_pyproject_retains_legacy_cache_entrypoint_until_cutover() -> None:
-    """The legacy cache CLI should stay wired until the offline cutover is complete."""
+def test_pyproject_omits_legacy_cache_entrypoints() -> None:
+    """Removed cache CLIs should stay out of project scripts."""
 
     pyproject_path = Path(__file__).resolve().parents[2] / "pyproject.toml"
-    payload = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
-    scripts = payload["project"]["scripts"]
-    assert scripts["nbv-cache-samples"] == "aria_nbv.lightning.cli:cache_main"  # noqa: S101
+    pyproject_text = pyproject_path.read_text(encoding="utf-8")
+    assert "nbv-cache-samples" not in pyproject_text  # noqa: S101
+    assert "nbv-cache-vin-snippets" not in pyproject_text  # noqa: S101
 
 
 def test_runtime_modules_do_not_import_data_handling_submodules() -> None:
     """Keep direct ``data_handling`` submodule imports tightly constrained."""
 
     package_root = Path(__file__).resolve().parents[2] / "aria_nbv"
-    allowed_modules = {
-        "aria_nbv.data_handling._legacy_cache_api",
-        "aria_nbv.data_handling._legacy_vin_source",
-        "data_handling._legacy_cache_api",
-        "data_handling._legacy_vin_source",
-    }
+    allowed_modules: set[str] = set()
     allowlist = {"vin/model_v3.py"}
     offenders: list[str] = []
     for path in package_root.rglob("*.py"):
@@ -173,6 +167,36 @@ def test_removed_legacy_data_modules_raise_import_error() -> None:
         "aria_nbv.data.vin_snippet_cache",
         "aria_nbv.data.vin_snippet_provider",
         "aria_nbv.data.vin_snippet_utils",
+    ]
+
+    for module_name in removed_modules:
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(module_name)
+
+
+def test_removed_legacy_data_handling_modules_raise_import_error() -> None:
+    """The data_handling legacy cache and migration modules should no longer exist."""
+
+    removed_modules = [
+        "aria_nbv.data_handling._legacy_cache_api",
+        "aria_nbv.data_handling._legacy_dataset_mixins",
+        "aria_nbv.data_handling._legacy_offline_cache_coverage",
+        "aria_nbv.data_handling._legacy_offline_cache_serialization",
+        "aria_nbv.data_handling._legacy_offline_cache_store",
+        "aria_nbv.data_handling._legacy_oracle_cache",
+        "aria_nbv.data_handling._legacy_vin_cache",
+        "aria_nbv.data_handling._legacy_vin_provider",
+        "aria_nbv.data_handling._legacy_vin_source",
+        "aria_nbv.data_handling._migration",
+        "aria_nbv.data_handling.cache_contracts",
+        "aria_nbv.data_handling.cache_index",
+        "aria_nbv.data_handling.offline_cache_coverage",
+        "aria_nbv.data_handling.offline_cache_serialization",
+        "aria_nbv.data_handling.offline_cache_store",
+        "aria_nbv.data_handling.oracle_cache",
+        "aria_nbv.data_handling.vin_cache",
+        "aria_nbv.data_handling.vin_oracle_datasets",
+        "aria_nbv.data_handling.vin_provider",
     ]
 
     for module_name in removed_modules:

@@ -5,13 +5,7 @@ surface:
 
 - raw ASE/EFM snippets and typed views,
 - VIN-facing runtime helpers and batch types,
-- the immutable VIN offline dataset format and writer, and
-- migration entry points for converting legacy cache artifacts.
-
-Legacy oracle-cache, VIN-snippet-cache, and coverage utilities now live behind
-dedicated ``_legacy_*`` compatibility modules. Old direct submodule imports
-such as ``aria_nbv.data_handling.oracle_cache`` still resolve, but new code
-should not rely on them through the package root.
+- the immutable VIN offline dataset format and writer.
 """
 
 from __future__ import annotations
@@ -38,9 +32,11 @@ _LAZY_EXPORTS = {
     "MeshProcessSpec": ".mesh_cache",
     "OFFLINE_DATASET_VERSION": "._offline_store",
     "ProcessedMesh": ".mesh_cache",
+    "NumericSummary": "._offline_diagnostics",
     "VinDatasetSourceConfig": "._vin_sources",
     "VinOfflineDataset": "._offline_dataset",
     "VinOfflineDatasetConfig": "._offline_dataset",
+    "VinOfflineDatasetStats": "._offline_diagnostics",
     "VinOfflineIndexRecord": "._offline_format",
     "VinOfflineManifest": "._offline_format",
     "VinOfflineMaterializedBlocks": "._offline_format",
@@ -55,13 +51,11 @@ _LAZY_EXPORTS = {
     "VinOracleOnlineDataset": "._vin_runtime",
     "VinOracleOnlineDatasetConfig": "._vin_runtime",
     "build_vin_snippet_view": "._vin_runtime",
+    "collect_vin_offline_dataset_stats": "._offline_diagnostics",
     "empty_vin_snippet": "._vin_runtime",
     "flush_prepared_samples_to_shard": "._offline_writer",
     "load_or_process_mesh": ".mesh_cache",
-    "migrate_legacy_offline_data": "._migration",
     "prepare_vin_offline_sample": "._offline_writer",
-    "scan_legacy_offline_data": "._migration",
-    "verify_migrated_offline_data": "._migration",
 }
 
 
@@ -88,11 +82,13 @@ __all__ = [
     "EfmSnippetView",
     "EfmTrajectoryView",
     "MeshProcessSpec",
+    "NumericSummary",
     "OFFLINE_DATASET_VERSION",
     "ProcessedMesh",
     "VinDatasetSourceConfig",
     "VinOfflineDataset",
     "VinOfflineDatasetConfig",
+    "VinOfflineDatasetStats",
     "VinOfflineIndexRecord",
     "VinOfflineManifest",
     "VinOfflineMaterializedBlocks",
@@ -108,14 +104,12 @@ __all__ = [
     "VinOracleOnlineDatasetConfig",
     "VinSnippetView",
     "build_vin_snippet_view",
+    "collect_vin_offline_dataset_stats",
     "empty_vin_snippet",
     "flush_prepared_samples_to_shard",
     "infer_semidense_bounds",
     "is_efm_snippet_view_instance",
     "is_vin_snippet_view_instance",
     "load_or_process_mesh",
-    "migrate_legacy_offline_data",
     "prepare_vin_offline_sample",
-    "scan_legacy_offline_data",
-    "verify_migrated_offline_data",
 ]

@@ -133,7 +133,7 @@ def summarize_vin_v3(
         if points_world.shape[-1] >= 5:
             obs_count_stats = _q_stats(points_world[..., 4][points_mask])
         efm_summary = {
-            "note": "VIN snippet cache (no raw EFM inputs)",
+            "note": "VIN offline-store snippet (no raw EFM inputs)",
             "vin_snippet.points_world": summarize(snippet_view.points_world, include_stats=True),
             "vin_snippet.lengths": summarize(snippet_view.lengths, include_stats=True),
             "vin_snippet.t_world_rig": summarize(snippet_view.t_world_rig.tensor()),

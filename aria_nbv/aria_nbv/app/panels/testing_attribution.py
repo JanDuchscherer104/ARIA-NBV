@@ -12,7 +12,6 @@ from torch import nn
 from torch.nn import functional as functional
 
 from ...configs import PathConfig
-from ...data_handling._legacy_cache_api import OracleRriCacheConfig, OracleRriCacheDatasetConfig
 from ...interpretability.attribution import (
     AttributionEngine,
     AttributionMethod,
@@ -24,7 +23,6 @@ from ...rri_metrics.coral import coral_expected_from_logits, coral_logits_to_pro
 from ...vin.experimental.pose_encoders import infer_pose_vec_groups
 from ..state import get_vin_state
 from .common import _info_popover
-from .offline_cache_utils import _load_efm_snippet_for_cache
 from .vin_utils import _load_vin_module_from_checkpoint
 
 
@@ -190,44 +188,13 @@ def render_testing_attribution_page() -> None:
         key="vin_attr_device",
     )
 
-    data_source = st.selectbox(
-        "Attribution source",
-        options=["VIN Diagnostics (last run)", "Offline cache"],
-        index=0,
-        key="vin_attr_source",
-    )
-    # NBV_LEGACY_OFFLINE_CACHE_REMOVE_AFTER_FULL_MIGRATION: attribution support
-    # for legacy oracle-cache samples.
-
-    cache_root = paths.offline_cache_dir or (paths.data_root / "oracle_rri_cache")
-    cache_dir = ""
-    cache_split = "val"
-    include_snippet = False
-    if data_source == "Offline cache":
-        cache_dir = st.text_input(
-            "Offline cache dir",
-            value=str(cache_root),
-            key="vin_attr_cache_dir",
-        )
-        cache_split = st.selectbox(
-            "Cache split",
-            options=["train", "val"],
-            index=1,
-            key="vin_attr_cache_split",
-        )
-        include_snippet = st.checkbox(
-            "Attach EFM snippet (slower, enables semidense features)",
-            value=False,
-            key="vin_attr_attach_snippet",
-        )
+    vin_state = get_vin_state()
+    if vin_state.batch is None:
+        st.warning("Run VIN Diagnostics first to populate a batch for attribution.")
     else:
-        vin_state = get_vin_state()
-        if vin_state.batch is None:
-            st.warning("Run VIN Diagnostics first to populate a batch for attribution.")
-        else:
-            st.caption(
-                f"Using VIN Diagnostics batch: scene={vin_state.batch.scene_id} snippet={vin_state.batch.snippet_id}",
-            )
+        st.caption(
+            f"Using VIN Diagnostics batch: scene={vin_state.batch.scene_id} snippet={vin_state.batch.snippet_id}",
+        )
 
     resolved_ckpt: Path | None = None
     if ckpt_path is not None:
@@ -251,78 +218,19 @@ def render_testing_attribution_page() -> None:
             st.error(f"Failed to load checkpoint: {type(exc).__name__}: {exc}")
             module = None
 
-    cache_ds = None
-    cache_len = 0
-    cache_idx = 0
-    sample_count = 1
-    if data_source == "Offline cache":
-        cache_ds = attr_state.get("cache_ds")
-        cache_key = (cache_dir, cache_split)
-        cache_len = int(attr_state.get("cache_len", 0) or 0)
-        cache_dir_path = Path(cache_dir).expanduser() if cache_dir else None
-        if cache_dir_path is not None and cache_dir_path.exists():
-            if attr_state.get("cache_key") != cache_key:
-                try:
-                    cache_cfg = OracleRriCacheDatasetConfig(
-                        cache=OracleRriCacheConfig(cache_dir=cache_dir_path, paths=paths),
-                        load_backbone=True,
-                        split=cache_split,
-                        include_efm_snippet=False,
-                        return_format="vin_batch",
-                    )
-                    cache_ds = cache_cfg.setup_target()
-                    cache_len = len(cache_ds)
-                    attr_state["cache_ds"] = cache_ds
-                    attr_state["cache_key"] = cache_key
-                    attr_state["cache_len"] = cache_len
-                    attr_state.pop("attr_result", None)
-                except Exception as exc:  # pragma: no cover - cache guard
-                    st.error(f"Failed to load offline cache: {type(exc).__name__}: {exc}")
-                    cache_ds = None
-                    cache_len = 0
-        elif cache_dir:
-            st.warning("Offline cache directory does not exist.")
-
-        if cache_len > 0:
-            st.caption(f"Cached samples available: {cache_len}")
-        else:
-            st.caption("No cached samples loaded.")
-
-        cache_idx = st.number_input(
-            "Cache index",
-            min_value=0,
-            max_value=max(0, cache_len - 1),
-            value=0,
-            step=1,
-            key="vin_attr_cache_idx",
-        )
-        if cache_len > 1:
-            sample_count = int(
-                st.number_input(
-                    "Attribution samples",
-                    min_value=1,
-                    max_value=min(32, cache_len),
-                    value=1,
-                    step=1,
-                    key="vin_attr_sample_count",
-                    help="Aggregate attributions over multiple cached samples (contiguous range).",
-                ),
-            )
-
     num_candidates = int(attr_state.get("num_candidates", 1) or 1)
-    if data_source == "VIN Diagnostics (last run)":
-        vin_state = get_vin_state()
-        if vin_state.batch is not None:
-            poses = getattr(vin_state.batch, "candidate_poses_world_cam", None)
-            tensor = getattr(poses, "tensor", None)
-            if isinstance(tensor, torch.Tensor):
-                if tensor.ndim >= 2:
-                    num_candidates = int(tensor.shape[-2])
-            else:
-                try:
-                    num_candidates = int(len(poses))
-                except TypeError:
-                    pass
+    vin_state = get_vin_state()
+    if vin_state.batch is not None:
+        poses = getattr(vin_state.batch, "candidate_poses_world_cam", None)
+        tensor = getattr(poses, "tensor", None)
+        if isinstance(tensor, torch.Tensor):
+            if tensor.ndim >= 2:
+                num_candidates = int(tensor.shape[-2])
+        else:
+            try:
+                num_candidates = int(len(poses))
+            except TypeError:
+                pass
 
     candidate_mode = st.selectbox(
         "Candidate selection",
@@ -401,19 +309,11 @@ def render_testing_attribution_page() -> None:
             st.error("Load a VIN checkpoint to compute attributions.")
         else:
             try:
-                if data_source == "Offline cache":
-                    if cache_ds is None or cache_len == 0:
-                        st.error("Load a non-empty offline cache to compute attributions.")
-                        return
-                    sample_indices = [
-                        int((cache_idx + offset) % max(cache_len, 1)) for offset in range(max(sample_count, 1))
-                    ]
-                else:
-                    vin_state = get_vin_state()
-                    if vin_state.batch is None:
-                        st.error("Run VIN Diagnostics first to populate a batch for attribution.")
-                        return
-                    sample_indices = [0]
+                vin_state = get_vin_state()
+                if vin_state.batch is None:
+                    st.error("Run VIN Diagnostics first to populate a batch for attribution.")
+                    return
+                sample_indices = [0]
 
                 device = torch.device(device_choice)
                 module.to(device)
@@ -436,40 +336,15 @@ def render_testing_attribution_page() -> None:
                     "rel_delta": [],
                 }
                 ablation_groups: list[str] = []
-                snippet_cache: dict[str, object] = {}
-
                 for sample_idx in sample_indices:
-                    if data_source == "Offline cache":
-                        cache_sample = cache_ds[int(sample_idx)]
-                    else:
-                        cache_sample = vin_state.batch
+                    _ = sample_idx
+                    cache_sample = vin_state.batch
 
                     backbone_out = getattr(cache_sample, "backbone_out", None)
                     if backbone_out is None:
-                        raise RuntimeError("Cached sample missing backbone outputs.")
-                    use_snippet = include_snippet or data_source == "VIN Diagnostics (last run)"
-                    if use_snippet and cache_sample.efm_snippet_view is None and cache_ds is not None:
-                        snippet_key = f"{cache_sample.scene_id}:{cache_sample.snippet_id}"
-                        if snippet_key in snippet_cache:
-                            cache_sample.efm_snippet_view = snippet_cache[snippet_key]  # type: ignore[assignment]
-                        else:
-                            try:
-                                efm_snippet = _load_efm_snippet_for_cache(
-                                    scene_id=cache_sample.scene_id,
-                                    snippet_id=cache_sample.snippet_id,
-                                    dataset_payload=cache_ds.metadata.dataset_config,
-                                    device="cpu",
-                                    paths=paths,
-                                    include_gt_mesh=False,
-                                )
-                                cache_sample.efm_snippet_view = efm_snippet
-                                snippet_cache[snippet_key] = efm_snippet
-                            except Exception as exc:  # pragma: no cover - IO guard
-                                st.warning(
-                                    f"Failed to load EFM snippet {snippet_key}: {type(exc).__name__}: {exc}",
-                                )
+                        raise RuntimeError("VIN diagnostics batch missing backbone outputs.")
                     efm = {}
-                    if use_snippet and cache_sample.efm_snippet_view is not None:
+                    if cache_sample.efm_snippet_view is not None:
                         efm = cache_sample.efm_snippet_view.efm
                     backbone_out = backbone_out.to(device)
                     p3d_cameras = cache_sample.p3d_cameras.to(device)

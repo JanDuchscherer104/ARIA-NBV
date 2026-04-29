@@ -1,4 +1,4 @@
-"""Plotting helpers for candidate sampling."""
+"""Plotting helpers for candidate sampling and counterfactual rollouts."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import numpy as np
 import plotly.graph_objects as go  # type: ignore[import]
 import torch
 from efm3d.aria.pose import PoseTW
+from plotly.colors import sample_colorscale  # type: ignore[import]
 from plotly.subplots import make_subplots  # type: ignore[import]
 
 from ..data_handling import EfmSnippetView
@@ -16,9 +17,20 @@ from ..utils.data_plotting import SnippetPlotBuilder, get_frustum_segments
 
 if TYPE_CHECKING:
     from .candidate_generation import CandidateViewGeneratorConfig
+    from .counterfactuals import CounterfactualRolloutResult, CounterfactualTrajectory
     from .types import CandidateSamplingResult
 
 console = Console.with_prefix("pose_plotting")
+COUNTERFACTUAL_COLORS = (
+    "#636EFA",
+    "#EF553B",
+    "#00CC96",
+    "#AB63FA",
+    "#FFA15A",
+    "#19D3F3",
+    "#FF6692",
+    "#B6E880",
+)
 
 
 def _pose_axes_np(candidates: "CandidateSamplingResult") -> tuple[np.ndarray, np.ndarray]:
@@ -421,6 +433,437 @@ class CandidatePlotBuilder(SnippetPlotBuilder):
             include_axes=include_axes,
             include_center=include_center,
         )
+
+
+def _counterfactual_color(index: int) -> str:
+    return COUNTERFACTUAL_COLORS[index % len(COUNTERFACTUAL_COLORS)]
+
+
+def _trajectory_positions_np(trajectory: "CounterfactualTrajectory") -> np.ndarray:
+    return trajectory.pose_chain_world().t.detach().cpu().numpy()
+
+
+def _pretty_metric_label(name: str) -> str:
+    if name == "cumulative_rri":
+        return "Cumulative RRI"
+    if name == "cumulative_score":
+        return "Cumulative score"
+    return name.replace("_", " ")
+
+
+def _trajectory_metric_values(
+    rollouts: "CounterfactualRolloutResult",
+    *,
+    color_metric: str,
+) -> tuple[np.ndarray | None, str | None]:
+    if color_metric == "auto":
+        if any(trajectory.cumulative_rri is not None for trajectory in rollouts.trajectories):
+            color_metric = "cumulative_rri"
+        else:
+            return None, None
+
+    if color_metric == "cumulative_rri":
+        values = np.array(
+            [
+                np.nan if trajectory.cumulative_rri is None else float(trajectory.cumulative_rri)
+                for trajectory in rollouts.trajectories
+            ],
+            dtype=float,
+        )
+        return values, "Cumulative RRI"
+
+    if color_metric == "cumulative_score":
+        values = np.array([float(trajectory.cumulative_score) for trajectory in rollouts.trajectories], dtype=float)
+        return values, "Cumulative score"
+
+    return None, None
+
+
+def _trajectory_colors(
+    rollouts: "CounterfactualRolloutResult",
+    *,
+    color_metric: str,
+    colorscale: str,
+) -> tuple[list[str], np.ndarray | None, str | None]:
+    values, metric_label = _trajectory_metric_values(rollouts, color_metric=color_metric)
+    if values is None:
+        return [_counterfactual_color(index) for index, _ in enumerate(rollouts.trajectories)], None, None
+
+    colors = [_counterfactual_color(index) for index, _ in enumerate(rollouts.trajectories)]
+    finite_mask = np.isfinite(values)
+    if not finite_mask.any():
+        return colors, values, metric_label
+
+    vmin = float(values[finite_mask].min())
+    vmax = float(values[finite_mask].max())
+    for idx, value in enumerate(values):
+        if not np.isfinite(value):
+            continue
+        scale_pos = 0.5 if np.isclose(vmin, vmax) else float((value - vmin) / (vmax - vmin))
+        colors[idx] = str(sample_colorscale(colorscale, [scale_pos])[0])
+    return colors, values, metric_label
+
+
+def _trajectory_name(
+    trajectory: "CounterfactualTrajectory",
+    *,
+    traj_idx: int,
+    score_label: str,
+) -> str:
+    parts: list[str] = []
+    if trajectory.cumulative_rri is not None:
+        parts.append(f"rri={trajectory.cumulative_rri:.3f}")
+    if not (trajectory.cumulative_rri is not None and score_label == "oracle_rri"):
+        parts.append(f"{score_label}={trajectory.cumulative_score:.3f}")
+    if not parts:
+        parts.append(f"score={trajectory.cumulative_score:.3f}")
+    return f"CF traj {traj_idx} ({', '.join(parts)})"
+
+
+def _add_metric_colorbar(
+    fig: go.Figure,
+    *,
+    metric_values: np.ndarray | None,
+    metric_label: str | None,
+    colorscale: str,
+    anchor: np.ndarray,
+) -> go.Figure:
+    if metric_values is None or metric_label is None:
+        return fig
+
+    finite_mask = np.isfinite(metric_values)
+    if not finite_mask.any():
+        return fig
+
+    finite_values = metric_values[finite_mask]
+    anchor_xyz = np.broadcast_to(anchor.reshape(1, 3), (finite_values.shape[0], 3))
+    fig.add_trace(
+        go.Scatter3d(
+            x=anchor_xyz[:, 0],
+            y=anchor_xyz[:, 1],
+            z=anchor_xyz[:, 2],
+            mode="markers",
+            marker={
+                "size": 0.1,
+                "opacity": 0.0,
+                "color": finite_values,
+                "colorscale": colorscale,
+                "showscale": True,
+                "colorbar": {"title": metric_label},
+                "cmin": float(finite_values.min()),
+                "cmax": float(finite_values.max()),
+            },
+            hoverinfo="skip",
+            showlegend=False,
+            name=metric_label,
+        )
+    )
+    return fig
+
+
+class CounterfactualPlotBuilder(CandidatePlotBuilder):
+    """Snippet-aware plotting builder for multi-step counterfactual trajectories."""
+
+    counterfactual_rollouts: CounterfactualRolloutResult | None = None
+
+    @classmethod
+    def from_rollouts(
+        cls,
+        snippet: EfmSnippetView,
+        rollouts: "CounterfactualRolloutResult",
+        *,
+        title: str,
+        height: int = 900,
+    ) -> "CounterfactualPlotBuilder":
+        return cls.from_snippet(snippet, title=title, height=height).attach_counterfactual_rollouts(rollouts)
+
+    def attach_counterfactual_rollouts(self, rollouts: "CounterfactualRolloutResult") -> Self:
+        """Attach rollout trajectories for subsequent plotting calls."""
+
+        self.counterfactual_rollouts = rollouts
+        return self
+
+    def add_counterfactual_paths(
+        self,
+        *,
+        show_step_markers: bool = True,
+        line_width: int = 5,
+        root_color: str = "black",
+        color_metric: str = "auto",
+        colorscale: str = "Viridis",
+        show_metric_colorbar: bool = True,
+    ) -> Self:
+        """Overlay rollout paths for all attached trajectories."""
+
+        if self.counterfactual_rollouts is None:
+            raise ValueError("Counterfactual rollouts missing; call attach_counterfactual_rollouts() first.")
+
+        root = self.counterfactual_rollouts.root_pose_world.t.detach().cpu().numpy()
+        self._update_scene_ranges(root)
+        self.fig.add_trace(
+            go.Scatter3d(
+                x=[root[0]],
+                y=[root[1]],
+                z=[root[2]],
+                mode="markers",
+                marker={"size": 7, "color": root_color, "symbol": "diamond"},
+                name="Counterfactual root",
+            )
+        )
+
+        colors, metric_values, metric_label = _trajectory_colors(
+            self.counterfactual_rollouts,
+            color_metric=color_metric,
+            colorscale=colorscale,
+        )
+        for traj_idx, trajectory in enumerate(self.counterfactual_rollouts.trajectories):
+            pts = _trajectory_positions_np(trajectory)
+            if pts.size == 0:
+                continue
+            self._update_scene_ranges(pts)
+            color = colors[traj_idx]
+            mode = "lines+markers" if show_step_markers else "lines"
+            self.fig.add_trace(
+                go.Scatter3d(
+                    x=pts[:, 0],
+                    y=pts[:, 1],
+                    z=pts[:, 2],
+                    mode=mode,
+                    marker={"size": 4, "color": color},
+                    line={"width": line_width, "color": color},
+                    name=_trajectory_name(
+                        trajectory,
+                        traj_idx=traj_idx,
+                        score_label=self.counterfactual_rollouts.score_label,
+                    ),
+                )
+            )
+        if show_metric_colorbar:
+            self.fig = _add_metric_colorbar(
+                self.fig,
+                metric_values=metric_values,
+                metric_label=metric_label,
+                colorscale=colorscale,
+                anchor=root,
+            )
+        return self
+
+    def add_counterfactual_selected_frusta(
+        self,
+        *,
+        scale: float = 0.6,
+        include_axes: bool = False,
+        include_center: bool = False,
+        max_frustums_per_trajectory: int | None = None,
+    ) -> Self:
+        """Overlay frusta for the selected poses in each attached trajectory."""
+
+        if self.counterfactual_rollouts is None:
+            raise ValueError("Counterfactual rollouts missing; call attach_counterfactual_rollouts() first.")
+
+        for traj_idx, trajectory in enumerate(self.counterfactual_rollouts.trajectories):
+            steps = trajectory.steps
+            if max_frustums_per_trajectory is not None:
+                steps = steps[:max_frustums_per_trajectory]
+            if not steps:
+                continue
+            cams = [step.selected_view for step in steps]
+            poses = [step.selected_pose_world for step in steps]
+            self._add_frusta_for_poses(
+                cams=cams,
+                poses=poses,
+                scale=scale,
+                color=_counterfactual_color(traj_idx),
+                name=f"CF frusta {traj_idx}",
+                max_frustums=None,
+                include_axes=include_axes,
+                include_center=include_center,
+            )
+        return self
+
+    def add_counterfactual_step_shell(
+        self,
+        *,
+        trajectory_index: int,
+        step_index: int,
+        show_history: bool = True,
+        show_selected: bool = True,
+        show_frusta: bool = True,
+        frustum_scale: float = 0.5,
+        max_frustums: int | None = 16,
+        include_rejected: bool = False,
+    ) -> Self:
+        """Plot one rollout step's candidate shell within the snippet scene."""
+
+        if self.counterfactual_rollouts is None:
+            raise ValueError("Counterfactual rollouts missing; call attach_counterfactual_rollouts() first.")
+
+        trajectory = self.counterfactual_rollouts.trajectories[trajectory_index]
+        step = trajectory.steps[step_index]
+
+        if show_history:
+            history = _trajectory_positions_np(trajectory)[: step_index + 1]
+            if history.size > 0:
+                self._update_scene_ranges(history)
+                self.fig.add_trace(
+                    go.Scatter3d(
+                        x=history[:, 0],
+                        y=history[:, 1],
+                        z=history[:, 2],
+                        mode="lines+markers",
+                        marker={"size": 4, "color": "black"},
+                        line={"width": 4, "color": "black"},
+                        name="Rollout history",
+                    )
+                )
+
+        self.attach_candidate_results(step.candidates)
+        colorbar_title = _pretty_metric_label(step.selection_score_label)
+        if step.selection_scores is not None:
+            self.add_candidate_points(
+                use_valid=True,
+                color=step.selection_scores.detach().cpu().numpy(),
+                colorbar_title=colorbar_title,
+                name=f"Step {step_index + 1} candidates",
+                size=4,
+                opacity=0.8,
+                mark_reference=True,
+            )
+        else:
+            self.add_candidate_cloud(use_valid=True, name=f"Step {step_index + 1} candidates")
+        if include_rejected:
+            self.add_rejected_cloud()
+        if show_frusta:
+            self.add_candidate_frusta(
+                scale=frustum_scale,
+                color="crimson",
+                name=f"Step {step_index + 1} frusta",
+                max_frustums=max_frustums,
+                include_axes=False,
+                include_center=False,
+                display_rotate=False,
+            )
+
+        ref_pose = trajectory.reference_pose_world(step_index)
+        self.add_frame_axes(frame=ref_pose, title="Rollout ref", is_rotate_yaw_cw90=False)
+        if show_selected:
+            self.add_points(
+                step.selected_pose_world,
+                name=f"Selected step {step_index + 1}",
+                color="gold",
+                size=7,
+                symbol="diamond",
+            )
+        return self
+
+
+def plot_counterfactual_paths_simple(
+    rollouts: "CounterfactualRolloutResult",
+    *,
+    title: str = "Counterfactual pose rollouts",
+    show_step_markers: bool = True,
+    color_metric: str = "auto",
+    colorscale: str = "Viridis",
+    show_metric_colorbar: bool = True,
+) -> go.Figure:
+    """Plot rollout paths without requiring a snippet or mesh."""
+
+    fig = go.Figure()
+    root = rollouts.root_pose_world.t.detach().cpu().numpy()
+    fig.add_trace(
+        go.Scatter3d(
+            x=[root[0]],
+            y=[root[1]],
+            z=[root[2]],
+            mode="markers",
+            marker={"size": 7, "color": "black", "symbol": "diamond"},
+            name="Counterfactual root",
+        )
+    )
+    colors, metric_values, metric_label = _trajectory_colors(
+        rollouts,
+        color_metric=color_metric,
+        colorscale=colorscale,
+    )
+    for traj_idx, trajectory in enumerate(rollouts.trajectories):
+        pts = _trajectory_positions_np(trajectory)
+        if pts.size == 0:
+            continue
+        color = colors[traj_idx]
+        fig.add_trace(
+            go.Scatter3d(
+                x=pts[:, 0],
+                y=pts[:, 1],
+                z=pts[:, 2],
+                mode="lines+markers" if show_step_markers else "lines",
+                marker={"size": 4, "color": color},
+                line={"width": 5, "color": color},
+                name=_trajectory_name(
+                    trajectory,
+                    traj_idx=traj_idx,
+                    score_label=rollouts.score_label,
+                ),
+            )
+        )
+    if show_metric_colorbar:
+        fig = _add_metric_colorbar(
+            fig,
+            metric_values=metric_values,
+            metric_label=metric_label,
+            colorscale=colorscale,
+            anchor=root,
+        )
+    fig.update_layout(
+        title=title,
+        scene={
+            "xaxis_title": "X (left)",
+            "yaxis_title": "Y (up)",
+            "zaxis_title": "Z (fwd)",
+            "aspectmode": "data",
+        },
+    )
+    return fig
+
+
+def plot_counterfactual_step_simple(
+    trajectory: "CounterfactualTrajectory",
+    *,
+    step_index: int,
+    scale: float = 0.5,
+    max_frustums: int | None = 12,
+) -> go.Figure:
+    """Plot one rollout step's candidate shell without requiring a snippet."""
+
+    step = trajectory.steps[step_index]
+    fig = plot_candidate_frusta_simple(step.candidates, scale=scale, max_frustums=max_frustums)
+
+    history = _trajectory_positions_np(trajectory)[: step_index + 1]
+    if history.size > 0:
+        fig.add_trace(
+            go.Scatter3d(
+                x=history[:, 0],
+                y=history[:, 1],
+                z=history[:, 2],
+                mode="lines+markers",
+                marker={"size": 4, "color": "black"},
+                line={"width": 4, "color": "black"},
+                name="Rollout history",
+            )
+        )
+
+    selected = step.selected_pose_world.t.detach().cpu().numpy()
+    fig.add_trace(
+        go.Scatter3d(
+            x=[selected[0]],
+            y=[selected[1]],
+            z=[selected[2]],
+            mode="markers",
+            marker={"size": 7, "color": "gold", "symbol": "diamond"},
+            name=f"Selected step {step_index + 1}",
+        )
+    )
+    fig.update_layout(title=f"Counterfactual step {step_index + 1}")
+    return fig
 
 
 def plot_direction_polar(

@@ -23,9 +23,9 @@ class VinDiagContext:
         pred: VIN predictions.
         batch: Oracle batch used for diagnostics.
         cfg: Experiment configuration used for the run.
-        use_offline_cache: Whether the batch originates from the offline cache.
-        attach_snippet: Whether to load full EFM snippet for geometry plots.
-        include_gt_mesh: Whether to include GT mesh when loading snippets.
+        use_offline_cache: Whether the batch originates from the VIN offline store.
+        attach_snippet: Whether snippets are expected to be present for geometry plots.
+        include_gt_mesh: Whether GT meshes are present when loading full snippets.
         has_tokens: Whether frustum tokens are available (VIN v1).
         has_semidense_frustum: Whether semidense frustum diagnostics are available (VIN v2).
         num_candidates: Number of candidate views in the batch.

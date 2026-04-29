@@ -11,8 +11,8 @@ from __future__ import annotations
 from .panels.candidates import render_candidates_page
 from .panels.data import render_data_page
 from .panels.depth import render_depth_page
-from .panels.offline_stats import render_offline_stats_page
 from .panels.optuna_sweep import render_optuna_sweep_page
+from .panels.rl import render_rl_page
 from .panels.rri import render_rri_page
 from .panels.rri_binning import render_rri_binning_page
 from .panels.testing_attribution import render_testing_attribution_page
@@ -23,8 +23,8 @@ __all__ = [
     "render_candidates_page",
     "render_data_page",
     "render_depth_page",
-    "render_offline_stats_page",
     "render_optuna_sweep_page",
+    "render_rl_page",
     "render_rri_page",
     "render_rri_binning_page",
     "render_testing_attribution_page",

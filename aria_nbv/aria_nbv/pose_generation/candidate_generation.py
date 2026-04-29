@@ -45,6 +45,7 @@ from .types import (
     SamplingStrategy,
     ViewDirectionMode,
 )
+from .utils import ensure_unbatched_pose
 
 
 class CandidateViewGeneratorConfig(BaseConfig):
@@ -167,22 +168,11 @@ class CandidateViewGeneratorConfig(BaseConfig):
     Set to ``None`` to keep the current global RNG state (non-deterministic).
     """
 
-    @field_validator("device", mode="before")
-    @classmethod
-    def _resolve_device(cls, value: str | torch.device) -> torch.device:
-        return super()._resolve_device(value)
+    _resolve_device = field_validator("device", mode="before")(BaseConfig._resolve_device)
 
-    @field_validator("verbosity", mode="before")
-    @classmethod
-    def _coerce_verbosity(cls, value: Verbosity | int | str) -> Verbosity:
-        return Verbosity.from_any(value)
+    _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
 
-    @field_validator("seed")
-    @classmethod
-    def _non_negative_seed(cls, value: int | None) -> int | None:
-        if value is not None and int(value) < 0:
-            raise ValueError("seed must be >= 0 or None.")
-        return value
+    _non_negative_seed = field_validator("seed")(BaseConfig._validate_non_negative_seed)
 
     @field_validator(
         "view_max_angle_deg",
@@ -221,13 +211,6 @@ class CandidateViewGeneratorConfig(BaseConfig):
         return radians(self.delta_azimuth_deg)
 
 
-def _ensure_unbatched_pose(pose: PoseTW) -> PoseTW:
-    """Ensure PoseTW has shape (12,) instead of (1,12) when singleton batch."""
-    if pose._data.ndim == 2 and pose._data.shape[0] == 1:
-        return PoseTW(pose._data.squeeze(0))
-    return pose
-
-
 def _gravity_align_pose(reference_pose: PoseTW, *, eps: float = 1e-6) -> PoseTW:
     """Return a gravity-aligned variant of ``reference_pose`` with identical translation.
 
@@ -242,7 +225,7 @@ def _gravity_align_pose(reference_pose: PoseTW, *, eps: float = 1e-6) -> PoseTW:
     Returns:
         ``PoseTW`` world<-reference pose with gravity-aligned rotation and unchanged translation.
     """
-    reference_pose = _ensure_unbatched_pose(reference_pose)
+    reference_pose = ensure_unbatched_pose(reference_pose)
     r_wr = reference_pose.R  # (..., 3, 3)
     t_w = reference_pose.t  # (..., 3)
     device = r_wr.device
@@ -429,7 +412,7 @@ class CandidateViewGenerator:
         device = self.config.device
 
         reference_pose = rotate_yaw_cw90(
-            _ensure_unbatched_pose(reference_pose.to(device)),
+            ensure_unbatched_pose(reference_pose.to(device)),
         )
         sampling_pose = _gravity_align_pose(reference_pose) if self.config.align_to_gravity else reference_pose
 

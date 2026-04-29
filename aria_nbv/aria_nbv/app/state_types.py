@@ -108,16 +108,6 @@ class VinDiagnosticsState:
     experiment: AriaNBVExperimentConfig | None = None
     module: Any | None = None
     datamodule: Any | None = None
-    offline_cache_sig: str | None = None
-    offline_cache: Any | None = None
-    offline_cache_len: int | None = None
-    offline_cache_idx: int = 0
-    vin_snippet_cache_sig: str | None = None
-    vin_snippet_cache: Any | None = None
-    vin_snippet_cache_len: int | None = None
-    offline_snippet_key: str | None = None
-    offline_snippet: EfmSnippetView | None = None
-    offline_snippet_error: str | None = None
     batch: VinOracleBatch | None = None
     pred: VinPrediction | None = None
     debug: VinForwardDiagnostics | None = None

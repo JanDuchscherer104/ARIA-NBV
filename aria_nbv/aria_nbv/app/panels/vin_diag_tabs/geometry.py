@@ -6,14 +6,12 @@ import plotly.graph_objects as go  # type: ignore[import-untyped]
 import streamlit as st
 import torch
 
-from ....configs import PathConfig
 from ....data_handling import VinSnippetView
 from ....rri_metrics.coral import coral_loss
 from ....vin.experimental.plotting import build_alignment_figures
 from ....vin.plotting import build_geometry_overview_figure, build_semidense_projection_figure
 from ..common import _info_popover
 from ..data import scene_plot_options_ui
-from ..offline_cache_utils import _load_efm_snippet_for_cache
 from .context import VinDiagContext
 
 
@@ -27,7 +25,6 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
     debug = ctx.debug
     pred = ctx.pred
     batch = ctx.batch
-    cfg = ctx.cfg
 
     _info_popover(
         "geometry overview",
@@ -36,85 +33,19 @@ def render_geometry_tab(ctx: VinDiagContext) -> None:
         "candidate poses align with scene geometry and annotations.",
     )
     snippet_view = batch.efm_snippet_view
-    if snippet_view is None and ctx.use_offline_cache and ctx.attach_snippet:
-        snippet_key = f"{batch.scene_id}:{batch.snippet_id}"
-        if state.offline_snippet_key != snippet_key or state.offline_snippet is None:
-            with st.spinner("Loading EFM snippet for geometry..."):
-                try:
-                    cache_ds = state.offline_cache
-                    dataset_payload = cache_ds.metadata.dataset_config if cache_ds else None
-                    paths = cfg.paths if isinstance(cfg.paths, PathConfig) else PathConfig()
-                    snippet_view = _load_efm_snippet_for_cache(
-                        scene_id=batch.scene_id,
-                        snippet_id=batch.snippet_id,
-                        dataset_payload=dataset_payload,
-                        device="cpu",
-                        paths=paths,
-                        include_gt_mesh=ctx.include_gt_mesh,
-                    )
-                    state.offline_snippet_key = snippet_key
-                    state.offline_snippet = snippet_view
-                    state.offline_snippet_error = None
-                except Exception as exc:  # pragma: no cover - IO guard
-                    state.offline_snippet_key = snippet_key
-                    state.offline_snippet = None
-                    state.offline_snippet_error = f"{type(exc).__name__}: {exc}"
-        else:
-            snippet_view = state.offline_snippet
-        if snippet_view is not None:
-            batch.efm_snippet_view = snippet_view
-
-    if isinstance(snippet_view, VinSnippetView) and ctx.use_offline_cache and ctx.attach_snippet:
-        snippet_key = f"{batch.scene_id}:{batch.snippet_id}"
-        if state.offline_snippet_key == snippet_key and state.offline_snippet is not None:
-            snippet_view = state.offline_snippet
-            batch.efm_snippet_view = snippet_view
-        else:
-            load_full = True
-            if (
-                torch.is_tensor(snippet_view.points_world)
-                and snippet_view.points_world.ndim == 3
-                and snippet_view.points_world.shape[0] > 1
-            ):
-                load_full = False
-            if load_full:
-                with st.spinner("Loading full EFM snippet for geometry..."):
-                    try:
-                        cache_ds = state.offline_cache
-                        dataset_payload = cache_ds.metadata.dataset_config if cache_ds else None
-                        paths = cfg.paths if isinstance(cfg.paths, PathConfig) else PathConfig()
-                        snippet_view = _load_efm_snippet_for_cache(
-                            scene_id=batch.scene_id,
-                            snippet_id=batch.snippet_id,
-                            dataset_payload=dataset_payload,
-                            device="cpu",
-                            paths=paths,
-                            include_gt_mesh=ctx.include_gt_mesh,
-                        )
-                        state.offline_snippet_key = snippet_key
-                        state.offline_snippet = snippet_view
-                        state.offline_snippet_error = None
-                        batch.efm_snippet_view = snippet_view
-                    except Exception as exc:  # pragma: no cover - IO guard
-                        state.offline_snippet_key = snippet_key
-                        state.offline_snippet = None
-                        state.offline_snippet_error = f"{type(exc).__name__}: {exc}"
-
     if snippet_view is None:
-        if state.offline_snippet_error:
-            st.warning(state.offline_snippet_error)
         st.info(
-            "Geometry plots require raw EFM snippets; enable 'Attach EFM snippet' or use online data.",
+            "Geometry plots require EFM or VIN snippets from the configured diagnostics source.",
         )
         return
     if isinstance(snippet_view, VinSnippetView) or not hasattr(snippet_view, "camera_rgb"):
         st.info(
-            "VIN snippet cache provides minimal geometry. Showing semidense-only views "
+            "VIN offline snippets provide minimal geometry. Showing semidense-only views "
             "and candidate visibility instead of the full scene overview.",
         )
         points_world = snippet_view.points_world
         if not torch.is_tensor(points_world) or points_world.numel() == 0:
-            st.info("VIN snippet cache points are empty.")
+            st.info("VIN offline snippet points are empty.")
         else:
             batch_idx = 0
             if points_world.ndim == 3:

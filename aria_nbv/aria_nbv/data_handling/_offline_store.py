@@ -30,7 +30,7 @@ from ._offline_format import (
     VinOfflineShardSpec,
 )
 
-OFFLINE_DATASET_VERSION = 4
+OFFLINE_DATASET_VERSION = 5
 """Version of the immutable VIN offline dataset format."""
 
 
@@ -250,7 +250,7 @@ class VinOfflineStoreReader:
             raise ValueError(
                 "Unsupported VIN offline dataset version "
                 f"{self.manifest.version}; expected {OFFLINE_DATASET_VERSION}. "
-                "Rebuild the store with the current migration tooling.",
+                "Rebuild the store with the current VIN offline writer.",
             )
         self.sample_index = VinOfflineIndexRecord.read_many(config.sample_index_path)
         self._records_by_sample_index = {record.sample_index: record for record in self.sample_index}
@@ -302,7 +302,7 @@ class VinOfflineStoreReader:
                 raise ValueError(
                     "Unsupported VIN offline block kind "
                     f"{block_spec.kind!r} for {block_name!r} in shard {shard_id!r}. "
-                    "Rebuild the store with the current migration tooling.",
+                    "Rebuild the store with the current VIN offline writer.",
                 )
         self._opened[shard_id] = opened
         return opened
