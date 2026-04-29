@@ -53,3 +53,12 @@ type = "maintenance"
 priority = "high"
 status = "open"
 labels = ["repo-hygiene", "handoff", "m0"]
+
+[[issue]]
+id = "issue-010"
+title = "Oracle pipeline simplification debt blocks M1 maintainability"
+description = "The candidate rendering, depth backprojection, offline-store diagnostic payload, and oracle RRI scoring path contain duplicate contracts, stale compatibility aliases, and memory-heavy hot-path choices that should be simplified before target-aware RRI work."
+type = "refactor"
+priority = "high"
+status = "open"
+labels = ["oracle", "rri", "rendering", "data", "performance", "simplification"]

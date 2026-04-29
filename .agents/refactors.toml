@@ -63,3 +63,131 @@ context = ["The bounded cleanup removed generated scaffold and TODO pages from p
 implementation_notes = ["Bounded first step: remove primary nav/sidebar exposure while keeping generated sources available for internal render workflows.", "Full relocation should be a separate docs triage task with archive decisions."]
 acceptance = ["Primary public docs navigation focuses on thesis, setup, theory, implementation, literature, and API reference.", "Agent scaffolding remains available to agents through .agents and generated mirrors when explicitly regenerated."]
 verification = ["cd docs && quarto render index.qmd contents/roadmap.qmd contents/questions.qmd", "rg -n \"Agent Scaffolding|contents/resources/agent_scaffold\" docs/_quarto.yml docs/index.qmd"]
+
+[[refactor]]
+id = "refactor-005"
+title = "Remove second oracle-render oversampling stage"
+description = "Delete the rendering-layer oversampling and dead post-render filtering path so candidate budgets have one owner."
+priority = "high"
+status = "todo"
+labels = ["oracle", "rendering", "simplification", "performance"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 40
+loc_expected = 120
+loc_max = 260
+context = ["CandidateViewGeneratorConfig already owns candidate oversampling before pruning.", "CandidateDepthRendererConfig.oversample_factor adds a second budget and _filter_valid_candidates is only exercised by direct logging tests.", "When rendering oversampling exceeds max_candidates_final, prepare_vin_offline_sample can receive more rendered candidates than the writer max_candidates budget."]
+implementation_notes = ["Remove CandidateDepthRendererConfig.oversample_factor and render at min(num_candidates, max_candidates_final).", "Delete CandidateDepthRenderer._filter_valid_candidates and tests/rendering/test_candidate_depth_renderer_filter_logging.py unless a real render call path starts using it.", "Update configs, app signature expectations, and docs/reference generation inputs if they mention the depth renderer oversample field."]
+acceptance = ["Candidate generation remains the only oversampling stage in the online oracle path.", "CandidateDepthRenderer.render never returns more rows than max_candidates_final.", "No tests rely on invoking a private unused post-render filter."]
+verification = ["cd aria_nbv && uv run pytest tests/rendering/test_candidate_renderer_integration.py tests/rendering/test_pytorch3d_renderer.py tests/data_handling/test_vin_offline_store.py", "rg -n \"depth\\.oversample_factor|CandidateDepthRendererConfig\\(.*oversample_factor|_filter_valid_candidates\" aria_nbv .configs docs"]
+
+[[refactor]]
+id = "refactor-006"
+title = "Collapse duplicate depth backprojection implementations"
+description = "Move to one public PyTorch3D depth-unprojection implementation and remove looped or commented-out duplicates."
+priority = "high"
+status = "todo"
+labels = ["oracle", "rendering", "frames", "simplification"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 120
+loc_expected = 320
+loc_max = 700
+context = ["rendering/candidate_pointclouds.py owns a vectorized private _backproject_depths_p3d_batch path used by the oracle pipeline.", "rendering/unproject.py owns a looped backproject_depth_with_p3d/backproject_batch path used by plotting and integration tests.", "tests currently import the private batch helper directly, which makes the frame contract harder to stabilize."]
+implementation_notes = ["Create one public batched unprojection function in rendering/unproject.py and have build_candidate_pointclouds call it.", "Keep the existing PyTorch3D NDC/pixel-center convention and tests that assert sign/frame behavior.", "Delete commented-out old backprojection functions and stop tests from importing private helpers."]
+acceptance = ["There is one canonical implementation for depth-to-world backprojection.", "Candidate point-cloud construction, plotting, and integration tests use the same unprojection code path.", "Frame-convention tests remain explicit and pass."]
+verification = ["cd aria_nbv && uv run pytest tests/rendering/test_depth_backprojection_conventions.py tests/rendering/test_rendering_plotting_helpers.py tests/rendering/test_candidate_renderer_integration.py", "rg -n \"# def backproject_depth|# def _backproject_depths_p3d_batch|_backproject_depths_p3d_batch\" aria_nbv/aria_nbv aria_nbv/tests"]
+
+[[refactor]]
+id = "refactor-007"
+title = "Default-off redundant VIN offline diagnostic payloads"
+description = "Stop writing duplicate rich diagnostic payloads by default when numeric blocks already reconstruct the required offline sample state."
+priority = "high"
+status = "todo"
+labels = ["data", "offline-store", "oracle", "performance", "simplification"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 100
+loc_expected = 300
+loc_max = 700
+context = ["VinOfflineWriter stores numeric depth/camera/oracle blocks and can also store oracle.depths_payload, oracle.candidate_pcs, and backbone.payload.", "VIN training disables most diagnostic loads through VinOfflineSourceConfig, so the duplicated payloads mainly increase build size and maintenance surface.", "Diagnostics should rebuild from numeric blocks unless a deliberate rich-payload mode is enabled."]
+implementation_notes = ["Make rich payload materialization explicit and default-off, or remove payloads that are fully reconstructible from numeric blocks.", "Keep training-critical Zarr numeric blocks stable and bump OFFLINE_DATASET_VERSION if on-disk format semantics change.", "Update tests to assert that diagnostics still work through numeric reconstruction."]
+acceptance = ["A default offline store does not duplicate candidate depths, candidate point clouds, or full backbone payloads unless requested.", "VIN diagnostics can still inspect candidates, depths, RRI, and basic backbone availability from canonical blocks.", "Store versioning and rebuild guidance are explicit if payload layout changes."]
+verification = ["cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py tests/data_handling/test_public_api_contract.py", "cd aria_nbv && uv run pytest tests/app/panels/test_vin_bin_values_tab.py tests/vin/test_vin_utils.py"]
+
+[[refactor]]
+id = "refactor-008"
+title = "Rewrite oracle RRI scoring to avoid duplicating current points"
+description = "Make OracleRRI score candidates with memory-lean distance composition instead of expanding P_t for every candidate."
+priority = "high"
+status = "todo"
+labels = ["rri", "oracle", "performance", "geometry"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 160
+loc_expected = 500
+loc_max = 1100
+context = ["OracleRRI.score expands points_t to every candidate and concatenates it with points_q before calling chamfer_point_mesh_batched.", "rri_metrics.metrics repeats the GT mesh per candidate, which is expensive for many candidates and target-aware rollouts.", "The thesis needs target-aware and multi-step RRI, so hot-path memory pressure will grow before September."]
+implementation_notes = ["Compute current point-to-mesh and mesh-to-current once.", "Compute candidate point-to-mesh separately, combine accuracy by weighted point counts, and compute completeness as the per-mesh-point minimum of current and candidate distances.", "Preserve RriResult semantics and add chunking only where it reduces peak memory without obscuring correctness."]
+acceptance = ["RRI values match the existing implementation on focused unit tests within tolerance.", "Peak memory does not scale by physically duplicating P_t for every candidate.", "The implementation has explicit shape/frame docstrings and keeps metric names unchanged."]
+verification = ["cd aria_nbv && uv run pytest tests/rri_metrics/test_oracle_rri_chunking.py tests/rri_metrics", "cd aria_nbv && uv run pytest tests/integration/test_oracle_rri_labeler_real_data.py"]
+
+[[refactor]]
+id = "refactor-009"
+title = "Make oracle mesh cropping strict and tensor-native"
+description = "Replace silent full-mesh fallback and CPU scalar conversion in oracle mesh cropping with an explicit crop contract."
+priority = "high"
+status = "todo"
+labels = ["rri", "oracle", "geometry", "contracts"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 80
+loc_expected = 220
+loc_max = 520
+context = ["_crop_mesh_to_aabb calls aabb.tolist(), which forces scalar CPU synchronization on GPU tensors.", "The current empty-crop fallback silently scores the full mesh, which would corrupt target-specific RRI when an entity crop misses.", "Entity-aware RRI needs a trusted crop rule before GT-OBB labels are used as thesis evidence."]
+implementation_notes = ["Keep the crop calculation tensor-native and document whether faces are kept by any-vertex, all-vertex, or triangle-AABB intersection.", "Return an explicit empty-crop result or raise a clear invalid-target error instead of falling back to full-scene scoring.", "Add tests covering empty crops, partial crops, and device preservation."]
+acceptance = ["Empty target crops are visible as invalid crop failures, not scene-level RRI.", "Cropping preserves device/dtype and does not call .tolist() on hot-path tensors.", "The chosen crop semantics are documented in code and RRI docs if metric meaning changes."]
+verification = ["cd aria_nbv && uv run pytest tests/rri_metrics/test_oracle_rri_chunking.py tests/rri_metrics", "rg -n \"tolist\\(|fallback to full mesh|_crop_mesh_to_aabb\" aria_nbv/aria_nbv/rri_metrics docs/contents/impl"]
+
+[[refactor]]
+id = "refactor-010"
+title = "Retire unsupported CPU depth renderer from oracle runtime"
+description = "Remove or quarantine Efm3dDepthRenderer so the public rendering API does not advertise a backend rejected by CandidateDepthRenderer."
+priority = "medium"
+status = "todo"
+labels = ["rendering", "oracle", "public-api", "simplification"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 80
+loc_expected = 260
+loc_max = 620
+context = ["rendering/efm3d_depth_renderer.py is a 365-line CPU ray-cast renderer exposed from aria_nbv.rendering.", "CandidateDepthRenderer.render currently rejects any renderer that is not Pytorch3DDepthRenderer.", "A public unsupported backend increases maintenance cost and confuses the oracle contract."]
+implementation_notes = ["Either delete Efm3dDepthRenderer from the package runtime or move it to tests/reference tooling with no public __all__ export.", "Remove generated docs and tests that imply it is an active oracle backend unless a real supported integration path is implemented.", "Do not add a compatibility wrapper; choose one supported rendering backend for the oracle path."]
+acceptance = ["The public rendering API exposes only supported oracle-runtime renderers.", "CandidateDepthRenderer no longer carries a misleading multi-backend config story.", "CPU/reference rendering remains available only if explicitly scoped outside the production oracle path."]
+verification = ["cd aria_nbv && uv run pytest tests/rendering", "rg -n \"Efm3dDepthRenderer|efm3d_depth_renderer\" aria_nbv/aria_nbv docs/reference docs/contents"]
+
+[[refactor]]
+id = "refactor-011"
+title = "Prune stale oracle and VIN DTO fields and aliases"
+description = "Remove old aliases, unused enum fields, and DTO attributes that widen the oracle/data public surface without active consumers."
+priority = "medium"
+status = "todo"
+labels = ["data", "rri", "public-api", "simplification"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 120
+loc_expected = 360
+loc_max = 900
+context = ["score_batch is an old alias for OracleRRI.score.", "DistanceAggregation and RriResult.fscore_tau are exported but not consumed by active code.", "CandidatePointClouds.semidense_length, VinOnlineDatasetConfig, empty_vin_snippet, and vin_snippet_cache_config_hash appear to be stale or compatibility-oriented surface area."]
+implementation_notes = ["Verify each symbol has no active consumer outside tests/generated docs before deleting.", "Update public API contract tests to prevent legacy names from reappearing.", "Regenerate or update API docs only if the deleted symbols were publicly documented."]
+acceptance = ["The oracle/data public API contains one active name per concept.", "Stale aliases and unused DTO fields are deleted rather than preserved through re-exports.", "Tests capture the intended reduced surface."]
+verification = ["cd aria_nbv && uv run pytest tests/data_handling/test_public_api_contract.py tests/rri_metrics tests/vin/test_vin_utils.py", "rg -n \"score_batch|DistanceAggregation|fscore_tau|semidense_length|VinOnlineDatasetConfig|empty_vin_snippet|vin_snippet_cache_config_hash\" aria_nbv/aria_nbv aria_nbv/tests docs/reference"]
+
+[[refactor]]
+id = "refactor-012"
+title = "Remove premature counterfactual offline-store hooks"
+description = "Delete future counterfactual flags and readers from the immutable offline store until rollout artifacts have a concrete M5 contract."
+priority = "medium"
+status = "todo"
+labels = ["data", "offline-store", "rollouts", "simplification"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 60
+loc_expected = 180
+loc_max = 420
+context = ["VinOfflineManifest and VinOfflineDataset contain counterfactual metadata, load flags, and readers, but VinOfflineWriter does not materialize a real counterfactual block.", "The roadmap puts multi-step rollouts in M5, after M1/M2 contracts are stable.", "Premature storage hooks create stale contract surface before the rollout artifact shape is known."]
+implementation_notes = ["Remove VinOfflineCounterfactuals, materialized_blocks.counterfactuals, include_counterfactuals, load_counterfactuals, and _build_counterfactuals unless a current test proves a real block exists.", "Bump OFFLINE_DATASET_VERSION if manifest schema changes.", "Reintroduce rollout storage later through a concrete trajectory/result DTO after M5 planning evidence."]
+acceptance = ["The offline-store schema does not advertise counterfactual data until it can actually be written and read.", "Training and diagnostics configs no longer carry no-op counterfactual toggles.", "Roadmap stretch work remains documented without widening the current data contract."]
+verification = ["cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py tests/data_handling/test_public_api_contract.py", "rg -n \"counterfactuals|include_counterfactuals|load_counterfactuals|VinOfflineCounterfactuals\" aria_nbv/aria_nbv aria_nbv/tests docs/contents"]
