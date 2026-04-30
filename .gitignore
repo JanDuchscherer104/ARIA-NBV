@@ -211,6 +211,7 @@ __marimo__/
 _site
 docs/_generated/context/*
 !docs/_generated/context/.gitignore
+!docs/_generated/context/glossary.jsonl
 docs/_site/
 docs/site_libs/
 docs/index_files/
@@ -232,6 +233,11 @@ docs/_freeze/**/*.html
 .codex/*.pdf
 .codex/*.patch
 .codex/*.skill
+!.codex/config.example.toml
+!.codex/hooks.example.json
+.codex/config.toml
+.codex/hooks.json
+.omx/
 .agents/tmp/*
 
 # Large download manifests

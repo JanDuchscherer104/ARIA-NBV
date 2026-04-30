@@ -24,21 +24,16 @@ GenNBV [@GenNBV-chen2024], Hestia [@Hestia-lu2026], and SceneScript
 
 ## Definitions {#rq-definitions}
 
-**Target of interest.** A selected entity, object crop, point, region, or
-surface-deficit hypothesis whose reconstruction quality should be improved.
-Aliases: target entity, object of interest, inspection target, task target.
+The core terms used by the research questions are maintained in the shared
+[glossary](glossary.qmd), which is generated from
+`docs/glossary/terms.yml` for Quarto, Typst, and KG ingestion:
 
-**Target-specific RRI.** Relative Reconstruction Improvement computed on the
-subset of the ground-truth mesh and reconstructed points associated with the
-target. Aliases: entity RRI, object RRI, target RRI.
+- [Target of interest](glossary.qmd#term-target-of-interest)
+- [Target-specific RRI](glossary.qmd#term-target-specific-rri)
+- [Acquisition cost](glossary.qmd#term-acquisition-cost)
+- [Target-conditioned scorer](glossary.qmd#term-target-conditioned-scorer)
 
-**Acquisition cost.** The budget consumed to acquire observations, measured by
-number of views, path length, time, invalid-action rate, or a weighted
-combination. Aliases: capture budget, view budget, motion cost.
-
-**Target-conditioned scorer.** A VIN-style candidate scorer that receives the
-current scene state, a candidate view, and an encoding of the target of
-interest. Related nodes: [VINv3](impl/vin_nbv.qmd),
+Related implementation nodes remain [VINv3](impl/vin_nbv.qmd),
 [EVL literature notes](literature/efm3d.qmd), and
 [candidate generation](../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd).
 

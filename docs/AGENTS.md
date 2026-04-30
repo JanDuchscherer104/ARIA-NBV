@@ -8,6 +8,9 @@ Apply this file when working under `docs/`.
 - Keep `docs/references.bib` as the single bibliography source of truth.
 - Preserve established Quarto and Typst structure unless the task explicitly changes it.
 - Prefer links to canonical state docs in `.agents/memory/state/` over re-explaining the same guidance in multiple places.
+- Keep internal agent guidance, generated context, and OMX runtime notes out of
+  public Quarto navigation. If a generated agent mirror is needed for an
+  operator render, keep it hidden and regenerate it from `.agents/`.
 
 ## Default Workflow
 - Start from `docs/typst/paper/main.typ`.
@@ -43,5 +46,7 @@ Apply this file when working under `docs/`.
 - Keep Quarto source files (`*.qmd`) separate from rendered site output. Published HTML belongs under `docs/_site/`, not next to the sources.
 - Treat `docs/_freeze/` as tracked execution state for code-backed pages when needed; treat `docs/_site/`, `site_libs/`, `index_files/`, and `*_files/` as generated publish artifacts.
 - Do not store generated context or rendered artifacts in tracked docs paths unless the task explicitly requires it.
-- Treat `docs/contents/resources/agent_scaffold/` as generated-from-source content. The local `.gitignore` keeps those mirrored pages out of Git; regenerate them before rendering when that subtree is missing or stale.
+- Treat `docs/contents/resources/agent_scaffold/` as generated internal mirror
+  content, not hand-authored public docs. Do not expose it as primary public
+  navigation.
 - For larger doc changes, run `quarto render` and `quarto check` before finishing.

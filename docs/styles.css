@@ -1,0 +1,184 @@
+/* Hand-authored site styles. Keep generated quartodoc CSS untouched. */
+
+.glossary-page {
+  --glossary-border: rgba(110, 118, 129, 0.28);
+  --glossary-muted: color-mix(in srgb, currentColor 68%, transparent);
+  --glossary-soft-bg: color-mix(in srgb, currentColor 5%, transparent);
+  --glossary-chip-bg: color-mix(in srgb, #2f6feb 10%, transparent);
+  --glossary-chip-border: color-mix(in srgb, #2f6feb 28%, transparent);
+}
+
+.glossary-intro {
+  max-width: 74ch;
+  margin: 0 0 1rem;
+  color: var(--glossary-muted);
+}
+
+.glossary-category-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 1rem 0 1.75rem;
+}
+
+.glossary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: 0.18rem 0.5rem;
+  border: 1px solid var(--glossary-chip-border);
+  border-radius: 999px;
+  background: var(--glossary-chip-bg);
+  font-size: 0.88rem;
+  line-height: 1.35;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.glossary-category-chip span {
+  color: var(--glossary-muted);
+  font-size: 0.78rem;
+}
+
+.glossary-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+  margin: 0.8rem 0 2rem;
+}
+
+.glossary-card {
+  border: 1px solid var(--glossary-border);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--glossary-soft-bg);
+  overflow-wrap: anywhere;
+}
+
+.glossary-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.45rem;
+}
+
+.glossary-term-title {
+  margin: 0;
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+
+.glossary-term-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.glossary-badge {
+  display: inline-flex;
+  padding: 0.1rem 0.42rem;
+  border-radius: 999px;
+  border: 1px solid var(--glossary-border);
+  color: var(--glossary-muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.glossary-badge-short {
+  color: inherit;
+  font-weight: 700;
+}
+
+.glossary-aliases {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.45rem 0;
+  color: var(--glossary-muted);
+  font-size: 0.9rem;
+}
+
+.glossary-aliases span,
+.glossary-metadata-row > span {
+  font-weight: 700;
+}
+
+.glossary-aliases code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.glossary-definition {
+  margin: 0.7rem 0 0;
+  font-weight: 560;
+}
+
+.glossary-detail-text {
+  margin: 0.55rem 0 0;
+}
+
+.glossary-formula {
+  margin-top: 0.7rem;
+  overflow-x: auto;
+}
+
+.glossary-details {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--glossary-border);
+  padding-top: 0.6rem;
+}
+
+.glossary-details summary {
+  cursor: pointer;
+  color: var(--glossary-muted);
+  font-weight: 700;
+}
+
+.glossary-metadata {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+
+.glossary-metadata-row {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.glossary-metadata-row > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.glossary-citation-seed {
+  display: none;
+}
+
+@media (min-width: 1180px) {
+  .glossary-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 575px) {
+  .glossary-card {
+    padding: 0.85rem;
+  }
+
+  .glossary-card-header {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .glossary-term-badges {
+    justify-content: flex-start;
+  }
+}

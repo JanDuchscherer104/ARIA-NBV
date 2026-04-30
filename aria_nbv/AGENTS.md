@@ -42,8 +42,13 @@ Apply this file when working under `aria_nbv/`.
   - `aria_nbv/aria_nbv/rri_metrics/AGENTS.md` for oracle labels, binning, ordinal loss, and reported metric semantics
   - `aria_nbv/aria_nbv/vin/AGENTS.md` for scorer, candidate-context, training batch, and VIN model contracts
 - If a task spans multiple modules, start with the owner of the main contract, then open adjacent guides only for crossed boundaries.
-- New raw-snippet or cache pipeline work should target `aria_nbv.data_handling`; treat `aria_nbv.data` as the compatibility surface and only extend it when the task explicitly requires backward compatibility.
-- Keep canonical package roots clean. Put backward compatibility only in dedicated wrapper modules such as `_legacy_*` or `_compat_*`, not mixed into canonical owners.
+- New raw-snippet, dataset, or offline-store work should target
+  `aria_nbv.data_handling` and the immutable `VinOfflineDataset` path.
+- Do not restore legacy cache migration helpers or runtime training APIs. If old
+  cache data is missing, rebuild available immutable stores with
+  `VinOfflineWriter` rather than reviving removed cache datasets/providers.
+- Keep canonical package roots clean. Add compatibility wrappers only when a
+  task explicitly requires them and the public contract is still active.
 
 ## Config-As-Factory
 - Config classes should inherit `BaseConfig` and remain the main construction surface for runtime objects.
@@ -67,7 +72,7 @@ Apply this file when working under `aria_nbv/`.
 - Use `Literal` for constrained string values.
 - Public methods, functions, classes and modules must have Google-style docstrings. Each module doc-string must give a high-level overview of the module's purpose and contents.
 - When shapes, coordinate frames, or transform directionality are non-obvious, document them explicitly in code and docstrings by providing all relevsant equations, references.
-- See [python_conventions.md](../.agents/references/python_conventions.md) for full examples and anti-patterns.
+- See `.agents/references/python_conventions.md` for full examples and anti-patterns.
 
 
 ## Verification

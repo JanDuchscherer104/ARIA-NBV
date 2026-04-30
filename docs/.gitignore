@@ -7,9 +7,10 @@
 /**/*.html
 /**/*_files/
 /**/.jupyter_cache/
-/_generated/
+/_generated/*
 !/_generated/context/
 !/_generated/context/.gitignore
+!/_generated/context/glossary.jsonl
 /_freeze/site_libs/
 /_freeze/**/*.html
 **/*.quarto_ipynb

@@ -86,7 +86,7 @@ uv run nbv-downloader -m download -c efm
 
 # Model Weights
 
-- download the [Dinov2 ViTB14 checkpoint](https://huggingface.co/zgcr654321/pretrained_models/blob/cc2e7aace55d6f06716dcf444c29d97bac0a99da/dinov2_pretrain_official_pytorch_weights/dinov2_vitb14_reg4_pretrain.pth) and place it in `.logs/ckpts/`
+- download the [DINOv2 ViT-B/14 checkpoint](https://dl.fbaipublicfiles.com/dinov2/dinov2_vitb14/dinov2_vitb14_reg4_pretrain.pth) and place it in `.logs/ckpts/`
 - PointNeXt-S checkpoint:
   - [Google Drive Link](https://drive.google.com/drive/folders/1UG8hh_CrUf-OhrYbcDd0zvDtoInrGP1u) - download, and move `s3dis-train-pointnext-s-ngpus1-seed1742-20220525-162639-Gz4ViiL95b6KP9MMH2ytG3_ckpt_best.pth` to `.logs/ckpts/`
   - [Model Zoo](https://guochengqian.github.io/PointNeXt/modelzoo/)

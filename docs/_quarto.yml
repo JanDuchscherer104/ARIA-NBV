@@ -27,6 +27,7 @@ format:
       dark: darkly           # built-in dark variant; auto toggles
     css:
       - reference/_styles-quartodoc.css
+      - styles.css
     toc: true
     number-sections: true
     code-copy: true          # copy-to-clipboard buttons for code blocks

@@ -44,6 +44,7 @@ claims.
 
 ## Milestone Timeline {#roadmap-milestones}
 
+<!-- TODO: This roadmap does not account for writing the thesis! -->
 | Dates | Milestone | Exit criteria |
 |---|---|---|
 | 2026-04-29 to 2026-05-10 | **M0 - Scope, repo, docs foundation** | Dirty worktree classified; available VIN offline store smoke-checked; KG-friendly doc and docstring rules documented. |
