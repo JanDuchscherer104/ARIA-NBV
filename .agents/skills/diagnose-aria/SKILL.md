@@ -27,7 +27,7 @@ Build the smallest deterministic loop that reproduces the user-visible symptom:
   `tests/data_handling/test_vin_offline_store.py`
 - Streamlit panel: import/dispatcher test before manual UI inspection
 - docs: `cd docs && quarto render <page>` or
-  `typst compile typst/slides/<file>.typ --root .`
+  `typst compile typst/seminar_slides/<file>.typ --root .`
 - KG: the narrowest `make kg-*` command that owns the failing artifact
 - performance: a timing harness or profiler before changing code
 

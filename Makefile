@@ -21,9 +21,9 @@ TEST_DIR := tests
 DOCS_DIR := docs
 TYPST ?= typst
 TYPST_ROOT ?= docs
-TYPST_PAPER ?= $(DOCS_DIR)/typst/paper/main.typ
-TYPST_PAPER_PDF ?= $(DOCS_DIR)/typst/paper/main.pdf
-TYPST_SLIDES_DIR ?= $(DOCS_DIR)/typst/slides
+TYPST_PAPER ?= $(DOCS_DIR)/typst/seminar_paper/main.typ
+TYPST_PAPER_PDF ?= $(DOCS_DIR)/typst/seminar_paper/main.pdf
+TYPST_SLIDES_DIR ?= $(DOCS_DIR)/typst/seminar_slides
 SLIDES ?= slides_4.typ
 SLIDES_FILE := $(if $(filter %.typ,$(SLIDES)),$(SLIDES),$(SLIDES).typ)
 SLIDES_SRC := $(if $(findstring /,$(SLIDES_FILE)),$(SLIDES_FILE),$(TYPST_SLIDES_DIR)/$(SLIDES_FILE))
@@ -409,10 +409,10 @@ quarto-preview: ## Preview the Quarto website locally
 #  ═══════════════════════════════════════════════════════════════════════
 
 .PHONY: typst-paper typst-slide
-typst-paper: ## Compile the Typst paper (docs/typst/paper/main.typ)
+typst-paper: ## Compile the Typst paper (docs/typst/seminar_paper/main.typ)
 	@$(TYPST) compile --root $(TYPST_ROOT) $(TYPST_PAPER) $(TYPST_PAPER_PDF)
 
-typst-slide: ## Compile a Typst slide deck (make typst-slide SLIDES=slides_4.typ)
+typst-slide: ## Compile a Typst slide deck (make typst-slide SLIDES=slides_4.typ or SLIDES=docs/typst/thesis_slides/slides_thesis_outlook.typ)
 	@$(TYPST) compile --root $(TYPST_ROOT) $(SLIDES_SRC) $(SLIDES_PDF)
 
 #  ═══════════════════════════════════════════════════════════════════════

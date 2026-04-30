@@ -6,6 +6,7 @@ local function extension_dir()
 end
 
 local terms = dofile(extension_dir() .. "/glossary_terms.generated.lua")
+local notation = dofile(extension_dir() .. "/notation.generated.lua")
 
 local function stringify_arg(args, index)
   local value = args[index]
@@ -113,11 +114,38 @@ local function render_term(args, full)
   return pandoc.Str(text)
 end
 
+local function render_notation(args, group, display)
+  local notation_id = stringify_arg(args, 1)
+  if notation_id == nil then
+    warn(group .. " shortcode missing notation id")
+    return pandoc.Str("??" .. group .. ":missing??")
+  end
+
+  local group_entries = notation[group] or {}
+  local entry = group_entries[notation_id]
+  if entry == nil then
+    warn("unknown " .. group .. " notation id: " .. notation_id)
+    return pandoc.Str("??" .. group .. ":" .. notation_id .. "??")
+  end
+
+  local math_type = "InlineMath"
+  if display then
+    math_type = "DisplayMath"
+  end
+  return pandoc.Math(math_type, entry.tex)
+end
+
 return {
   gls = function(args)
     return render_term(args, false)
   end,
   glsfull = function(args)
     return render_term(args, true)
+  end,
+  sym = function(args)
+    return render_notation(args, "symbols", false)
+  end,
+  eq = function(args)
+    return render_notation(args, "equations", true)
   end,
 }

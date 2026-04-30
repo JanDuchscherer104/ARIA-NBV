@@ -26,7 +26,7 @@ ground-truth meshes [@ProjectAria-ASE-2025], frozen EVL/EFM3D features
 continuous-RL claim. See the [research questions](questions.qmd), the
 [RRI theory page](../theory/rri_theory.qmd), the
 [VIN implementation note](../impl/vin_nbv.qmd), and the
-[Typst paper source](../../typst/paper/main.typ) for the main connected nodes.
+[Typst paper source](../../typst/seminar_paper/main.typ) for the main connected nodes.
 
 ## Thesis Outcome {#roadmap-thesis-outcome}
 

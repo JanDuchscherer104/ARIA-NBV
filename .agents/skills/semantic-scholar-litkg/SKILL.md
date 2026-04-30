@@ -9,7 +9,7 @@ description: Use when designing, implementing, reviewing, or operating Semantic 
 
 Start in ARIA-NBV, then hand implementation to the litkg-rs submodule.
 
-1. Read `docs/typst/paper/main.typ`, this repo's `AGENTS.md`, and `.agents/memory/state/PROJECT_STATE.md`.
+1. Read `docs/typst/seminar_paper/main.typ`, this repo's `AGENTS.md`, and `.agents/memory/state/PROJECT_STATE.md`.
 2. Read `.agents/external/litkg-rs/AGENTS.md`, `README.md`, `docs/architecture.md`, and `docs/kg-stack.md`.
 3. For toolkit edits inside litkg-rs, use `.agents/external/litkg-rs/.agents/skills/litkg-rs/SKILL.md`.
 4. Read `references/integration-spec.md` when the task touches source coverage, TOML shape, backend selection, or Semantic Scholar behavior.

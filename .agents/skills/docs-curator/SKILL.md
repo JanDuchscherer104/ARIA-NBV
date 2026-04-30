@@ -20,7 +20,7 @@ Do not use it for a localized typo fix unless source-of-truth alignment is at ri
 ## Read First
 
 1. `docs/AGENTS.md`
-2. `docs/typst/paper/main.typ`
+2. `docs/typst/seminar_paper/main.typ`
 3. `.agents/memory/state/PROJECT_STATE.md`
 4. `.agents/memory/state/GOTCHAS.md` when behavior or workflow claims are involved
 5. `.agents/references/agent_memory_templates.md` for debriefs
@@ -44,7 +44,7 @@ Do not use it for a localized typo fix unless source-of-truth alignment is at ri
 ## Verification
 
 - `cd docs && quarto render contents/thesis/roadmap.qmd contents/thesis/questions.qmd` for roadmap/question edits
-- `cd docs && typst compile typst/paper/main.typ --root .` for paper edits
-- `cd docs && typst compile typst/slides/<file>.typ --root .` for slide edits
+- `cd docs && typst compile typst/seminar_paper/main.typ --root .` for paper edits
+- `cd docs && typst compile typst/seminar_slides/<file>.typ --root .` for slide edits
 - `scripts/nbv_qmd_outline.sh --compact` for public navigation checks
 - `make check-agent-memory` for `.agents/` or canonical-memory edits

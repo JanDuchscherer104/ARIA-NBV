@@ -1,0 +1,51 @@
+{
+  "wandb": {
+    "checkpoint": ".logs/checkpoints/epoch=20-step=1869-train-loss=6.2684.ckpt",
+    "metrics": {
+      "epoch": 25,
+      "lr-AdamW": 0.00043427113457359805,
+      "train-aux/candidate_valid_frac_epoch": 0.7829800248146057,
+      "train-aux/semidense_candidate_vis_frac_mean_epoch": 0.061826419085264206,
+      "train-aux/spearman": 0.5727224349975586,
+      "train-aux/top3_accuracy_epoch": 0.36340802907943726,
+      "train-aux/voxel_valid_frac_mean_epoch": 0.7022163271903992,
+      "train-gradnorms/grad_norm_field_proj": 14.22441577911377,
+      "train-gradnorms/grad_norm_global_pooler": 16.02316665649414,
+      "train-gradnorms/grad_norm_head_coral": 3.3117494583129883,
+      "train-gradnorms/grad_norm_head_mlp": 6.317062854766846,
+      "train-gradnorms/grad_norm_pose_encoder_lff": 2.4935169219970703,
+      "train-gradnorms/grad_norm_traj_attn": 5.042608261108398,
+      "train-gradnorms/grad_norm_traj_encoder": 5.854684352874756,
+      "train/coral_loss_rel_random_epoch": 0.6302758455276489,
+      "train/coral_loss_rel_random_step": 0.6586679816246033,
+      "train/loss_epoch": 6.127434253692627,
+      "train/loss_step": 6.394665241241455,
+      "trainer/global_step": 2313,
+      "val-aux/candidate_valid_frac": 0.7856229543685913,
+      "val-aux/semidense_candidate_vis_frac_mean": 0.06534338742494583,
+      "val-aux/spearman": 0.5008993148803711,
+      "val-aux/top3_accuracy": 0.32874423265457153,
+      "val-aux/voxel_valid_frac_mean": 0.6963613629341125,
+      "val/coral_loss_rel_random": 0.665685772895813,
+      "val/loss": 6.4729790687561035
+    },
+    "run_dir": ".logs/wandb/wandb/run-20260126_205313-rtjvfyyp",
+    "run_id": "rtjvfyyp",
+    "vin_effective": {
+      "apply_cw90_correction": false,
+      "field_dim": 24,
+      "global_pool_grid_size": 5,
+      "head_dropout": 0.0071317082333434145,
+      "head_hidden_dim": 192,
+      "head_num_layers": 2,
+      "num_classes": 15,
+      "semidense_cnn_channels": 8,
+      "semidense_cnn_enabled": true,
+      "semidense_cnn_out_dim": 16,
+      "semidense_proj_grid_size": 12,
+      "semidense_proj_max_points": 16384,
+      "use_traj_encoder": true,
+      "use_voxel_valid_frac_gate": false
+    }
+  }
+}

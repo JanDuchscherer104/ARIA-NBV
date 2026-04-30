@@ -3,7 +3,7 @@
 Apply this file when working under `docs/`.
 
 ## Priorities
-- Treat `docs/typst/paper/main.typ` as the highest-level project ground truth.
+- Treat `docs/typst/seminar_paper/main.typ` as the highest-level project ground truth.
 - Keep Quarto docs aligned to the paper instead of introducing competing top-level narratives.
 - Keep `docs/references.bib` as the single bibliography source of truth.
 - Preserve established Quarto and Typst structure unless the task explicitly changes it.
@@ -13,7 +13,7 @@ Apply this file when working under `docs/`.
   operator render, keep it hidden and regenerate it from `.agents/`.
 
 ## Default Workflow
-- Start from `docs/typst/paper/main.typ`.
+- Start from `docs/typst/seminar_paper/main.typ`.
 - Use `scripts/nbv_qmd_outline.sh --compact` to localize the exact Quarto page before opening it.
 - Use `scripts/nbv_typst_includes.py --paper --mode outline` to localize the exact Typst section before opening it.
 - Open `docs/index.qmd`, `docs/contents/archive/todos.qmd`, `docs/contents/thesis/roadmap.qmd`, and `docs/contents/thesis/questions.qmd` only when the task is about project narrative, priorities, or roadmap.
@@ -26,8 +26,8 @@ Apply this file when working under `docs/`.
 - Quarto render: `cd docs && quarto render .`
 - Quarto preview: `cd docs && quarto preview`
 - Quarto check: `quarto check`
-- Typst paper: `cd docs && typst compile typst/paper/main.typ --root .`
-- Typst slides: `cd docs && typst compile typst/slides/<file>.typ --root .`
+- Typst paper: `cd docs && typst compile typst/seminar_paper/main.typ --root .`
+- Typst slides: `cd docs && typst compile typst/seminar_slides/<file>.typ --root .`
 - Typst fallback on sandboxed snap installs: `/snap/typst/current/bin/typst compile <file>.typ --root docs`
 - QMD tree: `make context-qmd-tree`
 - Outline-first routing: `scripts/nbv_qmd_outline.sh`, `scripts/nbv_typst_includes.py`

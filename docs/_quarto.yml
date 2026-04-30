@@ -140,13 +140,13 @@ website:
         - section: "Presentations"
           contents:
             - text: "Project Slides 1"
-              file: typst/slides/slides_1.pdf
+              file: typst/seminar_slides/slides_1.pdf
             - text: "Project Slides 2"
-              file: typst/slides/slides_2.pdf
+              file: typst/seminar_slides/slides_2.pdf
             - text: "Project Slides 4"
-              file: typst/slides/slides_4.pdf
+              file: typst/seminar_slides/slides_4.pdf
             - text: "MSc Slides 01 (outlook)"
-              file: typst/slides/slides_thesis_outlook.pdf
+              file: typst/thesis_slides/slides_thesis_outlook.pdf
 
   page-footer:
     left: ""

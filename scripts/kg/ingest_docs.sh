@@ -23,7 +23,7 @@ if [[ "$#" -eq 0 ]]; then
     "${PROJECT_ROOT}/docs/contents/impl/data_pipeline_overview.qmd" \
     "${PROJECT_ROOT}/docs/contents/literature/index.qmd" \
     "${PROJECT_ROOT}/docs/contents/theory/nbv_background.qmd" \
-    "${PROJECT_ROOT}/docs/typst/paper/main.typ"
+    "${PROJECT_ROOT}/docs/typst/seminar_paper/main.typ"
 fi
 
 GRAPHITI_GROUP_ID="${GRAPHITI_GROUP_ID:-aria-nbv-docs}" \

@@ -32,7 +32,7 @@ id = "aria-nbv"
 root = "/home/jd/repos/ARIA-NBV"
 
 [literature]
-bib_path = "docs/typst/paper/references.bib"
+bib_path = "docs/typst/seminar_paper/references.bib"
 tex_root = "docs/literature/tex-src"
 pdf_root = "docs/literature/pdf"
 

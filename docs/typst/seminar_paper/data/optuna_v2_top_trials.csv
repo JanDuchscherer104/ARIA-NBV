@@ -1,0 +1,13 @@
+trial,objective,regime,point,traj,frustum,obs,vis,mask,vfeat,vgate,pool
+41,0.724681,uncorrected,n/a,T,T,T,T,T,T,F,5
+20,0.724706,corrected,F,T,T,F,T,T,T,F,8
+23,0.724820,corrected,F,T,T,F,T,T,T,F,4
+8,0.724854,corrected,F,T,T,T,T,T,T,F,5
+9,0.725020,corrected,F,T,T,T,T,T,T,F,5
+11,0.725633,corrected,F,T,T,T,T,T,T,F,5
+15,0.726747,corrected,F,T,T,F,T,T,F,F,4
+19,0.726748,corrected,F,T,T,F,T,T,F,F,4
+16,0.726813,corrected,F,T,T,F,T,T,F,F,8
+14,0.727628,corrected,F,T,F,F,T,F,F,T,8
+13,0.727740,corrected,F,F,F,T,F,T,T,T,6
+6,0.727940,corrected,F,F,F,F,T,T,T,T,5

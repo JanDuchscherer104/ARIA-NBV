@@ -31,7 +31,7 @@ Before reviewing substantial changes, read:
 5. `.agents/AGENTS_INTERNAL_DB.md`
 
 For docs-heavy reviews, also read `docs/AGENTS.md` and start from
-`docs/typst/paper/main.typ`. For package-contract reviews, use
+`docs/typst/seminar_paper/main.typ`. For package-contract reviews, use
 `make context-contracts` before broad source browsing.
 
 ## Review Standard
@@ -75,7 +75,7 @@ Treat these as first-class review targets in this repo:
 - immutable VIN offline-store and split semantics
 - RRI metric meaning, binning semantics, and logged metric names
 - VIN candidate-ranking contracts and validation defaults
-- docs alignment with `docs/typst/paper/main.typ`
+- docs alignment with `docs/typst/seminar_paper/main.typ`
 - agent-memory/debrief hygiene under `.agents/memory/`
 
 ## Pull Request Review

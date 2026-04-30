@@ -1,0 +1,22 @@
+{
+  "wandb_dynamics": {
+    "run_id": "rtjvfyyp",
+    "max_epochs": 25,
+    "plateau_epoch": 20,
+    "lr_start": 0.0008,
+    "lr_end": 0.000434,
+    "loss_lr_spearman_rho": 0.43,
+    "train_coral_loss_rel_random_mean_early": 0.742,
+    "train_coral_loss_rel_random_mean_mid": 0.673,
+    "train_coral_loss_rel_random_mean_late": 0.636,
+    "val_coral_loss_rel_random_mean_early": 0.725,
+    "val_coral_loss_rel_random_mean_mid": 0.676,
+    "val_coral_loss_rel_random_mean_late": 0.665,
+    "train_loss_slope_late_per_step": -3.5e-05,
+    "val_loss_slope_late_per_step": -6.1e-06,
+    "step_loss_cv_late": 0.11,
+    "step_loss_min_late": 0.45,
+    "step_loss_max_late": 0.91
+  }
+}
+

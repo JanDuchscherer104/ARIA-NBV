@@ -6,6 +6,21 @@ return {
     short = "cost",
     anchor = "term-acquisition-cost",
   },
+  ["area-under-curve"] = {
+    label = "Area Under Curve",
+    short = "AUC",
+    anchor = "term-area-under-curve",
+  },
+  ["aria-digital-twin"] = {
+    label = "Aria Digital Twin",
+    short = "ADT",
+    anchor = "term-aria-digital-twin",
+  },
+  ["aria-everyday-objects"] = {
+    label = "Aria Everyday Objects",
+    short = "AEO",
+    anchor = "term-aria-everyday-objects",
+  },
   ["aria-synthetic-environments"] = {
     label = "Aria Synthetic Environments",
     short = "ASE",
@@ -21,6 +36,21 @@ return {
     short = "CPF",
     anchor = "term-central-pupil-frame",
   },
+  ["chamfer-distance"] = {
+    label = "Chamfer Distance",
+    short = "CD",
+    anchor = "term-chamfer-distance",
+  },
+  ["coverage-ratio"] = {
+    label = "Coverage Ratio",
+    short = "CR",
+    anchor = "term-coverage-ratio",
+  },
+  ["degrees-of-freedom"] = {
+    label = "Degrees of Freedom",
+    short = "DoF",
+    anchor = "term-degrees-of-freedom",
+  },
   ["egocentric-foundation-model-3d"] = {
     label = "Egocentric Foundation Model 3D",
     short = "EFM3D",
@@ -30,6 +60,11 @@ return {
     label = "Egocentric Voxel Lifting",
     short = "EVL",
     anchor = "term-egocentric-voxel-lifting",
+  },
+  ["five-degrees-of-freedom"] = {
+    label = "Five Degrees of Freedom",
+    short = "5DoF",
+    anchor = "term-five-degrees-of-freedom",
   },
   ["frustum"] = {
     label = "Frustum",
@@ -66,10 +101,20 @@ return {
     short = "MSDPD",
     anchor = "term-multi-semi-dense-point-data",
   },
+  ["multi-view-stereo"] = {
+    label = "Multi-view Stereo",
+    short = "MVS",
+    anchor = "term-multi-view-stereo",
+  },
   ["next-best-view"] = {
     label = "Next-Best-View",
     short = "NBV",
     anchor = "term-next-best-view",
+  },
+  ["occupancy-grid"] = {
+    label = "Occupancy Grid",
+    short = "Occupancy Grid",
+    anchor = "term-occupancy-grid",
   },
   ["oracle-rri"] = {
     label = "Oracle RRI",
@@ -100,6 +145,11 @@ return {
     label = "Simultaneous Localization and Mapping",
     short = "SLAM",
     anchor = "term-simultaneous-localization-and-mapping",
+  },
+  ["six-degrees-of-freedom"] = {
+    label = "Six Degrees of Freedom",
+    short = "6DoF",
+    anchor = "term-six-degrees-of-freedom",
   },
   ["snippet"] = {
     label = "Snippet",

@@ -21,7 +21,7 @@ Do not use it for an already-localized bug with a concrete failing command; use
 
 Before asking the user, answer discoverable questions from:
 
-1. `docs/typst/paper/main.typ`
+1. `docs/typst/seminar_paper/main.typ`
 2. `.agents/memory/state/PROJECT_STATE.md`
 3. `.agents/memory/state/DECISIONS.md`
 4. `.agents/memory/state/OPEN_QUESTIONS.md`

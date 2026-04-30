@@ -1,0 +1,128 @@
+# Canonical shared notation registry for Quarto shortcodes and generated Typst lookup helpers.
+# Typst paper/slides continue to use docs/typst/shared/macros.typ directly.
+symbols:
+  oracle.rri:
+    tex: '\mathrm{RRI}'
+    typst: '#symb.oracle.rri'
+  oracle.points:
+    tex: '\boldsymbol{\mathcal{P}}'
+    typst: '#symb.oracle.points'
+  oracle.points_q:
+    tex: '\boldsymbol{\mathcal{P}}_q'
+    typst: '#symb.oracle.points_q'
+  oracle.candidates:
+    tex: '\boldsymbol{\mathcal{Q}}'
+    typst: '#symb.oracle.candidates'
+  oracle.depth_q:
+    tex: '\boldsymbol{D}_q'
+    typst: '#symb.oracle.depth_q'
+  oracle.acc:
+    tex: '\mathcal{A}'
+    typst: '#symb.oracle.acc'
+  oracle.comp:
+    tex: '\mathcal{C}'
+    typst: '#symb.oracle.comp'
+  ase.mesh:
+    tex: '\boldsymbol{\mathcal{M}}_{\mathrm{GT}}'
+    typst: '#symb.ase.mesh'
+  ase.faces:
+    tex: '\boldsymbol{\mathcal{F}}_{\mathrm{GT}}'
+    typst: '#symb.ase.faces'
+  ase.traj:
+    tex: '\boldsymbol{T}_{\mathrm{rig}}^{\mathrm{w}}(t)'
+    typst: '#symb.ase.traj'
+  ase.traj_final:
+    tex: '\boldsymbol{T}_{\mathrm{rig}}^{\mathrm{w}}(T)'
+    typst: '#symb.ase.traj_final'
+  vin.rri:
+    tex: 'r'
+    typst: '#symb.vin.rri'
+  vin.rri_hat:
+    tex: '\hat{r}'
+    typst: '#symb.vin.rri_hat'
+  vin.loss:
+    tex: '\mathcal{L}'
+    typst: '#symb.vin.loss'
+  vin.cand_valid:
+    tex: 'm'
+    typst: '#symb.vin.cand_valid'
+  rl.s:
+    tex: 's'
+    typst: '#symb.rl.s'
+  rl.a:
+    tex: 'a'
+    typst: '#symb.rl.a'
+  rl.r:
+    tex: 'r'
+    typst: '#symb.rl.r'
+  rl.G:
+    tex: 'G'
+    typst: '#symb.rl.G'
+  shape.Nq:
+    tex: 'N_q'
+    typst: '#symb.shape.Nq'
+  shape.K:
+    tex: 'K'
+    typst: '#symb.shape.K'
+
+equations:
+  rri.cd:
+    tex: '\mathrm{CD}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\mathcal{A}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\mathcal{C}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})'
+    typst: '#eqs.rri.cd'
+  rri.acc:
+    tex: '\mathcal{A}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\frac{1}{\lVert\boldsymbol{\mathcal{P}}\rVert}\sum_{\boldsymbol{p}\in\boldsymbol{\mathcal{P}}}\min_{\boldsymbol{f}\in\boldsymbol{\mathcal{F}}_{\mathrm{GT}}} d(\boldsymbol{p},\boldsymbol{f})^2'
+    typst: '#eqs.rri.acc'
+  rri.comp:
+    tex: '\mathcal{C}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\frac{1}{\lVert\boldsymbol{\mathcal{F}}_{\mathrm{GT}}\rVert}\sum_{\boldsymbol{f}\in\boldsymbol{\mathcal{F}}_{\mathrm{GT}}}\min_{\boldsymbol{p}\in\boldsymbol{\mathcal{P}}} d(\boldsymbol{p},\boldsymbol{f})^2'
+    typst: '#eqs.rri.comp'
+  rri.union:
+    tex: '\boldsymbol{\mathcal{P}}_{t\cup q}=\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q'
+    typst: '#eqs.rri.union'
+  rri.rri:
+    tex: '\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}'
+    typst: '#eqs.rri.rri'
+  rri.greedy:
+    tex: 'q^*=\operatorname*{argmax}_{q\in\boldsymbol{\mathcal{Q}}}\mathrm{RRI}(q)'
+    typst: '#eqs.rri.greedy'
+  binning.edges:
+    tex: 'e_k=\operatorname{Quantile}(\{r_i\}_{i=1}^{N}, k/K),\quad k\in\{1,\ldots,K-1\}'
+    typst: '#eqs.binning.edges'
+  binning.label:
+    tex: 'y(r)=\sum_{k=1}^{K-1}\mathbb{1}[r>e_k],\quad y(r)\in\{0,\ldots,K-1\}'
+    typst: '#eqs.binning.label'
+  binning.levels:
+    tex: 't_k=\mathbb{1}[y>k],\quad k\in\{0,\ldots,K-2\}'
+    typst: '#eqs.binning.levels'
+  coral.loss:
+    tex: '\mathcal{L}_{\mathrm{coral}}(y,\boldsymbol{p})=-\sum_{k=0}^{K-2}\left(t_k\log p_k+(1-t_k)\log(1-p_k)\right)'
+    typst: '#eqs.coral.loss'
+  coral.rel_random:
+    tex: '\mathcal{L}_{\mathrm{rel}}=\mathcal{L}_{\mathrm{coral}}/((K-1)\log 2)'
+    typst: '#eqs.coral.rel_random'
+  vin.loss_total:
+    tex: '\mathcal{L}=\mathcal{L}_{\mathrm{coral}}+\lambda\mathcal{L}_{\mathrm{reg}}'
+    typst: '#eqs.vin.loss_total'
+  vin.aux_reg_mse:
+    tex: '\mathcal{L}_{\mathrm{reg}}=\frac{1}{N}\sum_i(\hat{r}_i-r_i)^2'
+    typst: '#eqs.vin.aux_reg_mse'
+  metrics.spearman:
+    tex: '\rho=\operatorname{corr}(\operatorname{rank}(\hat{r}_i),\operatorname{rank}(r_i))'
+    typst: '#eqs.metrics.spearman'
+  metrics.topk_acc:
+    tex: '\mathrm{TopKAcc}(k)=\frac{1}{N}\sum_i\mathbb{1}[y_i\in\mathrm{TopK}(\boldsymbol{\pi}_i,k)]'
+    typst: '#eqs.metrics.topk_acc'
+  rl.mdp:
+    tex: '\mathcal{M}=(\mathcal{S},\mathcal{A},P,r,\gamma)'
+    typst: '#eqs.rl.mdp'
+  rl.reward_geom:
+    tex: 'r_t^{\mathrm{geom}}=\log(\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon)-\log(\mathrm{CD}(\boldsymbol{\mathcal{P}}_{t+1},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon)-\alpha\mathbb{1}[\mathrm{collision}(a_t)]-\beta c(a_t)'
+    typst: '#eqs.rl.reward_geom'
+  rl.q_backup:
+    tex: 'y_t^Q=r_t+\gamma V(s_{t+1})'
+    typst: '#eqs.rl.q_backup'
+  action.space:
+    tex: '\mathcal{A}=\mathbb{R}^3\times SO(2)'
+    typst: '#eqs.action.space'
+  entity.objective:
+    tex: '\mathrm{RRI}_{\mathrm{total}}(q)=\sum_{e\in\mathcal{E}}w_e\mathrm{RRI}_e+\lambda_{\mathrm{scene}}\mathrm{RRI}'
+    typst: '#eqs.entity.objective'

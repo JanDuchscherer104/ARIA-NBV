@@ -2,106 +2,243 @@
 
 #let glossary = (
   (id: "acquisition-cost", label: "Acquisition Cost", short: "cost", anchor: "term-acquisition-cost"),
-  (id: "aria-synthetic-environments", label: "Aria Synthetic Environments", short: "ASE", anchor: "term-aria-synthetic-environments"),
+  (id: "area-under-curve", label: "Area Under Curve", short: "AUC", anchor: "term-area-under-curve"),
+  (id: "aria-digital-twin", label: "Aria Digital Twin", short: "ADT", anchor: "term-aria-digital-twin"),
+  (id: "aria-everyday-objects", label: "Aria Everyday Objects", short: "AEO", anchor: "term-aria-everyday-objects"),
+  (
+    id: "aria-synthetic-environments",
+    label: "Aria Synthetic Environments",
+    short: "ASE",
+    anchor: "term-aria-synthetic-environments",
+  ),
   (id: "candidate-view", label: "Candidate View", short: "candidate", anchor: "term-candidate-view"),
   (id: "central-pupil-frame", label: "Central Pupil Frame", short: "CPF", anchor: "term-central-pupil-frame"),
-  (id: "egocentric-foundation-model-3d", label: "Egocentric Foundation Model 3D", short: "EFM3D", anchor: "term-egocentric-foundation-model-3d"),
-  (id: "egocentric-voxel-lifting", label: "Egocentric Voxel Lifting", short: "EVL", anchor: "term-egocentric-voxel-lifting"),
+  (id: "chamfer-distance", label: "Chamfer Distance", short: "CD", anchor: "term-chamfer-distance"),
+  (id: "coverage-ratio", label: "Coverage Ratio", short: "CR", anchor: "term-coverage-ratio"),
+  (id: "degrees-of-freedom", label: "Degrees of Freedom", short: "DoF", anchor: "term-degrees-of-freedom"),
+  (
+    id: "egocentric-foundation-model-3d",
+    label: "Egocentric Foundation Model 3D",
+    short: "EFM3D",
+    anchor: "term-egocentric-foundation-model-3d",
+  ),
+  (
+    id: "egocentric-voxel-lifting",
+    label: "Egocentric Voxel Lifting",
+    short: "EVL",
+    anchor: "term-egocentric-voxel-lifting",
+  ),
+  (
+    id: "five-degrees-of-freedom",
+    label: "Five Degrees of Freedom",
+    short: "5DoF",
+    anchor: "term-five-degrees-of-freedom",
+  ),
   (id: "frustum", label: "Frustum", short: "frustum", anchor: "term-frustum"),
   (id: "ground-truth", label: "Ground Truth", short: "GT", anchor: "term-ground-truth"),
   (id: "left-up-forward", label: "Left-Up-Forward", short: "LUF", anchor: "term-left-up-forward"),
-  (id: "machine-perception-services", label: "Machine Perception Services", short: "MPS", anchor: "term-machine-perception-services"),
+  (
+    id: "machine-perception-services",
+    label: "Machine Perception Services",
+    short: "MPS",
+    anchor: "term-machine-perception-services",
+  ),
   (id: "motion-trajectory-data", label: "Motion Trajectory Data", short: "MTD", anchor: "term-motion-trajectory-data"),
-  (id: "multi-frame-camera-data", label: "Multi-Frame Camera Data", short: "MFCD", anchor: "term-multi-frame-camera-data"),
-  (id: "multi-semi-dense-point-data", label: "Multi-Semi-Dense Point Data", short: "MSDPD", anchor: "term-multi-semi-dense-point-data"),
+  (
+    id: "multi-frame-camera-data",
+    label: "Multi-Frame Camera Data",
+    short: "MFCD",
+    anchor: "term-multi-frame-camera-data",
+  ),
+  (
+    id: "multi-semi-dense-point-data",
+    label: "Multi-Semi-Dense Point Data",
+    short: "MSDPD",
+    anchor: "term-multi-semi-dense-point-data",
+  ),
+  (id: "multi-view-stereo", label: "Multi-view Stereo", short: "MVS", anchor: "term-multi-view-stereo"),
   (id: "next-best-view", label: "Next-Best-View", short: "NBV", anchor: "term-next-best-view"),
+  (id: "occupancy-grid", label: "Occupancy Grid", short: "Occupancy Grid", anchor: "term-occupancy-grid"),
   (id: "oracle-rri", label: "Oracle RRI", short: "oracle RRI", anchor: "term-oracle-rri"),
   (id: "oriented-bounding-box", label: "Oriented Bounding Box", short: "OBB", anchor: "term-oriented-bounding-box"),
   (id: "point-cloud", label: "Point Cloud", short: "PC", anchor: "term-point-cloud"),
-  (id: "relative-reconstruction-improvement", label: "Relative Reconstruction Improvement", short: "RRI", anchor: "term-relative-reconstruction-improvement"),
+  (
+    id: "relative-reconstruction-improvement",
+    label: "Relative Reconstruction Improvement",
+    short: "RRI",
+    anchor: "term-relative-reconstruction-improvement",
+  ),
   (id: "scene-script-language", label: "SceneScript Language", short: "SSL", anchor: "term-scene-script-language"),
-  (id: "simultaneous-localization-and-mapping", label: "Simultaneous Localization and Mapping", short: "SLAM", anchor: "term-simultaneous-localization-and-mapping"),
+  (
+    id: "simultaneous-localization-and-mapping",
+    label: "Simultaneous Localization and Mapping",
+    short: "SLAM",
+    anchor: "term-simultaneous-localization-and-mapping",
+  ),
+  (id: "six-degrees-of-freedom", label: "Six Degrees of Freedom", short: "6DoF", anchor: "term-six-degrees-of-freedom"),
   (id: "snippet", label: "Snippet", short: "snippet", anchor: "term-snippet"),
-  (id: "target-conditioned-scorer", label: "Target-Conditioned Scorer", short: "target-conditioned scorer", anchor: "term-target-conditioned-scorer"),
+  (
+    id: "target-conditioned-scorer",
+    label: "Target-Conditioned Scorer",
+    short: "target-conditioned scorer",
+    anchor: "term-target-conditioned-scorer",
+  ),
   (id: "target-of-interest", label: "Target of Interest", short: "target", anchor: "term-target-of-interest"),
   (id: "target-specific-rri", label: "Target-Specific RRI", short: "target RRI", anchor: "term-target-specific-rri"),
   (id: "track", label: "Track", short: "track", anchor: "term-track"),
-  (id: "view-introspection-network", label: "View Introspection Network", short: "VIN", anchor: "term-view-introspection-network"),
-  (id: "virtual-reality-standard", label: "Virtual Reality Standard", short: "VRS", anchor: "term-virtual-reality-standard"),
-  (id: "visual-inertial-odometry", label: "Visual-Inertial Odometry", short: "VIO", anchor: "term-visual-inertial-odometry"),
+  (
+    id: "view-introspection-network",
+    label: "View Introspection Network",
+    short: "VIN",
+    anchor: "term-view-introspection-network",
+  ),
+  (
+    id: "virtual-reality-standard",
+    label: "Virtual Reality Standard",
+    short: "VRS",
+    anchor: "term-virtual-reality-standard",
+  ),
+  (
+    id: "visual-inertial-odometry",
+    label: "Visual-Inertial Odometry",
+    short: "VIO",
+    anchor: "term-visual-inertial-odometry",
+  ),
 )
 
+// Backwards-compatible Typst term constants generated from glossary records
+// carrying `typst_macro` metadata.
+#let ADT = "ADT"
+#let ADT_full = "Aria Digital Twin"
+#let AEO = "AEO"
+#let AEO_full = "Aria Everyday Objects"
+#let ASE = "ASE"
+#let ASE_full = "Aria Synthetic Environments"
+#let AUC = "AUC"
+#let AUC_full = "Area Under Curve"
+#let CD = "CD"
+#let CD_full = "Chamfer Distance"
+#let CR = "CR"
+#let CR_full = "Coverage Ratio"
+#let DoF = "DoF"
+#let DoF_full = "Degrees of Freedom"
+#let EFM3D = "EFM3D"
+#let EFM3D_full = "Egocentric Foundation Model 3D"
+#let EVL = "EVL"
+#let EVL_full = "Egocentric Voxel Lifting"
+#let FiveDoF = "5DoF"
+#let FiveDoF_full = "Five Degrees of Freedom"
+#let GT = "GT"
+#let GT_full = "Ground Truth"
+#let MVS = "MVS"
+#let MVS_full = "Multi-view Stereo"
+#let NBV = "NBV"
+#let NBV_full = "Next-Best-View"
+#let OccGrid = "Occupancy Grid"
+#let OccGrid_full = "Occupancy Grid"
+#let PC = "PC"
+#let PC_full = "Point Cloud"
+#let RRI = "RRI"
+#let RRI_full = "Relative Reconstruction Improvement"
+#let SixDoF = "6DoF"
+#let SixDoF_full = "Six Degrees of Freedom"
+#let SLAM = "SLAM"
+#let SLAM_full = "Simultaneous Localization and Mapping"
+#let SSL = "SSL"
+#let SSL_full = "SceneScript Language"
+
 #let gls(id) = {
-  if id == "acquisition-cost" { [cost] 
-  } else if id == "aria-synthetic-environments" { [ASE] 
-  } else if id == "candidate-view" { [candidate] 
-  } else if id == "central-pupil-frame" { [CPF] 
-  } else if id == "egocentric-foundation-model-3d" { [EFM3D] 
-  } else if id == "egocentric-voxel-lifting" { [EVL] 
-  } else if id == "frustum" { [frustum] 
-  } else if id == "ground-truth" { [GT] 
-  } else if id == "left-up-forward" { [LUF] 
-  } else if id == "machine-perception-services" { [MPS] 
-  } else if id == "motion-trajectory-data" { [MTD] 
-  } else if id == "multi-frame-camera-data" { [MFCD] 
-  } else if id == "multi-semi-dense-point-data" { [MSDPD] 
-  } else if id == "next-best-view" { [NBV] 
-  } else if id == "oracle-rri" { [oracle RRI] 
-  } else if id == "oriented-bounding-box" { [OBB] 
-  } else if id == "point-cloud" { [PC] 
-  } else if id == "relative-reconstruction-improvement" { [RRI] 
-  } else if id == "scene-script-language" { [SSL] 
-  } else if id == "simultaneous-localization-and-mapping" { [SLAM] 
-  } else if id == "snippet" { [snippet] 
-  } else if id == "target-conditioned-scorer" { [target-conditioned scorer] 
-  } else if id == "target-of-interest" { [target] 
-  } else if id == "target-specific-rri" { [target RRI] 
-  } else if id == "track" { [track] 
-  } else if id == "view-introspection-network" { [VIN] 
-  } else if id == "virtual-reality-standard" { [VRS] 
-  } else if id == "visual-inertial-odometry" { [VIO] 
-  } else { id }
+  if id == "acquisition-cost" { [cost] } else if id == "area-under-curve" { [AUC] } else if id == "aria-digital-twin" {
+    [ADT]
+  } else if id == "aria-everyday-objects" { [AEO] } else if id == "aria-synthetic-environments" { [ASE] } else if (
+    id == "candidate-view"
+  ) { [candidate] } else if id == "central-pupil-frame" { [CPF] } else if id == "chamfer-distance" { [CD] } else if (
+    id == "coverage-ratio"
+  ) { [CR] } else if id == "degrees-of-freedom" { [DoF] } else if id == "egocentric-foundation-model-3d" {
+    [EFM3D]
+  } else if id == "egocentric-voxel-lifting" { [EVL] } else if id == "five-degrees-of-freedom" { [5DoF] } else if (
+    id == "frustum"
+  ) { [frustum] } else if id == "ground-truth" { [GT] } else if id == "left-up-forward" { [LUF] } else if (
+    id == "machine-perception-services"
+  ) { [MPS] } else if id == "motion-trajectory-data" { [MTD] } else if id == "multi-frame-camera-data" {
+    [MFCD]
+  } else if id == "multi-semi-dense-point-data" { [MSDPD] } else if id == "multi-view-stereo" { [MVS] } else if (
+    id == "next-best-view"
+  ) { [NBV] } else if id == "occupancy-grid" { [Occupancy Grid] } else if id == "oracle-rri" { [oracle RRI] } else if (
+    id == "oriented-bounding-box"
+  ) { [OBB] } else if id == "point-cloud" { [PC] } else if id == "relative-reconstruction-improvement" {
+    [RRI]
+  } else if id == "scene-script-language" { [SSL] } else if id == "simultaneous-localization-and-mapping" {
+    [SLAM]
+  } else if id == "six-degrees-of-freedom" { [6DoF] } else if id == "snippet" { [snippet] } else if (
+    id == "target-conditioned-scorer"
+  ) { [target-conditioned scorer] } else if id == "target-of-interest" { [target] } else if (
+    id == "target-specific-rri"
+  ) { [target RRI] } else if id == "track" { [track] } else if id == "view-introspection-network" { [VIN] } else if (
+    id == "virtual-reality-standard"
+  ) { [VRS] } else if id == "visual-inertial-odometry" { [VIO] } else { id }
 }
 
 #let gls-full(id) = {
-  if id == "acquisition-cost" { [Acquisition Cost (cost)] 
-  } else if id == "aria-synthetic-environments" { [Aria Synthetic Environments (ASE)] 
-  } else if id == "candidate-view" { [Candidate View (candidate)] 
-  } else if id == "central-pupil-frame" { [Central Pupil Frame (CPF)] 
-  } else if id == "egocentric-foundation-model-3d" { [Egocentric Foundation Model 3D (EFM3D)] 
-  } else if id == "egocentric-voxel-lifting" { [Egocentric Voxel Lifting (EVL)] 
-  } else if id == "frustum" { [Frustum (frustum)] 
-  } else if id == "ground-truth" { [Ground Truth (GT)] 
-  } else if id == "left-up-forward" { [Left-Up-Forward (LUF)] 
-  } else if id == "machine-perception-services" { [Machine Perception Services (MPS)] 
-  } else if id == "motion-trajectory-data" { [Motion Trajectory Data (MTD)] 
-  } else if id == "multi-frame-camera-data" { [Multi-Frame Camera Data (MFCD)] 
-  } else if id == "multi-semi-dense-point-data" { [Multi-Semi-Dense Point Data (MSDPD)] 
-  } else if id == "next-best-view" { [Next-Best-View (NBV)] 
-  } else if id == "oracle-rri" { [Oracle RRI (oracle RRI)] 
-  } else if id == "oriented-bounding-box" { [Oriented Bounding Box (OBB)] 
-  } else if id == "point-cloud" { [Point Cloud (PC)] 
-  } else if id == "relative-reconstruction-improvement" { [Relative Reconstruction Improvement (RRI)] 
-  } else if id == "scene-script-language" { [SceneScript Language (SSL)] 
-  } else if id == "simultaneous-localization-and-mapping" { [Simultaneous Localization and Mapping (SLAM)] 
-  } else if id == "snippet" { [Snippet (snippet)] 
-  } else if id == "target-conditioned-scorer" { [Target-Conditioned Scorer (target-conditioned scorer)] 
-  } else if id == "target-of-interest" { [Target of Interest (target)] 
-  } else if id == "target-specific-rri" { [Target-Specific RRI (target RRI)] 
-  } else if id == "track" { [Track (track)] 
-  } else if id == "view-introspection-network" { [View Introspection Network (VIN)] 
-  } else if id == "virtual-reality-standard" { [Virtual Reality Standard (VRS)] 
-  } else if id == "visual-inertial-odometry" { [Visual-Inertial Odometry (VIO)] 
+  if id == "acquisition-cost" { [Acquisition Cost (cost)] } else if id == "area-under-curve" {
+    [Area Under Curve (AUC)]
+  } else if id == "aria-digital-twin" { [Aria Digital Twin (ADT)] } else if id == "aria-everyday-objects" {
+    [Aria Everyday Objects (AEO)]
+  } else if id == "aria-synthetic-environments" { [Aria Synthetic Environments (ASE)] } else if id == "candidate-view" {
+    [Candidate View (candidate)]
+  } else if id == "central-pupil-frame" { [Central Pupil Frame (CPF)] } else if id == "chamfer-distance" {
+    [Chamfer Distance (CD)]
+  } else if id == "coverage-ratio" { [Coverage Ratio (CR)] } else if id == "degrees-of-freedom" {
+    [Degrees of Freedom (DoF)]
+  } else if id == "egocentric-foundation-model-3d" { [Egocentric Foundation Model 3D (EFM3D)] } else if (
+    id == "egocentric-voxel-lifting"
+  ) { [Egocentric Voxel Lifting (EVL)] } else if id == "five-degrees-of-freedom" {
+    [Five Degrees of Freedom (5DoF)]
+  } else if id == "frustum" { [Frustum (frustum)] } else if id == "ground-truth" { [Ground Truth (GT)] } else if (
+    id == "left-up-forward"
+  ) { [Left-Up-Forward (LUF)] } else if id == "machine-perception-services" {
+    [Machine Perception Services (MPS)]
+  } else if id == "motion-trajectory-data" { [Motion Trajectory Data (MTD)] } else if id == "multi-frame-camera-data" {
+    [Multi-Frame Camera Data (MFCD)]
+  } else if id == "multi-semi-dense-point-data" { [Multi-Semi-Dense Point Data (MSDPD)] } else if (
+    id == "multi-view-stereo"
+  ) { [Multi-view Stereo (MVS)] } else if id == "next-best-view" { [Next-Best-View (NBV)] } else if (
+    id == "occupancy-grid"
+  ) { [Occupancy Grid] } else if id == "oracle-rri" { [Oracle RRI (oracle RRI)] } else if (
+    id == "oriented-bounding-box"
+  ) { [Oriented Bounding Box (OBB)] } else if id == "point-cloud" { [Point Cloud (PC)] } else if (
+    id == "relative-reconstruction-improvement"
+  ) { [Relative Reconstruction Improvement (RRI)] } else if id == "scene-script-language" {
+    [SceneScript Language (SSL)]
+  } else if id == "simultaneous-localization-and-mapping" { [Simultaneous Localization and Mapping (SLAM)] } else if (
+    id == "six-degrees-of-freedom"
+  ) { [Six Degrees of Freedom (6DoF)] } else if id == "snippet" { [Snippet (snippet)] } else if (
+    id == "target-conditioned-scorer"
+  ) { [Target-Conditioned Scorer (target-conditioned scorer)] } else if id == "target-of-interest" {
+    [Target of Interest (target)]
+  } else if id == "target-specific-rri" { [Target-Specific RRI (target RRI)] } else if id == "track" {
+    [Track (track)]
+  } else if id == "view-introspection-network" { [View Introspection Network (VIN)] } else if (
+    id == "virtual-reality-standard"
+  ) { [Virtual Reality Standard (VRS)] } else if id == "visual-inertial-odometry" {
+    [Visual-Inertial Odometry (VIO)]
   } else { id }
 }
 
 #let glossary-list() = [
   - *cost - Acquisition Cost*: Budget consumed to acquire observations, measured by view count, path length, elapsed time, invalid-action rate, or a weighted combination.
+  - *AUC - Area Under Curve*: Aggregate score computed by integrating a metric curve over an acquisition, threshold, or ranking axis.
+  - *ADT - Aria Digital Twin*: Project Aria dataset with real-world captures and digital-twin scene annotations.
+  - *AEO - Aria Everyday Objects*: Small-scale real-world Project Aria object dataset used by EFM3D for egocentric 3D perception evaluation.
   - *ASE - Aria Synthetic Environments*: Large-scale synthetic indoor dataset with simulated Project Aria sensor characteristics, egocentric trajectories, and scene annotations.
   - *candidate - Candidate View*: Proposed camera pose whose expected reconstruction utility is evaluated before selecting the next observation.
   - *CPF - Central Pupil Frame*: Coordinate frame placed at the midpoint between the left and right eye boxes of Project Aria glasses.
+  - *CD - Chamfer Distance*: Bidirectional point-set distance commonly used to compare reconstructed points against reference geometry.
+  - *CR - Coverage Ratio*: Fraction of a target surface, scene, or region treated as observed under a chosen visibility or distance threshold.
+  - *DoF - Degrees of Freedom*: Number of independent pose parameters available to a camera, object, or action representation.
   - *EFM3D - Egocentric Foundation Model 3D*: Egocentric 3D foundation-model stack used as the frozen spatial backbone for ARIA-NBV candidate scoring.
   - *EVL - Egocentric Voxel Lifting*: EFM3D architecture that lifts synchronized egocentric observations into a gravity-aligned 3D voxel feature volume.
+  - *5DoF - Five Degrees of Freedom*: Reduced camera-action parameterization commonly used when roll is fixed or otherwise constrained.
   - *frustum - Frustum*: Truncated pyramidal camera-visible volume bounded by near and far clipping planes plus lateral field-of-view planes.
   - *GT - Ground Truth*: Reference data or annotations treated as the trusted target for training, validation, or evaluation.
   - *LUF - Left-Up-Forward*: Camera coordinate convention whose x axis points left, y axis points up, and z axis points forward.
@@ -109,13 +246,16 @@
   - *MTD - Motion Trajectory Data*: Device poses over time, usually represented as a sequence of 6-DoF transformations.
   - *MFCD - Multi-Frame Camera Data*: Synchronized camera streams from multiple Project Aria cameras over a temporal window.
   - *MSDPD - Multi-Semi-Dense Point Data*: Semi-dense 3D point observations generated by SLAM-style processing across a snippet or trajectory window.
+  - *MVS - Multi-view Stereo*: Reconstruction family that estimates dense or semi-dense scene geometry from multiple calibrated views.
   - *NBV - Next-Best-View*: Problem of selecting the next sensor viewpoint to improve an active reconstruction or inspection objective under a limited acquisition budget.
+  - *Occupancy Grid*: Spatial grid whose cells encode whether space is occupied, free, unknown, or represented by a related occupancy probability.
   - *oracle RRI - Oracle RRI*: RRI label computed with privileged ground-truth geometry, used for supervised training and evaluation.
   - *OBB - Oriented Bounding Box*: 3D bounding box with arbitrary orientation, used to represent object extent more tightly than an axis-aligned box.
   - *PC - Point Cloud*: Set of 3D points representing observed scene geometry.
   - *RRI - Relative Reconstruction Improvement*: Metric quantifying the relative reconstruction-quality improvement obtained by adding a candidate observation to the current reconstruction.
   - *SSL - SceneScript Language*: Structured language representation for indoor scene layout using primitives such as walls, doors, windows, and objects.
   - *SLAM - Simultaneous Localization and Mapping*: Method for estimating sensor motion while building a map of the surrounding scene.
+  - *6DoF - Six Degrees of Freedom*: Pose parameterization with three translational and three rotational degrees of freedom.
   - *snippet - Snippet*: Short synchronized temporal window of Aria sensor data used as one EVL/VIN input sample.
   - *target - Target of Interest*: Selected entity, object crop, point, region, or surface-deficit hypothesis whose reconstruction quality should be improved.
   - *target-conditioned scorer - Target-Conditioned Scorer*: VIN-style candidate scorer that receives scene state, a candidate view, and an encoding of the target of interest.

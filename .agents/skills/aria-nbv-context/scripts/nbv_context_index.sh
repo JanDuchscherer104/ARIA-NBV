@@ -51,8 +51,8 @@ count_immediate_dirs() {
 }
 
 qmd_count="$(count_files '*.qmd' "${ROOT_DIR}/docs")"
-typst_paper_count="$(count_files '*.typ' "${ROOT_DIR}/docs/typst/paper")"
-typst_slides_count="$(count_files '*.typ' "${ROOT_DIR}/docs/typst/slides")"
+typst_paper_count="$(count_files '*.typ' "${ROOT_DIR}/docs/typst/seminar_paper")"
+typst_slides_count="$(( $(count_files '*.typ' "${ROOT_DIR}/docs/typst/seminar_slides") + $(count_files '*.typ' "${ROOT_DIR}/docs/typst/thesis_slides") ))"
 typst_shared_count="$(count_files '*.typ' "${ROOT_DIR}/docs/typst/shared")"
 lit_tex_count="$(count_files '*.tex' "${ROOT_DIR}/literature")"
 lit_bib_count="$(count_files '*.bib' "${ROOT_DIR}/literature")"
@@ -69,7 +69,7 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "- Repo: ${ROOT_DIR}"
   echo
   echo "## Retrieval ladder"
-  echo "1. Fixed ground truth: docs/typst/paper/main.typ"
+  echo "1. Fixed ground truth: docs/typst/seminar_paper/main.typ"
   echo "2. Canonical current truth: .agents/memory/state/{PROJECT_STATE,DECISIONS,OPEN_QUESTIONS,GOTCHAS}.md"
   echo "3. Compact routing index: docs/_generated/context/source_index.md"
   echo "4. On-demand references: .agents/references/{operator_quick_reference,python_conventions,agent_memory_templates,context7_library_ids}.md"
@@ -78,7 +78,7 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "7. Heavyweight fallback: make context-heavy"
   echo
   echo "## Hot-path bundle"
-  echo "- docs/typst/paper/main.typ"
+  echo "- docs/typst/seminar_paper/main.typ"
   echo "- .agents/memory/state/PROJECT_STATE.md"
   echo "- .agents/memory/state/DECISIONS.md"
   echo "- .agents/memory/state/OPEN_QUESTIONS.md"

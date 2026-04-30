@@ -1,8 +1,11 @@
 ---
 title: "Glossary"
+page-layout: full
 format:
   html:
     code-tools: false
+    page-layout: full
+    toc: false
 bibliography: ../references.bib
 number-sections: false
 execute:
@@ -14,7 +17,7 @@ execute:
 ::: {.glossary-page}
 
 ::: {.glossary-intro}
-**28 terms** across **8 categories**. The canonical source is
+**38 terms** across **9 categories**. The canonical source is
 `docs/glossary/terms.yml`; generated Quarto, Typst, KG, and shortcode artifacts
 share the same definitions.
 
@@ -23,19 +26,78 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 :::
 
 <nav class="glossary-category-index" aria-label="Glossary categories">
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-dataset">Dataset <span>9</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-category-dataset">Dataset <span>11</span></a>
 <a class="glossary-chip glossary-category-chip" href="#glossary-category-entity">Entity <span>1</span></a>
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-geometry">Geometry <span>3</span></a>
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-metrics">Metrics <span>3</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-category-geometry">Geometry <span>5</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-category-metrics">Metrics <span>6</span></a>
 <a class="glossary-chip glossary-category-chip" href="#glossary-category-model">Model <span>4</span></a>
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-planning">Planning <span>3</span></a>
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-reconstruction">Reconstruction <span>4</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-category-planning">Planning <span>4</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-category-reconstruction">Reconstruction <span>5</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-category-representation">Representation <span>1</span></a>
 <a class="glossary-chip glossary-category-chip" href="#glossary-category-supervision">Supervision <span>1</span></a>
 </nav>
 
 ## Dataset {#glossary-category-dataset}
 
 <div class="glossary-card-grid">
+
+<article class="glossary-card" id="term-aria-digital-twin">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Aria Digital Twin</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">ADT</span>
+<span class="glossary-badge">dataset.aria</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>ADT</code>
+</div>
+
+<p class="glossary-definition">Project Aria dataset with real-world captures and digital-twin scene annotations.</p>
+
+<p class="glossary-detail-text">ADT is adjacent to ARIA-NBV's sim-to-real context; the current experiments focus on ASE and EFM3D/ATEK exports, while ADT remains a relevant transfer surface.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-aria-synthetic-environments">ASE</a> <a class="glossary-chip" href="#term-aria-everyday-objects">AEO</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="ase_dataset.html" title="docs/contents/ase_dataset.qmd">Aria Synthetic Environments (ASE) Dataset</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card" id="term-aria-everyday-objects">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Aria Everyday Objects</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">AEO</span>
+<span class="glossary-badge">dataset.aria</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>AEO</code>
+</div>
+
+<p class="glossary-definition">Small-scale real-world Project Aria object dataset used by EFM3D for egocentric 3D perception evaluation.</p>
+
+<p class="glossary-detail-text">AEO is relevant as a possible sim-to-real check for ARIA-NBV ideas that are first developed on ASE mesh-supervised snippets.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-aria-synthetic-environments">ASE</a> <a class="glossary-chip" href="#term-aria-digital-twin">ADT</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="ase_dataset.html" title="docs/contents/ase_dataset.qmd">Aria Synthetic Environments (ASE) Dataset</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a></div></div>
+</div>
+</details>
+
+</article>
 
 <article class="glossary-card" id="term-virtual-reality-standard">
 <div class="glossary-card-header">
@@ -418,7 +480,63 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-frustum">frustum</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="../typst/paper/sections/05-coordinate-conventions.typ" title="docs/typst/paper/sections/05-coordinate-conventions.typ">05 Coordinate Conventions</a> <a class="glossary-chip" href="../typst/paper/sections/12f-appendix-pose-frames.typ" title="docs/typst/paper/sections/12f-appendix-pose-frames.typ">12F Appendix Pose Frames</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="../typst/seminar_paper/sections/05-coordinate-conventions.typ" title="docs/typst/seminar_paper/sections/05-coordinate-conventions.typ">05 Coordinate Conventions</a> <a class="glossary-chip" href="../typst/seminar_paper/sections/12f-appendix-pose-frames.typ" title="docs/typst/seminar_paper/sections/12f-appendix-pose-frames.typ">12F Appendix Pose Frames</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card" id="term-degrees-of-freedom">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Degrees of Freedom</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">DoF</span>
+<span class="glossary-badge">geometry.pose</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>DoF</code>
+</div>
+
+<p class="glossary-definition">Number of independent pose parameters available to a camera, object, or action representation.</p>
+
+<p class="glossary-detail-text">ARIA-NBV distinguishes full 6-DoF pose estimation from reduced 5-DoF candidate or action spaces used for practical view planning.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-candidate-view">candidate</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="../typst/seminar_paper/sections/05-coordinate-conventions.typ" title="docs/typst/seminar_paper/sections/05-coordinate-conventions.typ">05 Coordinate Conventions</a> <a class="glossary-chip" href="../typst/seminar_paper/sections/12f-appendix-pose-frames.typ" title="docs/typst/seminar_paper/sections/12f-appendix-pose-frames.typ">12F Appendix Pose Frames</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card" id="term-six-degrees-of-freedom">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Six Degrees of Freedom</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">6DoF</span>
+<span class="glossary-badge">geometry.pose</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>6-DoF</code> <code>6 degrees of freedom</code>
+</div>
+
+<p class="glossary-definition">Pose parameterization with three translational and three rotational degrees of freedom.</p>
+
+<p class="glossary-detail-text">Project Aria poses, candidate cameras, and world-to-device transforms are usually represented as 6-DoF rigid-body transforms.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-degrees-of-freedom">DoF</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="../typst/seminar_paper/sections/05-coordinate-conventions.typ" title="docs/typst/seminar_paper/sections/05-coordinate-conventions.typ">05 Coordinate Conventions</a> <a class="glossary-chip" href="../typst/seminar_paper/sections/12f-appendix-pose-frames.typ" title="docs/typst/seminar_paper/sections/12f-appendix-pose-frames.typ">12F Appendix Pose Frames</a></div></div>
 </div>
 </details>
 
@@ -429,6 +547,92 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 ## Metrics {#glossary-category-metrics}
 
 <div class="glossary-card-grid">
+
+<article class="glossary-card" id="term-coverage-ratio">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Coverage Ratio</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">CR</span>
+<span class="glossary-badge">metrics.coverage</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>coverage ratio</code>
+</div>
+
+<p class="glossary-definition">Fraction of a target surface, scene, or region treated as observed under a chosen visibility or distance threshold.</p>
+
+<p class="glossary-detail-text">Coverage ratio is a useful diagnostic baseline for NBV, but ARIA-NBV treats reconstruction-quality improvement through RRI as the preferred optimization target.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-candidate-view">candidate</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/nbv_background.html" title="docs/contents/theory/nbv_background.qmd">NBV Background</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card" id="term-area-under-curve">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Area Under Curve</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">AUC</span>
+<span class="glossary-badge">metrics.evaluation</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>AUC</code>
+</div>
+
+<p class="glossary-definition">Aggregate score computed by integrating a metric curve over an acquisition, threshold, or ranking axis.</p>
+
+<p class="glossary-detail-text">AUC can summarize how quickly reconstruction quality, coverage, or ranking quality improves as views are acquired or candidate thresholds change.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-acquisition-cost">cost</a> <a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/nbv_background.html" title="docs/contents/theory/nbv_background.qmd">NBV Background</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card" id="term-chamfer-distance">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Chamfer Distance</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">CD</span>
+<span class="glossary-badge">metrics.reconstruction_quality</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>Chamfer metric</code>
+</div>
+
+<p class="glossary-definition">Bidirectional point-set distance commonly used to compare reconstructed points against reference geometry.</p>
+
+<p class="glossary-detail-text">ARIA-NBV uses point-to-mesh and Chamfer-style distances as reconstruction error components when deriving oracle RRI labels and diagnostics.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-point-cloud">PC</a> <a class="glossary-chip" href="#term-ground-truth">GT</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="theory/rri_theory.html" title="docs/contents/theory/rri_theory.qmd">Relative Reconstruction Improvement (RRI) Theory</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
+</div>
+</details>
+
+</article>
 
 <article class="glossary-card" id="term-relative-reconstruction-improvement">
 <div class="glossary-card-header">
@@ -448,11 +652,11 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 <p class="glossary-detail-text">ARIA-NBV computes RRI by comparing reconstruction error before and after fusing candidate-view geometry, usually against an ASE ground-truth mesh for oracle supervision and evaluation.</p>
 
-<div class="glossary-formula">
-\[
+::: {.glossary-formula}
+$$
 \mathrm{RRI}(q)=\frac{d(P_t,M)-d(P_t\cup P_q,M)}{d(P_t,M)+\varepsilon}
-\]
-</div>
+$$
+:::
 
 <details class="glossary-details">
 <summary>Links and references</summary>
@@ -482,6 +686,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 <p class="glossary-definition">RRI computed only on the ground-truth and reconstructed geometry associated with a selected target of interest.</p>
 
 <p class="glossary-detail-text">Target-specific RRI lets the thesis compare views by how much they improve a selected object or region, even when scene-level RRI would prefer large background surfaces.</p>
+
+::: {.glossary-formula}
+$$
+\mathrm{RRI}_e(q)=\frac{d(P_t^e,M_e)-d(P_t^e\cup P_q^e,M_e)}{d(P_t^e,M_e)+\varepsilon}
+$$
+:::
 
 <details class="glossary-details">
 <summary>Links and references</summary>
@@ -680,6 +890,35 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
+<article class="glossary-card" id="term-five-degrees-of-freedom">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Five Degrees of Freedom</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">5DoF</span>
+<span class="glossary-badge">planning.action_space</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>5-DoF</code> <code>5 degrees of freedom</code>
+</div>
+
+<p class="glossary-definition">Reduced camera-action parameterization commonly used when roll is fixed or otherwise constrained.</p>
+
+<p class="glossary-detail-text">ARIA-NBV uses 5-DoF language for candidate and planning abstractions where position and viewing direction matter while roll is not an independently optimized control dimension.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-next-best-view">NBV</a> <a class="glossary-chip" href="#term-degrees-of-freedom">DoF</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/roadmap.html" title="docs/contents/thesis/roadmap.qmd">Master Thesis Roadmap</a> <a class="glossary-chip" href="../typst/seminar_paper/sections/10a-extensions.typ" title="docs/typst/seminar_paper/sections/10a-extensions.typ">10A Extensions</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-GenNBV-chen2024">&#64;GenNBV-chen2024</a></div></div>
+</div>
+</details>
+
+</article>
+
 <article class="glossary-card" id="term-acquisition-cost">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Acquisition Cost</div>
@@ -761,17 +1000,45 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 <p class="glossary-detail-text">Tracks can be triangulated or optimized into 3D points, making them a bridge between image evidence and the semi-dense point clouds used by ARIA-NBV.</p>
 
-<div class="glossary-formula">
-\[
+::: {.glossary-formula}
+$$
 \mathcal{T}=\{(u_k,v_k,\mathrm{cam}_k,t_k)\}_{k=0}^{N}
-\]
-</div>
+$$
+:::
 
 <details class="glossary-details">
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-point-cloud">PC</a> <a class="glossary-chip" href="#term-simultaneous-localization-and-mapping">SLAM</a> <a class="glossary-chip" href="#term-visual-inertial-odometry">VIO</a></div></div>
 <div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/semi-dense-pc.html" title="docs/contents/theory/semi-dense-pc.qmd">Semi-Dense Point Clouds</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card" id="term-multi-view-stereo">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Multi-view Stereo</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">MVS</span>
+<span class="glossary-badge">reconstruction.geometry</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>multi-view reconstruction</code>
+</div>
+
+<p class="glossary-definition">Reconstruction family that estimates dense or semi-dense scene geometry from multiple calibrated views.</p>
+
+<p class="glossary-detail-text">MVS is part of the broader reconstruction context for NBV, although ARIA-NBV's current oracle labels are built from ASE meshes and Aria-style semi-dense point observations.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-point-cloud">PC</a> <a class="glossary-chip" href="#term-next-best-view">NBV</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/nbv_background.html" title="docs/contents/theory/nbv_background.qmd">NBV Background</a></div></div>
 </div>
 </details>
 
@@ -858,6 +1125,40 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-point-cloud">PC</a> <a class="glossary-chip" href="#term-snippet">snippet</a> <a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a></div></div>
 <div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/semi-dense-pc.html" title="docs/contents/theory/semi-dense-pc.qmd">Semi-Dense Point Clouds</a> <a class="glossary-chip" href="ase_dataset.html" title="docs/contents/ase_dataset.qmd">Aria Synthetic Environments (ASE) Dataset</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-ProjectAria-ASE-2025">&#64;ProjectAria-ASE-2025</a></div></div>
+</div>
+</details>
+
+</article>
+
+</div>
+
+## Representation {#glossary-category-representation}
+
+<div class="glossary-card-grid">
+
+<article class="glossary-card" id="term-occupancy-grid">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Occupancy Grid</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge">representation.spatial</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>occupancy volume</code>
+</div>
+
+<p class="glossary-definition">Spatial grid whose cells encode whether space is occupied, free, unknown, or represented by a related occupancy probability.</p>
+
+<p class="glossary-detail-text">Occupancy-style voxel evidence appears in EVL outputs and VIN feature construction, where it helps summarize local 3D scene state for candidate scoring.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-egocentric-voxel-lifting">EVL</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a> <a class="glossary-chip" href="../typst/seminar_paper/sections/06-architecture.typ" title="docs/typst/seminar_paper/sections/06-architecture.typ">06 Architecture</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a></div></div>
 </div>
 </details>
 

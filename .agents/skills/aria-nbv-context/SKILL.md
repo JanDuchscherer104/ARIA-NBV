@@ -9,7 +9,7 @@ description: Gather targeted context for Aria-NBV from the paper, agent memory, 
 Use this skill as the repo's discovery-and-routing layer. It should localize the task to the smallest relevant set of files, then hand off to the narrower workflow or skill that will do the actual work.
 
 Progressive disclosure order:
-1. Fixed ground truth: `docs/typst/paper/main.typ`
+1. Fixed ground truth: `docs/typst/seminar_paper/main.typ`
 2. Canonical current truth: `.agents/memory/state/`
 3. Compact generated routing index: `docs/_generated/context/source_index.md`
 4. Agent references in `.agents/references/` when conventions, operator aids, or external dependency lookup are needed
@@ -33,7 +33,7 @@ Progressive disclosure order:
 - The task is already localized to Typst editing, scientific writing, or a single code module.
 
 ## Retrieval Ladder (default)
-1. Open `docs/typst/paper/main.typ` first; treat it as the highest-level project ground truth.
+1. Open `docs/typst/seminar_paper/main.typ` first; treat it as the highest-level project ground truth.
 2. Read the canonical state docs in `.agents/memory/state/`:
    - `PROJECT_STATE.md`
    - `DECISIONS.md`
@@ -110,11 +110,11 @@ Use the source index when the topic is still broad and you need to identify the 
 - Use full outline mode only when you need nested section structure.
 - After narrowing, open the exact `.qmd` page and use `rg` within that page.
 
-### Typst paper (`docs/typst/paper/**/*.typ`)
+### Typst paper (`docs/typst/seminar_paper/**/*.typ`)
 - Start with `scripts/nbv_typst_includes.py --paper --mode outline`.
 - Use `--mode includes` when you only need the include graph.
 - Use `--with-slides` only when the task explicitly touches slides.
-- Treat `docs/typst/paper/main.typ` as the source of truth over Quarto summaries.
+- Treat `docs/typst/seminar_paper/main.typ` as the source of truth over Quarto summaries.
 
 ### Literature (`literature/**`)
 - Start with `scripts/nbv_literature_index.sh` to identify the right paper family.

@@ -18,6 +18,9 @@ DEFAULT_QMD = ROOT / "docs/contents/glossary.qmd"
 DEFAULT_TYPST = ROOT / "docs/typst/shared/glossary.generated.typ"
 DEFAULT_JSONL = ROOT / "docs/_generated/context/glossary.jsonl"
 DEFAULT_SHORTCODE_LUA = ROOT / "docs/_extensions/aria-glossary/glossary_terms.generated.lua"
+DEFAULT_NOTATION = ROOT / "docs/notation.yml"
+DEFAULT_NOTATION_LUA = ROOT / "docs/_extensions/aria-glossary/notation.generated.lua"
+DEFAULT_NOTATION_TYPST = ROOT / "docs/typst/shared/notation.generated.typ"
 
 REQUIRED_FIELDS = {
     "id",
@@ -48,9 +51,35 @@ def _load_terms(path: Path) -> list[dict[str, Any]]:
     return terms
 
 
+def _load_notation(path: Path) -> dict[str, dict[str, dict[str, str]]]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise GlossaryError(f"{path} must contain a YAML mapping")
+    notation: dict[str, dict[str, dict[str, str]]] = {}
+    for group in ("symbols", "equations"):
+        raw_group = data.get(group) or {}
+        if not isinstance(raw_group, dict):
+            raise GlossaryError(f"{path}: {group} must be a mapping")
+        notation[group] = {}
+        for key, raw_entry in raw_group.items():
+            if not isinstance(key, str) or not key.strip():
+                raise GlossaryError(f"{path}: {group} contains an invalid key")
+            if not isinstance(raw_entry, dict):
+                raise GlossaryError(f"{path}: {group}.{key} must be a mapping")
+            tex = raw_entry.get("tex")
+            typst = raw_entry.get("typst")
+            if not isinstance(tex, str) or not tex.strip():
+                raise GlossaryError(f"{path}: {group}.{key}.tex must be a non-empty string")
+            if not isinstance(typst, str) or not typst.strip():
+                raise GlossaryError(f"{path}: {group}.{key}.typst must be a non-empty string")
+            notation[group][key] = {"tex": tex.strip(), "typst": typst.strip()}
+    return notation
+
+
 def _validate_terms(terms: list[dict[str, Any]]) -> None:
     ids: set[str] = set()
     anchors: set[str] = set()
+    typst_macros: set[str] = set()
     for term in terms:
         missing = sorted(REQUIRED_FIELDS - set(term))
         if missing:
@@ -68,6 +97,22 @@ def _validate_terms(terms: list[dict[str, Any]]) -> None:
         for field in ("aliases", "internal_links", "citations", "related", "kg_tags"):
             if field in term and not isinstance(term[field], list):
                 raise GlossaryError(f"{term_id}: {field} must be a list")
+        typst_macro = term.get("typst_macro")
+        if typst_macro is not None:
+            if not isinstance(typst_macro, str) or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", typst_macro):
+                raise GlossaryError(f"{term_id}: typst_macro must be a valid Typst identifier")
+            if typst_macro in typst_macros:
+                raise GlossaryError(f"duplicate typst_macro: {typst_macro}")
+            typst_macros.add(typst_macro)
+        formulae = term.get("formulae")
+        if formulae is not None and not isinstance(formulae, list):
+            raise GlossaryError(f"{term_id}: formulae must be a list")
+        for idx, formula in enumerate(formulae or [], start=1):
+            if not isinstance(formula, dict):
+                raise GlossaryError(f"{term_id}: formulae[{idx}] must be a mapping")
+            tex = formula.get("tex")
+            if not isinstance(tex, str) or not tex.strip():
+                raise GlossaryError(f"{term_id}: formulae[{idx}].tex must be a non-empty string")
 
 
 def _expect_string(term: dict[str, Any], field: str) -> str:
@@ -80,6 +125,17 @@ def _expect_string(term: dict[str, Any], field: str) -> str:
 def _as_list(term: dict[str, Any], field: str) -> list[str]:
     values = term.get(field) or []
     return [str(value) for value in values]
+
+
+def _term_formulae(term: dict[str, Any]) -> list[dict[str, Any]]:
+    formulae: list[dict[str, Any]] = []
+    formula = term.get("formula")
+    if isinstance(formula, dict) and formula.get("tex"):
+        formulae.append(formula)
+    for item in term.get("formulae") or []:
+        if isinstance(item, dict) and item.get("tex"):
+            formulae.append(item)
+    return formulae
 
 
 def _html_attr(value: str) -> str:
@@ -172,9 +228,12 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
     lines = [
         "---",
         'title: "Glossary"',
+        "page-layout: full",
         "format:",
         "  html:",
         "    code-tools: false",
+        "    page-layout: full",
+        "    toc: false",
         "bibliography: ../references.bib",
         "number-sections: false",
         "execute:",
@@ -234,14 +293,18 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
             lines += [f'<p class="glossary-definition">{_html_text(term["definition_short"].strip())}</p>', ""]
             if term.get("definition_long"):
                 lines += [f'<p class="glossary-detail-text">{_html_text(str(term["definition_long"]).strip())}</p>', ""]
-            formula = term.get("formula") or {}
-            if isinstance(formula, dict) and formula.get("tex"):
+            for formula in _term_formulae(term):
+                label = str(formula.get("label") or "").strip()
                 lines += [
-                    '<div class="glossary-formula">',
-                    r"\[",
-                    _html_text(str(formula["tex"])),
-                    r"\]",
-                    "</div>",
+                    "::: {.glossary-formula}",
+                ]
+                if label:
+                    lines += [f"**{_html_text(label)}**", ""]
+                lines += [
+                    "$$",
+                    str(formula["tex"]).strip(),
+                    "$$",
+                    ":::",
                     "",
                 ]
             lines += _render_metadata_details(term, term_by_id)
@@ -317,6 +380,15 @@ def _typst_content(value: str) -> str:
     return "[" + value.replace("]", "\\]") + "]"
 
 
+def _typst_term_macros(terms: list[dict[str, Any]]) -> list[tuple[str, str, str]]:
+    macros = []
+    for term in terms:
+        typst_macro = term.get("typst_macro")
+        if isinstance(typst_macro, str) and typst_macro:
+            macros.append((typst_macro, str(term.get("short") or term["label"]), str(term["label"])))
+    return sorted(macros, key=lambda item: item[0].lower())
+
+
 def _render_typst(terms: list[dict[str, Any]], path: Path) -> None:
     lines = [
         "// Generated by scripts/glossary_build.py; edit docs/glossary/terms.yml.",
@@ -338,6 +410,16 @@ def _render_typst(terms: list[dict[str, Any]], path: Path) -> None:
         )
     lines += [
         ")",
+        "",
+        "// Backwards-compatible Typst term constants generated from glossary records",
+        "// carrying `typst_macro` metadata.",
+    ]
+    for macro, short, full in _typst_term_macros(terms):
+        lines += [
+            f"#let {macro} = {_typst_string(short)}",
+            f"#let {macro}_full = {_typst_string(full)}",
+        ]
+    lines += [
         "",
         "#let gls(id) = {",
     ]
@@ -389,8 +471,10 @@ def _render_jsonl(terms: list[dict[str, Any]], path: Path) -> None:
                 "citations": _as_list(term, "citations"),
                 "related": _as_list(term, "related"),
                 "kg_tags": _as_list(term, "kg_tags"),
+                "typst_macro": term.get("typst_macro"),
                 "notation": term.get("notation") or {},
                 "formula": term.get("formula") or {},
+                "formulae": term.get("formulae") or [],
             }
         )
     _write_text(path, "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows))
@@ -415,6 +499,47 @@ def _render_shortcode_lua(terms: list[dict[str, Any]], path: Path) -> None:
     _write_text(path, "\n".join(lines))
 
 
+def _render_notation_lua(notation: dict[str, dict[str, dict[str, str]]], path: Path) -> None:
+    lines = [
+        "-- Generated by scripts/glossary_build.py; edit docs/notation.yml.",
+        "",
+        "return {",
+    ]
+    for group in ("symbols", "equations"):
+        lines.append(f"  {group} = {{")
+        for key, entry in sorted(notation[group].items()):
+            lines += [
+                f"    [{_lua_string(key)}] = {{",
+                f"      tex = {_lua_string(entry['tex'])},",
+                f"      typst = {_lua_string(entry['typst'])},",
+                "    },",
+            ]
+        lines.append("  },")
+    lines += ["}", ""]
+    _write_text(path, "\n".join(lines))
+
+
+def _render_notation_typst(notation: dict[str, dict[str, dict[str, str]]], path: Path) -> None:
+    lines = [
+        "// Generated by scripts/glossary_build.py; edit docs/notation.yml.",
+        "",
+    ]
+    for group in ("symbols", "equations"):
+        lines.append(f"#let notation-{group} = (")
+        for key, entry in sorted(notation[group].items()):
+            lines.append(
+                "  "
+                + _typst_string(key)
+                + ": (tex: "
+                + _typst_string(entry["tex"])
+                + ", typst: "
+                + _typst_string(entry["typst"])
+                + "),"
+            )
+        lines += [")", ""]
+    _write_text(path, "\n".join(lines))
+
+
 def _write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -423,9 +548,18 @@ def _write_text(path: Path, text: str) -> None:
 def build(args: argparse.Namespace) -> None:
     terms = _load_terms(args.terms)
     _validate_terms(terms)
+    notation = _load_notation(args.notation)
     actions = set(args.actions)
     if "all" in actions:
-        actions = {"validate", "render-quarto", "render-typst", "render-jsonl", "render-shortcode-lua"}
+        actions = {
+            "validate",
+            "render-quarto",
+            "render-typst",
+            "render-jsonl",
+            "render-shortcode-lua",
+            "render-notation-lua",
+            "render-notation-typst",
+        }
     if "render-quarto" in actions:
         _render_qmd(terms, args.qmd_out)
     if "render-typst" in actions:
@@ -434,8 +568,16 @@ def build(args: argparse.Namespace) -> None:
         _render_jsonl(terms, args.jsonl_out)
     if "render-shortcode-lua" in actions:
         _render_shortcode_lua(terms, args.shortcode_lua_out)
+    if "render-notation-lua" in actions:
+        _render_notation_lua(notation, args.notation_lua_out)
+    if "render-notation-typst" in actions:
+        _render_notation_typst(notation, args.notation_typst_out)
     if "validate" in actions:
         print(f"Validated {len(terms)} glossary terms from {args.terms}")
+        print(
+            f"Validated {len(notation['symbols'])} symbols and "
+            f"{len(notation['equations'])} equations from {args.notation}"
+        )
 
 
 def main() -> None:
@@ -444,13 +586,25 @@ def main() -> None:
         "actions",
         nargs="*",
         default=["all"],
-        choices=["all", "validate", "render-quarto", "render-typst", "render-jsonl", "render-shortcode-lua"],
+        choices=[
+            "all",
+            "validate",
+            "render-quarto",
+            "render-typst",
+            "render-jsonl",
+            "render-shortcode-lua",
+            "render-notation-lua",
+            "render-notation-typst",
+        ],
     )
     parser.add_argument("--terms", type=Path, default=DEFAULT_TERMS)
+    parser.add_argument("--notation", type=Path, default=DEFAULT_NOTATION)
     parser.add_argument("--qmd-out", type=Path, default=DEFAULT_QMD)
     parser.add_argument("--typst-out", type=Path, default=DEFAULT_TYPST)
     parser.add_argument("--jsonl-out", type=Path, default=DEFAULT_JSONL)
     parser.add_argument("--shortcode-lua-out", type=Path, default=DEFAULT_SHORTCODE_LUA)
+    parser.add_argument("--notation-lua-out", type=Path, default=DEFAULT_NOTATION_LUA)
+    parser.add_argument("--notation-typst-out", type=Path, default=DEFAULT_NOTATION_TYPST)
     args = parser.parse_args()
     try:
         build(args)

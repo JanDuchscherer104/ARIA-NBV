@@ -18,10 +18,10 @@ tags: [codex, workflow, architecture]
 - `make context` is the lightweight scaffold refresh for `source_index.md`, `literature_index.md`, and `data_contracts.md`.
 - `make context-heavy` is explicit fallback for bundled heavy artifacts such as UML, bulk docstrings, and directory trees.
 - `docs/_generated/context/source_index.md` is a compact routing index; broad file inventories stay discoverable through commands, not the hot path.
-- The Codex hot path stays limited to `docs/typst/paper/main.typ` + `.agents/memory/state/` + `docs/_generated/context/source_index.md`.
+- The Codex hot path stays limited to `docs/typst/seminar_paper/main.typ` + `.agents/memory/state/` + `docs/_generated/context/source_index.md`.
 - Progressive disclosure routes from the root `AGENTS.md` into package, docs, and module-specific guides only after the touched surface is localized; agents should not load all nested guides up front.
 - `.agents/references/` holds operator aids and long-form conventions; those docs are on-demand references, not default bootstrap context.
-- `docs/typst/paper/main.typ` is the highest-level project truth when it disagrees with Quarto summaries.
+- `docs/typst/seminar_paper/main.typ` is the highest-level project truth when it disagrees with Quarto summaries.
 - Native debriefs under `.agents/memory/history/` must include `canonical_updates_needed`; existing `status: legacy-imported` notes are grandfathered archive evidence.
 - Ad hoc `.codex/*.md` notes are invalid; migrate them into `.agents/memory/history/` or archive them under `archive/codex-legacy/`.
 - Verification in shared repo guidance is selected by touched surface rather than by a single global checklist.

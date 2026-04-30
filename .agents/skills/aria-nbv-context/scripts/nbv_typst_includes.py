@@ -89,7 +89,7 @@ def main() -> int:
     repo_root = (script_dir / "../../../../").resolve()
     default_typst_root = (repo_root / "docs" / "typst").resolve()
     default_paper = default_typst_root / "paper" / "main.typ"
-    default_slides = default_typst_root / "slides"
+    default_slides = default_typst_root / "seminar_slides"
 
     parser = argparse.ArgumentParser(
         description="Outline Typst includes for the paper by default; opt into slides when needed."
@@ -100,7 +100,7 @@ def main() -> int:
         nargs="?",
         const=str(default_paper),
         default=str(default_paper),
-        help="Paper entrypoint path. Defaults to docs/typst/paper/main.typ.",
+        help="Paper entrypoint path. Defaults to docs/typst/seminar_paper/main.typ.",
     )
     parser.add_argument(
         "--with-slides",
