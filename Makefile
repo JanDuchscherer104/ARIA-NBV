@@ -23,6 +23,10 @@ TYPST ?= typst
 TYPST_ROOT ?= docs
 TYPST_PAPER ?= $(DOCS_DIR)/typst/seminar_paper/main.typ
 TYPST_PAPER_PDF ?= $(DOCS_DIR)/typst/seminar_paper/main.pdf
+TYPST_THESIS ?= $(DOCS_DIR)/typst/thesis/main.typ
+TYPST_THESIS_PDF ?= $(DOCS_DIR)/typst/thesis/main.pdf
+TYPST_PROPOSAL ?= $(DOCS_DIR)/typst/thesis/proposal.typ
+TYPST_PROPOSAL_PDF ?= $(DOCS_DIR)/typst/thesis/proposal.pdf
 TYPST_SLIDES_DIR ?= $(DOCS_DIR)/typst/seminar_slides
 SLIDES ?= slides_4.typ
 SLIDES_FILE := $(if $(filter %.typ,$(SLIDES)),$(SLIDES),$(SLIDES).typ)
@@ -411,12 +415,24 @@ quarto-preview: ## Preview the Quarto website locally
 #  🧾 Typst builds
 #  ═══════════════════════════════════════════════════════════════════════
 
-.PHONY: typst-paper typst-slide
+.PHONY: typst-paper typst-slide thesis-pdf thesis-watch proposal-pdf proposal-watch
 typst-paper: ## Compile the Typst paper (docs/typst/seminar_paper/main.typ)
 	@$(TYPST) compile --root $(TYPST_ROOT) $(TYPST_PAPER) $(TYPST_PAPER_PDF)
 
 typst-slide: ## Compile a Typst slide deck (make typst-slide SLIDES=slides_4.typ or SLIDES=docs/typst/thesis_slides/slides_thesis_outlook.typ)
 	@$(TYPST) compile --root $(TYPST_ROOT) $(SLIDES_SRC) $(SLIDES_PDF)
+
+thesis-pdf: ## Compile the Typst thesis (docs/typst/thesis/main.typ)
+	@$(TYPST) compile --root $(TYPST_ROOT) $(TYPST_THESIS) $(TYPST_THESIS_PDF)
+
+thesis-watch: ## Watch and recompile the Typst thesis
+	@$(TYPST) watch --root $(TYPST_ROOT) $(TYPST_THESIS) $(TYPST_THESIS_PDF)
+
+proposal-pdf: ## Compile the Typst thesis proposal (docs/typst/thesis/proposal.typ)
+	@$(TYPST) compile --root $(TYPST_ROOT) $(TYPST_PROPOSAL) $(TYPST_PROPOSAL_PDF)
+
+proposal-watch: ## Watch and recompile the Typst thesis proposal
+	@$(TYPST) watch --root $(TYPST_ROOT) $(TYPST_PROPOSAL) $(TYPST_PROPOSAL_PDF)
 
 #  ═══════════════════════════════════════════════════════════════════════
 #  ℹ️  Help
