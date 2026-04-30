@@ -239,7 +239,9 @@ docs/_freeze/**/*.html
 .codex/hooks.json
 .omx/
 .agents/generated/
+.agents/kg/generated/
 .agents/tmp/*
+.agents/work/
 
 # Large download manifests
 !.data/

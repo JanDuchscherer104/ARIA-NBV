@@ -38,12 +38,6 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
 - Do not use `git restore` or `git reset --hard` unless explicitly requested.
 - Assume the worktree can be dirty; never revert unrelated user or agent
   changes.
-<!-- TODO: the following commented out information do not belong here -->
-<!-- - Keep pose and camera interfaces as `PoseTW` and `CameraTW`.
-- Follow config-as-factory via `.setup_target()`.
-- Use the immutable VIN offline-store path (`VinOfflineDataset` /
-  `VinOfflineWriter`) for current training and diagnostics. Do not restore
-  legacy cache migration or runtime training APIs. -->
 - Keep public docs aligned with the Typst paper and current code.
 - Internal agent memory, generated context, and OMX runtime state are not public
   documentation surfaces.
