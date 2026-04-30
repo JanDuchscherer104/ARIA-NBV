@@ -194,6 +194,8 @@ def to_serializable(value: Any, *, exclude: set[str] | None = None) -> Any:
         tagged msgspec payloads.
     """
 
+    if isinstance(value, np.generic):
+        return value.item()
     if value is None or isinstance(value, (str, int, float, bool, bytes)):
         return value
     if isinstance(value, torch.Tensor):

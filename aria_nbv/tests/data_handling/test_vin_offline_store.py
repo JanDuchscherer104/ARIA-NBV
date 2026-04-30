@@ -7,7 +7,9 @@ import subprocess
 import sys
 from dataclasses import asdict
 from pathlib import Path
+from types import MethodType, SimpleNamespace
 
+import msgspec
 import numpy as np
 import pytest
 import torch
@@ -20,6 +22,7 @@ from aria_nbv.data_handling import (
     VinOfflineMaterializedBlocks,
     VinOfflineSourceConfig,
     VinOfflineStoreConfig,
+    VinOfflineWriter,
     VinOracleBatch,
     VinSnippetView,
     collect_vin_offline_dataset_stats,
@@ -32,7 +35,8 @@ from aria_nbv.data_handling._offline_writer import _assign_splits
 from aria_nbv.lightning.lit_datamodule import VinDataModuleConfig
 from aria_nbv.rendering.candidate_depth_renderer import CandidateDepths
 from aria_nbv.rri_metrics.types import RriResult
-from aria_nbv.utils import Stage
+from aria_nbv.utils import Console, Stage
+from aria_nbv.vin.types import EvlBackboneOutput
 
 PoseTW = pytest.importorskip("efm3d.aria.pose").PoseTW
 PerspectiveCameras = pytest.importorskip(
@@ -123,6 +127,202 @@ def _make_vin_snippet(*, offset: float = 0.0) -> VinSnippetView:
         lengths=lengths,
         t_world_rig=_make_pose_batch(2, offset=offset),
     )
+
+
+def _make_stub_backbone() -> EvlBackboneOutput:
+    """Build a small EVL backbone payload with both head and internal fields."""
+
+    t_world_voxel = _make_pose_batch(1, offset=0.0)
+    voxel_extent = torch.tensor([-1.0, 1.0, -1.0, 1.0, -1.0, 1.0], dtype=torch.float32)
+    scalar_grid = torch.ones((1, 1, 2, 2, 2), dtype=torch.float32)
+    return EvlBackboneOutput(
+        t_world_voxel=t_world_voxel,
+        voxel_extent=voxel_extent,
+        voxel_feat=torch.full((1, 4, 2, 2, 2), 2.0, dtype=torch.float32),
+        occ_feat=torch.full((1, 4, 2, 2, 2), 3.0, dtype=torch.float32),
+        obb_feat=torch.full((1, 4, 2, 2, 2), 4.0, dtype=torch.float32),
+        occ_pr=scalar_grid,
+        occ_input=scalar_grid * 2.0,
+        free_input=scalar_grid * 3.0,
+        counts=torch.ones((1, 2, 2, 2), dtype=torch.int64),
+        counts_m=torch.ones((1, 2, 2, 2), dtype=torch.int64) * 2,
+        voxel_select_t=torch.zeros((1, 1), dtype=torch.int64),
+        cent_pr=scalar_grid * 4.0,
+        bbox_pr=torch.ones((1, 7, 2, 2, 2), dtype=torch.float32),
+        clas_pr=torch.ones((1, 3, 2, 2, 2), dtype=torch.float32),
+        cent_pr_nms=scalar_grid * 5.0,
+        pts_world=torch.zeros((1, 8, 3), dtype=torch.float32),
+        feat2d_upsampled={"rgb": torch.ones((1, 1, 2, 2, 2), dtype=torch.float32)},
+        token2d={"rgb": torch.ones((1, 1, 2, 2, 2), dtype=torch.float32)},
+    )
+
+
+class _DumpConfig:
+    """Tiny config double exposing the writer's manifest dump method."""
+
+    def model_dump_cache(self, *, exclude_none: bool = False) -> dict[str, object]:  # noqa: ARG002
+        """Return an empty stable config payload."""
+
+        return {}
+
+
+def test_prepare_vin_offline_sample_filters_backbone_blocks_and_payload() -> None:
+    """Writer keep-lists should prune numeric blocks and rich backbone payloads."""
+
+    row = prepare_vin_offline_sample(
+        scene_id="scene-a",
+        snippet_id="snippet-000",
+        vin_snippet=_make_vin_snippet(offset=0.0),
+        candidates=None,
+        depths=_make_stub_depths(2, offset=0.0),
+        rri=_make_stub_rri(2),
+        candidate_pcs=None,
+        backbone_out=_make_stub_backbone(),
+        max_candidates=4,
+        include_depths=True,
+        include_candidate_pcs=False,
+        include_backbone=True,
+        include_diagnostic_payloads=True,
+        backbone_numeric_keep_fields={"t_world_voxel", "voxel_extent", "occ_pr", "counts"},
+        backbone_payload_keep_fields={"t_world_voxel", "voxel_extent", "occ_pr", "bbox_pr"},
+        sample_key="sample-0",
+    )
+
+    assert "backbone.t_world_voxel" in row.numeric_blocks  # noqa: S101
+    assert "backbone.voxel_extent" in row.numeric_blocks  # noqa: S101
+    assert "backbone.occ_pr" in row.numeric_blocks  # noqa: S101
+    assert "backbone.counts" in row.numeric_blocks  # noqa: S101
+    assert "backbone.occ_input" not in row.numeric_blocks  # noqa: S101
+    assert "backbone.cent_pr" not in row.numeric_blocks  # noqa: S101
+    payload = row.record_blocks["backbone.payload"]
+    assert set(payload) == {"t_world_voxel", "voxel_extent", "occ_pr", "bbox_pr"}  # noqa: S101
+    assert "voxel_feat" not in payload  # noqa: S101
+    assert "feat2d_upsampled" not in payload  # noqa: S101
+
+
+def test_flush_vin_offline_payloads_normalizes_numpy_scalars(tmp_path: Path) -> None:
+    """Diagnostic payloads from EVL may include NumPy scalar metadata."""
+
+    backbone = _make_stub_backbone()
+    backbone.obb_pred_sem_id_to_name = [np.str_("chair"), np.str_("table")]
+    row = prepare_vin_offline_sample(
+        scene_id="scene-a",
+        snippet_id="snippet-000",
+        vin_snippet=_make_vin_snippet(offset=0.0),
+        candidates=None,
+        depths=_make_stub_depths(2, offset=0.0),
+        rri=_make_stub_rri(2),
+        candidate_pcs=None,
+        backbone_out=backbone,
+        max_candidates=4,
+        include_depths=True,
+        include_candidate_pcs=False,
+        include_backbone=True,
+        include_diagnostic_payloads=True,
+        backbone_numeric_keep_fields={"t_world_voxel", "voxel_extent", "occ_pr", "counts"},
+        backbone_payload_keep_fields={"obb_pred_sem_id_to_name"},
+        sample_key="sample-0",
+    )
+
+    shard_spec, _ = flush_prepared_samples_to_shard(
+        shard_index=0,
+        shard_dir=tmp_path / "shard-000000",
+        rows=[row],
+    )
+
+    block = shard_spec.blocks["backbone.payload"]
+    payload_path, offsets_path = block.paths
+    offsets = np.load(tmp_path / "shard-000000" / offsets_path, allow_pickle=False)
+    payload_bytes = (tmp_path / "shard-000000" / payload_path).read_bytes()
+    payload = msgspec.msgpack.decode(payload_bytes[int(offsets[0]) : int(offsets[1])])
+    assert payload["obb_pred_sem_id_to_name"] == ["chair", "table"]  # noqa: S101
+    assert all(isinstance(name, str) for name in payload["obb_pred_sem_id_to_name"])  # noqa: S101
+
+
+def test_vin_offline_writer_finalizes_prepared_rows_on_keyboard_interrupt(tmp_path: Path) -> None:
+    """Ctrl-C should produce a valid partial store for already prepared rows."""
+
+    store_cfg = VinOfflineStoreConfig(store_dir=tmp_path / "vin_offline")
+    config = SimpleNamespace(
+        store=store_cfg,
+        dataset=_DumpConfig(),
+        labeler=_DumpConfig(),
+        backbone=None,
+        include_backbone=False,
+        include_depths=True,
+        include_pointclouds=False,
+        include_diagnostic_payloads=False,
+        include_counterfactuals=False,
+        backbone_numeric_keep_fields=None,
+        backbone_payload_keep_fields=None,
+        vin_pad_points=4,
+        semidense_max_points=None,
+        semidense_include_obs_count=False,
+        max_candidates=4,
+        samples_per_shard=16,
+        max_samples=None,
+        train_val_split=0.5,
+        overwrite=False,
+        num_failures_allowed=0,
+    )
+    writer = VinOfflineWriter.__new__(VinOfflineWriter)
+    writer.config = config
+    writer.console = Console.with_prefix("test-vin-offline-writer")
+    writer._dataset = [
+        SimpleNamespace(scene_id="scene-a", snippet_id="snippet-000"),
+        SimpleNamespace(scene_id="scene-b", snippet_id="snippet-001"),
+        SimpleNamespace(scene_id="scene-c", snippet_id="snippet-002"),
+    ]
+
+    class _InterruptingLabeler:
+        def __init__(self) -> None:
+            self.count = 0
+
+        def run(self, sample: object) -> object:  # noqa: ARG002
+            self.count += 1
+            if self.count == 3:
+                raise KeyboardInterrupt
+            return SimpleNamespace()
+
+    writer._labeler = _InterruptingLabeler()
+    writer._backbone = None
+
+    def _prepare_stub_row(
+        self: VinOfflineWriter,  # noqa: ARG001
+        *,
+        sample: object,
+        label_batch: object,  # noqa: ARG001
+        backbone_out: object,  # noqa: ARG001
+        max_candidates: int,
+    ) -> object:
+        offset = 0.0 if sample.snippet_id.endswith("000") else 10.0
+        return prepare_vin_offline_sample(
+            scene_id=sample.scene_id,
+            snippet_id=sample.snippet_id,
+            vin_snippet=_make_vin_snippet(offset=offset),
+            candidates=None,
+            depths=_make_stub_depths(2, offset=offset),
+            rri=_make_stub_rri(2),
+            candidate_pcs=None,
+            backbone_out=None,
+            max_candidates=max_candidates,
+            include_depths=True,
+            include_candidate_pcs=False,
+            include_backbone=False,
+            include_diagnostic_payloads=False,
+        )
+
+    writer._prepare_row = MethodType(_prepare_stub_row, writer)
+
+    manifest = writer.run()
+
+    assert store_cfg.manifest_path.exists()  # noqa: S101
+    assert store_cfg.sample_index_path.exists()  # noqa: S101
+    assert not (tmp_path / "vin_offline.tmp").exists()  # noqa: S101
+    assert manifest.stats["num_samples"] == 2  # noqa: S101
+    assert manifest.stats["interrupted"] is True  # noqa: S101
+    assert manifest.provenance["finalized_after_interrupt"] is True  # noqa: S101
+    assert len(_read_sample_index_rows(store_cfg.sample_index_path)) == 2  # noqa: S101
 
 
 def _write_test_store(tmp_path: Path, *, include_diagnostic_payloads: bool = False) -> VinOfflineStoreConfig:
@@ -352,6 +552,35 @@ def test_collect_vin_offline_dataset_stats_summarizes_store(tmp_path: Path) -> N
     assert stats.rri.count == 5  # noqa: S101
     assert stats.vin_points.mean == 2.0  # noqa: S101
     assert stats.numeric_bytes > 0  # noqa: S101
+    assert stats.candidate_count_values == [2.0, 3.0]  # noqa: S101
+    assert len(stats.rri_values) == 5  # noqa: S101
+    assert len(stats.vin_point_values) == 2  # noqa: S101
+
+
+def test_collect_vin_offline_dataset_stats_reports_blocks_and_sample_rows(tmp_path: Path) -> None:
+    """Offline diagnostics should expose render-ready block and row summaries."""
+
+    store_cfg = _write_test_store(tmp_path)
+
+    stats = collect_vin_offline_dataset_stats(store_cfg, max_samples=1)
+
+    block_by_name = {block.name: block for block in stats.block_diagnostics}
+    assert "oracle.rri" in block_by_name  # noqa: S101
+    rri_block = block_by_name["oracle.rri"]
+    assert rri_block.kind == "zarr_array"  # noqa: S101
+    assert rri_block.dtype == "float32"  # noqa: S101
+    assert rri_block.shape == [3, 4]  # noqa: S101
+    assert rri_block.estimated_bytes == 3 * 4 * np.dtype("float32").itemsize  # noqa: S101
+
+    assert len(stats.sample_summaries) == 1  # noqa: S101
+    row = stats.sample_summaries[0]
+    assert row.scene_id == "scene-a"  # noqa: S101
+    assert row.snippet_id == "snippet-000"  # noqa: S101
+    assert row.split == "train"  # noqa: S101
+    assert row.candidate_count == 2  # noqa: S101
+    assert row.rri.count == 2  # noqa: S101
+    assert row.rri.mean == pytest.approx(0.15)  # noqa: S101
+    assert row.vin_points.mean == 2.0  # noqa: S101
 
 
 def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:

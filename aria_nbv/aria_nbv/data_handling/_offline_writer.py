@@ -52,6 +52,35 @@ from ._raw import AseEfmDatasetConfig, EfmSnippetView, VinSnippetView
 from ._sample_keys import sanitize_token
 from ._vin_runtime import DEFAULT_VIN_SNIPPET_PAD_POINTS, build_vin_snippet_view
 
+DEFAULT_BACKBONE_NUMERIC_KEEP_FIELDS: tuple[str, ...] = (
+    "t_world_voxel",
+    "voxel_extent",
+    "occ_pr",
+    "occ_input",
+    "free_input",
+    "counts",
+    "cent_pr",
+    "pts_world",
+)
+"""Default EVL fields materialized as numeric offline blocks."""
+
+DEFAULT_BACKBONE_PAYLOAD_KEEP_FIELDS: tuple[str, ...] = (
+    "t_world_voxel",
+    "voxel_extent",
+    "occ_pr",
+    "cent_pr",
+    "bbox_pr",
+    "clas_pr",
+    "cent_pr_nms",
+    "obbs_pr_nms",
+    "obb_pred",
+    "obb_pred_viz",
+    "obb_pred_sem_id_to_name",
+    "obb_pred_probs_full",
+    "obb_pred_probs_full_viz",
+)
+"""Default EVL fields materialized in rich diagnostic backbone payloads."""
+
 
 def _utc_now_iso() -> str:
     """Return the current UTC time in stable ISO-8601 form."""
@@ -166,6 +195,20 @@ def _camera_param_to_numpy(param: Any, *, dtype: np.dtype[Any]) -> np.ndarray:
     return array
 
 
+def _keep_field(field_name: str, keep_fields: set[str] | None) -> bool:
+    """Return whether a field should be materialized.
+
+    Args:
+        field_name: Dataclass or logical field name.
+        keep_fields: Optional keep-list. ``None`` keeps all fields.
+
+    Returns:
+        Whether the requested field is enabled.
+    """
+
+    return keep_fields is None or field_name in keep_fields
+
+
 @dataclass(slots=True)
 class PreparedVinOfflineSample:
     """Normalized offline row before shard materialization.
@@ -209,6 +252,8 @@ def prepare_vin_offline_sample(
     include_candidate_pcs: bool = True,
     include_backbone: bool = True,
     include_diagnostic_payloads: bool = False,
+    backbone_numeric_keep_fields: set[str] | None = None,
+    backbone_payload_keep_fields: set[str] | None = None,
     sample_key: str | None = None,
 ) -> PreparedVinOfflineSample:
     """Normalize one oracle-labelled snippet into offline row blocks.
@@ -231,6 +276,12 @@ def prepare_vin_offline_sample(
             as full depth DTOs, candidate DTOs, candidate point clouds, and
             full backbone payloads. Defaults off because numeric blocks are the
             canonical training contract.
+        backbone_numeric_keep_fields: Optional EVL backbone field keep-list for
+            fixed numeric blocks. ``None`` preserves legacy behavior by writing
+            all supported numeric fields.
+        backbone_payload_keep_fields: Optional EVL backbone field keep-list for
+            rich diagnostic payloads. ``None`` preserves legacy behavior by
+            serializing all available fields.
         sample_key: Optional explicit sample key.
 
     Returns:
@@ -354,10 +405,12 @@ def prepare_vin_offline_sample(
         )
 
     if include_backbone and backbone_out is not None:
-        numeric_blocks["backbone.t_world_voxel"] = _pose_to_numpy(backbone_out.t_world_voxel).astype(
-            np.float32, copy=False
-        )
-        numeric_blocks["backbone.voxel_extent"] = _to_numpy(backbone_out.voxel_extent, dtype=np.float32)
+        if _keep_field("t_world_voxel", backbone_numeric_keep_fields):
+            numeric_blocks["backbone.t_world_voxel"] = _pose_to_numpy(backbone_out.t_world_voxel).astype(
+                np.float32, copy=False
+            )
+        if _keep_field("voxel_extent", backbone_numeric_keep_fields):
+            numeric_blocks["backbone.voxel_extent"] = _to_numpy(backbone_out.voxel_extent, dtype=np.float32)
         for field_name, dtype in (
             ("occ_pr", np.float32),
             ("occ_input", np.float32),
@@ -366,6 +419,8 @@ def prepare_vin_offline_sample(
             ("cent_pr", np.float32),
             ("pts_world", np.float32),
         ):
+            if not _keep_field(field_name, backbone_numeric_keep_fields):
+                continue
             value = getattr(backbone_out, field_name, None)
             if value is not None:
                 numeric_blocks[f"backbone.{field_name}"] = _to_numpy(value, dtype=dtype)
@@ -378,7 +433,9 @@ def prepare_vin_offline_sample(
     if include_diagnostic_payloads and include_candidate_pcs and candidate_pcs is not None:
         record_blocks["oracle.candidate_pcs"] = candidate_pcs.to_serializable()
     if include_diagnostic_payloads and include_backbone and backbone_out is not None:
-        record_blocks["backbone.payload"] = backbone_out.to_serializable()
+        record_blocks["backbone.payload"] = backbone_out.to_serializable(
+            include_fields=backbone_payload_keep_fields,
+        )
 
     return PreparedVinOfflineSample(
         sample_key=sample_key or _default_sample_key(scene_id, snippet_id),
@@ -526,6 +583,20 @@ class VinOfflineWriterConfig(BaseConfig):
     include_counterfactuals: bool = False
     """Whether to materialize future counterfactual payloads."""
 
+    backbone_numeric_keep_fields: list[str] | None = Field(
+        default_factory=lambda: list(DEFAULT_BACKBONE_NUMERIC_KEEP_FIELDS),
+    )
+    """EVL backbone fields written as fixed numeric blocks.
+
+    These blocks are the canonical training-time backbone contract. Use ``None``
+    to preserve all numeric fields supported by the writer.
+    """
+
+    backbone_payload_keep_fields: list[str] | None = Field(
+        default_factory=lambda: list(DEFAULT_BACKBONE_PAYLOAD_KEEP_FIELDS),
+    )
+    """EVL backbone fields written to the optional rich diagnostic payload."""
+
     vin_pad_points: int = DEFAULT_VIN_SNIPPET_PAD_POINTS
     """Fixed VIN point count stored per sample."""
 
@@ -654,6 +725,16 @@ class VinOfflineWriter:
             include_candidate_pcs=self.config.include_pointclouds,
             include_backbone=self.config.include_backbone,
             include_diagnostic_payloads=self.config.include_diagnostic_payloads,
+            backbone_numeric_keep_fields=(
+                set(self.config.backbone_numeric_keep_fields)
+                if self.config.backbone_numeric_keep_fields is not None
+                else None
+            ),
+            backbone_payload_keep_fields=(
+                set(self.config.backbone_payload_keep_fields)
+                if self.config.backbone_payload_keep_fields is not None
+                else None
+            ),
         )
 
     def run(self) -> VinOfflineManifest:
@@ -680,40 +761,45 @@ class VinOfflineWriter:
         index_records: list[VinOfflineIndexRecord] = []
         failures = 0
         processed = 0
+        interrupted = False
 
-        for sample in self._dataset:
-            if self.config.max_samples is not None and processed >= int(self.config.max_samples):
-                break
-            try:
-                label_batch = self._labeler.run(sample)
-                backbone_out = self._backbone.forward(sample.efm) if self._backbone is not None else None
-                prepared_rows.append(
-                    self._prepare_row(
-                        sample=sample,
-                        label_batch=label_batch,
-                        backbone_out=backbone_out,
-                        max_candidates=max_candidates,
-                    ),
-                )
-                processed += 1
-                if len(prepared_rows) >= int(self.config.samples_per_shard):
-                    shard_spec, local_records = flush_prepared_samples_to_shard(
-                        shard_index=len(shard_specs),
-                        shard_dir=temp_dir / self.config.store.shards_dirname / f"shard-{len(shard_specs):06d}",
-                        rows=prepared_rows,
+        try:
+            for sample in self._dataset:
+                if self.config.max_samples is not None and processed >= int(self.config.max_samples):
+                    break
+                try:
+                    label_batch = self._labeler.run(sample)
+                    backbone_out = self._backbone.forward(sample.efm) if self._backbone is not None else None
+                    prepared_rows.append(
+                        self._prepare_row(
+                            sample=sample,
+                            label_batch=label_batch,
+                            backbone_out=backbone_out,
+                            max_candidates=max_candidates,
+                        ),
                     )
-                    shard_specs.append(shard_spec)
-                    index_records.extend(local_records)
-                    prepared_rows = []
-            except Exception as exc:
-                failures += 1
-                self.console.error(
-                    f"Failed to build offline sample for scene={sample.scene_id} snippet={sample.snippet_id}: {exc}",
-                )
-                if failures > int(self.config.num_failures_allowed):
-                    raise RuntimeError(
-                        f"Exceeded num_failures_allowed={self.config.num_failures_allowed} while building offline data.",
-                    ) from exc
+                    processed += 1
+                    if len(prepared_rows) >= int(self.config.samples_per_shard):
+                        shard_spec, local_records = flush_prepared_samples_to_shard(
+                            shard_index=len(shard_specs),
+                            shard_dir=temp_dir / self.config.store.shards_dirname / f"shard-{len(shard_specs):06d}",
+                            rows=prepared_rows,
+                        )
+                        shard_specs.append(shard_spec)
+                        index_records.extend(local_records)
+                        prepared_rows = []
+                except Exception as exc:
+                    failures += 1
+                    self.console.error(
+                        f"Failed to build offline sample for scene={sample.scene_id} snippet={sample.snippet_id}: {exc}",
+                    )
+                    if failures > int(self.config.num_failures_allowed):
+                        raise RuntimeError(
+                            f"Exceeded num_failures_allowed={self.config.num_failures_allowed} while building offline data.",
+                        ) from exc
+        except KeyboardInterrupt:
+            interrupted = True
+            self.console.log("Interrupted by user; finalizing already prepared VIN offline samples.")
 
         if prepared_rows:
             shard_spec, local_records = flush_prepared_samples_to_shard(
@@ -747,6 +833,8 @@ class VinOfflineWriter:
                 if self.config.backbone is not None
                 else None,
                 "max_candidates": max_candidates,
+                "backbone_numeric_keep_fields": self.config.backbone_numeric_keep_fields,
+                "backbone_payload_keep_fields": self.config.backbone_payload_keep_fields,
             },
             vin={
                 "pad_points": int(self.config.vin_pad_points),
@@ -765,11 +853,13 @@ class VinOfflineWriter:
                 "num_shards": len(shard_specs),
                 "num_train": int(split_indices["train"].shape[0]),
                 "num_val": int(split_indices["val"].shape[0]),
+                "interrupted": interrupted,
             },
             provenance={
                 "writer": self.__class__.__name__,
                 "store_dir": store_dir.as_posix(),
                 "split_policy": "sha1(sample_key)",
+                "finalized_after_interrupt": interrupted,
             },
             shards=shard_specs,
         )
@@ -784,6 +874,8 @@ class VinOfflineWriter:
         self.console.log(
             f"Wrote VIN offline dataset with {len(index_records)} samples across {len(shard_specs)} shards to {store_dir}",
         )
+        if interrupted:
+            self.console.log("Partial VIN offline dataset finalized after Ctrl-C.")
         return manifest
 
 

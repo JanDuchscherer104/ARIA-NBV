@@ -180,10 +180,16 @@ class VinOfflineShardWriter:
 
         payload_rel_path = VinOfflineBlockSpec.msgpack_records_path(name)
         offsets_rel_path = VinOfflineBlockSpec.msgpack_records_offsets_path(name)
+        encoded_records: list[bytes] = []
+        for index, record in enumerate(records):
+            try:
+                encoded_records.append(msgspec.msgpack.encode(record))
+            except TypeError as exc:
+                raise TypeError(f"Failed to encode record block {name!r} row {index}.") from exc
+
         offsets = np.zeros((len(records) + 1,), dtype=np.int64)
         with (self.shard_dir / payload_rel_path).open("wb") as handle:
-            for index, record in enumerate(records, start=1):
-                payload = msgspec.msgpack.encode(record)
+            for index, payload in enumerate(encoded_records, start=1):
                 handle.write(payload)
                 offsets[index] = offsets[index - 1] + len(payload)
         np.save(self.shard_dir / offsets_rel_path, offsets, allow_pickle=False)

@@ -74,6 +74,90 @@ class VinOfflineDatasetStats:
     block_shapes: dict[str, list[int]] = field(default_factory=dict)
     """Stored numeric block shapes keyed by logical block name."""
 
+    block_diagnostics: list["VinOfflineBlockDiagnostic"] = field(default_factory=list)
+    """Manifest-declared block diagnostics for Streamlit and CLI tables."""
+
+    sample_summaries: list["VinOfflineSampleDiagnostic"] = field(default_factory=list)
+    """Per-row sanity summaries for sampled records."""
+
+    candidate_count_values: list[float] = field(default_factory=list)
+    """Sampled candidate-count values used for histograms."""
+
+    rri_values: list[float] = field(default_factory=list)
+    """Sampled finite oracle RRI values used for histograms."""
+
+    vin_point_values: list[float] = field(default_factory=list)
+    """Sampled VIN point lengths used for histograms."""
+
+
+@dataclass(slots=True)
+class VinOfflineBlockDiagnostic:
+    """Render-ready manifest summary for one stored offline block."""
+
+    shard_id: str
+    """Shard that declares the block."""
+
+    name: str
+    """Logical block name."""
+
+    kind: str
+    """Storage kind such as ``zarr_array`` or ``msgpack_indexed_records``."""
+
+    dtype: str | None
+    """Stored NumPy dtype for numeric blocks."""
+
+    shape: list[int] | None
+    """Stored array shape or record count."""
+
+    optional: bool
+    """Whether the block is optional."""
+
+    estimated_bytes: int | None
+    """Estimated numeric bytes, or ``None`` for non-numeric blocks."""
+
+
+@dataclass(slots=True)
+class VinOfflineSampleDiagnostic:
+    """Per-row sanity summary for one sampled VIN offline record."""
+
+    sample_index: int
+    """Global sample index."""
+
+    sample_key: str
+    """Stable sample key."""
+
+    scene_id: str
+    """ASE scene identifier."""
+
+    snippet_id: str
+    """ASE snippet identifier."""
+
+    split: str
+    """Dataset split membership."""
+
+    shard_id: str
+    """Shard that stores the row."""
+
+    row: int
+    """Shard-local row index."""
+
+    candidate_count: int
+    """Valid candidate count for the row."""
+
+    rri: NumericSummary
+    """Finite RRI summary for valid candidates."""
+
+    vin_points: NumericSummary
+    """VIN point-length summary for the row."""
+
+
+def _finite_values(values: np.ndarray) -> list[float]:
+    """Return finite values from a numeric array as Python floats."""
+
+    flat = np.asarray(values).reshape(-1)
+    finite = flat[np.isfinite(flat)]
+    return [float(value) for value in finite]
+
 
 def _summary(values: list[float]) -> NumericSummary:
     """Summarize finite numeric values."""
@@ -92,19 +176,35 @@ def _summary(values: list[float]) -> NumericSummary:
     )
 
 
-def _estimate_numeric_bytes(reader: VinOfflineStoreReader) -> tuple[int, dict[str, list[int]]]:
-    """Estimate bytes occupied by numeric blocks declared in the manifest."""
+def _collect_block_diagnostics(
+    reader: VinOfflineStoreReader,
+) -> tuple[int, dict[str, list[int]], list[VinOfflineBlockDiagnostic]]:
+    """Collect manifest-declared block shapes and byte estimates."""
 
     total = 0
     block_shapes: dict[str, list[int]] = {}
+    diagnostics: list[VinOfflineBlockDiagnostic] = []
     for shard in reader.manifest.shards:
         for block_name, spec in shard.blocks.items():
-            if spec.kind != "zarr_array" or spec.shape is None or spec.dtype is None:
-                continue
-            shape = [int(dim) for dim in spec.shape]
-            block_shapes.setdefault(block_name, shape)
-            total += int(np.prod(shape, dtype=np.int64)) * int(np.dtype(spec.dtype).itemsize)
-    return total, block_shapes
+            shape = [int(dim) for dim in spec.shape] if spec.shape is not None else None
+            estimated_bytes: int | None = None
+            if spec.kind == "zarr_array" and shape is not None and spec.dtype is not None:
+                block_shapes.setdefault(block_name, shape)
+                estimated_bytes = int(np.prod(shape, dtype=np.int64)) * int(np.dtype(spec.dtype).itemsize)
+                total += estimated_bytes
+            diagnostics.append(
+                VinOfflineBlockDiagnostic(
+                    shard_id=shard.shard_id,
+                    name=block_name,
+                    kind=spec.kind,
+                    dtype=spec.dtype,
+                    shape=shape,
+                    optional=bool(spec.optional),
+                    estimated_bytes=estimated_bytes,
+                ),
+            )
+    diagnostics.sort(key=lambda item: (item.shard_id, item.name))
+    return total, block_shapes, diagnostics
 
 
 def collect_vin_offline_dataset_stats(
@@ -134,15 +234,32 @@ def collect_vin_offline_dataset_stats(
     candidate_counts: list[float] = []
     rri_values: list[float] = []
     vin_lengths: list[float] = []
+    sample_summaries: list[VinOfflineSampleDiagnostic] = []
     for record in scan_records:
         candidate_count = int(reader.read_numeric_block(record, "oracle.candidate_count").reshape(()))
         candidate_counts.append(float(candidate_count))
         rri = np.asarray(reader.read_numeric_block(record, "oracle.rri")).reshape(-1)[:candidate_count]
-        rri_values.extend(float(value) for value in rri[np.isfinite(rri)])
+        row_rri_values = _finite_values(rri)
+        rri_values.extend(row_rri_values)
         lengths = np.asarray(reader.read_numeric_block(record, "vin.lengths")).reshape(-1)
-        vin_lengths.extend(float(value) for value in lengths[np.isfinite(lengths)])
+        row_vin_lengths = _finite_values(lengths)
+        vin_lengths.extend(row_vin_lengths)
+        sample_summaries.append(
+            VinOfflineSampleDiagnostic(
+                sample_index=int(record.sample_index),
+                sample_key=record.sample_key,
+                scene_id=record.scene_id,
+                snippet_id=record.snippet_id,
+                split=record.split,
+                shard_id=record.shard_id,
+                row=int(record.row),
+                candidate_count=candidate_count,
+                rri=_summary(row_rri_values),
+                vin_points=_summary(row_vin_lengths),
+            ),
+        )
 
-    numeric_bytes, block_shapes = _estimate_numeric_bytes(reader)
+    numeric_bytes, block_shapes, block_diagnostics = _collect_block_diagnostics(reader)
     return VinOfflineDatasetStats(
         store_dir=store.store_dir.expanduser().resolve().as_posix(),
         version=int(reader.manifest.version),
@@ -162,11 +279,18 @@ def collect_vin_offline_dataset_stats(
         vin_points=_summary(vin_lengths),
         numeric_bytes=int(numeric_bytes),
         block_shapes=block_shapes,
+        block_diagnostics=block_diagnostics,
+        sample_summaries=sample_summaries,
+        candidate_count_values=candidate_counts,
+        rri_values=rri_values,
+        vin_point_values=vin_lengths,
     )
 
 
 __all__ = [
     "NumericSummary",
+    "VinOfflineBlockDiagnostic",
     "VinOfflineDatasetStats",
+    "VinOfflineSampleDiagnostic",
     "collect_vin_offline_dataset_stats",
 ]

@@ -42,6 +42,17 @@ By default `VinOfflineStoreConfig.store_dir` resolves to
 `PathConfig().offline_cache_dir / "vin_offline"`. Relative store names such as
 `"vin_offline"` are resolved under `offline_cache_dir`.
 
+Build immutable stores through the writer CLI, not the removed legacy cache
+commands:
+
+```sh
+cd aria_nbv
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_81286.toml
+```
+
+Use `--dry-run` to validate a writer TOML and inspect the resolved store path
+without loading snippets, EVL, or writing shards.
+
 ## Training Source
 
 Lightning consumes offline data through:
