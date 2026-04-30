@@ -32,10 +32,18 @@ Do not use it for a localized typo fix unless source-of-truth alignment is at ri
 - Link to canonical state or owning implementation docs instead of repeating long explanations.
 - Keep bibliography additions in `docs/references.bib`.
 - Update canonical memory when the current truth changes; otherwise record `canonical_updates_needed: []` in the debrief.
+- Use QMD frontmatter to classify retained pages:
+  `phase: thesis | seminar | archive`, `audience: public | advisor | internal`,
+  `status: current | planned | scratch | archive`, and `owner`.
+- Triage docs with these labels: `KEEP_PUBLIC`, `MOVE_TO_AGENTS`,
+  `MOVE_TO_PACKAGE_CONTRACT`, `ARCHIVE`, `DELETE`, and
+  `GENERATED_UNTRACKED`.
+- Keep all retained QMD files renderable, but keep archive/scratch pages out of
+  primary navigation unless explicitly requested.
 
 ## Verification
 
-- `cd docs && quarto render contents/roadmap.qmd contents/questions.qmd` for roadmap/question edits
+- `cd docs && quarto render contents/thesis/roadmap.qmd contents/thesis/questions.qmd` for roadmap/question edits
 - `cd docs && typst compile typst/paper/main.typ --root .` for paper edits
 - `cd docs && typst compile typst/slides/<file>.typ --root .` for slide edits
 - `scripts/nbv_qmd_outline.sh --compact` for public navigation checks

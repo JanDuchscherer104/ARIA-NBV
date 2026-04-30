@@ -43,6 +43,8 @@ Default to a code-review mindset:
 - focus on correctness, behavioral regressions, determinism drift, missing validation, repo-boundary leaks, frame/pose mistakes, stale documentation, and operator-facing contract breaks
 - include tight file and line references whenever the location is clear
 - if there are no findings, say that explicitly and call out residual risk or missing tests
+- Prefer tests that exercise public contracts and user-visible behavior. Flag
+  tests that only preserve private helper shape when behavior could regress.
 
 Use this severity rubric:
 

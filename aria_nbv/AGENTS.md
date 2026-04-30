@@ -79,6 +79,10 @@ Apply this file when working under `aria_nbv/`.
 - For package changes, run format -> lint -> targeted pytest on the changed surface.
 - Every new feature or behavior change must come with targeted pytest coverage.
 - Prefer real-data or integration-style tests when feasible.
+- Prefer tracer-bullet TDD for risky behavior changes: one failing
+  public-interface behavior test, minimal implementation, repeat.
+- Tests should verify observable contracts through public package interfaces
+  rather than private helper shape whenever a public seam exists.
 - Update docs when behavior or user-facing workflows change.
 - Keep public signatures typed and public methods documented.
 - Work in a test-driven manner when possible - start by planning interfaces and writing tests before implementation.

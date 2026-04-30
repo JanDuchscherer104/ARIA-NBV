@@ -13,6 +13,8 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
   `literature_index.md`, and `data_contracts.md`; refresh with `make context`
   when stale.
 - Operator aids and long conventions: `.agents/references/`.
+- Durable human-owner preferences:
+  `.agents/references/human_owner_intent.md`.
 
 ## Routing
 - Package work under `aria_nbv/`: read `aria_nbv/AGENTS.md`, then the nested
@@ -20,6 +22,9 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
   touched.
 - Docs, bibliography, Typst, or Quarto work: read `docs/AGENTS.md`.
 - Broad cross-surface questions: use the `aria-nbv-context` skill first.
+- Vague, high-impact, or advisor-facing plans: use `plan-grill`.
+- Bugs, regressions, suspicious metrics, or failing docs/data/KG checks: use
+  `diagnose-aria`.
 - Backlog or memory changes: use the `agents-db` skill.
 - Cleanup, pruning, or simplification: use the `simplification` skill.
 - KG/literature/code graph work: use `semantic-scholar-litkg`; keep
@@ -40,6 +45,15 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
 - Keep public docs aligned with the Typst paper and current code.
 - Internal agent memory, generated context, and OMX runtime state are not public
   documentation surfaces.
+
+## Instruction Capture
+- Repo invariant: update this file or the nearest nested `AGENTS.md`.
+- Repeatable workflow: update or add a compact `.agents/skills/*/SKILL.md`.
+- Human-owner preference: update `.agents/references/human_owner_intent.md`.
+- Current truth: update `.agents/memory/state/`.
+- Actionable work: update `.agents/issues.toml`, `.agents/todos.toml`, or
+  `.agents/refactors.toml` through `agents-db`.
+- Public narrative: update Quarto or Typst docs.
 
 ## Commands
 - Python: `aria_nbv/.venv/bin/python`

@@ -16,7 +16,7 @@ Apply this file when working under `docs/`.
 - Start from `docs/typst/paper/main.typ`.
 - Use `scripts/nbv_qmd_outline.sh --compact` to localize the exact Quarto page before opening it.
 - Use `scripts/nbv_typst_includes.py --paper --mode outline` to localize the exact Typst section before opening it.
-- Open `docs/index.qmd`, `docs/contents/todos.qmd`, `docs/contents/roadmap.qmd`, and `docs/contents/questions.qmd` only when the task is about project narrative, priorities, or roadmap.
+- Open `docs/index.qmd`, `docs/contents/archive/todos.qmd`, `docs/contents/thesis/roadmap.qmd`, and `docs/contents/thesis/questions.qmd` only when the task is about project narrative, priorities, or roadmap.
 - If you need current project truth beyond the paper, open the relevant doc in `.agents/memory/state/` instead of scanning broad doc trees.
 
 ## Commands
@@ -49,4 +49,13 @@ Apply this file when working under `docs/`.
 - Treat `docs/contents/resources/agent_scaffold/` as generated internal mirror
   content, not hand-authored public docs. Do not expose it as primary public
   navigation.
+- Retained QMD pages should carry minimal ownership metadata: `title`, `phase`,
+  `audience`, `status`, and `owner`. Use `phase: thesis | seminar | archive`,
+  `audience: public | advisor | internal`, and
+  `status: current | planned | scratch | archive`.
+- Current thesis pages live under `docs/contents/thesis/`; past seminar
+  material belongs under `docs/contents/seminar/`; retained scratch or stale
+  history belongs under `docs/contents/archive/`.
+- Active tasks belong in `.agents/*.toml`, not public TODO pages. If an archived
+  QMD still renders, add a callout pointing readers to the current owner.
 - For larger doc changes, run `quarto render` and `quarto check` before finishing.

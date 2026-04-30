@@ -38,3 +38,15 @@ Do not use it for pure model-head, docs-only, or non-geometry app changes.
 - `cd aria_nbv && uv run pytest tests/rendering/test_candidate_renderer_integration.py tests/rendering/test_pytorch3d_renderer.py`
 - `cd aria_nbv && uv run pytest tests/vin/test_vin_utils.py` when VIN diagnostics or batch fields are affected
 - `make check-agent-memory` for guidance or memory edits
+
+## Diagnostics Matrix
+
+- Pose/frame edits: assert transform direction, units, and `PoseTW` batch shape.
+- Camera/projection edits: assert `CameraTW` intrinsics/extrinsics and
+  PyTorch3D/NDC conventions.
+- Depth/backprojection edits: assert metric-depth interpretation, valid masks,
+  and world-frame point bounds.
+- Candidate-frustum edits: assert display-only CW90 corrections do not mutate
+  training, rendering, or store semantics.
+- Streamlit diagnostics: verify figures are display transforms only and do not
+  feed back into model or oracle data.

@@ -23,6 +23,8 @@ Progressive disclosure order:
 - The question spans paper, docs, literature, code, or canonical project state.
 - The task needs architectural, methodological, or citation context before editing.
 - The target file or symbol is not yet known.
+- The user asks to zoom out, explain how a subsystem fits together, or map a
+  refactor surface before changing code.
 
 ## When Not To Use
 - The user already named the exact file to edit or review.
@@ -56,8 +58,19 @@ Progressive disclosure order:
 ## Do Not Escalate Early
 - Do not run `make context-heavy` when the state docs, references, routing map, source index, outlines, or AST summaries already localize the answer.
 - Do not open entire paper sections, Quarto chapters, or literature trees until the outline or index step identifies the exact file.
-- Do not open `docs/index.qmd` or `docs/contents/todos.qmd` until the task specifically needs project narrative, priorities, or open work items.
+- Do not open `docs/index.qmd` or `docs/contents/archive/todos.qmd` until the task specifically needs project narrative, priorities, or open work items.
 - Do not search `.agents/memory/history/` unless the question is historical, comparative, or explicitly asks for past debriefs.
+
+## Zoom-Out Output
+
+When asked to zoom out, return a compact map before implementation:
+
+- domain term and glossary anchor when one exists
+- owning package/module and nearest `AGENTS.md`
+- main callers and data contracts
+- relevant tests or render checks
+- docs/memory surfaces likely to need updates
+- open risks or missing seams
 
 ## Canonical State (`.agents/memory/`)
 Treat `.agents/memory/state/` as current truth and `.agents/memory/history/` as optional historical evidence.

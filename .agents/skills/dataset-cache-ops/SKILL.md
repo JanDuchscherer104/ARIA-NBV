@@ -33,6 +33,11 @@ Do not use it to restore legacy cache migration or removed training APIs.
 - Keep split manifests and sample indexes file-backed and inspectable.
 - Prefer list/smoke commands before expensive downloads or builds.
 - Record exact failing commands and traceback summaries when data checks fail.
+- For immutable-store checks, validate `manifest.json`, `sample_index.jsonl`,
+  split `.npy` files, block presence, tensor shapes, dtypes, and numeric byte
+  estimates on a tiny fixture before running large stores.
+- Use `collect_vin_offline_dataset_stats` and the VIN Offline Dataset panel for
+  diagnostics rather than legacy cache inspection helpers.
 
 ## Verification
 

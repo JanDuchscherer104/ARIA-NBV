@@ -19,8 +19,8 @@ involved.
 
 ## Read First
 
-1. `docs/contents/roadmap.qmd` sections M3 and M4
-2. `docs/contents/questions.qmd` sections RQ1, RQ2, and RQ4
+1. `docs/contents/thesis/roadmap.qmd` sections M3 and M4
+2. `docs/contents/thesis/questions.qmd` sections RQ1, RQ2, and RQ4
 3. `aria_nbv/aria_nbv/rri_metrics/AGENTS.md`
 4. `aria_nbv/aria_nbv/data_handling/AGENTS.md`
 5. `.agents/memory/state/GOTCHAS.md`
@@ -34,10 +34,17 @@ involved.
 - Log scene and target RRI separately.
 - Preserve `PoseTW` / `CameraTW` boundaries and document crop frame, margin,
   units, and empty-crop semantics.
+- Target-specific RRI for target `e` should follow the same improvement form as
+  scene RRI over the target support:
+  `RRI_e(q) = (d(P_t, M_e) - d(P_t union P_q, M_e)) / (d(P_t, M_e) + eps)`.
+- Empty or unsupported target crops are invalid samples. They are not
+  scene-level fallback labels and not lowest-bin valid targets.
+- Acceptance checks should show crop support, target OBB, current points,
+  candidate points, target RRI, scene RRI, and invalid reasons side by side.
 
 ## Verification
 
 - `cd aria_nbv && uv run pytest tests/rri_metrics`
 - `cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py`
-- `cd docs && quarto render contents/roadmap.qmd contents/questions.qmd` when target-aware claims change
+- `cd docs && quarto render contents/thesis/roadmap.qmd contents/thesis/questions.qmd` when target-aware claims change
 - `make check-agent-memory` for memory or skill edits

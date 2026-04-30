@@ -106,7 +106,7 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "| Topic | Primary paths | Use when |"
   echo "|---|---|---|"
   echo "| Project hub | \`docs/index.qmd\` | You need the docs landing page or high-level navigation. |"
-  echo "| Active work | \`docs/contents/todos.qmd\`, \`roadmap.qmd\`, \`questions.qmd\` | You need current work items, milestones, or open research questions. |"
+  echo "| Active work | \`.agents/*.toml\`, \`docs/contents/thesis/roadmap.qmd\`, \`docs/contents/thesis/questions.qmd\` | You need current work items, milestones, or open research questions. |"
   echo "| Setup and resources | \`docs/contents/setup.qmd\`, \`resources.qmd\` | You need environment/bootstrap help or external resource links. |"
   echo "| Findings and glossary | \`docs/contents/experiments/findings.qmd\`, \`glossary.qmd\` | You need prior experiment outcomes or project terminology. |"
   echo "| Internal implementation | \`docs/contents/impl/overview.qmd\`, \`rri_computation.qmd\` | You need package architecture or oracle/RRI computation details. |"
@@ -119,7 +119,7 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "- .agents/references/agent_memory_templates.md"
   echo "- .agents/references/context7_library_ids.md"
   echo "- docs/index.qmd"
-  echo "- docs/contents/todos.qmd"
+  echo "- docs/contents/archive/todos.qmd"
   echo
   echo "## Preferred reveal commands"
   echo '- scripts/nbv_qmd_outline.sh --compact'

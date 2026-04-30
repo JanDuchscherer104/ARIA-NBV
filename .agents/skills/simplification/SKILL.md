@@ -27,7 +27,7 @@ If the task also requires `.agents/` backlog reads or DB updates, use `agents-db
 
 Before simplification work:
 
-1. Read `README.md`, `docs/contents/questions.qmd`, `.agents/AGENTS_INTERNAL_DB.md`, and the nearest `AGENTS.md`.
+1. Read `README.md`, `docs/contents/thesis/questions.qmd`, `.agents/AGENTS_INTERNAL_DB.md`, and the nearest `AGENTS.md`.
 2. Use the `aria-nbv-context` skill when simplification depends on architecture or cross-package ownership understanding.
 3. Use focused `rg` searches and narrow file reads instead of bulk-loading the repo.
 4. Prefer `mcp__code_index__` for indexed repo navigation when the search surface is broader than a quick local `rg` pass:
@@ -55,6 +55,15 @@ Before simplification work:
 4. Validate the result.
    - Run focused tests, `make lint`, `ruff format`, and a final `make loc` when LOC is part of the decision.
    - Run `make ci` before creating a commit.
+
+Use tracer-bullet tests for behavior-preserving refactors when possible: write
+or identify one public-interface behavior test, make the smallest safe cut,
+rerun it, then repeat. Avoid private-helper tests that only freeze the old
+implementation shape.
+
+When architecture is the problem, look for deeper modules: small public
+interfaces that hide real complexity, clear seams for tests, and deletion of
+shallow adapters that only forward old names.
 
 ## Ruthless Simplification
 

@@ -30,7 +30,7 @@ This skill is not the canonical source for general package style or architecture
 
 Before DB work:
 
-1. Read `README.md`, `docs/contents/questions.qmd`, and the nearest `AGENTS.md`.
+1. Read `README.md`, `docs/contents/thesis/questions.qmd`, and the nearest `AGENTS.md`.
 2. Read `.agents/AGENTS_INTERNAL_DB.md` for mission, configuration, ownership, and stable repo facts.
 3. Use `rg` and narrow file reads instead of bulk-loading the repository.
 4. Keep the change scoped to the requested task; record validated debt instead of opportunistically editing unrelated code.
@@ -76,6 +76,24 @@ Ranking rules:
 - issues sort by priority first, then status, then ID
 - todos sort by priority first, then status, then lower `loc_expected`, then ID
 - refactors sort by priority first, then status, then lower `loc_expected`, then ID
+
+## Backlog Slicing
+
+When converting a plan into backlog work, use vertical slices rather than
+horizontal layer tasks:
+
+- each slice should deliver one narrow behavior or decision path end to end
+- mark HITL work through `labels` or `implementation_notes` when human/advisor
+  judgment is required
+- prefer `.agents/todos.toml` for concrete implementation work and
+  `.agents/refactors.toml` for optional cleanup candidates
+- include acceptance criteria that can be verified from commands, docs renders,
+  tests, or reviewable artifacts
+- do not create a parallel public-docs or GitHub-only tracker for local
+  scaffold work
+
+Use this workflow for Matt-style `to-issues` requests in ARIA-NBV unless the
+user explicitly asks to publish GitHub issues.
 
 ## Validation
 
