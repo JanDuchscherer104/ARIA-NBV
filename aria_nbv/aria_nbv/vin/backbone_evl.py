@@ -7,6 +7,7 @@ to score candidate poses.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -33,6 +34,101 @@ from .types import EfmDict, EvlBackboneOutput
 
 def _target_cls() -> type["EvlBackbone"]:
     return EvlBackbone
+
+
+def filter_backbone_output_for_features_mode(
+    output: EvlBackboneOutput,
+    *,
+    features_mode: Literal["heads", "neck", "both"],
+) -> EvlBackboneOutput:
+    """Apply ``EvlBackboneConfig.features_mode`` to an EVL output container.
+
+    Args:
+        output: Full EVL output container before feature-family filtering.
+        features_mode: Feature family requested by the caller.
+
+    Returns:
+        Filtered output with unsupported feature families set to ``None`` or
+        empty dictionaries.
+    """
+
+    if features_mode == "both":
+        return output
+    if features_mode == "heads":
+        return replace(
+            output,
+            voxel_feat=None,
+            occ_feat=None,
+            obb_feat=None,
+            feat2d_upsampled={},
+            token2d={},
+        )
+    if features_mode == "neck":
+        return replace(
+            output,
+            occ_pr=None,
+            occ_input=None,
+            free_input=None,
+            counts=None,
+            counts_m=None,
+            cent_pr=None,
+            bbox_pr=None,
+            clas_pr=None,
+            cent_pr_nms=None,
+            obbs_pr_nms=None,
+            obb_pred=None,
+            obb_pred_viz=None,
+            obb_pred_sem_id_to_name=None,
+            obb_pred_probs_full=None,
+            obb_pred_probs_full_viz=None,
+        )
+    raise ValueError(f"Unsupported EVL features_mode: {features_mode!r}.")
+
+
+def _resolve_evl_asset_path(value: object, *, root: Path) -> str:
+    """Resolve EVL Hydra asset paths against the current project checkout."""
+
+    path = Path(str(value)).expanduser()
+    if path.is_absolute() and path.exists():
+        return str(path.resolve())
+
+    candidates: list[Path] = []
+    parts = path.parts
+    for anchor in (".logs", "external"):
+        if anchor in parts:
+            candidates.append(root / Path(*parts[parts.index(anchor) :]))
+    if not path.is_absolute():
+        candidates.append(root / path)
+
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate.resolve())
+    return str(path.resolve() if not path.is_absolute() else path)
+
+
+def _normalize_evl_model_config_paths(
+    model_config: omegaconf.DictConfig,
+    *,
+    root: Path,
+) -> omegaconf.DictConfig:
+    """Patch EFM Hydra config paths that are checkout-local assets."""
+
+    taxonomy_file = omegaconf.OmegaConf.select(model_config, "taxonomy_file")
+    if taxonomy_file is not None:
+        omegaconf.OmegaConf.update(
+            model_config,
+            "taxonomy_file",
+            _resolve_evl_asset_path(taxonomy_file, root=root),
+        )
+
+    ckpt_path = omegaconf.OmegaConf.select(model_config, "video_backbone.image_tokenizer.ckpt_path")
+    if ckpt_path is not None:
+        omegaconf.OmegaConf.update(
+            model_config,
+            "video_backbone.image_tokenizer.ckpt_path",
+            _resolve_evl_asset_path(ckpt_path, root=root),
+        )
+    return model_config
 
 
 class EvlBackboneConfig(BaseConfig):
@@ -94,6 +190,7 @@ class EvlBackbone:
 
         checkpoint = torch.load(self.config.model_ckpt, weights_only=True, map_location=self.device)
         model_config = omegaconf.OmegaConf.load(self.config.model_cfg)
+        model_config = _normalize_evl_model_config_paths(model_config, root=self.config.paths.root)
         model = hydra.utils.instantiate(model_config)
         model.load_state_dict(checkpoint["state_dict"], strict=True)
         model.to(self.device)
@@ -183,7 +280,7 @@ class EvlBackbone:
         if not isinstance(voxel_extent, torch.Tensor):
             raise TypeError(f"Expected voxel_extent Tensor, got {type(voxel_extent)}")
 
-        return EvlBackboneOutput(
+        output = EvlBackboneOutput(
             t_world_voxel=t_world_voxel,
             voxel_extent=voxel_extent,
             voxel_feat=voxel_feat,
@@ -208,4 +305,8 @@ class EvlBackbone:
             pts_world=pts_world,
             feat2d_upsampled=feat2d_upsampled,
             token2d=token2d,
+        )
+        return filter_backbone_output_for_features_mode(
+            output,
+            features_mode=self.config.features_mode,
         )

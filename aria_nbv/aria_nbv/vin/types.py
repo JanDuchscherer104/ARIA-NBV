@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import TYPE_CHECKING, Annotated, TypedDict
 
 import torch
@@ -121,10 +121,25 @@ class EvlBackboneOutput:
     token2d: dict[str, Tensor] = field(default_factory=dict)
     """Per-stream 2D token maps keyed by stream name (e.g. "rgb")."""
 
-    def to_serializable(self) -> dict[str, object]:
-        """Serialize this backbone output into a cache-friendly CPU payload."""
+    def to_serializable(self, *, include_fields: set[str] | None = None) -> dict[str, object]:
+        """Serialize this backbone output into a cache-friendly CPU payload.
 
-        return to_serializable(self)
+        Args:
+            include_fields: Optional dataclass field names to include. When
+                omitted, all fields are serialized.
+
+        Returns:
+            CPU-only payload suitable for immutable offline-store records.
+        """
+
+        exclude: set[str] | None = None
+        if include_fields is not None:
+            known_fields = {field.name for field in fields(self)}
+            exclude = known_fields - include_fields
+        payload = to_serializable(self, exclude=exclude)
+        if not isinstance(payload, dict):
+            raise TypeError(f"Expected serialized EvlBackboneOutput payload dict, got {type(payload)!r}.")
+        return payload
 
     @classmethod
     def from_serializable(
