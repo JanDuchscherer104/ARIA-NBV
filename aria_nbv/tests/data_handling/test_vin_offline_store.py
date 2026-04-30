@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tarfile
 from dataclasses import asdict
+from io import BytesIO
 from pathlib import Path
 from types import MethodType, SimpleNamespace
 
@@ -25,6 +27,7 @@ from aria_nbv.data_handling import (
     VinOfflineWriter,
     VinOracleBatch,
     VinSnippetView,
+    collect_vin_offline_dataset_coverage,
     collect_vin_offline_dataset_stats,
     flush_prepared_samples_to_shard,
     prepare_vin_offline_sample,
@@ -325,7 +328,13 @@ def test_vin_offline_writer_finalizes_prepared_rows_on_keyboard_interrupt(tmp_pa
     assert len(_read_sample_index_rows(store_cfg.sample_index_path)) == 2  # noqa: S101
 
 
-def _write_test_store(tmp_path: Path, *, include_diagnostic_payloads: bool = False) -> VinOfflineStoreConfig:
+def _write_test_store(
+    tmp_path: Path,
+    *,
+    include_diagnostic_payloads: bool = False,
+    include_backbone: bool = False,
+    dataset_config: dict[str, object] | None = None,
+) -> VinOfflineStoreConfig:
     """Create a small immutable VIN offline store for reader tests."""
 
     store_cfg = VinOfflineStoreConfig(store_dir=tmp_path / "vin_offline")
@@ -341,11 +350,11 @@ def _write_test_store(tmp_path: Path, *, include_diagnostic_payloads: bool = Fal
             depths=_make_stub_depths(2, offset=0.0),
             rri=_make_stub_rri(2),
             candidate_pcs=None,
-            backbone_out=None,
+            backbone_out=_make_stub_backbone() if include_backbone else None,
             max_candidates=4,
             include_depths=True,
             include_candidate_pcs=False,
-            include_backbone=False,
+            include_backbone=include_backbone,
             include_diagnostic_payloads=include_diagnostic_payloads,
             sample_key="sample-0",
         ),
@@ -357,11 +366,11 @@ def _write_test_store(tmp_path: Path, *, include_diagnostic_payloads: bool = Fal
             depths=_make_stub_depths(3, offset=10.0),
             rri=_make_stub_rri(3),
             candidate_pcs=None,
-            backbone_out=None,
+            backbone_out=_make_stub_backbone() if include_backbone else None,
             max_candidates=4,
             include_depths=True,
             include_candidate_pcs=False,
-            include_backbone=False,
+            include_backbone=include_backbone,
             include_diagnostic_payloads=include_diagnostic_payloads,
             sample_key="sample-1",
         ),
@@ -373,11 +382,11 @@ def _write_test_store(tmp_path: Path, *, include_diagnostic_payloads: bool = Fal
             depths=_make_stub_depths(2, offset=20.0),
             rri=_make_stub_rri(2),
             candidate_pcs=None,
-            backbone_out=None,
+            backbone_out=_make_stub_backbone() if include_backbone else None,
             max_candidates=4,
             include_depths=True,
             include_candidate_pcs=False,
-            include_backbone=False,
+            include_backbone=include_backbone,
             include_diagnostic_payloads=include_diagnostic_payloads,
             sample_key="sample-2",
         ),
@@ -421,11 +430,11 @@ def _write_test_store(tmp_path: Path, *, include_diagnostic_payloads: bool = Fal
     manifest = VinOfflineManifest(
         version=OFFLINE_DATASET_VERSION,
         created_at="2026-03-29T00:00:00Z",
-        source={"dataset_config": {}},
+        source={"dataset_config": dataset_config or {}},
         oracle={"max_candidates": 4},
         vin={"pad_points": 4},
         materialized_blocks=VinOfflineMaterializedBlocks(
-            backbone=False,
+            backbone=include_backbone,
             depths=True,
             candidate_pcs=False,
             counterfactuals=False,
@@ -581,6 +590,77 @@ def test_collect_vin_offline_dataset_stats_reports_blocks_and_sample_rows(tmp_pa
     assert row.rri.count == 2  # noqa: S101
     assert row.rri.mean == pytest.approx(0.15)  # noqa: S101
     assert row.vin_points.mean == 2.0  # noqa: S101
+
+
+def test_collect_vin_offline_dataset_stats_reports_thesis_diagnostics(tmp_path: Path) -> None:
+    """Immutable diagnostics should expose RRI components, poses, memory, and backbone stats."""
+
+    store_cfg = _write_test_store(tmp_path, include_backbone=True)
+
+    stats = collect_vin_offline_dataset_stats(store_cfg, max_samples=1)
+
+    assert stats.rri_component_summaries["pm_acc_after"].count == 2  # noqa: S101
+    assert stats.rri_component_summaries["pm_acc_after"].mean == pytest.approx(0.25)  # noqa: S101
+    assert stats.rri_component_values["pm_comp_after"] == pytest.approx([0.15, 0.15])  # noqa: S101
+
+    assert stats.candidate_pose_values["offset_x"] == pytest.approx([0.0, 0.0])  # noqa: S101
+    assert stats.candidate_pose_values["offset_y"] == pytest.approx([0.0, 1.0])  # noqa: S101
+    assert stats.candidate_pose_summaries["radius_m"].maximum == pytest.approx(1.0)  # noqa: S101
+    assert stats.candidate_pose_summaries["rotation_delta_deg"].maximum == pytest.approx(0.0)  # noqa: S101
+
+    memory_by_component = {row.component: row for row in stats.memory_diagnostics}
+    assert {"backbone", "oracle_rri", "vin_snippet", "pose_camera", "total"} <= set(memory_by_component)  # noqa: S101
+    assert memory_by_component["total"].mean_mib > memory_by_component["oracle_rri"].mean_mib  # noqa: S101
+
+    backbone_by_field = {row.field: row for row in stats.backbone_diagnostics}
+    assert backbone_by_field["occ_pr"].shape == [1, 1, 2, 2, 2]  # noqa: S101
+    assert backbone_by_field["occ_pr"].mean == pytest.approx(1.0)  # noqa: S101
+    assert backbone_by_field["counts"].nz_frac == pytest.approx(1.0)  # noqa: S101
+
+
+def test_collect_vin_offline_dataset_stats_reports_batch_shape_preview(tmp_path: Path) -> None:
+    """Offline stats should preview the lean model-facing VIN batch path."""
+
+    store_cfg = _write_test_store(tmp_path, include_backbone=True)
+
+    stats = collect_vin_offline_dataset_stats(store_cfg, max_samples=1)
+
+    assert stats.batch_shapes["candidate_poses_world_cam"] == "(4, 12)"  # noqa: S101
+    assert stats.batch_shapes["rri"] == "(4,)"  # noqa: S101
+    assert stats.batch_shapes["vin_snippet.points_world"] == "(4, 4)"  # noqa: S101
+    assert stats.batch_shapes["backbone.occ_pr"] == "(1, 1, 2, 2, 2)"  # noqa: S101
+
+
+def _write_member(archive: tarfile.TarFile, name: str) -> None:
+    """Write one tiny tar member for coverage tests."""
+
+    payload = b"x"
+    info = tarfile.TarInfo(name=name)
+    info.size = len(payload)
+    archive.addfile(info, BytesIO(payload))
+
+
+def test_collect_vin_offline_dataset_coverage_scans_raw_tar_headers(tmp_path: Path) -> None:
+    """Coverage diagnostics should compare raw tar sample keys with immutable store rows."""
+
+    tar_path = tmp_path / "raw_samples.tar"
+    with tarfile.open(tar_path, mode="w") as archive:
+        _write_member(archive, "scene-a/snippet-000.rgb.pth")
+        _write_member(archive, "scene-b/snippet-001.rgb.pth")
+        _write_member(archive, "scene-d/snippet-003.rgb.pth")
+    store_cfg = _write_test_store(tmp_path, dataset_config={"tar_urls": [tar_path.as_posix()]})
+
+    coverage = collect_vin_offline_dataset_coverage(store_cfg)
+
+    assert coverage.tar_shards_scanned == 1  # noqa: S101
+    assert coverage.dataset_snippets == 3  # noqa: S101
+    assert coverage.store_snippets == 3  # noqa: S101
+    assert coverage.covered_snippets == 2  # noqa: S101
+    assert coverage.missing_in_store == 1  # noqa: S101
+    assert coverage.outside_dataset == 1  # noqa: S101
+    assert coverage.coverage == pytest.approx(2.0 / 3.0)  # noqa: S101
+    assert ("scene-d", "snippet-003") in coverage.missing_examples  # noqa: S101
+    assert ("scene-c", "snippet-002") in coverage.outside_examples  # noqa: S101
 
 
 def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
