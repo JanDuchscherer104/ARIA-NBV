@@ -27,6 +27,7 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
   `diagnose-aria`.
 - Backlog or memory changes: use the `agents-db` skill.
 - Cleanup, pruning, or simplification: use the `simplification` skill.
+- LRZ AI Systems, Slurm, DSS, Pyxis, or remote compute work: use `lrz-ai-systems`.
 - KG/literature/code graph work: use `semantic-scholar-litkg`; keep
   repo-independent implementation in `.agents/external/litkg-rs`.
 - OMX is optional operator orchestration. Use
