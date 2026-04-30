@@ -1,8 +1,8 @@
 {
-  "offline_cache": {
+  "vin_offline_store": {
     "config_hash": "d9687bf1c776ee5cc8b746a935fc386a4ed8d986",
     "created_at": "2026-01-03T11:57:52Z",
-    "dir": "/mnt/e/wsl-data/ase-atek-nbv/offline_cache",
+    "dir": "/mnt/e/wsl-data/ase-atek-nbv/vin_offline_store",
     "index_entries": 883,
     "labeler": {
       "backprojection_stride": 1,

@@ -32,7 +32,7 @@
 // Imported slide data (single source of truth for numbers shown in the deck)
 // ---------------------------------------------------------------------------
 
-#let cache = json("/typst/slides/data/offline_cache_stats.json").offline_cache
+#let cache = json("/typst/slides/data/vin_offline_store_stats.json").vin_offline_store
 #let wb = json("/typst/slides/data/wandb_rtjvfyyp_summary.json").wandb
 #let wb_dyn = json("/typst/slides/data/wandb_rtjvfyyp_dynamics.json").wandb_dynamics
 #let wb_top2 = json("/typst/slides/data/wandb_top2_improvements.json").wandb_top2
@@ -559,28 +559,28 @@
     ],
     [
       #figure(
-        image(fig_path + "offline_cache/coverage.png", width: 72%),
+        image(fig_path + "vin_offline_store/coverage.png", width: 72%),
         caption: [Coverage snapshot for the cached subset.],
       )
       #figure(
-        image(fig_path + "offline_cache/footprint.png", width: 75%),
+        image(fig_path + "vin_offline_store/footprint.png", width: 75%),
         caption: [Per-sample memory footprint (mean).],
       )
     ],
   )
 ]
 
-// #slide(title: [Offline cache: Implementation])[
+// #slide(title: [VIN offline store: implementation])[
 //   #figure(
-//     image(fig_path + "diagrams/vin_nbv/mermaid/offline_cache_training.png", width: 55%),
+//     image(fig_path + "diagrams/vin_nbv/mermaid/vin_offline_store_training.png", width: 55%),
 //     caption: [Per-sample memory footprint (mean).],
 //   )
 // ]
 
-#slide(title: [Offline cache: what is stored?])[
+#slide(title: [VIN offline store: what is stored?])[
   #grid(
     [
-      #color-block(title: [Cache structure])[
+      #color-block(title: [Store structure])[
 
         - Full Oracle pipeline outputs:
           + Candidates views #symb.oracle.candidates + #symb.oracle.cameras_q
@@ -594,7 +594,7 @@
     ],
     [
       #figure(
-        caption: [Vin Oracle Cache Sample: sample + candidates + depths + points + RRI.],
+        caption: [VIN offline-store sample: candidates, depths, points, and RRI.],
       )[
         #image(fig_path + "impl/vin-oracle-cache-sample.png", width: 100%)
       ]
@@ -615,7 +615,7 @@
     ],
     [
       #figure(caption: [VinOracleBatch Sample.])[
-        #image(fig_path + "offline_cache/vin_oracle_batch.png", width: 100%)
+        #image(fig_path + "vin_offline_store/vin_oracle_batch.png", width: 100%)
       ]
     ],
   )
@@ -641,7 +641,7 @@
     [
 
       #figure(
-        image(fig_path + "diagrams/vin_nbv/mermaid/offline_cache_training.png", width: 105%),
+        image(fig_path + "diagrams/vin_nbv/mermaid/vin_offline_store_training.png", width: 105%),
         caption: [Data Flow: immutable VIN offline store #sym.arrow.r VinOracleBatch.],
       )
     ],
