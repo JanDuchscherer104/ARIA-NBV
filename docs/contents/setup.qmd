@@ -1,5 +1,9 @@
 ---
 title: "Setup Instructions"
+phase: thesis
+audience: public
+status: current
+owner: jan
 format: html
 ---
 

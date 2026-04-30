@@ -1,5 +1,9 @@
 ---
 title: "VIN v2 Optuna Search Space Update (2026-01-07)"
+phase: thesis
+audience: advisor
+status: planned
+owner: jan
 format: html
 ---
 

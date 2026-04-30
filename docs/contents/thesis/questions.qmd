@@ -1,7 +1,10 @@
 ---
 title: "Master Thesis Research Questions"
+phase: thesis
+audience: advisor
+status: current
+owner: jan
 format: html
-bibliography: ../references.bib
 ---
 
 # Master Thesis Research Questions {#research-questions}
@@ -10,13 +13,14 @@ This page states the research questions for the master's thesis phase of
 Aria-NBV. The central question is:
 
 > Can we train a target-conditioned NBV model that produces
-> acquisition-cost-efficient trajectories maximizing Relative Reconstruction
-> Improvement (RRI) for a target of interest?
+> acquisition-cost-efficient trajectories maximizing
+> {{< glsfull relative-reconstruction-improvement >}} for a
+> {{< gls target-of-interest >}}?
 
 The questions are tied to the dated [roadmap](roadmap.qmd), the
-[RRI theory page](theory/rri_theory.qmd), the
-[oracle/RRI implementation notes](impl/rri_computation.qmd), the
-[VIN implementation notes](impl/vin_nbv.qmd), and the current ASE/EVL stack
+[RRI theory page](../theory/rri_theory.qmd), the
+[oracle/RRI implementation notes](../impl/rri_computation.qmd), the
+[VIN implementation notes](../impl/vin_nbv.qmd), and the current ASE/EVL stack
 [@ProjectAria-ASE-2025; @EFM3D-straub2024]. The thesis builds on VIN-NBV's
 quality-driven candidate-ranking objective [@VIN-NBV-frahm2025], while treating
 GenNBV [@GenNBV-chen2024], Hestia [@Hestia-lu2026], and SceneScript
@@ -25,22 +29,22 @@ GenNBV [@GenNBV-chen2024], Hestia [@Hestia-lu2026], and SceneScript
 ## Definitions {#rq-definitions}
 
 The core terms used by the research questions are maintained in the shared
-[glossary](glossary.qmd), which is generated from
+[glossary](../glossary.qmd), which is generated from
 `docs/glossary/terms.yml` for Quarto, Typst, and KG ingestion:
 
-- [Target of interest](glossary.qmd#term-target-of-interest)
-- [Target-specific RRI](glossary.qmd#term-target-specific-rri)
-- [Acquisition cost](glossary.qmd#term-acquisition-cost)
-- [Target-conditioned scorer](glossary.qmd#term-target-conditioned-scorer)
+- {{< glsfull target-of-interest >}}
+- {{< glsfull target-specific-rri >}}
+- {{< glsfull acquisition-cost >}}
+- {{< glsfull target-conditioned-scorer >}}
 
-Related implementation nodes remain [VINv3](impl/vin_nbv.qmd),
-[EVL literature notes](literature/efm3d.qmd), and
-[candidate generation](../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd).
+Related implementation nodes remain [VINv3](../impl/vin_nbv.qmd),
+[EVL literature notes](../literature/efm3d.qmd), and
+[candidate generation](../../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd).
 
 ## RQ1 - Objective {#rq1-objective}
 
-**Question.** How should target-specific RRI and acquisition cost be combined
-into a trajectory objective?
+**Question.** How should {{< gls target-specific-rri >}} and
+{{< gls acquisition-cost >}} be combined into a trajectory objective?
 
 **Working hypothesis.** The thesis should optimize cumulative target RRI first
 and report acquisition cost separately before introducing a weighted scalarized
@@ -88,7 +92,7 @@ data. Predicted OBBs and learned entity tokens are later realism ablations.
 
 **Connected implementation surfaces.** Target fields should enter through
 data-handling containers, then flow into the
-[VIN model API](../reference/aria_nbv.vin.model_v3.VinModelV3.qmd) and
+[VIN model API](../../reference/aria_nbv.vin.model_v3.VinModelV3.qmd) and
 diagnostics rather than through ad hoc dictionaries.
 
 ## RQ3 - Candidate and Action Space {#rq3-candidates}
@@ -113,8 +117,8 @@ target RRI distribution, scene RRI distribution, and selected-view diversity.
 
 ## RQ4 - Target-Conditioned Model {#rq4-model}
 
-**Question.** Can a target-conditioned VIN-style scorer rank candidates by
-target RRI better than a scene-level scorer?
+**Question.** Can a {{< gls target-conditioned-scorer >}} rank candidates by
+{{< gls target-specific-rri >}} better than a scene-level scorer?
 
 **Working hypothesis.** Target conditioning should improve ranking for selected
 objects and regions, especially when scene-level RRI would prefer walls, floors,
@@ -150,7 +154,7 @@ short path must move around occlusion.
 - optional value or Q scorer after the August gate.
 
 **Connected implementation surfaces.** Use the
-[CounterfactualPoseGenerator](../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd)
+[CounterfactualPoseGenerator](../../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd)
 and keep horizon, branch factor, and beam width explicit so planning complexity
 stays bounded.
 
@@ -215,13 +219,13 @@ experiment-grade evidence before the thesis freeze.
 
 | Question | Roadmap gate | Primary evidence | Main linked surface |
 |---|---|---|---|
-| [RQ1](#rq1-objective) | M1, M5 | target RRI and acquisition-cost curves | [RRI theory](theory/rri_theory.qmd) |
-| [RQ2](#rq2-target-encoding) | M3, M4 | target-encoding ablation | [EVL notes](literature/efm3d.qmd) |
-| [RQ3](#rq3-candidates) | M3, M5 | candidate sampler ablation | [Candidate API](../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd) |
-| [RQ4](#rq4-model) | M4 | scene vs target scorer ranking metrics | [VIN API](../reference/aria_nbv.vin.model_v3.VinModelV3.qmd) |
-| [RQ5](#rq5-planning) | M5 | one-step vs multi-step cumulative RRI | [Rollout API](../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd) |
-| [RQ6](#rq6-feasibility) | M3, M6 | invalid-action ablation | [Candidate API](../reference/aria_nbv.pose_generation.CandidateSamplingResult.qmd) |
-| [RQ7](#rq7-scaling) | M2 to M7 | scale and ablation tables | [Data pipeline](impl/data_pipeline_overview.qmd) |
+| [RQ1](#rq1-objective) | M1, M5 | target RRI and acquisition-cost curves | [RRI theory](../theory/rri_theory.qmd) |
+| [RQ2](#rq2-target-encoding) | M3, M4 | target-encoding ablation | [EVL notes](../literature/efm3d.qmd) |
+| [RQ3](#rq3-candidates) | M3, M5 | candidate sampler ablation | [Candidate API](../../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd) |
+| [RQ4](#rq4-model) | M4 | scene vs target scorer ranking metrics | [VIN API](../../reference/aria_nbv.vin.model_v3.VinModelV3.qmd) |
+| [RQ5](#rq5-planning) | M5 | one-step vs multi-step cumulative RRI | [Rollout API](../../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd) |
+| [RQ6](#rq6-feasibility) | M3, M6 | invalid-action ablation | [Candidate API](../../reference/aria_nbv.pose_generation.CandidateSamplingResult.qmd) |
+| [RQ7](#rq7-scaling) | M2 to M7 | scale and ablation tables | [Data pipeline](../impl/data_pipeline_overview.qmd) |
 | [RQ8](#rq8-extensions) | M6 | gate decision and future-work text | [Roadmap](roadmap.qmd#roadmap-m6) |
 
 ## KG-Friendly Question Writing {#rq-kg-writing}

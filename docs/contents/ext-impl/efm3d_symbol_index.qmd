@@ -1,5 +1,9 @@
 ---
 title: "EFM3D Symbol Index"
+phase: thesis
+audience: public
+status: current
+owner: jan
 format: html
 bibliography: ../../references.bib
 ---

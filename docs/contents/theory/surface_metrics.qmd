@@ -1,5 +1,9 @@
 ---
 title: "Surface Reconstruction Metrics"
+phase: thesis
+audience: public
+status: current
+owner: jan
 ---
 
 This document describes the fundamental metrics used to evaluate 3D reconstruction quality by comparing predicted reconstructions against ground truth meshes.

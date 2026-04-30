@@ -1,5 +1,9 @@
 ---
 title: "Aria-VIN-NBV (VINv3)"
+phase: thesis
+audience: public
+status: current
+owner: jan
 format:
   html:
     toc: true

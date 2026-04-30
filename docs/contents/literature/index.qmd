@@ -1,3 +1,12 @@
+---
+title: "Literature Review"
+phase: thesis
+audience: public
+status: current
+owner: jan
+format: html
+---
+
 # Literature Review
 
 This section contains detailed reviews of key papers and methods related to Next-Best-View planning and foundation models.

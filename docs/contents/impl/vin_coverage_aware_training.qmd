@@ -1,5 +1,9 @@
 ---
 title: VIN v2 Coverage-Aware Training Notes
+phase: thesis
+audience: advisor
+status: planned
+owner: jan
 ---
 
 # VIN v2 Coverage-Aware Training {#vin-coverage-aware}

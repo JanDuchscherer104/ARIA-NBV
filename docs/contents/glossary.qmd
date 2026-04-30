@@ -15,8 +15,11 @@ execute:
 
 ::: {.glossary-intro}
 **28 terms** across **8 categories**. The canonical source is
-`docs/glossary/terms.yml`; generated Quarto, Typst, and KG artifacts
+`docs/glossary/terms.yml`; generated Quarto, Typst, KG, and shortcode artifacts
 share the same definitions.
+
+Use `{{{< gls term-id >}}}` for the linked short label and
+`{{{< glsfull term-id >}}}` for the linked full label in QMD pages.
 :::
 
 <nav class="glossary-category-index" aria-label="Glossary categories">
@@ -172,7 +175,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-aria-synthetic-environments">ASE</a> <a class="glossary-chip" href="#term-target-of-interest">target</a> <a class="glossary-chip" href="#term-next-best-view">NBV</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/scene_script.html" title="docs/contents/literature/scene_script.qmd">SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model</a> <a class="glossary-chip" href="ase_dataset.html" title="docs/contents/ase_dataset.qmd">Aria Synthetic Environments (ASE) Dataset</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/scene_script.html" title="docs/contents/literature/scene_script.qmd">SceneScript</a> <a class="glossary-chip" href="ase_dataset.html" title="docs/contents/ase_dataset.qmd">Aria Synthetic Environments (ASE) Dataset</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-SceneScript-avetisyan2024">&#64;SceneScript-avetisyan2024</a></div></div>
 </div>
 </details>
@@ -230,7 +233,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-snippet">snippet</a> <a class="glossary-chip" href="#term-egocentric-voxel-lifting">EVL</a> <a class="glossary-chip" href="#term-visual-inertial-odometry">VIO</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="ase_dataset.html" title="docs/contents/ase_dataset.qmd">Aria Synthetic Environments (ASE) Dataset</a> <a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">Efm3D</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="ase_dataset.html" title="docs/contents/ase_dataset.qmd">Aria Synthetic Environments (ASE) Dataset</a> <a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">EFM3D and EVL</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-ProjectAria-ASE-2025">&#64;ProjectAria-ASE-2025</a> <a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a></div></div>
 </div>
 </details>
@@ -323,7 +326,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-target-conditioned-scorer">target-conditioned scorer</a> <a class="glossary-chip" href="#term-oriented-bounding-box">OBB</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="questions.html#rq2-target-encoding" title="docs/contents/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="questions.html#rq4-model" title="docs/contents/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_v2_feature_proposals.html" title="docs/contents/impl/vin_v2_feature_proposals.qmd">VIN v2 Feature + Encoding Proposals</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq2-target-encoding" title="docs/contents/thesis/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_v2_feature_proposals.html" title="docs/contents/impl/vin_v2_feature_proposals.qmd">VIN v2 Feature + Encoding Proposals</a></div></div>
 </div>
 </details>
 
@@ -357,7 +360,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-of-interest">target</a> <a class="glossary-chip" href="#term-target-conditioned-scorer">target-conditioned scorer</a> <a class="glossary-chip" href="#term-egocentric-voxel-lifting">EVL</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="ase_dataset.html#oriented-bounding-boxes" title="docs/contents/ase_dataset.qmd#oriented-bounding-boxes">Aria Synthetic Environments (ASE) Dataset</a> <a class="glossary-chip" href="questions.html#rq2-target-encoding" title="docs/contents/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_v2_feature_proposals.html" title="docs/contents/impl/vin_v2_feature_proposals.qmd">VIN v2 Feature + Encoding Proposals</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="ase_dataset.html#oriented-bounding-boxes" title="docs/contents/ase_dataset.qmd#oriented-bounding-boxes">Aria Synthetic Environments (ASE) Dataset</a> <a class="glossary-chip" href="thesis/questions.html#rq2-target-encoding" title="docs/contents/thesis/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_v2_feature_proposals.html" title="docs/contents/impl/vin_v2_feature_proposals.qmd">VIN v2 Feature + Encoding Proposals</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a></div></div>
 </div>
 </details>
@@ -455,7 +458,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a> <a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-candidate-view">candidate</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rri_theory.html" title="docs/contents/theory/rri_theory.qmd">Relative Reconstruction Improvement (RRI) Theory</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="literature/vin_nbv.html" title="docs/contents/literature/vin_nbv.qmd">Vin Nbv</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rri_theory.html" title="docs/contents/theory/rri_theory.qmd">Relative Reconstruction Improvement (RRI) Theory</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="literature/vin_nbv.html" title="docs/contents/literature/vin_nbv.qmd">VIN-NBV</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
 </div>
 </details>
@@ -484,7 +487,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-target-of-interest">target</a> <a class="glossary-chip" href="#term-acquisition-cost">cost</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="questions.html#rq1-objective" title="docs/contents/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="questions.html#rq4-model" title="docs/contents/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/rri_computation.html#entity-wise-rri" title="docs/contents/impl/rri_computation.qmd#entity-wise-rri">Computing RRI with Ground Truth Meshes</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/rri_computation.html#entity-wise-rri" title="docs/contents/impl/rri_computation.qmd#entity-wise-rri">Computing RRI with Ground Truth Meshes</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
 </div>
 </details>
@@ -548,7 +551,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-egocentric-voxel-lifting">EVL</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a> <a class="glossary-chip" href="#term-aria-synthetic-environments">ASE</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">Efm3D</a> <a class="glossary-chip" href="ext-impl/efm3d_implementation.html" title="docs/contents/ext-impl/efm3d_implementation.qmd">EFM3D Implementation Index</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">EFM3D and EVL</a> <a class="glossary-chip" href="ext-impl/efm3d_implementation.html" title="docs/contents/ext-impl/efm3d_implementation.qmd">EFM3D Implementation Index</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a></div></div>
 </div>
 </details>
@@ -577,7 +580,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-egocentric-foundation-model-3d">EFM3D</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a> <a class="glossary-chip" href="#term-oriented-bounding-box">OBB</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">Efm3D</a> <a class="glossary-chip" href="ext-impl/efm3d_implementation.html" title="docs/contents/ext-impl/efm3d_implementation.qmd">EFM3D Implementation Index</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.backbone_evl.EvlBackbone.html" title="docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd">EvlBackbone</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">EFM3D and EVL</a> <a class="glossary-chip" href="ext-impl/efm3d_implementation.html" title="docs/contents/ext-impl/efm3d_implementation.qmd">EFM3D Implementation Index</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.backbone_evl.EvlBackbone.html" title="docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd">EvlBackbone</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a> <a class="glossary-chip glossary-citation" href="#ref-EVL-Doc-2025">&#64;EVL-Doc-2025</a></div></div>
 </div>
 </details>
@@ -606,7 +609,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-of-interest">target</a> <a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="questions.html#rq4-model" title="docs/contents/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.model_v3.VinModelV3.html" title="docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd">VinModelV3</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.model_v3.VinModelV3.html" title="docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd">VinModelV3</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
 </div>
 </details>
@@ -635,7 +638,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-target-conditioned-scorer">target-conditioned scorer</a> <a class="glossary-chip" href="#term-egocentric-voxel-lifting">EVL</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/vin_nbv.html" title="docs/contents/literature/vin_nbv.qmd">Vin Nbv</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.model_v3.VinModelV3.html" title="docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd">VinModelV3</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/vin_nbv.html" title="docs/contents/literature/vin_nbv.qmd">VIN-NBV</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.model_v3.VinModelV3.html" title="docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd">VinModelV3</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
 </div>
 </details>
@@ -670,7 +673,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-next-best-view">NBV</a> <a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a> <a class="glossary-chip" href="#term-target-conditioned-scorer">target-conditioned scorer</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="questions.html#rq3-candidates" title="docs/contents/questions.qmd#rq3-candidates">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CandidateViewGenerator.html" title="docs/reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd">CandidateViewGenerator</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq3-candidates" title="docs/contents/thesis/questions.qmd#rq3-candidates">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CandidateViewGenerator.html" title="docs/reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd">CandidateViewGenerator</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
 </div>
 </details>
@@ -699,7 +702,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-next-best-view">NBV</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="questions.html#rq1-objective" title="docs/contents/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="roadmap.html#roadmap-m5" title="docs/contents/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a></div></div>
 </div>
 </details>
 
@@ -727,7 +730,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/nbv_background.html" title="docs/contents/theory/nbv_background.qmd">NBV Background</a> <a class="glossary-chip" href="roadmap.html" title="docs/contents/roadmap.qmd">Master Thesis Roadmap</a> <a class="glossary-chip" href="questions.html#research-questions" title="docs/contents/questions.qmd#research-questions">Master Thesis Research Questions</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/nbv_background.html" title="docs/contents/theory/nbv_background.qmd">NBV Background</a> <a class="glossary-chip" href="thesis/roadmap.html" title="docs/contents/thesis/roadmap.qmd">Master Thesis Roadmap</a> <a class="glossary-chip" href="thesis/questions.html#research-questions" title="docs/contents/thesis/questions.qmd#research-questions">Master Thesis Research Questions</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a> <a class="glossary-chip glossary-citation" href="#ref-GenNBV-chen2024">&#64;GenNBV-chen2024</a></div></div>
 </div>
 </details>
@@ -888,7 +891,7 @@ share the same definitions.
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-aria-synthetic-environments">ASE</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="impl/data_pipeline_overview.html" title="docs/contents/impl/data_pipeline_overview.qmd">ASE Data Pipeline &amp; Streamlit Usage</a> <a class="glossary-chip" href="roadmap.html#roadmap-m1" title="docs/contents/roadmap.qmd#roadmap-m1">Master Thesis Roadmap</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="impl/data_pipeline_overview.html" title="docs/contents/impl/data_pipeline_overview.qmd">ASE Data Pipeline &amp; Streamlit Usage</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m1" title="docs/contents/thesis/roadmap.qmd#roadmap-m1">Master Thesis Roadmap</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a> <a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a></div></div>
 </div>
 </details>

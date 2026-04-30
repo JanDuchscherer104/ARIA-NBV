@@ -1,5 +1,9 @@
 ---
 title: Experimental Findings
+phase: thesis
+audience: advisor
+status: current
+owner: jan
 format: html
 ---
 

@@ -1,5 +1,9 @@
 ---
 title: "NBV Background"
+phase: thesis
+audience: public
+status: current
+owner: jan
 ---
 
 # Classical Methods: Geometric Heuristics

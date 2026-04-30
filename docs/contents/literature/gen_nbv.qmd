@@ -1,3 +1,12 @@
+---
+title: "GenNBV"
+phase: thesis
+audience: public
+status: current
+owner: jan
+format: html
+---
+
 ## GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction {#gen-nbv}
 
 @GenNBV-chen2024 introduce GenNBV, an end-to-end reinforcement-learning policy that plans in a continuous five-degree-of-freedom view space.

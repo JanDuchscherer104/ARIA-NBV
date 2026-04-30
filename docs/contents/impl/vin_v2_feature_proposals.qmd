@@ -1,5 +1,9 @@
 ---
 title: "VIN v2 Feature + Encoding Proposals"
+phase: thesis
+audience: advisor
+status: planned
+owner: jan
 format: html
 ---
 

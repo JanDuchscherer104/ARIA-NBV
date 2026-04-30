@@ -1,5 +1,9 @@
 ---
 title: "Implementing CORAL for Ordinal Regression to Continuous Targets"
+phase: thesis
+audience: public
+status: current
+owner: jan
 ---
 
 ## 1. Correcting the probabilistic mistake (core insight)

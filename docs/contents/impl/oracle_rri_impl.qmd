@@ -1,5 +1,9 @@
 ---
 title: "aria_nbv Implementation Overview"
+phase: thesis
+audience: public
+status: current
+owner: jan
 format: html
 ---
 

@@ -1,5 +1,9 @@
 ---
 title: Implementation Overview
+phase: thesis
+audience: public
+status: current
+owner: jan
 ---
 
 # Reconstruction Quality Metrics & RRI Computation {#metrics-index}

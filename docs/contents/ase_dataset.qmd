@@ -1,5 +1,9 @@
 ---
 title: "Aria Synthetic Environments (ASE) Dataset"
+phase: thesis
+audience: public
+status: current
+owner: jan
 format: html
 bibliography: ../references.bib
 ---

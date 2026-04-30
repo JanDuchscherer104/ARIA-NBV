@@ -1,5 +1,9 @@
 ---
 title: "VIN v2: Component Architecture Diagrams (Mermaid)"
+phase: thesis
+audience: public
+status: current
+owner: jan
 format:
   html:
     page-layout: full

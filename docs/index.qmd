@@ -1,6 +1,9 @@
-
 ---
 title: "ARIA-NBV: Target-Aware Next-Best-View Planning"
+phase: thesis
+audience: public
+status: current
+owner: jan
 subtitle: "Quality-driven NBV with ASE, EFM3D, Relative Reconstruction Improvement, and VIN-style candidate scoring"
 author: "Jan Duchscherer, Munich University of Applied Sciences"
 date: last-modified
@@ -61,10 +64,10 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 
 - [Setup Instructions](contents/setup.qmd): Environment setup and dependencies
 
-## Project State
+## Thesis State
 
-- **[Project Roadmap](contents/roadmap.qmd)**: Milestones and timeline
-- **[Research Questions](contents/questions.qmd)**: Open problems and directions
+- **[Project Roadmap](contents/thesis/roadmap.qmd)**: Milestones and timeline
+- **[Research Questions](contents/thesis/questions.qmd)**: Open problems and directions
 - **[Experimental Findings](contents/experiments/findings.qmd)**: Run logs and takeaways
 
 ## Theory & Background

@@ -1,3 +1,12 @@
+---
+title: "EFM3D and EVL"
+phase: thesis
+audience: public
+status: current
+owner: jan
+format: html
+---
+
 ## EFM3D & EVL {#efm3d}
 
 <!-- # EFM Backbone

@@ -1,14 +1,17 @@
 ---
 title: "ASE Data Pipeline & Streamlit Usage"
+phase: thesis
+audience: public
+status: current
+owner: jan
 format: html
 ---
 
 # Quickstart (Streamlit UI)
 
 ```bash
-cd /home/jandu/repos/NBV
-source activate aria-nbv          # or conda activate aria-nbv
-streamlit run -m aria_nbv.streamlit_app
+cd aria_nbv
+uv run nbv-st
 ```
 
 Pages in the app:

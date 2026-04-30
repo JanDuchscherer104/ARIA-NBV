@@ -21,8 +21,8 @@
     RRI scores.
   internal_links:
     - docs/contents/theory/nbv_background.qmd
-    - docs/contents/roadmap.qmd
-    - docs/contents/questions.qmd#research-questions
+    - docs/contents/thesis/roadmap.qmd
+    - docs/contents/thesis/questions.qmd#research-questions
   citations:
     - VIN-NBV-frahm2025
     - GenNBV-chen2024
@@ -118,8 +118,8 @@
     Target-conditioned ARIA-NBV variants use this target as an explicit input to
     candidate scoring and planning instead of optimizing only scene-level RRI.
   internal_links:
-    - docs/contents/questions.qmd#rq2-target-encoding
-    - docs/contents/questions.qmd#rq4-model
+    - docs/contents/thesis/questions.qmd#rq2-target-encoding
+    - docs/contents/thesis/questions.qmd#rq4-model
     - docs/contents/impl/vin_v2_feature_proposals.qmd
   citations: []
   related:
@@ -150,8 +150,8 @@
   notation:
     typst: '$RRI_e$'
   internal_links:
-    - docs/contents/questions.qmd#rq1-objective
-    - docs/contents/questions.qmd#rq4-model
+    - docs/contents/thesis/questions.qmd#rq1-objective
+    - docs/contents/thesis/questions.qmd#rq4-model
     - docs/contents/impl/rri_computation.qmd#entity-wise-rri
   citations:
     - VIN-NBV-frahm2025
@@ -182,8 +182,8 @@
     separately, then use scalarized objectives only when the tradeoff is
     explicit.
   internal_links:
-    - docs/contents/questions.qmd#rq1-objective
-    - docs/contents/roadmap.qmd#roadmap-m5
+    - docs/contents/thesis/questions.qmd#rq1-objective
+    - docs/contents/thesis/roadmap.qmd#roadmap-m5
   citations: []
   related:
     - target-specific-rri
@@ -210,7 +210,7 @@
     The scorer predicts target-specific utility so view ranking can prioritize a
     selected entity or region instead of only optimizing scene-level RRI.
   internal_links:
-    - docs/contents/questions.qmd#rq4-model
+    - docs/contents/thesis/questions.qmd#rq4-model
     - docs/contents/impl/vin_nbv.qmd
     - docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd
   citations:
@@ -333,7 +333,7 @@
     provide center, extent, orientation, semantic class, and confidence signals.
   internal_links:
     - docs/contents/ase_dataset.qmd#oriented-bounding-boxes
-    - docs/contents/questions.qmd#rq2-target-encoding
+    - docs/contents/thesis/questions.qmd#rq2-target-encoding
     - docs/contents/impl/vin_v2_feature_proposals.qmd
   citations:
     - EFM3D-straub2024
@@ -771,7 +771,7 @@
   notation:
     typst: '#symb.oracle.candidates'
   internal_links:
-    - docs/contents/questions.qmd#rq3-candidates
+    - docs/contents/thesis/questions.qmd#rq3-candidates
     - docs/contents/impl/rri_computation.qmd
     - docs/reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd
   citations:
@@ -805,7 +805,7 @@
   internal_links:
     - docs/contents/impl/rri_computation.qmd
     - docs/contents/impl/data_pipeline_overview.qmd
-    - docs/contents/roadmap.qmd#roadmap-m1
+    - docs/contents/thesis/roadmap.qmd#roadmap-m1
   citations:
     - VIN-NBV-frahm2025
     - EFM3D-straub2024

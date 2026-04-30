@@ -20,9 +20,9 @@ The public documentation is published at
 
 ## Documentation Map
 
-- [Roadmap](docs/contents/roadmap.qmd): dated thesis milestones through
+- [Roadmap](docs/contents/thesis/roadmap.qmd): dated thesis milestones through
   2026-09-30.
-- [Research Questions](docs/contents/questions.qmd): target-conditioned NBV
+- [Research Questions](docs/contents/thesis/questions.qmd): target-conditioned NBV
   thesis questions and evaluation criteria.
 - [Implementation Notes](docs/contents/impl/overview.qmd): data, RRI, VIN, and
   diagnostics entry points.

@@ -1,5 +1,9 @@
 ---
 title: "Semi-Dense Point Clouds"
+phase: thesis
+audience: public
+status: current
+owner: jan
 format: html
 bibliography: ../../references.bib
 author: "OpenAI ChatGPT, Deep Research & GPT-5"

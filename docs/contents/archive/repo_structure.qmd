@@ -1,7 +1,17 @@
 ---
 title: "Repository Structure"
+phase: archive
+audience: internal
+status: archive
+owner: jan
 format: html
 ---
+::: {.callout-note}
+This historical structure page is retained for context. Prefer the generated
+API reference, `docs/_generated/context/source_index.md`, and targeted `rg`
+queries for current repository structure.
+:::
+
 <!-- TODO: auto-generate this page based on the actual *.py source code. Provide the tree directory structure with concise descriptions of each module.
 
 - should we use some package to generate api docs from our module and the doc-strings?

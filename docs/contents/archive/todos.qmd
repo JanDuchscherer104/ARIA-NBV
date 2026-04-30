@@ -1,7 +1,18 @@
 ---
 title: "Action Items & TODOs"
+phase: archive
+audience: internal
+status: archive
+owner: jan
 format: html
 ---
+::: {.callout-warning}
+This page is retained as renderable backlog history only. Current actionable
+work is tracked in `.agents/issues.toml`, `.agents/todos.toml`, and
+`.agents/refactors.toml`; current thesis milestones are in
+[roadmap](../thesis/roadmap.qmd).
+:::
+
 <!-- All TODO points must be listed as `- [ ]` or `- [x]`. If an issue has been resolved, it should be marked as `- [x]` followed with *how* it was resolved on the next line. i.e:
 ```
 - [x] Implement `OracleRRI` with point-cloud–to–mesh distance (Chamfer components).
@@ -463,15 +474,15 @@ print(run.history())
 
 ### Action Items (summary checklist)
 
-- [x] Implement a VIN model (RRI predictor) in `aria_nbv/aria_nbv/vin` on top of the EFM3D ([EFM3D](../contents/literature/efm3d.qmd)) / EVL backbone (frozen).
+- [x] Implement a VIN model (RRI predictor) in `aria_nbv/aria_nbv/vin` on top of the EFM3D ([EFM3D](../literature/efm3d.qmd)) / EVL backbone (frozen).
   - Input:
     - raw `efm_snippet_view.efm: efm: dict[str, Any]` as input to EVL backbone
     - candidate poses `PoseTW` (N candidates) as input to the view scorer head together with scene features from EVL as well as other potential candidate features.
     - choose suitable positional encoding for the candidate poses - i.e. learnable spherical harmonics encoding or learnable fourier features.
     - the candidate poses should be relative to the reference poses rig position and orientation.
-    - loss and training objective same as in [VIN-NBV](../contents/literature/vin_nbv.qmd)
+    - loss and training objective same as in [VIN-NBV](../literature/vin_nbv.qmd)
     - start with an implementation proposal of the model architecture and training procedure in `docs/contents/impl/vin_nbv.qmd`.
-    - For this do a comprehensive review of the EVL architecture to understand how to best integrate the view scorer head on top of it. Consider that we have a [simple script to infer EVL](../../aria_nbv/scripts/run_efm3d_on_ase.py). Another good starting point is our [EFM3D symbol index](../contents/ext-impl/efm3d_symbol_index.qmd) and [EFM3D implementation overview](../contents/ext-impl/efm3d_implementation.qmd).
+    - For this do a comprehensive review of the EVL architecture to understand how to best integrate the view scorer head on top of it. Consider that we have a [simple script to infer EVL](../../../aria_nbv/scripts/run_efm3d_on_ase.py). Another good starting point is our [EFM3D symbol index](../ext-impl/efm3d_symbol_index.qmd) and [EFM3D implementation overview](../ext-impl/efm3d_implementation.qmd).
 
     > **Done**: Implemented VIN package code in `aria_nbv/aria_nbv/vin/` (frozen EVL + CORAL head), shell+SH pose encoding via `e3nn` **plus 1D Fourier features for the radius**, and a Lightning-based training pipeline (`aria_nbv/aria_nbv/lightning/` + `nbv-train` / `nbv-fit-binner`) that uses `OracleRriLabeler`. Documented the architecture + training procedure in `docs/contents/impl/vin_nbv.qmd`.
 

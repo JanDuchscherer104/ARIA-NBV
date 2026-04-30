@@ -1,5 +1,9 @@
 ---
 title: "aria_nbv Overview & Architecture"
+phase: thesis
+audience: public
+status: current
+owner: jan
 format:
   html:
     page-layout: full

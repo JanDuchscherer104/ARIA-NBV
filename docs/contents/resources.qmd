@@ -1,5 +1,9 @@
 ---
 title: "Resources & Tools"
+phase: thesis
+audience: public
+status: current
+owner: jan
 format: html
 ---
 

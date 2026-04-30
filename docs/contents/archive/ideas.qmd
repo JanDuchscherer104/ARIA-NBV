@@ -1,11 +1,22 @@
 ---
+title: "Ideas and Future Directions Archive"
 id: ideas
 updated: 2026-04-11
+phase: archive
+audience: internal
+status: archive
+owner: jan
+format: html
 scope: repo
-owner: jan (CODEOWNER)
-status: active
 tags: [read-only, project-ideas, future-directions, multi-step rri based rl]
 ---
+
+::: {.callout-note}
+This page is retained as renderable scratch history. Current thesis decisions
+belong in [roadmap](../thesis/roadmap.qmd), active research questions belong in
+[questions](../thesis/questions.qmd), and actionable work belongs in the
+`.agents/*.toml` backlog.
+:::
 
 # Ideas and Future Directions
 

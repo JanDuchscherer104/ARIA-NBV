@@ -1,3 +1,12 @@
+---
+title: "Computing RRI with Ground Truth Meshes"
+phase: thesis
+audience: public
+status: current
+owner: jan
+format: html
+---
+
 # Computing RRI with Ground Truth Meshes
 
 This document describes the complete pipeline for computing the Relative Reconstruction Improvement (RRI) oracle using the ASE dataset and ground truth meshes, **leveraging existing EFM3D and ATEK utilities for scalability**.

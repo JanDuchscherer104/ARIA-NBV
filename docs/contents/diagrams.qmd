@@ -1,5 +1,9 @@
 ---
 title: "VIN NBV Diagrams"
+phase: thesis
+audience: public
+status: current
+owner: jan
 ---
 
 This page contains the architecture diagrams for the VIN NBV system.

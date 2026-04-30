@@ -1,5 +1,9 @@
 ---
 title: "ProjectAria Tools: Complete Reference"
+phase: thesis
+audience: public
+status: current
+owner: jan
 subtitle: "Data Loading, Transforms, Calibration & Visualization"
 format: html
 ---

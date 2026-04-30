@@ -12,6 +12,9 @@ project:
 metadata-files:
   - reference/_sidebar.yml
 
+shortcodes:
+  - _extensions/aria-glossary/aria-glossary.lua
+
 # Global execution defaults (fast iterations; deterministic rebuilds)
 execute: # see https://quarto.org/docs/computations/execution-options.html
   freeze: auto      # re-render only when source changes
@@ -56,14 +59,12 @@ website:
     left:
       - text: Setup
         href: contents/setup.qmd
-      - text: Project State
+      - text: Thesis State
         menu:
           - text: Roadmap
-            href: contents/roadmap.qmd
-          - text: Ideas (Brainstorming)
-            href: contents/ideas.qmd
+            href: contents/thesis/roadmap.qmd
           - text: Research Questions
-            href: contents/questions.qmd
+            href: contents/thesis/questions.qmd
           - text: Findings
             href: contents/experiments/findings.qmd
       - text: Aria NBV API
@@ -99,11 +100,11 @@ website:
             - contents/literature/scene_script.qmd
             - contents/literature/efm3d.qmd
             - contents/literature/hestia.qmd
-        - section: "Project State"
+        - section: "Thesis State"
           contents:
             - contents/experiments/findings.qmd
-            - contents/questions.qmd
-            - contents/roadmap.qmd
+            - contents/thesis/questions.qmd
+            - contents/thesis/roadmap.qmd
         - section: "Resources"
           contents:
             - contents/setup.qmd

@@ -1,7 +1,10 @@
 ---
 title: "Master Thesis Roadmap"
+phase: thesis
+audience: advisor
+status: current
+owner: jan
 format: html
-bibliography: ../references.bib
 ---
 
 # Master Thesis Roadmap {#roadmap}
@@ -9,31 +12,32 @@ bibliography: ../references.bib
 This roadmap covers full-time thesis work from **2026-04-29** through
 **2026-09-30**. The planned capacity is approximately 40 hours per week, with
 the final claim centered on target-conditioned, quality-driven
-Next-Best-View (NBV) planning:
+{{< glsfull next-best-view >}} planning:
 
 > Can we train a target-conditioned NBV model that produces
-> acquisition-cost-efficient trajectories maximizing Relative Reconstruction
-> Improvement (RRI) for a target of interest?
+> acquisition-cost-efficient trajectories maximizing
+> {{< glsfull relative-reconstruction-improvement >}} for a
+> {{< gls target-of-interest >}}?
 
 The technical spine follows the current Aria-NBV system: ASE snippets and
 ground-truth meshes [@ProjectAria-ASE-2025], frozen EVL/EFM3D features
-[@EFM3D-straub2024], oracle RRI supervision inspired by VIN-NBV
+[@EFM3D-straub2024], {{< gls oracle-rri >}} supervision inspired by VIN-NBV
 [@VIN-NBV-frahm2025], and bounded multi-step planning before any full
 continuous-RL claim. See the [research questions](questions.qmd), the
-[RRI theory page](theory/rri_theory.qmd), the
-[VIN implementation note](impl/vin_nbv.qmd), and the
-[Typst paper source](../typst/paper/main.typ) for the main connected nodes.
+[RRI theory page](../theory/rri_theory.qmd), the
+[VIN implementation note](../impl/vin_nbv.qmd), and the
+[Typst paper source](../../typst/paper/main.typ) for the main connected nodes.
 
 ## Thesis Outcome {#roadmap-thesis-outcome}
 
-The September deliverable is a reproducible target-aware NBV stack:
+The September deliverable is a reproducible target-aware {{< gls next-best-view >}} stack:
 
-- a trusted oracle for scene-level and target-specific RRI;
+- a trusted oracle for scene-level and {{< gls target-specific-rri >}};
 - a one-step VIN-style scorer that can be conditioned on a target encoding;
 - a multi-step rollout evaluator comparing greedy, stochastic/beam, and
   model-scored target-aware trajectories;
 - final figures, ablations, and failure cases that report cumulative target
-  RRI together with acquisition cost.
+  RRI together with {{< gls acquisition-cost >}}.
 
 Full continuous control, simulator-backed online RL, VLM/global planning, and
 real-device deployment remain stretch work unless the August evidence gate is
@@ -64,8 +68,8 @@ claims.
 **Primary question:** Which work is thesis-critical, and which work is support
 infrastructure?
 
-**Implementation surfaces:** root README, `docs/contents/roadmap.qmd`,
-`docs/contents/questions.qmd`, the Streamlit VIN diagnostics page, and the
+**Implementation surfaces:** root README, `docs/contents/thesis/roadmap.qmd`,
+`docs/contents/thesis/questions.qmd`, the Streamlit VIN diagnostics page, and the
 available VIN offline store.
 
 **Exit checks:**
@@ -73,7 +77,7 @@ available VIN offline store.
 - classify existing worktree changes into data/cache cleanup, RL/rollout
   scaffold, docs cleanup, and unrelated operator work;
 - validate that `offline_only.toml` can load the available VIN offline store into the
-  [VIN diagnostics page](../reference/aria_nbv.lightning.VinDataModule.qmd);
+  [VIN diagnostics page](../../reference/aria_nbv.lightning.VinDataModule.qmd);
 - record KG-friendly authoring rules in this roadmap and use them in new public
   docstrings;
 - keep thesis scope aligned with [RQ1](questions.qmd#rq1-objective) through
@@ -85,10 +89,10 @@ available VIN offline store.
 and planning claims?
 
 **Implementation surfaces:** the
-[data-handling API](../reference/data_handling.qmd), the
-[offline store contracts](../reference/aria_nbv.data_handling.VinSnippetView.qmd),
-the [RRI metric API](../reference/rri_metrics.qmd), and the
-[data pipeline overview](impl/data_pipeline_overview.qmd).
+[data-handling API](../../reference/data_handling.qmd), the
+[offline store contracts](../../reference/aria_nbv.data_handling.VinSnippetView.qmd),
+the [RRI metric API](../../reference/rri_metrics.qmd), and the
+[data pipeline overview](../impl/data_pipeline_overview.qmd).
 
 **Exit checks:**
 
@@ -103,8 +107,8 @@ the [RRI metric API](../reference/rri_metrics.qmd), and the
 **Primary question:** What is the reproducible one-step baseline before adding
 target conditioning?
 
-**Implementation surfaces:** the [VIN implementation note](impl/vin_nbv.qmd),
-the [VIN model API](../reference/aria_nbv.vin.model_v3.VinModelV3.qmd), the
+**Implementation surfaces:** the [VIN implementation note](../impl/vin_nbv.qmd),
+the [VIN model API](../../reference/aria_nbv.vin.model_v3.VinModelV3.qmd), the
 Lightning training surface, W&B/Optuna reports, and Streamlit diagnostics.
 
 **Exit checks:**
@@ -157,7 +161,7 @@ offline-store payload extensions, and model diagnostics.
 RRI under the same acquisition budget?
 
 **Implementation surfaces:** the
-[counterfactual rollout API](../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd),
+[counterfactual rollout API](../../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd),
 candidate generation, target-aware scorer backends, and rollout diagnostics.
 
 **Exit checks:**
@@ -176,7 +180,7 @@ candidate generation, target-aware scorer backends, and rollout diagnostics.
 credible before thesis freeze?
 
 **Implementation surfaces:** the
-[counterfactual RL API](../reference/aria_nbv.pose_generation.CounterfactualRolloutResult.qmd),
+[counterfactual RL API](../../reference/aria_nbv.pose_generation.CounterfactualRolloutResult.qmd),
 transition datasets, masked discrete Q, and optional close-greedy PPO/SB3
 experiments.
 
@@ -243,8 +247,8 @@ Docs changes should render the touched pages and preserve the context index:
 
 ```sh
 cd docs
-quarto render contents/roadmap.qmd
-quarto render contents/questions.qmd
+quarto render contents/thesis/roadmap.qmd
+quarto render contents/thesis/questions.qmd
 cd ..
 scripts/nbv_qmd_outline.sh --compact
 ```

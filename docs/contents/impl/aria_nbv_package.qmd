@@ -1,5 +1,9 @@
 ---
 title: aria_nbv Package
+phase: thesis
+audience: public
+status: current
+owner: jan
 ---
 
 > **Note**: This page is superseded by `aria_nbv_overview.qmd` for the consolidated package map. Keep this one for finer module notes.
