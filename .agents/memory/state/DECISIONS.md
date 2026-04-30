@@ -1,6 +1,6 @@
 ---
 id: decisions
-updated: 2026-03-30
+updated: 2026-04-30
 scope: repo
 owner: jan
 status: active
@@ -34,6 +34,14 @@ tags: [codex, workflow, architecture]
 - Documentation changes should update Quarto/Typst sources directly, not ad hoc notes under `.codex/`.
 - The published Quarto site refreshes `aria_nbv` API reference pages from docstrings via `quartodoc` during the Pages workflow, with `docs/reference/index.qmd` as the human-authored landing page.
 - The published Quarto site also regenerates maintained agent-scaffold pages from canonical markdown under `AGENTS.md`, `.agents/memory/state/`, `.agents/references/`, and `.agents/skills/aria-nbv-context/`, while keeping history and archive surfaces out of the site.
+- Retained QMD docs remain renderable, but current thesis pages use
+  `docs/contents/thesis/`, past seminar material uses `docs/contents/seminar/`,
+  and retained scratch/history uses `docs/contents/archive/` with explicit
+  `phase`, `audience`, `status`, and `owner` frontmatter.
+- Human-owner preferences that are durable but not public narrative or workflow
+  rules live in `.agents/references/human_owner_intent.md`.
+- OMX remains optional operator orchestration; it does not own canonical memory,
+  backlog, docs, or repo state.
 
 ## Working Project Decisions
 - RRI is the primary project objective for next-best-view research in this repo. Coverage-style objectives remain baselines or diagnostics, not the main thesis target.

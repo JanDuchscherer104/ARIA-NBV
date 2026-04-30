@@ -14,7 +14,7 @@ loc_max = 1600
 context = ["Current docs expose roadmap, TODOs, ideas, generated agent scaffold mirrors, literature notes, implementation guides, and scratchpad-like pages in the same public tree.", "docs/AGENTS.md says docs/typst/paper/main.typ is ground truth and Quarto should not introduce competing top-level narratives."]
 implementation_notes = ["Start with scripts/nbv_qmd_outline.sh --compact and docs/_quarto.yml navigation instead of broad manual browsing.", "Keep source pages until there is an explicit archive/move decision; first remove public navigation pressure and stale links.", "Do not delete history records under .agents/memory/history/."]
 acceptance = ["Each docs subtree has an explicit role: public, paper, slides, generated, internal mirror, or archive.", "Public nav no longer surfaces internal agent scaffolding or stale work-management pages as primary project content.", "Stale typo links such as coral_intergarion and hesita are either renamed or intentionally documented."]
-verification = ["scripts/nbv_qmd_outline.sh --compact", "cd docs && quarto render index.qmd contents/roadmap.qmd contents/questions.qmd", "rg -n \"Seminar|hesita|coral_intergarion|JanDuchscherer104/NBV\" README.md docs"]
+verification = ["scripts/nbv_qmd_outline.sh --compact", "cd docs && quarto render index.qmd contents/thesis/roadmap.qmd contents/thesis/questions.qmd", "rg -n \"Seminar|hesita|coral_intergarion|JanDuchscherer104/NBV\" README.md docs"]
 
 [[todo]]
 id = "todo-002"
@@ -50,8 +50,8 @@ verification = ["rg -n \"PRML|litkg-rs|Rust\" .agents/skills/oracle-rri-contract
 
 [[todo]]
 id = "todo-004"
-title = "Implement vin-training-diagnostics skill"
-description = "Create a skill for VIN scorer experiments, offline-store training, diagnostics, and W&B/Optuna logging."
+title = "Deferred vin-training-eval skill"
+description = "Create a deferred skill for VIN scorer experiments, offline-store training, diagnostics, and W&B/Optuna logging once VIN training work resumes."
 priority = "medium"
 status = "todo"
 labels = ["agent", "research"]
@@ -59,8 +59,8 @@ issue_ids = ["issue-007"]
 loc_min = 80
 loc_expected = 180
 loc_max = 360
-context = ["M2 requires a reproducible one-step VIN baseline, calibration/ranking plots, and a fixed ablation matrix.", "The current app and Lightning stack already expose VIN diagnostics, summary, W&B, and Optuna surfaces."]
-implementation_notes = ["Route to aria_nbv/aria_nbv/vin/AGENTS.md, app VIN diagnostics helpers, Lightning CLI, and docs/contents/impl/vin_nbv.qmd.", "Capture validation gotcha: trainer_config.enable_validation must be true for validation to run."]
+context = ["M2 requires a reproducible one-step VIN baseline, calibration/ranking plots, and a fixed ablation matrix.", "The current app and Lightning stack already expose VIN diagnostics, summary, W&B, and Optuna surfaces.", "The scaffold cleanup intentionally adds only diagnose-aria and plan-grill now; VIN training/eval should remain backlog until active VIN experiment work resumes."]
+implementation_notes = ["Route to aria_nbv/aria_nbv/vin/AGENTS.md, app VIN diagnostics helpers, Lightning CLI, and docs/contents/impl/vin_nbv.qmd.", "Capture validation gotcha: trainer_config.enable_validation must be true for validation to run.", "Use the final name vin-training-eval unless a later plan selects a narrower name."]
 acceptance = ["The skill gives a compact experiment workflow for offline_only.toml, nbv-summary, targeted VIN tests, and diagnostics interpretation.", "The skill names current ARIA-NBV surfaces only."]
 verification = ["make check-agent-memory", "rg -n \"PRML|litkg-rs|Rust\" .agents/skills/vin-training-diagnostics .agents/skills || true"]
 
@@ -78,7 +78,7 @@ loc_max = 1800
 context = ["Thesis RQ3/RQ4 require target-specific RRI before target-conditioned VIN can be evaluated.", "GOTCHAS.md notes EVL OBB outputs are not batch-collatable yet, so first runs may need batch_size=None or OBB outputs disabled outside the target-aware path."]
 implementation_notes = ["Start with GT OBBs and a small trusted subset; do not begin with predicted OBB realism ablations.", "Keep target mesh/point support, invalid target reasons, and scene-level-vs-target-level diagnostics explicit.", "Use existing PoseTW and CameraTW contracts; do not introduce raw matrix interfaces."]
 acceptance = ["GT-OBB cropped RRI runs on a small subset with side-by-side target RRI and scene RRI diagnostics.", "Unsupported targets have explicit invalid reasons rather than being encoded as low RRI.", "Docs and tests describe target frames, crop margin, units, and failure modes."]
-verification = ["cd aria_nbv && uv run pytest tests/rri_metrics tests/data_handling/test_vin_offline_store.py", "cd docs && quarto render contents/questions.qmd contents/roadmap.qmd"]
+verification = ["cd aria_nbv && uv run pytest tests/rri_metrics tests/data_handling/test_vin_offline_store.py", "cd docs && quarto render contents/thesis/questions.qmd contents/thesis/roadmap.qmd"]
 
 [[todo]]
 id = "todo-006"

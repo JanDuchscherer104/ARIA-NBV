@@ -1,6 +1,6 @@
 ---
 id: project_state
-updated: 2026-04-29
+updated: 2026-04-30
 scope: repo
 owner: jan
 status: active
@@ -51,8 +51,9 @@ This repository develops an active next-best-view planner for egocentric indoor 
 - *Current truth / active direction:* Empty oracle mesh crops are invalid inputs, not scene-level fallback labels.
 - *Current truth / active direction:* Preserve the current geometry-first interpretation of counterfactual state while clarifying which missing modalities should be synthesized later.
 - *Current truth / active direction:* Keep docs, Streamlit surfaces, and canonical memory aligned with code so advisor meetings stay grounded in the actual repo state.
+- *Current truth / active direction:* Quarto docs keep retained QMD pages renderable while separating current thesis pages under `docs/contents/thesis/` from archived scratch/history under `docs/contents/archive/`; active work belongs in the TOML backlog rather than public TODO pages.
 - *Current truth / active direction:* Literature/code knowledge graph work is routed through the `.agents/external/litkg-rs` submodule and the `semantic-scholar-litkg` skill, with ARIA-NBV-specific ingestion controlled by `.configs/litkg.toml` rather than toolkit hard-coding. The default representation is graphify-style durable Markdown/JSON plus Neo4j export bundles; CodeGraphContext is the code-symbol runtime; Graphiti and mempalace remain optional side integrations.
-- *Current truth / active direction:* Project terminology is maintained in `docs/glossary/terms.yml` and regenerated with `make glossary` into Quarto, Typst, and KG-facing artifacts. Research questions and thesis docs should link to glossary anchors instead of redefining canonical terms inline.
+- *Current truth / active direction:* Project terminology is maintained in `docs/glossary/terms.yml` and regenerated with `make glossary` into Quarto, Typst, KG-facing artifacts, and the Quarto glossary shortcode term map. QMD prose should use `{{< gls term-id >}}` or `{{< glsfull term-id >}}` instead of hand-written glossary links or inline redefinitions.
 
 ## Deferred but Important Extensions
 - *Deferred extension:* Hestia-style hierarchical control that separates target selection from view realization and later introduces continuous motion.
@@ -64,4 +65,4 @@ This repository develops an active next-best-view planner for egocentric indoor 
 ## Pointers
 - Stable and already-adopted project choices live in `DECISIONS.md`.
 - Advisor-pending scope calls and unresolved research/system questions live in `OPEN_QUESTIONS.md`.
-- The highest-signal idea scratchpad remains `docs/contents/ideas.qmd`.
+- The archived idea scratchpad remains `docs/contents/archive/ideas.qmd`; current thesis direction belongs in `docs/contents/thesis/roadmap.qmd` and `docs/contents/thesis/questions.qmd`.
