@@ -6,6 +6,13 @@
   --glossary-soft-bg: color-mix(in srgb, currentColor 5%, transparent);
   --glossary-chip-bg: color-mix(in srgb, #2f6feb 10%, transparent);
   --glossary-chip-border: color-mix(in srgb, #2f6feb 28%, transparent);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.glossary-page,
+.glossary-page * {
+  box-sizing: border-box;
 }
 
 .glossary-intro {
@@ -18,6 +25,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
+  max-width: 100%;
+  min-width: 0;
   margin: 1rem 0 1.75rem;
 }
 
@@ -34,6 +43,7 @@
   line-height: 1.35;
   text-decoration: none;
   overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .glossary-category-chip span {
@@ -45,6 +55,8 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.9rem;
+  max-width: 100%;
+  min-width: 0;
   margin: 0.8rem 0 2rem;
 }
 
@@ -53,6 +65,8 @@
   border-radius: 8px;
   padding: 1rem;
   background: var(--glossary-soft-bg);
+  max-width: 100%;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -68,6 +82,8 @@
   margin: 0;
   font-size: 1.08rem;
   line-height: 1.25;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .glossary-term-badges {
@@ -76,6 +92,7 @@
   justify-content: flex-end;
   gap: 0.35rem;
   min-width: 0;
+  max-width: 100%;
 }
 
 .glossary-badge {
@@ -86,7 +103,8 @@
   color: var(--glossary-muted);
   font-size: 0.76rem;
   line-height: 1.35;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .glossary-badge-short {
@@ -117,10 +135,12 @@
 .glossary-definition {
   margin: 0.7rem 0 0;
   font-weight: 560;
+  overflow-wrap: anywhere;
 }
 
 .glossary-detail-text {
   margin: 0.55rem 0 0;
+  overflow-wrap: anywhere;
 }
 
 .glossary-formula {
@@ -149,12 +169,14 @@
 .glossary-metadata-row {
   display: grid;
   gap: 0.25rem;
+  min-width: 0;
 }
 
 .glossary-metadata-row > div {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -169,6 +191,26 @@
 }
 
 @media (max-width: 575px) {
+  main.content:has(.glossary-page) {
+    max-width: min(calc(100svw - 64px), 326px);
+    min-width: 0;
+    overflow-x: hidden;
+    width: min(calc(100svw - 64px), 326px);
+  }
+
+  .glossary-page {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .glossary-intro,
+  .glossary-category-index,
+  .glossary-card-grid,
+  .glossary-card {
+    max-width: min(calc(100svw - 64px), 326px);
+    width: min(calc(100svw - 64px), 326px);
+  }
+
   .glossary-card {
     padding: 0.85rem;
   }

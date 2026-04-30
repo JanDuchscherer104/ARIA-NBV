@@ -270,7 +270,7 @@ def _render_metadata_details(term: dict[str, Any], term_by_id: dict[str, dict[st
             )
     docs = [_qmd_link(link, css_class="glossary-chip") for link in _as_list(term, "internal_links")]
     citations = [
-        f'<a class="glossary-chip glossary-citation" href="#ref-{_html_attr(citation)}">@{_html_text(citation)}</a>'
+        f'<a class="glossary-chip glossary-citation" href="#ref-{_html_attr(citation)}">&#64;{_html_text(citation)}</a>'
         for citation in _as_list(term, "citations")
     ]
     if not (related or docs or citations):
