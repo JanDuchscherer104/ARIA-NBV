@@ -1,0 +1,11 @@
+# Optional local Codex/OMX template for ARIA-NBV.
+#
+# Copy this to .codex/config.toml only in your local checkout. Do not commit the
+# runtime copy. Run `omx setup` after installing oh-my-codex if you want OMX to
+# manage additional local runtime settings.
+
+[projects."/absolute/path/to/ARIA-NBV"]
+trust_level = "trusted"
+
+# Keep repo-specific MCP/runtime configuration operator-local. The checked-in
+# .codex-plugin already declares the portable MemPalace plugin surface.

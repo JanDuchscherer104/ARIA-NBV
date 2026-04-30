@@ -12,9 +12,9 @@ labels = ["docs", "hygiene"]
 [[issue]]
 id = "issue-004"
 title = "Missing root CI and pre-commit"
-description = "The repository lacks a root-level pre-commit configuration and a comprehensive CI workflow; the visible workflow coverage is Quarto-oriented."
+description = "The repository lacks a root-level pre-commit configuration, make ci contract, and comprehensive CI workflow; the visible workflow coverage is Quarto-oriented."
 type = "feature"
-priority = "medium"
+priority = "high"
 status = "open"
 labels = ["ci", "dev-ergonomics"]
 
@@ -23,18 +23,9 @@ id = "issue-005"
 title = "Dedicated setup guide missing"
 description = "The README now provides a concise project front door, but setup details still need a dedicated portable guide for environment, CUDA, dataset access, cache paths, and first-run smoke commands."
 type = "maintenance"
-priority = "medium"
+priority = "high"
 status = "open"
 labels = ["docs", "identity"]
-
-[[issue]]
-id = "issue-006"
-title = "Dense root AGENTS.md"
-description = "The root AGENTS.md is too dense and should eventually become a thin dispatcher into scoped guides, skills, and references."
-type = "refactor"
-priority = "medium"
-status = "open"
-labels = ["agent", "guidance"]
 
 [[issue]]
 id = "issue-007"
@@ -46,15 +37,6 @@ status = "open"
 labels = ["data", "rri", "thesis", "contracts"]
 
 [[issue]]
-id = "issue-009"
-title = "Dirty worktree classification blocks M0 handoff"
-description = "The active worktree contains large unrelated data, app, RL, docs, and agent-memory changes; thesis work needs a classified handoff before larger implementation slices."
-type = "maintenance"
-priority = "high"
-status = "open"
-labels = ["repo-hygiene", "handoff", "m0"]
-
-[[issue]]
 id = "issue-010"
 title = "Oracle pipeline simplification debt blocks M1 maintainability"
 description = "The candidate rendering, depth backprojection, offline-store diagnostic payload, and oracle RRI scoring path contain duplicate contracts, stale compatibility aliases, and memory-heavy hot-path choices that should be simplified before target-aware RRI work."
@@ -62,6 +44,33 @@ type = "refactor"
 priority = "high"
 status = "open"
 labels = ["oracle", "rri", "rendering", "data", "performance", "simplification"]
+
+[[issue]]
+id = "issue-011"
+title = "GitHub collaboration scaffold is incomplete"
+description = "The PRML-VSLAM cross-review recommended explicit milestones, labels, issue templates, PR templates, and draft-PR disposition; ARIA-NBV currently has only a Quarto publish workflow and no repository-local collaboration contract."
+type = "maintenance"
+priority = "high"
+status = "open"
+labels = ["github", "scaffold", "workflow"]
+
+[[issue]]
+id = "issue-012"
+title = "ARIA-specific agent skill suite is incomplete"
+description = "The scaffold cross-check recommends domain skills for geometry contracts, oracle RRI, VIN diagnostics, rollout planning, entity-aware RRI, docs curation, dataset/cache operations, and lifecycle workflows; only part of that suite exists today."
+type = "maintenance"
+priority = "high"
+status = "open"
+labels = ["agent", "skills", "scaffold"]
+
+[[issue]]
+id = "issue-013"
+title = "Final experiment evidence registry is missing"
+description = "The roadmap requires final figures, ablations, and failure cases to trace back to configs, run IDs, cache hashes, split manifests, and source artifacts, but no dedicated experiment registry or claim matrix exists yet."
+type = "research-debt"
+priority = "medium"
+status = "open"
+labels = ["experiments", "thesis", "reproducibility"]
 
 [[issue]]
 id = "issue-014"

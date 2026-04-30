@@ -18,7 +18,7 @@ Examples:
 - `Return a :class:\`RunPlan\` built from the validated request.`
 - `Translate updates through :func:\`translate_slam_update\`.`
 - `See :meth:\`RunService.start_run\` for the entrypoint.`
-- `Keep pipeline semantics in :mod:\`prml_vslam.pipeline\`.`
+- `Keep offline-store semantics in :mod:\`aria_nbv.data_handling\`.`
 - `The payload is stored in :attr:\`RunSnapshot.slam\`.`
 - `Use :property:\`MethodId.display_name\` for UI labels.`
 - `Respect :data:\`DEFAULT_MAX_FRAMES_IN_FLIGHT\` when tuning credits.`

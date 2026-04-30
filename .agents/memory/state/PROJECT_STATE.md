@@ -51,7 +51,8 @@ This repository develops an active next-best-view planner for egocentric indoor 
 - *Current truth / active direction:* Empty oracle mesh crops are invalid inputs, not scene-level fallback labels.
 - *Current truth / active direction:* Preserve the current geometry-first interpretation of counterfactual state while clarifying which missing modalities should be synthesized later.
 - *Current truth / active direction:* Keep docs, Streamlit surfaces, and canonical memory aligned with code so advisor meetings stay grounded in the actual repo state.
-- *Current truth / active direction:* Literature/code knowledge graph work is routed through the `.agents/external/litkg-rs` submodule and the `semantic-scholar-litkg` skill, with ARIA-NBV-specific ingestion controlled by TOML rather than toolkit hard-coding.
+- *Current truth / active direction:* Literature/code knowledge graph work is routed through the `.agents/external/litkg-rs` submodule and the `semantic-scholar-litkg` skill, with ARIA-NBV-specific ingestion controlled by `.configs/litkg.toml` rather than toolkit hard-coding. The default representation is graphify-style durable Markdown/JSON plus Neo4j export bundles; CodeGraphContext is the code-symbol runtime; Graphiti and mempalace remain optional side integrations.
+- *Current truth / active direction:* Project terminology is maintained in `docs/glossary/terms.yml` and regenerated with `make glossary` into Quarto, Typst, and KG-facing artifacts. Research questions and thesis docs should link to glossary anchors instead of redefining canonical terms inline.
 
 ## Deferred but Important Extensions
 - *Deferred extension:* Hestia-style hierarchical control that separates target selection from view realization and later introduces continuous motion.

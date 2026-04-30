@@ -17,7 +17,7 @@ Start in ARIA-NBV, then hand implementation to the litkg-rs submodule.
 ## Defaults
 
 - Keep implementation in `.agents/external/litkg-rs`; keep ARIA-NBV-specific assumptions in TOML configs, docs, or this skill.
-- Prefer existing adapters and libraries before adding new code: litkg-rs pipeline primitives, CodeGraphContext/code-index, Graphiti, graphify, Neo4j export bundles, Context7, MarkItDown, and `mempalace-rs`.
+- Prefer existing adapters and libraries before adding new code: litkg-rs pipeline primitives, the native litkg-rs Semantic Scholar REST client, CodeGraphContext/code-index, Graphiti, graphify, Neo4j export bundles, Context7, MarkItDown, and `mempalace-rs`.
 - Treat `graphify` file output as the default durable sink, Neo4j export as optional query/runtime output, Graphiti/code-index as local enrichment, and mempalace as optional temporal memory/KG integration when its API fits cleanly.
 - Drive inclusion/exclusion, parser options, external URL ingestion, and backend toggles from TOML.
 - Track generated KG database files with Git LFS before committing them; do not commit local runtime cache directories.
@@ -27,7 +27,7 @@ Start in ARIA-NBV, then hand implementation to the litkg-rs submodule.
 1. Localize the requested graph capability to one of: literature metadata, local code symbols, repo docs, agent memory, external library docs, optional HTTPS pages, or backend export.
 2. Inspect litkg-rs for an existing module or adapter boundary before adding a new crate or schema field.
 3. Update litkg-rs first for repo-independent behavior; add ARIA-NBV config/docs only after the toolkit surface exists.
-4. For Semantic Scholar, verify the current official API docs before changing request fields, pagination, headers, or rate-limit behavior.
+4. For Semantic Scholar, use the litkg-rs REST-native commands first: `enrich-semantic-scholar`, `semantic-scholar-search`, `semantic-scholar-paper`, and `semantic-scholar-recommend`. Verify the current official API docs before changing request fields, pagination, headers, or rate-limit behavior.
 5. For Context7, resolve the library id first, then store only durable doc links or provenance in litkg outputs unless the user asks to snapshot docs.
 6. For MarkItDown, keep HTTPS ingestion optional and isolated behind a config flag because remote page conversion is slower and less reproducible than local file parsing.
 7. Update `AGENTS.md` or `.agents/AGENTS_INTERNAL_DB.md` when a new durable ingestion surface becomes mandatory agent behavior.

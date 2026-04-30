@@ -1,0 +1,4 @@
+interface:
+  display_name: "Counterfactual Rollout Planner"
+  short_description: "Bounded rollout and RL planning workflow"
+  default_prompt: "Use $counterfactual-rollout-planner for ARIA-NBV counterfactual rollout, planning metric, invalid-action, Gymnasium, and value/RL gate work."

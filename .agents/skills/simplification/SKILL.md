@@ -27,8 +27,8 @@ If the task also requires `.agents/` backlog reads or DB updates, use `agents-db
 
 Before simplification work:
 
-1. Read `README.md`, `docs/Questions.md`, `.agents/AGENTS_INTERNAL_DB.md`, and the nearest `AGENTS.md`.
-2. Use the `graphify` skill when the simplification depends on architecture or cross-package ownership understanding.
+1. Read `README.md`, `docs/contents/questions.qmd`, `.agents/AGENTS_INTERNAL_DB.md`, and the nearest `AGENTS.md`.
+2. Use the `aria-nbv-context` skill when simplification depends on architecture or cross-package ownership understanding.
 3. Use focused `rg` searches and narrow file reads instead of bulk-loading the repo.
 4. Prefer `mcp__code_index__` for indexed repo navigation when the search surface is broader than a quick local `rg` pass:
    - `set_project_path` + `build_deep_index` once per repo session before symbol-heavy exploration

@@ -1,36 +1,20 @@
 # ARIA-NBV Refactors
 
 [[refactor]]
-id = "refactor-001"
-title = "Thin root AGENTS.md dispatcher"
-description = "Convert the root AGENTS.md into a thinner router and move detailed guidance into scoped skills/references over time."
-priority = "medium"
-status = "todo"
-labels = ["guidance", "hygiene"]
-issue_ids = ["issue-006"]
-loc_min = 120
-loc_expected = 280
-loc_max = 700
-context = ["Root AGENTS.md currently carries broad setup, workflow, verification, and recurring gotcha content.", "The desired direction is a progressive-disclosure dispatcher into nested AGENTS.md files, .agents/references, and focused skills."]
-implementation_notes = ["Do this only after active package/docs boundaries are stable enough to avoid losing critical guidance.", "Keep non-negotiable constraints in root until nested references are proven discoverable."]
-acceptance = ["Root AGENTS.md is shorter and routes tasks to scoped guides.", "No critical verification or safety rule is removed without a replacement link."]
-verification = ["make check-agent-memory", "rg -n \"PoseTW|CameraTW|setup_target|check-agent-memory\" AGENTS.md .agents/references .agents/skills"]
-
-[[refactor]]
 id = "refactor-002"
 title = "Port PR and issue lifecycle skills"
 description = "Adapt PR and issue lifecycle workflows from earlier projects into ARIA-NBV-specific skills."
 priority = "medium"
 status = "todo"
 labels = ["agent", "workflow"]
-issue_ids = ["issue-006"]
+issue_ids = ["issue-012"]
 loc_min = 120
 loc_expected = 260
 loc_max = 620
 context = ["The code-review skill is now ARIA-NBV-specific, but PR and issue lifecycle workflows still need ARIA-specific acceptance criteria and verification conventions.", "GitHub workflow should be reviewer-first and must not import wrong project assumptions."]
 implementation_notes = ["Prefer current GitHub plugin skills when available instead of duplicating connector behavior.", "Use ARIA-NBV verification commands and docs/data/RRI/VIN ownership boundaries in any new lifecycle skill."]
-acceptance = ["ARIA-NBV has no active skill metadata mentioning litkg-rs or Rust review gates.", "PR/issue skills name ARIA-NBV verification commands and surfaces."]
-verification = ["rg -n \"litkg-rs|Rust|autoresearch|PRML\" .agents/skills", "make check-agent-memory"]
+acceptance = ["ARIA-specific PR/issue lifecycle skills do not import unrelated repo assumptions.", "PR/issue skills name ARIA-NBV verification commands and surfaces."]
+verification = ["rg -n \"autoresearch|PRML VSLAM|prml_vslam\" .agents/skills", "make check-agent-memory"]
 
 [[refactor]]
 id = "refactor-003"
@@ -127,3 +111,19 @@ context = ["VinOfflineManifest and VinOfflineDataset contain counterfactual meta
 implementation_notes = ["Remove VinOfflineCounterfactuals, materialized_blocks.counterfactuals, include_counterfactuals, load_counterfactuals, and _build_counterfactuals unless a current test proves a real block exists.", "Bump OFFLINE_DATASET_VERSION if manifest schema changes.", "Reintroduce rollout storage later through a concrete trajectory/result DTO after M5 planning evidence."]
 acceptance = ["The offline-store schema does not advertise counterfactual data until it can actually be written and read.", "Training and diagnostics configs no longer carry no-op counterfactual toggles.", "Roadmap stretch work remains documented without widening the current data contract."]
 verification = ["cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py tests/data_handling/test_public_api_contract.py", "rg -n \"counterfactuals|include_counterfactuals|load_counterfactuals|VinOfflineCounterfactuals\" aria_nbv/aria_nbv aria_nbv/tests docs/contents"]
+
+[[refactor]]
+id = "refactor-014"
+title = "Scope graph and memory tooling as KG support, not public docs"
+description = "Evaluate Graphify, MemPalace, code-index, Neo4j, and litkg-rs as internal KG infrastructure while keeping public docs and canonical memory as the source of truth."
+priority = "low"
+status = "todo"
+labels = ["kg", "agent", "docs", "scaffold"]
+issue_ids = ["issue-003", "issue-012"]
+loc_min = 80
+loc_expected = 180
+loc_max = 420
+context = ["The PRML cross-review classified Graphify, MemPalace, and OMX as later transfers, not immediate public-facing requirements.", "ARIA-NBV already has context scripts, memory state, and a semantic-scholar-litkg skill/submodule; these should improve retrieval without adding public-doc sprawl."]
+implementation_notes = ["Treat KG outputs as generated/internal unless explicitly curated into public docs.", "Prefer existing litkg-rs, code-index, Graphify, Neo4j, and MemPalace adapters before writing bespoke parsers.", "Keep canonical truth in Typst/Quarto source, .agents/memory/state, and code docstrings; KG artifacts should cite those sources."]
+acceptance = ["KG generation and memory mining have clear internal output locations and are not exposed as primary public navigation.", "The repo can explain when to use context scripts versus KG tooling.", "Generated KG artifacts are ignored, small, or intentionally versioned with provenance."]
+verification = ["make kg-sync || true", "make check-agent-memory", "rg -n \"graphify|MemPalace|Neo4j|code-index|litkg\" .agents/skills/semantic-scholar-litkg .configs scripts/kg"]

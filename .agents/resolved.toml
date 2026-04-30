@@ -36,6 +36,30 @@ resolved_at = "2026-04-29"
 resolution_note = "Bounded public identity/nav cleanup completed; broader docs role mixing remains tracked by issue-003 and refactor-004."
 resolved_from = ".agents/issues.toml"
 
+[[issue]]
+id = "issue-009"
+title = "Dirty worktree classification blocks M0 handoff"
+description = "The active worktree contains large unrelated data, app, RL, docs, and agent-memory changes; thesis work needs a classified handoff before larger implementation slices."
+type = "maintenance"
+priority = "high"
+status = "resolved"
+labels = ["repo-hygiene", "handoff", "m0"]
+resolved_at = "2026-04-29"
+resolution_note = "Dirty worktree classification no longer blocks M0: cleanup/runtime, docs, KG tooling, and simplification backlog were reviewed and committed as separate packages on 2026-04-29."
+resolved_from = ".agents/issues.toml"
+
+[[issue]]
+id = "issue-006"
+title = "Dense root AGENTS.md"
+description = "The root AGENTS.md is too dense and should eventually become a thin dispatcher into scoped guides, skills, and references."
+type = "refactor"
+priority = "medium"
+status = "resolved"
+labels = ["agent", "guidance"]
+resolved_at = "2026-04-29"
+resolution_note = "Root AGENTS.md is now a thin dispatcher; detailed guidance lives in nested AGENTS files, .agents/skills, and .agents/references."
+resolved_from = ".agents/issues.toml"
+
 [[todo]]
 id = "todo-009"
 title = "Bounded public docs identity cleanup"
@@ -54,6 +78,177 @@ verification = ["cd docs && quarto render index.qmd contents/roadmap.qmd content
 resolved_at = "2026-04-29"
 resolution_note = "Completed bounded public docs cleanup: README/docs identity updated, old repo links fixed, TODO and generated scaffold nav exposure removed, and typo-facing Quarto pages renamed."
 resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-010"
+title = "Classify dirty worktree for M0 handoff"
+description = "Group current dirty worktree changes into data migration, app diagnostics, RL scaffold, docs cleanup, agent-memory updates, and unrelated operator work."
+priority = "high"
+status = "resolved"
+labels = ["repo-hygiene", "m0", "handoff"]
+issue_ids = ["issue-009"]
+loc_min = 40
+loc_expected = 140
+loc_max = 360
+context = ["The current worktree contains large tracked deletions, modified configs, app changes, RL scaffold files, docs edits, and untracked .agents DB files.", "Roadmap M0 explicitly requires dirty worktree classification before larger thesis implementation work."]
+implementation_notes = ["Use git status --short and targeted git diff --stat by subsystem.", "Do not stage, revert, or delete unrelated user changes.", "Produce a handoff note that identifies which changes belong to the current slice and which need owner review."]
+acceptance = ["A concise worktree classification exists in .agents/memory/history or a canonical handoff doc.", "Current-task files are separable from unrelated pending work.", "No destructive git commands are used."]
+verification = ["git status --short", "git diff --stat -- . ':!docs/_site'"]
+resolved_at = "2026-04-29"
+resolution_note = "Resolved by the cleanup/refactor worktree review and commit packaging on 2026-04-29; current parent and litkg-rs submodule worktrees were clean after commits."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-013"
+title = "Implement nbv-geometry-contracts skill"
+description = "Create an ARIA-specific skill for pose, camera, coordinate-frame, projection, PyTorch3D, NDC, and CW90 contracts."
+priority = "high"
+status = "resolved"
+labels = ["agent", "geometry", "contracts"]
+issue_ids = ["issue-007", "issue-012"]
+loc_min = 80
+loc_expected = 160
+loc_max = 360
+context = ["The PRML cross-review recommended a dedicated geometry-contract skill because frame bugs are thesis-grade failure modes.", "Root and nested guides already require PoseTW/CameraTW, config-as-factory, and explicit frame semantics, but the guidance is spread across AGENTS.md, vin/AGENTS.md, rendering tests, and GOTCHAS.md."]
+implementation_notes = ["Base the skill on aria_nbv/AGENTS.md, aria_nbv/aria_nbv/vin/AGENTS.md, rendering tests, and GOTCHAS.md.", "Make it route tasks touching candidate poses, rig poses, cameras, frusta, CW90 display correction, PyTorch3D NDC, and depth backprojection.", "Keep the skill concise and contract-focused; link to tests instead of embedding long explanations."]
+acceptance = ["A .agents/skills/nbv-geometry-contracts/SKILL.md exists and names ARIA-NBV frame surfaces only.", "The skill lists targeted geometry/rendering verification commands.", "No wrong-repo or PRML domain content appears in the skill."]
+verification = ["make check-agent-memory", "rg -n \"PRML VSLAM|prml_vslam|litkg-rs|Rust\" .agents/skills/nbv-geometry-contracts || true"]
+resolved_at = "2026-04-29"
+resolution_note = "Added nbv-geometry-contracts skill with ARIA pose/camera/CW90/PyTorch3D contract workflow and metadata."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-014"
+title = "Implement counterfactual-rollout-planner skill"
+description = "Create an ARIA-specific skill for bounded counterfactual rollouts, non-myopic planning evaluation, invalid action handling, and the M6 value/RL gate."
+priority = "medium"
+status = "resolved"
+labels = ["agent", "rollouts", "planning"]
+issue_ids = ["issue-007", "issue-012"]
+loc_min = 80
+loc_expected = 160
+loc_max = 360
+context = ["Roadmap M5 and M6 require greedy, stochastic/beam, model-scored, and optional value/RL comparisons under explicit horizon and branch-factor limits.", "The PRML cross-review recommended a planning skill so agents keep rollout work bounded and do not overclaim continuous RL."]
+implementation_notes = ["Route to pose_generation counterfactual APIs, RL tests, roadmap M5/M6, and questions RQ5/RQ6.", "State that full continuous control and simulator-backed online RL remain stretch work unless the roadmap evidence gate passes.", "Require rollout artifacts to report cumulative RRI, acquisition cost, invalid rates, and runtime."]
+acceptance = ["The skill protects rollout/planning contract edits with targeted tests and docs checks.", "It distinguishes one-step VIN scoring, counterfactual rollout evaluation, and exploratory RL baselines.", "It uses current ARIA-NBV terminology and does not import PRML VSLAM domain rules."]
+verification = ["make check-agent-memory", "rg -n \"PRML VSLAM|prml_vslam|ViSTA\" .agents/skills/counterfactual-rollout-planner || true"]
+resolved_at = "2026-04-29"
+resolution_note = "Added counterfactual-rollout-planner skill for bounded rollout, invalid-action, and value/RL gate workflows."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-016"
+title = "Implement docs-curator skill"
+description = "Create an ARIA-specific skill for keeping README, SETUP, Quarto docs, Typst paper, slides, bibliography, generated context, and canonical memory aligned."
+priority = "medium"
+status = "resolved"
+labels = ["agent", "docs", "hygiene"]
+issue_ids = ["issue-003", "issue-012"]
+loc_min = 80
+loc_expected = 140
+loc_max = 320
+context = ["The PRML cross-review recommended a docs-paper-sync/docs-curator skill because public docs, paper, slides, roadmap, and agent memory can drift.", "docs/AGENTS.md already says Typst paper is the high-level ground truth and Quarto should not compete with it."]
+implementation_notes = ["Base the skill on docs/AGENTS.md, roadmap KG-friendly authoring rules, questions KG-friendly writing, and agent memory templates.", "Include when to render Quarto pages, compile Typst, update memory, and avoid generated/public docs pollution.", "Add a wrong-repo leakage check that allows intentionally repo-independent KG references but catches PRML examples in ARIA-specific skills."]
+acceptance = ["A docs-curator skill exists and gives compact routing for docs/paper/slides/memory updates.", "It states source-of-truth precedence and verification commands.", "It avoids duplicating long Quarto or Typst authoring instructions already owned elsewhere."]
+verification = ["make check-agent-memory", "rg -n \"PRML VSLAM|prml_vslam|CODEOWNER\" .agents/skills/docs-curator .agents/skills/python-docstrings .agents/references"]
+resolved_at = "2026-04-29"
+resolution_note = "Added docs-curator skill for README/Quarto/Typst/bibliography/generated-context/canonical-memory alignment and public/internal docs boundary."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-017"
+title = "Implement dataset-cache-ops skill"
+description = "Create an ARIA-specific operator skill for ASE download, ATEK shards, meshes, VIN offline stores, split manifests, storage estimates, and dataset smoke checks."
+priority = "medium"
+status = "resolved"
+labels = ["agent", "data", "offline-store"]
+issue_ids = ["issue-007", "issue-012"]
+loc_min = 80
+loc_expected = 160
+loc_max = 360
+context = ["The PRML cross-review recommended a dataset/cache operations skill; ARIA-NBV has data-handling guidance, downloader commands, offline store configs, and operator references but no compact operator skill.", "Migration functionality must not be restored; the canonical path is immutable VinOfflineDataset and available stores only."]
+implementation_notes = ["Route to aria_nbv/aria_nbv/data_handling/AGENTS.md, README offline data notes, SETUP once created, and operator_quick_reference.md.", "Cover list/download smoke commands, offline_only.toml, split manifests, config hashes, storage estimates, and failure triage.", "Explicitly state that legacy cache migration is not supported and should not be reintroduced."]
+acceptance = ["The skill helps agents operate current VIN offline stores without reviving legacy cache APIs.", "It names dry-run/list/smoke commands and data-handling tests.", "It stays operator-focused and does not widen the public Python API."]
+verification = ["make check-agent-memory", "rg -n \"OracleRriCacheDataset|VinSnippetCacheProvider|migrat\" .agents/skills/dataset-cache-ops || true"]
+resolved_at = "2026-04-29"
+resolution_note = "Added dataset-cache-ops skill for ASE/ATEK/mesh/VIN offline-store operations and smoke checks without restoring legacy cache migration."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-019"
+title = "Audit active skills for residual wrong-repo examples"
+description = "Find and fix leftover PRML/litkg/Rust/example leakage in ARIA-specific skills and references without removing intentionally repo-independent KG tooling."
+priority = "medium"
+status = "resolved"
+labels = ["agent", "hygiene", "scaffold"]
+issue_ids = ["issue-012"]
+loc_min = 40
+loc_expected = 100
+loc_max = 240
+context = ["The original PRML cross-review found copied skills with wrong repo names and commands.", "Most high-risk skills were fixed, but at least one ARIA skill reference still contains a prml_vslam example and some checks need to distinguish intentional litkg-rs KG tooling from wrong-repo leakage."]
+implementation_notes = ["Search .agents/skills and .agents/references for PRML VSLAM, prml_vslam, CODEOWNER placeholders, old repo paths, and Rust/litkg review gates.", "Do not flag .agents/skills/semantic-scholar-litkg merely for owning the litkg-rs submodule; flag only ARIA-specific skills that import unrelated repo assumptions.", "Update verification commands in existing DB records if they are now too broad."]
+acceptance = ["ARIA-specific skills and references contain no unrelated PRML examples or wrong paths.", "Intentional repo-independent KG/litkg guidance remains scoped to semantic-scholar-litkg.", "DB verification commands no longer fail on intentional KG references."]
+verification = ["rg -n \"PRML VSLAM|prml_vslam|CODEOWNER|JanDuchscherer104/NBV\" .agents/skills .agents/references AGENTS.md README.md", "make check-agent-memory"]
+resolved_at = "2026-04-29"
+resolution_note = "Audited active ARIA-specific guidance and removed stale PRML/NBV absolute-path examples while keeping intentional litkg-rs references scoped to semantic-scholar-litkg."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-015"
+title = "Implement entity-aware-rri skill"
+description = "Create an ARIA-specific skill for target/entity selection, OBB-cropped RRI, target-specific labels, and entity-conditioned VIN evaluation."
+priority = "medium"
+status = "resolved"
+labels = ["agent", "entity", "rri"]
+issue_ids = ["issue-007", "issue-012"]
+loc_min = 80
+loc_expected = 160
+loc_max = 360
+context = ["Roadmap M3/M4 centers target-aware RRI and target-conditioned VIN, while todo-005 tracks the implementation work.", "The PRML scaffold recommendation called for dedicated domain skills that prevent agents from treating entity-aware RRI as generic docs or model work."]
+implementation_notes = ["Route to roadmap M3/M4, questions RQ1/RQ2/RQ4, rri_metrics guidance, data-handling containers, and VIN batch contracts.", "Require invalid or unsupported targets to be represented explicitly rather than encoded as low-RRI candidates.", "Keep predicted OBB realism and SceneScript/global planning as later ablations unless directly tied to the target-aware thesis claim."]
+acceptance = ["The skill names target RRI, GT OBB crop, target selection, target-conditioned batch fields, and diagnostics boundaries.", "It links to existing todo-005 rather than duplicating implementation scope.", "No wrong-repo scaffold text remains."]
+verification = ["make check-agent-memory", "rg -n \"PRML VSLAM|prml_vslam|VSLAM-specific\" .agents/skills/entity-aware-rri || true"]
+resolved_at = "2026-04-29"
+resolution_note = "Added entity-aware-rri skill for target/entity selection, OBB-cropped RRI, target-conditioned VIN contracts, and diagnostics boundaries."
+resolved_from = ".agents/todos.toml"
+
+[[refactor]]
+id = "refactor-013"
+title = "Pilot optional OMX and Codex templates after scaffold cleanup"
+description = "Keep orchestration local and template-based until CI, docs partitioning, and skills are clean enough to support team workflows."
+priority = "low"
+status = "resolved"
+labels = ["agent", "workflow", "omx", "scaffold"]
+issue_ids = ["issue-006", "issue-012"]
+loc_min = 60
+loc_expected = 140
+loc_max = 320
+context = ["The PRML cross-review recommended using Oh My Codex only as an optional orchestration layer after pruning wrong skills and docs sprawl.", "ARIA-NBV now has a .codex-plugin scaffold, but committed personal runtime config and host-specific paths must remain out of the repo."]
+implementation_notes = ["Add example/template config only if needed; keep .omx/ and personal .codex runtime files ignored.", "Use OMX/team workflows first for audits and planning, not geometry/RRI code changes.", "Document how this differs from durable repo guidance in AGENTS.md and .agents/skills."]
+acceptance = ["Any Codex/OMX config committed to the repo is a template, not operator-local runtime state.", "Optional orchestration does not replace make ci, agents-db, or targeted tests.", "No API keys, host paths, or personal MCP assumptions are committed."]
+verification = ["rg -n \"api_key|/home/|/Users/|C:\\\\|\\.omx\" .codex-plugin .agents AGENTS.md .gitignore || true", "make check-agent-memory"]
+resolved_at = "2026-04-29"
+resolution_note = "Added optional OMX operator quick reference, checked-in Codex example templates, plugin README, and ignores for personal .codex/.omx runtime state."
+resolved_from = ".agents/refactors.toml"
+
+[[refactor]]
+id = "refactor-001"
+title = "Thin root AGENTS.md dispatcher"
+description = "Convert the root AGENTS.md into a thinner router and move detailed guidance into scoped skills/references over time."
+priority = "medium"
+status = "resolved"
+labels = ["guidance", "hygiene"]
+issue_ids = ["issue-006"]
+loc_min = 120
+loc_expected = 280
+loc_max = 700
+context = ["Root AGENTS.md currently carries broad setup, workflow, verification, and recurring gotcha content.", "The desired direction is a progressive-disclosure dispatcher into nested AGENTS.md files, .agents/references, and focused skills."]
+implementation_notes = ["Do this only after active package/docs boundaries are stable enough to avoid losing critical guidance.", "Keep non-negotiable constraints in root until nested references are proven discoverable."]
+acceptance = ["Root AGENTS.md is shorter and routes tasks to scoped guides.", "No critical verification or safety rule is removed without a replacement link."]
+verification = ["make check-agent-memory", "rg -n \"PoseTW|CameraTW|setup_target|check-agent-memory\" AGENTS.md .agents/references .agents/skills"]
+resolved_at = "2026-04-29"
+resolution_note = "Replaced dense root AGENTS.md with a short dispatcher into nested guides, skills, references, memory, and verification surfaces."
+resolved_from = ".agents/refactors.toml"
 
 [[refactor]]
 id = "refactor-005"

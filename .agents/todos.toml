@@ -129,17 +129,49 @@ acceptance = ["nbv-summary or an equivalent diagnostics helper loads at least on
 verification = ["cd aria_nbv && uv run nbv-summary --config-path offline_only.toml", "cd aria_nbv && uv run pytest tests/vin/test_vin_utils.py"]
 
 [[todo]]
-id = "todo-010"
-title = "Classify dirty worktree for M0 handoff"
-description = "Group current dirty worktree changes into data migration, app diagnostics, RL scaffold, docs cleanup, agent-memory updates, and unrelated operator work."
+id = "todo-011"
+title = "Add root CI, pre-commit, and make ci"
+description = "Port the PRML-style local verification contract into ARIA-NBV with root make targets, pre-commit parity, and a general GitHub Actions CI workflow."
 priority = "high"
 status = "todo"
-labels = ["repo-hygiene", "m0", "handoff"]
-issue_ids = ["issue-009"]
-loc_min = 40
-loc_expected = 140
-loc_max = 360
-context = ["The current worktree contains large tracked deletions, modified configs, app changes, RL scaffold files, docs edits, and untracked .agents DB files.", "Roadmap M0 explicitly requires dirty worktree classification before larger thesis implementation work."]
-implementation_notes = ["Use git status --short and targeted git diff --stat by subsystem.", "Do not stage, revert, or delete unrelated user changes.", "Produce a handoff note that identifies which changes belong to the current slice and which need owner review."]
-acceptance = ["A concise worktree classification exists in .agents/memory/history or a canonical handoff doc.", "Current-task files are separable from unrelated pending work.", "No destructive git commands are used."]
-verification = ["git status --short", "git diff --stat -- . ':!docs/_site'"]
+labels = ["ci", "dev-ergonomics", "scaffold"]
+issue_ids = ["issue-004"]
+loc_min = 120
+loc_expected = 260
+loc_max = 620
+context = ["The PRML cross-review identifies root make ci, lint/test/docs checks, pre-commit, and GitHub CI as scaffold discipline that ARIA-NBV still lacks.", "ARIA-NBV currently has a Quarto publish workflow but no root CI workflow or .pre-commit-config.yaml.", "The repo already has targeted Makefile checks for context, Typst, KG, and agent memory that can be composed into a lightweight default gate."]
+implementation_notes = ["Add make fmt-check, lint, test, docs-check, agent-check, and ci targets that delegate to uv under aria_nbv/ and existing docs/memory checks.", "Keep GPU, full dataset, and long experiment tests opt-in; the default CI should be reliable on a clean CPU runner.", "Add .pre-commit-config.yaml for merge-conflict checks, TOML/YAML/basic whitespace checks, Ruff format check, and Ruff lint check where feasible."]
+acceptance = ["make ci exists and is documented as the local verification gate.", ".github/workflows/ci.yml runs the lightweight source/docs/agent-memory checks on PR/push.", ".pre-commit-config.yaml exists and its core checks match CI rather than adding unrelated policy."]
+verification = ["make ci", "pre-commit run --all-files", "find .github/workflows -maxdepth 1 -type f -name 'ci.yml' -print"]
+
+[[todo]]
+id = "todo-012"
+title = "Add GitHub issue and PR governance templates"
+description = "Create the repository collaboration scaffold recommended by the PRML cross-review: labels, milestones, issue templates, PR template, and draft-PR disposition guidance."
+priority = "medium"
+status = "todo"
+labels = ["github", "workflow", "scaffold"]
+issue_ids = ["issue-011"]
+loc_min = 80
+loc_expected = 180
+loc_max = 420
+context = ["The PRML comparison called out missing milestones, labels, project-board views, issue templates, PR template, and explicit draft-PR disposition.", "The local agents DB now owns active backlog, so GitHub templates should route work into reproducible acceptance and verification rather than duplicating all TOML records."]
+implementation_notes = ["Add .github/ISSUE_TEMPLATE entries for bug, research task, docs task, and refactor work.", "Add .github/pull_request_template.md with summary, affected contracts, verification, docs/memory updates, and limitations.", "Document label/milestone taxonomy in a repo-local reference if it cannot be created directly through GitHub in the current task."]
+acceptance = ["New GitHub issues ask for affected files, contract impact, acceptance criteria, and verification.", "PR template is reviewer-first and asks for docs/memory updates when behavior changes.", "Open draft PR triage has a repeatable local checklist or issue template."]
+verification = ["find .github -maxdepth 3 -type f | sort", "rg -n \"Acceptance|Verification|Affected contracts|Docs|Memory\" .github"]
+
+[[todo]]
+id = "todo-018"
+title = "Create experiment registry and final claim matrix"
+description = "Add a reproducibility surface that maps final figures, tables, ablations, and thesis claims to run IDs, configs, cache hashes, split manifests, metrics, and source artifacts."
+priority = "medium"
+status = "todo"
+labels = ["experiments", "thesis", "reproducibility"]
+issue_ids = ["issue-013"]
+loc_min = 120
+loc_expected = 260
+loc_max = 620
+context = ["Roadmap M7/M8 require final tables, figures, failure cases, and reproducible configs.", "The PRML-style issue register recommended a final experiment registry, run-report generator, claim matrix, and release checklist."]
+implementation_notes = ["Start with a small docs or .agents-owned registry schema before building automation.", "Record run ID, config path/hash, cache/store ID, split manifest, candidate profile, seed, checkpoint, metric table, and figure output.", "Keep final claims explicit: do not claim continuous RL, real-device deployment, or VLM/global planning without evidence."]
+acceptance = ["There is a canonical place to trace final experiment artifacts to source inputs.", "At least one smoke/final-row example is represented.", "The registry can be referenced from paper/slides without copying unverified run notes."]
+verification = ["rg -n \"claim matrix|run_id|config_hash|cache_hash|split\" docs .agents", "make check-agent-memory"]

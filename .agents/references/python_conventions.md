@@ -1,6 +1,8 @@
 # Python Conventions
 
-This file is the long-form reference for Python typing, docstring, and config conventions in `aria_nbv/`. Binding short-form rules live in [aria_nbv/AGENTS.md](/home/jandu/repos/NBV/aria_nbv/AGENTS.md).
+This file is the long-form reference for Python typing, docstring, and config
+conventions in `aria_nbv/`. Binding short-form rules live in
+`aria_nbv/AGENTS.md`.
 
 ## Core Rules
 - Config classes should inherit from `BaseConfig` where appropriate.

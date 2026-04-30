@@ -95,6 +95,7 @@ lfs = true
 - `cargo run -p litkg-cli -- semantic-scholar-search --query '<query>' --limit 20` runs official bulk paper search.
 - `cargo run -p litkg-cli -- semantic-scholar-paper --paper ARXIV:<id> --format json` resolves a known paper id.
 - `cargo run -p litkg-cli -- semantic-scholar-recommend --positive <paperId>` returns recommendation results from seed papers.
+- The Rust client also exposes `get_citations` and `get_references` for citation/reference tracing; add CLI wrappers only when an operator workflow needs them.
 
 ## Storage and LFS
 
