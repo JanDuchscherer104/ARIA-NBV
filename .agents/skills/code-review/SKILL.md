@@ -45,6 +45,8 @@ Default to a code-review mindset:
 - if there are no findings, say that explicitly and call out residual risk or missing tests
 - Prefer tests that exercise public contracts and user-visible behavior. Flag
   tests that only preserve private helper shape when behavior could regress.
+- For risky behavior changes, prefer tracer-bullet evidence: one failing
+  public-interface behavior test, minimal implementation, repeat.
 
 Use this severity rubric:
 

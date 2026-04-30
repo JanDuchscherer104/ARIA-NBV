@@ -33,11 +33,14 @@ tags: [codex, workflow, architecture]
 - The tracked Python workspace and package root are `aria_nbv/` and `aria_nbv/aria_nbv`; repo tooling and docs should refer to that layout.
 - Documentation changes should update Quarto/Typst sources directly, not ad hoc notes under `.codex/`.
 - The published Quarto site refreshes `aria_nbv` API reference pages from docstrings via `quartodoc` during the Pages workflow, with `docs/reference/index.qmd` as the human-authored landing page.
-- The published Quarto site also regenerates maintained agent-scaffold pages from canonical markdown under `AGENTS.md`, `.agents/memory/state/`, `.agents/references/`, and `.agents/skills/aria-nbv-context/`, while keeping history and archive surfaces out of the site.
+- Generated agent-scaffold pages are internal operator artifacts under
+  `.agents/generated/agent_scaffold/`; the published Quarto site must not
+  regenerate or render them.
 - Retained QMD docs remain renderable, but current thesis pages use
   `docs/contents/thesis/`, past seminar material uses `docs/contents/seminar/`,
-  and retained scratch/history uses `docs/contents/archive/` with explicit
-  `phase`, `audience`, `status`, and `owner` frontmatter.
+  and only curated public archive summaries use `docs/contents/archive/` with
+  explicit `phase`, `audience`, `status`, and `owner` frontmatter. Raw
+  scratch/history belongs under `.agents/archive/docs/`.
 - Human-owner preferences that are durable but not public narrative or workflow
   rules live in `.agents/references/human_owner_intent.md`.
 - OMX remains optional operator orchestration; it does not own canonical memory,

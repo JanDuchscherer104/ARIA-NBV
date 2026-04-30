@@ -43,10 +43,10 @@ issue_ids = ["issue-003"]
 loc_min = 180
 loc_expected = 420
 loc_max = 1000
-context = ["The bounded cleanup removed generated scaffold and TODO pages from primary public navigation, but the full docs tree still mixes public narrative, generated mirrors, scratchpads, and internal guidance.", "docs/AGENTS.md says docs/contents/resources/agent_scaffold/ is generated-from-source content, not a hand-authored public docs surface."]
-implementation_notes = ["Bounded first step: remove primary nav/sidebar exposure while keeping generated sources available for internal render workflows.", "Full relocation should be a separate docs triage task with archive decisions."]
-acceptance = ["Primary public docs navigation focuses on thesis, setup, theory, implementation, literature, and API reference.", "Agent scaffolding remains available to agents through .agents and generated mirrors when explicitly regenerated."]
-verification = ["cd docs && quarto render index.qmd contents/thesis/roadmap.qmd contents/thesis/questions.qmd", "rg -n \"Agent Scaffolding|contents/resources/agent_scaffold\" docs/_quarto.yml docs/index.qmd"]
+context = ["The bounded cleanup removed generated scaffold and TODO pages from primary public navigation, but the full docs tree still needed a firm public/internal render boundary.", "docs/AGENTS.md says generated agent scaffold mirrors are internal operator artifacts under .agents/generated/ and must not be written under docs/contents/**."]
+implementation_notes = ["Keep public docs focused on curated thesis/advisor material.", "Raw scratch, backlog history, and generated agent mirrors belong under .agents/, not rendered Quarto content."]
+acceptance = ["Primary public docs navigation focuses on thesis, setup, theory, implementation, literature, and API reference.", "Agent scaffolding remains available to agents through .agents and generated mirrors when explicitly regenerated.", "Rendered docs/contents pages carry taxonomy frontmatter and no agent/internal audience."]
+verification = ["cd docs && quarto render index.qmd contents/thesis/roadmap.qmd contents/thesis/questions.qmd contents/archive/index.qmd", "rg -n \"Agent Scaffolding|old public agent-scaffold path\" docs/_quarto.yml docs/index.qmd", "make qmd-frontmatter-check"]
 
 [[refactor]]
 id = "refactor-008"

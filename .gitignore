@@ -238,6 +238,7 @@ docs/_freeze/**/*.html
 .codex/config.toml
 .codex/hooks.json
 .omx/
+.agents/generated/
 .agents/tmp/*
 
 # Large download manifests

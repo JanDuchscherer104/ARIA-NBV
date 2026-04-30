@@ -77,6 +77,8 @@ website:
           href: contents/ase_dataset.qmd
         - text: Glossary
           href: contents/glossary.qmd
+        - text: Archive
+          href: contents/archive/index.qmd
     right:
       - icon: github
         menu:
@@ -111,6 +113,7 @@ website:
             - contents/resources.qmd
             - contents/ase_dataset.qmd
             - contents/glossary.qmd
+            - contents/archive/index.qmd
         - section: Theory
           contents:
             - contents/theory/nbv_background.qmd

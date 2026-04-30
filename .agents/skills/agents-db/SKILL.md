@@ -95,6 +95,22 @@ horizontal layer tasks:
 Use this workflow for Matt-style `to-issues` requests in ARIA-NBV unless the
 user explicitly asks to publish GitHub issues.
 
+## Matt-Style Workflow Modes
+
+Use these names as modes inside this skill, not as separate trackers:
+
+- `triage`: classify incoming work by updating existing `priority`, `status`,
+  and `labels`; do not add new TOML schema fields for triage state.
+- `to-issues`: split a plan into independently grabbable vertical slices in
+  `.agents/todos.toml` or `.agents/refactors.toml`.
+- `to-prd`: synthesize the current conversation into a problem statement,
+  solution, affected modules, implementation decisions, testing decisions,
+  out-of-scope list, and follow-up TOML slices. For non-trivial work, preserve
+  the narrative in `.agents/memory/history/` rather than public docs.
+
+Do not publish GitHub issues from these modes unless the user explicitly asks
+for GitHub publication.
+
 ## Validation
 
 - run `make agents-db` after DB edits to confirm the files still parse and rank correctly

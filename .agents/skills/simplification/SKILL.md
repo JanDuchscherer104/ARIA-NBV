@@ -65,6 +65,12 @@ When architecture is the problem, look for deeper modules: small public
 interfaces that hide real complexity, clear seams for tests, and deletion of
 shallow adapters that only forward old names.
 
+For Matt-style architecture review, keep the useful vocabulary local to this
+skill: deep module, public interface, seam, adapter, deletion test, locality,
+leverage, and interface as test surface. Use `docs/typst/shared/glossary.typ`,
+`.agents/memory/state/DECISIONS.md`, and nearest `AGENTS.md` files for domain
+language; do not introduce a parallel root context file or ADR tree.
+
 ## Ruthless Simplification
 
 Use ruthless simplification when the goal is to drastically reduce LOC, type count, public surface, and indirection while preserving the currently intended behavior.

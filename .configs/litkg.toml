@@ -104,6 +104,7 @@ exclude = [
 [sources.glossary]
 required = true
 include = [
+  "docs/typst/shared/glossary.typ",
   "docs/glossary/terms.yml",
   "docs/_generated/context/glossary.jsonl",
 ]

@@ -30,7 +30,7 @@ GenNBV [@GenNBV-chen2024], Hestia [@Hestia-lu2026], and SceneScript
 
 The core terms used by the research questions are maintained in the shared
 [glossary](../glossary.qmd), which is generated from
-`docs/glossary/terms.yml` for Quarto, Typst, and KG ingestion:
+`docs/typst/shared/glossary.typ` for Quarto, Typst, and KG ingestion:
 
 - {{< glsfull target-of-interest >}}
 - {{< glsfull target-specific-rri >}}

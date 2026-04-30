@@ -1,0 +1,20 @@
+---
+title: "Archive"
+phase: archive
+audience: public
+status: current
+owner: docs
+format: html
+---
+
+# Archive
+
+This public archive is a curated pointer page. Raw scratch notes, historical
+TODOs, and obsolete repository-structure drafts are kept under
+`.agents/archive/docs/` so they remain available to agents without being
+published as reader-facing documentation.
+
+Current project direction lives in the [roadmap](../thesis/roadmap.qmd) and
+[research questions](../thesis/questions.qmd). Active implementation work lives
+in the `.agents/*.toml` backlog, and canonical terms live in the
+[glossary](../glossary.qmd).

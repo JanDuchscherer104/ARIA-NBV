@@ -8,6 +8,12 @@
   --glossary-chip-border: color-mix(in srgb, #2f6feb 28%, transparent);
   max-width: 100%;
   min-width: 0;
+  width: 100%;
+}
+
+main.content:has(.glossary-page) {
+  max-width: none;
+  width: 100%;
 }
 
 .glossary-page,
@@ -53,7 +59,7 @@
 
 .glossary-card-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
   gap: 0.9rem;
   max-width: 100%;
   min-width: 0;
@@ -144,8 +150,22 @@
 }
 
 .glossary-formula {
-  margin-top: 0.7rem;
+  margin: 0.8rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--glossary-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 3%, transparent);
   overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.glossary-formula p {
+  margin: 0;
+}
+
+.glossary-formula .math.display {
+  margin: 0;
+  min-width: max-content;
 }
 
 .glossary-details {
@@ -186,16 +206,20 @@
 
 @media (min-width: 1180px) {
   .glossary-card-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(28rem, 1fr));
+  }
+}
+
+@media (min-width: 1650px) {
+  .glossary-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 575px) {
   main.content:has(.glossary-page) {
-    max-width: min(calc(100svw - 64px), 326px);
     min-width: 0;
-    overflow-x: hidden;
-    width: min(calc(100svw - 64px), 326px);
+    overflow-x: clip;
   }
 
   .glossary-page {
@@ -207,8 +231,8 @@
   .glossary-category-index,
   .glossary-card-grid,
   .glossary-card {
-    max-width: min(calc(100svw - 64px), 326px);
-    width: min(calc(100svw - 64px), 326px);
+    max-width: 100%;
+    width: 100%;
   }
 
   .glossary-card {

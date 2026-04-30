@@ -19,12 +19,12 @@ narrative, not current technical truth, and not a repeatable workflow.
 | New durable information | Destination |
 |---|---|
 | Repo-wide invariant or safety rule | `AGENTS.md` or nearest nested `AGENTS.md` |
-| Repeatable workflow | `.agents/skills/<name>/SKILL.md` |
+| Repeatable workflow | `.agents/skills/[skill-name]/SKILL.md` |
 | Human-owner preference | `.agents/references/human_owner_intent.md` |
 | Current project truth | `.agents/memory/state/*.md` |
 | Actionable defect, todo, or refactor | `.agents/issues.toml`, `.agents/todos.toml`, or `.agents/refactors.toml` |
 | Public thesis narrative | `docs/` Quarto or `docs/typst/seminar_paper/` |
-| Generated routing/context | `docs/_generated/context/` or `.agents/kg/generated/` with provenance |
+| Generated routing/context | `docs/_generated/context/`, `.agents/generated/`, or `.agents/kg/generated/` with provenance |
 
 Prefer the smallest surface that can preserve the instruction without creating
 a second source of truth.

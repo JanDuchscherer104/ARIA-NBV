@@ -34,6 +34,11 @@ Build the smallest deterministic loop that reproduces the user-visible symptom:
 Do not proceed on code guesses until the loop fails in the same way the user
 reported, or until you can state exactly why a loop cannot be built.
 
+If no reproducible loop can be built, do not patch by guesswork. State the
+missing artifact, access, fixture, command, or metric needed next. If the
+blocker is durable repo debt, record a blocked issue in `.agents/issues.toml`
+through `agents-db`.
+
 ## Workflow
 
 1. Reproduce the symptom and capture the exact command, traceback, metric, or

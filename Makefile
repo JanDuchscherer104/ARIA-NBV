@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 .PHONY: help
-.PHONY: context-qmd-tree
+.PHONY: context-qmd-tree qmd-frontmatter-check
 .PHONY: context-index context-get context-contracts context-modules context-classes context-functions
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory
@@ -65,9 +65,9 @@ MMD_SCALE ?= 4
 
 .PHONY: _check_python
 _check_python:
-	@if [ ! -x "$(PYTHON_INTERPRETER)" ]; then \
+	@if ! { [ -x "$(PYTHON_INTERPRETER)" ] || command -v "$(PYTHON_INTERPRETER)" >/dev/null 2>&1; }; then \
 		echo "$(RED)🚫 Python interpreter not found at $(PYTHON_INTERPRETER)$(NC)"; \
-		echo "$(YELLOW)Run: UV_PYTHON=/home/jandu/miniforge3/envs/aria-nbv/bin/python uv sync$(NC)"; \
+		echo "$(YELLOW)Run: cd aria_nbv && uv sync --all-extras$(NC)"; \
 		exit 1; \
 	fi
 	@echo "$(GREEN)Using python: $(PYTHON_INTERPRETER)$(NC)"
@@ -138,6 +138,9 @@ agents-db: _check_python ## 🧠 Inspect or maintain .agents/issues,todos,refact
 
 glossary: _check_python ## 📖 Build shared Quarto/Typst/KG glossary artifacts
 	@$(PYTHON_INTERPRETER) scripts/glossary_build.py all
+
+qmd-frontmatter-check: _check_python ## 📖 Validate taxonomy frontmatter for rendered Quarto content
+	@$(PYTHON_INTERPRETER) scripts/validate_qmd_frontmatter.py docs/contents
 
 memory-mine: _check_python ## 🧠 Mine current repo state (docs, code, history) into repo-local MemPalace
 	@echo "$(BLUE)Mining project into MemPalace...$(NC)"

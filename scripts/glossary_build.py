@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build ARIA-NBV glossary artifacts from the canonical YAML source."""
+"""Build ARIA-NBV glossary artifacts from the canonical Typst source."""
 
 from __future__ import annotations
 
@@ -7,17 +7,21 @@ import argparse
 import html
 import json
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TERMS = ROOT / "docs/glossary/terms.yml"
+DEFAULT_TERMS = ROOT / "docs/typst/shared/glossary.typ"
+DEFAULT_COMPAT_YAML = ROOT / "docs/glossary" / "terms.yml"
 DEFAULT_QMD = ROOT / "docs/contents/glossary.qmd"
 DEFAULT_TYPST = ROOT / "docs/typst/shared/glossary.generated.typ"
 DEFAULT_JSONL = ROOT / "docs/_generated/context/glossary.jsonl"
-DEFAULT_SHORTCODE_LUA = ROOT / "docs/_extensions/aria-glossary/glossary_terms.generated.lua"
+DEFAULT_SHORTCODE_LUA = (
+    ROOT / "docs/_extensions/aria-glossary/glossary_terms.generated.lua"
+)
 DEFAULT_NOTATION = ROOT / "docs/notation.yml"
 DEFAULT_NOTATION_LUA = ROOT / "docs/_extensions/aria-glossary/notation.generated.lua"
 DEFAULT_NOTATION_TYPST = ROOT / "docs/typst/shared/notation.generated.typ"
@@ -40,15 +44,63 @@ class GlossaryError(ValueError):
 
 
 def _load_terms(path: Path) -> list[dict[str, Any]]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    command = [
+        "typst",
+        "query",
+        str(path),
+        "<aria-glossary-term>",
+        "--field",
+        "value",
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise GlossaryError(
+            "typst executable not found; install Typst to build the glossary"
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        details = (exc.stderr or exc.stdout or "").strip()
+        raise GlossaryError(f"typst query failed for {path}: {details}") from exc
+
+    data = json.loads(completed.stdout)
     if not isinstance(data, list):
-        raise GlossaryError(f"{path} must contain a YAML list of term records")
+        raise GlossaryError(f"{path} query must return a list of term metadata")
     terms: list[dict[str, Any]] = []
     for idx, raw in enumerate(data, start=1):
         if not isinstance(raw, dict):
             raise GlossaryError(f"term #{idx} must be a mapping")
-        terms.append(raw)
+        terms.append(_normalize_queried_term(raw))
     return terms
+
+
+def _normalize_queried_term(raw: dict[str, Any]) -> dict[str, Any]:
+    term = dict(raw)
+    for field in (
+        "aliases",
+        "internal_links",
+        "citations",
+        "related",
+        "kg_tags",
+        "formulae",
+    ):
+        if term.get(field) is None:
+            term[field] = []
+    for field in ("notation", "formula"):
+        if term.get(field) is None:
+            term[field] = {}
+    if term.get("short") is None and term.get("label") is not None:
+        term["short"] = term["label"]
+    if term.get("parent") is None:
+        term.pop("parent", None)
+    if term.get("typst_macro") is None:
+        term.pop("typst_macro", None)
+    return term
 
 
 def _load_notation(path: Path) -> dict[str, dict[str, dict[str, str]]]:
@@ -69,9 +121,13 @@ def _load_notation(path: Path) -> dict[str, dict[str, dict[str, str]]]:
             tex = raw_entry.get("tex")
             typst = raw_entry.get("typst")
             if not isinstance(tex, str) or not tex.strip():
-                raise GlossaryError(f"{path}: {group}.{key}.tex must be a non-empty string")
+                raise GlossaryError(
+                    f"{path}: {group}.{key}.tex must be a non-empty string"
+                )
             if not isinstance(typst, str) or not typst.strip():
-                raise GlossaryError(f"{path}: {group}.{key}.typst must be a non-empty string")
+                raise GlossaryError(
+                    f"{path}: {group}.{key}.typst must be a non-empty string"
+                )
             notation[group][key] = {"tex": tex.strip(), "typst": typst.strip()}
     return notation
 
@@ -83,7 +139,9 @@ def _validate_terms(terms: list[dict[str, Any]]) -> None:
     for term in terms:
         missing = sorted(REQUIRED_FIELDS - set(term))
         if missing:
-            raise GlossaryError(f"{term.get('id', '<missing id>')} missing fields: {missing}")
+            raise GlossaryError(
+                f"{term.get('id', '<missing id>')} missing fields: {missing}"
+            )
         term_id = _expect_string(term, "id")
         anchor = _expect_string(term, "anchor")
         if term_id in ids:
@@ -99,26 +157,43 @@ def _validate_terms(terms: list[dict[str, Any]]) -> None:
                 raise GlossaryError(f"{term_id}: {field} must be a list")
         typst_macro = term.get("typst_macro")
         if typst_macro is not None:
-            if not isinstance(typst_macro, str) or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", typst_macro):
-                raise GlossaryError(f"{term_id}: typst_macro must be a valid Typst identifier")
+            if not isinstance(typst_macro, str) or not re.match(
+                r"^[A-Za-z_][A-Za-z0-9_]*$", typst_macro
+            ):
+                raise GlossaryError(
+                    f"{term_id}: typst_macro must be a valid Typst identifier"
+                )
             if typst_macro in typst_macros:
                 raise GlossaryError(f"duplicate typst_macro: {typst_macro}")
             typst_macros.add(typst_macro)
         formulae = term.get("formulae")
         if formulae is not None and not isinstance(formulae, list):
             raise GlossaryError(f"{term_id}: formulae must be a list")
+        formula = term.get("formula")
+        if formula is not None and not isinstance(formula, dict):
+            raise GlossaryError(f"{term_id}: formula must be a mapping")
+        if isinstance(formula, dict) and formula:
+            tex = formula.get("tex")
+            if tex is not None and (not isinstance(tex, str) or not tex.strip()):
+                raise GlossaryError(
+                    f"{term_id}: formula.tex must be a non-empty string"
+                )
         for idx, formula in enumerate(formulae or [], start=1):
             if not isinstance(formula, dict):
                 raise GlossaryError(f"{term_id}: formulae[{idx}] must be a mapping")
             tex = formula.get("tex")
             if not isinstance(tex, str) or not tex.strip():
-                raise GlossaryError(f"{term_id}: formulae[{idx}].tex must be a non-empty string")
+                raise GlossaryError(
+                    f"{term_id}: formulae[{idx}].tex must be a non-empty string"
+                )
 
 
 def _expect_string(term: dict[str, Any], field: str) -> str:
     value = term.get(field)
     if not isinstance(value, str) or not value.strip():
-        raise GlossaryError(f"{term.get('id', '<missing id>')}: {field} must be a non-empty string")
+        raise GlossaryError(
+            f"{term.get('id', '<missing id>')}: {field} must be a non-empty string"
+        )
     return value.strip()
 
 
@@ -146,7 +221,9 @@ def _html_text(value: str) -> str:
     return html.escape(value, quote=False)
 
 
-def _qmd_link(path: str, label: str | None = None, *, css_class: str = "glossary-chip") -> str:
+def _qmd_link(
+    path: str, label: str | None = None, *, css_class: str = "glossary-chip"
+) -> str:
     target = _qmd_target(path)
     text = label or _link_label(path)
     return f'<a class="{css_class}" href="{_html_attr(target)}" title="{_html_attr(path)}">{_html_text(text)}</a>'
@@ -160,7 +237,11 @@ def _qmd_target(path: str) -> str:
     if path.startswith("docs/contents/"):
         return _rendered_doc_path(path.removeprefix("docs/contents/")) + anchor
     elif path.startswith("docs/reference/"):
-        return "../reference/" + _rendered_doc_path(path.removeprefix("docs/reference/")) + anchor
+        return (
+            "../reference/"
+            + _rendered_doc_path(path.removeprefix("docs/reference/"))
+            + anchor
+        )
     elif path.startswith("docs/"):
         return "../" + _rendered_doc_path(path.removeprefix("docs/")) + anchor
     return _rendered_doc_path(path) + anchor
@@ -182,7 +263,9 @@ def _link_label(path: str) -> str:
         if title:
             return title
     if path_without_anchor.startswith("docs/typst/"):
-        return Path(path_without_anchor).stem.replace("-", " ").replace("_", " ").title()
+        return (
+            Path(path_without_anchor).stem.replace("-", " ").replace("_", " ").title()
+        )
     stem = Path(path_without_anchor).stem
     return stem.replace("-", " ").replace("_", " ").title()
 
@@ -216,7 +299,9 @@ def _term_title(term: dict[str, Any]) -> str:
 
 def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
     grouped: dict[str, list[dict[str, Any]]] = {}
-    for term in sorted(terms, key=lambda item: (item["category"], item["label"].lower())):
+    for term in sorted(
+        terms, key=lambda item: (item["category"], item["label"].lower())
+    ):
         grouped.setdefault(term["category"].split(".", 1)[0], []).append(term)
 
     term_by_id = {term["id"]: term for term in terms}
@@ -228,6 +313,10 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
     lines = [
         "---",
         'title: "Glossary"',
+        "phase: generated",
+        "audience: public",
+        "status: current",
+        "owner: generated",
         "page-layout: full",
         "format:",
         "  html:",
@@ -240,13 +329,13 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
         "  freeze: false",
         "---",
         "",
-        "<!-- Generated by scripts/glossary_build.py; edit docs/glossary/terms.yml. -->",
+        "<!-- Generated by scripts/glossary_build.py; edit docs/typst/shared/glossary.typ. -->",
         "",
         "::: {.glossary-page}",
         "",
         "::: {.glossary-intro}",
         f"**{len(terms)} terms** across **{len(grouped)} categories**. The canonical source is",
-        "`docs/glossary/terms.yml`; generated Quarto, Typst, KG, and shortcode artifacts",
+        "`docs/typst/shared/glossary.typ`; generated Quarto, Typst, YAML, KG, and shortcode artifacts",
         "share the same definitions.",
         "",
         "Use `{{{< gls term-id >}}}` for the linked short label and",
@@ -274,7 +363,9 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
             ]
             short = term.get("short")
             if isinstance(short, str) and short and short != term["label"]:
-                lines.append(f'<span class="glossary-badge glossary-badge-short">{_html_text(short)}</span>')
+                lines.append(
+                    f'<span class="glossary-badge glossary-badge-short">{_html_text(short)}</span>'
+                )
             lines += [
                 f'<span class="glossary-badge">{_html_text(term["category"])}</span>',
                 "</div>",
@@ -290,9 +381,15 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
                     "</div>",
                     "",
                 ]
-            lines += [f'<p class="glossary-definition">{_html_text(term["definition_short"].strip())}</p>', ""]
+            lines += [
+                f'<p class="glossary-definition">{_html_text(term["definition_short"].strip())}</p>',
+                "",
+            ]
             if term.get("definition_long"):
-                lines += [f'<p class="glossary-detail-text">{_html_text(str(term["definition_long"]).strip())}</p>', ""]
+                lines += [
+                    f'<p class="glossary-detail-text">{_html_text(str(term["definition_long"]).strip())}</p>',
+                    "",
+                ]
             for formula in _term_formulae(term):
                 label = str(formula.get("label") or "").strip()
                 lines += [
@@ -310,7 +407,9 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
             lines += _render_metadata_details(term, term_by_id)
             lines += ["</article>", ""]
         lines += ["</div>", ""]
-    all_citations = sorted({citation for term in terms for citation in _as_list(term, "citations")})
+    all_citations = sorted(
+        {citation for term in terms for citation in _as_list(term, "citations")}
+    )
     if all_citations:
         lines += [
             "::: {.glossary-citation-seed}",
@@ -322,7 +421,9 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
     _write_text(path, "\n".join(lines).rstrip() + "\n")
 
 
-def _render_metadata_details(term: dict[str, Any], term_by_id: dict[str, dict[str, Any]]) -> list[str]:
+def _render_metadata_details(
+    term: dict[str, Any], term_by_id: dict[str, dict[str, Any]]
+) -> list[str]:
     related = []
     for related_id in _as_list(term, "related"):
         related_term = term_by_id.get(related_id)
@@ -335,7 +436,10 @@ def _render_metadata_details(term: dict[str, Any], term_by_id: dict[str, dict[st
             related.append(
                 f'<a class="glossary-chip" href="#term-{_html_attr(_slug(related_id))}">{_html_text(related_id)}</a>'
             )
-    docs = [_qmd_link(link, css_class="glossary-chip") for link in _as_list(term, "internal_links")]
+    docs = [
+        _qmd_link(link, css_class="glossary-chip")
+        for link in _as_list(term, "internal_links")
+    ]
     citations = [
         f'<a class="glossary-chip glossary-citation" href="#ref-{_html_attr(citation)}">&#64;{_html_text(citation)}</a>'
         for citation in _as_list(term, "citations")
@@ -349,9 +453,13 @@ def _render_metadata_details(term: dict[str, Any], term_by_id: dict[str, dict[st
         '<div class="glossary-metadata">',
     ]
     if related:
-        lines.append(f'<div class="glossary-metadata-row"><span>Related</span><div>{" ".join(related)}</div></div>')
+        lines.append(
+            f'<div class="glossary-metadata-row"><span>Related</span><div>{" ".join(related)}</div></div>'
+        )
     if docs:
-        lines.append(f'<div class="glossary-metadata-row"><span>Docs</span><div>{" ".join(docs)}</div></div>')
+        lines.append(
+            f'<div class="glossary-metadata-row"><span>Docs</span><div>{" ".join(docs)}</div></div>'
+        )
     if citations:
         lines.append(
             f'<div class="glossary-metadata-row"><span>References</span><div>{" ".join(citations)}</div></div>'
@@ -385,13 +493,19 @@ def _typst_term_macros(terms: list[dict[str, Any]]) -> list[tuple[str, str, str]
     for term in terms:
         typst_macro = term.get("typst_macro")
         if isinstance(typst_macro, str) and typst_macro:
-            macros.append((typst_macro, str(term.get("short") or term["label"]), str(term["label"])))
+            macros.append(
+                (
+                    typst_macro,
+                    str(term.get("short") or term["label"]),
+                    str(term["label"]),
+                )
+            )
     return sorted(macros, key=lambda item: item[0].lower())
 
 
 def _render_typst(terms: list[dict[str, Any]], path: Path) -> None:
     lines = [
-        "// Generated by scripts/glossary_build.py; edit docs/glossary/terms.yml.",
+        "// Generated by scripts/glossary_build.py; edit docs/typst/shared/glossary.typ.",
         "",
         "#let glossary = (",
     ]
@@ -426,7 +540,8 @@ def _render_typst(terms: list[dict[str, Any]], path: Path) -> None:
     for index, term in enumerate(sorted(terms, key=lambda item: item["id"])):
         keyword = "if" if index == 0 else "} else if"
         lines.append(
-            f"  {keyword} id == {_typst_string(term['id'])} {{ {_typst_content(str(term.get('short') or term['label']))} "
+            f"  {keyword} id == {_typst_string(term['id'])} {{ "
+            f"{_typst_content(str(term.get('short') or term['label']))}"
         )
     lines += [
         "  } else { id }",
@@ -437,8 +552,14 @@ def _render_typst(terms: list[dict[str, Any]], path: Path) -> None:
     for index, term in enumerate(sorted(terms, key=lambda item: item["id"])):
         keyword = "if" if index == 0 else "} else if"
         short = term.get("short")
-        full = term["label"] if not short or short == term["label"] else f"{term['label']} ({short})"
-        lines.append(f"  {keyword} id == {_typst_string(term['id'])} {{ {_typst_content(full)} ")
+        full = (
+            term["label"]
+            if not short or short == term["label"]
+            else f"{term['label']} ({short})"
+        )
+        lines.append(
+            f"  {keyword} id == {_typst_string(term['id'])} {{ {_typst_content(full)}"
+        )
     lines += [
         "  } else { id }",
         "}",
@@ -480,9 +601,47 @@ def _render_jsonl(terms: list[dict[str, Any]], path: Path) -> None:
     _write_text(path, "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows))
 
 
+def _render_compat_yaml(terms: list[dict[str, Any]], path: Path) -> None:
+    rows = []
+    for term in terms:
+        row = {
+            "id": term["id"],
+            "anchor": term["anchor"],
+            "label": term["label"],
+            "short": term.get("short"),
+        }
+        if term.get("typst_macro"):
+            row["typst_macro"] = term["typst_macro"]
+        row.update(
+            {
+                "aliases": _as_list(term, "aliases"),
+                "category": term["category"],
+                "parent": term.get("parent"),
+                "definition_short": str(term["definition_short"]).strip(),
+                "definition_long": str(term.get("definition_long") or "").strip(),
+                "formula": term.get("formula") or {},
+                "formulae": term.get("formulae") or [],
+                "notation": term.get("notation") or {},
+                "internal_links": _as_list(term, "internal_links"),
+                "citations": _as_list(term, "citations"),
+                "related": _as_list(term, "related"),
+                "kg_tags": _as_list(term, "kg_tags"),
+            }
+        )
+        rows.append(
+            {key: value for key, value in row.items() if value not in (None, {}, [])}
+        )
+    header = (
+        "# Generated compatibility glossary source.\n"
+        "# Do not edit by hand; edit docs/typst/shared/glossary.typ and run `make glossary`.\n\n"
+    )
+    body = yaml.safe_dump(rows, sort_keys=False, allow_unicode=True, width=88)
+    _write_text(path, header + body)
+
+
 def _render_shortcode_lua(terms: list[dict[str, Any]], path: Path) -> None:
     lines = [
-        "-- Generated by scripts/glossary_build.py; edit docs/glossary/terms.yml.",
+        "-- Generated by scripts/glossary_build.py; edit docs/typst/shared/glossary.typ.",
         "",
         "return {",
     ]
@@ -499,7 +658,9 @@ def _render_shortcode_lua(terms: list[dict[str, Any]], path: Path) -> None:
     _write_text(path, "\n".join(lines))
 
 
-def _render_notation_lua(notation: dict[str, dict[str, dict[str, str]]], path: Path) -> None:
+def _render_notation_lua(
+    notation: dict[str, dict[str, dict[str, str]]], path: Path
+) -> None:
     lines = [
         "-- Generated by scripts/glossary_build.py; edit docs/notation.yml.",
         "",
@@ -519,7 +680,9 @@ def _render_notation_lua(notation: dict[str, dict[str, dict[str, str]]], path: P
     _write_text(path, "\n".join(lines))
 
 
-def _render_notation_typst(notation: dict[str, dict[str, dict[str, str]]], path: Path) -> None:
+def _render_notation_typst(
+    notation: dict[str, dict[str, dict[str, str]]], path: Path
+) -> None:
     lines = [
         "// Generated by scripts/glossary_build.py; edit docs/notation.yml.",
         "",
@@ -556,6 +719,7 @@ def build(args: argparse.Namespace) -> None:
             "render-quarto",
             "render-typst",
             "render-jsonl",
+            "render-compat-yaml",
             "render-shortcode-lua",
             "render-notation-lua",
             "render-notation-typst",
@@ -566,6 +730,8 @@ def build(args: argparse.Namespace) -> None:
         _render_typst(terms, args.typst_out)
     if "render-jsonl" in actions:
         _render_jsonl(terms, args.jsonl_out)
+    if "render-compat-yaml" in actions:
+        _render_compat_yaml(terms, args.compat_yaml_out)
     if "render-shortcode-lua" in actions:
         _render_shortcode_lua(terms, args.shortcode_lua_out)
     if "render-notation-lua" in actions:
@@ -592,19 +758,23 @@ def main() -> None:
             "render-quarto",
             "render-typst",
             "render-jsonl",
+            "render-compat-yaml",
             "render-shortcode-lua",
             "render-notation-lua",
             "render-notation-typst",
         ],
     )
     parser.add_argument("--terms", type=Path, default=DEFAULT_TERMS)
+    parser.add_argument("--compat-yaml-out", type=Path, default=DEFAULT_COMPAT_YAML)
     parser.add_argument("--notation", type=Path, default=DEFAULT_NOTATION)
     parser.add_argument("--qmd-out", type=Path, default=DEFAULT_QMD)
     parser.add_argument("--typst-out", type=Path, default=DEFAULT_TYPST)
     parser.add_argument("--jsonl-out", type=Path, default=DEFAULT_JSONL)
     parser.add_argument("--shortcode-lua-out", type=Path, default=DEFAULT_SHORTCODE_LUA)
     parser.add_argument("--notation-lua-out", type=Path, default=DEFAULT_NOTATION_LUA)
-    parser.add_argument("--notation-typst-out", type=Path, default=DEFAULT_NOTATION_TYPST)
+    parser.add_argument(
+        "--notation-typst-out", type=Path, default=DEFAULT_NOTATION_TYPST
+    )
     args = parser.parse_args()
     try:
         build(args)

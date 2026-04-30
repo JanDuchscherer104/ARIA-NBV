@@ -83,6 +83,9 @@ Apply this file when working under `aria_nbv/`.
   public-interface behavior test, minimal implementation, repeat.
 - Tests should verify observable contracts through public package interfaces
   rather than private helper shape whenever a public seam exists.
+- Treat public package interfaces, config `.setup_target()` surfaces, CLIs, and
+  Streamlit dispatcher imports as the preferred test seams before private
+  helper tests.
 - Update docs when behavior or user-facing workflows change.
 - Keep public signatures typed and public methods documented.
 - Work in a test-driven manner when possible - start by planning interfaces and writing tests before implementation.

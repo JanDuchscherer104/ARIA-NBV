@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Quarto pages for maintained agent guidance and scaffold docs."""
+"""Generate internal Quarto pages for maintained agent guidance."""
 
 from __future__ import annotations
 
@@ -12,10 +12,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = REPO_ROOT / "docs"
-OUTPUT_ROOT = DOCS_ROOT / "contents" / "resources" / "agent_scaffold"
-GITHUB_BLOB_BASE = "https://github.com/JanDuchscherer104/NBV/blob/main"
+OUTPUT_ROOT = REPO_ROOT / ".agents" / "generated" / "agent_scaffold"
+GITHUB_BLOB_BASE = "https://github.com/JanDuchscherer104/ARIA-NBV/blob/main"
 GENERATED_NOTE = (
-    "This page is generated from the canonical repo markdown source. "
+    "This internal page is generated from canonical repo markdown. "
+    "It is an operator aid under `.agents/generated/`, not public Quarto content. "
     "Refresh it with `./scripts/quarto_generate_agent_docs.py`."
 )
 
@@ -33,7 +34,7 @@ class DocSpec:
 DOC_SPECS: tuple[DocSpec, ...] = (
     DocSpec(
         source="AGENTS.md",
-        output="contents/resources/agent_scaffold/instructions/repo_guidance.qmd",
+        output="instructions/repo_guidance.qmd",
         title="Repo Guidance",
         section="Instructions",
         nav_label="Repo Guidance",
@@ -41,7 +42,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source="docs/AGENTS.md",
-        output="contents/resources/agent_scaffold/instructions/docs_guidance.qmd",
+        output="instructions/docs_guidance.qmd",
         title="Docs Guidance",
         section="Instructions",
         nav_label="Docs Guidance",
@@ -49,7 +50,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source="aria_nbv/AGENTS.md",
-        output="contents/resources/agent_scaffold/instructions/package_guidance.qmd",
+        output="instructions/package_guidance.qmd",
         title="Package Guidance",
         section="Instructions",
         nav_label="Package Guidance",
@@ -57,7 +58,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source="aria_nbv/aria_nbv/data_handling/AGENTS.md",
-        output="contents/resources/agent_scaffold/instructions/data_handling_boundary.qmd",
+        output="instructions/data_handling_boundary.qmd",
         title="Data Handling Boundary",
         section="Instructions",
         nav_label="Data Handling Boundary",
@@ -65,7 +66,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source="aria_nbv/aria_nbv/rri_metrics/AGENTS.md",
-        output="contents/resources/agent_scaffold/instructions/rri_metrics_boundary.qmd",
+        output="instructions/rri_metrics_boundary.qmd",
         title="RRI Metrics Boundary",
         section="Instructions",
         nav_label="RRI Metrics Boundary",
@@ -73,7 +74,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source="aria_nbv/aria_nbv/vin/AGENTS.md",
-        output="contents/resources/agent_scaffold/instructions/vin_boundary.qmd",
+        output="instructions/vin_boundary.qmd",
         title="VIN Boundary",
         section="Instructions",
         nav_label="VIN Boundary",
@@ -81,7 +82,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source=".agents/memory/README.md",
-        output="contents/resources/agent_scaffold/state/memory_readme.qmd",
+        output="state/memory_readme.qmd",
         title="Agent Memory README",
         section="Canonical State",
         nav_label="Memory README",
@@ -89,7 +90,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source=".agents/memory/state/PROJECT_STATE.md",
-        output="contents/resources/agent_scaffold/state/project_state.qmd",
+        output="state/project_state.qmd",
         title="Project State",
         section="Canonical State",
         nav_label="Project State",
@@ -97,7 +98,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source=".agents/memory/state/DECISIONS.md",
-        output="contents/resources/agent_scaffold/state/decisions.qmd",
+        output="state/decisions.qmd",
         title="Decisions",
         section="Canonical State",
         nav_label="Decisions",
@@ -105,7 +106,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source=".agents/memory/state/OPEN_QUESTIONS.md",
-        output="contents/resources/agent_scaffold/state/open_questions.qmd",
+        output="state/open_questions.qmd",
         title="Open Questions",
         section="Canonical State",
         nav_label="Open Questions",
@@ -113,7 +114,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source=".agents/memory/state/GOTCHAS.md",
-        output="contents/resources/agent_scaffold/state/gotchas.qmd",
+        output="state/gotchas.qmd",
         title="Gotchas",
         section="Canonical State",
         nav_label="Gotchas",
@@ -121,7 +122,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source=".agents/references/operator_quick_reference.md",
-        output="contents/resources/agent_scaffold/references/operator_quick_reference.qmd",
+        output="references/operator_quick_reference.qmd",
         title="Operator Quick Reference",
         section="References",
         nav_label="Operator Quick Reference",
@@ -129,7 +130,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source=".agents/references/python_conventions.md",
-        output="contents/resources/agent_scaffold/references/python_conventions.qmd",
+        output="references/python_conventions.qmd",
         title="Python Conventions",
         section="References",
         nav_label="Python Conventions",
@@ -137,7 +138,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source=".agents/references/context7_library_ids.md",
-        output="contents/resources/agent_scaffold/references/context7_library_ids.qmd",
+        output="references/context7_library_ids.qmd",
         title="Context7 Library IDs",
         section="References",
         nav_label="Context7 Library IDs",
@@ -145,7 +146,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source=".agents/references/agent_memory_templates.md",
-        output="contents/resources/agent_scaffold/references/agent_memory_templates.qmd",
+        output="references/agent_memory_templates.qmd",
         title="Agent Memory Templates",
         section="References",
         nav_label="Agent Memory Templates",
@@ -153,7 +154,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source=".agents/skills/aria-nbv-context/SKILL.md",
-        output="contents/resources/agent_scaffold/skills/aria_nbv_context_skill.qmd",
+        output="skills/aria_nbv_context_skill.qmd",
         title="aria-nbv-context Skill",
         section="Skills & Routing",
         nav_label="aria-nbv-context Skill",
@@ -161,7 +162,7 @@ DOC_SPECS: tuple[DocSpec, ...] = (
     ),
     DocSpec(
         source=".agents/skills/aria-nbv-context/references/context_map.md",
-        output="contents/resources/agent_scaffold/skills/context_map.qmd",
+        output="skills/context_map.qmd",
         title="Context Map",
         section="Skills & Routing",
         nav_label="Context Map",
@@ -242,7 +243,7 @@ def translate_target(
         return target
 
     if repo_relative in source_map:
-        mapped = DOCS_ROOT / source_map[repo_relative].output
+        mapped = OUTPUT_ROOT / source_map[repo_relative].output
         return f"{relative_path(output_file, mapped)}{fragment}"
 
     if repo_relative.startswith("docs/"):
@@ -292,7 +293,7 @@ def rewrite_links(
 
 def render_page(spec: DocSpec, source_map: dict[str, DocSpec]) -> None:
     source_file = REPO_ROOT / spec.source
-    output_file = DOCS_ROOT / spec.output
+    output_file = OUTPUT_ROOT / spec.output
     metadata, text = split_frontmatter(source_file.read_text(encoding="utf-8"))
     source_heading, body = split_heading(text)
     body = rewrite_links(
@@ -303,11 +304,11 @@ def render_page(spec: DocSpec, source_map: dict[str, DocSpec]) -> None:
     )
 
     callout_lines = [
-        "::: {.callout-note collapse=\"true\"}",
+        '::: {.callout-note collapse="true"}',
         "## Canonical Source",
         f"- Source file: [`{spec.source}`]({GITHUB_BLOB_BASE}/{spec.source})",
-        f"- Published page: `{spec.output}`",
-        f"- Refresh: `./scripts/quarto_generate_agent_docs.py`",
+        f"- Generated page: `.agents/generated/agent_scaffold/{spec.output}`",
+        "- Refresh: `./scripts/quarto_generate_agent_docs.py`",
     ]
     if "scope" in metadata:
         callout_lines.append(f"- Scope: `{metadata['scope']}`")
@@ -352,15 +353,15 @@ def render_index() -> None:
         "",
         "<!-- Generated by scripts/quarto_generate_agent_docs.py. -->",
         "",
-        "This section publishes the maintained Codex guidance and scaffold markdown",
-        "surfaces from the repository under Quarto `Resources`.",
+        "This internal index mirrors maintained Codex guidance and scaffold",
+        "markdown for operator use.",
         "",
         "It includes the active `AGENTS.md` files, canonical memory state, agent",
         "references, and the `aria-nbv-context` routing skill. It intentionally",
         "excludes episodic history, `.agents/archive/`, and temporary workpads.",
         "",
-        "Refresh these pages with `./scripts/quarto_generate_agent_docs.py`. The",
-        "GitHub Pages workflow runs that generator before rendering the site.",
+        "Refresh these pages with `./scripts/quarto_generate_agent_docs.py`.",
+        "GitHub Pages must not publish this generated tree.",
         "",
     ]
 
@@ -372,8 +373,7 @@ def render_index() -> None:
             ]
         )
         for spec in grouped[section]:
-            output_path = Path(spec.output).relative_to("contents/resources/agent_scaffold")
-            lines.append(f"- [{spec.nav_label}]({output_path.as_posix()}): {spec.summary}")
+            lines.append(f"- [{spec.nav_label}]({spec.output}): {spec.summary}")
         lines.append("")
 
     index_file = OUTPUT_ROOT / "index.qmd"

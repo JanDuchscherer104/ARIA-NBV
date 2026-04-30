@@ -28,18 +28,22 @@ Do not use it for a localized typo fix unless source-of-truth alignment is at ri
 ## Rules
 
 - Treat the Typst paper as the highest-level project narrative.
-- Keep public Quarto docs reader-facing; internal agent guidance, generated context, and OMX runtime notes stay under `.agents/` unless explicitly curated.
+- Keep public Quarto docs reader-facing; internal agent guidance, generated context, raw scratch history, and OMX runtime notes stay under `.agents/` unless explicitly curated.
 - Link to canonical state or owning implementation docs instead of repeating long explanations.
 - Keep bibliography additions in `docs/references.bib`.
 - Update canonical memory when the current truth changes; otherwise record `canonical_updates_needed: []` in the debrief.
-- Use QMD frontmatter to classify retained pages:
-  `phase: thesis | seminar | archive`, `audience: public | advisor | internal`,
-  `status: current | planned | scratch | archive`, and `owner`.
+- Use QMD frontmatter to classify rendered pages:
+  `phase: thesis | seminar | archive | generated`,
+  `audience: public | advisor | developer | agent`,
+  `status: current | planned | scratch | deprecated`, and
+  `owner: paper | docs | code | agent | generated | jan`.
+- Do not render `audience: agent` pages under `docs/contents/**`; raw internal
+  archive and backlog history belongs under `.agents/archive/docs/`.
 - Triage docs with these labels: `KEEP_PUBLIC`, `MOVE_TO_AGENTS`,
   `MOVE_TO_PACKAGE_CONTRACT`, `ARCHIVE`, `DELETE`, and
   `GENERATED_UNTRACKED`.
-- Keep all retained QMD files renderable, but keep archive/scratch pages out of
-  primary navigation unless explicitly requested.
+- Keep all retained public QMD files renderable. Only curated archive summaries
+  belong under `docs/contents/archive/`.
 
 ## Verification
 
@@ -47,4 +51,5 @@ Do not use it for a localized typo fix unless source-of-truth alignment is at ri
 - `cd docs && typst compile typst/seminar_paper/main.typ --root .` for paper edits
 - `cd docs && typst compile typst/seminar_slides/<file>.typ --root .` for slide edits
 - `scripts/nbv_qmd_outline.sh --compact` for public navigation checks
+- `make qmd-frontmatter-check` for rendered QMD taxonomy changes
 - `make check-agent-memory` for `.agents/` or canonical-memory edits

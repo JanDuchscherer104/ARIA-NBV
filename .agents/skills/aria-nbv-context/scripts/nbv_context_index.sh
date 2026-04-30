@@ -119,7 +119,7 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "- .agents/references/agent_memory_templates.md"
   echo "- .agents/references/context7_library_ids.md"
   echo "- docs/index.qmd"
-  echo "- docs/contents/archive/todos.qmd"
+  echo "- .agents/archive/docs/todos.qmd  # historical archive only"
   echo
   echo "## Preferred reveal commands"
   echo '- scripts/nbv_qmd_outline.sh --compact'

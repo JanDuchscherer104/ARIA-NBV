@@ -25,7 +25,7 @@ Before asking the user, answer discoverable questions from:
 2. `.agents/memory/state/PROJECT_STATE.md`
 3. `.agents/memory/state/DECISIONS.md`
 4. `.agents/memory/state/OPEN_QUESTIONS.md`
-5. `docs/glossary/terms.yml`
+5. `docs/typst/shared/glossary.typ`
 6. `docs/contents/thesis/roadmap.qmd`
 7. `docs/contents/thesis/questions.qmd`
 8. the nearest `AGENTS.md` for touched code or docs
@@ -36,9 +36,14 @@ Use `aria-nbv-context` if the relevant surface is not yet localized.
 
 - Ask one material decision at a time.
 - State the recommended answer with the tradeoff.
-- Challenge overloaded terms against `docs/glossary/terms.yml`.
+- Challenge overloaded terms against `docs/typst/shared/glossary.typ`.
+- For fuzzy thesis or planning terms, test the plan with three concrete
+  scenarios: one normal case, one boundary case, and one failure case.
 - Cross-check claims against code, paper, memory state, and roadmap before
   accepting them.
+- Resolved terminology updates `docs/typst/shared/glossary.typ` or
+  `.agents/memory/state/DECISIONS.md`. Do not add a parallel root context file
+  or ADR tree as a second source of truth.
 - Distinguish `current`, `planned`, `scratch`, and `archive` docs.
 - Capture durable outcomes in the smallest correct surface:
   - invariant -> `AGENTS.md`

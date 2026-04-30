@@ -58,7 +58,7 @@ Progressive disclosure order:
 ## Do Not Escalate Early
 - Do not run `make context-heavy` when the state docs, references, routing map, source index, outlines, or AST summaries already localize the answer.
 - Do not open entire paper sections, Quarto chapters, or literature trees until the outline or index step identifies the exact file.
-- Do not open `docs/index.qmd` or `docs/contents/archive/todos.qmd` until the task specifically needs project narrative, priorities, or open work items.
+- Do not open `docs/index.qmd` until the task specifically needs project narrative. Do not open `.agents/archive/docs/todos.qmd` unless the task is explicitly historical or asks for old backlog archaeology.
 - Do not search `.agents/memory/history/` unless the question is historical, comparative, or explicitly asks for past debriefs.
 
 ## Zoom-Out Output

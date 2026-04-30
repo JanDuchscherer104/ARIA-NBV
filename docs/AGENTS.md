@@ -9,20 +9,25 @@ Apply this file when working under `docs/`.
 - Preserve established Quarto and Typst structure unless the task explicitly changes it.
 - Prefer links to canonical state docs in `.agents/memory/state/` over re-explaining the same guidance in multiple places.
 - Keep internal agent guidance, generated context, and OMX runtime notes out of
-  public Quarto navigation. If a generated agent mirror is needed for an
-  operator render, keep it hidden and regenerate it from `.agents/`.
+  public Quarto navigation. If a generated agent mirror is needed, regenerate
+  it under `.agents/generated/`; do not write agent mirrors under
+  `docs/contents/**`.
 
 ## Default Workflow
 - Start from `docs/typst/seminar_paper/main.typ`.
 - Use `scripts/nbv_qmd_outline.sh --compact` to localize the exact Quarto page before opening it.
 - Use `scripts/nbv_typst_includes.py --paper --mode outline` to localize the exact Typst section before opening it.
-- Open `docs/index.qmd`, `docs/contents/archive/todos.qmd`, `docs/contents/thesis/roadmap.qmd`, and `docs/contents/thesis/questions.qmd` only when the task is about project narrative, priorities, or roadmap.
+- Open `docs/index.qmd`, `docs/contents/thesis/roadmap.qmd`, and
+  `docs/contents/thesis/questions.qmd` only when the task is about project
+  narrative, priorities, or roadmap. Historical scratch pages live under
+  `.agents/archive/docs/`.
 - If you need current project truth beyond the paper, open the relevant doc in `.agents/memory/state/` instead of scanning broad doc trees.
 
 ## Commands
 - Context refresh: `make context`
 - API reference refresh: `./scripts/quarto_generate_api_docs.sh`
-- Agent scaffold refresh: `./scripts/quarto_generate_agent_docs.py`
+- Internal agent scaffold refresh: `./scripts/quarto_generate_agent_docs.py`
+- QMD frontmatter check: `make qmd-frontmatter-check`
 - Quarto render: `cd docs && quarto render .`
 - Quarto preview: `cd docs && quarto preview`
 - Quarto check: `quarto check`
@@ -46,16 +51,18 @@ Apply this file when working under `docs/`.
 - Keep Quarto source files (`*.qmd`) separate from rendered site output. Published HTML belongs under `docs/_site/`, not next to the sources.
 - Treat `docs/_freeze/` as tracked execution state for code-backed pages when needed; treat `docs/_site/`, `site_libs/`, `index_files/`, and `*_files/` as generated publish artifacts.
 - Do not store generated context or rendered artifacts in tracked docs paths unless the task explicitly requires it.
-- Treat `docs/contents/resources/agent_scaffold/` as generated internal mirror
-  content, not hand-authored public docs. Do not expose it as primary public
-  navigation.
+- Treat generated agent scaffold mirrors as internal operator artifacts under
+  `.agents/generated/`; do not expose them in public Quarto content.
 - Retained QMD pages should carry minimal ownership metadata: `title`, `phase`,
-  `audience`, `status`, and `owner`. Use `phase: thesis | seminar | archive`,
-  `audience: public | advisor | internal`, and
-  `status: current | planned | scratch | archive`.
+  `audience`, `status`, and `owner`. Use
+  `phase: thesis | seminar | archive | generated`,
+  `audience: public | advisor | developer | agent`,
+  `status: current | planned | scratch | deprecated`, and
+  `owner: paper | docs | code | agent | generated | jan`.
 - Current thesis pages live under `docs/contents/thesis/`; past seminar
-  material belongs under `docs/contents/seminar/`; retained scratch or stale
-  history belongs under `docs/contents/archive/`.
-- Active tasks belong in `.agents/*.toml`, not public TODO pages. If an archived
-  QMD still renders, add a callout pointing readers to the current owner.
-- For larger doc changes, run `quarto render` and `quarto check` before finishing.
+  material belongs under `docs/contents/seminar/`; raw scratch or stale history
+  belongs under `.agents/archive/docs/`. Only curated public archive summaries
+  may live under `docs/contents/archive/`.
+- Active tasks belong in `.agents/*.toml`, not public TODO pages.
+- For larger doc changes, run `make qmd-frontmatter-check`, `quarto render`,
+  and `quarto check` before finishing.

@@ -14,7 +14,7 @@ loc_max = 1600
 context = ["Current docs expose roadmap, TODOs, ideas, generated agent scaffold mirrors, literature notes, implementation guides, and scratchpad-like pages in the same public tree.", "docs/AGENTS.md says docs/typst/paper/main.typ is ground truth and Quarto should not introduce competing top-level narratives."]
 implementation_notes = ["Start with scripts/nbv_qmd_outline.sh --compact and docs/_quarto.yml navigation instead of broad manual browsing.", "Keep source pages until there is an explicit archive/move decision; first remove public navigation pressure and stale links.", "Do not delete history records under .agents/memory/history/."]
 acceptance = ["Each docs subtree has an explicit role: public, paper, slides, generated, internal mirror, or archive.", "Public nav no longer surfaces internal agent scaffolding or stale work-management pages as primary project content.", "Stale typo links such as coral_intergarion and hesita are either renamed or intentionally documented."]
-verification = ["scripts/nbv_qmd_outline.sh --compact", "cd docs && quarto render index.qmd contents/thesis/roadmap.qmd contents/thesis/questions.qmd", "rg -n \"Seminar|hesita|coral_intergarion|JanDuchscherer104/NBV\" README.md docs"]
+verification = ["scripts/nbv_qmd_outline.sh --compact", "cd docs && quarto render index.qmd contents/thesis/roadmap.qmd contents/thesis/questions.qmd contents/archive/index.qmd", "rg -n \"Seminar|hesita|coral_intergarion|old NBV repo URL\" README.md docs"]
 
 [[todo]]
 id = "todo-002"
@@ -30,7 +30,7 @@ loc_max = 360
 context = ["README.md should stay concise, while setup details need a stable place for uv sync, Project Aria/ATEK/EFM dependencies, cache roots, and offline-only smoke tests.", ".agents/references/operator_quick_reference.md can be used for machine-specific recovery details, but shared setup docs must stay portable."]
 implementation_notes = ["Create root SETUP.md or a docs/contents/setup.qmd-aligned root pointer without duplicating host-specific paths.", "Include uv sync --all-extras from aria_nbv/, VIN offline-store expectations, and Streamlit/VIN summary smoke commands.", "Link from README.md and docs/index.qmd."]
 acceptance = ["A new contributor can find environment setup, cache prerequisites, and the first smoke commands from the README.", "No shared setup text contains operator-specific interpreter paths."]
-verification = ["rg -n \"/home/jandu|/home/jd|miniforge\" README.md SETUP.md docs/contents/setup.qmd", "cd docs && quarto render index.qmd contents/setup.qmd"]
+verification = ["rg -n \"host-local home path|miniforge\" README.md SETUP.md docs/contents/setup.qmd", "cd docs && quarto render index.qmd contents/setup.qmd"]
 
 [[todo]]
 id = "todo-003"
