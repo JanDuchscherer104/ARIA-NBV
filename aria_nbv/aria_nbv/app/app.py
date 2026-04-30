@@ -16,6 +16,7 @@ from .panels import (
     render_candidates_page,
     render_data_page,
     render_depth_page,
+    render_offline_dataset_page,
     render_rl_page,
     render_rri_binning_page,
     render_rri_page,
@@ -227,6 +228,9 @@ class NbvStreamlitApp:
         def _page_vin() -> None:
             render_vin_diagnostics_page()
 
+        def _page_offline_dataset() -> None:
+            render_offline_dataset_page()
+
         def _page_rri_binning() -> None:
             render_rri_binning_page()
 
@@ -250,6 +254,7 @@ class NbvStreamlitApp:
         pages.extend(
             [
                 st.Page(_page_vin, title="VIN Diagnostics"),
+                st.Page(_page_offline_dataset, title="VIN Offline Dataset"),
                 st.Page(_page_wandb, title="W&B Analysis"),
                 st.Page(_page_optuna_sweep, title="Optuna Sweep"),
                 st.Page(_page_testing_attr, title="Testing & Attribution"),
