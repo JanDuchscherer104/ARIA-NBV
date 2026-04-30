@@ -242,8 +242,13 @@ docs/_freeze/**/*.html
 .agents/tmp/*
 
 # Large download manifests
-.data/aria_download_urls/
-.data
+!.data/
+.data/*
+!.data/aria_download_urls/
+.data/aria_download_urls/*
+!.data/aria_download_urls/aria_synthetic_environments_dataset_download_urls.json
+!.data/aria_download_urls/AriaSyntheticEnvironment_ATEK_download_urls.json
+!.data/aria_download_urls/ase_mesh_download_urls.json
 
 .logs/*
 .logs/ckpts
