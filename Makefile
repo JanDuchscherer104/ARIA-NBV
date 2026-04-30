@@ -6,6 +6,7 @@
 .PHONY: context-literature-index context-literature-search migrate-codex-memory
 .PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory
 .PHONY: memory-mine agents-db glossary kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-papers kg-export-neo4j kg-semantic-enrich
+.PHONY: lrz-probe lrz-resources lrz-resources-gpu lrz-resources-cpu lrz-jobs lrz-dss-init lrz-container-shell lrz-sbatch-cpu lrz-sbatch-single-gpu lrz-sbatch-multigpu
 
 # Color codes
 BLUE := \033[0;34m
@@ -62,6 +63,10 @@ MMD_DIR ?= external/mmdc-examples
 MMD_OUT ?= $(MMD_DIR)
 MMD_FORMAT ?= png
 MMD_SCALE ?= 4
+LRZ_SKILL_DIR ?= .agents/skills/lrz-ai-systems
+LRZ_SCRIPTS_DIR ?= $(LRZ_SKILL_DIR)/scripts
+LRZ_RESOURCES_ARGS ?= summary
+LRZ_CMD ?=
 
 #  ══════════════════════════════════════════════════════════════════════
 #  Agent Context helpers
@@ -175,6 +180,76 @@ kg-export-neo4j: ## 📚 Export literature and memory nodes to a Neo4j import bu
 
 kg-semantic-enrich: ## 📚 Enrich literature registry with Semantic Scholar metadata
 	@./scripts/kg/ingest_papers.sh semantic-enrich
+
+#  ═══════════════════════════════════════════════════════════════════════
+#  🔧 LRZ AI Systems operator helpers
+#  ═══════════════════════════════════════════════════════════════════════
+
+lrz-probe: ## 🔧 Inspect LRZ login/allocation, DSS containers, partitions, jobs, and GPU visibility
+	@$(LRZ_SCRIPTS_DIR)/lrz-probe.sh
+
+lrz-resources: ## 🔧 One-shot Slurm resource query (LRZ_RESOURCES_ARGS='summary' or 'partition lrz-v100x2')
+	@$(LRZ_SCRIPTS_DIR)/lrz-resources.sh $(LRZ_RESOURCES_ARGS)
+
+lrz-resources-gpu: ## 🔧 One-shot LRZ GPU partition summary
+	@$(LRZ_SCRIPTS_DIR)/lrz-resources.sh gpu
+
+lrz-resources-cpu: ## 🔧 One-shot LRZ CPU partition summary
+	@$(LRZ_SCRIPTS_DIR)/lrz-resources.sh cpu
+
+lrz-jobs: ## 🔧 Show current user's LRZ Slurm jobs once
+	@$(LRZ_SCRIPTS_DIR)/lrz-resources.sh mine
+
+lrz-dss-init: ## 🔧 Initialize ARIA DSS layout (requires ARIA_DSS=/dss/.../aria-nbv)
+	@if [ -z "$(strip $(ARIA_DSS))" ]; then \
+		echo "$(RED)ARIA_DSS is required, e.g. make lrz-dss-init ARIA_DSS=/dss/.../aria-nbv$(NC)"; \
+		exit 2; \
+	fi
+	@$(LRZ_SCRIPTS_DIR)/lrz-dss-init.sh "$(ARIA_DSS)"
+
+lrz-container-shell: ## 🔧 Launch Pyxis container shell inside an LRZ Slurm allocation (requires ARIA_DSS)
+	@if [ -z "$(strip $(ARIA_DSS))" ]; then \
+		echo "$(RED)ARIA_DSS is required, e.g. make lrz-container-shell ARIA_DSS=/dss/.../aria-nbv$(NC)"; \
+		exit 2; \
+	fi
+	@ARIA_DSS="$(ARIA_DSS)" ARIA_REPO="$(ARIA_REPO)" LRZ_CONTAINER_IMAGE="$(LRZ_CONTAINER_IMAGE)" \
+		$(LRZ_SCRIPTS_DIR)/lrz-container-shell.sh
+
+lrz-sbatch-cpu: ## 🔧 Submit LRZ CPU batch job (requires ARIA_DSS and LRZ_CMD)
+	@if [ -z "$(strip $(ARIA_DSS))" ]; then \
+		echo "$(RED)ARIA_DSS is required, e.g. make lrz-sbatch-cpu ARIA_DSS=/dss/.../aria-nbv LRZ_CMD='uv run pytest ...'$(NC)"; \
+		exit 2; \
+	fi
+	@if [ -z '$(strip $(LRZ_CMD))' ]; then \
+		echo "$(RED)LRZ_CMD is required, e.g. make lrz-sbatch-cpu ARIA_DSS=/dss/.../aria-nbv LRZ_CMD='uv run pytest ...'$(NC)"; \
+		exit 2; \
+	fi
+	@ARIA_DSS="$(ARIA_DSS)" ARIA_REPO="$(ARIA_REPO)" LRZ_TIME="$(LRZ_TIME)" LRZ_CPUS="$(LRZ_CPUS)" LRZ_MEM="$(LRZ_MEM)" \
+		$(LRZ_SCRIPTS_DIR)/lrz-sbatch-cpu.sh '$(LRZ_CMD)'
+
+lrz-sbatch-single-gpu: ## 🔧 Submit LRZ single-GPU batch job (requires ARIA_DSS and LRZ_CMD)
+	@if [ -z "$(strip $(ARIA_DSS))" ]; then \
+		echo "$(RED)ARIA_DSS is required, e.g. make lrz-sbatch-single-gpu ARIA_DSS=/dss/.../aria-nbv LRZ_CMD='uv run python -c \"print(1)\"'$(NC)"; \
+		exit 2; \
+	fi
+	@if [ -z '$(strip $(LRZ_CMD))' ]; then \
+		echo "$(RED)LRZ_CMD is required, e.g. make lrz-sbatch-single-gpu ARIA_DSS=/dss/.../aria-nbv LRZ_CMD='uv run python -c \"print(1)\"'$(NC)"; \
+		exit 2; \
+	fi
+	@ARIA_DSS="$(ARIA_DSS)" ARIA_REPO="$(ARIA_REPO)" LRZ_PARTITION="$(LRZ_PARTITION)" LRZ_GPUS="$(LRZ_GPUS)" LRZ_TIME="$(LRZ_TIME)" LRZ_CPUS="$(LRZ_CPUS)" LRZ_MEM="$(LRZ_MEM)" LRZ_CONTAINER_IMAGE="$(LRZ_CONTAINER_IMAGE)" \
+		$(LRZ_SCRIPTS_DIR)/lrz-sbatch-single-gpu.sh '$(LRZ_CMD)'
+
+lrz-sbatch-multigpu: ## 🔧 Submit LRZ multi-GPU torchrun batch job (requires ARIA_DSS and LRZ_CMD)
+	@if [ -z "$(strip $(ARIA_DSS))" ]; then \
+		echo "$(RED)ARIA_DSS is required, e.g. make lrz-sbatch-multigpu ARIA_DSS=/dss/.../aria-nbv LRZ_GPUS=2 LRZ_CMD='<TRAIN_MODULE_OR_SCRIPT> <ARGS>'$(NC)"; \
+		exit 2; \
+	fi
+	@if [ -z '$(strip $(LRZ_CMD))' ]; then \
+		echo "$(RED)LRZ_CMD is required, e.g. make lrz-sbatch-multigpu ARIA_DSS=/dss/.../aria-nbv LRZ_GPUS=2 LRZ_CMD='<TRAIN_MODULE_OR_SCRIPT> <ARGS>'$(NC)"; \
+		exit 2; \
+	fi
+	@ARIA_DSS="$(ARIA_DSS)" ARIA_REPO="$(ARIA_REPO)" LRZ_PARTITION="$(LRZ_PARTITION)" LRZ_GPUS="$(LRZ_GPUS)" LRZ_NODES="$(LRZ_NODES)" LRZ_TIME="$(LRZ_TIME)" LRZ_CPUS="$(LRZ_CPUS)" LRZ_MEM="$(LRZ_MEM)" LRZ_CONTAINER_IMAGE="$(LRZ_CONTAINER_IMAGE)" \
+		$(LRZ_SCRIPTS_DIR)/lrz-sbatch-multigpu.sh '$(LRZ_CMD)'
 
 context: _check_python ## 🗺️ Refresh lightweight context artifacts (source index, literature index, data contracts)
 	@bash -lc 'set -euo pipefail; \
