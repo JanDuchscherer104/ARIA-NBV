@@ -254,11 +254,12 @@ docs/_freeze/**/*.html
 .logs/ckpts
 
 # Literature review - ignore non-documentation files
-docs/literature/**
-!literature/**/*.md
-!literature/**/*.tex
-!literature/**/*.bib
-!literature/**/
+docs/literature/pdf/
+docs/literature/tex-src/
+!docs/literature/**/*.md
+!docs/literature/**/*.bib
+!docs/literature/**/*.jsonl
+!docs/literature/**/
 
 /.quarto/
 **/*.quarto_ipynb
