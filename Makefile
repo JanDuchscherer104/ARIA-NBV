@@ -5,7 +5,7 @@
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory
 .PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory
-.PHONY: memory-mine agents-db kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-papers
+.PHONY: memory-mine agents-db glossary kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-papers kg-export-neo4j kg-semantic-enrich
 
 # Color codes
 BLUE := \033[0;34m
@@ -136,6 +136,9 @@ check-agent-memory: _check_python ## 🗺️ Validate agent memory scaffolding a
 agents-db: _check_python ## 🧠 Inspect or maintain .agents/issues,todos,refactors,resolved (set AGENTS_ARGS='validate')
 	@$(PYTHON_INTERPRETER) scripts/agents_db.py $(AGENTS_ARGS)
 
+glossary: _check_python ## 📖 Build shared Quarto/Typst/KG glossary artifacts
+	@$(PYTHON_INTERPRETER) scripts/glossary_build.py all
+
 memory-mine: _check_python ## 🧠 Mine current repo state (docs, code, history) into repo-local MemPalace
 	@echo "$(BLUE)Mining project into MemPalace...$(NC)"
 	@mkdir -p .artifacts/mempalace/palace
@@ -144,13 +147,12 @@ memory-mine: _check_python ## 🧠 Mine current repo state (docs, code, history)
 	@echo "$(GREEN)MemPalace mining complete.$(NC)"
 
 kg-sync: ## 📚 Sync literature registry from docs/references.bib
-	@./scripts/kg/ingest_papers.sh
+	@./scripts/kg/ingest_papers.sh sync
 
 kg-materialize: ## 📚 Materialize literature into Markdown for agent consumption
 	@echo "$(BLUE)Materializing literature...$(NC)"
-	@# This would call the materialize step in scripts/kg/ingest_papers.sh
-	@./scripts/kg/ingest_papers.sh
-	@echo "$(GREEN)Literature materialized to docs/literature/.$(NC)"
+	@./scripts/kg/ingest_papers.sh materialize
+	@echo "$(GREEN)Literature materialized to .agents/kg/generated/literature/.$(NC)"
 
 kg-index-code: ## 🏗️ Index aria_nbv code into Neo4j
 	@./scripts/kg/index_code.sh
@@ -160,6 +162,12 @@ kg-ingest-docs: ## 📝 Ingest docs/ into Neo4j/Graphiti
 
 kg-ingest-papers: ## 📚 Full literature pipeline (sync, download, parse, materialize)
 	@./scripts/kg/ingest_papers.sh
+
+kg-export-neo4j: ## 📚 Export literature and memory nodes to a Neo4j import bundle
+	@./scripts/kg/ingest_papers.sh export-neo4j
+
+kg-semantic-enrich: ## 📚 Enrich literature registry with Semantic Scholar metadata
+	@./scripts/kg/ingest_papers.sh semantic-enrich
 
 context: _check_python ## 🗺️ Refresh lightweight context artifacts (source index, literature index, data contracts)
 	@bash -lc 'set -euo pipefail; \

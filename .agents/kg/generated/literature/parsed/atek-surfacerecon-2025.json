@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "paper_id": "atek-surfacerecon-2025",
+    "citation_key": "ATEK-SurfaceRecon-2025",
+    "title": "Machine Learning tasks supported by ATEK: 3D surface reconstruction",
+    "authors": [
+      "{Meta Platforms Inc.}"
+    ],
+    "year": "2025",
+    "arxiv_id": null,
+    "doi": null,
+    "url": "https://github.com/facebookresearch/ATEK/blob/main/docs/ML_task_surface_recon.md",
+    "tex_dir": null,
+    "pdf_file": null,
+    "source_kind": "Bib",
+    "download_mode": "MetadataOnly",
+    "has_local_tex": false,
+    "has_local_pdf": false,
+    "parse_status": "MetadataOnly"
+  },
+  "abstract_text": null,
+  "sections": [],
+  "figures": [],
+  "tables": [],
+  "citations": [],
+  "provenance": []
+}

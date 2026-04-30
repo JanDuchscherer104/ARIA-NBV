@@ -1,0 +1,122 @@
+{
+  "metadata": {
+    "paper_id": "perez2017filmvisualreasoninggeneral",
+    "citation_key": "perez2017filmvisualreasoninggeneral",
+    "title": "FiLM: Visual Reasoning with a General Conditioning Layer",
+    "authors": [
+      "Ethan Perez",
+      "Florian Strub",
+      "Harm de Vries",
+      "Vincent Dumoulin",
+      "Aaron Courville"
+    ],
+    "year": "2017",
+    "arxiv_id": "1709.07871",
+    "doi": "10.1609/aaai.v32i1.11671",
+    "url": "https://arxiv.org/abs/1709.07871",
+    "tex_dir": null,
+    "pdf_file": null,
+    "source_kind": "Bib",
+    "download_mode": "MetadataOnly",
+    "has_local_tex": false,
+    "has_local_pdf": false,
+    "parse_status": "MetadataOnly",
+    "semantic_scholar": {
+      "paperId": "7cfa5c97164129ce3630511f639040d28db1d4b7",
+      "corpusId": 19119291,
+      "externalIds": {
+        "ArXiv": "1709.07871",
+        "CorpusId": "19119291",
+        "DBLP": "journals/corr/abs-1709-07871",
+        "DOI": "10.1609/aaai.v32i1.11671",
+        "MAG": "2951555602"
+      },
+      "url": "https://www.semanticscholar.org/paper/7cfa5c97164129ce3630511f639040d28db1d4b7",
+      "title": "FiLM: Visual Reasoning with a General Conditioning Layer",
+      "abstract": "\n \n We introduce a general-purpose conditioning method for neural networks called FiLM: Feature-wise Linear Modulation. FiLM layers influence neural network computation via a simple, feature-wise affine transformation based on conditioning information. We show that FiLM layers are highly effective for visual reasoning - answering image-related questions which require a multi-step, high-level process - a task which has proven difficult for standard deep learning methods that do not explicitly model reasoning. Specifically, we show on visual reasoning tasks that FiLM layers 1) halve state-of-the-art error for the CLEVR benchmark, 2) modulate features in a coherent manner, 3) are robust to ablations and architectural modifications, and 4) generalize well to challenging, new data from few examples or even zero-shot.\n \n",
+      "tldr": {
+        "text": "It is shown that FiLM layers are highly effective for visual reasoning - answering image-related questions which require a multi-step, high-level process - a task which has proven difficult for standard deep learning methods that do not explicitly model reasoning."
+      },
+      "venue": "AAAI Conference on Artificial Intelligence",
+      "year": 2017,
+      "publicationDate": "2017-09-01",
+      "publicationTypes": [
+        "JournalArticle",
+        "Conference"
+      ],
+      "fieldsOfStudy": [
+        "Computer Science",
+        "Mathematics"
+      ],
+      "s2FieldsOfStudy": [
+        {
+          "category": "Computer Science",
+          "source": "external"
+        },
+        {
+          "category": "Mathematics",
+          "source": "external"
+        },
+        {
+          "category": "Computer Science",
+          "source": "s2-fos-model"
+        }
+      ],
+      "authors": [
+        {
+          "authorId": "3439053",
+          "name": "Ethan Perez",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "3367628",
+          "name": "Florian Strub",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "153559313",
+          "name": "H. D. Vries",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "3074927",
+          "name": "Vincent Dumoulin",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "1760871",
+          "name": "Aaron C. Courville",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        }
+      ],
+      "citationCount": 3453,
+      "influentialCitationCount": 267,
+      "referenceCount": 44,
+      "openAccessPdf": {
+        "url": "https://ojs.aaai.org/index.php/AAAI/article/download/11671/11530",
+        "status": "BRONZE"
+      }
+    }
+  },
+  "abstract_text": null,
+  "sections": [],
+  "figures": [],
+  "tables": [],
+  "citations": [],
+  "provenance": []
+}

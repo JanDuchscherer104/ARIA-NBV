@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "paper_id": "e3nn-sphericalharmonics-2025",
+    "citation_key": "e3nn-SphericalHarmonics-2025",
+    "title": "e3nn spherical harmonics documentation",
+    "authors": [
+      "{e3nn contributors}"
+    ],
+    "year": "2025",
+    "arxiv_id": null,
+    "doi": null,
+    "url": "https://docs.e3nn.org/en/stable/api/o3/o3_sh.html",
+    "tex_dir": null,
+    "pdf_file": null,
+    "source_kind": "Bib",
+    "download_mode": "MetadataOnly",
+    "has_local_tex": false,
+    "has_local_pdf": false,
+    "parse_status": "MetadataOnly"
+  },
+  "abstract_text": null,
+  "sections": [],
+  "figures": [],
+  "tables": [],
+  "citations": [],
+  "provenance": []
+}

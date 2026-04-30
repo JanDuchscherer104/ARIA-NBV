@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "paper_id": "atek-datastore-2025",
+    "citation_key": "ATEK-DataStore-2025",
+    "title": "ATEK Data Store documentation",
+    "authors": [
+      "{Meta Platforms Inc.}"
+    ],
+    "year": "2025",
+    "arxiv_id": null,
+    "doi": null,
+    "url": "https://github.com/facebookresearch/ATEK/blob/main/docs/ATEK_Data_Store.md",
+    "tex_dir": null,
+    "pdf_file": null,
+    "source_kind": "Bib",
+    "download_mode": "MetadataOnly",
+    "has_local_tex": false,
+    "has_local_pdf": false,
+    "parse_status": "MetadataOnly"
+  },
+  "abstract_text": null,
+  "sections": [],
+  "figures": [],
+  "tables": [],
+  "citations": [],
+  "provenance": []
+}

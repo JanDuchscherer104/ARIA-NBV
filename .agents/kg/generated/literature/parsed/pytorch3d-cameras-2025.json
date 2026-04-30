@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "paper_id": "pytorch3d-cameras-2025",
+    "citation_key": "PyTorch3D-Cameras-2025",
+    "title": "PyTorch3D Cameras + Rendering Documentation, Tutorial: Render a Textured Mesh",
+    "authors": [
+      "{Meta Platforms Inc.}"
+    ],
+    "year": "2025",
+    "arxiv_id": null,
+    "doi": null,
+    "url": "https://pytorch3d.readthedocs.io/en/latest/modules/renderer/cameras.html, https://pytorch3d.org/docs/renderer, https://pytorch3d.org/docs/renderer_getting_started, https://pytorch3d.org/docs/cameras, https://pytorch3d.org/tutorials/render_textured_meshes",
+    "tex_dir": null,
+    "pdf_file": null,
+    "source_kind": "Bib",
+    "download_mode": "MetadataOnly",
+    "has_local_tex": false,
+    "has_local_pdf": false,
+    "parse_status": "MetadataOnly"
+  },
+  "abstract_text": null,
+  "sections": [],
+  "figures": [],
+  "tables": [],
+  "citations": [],
+  "provenance": []
+}

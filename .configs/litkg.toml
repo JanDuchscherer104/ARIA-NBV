@@ -1,17 +1,173 @@
+manifest_path = "docs/literature/sources.jsonl"
+bib_path = "docs/references.bib"
+tex_root = "docs/literature/tex-src"
+pdf_root = "docs/literature/pdf"
+generated_docs_root = ".agents/kg/generated/literature"
+registry_path = ".agents/kg/generated/literature/registry.jsonl"
+parsed_root = ".agents/kg/generated/literature/parsed"
+neo4j_export_root = ".agents/kg/generated/neo4j-export"
+memory_state_root = ".agents/memory/state"
+sink = "both"
+download_pdfs = false
+relevance_tags = [
+  "next-best-view",
+  "relative reconstruction improvement",
+  "egocentric foundation models",
+  "EFM3D",
+  "Aria Synthetic Environments",
+  "VIN-NBV",
+  "GenNBV",
+  "Hestia",
+  "SceneScript",
+  "Project Aria",
+  "3D Gaussian Splatting",
+  "offline RL",
+]
+
+[semantic_scholar]
+enabled = true
+api_key_env = "SEMANTIC_SCHOLAR_API_KEY"
+min_interval_s = 1.05
+max_retries = 4
+batch_size = 100
+fields = [
+  "paperId",
+  "corpusId",
+  "externalIds",
+  "url",
+  "title",
+  "abstract",
+  "tldr",
+  "venue",
+  "year",
+  "publicationDate",
+  "publicationTypes",
+  "fieldsOfStudy",
+  "s2FieldsOfStudy",
+  "authors",
+  "citationCount",
+  "influentialCitationCount",
+  "referenceCount",
+  "openAccessPdf",
+]
+
 [project]
+id = "aria-nbv"
 name = "ARIA-NBV"
 root = "."
 
-[literature]
-bibliography = "docs/references.bib"
-storage = ".artifacts/litkg/literature"
-materialize_path = "docs/literature"
+[sources.agent_guidance]
+required = true
+include = [
+  "AGENTS.md",
+  "aria_nbv/AGENTS.md",
+  "aria_nbv/aria_nbv/data_handling/AGENTS.md",
+  "aria_nbv/aria_nbv/rri_metrics/AGENTS.md",
+  "aria_nbv/aria_nbv/vin/AGENTS.md",
+  "docs/AGENTS.md",
+  ".agents/AGENTS_INTERNAL_DB.md",
+]
 
-[kg]
-neo4j_uri = "bolt://localhost:7687"
-neo4j_user = "neo4j"
-neo4j_password = "password"
+[sources.agent_memory]
+required = true
+include = [
+  ".agents/memory/state/*.md",
+  ".agents/issues.toml",
+  ".agents/todos.toml",
+  ".agents/refactors.toml",
+  ".agents/resolved.toml",
+]
 
-[ingestion]
-code_root = "aria_nbv"
-docs_root = "docs"
+[sources.python]
+required = true
+include = ["aria_nbv/aria_nbv/**/*.py"]
+exclude = [
+  "**/.venv/**",
+  "**/__pycache__/**",
+  "aria_nbv/aria_nbv/vin/experimental/**",
+]
+symbols = true
+edges = "codegraphcontext"
+
+[sources.quarto]
+required = true
+include = [
+  "docs/index.qmd",
+  "docs/contents/**/*.qmd",
+  "docs/reference/**/*.qmd",
+]
+exclude = [
+  "docs/_freeze/**",
+  "docs/_site/**",
+]
+
+[sources.glossary]
+required = true
+include = [
+  "docs/glossary/terms.yml",
+  "docs/_generated/context/glossary.jsonl",
+]
+
+[sources.typst]
+required = true
+include = [
+  "docs/typst/paper/**/*.typ",
+  "docs/typst/slides/**/*.typ",
+  "docs/typst/shared/**/*.typ",
+]
+entrypoints = [
+  "docs/typst/paper/main.typ",
+  "docs/typst/slides/slides_4.typ",
+  "docs/typst/slides/slides_thesis_outlook.typ",
+]
+
+[sources.literature]
+required = true
+manifest = "docs/literature/sources.jsonl"
+bib = "docs/references.bib"
+pdfs = "docs/literature/pdf/*.pdf"
+tex = "docs/literature/tex-src/**"
+
+[sources.external_docs]
+required = false
+snapshot_content = false
+context7_libraries = [
+  "/facebookresearch/atek",
+  "/facebookresearch/efm3d",
+  "/websites/facebookresearch_github_io_projectaria_tools",
+  "/rocm/pytorch",
+  "/facebookresearch/pytorch3d",
+  "/lightning-ai/pytorch-lightning",
+  "/pydantic/pydantic",
+  "/isl-org/open3d",
+  "/farama-foundation/gymnasium",
+  "/dlr-rm/stable-baselines3",
+  "/websites/typst_app",
+  "/websites/quarto",
+]
+
+[sources.web]
+enabled = false
+markitdown = true
+urls = []
+
+[representation]
+primary = "graphify"
+durable_exports = ["graphify", "neo4j_export"]
+runtime_enrichment = ["codegraphcontext"]
+optional_runtime = ["graphiti"]
+memory_backend = "mempalace"
+memory_backend_mode = "separate-memory-mining"
+
+[backends]
+graphify = true
+neo4j_export = true
+code_index = true
+graphiti = false
+mempalace = false
+
+[storage]
+generated_root = ".agents/kg/generated"
+db_root = ".agents/kg/db"
+runtime_cache_root = ".agents/external/litkg-rs/.cache/kg"
+lfs = true

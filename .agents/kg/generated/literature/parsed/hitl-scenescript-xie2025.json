@@ -1,0 +1,142 @@
+{
+  "metadata": {
+    "paper_id": "hitl-scenescript-xie2025",
+    "citation_key": "HITL-SceneScript-xie2025",
+    "title": "Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling",
+    "authors": [
+      "Christopher Xie",
+      "Armen Avetisyan",
+      "Henry Howard-Jenkins",
+      "Yawar Siddiqui",
+      "Julian Straub",
+      "Richard Newcombe",
+      "Vasileios Balntas",
+      "Jakob Engel"
+    ],
+    "year": "2025",
+    "arxiv_id": "2503.11806",
+    "doi": "10.48550/arXiv.2503.11806",
+    "url": "https://arxiv.org/abs/2503.11806",
+    "tex_dir": null,
+    "pdf_file": null,
+    "source_kind": "Bib",
+    "download_mode": "MetadataOnly",
+    "has_local_tex": false,
+    "has_local_pdf": false,
+    "parse_status": "MetadataOnly",
+    "semantic_scholar": {
+      "paperId": "7e9a4ed6c3944762251c3a859f5c534d59e8c282",
+      "corpusId": 277066666,
+      "externalIds": {
+        "ArXiv": "2503.11806",
+        "CorpusId": "277066666",
+        "DBLP": "journals/corr/abs-2503-11806",
+        "DOI": "10.48550/arXiv.2503.11806"
+      },
+      "url": "https://www.semanticscholar.org/paper/7e9a4ed6c3944762251c3a859f5c534d59e8c282",
+      "title": "Human-in-the-Loop Local Corrections of 3D Scene Layouts via Infilling",
+      "abstract": "We present a novel human-in-the-loop approach to estimate 3D scene layout that uses human feedback from an egocentric standpoint. We study this approach through introduction of a novel local correction task, where users identify local errors and prompt a model to automatically correct them. Building on SceneScript, a state-of-the-art framework for 3D scene layout estimation that leverages structured language, we propose a solution that structures this problem as\"infilling\", a task studied in natural language processing. We train a multi-task version of SceneScript that maintains performance on global predictions while significantly improving its local correction ability. We integrate this into a human-in-the-loop system, enabling a user to iteratively refine scene layout estimates via a low-friction\"one-click fix''workflow. Our system enables the final refined layout to diverge from the training distribution, allowing for more accurate modelling of complex layouts.",
+      "tldr": {
+        "text": "A multi-task version of SceneScript is trained that maintains performance on global predictions while significantly improving its local correction ability, and a human-in-the-loop system is integrated, enabling a user to iteratively refine scene layout estimates via a low-friction \"one-click fix''workflow."
+      },
+      "venue": "arXiv.org",
+      "year": 2025,
+      "publicationDate": "2025-03-14",
+      "publicationTypes": [
+        "JournalArticle"
+      ],
+      "fieldsOfStudy": [
+        "Computer Science"
+      ],
+      "s2FieldsOfStudy": [
+        {
+          "category": "Computer Science",
+          "source": "external"
+        },
+        {
+          "category": "Computer Science",
+          "source": "s2-fos-model"
+        }
+      ],
+      "authors": [
+        {
+          "authorId": "2292263536",
+          "name": "Christopher Xie",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "2078286329",
+          "name": "A. Avetisyan",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "2292257190",
+          "name": "Henry Howard-Jenkins",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "2350518216",
+          "name": "Yawar Siddiqui",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "2293613321",
+          "name": "Julian Straub",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "2292257340",
+          "name": "Richard A. Newcombe",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "2090568043",
+          "name": "Vasileios Balntas",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "2241357086",
+          "name": "J. Engel",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        }
+      ],
+      "citationCount": 3,
+      "influentialCitationCount": 2,
+      "referenceCount": 42,
+      "openAccessPdf": {
+        "url": "",
+        "status": null
+      }
+    }
+  },
+  "abstract_text": null,
+  "sections": [],
+  "figures": [],
+  "tables": [],
+  "citations": [],
+  "provenance": []
+}

@@ -1,17 +1,56 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Sync, Download, Parse, and Materialize literature
 
 PROJECT_ROOT=$(git rev-parse --show-toplevel)
 CONFIG_PATH="${PROJECT_ROOT}/.configs/litkg.toml"
+TOOLKIT_ROOT="${PROJECT_ROOT}/.agents/external/litkg-rs"
+MODE="${1:-all}"
 
-cat >&2 <<MSG
-ARIA-NBV literature KG ingestion is not wired yet.
+if [[ -f "${PROJECT_ROOT}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${PROJECT_ROOT}/.env"
+  set +a
+fi
 
-Expected config: ${CONFIG_PATH}
-Expected toolkit: ${PROJECT_ROOT}/.agents/external/litkg-rs
+if [[ ! -f "${TOOLKIT_ROOT}/Cargo.toml" ]]; then
+  echo "Missing litkg-rs submodule at ${TOOLKIT_ROOT}" >&2
+  exit 2
+fi
 
-Wire the litkg-rs CLI commands before using this target so the make task cannot
-silently report a successful no-op.
-MSG
-exit 2
+run_litkg() {
+  cargo run --manifest-path "${TOOLKIT_ROOT}/Cargo.toml" -p litkg-cli -- "$@"
+}
+
+case "${MODE}" in
+  sync)
+    run_litkg sync-registry --config "${CONFIG_PATH}"
+    ;;
+  download)
+    run_litkg download --config "${CONFIG_PATH}"
+    ;;
+  parse)
+    run_litkg parse --config "${CONFIG_PATH}"
+    ;;
+  materialize)
+    run_litkg materialize --config "${CONFIG_PATH}"
+    ;;
+  export-neo4j)
+    run_litkg export-neo4j --config "${CONFIG_PATH}"
+    ;;
+  semantic-enrich)
+    run_litkg enrich-semantic-scholar --config "${CONFIG_PATH}"
+    ;;
+  all)
+    run_litkg sync-registry --config "${CONFIG_PATH}"
+    run_litkg download --config "${CONFIG_PATH}"
+    run_litkg parse --config "${CONFIG_PATH}"
+    run_litkg materialize --config "${CONFIG_PATH}"
+    run_litkg export-neo4j --config "${CONFIG_PATH}"
+    ;;
+  *)
+    echo "Unknown mode: ${MODE}" >&2
+    echo "Expected one of: sync, download, parse, materialize, export-neo4j, semantic-enrich, all" >&2
+    exit 2
+    ;;
+esac

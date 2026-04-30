@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "paper_id": "pytorch3d-transforms",
+    "citation_key": "pytorch3d-transforms",
+    "title": "PyTorch3D Transforms Documentation",
+    "authors": [
+      "Facebook Research"
+    ],
+    "year": "2024",
+    "arxiv_id": null,
+    "doi": null,
+    "url": null,
+    "tex_dir": null,
+    "pdf_file": null,
+    "source_kind": "Bib",
+    "download_mode": "MetadataOnly",
+    "has_local_tex": false,
+    "has_local_pdf": false,
+    "parse_status": "MetadataOnly"
+  },
+  "abstract_text": null,
+  "sections": [],
+  "figures": [],
+  "tables": [],
+  "citations": [],
+  "provenance": []
+}

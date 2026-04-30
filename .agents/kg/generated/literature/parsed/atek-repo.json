@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "paper_id": "atek-repo",
+    "citation_key": "ATEK-Repo",
+    "title": "Aria Training and Evaluation toolkit (ATEK)",
+    "authors": [
+      "{Meta Platforms Inc.}"
+    ],
+    "year": "2025",
+    "arxiv_id": null,
+    "doi": null,
+    "url": "https://github.com/facebookresearch/ATEK",
+    "tex_dir": null,
+    "pdf_file": null,
+    "source_kind": "Bib",
+    "download_mode": "MetadataOnly",
+    "has_local_tex": false,
+    "has_local_pdf": false,
+    "parse_status": "MetadataOnly"
+  },
+  "abstract_text": null,
+  "sections": [],
+  "figures": [],
+  "tables": [],
+  "citations": [],
+  "provenance": []
+}

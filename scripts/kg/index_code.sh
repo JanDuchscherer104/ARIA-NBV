@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Ingest code into Neo4j using LitKG-RS CodeGraphContext
-# Assumes litkg-rs is available in the environment (e.g., via cargo run)
 
 PROJECT_ROOT=$(git rev-parse --show-toplevel)
-CONFIG_PATH="${PROJECT_ROOT}/.configs/litkg.toml"
+TOOLKIT_ROOT="${PROJECT_ROOT}/.agents/external/litkg-rs"
+TARGET="${KG_SRC_DIR:-aria_nbv/aria_nbv}"
 
-cat >&2 <<MSG
-ARIA-NBV code KG indexing is not wired yet.
+if [[ ! -x "${TOOLKIT_ROOT}/scripts/kg/index_code.sh" ]]; then
+  echo "Missing litkg-rs code-index helper at ${TOOLKIT_ROOT}/scripts/kg/index_code.sh" >&2
+  exit 2
+fi
 
-Expected config: ${CONFIG_PATH}
-Expected toolkit: ${PROJECT_ROOT}/.agents/external/litkg-rs
-
-Wire the litkg-rs CLI command before using this target so the make task cannot
-silently report a successful no-op.
-MSG
-exit 2
+if [[ "$#" -gt 0 && "${1}" != -* ]]; then
+  TARGET="$1"
+  shift
+fi
+KG_CODE_REPO_ROOT="${PROJECT_ROOT}" \
+  "${TOOLKIT_ROOT}/scripts/kg/index_code.sh" "${TARGET}" "$@"

@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "paper_id": "coral-pytorch-2025",
+    "citation_key": "coral-pytorch-2025",
+    "title": "coral-pytorch documentation",
+    "authors": [
+      "{Raschka Research Group}"
+    ],
+    "year": "2025",
+    "arxiv_id": null,
+    "doi": null,
+    "url": "https://raschka-research-group.github.io/coral-pytorch/",
+    "tex_dir": null,
+    "pdf_file": null,
+    "source_kind": "Bib",
+    "download_mode": "MetadataOnly",
+    "has_local_tex": false,
+    "has_local_pdf": false,
+    "parse_status": "MetadataOnly"
+  },
+  "abstract_text": null,
+  "sections": [],
+  "figures": [],
+  "tables": [],
+  "citations": [],
+  "provenance": []
+}

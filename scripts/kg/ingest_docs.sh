@@ -1,17 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Ingest internal documentation into Neo4j/Graphiti
 
 PROJECT_ROOT=$(git rev-parse --show-toplevel)
-CONFIG_PATH="${PROJECT_ROOT}/.configs/litkg.toml"
+TOOLKIT_ROOT="${PROJECT_ROOT}/.agents/external/litkg-rs"
 
-cat >&2 <<MSG
-ARIA-NBV docs KG ingestion is not wired yet.
+if [[ ! -x "${TOOLKIT_ROOT}/scripts/kg/ingest_docs.sh" ]]; then
+  echo "Missing litkg-rs Graphiti ingestion helper at ${TOOLKIT_ROOT}/scripts/kg/ingest_docs.sh" >&2
+  exit 2
+fi
 
-Expected config: ${CONFIG_PATH}
-Expected toolkit: ${PROJECT_ROOT}/.agents/external/litkg-rs
+if [[ "$#" -eq 0 ]]; then
+  set -- \
+    "${PROJECT_ROOT}/AGENTS.md" \
+    "${PROJECT_ROOT}/.agents/AGENTS_INTERNAL_DB.md" \
+    "${PROJECT_ROOT}/.agents/memory/state/PROJECT_STATE.md" \
+    "${PROJECT_ROOT}/.agents/memory/state/DECISIONS.md" \
+    "${PROJECT_ROOT}/.agents/memory/state/OPEN_QUESTIONS.md" \
+    "${PROJECT_ROOT}/.agents/memory/state/GOTCHAS.md" \
+    "${PROJECT_ROOT}/docs/index.qmd" \
+    "${PROJECT_ROOT}/docs/contents/impl/overview.qmd" \
+    "${PROJECT_ROOT}/docs/contents/impl/oracle_rri_impl.qmd" \
+    "${PROJECT_ROOT}/docs/contents/impl/data_pipeline_overview.qmd" \
+    "${PROJECT_ROOT}/docs/contents/literature/index.qmd" \
+    "${PROJECT_ROOT}/docs/contents/theory/nbv_background.qmd" \
+    "${PROJECT_ROOT}/docs/typst/paper/main.typ"
+fi
 
-Wire the litkg-rs CLI command before using this target so the make task cannot
-silently report a successful no-op.
-MSG
-exit 2
+GRAPHITI_GROUP_ID="${GRAPHITI_GROUP_ID:-aria-nbv-docs}" \
+  "${TOOLKIT_ROOT}/scripts/kg/ingest_docs.sh" "$@"

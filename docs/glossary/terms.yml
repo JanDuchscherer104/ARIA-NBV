@@ -1,0 +1,850 @@
+# Canonical ARIA-NBV glossary source.
+# Humans edit this file; generated Quarto, Typst, and KG artifacts are rebuilt
+# with `make glossary`.
+
+- id: next-best-view
+  anchor: term-next-best-view
+  label: Next-Best-View
+  short: NBV
+  aliases:
+    - next best view
+    - viewpoint selection
+    - view planning
+  category: planning.view_selection
+  parent: view-planning
+  definition_short: >
+    Problem of selecting the next sensor viewpoint to improve an active
+    reconstruction or inspection objective under a limited acquisition budget.
+  definition_long: >
+    In ARIA-NBV, the preferred objective is reconstruction quality improvement
+    rather than coverage alone, with candidate views ranked by oracle or learned
+    RRI scores.
+  internal_links:
+    - docs/contents/theory/nbv_background.qmd
+    - docs/contents/roadmap.qmd
+    - docs/contents/questions.qmd#research-questions
+  citations:
+    - VIN-NBV-frahm2025
+    - GenNBV-chen2024
+  related:
+    - candidate-view
+    - relative-reconstruction-improvement
+    - view-introspection-network
+  kg_tags:
+    - planning
+    - active-reconstruction
+
+- id: relative-reconstruction-improvement
+  anchor: term-relative-reconstruction-improvement
+  label: Relative Reconstruction Improvement
+  short: RRI
+  aliases:
+    - reconstruction-quality gain
+    - relative quality improvement
+  category: metrics.reconstruction_quality
+  parent: reconstruction-quality
+  definition_short: >
+    Metric quantifying the relative reconstruction-quality improvement obtained
+    by adding a candidate observation to the current reconstruction.
+  definition_long: >
+    ARIA-NBV computes RRI by comparing reconstruction error before and after
+    fusing candidate-view geometry, usually against an ASE ground-truth mesh for
+    oracle supervision and evaluation.
+  formula:
+    tex: '\mathrm{RRI}(q)=\frac{d(P_t,M)-d(P_t\cup P_q,M)}{d(P_t,M)+\varepsilon}'
+    typst: '$"RRI"(q) = (d(#(symb.oracle.points)_t, M) - d(#(symb.oracle.points)_t union #(symb.oracle.points_q), M)) / (d(#(symb.oracle.points)_t, M) + epsilon)$'
+  notation:
+    typst: '#symb.oracle.rri'
+  internal_links:
+    - docs/contents/theory/rri_theory.qmd
+    - docs/contents/impl/rri_computation.qmd
+    - docs/contents/literature/vin_nbv.qmd
+  citations:
+    - VIN-NBV-frahm2025
+  related:
+    - oracle-rri
+    - target-specific-rri
+    - candidate-view
+  kg_tags:
+    - metric
+    - oracle-label
+    - reconstruction-quality
+
+- id: ground-truth
+  anchor: term-ground-truth
+  label: Ground Truth
+  short: GT
+  aliases:
+    - reference annotation
+    - oracle reference
+  category: metrics.reference
+  parent: supervision
+  definition_short: >
+    Reference data or annotations treated as the trusted target for training,
+    validation, or evaluation.
+  definition_long: >
+    In ARIA-NBV, ground truth usually refers to ASE meshes, object annotations,
+    poses, or labels used to compute oracle supervision and diagnostic metrics.
+  internal_links:
+    - docs/contents/ase_dataset.qmd
+    - docs/contents/impl/rri_computation.qmd
+  citations:
+    - ProjectAria-ASE-2025
+    - EFM3D-straub2024
+  related:
+    - oracle-rri
+    - relative-reconstruction-improvement
+    - oriented-bounding-box
+  kg_tags:
+    - supervision
+    - evaluation
+    - ground-truth
+
+- id: target-of-interest
+  anchor: term-target-of-interest
+  label: Target of Interest
+  short: target
+  aliases:
+    - target entity
+    - object of interest
+    - inspection target
+    - task target
+  category: entity.targeting
+  parent: entity-aware-rri
+  definition_short: >
+    Selected entity, object crop, point, region, or surface-deficit hypothesis
+    whose reconstruction quality should be improved.
+  definition_long: >
+    Target-conditioned ARIA-NBV variants use this target as an explicit input to
+    candidate scoring and planning instead of optimizing only scene-level RRI.
+  internal_links:
+    - docs/contents/questions.qmd#rq2-target-encoding
+    - docs/contents/questions.qmd#rq4-model
+    - docs/contents/impl/vin_v2_feature_proposals.qmd
+  citations: []
+  related:
+    - target-specific-rri
+    - target-conditioned-scorer
+    - oriented-bounding-box
+  kg_tags:
+    - entity-aware
+    - target-conditioned
+
+- id: target-specific-rri
+  anchor: term-target-specific-rri
+  label: Target-Specific RRI
+  short: target RRI
+  aliases:
+    - entity RRI
+    - object RRI
+    - target RRI
+  category: metrics.reconstruction_quality
+  parent: relative-reconstruction-improvement
+  definition_short: >
+    RRI computed only on the ground-truth and reconstructed geometry associated
+    with a selected target of interest.
+  definition_long: >
+    Target-specific RRI lets the thesis compare views by how much they improve a
+    selected object or region, even when scene-level RRI would prefer large
+    background surfaces.
+  notation:
+    typst: '$RRI_e$'
+  internal_links:
+    - docs/contents/questions.qmd#rq1-objective
+    - docs/contents/questions.qmd#rq4-model
+    - docs/contents/impl/rri_computation.qmd#entity-wise-rri
+  citations:
+    - VIN-NBV-frahm2025
+  related:
+    - relative-reconstruction-improvement
+    - target-of-interest
+    - acquisition-cost
+  kg_tags:
+    - metric
+    - entity-aware
+    - thesis-core
+
+- id: acquisition-cost
+  anchor: term-acquisition-cost
+  label: Acquisition Cost
+  short: cost
+  aliases:
+    - capture budget
+    - view budget
+    - motion cost
+  category: planning.objective
+  parent: trajectory-objective
+  definition_short: >
+    Budget consumed to acquire observations, measured by view count, path
+    length, elapsed time, invalid-action rate, or a weighted combination.
+  definition_long: >
+    The thesis should first report cumulative target RRI and acquisition cost
+    separately, then use scalarized objectives only when the tradeoff is
+    explicit.
+  internal_links:
+    - docs/contents/questions.qmd#rq1-objective
+    - docs/contents/roadmap.qmd#roadmap-m5
+  citations: []
+  related:
+    - target-specific-rri
+    - candidate-view
+    - next-best-view
+  kg_tags:
+    - objective
+    - planning
+    - evaluation
+
+- id: target-conditioned-scorer
+  anchor: term-target-conditioned-scorer
+  label: Target-Conditioned Scorer
+  short: target-conditioned scorer
+  aliases:
+    - target-conditioned VIN
+    - target-aware scorer
+  category: model.scoring
+  parent: view-introspection-network
+  definition_short: >
+    VIN-style candidate scorer that receives scene state, a candidate view, and
+    an encoding of the target of interest.
+  definition_long: >
+    The scorer predicts target-specific utility so view ranking can prioritize a
+    selected entity or region instead of only optimizing scene-level RRI.
+  internal_links:
+    - docs/contents/questions.qmd#rq4-model
+    - docs/contents/impl/vin_nbv.qmd
+    - docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd
+  citations:
+    - VIN-NBV-frahm2025
+  related:
+    - target-of-interest
+    - target-specific-rri
+    - view-introspection-network
+  kg_tags:
+    - model
+    - target-conditioned
+    - vin
+
+- id: aria-synthetic-environments
+  anchor: term-aria-synthetic-environments
+  label: Aria Synthetic Environments
+  short: ASE
+  aliases:
+    - Aria Synthetic Environment
+    - ASE dataset
+  category: dataset.synthetic
+  parent: dataset
+  definition_short: >
+    Large-scale synthetic indoor dataset with simulated Project Aria sensor
+    characteristics, egocentric trajectories, and scene annotations.
+  definition_long: >
+    ARIA-NBV uses ASE snippets and the public mesh-supervised subset to generate
+    oracle RRI labels from ground-truth meshes and semi-dense point clouds.
+  internal_links:
+    - docs/contents/ase_dataset.qmd
+    - docs/contents/setup.qmd#aria-synthetic-environments
+  citations:
+    - ProjectAria-ASE-2025
+    - EFM3D-straub2024
+  related:
+    - snippet
+    - egocentric-foundation-model-3d
+    - oracle-rri
+  kg_tags:
+    - dataset
+    - synthetic
+    - project-aria
+
+- id: egocentric-foundation-model-3d
+  anchor: term-egocentric-foundation-model-3d
+  label: Egocentric Foundation Model 3D
+  short: EFM3D
+  aliases:
+    - EFM
+    - egocentric foundation model
+  category: model.backbone
+  parent: foundation-model
+  definition_short: >
+    Egocentric 3D foundation-model stack used as the frozen spatial backbone for
+    ARIA-NBV candidate scoring.
+  definition_long: >
+    The current project uses EFM3D and its EVL architecture to expose voxel
+    occupancy, centerness, semantic, and OBB evidence for VIN-style RRI
+    prediction.
+  internal_links:
+    - docs/contents/literature/efm3d.qmd
+    - docs/contents/ext-impl/efm3d_implementation.qmd
+    - docs/contents/impl/vin_nbv.qmd
+  citations:
+    - EFM3D-straub2024
+  related:
+    - egocentric-voxel-lifting
+    - view-introspection-network
+    - aria-synthetic-environments
+  kg_tags:
+    - foundation-model
+    - backbone
+    - evl
+
+- id: egocentric-voxel-lifting
+  anchor: term-egocentric-voxel-lifting
+  label: Egocentric Voxel Lifting
+  short: EVL
+  aliases:
+    - voxel lifting
+    - EVL backbone
+  category: model.backbone
+  parent: egocentric-foundation-model-3d
+  definition_short: >
+    EFM3D architecture that lifts synchronized egocentric observations into a
+    gravity-aligned 3D voxel feature volume.
+  definition_long: >
+    ARIA-NBV uses EVL head outputs and voxel evidence as the frozen scene
+    representation for VIN-style RRI prediction.
+  internal_links:
+    - docs/contents/literature/efm3d.qmd
+    - docs/contents/ext-impl/efm3d_implementation.qmd
+    - docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd
+  citations:
+    - EFM3D-straub2024
+    - EVL-Doc-2025
+  related:
+    - egocentric-foundation-model-3d
+    - view-introspection-network
+    - oriented-bounding-box
+  kg_tags:
+    - backbone
+    - voxel
+    - evl
+
+- id: oriented-bounding-box
+  anchor: term-oriented-bounding-box
+  label: Oriented Bounding Box
+  short: OBB
+  aliases:
+    - oriented box
+    - object box
+  category: geometry.annotation
+  parent: object-geometry
+  definition_short: >
+    3D bounding box with arbitrary orientation, used to represent object extent
+    more tightly than an axis-aligned box.
+  definition_long: >
+    OBBs are a natural target encoding for entity-aware ARIA-NBV because they
+    provide center, extent, orientation, semantic class, and confidence signals.
+  internal_links:
+    - docs/contents/ase_dataset.qmd#oriented-bounding-boxes
+    - docs/contents/questions.qmd#rq2-target-encoding
+    - docs/contents/impl/vin_v2_feature_proposals.qmd
+  citations:
+    - EFM3D-straub2024
+  related:
+    - target-of-interest
+    - target-conditioned-scorer
+    - egocentric-voxel-lifting
+  kg_tags:
+    - geometry
+    - entity-aware
+    - annotation
+
+- id: frustum
+  anchor: term-frustum
+  label: Frustum
+  short: frustum
+  aliases:
+    - viewing frustum
+    - camera frustum
+  category: geometry.camera
+  parent: camera-geometry
+  definition_short: >
+    Truncated pyramidal camera-visible volume bounded by near and far clipping
+    planes plus lateral field-of-view planes.
+  definition_long: >
+    Candidate-view frusta define which scene surfaces can project into a camera
+    image and are therefore central to visibility, rendering, and RRI
+    diagnostics.
+  internal_links:
+    - docs/contents/impl/rri_computation.qmd
+    - docs/contents/impl/vin_nbv.qmd
+  citations:
+    - Frustum-Wikipedia-2025
+  related:
+    - candidate-view
+    - egocentric-voxel-lifting
+    - point-cloud
+  kg_tags:
+    - geometry
+    - camera
+    - visibility
+
+- id: left-up-forward
+  anchor: term-left-up-forward
+  label: Left-Up-Forward
+  short: LUF
+  aliases:
+    - LUF frame
+    - left up forward
+  category: geometry.frames
+  parent: coordinate-frame
+  definition_short: >
+    Camera coordinate convention whose x axis points left, y axis points up, and
+    z axis points forward.
+  definition_long: >
+    LUF is one of the coordinate-frame conventions that must stay explicit when
+    moving between Project Aria cameras, PyTorch3D cameras, and ARIA-NBV
+    candidate poses.
+  internal_links:
+    - docs/typst/paper/sections/05-coordinate-conventions.typ
+    - docs/typst/paper/sections/12f-appendix-pose-frames.typ
+  citations: []
+  related:
+    - candidate-view
+    - frustum
+  kg_tags:
+    - geometry
+    - coordinate-frame
+    - camera
+
+- id: simultaneous-localization-and-mapping
+  anchor: term-simultaneous-localization-and-mapping
+  label: Simultaneous Localization and Mapping
+  short: SLAM
+  aliases:
+    - visual SLAM
+    - mapping and localization
+  category: reconstruction.state
+  parent: reconstruction
+  definition_short: >
+    Method for estimating sensor motion while building a map of the surrounding
+    scene.
+  definition_long: >
+    In ARIA-NBV, logged SLAM poses and semi-dense points form the current
+    reconstruction state against which candidate-view RRI is evaluated.
+  internal_links:
+    - docs/contents/theory/semi-dense-pc.qmd
+    - docs/contents/ase_dataset.qmd
+  citations:
+    - ProjectAria-ASE-2025
+  related:
+    - point-cloud
+    - snippet
+    - relative-reconstruction-improvement
+  kg_tags:
+    - reconstruction
+    - pose
+    - project-aria
+
+- id: visual-inertial-odometry
+  anchor: term-visual-inertial-odometry
+  label: Visual-Inertial Odometry
+  short: VIO
+  aliases:
+    - visual inertial odometry
+    - inertial visual odometry
+  category: reconstruction.pose
+  parent: simultaneous-localization-and-mapping
+  definition_short: >
+    Pose-estimation method that combines visual measurements from cameras with
+    inertial measurements from IMUs.
+  definition_long: >
+    Project Aria pose and mapping products build on visual-inertial estimation,
+    and ARIA-NBV depends on those pose streams for snippet state and candidate
+    frame contracts.
+  internal_links:
+    - docs/contents/ase_dataset.qmd
+    - docs/contents/theory/semi-dense-pc.qmd
+  citations:
+    - ProjectAria-ASE-2025
+  related:
+    - simultaneous-localization-and-mapping
+    - motion-trajectory-data
+  kg_tags:
+    - pose
+    - reconstruction
+    - project-aria
+
+- id: point-cloud
+  anchor: term-point-cloud
+  label: Point Cloud
+  short: PC
+  aliases:
+    - 3D points
+    - semi-dense point cloud
+  category: reconstruction.representation
+  parent: reconstruction
+  definition_short: >
+    Set of 3D points representing observed scene geometry.
+  definition_long: >
+    ARIA-NBV compares current and candidate-fused point clouds against
+    ground-truth meshes to compute oracle RRI and surface-distance diagnostics.
+  notation:
+    typst: '#symb.oracle.points'
+  internal_links:
+    - docs/contents/theory/semi-dense-pc.qmd
+    - docs/contents/theory/surface_metrics.qmd
+    - docs/contents/impl/rri_computation.qmd
+  citations: []
+  related:
+    - relative-reconstruction-improvement
+    - oracle-rri
+    - simultaneous-localization-and-mapping
+  kg_tags:
+    - geometry
+    - reconstruction
+    - point-cloud
+
+- id: track
+  anchor: term-track
+  label: Track
+  short: track
+  aliases:
+    - feature track
+    - 2D track
+    - SLAM track
+  category: reconstruction.features
+  parent: simultaneous-localization-and-mapping
+  definition_short: >
+    Temporal sequence of corresponding image-feature detections across frames,
+    usually carrying per-frame image coordinates, timestamps, and camera IDs.
+  definition_long: >
+    Tracks can be triangulated or optimized into 3D points, making them a bridge
+    between image evidence and the semi-dense point clouds used by ARIA-NBV.
+  formula:
+    tex: '\mathcal{T}=\{(u_k,v_k,\mathrm{cam}_k,t_k)\}_{k=0}^{N}'
+  internal_links:
+    - docs/contents/theory/semi-dense-pc.qmd
+  citations: []
+  related:
+    - point-cloud
+    - simultaneous-localization-and-mapping
+    - visual-inertial-odometry
+  kg_tags:
+    - feature-track
+    - slam
+    - reconstruction
+
+- id: snippet
+  anchor: term-snippet
+  label: Snippet
+  short: snippet
+  aliases:
+    - temporal window
+    - ASE snippet
+  category: dataset.sample
+  parent: aria-synthetic-environments
+  definition_short: >
+    Short synchronized temporal window of Aria sensor data used as one EVL/VIN
+    input sample.
+  definition_long: >
+    A snippet typically contains RGB or grayscale streams, poses, calibration,
+    semi-dense points, and scene metadata that EVL lifts into a voxel grid.
+  internal_links:
+    - docs/contents/ase_dataset.qmd
+    - docs/contents/impl/data_pipeline_overview.qmd
+    - docs/contents/impl/vin_nbv.qmd
+  citations:
+    - ProjectAria-ASE-2025
+    - EFM3D-straub2024
+  related:
+    - aria-synthetic-environments
+    - egocentric-voxel-lifting
+    - view-introspection-network
+  kg_tags:
+    - dataset
+    - sample
+    - evl
+
+- id: central-pupil-frame
+  anchor: term-central-pupil-frame
+  label: Central Pupil Frame
+  short: CPF
+  aliases:
+    - central pupil coordinate frame
+  category: dataset.frames
+  parent: project-aria
+  definition_short: >
+    Coordinate frame placed at the midpoint between the left and right eye boxes
+    of Project Aria glasses.
+  definition_long: >
+    CPF is used by Project Aria for gaze-related quantities and should remain
+    distinct from rig, camera, world, and PyTorch3D frames in ARIA-NBV docs.
+  internal_links:
+    - docs/contents/ase_dataset.qmd
+  citations:
+    - ProjectAria-ASE-2025
+  related:
+    - left-up-forward
+    - visual-inertial-odometry
+  kg_tags:
+    - project-aria
+    - coordinate-frame
+
+- id: machine-perception-services
+  anchor: term-machine-perception-services
+  label: Machine Perception Services
+  short: MPS
+  aliases:
+    - Project Aria MPS
+  category: dataset.project_aria
+  parent: project-aria
+  definition_short: >
+    Project Aria processing services that derive pose, mapping, gaze, hand, and
+    related perception outputs from sensor recordings.
+  definition_long: >
+    ARIA-NBV mainly depends on MPS-style pose and semi-dense mapping products as
+    the current reconstruction state for RRI computation.
+  internal_links:
+    - docs/contents/ase_dataset.qmd
+    - docs/contents/theory/semi-dense-pc.qmd
+  citations:
+    - ProjectAria-ASE-2025
+  related:
+    - simultaneous-localization-and-mapping
+    - point-cloud
+    - visual-inertial-odometry
+  kg_tags:
+    - project-aria
+    - data-product
+
+- id: motion-trajectory-data
+  anchor: term-motion-trajectory-data
+  label: Motion Trajectory Data
+  short: MTD
+  aliases:
+    - trajectory data
+    - pose stream
+  category: dataset.stream
+  parent: snippet
+  definition_short: >
+    Device poses over time, usually represented as a sequence of 6-DoF
+    transformations.
+  definition_long: >
+    MTD supplies the logged egocentric trajectory used to define snippet state,
+    current reconstruction context, and candidate-view reference poses.
+  internal_links:
+    - docs/contents/ase_dataset.qmd
+    - docs/contents/impl/data_pipeline_overview.qmd
+  citations:
+    - ProjectAria-ASE-2025
+  related:
+    - snippet
+    - visual-inertial-odometry
+    - candidate-view
+  kg_tags:
+    - dataset
+    - pose
+    - trajectory
+
+- id: multi-frame-camera-data
+  anchor: term-multi-frame-camera-data
+  label: Multi-Frame Camera Data
+  short: MFCD
+  aliases:
+    - multi-camera frame data
+    - synchronized camera data
+  category: dataset.stream
+  parent: snippet
+  definition_short: >
+    Synchronized camera streams from multiple Project Aria cameras over a
+    temporal window.
+  definition_long: >
+    MFCD provides the egocentric image evidence consumed by EVL and aligned with
+    pose, calibration, and semi-dense point streams.
+  internal_links:
+    - docs/contents/ase_dataset.qmd
+    - docs/contents/literature/efm3d.qmd
+  citations:
+    - ProjectAria-ASE-2025
+    - EFM3D-straub2024
+  related:
+    - snippet
+    - egocentric-voxel-lifting
+    - visual-inertial-odometry
+  kg_tags:
+    - dataset
+    - camera
+    - evl
+
+- id: multi-semi-dense-point-data
+  anchor: term-multi-semi-dense-point-data
+  label: Multi-Semi-Dense Point Data
+  short: MSDPD
+  aliases:
+    - multi-frame semi-dense points
+    - semi-dense point stream
+  category: dataset.stream
+  parent: snippet
+  definition_short: >
+    Semi-dense 3D point observations generated by SLAM-style processing across
+    a snippet or trajectory window.
+  definition_long: >
+    MSDPD is the sparse observed geometry that ARIA-NBV fuses with candidate
+    point clouds and compares against ground-truth meshes for RRI labels.
+  internal_links:
+    - docs/contents/theory/semi-dense-pc.qmd
+    - docs/contents/impl/rri_computation.qmd
+  citations:
+    - ProjectAria-ASE-2025
+  related:
+    - point-cloud
+    - simultaneous-localization-and-mapping
+    - relative-reconstruction-improvement
+  kg_tags:
+    - dataset
+    - point-cloud
+    - reconstruction
+
+- id: virtual-reality-standard
+  anchor: term-virtual-reality-standard
+  label: Virtual Reality Standard
+  short: VRS
+  aliases:
+    - VRS file
+    - Project Aria VRS
+  category: dataset.file_format
+  parent: project-aria
+  definition_short: >
+    File format used by Project Aria tooling to store multi-modal sensor
+    recordings efficiently.
+  definition_long: >
+    VRS is part of the upstream Project Aria ecosystem, while ARIA-NBV primarily
+    consumes ASE/ATEK-derived tensorized snippets for current experiments.
+  internal_links:
+    - docs/contents/setup.qmd
+    - docs/contents/ase_dataset.qmd
+  citations:
+    - ProjectAria-ASE-2025
+  related:
+    - snippet
+    - multi-frame-camera-data
+    - motion-trajectory-data
+  kg_tags:
+    - project-aria
+    - file-format
+    - dataset
+
+- id: scene-script-language
+  anchor: term-scene-script-language
+  label: SceneScript Language
+  short: SSL
+  aliases:
+    - Structure Scene Language
+    - SceneScript structured language
+  category: dataset.scene_representation
+  parent: scene-representation
+  definition_short: >
+    Structured language representation for indoor scene layout using primitives
+    such as walls, doors, windows, and objects.
+  definition_long: >
+    SceneScript is relevant to ARIA-NBV as a possible semantic/global planning
+    layer and as one source of ASE scene-structure context.
+  internal_links:
+    - docs/contents/literature/scene_script.qmd
+    - docs/contents/ase_dataset.qmd
+  citations:
+    - SceneScript-avetisyan2024
+  related:
+    - aria-synthetic-environments
+    - target-of-interest
+    - next-best-view
+  kg_tags:
+    - scene-representation
+    - semantics
+    - extension
+
+- id: candidate-view
+  anchor: term-candidate-view
+  label: Candidate View
+  short: candidate
+  aliases:
+    - candidate pose
+    - candidate viewpoint
+    - next-view candidate
+  category: planning.action
+  parent: next-best-view
+  definition_short: >
+    Proposed camera pose whose expected reconstruction utility is evaluated
+    before selecting the next observation.
+  definition_long: >
+    ARIA-NBV samples candidate views around a reference pose or target, renders
+    candidate depths from the mesh for oracle labels, and scores candidates with
+    RRI or learned VIN predictions.
+  notation:
+    typst: '#symb.oracle.candidates'
+  internal_links:
+    - docs/contents/questions.qmd#rq3-candidates
+    - docs/contents/impl/rri_computation.qmd
+    - docs/reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd
+  citations:
+    - VIN-NBV-frahm2025
+  related:
+    - next-best-view
+    - oracle-rri
+    - target-conditioned-scorer
+  kg_tags:
+    - planning
+    - action-space
+    - candidate-generation
+
+- id: oracle-rri
+  anchor: term-oracle-rri
+  label: Oracle RRI
+  short: oracle RRI
+  aliases:
+    - RRI oracle
+    - oracle label
+    - mesh-supervised RRI
+  category: supervision.oracle
+  parent: relative-reconstruction-improvement
+  definition_short: >
+    RRI label computed with privileged ground-truth geometry, used for
+    supervised training and evaluation.
+  definition_long: >
+    The current oracle renders candidate depth maps from ASE ground-truth meshes,
+    backprojects candidate point clouds, fuses them with the current semi-dense
+    reconstruction, and scores the resulting surface-distance improvement.
+  internal_links:
+    - docs/contents/impl/rri_computation.qmd
+    - docs/contents/impl/data_pipeline_overview.qmd
+    - docs/contents/roadmap.qmd#roadmap-m1
+  citations:
+    - VIN-NBV-frahm2025
+    - EFM3D-straub2024
+  related:
+    - relative-reconstruction-improvement
+    - candidate-view
+    - aria-synthetic-environments
+  kg_tags:
+    - oracle
+    - supervision
+    - mesh
+
+- id: view-introspection-network
+  anchor: term-view-introspection-network
+  label: View Introspection Network
+  short: VIN
+  aliases:
+    - VIN scorer
+    - VIN-NBV model
+    - Aria-VIN-NBV
+  category: model.scoring
+  parent: next-best-view
+  definition_short: >
+    Learned candidate-view scorer that predicts RRI or an ordinal RRI-derived
+    utility without capturing the candidate view.
+  definition_long: >
+    ARIA-NBV adapts VIN-NBV by placing a lightweight RRI prediction head on top
+    of frozen EVL features and candidate-pose evidence from ASE snippets.
+  internal_links:
+    - docs/contents/literature/vin_nbv.qmd
+    - docs/contents/impl/vin_nbv.qmd
+    - docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd
+  citations:
+    - VIN-NBV-frahm2025
+  related:
+    - relative-reconstruction-improvement
+    - target-conditioned-scorer
+    - egocentric-voxel-lifting
+  kg_tags:
+    - model
+    - vin
+    - candidate-scoring

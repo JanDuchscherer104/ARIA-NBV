@@ -1,0 +1,103 @@
+{
+  "metadata": {
+    "paper_id": "coral-cao2019",
+    "citation_key": "CORAL-cao2019",
+    "title": "Rank consistent ordinal regression for neural networks with application to age estimation",
+    "authors": [
+      "Wenzhi Cao",
+      "Vahid Mirjalili",
+      "Sebastian Raschka"
+    ],
+    "year": "2019",
+    "arxiv_id": "1901.07884",
+    "doi": "10.1016/j.patrec.2020.11.008",
+    "url": "https://arxiv.org/abs/1901.07884",
+    "tex_dir": null,
+    "pdf_file": null,
+    "source_kind": "Bib",
+    "download_mode": "MetadataOnly",
+    "has_local_tex": false,
+    "has_local_pdf": false,
+    "parse_status": "MetadataOnly",
+    "semantic_scholar": {
+      "paperId": "072229ccbdbac7289b6067167a0279ae38a269f9",
+      "corpusId": 226970435,
+      "externalIds": {
+        "ArXiv": "1901.07884",
+        "CorpusId": "226970435",
+        "DBLP": "journals/prl/CaoMR20",
+        "DOI": "10.1016/j.patrec.2020.11.008",
+        "MAG": "3098915488"
+      },
+      "url": "https://www.semanticscholar.org/paper/072229ccbdbac7289b6067167a0279ae38a269f9",
+      "title": "Rank consistent ordinal regression for neural networks with application to age estimation",
+      "abstract": "Abstract In many real-world prediction tasks, class labels include information about the relative ordering between labels, which is not captured by commonly-used loss functions such as multi-category cross-entropy. Recently, the deep learning community adopted ordinal regression frameworks to take such ordering information into account. Neural networks were equipped with ordinal regression capabilities by transforming ordinal targets into binary classification subtasks. However, this method suffers from inconsistencies among the different binary classifiers. To resolve these inconsistencies, we propose the COnsistent RAnk Logits (CORAL) framework with strong theoretical guarantees for rank-monotonicity and consistent confidence scores. Moreover, the proposed method is architecture-agnostic and can extend arbitrary state-of-the-art deep neural network classifiers for ordinal regression tasks. The empirical evaluation of the proposed rank-consistent method on a range of face-image datasets for age prediction shows a substantial reduction of the prediction error compared to the reference ordinal regression network.",
+      "tldr": {
+        "text": "The COnsistent RAnk Logits (CORAL) framework is proposed with strong theoretical guarantees for rank-monotonicity and consistent confidence scores and can extend arbitrary state-of-the-art deep neural network classifiers for ordinal regression tasks."
+      },
+      "venue": "Pattern Recognition Letters",
+      "year": 2019,
+      "publicationDate": "2019-01-20",
+      "publicationTypes": [
+        "JournalArticle"
+      ],
+      "fieldsOfStudy": [
+        "Computer Science",
+        "Mathematics"
+      ],
+      "s2FieldsOfStudy": [
+        {
+          "category": "Computer Science",
+          "source": "external"
+        },
+        {
+          "category": "Mathematics",
+          "source": "external"
+        },
+        {
+          "category": "Computer Science",
+          "source": "s2-fos-model"
+        }
+      ],
+      "authors": [
+        {
+          "authorId": "2075437421",
+          "name": "Wenzhi Cao",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "2067221484",
+          "name": "Vahid Mirjalili",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        },
+        {
+          "authorId": "2562040",
+          "name": "S. Raschka",
+          "url": null,
+          "paperCount": null,
+          "citationCount": null,
+          "hIndex": null
+        }
+      ],
+      "citationCount": 317,
+      "influentialCitationCount": 40,
+      "referenceCount": 30,
+      "openAccessPdf": {
+        "url": "https://doi.org/10.1016/j.patrec.2020.11.008",
+        "status": "HYBRID"
+      }
+    }
+  },
+  "abstract_text": null,
+  "sections": [],
+  "figures": [],
+  "tables": [],
+  "citations": [],
+  "provenance": []
+}
