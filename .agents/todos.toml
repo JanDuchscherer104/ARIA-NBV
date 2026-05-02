@@ -12,6 +12,7 @@ loc_min = 200
 loc_expected = 700
 loc_max = 1600
 context = ["Current docs expose roadmap, TODOs, ideas, generated agent scaffold mirrors, literature notes, implementation guides, and scratchpad-like pages in the same public tree.", "docs/AGENTS.md says docs/typst/paper/main.typ is ground truth and Quarto should not introduce competing top-level narratives."]
+references = ["repo:docs/AGENTS.md", "repo:docs/_quarto.yml", "repo:docs/contents/thesis/questions.qmd#kg-friendly-question-writing"]
 implementation_notes = ["Start with scripts/nbv_qmd_outline.sh --compact and docs/_quarto.yml navigation instead of broad manual browsing.", "Keep source pages until there is an explicit archive/move decision; first remove public navigation pressure and stale links.", "Do not delete history records under .agents/memory/history/."]
 acceptance = ["Each docs subtree has an explicit role: public, paper, slides, generated, internal mirror, or archive.", "Public nav no longer surfaces internal agent scaffolding or stale work-management pages as primary project content.", "Stale typo links such as coral_intergarion and hesita are either renamed or intentionally documented."]
 verification = ["scripts/nbv_qmd_outline.sh --compact", "cd docs && quarto render index.qmd contents/thesis/roadmap.qmd contents/thesis/questions.qmd contents/archive/index.qmd", "rg -n \"Seminar|hesita|coral_intergarion|old NBV repo URL\" README.md docs"]
@@ -28,6 +29,7 @@ loc_min = 80
 loc_expected = 180
 loc_max = 360
 context = ["README.md should stay concise, while setup details need a stable place for uv sync, Project Aria/ATEK/EFM dependencies, cache roots, and offline-only smoke tests.", ".agents/references/operator_quick_reference.md can be used for machine-specific recovery details, but shared setup docs must stay portable."]
+references = ["repo:README.md#documentation-map", "repo:docs/contents/setup.qmd", "url:https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_getting_started"]
 implementation_notes = ["Create root SETUP.md or a docs/contents/setup.qmd-aligned root pointer without duplicating host-specific paths.", "Include uv sync --all-extras from aria_nbv/, VIN offline-store expectations, and Streamlit/VIN summary smoke commands.", "Link from README.md and docs/index.qmd."]
 acceptance = ["A new contributor can find environment setup, cache prerequisites, and the first smoke commands from the README.", "No shared setup text contains operator-specific interpreter paths."]
 verification = ["rg -n \"host-local home path|miniforge\" README.md SETUP.md docs/contents/setup.qmd", "cd docs && quarto render index.qmd contents/setup.qmd"]
@@ -44,6 +46,7 @@ loc_min = 80
 loc_expected = 180
 loc_max = 360
 context = ["RRI semantics are contract changes, not local refactors.", "aria_nbv/aria_nbv/rri_metrics/AGENTS.md already defines the boundary for oracle labels, binning, ordinal loss, and reported metric meaning."]
+references = ["repo:aria_nbv/aria_nbv/rri_metrics/AGENTS.md", "repo:docs/contents/impl/rri_computation.qmd", "repo:.agents/memory/state/GOTCHAS.md"]
 implementation_notes = ["Base the skill on rri_metrics/AGENTS.md, GOTCHAS.md frame notes, and docs/contents/impl/rri_computation.qmd.", "Require tensor shapes, frames, units, and metric interpretation in any public RRI docstrings."]
 acceptance = ["The skill routes RRI/oracle tasks to the right docs, tests, and gotchas.", "No copied wrong-repo text remains."]
 verification = ["rg -n \"PRML|litkg-rs|Rust\" .agents/skills/oracle-rri-contracts .agents/skills || true", "make check-agent-memory"]
@@ -60,6 +63,7 @@ loc_min = 80
 loc_expected = 180
 loc_max = 360
 context = ["M2 requires a reproducible one-step VIN baseline, calibration/ranking plots, and a fixed ablation matrix.", "The current app and Lightning stack already expose VIN diagnostics, summary, W&B, and Optuna surfaces.", "The scaffold cleanup intentionally adds only diagnose-aria and plan-grill now; VIN training/eval should remain backlog until active VIN experiment work resumes."]
+references = ["repo:aria_nbv/aria_nbv/vin/AGENTS.md", "repo:docs/contents/impl/vin_nbv.qmd", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m2", "bib:VIN-NBV-frahm2025"]
 implementation_notes = ["Route to aria_nbv/aria_nbv/vin/AGENTS.md, app VIN diagnostics helpers, Lightning CLI, and docs/contents/impl/vin_nbv.qmd.", "Capture validation gotcha: trainer_config.enable_validation must be true for validation to run.", "Use the final name vin-training-eval unless a later plan selects a narrower name."]
 acceptance = ["The skill gives a compact experiment workflow for offline_only.toml, nbv-summary, targeted VIN tests, and diagnostics interpretation.", "The skill names current ARIA-NBV surfaces only."]
 verification = ["make check-agent-memory", "rg -n \"PRML|litkg-rs|Rust\" .agents/skills/vin-training-diagnostics .agents/skills || true"]
@@ -75,9 +79,10 @@ issue_ids = ["issue-007"]
 loc_min = 350
 loc_expected = 900
 loc_max = 1800
-context = ["Thesis RQ3/RQ4 require target-specific RRI before target-conditioned VIN can be evaluated.", "GOTCHAS.md notes EVL OBB outputs are not batch-collatable yet, so first runs may need batch_size=None or OBB outputs disabled outside the target-aware path."]
-implementation_notes = ["Start with GT OBBs and a small trusted subset; do not begin with predicted OBB realism ablations.", "Keep target mesh/point support, invalid target reasons, and scene-level-vs-target-level diagnostics explicit.", "Use existing PoseTW and CameraTW contracts; do not introduce raw matrix interfaces."]
-acceptance = ["GT-OBB cropped RRI runs on a small subset with side-by-side target RRI and scene RRI diagnostics.", "Unsupported targets have explicit invalid reasons rather than being encoded as low RRI.", "Docs and tests describe target frames, crop margin, units, and failure modes."]
+context = ["Thesis RQ3/RQ4 require target-specific RRI before target-conditioned VIN can be evaluated.", "GOTCHAS.md notes EVL OBB outputs are not batch-collatable yet, so first runs may need batch_size=None or OBB outputs disabled outside the target-aware path.", "The Rerun inspector should eventually render scene-level and target-level RRI side by side once target-aware fields are persisted."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq2-target-encoding", "repo:docs/contents/thesis/questions.qmd#rq4-model", "repo:.agents/skills/entity-aware-rri/SKILL.md", "bib:VIN-NBV-frahm2025", "bib:EFM3D-straub2024"]
+implementation_notes = ["Start with GT OBBs and a small trusted subset; do not begin with predicted OBB realism ablations.", "Keep target mesh/point support, invalid target reasons, and scene-level-vs-target-level diagnostics explicit.", "Use existing PoseTW and CameraTW contracts; do not introduce raw matrix interfaces.", "Expose enough metadata for Rerun diagnostics to compare scene RRI and GT-OBB-cropped target RRI for the same candidate set."]
+acceptance = ["GT-OBB cropped RRI runs on a small subset with side-by-side target RRI and scene RRI diagnostics.", "Unsupported targets have explicit invalid reasons rather than being encoded as low RRI.", "Docs and tests describe target frames, crop margin, units, and failure modes.", "Persisted or logged diagnostics are sufficient for a Rerun view to compare scene-level and target-level candidate rankings."]
 verification = ["cd aria_nbv && uv run pytest tests/rri_metrics tests/data_handling/test_vin_offline_store.py", "cd docs && quarto render contents/thesis/questions.qmd contents/thesis/roadmap.qmd"]
 
 [[todo]]
@@ -92,6 +97,7 @@ loc_min = 300
 loc_expected = 900
 loc_max = 1800
 context = ["The roadmap places multi-step rollout comparison in August and the value/RL gate after rollout evidence, so simulator work should not outrun data/RRI contract stabilization.", "Current canonical state frames full continuous RL as a stretch direction rather than the thesis core."]
+references = ["repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/aria_nbv/rl/counterfactual_env.py", "url:https://gymnasium.farama.org/api/env/", "url:https://stable-baselines3.readthedocs.io/en/master/guide/algos.html", "bib:GenNBV-chen2024"]
 implementation_notes = ["Begin with discrete candidate shell rollouts and hard masks; avoid full continuous control until the gate evidence exists.", "Keep oracle reward, VIN surrogate reward, state modalities, and invalid action handling separated."]
 acceptance = ["Simulator API can replay bounded discrete rollouts with cumulative target or scene RRI accounting.", "Invalid actions are masked or reported with reasons, not silently treated as low-RRI candidates."]
 verification = ["cd aria_nbv && uv run pytest tests/pose_generation tests/rl", "make context-contracts"]
@@ -108,25 +114,78 @@ loc_min = 160
 loc_expected = 420
 loc_max = 1000
 context = ["Roadmap M1 exit criteria require stable offline store and RRI contracts, documented frame/CW90 risks, and measured oracle throughput.", "data_handling/AGENTS.md says readers should validate strictly and fail with rebuild guidance rather than mutate derived artifacts.", "rri_metrics/AGENTS.md says metric semantics, binning definitions, and reported metric meanings are contract changes."]
+references = ["repo:docs/contents/thesis/roadmap.qmd#roadmap-m1", "repo:aria_nbv/aria_nbv/data_handling/AGENTS.md", "repo:aria_nbv/aria_nbv/rri_metrics/AGENTS.md", "repo:.agents/skills/nbv-geometry-contracts/SKILL.md"]
 implementation_notes = ["Run make context-contracts and targeted data/RRI tests first; record failures in issues/todos before changing package semantics.", "Confirm offline_only.toml uses apply_cw90_correction=false and that pose/camera frame alignment tests cover this setting.", "Collect oracle throughput on representative snippets only after correctness checks pass."]
 acceptance = ["Targeted data_handling and rri_metrics tests pass or DB records identify exact blockers.", "Frame/CW90 contract is documented in active docs or gotchas.", "A throughput command/report path is identified for representative snippets."]
 verification = ["make context-contracts", "cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py tests/data_handling/test_public_api_contract.py", "cd aria_nbv && uv run pytest tests/rri_metrics"]
 
 [[todo]]
 id = "todo-008"
-title = "Validate offline_only.toml VIN offline store in VIN diagnostics"
-description = "Smoke the available VIN offline store through the Streamlit VIN diagnostics and summary path."
+title = "Validate partial offline_only.toml VIN offline store smoke path"
+description = "Make offline_only.toml load at least one immutable VIN offline-store train/val sample from the current partial local store after corrected command behavior and validation land."
 priority = "high"
 status = "todo"
-labels = ["m0", "vin", "diagnostics", "offline-store"]
+labels = ["m0", "vin", "diagnostics", "offline-store", "data-blocker", "rerun"]
 issue_ids = ["issue-007", "issue-014"]
 loc_min = 40
 loc_expected = 120
 loc_max = 260
-context = ["Roadmap M0 requires validating that offline_only.toml can load the available VIN offline store into the VIN diagnostics page.", "aria_nbv/tests/vin/test_vin_utils.py already checks that the diagnostics config preserves the offline source and disables W&B.", "2026-04-29 smoke reached VinOfflineStoreReader and failed on missing `.data/offline_cache/vin_offline/manifest.json`; no manifest/sample_index exists under the repo."]
-implementation_notes = ["Prefer nbv-summary as a non-interactive smoke before manual Streamlit inspection.", "Use `--config-path offline_only.toml`; bare config names resolve under `.configs/`.", "Do not change offline store payloads to silence failures; materialize the store or point the config at an existing immutable store.", "Keep apply_cw90_correction=false unless candidate poses, p3d_cameras, and reference pose are rotated in lockstep."]
-acceptance = ["nbv-summary or an equivalent diagnostics helper loads at least one train/val batch from offline_only.toml.", "Streamlit VIN diagnostics can point at offline_only.toml without falling back to online data.", "Any failure has an issue with exact command, traceback summary, and affected contract."]
-verification = ["cd aria_nbv && uv run nbv-summary --config-path offline_only.toml", "cd aria_nbv && uv run pytest tests/vin/test_vin_utils.py"]
+context = ["Roadmap M0 requires validating that offline_only.toml can load the available VIN offline store into the VIN diagnostics page.", "aria_nbv/tests/vin/test_vin_utils.py now checks that the diagnostics config preserves the offline source, disables W&B, and keeps apply_cw90_correction=false.", "The local `.data/offline_cache/vin_offline` store has manifest.json, sample_index.jsonl, split arrays, and shard directories, but the current reader rejects it as manifest version 5 while OFFLINE_DATASET_VERSION expects 6.", "A Rerun offline inspector can target the partial store for diagnostic smoke only after the store is rebuilt or a deliberate compatibility path is chosen."]
+references = ["repo:README.md#offline-data", "repo:.configs/offline_only.toml", "repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:aria_nbv/tests/vin/test_vin_utils.py"]
+implementation_notes = ["Prefer nbv-summary as a non-interactive smoke before manual Streamlit or Rerun inspection.", "Use `--config-path offline_only.toml`; bare config names resolve under `.configs/`.", "Validate the partial store strictly and surface actionable validation errors instead of assuming the manifest is missing.", "Do not hand-edit store manifests, sample_index.jsonl, split arrays, shards, or payloads to silence failures.", "Keep apply_cw90_correction=false unless candidate poses, p3d_cameras, and reference pose are rotated in lockstep."]
+acceptance = ["`uv run nbv-summary --config-path offline_only.toml` loads at least one train/val batch from the immutable offline store after the version mismatch is resolved.", "Streamlit VIN diagnostics can point at offline_only.toml without falling back to online data once validation passes.", "The same partial store can be used by `nbv-rerun-inspect` for diagnostic smoke once that CLI exists and the store is compatible.", "Any remaining failure has an issue with exact command, traceback summary, and affected contract."]
+verification = ["cd aria_nbv && uv run nbv-summary --config-path offline_only.toml", "cd aria_nbv && uv run pytest tests/vin/test_vin_utils.py tests/data_handling/test_vin_offline_store.py"]
+
+[[todo]]
+id = "todo-020"
+title = "Add offline-store visual primitive inventory"
+description = "Create a strict inventory of visualizable primitives and required fields for immutable VIN offline-store samples."
+priority = "high"
+status = "todo"
+labels = ["offline-store", "diagnostics", "data", "contracts", "rerun"]
+issue_ids = ["issue-017", "issue-007"]
+loc_min = 120
+loc_expected = 260
+loc_max = 520
+context = ["A Rerun inspector should be a contract verifier before it is a renderer.", "The review identified required fields such as sample_id, split, scene_id/snippet_id, reference_pose_world_rig, candidate_poses_world_cam, p3d_cameras or intrinsics, candidate_valid_mask, oracle_rri, accuracy_delta, completeness_delta, and semidense points.", "Optional visual layers include invalid_reason, candidate_depth, candidate_points, mesh references, OBBs, fused points, voxel bounds, EVL extents, and collision segments."]
+references = ["repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:aria_nbv/aria_nbv/data_handling/_offline_visual_inventory.py", "repo:aria_nbv/tests/rerun_inspector/", "repo:.agents/skills/dataset-cache-ops/SKILL.md"]
+implementation_notes = ["Add a typed inventory helper such as OfflineVisualInventory with booleans for semidense points, candidate poses, candidate points/depths, GT mesh refs, OBBs, oracle RRI, accuracy/completeness, masks, and warnings.", "Use active aria_nbv.data_handling immutable offline-store samples only; do not revive removed cache modules or online runtime training APIs.", "Make required-field failures actionable before any Rerun logging starts, and report missing optional fields in metadata.", "Keep this inventory small enough to be reusable by CLI, tests, and future diagnostics."]
+acceptance = ["One function returns the available visualizable fields for a loaded offline sample.", "Missing required pose/camera/RRI fields fail before rendering with rebuild or config guidance.", "Missing optional fields are reported as metadata warnings rather than guessed from ad hoc sample attributes.", "The inventory is covered by fixture-based tests and does not mutate derived store artifacts."]
+verification = ["cd aria_nbv && uv run pytest tests/rerun_inspector tests/data_handling/test_vin_offline_store.py", "ruff check aria_nbv/aria_nbv/rerun_inspector aria_nbv/tests/rerun_inspector"]
+
+[[todo]]
+id = "todo-021"
+title = "Add TOML-configurable Rerun offline inspector CLI"
+description = "Implement nbv-rerun-inspect as a CLI-generated Rerun recording workflow for immutable VIN offline-store samples."
+priority = "high"
+status = "todo"
+labels = ["diagnostics", "offline-store", "geometry", "rerun", "thesis"]
+issue_ids = ["issue-015", "issue-014", "issue-017", "issue-016"]
+loc_min = 320
+loc_expected = 700
+loc_max = 1400
+context = ["Temporal, multimodal, 3D candidate-set debugging is not covered by the current Plotly/Streamlit diagnostics surface.", "The intended first tool should inspect one real offline sample/snippet with semidense points, candidate camera frusta, candidate validity, RRI labels, optional mesh/OBBs/geometric primitives, and metadata.", "The default viewer must avoid excessive entity counts by batching candidate frusta and downsampling point clouds or meshes by config."]
+references = ["repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:README.md#important-cli-commands", "repo:aria_nbv/aria_nbv/rerun_inspector/_cli.py", "url:https://rerun.io/docs"]
+implementation_notes = ["Add aria_nbv/aria_nbv/rerun_inspector with config, sample, frusta, color, logger, metadata, and CLI modules.", "Add RerunOfflineInspectorConfig with config-as-factory construction and `.configs/rerun_offline.toml` for dataset, output, timeline, world, geometry, cameras, metrics, and primitives sections.", "Add the `nbv-rerun-inspect = aria_nbv.rerun_inspector._cli:main` entry point and an optional pinned rerun-sdk dependency.", "Support spawn, save, and connect output modes plus split/index or sample-id selection.", "Use stable batched entity paths such as `/world/candidates/frusta_all`, `/world/candidates/frusta_top_oracle`, and `/world/candidates/selected/<candidate_id>`.", "Keep the inspector read-only and scoped to the current immutable offline store; do not support legacy cache modules, online datasets, or premature counterfactual fields."]
+acceptance = ["`nbv-rerun-inspect` exists and reads `.configs/rerun_offline.toml`.", "The CLI loads one immutable VIN offline-store sample and logs semidense points, candidate frusta, reference pose, optional mesh, and candidate RRI/validity metadata.", "Output modes include spawn, save, and connect.", "Candidate count, top-k, filter, coloring, line radius, labels, and point/mesh downsampling are TOML-configurable.", "Default rendering handles a 60-candidate sample with batched frusta and stable entity paths.", "Missing required sample fields fail with actionable errors before logging."]
+verification = ["cd aria_nbv && uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline.toml --split val --index 0 --save ../.artifacts/rerun/sample.rrd", "cd aria_nbv && uv run pytest tests/rerun_inspector", "ruff format aria_nbv/aria_nbv/rerun_inspector aria_nbv/tests/rerun_inspector", "ruff check aria_nbv/aria_nbv/rerun_inspector aria_nbv/tests/rerun_inspector"]
+
+[[todo]]
+id = "todo-022"
+title = "Add frame-safe Rerun geometry logging helpers"
+description = "Implement PoseTW/CameraTW-aware Rerun logging helpers for manual frusta and tested native camera logging."
+priority = "high"
+status = "todo"
+labels = ["geometry", "camera", "rerun", "tests", "contracts"]
+issue_ids = ["issue-016", "issue-007"]
+loc_min = 160
+loc_expected = 360
+loc_max = 760
+context = ["ARIA/PyTorch3D/EFM coordinate conventions are fragile, and plausible-looking frusta can be wrong if logged through raw matrices or an untested native camera path.", "Manual batched LineStrips3D frusta are safer for candidate cameras until native rr.Pinhole alignment is proven.", "Display-only CW90 corrections must remain visual-only and never leak into logged model/cache geometry."]
+references = ["repo:.agents/skills/nbv-geometry-contracts/SKILL.md", "repo:docs/contents/impl/rerun_offline_inspector.qmd#frame-safety", "repo:aria_nbv/aria_nbv/rerun_inspector/_frusta.py", "url:https://docs.rs/rerun/latest/rerun/struct.LineStrips3D.html"]
+implementation_notes = ["Public helpers should accept PoseTW, CameraTW, or typed project DTOs rather than unlabelled raw matrices.", "Implement a manual_lines path that computes camera-center, image-plane corners, rectangle edges, center rays, and optional optical axes in world coordinates.", "Use batched rr.LineStrips3D for candidate frusta with colors, radii, and labels.", "Provide native rr.Transform3D plus rr.Pinhole logging only for tested reference/RGB/SLAM cameras.", "Keep candidate frustum helpers independent from Streamlit panels and reusable by tests."]
+acceptance = ["Manual candidate frusta are generated from the camera model and pose and are the default candidate mode.", "Native Pinhole logging exists only for camera relationships covered by tests.", "A synthetic-camera test verifies frustum endpoints against projected or unprojected rays.", "CW90/display-only corrections cannot alter model/cache pose or camera values."]
+verification = ["cd aria_nbv && uv run pytest tests/rerun_inspector/test_frusta.py tests/data_handling/test_vin_offline_store.py", "ruff check aria_nbv/aria_nbv/rerun_inspector aria_nbv/tests/rerun_inspector"]
 
 [[todo]]
 id = "todo-011"
@@ -140,6 +199,7 @@ loc_min = 120
 loc_expected = 260
 loc_max = 620
 context = ["The PRML cross-review identifies root make ci, lint/test/docs checks, pre-commit, and GitHub CI as scaffold discipline that ARIA-NBV still lacks.", "ARIA-NBV currently has a Quarto publish workflow but no root CI workflow or .pre-commit-config.yaml.", "The repo already has targeted Makefile checks for context, Typst, KG, and agent memory that can be composed into a lightweight default gate."]
+references = ["repo:AGENTS.md#commands", "repo:AGENTS.md#verification", "repo:Makefile", "repo:.github/workflows/quarto-publish.yml"]
 implementation_notes = ["Add make fmt-check, lint, test, docs-check, agent-check, and ci targets that delegate to uv under aria_nbv/ and existing docs/memory checks.", "Keep GPU, full dataset, and long experiment tests opt-in; the default CI should be reliable on a clean CPU runner.", "Add .pre-commit-config.yaml for merge-conflict checks, TOML/YAML/basic whitespace checks, Ruff format check, and Ruff lint check where feasible."]
 acceptance = ["make ci exists and is documented as the local verification gate.", ".github/workflows/ci.yml runs the lightweight source/docs/agent-memory checks on PR/push.", ".pre-commit-config.yaml exists and its core checks match CI rather than adding unrelated policy."]
 verification = ["make ci", "pre-commit run --all-files", "find .github/workflows -maxdepth 1 -type f -name 'ci.yml' -print"]
@@ -156,6 +216,7 @@ loc_min = 80
 loc_expected = 180
 loc_max = 420
 context = ["The PRML comparison called out missing milestones, labels, project-board views, issue templates, PR template, and explicit draft-PR disposition.", "The local agents DB now owns active backlog, so GitHub templates should route work into reproducible acceptance and verification rather than duplicating all TOML records."]
+references = ["repo:.agents/AGENTS_INTERNAL_DB.md", "repo:AGENTS.md#instruction-capture", "url:https://docs.github.com/en/issues/using-labels-and-milestones-to-track-work/about-milestones"]
 implementation_notes = ["Add .github/ISSUE_TEMPLATE entries for bug, research task, docs task, and refactor work.", "Add .github/pull_request_template.md with summary, affected contracts, verification, docs/memory updates, and limitations.", "Document label/milestone taxonomy in a repo-local reference if it cannot be created directly through GitHub in the current task."]
 acceptance = ["New GitHub issues ask for affected files, contract impact, acceptance criteria, and verification.", "PR template is reviewer-first and asks for docs/memory updates when behavior changes.", "Open draft PR triage has a repeatable local checklist or issue template."]
 verification = ["find .github -maxdepth 3 -type f | sort", "rg -n \"Acceptance|Verification|Affected contracts|Docs|Memory\" .github"]
@@ -171,7 +232,331 @@ issue_ids = ["issue-013"]
 loc_min = 120
 loc_expected = 260
 loc_max = 620
-context = ["Roadmap M7/M8 require final tables, figures, failure cases, and reproducible configs.", "The PRML-style issue register recommended a final experiment registry, run-report generator, claim matrix, and release checklist."]
-implementation_notes = ["Start with a small docs or .agents-owned registry schema before building automation.", "Record run ID, config path/hash, cache/store ID, split manifest, candidate profile, seed, checkpoint, metric table, and figure output.", "Keep final claims explicit: do not claim continuous RL, real-device deployment, or VLM/global planning without evidence."]
-acceptance = ["There is a canonical place to trace final experiment artifacts to source inputs.", "At least one smoke/final-row example is represented.", "The registry can be referenced from paper/slides without copying unverified run notes."]
-verification = ["rg -n \"claim matrix|run_id|config_hash|cache_hash|split\" docs .agents", "make check-agent-memory"]
+context = ["Roadmap M7/M8 require final tables, figures, failure cases, and reproducible configs.", "The PRML-style issue register recommended a final experiment registry, run-report generator, claim matrix, and release checklist.", "The litkg agent-memory plan requires experiments and cache manifests to become first-class KG inputs so agents can trace thesis claims to run IDs, config hashes, cache IDs, split manifests, metrics, and artifacts without ingesting raw tensor stores."]
+references = ["repo:docs/contents/thesis/roadmap.qmd#roadmap-m7", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m8", "repo:docs/contents/thesis/questions.qmd#rq7-scaling", "repo:.agents/memory/state/DECISIONS.md", "repo:.configs/litkg.toml", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/external/litkg-rs/docs/kg-stack.md"]
+implementation_notes = ["Start with a small docs or .agents-owned registry schema before building automation.", "Record run ID, config path/hash, cache/store ID, split manifest, candidate profile, seed, checkpoint, metric table, figure output, and supported claim ids.", "Expose curated registry and manifest summaries to litkg source ingestion; exclude raw sample tensors, heavy shards, and full backbone stores from KG ingestion.", "Keep final claims explicit: do not claim continuous RL, real-device deployment, or VLM/global planning without evidence."]
+acceptance = ["There is a canonical place to trace final experiment artifacts to source inputs.", "At least one smoke/final-row example is represented.", "litkg can ingest or query curated run/cache/split evidence once the registry exists.", "The registry can be referenced from paper/slides without copying unverified run notes."]
+verification = ["rg -n \"claim matrix|run_id|config_hash|cache_hash|split|supported claims\" docs .agents", "make kg-search KG_QUERY=\"experiment registry claim matrix\" || true", "make check-agent-memory"]
+
+[[todo]]
+id = "todo-026"
+title = "Harden bounded oracle-RRI lookahead versus greedy comparison"
+description = "Make the first thesis-grade non-myopic comparison executable: bounded oracle-RRI lookahead against one-step greedy under equal acquisition and candidate budget."
+priority = "high"
+status = "todo"
+labels = ["rollouts", "rri", "planning", "thesis"]
+issue_ids = ["issue-018", "issue-007"]
+loc_min = 180
+loc_expected = 420
+loc_max = 900
+context = ["DECISIONS.md locks bounded oracle-RRI lookahead versus one-step greedy as the first non-myopic comparison.", "docs/contents/thesis/questions.qmd defines the ArgTopK to ArgTop1_h ladder and requires equal acquisition budget.", "The current rollout code has horizon, branch_factor, beam_width, and oracle scoring, but needs a reportable comparison path with budget parity and diagnostics."]
+references = ["repo:.agents/memory/state/DECISIONS.md", "repo:docs/contents/thesis/questions.qmd#rq5-planning", "repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/tests/pose_generation/test_counterfactuals.py"]
+implementation_notes = ["Implement or expose deterministic one-step greedy, random-valid, and h-step oracle lookahead from the same candidate generator and scorer.", "Ensure candidate budget, horizon, branch factor, beam width, and seed are logged in the trace and report.", "Report cumulative RRI, path length, invalid fraction, runtime, and selected first action for each method.", "Keep VIN-surrogate and learned value heads out of this slice."]
+acceptance = ["A smoke experiment compares greedy and bounded oracle lookahead on one trusted snippet or scene.", "The comparison enforces equal candidate and acquisition budgets.", "Outputs include cumulative RRI and acquisition-cost metrics suitable for the M5 roadmap gate.", "Representative success/failure traces can be inspected or plotted."]
+verification = ["cd aria_nbv && uv run pytest tests/pose_generation/test_counterfactuals.py", "cd docs && quarto render contents/thesis/questions.qmd contents/thesis/roadmap.qmd"]
+
+[[todo]]
+id = "todo-027"
+title = "Add stochastic rollout selectors and branch schedules"
+description = "Implement temperature-softmax, Gumbel-Top-k beam sampling, explicit branch schedules, and late-exploration mode for bounded rollout generation."
+priority = "high"
+status = "todo"
+labels = ["rollouts", "stochastic", "planning", "rl"]
+issue_ids = ["issue-019", "issue-018"]
+loc_min = 180
+loc_expected = 460
+loc_max = 1000
+context = ["The literature synthesis maps Gumbel-Top-k to diverse branch sampling without replacement and soft Q / maximum-entropy ideas to softmax-over-score exploration.", "The current CounterfactualSelectionPolicy enum only covers farthest-from-history, farthest-from-reference, and random selection.", "Branching only at step 0 can miss later setup actions that unlock valuable views."]
+references = ["repo:docs/contents/theory/rl_planning.qmd", "repo:.agents/skills/counterfactual-rollout-planner/SKILL.md", "bib:GumbelTopK-kool2019", "bib:DeepEnergyPolicies-haarnoja2017", "bib:TrajectoryTransformer-janner2021"]
+implementation_notes = ["Score all valid candidates before sampling; use deterministic seeds and record sampled logits/noise or enough seed state to replay.", "Represent branch_schedule as explicit per-step policy parameters such as gumbel_top_k, top_k, random_branch_prob, and late_explore probability.", "Keep computational complexity bounded by beam_width, horizon, and candidate count.", "Add tests that stochastic selectors are reproducible under a fixed seed and produce distinct candidates when possible."]
+acceptance = ["Rollouts support temperature-softmax and Gumbel-Top-k selection policies.", "Branch schedules can vary branching by step instead of only at the root.", "Late exploration can sample valid medium/high-entropy candidates under an explicit probability.", "Trace output records policy parameters and selected strategy per step."]
+verification = ["cd aria_nbv && uv run pytest tests/pose_generation/test_counterfactuals.py", "rg -n \"temperature|gumbel|branch_schedule|late_explore\" aria_nbv/aria_nbv/pose_generation aria_nbv/tests/pose_generation"]
+
+[[todo]]
+id = "todo-028"
+title = "Add target-aware candidate strategy mixture"
+description = "Generalize candidate orientation and sampling into a mixture of LookAway, LookAt target/entity, frontier or deficit, random orientation, and trajectory-forward strategies."
+priority = "high"
+status = "todo"
+labels = ["candidate-generation", "target", "entity-aware", "rollouts"]
+issue_ids = ["issue-020", "issue-007"]
+loc_min = 220
+loc_expected = 520
+loc_max = 1200
+context = ["CandidateViewGenerator already supports RADIAL_AWAY, RADIAL_TOWARDS, FORWARD_RIG, and TARGET_POINT, but the generator lacks a first-class mixture registry and per-rollout/per-step strategy provenance.", "The thesis RQ3 working hypothesis expects object-centric candidates plus default exploration candidates.", "The synthesis calls for LookAt entity center, missing-surface centroid, frontier, random orientation, and trajectory-forward modes."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq3-candidates", "repo:aria_nbv/aria_nbv/pose_generation/candidate_generation.py", "repo:aria_nbv/aria_nbv/pose_generation/orientations.py", "repo:.agents/skills/entity-aware-rri/SKILL.md"]
+implementation_notes = ["Refactor strategy selection around existing ViewDirectionMode and OrientationBuilder before adding new abstractions.", "Allow per-rollout or per-step strategy_weights and record the sampled strategy in the candidate result or rollout trace.", "Start with target point or GT OBB center; keep frontier/missing-surface centroid behind clear data availability checks.", "Preserve existing LookAway behavior as one strategy in the mixture, not as removed legacy behavior."]
+acceptance = ["A config can sample candidates from at least default LookAway/RADIAL_AWAY, target LookAt/TARGET_POINT, and random-orientation or forward modes.", "Each candidate set records the strategy or mixture that produced it.", "Entity-aware rollout smoke can generate target-directed candidates around a GT OBB center.", "Existing candidate-generation tests continue to pass for legacy configs."]
+verification = ["cd aria_nbv && uv run pytest tests/pose_generation", "rg -n \"strategy_weights|TARGET_POINT|RADIAL_AWAY|ViewDirectionMode\" aria_nbv/aria_nbv/pose_generation aria_nbv/tests/pose_generation"]
+
+[[todo]]
+id = "todo-029"
+title = "Implement target selector eligibility scoring"
+description = "Select suitable target entities for entity-aware rollouts using visibility, partial reconstruction, projected area, distance, complexity, and completeness filters."
+priority = "high"
+status = "todo"
+labels = ["entity-aware", "target", "rri", "diagnostics"]
+issue_ids = ["issue-020", "issue-007"]
+loc_min = 200
+loc_expected = 480
+loc_max = 1100
+context = ["Entity-aware RRI needs a target of interest before target-conditioned sampling or scoring can be evaluated.", "The synthesis identified filters for projected area, distance, visible-surface fraction, GT mesh-face support after OBB crop, OBB tightness, category validity, and not-yet-complete targets.", "The roadmap keeps GT OBBs as the first trusted target encoding before predicted OBB realism ablations."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq2-target-encoding", "repo:docs/contents/thesis/questions.qmd#rq3-candidates", "repo:.agents/skills/entity-aware-rri/SKILL.md", "repo:docs/contents/ase_dataset.qmd", "bib:EFM3D-straub2024"]
+implementation_notes = ["Build target selection on GT OBBs and mesh/point support for the first slice.", "Return explicit selection reason, rejected-target reasons, and score components rather than only a target id.", "Keep target selector output compatible with later VIN target fields and Rerun diagnostics.", "Do not allow empty GT mesh crops to fall back to scene-level labels."]
+acceptance = ["A small trusted subset can choose at least one eligible target or explain why none exists.", "Selection output includes entity id/class/OBB, eligibility score components, and rejection reasons.", "Unsupported or complete targets are filtered before target RRI generation.", "Diagnostics can summarize selected-target distributions across snippets."]
+verification = ["cd aria_nbv && uv run pytest tests/rri_metrics tests/data_handling/test_vin_offline_store.py", "rg -n \"target selector|eligibility|projected_area|visible_surface|selection_reason\" aria_nbv/aria_nbv aria_nbv/tests docs/contents"]
+
+[[todo]]
+id = "todo-030"
+title = "Add candidate-realism diagnostics by strategy"
+description = "Measure and report candidate validity, collision rejection, clearance, view-direction distributions, RRI histograms, target visibility, no-depth/no-hit counts, and path feasibility per sampling strategy."
+priority = "medium"
+status = "todo"
+labels = ["candidate-generation", "diagnostics", "experiments"]
+issue_ids = ["issue-020", "issue-013"]
+loc_min = 120
+loc_expected = 320
+loc_max = 760
+context = ["Candidate-generation realism versus generalization remains under-specified in PROJECT_STATE.md and OPEN_QUESTIONS.md.", "The synthesis calls out strategy-level diagnostics before broad candidate-generation changes are trusted.", "These diagnostics are needed to decide whether broader candidate distributions buy more than deeper VIN architecture work."]
+references = ["repo:.agents/memory/state/PROJECT_STATE.md", "repo:.agents/memory/state/OPEN_QUESTIONS.md", "repo:docs/contents/thesis/questions.qmd#rq3-candidates", "repo:aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py"]
+implementation_notes = ["Aggregate metrics by candidate strategy, scene/snippet, stage, and target type where available.", "Include valid ratio, collision/free-space rejection, mesh clearance, distance to reference, azimuth/elevation, candidate RRI histogram, entity visibility, no-hit depth, and path feasibility.", "Keep diagnostics lightweight enough for smoke subsets and final report tables.", "Prefer existing candidate result masks/extras rather than recomputing expensive geometry unless needed."]
+acceptance = ["A report or helper summarizes candidate realism metrics for at least two strategies on a smoke subset.", "Metrics are grouped by strategy and can reveal whether a sampler produces many invalid or no-hit candidates.", "The output can feed the experiment registry or thesis figures without manual spreadsheet reconstruction."]
+verification = ["cd aria_nbv && uv run pytest tests/pose_generation", "rg -n \"candidate realism|valid_ratio|collision_rejection|mesh_clearance|azimuth|target_visibility\" aria_nbv docs .agents"]
+
+[[todo]]
+id = "todo-031"
+title = "Separate invalidity taxonomy from RRI labels"
+description = "Introduce explicit invalid candidate and target reason labels so feasibility is not encoded as low reconstruction quality."
+priority = "high"
+status = "todo"
+labels = ["validity", "rri", "data", "rollouts"]
+issue_ids = ["issue-021", "issue-007"]
+loc_min = 180
+loc_expected = 420
+loc_max = 1000
+context = ["RQ6 states that invalidity is not a low RRI class.", "The synthesis lists collision, outside bounds, no target visibility, bad frustum, unsafe transition, no depth hits, and outside EVL voxel extent as distinct invalid reasons.", "Entity-aware target selection and rollout storage both need explicit unsupported-target and invalid-candidate reasons."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq6-feasibility", "repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py", "repo:aria_nbv/aria_nbv/rri_metrics/types.py"]
+implementation_notes = ["Define an enum or typed code table for invalid reasons and keep it separate from ordinal RRI bins.", "Propagate validity masks/reasons through candidate generation, oracle labeling, rollout traces, and future VIN batches.", "Add hooks for separate validity/collision/invalid-reason heads only after labels are reliable.", "Keep hard masking as the first trusted baseline."]
+acceptance = ["Invalid candidates can be represented with reason codes without assigning them an RRI ordinal class.", "Candidate/RRI ordering remains aligned when masks and reason codes are serialized.", "At least collision/out-of-bounds/no-depth/no-target-support/out-of-extent reasons are representable or explicitly deferred.", "Tests cover serialization and mask alignment."]
+verification = ["cd aria_nbv && uv run pytest tests/pose_generation tests/data_handling/test_vin_offline_store.py tests/rri_metrics", "rg -n \"invalid_reason|validity_head|collision_head|candidate_valid\" aria_nbv/aria_nbv aria_nbv/tests docs/contents/thesis/questions.qmd"]
+
+[[todo]]
+id = "todo-032"
+title = "Prototype lean rollout storage and lineage manifest"
+description = "Evaluate a minimal rollout storage layout, likely Zarr or a compact PT/JSONL smoke format, with ragged point support, config hashes, and optional heavy diagnostics."
+priority = "medium"
+status = "todo"
+labels = ["rollouts", "storage", "data", "reproducibility"]
+issue_ids = ["issue-018", "issue-022"]
+loc_min = 160
+loc_expected = 420
+loc_max = 1000
+context = ["The synthesis warned that full EVL/backbone cache payloads dominate storage and that rollout storage should keep only replay/verification essentials by default.", "Zarr is attractive for chunked arrays but variable-length rollouts, ragged point clouds, and variable candidate counts need masks, offsets, padding, or per-sample groups.", "PROJECT_STATE.md already says immutable VIN stores should stay lean and rich diagnostic DTO payloads are opt-in."]
+references = ["repo:.agents/memory/state/PROJECT_STATE.md", "repo:docs/contents/thesis/questions.qmd#rq5-planning", "url:https://zarr-specs.readthedocs.io/en/latest/v3/core/index.html", "repo:aria_nbv/aria_nbv/pose_generation/counterfactuals.py"]
+implementation_notes = ["Start with a minimal smoke writer before large Zarr adoption; store selected pose sequence, candidate tables, masks, scores/RRI, invalid reasons, cumulative metrics, and lineage.", "Represent ragged candidate point clouds through offsets or omit them by default unless selected-action replay requires them.", "Record generation_version, config hashes, seed, policy name, source store version, mesh version, and checkpoint hash when applicable.", "Add storage-footprint summaries per generated sample."]
+acceptance = ["A smoke rollout store can be replayed or verified without full EVL backbone tensors.", "Optional heavy arrays are gated by config and absent from the minimal payload.", "The manifest reports bytes per field and key lineage identifiers.", "The storage format decision is documented with explicit padding/mask/offset handling for ragged data."]
+verification = ["cd aria_nbv && uv run pytest tests/pose_generation tests/data_handling", "rg -n \"rollout.*manifest|config_hash|generation_version|point_offsets|zarr\" aria_nbv docs .agents"]
+
+[[todo]]
+id = "todo-033"
+title = "Add deterministic sharding for oracle and rollout generation"
+description = "Create a Lightning/Fabric-compatible generation loop or CLI design for oracle cache and rollout generation with resumable shard ownership and atomic writes."
+priority = "medium"
+status = "todo"
+labels = ["data-generation", "lightning", "rollouts", "cluster"]
+issue_ids = ["issue-022", "issue-018"]
+loc_min = 240
+loc_expected = 620
+loc_max = 1400
+context = ["Scaling rollouts requires cluster-safe generation rather than ad hoc local loops.", "The synthesis recommends DataModule-style manifest sharding, Fabric or Lightning orchestration, temp-write to atomic commit, and pending/running/done/failed manifest status.", "Parallel write races and resumability are high-priority risks before multi-hundred-GB generation."]
+references = ["repo:docs/contents/thesis/roadmap.qmd#roadmap-m5", "repo:.agents/skills/lrz-ai-systems/SKILL.md", "url:https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.plugins.environments.SLURMEnvironment.html", "repo:.agents/skills/lrz-ai-systems/references/slurm-partitions.md"]
+implementation_notes = ["Define a shard manifest over scenes/snippets/rollout seeds before implementation.", "Use deterministic shard ownership keyed by scene/snippet/rollout_id and skip already completed groups.", "Log SLURM_JOB_ID, SLURM_ARRAY_TASK_ID, node name, GPU type, config hash, and runtime metrics when present.", "Keep write operations idempotent and use temp paths followed by atomic commit."]
+acceptance = ["A dry-run or smoke command partitions generation work into deterministic shards.", "Completed shards are skipped on rerun without rewriting successful outputs.", "Failed shards leave actionable status and error metadata.", "Atomic write semantics prevent partially written rollout groups from being treated as done."]
+verification = ["cd aria_nbv && uv run pytest tests/lightning tests/data_handling", "rg -n \"SLURM_JOB_ID|ARRAY_TASK|atomic|pending|running|done|failed|rollout\" aria_nbv .configs docs .agents"]
+
+[[todo]]
+id = "todo-034"
+title = "Add LRZ Slurm and DSS-safe generation templates"
+description = "Document and template LRZ AI Systems batch jobs for oracle cache generation, rollout generation, VIN training, and diagnostics with Enroot/Pyxis and DSS storage constraints."
+priority = "medium"
+status = "todo"
+labels = ["lrz", "slurm", "storage", "cluster"]
+issue_ids = ["issue-022"]
+loc_min = 160
+loc_expected = 380
+loc_max = 900
+context = ["The synthesis identified LRZ batch jobs, Slurm arrays, Enroot/Pyxis containers, and DSS quotas as required before scaling data generation.", "DSS default quotas and high storage utilization make naive multi-hundred-GB caches risky.", "The root guidance routes LRZ work through the lrz-ai-systems skill and references."]
+references = ["repo:.agents/skills/lrz-ai-systems/SKILL.md", "repo:.agents/skills/lrz-ai-systems/references/storage-dss.md", "repo:.agents/skills/lrz-ai-systems/references/containers-pyxis.md", "url:https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.plugins.environments.SLURMEnvironment.html"]
+implementation_notes = ["Use the existing lrz-ai-systems skill references rather than inventing a second scheduler story.", "Template sbatch jobs for oracle cache generation, rollout generation, VIN training, and validation/diagnostics.", "Include DSS staging rules: active shards only, compression/pruning, inode awareness, final artifact sync, and no blind full-backbone caches.", "Record container/runtime assumptions for Enroot/Pyxis without committing personal runtime config."]
+acceptance = ["There are repo-local templates or references for the four major LRZ job classes.", "Templates support job arrays and deterministic shard ids.", "Storage guidance explicitly covers DSS quota/inode constraints and active-shard staging.", "The docs do not claim LSF or another unsupported scheduler."]
+verification = ["rg -n \"sbatch|srun|scancel|SLURM_ARRAY_TASK_ID|Enroot|Pyxis|DSS\" .agents docs .configs scripts", "make check-agent-memory"]
+
+[[todo]]
+id = "todo-035"
+title = "Finish litkg config refresh and Semantic Scholar enrichment path"
+description = "Keep ARIA-NBV litkg config aligned with current Typst/slide paths, refresh generated graph outputs, and document the Semantic Scholar API-key/rate-limit workflow."
+priority = "medium"
+status = "todo"
+labels = ["kg", "litkg", "semantic-scholar", "docs"]
+issue_ids = ["issue-023"]
+loc_min = 80
+loc_expected = 220
+loc_max = 520
+context = ["The litkg profile now points at current seminar_paper, seminar_slides, thesis, thesis_slides, and shared Typst sources, but this TODO remains open until generated graph outputs and documented refresh/enrichment paths are clean.", "The context pack still reports graphify and codegraphcontext refresh recommendations.", "Semantic Scholar REST lookups worked for several papers but enrichment remains incomplete without SEMANTIC_SCHOLAR_API_KEY and unauthenticated calls hit 429."]
+references = ["repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/skills/semantic-scholar-litkg/references/integration-spec.md", "repo:.configs/litkg.toml", "repo:.agents/external/litkg-rs/docs/architecture.md#semantic-scholar-contract", "url:https://www.semanticscholar.org/product/api"]
+implementation_notes = ["Keep .configs/litkg.toml source paths aligned with current seminar_paper, seminar_slides, thesis, thesis_slides, and shared Typst locations.", "Run the lightest litkg capability/context-pack checks after config changes; avoid committing generated runtime caches unless intentionally versioned.", "Document how to set SEMANTIC_SCHOLAR_API_KEY and rerun s2 enrich without storing the key.", "Keep litkg-rs toolkit changes repo-independent; put ARIA-specific fixes in config/docs."]
+acceptance = ["`litkg-cli capabilities` no longer reports stale Typst source paths for ARIA-NBV.", "The context-pack action plan can cite current Typst/docs/literature surfaces.", "Semantic Scholar enrichment instructions are clear and do not commit secrets.", "Graphify/Neo4j/generated outputs are refreshed or explicitly left as generated artifacts with repair commands."]
+verification = [".agents/external/litkg-rs/target/debug/litkg-cli capabilities --config .configs/litkg.toml --repo-root . --format json", ".agents/external/litkg-rs/target/debug/litkg-cli context-pack --config .configs/litkg.toml --repo-root . --task \"rollout planning smoke\" --profile rollout-planning --format text", "make check-agent-memory"]
+
+[[todo]]
+id = "todo-037"
+title = "Create VIN evidence-gate rollout report"
+description = "Produce the report path that decides whether VIN can become a surrogate reward, critic, value head, or return/Q model after held-out ranking and oracle-evaluated rollouts."
+priority = "medium"
+status = "todo"
+labels = ["vin", "rollouts", "experiments", "thesis"]
+issue_ids = ["issue-013", "issue-018"]
+loc_min = 160
+loc_expected = 360
+loc_max = 800
+context = ["DECISIONS.md says VIN earns value, Q, or return heads only after held-out ranking quality, oracle-evaluated VIN-selected rollouts, calibration/stage-shift analysis, and Rerun failure visualization.", "The synthesis warned that prior Optuna/VIN comparisons mixed multiple factors and need controlled ablations.", "The experiment registry todo records final claims but not the specific VIN-to-planning evidence gate."]
+references = ["repo:.agents/memory/state/DECISIONS.md", "repo:docs/contents/thesis/questions.qmd#rq6-feasibility", "repo:docs/contents/theory/rl_planning.qmd", "bib:DoubleDQN-vanHasselt2015", "bib:IQL-kostrikov2021"]
+implementation_notes = ["Define a compact report schema or script output covering ranking metrics, top-k hit rate, oracle-evaluated selected rollouts, calibration/stage shift, and representative Rerun failure cases.", "Use fixed seeds, fixed splits, fixed schedule, and one change at a time for any ablation matrix.", "Keep value/Q/return heads deferred unless the report passes predefined thresholds or advisor decision.", "Link report rows to configs, checkpoints, cache hashes, and split manifests."]
+acceptance = ["There is a reproducible report path for the VIN evidence gate.", "The report can say pass/fail/defer for VIN-as-surrogate or value-learning work.", "At least one oracle-evaluated model-scored rollout smoke is represented once rollout traces exist.", "The report output can feed the final experiment registry."]
+verification = ["rg -n \"VIN evidence gate|oracle-evaluated|calibration|stage-shift|top-k\" docs .agents aria_nbv", "cd aria_nbv && uv run pytest tests/vin tests/lightning"]
+
+[[todo]]
+id = "todo-038"
+title = "Write simulator and external-data expansion gate"
+description = "Create a decision artifact that ranks ASE-native simulation, Habitat, Isaac, 3DGS/world-model, and external dataset paths against thesis timing and current ASE mesh-supervised evidence needs."
+priority = "low"
+status = "todo"
+labels = ["simulator", "datasets", "scope", "thesis"]
+issue_ids = ["issue-024"]
+loc_min = 100
+loc_expected = 240
+loc_max = 560
+context = ["The synthesis ranks ASE-native simulation, Habitat fast RL sidecar, Isaac multimodal simulator, and semantic/VLM simulator paths, while the roadmap keeps simulator-backed online RL as stretch work.", "The core scale limitation remains the 100 GT-mesh ASE scene subset and available mesh-supervised snippets.", "A simulator decision should not preempt M1-M5 ASE rollout evidence."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq8-extensions", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m6", "url:https://aihabitat.org/docs/habitat-sim/habitat_sim.nav.html", "url:https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_getting_started", "bib:GenNBV-chen2024", "bib:Hestia-lu2026"]
+implementation_notes = ["Compare options by sensor fidelity, Aria/EFM compatibility, reward availability, setup cost, data license, scene diversity, and thesis timeline impact.", "Treat Habitat as a fast topology/RL sidecar and Isaac/ASE-native as higher-fidelity options only if access and evaluation are realistic.", "List external datasets such as Replica, HM3D, Matterport3D, ScanNet, Structured3D, Hypersim, InteriorNet, ProcTHOR, OmniObject3D, Objaverse, and Houses3K as candidates, not commitments.", "End with a go/no-go gate tied to M5/M6 evidence."]
+acceptance = ["A short decision artifact states what simulator/data work is thesis-core, stretch, or deferred.", "The artifact preserves the ASE mesh-supervised rollout path as the default until a gate is passed.", "Dataset/simulator recommendations name the evidence required to proceed.", "Public thesis docs avoid claiming simulator-backed online RL unless the gate is passed."]
+verification = ["cd docs && quarto render contents/thesis/roadmap.qmd contents/thesis/questions.qmd", "rg -n \"Habitat|Isaac|Replica|HM3D|Matterport|simulator-backed\" docs .agents"]
+
+[[todo]]
+id = "todo-039"
+title = "Add litkg-backed agents-db source-reference validation and KG edges"
+description = "Resolve agents-db references into litkg-rs graph entities and expose validation, repair, retrieval, and consolidation output for repo files, citation keys, Semantic Scholar IDs, external docs, generated context, and experiment evidence."
+priority = "medium"
+status = "todo"
+labels = ["agents-db", "kg", "litkg", "provenance"]
+issue_ids = ["issue-023", "issue-025"]
+loc_min = 180
+loc_expected = 420
+loc_max = 900
+context = ["The ARIA agents DB now requires context and structured references, and litkg-rs context packs can carry those fields.", "The next integration step is to resolve those reference strings into typed KG nodes/edges and report stale references before agents rely on them.", "This should grow beyond reference-edge validation into the full source-reference contract for kg-query/kg-route, authority-aware ranking, claim checks, and consolidation proposals that cite DB evidence alongside code, docs, papers, and experiment manifests."]
+references = ["repo:scripts/agents_db.py", "repo:.agents/skills/agents-db/SKILL.md#provenance-contract", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/docs/architecture.md#adapter-output-contracts", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "url:https://www.semanticscholar.org/product/api"]
+implementation_notes = ["Start in litkg-rs with a repo-independent source-reference parser for prefixes already enforced by scripts/agents_db.py.", "Validate repo paths and anchors best-effort, check bib keys against configured BibTeX, and connect arxiv/doi/s2 references to Semantic Scholar-enriched records when present.", "Emit typed KG edges such as BACKLOG_REFERENCES_FILE, BACKLOG_REFERENCES_PAPER, BACKLOG_REFERENCES_EXTERNAL_DOC, BACKLOG_REFERENCES_EXPERIMENT, and BACKLOG_DERIVED_FROM_CONTEXT_PACK in graphify/Neo4j outputs where the adapter supports them.", "Expose unresolved-reference, stale-source, and consolidation-proposal output through context-pack or a dedicated check command.", "Keep ARIA-specific defaults in .configs/litkg.toml and skills; do not hard-code ARIA paths into litkg-core."]
+acceptance = ["A litkg-rs check or context-pack report can list unresolved agents-db references with record ids and repair hints.", "Context-pack JSON exposes issue/todo context and references for ARIA-NBV active backlog records.", "At least repo: and bib: references are resolved into graph/export evidence in a smoke run or documented adapter contract.", "Agents can query backlog evidence alongside code/docs/papers from one litkg surface.", "Semantic Scholar identifiers remain optional enrichment and missing API keys produce repair commands, not hard failures."]
+verification = ["cargo test --manifest-path .agents/external/litkg-rs/Cargo.toml -p litkg-core -p litkg-cli context_pack", ".agents/external/litkg-rs/target/debug/litkg-cli context-pack --config .configs/litkg.toml --repo-root . --task \"agents db provenance smoke\" --profile thesis-coding --format json", "make agents-db AGENTS_ARGS='validate'"]
+
+[[todo]]
+id = "todo-040"
+title = "Add aria-litkg-memory skill"
+description = "Create and adopt a compact ARIA-NBV skill that routes broad memory retrieval, claim checks, source-backed task routing, and consolidation through litkg before manual browsing."
+priority = "high"
+status = "todo"
+labels = ["agent", "skills", "kg", "litkg", "memory"]
+issue_ids = ["issue-012", "issue-023"]
+loc_min = 40
+loc_expected = 100
+loc_max = 220
+context = ["Root routing now requires broad cross-surface coding, docs, KG, or thesis work to start from a litkg context pack, but ordinary agent memory retrieval still needs an explicit skill distinct from litkg-rs implementation work.", "The new skill should make litkg the default context router while leaving semantic-scholar-litkg responsible for KG toolkit/config/backend implementation.", "This skill is also the agent-facing place to encode source authority until litkg retrieval exposes authority/freshness metadata directly."]
+references = ["repo:AGENTS.md#routing", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/skills/agents-db/SKILL.md#provenance-contract", "repo:.configs/litkg.toml", "repo:.agents/kg/README.md"]
+implementation_notes = ["Keep the skill concise and focused on usage protocol, not litkg-rs internals.", "List the main Make targets for capability checks, query, brief, route, search, related-source retrieval, and claim checking.", "Document the authority order from code/canonical memory through generated context, debrief history, archives, and external papers.", "Validate with the local skill validator and make check-agent-memory."]
+acceptance = ["`.agents/skills/aria-litkg-memory/SKILL.md` exists with valid skill frontmatter.", "Root routing points broad memory retrieval and consolidation work to the skill.", "The skill tells agents to inspect cited canonical sources before acting on retrieved context.", "The skill separates routine memory retrieval from semantic-scholar-litkg implementation work."]
+verification = ["python3 /home/jd/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/aria-litkg-memory", "make check-agent-memory"]
+
+[[todo]]
+id = "todo-041"
+title = "Add root kg-query / kg-brief / kg-route retrieval targets"
+description = "Expose one-command root litkg retrieval and routing targets so agents can query canonical memory, docs, code, papers, and backlog without hand-assembling cargo commands."
+priority = "high"
+status = "todo"
+labels = ["kg", "litkg", "makefile", "agent", "retrieval"]
+issue_ids = ["issue-023"]
+loc_min = 50
+loc_expected = 140
+loc_max = 320
+context = ["litkg-rs already exposes capabilities, context-pack, literature search/show, and KG find operations, but ARIA agents need a stable root surface that matches the root dispatcher and skill workflow.", "The first retrieval layer should cover kg-capabilities, kg-search, kg-show-paper, kg-query, kg-brief, kg-route, kg-claim-check, and kg-related, with JSON output available for agents or scripts.", "These wrappers should remain thin and local-first; richer claim/consolidation behavior belongs in litkg-rs once the repo-independent command exists."]
+references = ["repo:Makefile", "repo:AGENTS.md#commands", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md#agent-contract", "repo:.agents/external/litkg-rs/AGENTS.md", "repo:.agents/external/litkg-rs/docs/architecture.md"]
+implementation_notes = ["Use the checked-in litkg-rs submodule through `cargo run --manifest-path .agents/external/litkg-rs/Cargo.toml -p litkg-cli -- ...`.", "Keep variables such as LITKG_CONFIG, LITKG_PROFILE, KG_QUERY, KG_TASK, KG_TOPIC, KG_FORMAT, and KG_LIMIT overridable.", "Prefer context-pack for query/brief/route and kg find for quick search or related-path retrieval.", "Do not make these targets depend on a live Neo4j/Graphiti/MemPalace service."]
+acceptance = ["`make kg-capabilities` reports backend/source readiness.", "`make kg-search KG_QUERY=...` and `make kg-query KG_QUERY=...` return useful text results.", "`make kg-brief`, `make kg-route`, `make kg-show-paper`, `make kg-claim-check`, and `make kg-related` have documented required variables.", "Targets fail with actionable messages when required variables are missing."]
+verification = ["make kg-capabilities KG_FORMAT=json", "make kg-search KG_QUERY=\"entity-aware RRI\" KG_LIMIT=5", "make kg-query KG_QUERY=\"current RRI contract\""]
+
+[[todo]]
+id = "todo-042"
+title = "Expand litkg source coverage for agent history, skills, references, generated context, and experiment placeholders"
+description = "Split ARIA-NBV litkg sources into canonical state, active backlog, workflow guidance, episodic history, generated context, and future experiment/cache evidence so retrieval has the right material and authority metadata."
+priority = "high"
+status = "todo"
+labels = ["kg", "litkg", "config", "memory", "experiments"]
+issue_ids = ["issue-023", "issue-025"]
+loc_min = 60
+loc_expected = 160
+loc_max = 380
+context = ["The current litkg config ingests canonical memory and active backlog, but the agent-memory plane also needs debrief history, work notes, skills, references, generated context, and curated experiment/cache manifests.", "Source classes need explicit descriptive authority such as canonical, active_backlog, workflow, episodic, generated, and evidence so future retrieval can rank conflicting context.", "Experiment/cache ingestion should target manifests and summaries, not raw tensor blocks, sample shards, or full EVL backbone stores."]
+references = ["repo:.configs/litkg.toml", "repo:.agents/kg/README.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md#source-authority", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "repo:docs/_generated/context/source_index.md"]
+implementation_notes = ["Keep legacy source sections until current litkg-rs consumers understand the split source classes.", "Add descriptive authority metadata in TOML even if current litkg-rs ignores it; future retrieval should consume it.", "Exclude raw heavy stores and shard directories from experiment/cache source globs.", "Run litkg capabilities after config edits to catch stale or missing required paths."]
+acceptance = ["`.configs/litkg.toml` names separate source classes for agent_state, agent_backlog, agent_history, agent_skills, generated_context, and experiments.", "Generated context and skill/reference docs are discoverable through litkg retrieval.", "Experiment placeholders point at curated manifests/summaries and exclude heavy tensors/shards.", "Capability output does not regress because of the added source metadata."]
+verification = ["make kg-capabilities KG_FORMAT=json", "make kg-search KG_QUERY=\"aria-litkg-memory source authority\" KG_LIMIT=5", "make check-agent-memory"]
+
+[[todo]]
+id = "todo-043"
+title = "Add authority and freshness ranking to litkg retrieval"
+description = "Teach litkg retrieval output to expose source type, authority tier, freshness/status metadata, component scores, final score, and explanation so agents can distinguish current canonical truth from stale evidence."
+priority = "high"
+status = "todo"
+labels = ["kg", "litkg", "retrieval", "ranking", "memory"]
+issue_ids = ["issue-023", "issue-025"]
+loc_min = 180
+loc_expected = 420
+loc_max = 900
+context = ["ARIA-NBV source order is currently encoded in AGENTS.md and the aria-litkg-memory skill, but litkg retrieval itself does not yet surface authority/freshness ranking.", "Without explicit ranking metadata, semantic search can over-rank old debriefs, archived scratchpads, or generated context above code, tests, current configs, canonical memory, and active backlog.", "The desired output should explain why a result was ranked, including lexical, semantic, graph-neighborhood, authority, and freshness contributions when available."]
+references = ["repo:AGENTS.md#source-order", "repo:.agents/skills/aria-litkg-memory/SKILL.md#source-authority", "repo:.configs/litkg.toml", "repo:.agents/external/litkg-rs/docs/architecture.md", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "repo:.agents/kg/README.md"]
+implementation_notes = ["Start with deterministic metadata and scoring over existing file-based retrieval before adding optional embedding or live graph dependencies.", "Emit fields such as source_path, source_type, authority, updated, status, score_lexical, score_semantic, score_graph, score_final, and why in JSON output.", "Warn when results come from archived, historical, or superseded sources.", "Keep repo-specific authority tiers configurable instead of hard-coding ARIA paths into litkg-core."]
+acceptance = ["`kg find` or context-pack JSON includes source authority/freshness fields for retrieved evidence.", "Canonical memory and active backlog outrank old debriefs for broad current-truth queries when relevance is comparable.", "Stale/archive sources are marked rather than silently treated as current.", "Text output includes enough explanation for an agent to cite the right source."]
+verification = ["cargo test --manifest-path .agents/external/litkg-rs/Cargo.toml -p litkg-core -p litkg-cli", "make kg-search KG_QUERY=\"current project state\" KG_FORMAT=json KG_LIMIT=5"]
+
+[[todo]]
+id = "todo-044"
+title = "Add kg-consolidate memory proposal command"
+description = "Add a litkg consolidation proposal mode that scans debriefs, resolved work, changed docs/code, generated context, and experiment manifests to propose canonical memory and backlog updates."
+priority = "medium"
+status = "todo"
+labels = ["kg", "litkg", "memory", "consolidation", "agents-db"]
+issue_ids = ["issue-025", "issue-023"]
+loc_min = 220
+loc_expected = 520
+loc_max = 1200
+context = ["ARIA-NBV already separates durable state under `.agents/memory/state/` from active backlog in the agents DB, but litkg does not yet close the loop from episodic evidence to proposed canonical updates.", "The command should produce patch-like Markdown suggestions for PROJECT_STATE, DECISIONS, OPEN_QUESTIONS, GOTCHAS, issues, todos, and refactors rather than overwriting files.", "This is the missing end-of-task leg of the agent memory plane: retrieve context, do work, write debrief, then consolidate proposals with source references."]
+references = ["repo:.agents/references/agent_memory_templates.md", "repo:.agents/skills/agents-db/SKILL.md#provenance-contract", "repo:.agents/skills/aria-litkg-memory/SKILL.md#consolidation", "repo:.agents/memory/state/PROJECT_STATE.md", "repo:.agents/external/litkg-rs/docs/architecture.md", "litkg:context-pack"]
+implementation_notes = ["Implement the repo-independent command in litkg-rs, such as `consolidate-memory`, then expose a root `make kg-consolidate` wrapper after the CLI exists.", "Scan new debriefs, resolved DB records, active TODO deltas, changed source/docs, generated context, and curated experiment manifests.", "Group output by target file and include source references plus confidence/authority notes.", "Never silently edit canonical memory or backlog; output proposals for human/agent review."]
+acceptance = ["A consolidation command can emit suggested PROJECT_STATE, DECISIONS, OPEN_QUESTIONS, GOTCHAS, and backlog changes in Markdown or JSON.", "Suggestions cite source files/debriefs/records that justify each proposed change.", "The command distinguishes canonical updates from stale or low-authority history.", "No files are overwritten unless a separate explicit apply workflow is requested."]
+verification = ["cargo test --manifest-path .agents/external/litkg-rs/Cargo.toml -p litkg-core -p litkg-cli", "make check-agent-memory", "make agents-db AGENTS_ARGS='validate'"]
+
+[[todo]]
+id = "todo-045"
+title = "Add stale-doc and contradiction detection"
+description = "Add litkg checks that flag stale docs, conflicting source statements, and unsupported thesis claims such as overclaiming ARIA-NBV as a finished end-to-end RL policy."
+priority = "medium"
+status = "todo"
+labels = ["kg", "litkg", "docs", "claim-check", "thesis"]
+issue_ids = ["issue-023", "issue-025", "issue-003"]
+loc_min = 160
+loc_expected = 420
+loc_max = 1000
+context = ["The project evolves quickly and agents can overclaim when old notes, generated context, or future-work language are retrieved without source authority.", "Current paper and memory state frame ARIA-NBV as a one-step candidate-ranking system moving toward sequence/counterfactual/RL data generation, not a completed end-to-end NBV policy.", "Stale-doc and contradiction checks should compare public docs, generated context, backlog, debriefs, and canonical memory against source order and cite exact conflicting sources."]
+references = ["repo:docs/typst/seminar_paper/main.typ", "repo:.agents/memory/state/PROJECT_STATE.md", "repo:docs/contents/thesis/questions.qmd", "repo:docs/contents/thesis/roadmap.qmd", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "bib:VIN-NBV-frahm2025", "bib:GenNBV-chen2024"]
+implementation_notes = ["Start with claim-check heuristics over canonical memory/paper/current docs before adding learned contradiction detection.", "Flag phrases such as finished end-to-end policy, deployed real-device RL, or simulator-backed online RL unless supported by current evidence.", "Expose `kg-stale`, `kg-contradictions`, and `kg-claim-check` once the repo-independent litkg command exists; root Make wrappers can delegate to context-pack until then.", "Treat external papers as support or contrast, not proof that ARIA-NBV implemented the cited method."]
+acceptance = ["A litkg check can flag at least one unsupported overclaim against canonical memory and the current paper state.", "Detected stale or contradictory statements include source paths and recommended review targets.", "Generated KG artifacts remain internal and stale-check output is not added to public Quarto navigation.", "The check can run without a live database backend on a fresh checkout."]
+verification = ["make kg-claim-check KG_CLAIM=\"ARIA-NBV is a finished end-to-end RL policy\"", "cargo test --manifest-path .agents/external/litkg-rs/Cargo.toml -p litkg-core -p litkg-cli", "make check-agent-memory"]

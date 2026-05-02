@@ -8,6 +8,8 @@ type = "maintenance"
 priority = "high"
 status = "open"
 labels = ["docs", "hygiene"]
+context = ["Root guidance separates high-level paper truth, durable memory, active backlog, generated context, and operator references, so public docs should not collapse those roles.", "The docs guide asks Quarto to stay aligned with the Typst paper and keep internal agent guidance/generated context out of public navigation."]
+references = ["repo:AGENTS.md#source-order", "repo:docs/AGENTS.md", "repo:docs/contents/thesis/questions.qmd#kg-friendly-question-writing"]
 
 [[issue]]
 id = "issue-004"
@@ -17,6 +19,8 @@ type = "feature"
 priority = "high"
 status = "open"
 labels = ["ci", "dev-ergonomics"]
+context = ["Root guidance names package tests, context refresh, KG checks, agent-memory checks, and docs renders as verification surfaces, but there is no single root CI/pre-commit contract that composes them.", "The only visible GitHub workflow is Quarto-oriented, so source, agent-memory, and package smoke checks can drift until run manually."]
+references = ["repo:AGENTS.md#commands", "repo:AGENTS.md#verification", "repo:Makefile", "repo:.github/workflows/quarto-publish.yml"]
 
 [[issue]]
 id = "issue-005"
@@ -26,6 +30,8 @@ type = "maintenance"
 priority = "high"
 status = "open"
 labels = ["docs", "identity"]
+context = ["README.md is now a concise project front door, while setup.qmd and operator references hold pieces of environment, dataset, cache, and first-smoke guidance.", "A portable setup path needs to cite Project Aria/ASE access, uv-managed package setup, CUDA/device expectations, and offline-store smoke commands without committing host-local assumptions."]
+references = ["repo:README.md#documentation-map", "repo:docs/contents/setup.qmd", "url:https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_getting_started"]
 
 [[issue]]
 id = "issue-007"
@@ -35,6 +41,8 @@ type = "research-debt"
 priority = "high"
 status = "open"
 labels = ["data", "rri", "thesis", "contracts"]
+context = ["Roadmap M1 requires the offline store, split, frame/CW90, and oracle RRI contracts to be stable before target-conditioned VIN or rollout evidence is trusted.", "The thesis questions keep actor-visible state, oracle-only signals, target RRI, and invalidity semantics separate, which makes M1 a contract gate rather than a cleanup preference."]
+references = ["repo:docs/contents/thesis/roadmap.qmd#roadmap-m1", "repo:docs/contents/thesis/questions.qmd#rq1-objective", "repo:docs/contents/thesis/questions.qmd#rq6-feasibility", "bib:ProjectAria-ASE-2025", "bib:VIN-NBV-frahm2025"]
 
 [[issue]]
 id = "issue-010"
@@ -44,6 +52,8 @@ type = "refactor"
 priority = "high"
 status = "open"
 labels = ["oracle", "rri", "rendering", "data", "performance", "simplification"]
+context = ["Oracle RRI correctness depends on rendering, depth backprojection, point-cloud fusion, and distance composition agreeing on frames and sampling semantics.", "Memory-heavy per-candidate current-point duplication and stale compatibility surfaces increase both throughput cost and label-corruption risk before target-aware RRI work."]
+references = ["repo:docs/contents/impl/rri_computation.qmd", "repo:aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py", "repo:aria_nbv/aria_nbv/rendering/candidate_depth_renderer.py", "repo:aria_nbv/aria_nbv/rri_metrics/oracle_rri.py", "bib:EFM3D-straub2024"]
 
 [[issue]]
 id = "issue-011"
@@ -53,6 +63,8 @@ type = "maintenance"
 priority = "high"
 status = "open"
 labels = ["github", "scaffold", "workflow"]
+context = ["The local agents DB is the canonical active tracker, but collaboration through GitHub still needs templates and conventions that route outside discussion back into reproducible acceptance and verification.", "This should remain a scaffold/governance surface and not replace the TOML backlog for local research debt."]
+references = ["repo:.agents/AGENTS_INTERNAL_DB.md", "repo:AGENTS.md#instruction-capture", "repo:.github/workflows/quarto-publish.yml", "url:https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/about-issues"]
 
 [[issue]]
 id = "issue-012"
@@ -62,6 +74,8 @@ type = "maintenance"
 priority = "high"
 status = "open"
 labels = ["agent", "skills", "scaffold"]
+context = ["Root guidance routes work through domain-specific skills, but the ARIA-specific skill set has evolved incrementally and still has gaps around oracle, VIN, lifecycle, and KG-backed workflows.", "Missing or stale skills cause broad tasks to fall back to generic chat memory instead of narrow, repeatable repo guidance."]
+references = ["repo:AGENTS.md#routing", "repo:.agents/skills/", "repo:.agents/AGENTS_INTERNAL_DB.md", "repo:.agents/memory/state/DECISIONS.md"]
 
 [[issue]]
 id = "issue-013"
@@ -71,12 +85,137 @@ type = "research-debt"
 priority = "medium"
 status = "open"
 labels = ["experiments", "thesis", "reproducibility"]
+context = ["Roadmap M7/M8 require final tables, figures, failure cases, configs, docs, and smoke checks to freeze into a reproducible thesis package.", "Without a claim matrix or experiment registry, final paper statements can become detached from run IDs, cache hashes, split manifests, and source artifacts."]
+references = ["repo:docs/contents/thesis/roadmap.qmd#roadmap-m7", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m8", "repo:docs/contents/thesis/questions.qmd#rq7-scaling", "repo:.agents/memory/state/DECISIONS.md"]
 
 [[issue]]
 id = "issue-014"
-title = "offline_only.toml points to a missing local vin_offline store"
-description = "`cd aria_nbv && uv run nbv-summary --config-path offline_only.toml` resolves the config and reaches the offline reader, but fails because `.data/offline_cache/vin_offline/manifest.json` is absent; no VIN diagnostics batch can be loaded until the store is materialized or the config points at an existing store."
+title = "offline_only.toml local vin_offline store is partial and version-blocked"
+description = "`cd aria_nbv && uv run nbv-summary --config-path offline_only.toml` targets a local `.data/offline_cache/vin_offline` store with manifest, sample index, split arrays, and shards, but the current reader rejects the manifest as version 5 while `OFFLINE_DATASET_VERSION` expects 6."
 type = "data-blocker"
 priority = "high"
 status = "open"
-labels = ["data", "offline-store", "vin", "m0"]
+labels = ["data", "offline-store", "vin", "rerun", "m0"]
+context = ["The current local offline VIN store is useful as a diagnostic smoke asset but is marked interrupted/partial, so tooling must report its exact validation state rather than treating it as complete training data.", "As of 2026-05-02, `uv run nbv-summary --config-path offline_only.toml` resolves the bare config path correctly but fails with `Unsupported VIN offline dataset version 5; expected 6. Rebuild the store with the current VIN offline writer.`", "Rerun and VIN smoke commands should use the store only after corrected config resolution and strict offline-store validation agree on what is present."]
+references = ["repo:README.md#offline-data", "repo:.configs/offline_only.toml", "repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:.agents/memory/state/GOTCHAS.md"]
+
+[[issue]]
+id = "issue-015"
+title = "No first-class Rerun offline dataset inspector"
+description = "The project lacks a TOML-configurable Rerun CLI that can render an immutable VIN offline-store sample with semidense points, candidate frusta, RRI/validity metadata, optional mesh/OBBs, and stable recording output."
+type = "feature"
+priority = "high"
+status = "open"
+labels = ["diagnostics", "offline-store", "geometry", "rerun", "thesis"]
+context = ["The Rerun offline inspector note defines the needed visual smoke path for immutable offline samples, but the project still needs a first-class CLI/config workflow that produces stable recordings.", "This is a trust diagnostic for geometry, candidate ordering, validity, and labels before samples feed VIN training or rollout evidence."]
+references = ["repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:README.md#important-cli-commands", "repo:aria_nbv/aria_nbv/rerun_inspector/_cli.py", "url:https://rerun.io/docs"]
+
+[[issue]]
+id = "issue-016"
+title = "Rerun geometry logging lacks a frame-safe contract"
+description = "Candidate and reference camera visualization needs PoseTW/CameraTW-aware Rerun helpers and regression tests so manual frusta, native Pinhole logging, and display-only CW90 corrections cannot silently produce plausible but wrong geometry."
+type = "research-debt"
+priority = "high"
+status = "open"
+labels = ["geometry", "camera", "rerun", "tests", "contracts"]
+context = ["Pose/camera frames, LUF conventions, PyTorch3D cameras, and display-only CW90 corrections can all produce plausible but wrong visualizations if logged through raw matrices.", "Rerun helpers need typed PoseTW/CameraTW boundaries and tests so visual diagnostics do not silently bless corrupted geometry."]
+references = ["repo:.agents/skills/nbv-geometry-contracts/SKILL.md", "repo:docs/contents/impl/rerun_offline_inspector.qmd#frame-safety", "repo:aria_nbv/aria_nbv/rerun_inspector/_frusta.py", "url:https://docs.rs/rerun/latest/rerun/struct.LineStrips3D.html"]
+
+[[issue]]
+id = "issue-017"
+title = "Offline-store visual primitive inventory is missing"
+description = "Diagnostics currently have no single strict inventory that tells a viewer which sample primitives are present, which fields are required, and which optional visual layers should be reported as unavailable before rendering starts."
+type = "diagnostics"
+priority = "high"
+status = "open"
+labels = ["offline-store", "diagnostics", "data", "contracts"]
+context = ["The inspector should fail early when required offline-store fields are absent and report optional layers explicitly instead of guessing from ad hoc sample attributes.", "A visual primitive inventory also gives future rollout/entity diagnostics a reusable contract for what can be rendered and what remains unavailable."]
+references = ["repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:aria_nbv/aria_nbv/data_handling/_offline_visual_inventory.py", "repo:aria_nbv/tests/rerun_inspector/", "repo:.agents/skills/dataset-cache-ops/SKILL.md"]
+
+[[issue]]
+id = "issue-018"
+title = "Rollout trace and cache schema are not first-class contracts"
+description = "The current counterfactual rollout code can produce trajectories, but the project lacks a durable rollout trace/cache schema with lineage, replay metadata, cumulative metrics, candidate tables, and storage rules before larger sequence datasets are generated."
+type = "research-debt"
+priority = "high"
+status = "open"
+labels = ["rollouts", "data", "contracts", "storage", "thesis"]
+context = ["Bounded rollouts are now part of the thesis direction, but large sequence data should not be generated until per-step candidate tables, lineage, actor-visible state, oracle-only fields, and storage rules are explicit.", "The trace schema must bridge in-memory counterfactual results, replayable smoke stores, and future lean Zarr/PT layouts without caching full backbone tensors by default."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq5-planning", "repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/aria_nbv/pose_generation/counterfactuals.py", "url:https://zarr-specs.readthedocs.io/en/latest/v3/core/index.html", "bib:TrajectoryTransformer-janner2021"]
+
+[[issue]]
+id = "issue-019"
+title = "Stochastic rollout branching is not implemented"
+description = "The roadmap and literature synthesis call for temperature-softmax selection, Gumbel-Top-k stochastic beams, branch schedules, and late exploration, but the current rollout selector is still deterministic or simple random over valid candidates."
+type = "feature"
+priority = "high"
+status = "open"
+labels = ["rollouts", "planning", "stochastic", "rl", "thesis"]
+context = ["The first non-myopic baseline is deterministic bounded lookahead, but the roadmap and literature path also need stochastic selectors that can diversify near-tied or late-unlocking branches.", "Without temperature/Gumbel branch schedules, rollout generation risks over-representing root-greedy behavior and missing later surprise views."]
+references = ["repo:docs/contents/theory/rl_planning.qmd", "repo:.agents/skills/counterfactual-rollout-planner/SKILL.md", "bib:GumbelTopK-kool2019", "bib:DeepEnergyPolicies-haarnoja2017", "bib:TrajectoryTransformer-janner2021"]
+
+[[issue]]
+id = "issue-020"
+title = "Target-aware candidate generation and target selection are under-specified"
+description = "Object-centric LookAt, frontier or missing-surface candidates, sampler mixtures, target eligibility scoring, and candidate-realism diagnostics are planned but not yet represented as a trusted implementation contract."
+type = "research-debt"
+priority = "high"
+status = "open"
+labels = ["candidate-generation", "entity-aware", "target", "diagnostics", "thesis"]
+context = ["RQ3 and RQ2 require object-centric candidate generation and target selection to become inspectable contracts, not only ad hoc sampler tweaks.", "The existing candidate generator has direction modes, but the missing piece is mixture provenance, entity/target eligibility, and strategy-level realism diagnostics."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq2-target-encoding", "repo:docs/contents/thesis/questions.qmd#rq3-candidates", "repo:.agents/skills/entity-aware-rri/SKILL.md", "repo:aria_nbv/aria_nbv/pose_generation/candidate_generation.py", "bib:EFM3D-straub2024"]
+
+[[issue]]
+id = "issue-021"
+title = "Invalidity is not yet a separate learning and rollout contract"
+description = "Invalid candidates and targets need explicit reasons, masks, and optional heads or penalties; treating collisions, no-depth/no-hit cases, unsupported target crops, or out-of-extent poses as the lowest RRI bin would blur feasibility and reconstruction quality."
+type = "research-debt"
+priority = "high"
+status = "open"
+labels = ["validity", "rri", "rollouts", "candidate-generation", "contracts"]
+context = ["RQ6 explicitly states that invalidity is not a low RRI class, because feasibility failures and low reconstruction utility are different labels.", "Rollouts, target-aware RRI, and future VIN heads need masks and reason codes that survive serialization and candidate/RRI order changes."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq6-feasibility", "repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py", "repo:aria_nbv/aria_nbv/rri_metrics/types.py"]
+
+[[issue]]
+id = "issue-022"
+title = "Cluster-scale oracle and rollout generation plan is missing"
+description = "Scaling oracle labels and rollout datasets needs deterministic sharding, resumable writes, storage-footprint controls, SLURM/LRZ templates, and DSS-safe staging before multi-scene generation starts."
+type = "infrastructure"
+priority = "medium"
+status = "open"
+labels = ["cluster", "slurm", "lrz", "storage", "data-generation"]
+context = ["Scaling oracle and rollout generation beyond smoke subsets requires deterministic sharding, idempotent writes, resumability, and storage-aware staging before cluster jobs run.", "LRZ Slurm, Enroot/Pyxis, and DSS constraints make naive multi-hundred-GB cache generation a practical thesis risk, not just infrastructure polish."]
+references = ["repo:.agents/skills/lrz-ai-systems/SKILL.md", "repo:.agents/skills/lrz-ai-systems/references/storage-dss.md", "repo:.agents/skills/lrz-ai-systems/references/containers-pyxis.md", "url:https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.plugins.environments.SLURMEnvironment.html"]
+
+[[issue]]
+id = "issue-023"
+title = "litkg agent-memory routing and source coverage have drift"
+description = "litkg remains partly an operator toolkit instead of the default agent context router: root query surfaces, source coverage, staged refresh paths, and authority/freshness ranking are incomplete alongside stale config and Semantic Scholar enrichment gaps."
+type = "maintenance"
+priority = "medium"
+status = "open"
+labels = ["kg", "litkg", "semantic-scholar", "docs", "tooling"]
+context = ["litkg-rs is the shared action/evidence contract for broad ARIA-NBV tasks, but agents still need explicit root commands for query, brief, route, claim-check, and related-source retrieval.", "The ARIA DB is configured as an agent-memory source, yet source coverage should distinguish canonical state, active backlog, workflow skills, episodic debriefs, generated context, and experiment/cache evidence instead of treating memory as one flat bucket.", "Capability checks also report stale or missing leaves such as graphify/codegraph refresh, Context7, and Semantic Scholar enrichment, so retrieval output needs freshness and authority cues before agents trust it as current."]
+references = ["repo:AGENTS.md#routing", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.configs/litkg.toml", "repo:.agents/kg/README.md", "repo:Makefile", "repo:.agents/external/litkg-rs/docs/architecture.md#semantic-scholar-contract", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "url:https://www.semanticscholar.org/product/api"]
+
+[[issue]]
+id = "issue-024"
+title = "Simulator and external-data expansion lacks a gated decision"
+description = "ASE-native simulation, Habitat, Isaac, Replica/HM3D/Matterport-style sidecars, and 3DGS/world-model options are useful extensions, but the thesis needs an explicit gate so simulator work does not displace the ASE mesh-supervised rollout evidence path."
+type = "research-debt"
+priority = "low"
+status = "open"
+labels = ["simulator", "datasets", "scope", "thesis", "future-work"]
+context = ["The thesis core remains ASE mesh-supervised target-aware rollout evidence, while simulator and external-dataset paths are useful but potentially schedule-consuming extensions.", "A decision gate should compare fidelity, reward availability, data licensing, setup cost, and thesis timing before Habitat, Isaac, or ASE-native simulation work expands."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq8-extensions", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m6", "url:https://aihabitat.org/docs/habitat-sim/habitat_sim.nav.html", "url:https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_getting_started", "bib:GenNBV-chen2024", "bib:Hestia-lu2026"]
+
+[[issue]]
+id = "issue-025"
+title = "Agents DB provenance is not yet a full KG edge and retrieval contract"
+description = "Active backlog records carry context and references, but litkg-rs still needs deeper validation, typed source resolution, graph edges, source-authority metadata, and query/consolidation integration for DB records."
+type = "integration"
+priority = "medium"
+status = "open"
+labels = ["agents-db", "kg", "litkg", "provenance", "semantic-scholar"]
+context = ["ARIA-NBV issues/todos are now source-backed and context-pack parsing preserves context/references, but graphify/Neo4j exports still need typed edges from backlog records to repo files, papers, external docs, Semantic Scholar IDs, generated context, and experiment evidence.", "The desired agent-memory loop also needs retrieval and consolidation surfaces: DB references should inform kg-query/kg-route results, claim checks should identify unsupported backlog-driven overclaims, and consolidate-memory should propose state/backlog patches instead of silently overwriting canonical memory.", "Authority and freshness metadata should be part of the edge contract so canonical state and active backlog outrank stale debriefs or archived notes while still preserving their evidential provenance."]
+references = ["repo:scripts/agents_db.py", "repo:.agents/skills/agents-db/SKILL.md#provenance-contract", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md#agents-db-integration", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/docs/architecture.md#adapter-output-contracts", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "litkg:context-pack", "url:https://www.semanticscholar.org/product/api"]

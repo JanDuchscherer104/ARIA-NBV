@@ -1,0 +1,4 @@
+interface:
+  display_name: "ARIA litkg Memory"
+  short_description: "Route broad ARIA-NBV work through litkg memory retrieval"
+  default_prompt: "Use $aria-litkg-memory to retrieve current ARIA-NBV code, docs, papers, memory, and backlog context before broad project work."

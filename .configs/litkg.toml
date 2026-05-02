@@ -78,6 +78,71 @@ include = [
   ".agents/resolved.toml",
 ]
 
+# Agent-memory routing sources. The authority fields are intentionally
+# ARIA-facing metadata: current litkg-rs accepts them as descriptive config and
+# future retrieval should use them for freshness/authority ranking.
+[sources.agent_state]
+required = true
+authority = "canonical"
+include = [
+  ".agents/memory/state/PROJECT_STATE.md",
+  ".agents/memory/state/DECISIONS.md",
+  ".agents/memory/state/OPEN_QUESTIONS.md",
+  ".agents/memory/state/GOTCHAS.md",
+]
+
+[sources.agent_backlog]
+required = true
+authority = "active_backlog"
+include = [
+  ".agents/issues.toml",
+  ".agents/todos.toml",
+  ".agents/refactors.toml",
+  ".agents/resolved.toml",
+]
+
+[sources.agent_history]
+required = false
+authority = "episodic"
+include = [
+  ".agents/memory/history/**/*.md",
+  ".agents/work/**/*.md",
+  ".agents/archive/**/*.md",
+]
+
+[sources.agent_skills]
+required = true
+authority = "workflow"
+include = [
+  "AGENTS.md",
+  "**/AGENTS.md",
+  ".agents/skills/**/*.md",
+  ".agents/references/**/*.md",
+]
+
+[sources.generated_context]
+required = false
+authority = "generated"
+include = [
+  "docs/_generated/context/*.md",
+]
+
+[sources.experiments]
+required = false
+authority = "evidence"
+include = [
+  ".agents/experiments/**/*.toml",
+  ".agents/experiments/**/*.jsonl",
+  "docs/_generated/experiments/**/*.jsonl",
+  ".data/**/manifest.json",
+  ".data/**/manifest.jsonl",
+]
+exclude = [
+  ".data/**/samples/**",
+  ".data/**/tensor_blocks/**",
+  ".data/**/shards/**",
+]
+
 [sources.python]
 required = true
 include = ["aria_nbv/aria_nbv/**/*.py"]
@@ -112,14 +177,18 @@ include = [
 [sources.typst]
 required = true
 include = [
-  "docs/typst/paper/**/*.typ",
-  "docs/typst/slides/**/*.typ",
+  "docs/typst/seminar_paper/**/*.typ",
+  "docs/typst/seminar_slides/**/*.typ",
+  "docs/typst/thesis/**/*.typ",
+  "docs/typst/thesis_slides/**/*.typ",
   "docs/typst/shared/**/*.typ",
 ]
 entrypoints = [
-  "docs/typst/paper/main.typ",
-  "docs/typst/slides/slides_4.typ",
-  "docs/typst/slides/slides_thesis_outlook.typ",
+  "docs/typst/seminar_paper/main.typ",
+  "docs/typst/seminar_slides/slides_4.typ",
+  "docs/typst/thesis/main.typ",
+  "docs/typst/thesis/proposal.typ",
+  "docs/typst/thesis_slides/slides_thesis_outlook.typ",
 ]
 
 [sources.literature]
@@ -152,6 +221,12 @@ enabled = false
 markitdown = true
 urls = []
 
+# Runtime role contract:
+# - litkg is the structural project KG and agent retrieval/consolidation layer.
+# - graphify/JSONL are the durable default artifacts.
+# - Neo4j is an optional traversal/runtime DB over exported bundles.
+# - Graphiti is optional temporal ingestion.
+# - MemPalace remains separate episodic memory mining through make memory-mine.
 [representation]
 primary = "graphify"
 durable_exports = ["graphify", "neo4j_export"]

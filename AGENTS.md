@@ -22,6 +22,11 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
   touched.
 - Docs, bibliography, Typst, or Quarto work: read `docs/AGENTS.md`.
 - Broad cross-surface questions: use the `aria-nbv-context` skill first.
+- Broad memory retrieval, claim checks, source-backed routing, or consolidation:
+  use the `aria-litkg-memory` skill.
+- Broad cross-surface coding, docs, KG, or thesis work: run a `litkg
+  context-pack` first so Codex/Gemini get the same action/evidence contract.
+  Already-localized one-file edits are exempt.
 - Vague, high-impact, or advisor-facing plans: use `plan-grill`.
 - Bugs, regressions, suspicious metrics, or failing docs/data/KG checks: use
   `diagnose-aria`.
@@ -61,6 +66,15 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
 - KG profile: `.configs/litkg.toml`; use `make kg-sync`,
   `make kg-materialize`, `make kg-semantic-enrich`, `make kg-export-neo4j`,
   and `make kg-index-code` for the ARIA-NBV litkg-rs integration.
+- litkg agent retrieval: `make kg-capabilities`, `make kg-search
+  KG_QUERY="..."`, `make kg-query KG_QUERY="..."`, `make kg-brief
+  KG_TOPIC="..."`, `make kg-route KG_TASK="..."`, `make kg-related
+  KG_RELATED_PATH="..."`, `make kg-claim-check KG_CLAIM="..."`, and
+  `make kg-show-paper KG_PAPER="..."`.
+- litkg action pack:
+  `cargo run --manifest-path .agents/external/litkg-rs/Cargo.toml -p litkg-cli -- context-pack --config .configs/litkg.toml --repo-root . --task "<task>" --profile thesis-coding --format text`
+- litkg backend contract:
+  `cargo run --manifest-path .agents/external/litkg-rs/Cargo.toml -p litkg-cli -- capabilities --config .configs/litkg.toml --repo-root . --format json`
 - Agent memory check: `make check-agent-memory`
 - Agents DB: `make agents-db` or `make agents-db AGENTS_ARGS='validate'`
 

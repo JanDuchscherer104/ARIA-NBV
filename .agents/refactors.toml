@@ -59,9 +59,9 @@ issue_ids = ["issue-007", "issue-010"]
 loc_min = 160
 loc_expected = 500
 loc_max = 1100
-context = ["OracleRRI.score expands points_t to every candidate and concatenates it with points_q before calling chamfer_point_mesh_batched.", "rri_metrics.metrics repeats the GT mesh per candidate, which is expensive for many candidates and target-aware rollouts.", "The thesis needs target-aware and multi-step RRI, so hot-path memory pressure will grow before September."]
-implementation_notes = ["Compute current point-to-mesh and mesh-to-current once.", "Compute candidate point-to-mesh separately, combine accuracy by weighted point counts, and compute completeness as the per-mesh-point minimum of current and candidate distances.", "Preserve RriResult semantics and add chunking only where it reduces peak memory without obscuring correctness."]
-acceptance = ["RRI values match the existing implementation on focused unit tests within tolerance.", "Peak memory does not scale by physically duplicating P_t for every candidate.", "The implementation has explicit shape/frame docstrings and keeps metric names unchanged."]
+context = ["OracleRRI.score expands points_t to every candidate and concatenates it with points_q before calling chamfer_point_mesh_batched.", "rri_metrics.metrics repeats the GT mesh per candidate, which is expensive for many candidates, GT-OBB-cropped target RRI, and bounded oracle-RRI lookahead.", "The thesis needs target-aware and multi-step RRI, so hot-path memory pressure will grow before September.", "Rerun/display downsampling is not a correctness fix for oracle memory pressure; oracle scoring must preserve label semantics."]
+implementation_notes = ["Compute current point-to-mesh and mesh-to-current once.", "Compute candidate point-to-mesh separately, combine accuracy by weighted point counts, and compute completeness as the per-mesh-point minimum of current and candidate distances.", "Preserve RriResult semantics and add chunking only where it reduces peak memory without obscuring correctness.", "Keep display-only point/mesh downsampling out of oracle label computation."]
+acceptance = ["RRI values match the existing implementation on focused unit tests within tolerance.", "Peak memory does not scale by physically duplicating P_t for every candidate.", "The implementation has explicit shape/frame docstrings and keeps metric names unchanged.", "No visualization-only downsampling is used to change oracle labels or pass memory tests."]
 verification = ["cd aria_nbv && uv run pytest tests/rri_metrics/test_oracle_rri_chunking.py tests/rri_metrics", "cd aria_nbv && uv run pytest tests/integration/test_oracle_rri_labeler_real_data.py"]
 
 [[refactor]]
@@ -115,7 +115,7 @@ verification = ["cd aria_nbv && uv run pytest tests/data_handling/test_vin_offli
 [[refactor]]
 id = "refactor-014"
 title = "Scope graph and memory tooling as KG support, not public docs"
-description = "Evaluate Graphify, MemPalace, code-index, Neo4j, and litkg-rs as internal KG infrastructure while keeping public docs and canonical memory as the source of truth."
+description = "Clarify litkg-rs, graphify/JSONL, Neo4j, Graphiti, CodeGraphContext, and MemPalace as internal KG/memory infrastructure while keeping public docs and canonical memory as the source of truth."
 priority = "low"
 status = "todo"
 labels = ["kg", "agent", "docs", "scaffold"]
@@ -123,7 +123,7 @@ issue_ids = ["issue-003", "issue-012"]
 loc_min = 80
 loc_expected = 180
 loc_max = 420
-context = ["The PRML cross-review classified Graphify, MemPalace, and OMX as later transfers, not immediate public-facing requirements.", "ARIA-NBV already has context scripts, memory state, and a semantic-scholar-litkg skill/submodule; these should improve retrieval without adding public-doc sprawl."]
-implementation_notes = ["Treat KG outputs as generated/internal unless explicitly curated into public docs.", "Prefer existing litkg-rs, code-index, Graphify, Neo4j, and MemPalace adapters before writing bespoke parsers.", "Keep canonical truth in Typst/Quarto source, .agents/memory/state, and code docstrings; KG artifacts should cite those sources."]
-acceptance = ["KG generation and memory mining have clear internal output locations and are not exposed as primary public navigation.", "The repo can explain when to use context scripts versus KG tooling.", "Generated KG artifacts are ignored, small, or intentionally versioned with provenance."]
-verification = ["make kg-sync || true", "make check-agent-memory", "rg -n \"graphify|MemPalace|Neo4j|code-index|litkg\" .agents/skills/semantic-scholar-litkg .configs scripts/kg"]
+context = ["The PRML cross-review classified Graphify, MemPalace, and OMX as later transfers, not immediate public-facing requirements.", "ARIA-NBV already has context scripts, memory state, litkg-rs, and a semantic-scholar-litkg skill/submodule; these should improve retrieval without adding public-doc sprawl.", "The agent-memory plan needs explicit runtime-role language: litkg is the structural KG/retrieval/consolidation layer, graphify/JSONL is durable output, Neo4j is optional traversal DB, Graphiti is optional temporal runtime, MemPalace is separate episodic mining, and generated KG artifacts stay internal."]
+implementation_notes = ["Treat KG outputs as generated/internal unless explicitly curated into public docs.", "Prefer existing litkg-rs, code-index, Graphify, Neo4j, Graphiti, and MemPalace adapters before writing bespoke parsers.", "Keep canonical truth in Typst/Quarto source, .agents/memory/state, active backlog, and code docstrings; KG artifacts should cite those sources.", "Align AGENTS.md, semantic-scholar-litkg, aria-litkg-memory, .agents/kg/README.md, and .configs/litkg.toml so agents do not confuse MemPalace with the structural KG backend."]
+acceptance = ["KG generation and memory mining have clear internal output locations and are not exposed as primary public navigation.", "The repo can explain when to use context scripts, litkg retrieval, litkg implementation work, and MemPalace mining.", "Generated KG artifacts are ignored, small, or intentionally versioned with provenance.", "Public Quarto navigation does not surface raw .agents/kg/generated outputs."]
+verification = ["make kg-capabilities || true", "make check-agent-memory", "rg -n \"graphify|MemPalace|Neo4j|Graphiti|code-index|litkg|aria-litkg-memory\" .agents/skills .agents/kg/README.md .configs scripts/kg AGENTS.md"]

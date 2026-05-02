@@ -12,9 +12,26 @@ Default runtime representation:
 - Graphiti is optional for temporal doc/memory ingestion and is disabled by default in the TOML profile.
 - MemPalace remains separate through `make memory-mine`; use it for repo memory retrieval, not as the structural literature/code KG backend.
 
+Role boundary:
+
+| Surface | Role |
+| --- | --- |
+| litkg-rs | Structural project KG, source routing, retrieval, and consolidation proposal layer. |
+| graphify/JSONL | Durable local KG artifact format rebuilt from source files. |
+| Neo4j | Optional traversal/runtime database over exported bundles. |
+| Graphiti | Optional temporal runtime ingestion for docs or memory episodes. |
+| MemPalace | Separate episodic memory-mining backend invoked by `make memory-mine`. |
+| `.agents/kg/generated/**` | Internal generated artifacts; do not add raw KG output to public Quarto navigation. |
+
 Useful commands:
 
 ```bash
+make kg-capabilities
+make kg-search KG_QUERY="entity-aware RRI"
+make kg-query KG_QUERY="current RRI contract"
+make kg-brief KG_TOPIC="VIN offline-store diagnostics"
+make kg-route KG_TASK="debug candidate pose frame mismatch"
+make kg-show-paper KG_PAPER="VIN-NBV-frahm2025"
 make kg-sync
 make kg-materialize
 make kg-semantic-enrich
@@ -22,6 +39,10 @@ make kg-export-neo4j
 make kg-index-code
 make kg-ingest-docs
 make kg-ingest-papers
+make kg-refresh-light
+make kg-refresh-code
+make kg-refresh-lit
+make kg-refresh-full
 ```
 
 Generated KG output is ignored by Git. Rebuild it from `.configs/litkg.toml`

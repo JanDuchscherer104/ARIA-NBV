@@ -5,7 +5,7 @@
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory
 .PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory
-.PHONY: memory-mine agents-db glossary kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-papers kg-export-neo4j kg-semantic-enrich
+.PHONY: memory-mine agents-db glossary kg-capabilities kg-search kg-query kg-brief kg-route kg-claim-check kg-related kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-full
 .PHONY: lrz-probe lrz-resources lrz-resources-gpu lrz-resources-cpu lrz-jobs lrz-dss-init lrz-container-shell lrz-sbatch-cpu lrz-sbatch-single-gpu lrz-sbatch-multigpu
 
 # Color codes
@@ -67,6 +67,18 @@ LRZ_SKILL_DIR ?= .agents/skills/lrz-ai-systems
 LRZ_SCRIPTS_DIR ?= $(LRZ_SKILL_DIR)/scripts
 LRZ_RESOURCES_ARGS ?= summary
 LRZ_CMD ?=
+LITKG_MANIFEST ?= .agents/external/litkg-rs/Cargo.toml
+LITKG_CONFIG ?= .configs/litkg.toml
+LITKG_REPO_ROOT ?= .
+LITKG_PROFILE ?= thesis-coding
+KG_QUERY ?=
+KG_TOPIC ?=
+KG_TASK ?=
+KG_CLAIM ?=
+KG_RELATED_PATH ?=
+KG_PAPER ?=
+KG_LIMIT ?= 24
+KG_FORMAT ?= text
 
 #  ══════════════════════════════════════════════════════════════════════
 #  Agent Context helpers
@@ -158,6 +170,94 @@ memory-mine: _check_python ## 🧠 Mine current repo state (docs, code, history)
 	@$(PYTHON_INTERPRETER) -m mempalace --palace .artifacts/mempalace/palace mine .agents/memory --mode convos
 	@echo "$(GREEN)MemPalace mining complete.$(NC)"
 
+kg-capabilities: ## 📚 Show litkg backend/source readiness (set KG_FORMAT=json for machine output)
+	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- capabilities \
+		--config "$(LITKG_CONFIG)" \
+		--repo-root "$(LITKG_REPO_ROOT)" \
+		--format "$(KG_FORMAT)"
+
+kg-search: ## 📚 Search litkg-indexed code/docs/memory/backlog/literature (set KG_QUERY='...')
+	@if [ -z "$(strip $(KG_QUERY))" ]; then \
+		echo "$(RED)KG_QUERY is required, e.g. make kg-search KG_QUERY='entity-aware RRI'$(NC)"; \
+		exit 2; \
+	fi
+	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- kg find \
+		--config "$(LITKG_CONFIG)" \
+		--repo-root "$(LITKG_REPO_ROOT)" \
+		--limit "$(KG_LIMIT)" \
+		--format "$(KG_FORMAT)" \
+		"$(KG_QUERY)"
+
+kg-query: ## 📚 Build a litkg context pack for a project question (set KG_QUERY='...')
+	@if [ -z "$(strip $(KG_QUERY))" ]; then \
+		echo "$(RED)KG_QUERY is required, e.g. make kg-query KG_QUERY='current RRI contract'$(NC)"; \
+		exit 2; \
+	fi
+	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
+		--config "$(LITKG_CONFIG)" \
+		--repo-root "$(LITKG_REPO_ROOT)" \
+		--task "$(KG_QUERY)" \
+		--profile "$(LITKG_PROFILE)" \
+		--format "$(KG_FORMAT)"
+
+kg-brief: ## 📚 Build a litkg brief for a topic (set KG_TOPIC='...')
+	@if [ -z "$(strip $(KG_TOPIC))" ]; then \
+		echo "$(RED)KG_TOPIC is required, e.g. make kg-brief KG_TOPIC='entity-aware RRI'$(NC)"; \
+		exit 2; \
+	fi
+	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
+		--config "$(LITKG_CONFIG)" \
+		--repo-root "$(LITKG_REPO_ROOT)" \
+		--task "brief: $(KG_TOPIC)" \
+		--profile "$(LITKG_PROFILE)" \
+		--format "$(KG_FORMAT)"
+
+kg-route: ## 📚 Route a broad task through litkg evidence and backlog (set KG_TASK='...')
+	@if [ -z "$(strip $(KG_TASK))" ]; then \
+		echo "$(RED)KG_TASK is required, e.g. make kg-route KG_TASK='debug candidate pose frame mismatch'$(NC)"; \
+		exit 2; \
+	fi
+	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
+		--config "$(LITKG_CONFIG)" \
+		--repo-root "$(LITKG_REPO_ROOT)" \
+		--task "$(KG_TASK)" \
+		--profile "$(LITKG_PROFILE)" \
+		--format "$(KG_FORMAT)"
+
+kg-claim-check: ## 📚 Claim-check against litkg context (set KG_CLAIM='...')
+	@if [ -z "$(strip $(KG_CLAIM))" ]; then \
+		echo "$(RED)KG_CLAIM is required, e.g. make kg-claim-check KG_CLAIM='ARIA-NBV is an end-to-end policy'$(NC)"; \
+		exit 2; \
+	fi
+	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
+		--config "$(LITKG_CONFIG)" \
+		--repo-root "$(LITKG_REPO_ROOT)" \
+		--task "claim-check: $(KG_CLAIM)" \
+		--profile "$(LITKG_PROFILE)" \
+		--format "$(KG_FORMAT)"
+
+kg-related: ## 📚 Find litkg context related to a path or symbol (set KG_RELATED_PATH='...')
+	@if [ -z "$(strip $(KG_RELATED_PATH))" ]; then \
+		echo "$(RED)KG_RELATED_PATH is required, e.g. make kg-related KG_RELATED_PATH='aria_nbv/aria_nbv/rri_metrics/oracle_rri.py'$(NC)"; \
+		exit 2; \
+	fi
+	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- kg find \
+		--config "$(LITKG_CONFIG)" \
+		--repo-root "$(LITKG_REPO_ROOT)" \
+		--limit "$(KG_LIMIT)" \
+		--format "$(KG_FORMAT)" \
+		"$(KG_RELATED_PATH)"
+
+kg-show-paper: ## 📚 Show one registered paper (set KG_PAPER='VIN-NBV-frahm2025')
+	@if [ -z "$(strip $(KG_PAPER))" ]; then \
+		echo "$(RED)KG_PAPER is required, e.g. make kg-show-paper KG_PAPER='VIN-NBV-frahm2025'$(NC)"; \
+		exit 2; \
+	fi
+	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- lit show \
+		--config "$(LITKG_CONFIG)" \
+		--paper "$(KG_PAPER)" \
+		--format "$(KG_FORMAT)"
+
 kg-sync: ## 📚 Sync literature registry from docs/references.bib
 	@./scripts/kg/ingest_papers.sh sync
 
@@ -180,6 +280,19 @@ kg-export-neo4j: ## 📚 Export literature and memory nodes to a Neo4j import bu
 
 kg-semantic-enrich: ## 📚 Enrich literature registry with Semantic Scholar metadata
 	@./scripts/kg/ingest_papers.sh semantic-enrich
+
+kg-refresh-light: context kg-capabilities ## 📚 Refresh lightweight generated context and inspect litkg readiness
+
+kg-refresh-code: kg-index-code ## 📚 Refresh litkg code-symbol index
+
+kg-refresh-lit: kg-sync kg-materialize kg-export-neo4j ## 📚 Refresh literature registry/materialization/export; enrich with S2 when keyed
+	@if [ -n "$$SEMANTIC_SCHOLAR_API_KEY" ]; then \
+		$(MAKE) kg-semantic-enrich; \
+	else \
+		echo "$(YELLOW)Skipping Semantic Scholar enrichment; SEMANTIC_SCHOLAR_API_KEY is not set.$(NC)"; \
+	fi
+
+kg-refresh-full: kg-refresh-light kg-refresh-code kg-refresh-lit ## 📚 Refresh lightweight context, code index, and literature artifacts
 
 #  ═══════════════════════════════════════════════════════════════════════
 #  🔧 LRZ AI Systems operator helpers
