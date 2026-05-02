@@ -120,23 +120,6 @@ acceptance = ["Targeted data_handling and rri_metrics tests pass or DB records i
 verification = ["make context-contracts", "cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py tests/data_handling/test_public_api_contract.py", "cd aria_nbv && uv run pytest tests/rri_metrics"]
 
 [[todo]]
-id = "todo-008"
-title = "Validate partial offline_only.toml VIN offline store smoke path"
-description = "Make offline_only.toml load at least one immutable VIN offline-store train/val sample from the current partial local store after corrected command behavior and validation land."
-priority = "high"
-status = "todo"
-labels = ["m0", "vin", "diagnostics", "offline-store", "data-blocker", "rerun"]
-issue_ids = ["issue-007", "issue-014"]
-loc_min = 40
-loc_expected = 120
-loc_max = 260
-context = ["Roadmap M0 requires validating that offline_only.toml can load the available VIN offline store into the VIN diagnostics page.", "aria_nbv/tests/vin/test_vin_utils.py now checks that the diagnostics config preserves the offline source, disables W&B, and keeps apply_cw90_correction=false.", "The local `.data/offline_cache/vin_offline` store has manifest.json, sample_index.jsonl, split arrays, and shard directories, but the current reader rejects it as manifest version 5 while OFFLINE_DATASET_VERSION expects 6.", "A Rerun offline inspector can target the partial store for diagnostic smoke only after the store is rebuilt or a deliberate compatibility path is chosen."]
-references = ["repo:README.md#offline-data", "repo:.configs/offline_only.toml", "repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:aria_nbv/tests/vin/test_vin_utils.py"]
-implementation_notes = ["Prefer nbv-summary as a non-interactive smoke before manual Streamlit or Rerun inspection.", "Use `--config-path offline_only.toml`; bare config names resolve under `.configs/`.", "Validate the partial store strictly and surface actionable validation errors instead of assuming the manifest is missing.", "Do not hand-edit store manifests, sample_index.jsonl, split arrays, shards, or payloads to silence failures.", "Keep apply_cw90_correction=false unless candidate poses, p3d_cameras, and reference pose are rotated in lockstep."]
-acceptance = ["`uv run nbv-summary --config-path offline_only.toml` loads at least one train/val batch from the immutable offline store after the version mismatch is resolved.", "Streamlit VIN diagnostics can point at offline_only.toml without falling back to online data once validation passes.", "The same partial store can be used by `nbv-rerun-inspect` for diagnostic smoke once that CLI exists and the store is compatible.", "Any remaining failure has an issue with exact command, traceback summary, and affected contract."]
-verification = ["cd aria_nbv && uv run nbv-summary --config-path offline_only.toml", "cd aria_nbv && uv run pytest tests/vin/test_vin_utils.py tests/data_handling/test_vin_offline_store.py"]
-
-[[todo]]
 id = "todo-020"
 title = "Add offline-store visual primitive inventory"
 description = "Create a strict inventory of visualizable primitives and required fields for immutable VIN offline-store samples."
@@ -160,7 +143,7 @@ description = "Implement nbv-rerun-inspect as a CLI-generated Rerun recording wo
 priority = "high"
 status = "todo"
 labels = ["diagnostics", "offline-store", "geometry", "rerun", "thesis"]
-issue_ids = ["issue-015", "issue-014", "issue-017", "issue-016"]
+issue_ids = ["issue-015", "issue-017", "issue-016"]
 loc_min = 320
 loc_expected = 700
 loc_max = 1400
@@ -458,57 +441,6 @@ references = ["repo:scripts/agents_db.py", "repo:.agents/skills/agents-db/SKILL.
 implementation_notes = ["Start in litkg-rs with a repo-independent source-reference parser for prefixes already enforced by scripts/agents_db.py.", "Validate repo paths and anchors best-effort, check bib keys against configured BibTeX, and connect arxiv/doi/s2 references to Semantic Scholar-enriched records when present.", "Emit typed KG edges such as BACKLOG_REFERENCES_FILE, BACKLOG_REFERENCES_PAPER, BACKLOG_REFERENCES_EXTERNAL_DOC, BACKLOG_REFERENCES_EXPERIMENT, and BACKLOG_DERIVED_FROM_CONTEXT_PACK in graphify/Neo4j outputs where the adapter supports them.", "Expose unresolved-reference, stale-source, and consolidation-proposal output through context-pack or a dedicated check command.", "Keep ARIA-specific defaults in .configs/litkg.toml and skills; do not hard-code ARIA paths into litkg-core."]
 acceptance = ["A litkg-rs check or context-pack report can list unresolved agents-db references with record ids and repair hints.", "Context-pack JSON exposes issue/todo context and references for ARIA-NBV active backlog records.", "At least repo: and bib: references are resolved into graph/export evidence in a smoke run or documented adapter contract.", "Agents can query backlog evidence alongside code/docs/papers from one litkg surface.", "Semantic Scholar identifiers remain optional enrichment and missing API keys produce repair commands, not hard failures."]
 verification = ["cargo test --manifest-path .agents/external/litkg-rs/Cargo.toml -p litkg-core -p litkg-cli context_pack", ".agents/external/litkg-rs/target/debug/litkg-cli context-pack --config .configs/litkg.toml --repo-root . --task \"agents db provenance smoke\" --profile thesis-coding --format json", "make agents-db AGENTS_ARGS='validate'"]
-
-[[todo]]
-id = "todo-040"
-title = "Add aria-litkg-memory skill"
-description = "Create and adopt a compact ARIA-NBV skill that routes broad memory retrieval, claim checks, source-backed task routing, and consolidation through litkg before manual browsing."
-priority = "high"
-status = "todo"
-labels = ["agent", "skills", "kg", "litkg", "memory"]
-issue_ids = ["issue-012", "issue-023"]
-loc_min = 40
-loc_expected = 100
-loc_max = 220
-context = ["Root routing now requires broad cross-surface coding, docs, KG, or thesis work to start from a litkg context pack, but ordinary agent memory retrieval still needs an explicit skill distinct from litkg-rs implementation work.", "The new skill should make litkg the default context router while leaving semantic-scholar-litkg responsible for KG toolkit/config/backend implementation.", "This skill is also the agent-facing place to encode source authority until litkg retrieval exposes authority/freshness metadata directly."]
-references = ["repo:AGENTS.md#routing", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/skills/agents-db/SKILL.md#provenance-contract", "repo:.configs/litkg.toml", "repo:.agents/kg/README.md"]
-implementation_notes = ["Keep the skill concise and focused on usage protocol, not litkg-rs internals.", "List the main Make targets for capability checks, query, brief, route, search, related-source retrieval, and claim checking.", "Document the authority order from code/canonical memory through generated context, debrief history, archives, and external papers.", "Validate with the local skill validator and make check-agent-memory."]
-acceptance = ["`.agents/skills/aria-litkg-memory/SKILL.md` exists with valid skill frontmatter.", "Root routing points broad memory retrieval and consolidation work to the skill.", "The skill tells agents to inspect cited canonical sources before acting on retrieved context.", "The skill separates routine memory retrieval from semantic-scholar-litkg implementation work."]
-verification = ["python3 /home/jd/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/aria-litkg-memory", "make check-agent-memory"]
-
-[[todo]]
-id = "todo-041"
-title = "Add root kg-query / kg-brief / kg-route retrieval targets"
-description = "Expose one-command root litkg retrieval and routing targets so agents can query canonical memory, docs, code, papers, and backlog without hand-assembling cargo commands."
-priority = "high"
-status = "todo"
-labels = ["kg", "litkg", "makefile", "agent", "retrieval"]
-issue_ids = ["issue-023"]
-loc_min = 50
-loc_expected = 140
-loc_max = 320
-context = ["litkg-rs already exposes capabilities, context-pack, literature search/show, and KG find operations, but ARIA agents need a stable root surface that matches the root dispatcher and skill workflow.", "The first retrieval layer should cover kg-capabilities, kg-search, kg-show-paper, kg-query, kg-brief, kg-route, kg-claim-check, and kg-related, with JSON output available for agents or scripts.", "These wrappers should remain thin and local-first; richer claim/consolidation behavior belongs in litkg-rs once the repo-independent command exists."]
-references = ["repo:Makefile", "repo:AGENTS.md#commands", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md#agent-contract", "repo:.agents/external/litkg-rs/AGENTS.md", "repo:.agents/external/litkg-rs/docs/architecture.md"]
-implementation_notes = ["Use the checked-in litkg-rs submodule through `cargo run --manifest-path .agents/external/litkg-rs/Cargo.toml -p litkg-cli -- ...`.", "Keep variables such as LITKG_CONFIG, LITKG_PROFILE, KG_QUERY, KG_TASK, KG_TOPIC, KG_FORMAT, and KG_LIMIT overridable.", "Prefer context-pack for query/brief/route and kg find for quick search or related-path retrieval.", "Do not make these targets depend on a live Neo4j/Graphiti/MemPalace service."]
-acceptance = ["`make kg-capabilities` reports backend/source readiness.", "`make kg-search KG_QUERY=...` and `make kg-query KG_QUERY=...` return useful text results.", "`make kg-brief`, `make kg-route`, `make kg-show-paper`, `make kg-claim-check`, and `make kg-related` have documented required variables.", "Targets fail with actionable messages when required variables are missing."]
-verification = ["make kg-capabilities KG_FORMAT=json", "make kg-search KG_QUERY=\"entity-aware RRI\" KG_LIMIT=5", "make kg-query KG_QUERY=\"current RRI contract\""]
-
-[[todo]]
-id = "todo-042"
-title = "Expand litkg source coverage for agent history, skills, references, generated context, and experiment placeholders"
-description = "Split ARIA-NBV litkg sources into canonical state, active backlog, workflow guidance, episodic history, generated context, and future experiment/cache evidence so retrieval has the right material and authority metadata."
-priority = "high"
-status = "todo"
-labels = ["kg", "litkg", "config", "memory", "experiments"]
-issue_ids = ["issue-023", "issue-025"]
-loc_min = 60
-loc_expected = 160
-loc_max = 380
-context = ["The current litkg config ingests canonical memory and active backlog, but the agent-memory plane also needs debrief history, work notes, skills, references, generated context, and curated experiment/cache manifests.", "Source classes need explicit descriptive authority such as canonical, active_backlog, workflow, episodic, generated, and evidence so future retrieval can rank conflicting context.", "Experiment/cache ingestion should target manifests and summaries, not raw tensor blocks, sample shards, or full EVL backbone stores."]
-references = ["repo:.configs/litkg.toml", "repo:.agents/kg/README.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md#source-authority", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "repo:docs/_generated/context/source_index.md"]
-implementation_notes = ["Keep legacy source sections until current litkg-rs consumers understand the split source classes.", "Add descriptive authority metadata in TOML even if current litkg-rs ignores it; future retrieval should consume it.", "Exclude raw heavy stores and shard directories from experiment/cache source globs.", "Run litkg capabilities after config edits to catch stale or missing required paths."]
-acceptance = ["`.configs/litkg.toml` names separate source classes for agent_state, agent_backlog, agent_history, agent_skills, generated_context, and experiments.", "Generated context and skill/reference docs are discoverable through litkg retrieval.", "Experiment placeholders point at curated manifests/summaries and exclude heavy tensors/shards.", "Capability output does not regress because of the added source metadata."]
-verification = ["make kg-capabilities KG_FORMAT=json", "make kg-search KG_QUERY=\"aria-litkg-memory source authority\" KG_LIMIT=5", "make check-agent-memory"]
 
 [[todo]]
 id = "todo-043"

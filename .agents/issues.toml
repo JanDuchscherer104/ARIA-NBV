@@ -89,17 +89,6 @@ context = ["Roadmap M7/M8 require final tables, figures, failure cases, configs,
 references = ["repo:docs/contents/thesis/roadmap.qmd#roadmap-m7", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m8", "repo:docs/contents/thesis/questions.qmd#rq7-scaling", "repo:.agents/memory/state/DECISIONS.md"]
 
 [[issue]]
-id = "issue-014"
-title = "offline_only.toml local vin_offline store is partial and version-blocked"
-description = "`cd aria_nbv && uv run nbv-summary --config-path offline_only.toml` targets a local `.data/offline_cache/vin_offline` store with manifest, sample index, split arrays, and shards, but the current reader rejects the manifest as version 5 while `OFFLINE_DATASET_VERSION` expects 6."
-type = "data-blocker"
-priority = "high"
-status = "open"
-labels = ["data", "offline-store", "vin", "rerun", "m0"]
-context = ["The current local offline VIN store is useful as a diagnostic smoke asset but is marked interrupted/partial, so tooling must report its exact validation state rather than treating it as complete training data.", "As of 2026-05-02, `uv run nbv-summary --config-path offline_only.toml` resolves the bare config path correctly but fails with `Unsupported VIN offline dataset version 5; expected 6. Rebuild the store with the current VIN offline writer.`", "Rerun and VIN smoke commands should use the store only after corrected config resolution and strict offline-store validation agree on what is present."]
-references = ["repo:README.md#offline-data", "repo:.configs/offline_only.toml", "repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:.agents/memory/state/GOTCHAS.md"]
-
-[[issue]]
 id = "issue-015"
 title = "No first-class Rerun offline dataset inspector"
 description = "The project lacks a TOML-configurable Rerun CLI that can render an immutable VIN offline-store sample with semidense points, candidate frusta, RRI/validity metadata, optional mesh/OBBs, and stable recording output."
