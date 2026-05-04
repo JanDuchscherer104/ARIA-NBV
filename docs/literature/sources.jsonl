@@ -1,0 +1,16 @@
+{"title":"EFM3D: A Benchmark for Measuring Progress Towards 3D Egocentric Foundation Models","short_title":"EFM3D","arxiv_id":"2406.10224","tex_dir":"arXiv-EFM3D","pdf_file":"EFM3D.pdf"}
+{"title":"GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction","short_title":"GenNBV","arxiv_id":"2402.16174","tex_dir":"arXiv-GenNBV","pdf_file":"GenNBV.pdf"}
+{"title":"Project Aria: A New Tool for Egocentric Multi-Modal AI Research","short_title":"Project Aria","arxiv_id":"2308.13561","tex_dir":"arXiv-project-aria","pdf_file":"project-aria.pdf"}
+{"title":"SceneScript: Reconstructing Scenes With An Autoregressive Structured Language Model","short_title":"SceneScript","arxiv_id":"2403.13064","tex_dir":"arXiv-scene-script","pdf_file":"scene-script.pdf"}
+{"title":"VIN-NBV: A View Introspection Network for Next-Best-View Selection","short_title":"VIN-NBV","arxiv_id":"2505.06219","tex_dir":"arXiv-VIN-NBV","pdf_file":"VIN-NBV.pdf"}
+{"title":"Informative Object-centric Next Best View for Object-aware 3D Gaussian Splatting in Cluttered Scenes","short_title":"Instance-NBV","arxiv_id":"2602.08266","tex_dir":"arXiv-Instance-NBV","pdf_file":"Instance-NBV.pdf"}
+{"title":"PB-NBV: Efficient Projection-Based Next-Best-View Planning Framework for Reconstruction of Unknown Objects","short_title":"PB-NBV","arxiv_id":"2501.10663","tex_dir":"arXiv-PB-NBV","pdf_file":"PB-NBV.pdf"}
+{"title":"Next Best View Selections for Semantic and Dynamic 3D Gaussian Splatting","short_title":"Dynamic 3DGS NBV","arxiv_id":"2512.22771","tex_dir":"arXiv-Dynamic-3DGS","pdf_file":"Dynamic-3DGS.pdf"}
+{"title":"Hestia: Voxel-Face-Aware Hierarchical Next-Best-View Acquisition for Efficient 3D Reconstruction","short_title":"Hestia","arxiv_id":"2508.01014","tex_dir":"arXiv-Hestia","pdf_file":"Hestia.pdf"}
+{"title":"Offline Reinforcement Learning as One Big Sequence Modeling Problem","short_title":"Trajectory Transformer","arxiv_id":"2106.02039","tex_dir":"","pdf_file":""}
+{"title":"Deep Reinforcement Learning with Double Q-Learning","short_title":"Double DQN","arxiv_id":"1509.06461","tex_dir":"","pdf_file":""}
+{"title":"Offline Reinforcement Learning with Implicit Q-Learning","short_title":"IQL","arxiv_id":"2110.06169","tex_dir":"","pdf_file":""}
+{"title":"Reinforcement Learning with Deep Energy-Based Policies","short_title":"Deep Energy-Based Policies","arxiv_id":"1702.08165","tex_dir":"","pdf_file":""}
+{"title":"Stochastic Beams and Where to Find Them: The Gumbel-Top-k Trick for Sampling Sequences Without Replacement","short_title":"Gumbel-Top-k","arxiv_id":"1903.06059","tex_dir":"","pdf_file":""}
+{"title":"Next Best Sense: Guiding Vision and Touch with FisherRF for 3D Gaussian Splatting","short_title":"Next Best Sense","arxiv_id":"2410.04680","tex_dir":"","pdf_file":""}
+{"title":"Finding Optimal Viewpoints for Monocular 3D Human Pose Estimation in Dynamic 3D Gaussian Splatting Space","short_title":"FOV-HPE","arxiv_id":"","tex_dir":"","pdf_file":"","doi":"10.1109/AVSS65446.2025.11149906","url":"https://doi.org/10.1109/AVSS65446.2025.11149906"}
