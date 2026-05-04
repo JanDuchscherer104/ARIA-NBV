@@ -2,13 +2,14 @@
 #import "metadata.typ": *
 #import "../shared/macros.typ": *
 #import "../shared/glossary.typ": *
+#import "sections/proposal/_style.typ": *
 
 #set document(title: titleEnglish + " Proposal", author: author)
 #set text(font: "New Computer Modern")
 
 #show: proposal.with(
   title: titleEnglish,
-  titleGerman: titleGerman,
+  titleGerman: "Aria-NBV: Qualitaetsgetriebene Next-Best-View-Planung mit egozentrischen Foundation-Modellen",
   thesisKindEnglish: thesisKindEnglish + " Proposal",
   thesisKindGerman: "Proposal zur " + thesisKindGerman,
   academicDegree: academicDegree,
@@ -19,20 +20,23 @@
   facultyEnglish: facultyEnglish,
   facultyGerman: facultyGerman,
   firstExaminer: firstExaminer,
-  secondExaminer: secondExaminer,
+  secondExaminer: "",
   supervisors: supervisors,
   author: author,
   email: email,
   matriculationNumber: matriculationNumber,
   startDate: startDate,
-  submissionDate: submissionDate,
-  submissionDateText: submissionDateText,
+  submissionDate: datetime(day: 30, month: 4, year: 2026),
+  submissionDateText: "30 April 2026",
   transparency_ai_tools: [
-    TODO: Document AI tools used while preparing the proposal according to the final institutional requirements.
+    AI-assisted tools were used to organize literature notes, check consistency across repository documentation, and draft parts of the proposal text. The author remains responsible for the final research scope, technical claims, citations, and submitted document.
   ],
 )
 
+#show: proposal-style
+
 #include "sections/proposal/01-motivation.typ"
+#include "sections/proposal/02-related-work.typ"
 #include "sections/proposal/02-problem.typ"
 #include "sections/proposal/03-objectives.typ"
 #include "sections/proposal/04-method.typ"
