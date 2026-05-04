@@ -52,3 +52,8 @@ tags: [codex, workflow, architecture]
 - Non-myopic work is being introduced incrementally through multi-step counterfactual rollouts, structured evaluator metrics, cumulative-RRI accounting, and a discrete-shell RL scaffold before any continuous-control claim.
 - Counterfactual reasoning is currently geometry-first: logged ego-trajectory modalities are the trustworthy historical state, while counterfactual views default to mesh-, depth-, and visibility-derived quantities plus accumulated selected observations until richer synthesis exists.
 - Entity-aware objectives, hierarchical control, and semantic-global planning are treated as extensions on top of the current scene-level RRI baseline rather than replacements for it.
+- The first thesis-grade non-myopic comparison is bounded oracle-RRI lookahead versus one-step greedy under equal acquisition and candidate budget.
+- The first rollout actor-visible state is geometry-first: accumulated semidense/current points, candidate poses, validity/diagnostic metadata, and bounded history. Oracle labels, GT meshes, and GT OBB crops are supervision and evaluation only unless a later ablation explicitly marks them as privileged.
+- Multi-step reward should start as episode-normalized additive RRI or log-improvement reward. The current one-step RRI label remains unchanged for VIN compatibility.
+- The first target-aware metric is GT-OBB-cropped target RRI before predicted OBB or learned target-token realism ablations.
+- VIN earns value, Q, or return heads only after held-out ranking quality, oracle-evaluated VIN-selected rollouts, calibration and stage-shift analysis, and Rerun failure visualization are available.

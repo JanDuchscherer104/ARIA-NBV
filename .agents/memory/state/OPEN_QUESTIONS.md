@@ -11,15 +11,12 @@ tags: [research, nbv, vin, training]
 
 ## Advisor-Facing Scope and Priority Questions
 - Should the thesis be scoped around geometry-first non-myopic planning on the current ASE / EFM stack, or should a major share of time shift toward a VIN v4 or broader model-architecture rewrite?
-- Is the first non-myopic milestone expected to be beam search, close-greedy control, or discrete-shell RL, or should the project aim directly for hierarchical or continuous control?
 - Should the thesis core stay within the current mesh-supervised ASE ecosystem, or is there a strong reason to switch datasets, simulators, or supervision sources earlier?
 - Which external asks are worth escalating now: university workstation access, ASE simulator access, Aria Gen2 hardware, or some narrower subset?
-- What evidence bar should be met before making RL or multi-step planning claims beyond scaffolding and diagnostics?
+- After bounded oracle-RRI lookahead is compared with one-step greedy, should the next non-myopic baseline be beam search, close-greedy control, or discrete-shell RL?
 
 ## Planning and RL Formulation
-- How should the MDP state be split between historical ego modalities and counterfactual state that must be synthesized or approximated?
 - Which counterfactual modalities are acceptable in the first multi-step setting: GT mesh, SDF / visibility, normals, depth, synthetic SLAM, splats, or learned world models?
-- How should cumulative return be defined from RRI: direct sum of oracle RRI, discounted return over VIN-predicted rewards, or a mixed oracle / surrogate setup?
 - Can the critic use privileged GT signals such as OBBs, segmentation masks, or mesh-derived descriptors during training if the actor cannot?
 - Should the first RL variant be explicitly close-greedy, low-discount, and receding-horizon rather than full long-horizon RL?
 - When should the current discrete shell give way to hierarchical target-selection plus view realization or to continuous pose control?
@@ -42,3 +39,10 @@ tags: [research, nbv, vin, training]
 - Where should gravity-aligned sampling convenience end and physical rig-frame supervision begin?
 - Which diagnostics and acceptance checks are strong enough to catch pose-frame mismatches early?
 - What is the minimum stable context bundle Codex needs for code, paper, and experiment tasks without reintroducing large static dumps?
+
+## Recently Locked Decisions
+- The first non-myopic comparison is bounded oracle-RRI lookahead versus one-step greedy under equal budget.
+- The first rollout actor-visible state is geometry-first; oracle labels, GT mesh quantities, and GT OBB crops are supervision/evaluation only.
+- Multi-step reward starts with episode-normalized additive RRI or log-improvement reward, while the current one-step RRI label remains compatible with VIN training.
+- The first target-aware metric is GT-OBB-cropped target RRI.
+- The VIN evidence gate is held-out ranking, oracle-evaluated VIN-selected rollouts, calibration/stage-shift analysis, Rerun failure visualization, and only then value, Q, or return heads.
