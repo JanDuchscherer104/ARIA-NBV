@@ -26,6 +26,8 @@ The public documentation is published at
   thesis questions and evaluation criteria.
 - [Implementation Notes](docs/contents/impl/overview.qmd): data, RRI, VIN, and
   diagnostics entry points.
+- [Rerun Offline Inspector](docs/contents/impl/rerun_offline_inspector.qmd):
+  visual smoke path for one immutable VIN offline-store sample.
 - [API Reference](docs/reference/index.qmd): generated `aria_nbv` reference
   pages.
 - [Setup](docs/contents/setup.qmd): environment and dependency notes.
@@ -44,6 +46,9 @@ uv run nbv-train --config-path offline_only.toml
 # Single forward pass that summarizes VIN outputs
 uv run nbv-summary --config-path offline_only.toml
 
+# Save one Rerun recording from an offline sample
+uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline.toml --split val --index 0 --save ../.artifacts/rerun/sample.rrd
+
 # Hyperparameter sweep with Optuna
 uv run nbv-optuna --config-path ../.configs/sweep_config.toml
 
@@ -60,6 +65,10 @@ Offline VIN training reads the immutable store configured by
 `.configs/offline_only.toml`. By default the store resolves to the `vin_offline`
 store under the configured `offline_cache_dir` and is consumed through the
 `kind = "offline"` datamodule source.
+
+The local `vin_offline` store may be a partial diagnostic store. Confirm it with
+`uv run nbv-summary --config-path offline_only.toml` before using it for
+training, Rerun inspection, or thesis figures.
 
 ## ASE Downloader
 

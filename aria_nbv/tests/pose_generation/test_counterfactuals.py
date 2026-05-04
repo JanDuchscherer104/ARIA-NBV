@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 pytest.importorskip("efm3d")
@@ -14,17 +16,23 @@ import trimesh
 from efm3d.aria import CameraTW, PoseTW
 
 from aria_nbv.pose_generation import (
+    CandidateSamplingResult,
     CandidateViewGeneratorConfig,
     CounterfactualCandidateEvaluation,
     CounterfactualPoseGenerator,
     CounterfactualPoseGeneratorConfig,
     CounterfactualSelectionPolicy,
+    RolloutTrace,
     SamplingStrategy,
+    read_rollout_traces,
+    traces_from_rollout_result,
+    write_rollout_traces,
 )
 from aria_nbv.pose_generation.plotting import (
     plot_counterfactual_paths_simple,
     plot_counterfactual_step_simple,
 )
+from aria_nbv.rendering import CandidateDepthRendererConfig
 
 
 def _identity_pose(device: torch.device | str = "cpu") -> PoseTW:
@@ -181,3 +189,95 @@ def test_counterfactual_path_plot_uses_rri_colorbar_when_available() -> None:
     assert any(
         getattr(getattr(trace, "marker", None), "showscale", False) for trace in fig.data if hasattr(trace, "marker")
     )
+
+
+def test_candidate_sampling_roundtrip_preserves_valid_pose_order_and_cw90_display_is_read_only() -> None:
+    cfg = _make_rollout_config(horizon=1, branch_factor=1)
+    generator = CounterfactualPoseGenerator(cfg)
+    mesh, verts, faces = _mesh_triplet(cfg.candidate_config.device)
+    candidates = generator._candidate_generator.generate(  # noqa: SLF001
+        reference_pose=_identity_pose(device=cfg.candidate_config.device),
+        gt_mesh=mesh,
+        mesh_verts=verts,
+        mesh_faces=faces,
+        camera_calib_template=_dummy_camera(cfg.candidate_config.device),
+        occupancy_extent=_default_extent(cfg.candidate_config.device),
+    )
+    views_before = candidates.views.tensor().detach().clone()
+    reference_before = candidates.reference_pose.tensor().detach().clone()
+    poses_before = candidates.poses_world_cam().tensor().detach().clone()
+
+    candidates.get_offsets_and_dirs_ref(display_rotate=True)
+
+    assert torch.equal(candidates.views.tensor(), views_before)
+    assert torch.equal(candidates.reference_pose.tensor(), reference_before)
+    assert torch.equal(candidates.poses_world_cam().tensor(), poses_before)
+
+    decoded = type(candidates).from_serializable(candidates.to_serializable(), device=torch.device("cpu"))
+
+    assert torch.equal(decoded.mask_valid.cpu(), candidates.mask_valid.cpu())
+    assert torch.allclose(decoded.shell_poses.tensor(), candidates.shell_poses.to(device="cpu").tensor())
+    assert torch.allclose(decoded.poses_world_cam().tensor(), candidates.poses_world_cam().to(device="cpu").tensor())
+
+
+def test_candidate_depth_renderer_reports_full_shell_candidate_indices() -> None:
+    shell = PoseTW(
+        torch.cat(
+            [
+                torch.eye(3, dtype=torch.float32).reshape(1, 9).repeat(4, 1),
+                torch.arange(4, dtype=torch.float32).reshape(4, 1).expand(4, 3),
+            ],
+            dim=1,
+        )
+    )
+    camera = _dummy_camera()
+    camera_data = camera.tensor().repeat(2, 1)
+    candidates = CandidateSamplingResult(
+        views=CameraTW(camera_data),
+        reference_pose=_identity_pose(),
+        mask_valid=torch.tensor([False, True, False, True]),
+        masks={},
+        shell_poses=shell,
+    )
+    renderer = CandidateDepthRendererConfig(device="cpu", max_candidates_final=2, verbosity=0).setup_target()
+
+    _, _, candidate_indices = renderer._select_candidate_views(candidates)  # noqa: SLF001
+
+    assert candidate_indices.tolist() == [1, 3]
+
+
+def test_rollout_trace_maps_scores_to_full_candidate_shell_and_roundtrips(tmp_path: Path) -> None:
+    rollouts = _run_rollouts(horizon=2, branch_factor=1, score_candidates=_fake_rri_evaluator)
+    traces = traces_from_rollout_result(
+        rollouts,
+        rollout_id_prefix="test-rollout",
+        scene_id="scene",
+        snippet_id="snippet",
+        candidate_config_hash="candidate-hash",
+        oracle_config_hash="oracle-hash",
+        random_seed=0,
+    )
+
+    assert len(traces) == 1
+    trace = traces[0]
+    assert isinstance(trace, RolloutTrace)
+    assert trace.lineage.rollout_id == "test-rollout-000000"
+    assert trace.lineage.candidate_config_hash == "candidate-hash"
+    assert trace.termination_reason == "fixed_horizon"
+
+    first_step = trace.steps[0]
+    assert first_step.candidate_valid.shape[0] == first_step.candidate_poses_world_cam.shape[0]
+    assert first_step.candidate_scores is not None
+    assert torch.isclose(
+        first_step.candidate_scores[first_step.selected_shell_index],
+        torch.tensor(first_step.selection_score, dtype=first_step.candidate_scores.dtype),
+    )
+    assert first_step.metric_vectors["rri"].shape == first_step.candidate_valid.shape
+    assert first_step.cumulative_rri == pytest.approx(first_step.selected_metrics["rri"])
+
+    path = write_rollout_traces(tmp_path / "rollouts.msgpack", traces)
+    decoded = read_rollout_traces(path)
+
+    assert decoded[0].lineage.scene_id == "scene"
+    assert decoded[0].steps[0].selected_shell_index == first_step.selected_shell_index
+    assert torch.equal(decoded[0].steps[0].candidate_valid, first_step.candidate_valid)

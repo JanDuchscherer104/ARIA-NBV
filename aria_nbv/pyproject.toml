@@ -42,6 +42,7 @@ dependencies = [
     "efm3d",
     "plotly>=6.4.0",
     "open3d>=0.19.0",
+    "rerun-sdk==0.22.1",
     "rich>=13.9.4",
     "devtools>=0.12.2",
     "pydantic-settings>=2.12.0",
@@ -85,6 +86,8 @@ dependencies = [
     nbv-st                 = "aria_nbv.streamlit_app:streamlit_entry"
     nbv-fit-binner         = "aria_nbv.lightning.cli:fit_binner_main"
     nbv-build-offline      = "aria_nbv.data_handling.offline_cli:main"
+    nbv-rerun-inspect      = "aria_nbv.rerun_inspector._cli:main"
+    nbv-rollout-trace-smoke = "aria_nbv.pose_generation.rollout_trace:smoke_main"
     nbv-train              = "aria_nbv.lightning.cli:train_main"
     nbv-optuna             = "aria_nbv.lightning.cli:optuna_main"
     nbv-wandb              = "aria_nbv.lightning.cli:wandb_main"

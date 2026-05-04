@@ -18,6 +18,7 @@ def test_build_experiment_config_defaults_to_online_source() -> None:
     assert cfg.stage is Stage.TRAIN
     assert cfg.trainer_config.use_wandb is False
     assert cfg.datamodule_config.num_workers == 0
+    assert cfg.datamodule_config.batch_size is None
     assert isinstance(cfg.datamodule_config.source, VinOracleOnlineDatasetConfig)
 
 
@@ -29,3 +30,4 @@ def test_build_experiment_config_preserves_toml_source() -> None:
     assert cfg.stage is Stage.VAL
     assert cfg.trainer_config.use_wandb is False
     assert isinstance(cfg.datamodule_config.source, VinOfflineSourceConfig)
+    assert cfg.module_config.vin.apply_cw90_correction is False

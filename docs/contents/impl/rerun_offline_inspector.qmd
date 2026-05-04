@@ -1,0 +1,119 @@
+---
+title: "Rerun Offline Inspector"
+phase: thesis
+audience: public
+status: current
+owner: code
+format: html
+---
+
+# Rerun Offline Inspector {#rerun-offline-inspector}
+
+The Rerun offline inspector is a visual smoke path for immutable VIN offline
+stores. It opens one stored sample and records the geometry that matters for
+trusting oracle labels: the current semidense reconstruction, reference pose,
+candidate camera frusta, validity metadata, oracle RRI values, and optional
+candidate depths, candidate point clouds, mesh references, and object boxes
+when those blocks are present.
+
+The inspector is diagnostic tooling. It does not train a model, recompute oracle
+labels, or turn the VIN scorer into a full NBV policy. Its purpose is to make
+pose-frame, camera, candidate, and label failures visible before those samples
+are used for VIN training or rollout evidence.
+
+## Prerequisites {#rerun-prerequisites}
+
+Run the inspector from the `aria_nbv/` package environment after the package
+entry point and inspector config are available:
+
+```sh
+uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline.toml --split val --index 0 --save ../.artifacts/rerun/sample.rrd
+```
+
+The command expects an immutable VIN offline store under the configured
+`offline_cache_dir`. The current local default is the `vin_offline` store used
+by `.configs/offline_only.toml`; it has a manifest, sample index, split arrays,
+and shards, but it is marked as an interrupted partial store. Treat that as a
+small diagnostic store until a full M1 store is materialized and smoke-checked.
+
+Required sample fields should be validated before Rerun logging starts:
+
+- sample id, split, scene id, and snippet id;
+- reference rig or camera pose in a typed pose contract;
+- candidate camera poses and camera intrinsics;
+- candidate validity mask;
+- oracle RRI and related accuracy/completeness deltas;
+- semidense or current reconstruction points.
+
+Optional layers such as candidate depths, candidate point clouds, mesh
+references, OBBs, fused points, voxel bounds, and invalid-action reasons should
+be logged when present and reported as unavailable when absent. They should not
+be guessed from ad hoc sample attributes.
+
+## Configuration {#rerun-config}
+
+The intended config surface is `.configs/rerun_offline.toml`. Keep it small and
+auditable:
+
+- **dataset:** offline store path, split, index or sample id, and strict
+  validation behavior;
+- **output:** `spawn`, `save`, or `connect`, plus application id and output
+  path for saved recordings;
+- **timeline:** sample, frame, or candidate timeline choices;
+- **world:** world-frame axis conventions and root entity path;
+- **geometry:** point and mesh display budgets, frustum sizes, line radii, and
+  optional top-k candidate highlighting;
+- **metrics:** candidate coloring by RRI, validity, rank, or selected candidate;
+- **primitives:** toggles for semidense points, current points, candidate
+  frusta, candidate depths/points, mesh, OBBs, and metadata panels.
+
+Use explicit paths and stable entity names so recordings can be compared across
+runs. Candidate frusta should be batched under stable paths such as
+`/world/candidates/frusta_all`, with separate highlighted paths for the top
+oracle candidates or a selected candidate.
+
+## Output Modes {#rerun-output-modes}
+
+Use `--save` for reproducible smoke checks and advisor-facing failure cases. It
+writes an `.rrd` recording that can be opened later without reloading the
+offline store.
+
+Use `spawn` for interactive local debugging when a Rerun viewer is available.
+This is useful while inspecting pose-frame alignment, candidate ordering, and
+optional layers.
+
+Use `connect` only when a Rerun server is already running and the workflow needs
+live streaming. Saved recordings remain the preferred artifact for reproducible
+diagnostics.
+
+## Geometry Safety {#rerun-geometry-safety}
+
+Rerun views can look plausible even when frame conventions are wrong. The
+inspector should therefore log geometry through typed pose and camera contracts,
+preferably `PoseTW` and `CameraTW`, instead of unlabelled matrices. Manual
+candidate frusta are the safest default until native `rr.Pinhole` logging has
+tests proving the expected transform direction and camera convention.
+
+Display-only CW90 corrections must stay display-only. They must not alter
+offline-store poses, candidate poses, cached camera values, RRI labels, or model
+inputs. If a view needs rotation for human readability, record that as viewer
+metadata rather than mutating the stored geometry.
+
+Downsampling in this inspector is also display-only. Point clouds and meshes may
+be decimated to keep the viewer responsive, but oracle RRI values, rank metrics,
+candidate validity, and training labels must always come from the stored sample
+or a deliberately recomputed oracle run.
+
+## Trust Checks {#rerun-trust-checks}
+
+A useful first recording should answer these questions:
+
+- Do the reference camera and candidate frusta sit in the expected world frame?
+- Do high-RRI candidates look geometrically capable of adding new surface?
+- Are invalid candidates visibly outside the supported pose/camera contract?
+- Do optional mesh or OBB layers align with semidense and candidate points?
+- Are candidate ranks and saved RRI values consistent with the metadata panel?
+
+Use failures from this page to fix the data, geometry, or inspector contract.
+Do not hide them by changing visualization-only downsampling or by silently
+falling back to online datasets.

@@ -1,0 +1,63 @@
+[dataset]
+
+    [dataset.offline]
+    split                    = "all"
+    include_efm_snippet      = true
+    include_gt_mesh          = true
+    load_backbone            = true
+    load_candidates          = true
+    load_depths              = true
+    load_candidate_pcs       = true
+    load_gt_obbs             = true
+    load_detected_obbs       = true
+    load_trajectory_metadata = true
+    load_counterfactuals     = false
+    return_format            = "sample"
+    map_location             = "cpu"
+
+        [dataset.offline.store]
+        store_dir = "vin_offline_rerun_smoke_v6"
+
+[selection]
+split = "val"
+index = 0
+
+[output]
+mode                = "save"
+application_id      = "aria-nbv-rerun-inspector"
+save_path           = "../.artifacts/rerun/offline_smoke_v6.rrd"
+spawn_port          = 9876
+spawn_memory_limit  = "75%"
+hide_welcome_screen = true
+
+[geometry]
+frustum_scale           = 0.35
+reference_axis_length   = 0.45
+semidense_radius        = 0.015
+candidate_center_radius = 0.035
+candidate_point_radius  = 0.01
+trajectory_radius       = 0.02
+
+[performance]
+max_semidense_points = 50000
+max_candidate_points = 20000
+seed                 = 0
+verbosity            = "normal"
+
+[primitives]
+log_semidense          = true
+log_reference_pose     = true
+log_candidate_frusta   = true
+log_top_oracle_frustum = true
+log_invalid_frusta     = true
+log_candidate_centers  = true
+log_metadata           = true
+log_mesh               = true
+log_candidate_points   = false
+log_gt_mesh            = true
+log_gt_obbs            = true
+log_detected_obbs      = true
+log_gt_trajectory      = true
+log_candidate_depths   = true
+log_rgb_keyframes      = false
+log_depth_keyframes    = false

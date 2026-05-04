@@ -200,6 +200,15 @@ class VinOfflineMaterializedBlocks:
     counterfactuals: bool
     """Whether future counterfactual trajectory blocks are materialized."""
 
+    gt_obbs: bool = False
+    """Whether compact GT OBB blocks are materialized."""
+
+    detected_obbs: bool = False
+    """Whether compact detected OBB blocks are materialized."""
+
+    trajectory: bool = False
+    """Whether trajectory timing/gravity blocks are materialized."""
+
 
 @dataclass(slots=True)
 class VinOfflineCounterfactuals:

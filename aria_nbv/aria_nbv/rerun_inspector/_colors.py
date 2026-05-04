@@ -1,0 +1,247 @@
+"""Deterministic candidate color mapping for Rerun inspector views.
+
+The helpers in this module return plain ``uint8`` RGBA arrays that can be
+passed directly to Rerun component constructors.  They intentionally avoid a
+Matplotlib dependency so diagnostic colors stay stable across environments.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Literal
+
+import numpy as np
+import torch
+from numpy.typing import NDArray
+
+ColorMode = Literal["oracle_rri", "rank", "validity"]
+
+ArrayLike1D = Sequence[float] | Sequence[int] | np.ndarray | torch.Tensor
+BoolArrayLike1D = Sequence[bool] | np.ndarray | torch.Tensor
+RGBAArray = NDArray[np.uint8]
+
+VALID_RGBA = np.array([34, 197, 94, 255], dtype=np.uint8)
+"""RGBA color used for valid candidates."""
+
+INVALID_RGBA = np.array([148, 163, 184, 96], dtype=np.uint8)
+"""Muted RGBA color used for invalid candidates."""
+
+UNKNOWN_RGBA = np.array([100, 116, 139, 160], dtype=np.uint8)
+"""Fallback RGBA color used for non-finite scalar values."""
+
+_RRI_STOPS = np.array(
+    [
+        [68, 1, 84],
+        [59, 82, 139],
+        [33, 145, 140],
+        [94, 201, 98],
+        [253, 231, 37],
+    ],
+    dtype=np.float32,
+)
+
+_RANK_PALETTE = np.array(
+    [
+        [37, 99, 235],
+        [16, 185, 129],
+        [245, 158, 11],
+        [239, 68, 68],
+        [139, 92, 246],
+        [20, 184, 166],
+        [236, 72, 153],
+        [107, 114, 128],
+    ],
+    dtype=np.uint8,
+)
+
+
+def oracle_rri_to_rgba(
+    oracle_rri: ArrayLike1D,
+    *,
+    validity: BoolArrayLike1D | None = None,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    alpha: int = 255,
+) -> RGBAArray:
+    """Map oracle RRI values to deterministic RGBA colors.
+
+    Args:
+        oracle_rri: Candidate RRI values.  Higher finite values map to brighter
+            colors.
+        validity: Optional candidate validity mask.  Invalid candidates override
+            the RRI color with :data:`INVALID_RGBA`.
+        vmin: Optional lower normalization bound.  Defaults to the minimum
+            finite RRI in ``oracle_rri``.
+        vmax: Optional upper normalization bound.  Defaults to the maximum
+            finite RRI in ``oracle_rri``.
+        alpha: Alpha channel for finite, valid RRI colors.
+
+    Returns:
+        ``uint8`` array with shape ``(N, 4)``.
+    """
+
+    values = _as_1d_array(oracle_rri, name="oracle_rri", dtype=np.float32)
+    alpha_u8 = _validate_uint8_scalar(alpha, name="alpha")
+    colors = np.tile(UNKNOWN_RGBA, (values.shape[0], 1))
+
+    finite = np.isfinite(values)
+    if finite.any():
+        lo = float(np.nanmin(values[finite])) if vmin is None else float(vmin)
+        hi = float(np.nanmax(values[finite])) if vmax is None else float(vmax)
+        if not np.isfinite(lo) or not np.isfinite(hi):
+            raise ValueError(f"RRI normalization bounds must be finite, got vmin={lo}, vmax={hi}")
+
+        norm = np.full(values.shape, 0.5, dtype=np.float32)
+        if hi > lo:
+            norm[finite] = np.clip((values[finite] - lo) / (hi - lo), 0.0, 1.0)
+
+        colors[finite, :3] = _interpolate_rgb(_RRI_STOPS, norm[finite])
+        colors[finite, 3] = alpha_u8
+
+    return _apply_validity_override(colors, validity)
+
+
+def rank_to_rgba(
+    ranks: ArrayLike1D,
+    *,
+    validity: BoolArrayLike1D | None = None,
+    alpha: int = 255,
+) -> RGBAArray:
+    """Map integer candidate ranks to a stable categorical RGBA palette.
+
+    Args:
+        ranks: Candidate ranks where rank ``0`` receives the first palette
+            color.
+        validity: Optional candidate validity mask.  Invalid candidates override
+            the rank color with :data:`INVALID_RGBA`.
+        alpha: Alpha channel for valid rank colors.
+
+    Returns:
+        ``uint8`` array with shape ``(N, 4)``.
+    """
+
+    values = _as_1d_array(ranks, name="ranks", dtype=np.int64)
+    alpha_u8 = _validate_uint8_scalar(alpha, name="alpha")
+    colors = np.empty((values.shape[0], 4), dtype=np.uint8)
+    palette_idx = np.mod(values, _RANK_PALETTE.shape[0])
+    colors[:, :3] = _RANK_PALETTE[palette_idx]
+    colors[:, 3] = alpha_u8
+    return _apply_validity_override(colors, validity)
+
+
+def validity_to_rgba(validity: BoolArrayLike1D) -> RGBAArray:
+    """Map candidate validity directly to valid/invalid RGBA colors.
+
+    Args:
+        validity: Candidate validity mask.
+
+    Returns:
+        ``uint8`` array with shape ``(N, 4)``.
+    """
+
+    mask = _as_bool_array(validity, count=None)
+    colors = np.tile(INVALID_RGBA, (mask.shape[0], 1))
+    colors[mask] = VALID_RGBA
+    return colors
+
+
+def candidate_rgba(
+    mode: ColorMode,
+    *,
+    oracle_rri: ArrayLike1D | None = None,
+    ranks: ArrayLike1D | None = None,
+    validity: BoolArrayLike1D | None = None,
+    alpha: int = 255,
+) -> RGBAArray:
+    """Return candidate colors for the requested scalar or categorical mode.
+
+    Args:
+        mode: Color mapping mode, one of ``"oracle_rri"``, ``"rank"``, or
+            ``"validity"``.
+        oracle_rri: RRI values required for ``mode="oracle_rri"``.
+        ranks: Rank values required for ``mode="rank"``.
+        validity: Validity mask used either directly or as an override.
+        alpha: Alpha channel for valid non-validity color modes.
+
+    Returns:
+        ``uint8`` array with shape ``(N, 4)``.
+    """
+
+    if mode == "oracle_rri":
+        if oracle_rri is None:
+            raise ValueError("oracle_rri is required when mode='oracle_rri'")
+        return oracle_rri_to_rgba(oracle_rri, validity=validity, alpha=alpha)
+    if mode == "rank":
+        if ranks is None:
+            raise ValueError("ranks is required when mode='rank'")
+        return rank_to_rgba(ranks, validity=validity, alpha=alpha)
+    if validity is None:
+        raise ValueError("validity is required when mode='validity'")
+    return validity_to_rgba(validity)
+
+
+def _as_1d_array(values: ArrayLike1D, *, name: str, dtype: np.dtype | type[np.generic]) -> np.ndarray:
+    """Convert a tensor or array-like input to a one-dimensional NumPy array."""
+
+    if isinstance(values, torch.Tensor):
+        arr = values.detach().cpu().numpy()
+    else:
+        arr = np.asarray(values)
+    arr = arr.reshape(-1)
+    return arr.astype(dtype, copy=False)
+
+
+def _as_bool_array(values: BoolArrayLike1D, *, count: int | None) -> np.ndarray:
+    """Convert a tensor or array-like mask to one-dimensional boolean values."""
+
+    if isinstance(values, torch.Tensor):
+        arr = values.detach().cpu().numpy()
+    else:
+        arr = np.asarray(values)
+    mask = arr.reshape(-1).astype(bool, copy=False)
+    if count is not None and mask.shape[0] != count:
+        raise ValueError(f"validity length {mask.shape[0]} must match color count {count}")
+    return mask
+
+
+def _apply_validity_override(colors: RGBAArray, validity: BoolArrayLike1D | None) -> RGBAArray:
+    """Apply invalid-candidate coloring to a copied RGBA array."""
+
+    out = colors.copy()
+    if validity is None:
+        return out
+    mask = _as_bool_array(validity, count=out.shape[0])
+    out[~mask] = INVALID_RGBA
+    return out
+
+
+def _interpolate_rgb(stops: np.ndarray, normalized: np.ndarray) -> NDArray[np.uint8]:
+    """Interpolate RGB palette stops for normalized values in ``[0, 1]``."""
+
+    positions = np.linspace(0.0, 1.0, num=stops.shape[0], dtype=np.float32)
+    rgb = np.empty((normalized.shape[0], 3), dtype=np.float32)
+    for channel in range(3):
+        rgb[:, channel] = np.interp(normalized, positions, stops[:, channel])
+    return np.rint(rgb).astype(np.uint8)
+
+
+def _validate_uint8_scalar(value: int, *, name: str) -> np.uint8:
+    """Validate and convert an integer-like value to ``uint8``."""
+
+    value_int = int(value)
+    if value_int < 0 or value_int > 255:
+        raise ValueError(f"{name} must be in [0, 255], got {value}")
+    return np.uint8(value_int)
+
+
+__all__ = [
+    "ColorMode",
+    "RGBAArray",
+    "VALID_RGBA",
+    "INVALID_RGBA",
+    "UNKNOWN_RGBA",
+    "candidate_rgba",
+    "oracle_rri_to_rgba",
+    "rank_to_rgba",
+    "validity_to_rgba",
+]

@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,11 +27,15 @@ from typing import Any
 
 import numpy as np
 import torch
+from efm3d.aria.aria_constants import ARIA_OBB_SEM_ID_TO_NAME
+from efm3d.aria.obb import ObbTW
 from efm3d.aria.pose import PoseTW
+from numpy.typing import DTypeLike, NDArray
 from pydantic import Field, field_validator
 
 from ..configs import PathConfig
 from ..pipelines.oracle_rri_labeler import OracleRriLabelerConfig, OracleRriSample
+from ..pose_generation.types import CandidateSamplingResult
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..rri_metrics.types import RriResult
@@ -123,10 +128,10 @@ def _default_sample_key(scene_id: str, snippet_id: str) -> str:
 
 
 def _to_numpy(
-    value: torch.Tensor | np.ndarray | bool | int | float,
+    value: torch.Tensor | NDArray[Any] | bool | int | float,
     *,
-    dtype: np.dtype[Any] | None = None,
-) -> np.ndarray:
+    dtype: DTypeLike | None = None,
+) -> NDArray[Any]:
     """Convert a scalar or tensor-like value into a NumPy array.
 
     Args:
@@ -148,21 +153,23 @@ def _to_numpy(
     return array
 
 
-def _pose_to_numpy(pose: PoseTW) -> np.ndarray:
+def _pose_to_numpy(pose: PoseTW) -> NDArray[Any]:
     """Convert a ``PoseTW`` into a CPU float32 NumPy array."""
 
-    array = _to_numpy(pose.tensor(), dtype=np.float32)
+    if pose._data is None:
+        raise ValueError("PoseTW payload is empty; cannot persist pose block.")
+    array = _to_numpy(pose._data, dtype=np.float32)
     if array.ndim == 3 and array.shape[0] == 1:
         return array[0]
     return array
 
 
 def _pad_first_axis(
-    array: np.ndarray,
+    array: NDArray[Any],
     *,
     target_len: int,
     fill_value: float | int | bool,
-) -> np.ndarray:
+) -> NDArray[Any]:
     """Pad or truncate the first axis of an array.
 
     Args:
@@ -186,13 +193,86 @@ def _pad_first_axis(
     return np.concatenate([array, pad], axis=0)
 
 
-def _camera_param_to_numpy(param: Any, *, dtype: np.dtype[Any]) -> np.ndarray:
+def _stack_numeric_rows(block_name: str, rows: list[PreparedVinOfflineSample]) -> NDArray[Any]:
+    """Stack a numeric block, padding variable first-axis payloads when needed."""
+
+    exemplar = next(row.numeric_blocks[block_name] for row in rows if block_name in row.numeric_blocks)
+    values = [row.numeric_blocks.get(block_name) for row in rows]
+    present = [value for value in values if value is not None]
+    if not present:
+        raise ValueError(f"No rows materialized numeric block {block_name!r}.")
+    shapes = [tuple(value.shape) for value in present]
+    if all(shape == shapes[0] for shape in shapes):
+        return np.stack([value if value is not None else np.zeros_like(exemplar) for value in values], axis=0)
+    if exemplar.ndim == 0:
+        raise ValueError(f"Cannot stack scalar block {block_name!r} with mismatched shapes {shapes}.")
+    trailing = tuple(exemplar.shape[1:])
+    if any(tuple(value.shape[1:]) != trailing for value in present):
+        raise ValueError(f"Cannot stack block {block_name!r} with incompatible shapes {shapes}.")
+    target_len = max(int(value.shape[0]) for value in present)
+    if np.issubdtype(exemplar.dtype, np.floating):
+        fill_value: float | int | bool = np.nan
+    elif np.issubdtype(exemplar.dtype, np.integer):
+        fill_value = -1
+    elif np.issubdtype(exemplar.dtype, np.bool_):
+        fill_value = False
+    else:
+        fill_value = 0
+    stacked_values = [
+        _pad_first_axis(
+            value if value is not None else np.zeros_like(exemplar), target_len=target_len, fill_value=fill_value
+        )
+        for value in values
+    ]
+    return np.stack(stacked_values, axis=0)
+
+
+def _camera_param_to_numpy(
+    param: torch.Tensor | NDArray[Any] | bool | int | float, *, dtype: DTypeLike
+) -> NDArray[Any]:
     """Convert one PyTorch3D camera parameter into a NumPy array."""
 
     array = _to_numpy(param, dtype=dtype)
     if array.ndim == 0:
         return array.reshape(1)
     return array
+
+
+def _wrapper_to_numpy(value: ObbTW | torch.Tensor | None, *, dtype: DTypeLike) -> NDArray[Any] | None:
+    """Convert an optional OBB wrapper or tensor to a NumPy array."""
+
+    if value is None:
+        return None
+    if isinstance(value, torch.Tensor):
+        return _to_numpy(value, dtype=dtype)
+    if value._data is None:
+        raise ValueError("ObbTW payload is empty; cannot persist detected OBB block.")
+    return _to_numpy(value._data, dtype=dtype)
+
+
+def _probabilities_to_numpy(values: torch.Tensor | Sequence[torch.Tensor] | None) -> NDArray[Any] | None:
+    """Convert optional OBB probability payloads to a dense float array."""
+
+    if values is None:
+        return None
+    if isinstance(values, torch.Tensor):
+        return _to_numpy(values, dtype=np.float32)
+    shapes = {tuple(item.shape) for item in values}
+    if len(shapes) != 1:
+        raise ValueError(f"Detected OBB probability tensors must share one shape, got {sorted(shapes)}.")
+    return _to_numpy(torch.stack(list(values), dim=0), dtype=np.float32)
+
+
+def _semantic_names_payload(
+    value: Mapping[object, object] | Sequence[object] | None,
+) -> list[str] | dict[str, str] | None:
+    """Normalize semantic-name mappings for msgpack records."""
+
+    if value is None:
+        return None
+    if isinstance(value, Mapping):
+        return {str(key): str(item) for key, item in value.items()}
+    return [str(item) for item in value]
 
 
 def _keep_field(field_name: str, keep_fields: set[str] | None) -> bool:
@@ -230,7 +310,7 @@ class PreparedVinOfflineSample:
     snippet_id: str
     """ASE snippet identifier."""
 
-    numeric_blocks: dict[str, np.ndarray] = field(default_factory=dict)
+    numeric_blocks: dict[str, NDArray[Any]] = field(default_factory=dict)
     """Fixed-size numeric blocks stored per row."""
 
     record_blocks: dict[str, Any] = field(default_factory=dict)
@@ -242,16 +322,20 @@ def prepare_vin_offline_sample(
     scene_id: str,
     snippet_id: str,
     vin_snippet: VinSnippetView,
-    candidates: Any | None,
+    candidates: CandidateSamplingResult | None,
     depths: CandidateDepths,
     rri: RriResult,
     candidate_pcs: CandidatePointClouds | None,
     backbone_out: EvlBackboneOutput | None,
     max_candidates: int,
+    source_sample: EfmSnippetView | None = None,
     include_depths: bool = True,
     include_candidate_pcs: bool = True,
     include_backbone: bool = True,
     include_diagnostic_payloads: bool = False,
+    include_gt_obbs: bool = True,
+    include_detected_obbs: bool = True,
+    include_trajectory_metadata: bool = True,
     backbone_numeric_keep_fields: set[str] | None = None,
     backbone_payload_keep_fields: set[str] | None = None,
     sample_key: str | None = None,
@@ -267,6 +351,7 @@ def prepare_vin_offline_sample(
         rri: Oracle metrics aligned with the rendered candidates.
         candidate_pcs: Optional candidate point clouds for diagnostics.
         backbone_out: Optional backbone outputs for training or diagnostics.
+        source_sample: Optional raw EFM snippet used for compact GT modalities.
         max_candidates: Maximum number of candidates stored in fixed blocks.
         include_depths: Whether to materialize numeric depth blocks.
         include_candidate_pcs: Whether candidate point clouds may be written
@@ -276,6 +361,9 @@ def prepare_vin_offline_sample(
             as full depth DTOs, candidate DTOs, candidate point clouds, and
             full backbone payloads. Defaults off because numeric blocks are the
             canonical training contract.
+        include_gt_obbs: Whether to persist compact GT OBB tensors from the raw snippet.
+        include_detected_obbs: Whether to persist compact detected OBB tensors from the backbone.
+        include_trajectory_metadata: Whether to persist trajectory timestamps and gravity.
         backbone_numeric_keep_fields: Optional EVL backbone field keep-list for
             fixed numeric blocks. ``None`` preserves legacy behavior by writing
             all supported numeric fields.
@@ -312,7 +400,7 @@ def prepare_vin_offline_sample(
     if candidate_indices.shape[0] != candidate_count:
         raise ValueError("CandidateDepths.candidate_indices must align with rendered candidates.")
 
-    numeric_blocks: dict[str, np.ndarray] = {
+    numeric_blocks: dict[str, NDArray[Any]] = {
         "vin.points_world": points_world,
         "vin.lengths": lengths,
         "vin.t_world_rig": t_world_rig,
@@ -425,6 +513,32 @@ def prepare_vin_offline_sample(
             if value is not None:
                 numeric_blocks[f"backbone.{field_name}"] = _to_numpy(value, dtype=dtype)
 
+    if include_trajectory_metadata and source_sample is not None:
+        trajectory = source_sample.trajectory
+        numeric_blocks["vin.trajectory.time_ns"] = _to_numpy(trajectory.time_ns, dtype=np.int64)
+        numeric_blocks["vin.trajectory.gravity_in_world"] = _to_numpy(trajectory.gravity_in_world, dtype=np.float32)
+
+    if include_gt_obbs and source_sample is not None:
+        gt_obbs = source_sample.obbs
+        if gt_obbs is not None:
+            if gt_obbs.obbs._data is None:
+                raise ValueError("ObbTW payload is empty; cannot persist GT OBB block.")
+            numeric_blocks["gt.obbs"] = _to_numpy(gt_obbs.obbs._data, dtype=np.float32)
+
+    if include_detected_obbs and backbone_out is not None:
+        detected_source = backbone_out.obb_pred_viz if backbone_out.obb_pred_viz is not None else backbone_out.obb_pred
+        detected = _wrapper_to_numpy(detected_source, dtype=np.float32)
+        if detected is not None:
+            numeric_blocks["detected.obbs"] = detected
+        probs_source = (
+            backbone_out.obb_pred_probs_full_viz
+            if backbone_out.obb_pred_probs_full_viz is not None
+            else backbone_out.obb_pred_probs_full
+        )
+        probs = _probabilities_to_numpy(probs_source)
+        if probs is not None:
+            numeric_blocks["detected.obb_probs"] = probs
+
     record_blocks: dict[str, Any] = {}
     if include_diagnostic_payloads and include_depths:
         record_blocks["oracle.depths_payload"] = depths.to_serializable()
@@ -436,6 +550,12 @@ def prepare_vin_offline_sample(
         record_blocks["backbone.payload"] = backbone_out.to_serializable(
             include_fields=backbone_payload_keep_fields,
         )
+    if include_gt_obbs and source_sample is not None:
+        sem_id_to_name = _semantic_names_payload(source_sample.efm.get(ARIA_OBB_SEM_ID_TO_NAME))
+        if sem_id_to_name is not None:
+            record_blocks["gt.obb_sem_id_to_name"] = sem_id_to_name
+    if include_detected_obbs and backbone_out is not None and backbone_out.obb_pred_sem_id_to_name is not None:
+        record_blocks["detected.obb_sem_id_to_name"] = _semantic_names_payload(backbone_out.obb_pred_sem_id_to_name)
 
     return PreparedVinOfflineSample(
         sample_key=sample_key or _default_sample_key(scene_id, snippet_id),
@@ -471,11 +591,7 @@ def flush_prepared_samples_to_shard(
     block_specs: dict[str, Any] = {}
     numeric_block_names = sorted({name for row in rows for name in row.numeric_blocks})
     for block_name in numeric_block_names:
-        exemplar = next(row.numeric_blocks[block_name] for row in rows if block_name in row.numeric_blocks)
-        stacked = np.stack(
-            [row.numeric_blocks.get(block_name, np.zeros_like(exemplar)) for row in rows],
-            axis=0,
-        )
+        stacked = _stack_numeric_rows(block_name, rows)
         block_specs[block_name] = shard_writer.write_numeric_block(block_name, stacked)
 
     record_block_names = sorted({name for row in rows for name in row.record_blocks})
@@ -512,7 +628,7 @@ def _assign_splits(
     *,
     records: list[VinOfflineIndexRecord],
     val_fraction: float,
-) -> dict[str, np.ndarray]:
+) -> dict[str, NDArray[Any]]:
     """Assign deterministic split membership to global sample indices.
 
     Args:
@@ -582,6 +698,15 @@ class VinOfflineWriterConfig(BaseConfig):
 
     include_counterfactuals: bool = False
     """Whether to materialize future counterfactual payloads."""
+
+    include_gt_obbs: bool = True
+    """Whether to persist compact GT OBB tensors from raw snippets."""
+
+    include_detected_obbs: bool = True
+    """Whether to persist compact detected OBB tensors from backbone outputs."""
+
+    include_trajectory_metadata: bool = True
+    """Whether to persist trajectory timestamps and gravity."""
 
     backbone_numeric_keep_fields: list[str] | None = Field(
         default_factory=lambda: list(DEFAULT_BACKBONE_NUMERIC_KEEP_FIELDS),
@@ -721,10 +846,14 @@ class VinOfflineWriter:
             candidate_pcs=label_batch.candidate_pcs if self.config.include_pointclouds else None,
             backbone_out=backbone_out if self.config.include_backbone else None,
             max_candidates=max_candidates,
+            source_sample=sample,
             include_depths=self.config.include_depths,
             include_candidate_pcs=self.config.include_pointclouds,
             include_backbone=self.config.include_backbone,
             include_diagnostic_payloads=self.config.include_diagnostic_payloads,
+            include_gt_obbs=self.config.include_gt_obbs,
+            include_detected_obbs=self.config.include_detected_obbs,
+            include_trajectory_metadata=self.config.include_trajectory_metadata,
             backbone_numeric_keep_fields=(
                 set(self.config.backbone_numeric_keep_fields)
                 if self.config.backbone_numeric_keep_fields is not None
@@ -816,6 +945,8 @@ class VinOfflineWriter:
             shard_spec.row_start = row_start
             row_start += int(shard_spec.num_rows)
 
+        materialized_block_names = {block_name for shard_spec in shard_specs for block_name in shard_spec.blocks}
+
         manifest = VinOfflineManifest(
             version=OFFLINE_DATASET_VERSION,
             created_at=_utc_now_iso(),
@@ -847,6 +978,12 @@ class VinOfflineWriter:
                 depths=bool(self.config.include_depths),
                 candidate_pcs=bool(self.config.include_diagnostic_payloads and self.config.include_pointclouds),
                 counterfactuals=bool(self.config.include_counterfactuals),
+                gt_obbs="gt.obbs" in materialized_block_names,
+                detected_obbs="detected.obbs" in materialized_block_names,
+                trajectory=(
+                    "vin.trajectory.time_ns" in materialized_block_names
+                    or "vin.trajectory.gravity_in_world" in materialized_block_names
+                ),
             ),
             stats={
                 "num_samples": len(index_records),

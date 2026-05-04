@@ -24,6 +24,7 @@ import torch
 from pydantic import Field, field_validator, model_validator
 
 from ..configs import OptunaConfig, PathConfig
+from ..data_handling import VinOfflineSourceConfig
 from ..utils import BaseConfig, Console, Stage
 from ..utils.console import Verbosity
 from .lit_datamodule import VinDataModule, VinDataModuleConfig
@@ -260,6 +261,20 @@ class AriaNBVExperimentConfig(BaseConfig):
         out_dir = self.resolved_out_dir
         if self.run_mode in ("summarize_vin", "plot_vin_encodings"):
             object.__setattr__(self.trainer_config, "use_wandb", False)
+            object.__setattr__(self.datamodule_config, "num_workers", 0)
+            object.__setattr__(self.datamodule_config, "persistent_workers", False)
+            object.__setattr__(
+                self.datamodule_config,
+                "batch_size",
+                1 if self.datamodule_config.source.is_map_style else None,
+            )
+            object.__setattr__(self.datamodule_config, "shuffle", False)
+            if isinstance(self.datamodule_config.source, VinOfflineSourceConfig):
+                object.__setattr__(
+                    self.datamodule_config.source.offline,
+                    "include_efm_snippet",
+                    False,
+                )
 
         if self.fit_binner_only:
             object.__setattr__(self, "run_mode", "fit_binner")

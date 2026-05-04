@@ -19,13 +19,15 @@ from .vin_adapter import (
     pad_vin_points,
     vin_snippet_cache_config_hash,
 )
-from .vin_oracle_types import VinOracleBatch, VinOracleDatasetBase
+from .vin_oracle_types import CompactObbBlock, CompactTrajectoryBlock, VinOracleBatch, VinOracleDatasetBase
 
 VinOnlineDatasetConfig = VinOracleOnlineDatasetConfig
 """Stable alias for the online VIN dataset configuration."""
 
 __all__ = [
     "DEFAULT_VIN_SNIPPET_PAD_POINTS",
+    "CompactObbBlock",
+    "CompactTrajectoryBlock",
     "VinOnlineDatasetConfig",
     "VinOracleBatch",
     "VinOracleDatasetBase",

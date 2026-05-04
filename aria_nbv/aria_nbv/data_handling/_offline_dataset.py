@@ -14,7 +14,7 @@ msgspec record lists only when requested.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -22,7 +22,7 @@ import numpy as np
 import torch
 from efm3d.aria.pose import PoseTW
 from pydantic import Field, field_validator
-from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
+from pytorch3d.renderer.cameras import PerspectiveCameras
 from torch import Tensor
 from torch.utils.data import Dataset
 
@@ -35,7 +35,7 @@ from ..vin.types import EvlBackboneOutput
 from ._offline_format import VinOfflineIndexRecord
 from ._offline_store import VinOfflineStoreConfig, VinOfflineStoreReader
 from ._raw import EfmSnippetLoader, EfmSnippetView, VinSnippetView
-from .vin_oracle_types import VinOracleBatch
+from .vin_oracle_types import CompactObbBlock, CompactTrajectoryBlock, VinOracleBatch
 
 
 @dataclass(slots=True)
@@ -95,6 +95,12 @@ class VinOfflineSample:
     oracle: VinOfflineOracleBlock
     """Oracle-label block stored for the sample."""
 
+    sample_index: int = -1
+    """Global zero-based sample index from ``sample_index.jsonl``."""
+
+    split: str = "all"
+    """Split membership from ``sample_index.jsonl``."""
+
     candidates: CandidateSamplingResult | None = None
     """Optional candidate-sampling payload preserved for diagnostics."""
 
@@ -112,6 +118,15 @@ class VinOfflineSample:
 
     efm_snippet_view: EfmSnippetView | None = None
     """Optional raw EFM snippet view attached live from the source dataset."""
+
+    gt_obbs: CompactObbBlock | None = None
+    """Optional compact GT OBBs decoded from persisted blocks."""
+
+    detected_obbs: CompactObbBlock | None = None
+    """Optional compact detected OBBs decoded from persisted blocks."""
+
+    trajectory: CompactTrajectoryBlock | None = None
+    """Optional persisted trajectory timing and gravity metadata."""
 
     def to_vin_oracle_batch(self) -> VinOracleBatch:
         """Convert the offline sample into a model-facing VIN batch.
@@ -140,6 +155,9 @@ class VinOfflineSample:
             scene_id=self.scene_id,
             snippet_id=self.snippet_id,
             backbone_out=self.backbone_out,
+            gt_obbs=self.gt_obbs,
+            detected_obbs=self.detected_obbs,
+            trajectory=self.trajectory,
         )
 
 
@@ -190,6 +208,15 @@ class VinOfflineDatasetConfig(BaseConfig):
 
     load_counterfactuals: bool = True
     """Whether to decode future counterfactual blocks when present."""
+
+    load_gt_obbs: bool = True
+    """Whether to decode compact GT OBB blocks."""
+
+    load_detected_obbs: bool = True
+    """Whether to decode compact detected OBB blocks."""
+
+    load_trajectory_metadata: bool = True
+    """Whether to decode compact trajectory timing/gravity blocks."""
 
     return_format: Literal["sample", "vin_batch"] = "sample"
     """Whether to return full offline samples or model-facing VIN batches."""
@@ -273,7 +300,7 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
 
         return len(self._records)
 
-    def __getitem__(self, idx: int) -> VinOfflineSample | VinOracleBatch:  # type: ignore[override]
+    def __getitem__(self, idx: int) -> VinOfflineSample | VinOracleBatch:
         """Return one offline sample or VIN batch.
 
         Args:
@@ -634,6 +661,80 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
             return None
         return self._store.read_optional_record(record, "counterfactuals")
 
+    def _build_gt_obbs(self, record: VinOfflineIndexRecord) -> CompactObbBlock | None:
+        """Decode compact GT OBB tensors when requested and available."""
+
+        if not self.config.load_gt_obbs:
+            return None
+        if not self.manifest.materialized_blocks.gt_obbs:
+            return None
+        if not self._has_block("gt.obbs"):
+            return None
+        sem_id_to_name = self._normalize_semantic_names(
+            self._store.read_optional_record(record, "gt.obb_sem_id_to_name")
+        )
+        return CompactObbBlock(
+            obbs=self._tensor(self._store.read_numeric_block(record, "gt.obbs"), dtype=torch.float32),
+            sem_id_to_name=sem_id_to_name,
+        )
+
+    def _build_detected_obbs(self, record: VinOfflineIndexRecord) -> CompactObbBlock | None:
+        """Decode compact detected OBB tensors when requested and available."""
+
+        if not self.config.load_detected_obbs:
+            return None
+        if not self.manifest.materialized_blocks.detected_obbs:
+            return None
+        if not self._has_block("detected.obbs"):
+            return None
+        probs = None
+        if self._has_block("detected.obb_probs"):
+            probs = self._tensor(self._store.read_numeric_block(record, "detected.obb_probs"), dtype=torch.float32)
+        sem_id_to_name = self._normalize_semantic_names(
+            self._store.read_optional_record(record, "detected.obb_sem_id_to_name")
+        )
+        return CompactObbBlock(
+            obbs=self._tensor(self._store.read_numeric_block(record, "detected.obbs"), dtype=torch.float32),
+            sem_id_to_name=sem_id_to_name,
+            probs=probs,
+        )
+
+    @staticmethod
+    def _normalize_semantic_names(value: object | None) -> list[str] | None:
+        """Normalize stored semantic maps to an index-ordered list when possible."""
+
+        if value is None:
+            return None
+        if isinstance(value, list):
+            return [str(item) for item in value]
+        if isinstance(value, Mapping):
+            try:
+                keys = sorted(value, key=lambda item: int(item))
+            except (TypeError, ValueError):
+                keys = sorted(value)
+            return [str(value[key]) for key in keys]
+        return None
+
+    def _build_trajectory_metadata(self, record: VinOfflineIndexRecord) -> CompactTrajectoryBlock | None:
+        """Decode compact trajectory timing/gravity metadata."""
+
+        if not self.config.load_trajectory_metadata:
+            return None
+        if not self.manifest.materialized_blocks.trajectory:
+            return None
+        time_ns = None
+        gravity = None
+        if self._has_block("vin.trajectory.time_ns"):
+            time_ns = self._tensor(self._store.read_numeric_block(record, "vin.trajectory.time_ns"), dtype=torch.int64)
+        if self._has_block("vin.trajectory.gravity_in_world"):
+            gravity = self._tensor(
+                self._store.read_numeric_block(record, "vin.trajectory.gravity_in_world"),
+                dtype=torch.float32,
+            )
+        if time_ns is None and gravity is None:
+            return None
+        return CompactTrajectoryBlock(time_ns=time_ns, gravity_in_world=gravity)
+
     def _ensure_loader(self) -> EfmSnippetLoader:
         """Create or reuse the worker-local raw snippet loader.
 
@@ -696,12 +797,17 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
             snippet_id=record.snippet_id,
             vin_snippet=vin_snippet,
             oracle=oracle,
+            sample_index=int(record.sample_index),
+            split=record.split,
             candidates=self._build_candidates(record),
             backbone_out=self._build_backbone(record),
             depths=self._build_depths(record, oracle),
             candidate_pcs=self._build_candidate_pcs(record),
             counterfactuals=self._build_counterfactuals(record),
             efm_snippet_view=self._attach_efm_snippet(record, vin_snippet),
+            gt_obbs=self._build_gt_obbs(record),
+            detected_obbs=self._build_detected_obbs(record),
+            trajectory=self._build_trajectory_metadata(record),
         )
         return sample
 
@@ -731,6 +837,9 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
             scene_id=record.scene_id,
             snippet_id=record.snippet_id,
             backbone_out=self._build_backbone(record),
+            gt_obbs=self._build_gt_obbs(record),
+            detected_obbs=self._build_detected_obbs(record),
+            trajectory=self._build_trajectory_metadata(record),
         )
 
     def get_by_scene_snippet(

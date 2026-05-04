@@ -182,6 +182,27 @@ class VinOfflineSourceConfig(BaseConfig):
     val_split: Literal["train", "val", "all"] = "val"
     """Offline split to use for validation and testing."""
 
+    load_candidates_for_batch: bool = False
+    """Whether VIN-batch reads should decode candidate diagnostics."""
+
+    load_depths_for_batch: bool = False
+    """Whether VIN-batch reads should decode candidate depth diagnostics."""
+
+    load_candidate_pcs_for_batch: bool = False
+    """Whether VIN-batch reads should decode candidate point-cloud diagnostics."""
+
+    load_counterfactuals_for_batch: bool = False
+    """Whether VIN-batch reads should decode counterfactual diagnostics."""
+
+    load_gt_obbs_for_batch: bool = True
+    """Whether VIN-batch reads should decode compact GT OBB blocks."""
+
+    load_detected_obbs_for_batch: bool = True
+    """Whether VIN-batch reads should decode compact detected OBB blocks."""
+
+    load_trajectory_metadata_for_batch: bool = True
+    """Whether VIN-batch reads should decode trajectory metadata blocks."""
+
     def setup_target(self, *, split: Stage) -> VinOfflineDataset:  # type: ignore[override]
         """Instantiate the immutable offline VIN dataset for the requested split."""
 
@@ -191,10 +212,13 @@ class VinOfflineSourceConfig(BaseConfig):
         offline_cfg.store.paths = self.paths
         offline_cfg.split = dataset_split
         offline_cfg.return_format = "vin_batch"
-        offline_cfg.load_candidates = False
-        offline_cfg.load_depths = False
-        offline_cfg.load_candidate_pcs = False
-        offline_cfg.load_counterfactuals = False
+        offline_cfg.load_candidates = bool(self.load_candidates_for_batch)
+        offline_cfg.load_depths = bool(self.load_depths_for_batch)
+        offline_cfg.load_candidate_pcs = bool(self.load_candidate_pcs_for_batch)
+        offline_cfg.load_counterfactuals = bool(self.load_counterfactuals_for_batch)
+        offline_cfg.load_gt_obbs = bool(self.load_gt_obbs_for_batch)
+        offline_cfg.load_detected_obbs = bool(self.load_detected_obbs_for_batch)
+        offline_cfg.load_trajectory_metadata = bool(self.load_trajectory_metadata_for_batch)
         return offline_cfg.setup_target()
 
     @property

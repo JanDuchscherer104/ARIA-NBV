@@ -8,7 +8,7 @@ import pytest
 import torch
 from efm3d.aria.pose import PoseTW
 
-from aria_nbv.data_handling import VinOracleBatch, VinSnippetView
+from aria_nbv.data_handling import CompactObbBlock, CompactTrajectoryBlock, VinOracleBatch, VinSnippetView
 from aria_nbv.lightning.lit_module import VinLightningModule, VinLightningModuleConfig
 from aria_nbv.rri_metrics.coral import coral_expected_from_logits, coral_logits_to_prob
 from aria_nbv.rri_metrics.rri_binning import RriOrdinalBinner
@@ -101,6 +101,39 @@ def _make_snippet() -> VinSnippetView:
     )
 
 
+def _make_compact_batch(*, sem_names: list[str] | None = None, offset: float = 0.0) -> VinOracleBatch:
+    """Build a compact-modality batch fixture."""
+
+    return VinOracleBatch(
+        efm_snippet_view=None,
+        candidate_poses_world_cam=_identity_pose(2),
+        reference_pose_world_rig=PoseTW(_identity_pose(1).tensor().squeeze(0)),
+        rri=torch.tensor([0.1 + offset, 0.2 + offset], dtype=torch.float32),
+        pm_dist_before=torch.ones(2, dtype=torch.float32),
+        pm_dist_after=torch.ones(2, dtype=torch.float32),
+        pm_acc_before=torch.ones(2, dtype=torch.float32),
+        pm_comp_before=torch.ones(2, dtype=torch.float32),
+        pm_acc_after=torch.ones(2, dtype=torch.float32),
+        pm_comp_after=torch.ones(2, dtype=torch.float32),
+        p3d_cameras=_make_cameras(2),
+        scene_id=f"scene-{offset}",
+        snippet_id=f"snip-{offset}",
+        gt_obbs=CompactObbBlock(
+            obbs=torch.full((2, 34), offset, dtype=torch.float32),
+            sem_id_to_name=sem_names,
+        ),
+        detected_obbs=CompactObbBlock(
+            obbs=torch.full((1, 2, 34), offset + 1.0, dtype=torch.float32),
+            sem_id_to_name=sem_names,
+            probs=torch.full((2, 3), 1.0 / 3.0, dtype=torch.float32),
+        ),
+        trajectory=CompactTrajectoryBlock(
+            time_ns=torch.tensor([100, 200], dtype=torch.int64) + int(offset),
+            gravity_in_world=torch.tensor([0.0, 0.0, -9.81], dtype=torch.float32),
+        ),
+    )
+
+
 def test_collate_vin_oracle_batches_pads_candidates() -> None:
     """Pad candidate sets and backbone outputs to a shared batch shape."""
     batch_size = 2
@@ -156,6 +189,38 @@ def test_collate_vin_oracle_batches_pads_candidates() -> None:
     assert backbone.occ_pr is not None  # noqa: S101
     assert backbone.occ_pr.shape[0] == batch_size  # noqa: S101
     assert backbone.voxel_extent.shape == (batch_size, 6)  # noqa: S101
+
+
+def test_collate_batches_compact_obbs_and_trajectory() -> None:
+    """Compact numeric OBB and trajectory blocks should stack for training."""
+
+    batch_a = _make_compact_batch(sem_names=["chair", "table"], offset=0.0)
+    batch_b = _make_compact_batch(sem_names=["chair", "table"], offset=10.0)
+
+    batched = VinOracleBatch.collate([batch_a, batch_b])
+
+    assert batched.gt_obbs is not None  # noqa: S101
+    assert batched.gt_obbs.obbs.shape == (2, 2, 34)  # noqa: S101
+    assert batched.gt_obbs.sem_id_to_name == ["chair", "table"]  # noqa: S101
+    assert batched.detected_obbs is not None  # noqa: S101
+    assert batched.detected_obbs.obbs.shape == (2, 2, 34)  # noqa: S101
+    assert batched.detected_obbs.probs is not None  # noqa: S101
+    assert batched.detected_obbs.probs.shape == (2, 2, 3)  # noqa: S101
+    assert batched.trajectory is not None  # noqa: S101
+    assert batched.trajectory.time_ns is not None  # noqa: S101
+    assert batched.trajectory.time_ns.shape == (2, 2)  # noqa: S101
+    assert batched.trajectory.gravity_in_world is not None  # noqa: S101
+    assert batched.trajectory.gravity_in_world.shape == (2, 3)  # noqa: S101
+
+
+def test_collate_rejects_inconsistent_compact_obb_semantic_maps() -> None:
+    """Semantic maps are part of the batch contract for compact OBBs."""
+
+    batch_a = _make_compact_batch(sem_names=["chair", "table"], offset=0.0)
+    batch_b = _make_compact_batch(sem_names=["chair", "lamp"], offset=10.0)
+
+    with pytest.raises(ValueError, match="gt_obbs.sem_id_to_name must match"):
+        VinOracleBatch.collate([batch_a, batch_b])
 
 
 def test_collate_vin_snippet_view_pads_points_and_traj() -> None:

@@ -14,7 +14,7 @@ from typing import Any
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic._internal._utils import deep_update
-from pydantic_settings import SettingsConfigDict
+from pydantic_settings import PydanticBaseSettingsSource, SettingsConfigDict
 
 from aria_nbv.configs import PathConfig
 from aria_nbv.lightning.aria_nbv_experiment import AriaNBVExperimentConfig
@@ -57,6 +57,19 @@ class CLIAriaNBVExperimentConfig(AriaNBVExperimentConfig):
         cli_avoid_json=True,
         env_prefix="ARIA_NBV_",
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[Any],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Use pydantic's CLI source so `_cli_parse_args` is honored."""
+        del settings_cls, env_settings, dotenv_settings, file_secret_settings
+        return (init_settings,)
 
 
 class CLIWandbAnalysisConfig(BaseConfig):

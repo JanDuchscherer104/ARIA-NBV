@@ -48,9 +48,10 @@ alignment. EVL backbone outputs do not use this convention. VinModelV3 therefore
 undoes this rotation before computing pose features. If apply_cw90_correction is
 enabled, callers must pre-correct p3d_cameras and set cw90_corrected=True.
 
-NOTE: vin inputs are typically VinSnippetView with points_world shaped (N,5)
-containing (x, y, z, 1/sigma_d, n_obs). This file enforces that contract to
-avoid silent failure modes.
+NOTE: vin inputs are typically VinSnippetView with points_world shaped (N,4)
+or (N,5) containing (x, y, z, 1/sigma_d) with optional n_obs. This file
+enforces the required XYZ + reliability channel contract to avoid silent
+failure modes.
 
 TODO: Do we differentiate between semi-dense points based on their visibility from each candidate view?
 """
@@ -731,13 +732,14 @@ class VinModelV3(PoseFeatureGlobalContextMixin, nn.Module):
         """Sample semidense points once for shared use.
 
         Semidense projection stats were the most reliable signal in the sweep,
-        so this enforces the (x, y, z, 1/sigma_d, n_obs) channel contract and
-        fails fast on missing/invalid data.
+        so this enforces the required (x, y, z, 1/sigma_d) channel contract and
+        accepts optional n_obs when present. Missing observation counts are
+        handled downstream as equal per-point reliability.
 
         Args:
             snippet (VinSnippetView): Padded semidense snippet.
                 - points_world (Tensor["B, P, C_sem"] or Tensor["P, C_sem"]):
-                  channels (x, y, z, inv_dist_std, obs_count).
+                  channels (x, y, z, inv_dist_std[, obs_count]).
                 - lengths (Tensor["B"], optional): valid lengths per batch item.
             device (torch.device): Target device for returned points.
 
@@ -750,9 +752,9 @@ class VinModelV3(PoseFeatureGlobalContextMixin, nn.Module):
         lengths = getattr(snippet, "lengths", None)
         if points.numel() == 0:
             raise RuntimeError("VinSnippetView.points_world is empty.")
-        if points.shape[-1] < 5:
+        if points.shape[-1] < 4:
             raise ValueError(
-                "VinSnippetView.points_world must have at least 5 channels (x,y,z,1/sigma_d,n_obs).",
+                "VinSnippetView.points_world must have at least 4 channels (x,y,z,1/sigma_d); n_obs is optional.",
             )
         if points.ndim == 2:
             valid_len = None

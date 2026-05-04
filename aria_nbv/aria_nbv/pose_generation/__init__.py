@@ -11,6 +11,14 @@ from .counterfactuals import (
     CounterfactualStepResult,
     CounterfactualTrajectory,
 )
+from .rollout_trace import (
+    RolloutLineage,
+    RolloutStepTrace,
+    RolloutTrace,
+    read_rollout_traces,
+    traces_from_rollout_result,
+    write_rollout_traces,
+)
 from .types import CandidateSamplingResult, CollisionBackend, SamplingStrategy
 from .utils import (
     stats_to_markdown_table,
@@ -31,6 +39,12 @@ __all__ = [
     "CounterfactualSelectionPolicy",
     "CounterfactualStepResult",
     "CounterfactualTrajectory",
+    "RolloutLineage",
+    "RolloutStepTrace",
+    "RolloutTrace",
+    "traces_from_rollout_result",
+    "write_rollout_traces",
+    "read_rollout_traces",
     "CandidateSamplingResult",
     "SamplingStrategy",
     "CollisionBackend",

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import torch
 from efm3d.aria.pose import PoseTW
-from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
+from pytorch3d.renderer.cameras import PerspectiveCameras
 from torch import Tensor
 
 from ..vin.types import EvlBackboneOutput
@@ -21,6 +21,31 @@ from .efm_views import (
 
 if TYPE_CHECKING:
     from ..pipelines.oracle_rri_labeler import OracleRriSample
+
+
+@dataclass(slots=True)
+class CompactObbBlock:
+    """Collatable numeric OBB payload used by training and diagnostics."""
+
+    obbs: Tensor
+    """OBB tensor with shape ``(..., K, 34)`` using EFM ``ObbTW`` layout."""
+
+    sem_id_to_name: list[str] | None = None
+    """Optional semantic id to class-name map."""
+
+    probs: Tensor | None = None
+    """Optional class probabilities aligned with ``obbs``."""
+
+
+@dataclass(slots=True)
+class CompactTrajectoryBlock:
+    """Trajectory metadata persisted alongside VIN snippet poses."""
+
+    time_ns: Tensor | None = None
+    """Pose timestamps with shape ``(F,)`` when available."""
+
+    gravity_in_world: Tensor | None = None
+    """Gravity vector in world frame with shape ``(3,)`` when available."""
 
 
 @dataclass(slots=True)
@@ -89,6 +114,15 @@ class VinOracleBatch:
 
     backbone_out: EvlBackboneOutput | None = None
     """Optional cached EVL backbone outputs (used to skip backbone inference)."""
+
+    gt_obbs: CompactObbBlock | None = None
+    """Optional compact GT OBB payload."""
+
+    detected_obbs: CompactObbBlock | None = None
+    """Optional compact detected OBB payload."""
+
+    trajectory: CompactTrajectoryBlock | None = None
+    """Optional trajectory timing and gravity metadata."""
 
     def resolved_candidate_count(self, *, device: torch.device | None = None) -> Tensor:
         """Return the valid candidate count as a scalar or batched vector."""
@@ -201,6 +235,20 @@ class VinOracleBatch:
                     out[f"backbone.{name}"] = _shape(value)
         else:
             out["backbone"] = "None"
+
+        if self.gt_obbs is not None:
+            out["gt_obbs.obbs"] = _shape(self.gt_obbs.obbs)
+            if self.gt_obbs.probs is not None:
+                out["gt_obbs.probs"] = _shape(self.gt_obbs.probs)
+        if self.detected_obbs is not None:
+            out["detected_obbs.obbs"] = _shape(self.detected_obbs.obbs)
+            if self.detected_obbs.probs is not None:
+                out["detected_obbs.probs"] = _shape(self.detected_obbs.probs)
+        if self.trajectory is not None:
+            if self.trajectory.time_ns is not None:
+                out["trajectory.time_ns"] = _shape(self.trajectory.time_ns)
+            if self.trajectory.gravity_in_world is not None:
+                out["trajectory.gravity_in_world"] = _shape(self.trajectory.gravity_in_world)
 
         return out
 
@@ -335,6 +383,9 @@ class VinOracleBatch:
             scene_id=self.scene_id,
             snippet_id=self.snippet_id,
             backbone_out=self.backbone_out,
+            gt_obbs=self.gt_obbs,
+            detected_obbs=self.detected_obbs,
+            trajectory=self.trajectory,
         )
 
     @classmethod
@@ -462,7 +513,17 @@ class VinOracleBatch:
 
         backbone_out = None
         if any(sample.backbone_out is not None for sample in samples):
-            backbone_out = cls._stack_backbone_outputs([sample.backbone_out for sample in samples])  # type: ignore
+            if any(sample.backbone_out is None for sample in samples):
+                raise ValueError("Cannot batch backbone outputs when some entries are missing.")
+            backbone_out = cls._stack_backbone_outputs(
+                [sample.backbone_out for sample in samples if sample.backbone_out is not None],
+            )
+        gt_obbs = cls._stack_optional_obbs([sample.gt_obbs for sample in samples], name="gt_obbs")
+        detected_obbs = cls._stack_optional_obbs(
+            [sample.detected_obbs for sample in samples],
+            name="detected_obbs",
+        )
+        trajectory = cls._stack_optional_trajectory([sample.trajectory for sample in samples])
         vin_snippet = None
         if has_snippet:
             points_list = [view.points_world for view in snippet_views if view is not None]
@@ -515,6 +576,9 @@ class VinOracleBatch:
             scene_id=scene_id,
             snippet_id=snippet_id,
             backbone_out=backbone_out,
+            gt_obbs=gt_obbs,
+            detected_obbs=detected_obbs,
+            trajectory=trajectory,
         )
 
     @staticmethod
@@ -736,7 +800,58 @@ class VinOracleBatch:
         for value in values[1:]:
             if set(value.keys()) != keys:
                 raise ValueError(f"Cannot batch backbone field '{name}': mismatched dict keys.")
-        return {key: cls._stack_tensor_field([value[key] for value in values], name=f"{name}.{key}") for key in keys}
+        stacked: dict[str, Tensor] = {}
+        for key in keys:
+            field = cls._stack_tensor_field([value[key] for value in values], name=f"{name}.{key}")
+            if field is None:
+                raise ValueError(f"Cannot batch backbone field '{name}.{key}': missing values.")
+            stacked[key] = field
+        return stacked
+
+    @classmethod
+    def _stack_optional_obbs(cls, values: list[CompactObbBlock | None], *, name: str) -> CompactObbBlock | None:
+        """Stack compact numeric OBB payloads."""
+
+        if all(value is None for value in values):
+            return None
+        if any(value is None for value in values):
+            raise ValueError(f"Cannot batch {name}: missing values.")
+        blocks = [value for value in values if value is not None]
+        sem_names = [block.sem_id_to_name for block in blocks]
+        if any(item is not None for item in sem_names):
+            if any(item != sem_names[0] for item in sem_names[1:]):
+                raise ValueError(f"{name}.sem_id_to_name must match across batch.")
+            sem_id_to_name = sem_names[0]
+        else:
+            sem_id_to_name = None
+        obbs = cls._stack_tensor_field([block.obbs for block in blocks], name=f"{name}.obbs")
+        if obbs is None:
+            raise ValueError(f"Cannot batch {name}: missing OBB tensor.")
+        return CompactObbBlock(
+            obbs=obbs,
+            sem_id_to_name=sem_id_to_name,
+            probs=cls._stack_tensor_field([block.probs for block in blocks], name=f"{name}.probs"),
+        )
+
+    @classmethod
+    def _stack_optional_trajectory(
+        cls,
+        values: list[CompactTrajectoryBlock | None],
+    ) -> CompactTrajectoryBlock | None:
+        """Stack optional trajectory metadata."""
+
+        if all(value is None for value in values):
+            return None
+        if any(value is None for value in values):
+            raise ValueError("Cannot batch trajectory metadata: missing values.")
+        trajectories = [value for value in values if value is not None]
+        return CompactTrajectoryBlock(
+            time_ns=cls._stack_tensor_field([item.time_ns for item in trajectories], name="trajectory.time_ns"),
+            gravity_in_world=cls._stack_tensor_field(
+                [item.gravity_in_world for item in trajectories],
+                name="trajectory.gravity_in_world",
+            ),
+        )
 
     @classmethod
     def _stack_backbone_outputs(cls, outputs: list[EvlBackboneOutput]) -> EvlBackboneOutput:
@@ -754,8 +869,8 @@ class VinOracleBatch:
             ("obb_pred", [output.obb_pred for output in outputs]),
             ("obb_pred_viz", [output.obb_pred_viz for output in outputs]),
         ]
-        for field_name, values in obb_fields:
-            if any(value is not None for value in values):
+        for field_name, obb_values in obb_fields:
+            if any(value is not None for value in obb_values):
                 raise NotImplementedError(
                     f"Batching backbone field '{field_name}' is not supported yet. "
                     "Disable OBB outputs or set batch_size=None.",
@@ -765,8 +880,8 @@ class VinOracleBatch:
             ("obb_pred_probs_full", [output.obb_pred_probs_full for output in outputs]),
             ("obb_pred_probs_full_viz", [output.obb_pred_probs_full_viz for output in outputs]),
         ]
-        for field_name, values in list_fields:
-            if any(value is not None for value in values):
+        for field_name, probability_values in list_fields:
+            if any(value is not None for value in probability_values):
                 raise NotImplementedError(
                     f"Batching backbone field '{field_name}' is not supported yet. "
                     "Disable OBB outputs or set batch_size=None.",
@@ -824,4 +939,9 @@ class VinOracleDatasetBase(Protocol):
         """Iterate over VIN oracle batches."""
 
 
-__all__ = ["VinOracleBatch", "VinOracleDatasetBase"]
+__all__ = [
+    "CompactObbBlock",
+    "CompactTrajectoryBlock",
+    "VinOracleBatch",
+    "VinOracleDatasetBase",
+]

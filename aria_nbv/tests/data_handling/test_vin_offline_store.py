@@ -18,6 +18,7 @@ import torch
 
 from aria_nbv.data_handling import (
     OFFLINE_DATASET_VERSION,
+    EfmSnippetView,
     VinOfflineDatasetConfig,
     VinOfflineIndexRecord,
     VinOfflineManifest,
@@ -42,6 +43,12 @@ from aria_nbv.utils import Console, Stage
 from aria_nbv.vin.types import EvlBackboneOutput
 
 PoseTW = pytest.importorskip("efm3d.aria.pose").PoseTW
+ObbTW = pytest.importorskip("efm3d.aria.obb").ObbTW
+aria_constants = pytest.importorskip("efm3d.aria.aria_constants")
+ARIA_OBB_PADDED = aria_constants.ARIA_OBB_PADDED
+ARIA_OBB_SEM_ID_TO_NAME = aria_constants.ARIA_OBB_SEM_ID_TO_NAME
+ARIA_POSE_TIME_NS = aria_constants.ARIA_POSE_TIME_NS
+ARIA_POSE_T_WORLD_RIG = aria_constants.ARIA_POSE_T_WORLD_RIG
 PerspectiveCameras = pytest.importorskip(
     "pytorch3d.renderer.cameras",
 ).PerspectiveCameras
@@ -132,6 +139,57 @@ def _make_vin_snippet(*, offset: float = 0.0) -> VinSnippetView:
     )
 
 
+def _make_obb_tensor(num: int = 2, *, offset: float = 0.0) -> ObbTW:
+    """Build a compact, valid ObbTW payload."""
+
+    bb3 = torch.tensor([[-0.5, 0.5, -0.25, 0.25, -0.1, 0.9]], dtype=torch.float32).repeat(num, 1)
+    bb2 = torch.full((num, 4), -1.0, dtype=torch.float32)
+    pose = _make_pose_batch(num, offset=offset)
+    sem_id = torch.arange(num, dtype=torch.float32).reshape(num, 1)
+    inst_id = torch.arange(num, dtype=torch.float32).reshape(num, 1) + 10.0
+    prob = torch.full((num, 1), 0.9, dtype=torch.float32)
+    moveable = torch.zeros((num, 1), dtype=torch.float32)
+    return ObbTW.from_lmc(
+        bb3_object=bb3,
+        bb2_rgb=bb2,
+        bb2_slaml=bb2,
+        bb2_slamr=bb2,
+        T_world_object=pose,
+        sem_id=sem_id,
+        inst_id=inst_id,
+        prob=prob,
+        moveable=moveable,
+    )
+
+
+def _make_source_sample(*, offset: float = 0.0) -> EfmSnippetView:
+    """Build a minimal EFM snippet carrying compact GT modalities."""
+
+    efm = {
+        ARIA_POSE_T_WORLD_RIG: _make_pose_batch(2, offset=offset),
+        ARIA_POSE_TIME_NS: torch.tensor([100, 200], dtype=torch.int64),
+        "pose/gravity_in_world": torch.tensor([0.0, 0.0, -9.81], dtype=torch.float32),
+        ARIA_OBB_PADDED: ObbTW(_make_obb_tensor(2, offset=offset).tensor().unsqueeze(0).repeat(2, 1, 1)),
+        ARIA_OBB_SEM_ID_TO_NAME: ["chair", "table"],
+    }
+    return EfmSnippetView(
+        efm=efm,
+        scene_id="scene-a",
+        snippet_id="snippet-000",
+        mesh=None,
+        crop_bounds=(
+            torch.tensor([-1.0, -1.0, -1.0], dtype=torch.float32),
+            torch.tensor([1.0, 1.0, 1.0], dtype=torch.float32),
+        ),
+        mesh_verts=torch.tensor(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            dtype=torch.float32,
+        )
+        + offset,
+        mesh_faces=torch.tensor([[0, 1, 2]], dtype=torch.int64),
+    )
+
+
 def _make_stub_backbone() -> EvlBackboneOutput:
     """Build a small EVL backbone payload with both head and internal fields."""
 
@@ -154,6 +212,9 @@ def _make_stub_backbone() -> EvlBackboneOutput:
         bbox_pr=torch.ones((1, 7, 2, 2, 2), dtype=torch.float32),
         clas_pr=torch.ones((1, 3, 2, 2, 2), dtype=torch.float32),
         cent_pr_nms=scalar_grid * 5.0,
+        obb_pred_viz=ObbTW(_make_obb_tensor(2, offset=0.25).tensor().unsqueeze(0)),
+        obb_pred_sem_id_to_name=["chair", "table", "lamp"],
+        obb_pred_probs_full_viz=[torch.full((3,), 1.0 / 3.0, dtype=torch.float32) for _ in range(2)],
         pts_world=torch.zeros((1, 8, 3), dtype=torch.float32),
         feat2d_upsampled={"rgb": torch.ones((1, 1, 2, 2, 2), dtype=torch.float32)},
         token2d={"rgb": torch.ones((1, 1, 2, 2, 2), dtype=torch.float32)},
@@ -256,6 +317,9 @@ def test_vin_offline_writer_finalizes_prepared_rows_on_keyboard_interrupt(tmp_pa
         include_pointclouds=False,
         include_diagnostic_payloads=False,
         include_counterfactuals=False,
+        include_gt_obbs=False,
+        include_detected_obbs=False,
+        include_trajectory_metadata=False,
         backbone_numeric_keep_fields=None,
         backbone_payload_keep_fields=None,
         vin_pad_points=4,
@@ -352,6 +416,7 @@ def _write_test_store(
             candidate_pcs=None,
             backbone_out=_make_stub_backbone() if include_backbone else None,
             max_candidates=4,
+            source_sample=_make_source_sample(offset=0.0),
             include_depths=True,
             include_candidate_pcs=False,
             include_backbone=include_backbone,
@@ -368,6 +433,7 @@ def _write_test_store(
             candidate_pcs=None,
             backbone_out=_make_stub_backbone() if include_backbone else None,
             max_candidates=4,
+            source_sample=_make_source_sample(offset=10.0),
             include_depths=True,
             include_candidate_pcs=False,
             include_backbone=include_backbone,
@@ -384,6 +450,7 @@ def _write_test_store(
             candidate_pcs=None,
             backbone_out=_make_stub_backbone() if include_backbone else None,
             max_candidates=4,
+            source_sample=_make_source_sample(offset=20.0),
             include_depths=True,
             include_candidate_pcs=False,
             include_backbone=include_backbone,
@@ -438,6 +505,9 @@ def _write_test_store(
             depths=True,
             candidate_pcs=False,
             counterfactuals=False,
+            gt_obbs=True,
+            detected_obbs=include_backbone,
+            trajectory=True,
         ),
         stats={"num_samples": 3},
         provenance={},
@@ -678,11 +748,26 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     assert int(first.oracle.rri.shape[0]) == 4  # noqa: S101
     assert torch.isnan(first.oracle.rri[2:]).all()  # noqa: S101
     assert int(first.vin_snippet.lengths[0].item()) == 2  # noqa: S101
+    assert first.gt_obbs is not None  # noqa: S101
+    assert first.gt_obbs.obbs.shape == (2, 2, 34)  # noqa: S101
+    assert first.gt_obbs.sem_id_to_name == ["chair", "table"]  # noqa: S101
+    assert first.detected_obbs is None  # noqa: S101
+    assert first.trajectory is not None  # noqa: S101
+    assert torch.equal(first.trajectory.time_ns, torch.tensor([100, 200], dtype=torch.int64))  # noqa: S101
+    assert first.trajectory.gravity_in_world is not None  # noqa: S101
+    assert first.trajectory.gravity_in_world.tolist() == pytest.approx([0.0, 0.0, -9.81])  # noqa: S101
 
     stored_manifest = VinOfflineManifest.read(store_cfg.manifest_path)
     assert stored_manifest.version == OFFLINE_DATASET_VERSION  # noqa: S101
+    assert stored_manifest.materialized_blocks.gt_obbs is True  # noqa: S101
+    assert stored_manifest.materialized_blocks.detected_obbs is False  # noqa: S101
+    assert stored_manifest.materialized_blocks.trajectory is True  # noqa: S101
     assert stored_manifest.shards[0].shard_id == "shard-000000"  # noqa: S101
     assert stored_manifest.shards[0].blocks["vin.points_world"].kind == "zarr_array"  # noqa: S101
+    assert stored_manifest.shards[0].blocks["gt.obbs"].kind == "zarr_array"  # noqa: S101
+    assert stored_manifest.shards[0].blocks["vin.trajectory.time_ns"].kind == "zarr_array"  # noqa: S101
+    assert "gt.mesh.verts" not in stored_manifest.shards[0].blocks  # noqa: S101
+    assert "gt.mesh.faces" not in stored_manifest.shards[0].blocks  # noqa: S101
     assert "oracle.depths_payload" not in stored_manifest.shards[0].blocks  # noqa: S101
 
     sample_index_rows = _read_sample_index_rows(store_cfg.sample_index_path)
@@ -701,6 +786,44 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     assert int(batch.rri.shape[0]) == 4  # noqa: S101
     assert int(batch.resolved_candidate_count().item()) == 2  # noqa: S101
     assert batch.candidate_valid_mask().tolist() == [True, True, False, False]  # noqa: S101
+    assert batch.gt_obbs is not None  # noqa: S101
+    assert batch.gt_obbs.obbs.shape == (2, 2, 34)  # noqa: S101
+    assert batch.trajectory is not None  # noqa: S101
+    assert torch.equal(batch.trajectory.time_ns, torch.tensor([100, 200], dtype=torch.int64))  # noqa: S101
+
+
+def test_vin_offline_store_persists_detected_obbs_for_training(tmp_path: Path) -> None:
+    """Detected OBB tensors/probabilities should be numeric collatable blocks."""
+
+    store_cfg = _write_test_store(tmp_path, include_backbone=True)
+    sample_dataset = VinOfflineDatasetConfig(
+        store=store_cfg,
+        return_format="sample",
+        split="all",
+    ).setup_target()
+
+    first = sample_dataset[0]
+    assert first.detected_obbs is not None  # noqa: S101
+    assert first.detected_obbs.obbs.shape == (1, 2, 34)  # noqa: S101
+    assert first.detected_obbs.probs is not None  # noqa: S101
+    assert first.detected_obbs.probs.shape == (2, 3)  # noqa: S101
+    assert first.detected_obbs.sem_id_to_name == ["chair", "table", "lamp"]  # noqa: S101
+
+    batch_dataset = VinOfflineDatasetConfig(
+        store=store_cfg,
+        return_format="vin_batch",
+        split="train",
+    ).setup_target()
+    batched = VinOracleBatch.collate([batch_dataset[0], batch_dataset[1]])
+    assert batched.gt_obbs is not None  # noqa: S101
+    assert batched.gt_obbs.obbs.shape == (2, 2, 2, 34)  # noqa: S101
+    assert batched.detected_obbs is not None  # noqa: S101
+    assert batched.detected_obbs.obbs.shape == (2, 2, 34)  # noqa: S101
+    assert batched.detected_obbs.probs is not None  # noqa: S101
+    assert batched.detected_obbs.probs.shape == (2, 2, 3)  # noqa: S101
+    assert batched.trajectory is not None  # noqa: S101
+    assert batched.trajectory.time_ns is not None  # noqa: S101
+    assert batched.trajectory.time_ns.shape == (2, 2)  # noqa: S101
 
 
 def test_vin_offline_store_writes_indexed_record_blocks(tmp_path: Path) -> None:
@@ -778,10 +901,14 @@ def test_vin_offline_dataset_vin_batch_skips_optional_record_reads(
         split="train",
     ).setup_target()
 
-    def _raise_if_called(*_: object, **__: object) -> None:
-        raise AssertionError("vin_batch path should not touch optional record blocks")
+    original_read_optional_record = dataset._store.read_optional_record
 
-    monkeypatch.setattr(dataset._store, "read_optional_record", _raise_if_called)
+    def _raise_if_diagnostic_record(record: object, block_name: str) -> object:
+        if block_name not in {"gt.obb_sem_id_to_name", "detected.obb_sem_id_to_name"}:
+            raise AssertionError(f"vin_batch path should not touch diagnostic record block {block_name!r}")
+        return original_read_optional_record(record, block_name)
+
+    monkeypatch.setattr(dataset._store, "read_optional_record", _raise_if_diagnostic_record)
     batch = dataset[0]
     assert isinstance(batch, VinOracleBatch)  # noqa: S101
 
@@ -851,3 +978,6 @@ def test_vin_offline_source_config_disables_diagnostic_blocks_for_vin_batches(tm
     assert dataset.config.load_depths is False  # noqa: S101
     assert dataset.config.load_candidate_pcs is False  # noqa: S101
     assert dataset.config.load_counterfactuals is False  # noqa: S101
+    assert dataset.config.load_gt_obbs is True  # noqa: S101
+    assert dataset.config.load_detected_obbs is True  # noqa: S101
+    assert dataset.config.load_trajectory_metadata is True  # noqa: S101

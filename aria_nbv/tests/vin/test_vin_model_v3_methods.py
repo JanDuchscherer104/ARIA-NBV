@@ -316,6 +316,22 @@ def test_sample_semidense_points_vin_view() -> None:
     assert points.dtype == torch.float32
 
 
+def test_sample_semidense_points_accepts_optional_obs_count() -> None:
+    model = _make_model()
+    snippet = _make_vin_snippet(num_points=8)
+    four_channel_points = snippet.points_world[:, :4]
+    four_channel_snippet = VinSnippetView(
+        points_world=four_channel_points,
+        lengths=snippet.lengths,
+        t_world_rig=snippet.t_world_rig,
+    )
+    sampled = model._sample_semidense_points(four_channel_snippet, device=torch.device("cpu"))
+    assert sampled is not None
+    assert sampled.shape == four_channel_points.shape
+    assert sampled.dtype == torch.float32
+    assert torch.isfinite(sampled).all()
+
+
 def test_sample_semidense_points_vin_batch() -> None:
     model = _make_model()
     snippet = _make_vin_snippet(num_points=16)
@@ -331,9 +347,9 @@ def test_sample_semidense_points_vin_batch() -> None:
 def test_sample_semidense_points_invalid_channels() -> None:
     model = _make_model()
     snippet = _make_vin_snippet(num_points=4)
-    bad_points = snippet.points_world[:, :4]
+    bad_points = snippet.points_world[:, :3]
     bad_snippet = VinSnippetView(points_world=bad_points, lengths=snippet.lengths, t_world_rig=snippet.t_world_rig)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="at least 4 channels"):
         model._sample_semidense_points(bad_snippet, device=torch.device("cpu"))
 
 
@@ -668,19 +684,33 @@ def test_vin_oracle_batch_shuffle_candidates_batched() -> None:
     batch = VinOracleBatch.collate([batch_a, batch_b])
 
     perm_gen = torch.Generator().manual_seed(7)
-    expected_perm = torch.rand((2, num), generator=perm_gen).argsort(dim=1)
+    expected_perm = torch.stack([torch.randperm(num, generator=perm_gen) for _ in range(2)])
     shuffled = batch.shuffle_candidates(generator=torch.Generator().manual_seed(7))
 
-    expected_rri = torch.gather(batch.rri, dim=1, index=expected_perm)
-    assert torch.equal(shuffled.rri, expected_rri)
+    for field_name in (
+        "rri",
+        "pm_dist_before",
+        "pm_dist_after",
+        "pm_acc_before",
+        "pm_comp_before",
+        "pm_acc_after",
+        "pm_comp_after",
+    ):
+        values = getattr(batch, field_name)
+        expected_values = torch.gather(values, dim=1, index=expected_perm)
+        assert torch.equal(getattr(shuffled, field_name), expected_values)
 
     poses = batch.candidate_poses_world_cam.tensor()
     pose_index = expected_perm.view(2, num, 1).expand_as(poses)
     expected_poses = torch.gather(poses, dim=1, index=pose_index)
     assert torch.equal(shuffled.candidate_poses_world_cam.tensor(), expected_poses)
 
-    cam_t = batch.p3d_cameras.T.reshape(2, num, 3)
-    cam_index = expected_perm.view(2, num, 1).expand_as(cam_t)
-    expected_t = torch.gather(cam_t, dim=1, index=cam_index)
-    shuffled_t = shuffled.p3d_cameras.T.reshape(2, num, 3)
-    assert torch.equal(shuffled_t, expected_t)
+    for field_name in ("R", "T", "focal_length", "principal_point", "image_size"):
+        values = getattr(batch.p3d_cameras, field_name).reshape(
+            2, num, *getattr(batch.p3d_cameras, field_name).shape[1:]
+        )
+        index = expected_perm.view(2, num, *([1] * (values.ndim - 2))).expand_as(values)
+        expected_values = torch.gather(values, dim=1, index=index).reshape_as(
+            getattr(shuffled.p3d_cameras, field_name),
+        )
+        assert torch.equal(getattr(shuffled.p3d_cameras, field_name), expected_values)
