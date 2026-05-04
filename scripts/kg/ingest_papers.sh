@@ -24,29 +24,29 @@ run_litkg() {
 
 case "${MODE}" in
   sync)
-    run_litkg sync-registry --config "${CONFIG_PATH}"
+    run_litkg ingest --config "${CONFIG_PATH}"
     ;;
   download)
-    run_litkg download --config "${CONFIG_PATH}"
+    run_litkg lit download --config "${CONFIG_PATH}"
     ;;
   parse)
-    run_litkg parse --config "${CONFIG_PATH}"
+    run_litkg lit parse --config "${CONFIG_PATH}"
     ;;
   materialize)
-    run_litkg materialize --config "${CONFIG_PATH}"
+    run_litkg kg build --config "${CONFIG_PATH}"
     ;;
   export-neo4j)
-    run_litkg export-neo4j --config "${CONFIG_PATH}"
+    run_litkg kg export --config "${CONFIG_PATH}"
     ;;
   semantic-enrich)
-    run_litkg enrich-semantic-scholar --config "${CONFIG_PATH}"
+    run_litkg s2 enrich --config "${CONFIG_PATH}"
     ;;
   all)
-    run_litkg sync-registry --config "${CONFIG_PATH}"
-    run_litkg download --config "${CONFIG_PATH}"
-    run_litkg parse --config "${CONFIG_PATH}"
-    run_litkg materialize --config "${CONFIG_PATH}"
-    run_litkg export-neo4j --config "${CONFIG_PATH}"
+    run_litkg ingest --config "${CONFIG_PATH}"
+    run_litkg lit download --config "${CONFIG_PATH}"
+    run_litkg lit parse --config "${CONFIG_PATH}"
+    run_litkg kg build --config "${CONFIG_PATH}"
+    run_litkg kg export --config "${CONFIG_PATH}"
     ;;
   *)
     echo "Unknown mode: ${MODE}" >&2

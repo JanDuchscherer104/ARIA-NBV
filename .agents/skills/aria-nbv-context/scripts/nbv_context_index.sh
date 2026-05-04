@@ -54,9 +54,10 @@ qmd_count="$(count_files '*.qmd' "${ROOT_DIR}/docs")"
 typst_paper_count="$(count_files '*.typ' "${ROOT_DIR}/docs/typst/seminar_paper")"
 typst_slides_count="$(( $(count_files '*.typ' "${ROOT_DIR}/docs/typst/seminar_slides") + $(count_files '*.typ' "${ROOT_DIR}/docs/typst/thesis_slides") ))"
 typst_shared_count="$(count_files '*.typ' "${ROOT_DIR}/docs/typst/shared")"
-lit_tex_count="$(count_files '*.tex' "${ROOT_DIR}/literature")"
-lit_bib_count="$(count_files '*.bib' "${ROOT_DIR}/literature")"
-lit_family_count="$(count_immediate_dirs "${ROOT_DIR}/literature/tex-src")"
+lit_root="${ROOT_DIR}/docs/literature"
+lit_tex_count="$(count_files '*.tex' "${lit_root}")"
+lit_bib_count="$(count_files '*.bib' "${lit_root}")"
+lit_family_count="$(count_immediate_dirs "${lit_root}/tex-src")"
 py_count="$(count_files '*.py' "${ROOT_DIR}/aria_nbv/aria_nbv")"
 ref_count="$(count_files '*.md' "${ROOT_DIR}/.agents/references")"
 memory_state_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/state")"
@@ -142,7 +143,7 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo 'rg -n "<term>" .agents/references'
   echo 'rg -n "<term>" docs/**/*.qmd'
   echo 'rg -n "<term>" docs/typst/**/*.typ'
-  echo 'rg -n "<term>" literature/**/*.{tex,bib,sty}'
+  echo 'rg -n "<term>" docs/literature/**/*.{tex,bib,sty}'
   echo 'rg -n "<term>" aria_nbv/aria_nbv'
   echo 'rg -n "VinPrediction|EfmSnippetView|BaseConfig" docs/_generated/context/data_contracts.md'
 } > "$tmp"
