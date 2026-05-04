@@ -7,8 +7,9 @@ from typing import Any, Protocol, TypeAlias, cast
 
 import numpy as np
 import torch
+from efm3d.aria.aria_constants import ARIA_SNIPPET_T_WORLD_SNIPPET
 from efm3d.aria.camera import CameraTW
-from efm3d.aria.obb import ObbTW
+from efm3d.aria.obb import ObbTW, transform_obbs
 from efm3d.aria.pose import PoseTW
 from efm3d.aria.tensor_wrapper import TensorWrapper
 from numpy.typing import DTypeLike, NDArray
@@ -441,36 +442,50 @@ def _detected_obbs(sample: VinOfflineSample) -> Tensor | ObbTW | None:
     return backbone.obb_pred_viz if backbone.obb_pred_viz is not None else backbone.obb_pred
 
 
-def _obb_line_strips(obbs: Tensor | ObbTW) -> list[list[list[float]]]:
-    """Convert EFM OBB tensors into Rerun 3D line strips."""
+def _snippet_t_world_snippet(sample: VinOfflineSample) -> PoseTW | None:
+    """Return ``T_world_snippet`` for snippet-frame OBB tensors."""
 
-    arr = _to_numpy(obbs).reshape(-1, 34)
-    valid = arr[~np.all(np.isclose(arr, -1.0), axis=1)]
-    if valid.size == 0:
+    snippet = sample.efm_snippet_view
+    if snippet is not None:
+        value = snippet.efm.get(ARIA_SNIPPET_T_WORLD_SNIPPET)
+        if isinstance(value, PoseTW):
+            return PoseTW(value._data.reshape(-1, 12)[:1])
+        if isinstance(value, Tensor):
+            return PoseTW(value.reshape(-1, 12)[:1])
+
+    poses = getattr(sample.vin_snippet, "t_world_rig", None)
+    if isinstance(poses, PoseTW):
+        data = poses._data.reshape(-1, 12)
+        if data.shape[0] > 0:
+            return PoseTW(data[:1])
+    return None
+
+
+def _transform_snippet_obbs_to_world(obbs: Tensor | ObbTW, t_world_snippet: PoseTW) -> ObbTW:
+    """Transform EFM snippet-frame OBBs into ARIA world coordinates."""
+
+    obb = obbs if isinstance(obbs, ObbTW) else ObbTW(torch.as_tensor(_to_numpy(obbs), dtype=torch.float32))
+    if obb.ndim == 1 or obb.ndim == 2:
+        return obb.transform(t_world_snippet)
+    if obb.ndim == 3:
+        return transform_obbs(obb, t_world_snippet)
+    if obb.ndim == 4:
+        return transform_obbs(obb, t_world_snippet.unsqueeze(0))
+    raise ValueError(f"Unsupported OBB tensor rank for Rerun logging: {obb.shape}.")
+
+
+def _obb_line_strips(obbs: Tensor | ObbTW, *, t_world_snippet: PoseTW) -> list[list[list[float]]]:
+    """Convert EFM snippet-frame OBB tensors into world-frame Rerun line strips."""
+
+    world_obbs = _transform_snippet_obbs_to_world(obbs, t_world_snippet)
+    valid_mask = ~world_obbs.get_padding_mask().detach().cpu().numpy()
+    if not np.any(valid_mask):
         return []
-    bb3 = valid[:, :6]
-    poses = valid[:, 18:30]
-    corners_idx = np.asarray(
-        [
-            [0, 2, 4],
-            [1, 2, 4],
-            [1, 3, 4],
-            [0, 3, 4],
-            [0, 2, 5],
-            [1, 2, 5],
-            [1, 3, 5],
-            [0, 3, 5],
-        ],
-        dtype=np.int64,
-    )
+    corners = world_obbs.bb3corners_world.detach().cpu().numpy()[valid_mask]
     strips: list[list[list[float]]] = []
-    for box, pose in zip(bb3, poses, strict=False):
-        if not np.isfinite(box).all() or not np.isfinite(pose).all():
+    for corners_world in corners.reshape(-1, 8, 3):
+        if not np.isfinite(corners_world).all():
             continue
-        corners_obj = box[corners_idx]
-        rot = pose[:9].reshape(3, 3)
-        trans = pose[9:12]
-        corners_world = (rot @ corners_obj.T).T + trans.reshape(1, 3)
         for start, end in _OBB_EDGES:
             strips.append([corners_world[start].tolist(), corners_world[end].tolist()])
     return strips
@@ -794,10 +809,13 @@ class RerunOfflineLogger:
         obbs: Tensor | ObbTW | None,
         palette: str,
     ) -> None:
-        del sample
         if obbs is None:
             return
-        strips = _obb_line_strips(obbs)
+        t_world_snippet = _snippet_t_world_snippet(sample)
+        if t_world_snippet is None:
+            self._warn_metadata(f"{entity_path} skipped: missing T_world_snippet for snippet-frame OBBs.")
+            return
+        strips = _obb_line_strips(obbs, t_world_snippet=t_world_snippet)
         if not strips:
             return
         self.rr.log(

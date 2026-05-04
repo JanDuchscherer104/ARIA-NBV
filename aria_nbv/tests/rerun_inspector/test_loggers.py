@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 import torch
+from efm3d.aria.aria_constants import ARIA_SNIPPET_T_WORLD_SNIPPET
 from efm3d.aria.pose import PoseTW
 from pytorch3d.renderer.cameras import PerspectiveCameras
 
@@ -421,6 +422,32 @@ def test_compact_modalities_log_to_stable_entity_paths() -> None:
     assert fake.logged[depth_path].kwargs["camera_xyz"] == "LUF"  # noqa: S101
     assert fake.logged_extras[depth_path][0].kwargs["meter"] == 1.0  # noqa: S101
     assert len(fake.logged[ENTITY_GT_OBBS].args[0]) == 12  # noqa: S101
+
+
+def test_obbs_are_transformed_from_snippet_to_world_before_logging() -> None:
+    """Snippet-frame OBB payloads should be drawn under world after applying T_world_snippet."""
+
+    cfg = RerunOfflineInspectorConfig()
+    cfg.primitives.log_semidense = False
+    cfg.primitives.log_reference_pose = False
+    cfg.primitives.log_candidate_frusta = False
+    cfg.primitives.log_top_oracle_frustum = False
+    cfg.primitives.log_invalid_frusta = False
+    cfg.primitives.log_candidate_centers = False
+    sample = _sample()
+    sample.gt_obbs = SimpleNamespace(obbs=_obb_tensor(0.0))
+    sample.efm_snippet_view = SimpleNamespace(efm={ARIA_SNIPPET_T_WORLD_SNIPPET: _poses([[10.0, 0.0, 0.0]])})
+    fake = _FakeRerun()
+
+    RerunOfflineLogger(cfg, rr_module=fake).log_sample(
+        sample=sample,
+        inventory=OfflineVisualInventory(has_gt_obbs=True),
+        selection="sample_key=sample-0",
+    )
+
+    strips = np.asarray(fake.logged[ENTITY_GT_OBBS].args[0], dtype=np.float32)
+    assert np.allclose(strips[0, 0], np.asarray([9.5, -0.25, -0.1], dtype=np.float32))  # noqa: S101
+    assert np.allclose(strips[0, 1], np.asarray([10.5, -0.25, -0.1], dtype=np.float32))  # noqa: S101
 
 
 def test_missing_keyframe_context_is_reported_in_metadata() -> None:
