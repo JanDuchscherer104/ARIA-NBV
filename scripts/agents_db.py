@@ -45,6 +45,8 @@ REQUIRED_FIELDS = {
         "priority",
         "status",
         "labels",
+        "context",
+        "references",
     },
     "todo": {
         "id",
@@ -58,6 +60,7 @@ REQUIRED_FIELDS = {
         "loc_max",
         "issue_ids",
         "context",
+        "references",
         "implementation_notes",
         "acceptance",
         "verification",
@@ -85,10 +88,22 @@ LIST_FIELDS = {
     "labels",
     "issue_ids",
     "context",
+    "references",
     "implementation_notes",
     "acceptance",
     "verification",
 }
+NON_EMPTY_LIST_FIELDS = {"context", "references"}
+REFERENCE_PREFIXES = (
+    "repo:",
+    "bib:",
+    "doi:",
+    "arxiv:",
+    "s2:",
+    "url:",
+    "litkg:",
+    "context7:",
+)
 RESOLUTION_FIELDS = ["resolved_at", "resolution_note", "resolved_from"]
 
 
@@ -128,7 +143,7 @@ def _format_value(value: Any) -> str:
 def _field_order(kind: str, record: dict[str, Any]) -> list[str]:
     common = ["id", "title", "description"]
     if kind == "issue":
-        ordered = [*common, "type", "priority", "status", "labels"]
+        ordered = [*common, "type", "priority", "status", "labels", "context", "references"]
     else:
         ordered = [
             *common,
@@ -140,6 +155,7 @@ def _field_order(kind: str, record: dict[str, Any]) -> list[str]:
             "loc_expected",
             "loc_max",
             "context",
+            "references",
             "implementation_notes",
             "acceptance",
             "verification",
@@ -172,7 +188,8 @@ def _write_resolved(records_by_kind: dict[str, list[dict[str, Any]]]) -> None:
         for record in records_by_kind.get(kind, []):
             lines.append(f"[[{kind}]]")
             for key in _field_order(kind, record):
-                lines.append(f"{key} = {_format_value(record[key])}")
+                if key in record:
+                    lines.append(f"{key} = {_format_value(record[key])}")
             lines.append("")
     RESOLVED_FILE.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
@@ -224,6 +241,17 @@ def _validate_record(
         value = record[field]
         if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
             errors.append(f"{record_id}: `{field}` must be a string list")
+            continue
+        if field in NON_EMPTY_LIST_FIELDS and not value:
+            errors.append(f"{record_id}: `{field}` must not be empty")
+        if field == "references":
+            for item in value:
+                if not item.strip():
+                    errors.append(f"{record_id}: `references` contains an empty item")
+                if not item.startswith(REFERENCE_PREFIXES):
+                    errors.append(
+                        f"{record_id}: reference `{item}` must start with one of {', '.join(REFERENCE_PREFIXES)}"
+                    )
 
     if kind in {"todo", "refactor"}:
         for issue_id in record.get("issue_ids", []):

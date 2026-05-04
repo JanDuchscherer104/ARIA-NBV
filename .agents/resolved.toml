@@ -227,6 +227,84 @@ resolution_note = "Added entity-aware-rri skill for target/entity selection, OBB
 resolved_from = ".agents/todos.toml"
 
 [[todo]]
+id = "todo-023"
+title = "Document Rerun inspector smoke workflow"
+description = "Add public-facing operator documentation and README pointers for producing one Rerun .rrd recording from an offline sample."
+priority = "medium"
+status = "resolved"
+labels = ["docs", "diagnostics", "rerun", "setup"]
+issue_ids = ["issue-015", "issue-005", "issue-003"]
+loc_min = 80
+loc_expected = 180
+loc_max = 360
+context = ["The Rerun tool should not become an undocumented operator-only workflow.", "The review asked for docs/contents/impl/rerun_offline_inspector.qmd, `.configs/rerun_offline.toml`, and a README link to the smoke command.", "Public docs should stay aligned with the thesis and avoid exposing internal agent work-management surfaces."]
+implementation_notes = ["Add a concise Quarto implementation page for the Rerun offline inspector once the CLI/config exist.", "Link the smoke command from README.md and, if appropriate, the implementation docs overview.", "Explain store prerequisites, spawn/save modes, candidate filtering/coloring, and the expected output artifact without duplicating internal TOML backlog details."]
+acceptance = ["A new user can find the intended Rerun `.rrd` smoke command for one immutable offline sample.", "README.md links to the Rerun inspector smoke command and implementation page.", "Docs make clear that visualization downsampling is display-only and never mutates oracle labels."]
+verification = ["cd docs && quarto render contents/impl/rerun_offline_inspector.qmd", "rg -n \"nbv-rerun-inspect|rerun_offline\" README.md docs/contents/impl .configs"]
+resolved_at = "2026-04-30"
+resolution_note = "Documented the Rerun offline inspector smoke workflow in README and docs/contents/impl/rerun_offline_inspector.qmd, including prerequisites, smoke command, output modes, geometry safety, and display-only downsampling."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-024"
+title = "Lock non-myopic rollout state, reward, and VIN evidence gates"
+description = "Record the first thesis-grade non-myopic comparison and related reward/state/evidence decisions before larger rollout or RL work proceeds."
+priority = "medium"
+status = "resolved"
+labels = ["research", "planning", "rri", "vin", "thesis"]
+issue_ids = ["issue-007", "issue-013"]
+loc_min = 80
+loc_expected = 180
+loc_max = 360
+context = ["The project state already recommends discrete search, beam rollouts, close-greedy control, or discrete-shell RL before continuous control.", "Counterfactual multi-step states still lack full RGB, SLAM, and semantic modalities unless synthesized or approximated.", "The review recommended bounded oracle-RRI lookahead versus one-step greedy RRI as the first thesis-grade comparison and a geometry-first actor-visible state."]
+implementation_notes = ["Update thesis questions, roadmap, or canonical memory to state the first comparison as bounded lookahead over oracle RRI versus one-step greedy under the same candidate budget.", "Define first rollout state as geometry-first: accumulated semidense/current points, candidate poses, persisted candidate diagnostics, and oracle labels for supervision/evaluation only.", "Choose episode-normalized additive reward or log-improvement reward for multi-step return while keeping current RRI for one-step label compatibility.", "Keep the first target-aware metric as GT-OBB-cropped target RRI and compare scene-level versus target-level RRI.", "Set the VIN evidence gate as held-out ranking quality, oracle-evaluated VIN-selected rollouts, calibration/stage-shift analysis, Rerun failure visualization, and only then Q/return heads."]
+acceptance = ["The first non-myopic experiment, actor-visible state, reward convention, target-aware metric, and VIN evidence gate are documented in current thesis-facing or canonical memory surfaces.", "The documentation explicitly keeps continuous actor-critic and synthesized rich modalities out of the first milestone.", "The recorded decisions are linked to existing RQ and roadmap sections rather than added as public TODO prose."]
+verification = ["cd docs && quarto render contents/thesis/questions.qmd contents/thesis/roadmap.qmd", "make check-agent-memory"]
+resolved_at = "2026-04-30"
+resolution_note = "Locked the first non-myopic comparison, rollout actor-visible state, multi-step reward convention, first target-aware metric, and VIN evidence gate in thesis docs and canonical memory."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-025"
+title = "Define RolloutTrace schema and one-scene trace writer"
+description = "Create a durable rollout trace contract for candidate tables, selected actions, per-step metrics, cumulative metrics, termination reasons, and replay lineage."
+priority = "high"
+status = "resolved"
+labels = ["rollouts", "data", "contracts", "storage"]
+issue_ids = ["issue-018", "issue-007"]
+loc_min = 220
+loc_expected = 520
+loc_max = 1100
+context = ["CounterfactualPoseGenerator currently returns in-memory trajectories, but the thesis sequence-data direction needs durable per-step traces before generating many rollouts.", "The trace must distinguish actor-visible state, oracle-only signals, and critic/model predictions.", "The context synthesis listed required fields such as scene_id, snippet_id, rollout_id, step index, candidate set, validity, selected action, RRI/entity RRI, generated candidate observations, cumulative metrics, and termination reason."]
+references = ["repo:aria_nbv/aria_nbv/pose_generation/rollout_trace.py", "repo:aria_nbv/aria_nbv/pose_generation/counterfactuals.py", "repo:aria_nbv/tests/pose_generation/test_counterfactuals.py", "repo:docs/contents/thesis/questions.qmd#rq5-planning"]
+implementation_notes = ["Start with typed Python dataclasses or DTOs that wrap the existing CounterfactualRolloutResult rather than a parallel MDP stack.", "Store full candidate tables and masks, but materialize expensive candidate observations only for selected actions or retained chains.", "Include deterministic lineage fields: mesh version, candidate config hash, oracle config hash, model checkpoint hash when applicable, random seed, rollout policy, and source cache version.", "Keep the first writer small and one-scene smokeable before choosing a large Zarr layout."]
+acceptance = ["A typed RolloutTrace or equivalent schema can represent a fixed-horizon rollout with full per-step candidate metadata.", "A one-scene smoke command writes a replayable trace for at least greedy and random-valid policies.", "Trace metadata records enough lineage to compare or reject mixed-generation samples.", "Docs or docstrings define which fields are actor-visible, oracle-only, and optional heavy diagnostics."]
+verification = ["cd aria_nbv && uv run pytest tests/pose_generation/test_counterfactuals.py", "cd aria_nbv && uv run nbv-rollout-trace-smoke --output-path ../.artifacts/rollouts/synthetic_rollout_traces.msgpack --horizon 2 --num-samples 8 --seed 0", "rg -n \"RolloutTrace|rollout_id|termination_reason|candidate_config_hash|oracle_config_hash\" aria_nbv/aria_nbv aria_nbv/tests docs/contents/thesis/questions.qmd"]
+resolved_at = "2026-05-02"
+resolution_note = "Added RolloutTrace/RolloutStepTrace/RolloutLineage schema, MessagePack trace writer/reader, synthetic greedy/random trace smoke command, and rollout trace roundtrip tests."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-036"
+title = "Add M1 geometry and candidate-order guard tests"
+description = "Add focused tests and diagnostics for pose-frame/CW90 consistency, candidate/RRI order alignment, validity-mask alignment, and depth/backprojection convention before large rollout generation."
+priority = "high"
+status = "resolved"
+labels = ["geometry", "rri", "tests", "contracts"]
+issue_ids = ["issue-007", "issue-021"]
+loc_min = 160
+loc_expected = 360
+loc_max = 820
+context = ["The current context repeatedly flags coordinate-frame bugs and candidate/RRI shuffling as silent label-corruption risks.", "GOTCHAS.md maintains candidate validity and frame caveats, while roadmap M1 requires frame/CW90 risks to be documented.", "Rollout traces will amplify any ordering or frame bug across multiple steps."]
+references = ["repo:.agents/skills/nbv-geometry-contracts/SKILL.md", "repo:.agents/memory/state/GOTCHAS.md", "repo:docs/contents/ase_dataset.qmd#coordinate-systems", "repo:aria_nbv/tests/pose_generation/test_counterfactuals.py"]
+implementation_notes = ["Add tests that candidate poses, p3d cameras, validity masks, RRI vectors, and selected indices remain aligned through serialization/collation.", "Include CW90 display-only checks so visual rotations cannot mutate training/cache geometry.", "Cover world<-camera versus camera<-world naming and PyTorch3D unprojection sign/frame conventions where the current code touches them.", "Treat failures as blockers for scale generation rather than paper-only caveats."]
+acceptance = ["Targeted tests fail on candidate/RRI shuffles or validity-mask misalignment.", "Pose-frame tests document physical frame versus display-only CW90 behavior.", "Depth render/backprojection conventions are covered by at least one regression path used by oracle labels.", "The tests are part of M1 verification guidance."]
+verification = ["cd aria_nbv && uv run pytest tests/pose_generation tests/rendering tests/data_handling/test_vin_batch_collate.py tests/rri_metrics", "make context-contracts"]
+resolved_at = "2026-05-02"
+resolution_note = "Added candidate/RRI order, CW90 display-only, full-shell candidate index, and depth/backprojection guard coverage; targeted M1 tests and make context-contracts pass."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
 id = "todo-040"
 title = "Add aria-litkg-memory skill"
 description = "Create and adopt a compact ARIA-NBV skill that routes broad memory retrieval, claim checks, source-backed task routing, and consolidation through litkg before manual browsing."

@@ -13,6 +13,13 @@ This file tracks the active engineering and research backlog for ARIA-NBV.
 
 While `.agents/memory/state/` holds the **durable current truth**, this DB holds the **active maintenance debt**.
 
+Active issues and todos must carry compact prose context plus structured
+`references` pointers. Use `repo:` for internal files, `bib:` for papers in
+`docs/references.bib`, durable identifiers such as `arxiv:`/`doi:`/`s2:`,
+external docs as `url:`, Context7 library docs as `context7:`, and litkg-rs
+evidence as `litkg:`. This keeps local backlog records auditable and
+machine-usable by the litkg-rs context-pack/KG pipeline.
+
 ## Priority Pillars
 
 1. **Scaffold Hygiene**: Fix stale skills and dense root guidance.

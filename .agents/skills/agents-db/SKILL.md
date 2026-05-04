@@ -41,9 +41,13 @@ Use the repo-local files under `.agents/` as follows:
 
 - `.agents/issues.toml`
   - active validated defects, integration gaps, and architectural debt
+  - every issue must define `context` and `references` so the record can be
+    audited from internal docs, code, papers, KG output, or external API docs
 - `.agents/todos.toml`
   - active actionable follow-up work linked to issue IDs
-  - every todo must define `loc_min`, `loc_expected`, `loc_max`, `issue_ids`, `context`, `implementation_notes`, `acceptance`, and `verification`
+  - every todo must define `loc_min`, `loc_expected`, `loc_max`, `issue_ids`,
+    `context`, `references`, `implementation_notes`, `acceptance`, and
+    `verification`
 - `.agents/refactors.toml`
   - active suggested refactors and simplifications that are worth considering but are not necessarily defect-driven
   - every refactor must define `loc_min`, `loc_expected`, `loc_max`, `issue_ids`, `context`, `implementation_notes`, `acceptance`, and `verification`
@@ -70,6 +74,28 @@ Use the backlog helper through `make agents-db`:
   - moves a todo into `.agents/resolved.toml`
 - `make agents-db AGENTS_ARGS='resolve refactor refactor-XXXX --note "..."'`
   - moves a refactor into `.agents/resolved.toml`
+
+## Provenance Contract
+
+Every active issue and todo needs enough context for a future agent to verify
+why it exists without relying on chat memory. Put short explanatory prose in
+`context` and stable source pointers in `references`.
+
+Use these `references` prefixes:
+
+- `repo:<path>#<anchor-or-section>` for internal files, docs, code, tests,
+  skills, or generated context
+- `bib:<citation-key>` for papers in `docs/references.bib`
+- `arxiv:<id>`, `doi:<doi>`, or `s2:<paperId>` for durable paper identifiers
+- `url:<https-url>` for external API or tool documentation
+- `context7:<library-id>` for Context7-resolved external library docs
+- `litkg:<profile-or-command>` for litkg-rs context-pack, capability, or KG
+  command evidence
+
+For broad or literature-backed DB additions, run a litkg context pack before
+editing and copy the relevant internal paths, citation keys, Semantic Scholar
+IDs, or external-doc URLs into `references`. Prefer source pointers over long
+summaries; the DB should be compact but auditable.
 
 Ranking rules:
 
