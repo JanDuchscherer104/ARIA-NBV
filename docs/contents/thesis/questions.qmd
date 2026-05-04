@@ -19,6 +19,7 @@ Aria-NBV. The central question is:
 
 The questions are tied to the dated [roadmap](roadmap.qmd), the
 [RRI theory page](../theory/rri_theory.qmd), the
+[RL and bounded rollout theory page](../theory/rl_planning.qmd), the
 [oracle/RRI implementation notes](../impl/rri_computation.qmd), the
 [VIN implementation notes](../impl/vin_nbv.qmd), and the current ASE/EVL stack
 [@ProjectAria-ASE-2025; @EFM3D-straub2024]. The thesis builds on VIN-NBV's
@@ -70,6 +71,11 @@ only for oracle supervision and evaluation.
 - view count, path length, invalid-action rate, and runtime;
 - comparison to one-step greedy selection under equal budget.
 
+**Multi-step reward convention.** Multi-step experiments should start with an
+episode-normalized additive reward or a log-improvement reward derived from
+RRI. The existing one-step RRI label remains unchanged for VIN compatibility and
+for comparison against the one-step greedy baseline.
+
 ## RQ2 - Target Encoding {#rq2-target-encoding}
 
 **Question.** Which target representation works best for conditioning the NBV
@@ -94,6 +100,10 @@ data. Predicted OBBs and learned entity tokens are later realism ablations.
 data-handling containers, then flow into the
 [VIN model API](../../reference/aria_nbv.vin.model_v3.VinModelV3.qmd) and
 diagnostics rather than through ad hoc dictionaries.
+
+**First metric.** The first target-aware metric is GT-OBB-cropped target RRI.
+Predicted OBBs and learned target tokens are realism ablations after the
+GT-cropped oracle is trusted.
 
 ## RQ3 - Candidate and Action Space {#rq3-candidates}
 
@@ -148,10 +158,71 @@ short path must move around occlusion.
 
 - one-step greedy oracle and one-step model scoring;
 - random valid selection;
-- stochastic softmax rollout;
-- Gumbel-Top-k or stochastic-beam roots;
+- bounded oracle-RRI lookahead under the same candidate and view budget as
+  one-step greedy;
+- stochastic softmax or beam rollout after the oracle comparison is trusted;
 - model-scored rollout with oracle evaluation;
 - optional value or Q scorer after the August gate.
+
+**First comparison.** The first thesis-grade non-myopic comparison is bounded
+oracle-RRI lookahead versus one-step greedy selection under equal acquisition
+budget. This isolates whether planning depth helps before claiming that a
+learned model or policy improves trajectories.
+
+### Minimal ArgTopK Rollout Sequence {#rq5-argtopk-rollout-sequence}
+
+The current implementation already has the right abstraction for the next
+research step: `CounterfactualPoseGeneratorConfig` exposes an explicit horizon,
+branch factor, beam width, and selection policy, while
+`CounterfactualOracleRriScorer` can score valid rollout candidates with oracle
+RRI on the accumulated counterfactual point state. This means the next
+contribution should not begin as continuous control. It should begin as a
+finite-horizon selector over typed candidate sets, keeping the VIN-NBV
+quality-driven ranking objective intact [@VIN-NBV-frahm2025] while delaying the
+continuous 5-DoF policy-learning problem exemplified by GenNBV
+[@GenNBV-chen2024].
+
+Let $s_t$ denote the geometry-first rollout state, $C(s_t)$ the valid candidate
+set sampled around the current reference pose, $r(s_t,q)$ the oracle RRI
+obtained after fusing candidate $q$, and $T(s_t,q)$ the deterministic
+counterfactual transition that appends the selected candidate observation to
+the accumulated point state. The one-step baseline is
+$\operatorname{ArgTop1}_1(s_t)=\arg\max_{q \in C(s_t)} r(s_t,q)$. For a horizon
+$h>1$, bounded lookahead should first compute
+$\operatorname{ArgTopK}(s_t)$ as the $K$ best valid candidates under the same
+one-step score, then recurse only through those branches:
+
+$$
+V_h(s_t)=
+\max_{q \in \operatorname{ArgTopK}(s_t)}
+\left[r(s_t,q)+V_{h-1}(T(s_t,q))\right],
+\qquad
+\operatorname{ArgTop1}_h(s_t)=
+\arg\max_{q \in \operatorname{ArgTopK}(s_t)}
+\left[r(s_t,q)+V_{h-1}(T(s_t,q))\right].
+$$
+
+The resulting experimental ladder is therefore
+$\operatorname{ArgTopK} \rightarrow \operatorname{ArgTop1}_1 \rightarrow
+\operatorname{ArgTop1}_2 \rightarrow \cdots \rightarrow
+\operatorname{ArgTop1}_H$. In practical terms, `ArgTop1_1` is the trusted
+greedy oracle baseline, `ArgTop1_h` is the first action selected by an
+$h$-step oracle rollout, and the branch factor $K$ is the computational budget
+that keeps the tree inspectable. This progression follows the same decoding
+logic that makes beam search useful for offline trajectory models
+[@TrajectoryTransformer-janner2021] and can later be made stochastic with
+Gumbel-Top-k sampling without replacement [@GumbelTopK-kool2019]. It also
+matches Hestia's lesson that
+high-dimensional NBV control benefits from structured, close-greedy or
+hierarchical decomposition [@Hestia-lu2026], but it keeps ARIA-NBV's first
+claim narrower: planning depth is useful only if
+$\operatorname{ArgTop1}_h$ improves cumulative RRI over
+$\operatorname{ArgTop1}_1$ under the same acquisition budget.
+
+**Actor-visible state.** The first rollout actor state is geometry-first:
+accumulated semidense/current points, candidate poses, candidate validity and
+diagnostic metadata, and bounded history. Oracle labels, GT mesh quantities, and
+GT OBB crops are supervision and evaluation signals, not actor-visible inputs.
 
 **Connected implementation surfaces.** Use the
 [CounterfactualPoseGenerator](../../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd)
@@ -175,6 +246,14 @@ lowest ordinal RRI bin would blur feasibility and reconstruction quality.
 **Evaluation nodes.** Invalid fraction, invalid reason distribution,
 target-visible fraction, rank metrics with and without masks, and penalty/head
 ablation once labels are reliable.
+
+**VIN evidence gate.** Before adding value, Q, or return heads, the VIN scorer
+needs held-out ranking evidence, oracle-evaluated VIN-selected rollouts,
+calibration and stage-shift analysis, and Rerun visualizations of representative
+successes and failures. If this gate is passed, the first value-learning
+references are masked Double-Q-style targets for overestimation control
+[@DoubleDQN-vanHasselt2015] and in-support offline value learning such as IQL
+[@IQL-kostrikov2021], not unconstrained continuous actor-critic training.
 
 ## RQ7 - Scaling and Ablations {#rq7-scaling}
 

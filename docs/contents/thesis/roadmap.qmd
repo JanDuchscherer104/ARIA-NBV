@@ -25,7 +25,9 @@ ground-truth meshes [@ProjectAria-ASE-2025], frozen EVL/EFM3D features
 [@VIN-NBV-frahm2025], and bounded multi-step planning before any full
 continuous-RL claim. See the [research questions](questions.qmd), the
 [RRI theory page](../theory/rri_theory.qmd), the
-[VIN implementation note](../impl/vin_nbv.qmd), and the
+[RL and bounded rollout theory page](../theory/rl_planning.qmd), the
+[VIN implementation note](../impl/vin_nbv.qmd), the
+[Rerun offline inspector note](../impl/rerun_offline_inspector.qmd), and the
 [Typst paper source](../../typst/seminar_paper/main.typ) for the main connected nodes.
 
 ## Thesis Outcome {#roadmap-thesis-outcome}
@@ -51,7 +53,7 @@ claims.
 <!-- TODO: This roadmap does not account for writing the thesis! -->
 | Dates | Milestone | Exit criteria |
 |---|---|---|
-| 2026-04-29 to 2026-05-10 | **M0 - Scope, repo, docs foundation** | Dirty worktree classified; available VIN offline store smoke-checked; KG-friendly doc and docstring rules documented. |
+| 2026-04-29 to 2026-05-10 | **M0 - Scope, repo, docs foundation** | Dirty worktree classified; available partial VIN offline store smoke path understood; Rerun inspector smoke command documented; KG-friendly doc and docstring rules documented. |
 | 2026-05-11 to 2026-05-31 | **M1 - Data, cache, oracle correctness** | Offline store and RRI contracts stable; frame/CW90 risks documented; oracle throughput measured. |
 | 2026-06-01 to 2026-06-21 | **M2 - VIN baseline and diagnostics** | One-step VIN baseline reproducible; calibration and ranking plots available; ablation matrix fixed. |
 | 2026-06-22 to 2026-07-12 | **M3 - Entity/target-aware RRI** | GT-OBB cropped RRI implemented and trusted on a small subset; target selection policy defined. |
@@ -69,15 +71,18 @@ claims.
 infrastructure?
 
 **Implementation surfaces:** root README, `docs/contents/thesis/roadmap.qmd`,
-`docs/contents/thesis/questions.qmd`, the Streamlit VIN diagnostics page, and the
-available VIN offline store.
+`docs/contents/thesis/questions.qmd`, the Streamlit VIN diagnostics page, the
+Rerun offline inspector, and the available VIN offline store.
 
 **Exit checks:**
 
 - classify existing worktree changes into data/cache cleanup, RL/rollout
   scaffold, docs cleanup, and unrelated operator work;
-- validate that `offline_only.toml` can load the available VIN offline store into the
-  [VIN diagnostics page](../../reference/aria_nbv.lightning.VinDataModule.qmd);
+- validate that `offline_only.toml` can load the available VIN offline store
+  into the [VIN diagnostics page](../../reference/aria_nbv.lightning.VinDataModule.qmd)
+  once corrected command behavior and validation land;
+- save one Rerun recording from a validation sample once the inspector CLI and
+  `.configs/rerun_offline.toml` are present;
 - record KG-friendly authoring rules in this roadmap and use them in new public
   docstrings;
 - keep thesis scope aligned with [RQ1](questions.qmd#rq1-objective) through
@@ -132,7 +137,7 @@ metrics.
 
 - target entity eligibility policy based on visibility, distance, crop size,
   and mesh/point support;
-- GT-OBB cropped RRI on a small trusted subset;
+- GT-OBB cropped target RRI on a small trusted subset;
 - diagnostics showing current points, candidate points, cropped mesh, target
   OBB, target RRI, and scene RRI side by side;
 - clear handling of invalid or unsupported targets.
@@ -168,8 +173,12 @@ candidate generation, target-aware scorer backends, and rollout diagnostics.
 
 - compare one-step greedy, random, oracle rollout, stochastic/beam rollout, and
   model-scored rollout;
+- make bounded oracle-RRI lookahead versus one-step greedy under equal budget
+  the first non-myopic comparison;
 - report cumulative target RRI, scene RRI, number of views, path length, invalid
   action rate, and runtime;
+- use an episode-normalized additive or log-improvement reward for multi-step
+  return while preserving current one-step RRI labels;
 - keep rollout complexity bounded by explicit horizon, branch factor, and beam
   width;
 - visualize representative successes and failures.
@@ -190,6 +199,9 @@ experiments.
   low-discount policy baseline;
 - if M5 does not show enough headroom, defer RL and spend the window on
   target-aware ablations and rollout robustness;
+- require held-out ranking, oracle-evaluated VIN-selected rollouts, calibration
+  and stage-shift analysis, and Rerun failure visualization before adding value,
+  Q, or return heads;
 - do not claim full continuous RL unless online interaction, reward speed, and
   evaluation are all thesis-grade.
 

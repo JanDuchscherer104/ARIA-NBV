@@ -9,20 +9,35 @@ format: html
 
 # Literature Review
 
-This section contains detailed reviews of key papers and methods related to Next-Best-View planning and foundation models.
+This section contains detailed reviews of key papers and methods related to Next-Best-View planning, active perception, egocentric foundation models, radiance-field view selection, and rollout planning.
 
 ## Key Papers
 
 ### Next-Best-View Planning
 
-- **[VIN-NBV](vin_nbv.qmd)**: Learning-based RRI prediction for quality-driven view planning
-- **[GenNBV](gen_nbv.qmd)**: Continuous action spaces and reinforcement learning approaches
-- **[Hestia](hestia.qmd)**: Face-aware hierarchical continuous NBV with look-at-point decomposition
+- **[VIN-NBV](vin_nbv.qmd)**: Learning-based RRI prediction for quality-driven view planning. Source: [arXiv 2505.06219](https://arxiv.org/abs/2505.06219) [@VIN-NBV-frahm2025].
+- **[GenNBV](gen_nbv.qmd)**: Continuous 5-DoF policy learning for active 3D reconstruction. Source: [arXiv 2402.16174](https://arxiv.org/abs/2402.16174) [@GenNBV-chen2024].
+- **[Hestia](hestia.qmd)**: Face-aware hierarchical continuous NBV with look-at-point decomposition. Source: [project page](https://johnnylu305.github.io/hestia_web) [@Hestia-lu2026].
+- **[PB-NBV](https://arxiv.org/abs/2501.10663)**: Projection-based candidate evaluation for efficient unknown-object reconstruction [@PB-NBV-jia2025].
+- **[Receding-horizon NBV](https://doi.org/10.1109/ICRA.2016.7487281)** and **[shadowcasting NBV](https://doi.org/10.1109/LRA.2022.3146586)**: search-depth and efficient gain-estimation references for bounded planning [@RecedingHorizonNBV-bircher2016; @ShadowcastingNBV-batinovic2022].
+- **[RL and Rollout Planning](rl_planning.qmd)**: Sequence decoding, stochastic beams, offline RL, and value-learning gates.
+- **[Active 3DGS and Targeted NBV](active_3dgs_nbv.qmd)**: Fisher-information, object-centric, dynamic, and task-aware 3DGS view selection.
+
+### Foundational Active Perception and View Planning
+
+- **[Active perception](https://doi.org/10.1109/5.5968)** and **[active vision](https://doi.org/10.1007/BF00133571)**: classical framing for perception as action-conditioned sensing [@ActivePerception-bajcsy1988; @ActiveVision-aloimonos1988].
+- **[View planning survey](https://doi.org/10.1145/641865.641868)** and **[autonomous 3D NBV system](https://doi.org/10.1109/3468.867866)**: classical generate-and-test NBV baselines and constraints [@ViewPlanningSurvey-scott2003; @NBVSystem-banta2000].
 
 ### Foundation Models & Scene Understanding  
 
-- **[EFM3D/EVL](efm3d.qmd)**: Egocentric foundation models for 3D perception and voxel lifting
-- **[SceneScript](scene_script.qmd)**: Structured scene language for semantic scene manipulation
+- **[EFM3D/EVL](efm3d.qmd)**: Egocentric foundation models for 3D perception and voxel lifting. Source: [arXiv 2406.10224](https://arxiv.org/abs/2406.10224) [@EFM3D-straub2024].
+- **[SceneScript](scene_script.qmd)**: Structured scene language for semantic scene manipulation. Source: [arXiv 2403.13064](https://arxiv.org/abs/2403.13064) [@SceneScript-avetisyan2024].
+
+### Radiance-Field and Gaussian-Splatting View Selection
+
+- **[NeRF](https://arxiv.org/abs/2003.08934)** and **[3D Gaussian Splatting](https://doi.org/10.1145/3592433)**: representation foundations for active radiance-field and 3DGS view-selection work [@NeRF-mildenhall2020; @GaussianSplatting-kerbl2023].
+- **[ActiveNeRF](https://arxiv.org/abs/2209.08546)** and **[FisherRF](https://arxiv.org/abs/2311.17874)**: uncertainty and Fisher-information references for active neural/radiance-field selection [@ActiveNeRF-pan2022; @FisherRF-jiang2024].
+- **[Next Best Sense](https://arxiv.org/abs/2410.04680)**, **[Semantic and Dynamic 3DGS NBV](https://arxiv.org/abs/2512.22771)**, and **[Object-centric 3DGS NBV](https://arxiv.org/abs/2602.08266)**: task-aware, dynamic, and object-centric view-selection references [@NextBestSense-strong2024; @li2025bestviewselectionssemantic; @ObjectCentricNBV-jeong2026].
 
 ## Local \LaTeX{} Corpus
 
@@ -32,6 +47,9 @@ Key entry points:
 - [`arXiv-EFM3D/main.tex`](../../literature/tex-src/arXiv-EFM3D/main.tex)
 - [`arXiv-GenNBV/main.tex`](../../literature/tex-src/arXiv-GenNBV/main.tex)
 - [`arXiv-VIN-NBV/main.tex`](../../literature/tex-src/arXiv-VIN-NBV/main.tex)
+- [`arXiv-Hestia/main.tex`](../../literature/tex-src/arXiv-Hestia/main.tex)
+- [`arXiv-Dynamic-3DGS/main.tex`](../../literature/tex-src/arXiv-Dynamic-3DGS/main.tex)
+- [`arXiv-Instance-NBV/root.tex`](../../literature/tex-src/arXiv-Instance-NBV/root.tex)
 - [`arXiv-project-aria/main.tex`](../../literature/tex-src/arXiv-project-aria/main.tex)
 - [`arXiv-scene-script/main.tex`](../../literature/tex-src/arXiv-scene-script/main.tex)
 

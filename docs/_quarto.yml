@@ -102,6 +102,8 @@ website:
             - contents/literature/scene_script.qmd
             - contents/literature/efm3d.qmd
             - contents/literature/hestia.qmd
+            - contents/literature/rl_planning.qmd
+            - contents/literature/active_3dgs_nbv.qmd
         - section: "Thesis State"
           contents:
             - contents/experiments/findings.qmd
@@ -118,6 +120,7 @@ website:
           contents:
             - contents/theory/nbv_background.qmd
             - contents/theory/rri_theory.qmd
+            - contents/theory/rl_planning.qmd
             - contents/theory/surface_metrics.qmd
             - contents/theory/semi-dense-pc.qmd
         - section: "Implementations"
@@ -130,6 +133,7 @@ website:
             - contents/impl/rri_computation.qmd
             - contents/impl/coral_integration.qmd
             - contents/impl/vin_nbv.qmd
+            - contents/impl/rerun_offline_inspector.qmd
             - contents/impl/vin_v2_feature_proposals.qmd
         - section: "Architecture Diagrams"
           contents:

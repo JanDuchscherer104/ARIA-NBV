@@ -1,0 +1,57 @@
+---
+title: "RL and Bounded Rollout Theory"
+phase: thesis
+audience: public
+status: current
+owner: jan
+format: html
+---
+
+# RL and Bounded Rollout Theory {#rl-planning-theory}
+
+ARIA-NBV should formulate its first non-myopic experiment as finite-horizon planning over discrete candidate views, not as full continuous reinforcement learning. At time $t$, the rollout state $s_t$ contains the accumulated geometry-first reconstruction state, the current reference pose, the candidate poses and masks, and any actor-visible diagnostic fields that can be obtained without privileged ground truth. The action set $\mathcal{A}(s_t)$ is the valid subset of sampled candidate views. A transition $T(s_t, q)$ appends the selected candidate observation to the counterfactual point state, and the immediate reward is a reconstruction-quality improvement signal such as scene-level RRI or target-specific RRI. Oracle labels, GT meshes, and GT OBB crops define supervision and evaluation; they should not become actor-visible inputs in the first rollout state.
+
+The one-step greedy baseline is the depth-one selector
+$$
+\operatorname{ArgTop1}_1(s_t) =
+\arg\max_{q \in \mathcal{A}(s_t)} r(s_t, q),
+$$
+where $r$ is the trusted oracle RRI during the first planning experiment. A bounded non-myopic rollout first restricts the search tree to the $K$ strongest valid branches,
+$$
+\operatorname{ArgTopK}(s_t) \subset \mathcal{A}(s_t),
+$$
+then computes a finite-horizon value over that pruned branch set:
+$$
+V_h(s_t) =
+\max_{q \in \operatorname{ArgTopK}(s_t)}
+\left[
+r(s_t, q) + V_{h-1}(T(s_t, q))
+\right].
+$$
+The selected action at horizon $h$ is therefore
+$$
+\operatorname{ArgTop1}_h(s_t) =
+\arg\max_{q \in \operatorname{ArgTopK}(s_t)}
+\left[
+r(s_t, q) + V_{h-1}(T(s_t, q))
+\right].
+$$
+This creates the experimental ladder $\operatorname{ArgTopK} \rightarrow \operatorname{ArgTop1}_1 \rightarrow \operatorname{ArgTop1}_2 \rightarrow \cdots \rightarrow \operatorname{ArgTop1}_H$. The scientific question is whether the first action chosen by an $h$-step oracle rollout improves cumulative RRI over the depth-one greedy action under the same candidate budget, horizon, and acquisition cost.
+
+This formulation is deliberately close to sequence decoding. Trajectory Transformer shows that offline control can be reframed as sequence modeling and decoded with beam search over predicted high-reward trajectories [@TrajectoryTransformer-janner2021]. ARIA-NBV does not need to train such a model first, because the current counterfactual evaluator already supplies typed transitions and oracle candidate rewards. The relevant import is the planning abstraction: beam width, context, and horizon are explicit computational budgets, which matches the roadmap's need for inspectable non-myopic evaluation before learned rollout claims.
+
+Gumbel-Top-k gives the natural stochastic extension of the deterministic branch set [@GumbelTopK-kool2019]. Deterministic top-k is best for the first trust experiment because it is reproducible and easy to inspect in Rerun. Once the oracle rollout path is stable, Gumbel-Top-k can sample candidate branches without replacement from a score distribution, preserving diversity while still favoring high-utility candidates. In ARIA-NBV terms, it should be treated as a stochastic beam proposal mechanism over candidate-view sequences, not as a replacement reward.
+
+The reward used for multi-step return should differ from the one-step training label only where the return semantics require it. The one-step VIN label remains the current RRI, because it is tied to the existing offline store and ranking diagnostics. For a horizon-$H$ rollout, an episode-normalized additive reward,
+$$
+r_t = \frac{d(P_t, M) - d(P_{t+1}, M)}{d(P_0, M) + \epsilon},
+$$
+or a log-improvement reward,
+$$
+r_t = \log(d(P_t, M)+\epsilon) - \log(d(P_{t+1}, M)+\epsilon),
+$$
+is better suited to cumulative comparison because the terms add cleanly across steps. The same formulas can be restricted to a target crop $M_e$ when evaluating target-specific RRI, while scene-level RRI remains a parallel diagnostic.
+
+Value learning should remain behind an evidence gate. If a masked discrete Q-function is trained over candidate views, Double Q-learning is the relevant safeguard against overoptimistic candidate values, because it separates action selection from action evaluation in the bootstrap target [@DoubleDQN-vanHasselt2015]. If the training data is a fixed rollout store, IQL is the stronger offline-RL reference because it avoids evaluating unseen actions while still performing multi-step dynamic programming through expectile value learning and advantage-weighted policy extraction [@IQL-kostrikov2021]. In both cases, the core ARIA-NBV constraint is support: the learned value or policy must respect sampled candidate geometry and validity masks before it is allowed to generalize beyond the offline store.
+
+Continuous policies are a later stage, but the literature clarifies what such a stage should look like. GenNBV demonstrates end-to-end PPO over five-degree-of-freedom actions with coverage rewards and multi-source state embeddings [@GenNBV-chen2024]. Hestia improves the continuous-control formulation by factorizing action prediction into a look-at proposal and feasible camera placement, adding directional voxel-face visibility, and using a close-greedy low-discount reward to reduce spurious long-horizon credit assignment [@Hestia-lu2026]. Deep energy-based policies and soft Q-learning explain how a policy can represent multiple good actions through a maximum-entropy energy distribution [@DeepEnergyPolicies-haarnoja2017]. These ideas are useful extensions, but they become thesis-grade only after bounded oracle-RRI rollouts demonstrate real headroom over one-step greedy selection.
