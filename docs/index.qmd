@@ -68,7 +68,6 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 
 - **[Project Roadmap](contents/thesis/roadmap.qmd)**: Milestones and timeline
 - **[Research Questions](contents/thesis/questions.qmd)**: Open problems and directions
-- **[Experimental Findings](contents/experiments/findings.qmd)**: Run logs and takeaways
 
 ## Theory & Background
 

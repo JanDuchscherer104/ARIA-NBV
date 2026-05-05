@@ -1,11 +1,16 @@
 ---
-title: Experimental Findings
-phase: thesis
-audience: advisor
+title: "Main Seminar Findings Archive"
+phase: archive
+audience: public
 status: current
 owner: jan
 format: html
 ---
+
+This page preserves historical visual findings from the main seminar phase.
+It is not current thesis evidence; current thesis direction lives in the
+[roadmap](../thesis/roadmap.qmd) and
+[research questions](../thesis/questions.qmd).
 
 ![ASE Semi-Dense Point Cloud Visualization](../../figures/dataset/ase_semi_dense.png)
 

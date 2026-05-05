@@ -18,3 +18,8 @@ Current project direction lives in the [roadmap](../thesis/roadmap.qmd) and
 [research questions](../thesis/questions.qmd). Active implementation work lives
 in the `.agents/*.toml` backlog, and canonical terms live in the
 [glossary](../glossary.qmd).
+
+## Historical Seminar Material
+
+- [Main Seminar Findings Archive](main_seminar_findings.qmd): historical visual
+  findings from the main seminar phase, retained as public archive material.

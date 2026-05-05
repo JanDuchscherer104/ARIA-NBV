@@ -65,8 +65,6 @@ website:
             href: contents/thesis/roadmap.qmd
           - text: Research Questions
             href: contents/thesis/questions.qmd
-          - text: Findings
-            href: contents/experiments/findings.qmd
       - text: Aria NBV API
         file: reference/index.qmd
       - text: Resources
@@ -114,7 +112,6 @@ website:
                 - contents/literature/rl_planning.qmd
         - section: "Thesis State"
           contents:
-            - contents/experiments/findings.qmd
             - contents/thesis/questions.qmd
             - contents/thesis/roadmap.qmd
         - section: "Resources"
