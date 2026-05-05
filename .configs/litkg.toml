@@ -51,6 +51,25 @@ fields = [
   "openAccessPdf",
 ]
 
+[runtime.ollama]
+base_url = "http://127.0.0.1:11434/v1"
+embedding_model = "qwen3-embedding:4b"
+embedding_dim = 2560
+chat_model = "gemma4:26b"
+
+[authority_tiers]
+".agents/memory/state/*.md" = 1.5
+".agents/*.toml" = 1.2
+"AGENTS.md" = 1.2
+"**/AGENTS.md" = 1.2
+".agents/skills/**/*.md" = 1.1
+".agents/references/**/*.md" = 1.1
+"aria_nbv/**/*.py" = 1.5
+"docs/typst/seminar_paper/main.typ" = 1.5
+"docs/contents/thesis/*.qmd" = 1.2
+"docs/_generated/context/*.md" = 0.8
+".agents/memory/history/**/*.md" = 0.5
+
 [project]
 id = "aria-nbv"
 name = "ARIA-NBV"
@@ -107,7 +126,6 @@ authority = "episodic"
 include = [
   ".agents/memory/history/**/*.md",
   ".agents/work/**/*.md",
-  ".agents/archive/**/*.md",
 ]
 
 [sources.agent_skills]

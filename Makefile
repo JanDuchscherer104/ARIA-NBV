@@ -5,7 +5,7 @@
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory
 .PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory
-.PHONY: memory-mine agents-db glossary kg-capabilities kg-search kg-query kg-brief kg-route kg-claim-check kg-related kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-full
+.PHONY: memory-mine agents-db glossary kg-up kg-down kg-capabilities kg-ollama-check kg-search kg-query kg-brief kg-route kg-claim-check kg-consolidate kg-related kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-docs-smoke kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-full
 .PHONY: lrz-probe lrz-resources lrz-resources-gpu lrz-resources-cpu lrz-jobs lrz-dss-init lrz-container-shell lrz-sbatch-cpu lrz-sbatch-single-gpu lrz-sbatch-multigpu
 
 # Color codes
@@ -79,6 +79,7 @@ KG_RELATED_PATH ?=
 KG_PAPER ?=
 KG_LIMIT ?= 24
 KG_FORMAT ?= text
+KG_DOC_PATHS ?=
 
 #  ══════════════════════════════════════════════════════════════════════
 #  Agent Context helpers
@@ -170,11 +171,21 @@ memory-mine: _check_python ## 🧠 Mine current repo state (docs, code, history)
 	@$(PYTHON_INTERPRETER) -m mempalace --palace .artifacts/mempalace/palace mine .agents/memory --mode convos
 	@echo "$(GREEN)MemPalace mining complete.$(NC)"
 
+kg-up: ## 📚 Start the optional litkg Neo4j runtime
+	@.agents/external/litkg-rs/scripts/kg/up.sh
+
+kg-down: ## 📚 Stop the optional litkg Neo4j runtime
+	@.agents/external/litkg-rs/scripts/kg/down.sh
+
 kg-capabilities: ## 📚 Show litkg backend/source readiness (set KG_FORMAT=json for machine output)
 	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- capabilities \
 		--config "$(LITKG_CONFIG)" \
 		--repo-root "$(LITKG_REPO_ROOT)" \
 		--format "$(KG_FORMAT)"
+
+kg-ollama-check: ## 📚 Validate Mac/remote Ollama model endpoint for litkg runtime refresh
+	@python3 .agents/external/litkg-rs/scripts/kg/ollama_http.py check \
+		--config "$(LITKG_CONFIG)"
 
 kg-search: ## 📚 Search litkg-indexed code/docs/memory/backlog/literature (set KG_QUERY='...')
 	@if [ -z "$(strip $(KG_QUERY))" ]; then \
@@ -236,6 +247,12 @@ kg-claim-check: ## 📚 Claim-check against litkg context (set KG_CLAIM='...')
 		--profile "$(LITKG_PROFILE)" \
 		--format "$(KG_FORMAT)"
 
+kg-consolidate: ## 📚 Propose memory/backlog consolidation updates without editing files
+	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- kg consolidate \
+		--config "$(LITKG_CONFIG)" \
+		--repo-root "$(LITKG_REPO_ROOT)" \
+		--format "$(KG_FORMAT)"
+
 kg-related: ## 📚 Find litkg context related to a path or symbol (set KG_RELATED_PATH='...')
 	@if [ -z "$(strip $(KG_RELATED_PATH))" ]; then \
 		echo "$(RED)KG_RELATED_PATH is required, e.g. make kg-related KG_RELATED_PATH='aria_nbv/aria_nbv/rri_metrics/oracle_rri.py'$(NC)"; \
@@ -270,7 +287,16 @@ kg-index-code: ## 🏗️ Index aria_nbv code into Neo4j
 	@./scripts/kg/index_code.sh
 
 kg-ingest-docs: ## 📝 Ingest docs/ into Neo4j/Graphiti
-	@./scripts/kg/ingest_docs.sh
+	@./scripts/kg/ingest_docs.sh $(KG_DOC_PATHS)
+
+kg-ingest-docs-smoke: ## 📝 Smoke-ingest one small doc into Neo4j/Graphiti
+	@GRAPHITI_DOC_CHAR_LIMIT=1200 $(MAKE) kg-ingest-docs KG_DOC_PATHS=AGENTS.md
+
+kg-enrich: ## 📚 Refresh litkg runtime embeddings and code↔doc links
+	@KG_OLLAMA_CONFIG="$(LITKG_CONFIG)" \
+		KG_CODE_REPO_ROOT="$(CURDIR)" \
+		KG_CODE_PATH_PREFIX="$(KG_SRC_DIR)" \
+		python3 .agents/external/litkg-rs/scripts/kg/enrich_embeddings.py
 
 kg-ingest-papers: ## 📚 Full literature pipeline (sync, download, parse, materialize)
 	@./scripts/kg/ingest_papers.sh

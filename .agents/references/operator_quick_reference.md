@@ -27,6 +27,33 @@ aria_nbv/.venv/bin/python --version
 uv run python --version
 ```
 
+## Mac-Offloaded litkg Ollama
+Use the Mac as the Ollama model host while keeping ARIA-NBV sources, Neo4j,
+Graphiti, and generated KG artifacts on the Ubuntu workstation.
+
+On the Mac:
+
+```bash
+ollama serve
+ollama pull qwen3-embedding:4b
+ollama pull gemma4:26b
+ssh -R 11434:127.0.0.1:11434 jd@ubuntu-workstation
+```
+
+On Ubuntu, the ARIA-NBV Makefile reads the Ollama model settings from
+`.configs/litkg.toml`:
+
+```bash
+make kg-ollama-check
+make kg-up
+make kg-ingest-docs-smoke
+```
+
+Run `make kg-ollama-check` before `make kg-ingest-docs` or embedding
+enrichment when the tunnel might have expired. Override values with environment
+variables only for one-off experiments; the default ARIA-NBV contract lives in
+`[runtime.ollama]`.
+
 ## Repo Hygiene
 Run these before staging or when the worktree looks noisy:
 
