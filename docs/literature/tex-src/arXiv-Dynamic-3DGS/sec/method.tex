@@ -1,0 +1,166 @@
+\section{Method}
+In this section, we describe our active learning algorithm with Fisher Information for NBV selection in dynamic semantic 3DGS. We begin by reviewing the necessary preliminaries on semantic 3DGS and dynamic 3DGS, which form the foundation of our unified backbone. We then introduce our formulation for computing Fisher Information, first for Gaussian parameters, which capture both geometry and semantics features in Section 3.2 and subsequently for the deformation network, which captures temporal dynamics in Section 3.3. This decomposition allows us to quantify the informativeness of candidate views across all key aspects of the scene representation, enabling principled and efficient NBV selection.
+
+\subsection{Preliminaries}
+In this Section, we first introduce the two core components of our representation framework. Section 3.1.1 details the formulation of Semantic 3D Gaussian Splatting, which distills semantic features from 2D vision-language models into a 3D explicit representation. Section 3.1.2 extends this framework to 4D Gaussian Splatting, incorporating a deformation network to capture dynamic scene changes over time. 
+
+\subsubsection{Semantic 3D Gaussians Splatting}
+
+Following the work of feature 3DGS~\cite{feature3dgs}, the semantic 3D Gaussian Splatting (3DGS) represents a scene using a collection of Gaussians \(\{\mathcal{G}_i\}_{i=1}^N\), where each Gaussian \(\mathcal{G}_i\) is defined by its location \(x_i \in \mathbb{R}^3\), rotation \(q_i \in \mathbb{R}^4\), scale \(s_i \in \mathbb{R}^3\), opacity \(\alpha_i \in \mathbb{R}\), color \(c_i \in \mathbb{R}^3\), and a semantic feature vector \(f_i \in \mathbb{R}^d\). The full parameter set is:
+\[
+\Theta_i = \{x_i, q_i, s_i, \alpha_i, c_i, f_i\}.
+\]
+
+To project the 3D Gaussians into image space, each covariance matrix \(\Sigma_i\) is transformed to camera space:
+\begin{equation}
+\Sigma'_i = J W \Sigma_i W^\top J^\top,
+\end{equation}
+where \(W\) is the world-to-camera transformation and \(J\) is the Jacobian of the projection function. The original 3D covariance is decomposed as:
+\begin{equation}
+\Sigma_i = R_i S_i^2 R_i^\top,
+\end{equation}
+where \(R_i\) is the rotation matrix, which can be converted from quaternions \(q_i\)) and \(S_i\) is a diagonal matrix of scales \(s_i\). In this way, the \(\Sigma_i\) can be guaranteed to be positive semi-definite during optimization.
+
+Rendering is performed using volumetric \(\alpha\)-compositing in front-to-back order. The color \(C\) and semantic feature \(F_s\) at a pixel are computed as:
+\begin{equation}
+C = \sum_{i \in \mathcal{N}} c_i \alpha_i T_i, \quad
+F_s = \sum_{i \in \mathcal{N}} f_i \alpha_i T_i,
+\end{equation}
+where \(\mathcal{N}\) is the set of Gaussians overlapping the pixel (sorted by depth), and the transmittance \(T_i\) is:
+\begin{equation}
+T_i = \prod_{j=1}^{i-1} (1 - \alpha_j).
+\end{equation}
+
+In order to supervise the semantic features, we distill from the pretrained 2D foundation model Lseg~\cite{Lseg} with a feature dimension of 512. To reduce training and rendering cost, we keep low-dimensional features \(f_i \in \mathbb{R}^{128}\) at each 3D Gaussian and employ a lightweight convolutional decoder to upsample the rendered feature map \(F_s \in \mathbb{R}^{H \times W \times 128}\) to \(F_s' \in \mathbb{R}^{H \times W \times 512}\).  The overall loss function is:
+\begin{equation}
+\mathcal{L} = \mathcal{L}_{\text{rgb}} + \gamma \mathcal{L}_{\text{feat}},
+\end{equation}
+with:
+\[
+\mathcal{L}_{\text{rgb}} = (1 - \lambda)\|I - \hat{I}\|_1 + \lambda \mathcal{L}_{\text{D-SSIM}}, \quad
+\mathcal{L}_{\text{feat}} = \|F_t - F_s'\|_1,
+\]
+where \(\hat{I}\) is the rendered image and \(I\) is the ground truth.
+
+
+\subsubsection{Dynamic 3DGS}
+
+4D-GS~\cite{4dgs} extends the static 3D Gaussian Splatting framework to dynamic scenes by introducing a deformation network that models the motion and shape changes of 3D Gaussians over time. At any timestamp \(t\), the Gaussians are transformed via a deformation network:
+\begin{equation}
+G'_t = G + \Delta G_t = \{X_i + \Delta X_i(t), s_i + \Delta s_i(t), r_i + \Delta r_i(t)\},
+\end{equation}
+where \(\Delta X_i(t)\), \(\Delta s_i(t)\), and \(\Delta r_i(t)\) are the time-dependent predicted deformations.
+
+The deformation network \(F_{\phi}\) consists of two components: a spatial-temporal structure encoder \(H\) and a multi-head deformation decoder \(D\). The encoder \(H\) uses a multi-resolution voxel grid decomposition, inspired by K-Planes~\cite{Kp}, over six 2D plane projections \((x,y), (x,z), (y,z), (x,t), (y,t), (z,t)\). Each Gaussian’s position and time \((X_i, t)\) are queried from these planes via bilinear interpolation to produce a feature embedding:
+\begin{equation}
+F_{i} = \phi_d\left(\bigcup_{(i,j)} \text{interp}(R_{(i,j)}^{(l)})\right),
+\end{equation}
+where \(R_{(i,j)}^{(l)}\) denotes the voxel planes at resolution level \(l\), and \(\phi_d\) is a small MLP used to fuse the plane features.
+
+The decoder \(D = \{\phi_x, \phi_r, \phi_s\}\) consists of three heads that output the deformation for position, rotation, and scale:
+\begin{equation}
+\Delta X_i(t) = \phi_x(F_i), \quad \Delta r_i(t) = \phi_r(F_i), \quad \Delta s_i(t) = \phi_s(F_i).
+\end{equation}
+
+During rendering, the pretrained 3DGS are first deformed through $\{G'_i\}_{i=1}^N = F\left(\{G_i\}_{i=1}^N\right)$. Then, the deformed Gaussians \(G'_t\) are rendered via differentiable splatting to produce the final image:
+\begin{equation}
+\hat{y}_t = S(M_t, G'_t),
+\end{equation}
+where \(M_t\) is the camera pose at time \(t\) and \(S\) denotes the splatting renderer. 
+
+% \begin{figure}
+%   \centering
+%   \includegraphics[width=1.0\linewidth]{images/pipeline.jpg}
+%   \caption{\textbf{Overview of our work.} At each timestep, we select the NBV from a set of candidate camera views using a Fisher Information-based criterion. The selection process evaluates each candidate view based on its expected contribution to both semantic feature learning and dynamic deformation modeling. Once selected, the chosen view is incorporated into the training process of our Dynamic Semantic 3DGS. For rendering and supervision, the Gaussians are first deformed by an MLP deformation network based on the current timestep, then projected into RGB images and semantic feature maps. These outputs are compared against ground-truth images and semantic labels to jointly optimize both the dynamic deformation and semantic representation.}
+% \end{figure}
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.95\textwidth]{images/pipeline.jpg}
+  \caption{\textbf{Overview of our work.} At each timestep, we select the NBV from a set of candidate camera views using a Fisher Information-based criterion. The selection process evaluates each candidate view based on its expected contribution to both semantic feature learning and dynamic deformation modeling. Once selected, the chosen view is incorporated into the training process of our Dynamic and Semantic 3DGS. For rendering and supervision, the Gaussians are first deformed by an MLP deformation network based on the current timestep, then projected into RGB images and semantic feature maps. These outputs are compared against ground-truth images and semantic labels to jointly optimize both the dynamic deformation and semantic representation.}
+  \label{fig:pipeline}
+\end{figure*}
+
+
+
+
+\subsection{Fisher information for semantic 3DGS}
+In this section, we will describe how to qualify Fisher information for Gaussian parameters for NBV selection.\\
+Following the instruction of FisherRF~\cite{fisherrf}, let the radiance field be parameterized by \( G \), representing the set of attributes for all 3D Gaussians in the scene, including location \( x \), scale \( s \), opacities \( \alpha \), colors \( c \), and semantic feature \( f \). At a given camera pose \( M \in \text{SE}(3) \), the rendering function \( S(M, G) \) produces a synthetic image. We consider the negative log-likelihood of the observed image \( y \) under the rendered prediction:
+\begin{equation}
+\mathcal{L}(y; G) = -\log p(y | M,G) = \| y -  S(M, G) \|^2_2.
+\end{equation} 
+Under standard regularity conditions, the \emph{observed} Fisher Information with respect to the parameters \( G \) at pose \( M \) is given by the Hessian of this loss:
+\begin{equation}
+\mathcal{I}(G; M) = \nabla_G  S(M, G)^\top \nabla_G  S(M, G) + \lambda I,
+\label{eq:fisherreg}
+\end{equation}
+where \( \lambda I \) is a log-prior regularization term.
+
+However, due to the large number of parameters, computing the full Fisher Information matrix is intractable in practice. Following the approximation proposed in FisherRF~\cite{fisherrf}, we apply a Laplace approximation by retaining only the diagonal elements of the Hessian and adding a prior regularization term:
+
+\begin{equation}
+\mathcal{I}(G; M) \approx \text{diag}\left( \nabla_G S(M, G)^\top \nabla_G S(M, G) \right) + \lambda I,
+\end{equation}
+ This diagonal approximation significantly reduces computational cost and memory overhead, while preserving the essential structure of the Fisher Information needed for evaluating local sensitivity.
+
+
+To select the most informative viewpoint from a candidate pool \( \{M_i\}_{i=1}^N \), we pick the view that maximize the \emph{Expected Information Gain} (EIG), defined as:
+\begin{equation}
+\text{EIG}(M_i) = \mathrm{tr}\left( \mathcal{I}(G; M_i) \cdot \mathcal{I}_{\text{train}}^{-1} \right),
+\end{equation}
+where \( \mathcal{I}_{\text{train}} \) is the accumulated Fisher Information of current training views. The trace measures how much the candidate view would sharpen the current uncertainty landscape over parameters.
+
+\subsection{Fisher Information for Deformation Network}
+In this section, we introduce a novel estimator for the Fisher Information of multilayer perceptrons (MLPs), which we employ to quantify the informativeness of our deformation module.
+
+For the deformation network \(F_{\phi}\), the informativeness of a candidate view \((\mathbf{x}^{acq}, \mathbf{y}^{acq})\) is quantified by the Fisher Information with respect to deformation network parameters \(\phi\) and the current training data \(D^{train}\):
+% \[
+% \mathcal{I}[\phi ; \mathbf{y}^{acq} \mid \mathbf{x}^{acq}, D^{train}] 
+% = H[\phi \mid D^{train}] - H[\phi \mid \mathbf{y}^{acq}, \mathbf{x}^{acq}, D^{train}].
+% \]
+\begin{align}
+\mathcal{I}[\phi ; \mathbf{y}^{acq} \mid \mathbf{x}^{acq}, D^{train}] 
+&= H[\phi \mid D^{train}] \nonumber \\
+&\quad - H[\phi \mid \mathbf{y}^{acq}, \mathbf{x}^{acq}, D^{train}].
+\end{align}
+
+
+Following FisherRF~\cite{fisherrf}, this gain can be upper bounded by the curvature of the log-likelihood:
+% \[
+% \mathcal{I}[\phi] 
+% \;\le\; \tfrac{1}{2}\,\operatorname{tr} \Big(
+%     \mathbf{H}''_{\phi}\big[ \log p(\mathbf{y}^{acq} \mid \mathbf{x}^{acq}, \phi) \big]
+%     \cdot
+%     \mathbf{H}''_{\phi}\big[ \log p(\phi \mid D^{train}) \big]^{-1}
+% \Big),
+% \]
+\begin{align}
+\mathcal{I}[\phi] 
+&\;\le\; \tfrac{1}{2}\,\operatorname{tr} \Big(
+    \mathbf{H}''_{\phi}\big[ \log p(\mathbf{y}^{acq} \mid \mathbf{x}^{acq}, \phi) \big] 
+    \nonumber \\
+&\quad \cdot \;
+    \mathbf{H}''_{\phi}\big[ \log p(\phi \mid D^{train}) \big]^{-1}
+\Big).
+\end{align}
+
+where \(\mathbf{H}''_{\phi}\) denotes the Hessian with respect to \(\phi\).
+
+For view selection, the prior Hessian term \(\mathbf{H}''_{\phi}[\log p(\phi \mid D^{train})]^{-1}\) is constant across candidate views and can be dropped. Thus our acquisition criterion simplifies to maximizing
+\[
+\mathcal{S}(\mathbf{x}^{acq}) 
+= \operatorname{tr}\!\left( \mathbf{H}''_{\phi}\big[ \log p(\mathbf{y}^{acq} \mid \mathbf{x}^{acq}, \phi) \big] \right).
+\]
+
+Finally, we estimate the trace efficiently with Hutchinson’s estimator:
+\[
+\mathcal{S}(\mathbf{x}^{acq}) 
+\;\approx\; \mathbb{E}_{\mathbf{v} \sim \mathcal{N}(0, I)} \big[ \| \mathbf{H}''_{\phi}\, \mathbf{v} \|^2 \big],
+\]
+where \(\mathbf{v}\) is a random probe vector and Hessian-vector products are computed via automatic differentiation.
+
+This formulation explicitly ties Fisher Information to the deformation network parameters \(\phi\), ensuring that the selected views maximize temporal consistency and improve the modeling of dynamic scene evolution.
+
+
+
+

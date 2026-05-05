@@ -127,3 +127,19 @@ context = ["The PRML cross-review classified Graphify, MemPalace, and OMX as lat
 implementation_notes = ["Treat KG outputs as generated/internal unless explicitly curated into public docs.", "Prefer existing litkg-rs, code-index, Graphify, Neo4j, Graphiti, and MemPalace adapters before writing bespoke parsers.", "Keep canonical truth in Typst/Quarto source, .agents/memory/state, active backlog, and code docstrings; KG artifacts should cite those sources.", "Align AGENTS.md, semantic-scholar-litkg, aria-litkg-memory, .agents/kg/README.md, and .configs/litkg.toml so agents do not confuse MemPalace with the structural KG backend."]
 acceptance = ["KG generation and memory mining have clear internal output locations and are not exposed as primary public navigation.", "The repo can explain when to use context scripts, litkg retrieval, litkg implementation work, and MemPalace mining.", "Generated KG artifacts are ignored, small, or intentionally versioned with provenance.", "Public Quarto navigation does not surface raw .agents/kg/generated outputs."]
 verification = ["make kg-capabilities || true", "make check-agent-memory", "rg -n \"graphify|MemPalace|Neo4j|Graphiti|code-index|litkg|aria-litkg-memory\" .agents/skills .agents/kg/README.md .configs scripts/kg AGENTS.md"]
+
+[[refactor]]
+id = "refactor-015"
+title = "Split dependencies into extras and remove stale host paths"
+description = "Separate core/train/viz/dev/notebook/EFM/diagnostics dependency groups and remove stale hard-coded host paths or legacy config assumptions from shared repo surfaces."
+priority = "medium"
+status = "todo"
+labels = ["packaging", "setup", "hygiene", "dependencies"]
+issue_ids = ["issue-004", "issue-005", "issue-010"]
+loc_min = 160
+loc_expected = 360
+loc_max = 900
+context = ["The alignment distillation listed dependency extras, old hard-coded /home/jandu/repos/NBV paths, and setup/runtime hygiene as remaining cleanup targets.", "The current package depends on heavyweight training, visualization, Rerun, Zarr, and EFM-related libraries in one shared setup surface, which makes portable setup and CI harder.", "Shared docs and configs should not encode one operator's workstation paths."]
+implementation_notes = ["Inventory pyproject dependencies and classify them into minimal runtime, train, viz/diagnostics, dev/test, notebooks, EFM/ATEK, and all extras.", "Keep default install compatible with current CLI expectations or document the exact extra needed for each CLI.", "Search shared docs/configs for old /home/jandu/repos/NBV and similar host-local paths; move unavoidable operator examples into .agents/references.", "Avoid changing scientific behavior while splitting dependency declarations."]
+acceptance = ["Optional heavy dependencies are grouped into documented extras without breaking existing dev setup.", "README/SETUP/docs name which extras are required for training, Rerun diagnostics, KG/docs work, and notebooks.", "Shared tracked files no longer contain stale NBV repo paths or personal absolute paths except in explicitly operator-scoped references.", "CI/pre-commit planning can choose a lightweight install target."]
+verification = ["rg -n \"/home/jandu/repos/NBV|/home/.*/repos/NBV|miniforge|conda env\" README.md SETUP.md docs .configs aria_nbv/pyproject.toml .agents/references", "cd aria_nbv && uv run pytest tests/data_handling/test_public_api_contract.py", "ruff check aria_nbv/pyproject.toml || true"]

@@ -1,0 +1,102 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%2345678901234567890123456789012345678901234567890123456789012345678901234567890
+%        1         2         3         4         5         6         7         8
+\documentclass[letterpaper, 10 pt, conference]{ieeeconf}  % Comment this line out if you need a4paper
+
+%\documentclass[a4paper, 10pt, conference]{ieeeconf}      % Use this line for a4 paper
+\usepackage[space]{cite}
+\usepackage{amsmath,amsfonts}
+\usepackage{algorithm}
+\usepackage{array}
+\usepackage{textcomp}
+\usepackage{stfloats}
+\usepackage{url}
+\usepackage{verbatim}
+\usepackage{graphicx}
+\usepackage{algpseudocode}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage[switch,pagewise]{lineno}
+\usepackage{orcidlink}
+\usepackage[utf8]{inputenc}
+\usepackage[caption=false]{subfig}
+\usepackage{soul,xcolor}
+\usepackage{tablefootnote} % 在导言区添加
+\hyphenation{op-tical net-works semi-conduct-tor IEEE-Xplore}
+% updated with editorial comments 8/9/2021
+\graphicspath{{./img/}}
+
+\IEEEoverridecommandlockouts                              % This command is only needed if 
+                                                          % you want to use the \thanks command
+
+\overrideIEEEmargins                                      % 
+
+\title{\LARGE \bf
+    PB-NBV: Efficient Projection-Based Next-Best-View Planning Framework for Reconstruction of Unknown Objects
+}
+
+\author{Zhizhou Jia, Yuetao Li, Qun Hao, and Shaohui Zhang % <-this % stops a space
+\thanks{
+This paper has been accepted for publication in IEEE Robotics and Automation Letters (RA-L), 2025.
+DOI: 10.1109/LRA.2025.3573631.}
+\thanks{All authors are with the School of Optics and Photonics, Beijing Institute of Technology, Beijing 100081, China. (Corresponding author: Shaohui Zhang.)
+        {\tt\small \{jiazhizhou, liyuetaochn, qhao, zhangshaohui\}@bit.edu.cn}}%
+}
+
+\begin{document}
+% \pagewiselinenumbers% 按页重新编号 
+\maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{abstract}
+% 完整地捕获目标三维数据对工业与机器人领域来说十分重要。
+Completely capturing the three-dimensional (3D) data of an object is essential in industrial and robotic applications.
+% next-best-view(NBV) planning要完成的任即是根据当前的数据推断出下一帧拍摄视点的位置，逐步实现对目标的完整三维重建。
+The task of next-best-view (NBV) planning is to calculate the next optimal viewpoint based on the current data, gradually achieving a complete 3D reconstruction of the object.
+% 然而，现有的很多NBV planning算法都因为使用大量的ray-casting而造成了极大的计算负担。
+However, many existing NBV planning algorithms incur heavy computational costs due to the extensive use of ray-casting.
+% To address this，本文提出了 a projection-based NBV planning framework。
+To address this, we propose a projection-based NBV planning framework. 
+% 具体来说，该框架在体素结构的基础上，将不同种类的体素聚类再拟合成椭球。
+% 然后通过使用基于投影的视点质量评估函数结合全局分区策略在候选视角中选择下一帧最佳视角。
+% 这个过程替代了体素结构中的ray-casting，显著提高了计算效率。
+Specifically, this framework refits different types of voxel clusters into ellipsoids based on the voxel structure.
+Then, the next optimal viewpoint is selected from the candidate views using a projection-based viewpoint quality evaluation function in conjunction with a global partitioning strategy.
+This process replaces extensive ray-casting, significantly improving the computational efficiency.
+% 在仿真环境中与其他框架的对比实验表明，本文提出的算法可以在可以获得更高的点云覆盖率，用很低的计算耗时.
+% 实物实验结果也证明了该框架的高效性和可行性。
+Comparison experiments in the simulation environment show that our framework achieves the highest point cloud coverage with low computational time compared to other frameworks.
+The real-world experiments also confirm the efficiency and feasibility of the framework.
+% 我们的方法将开源以造福社区。
+Our method will be made open source to benefit the community \footnote{ \href{https://github.com/dspangpang/pb\_nbv}{To be released at:https://github.com/dspangpang/pb\_nbv}}.
+\end{abstract}
+
+\input{sections/intro.tex}
+
+\input{sections/related.tex}
+
+\input{sections/method.tex}
+
+\input{sections/result.tex}
+
+\section{Conclusion}
+% 本文提出了一个基于投影的NBV规划框架，在体素结构的情况下使用椭球来表征目标，在选择最优视点是通过椭球投影来替代ray-casting, 在能够提供更高覆盖率的同时，极大的降低了计算负担，并通过仿真和实测验证了方法的高效性和可行性。
+% 然而，面对高反射率材质或物体间相互反射时，结构光相机难以获取完整表面数据，这是未来NBV规划框架研究的方向。
+% 同时，基于效率的NBV规划框架也应关注系统运动效率，包括最少的移动次数和最优的全局路径规划。
+
+This paper introduces a projection-based NBV planning framework that uses ellipsoids to represent objects in voxel structures, replacing ray-casting with ellipsoid projection to select the optimal viewpoint. This approach not only provides higher coverage but also significantly reduces computational load, with both simulation and real-world experiments confirming its efficiency and feasibility.
+However, challenges remain in capturing complete surface data with structured light cameras on high-reflectivity materials or mutual reflections, which will guide future improvements to the NBV planning framework. 
+In addition, efficiency-focused NBV planning frameworks should also focus on system movement efficiency, aiming for minimal movements and optimal global path planning.
+
+\addtolength{\textheight}{0.cm}   % This command serves to balance the column lengths
+                                  % on the last page of the document manually. It shortens
+                                  % the height of the last page by a suitable amount.
+                                  % This command does not take effect until the next page
+                                  % so it should come on the page before the last. Make
+                                  % Make sure that you do not shorten the height too much.
+\bibliographystyle{IEEEtran}
+\bibliography{IEEEabrv,jzzpb}
+
+\end{document}

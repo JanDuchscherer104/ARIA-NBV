@@ -1,0 +1,59 @@
+
+As robots become more capable of performing manipulation in daily tasks, it is important for them to efficiently model the scene and relevant objects \cite{lu2024manigaussian,shorinwa2024splat}. One prominent explicit 3D representation is \gls*{3DGS} \cite{3dgs}, which reconstructs a 3D scene from RGB images and camera poses. Traditionally, the creation of \gls{3DGS} scenes is done with a). many views and b). complete human supervision. \gls{3DGS} is well-known for requiring tens of views and near-perfect camera poses; as it is prone to overfitting on sparse input views.  This approach, however, is inconsistent with many of the potential robotic applications of \gls{3DGS}. In a robotic setting, it is inefficient to collect hundreds of views, often by a human teleoperator, required for training a \gls{3DGS} model in robotic environments. For future applications of \gls{3DGS} on robotics systems, robust few-view training methods are needed. Even the assistance of depth priors in prior work on few-shot Gaussian Splatting \cite{chung2024depthregularized,paliwal2024coherentgssparsenovelview,dust3r2023, zhu2023fsgs} often relies on high quality visual data for constructing a precise 3D scene, assumes that structure from motion points are already available, and require strong visual priors. Robots with noisy depth and low resolution RGB cameras cannot benefit from this.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=.45\textwidth]{figure/splash_next_best.png}
+    \caption{Our method outperforms random view selection for few view \gls{3DGS} scenes. We show a series of robot views, with the next view proposed by our method compared to random..}
+    \label{fig:showcase}
+    % We also highlight our method versus 3DGS with monocular depth supervision.
+    \vspace{-6mm}
+\end{figure}
+
+
+To address this, we propose the use of \textit{semantic depth alignment} to enhance the impact of each additional view. We draw from the power of state-of-the-art monocular depth estimation models, and with an off-the-shelf depth camera and color image, we perform a semantic depth alignment by aligning objects and the background of an image with Segment Anything Model 2 (SAM2) \cite{ravi2024sam2segmentimages}. This is used as a form of initialization in our few-shot scene. During training, depth supervision is enforced with a relaxed relative loss, which mitigates the scale ambiguities between the true depth and estimated depth from the depth estimation models. Gentle normal supervision and camera optimization guide the Gaussian Splat to reconstruct a visually accurate scene.
+
+
+% part 3: autonomously with a robot -- which views
+In addition to maximizing the impact of each of the limited training views, we propose a method to optimally select the \emph{next best view} based on depth uncertainty and optionally color uncertainty. When there are a limited number of views available, uncertainty emerges from depth discontinuities, occluded regions, and sources of aleatoric error. It is critical to understand where \textit{next} best views and touches should be made in a scene to reduce this uncertainty and construct precise representations for effective robot operation. 
+
+In order to determine the optimal next view in a radiance field, we develop a uncertainty metric and maximize uncertainty gain. Past work in uncertainty quantification in radiance fields includes per-pixel uncertainty, ray entropy, ensemble methods, and interpreting the radiance field as a probability distribution  \cite{lin2022active, pan2022activenerf, lee2022uncertainty, shen2024estimating}. These works require significant modifications to the original radiance field architecture, become computationally infeasible in the case of ensemble-based uncertainty, and make assumptions about ray density distributions that are not generalizable. FisherRF~\cite{jiang2023fisherrf}, a recent state-of-the-art work in uncertainty quantification, uses the \textbf{Fisher Information} to quantify observed information without any ground truth data. Only requiring one backward pass, FisherRF is broadly generalizable to explicit radiance fields like Gaussian Splatting, making it a suitable method for robotics applications.
+
+ % , it is desirable to compute the uncertainty in a radiance field like \gls{3DGS}, where more uncertain regions are more likely to be viewed.
+
+FisherRF computes the expected information gain on candidate views of \gls{3DGS} to then select the next best view. Unlike FisherRF, recent research on NBV in offline and online applications \cite{lee2022uncertainty, shen2024estimating, pan2022activenerf} leverages prior methods for uncertainty quantification and is only applied to implicit radiance fields methods like Neural Radiance Fields (NeRFs). 
+
+
+We extend FisherRF to select views \textit{and} touches based on \textbf{depth uncertainty}. We posit that the geometry and visual quality of a scene can be guided through depth, as we observe that regions of erroneous color in Gaussian Splats are often associated with ambiguous depth. This framework can be easily extended to touch, which has been shown to improve \gls{3DGS} quality \cite{swann2024touch}. 
+
+
+The integration of touch into \gls{3DGS} is still limited, however -- only  Touch-GS \cite{swann2024touch} and Snap-It, Tap-It, Splat-It \cite{comi2024snap} address touch-informed \gls{3DGS}, as compared to several works fusing vision and touch for manipulation \cite{smith2021active, suresh2023neural,yang2024binding, fu2024touch,watkins2019multi, smith20203d}. While Touch-GS demonstrates the improvements on \gls{3DGS} scenes with touch, it suffers from two shortcomings: 1. it requires a human to move the robot to desired vision and touch poses and 2. requires the order of 100-500 touches to construct a visually and geometrically sufficient scene. Snap-It, Tap-It, Splat-It similarly requires manual views. Our method automonously selects views and touches guided by uncertainty, in a two stage process, where vision coarsely reconstructs the object, and then touch refines it.
+
+
+Altogether, we construct a framework that enables for the autonomous sense selection with a robotic manipulator, which we call \textit{Next Best Sense}.
+
+
+
+\noindent \textbf{Key Contributions.} We propose \textit{Next Best Sense}, the first approach that enables uncertainty-guided view \textit{and} touch selection for training a \gls*{3DGS} for robotic manipulators. Our main contributions in Next Best Sense are as follows:
+\textbf{1)} We propose an improved method in few-shot \gls{3DGS} scenes with a novel depth alignment method using Segment Anything Model 2.
+\textbf{2) }We present a novel extension of FisherRF by leveraging depth uncertainty to assist in view and touch selection.
+\textbf{3)} We present a closed-loop framework coupling both perception and action for training few-view scenes for robotic manipulators with FisherRF. To the best of our knowledge, this is the first work that enables next best view planning for Gaussian Splatting for robot manipulators in real-time. 
+\textbf{4)} We extend our method to uncertainty-guided touch, demonstrating qualitative improvements with only 10 touches.
+
+
+% \section{Related Works}
+% \label{sec:related-works}
+% \textbf{Few Shot Gaussian Splatting}. Traditional Gaussian Splats trained on few, sparse views tend to overfit to each view, causing degradation on novel views. To address this, prior works  enforce monocular depth priors \cite{chung2024depthregularized, paliwal2024coherentgssparsenovelview}, use vision priors such as DUSt3R \cite{dust3r2023}, and unpooling of sparse Gaussians from SfM points \cite{zhu2023fsgs} to generalize to novel views. These works often rely on simple alignment or priors for accurate depth information, which is challenging in robotics, where alignment is performed with noisy depth data, and the views are even more sparse.
+
+% \textbf{Fusing Vision and Touch for Robotics.} Prior works have addressed the multi-modal fusion of vision and touch to reconstruct accurate objects for manipulation \cite{smith2021active, suresh2023neural}. Others have focused on constructing a shared representation for manipulation \cite{yang2024binding, fu2024touch}.  \cite{watkins2019multi, smith20203d} focus on many views or only tactile input. Recently, there are also works that try to incorporate tactile data into Gaussian Splatting radiance field. Touch-GS \cite{swann2024touch} and Snap-It, Tap-It, Splat-It \cite{comi2024snap} address tactile data for \gls*{3DGS}. While Touch-GS demonstrates the improvements on GS scenes with touch, it suffers from two shortcomings: 1. it requires a human to move the robot to desired vision \textit{and} touch poses and 2. requires the order of 100-500 touches to construct a visually and geometrically sufficient scene. \cite{comi2024snap} focuses on all manually selected several views and touches in the real world.
+
+% \textbf{Uncertainty in Radiance Fields.} Uncertainty quantification in radiance fields is a relatively new area of study. Uncertainty has traditionally been applied to implicit representation such as NeRF, which require learning complex additions onto the traditional pipeline \cite{pan2022activenerf, shen2021snerf} or simply using the entropy of the ray distribution to measure uncertainty. Bayes' Rays \cite{goli2023} utilizes the Fisher information on a spatial deformation field on NeRF by measuring color uncertainty. Uncertainty in Gaussian Splatting remains generally unexplored with using variational inference to quantify uncertainty. In general, these methods use \textit{color} as the guiding metric for uncertainty.
+
+% I think we can combine these two sections if we are low on space
+
+% \textbf{Active Learning for Radiance Fields.} The problem of active learning or next best view has been extensively studied by the vision and robotics community.
+% % Traditionally, frontier-based approach~\cite{frontier} and Rapidly exploring Random Tree~(RRT)~\cite{RRT} are the most representative and have been extended and enhanced for different data representations~\cite{zhu20153d, karaman2010incremental, dornhege2013frontier, shen2012autonomous} and complex conditions~\cite{ye2022multi, papachristos2017uncertainty}. 
+% Recently, as the radiance field gained popularity, there are also methods that try to find the next best view for the current model \cite{lin2022active}. Jin  trains a neural network to predict per-pixel uncertainty for view selection. However, their method requires an image capture as the input of the network, which is closer to dataset sub-sampling rather than active learning.
+% ActiveNeRF~\cite{pan2022activenerf} studied the next best view selection by directly adding variances as the output of the vanilla NeRF, and it is the closest approach to the view selection problem we present in this paper. Most recently, FisherRF~\cite{jiang2023fisherrf} quantized the expected Fisher Information Gain of candidate views on the radiance field, and selects views based on it. It was built on top of Gaussian Splatting~\cite{3dgs}.
+
+% \textbf{Next Best View for Robotic Applications in Radiance Fields.} Recent research on NBV selection traditionally uses the uncertainty of a neural radiance field via ray entropy \cite{lee2022uncertainty} and interpreting the radiance field as a probability distribution \cite{shen2024estimating}. Similar to our work, a first work of performing active planning in Gaussian Splatting \cite{jin2024gs} uses information gain; however, they are focused on the task of navigation on completely unseen areas.

@@ -1,0 +1,15 @@
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+We have presented a sequence modeling view on reinforcement learning that enables us to derive a single algorithm for a diverse range of problem settings, unifying many of the standard components of reinforcement learning algorithms (such as policies, models, and value functions) under a single sequence model. The algorithm involves training a sequence model jointly on states, actions, and rewards and sampling from it using a minimally modified beam search.
+Despite drawing from the tools of large-scale language modeling instead of those normally associated with control, we find that this approach is effective in imitation learning, goal-reaching, and offline reinforcement learning.
+
+However, prediction with Transformers is currently slower and more resource-intensive than prediction with the types of single-step models often used in model-based control, requiring up to multiple seconds for action selection when the context window grows too large.
+This precludes real-time control with standard Transformers for most dynamical systems.
+While the beam-search-based planner is conceptually an instance of model-predictive control, and as such could be applicable wherever model-based RL is, in practice the slow planning also makes online RL experiments unwieldy.
+(Computationally-efficient Transformer architectures \citep{tay2021long} could potentially cut runtimes down substantially.)
+Further, we have chosen to discretize continuous data to fit a standard architecture instead of modifying the architecture to handle continuous inputs.
+While we found this design to be much more effective than conventional continuous dynamics models, it does in principle impose an upper bound on prediction precision.
+
+This paper is an investigation of a minimal type of algorithm that can be applied to RL problems.
+While one of the interesting implications of our results is that RL problems can be reframed as supervised learning tasks with an appropriate choice of model, the most practical instantiation of this idea may come from combinations with dynamic programming techniques, as suggested by the effectiveness of the Trajectory Transformer with $Q$-guided planning.

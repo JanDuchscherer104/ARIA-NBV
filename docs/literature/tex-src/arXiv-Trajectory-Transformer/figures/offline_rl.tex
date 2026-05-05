@@ -1,0 +1,43 @@
+\begin{table*}
+\centering
+\small
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}llrrrrrrr}
+\toprule
+\multicolumn{1}{c}{\bf Dataset} & \multicolumn{1}{c}{\bf Environment} & \multicolumn{1}{c}{\bf BC} & \multicolumn{1}{c}{\bf MBOP} & \multicolumn{1}{c}{\bf BRAC} & \multicolumn{1}{c}{\bf CQL} & \multicolumn{1}{c}{\bf DT} & \multicolumn{1}{c}{\bf TT \scriptsize{\textcolor{cgrey}{(uniform)}}} & \multicolumn{1}{c}{\bf TT \scriptsize{\textcolor{cgrey}{(quantile)}}} \\ 
+\midrule
+Med-Expert & HalfCheetah & $59.9$ & $105.9$ & $41.9$ & $91.6$ & $86.8$ & $40.8$ \scriptsize{\raisebox{1pt}{$\pm 2.3$}} & $95.0$ \scriptsize{\raisebox{1pt}{$\pm 0.2$}} \\ 
+Med-Expert & Hopper & $79.6$ & $55.1$ & $0.9$ & $105.4$ & $107.6$ & $106.0$ \scriptsize{\raisebox{1pt}{$\pm 0.28$}} & $110.0$ \scriptsize{\raisebox{1pt}{$\pm 2.7$}} \\ 
+Med-Expert & Walker2d & $36.6$ & $70.2$ & $81.6$ & $108.8$ & $108.1$ & $91.0$ \scriptsize{\raisebox{1pt}{$\pm 2.8$}} & $101.9$ \scriptsize{\raisebox{1pt}{$\pm 6.8$}} \\ 
+\midrule
+Medium & HalfCheetah & $43.1$ & $44.6$ & $46.3$ & $44.0$ & $42.6$ & $44.0$ \scriptsize{\raisebox{1pt}{$\pm 0.31$}} & $46.9$ \scriptsize{\raisebox{1pt}{$\pm 0.4$}} \\ 
+Medium & Hopper & $63.9$ & $48.8$ & $31.3$ & $58.5$ & $67.6$ & $67.4$ \scriptsize{\raisebox{1pt}{$\pm 2.9$}} & $61.1$ \scriptsize{\raisebox{1pt}{$\pm 3.6$}} \\ 
+Medium & Walker2d & $77.3$ & $41.0$ & $81.1$ & $72.5$ & $74.0$ & $81.3$ \scriptsize{\raisebox{1pt}{$\pm 2.1$}} & $79.0$ \scriptsize{\raisebox{1pt}{$\pm 2.8$}} \\ 
+\midrule
+Med-Replay & HalfCheetah & $4.3$ & $42.3$ & $47.7$ & $45.5$ & $36.6$ & $44.1$ \scriptsize{\raisebox{1pt}{$\pm 0.9$}} & $41.9$ \scriptsize{\raisebox{1pt}{$\pm 2.5$}} \\ 
+Med-Replay & Hopper & $27.6$ & $12.4$ & $0.6$ & $95.0$ & $82.7$ & $99.4$ \scriptsize{\raisebox{1pt}{$\pm 3.2$}} & $91.5$ \scriptsize{\raisebox{1pt}{$\pm 3.6$}} \\ 
+Med-Replay & Walker2d & $36.9$ & $9.7$ & $0.9$ & $77.2$ & $66.6$ & $79.4$ \scriptsize{\raisebox{1pt}{$\pm 3.3$}} & $82.6$ \scriptsize{\raisebox{1pt}{$\pm 6.9$}} \\ 
+\midrule
+\multicolumn{2}{c}{\bf Average} & 47.7 & 47.8 & 36.9 & 77.6 & 74.7 & 72.6 \hspace{.6cm} & 78.9 \hspace{.6cm} \\ 
+\bottomrule
+\end{tabular*}
+\vspace{.1cm}
+\caption{
+\textbf{(Offline reinforcement learning)} The Trajectory Transformer (TT) performs on par with or better than the best prior offline reinforcement learning algorithms on D4RL locomotion (\texttt{v2}) tasks.
+Results for TT variants correspond to the mean and standard error over 15 random seeds (5 independently trained Transformers and 3 trajectories per Transformer).
+We detail the sources of the performance for other methods in Appendix~\ref{app:baselines}.
+}
+\label{table:d4rl}
+\end{table*}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.85\linewidth]{images/bar.pdf}
+% \vspace{-0.1cm}
+\caption{
+\textbf{(Offline averages)}
+A plot showing the average per-algorithm performance in Table~\ref{table:d4rl}, with bars colored according to a crude algorithm categorization.
+In this plot, ``Trajectory Transformer'' refers to the quantile discreization variant.
+}
+\vspace{-.25cm}
+\label{fig:offline}
+\end{figure}

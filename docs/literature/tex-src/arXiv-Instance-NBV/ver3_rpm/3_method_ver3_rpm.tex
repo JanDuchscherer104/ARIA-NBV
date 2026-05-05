@@ -1,0 +1,268 @@
+\section{Method}
+
+% \begin{figure*}[!t]
+%   \centering
+%   \fbox{\rule{0pt}{0.3\textwidth} \rule{0.9\textwidth}{0pt}}
+%   \caption{Figure 2}
+%   \label{fig:fig2}
+%   \vspace{-4mm}
+% \end{figure*}
+
+In this section, we describe our proposed \ac{NBV} pipeline for cluttered scenes, structured into three main components. First, we introduce object-aware 3D Gaussian Splatting, which gradually reconstructs the scene as new views are incorporated. Second, we explain our improved uncertainty quantification and information gain strategy, tailored to effectively explore previously unseen regions of the scene. Lastly, we present our method for selecting views focused on specific target objects, along with subsequent object-centric robotic manipulation tasks.
+
+% 이 섹션에서는 cluttered scene을 위한 제안된 manipulation pipeline을 세 가지 핵심 부분으로 나누어 설명한다. 첫째, 추가적인 view가 들어올 때마다 점진적으로 scene reconstruction을 수행하는 Active Semantic 3D Gaussian Splatting 기법을 소개한다. 둘째, 관찰되지 않은 영역을 효과적으로 탐색(exploration)하기 위해 uncertainty quantification 및 Information Gain 계산 방식을 개선한 방법을 설명한다. 마지막으로, 특정 물체에 초점을 맞추어 Next Best View를 선정하고 이를 기반으로 manipulation을 수행하는 과정을 제시한다.
+
+
+\subsection{Object-aware 3D Gaussian Splatting}
+% \subsubsection{3D Gaussian Splatting}
+% \ac{3DGS} represents a 3D scene as a set of Gaussian ellipsoids, each parameterized by a center position $\mu \in \mathbb{R}^{3}$, scale parameters $s \in \mathbb{R}^{3}$ defining the length of each axis, rotation $r \in \mathbb{R}^{4}$, opacity $\sigma \in \mathbb{R}$, and spherical harmonic coefficients $c \in \mathbb{R}^{3(d+1)^2}$ for view-dependent color where d is the degree of spherical harmonic. The covariance (shape) of each Gaussian is determined by combining a diagonal scaling matrix $S$ and a rotation matrix $R$ as $\Sigma = RSS^{T}R^{T}$.
+
+% \ac{3DGS}에서는 scene을 3D gaussian의 set으로 표현한다. 각 ellipsoid는 중심의 위치 mu (R^3), 각 축의 길이 (scale) s (R^3), rotation R (R^4), opacity sigma (R), 그리고 view dependent한 색깔을 나타내기 위한 spherical parameter c (R^(k+1)^2)가 할당된다. 각 gaussian의 모양, covariance는 diagonal scale matrix S와 rotation matrix R을 이용해 simga=RSS^TR^T와 같이 결정된다.
+
+% To render a view from a camera origin $\mathbf{o}$ along viewing direction $\mathbf{d}$, the covariance matrices of relevant Gaussians are first projected onto image space and view-wise opacity value $\alpha_i$ is calculated. Then, the Gaussian properties $f_{i}$ such as color $c_{i}$ or depth $d_{i}$ are blended sequentially along each ray to determine the final pixel values as below.
+
+% {\small
+% \begin{equation}
+% F = \sum_{i \in \mathcal{N}} f_i \alpha_i T_i, \quad  f_i \in \left\{ c_i,\ d_i \right\}
+% \end{equation}
+% }
+
+% Specifically, the blending weights depend on the opacity of each Gaussian and the accumulated transparency from preceding Gaussians along the ray.
+
+% {\small
+% \begin{equation}
+% T_{i} = \prod_{j=1}^{i-1}(1 - \alpha_j).
+% \end{equation}
+% }
+
+% % 특정 카메라 origin o에서 d 방향으로의 view를 렌더링하기 위해, 먼저 범위에 들어오는 3D gaussian들의 covariance matrix를 image space에 projection 시키고 그 뒤 각 gaussian들의 property들을 ray 순서대로 blending 해줘서 픽셀 value를 얻게 된다. 이때, gaussian의 property는 색깔과 depth가 가능하고, blending weight는 해당 gaussian의 opacity와 그 앞에 있는 gaussian들의 opacity를 이용해 계산된다. T_i = PI_{j=1}^{i-1}(1-alpha_j)
+
+% The Gaussian parameters are optimized via gradient descent by comparing the rendered images with ground-truth images. The optimization uses a weighted loss combining the RGB L1 loss $L_1$ and structural similarity loss $L_{SSIM}$ \cite{wang2004image}. When ground-truth depth is available, an additional depth loss $L_{depth}$ can also be incorporated.
+
+% gaussian들의 parameter들은 rendering된 이미지와 gt 이미지를 비교를 통해 gradient descent로 optimize된다. loss로는 rgb value의 l1 loss L_1과 structual simlarity를 위한 ssim loss L_ssim의 weighted loss가 사용된다. gt depth가 있을 경우 그를 이용한 L_depth도 사용된다.
+
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=1\linewidth]{figure/fig2_ver4.pdf}
+  % \fbox{\rule{0pt}{0.5\columnwidth} \rule{0.9\columnwidth}{0pt}}
+  \caption{Visualization of the rendering and learning process of the one-hot object vector. Each Gaussian stores logits for $n+1$ classes, including $n$ object categories and the background. The logits are passed through a softmax function and alpha-blended in the same manner as RGB in \ac{3DGS}. After normalization, this yields the per-pixel class probability along each ray. By supervising these probabilities with one-hot vectors obtained from instance masks, the logits for each Gaussian can be optimized.}
+  % One-hot object vector의 작동과 학습 방식에 대한 visualization. gaussian마다 물체 n개와 background를 포함한 n+1개의 class에 대한 logit이 저장되어 있다. softmax된 logit을 rgb와 같은 방식으로 alpha blending을 한 뒤 합을 1로 맞춰주면 해당 ray에 해당하는 픽셀의 class probability를 얻을 수 있다. 이를 instance mask로부터 얻을 수 있는 one-hot vector와 supervision을 통해 각 gaussian의 logit을 학습할 수 있다.
+  \label{fig:object vector}
+  \vspace{-5mm}
+\end{figure}
+
+\subsubsection{One-hot Object Vector for Instance Segmentation}
+With recent advances in 2D segmentation, obtaining object masks has become practical using image foundation models. Here, we describe how to integrate a given object mask into the \ac{3DGS} framework by adding a lightweight feature to each Gaussian. Assume the scene contains $n$ distinct objects, with object IDs assigned from $1$ to $n$ and the background labeled as $0$. Each pixel in the mask is represented as a one-hot vector of dimension $n+1$, where each channel corresponds to a specific object class or the background.
+% DEVA \cite{cheng2023tracking}, 
+
+% 2d segmentation 기술의 발전으로 DEVA, CLIP, Grounding DINO, SAM 등의 foundation model을 이용해 object mask를 쉽게 구할 수 있게 되었다. 우리는 given object mask S를 3dgs에 어떻게 inject 할 수 있는지 논하고자 한다. assume that scene에 n개의 object가 있다고 하고 우리는 그의 object id를 1~n으로 정하자. 물체가 아닌 background를 0으로 잡으면 gt mask의 각 픽셀은 n+1 dimension의 one-hot encoding vector로 나타낼 수 있다.
+
+{\small
+\begin{equation}
+O' = \sum_{i} softmax(o_i) \alpha_i T_i, \quad T_{i} = \prod_{j=1}^{i-1}(1 - \alpha_j).
+\end{equation}
+}
+
+\ac{3DGS} represents a 3D scene as a set of Gaussian ellipsoids, each parameterized by a center position $\mu \in \mathbb{R}^{3}$, scale $s \in \mathbb{R}^{3}$, rotation $r \in \mathbb{R}^{4}$, opacity $\sigma \in \mathbb{R}$, and spherical harmonic coefficients $c \in \mathbb{R}^{3(d+1)^2}$ where d is the degree of spherical harmonic. We assign an additional object feature vector $o_i \in \mathbb{R}^{n+1}$ to each Gaussian and optimize it by comparing the rendered results against the ground-truth object masks as shown in \figref{fig:object vector}. We apply a softmax to each $o_i$, then perform alpha-weighted blending across Gaussians to obtain a per-pixel object vector. 
+
+{\small
+\begin{equation}
+O=O' + \left[1, 0, \dots, 0 \right] \cdot \left(1 - \mathbf{1}^\top O' \right)
+\end{equation}
+}
+
+Since the blended object vector often sums to less than 1 due to incomplete coverage, we add the residual value to the background channel to ensure that it sums to 1. This lets each value $O_{k}$ be interpreted as the probability of the pixel belonging to object class $k$. Treating this as a multi-class segmentation, we supervise the object features with the L1 loss and the Dice loss \cite{sudre2017generalised}:
+
+% 우리는 gaussian에 추가적인 object feature o_i를 assign하고 이를 이용하여 gt mask와 비교하며 optimize 하였다. one-hot encoding과 같이 만들기 위해 우리는 feature를 softmax 한 뒤 blending 하여 각 픽셀의 object vector를 구한다. 이 때, blending한 object vector에서 합이 1보다 작기 때문에 그만큼을 background에 더해줘서 합이 1이 되도록 하였고, 그러면 각 value들은 해당 픽셀이 특정 물체일 확률로 해석될 수 있다. 이를 multi-class segmentation으로 해석하여 우리는 l1 loss와 함께 dice loss를 사용했다.
+{\small
+\begin{equation}
+L_{obj} = (1-\lambda_{Dice}) \times L_{1, obj} + \lambda_{Dice} \times L_{Dice},
+\end{equation}
+}
+and the softmax of the supervised object feature yields the per-Gaussian object probability $p_i = softmax(o_i)$.
+
+Segmentation masks primarily remove background in \ac{3DGS}. Assigning a default color to background pixels suppresses the opacity of background Gaussians, markedly reducing both the total number of Gaussians and floaters. 
+% In addition, Gaussians outside the camera frustum of all training views or otherwise weakly constrained receive negligible gradients. 
+In addition, we prune any Gaussian whose maximum object class probability $\max_{k}(p_{i,k})$ falls below a threshold $\delta_{obj}$ near the uniform prior $1/(n+1)$, thereby eliminating unobservable or irrelevant regions.
+
+% One of the most significant effects of incorporating segmentation masks into \ac{3DGS} is the effective removal of background content. By replacing background pixels with a default background color, the opacity of Gaussians corresponding to the background is suppressed, making them more likely to be pruned. This substantially reduces both the total number of Gaussians and the number of floaters. Additionally, Gaussians that lie outside the camera frustum of all training views or receive only very weak gradient updates cannot be effectively optimized. To address this, we set a threshold $\delta_{obj}$ close to the uniform prior $1/(n+1)$ for the object probability. Any Gaussian whose maximum probability falls below this threshold is pruned, reducing the influence of unobservable or irrelevant regions.
+
+% Additionally, Gaussians that do not lie within the camera frustum of any training view remain unchanged throughout training, since they receive no gradient updates. Notably, in the initial state, each Gaussian’s object probability would be uniform to $1/(n+1)$. Leveraging this, we further prune Gaussians whose object probability falls below a threshold $\delta_{obj}$ close to $1/(n+1)$. This helps eliminate the influence of Gaussians located in regions that are entirely unobserved.
+
+% As a result, after this series of filtering steps, the remaining scene consists primarily of Gaussians that correspond to visible object regions or locate within the frustum but are occluded and thus weakly constrained—precisely the ones that require additional views to be properly optimized.
+
+% 3dgs에서 segmentation mask의 가장 큰 영향 중 하나는 background의 제거이다. background에 해당하는 부분을 기본 background 색인 검정으로 바꿔주면 background에 해당하는 gaussian들의 opacity가 줄어 pruning되는 데, 이것이 전체 gaussian의 개수와 floater를 크게 줄여준다. 또한, 그 어떤 training view의 camera frustum 안에도 없는 gaussian의 경우 primitive가 전혀 변하지 않는데, 이를 이용해 object probability가 $1/{n+1}$에 가까운 threshold보다 낮은 gaussian들을 prune 하여 전혀 알지 못하는 영역의 gaussian에 의한 영향을 줄였다. 결과적으로, 일련의 과정을 통해 background 및 의미 없는 gaussian이 제거된 scene에는 물체의 보이는 영역에 대한 gaussian과 camera frustum 안에는 있지만 가려져 기여도가 작아 잘 위치하지 않는, 우리가 새로운 뷰를 통해 봐야하는 gaussian들만이 남게 된다.
+
+\subsubsection{Fast Scene Refinement with New Images}
+Our reconstruction begins with few initial views with predefined camera pose. Given $m$ views, we run optimization for $100m$ iterations and then proceed with the \ac{NBV} selection, as described in Section 3.B, based on the current reconstruction. To enable faster optimization during the early stages, we set the spherical harmonic (SH) degree $d=0$ until the final view is added. Additionally, to avoid the influence of local minima or overfitting effects from previous reconstructions, we reinitialize the Gaussians with new random points at each step. The overall loss function is based on the standard 3DGS loss, with an additional term introduced for supervising the object vector associated with each Gaussian.
+
+% 우리의 active reconstruction은 정해진 2~4개의 view로부터 3d를 reconstruction하는 것이다. view가 $m$개 있을 때 iteration은 ${k}_{iter}m$번으로 잡고 학습을 돌리고 그 때까지의 reconstruction을 이용하여 3.B에서 소개될 NBV를 진행한다. reconstruction 과정에 sparse-view를 위한 기존에 제안된 방법들을 사용하지는 않으며, 빠른 optimization을 위해 마지막 view가 추가되기 이전까지 sh degree d는 0으로 잡는다. 또한, 이전 reconstruction에서 발생했을 local minimum이나 overfitting의 효과를 무시하기 위해 gaussian들의 initialization 또한 다시 random points로 한다. loss는 기존 3dgs의 loss에 object vector를 위한 loss를 추가한다.
+
+{\small
+\begin{equation}
+L_{overall} = (1-\lambda) L_{1} + \lambda L_{SSIM} + \lambda_{obj}L_{obj}
+\end{equation}
+}
+
+% While standard \ac{3DGS} typically requires around 30,000 iterations, integrating segmentation significantly reduces this requirement. Once the designated number of views has been collected, the scene can be reconstructed in only 3,000 iterations, despite raising the SH degree back to 3. Even when considering all iterations performed before the full view set is collected, the total number of iterations remains under 10,000, which is one-third of that in the original setup.
+
+Once the designated number of views has been collected, the final reconstruction can be achieved in 3,000 iterations, despite raising the SH degree back to 3 because we integrate object segmentation into the optimization. Even when considering all iterations performed before the full view set is acquired, the total iterations remain under 10,000, compared to 30,000 iterations in the standard \ac{3DGS} setup.
+
+% segmentation의 또다른 장점은 빠른 optimization이다. 기존의 3dgs가 아무 설정 없이 30000번의 iteration을 필요로 한 것과 달리, segmentation을 포함하면 정해진 개수의 뷰를 모은 뒤 sh degree를 다시 3으로 올린 뒤에도 기존의 1/10인 3000번의 iteration 만으로 scene을 빠르게 reconstruct할 수 있다. 이는 단순히 iteration이 적은 것에 더해, background pruning을 통해 gaussian의 수가 준 것에 대한 효과도 있다. 뷰를 전부 모으기 전의 iteration을 전부 포함해도 전체 iteration은 설정에 따라 다르지만 10000번 이하로 reconstruction을 끝낼 수 있다.
+
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=1\linewidth]{figure/fig3_ver4.pdf}
+  % \fbox{\rule{0pt}{0.5\columnwidth} \rule{0.9\columnwidth}{0pt}}
+  \caption{Illustration of the overall NBV system. Given an object-segmented 3D Gaussian map $G$ and candidate camera pose, the CUDA rasterizer computes the Jacobian of the rendering with respect to Gaussian parameters. Correlations among parameters of each Gaussian are captured in a block diagonal Hessian, which is then used to estimate information gain. By comparing gains across candidates, the most informative view is selected, without requiring GT images of candidate views.}
+  % 전반적인 NBV system에 대한 illustration. 3D Gaussian map G와 candidate camera pose p가 주어질 때, 먼저 gaussian들의 파라미터들에 대한 해당 candidate에서의 rendering의 jacobian을 CUDA rasterizer에서 계산한다. 같은 gaussian에서의 파라미터들간의 correlation이 고려되어 Block diagonal Hessian을 구할 수 있는데, candidate view의 유무에 따른 information gain을 비교하여 가장 informative한 view를 선택한다. 이 과정에서 candidate view의 GT는 사용하지 않는다.
+  \label{fig:uncertainty}
+  \vspace{-5mm}
+\end{figure}
+
+\subsection{Next Best View Policy with Uncertainty Quantization}
+\subsubsection{Information Gain of the New Image}
+% To quantify information gain from adding a view, we interpret how much each Gaussian’s parameters can vary without changing the rendering results on the training views as epistemic uncertainty. 
+Information gain $IG(T,c)$ with training view set $T$ and candidate $c$ can be calculated by comparing quantified uncertainty value with and without the new image. Candidate which maximizes the information gain among the candidate view set $C$ includes to the training view set:
+
+{\small
+\begin{equation}
+IG(T,c) = f(T \cup c) - f(T), \quad c=\operatorname*{argmax}_{c \in C} IG(T,c).
+\end{equation}
+}
+
+Following POp-GS \cite{wilson2025pop}, we assume i.i.d. Gaussian pixel noise and adopt a maximum-likelihood formulation as shown in \figref{fig:uncertainty}. 
+Maximizing the likelihood is equivalent to minimizing the least-squares objective $\frac{1}{2}||e||^{2}$ for the \ac{3DGS} model $h$, where $e$ denotes the per-pixel residual between the observation and the rendering.
+% Under this assumption, the negative log-likelihood reduces to the least-squares objective $\frac{1}{2}||e||^{2}$ for the \ac{3DGS} model $h$, where $e$ is the per-pixel residual between the observation and the rendering.
+% 이 문장 뭔 소리지
+% Following POp-GS \cite{wilson2025pop}, we adopt a maximum-likelihood formulation with IID Gaussian pixel noise, where the negative log-likelihood reduces to a least-squares objective $\frac{1}{2}||e||^{2}$ for the \ac{3DGS} model $h$ as illustrated in \figref{fig:uncertainty}. 
+Linearizing $h(\theta)$ around the current estimate yields the Gauss–Newton approximation with the Hessian $H \approx J^\top J$, where $J$ is the Jacobian of the rendering with respect to Gaussian parameters. We use $H^{-1}$ as a proxy for epistemic uncertainty and score candidate views by their expected reduction of this covariance while preserving fidelity on the training views.
+
+% The definition of the uncertainty quantization function $f$ varies across prior works, and in our approach we adopt the formulation proposed in POp-GS \cite{wilson2025pop}. Under a maximum‑likelihood formulation with IID Gaussian pixel noise, the negative log‑likelihood reduces to a least‑squares objective, $\frac{1}{2}||e||^{2}$ with $e=c-h(\theta)$ for the \ac{3DGS} model $h(\theta)$. Estimating $\theta$ is thus equivalent to minimizing the residual norm.
+
+% Linearizing the model around the current estimate $\theta^{*}$ yields $h(\theta) \approx h(\theta^*) + J \Delta\theta$ where $J = \frac{\partial h}{\partial \theta} \Big|_{\theta^*}$ and $\Delta \theta=\theta-\theta^{*}$. With $e^{*}=c-h(\theta^{*})$, the objective becomes a quadratic in $\Delta \theta$, and the first‑order optimality condition gives the Gauss–Newton update:
+
+% {\small
+% \begin{equation}
+% \Delta \theta = (J^T J)^{-1} J^{T} e^{*}
+% \end{equation}
+% }
+
+% Assuming an unbiased estimate and noise covariance $\sigma^{2}_{e}I$ of the error, the parameter covariance is $\Sigma_{\theta}=E[\Delta \theta \Delta \theta ^T]=\sigma^{2}_{e}(J^{T}J)^{-1}$. Defining the information (Hessian) matrix via Gauss-Newton approximation $ H \approx J^TJ$ and, for convenience, setting $\sigma^{2}_{e}=1$, we use $H^{-1}$ as a proxy for epistemic uncertainty. We then evaluate the value of an additional view by its expected reduction of this covariance while preserving training‑view fidelity. 
+
+% The function $f$ can be defined in various ways such as the trace $trace(H^{-1})^{-1}$ or the determinant $\det(H)$ from the Hessian matrix, but in our case, we use $\log(\det(H))$. Given a view set $V$, the matrix $H$ is computed as the sum of $J^TJ$ over all views in $V$:
+
+% The function $f$ can be defined in various ways such as trace $trace(H^{-1})^{-1}$ or determinant $\det(H)$ of the Hessian, but in our case, we use $\log(\det(H))$ for numerical stability and convenience of calculation. Given a view set $V$, the matrix $H$ is computed as the sum of $J^\top J$ over all views in $V$:
+
+Several choices exist for $f$ such as the trace-based $trace(H^{-1})^{-1}$ or the determinant $\det(H)$ of the Hessian, but we adopt the log-determinant $\log(\det(H))$ for numerical stability and computational convenience. Given a view set $V$, the matrix $H$ is computed as the sum of $J^\top J$ over all views in $V$:
+
+{\small
+\begin{equation}
+f(V) = \log(\det(H_V)) = \log( \det(\sum_{v \in V}J_v^\top J_v)).
+\end{equation}
+}
+
+Note that this process does not require ground-truth images; it relies solely on camera poses, making it applicable to candidate views as well.
+
+% f는 trace나 determinant 등 다양한 값을 사용 가능하나, 우리는 log(det(H))를 사용한다. 주어진 view set V에 대해 H는 V에 대한 view 각각에 대한 $J^TJ$의 합으로 정의된다. Note that 이 과정에서는 view의 gt image를 필요로 하지 않고 오직 camera pose만을 사용하므로 candidate에 대해서도 정상적으로 사용할 수 있다.
+
+For $n$ Gaussians each with $l$ parameters, the full Information matrix $H_V$ has a dimensionality of $nl \times nl$, which results in a substantial computational burden when computing its determinant. To alleviate this, we consider only the intra-Gaussian correlations among parameters, approximating $H_V$ as a block diagonal matrix. This allows us to compute the determinant as the product of per-Gaussian blocks, reducing the computational complexity from $O(l^3n^3)$ to $O(l^3n)$. This block-diagonal approximation is implemented by modifying the original CUDA rasterizer in \ac{3DGS}.
+
+% 한 개당 l개의 parameter를 가지고 있는 gaussian이 n개라고 할 때 H_V는 $R^{nl x nl}$의 dimension을 가지고, 이는 detminant을 계산할 때 굉장한 computational cost를 필요로 한다. 이를 줄이기 위해 우리는 같은 gaussian의 parameter에 대한 correlation만을 고려하고 block diagonal로 Hessian matrix의 determinant를 계산하여 계산량을 O(l^3n^3)에서 O(l^3n)으로 줄였다. 이 과정은 기존 \ac{3DGS}의 cuda rasterizer를 변형하여 구현되었다.
+
+\definecolor{mypurple}{HTML}{7600bc}
+\definecolor{mypink}{HTML}{ff69b4}
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=1\linewidth]{figure/fig4_ver6.pdf}
+  % \fbox{\rule{0pt}{0.3\columnwidth} \rule{0.9\columnwidth}{0pt}}
+  \caption{Illustration of object confidence scores for exploration. The top row shows the 3D representation of a captured scene trained with 6 views, visualized as Gaussian opacity, object probability, and object index. Rectangles of the same color highlight different cases: \textcolor{mypurple}{purple} indicates well-optimized regions that require no further observation, while \textcolor{mypink}{pink} and \textcolor{blue}{blue} denote areas either unseen or poorly localized, thus requiring exploration. We leverage the intuition that regions needing additional views exhibit low opacity and low object probability, and incorporate this insight into our NBV formulation.}
+  % Exploration을 위한 object confidence score에 대한 illustration이다. 윗줄의 세 이미지는 6장을 이용해 학습한 captured scene의 3d representation으로, 왼쪽부터 gaussian의 opacity, object probability, object idx이다. 같은 색깔의 직사각형들을 보면 보라색은 optimize가 잘 되었기 때문에 더 볼 필요 없고, 분홍색과 파란색은 아직 못 봤거나 제대로 위치하지 않기 때문에 exploration이 필요한 상황이다. 우리는 뷰가 더 필요한 경우 opacity와 object probability가 낮다는 직관을 이용하여 nbv에 이를 수식적으로 적용하였다.
+  \label{fig:object confidence}
+  \vspace{-5mm}
+\end{figure}
+
+\subsubsection{Confidence-weighted Information Gain for Exploration}
+Gaussians corresponding to regions that require further observation through additional views tend to have low contributions in the training views. As a result, they generally exhibit small gradients, low opacity $\sigma_i$, and uniform object probability $p_{i}$ that are not strongly biased toward a single object. Consequently, in Hessian-based \ac{NBV} formulations, the Jacobians of well-observed primitives with low uncertainty still dominate the overall information, leading to a misalignment between information gain and true exploration needs. To address this issue, we propose a confidence-weighted information matrix that incorporates confidence of each Gaussian, prioritizing under-observed regions.
+
+% 우리가 추가적인 view를 통해 봐야할 region의 gaussian들은 training view에서의 기여도가 적기 때문에 일반적으로 작은 gradient와 opacity, 완전히 치우쳐져 있지 않은 object vector를 가지고 있다. 따라서 Hessian matrix에 기반한 NBV는 observation이 많아 uncertainty가 작은 primitive의 jacobian이 여전히 전체 information에 dominant한 영향을 끼친다는 문제를 가지고 있다. 이런 misalignment을 해소하기 위해 우리는 gaussian 별로의 confidence를 고려한 confidence-weighted information matrix를 제안한다.
+
+{\small
+\begin{equation}
+c_g=\max_k(p_{g,k})^{-\alpha_{obj}}{\sigma_g}^{-\alpha_{opa}}
+\end{equation}
+\begin{equation}
+C_g=\text{diag}(c_g,...c_g) \in R^{l \times l}
+\end{equation}
+}
+
+We define confidence without introducing any additional components, instead leveraging the previously discussed insights on opacity and the object vector. For example, as illustrated in \figref{fig:object confidence}, the well-observed part of the surface typically exhibits both high opacity and a maximum object probability close to 1. On the other hand, Gaussians that are poorly fitted or occluded tend to exhibit low opacity and object probability. To encourage more exploration of low-confidence Gaussians and reduce focus on those already well observed, we scale each Jacobian by a factor inversely proportional to both the opacity and the object probability during information gain computation:
+
+{\small
+\begin{equation}
+% H=J^\top C J, \quad C = \text{diag}(C_g).
+% H\overset{\Delta}{=}J^\top C J, \quad C = \text{diag}(C_g).
+H \coloneq J^\top C J, \quad C = \text{diag}(C_g).
+\end{equation}
+}
+
+% 우리는 confidence를 구하기 위해 뭔가를 추가하지 않고, 앞에서 언급한 opacity와 object vector에 관한 insight를 이용하여 confidence를 정의한다. 예를 들어, observation이 많은 물체의 위쪽 표면의 경우 opacity와 object vector의 max 값이 1에 가깝다. 이렇게 높은 confidence의 gaussian들은 조금 덜 보고, 그렇지 않은 gaussian은 더 보게 하기 위해 두 값에 반비례하는 값을 jacobian에 곱하여 information gain을 측정했다.
+
+\subsubsection{Information Gain from Multiple Outputs}
+A single 3DGS map can render RGB images, depth maps, and object masks from the same Gaussians but with different parameter subsets. All outputs use position, scale, rotation, and opacity, while RGB additionally uses SH coefficients, and masks use the object vector. Although information gain can be aggregated across outputs, scale differences across parameters and outputs make it difficult to balance their contributions.
+
+% 3dgs를 통해 우리는 한 gaussian map에서 rgb image, depth, object mask를 얻을 수 있고, 그 때마다 사용되는 parameter가 다르다. specifically, 셋 모두에 position, scale, rotation, opacity가 사용되고 rgb image와 object mask에서는 각각 sh parameter와 object vector가 추가로 사용된다. Next Best Sense에서는 information gain을 계산할 때 이 output들 모두에 대한 값을 더해서 NBV를 진행했지만, 이 경우엔 output이나 parameter 간의 scale issue로 인해 발생하는 imbalance를 balancing하기 어렵다는 것이다.
+
+We address this issue with the following insight: for a well-optimized Gaussian map, treating any training view as a candidate should yield negligible—ideally zero—additional information gain. In practice, however, Hessian-based information gain does not satisfy this property, since the Jacobian $J$ is not zero for training views. Hessian matrix $H'=H+J^\top J$ contains more information than $H$, thereby inflating the gain.
+
+{\small
+\begin{equation}
+\tilde{IG}_f(T,c) = \frac{IG_f(T,c)}{\frac{1}{|T|} \sum_{t \in T} IG_f(T,t)} \quad f \in \left\{ rgb, d, o \right\}
+\end{equation}
+}
+
+To compensate, we normalize each output’s information gain by the mean information gain over the training views, which calibrates modality scales so that a typical training view has unit gain. This per-output normalization mitigates imbalance and allows RGB, depth, and mask contributions to be integrated more fairly and effectively in \ac{NBV}:
+
+{\small
+\begin{equation}
+\tilde{IG}(T,c) = \tilde{IG}_{rgb}(T,c) + \beta_{d}\tilde{IG}_{d}(T,c) + \beta_{o}\tilde{IG}_{o}(T,c)
+\end{equation}
+}
+
+% 이를 위해 우리는 하나의 insight를 활용하였는데, training view에 대해 잘 optimize된 3dgs gaussian map은 training view를 candidate처럼 생각할 때 추가적인 information gain이 매우 작고 이론적으로 0이어야 한다는 것이다. 그러나, Hessian matrix를 기반으로 한 information gain은 계산상으로 training view에 대해 J가 0이 아니기 때문에 H' = H + J^TJ에서 H'이 H보다 많은 information을 가지고 있는 것이 된다. 따라서 우리는 이를 output 간 scaling에 사용하여 같은 candidate view의 multiple output의 information gain에 대해 각각을 training view들의 information gain의 평균으로 나눈다. 식으로 표현하면 아래와 같다.
+
+
+\begin{figure*}[!t]
+  \centering
+  % \fbox{\rule{0pt}{0.2\textwidth} \rule{0.9\textwidth}{0pt}}
+  \includegraphics[width=\linewidth]{figure/fig5_ver2.pdf}
+  \caption{Qualitative results of NBV system and 3D reconstruction for whole scene. Looking at the dish or the snack box, we can see that in the baseline, since training was performed only with RGB without instance information, textures and text appear in the depth results. In contrast, with our method such artifacts are absent, and the views selected through our NBV capture scene information from all directions, enabling more accurate overall depth reconstruction.}
+  % 첫 Row의 접시나 두 번째 과자 박스를 보면 baseline에서는 semantic 정보를 주지 않고 rgb로만 학습했기 때문에 texture나 글씨가 depth 결과에 드러나는 것을 볼 수 있다. 반면 우리는 이런 모습이 보이지 않고 우리의 NBV를 통해 뽑힌 뷰가 scene의 information을 전방위로 적절히 뽑아주기에 전반적인 depth도 정확하게 복원한다. 
+  \label{fig:fig5}
+  \vspace{-1mm}
+\end{figure*}
+
+\input{tab/main}
+
+\input{tab/main2}
+
+\subsection{Object-centric Next Best View for Manipulation}
+
+When a robot is tasked with performing a specific operation, it is often unnecessary to reconstruct the entire scene. If a particular object or region is of interest, prioritizing the reconstruction of that area is more practical and efficient. To enable this targeted reconstruction, we apply a simple modification to the previously defined confidence measure. Instead of using the maximum value of the object vector for each Gaussian, we directly use the value corresponding to the target object’s for confidence: 
+
+
+{\small
+\begin{equation}
+c_{g,obj}=\begin{cases} 
+		p_{g,obj}^{-\alpha_{obj}} {\sigma_g}^{-\alpha_{opa}} & \text{if } \text{argmax}_{k}(p_{g,k}) = obj \\ 
+         0 & \text{else }
+     \end{cases},
+\end{equation}
+}
+and this allows the system to focus on the Gaussians most relevant to the specified object.
+
+% 로봇이 특정 task를 수행할 때 전체 scene을 굳이 전부 reconstruction 할 필요는 없다. 만약 특정 object나 영역에 관심이 있다면, 그 물체 주변을 우선적으로 reconstruction 하는 것이 필요하다. 우리는 집중하고 싶은 물체가 주어졌을 때 이를 가능하게 하기 위해 이전의 confidence에 간단한 트릭을 넣었다. 그것은 바로 object vector의 max를 사용하는 것이 아닌, 그저 그 object에 대한 element를 사용하는 것이다.
+
+After performing reconstruction using the views selected through NBV, we obtain depth images from all training views for actual manipulation. In cluttered scenes, feeding a single bird’s-eye view depth image into the grasping model is often suboptimal. Since the selected views are expected to contain high-information content, it is more effective to extract candidate grasping points from the depth maps of these views and select the most confident one among them.
+
+% 이렇게 nbv를 통해 얻은 view로 reconstruction을 한 뒤, 실제 manipulation을 하기 위해 모든 training view에서 depth를 얻는다. cluttered scene에서는 보통의 방식대로 단순히 bird-eye view에서의 depth를 모델에 넣는 것은 권장되지 않는다. 우리가 얻은 view는 information이 많을 것으로 예상되는 view들이었기 때문에, 그 view들의 depth로부터 얻을 수 있는 여러 grasping point 중 가장 좋은 것을 선택하는 것이 좋다. 

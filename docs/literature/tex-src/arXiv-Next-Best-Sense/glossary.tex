@@ -1,0 +1,24 @@
+% Latex glossaries: https://www.overleaf.com/learn/latex/glossaries
+%example: \acrshort{lfd} or \acrfull{lfd}; or \gls{lfd}. As we will not want to list the glossary, please use the asterisk: \gls*{--}; And if you use \gls{}, it will put the full acronym the first time it is called, then the shortened version there-after. \acrfull{} will force full form
+\usepackage[acronym,nomain,nonumberlist]{glossaries}
+\makeglossaries
+%
+%Example: \newacronym{name_you_call}{Short_form}{Full_form} %then just \gls{name_you_call}, and if you want to restate the full: \acrfull{name_you_call}
+% To get plural \glspl{name_you_call}
+
+\newacronym{NeRF}{NeRF}{Neural Radiance Fields}
+
+
+\newacronym{3DGS}{3DGS}{3D Gaussian Splatting}
+\newacronym{GS}{GS}{Gaussian Splatting}
+\newacronym{SDF}{SDF}{Signed Distance Field}
+
+\newacronym{SfM}{SfM}{Structure from Motion}
+
+\newacronym{GPIS}{GPIS}{Gaussian Process Implicit Surface}
+\newacronym{GP}{GP}{Gaussian Process}
+
+% \newacronym{SfM}{Structure from motion}{structure from motion}{Structure from Motion}
+
+
+

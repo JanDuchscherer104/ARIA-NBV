@@ -1,0 +1,102 @@
+\section{Related Work}
+We categorize the related work into datasets, 3D foundation models, object detection, and surface reconstruction methods using video and point cloud inputs. 
+\input{tables/datasets}
+
+%\TODO{use the dataset overview table to shorten this section (hopefully)}
+\noindent\textbf{Datasets}. 
+As shown in Table~\ref{tab:datasets}, egocentric datasets~\cite{grauman2023egoexo,grauman2022ego4d,lee2012discovering,Damen2018EPICKITCHENS,northcutt2020egocom} have been typically designed to enable activity recognition, video narration and 2D understanding tasks. The most recent egocentric datasets, through the use of Project Aria~\cite{engel2023project}, are starting to enable 3D perception by releasing accurate camera calibrations, pose and semi-dense points information. Examples are Ego-Exo4D~\cite{grauman2023egoexo}, which also contains localized third-person perspective information, the Aria Everyday Activities (AEA)~\cite{lv2024aria} dataset as well as the Aria Digital Twin (ADT)~\cite{Pan_2023_ICCV} dataset. Only the ADT dataset contains 3D OBBs and CAD mesh GT annotations for real-world Project Aria data. However all data is recorded in a single space, making diversity too low for OBB tasks.
+Thus far 3D object detection and surface reconstruction datasets used by the community are either real RGB-D scanning sequences of indoor spaces (e.g. ScanNet~\cite{dai2017scannet,Avetisyan_2019_CVPR}, ScanNet++~\cite{yeshwanthliu2023scannetpp}, and  ARKitScenes~\cite{dehghan2021arkitscenes}) or simulations (e.g. Hypersim~\cite{roberts2021hypersim}, InterioNet~\cite{InteriorNet18}, and 3D-Front~\cite{fu20213dfront}).   
+%
+%Examples of scanning datasets include ScanNet~\cite{dai2017scannet} which together with Scan2CAD~\cite{Avetisyan_2019_CVPR} contains 1.5k indoor reconstructions and 14k OBBs, and 
+%ARKitScenes~\cite{dehghan2021arkitscenes} which contains 1.6k reconstructions annotated with OBBs. 
+%ScanNet++~\cite{yeshwanthliu2023scannetpp} is a newer datasets with higher fidelity. 
+% Prominent indoor RGB-D scanning datasets include ScanNet~\cite{dai2017scannet,Avetisyan_2019_CVPR}, the slightly larger ARKitScenes~\cite{dehghan2021arkitscenes} and ScanNet++~\cite{yeshwanthliu2023scannetpp} which is of higher quality.
+%
+%Indoor simulation datasets include Hypersim~\cite{roberts2021hypersim} simulates 774 random 100-frame videos with OBBs, InterioNet~\cite{InteriorNet18} contains 22M annotated frames and 3D OBBs. 3D-Front~\cite{fu20213dfront} contains a large set of 19k rooms but videos and OBBs would have to be generated since they are not part of the release. 
+% Indoor RGB-D video simulation datasets include Hypersim~\cite{roberts2021hypersim}, and InterioNet~\cite{InteriorNet18}. 3D-Front~\cite{fu20213dfront} contains a large set of 19k rooms but RGB-D videos and OBBs are not part of the release. 
+%
+% \TODO{viewpoint differences in trajectory}
+While these RGB-D datasets have sufficient scale for training, there is substantial modality difference from RGB-D datasets to egocentric data from Project Aria. 
+Project Aria provides one high-resolution RGB and two grey-scale video streams whereas RGB-D datasets come with just a single RGB stream. RGB-D datasets contain dense, uniformly sampled depth and surface information whereas egocentric data from Project Aria comes only with sparse depth via semi-dense point clouds from the SLAM system.
+%Scanning RGB-D datasets provide only a single RGB and a dense depth stream. 
+Additionally, the motion in scanning datasets is different than egocentric motion because the aim is to ``cover'' and observe all surfaces of the scene, which is not the case in typical egocentric data.
+We find these differences in modalities and motion patterns are challenging and necessitate substantial differences in model design which opens up new research.
+%We find that~\EFMmodel{} which is designed for and trained on 
+%We find that methods deisgned for such RGB-D scanning datasets are not fully exploiting all egocentric modalities and thus cannot reach the full 
+%To close these gaps we provide 3D OBB annotations and GT depth for \ASE{}~\cite{ase2024web}, validation GT meshes for ADT,  and high quality 3D OBB annotations for real Aria recordings in \AOThree{}. 
+To close these gaps we provide new object and mesh annotations for existing Project Aria datasets~\cite{ase2024web,Pan_2023_ICCV} and a small high-quality object detection benchmark. 
+
+%Here, we leverage the Aria Synthetic Environments (\ASE{})~\cite{ase2024web} dataset which contains 100k scenes and one 2-min egocentric video rendered with Aria~\cite{engel2023project} sensors. We release GT depth and 3D OBBs. 
+%However none of these egocentric datasets contains 3D OBBs or surface annotations at the scale required for training or testing. 
+% In addition to the aforementioned egocentric~\ASE{} dataset, we use the ADT dataset since it ads 3D GT surface and 3D OBB annotations to real-world Aria recordings.
+% Furthermore, the Aria Synthetic Environments (ASE)~\cite{ase2024web} contains simulated Aria video sequences in 100k scenes.
+%We leverage and augment ASE with 3D OBB annotations and release a training and validation dataset.
+%EgoHumans~\cite{khirodkar2023egohumans}
+
+%\noindent\textbf{Object Detection and Scene Reconstruction Datasets} 
+%On a high level there are synthetic and real indoor datasets as well as autonomous car datasets~\cite{caesar2020nuscenes,Geiger2012CVPR} that are annotated with 3D surface and object bounding boxes (OBBs). The most closely related indoor datasets are typically created by scanning rooms or houses. 
+%Examples include ScanNet~\cite{dai2017scannet} which together with Scan2CAD~\cite{Avetisyan_2019_CVPR} contains 1.5k indoor reconstructions and 14k OBBs, and 
+%ARKitScenes~\cite{Avetisyan_2019_CVPR} which contains 1.6k reconstructions annotated with OBBs. 
+%ScanNet++~\cite{yeshwanthliu2023scannetpp} is a newer datasets with higher fidelity. 
+%The Objectron~\cite{ahmadyan2021objectron} dataset contains 15k RGB videos that scan one object each with OBB annotations but no reconstruction. 
+%The motion in these scanning datasets is by necessity different than egocentric motion because the aim is to ``cover'' and observe all surfaces of the scene, which is not the case in typical egocentric data.
+%Replica~\cite{replica19arxiv} contains 18 high quality reconstructions from which validation data could be simulated and 3D OBBs extracted. 
+%
+%Scanning-type datasets contain ScanNet~\cite{dai2017scannet} which has 1.5k 3D scene reconstructions and axis aligned BBs (AABB). Scan2CAD~\cite{Avetisyan_2019_CVPR} adds OBB information to the AABBs in ScanNet. The follow on work ScanNet++~\cite{yeshwanthliu2023scannetpp} falls into the same category albeit with higher quality 3D structure. 
+%ARKitScenes~\cite{dehghan2021arkitscenes} is similar to ScanNet in that it contains 1.6k 3D reconstructions of rooms with an RGB-D scanner and 3D bounding box annotations.
+%
+%There is also a variety of indoor simulation datasets.
+%Hypersim~\cite{roberts2021hypersim} simulates 774 random 100-frame videos with OBBs, InterioNet~\cite{InteriorNet18} contains 22M annotated frames and 3D OBBs. 3D-Front~\cite{fu20213dfront} contains a large set of 19k rooms but videos and OBBs would have to be generated since they are not part of the release. 
+%Here, we leverage the Aria Synthetic Environments (\ASE{})~\cite{ase2024web} dataset which contains 100k scenes and one 2-min egocentric video rendered with Aria~\cite{engel2023project} sensors. We release GT depth and 3D OBBs. 
+%
+%Hypersim~\cite{roberts2021hypersim} contains 461 indoor scenes and 774 videos of about 100 timesteps each with groundtruth (GT) depth and 3D OBB annotations. A random trajectory generator is used that does not take into account egocentric trajectories.
+%3D-Front~\cite{fu20213dfront} dataset contains 6.8k houses containing 19k rooms. \TODO{While all GT could be generated from it, no video sequences are part of the release.} 
+%InteriorNet~\cite{InteriorNet18} is a large dataset of 22M images with depth and 3D OBB annotations.  
+%Here, we leverage the ASE dataset which contains 100k scenes and egocentric videos with GT depth and 3D OBBs. 
+%\TODO{more stats}
+%
+%A variety of datasets have OBB information or surface reconstructions but do not contain video data for inputs. Among them are Matterport3D which relies on stationary scanners, and SUNRGBD~\cite{song2015sun} and NYUv2~\cite{Silberman:ECCV12} which are datasets of individual annotated RGB-D frames. Omni3D~\cite{Brazil_2023_CVPR} is a large set of individual frames annotated with 3D OBBs sampled from a collection of datasets. 
+
+%\noindent\textbf{Surface Regression Datasets} For the purposes of surface regression datasets of scenes the main indoor scanning datasets are ScanNet~\cite{dai2017scannet}, ARKitScenes~\cite{dehghan2021arkitscenes} and for validation Replica~\cite{replica19arxiv}.
+
+\noindent\textbf{3D Foundation Models}. Likely hindered by the availability of sufficient 3D training data, there are few related 3D foundation models and none designed for egocentric data. 3D-LFM~\cite{dabhi202333dlfm} generates 3D skeletons from 2D point inputs for more than 30 categories of 2D-3D point sets. 
+%GMFlow~\cite{xu2023unifying} aims to solve a 
+Most relevant is Ponder~\cite{huang2023ponder,zhu2023ponderv2} which uses a point-cloud encoder on unprojected RGB-D frames from ScanNet to produce a dense feature volume that is trained via a NERF~\cite{mildenhall2021nerf} rendering loss. The architecture shares the lifting into a feature volume~\cite{harley2019learning} but does so via a sparse point encoder instead of leveraging 2D foundation models and dense lifting. As we find in our experiments 3D point-encoder-based methods like 3DETR~\cite{misra2021end} struggle with the non-uniform egocentric point clouds.
+%Additionally, freespace information is not encoded in the point-cloud encoder.
+
+\noindent\textbf{3D Object Detection}. 
+The most similar method to the proposed \EFMmodel{} model is ImVoxelNet~\cite{rukhovich2022imvoxelnet}. After unprojecting 2D image features into a 3D feature volume, a 3D CNN head regresses 3D bounding box parameters at multi-scales. Similarly, Raytran~\cite{tyszkiewicz2022raytran} lifts 2D features into a 3D grid via a sparse attention mechanism to detect 3D OBBs. Neither use additional semi-dense point information.
+In the AV community 3D OBB detection is also investigated based on video and LiDAR points~\cite{yin2021center,focalsconv-chen}. LiDAR points sparsely but uniformly provide depth input in contrast to egocentric semidense points. The OBB distribution is also more constrained due to the fact that the car and objects move essentially in the same, locally-2D plane.
+DETR3D~\cite{wang2022detr3d} and extensions such as PARQ~\cite{Xie_2023_ICCV} explore how to directly perform 3D OBB detection from multi-view image input. 
+%that is improved upon by using image-aligned queries in PARQ~\cite{Xie_2023_ICCV}.
+%With the advent of Transformers, one branch of research is exploring how to use multi-view image input to Transformers for 3D object detection following the DETR~\cite{carion2020detr} paradigm in 2D detection. DETR3D~\cite{wang2022detr3d} is the seminal work that is improved upon by using image-aligned queries in PARQ~\cite{Xie_2023_ICCV}.
+%
+Cube R-CNN~\cite{Brazil_2023_CVPR} is following the Mask R-CNN-paradigm and directly regresses 3D OBBs form single frames. Similarly, MOLTR~\cite{li2021moltr} and ODAM~\cite{li2021odam} detect 3D OBBs per frame and additionally learn to track and fuse 3D OBBs.
+%The intuition is that a learned prior over object scales allows resolving the object depth from a single view.
+Point-cloud based methods for 3D object detection such as VoteNet~\cite{qi2019votenet} and more recent Transformer-based 3DETR~\cite{misra2021end}, typically leverage either dense depth or fused RGB-D reconstructions as inputs. We find that the sparse, non-uniform nature of egocentric point clouds is challenging for this class of methods.
+%At the same time various methods directly detect 3D OBBs on top of point clouds or surfaces of the scene. VoteNet~\cite{qi2019votenet} is a representative work that is improved upon recently with the advent of Transformer-based architectures for 3D detection in 3DETR~\cite{misra2021end}.
+%
+
+%multi-view fusion strategies:
+%early fusion across a snippet of time #parq #detr3d
+%early fusion over a sampling of images of a static scene #RayTransformer
+%late fusion based on 2d observations #FroDo
+%late fusion based on 3d observations #ODAM
+% related methods
+%\TODO{RayTran}
+%\TODO{ODAM}
+%\TODO{FroDo}
+%\TODO{Vid2Cad}
+%\TODO{MOLTR}
+
+
+\noindent\textbf{3D Surface Estimation} Aside from the vast amount of traditional stereo methods~\cite{furukawa2009accurate,goesele2007multi}, learning-based surface reconstruction can be categorized into volumetric methods, depth-based methods, and scene-specific methods~\cite{mildenhall2021nerf,kerbl3Dgaussians}. 
+%The first two are trained to directly output depth maps or 3D surface representations in the form of signed distance values (SDFs) or occupancy grid. Scene-specific methods optimize a single representation for each scene.
+Among depth-based approaches, the premise of monocular depth estimation is to learn strong priors about scenes and environments to regress depth without any multi-view information. ZoeDepth~\cite{bhat2023zoedepth} is a high-performing monocular depth estimator that is first trained on relative depth and then fine-tuned on datasets with metric depth. Typically mono-depth methods have problems with the scale ambiguity of natural images. %Having additional cues such as sparse points from SLAM or structure from motion (SfM) systems can help mitigate this issue. 
+ConsistentDepth~\cite{khan2023tcod} addresses this issue by leveraging the global sparse points to achieve temporally consistent depths. With multi-view inputs, MVSNet~\cite{yao2018mvsnet} builds a 3D cost volume via differentiable homography warping to regress depths. At the boundary between multi-view methods and mono-depth methods that infer depth from multiple views is SimpleRecon~\cite{sayed2022simplerecon}, which constructs a frustum cost volume but then squashes it into a 2D feature map for depth regression.
+ATLAS~\cite{murez2020atlas} proposes the idea of unprojecting 2D image features into a 3D feature grid for semantic surface regression. and Lift-Splat-Shoot~\cite{philion2020lift} in the AV literature concurrently uses a similar idea to lift to a bird-eye-view (BEV) grid. 
+NeuralRecon~\cite{sun2021neucon} expands on this idea by first regressing local sparse TSDF and then fusing local reconstructions into a global volume using a learned fusion module. As such it is the most similar method to the proposed \EFMmodel{} model.
+% we can bring this back if we bring gaussian splats back in
+%In terms of per-scene optimization methods, there has been a recent surge in neural reconstruction methods initiated by NERF~\cite{mildenhall2021nerf} and more recently evolved into Gaussian Splats~\cite{kerbl3Dgaussians} based reconstructions that optimize an underlying scene representation using the photometric rendering equation. 
+%
+None of these methods is designed for egocentric data modalities nor has been evaluated on egocentric data.

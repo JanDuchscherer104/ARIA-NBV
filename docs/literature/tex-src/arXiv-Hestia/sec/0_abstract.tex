@@ -1,0 +1,15 @@
+\begin{abstract}
+
+Advances in 3D reconstruction and novel view synthesis have enabled efficient and photorealistic rendering.  
+However, images for reconstruction are still either largely manual or constrained by simple preplanned trajectories.
+To address this issue, recent works propose generalizable next-best-view planners that do not require online learning.
+Nevertheless, robustness and performance remain limited across various shapes. 
+Hence, this study introduces Voxel-Face-Aware \underline{H}ierarchical N\underline{e}xt-Be\underline{s}\underline{t}-V\underline{i}ew \underline{A}cquisition for Efficient 3D Reconstruction (Hestia\footnote{In Greek mythology, Hestia is the goddess of the hearth, symbolizing home, foundation, and structure, representing stability and guidance in complex systems}), which addresses the shortcomings of the reinforcement learning-based generalizable approaches for five-degree-of-freedom viewpoint prediction. 
+Hestia systematically improves the planners through four components: a more diverse dataset to promote robustness, a hierarchical structure to manage the high-dimensional continuous action search space, a close-greedy strategy to mitigate spurious correlations, and a face-aware design to avoid overlooking geometry.
+Experimental results show that Hestia achieves non-marginal improvements, with at least a 4\% gain in coverage ratio, while reducing Chamfer Distance by 50\% and maintaining real-time inference. 
+In addition, Hestia outperforms prior methods by at least 12\% in coverage ratio with a 5-image budget and remains robust to object placement variations. 
+Finally, we demonstrate that Hestia, as a next-best-view planner, is feasible for the real-world application.
+%The code and data processing script for Hestia are provided in the supplementary materials and will be released after publication.
+Our project page is \href{https://johnnylu305.github.io/hestia_web}{\texttt{https://johnnylu305.github.io/hestia\_web}}.
+%\noindent\textbf{Project page:} %\href{https://github.com/johnnylu305/Hestia-NBV}%{\texttt{https://github.com/johnnylu305/Hestia-NBV}}
+\end{abstract}

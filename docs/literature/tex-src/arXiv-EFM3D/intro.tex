@@ -1,0 +1,62 @@
+\begin{figure}
+    \centering
+    \vspace{-5mm}
+    \includegraphics[width=\textwidth]{figures/EFM3D_teaser_v1.pdf}
+    %\includegraphics[width=\textwidth]{figures/EFM3D_teaser_v1.png}
+    \caption{3D Egocentric Foundation Models leverage spatial priors from egocentric data to power core 3D tasks such as 3D object detection and reconstruction.}
+    \label{fig:efm3d_teaser}
+    \vspace{-5mm}
+\end{figure}
+
+\section{Introduction}
+Foundation models trained on Internet-scale text, image and video datasets have demonstrated the potential in using large-scale self-supervised learning approaches to build backbones that are useful for numerous downstream tasks, through both fine-tuning and zero-shot learning. 
+% Wearable computers provide new source of context from egocentric sensor data
+The advent of wearable spatial computers enables a new source of context from egocentric sensor data. Key to unlocking this context is understanding the environment of the wearer. 
+%The advent of wearable spatial computers that make available physical context; key aspect is understanding the environment; 
+% Advent of spatial computers present opportunity for spatial foundation models; 
+This new egocentric data source comes equipped with fine-grained 3D location information~\cite{engel2023project,grauman2023egoexo} and thus presents the opportunity for a novel class of spatial foundation models that are rooted in 3D space.
+% Sentence about the path to 3D Egocentric Foundation models that utilize 3D signals that spatial computing provides (e.g. SLAM)
+% Egocentric foundation models for 3d data; that can learn and utilize strong priors from egocentric (pose and points)
+This class of 3D egocentric foundation models (EFMs) can leverage strong priors from egocentric data like camera poses, calibration and semi-dense point information. 
+%
+% Egocentric Data distribution is novel and starting to become available, but isn’t at the scale we should expect EFM with SSL to work yet.
+As with 2D image foundation models~\cite{he2022masked,oquab2023dinov2,assran2023ijepa,kirillov2023segany}, the availability of large amounts of data is critical for training such models and high quality annotations to measuring their performance. While there are now significant amounts of 2D data with 2D annotations~\cite{deng2009imagenet,lin2014coco,gupta2019lvis}, and a large body of 3D scene dataset~\cite{dai2017scannet,yeshwanthliu2023scannetpp,replica19arxiv,dehghan2021arkitscenes}, and autonomous vehicles (AV) datasets~\cite{caesar2020nuscenes,Geiger2012CVPR}, the equivalent for egocentric data from wearable devices with 3D annotations is only just starting to become available~\cite{engel2023project,grauman2023egoexo,ase2024web}.  
+% Following recent work [e.g. sceneScript, some other paper…,] we show that our baseline architecture can be trained in simulation and directly deployed on real-data. 
+%
+% Path to 3D EFM is to set up a strong supervised learning architecture with clear Benchmarks of important tasks to measure progress
+%As with 2d counterparts; we need to first establish supervised baselines with clear metrics;
+%
+%As with 2D foundation model counterparts~\cite{he2022masked,oquab2023dinov2,assran2023ijepa,kirillov2023segany}, we need to establish benchmarks with clear metrics in order to measure progress. 
+%
+
+To enable measuring progress towards EFMs we propose the EFM3D benchmark which contains two tasks: 3D bounding box detection and surface regression.
+%Additionally, we introduce an unified architecture for supervised learning of these two tasks that we expect to be crucial for future EFM3D to demonstrate performance against.
+%
+%In this paper we introduce an architecture for supervised learning of two key downstream tasks and benchmarks that we expect to be crucial for future EFM3D to demonstrate performance against: 3D bounding box detection and surface regression.
+% We establish the first two benchmarks for 3D EFMs for measuring progress and we show 
+%We introduce an unified architecture for supervised learning of two key downstream tasks and benchmarks that we expect to be crucial for future EFM3D to demonstrate performance against: 3D bounding box detection and surface regression.
+% We show a first example of how the same architecture for a future 3D EFM can be trained for multiple tasks. 
+% As a first example of how the same architecture for a future 3D EFM can be trained for multiple tasks, we take two core interrelated 3D perception tasks: 3D object detection and surface regression. We propose the first benchmarks on real world egocentric data to study these two tasks in the egocentric setting. 
+%
+% On this benchmark existing models trained on non-egocentric data do not perform well, when tested on egocentric tasks.
+To set up the first baseline model on EFM3D, we introduce the Egocentric Voxel Lifting (\EFMmodel{}) model which relies on frozen 2D foundation features to set a competitive performance. \EFMmodel{} leverages all egocentric modalities from Aria including posed and calibrated RGB and greyscale video streams and semidense points. 
+When trained on our new large-scale simulated dataset \EFMmodel{} generalizes well to the real-world EFM3D benchmark and significantly outperforms the current state-of-the-art 3D scene understanding models even when they are retrained on the same dataset. To summarize our contributions:
+
+\noindent \textbf{Dataset.} We release more annotations including 3D object bounding boxes (OBBs) and groundtruth (GT) meshes built on top of Aria Synthetic Environments dataset~\cite{ase2024web} and real Project~Aria sequences to enable research on the two foundational tasks of 3D object detection and surface reconstruction. 
+
+\noindent \textbf{Benchmark.} We set up the EFM3D benchmark with the first two tasks, namely 3D object detection and surface reconstruction, to advance continuous research in the areas of egocentric machine perception.
+
+\noindent \textbf{Method.} We introduce a baseline model, \EFMmodel{}, to solve both tasks at the state-of-the-art level by leveraging explicit volumetric representation, a full suite of egocentric signals, and 2D features from vision foundation models.
+
+% To enable the community to measure progress towards 3D EFMs, we release the real-world egocentric 3D object detection and surface reconstruction benchmark datasets including groundtruth annotations as well as evaluation code. In addition, we publish the \EFMmodel{} and the simulated egocentric training and validation datasets at REDACTED. 
+
+%In summary we contribute 
+%\begin{itemize}
+%    \item visibility annotations for \ASE{} to enable training of 3D detection
+%    \item \AOThree{}, a novel validation dataset for 3d bounding box detection on real Aria sequences. This allows evaluating sim-to-real generalization.
+%    \item GT meshes for the \ADT{} dataset to enable evaluating 3D surface regression on real-world Aria sequences.
+%    \item evaluation of state of the art methods retrained on egocentric data on simulation and real datasets.
+%    \item ~\EFMmodel, a simple baseline model that can solve both tasks at state of the art levels by leveraging the full suite of egocentric signals.
+%    \item \TODO{Object tracker? Sequence-level evaluation?}
+%\end{itemize}
+

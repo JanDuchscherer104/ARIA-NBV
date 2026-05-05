@@ -1,0 +1,98 @@
+\input{figures/humanoid}
+
+\vspace{-.2cm}
+\section{Experiments}
+\label{sec:experiments}
+\vspace{-.1cm}
+
+Our experimental evaluation focuses on (1) the accuracy of the Trajectory Transformer as a long-horizon predictor compared to standard dynamics model parameterizations and (2) the utility of sequence modeling tools -- namely beam search -- as a control algorithm in the context of offline reinforcement learning, imitation learning, and goal-reaching.
+
+\vspace{-.05cm}
+\subsection{Model Analysis}
+\vspace{-.05cm}
+
+We begin by evaluating the Trajectory Transformer
+as a long-horizon policy-conditioned predictive model.
+The usual strategy for predicting trajectories given a policy is to rollout with a single-step model, with actions supplied by the policy.
+Our protocol differs from the standard approach not only in that the model is not Markovian, but also in that it does not require access to a policy to make predictions -- the outputs of the policy are modeled alongside the states encountered by that policy.
+Here, we focus only on the quality of the model's predictions; we use actions predicted by the model for an imitation learning method in the next subsection.
+
+\input{figures/model_error}
+
+\paragraph{Trajectory predictions.}
+Figure~\ref{fig:humanoid} depicts a visualization of predicted 100-timestep trajectories from our model after having trained on a dataset collected by a trained humanoid policy.
+Though model-based methods have been applied to the humanoid task, prior works tend to keep the horizon intentionally short to prevent the accumulation of model errors \citep{janner2019mbpo,amos2020model}.
+The reference model is the probabilistic ensemble implementation of PETS \citep{chua2018pets}; we tuned the number of models within the ensemble, the number of layers, and layer sizes, but were unable to produce a model that predicted accurate sequences for more than a few dozen steps.
+In contrast, we see that the Trajectory Transformer's
+long-horizon predictions are substantially more accurate, remaining visually indistinguishable from the ground-truth trajectories even after 100 predicted steps.
+To our knowledge, no prior model-based RL algorithm has demonstrated predicted rollouts of such accuracy and length on tasks of comparable dimensionality.
+
+\paragraph{Error accumulation.}
+A quantitative account of the same finding is provided in Figure~\ref{fig:model_error}, in which we evaluate the model's accumulated error versus prediction horizon.
+Standard predictive models tend to have excellent single-step errors but poor long-horizon accuracy, so instead of evaluating a test-set single-step likelihood, we sample 1000 trajectories from a fixed starting point to estimate the per-timestep state marginal predicted by each model.
+We then report the likelihood of the states visited by the reference policy on a held-out set of trajectories under these predicted marginals.
+To evaluate the likelihood under our discretized model, we treat each bin as a uniform distribution over its specified range; by construction, the model assigns zero probability outside of this range.
+
+To better isolate the source of the Transformer's improved accuracy over standard single-step models, we also evaluate a Markovian variant of our same architecture.
+This ablation has a truncated context window that prevents it from attending to more than one timestep in the past.
+This model performs similarly to the trajectory Transformer on fully-observed environments, suggesting that architecture differences and increased expressivity from the autoregressive state discretization play a large role in the trajectory Transformer's long-horizon accuracy.
+We construct a partially-observed version of the same humanoid environment, in which each dimension of every state is masked out with $50\%$ probability (Figure~\ref{fig:model_error} right), and find that, as expected, the long-horizon conditioning plays a larger role in the model's accuracy in this setting.
+
+\paragraph{Attention patterns.}
+We visualize the attention maps during model predictions in Figure~\ref{fig:attention}.
+We find two primary attention patterns.
+The first is a discovered Markovian strategy, in which a state prediction attends overwhelmingly to the previous transition.
+The second is qualitatively striated, with the model attending to specific dimensions in multiple prior states for each state prediction.
+Simultaneously, the action predictions attend to prior actions more than they do prior states.
+The action dependencies contrast with the usual formulation of behavior cloning, in which actions are a function of only past states, but is reminiscent of the action filtering technique used in some planning algorithm to produce smoother action sequences \citep{nagabandi2019pddm}.
+
+\input{figures/attention_maps}
+
+\subsection{Reinforcement Learning and Control}
+\label{sec:exp_rl}
+
+\paragraph{Offline reinforcement learning.}
+We evaluate the Trajectory Transformer on a number of environments from the D4RL offline benchmark suite \citep{fu2020d4rl}, including the locomotion and AntMaze domains.
+This evaluation is the most difficult of our control settings, as reward-maximizing behavior is the most qualitatively dissimilar from the types of behavior that are normally associated with unsupervised modeling -- namely, imitative behavior.
+Results for the locomotion environments are shown in Table~\ref{table:d4rl}.
+We compare against five other methods spanning other approaches to data-driven control: (1) behavior-regularized actor-critic (BRAC; \citealt{wu2019behavior}) and conservative $Q$-learning (CQL; \citealt{kumar2020conservative}) represent the current state-of-the-art in model-free offline RL; model-based offline planning (MBOP; \citealt{argenson2020model}) is the best-performing prior offline trajectory optimization technique; decision transformer (DT; \cite{chen2021decision}) is a concurrently-developed sequence-modeling approach that uses return-conditioning instead of planning; and behavior-cloning (BC) provides the performance of a pure imitative method.
+
+The Trajectory Transformer performs on par with or better than all prior methods (Table~\ref{table:d4rl}).
+The two discretization variants of the Trajectory Transformer, uniform and quantile, perform similarly on all environments except for HalfCheetah-Medium-Expert, where the large range of the velocities prevents the uniform discretization scheme from recovering the precise actuation required for enacting the expert policy.
+As a result, the quantile discretization approach achieves a return of more than twice that of the uniform discretization.\blfootnote{
+    $^1$More attention visualizations can be found at 
+    \href{https://trajectory-transformer.github.io/attention}
+    {\texttt{trajectory-transformer.github.io/attention}}
+}
+
+\paragraph{Combining with $Q$-functions.}
+Though Monte Carlo value estimates are sufficient for many standard offline RL benchmarks, in sparse-reward and long-horizon settings they become too uninformative to guide the beam-search-based planning procedure.
+In these problems, the value estimate from the Transformer can be replaced with a $Q$-function trained via dynamic programming.
+We explore this combination by using the $Q$-function from the implicit $Q$-learning algorithm (IQL; \citealt{kostrikov2021implicit}) on the AntMaze navigation tasks \citep{fu2020d4rl}, for which there is only a sparse reward upon reaching the goal state.
+These tasks evaluate temporal compositionality because they require stitching together multiple zero-reward trajectories in the dataset to reach a designated goal.
+
+AntMaze results are provided in Table~\ref{table:antmaze}.
+$Q$-guided Trajectory Transformer planning outperforms all prior methods on all maze sizes and dataset compositions.
+In particular, it outperforms the IQL method from which we obtain the $Q$-function, underscoring that planning with a $Q$-function as a search heuristic can be less susceptible to errors in the $Q$-function than policy extraction.
+However, because the $Q$-guided planning procedure still benefits from the temporal compositionality of both dynamic programming and planning, it outperforms return-conditioning approaches, such as the Decision Transformer, that suffer due to the lack of complete demonstrations in the AntMaze datasets.
+
+\input{figures/offline_rl}
+
+\input{figures/antmaze}
+
+
+\paragraph{Imitation and goal-reaching.}
+We additionally plan with the Trajectory Transformer using standard likelihood-maximizing beam search, as opposed to the return-maximizing version used for offline RL.
+We find that after training the model on datasets collected by expert policies \citep{fu2020d4rl}, using beam search as a receding-horizon controller achieves an average normalized return of $104\%$ and $109\%$ in the Hopper and Walker2d environments, respectively, using the same evaluation protocol of 15 runs described as in the offline RL results.
+While this result is perhaps unsurprising, as behavior cloning with standard feedforward architectures is already able to reproduce the behavior of the expert policies, it demonstrates that a decoding algorithm used for language modeling can be effectively repurposed for control.
+
+Finally, we evaluate the goal-reaching variant of beam-search, which conditions on a future desired state alongside previously encountered states.
+We use a continuous variant of the classic four rooms environment as a testbed \citep{sutton1999semimdps}.
+Our training data consists of trajectories collected by a pretrained goal-reaching agent, with start and goal states sampled uniformly at random across the state space.
+Figure~\ref{fig:goals} depicts routes taken by the the planner.
+Anti-causal conditioning on a future state allows for beam search to be used as a goal-reaching method.
+No reward shaping, or rewards of any sort, are required; the planning method relies entirely on goal relabeling.
+An extension of this experiment to procedurally-generated maps is described in Appendix~\ref{app:minigrid}.
+
+\input{figures/goals}
+

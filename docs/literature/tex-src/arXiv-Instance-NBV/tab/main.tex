@@ -1,0 +1,433 @@
+\begin{table*}[ht]
+\centering
+
+\caption{Results of \ac{NBV} evaluation for whole scene reconstruction in synthetic and GraspNet dataset. Best results are highlighted in \textbf{bold}, and second-best results are \underline{underlined}. The “All” row, which uses all candidate views, is excluded from this comparison.}
+% 모든 candidate를 사용한 "All"을 제외하고 Best는 Bold, second best는 밑줄을 쳤다.
+\vspace{-2mm}
+\label{tab:main}
+
+\resizebox{\textwidth}{!}{
+\renewcommand{\arraystretch}{1.2}
+{\large
+\begin{tabular}{cc|cccccccc|cccccccc}
+\hline \toprule
+\multicolumn{2}{c|}{\multirow{3}{*}{\textbf{Methods}}} &
+  \multicolumn{8}{c|}{\textbf{BlenderProc Synthetic Dataset (10 Scenes)}} &
+  \multicolumn{8}{c}{\textbf{GraspNet Real Dataset (10 Scenes)}} \\ \cline{3-18} 
+\multicolumn{2}{c|}{} &
+  \multicolumn{4}{c|}{\textbf{W/o Obj mask}} &
+  \multicolumn{4}{c|}{\textbf{With Obj mask}} &
+  \multicolumn{4}{c|}{\textbf{W/o Obj mask}} &
+  \multicolumn{4}{c}{\textbf{With Obj mask}} \\ \cline{3-18} 
+\multicolumn{2}{c|}{} &
+  PSNR $\uparrow$ &
+  SSIM $\uparrow$ &
+  LPIPS $\downarrow$ &
+  \multicolumn{1}{c|}{D-MAE $\downarrow$} &
+  PSNR $\uparrow$ &
+  SSIM $\uparrow$ &
+  LPIPS $\downarrow$ &
+  D-MAE $\downarrow$ &
+  PSNR $\uparrow$ &
+  SSIM $\uparrow$ &
+  LPIPS $\downarrow$ &
+  \multicolumn{1}{c|}{D-MAE $\downarrow$} &
+  PSNR $\uparrow$ &
+  SSIM $\uparrow$ &
+  LPIPS $\downarrow$ &
+  D-MAE $\downarrow$ \\ 
+  \hline \midrule
+  % \hline  
+% \multicolumn{1}{c|}{No Selection} &
+%   All &
+  \multicolumn{2}{c|}{All} &
+  23.87 &
+  0.7756 &
+  0.3249 &
+  \multicolumn{1}{c|}{0.0390} &
+  29.95 &
+  0.9646 &
+  0.0601 &
+  0.0552 &
+  22.49 &
+  0.8035 &
+  0.3885 &
+  \multicolumn{1}{c|}{0.0645} &
+  23.15 &
+  0.8759 &
+  0.1590 &
+  0.0664 \\ 
+  % \hline
+  \midrule
+% \multicolumn{1}{c|}{\multirow{3}{*}{\begin{tabular}[c]{@{}c@{}}Heuristic \\ Selection\end{tabular}}} &
+  % Spiral &
+  \multicolumn{2}{c|}{Spiral} &
+  17.75 &
+  0.5726 &
+  0.4100 &
+  \multicolumn{1}{c|}{\underline{0.0630}} &
+  25.69 &
+  0.8836 &
+  0.1047 &
+  0.0694 &
+  19.85 &
+  0.7326 &
+  0.4164 &
+  \multicolumn{1}{c|}{0.0749} &
+  \textbf{21.69} &
+  \underline{0.8414} &
+  \textbf{0.1605} &
+  \underline{0.0739} \\
+% \multicolumn{1}{c|}{} &
+%   Random &
+  \multicolumn{2}{c|}{Random} &
+  17.95 &
+  0.5568 &
+  0.4347 &
+  \multicolumn{1}{c|}{0.0701} &
+  24.91 &
+  0.9079 &
+  0.0978 &
+  0.0716 &
+  18.55 &
+  0.6990 &
+  0.4427 &
+  \multicolumn{1}{c|}{0.0801} &
+  20.44 &
+  0.7997 &
+  0.1830 &
+  0.0786 \\
+% \multicolumn{1}{c|}{} &
+%   FPS &
+  \multicolumn{2}{c|}{FPS} &
+  18.42 &
+  0.5808 &
+  0.4271 &
+  \multicolumn{1}{c|}{0.0670} &
+  24.47 &
+  0.9026 &
+  0.1020 &
+  0.0733 &
+  19.22 &
+  0.7098 &
+  0.4404 &
+  \multicolumn{1}{c|}{0.0822} &
+  21.25 &
+  0.8346 &
+  0.1706 &
+  0.0786 \\ 
+  % \hline
+  \midrule
+% \multicolumn{1}{c|}{\multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}Info-based\\ Selection\end{tabular}}} &
+%   FisherRF &
+  \multicolumn{2}{c|}{FisherRF \cite{jiang2024fisherrf}} &
+  18.64 &
+  0.5753 &
+  0.4335 &
+  \multicolumn{1}{c|}{0.0703} &
+  25.34 &
+  0.9253 &
+  0.0873 &
+  0.0695 &
+  18.82 &
+  0.7046 &
+  0.4358 &
+  \multicolumn{1}{c|}{0.0805} &
+  21.22 &
+  0.8328 &
+  0.1715 &
+  0.0768 \\
+% \multicolumn{1}{c|}{} &
+%   POp-GS (T) &
+  \multicolumn{2}{c|}{POp-T \cite{wilson2025pop}} &
+  19.07 &
+  0.6046 &
+  0.4093 &
+  \multicolumn{1}{c|}{0.0648} &
+  26.54 &
+  0.9366 &
+  0.0783 &
+  0.0651 &
+  19.05 &
+  0.7047 &
+  0.4435 &
+  \multicolumn{1}{c|}{0.0801} &
+  21.10 &
+  0.8310 &
+  0.1733 &
+  0.0768 \\
+% \multicolumn{1}{c|}{} &
+%   POp-GS (D) &
+  \multicolumn{2}{c|}{POp-D \cite{wilson2025pop}} &
+  19.04 &
+  0.5973 &
+  0.4139 &
+  \multicolumn{1}{c|}{0.0675} &
+  26.64 &
+  0.9387 &
+  \underline{0.0770} &
+  0.0641 &
+  18.99 &
+  0.7046 &
+  0.4427 &
+  \multicolumn{1}{c|}{0.0801} &
+  21.16 &
+  0.8313 &
+  0.1731 &
+  0.0770 \\
+% \multicolumn{1}{c|}{} &
+%   POp-GS (B) &
+  \multicolumn{2}{c|}{POp-B \cite{wilson2025pop}} &
+  19.04 &
+  0.5973 &
+  0.4139 &
+  \multicolumn{1}{c|}{0.0675} &
+  \underline{26.69} &
+  \underline{0.9393} &
+  \textbf{0.0766} &
+  0.0636 &
+  18.99 &
+  0.7043 &
+  0.4413 &
+  \multicolumn{1}{c|}{0.0803} &
+  21.12 &
+  0.8315 &
+  0.1731 &
+  0.0768 \\
+% \multicolumn{1}{c|}{} &
+%   \textbf{Ours} &
+  \multicolumn{2}{c|}{\textbf{Ours}} &
+  \textbf{-} &
+  - &
+  - &
+  \multicolumn{1}{c|}{-} &
+  \textbf{26.90} &
+  \textbf{0.9408} &
+  0.0773 &
+  \textbf{0.0144} &
+  - &
+  - &
+  - &
+  \multicolumn{1}{c|}{-} &
+  \underline{21.47} &
+  \textbf{0.8430} &
+  \underline{0.1653} &
+  \textbf{0.0487} \\ 
+  % \hline
+  \bottomrule
+\end{tabular}
+}
+}
+\end{table*}
+
+% \begin{table*}[ht]
+% \centering
+
+% \caption{Results of \ac{NBV} evaluation for whole scene reconstruction in synthetic and GraspNet dataset. Best results are highlighted in \textbf{bold}, and second-best results are \underline{underlined}. The “All” row, which uses all candidate views, is excluded from this comparison.}
+% % 모든 candidate를 사용한 "All"을 제외하고 Best는 Bold, second best는 밑줄을 쳤다.
+% \vspace{-2mm}
+% \label{tab:main}
+
+% \resizebox{\textwidth}{!}{
+% \renewcommand{\arraystretch}{1.4}
+% \begin{tabular}{cc|cccccccc|cccccccc}
+% \toprule
+% % \hline
+% \multicolumn{2}{c|}{\multirow{3}{*}{\textbf{Methods}}} &
+%   \multicolumn{8}{c|}{\textbf{BlenderProc Synthetic Dataset (10 Scenes)}} &
+%   \multicolumn{8}{c}{\textbf{GraspNet Real Dataset (10 Scenes)}} \\ \cline{3-18} 
+% \multicolumn{2}{c|}{} &
+%   \multicolumn{4}{c|}{\textbf{W/o Obj mask}} &
+%   \multicolumn{4}{c|}{\textbf{With Obj mask}} &
+%   \multicolumn{4}{c|}{\textbf{W/o Obj mask}} &
+%   \multicolumn{4}{c}{\textbf{With Obj mask}} \\ \cline{3-18} 
+% \multicolumn{2}{c|}{} &
+%   PSNR $\uparrow$ &
+%   SSIM $\uparrow$ &
+%   LPIPS $\downarrow$ &
+%   \multicolumn{1}{c|}{D-MAE $\downarrow$} &
+%   PSNR $\uparrow$ &
+%   SSIM $\uparrow$ &
+%   LPIPS $\downarrow$ &
+%   D-MAE $\downarrow$ &
+%   PSNR $\uparrow$ &
+%   SSIM $\uparrow$ &
+%   LPIPS $\downarrow$ &
+%   \multicolumn{1}{c|}{D-MAE $\downarrow$} &
+%   PSNR $\uparrow$ &
+%   SSIM $\uparrow$ &
+%   LPIPS $\downarrow$ &
+%   D-MAE $\downarrow$ \\ 
+%   % \hline
+%   \midrule
+% \multicolumn{1}{c|}{No Selection} &
+%   All &
+%   23.87 &
+%   0.7756 &
+%   0.3249 &
+%   \multicolumn{1}{c|}{0.0390} &
+%   29.95 &
+%   0.9646 &
+%   0.0601 &
+%   0.0552 &
+%   22.49 &
+%   0.8035 &
+%   0.3885 &
+%   \multicolumn{1}{c|}{0.0645} &
+%   23.15 &
+%   0.8759 &
+%   0.1590 &
+%   0.0664 \\ 
+%   % \hline
+%   \midrule
+% \multicolumn{1}{c|}{\multirow{3}{*}{\begin{tabular}[c]{@{}c@{}}Heuristic \\ Selection\end{tabular}}} &
+%   Spiral &
+%   17.75 &
+%   0.5726 &
+%   0.4100 &
+%   \multicolumn{1}{c|}{\underline{0.0630}} &
+%   25.69 &
+%   0.8836 &
+%   0.1047 &
+%   0.0694 &
+%   19.85 &
+%   0.7326 &
+%   0.4164 &
+%   \multicolumn{1}{c|}{0.0749} &
+%   \textbf{21.69} &
+%   \underline{0.8414} &
+%   \textbf{0.1605} &
+%   \underline{0.0739} \\
+% \multicolumn{1}{c|}{} &
+%   Random &
+%   17.95 &
+%   0.5568 &
+%   0.4347 &
+%   \multicolumn{1}{c|}{0.0701} &
+%   24.91 &
+%   0.9079 &
+%   0.0978 &
+%   0.0716 &
+%   18.55 &
+%   0.6990 &
+%   0.4427 &
+%   \multicolumn{1}{c|}{0.0801} &
+%   20.44 &
+%   0.7997 &
+%   0.1830 &
+%   0.0786 \\
+% \multicolumn{1}{c|}{} &
+%   FPS &
+%   18.42 &
+%   0.5808 &
+%   0.4271 &
+%   \multicolumn{1}{c|}{0.0670} &
+%   24.47 &
+%   0.9026 &
+%   0.1020 &
+%   0.0733 &
+%   19.22 &
+%   0.7098 &
+%   0.4404 &
+%   \multicolumn{1}{c|}{0.0822} &
+%   21.25 &
+%   0.8346 &
+%   0.1706 &
+%   0.0786 \\ 
+%   % \hline
+%   \midrule
+% \multicolumn{1}{c|}{\multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}Info-based\\ Selection\end{tabular}}} &
+%   FisherRF &
+%   18.64 &
+%   0.5753 &
+%   0.4335 &
+%   \multicolumn{1}{c|}{0.0703} &
+%   25.34 &
+%   0.9253 &
+%   0.0873 &
+%   0.0695 &
+%   18.82 &
+%   0.7046 &
+%   0.4358 &
+%   \multicolumn{1}{c|}{0.0805} &
+%   21.22 &
+%   0.8328 &
+%   0.1715 &
+%   0.0768 \\
+% \multicolumn{1}{c|}{} &
+%   POp-GS (T) &
+%   19.07 &
+%   0.6046 &
+%   0.4093 &
+%   \multicolumn{1}{c|}{0.0648} &
+%   26.54 &
+%   0.9366 &
+%   0.0783 &
+%   0.0651 &
+%   19.05 &
+%   0.7047 &
+%   0.4435 &
+%   \multicolumn{1}{c|}{0.0801} &
+%   21.10 &
+%   0.8310 &
+%   0.1733 &
+%   0.0768 \\
+% \multicolumn{1}{c|}{} &
+%   POp-GS (D) &
+%   19.04 &
+%   0.5973 &
+%   0.4139 &
+%   \multicolumn{1}{c|}{0.0675} &
+%   26.64 &
+%   0.9387 &
+%   \underline{0.0770} &
+%   0.0641 &
+%   18.99 &
+%   0.7046 &
+%   0.4427 &
+%   \multicolumn{1}{c|}{0.0801} &
+%   21.16 &
+%   0.8313 &
+%   0.1731 &
+%   0.0770 \\
+% \multicolumn{1}{c|}{} &
+%   POp-GS (B) &
+%   19.04 &
+%   0.5973 &
+%   0.4139 &
+%   \multicolumn{1}{c|}{0.0675} &
+%   \underline{26.69} &
+%   \underline{0.9393} &
+%   \textbf{0.0766} &
+%   0.0636 &
+%   18.99 &
+%   0.7043 &
+%   0.4413 &
+%   \multicolumn{1}{c|}{0.0803} &
+%   21.12 &
+%   0.8315 &
+%   0.1731 &
+%   0.0768 \\
+% \multicolumn{1}{c|}{} &
+%   \textbf{Ours} &
+%   \textbf{-} &
+%   - &
+%   - &
+%   \multicolumn{1}{c|}{-} &
+%   \textbf{26.90} &
+%   \textbf{0.9408} &
+%   0.0773 &
+%   \textbf{0.0144} &
+%   - &
+%   - &
+%   - &
+%   \multicolumn{1}{c|}{-} &
+%   \underline{21.47} &
+%   \textbf{0.8430} &
+%   \underline{0.1653} &
+%   \textbf{0.0487} \\ 
+%   % \hline
+%   \bottomrule
+% \end{tabular}
+% }
+% \end{table*}

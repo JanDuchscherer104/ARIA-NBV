@@ -1,0 +1,219 @@
+\clearpage
+% \setcounter{page}{1}
+\maketitlesupplementary
+\appendix
+
+
+\section{Implementation Details}
+\subsection{Occupancy Grid Mapping Algorithm}
+\label{app:grid}
+     Before updating the probabilistic occupancy grid $F^G_t$, Bresenham's line algorithm is implemented to cast the ray path in 3D space between the camera viewpoint and the endpoints among the point cloud back-projected from $D_{t+1}$. % We then update the occupancy probability of the voxels passed by camera rays following the Bayesian principles. 
+     According to the classical occupancy grid mapping algorithm~\citep{thrun2002probabilistic}, we have the log-odds formulation of occupancy probability:
+    \begin{equation}
+        \label{eqn:OGM}
+        \log Odd(v_i|z_j) = \log Odd(v_i) + \log\frac{p(z_j|v_i=1)}{p(z_j|v_i=0)},
+    \end{equation}
+    where $v_i$ denotes the occupancy probability of $i^{th}$ voxel in the grid $F^G_t$, $z_j$ is the measurement event that $j^{th}$ camera ray passes through this voxel. 
+
+    For the item $C=\log\frac{p(z_j|v_i=1)}{p(z_j|v_i=0)}$, there are only two cases for the measurement event in fact: $z_j=0$ or $z_j=1$. Thus, if the measurement event $z_j$ (i.g., the voxel is passed through by the $j^{th}$ camera ray) happens, we’ll update the occupancy by adding the value of $C_1=\log\frac{p(z_j = 1 | v_i = 1)}{p(z_j = 1 | v_i = 0)}$. If it’s not passed, we’ll add the value $C_2 = \log\frac{p(z_j = 0 | v_i = 1)}{p(z_j = 0 | v_i = 0)}$. The values of $C_1$ and $C_2$ can be set as an empirical constant, depending on factors such as the accuracy of ray casting and the confidence of each ray. Actually, $C’ = |\frac{C_1}{C_2}|$. We set a high incremental value for $C'$ (i.e., high confidence) because our experiments are based on the realistic simulator and accurate observations like depth maps.
+
+    % The numerator of the item $\log\frac{p(z_j|v_i=1)}{p(z_j|v_i=0)}$ means that the probability of being passed for a voxel if this voxel is occupied in fact, which shows the confidence of ray casting process. The numerator and denominator can be set as an empirical constant. 
+
+    Therefore, we can update the occupancy status of each voxel in the grid $F^G_t$ by adding a constant for each ray casting process. Note that the probabilistic occupancy grid $F^G$ is continuously updated within an episode. Finally, the occupancy status of voxels can be classified into three categories: unknown, occupied, and free, by setting an empirical threshold.
+    
+    To demonstrate the robustness and optimality of hyper-parameter in our implementation, we show the experimental results in~\cref{tab:ablation_param}.
+
+    \begin{table}[ht!]
+        \center
+        \setlength{\tabcolsep}{8pt}    % column interval
+        \renewcommand{\arraystretch}{1.5}   % vertical
+        \caption{Evaluation results for different empirical parameters in the implementation of occupancy grid mapping algorithm. Note that we use a constant $C'$ to represent the value of a ratio $|\frac{C_1}{C_2}|$ introduced in \ref{app:grid}}.
+        \label{tab:ablation_param}
+        \resizebox{1.0\linewidth}{!}{
+        \begin{tabular}{c|ccc}
+        \toprule
+            \textbf{Occupancy Threshold} & \textbf{Mean AUC $\uparrow$} & \textbf{Final Coverage Ratio $\uparrow$} & \textbf{Accuracy $\downarrow$} \\ \hline
+            % 0.1 & \% & \% \\
+            \textbf{0.5 (Ours)} & \textbf{87.39\%} & \textbf{95.63\%} & \textbf{0.37} \\
+            1.0 & 84.41\% & 93.43\% & 0.41 \\
+            1.5 & 84.84\% & 95.20\% & 0.39 \\
+            2.5 & 54.77\% & 58.70\% & 0.85 \\ \hline
+            \textbf{Value of Constant $C'$} & \textbf{Mean AUC $\uparrow$} & \textbf{Final Coverage Ratio $\uparrow$} & \textbf{Accuracy $\downarrow$} \\ \hline
+            5 & 66.96\% & 71.92\% & 0.49 \\
+            10 & 80.75\% & 92.16\% & 0.43\\
+            \textbf{20 (Ours)} & \textbf{87.39\%} & \textbf{95.63\%} & \textbf{0.37} \\
+            40 & 86.97\% & 94.12\% & 0.40\\
+        \bottomrule
+        \end{tabular}}
+    \end{table}
+
+
+\vspace{5pt}
+\subsection{Network and Training}
+    \noindent \textbf{Training.}\quad
+    In Isaac Gym~\citep{makoviychuk2021isaac}, we set 256 parallel environments for policy training, where each environment corresponds with one building-level object. % The maximum number of steps within one episode is 100. 
+    Once the coverage ratio reaches a threshold (99\% in practice), a collision occurs, or the episode length reaches the maximum threshold (100 steps), the environment is reset and the building to be reconstructed is replaced.
+    Our NBV policy is optimized through more than 32 million iterations and uses approximately 24 hours of training time on an NVIDIA V100 GPU. All networks are randomly initialized and trained end-to-end.
+
+    \noindent \textbf{Network.}\quad
+    We propose a multi-source representation that has better generalizability. In particular, we first build two mid-level representations: a 3D geometric representation $F^G$ from depth maps and a semantic representation $F^S$ from RGB images. The geometric representation $F^G$ encoded from depth images is with the shape of $(N, X, Y, Z, 4)$, where the number of parallel training environments $N$ is 256, the grid size $(X, Y, Z)$ is $(20, 20, 20)$, and the last dimension represents the 3D world coordinate and occupancy possibility. Semantic representation $F_S$ is stacked grayscale images encoded from multi-view RGB images with the shape of $(N, M, H, W)$, where the number of RGB images $M$ is 5, the size of grayscale images is $(64, 64)$
+
+    Specifically, we encode mid-level representations to embeddings: $s^S_t=f^S(F^S_t)$ and $s^G_t=f^G(F^G_t)$. $f^S$ encompasses a 2-layer 2D convolution and $\mathrm{Linear}(\mathrm{Flatten}(x))$ operation, while $f^G$ encompasses a 2-layer 3D convolution and $\mathrm{Linear}(\mathrm{Flatten}(x))$. Subsequently, we combine them with the historical action embedding $s^A_t=\mathrm{Linear}(a_{1:t})$ to generate the final state embedding $s_t$, as the input to the policy network. This process can be formulated as: % Finally, we concatenate corresponding embeddings $(s^G_t, s^S_t)$ from these mid-level representations with a pose embedding $s^A_t$ into state embedding $s_t$, guiding the NBV policy for subsequent decision-making. 
+        \begin{equation}
+        \label{eqn:state}
+        s_t = \mathrm{Linear}(s^G_t; s^S_t; s^A_t),
+        \end{equation}
+    where all embeddings are 256 vectors.
+
+    % To encode the geometric embedding $s^G_t$, we first build a 3D geometric representation $F^G$ with shape of $(N, X, Y, Z, 4)$ from depth images, where the number of parallel training environments $N$ is 256, grid size $(X, Y, Z)$ is $(20, 20, 20)$ and last dimension represents the 3D world coordinate and occupancy possibility. Then we use 2-layer 3D CNN and 1-layer MLP to obtain 256-dim $s^G_t$.
+
+    Our policy network PPO, implemented by Stable Baseline3~\citep{raffin2021stable}, is a 3-layer multi-layer perceptron (MLP). The output of our policy is used to parameterize a distribution over our 5-dimensional action space. In this way, the action can be drawn from the stochastic policy $a \sim \pi(\cdot |o_t)$.
+
+
+\subsection{Baseline Policies}
+\label{app:baseline}
+    The implementation details of baseline policies are described below:
+
+    \noindent1) \textbf{Random Policy}: This policy randomly generates 5-dim vector $(x, y, z, pitch, yaw)$ among the action space as the next action. The randomly generated positions are constrained so as not to cause collisions. The reported results are evaluated on the test set and averaged over random seeds from 0 to 4. 
+
+    % \vspace{1pt}
+    \noindent2) \textbf{Random Policy on the Sphere}: This policy randomly generates positions $(x, y, z)$ on a pre-defined hemisphere that exactly covers all objects of the test set. The headings are required to point to the center of the hemisphere. To avoid collisions, we set the radius of the hemisphere to 9 meters, which is greater than the maximum height of the test set object. The reported results are evaluated on the test set and averaged over random seeds from 0 to 4. 
+    
+    % \vspace{3pt}
+    \noindent3) \textbf{Uniform Policy on the Sphere}: All positions are evenly distributed on the previously mentioned hemispheres. Specifically, for Houses3K test set, all sampling points are distributed over 5 heights, each with 6 evenly spaced positions. For OmniObject3D, all sampling points are distributed over 4 heights, each with 5 evenly spaced positions.
+    
+    % \vspace{3pt}
+    \noindent4) \textbf{Uncertainty-Guided}~\citep{lee2022uncertainty}: This NBV policy iteratively selects the next view from a pre-defined viewpoint set based on the entropy-based uncertainty based on a continually optimized neural radiance field. We use TensoRF~\citep{chen2022tensorf} as the implementation foundation of neural radiance field. Before implementing uncertainty-driven viewpoint selection, we uniformly sample 100 views on the pre-defined hemisphere as the viewpoint candidate set. Note that we need to sample the candidate set for each object.
+
+    % \vspace{3pt}
+    \noindent5) \textbf{ActiveRMap}~\citep{zhan2022activermap}: The working pipeline is similar to uncertainty-guided policy. In particular, we implement the ``discrete (free)'' setup of ActiveRMap, which constrains the drone agent on the pre-defined hemisphere. Having considered collision avoidance in the design of the viewpoint set, we remove the collision penalty in its optimization objective.
+
+    \noindent6) \textbf{Scan-RL}~\citep{peralta2020next}: This RL-based policy predicts the next viewpoint from a 3-dim hemisphere space, relying on the historical RGB.
+
+    \noindent7) \textbf{Ours with Scan-RL's Representation}: To further compare the former Next-Best-View policy Scan-RL~\citep{peralta2020next} with us, we implement Scan-RL in our experimental setup, with our action and state space. This free-space NBV policy uses Scan-RL's representation, which is only extracted from RGB images instead of our original hybrid representations.
+
+
+% \vspace{5pt}
+\section{Data Preprocessing}
+    \noindent \textbf{3D Mesh.}
+    To boost our NBV policy's generalizability on building-scale objects, we rescale the original 3D meshes from Houses3K~\citep{houses3k}, OmniObject3D~\citep{wu2023omniobject3d} and Objaverse~\citep{deitke2023objaverse} to a reasonable building size. For example, the size of building meshes from Houses3K and OmniObject3D are approximately $(15m, 15m, 8m)$.
+
+    \noindent \textbf{Ground-truth Point Cloud.}
+    We use the Poisson Disk sampling method~\citep{yuksel2015sample} implemented by Open3D~\citep{Zhou2018} to sample $100,000$ points from 3D meshes. And then we voxelize these point clouds. These voxelized points are viewed as ground-truth point clouds of these meshes.
+
+
+\section{Additional Experiments}
+    \noindent\textbf{Number of Training Objects.} Motivated by generalizable RL-based policies~\citep{cobbe2020leveraging, li2023scenarionet, li2022metadrive}, we explore the impact of diversity of training data for generalizability. As shown in Table.~\ref{tab:ablation_obj} and Fig.~\ref{fig:scaling}, we found that increasing the diversity of training objects indeed leads to better generalizability for 3D reconstruction.
+    \vspace{-2pt}
+    \begin{table}[htbp]
+    \center
+    \setlength{\tabcolsep}{12pt}
+    \renewcommand{\arraystretch}{1.1}
+    \captionof{table}{Ablation studies of the number of training objects in our framework on unseen OmniObject3D house category.}
+    \vspace{-5pt}
+    \label{tab:ablation_obj}
+    \resizebox{1.0\linewidth}{!}{
+    \begin{tabular}{c|cc}
+    \toprule
+        \textbf{\makecell{Number of \\ Training Objects}} & \textbf{Mean AUC} & \textbf{Final Coverage Ratio} \\ \hline
+        1 & 61.76\% & 67.32\% \\
+        2 & 71.03\% & 82.98\% \\
+        4 & 70.72\% & 89.53\% \\
+        8 & 73.71\% & 90.47\% \\
+        16 & 73.73\% & 88.23\% \\
+        32 & 82.39\% & 92.41\% \\
+        64 & 82.09\% & 93.70\% \\
+        128 & 87.21\% & 96.75\% \\
+        \textbf{256} & \textbf{88.63\%} & \textbf{97.12\%} \\
+    \bottomrule
+    \end{tabular}}
+    \end{table}
+
+    \vspace{-5pt}
+    \begin{figure}[htbp]
+    \vspace{-5pt}
+      \centering
+      \includegraphics[width=0.5\textwidth]{Figure/Fig_Exp_Scaling_v2.pdf}
+      \caption{The curve of coverage ratio with the increasing number of training objects on unseen OmniObject3D house category.}
+      \label{fig:scaling}
+    \end{figure}
+    \noindent \textbf{The evidence for sufficient and efficient capturing.} To evaluate both completeness and efficiency, we use the area under the curve (AUC) of coverage ratio as our main metric, stated in Sec. 4.1. Additionally, the figure below shows the mean AUC curves for OmniObject3D houses. Our GenNBV achieves a better coverage ratio under 20 views (97.12\% v.s. 92.53\%), and even surpasses the saturated coverage of Scan-RL using merely 5 views.
+    
+    \vspace{0.2cm}
+    \noindent\includegraphics[width=0.49\textwidth, height=2.5cm]{Supp/AUC_Curve.pdf}
+    \vspace{-0.2cm}
+
+    \noindent \textbf{The effectiveness of 2D semantic representations.} Below, we add the experiments on Houses3K test set to illustrate the effectiveness of the proposed semantic representation. Note that Scan-RL's representation uses 6 frames, while our semantic representation only needs 2 frames.
+
+    \vspace{2pt}
+    \noindent\resizebox{\linewidth}{!}{%
+        \centering
+        \begin{tabular}{c|l|ccc}
+        \hline
+        \textbf{Num. of RGB} & \textbf{NBV Policy} & \textbf{AUC $\uparrow$} & \textbf{FCR $\uparrow$} & \textbf{Acc. $\downarrow$}\\
+        \toprule
+        \multirow{2}{*}{2} & Ours w/ Scan-RL Repre. & 76.31\% & 79.35\% & 0.50\\
+         & Ours (RGB-only) & \textbf{81.24\%} & \textbf{87.90\%} & \textbf{0.45} \\ \hline
+        \multirow{2}{*}{6} & Ours w/ Scan-RL Repre. & 87.39\% & 95.63\% & \textbf{0.38} \\ 
+         & Ours (RGB-only) & \textbf{87.95\%} & \textbf{96.92\%} &\textbf{0.38} \\ \hline
+        \end{tabular}%
+    }\vspace{0.1cm}
+
+    In addition, we preprocess the RGB images to grayscale images because we empirically find that the grayscale images featuring edges are sufficient to guide the NBV prediction and achieve slightly better performance.
+
+
+
+% \section{Additional Experiments}
+%     Motivated by generalizable RL policies~\citep{cobbe2020leveraging, li2023scenarionet, li2022metadrive}, we explore the impact of diversity of training data for generalizability. 
+
+%     As shown in \cref{tab:ablation_obj_all}, we found that increasing diversity of training objects leads to better generalizability for 3D reconstruction. The experimental table is as follows:
+%     % \begin{table}[htbp]
+%     \begin{table}[ht]
+%     \center
+%     \setlength{\tabcolsep}{12pt}
+%     \renewcommand{\arraystretch}{1.3}
+%     \captionof{table}{Ablation studies of the number of training objects in our framework on unseen OmniObject3D house category.}
+%     \label{tab:ablation_obj_all}
+%     \resizebox{1.0\linewidth}{!}{
+%     \begin{tabular}{c|cc}
+%     \toprule
+%         \textbf{\makecell{Number of \\ Training Objects}} & \textbf{Mean AUC} & \textbf{Final Coverage Ratio} \\ \hline
+%         1 & 61.76\% & 67.32\% \\
+%         2 & 71.03\% & 82.98\% \\
+%         4 & 70.72\% & 89.53\% \\
+%         8 & 73.71\% & 90.47\% \\
+%         16 & 73.73\% & 88.23\% \\
+%         32 & 82.39\% & 92.41\% \\
+%         64 & 82.09\% & 93.70\% \\
+%         128 & 87.21\% & 96.75\% \\
+%         \textbf{256} & \textbf{88.63\%} & \textbf{97.12\%} \\
+%     \bottomrule
+%     \end{tabular}}
+%     \end{table}
+
+%     Also, we provide the curve of coverage ratio along the number of training objects in Fig.~\ref{fig:scaling}.
+%     \begin{figure}[htbp]
+%       \centering
+%       \includegraphics[width=0.5\textwidth]{Figure/Fig_Exp_Scaling.pdf}
+%       \caption{Ablation studies of the number of training objects in our framework on unseen OmniObject3D house category.}
+%       \label{fig:scaling}
+%     \end{figure}
+
+%     % % \begin{figure*}[htbp]
+%     % \begin{figure*}[ht]
+%     %   \centering
+%     %   \includegraphics[width=1.0\textwidth]{Figure/Fig_Supp_CamPose.pdf}
+%     %   \caption{Camera Pose (20 views)}
+%     %   \label{fig:cam_pose}
+%     % \end{figure*}
+
+
+% \newpage
+% {
+%     \small
+%     \bibliographystyle{ieeenat_fullname}
+%     \bibliography{supp}
+% }
+
+% WARNING: do not forget to delete the supplementary pages from your submission 
+% \input{sec/X_suppl}

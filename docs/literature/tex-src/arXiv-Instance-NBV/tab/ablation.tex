@@ -1,0 +1,82 @@
+\begin{table}[t]
+\centering
+
+\caption{Ablation study for design choices.}       
+\vspace{-2mm}
+\label{tab:ablation}
+
+\resizebox{\columnwidth}{!}{
+\renewcommand{\arraystretch}{1.2}
+{\large
+\begin{tabular}{ll|cc|cc|cc}
+% \hline
+\toprule
+ &
+  \multicolumn{1}{l|}{} &
+  \multicolumn{2}{c|}{\textbf{BlenderProc Dataset}} &
+  \multicolumn{2}{c|}{\textbf{GraspNet Dataset}} &
+  \multicolumn{2}{c}{\textbf{Captured Scenes}} \\
+ &
+  \multicolumn{1}{l|}{} &
+  PSNR $\uparrow$ &
+  D-MAE $\downarrow$ &
+  PSNR $\uparrow$ &
+  D-MAE $\downarrow$ &
+  PSNR $\uparrow$ &
+  D-MAE $\downarrow$ \\ 
+  % \hline
+  \midrule
+\multicolumn{2}{l|}{FisherRF with mask} &
+  25.34 &
+  0.0695 &
+  21.23 &
+  0.0768 &
+  15.25 &
+  0.0913 \\
+\multicolumn{1}{r}{} &
+  + Object vector &
+  25.60 &
+  0.0189 &
+  21.44 &
+  0.0486 &
+  16.05 &
+  0.0583 \\
+\multicolumn{1}{r}{} &
+  + Confidence score &
+  26.84 &
+  0.0143 &
+  21.39 &
+  0.0488 &
+  16.29 &
+  0.0521 \\
+\multicolumn{1}{r}{} &
+  \textbf{+ IG scaling (Ours)} &
+  \textbf{26.92} &
+  \textbf{0.0144} &
+  \textbf{21.37} &
+  \textbf{0.0491} &
+  \textbf{16.34} &
+  \textbf{0.0507} \\ 
+  % \hline
+  \midrule
+\multicolumn{2}{l|}{NBS (Depth) \cite{strong2024next}} &
+  26.00 &
+  0.0675 &
+  21.21 &
+  0.0765 &
+  15.62 &
+  0.0936 \\
+\multicolumn{2}{l|}{NBS (RGB + D) \cite{strong2024next}} &
+  25.83 &
+  0.0675 &
+  21.16 &
+  0.0763 &
+  15.17 &
+  0.0896 \\ 
+  % \hline
+  \bottomrule
+\end{tabular}
+}
+}
+\vspace{-4mm}
+\end{table}

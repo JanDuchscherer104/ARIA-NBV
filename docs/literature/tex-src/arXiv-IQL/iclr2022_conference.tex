@@ -1,0 +1,547 @@
+
+\documentclass{article} %
+\usepackage{iclr2022_conference,times}
+
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{bbm}
+\usepackage{cleveref}
+\usepackage{bbm}
+\usepackage{xspace}
+\usepackage{subcaption}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+\usepackage{wrapfig}
+\usepackage{lipsum}
+\usepackage{booktabs, multirow} %
+\usepackage{soul}%
+\usepackage{float}
+\usepackage[english]{babel}
+\usepackage{amsthm}
+\usepackage{tablefootnote}
+\usepackage[flushleft]{threeparttable}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newcommand{\comment}[1]{}
+\newtheorem{corollary}{Corollary}[theorem]
+
+
+\newenvironment{sproof}{%
+  \renewcommand{\proofname}{ Proof Sketch}\proof}{\endproof}
+
+
+\Crefname{equation}{Eqn.}{Eqns.}
+\Crefname{figure}{Fig.}{Figs.}
+\Crefname{tabular}{Tab.}{Tabs.}
+
+\def\ourname{IQL\xspace}
+
+
+\title{Offline Reinforcement Learning \\ with Implicit Q-Learning}
+
+\author{Ilya Kostrikov, Ashvin Nair \& Sergey Levine \\
+Department of Electrical Engineering and Computer Science \\
+University of California, Berkeley \\
+\texttt{\{kostrikov,anair17\}@berkeley.edu}, \texttt{svlevine@eecs.berkeley.edu} 
+}
+
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\include{my_defs}
+
+\iclrfinalcopy %
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Offline reinforcement learning requires reconciling two conflicting aims: learning a policy that improves over the behavior policy that collected the dataset, while at the same time minimizing the deviation from the behavior policy so as to avoid errors due to distributional shift. This trade-off is critical, because most current offline reinforcement learning methods need to query the value of unseen actions during training to improve the policy, and therefore need to either constrain these actions to be in-distribution, or else regularize their values. We propose a new offline RL method that never needs to evaluate actions outside of the dataset, but still enables the learned policy to improve substantially over the best behavior in the data through generalization.
+The main insight in our work is that, instead of evaluating unseen actions from the latest policy, we can approximate the policy improvement step implicitly by treating the state value function as a random variable, with randomness determined by the action (while still integrating over the dynamics to avoid excessive optimism), and then taking a state conditional upper expectile of this random variable to estimate the value of the best actions in that state. This leverages the generalization capacity of the function approximator to estimate the value of the best available action at a given state without ever directly querying a Q-function with this unseen action.
+Our algorithm alternates between fitting this upper expectile value function and backing it up into a Q-function, without any explicit policy. Then, we extract the policy via advantage-weighted behavioral cloning, which also avoids querying out-of-sample actions. We dub our method implicit Q-learning (\ourname).  \ourname is easy to implement, computationally efficient, and only requires fitting an additional critic with an asymmetric L2 loss.\footnote{Our implementation is available at \href{https://github.com/ikostrikov/implicit\_policy\_improvement}{https://github.com/ikostrikov/implicit\_q\_learning}} \ourname demonstrates the state-of-the-art performance on D4RL, a standard benchmark for offline reinforcement learning.
+We also demonstrate that \ourname achieves strong performance fine-tuning using online interaction after offline initialization.
+\end{abstract}
+
+\section{Introduction}
+
+
+Offline reinforcement learning (RL) addresses the problem of learning effective policies entirely from previously collected data, without online interaction~\citep{fujimoto2019off, lange2012batch}. This is very appealing in a range of real-world domains, from robotics to logistics and operations research, where real-world exploration with untrained policies is costly or dangerous, but prior data is available. However, this also carries with it major challenges: improving the policy beyond the level of the behavior policy that collected the data requires estimating values for actions other than those that were seen in the dataset, and this, in turn, requires trading off policy improvement against distributional shift, since the values of actions that are too different from those in the data are unlikely to be estimated accurately. Prior methods generally address this by either constraining the policy to limit how far it deviates from the behavior policy~\citep{fujimoto2019off, wu2019behavior, fujimoto2021minimalist, kumar2019stabilizing, nair2020awac, wang2020critic}, or by regularizing the learned value functions to assign low values to out-of-distribution actions~\citep{kumar2020conservative, kostrikov2021offline}. Nevertheless, this imposes a trade-off between how much the policy improves and how vulnerable it is to misestimation due to distributional shift. Can we devise an offline RL method that avoids this issue by never needing to directly query or estimate values for actions that were not seen in the data?
+
+
+In this work, we start from an observation that \emph{in-distribution} constraints widely used in prior work might not be sufficient to avoid value function extrapolation, and we ask whether it is possible to learn an optimal policy with \emph{in-sample learning}, without \emph{ever} querying the values of any unseen actions.
+The key idea in our method is to approximate an upper expectile of the distribution over values with respect to the distribution of dataset actions for each state. We alternate between fitting this value function with expectile regression, and then using it to compute Bellman backups for training the $Q$-function.
+We show that we can do this simply by modifying the loss function in a SARSA-style TD backup, without ever using out-of-sample actions in the target value.
+Once this $Q$-function has converged, we extract the corresponding policy using advantage-weighted behavioral cloning.
+This approach does not require explicit constraints or explicit regularization of out-of-distribution actions during value function training, though our policy extraction step does implicitly enforce a constraint, as discussed in prior work on advantage-weighted regression~\citep{peters2007reinforcement, peng2019advantage, nair2020awac, wang2020critic}.
+
+Our main contribution is implicit Q-learning (\ourname), a new offline RL algorithm that avoids ever querying values of unseen actions while still being able to perform multi-step dynamic programming updates.
+Our method is easy to implement by making a small change to the loss function in a simple SARSA-like TD update and is computationally very efficient. Furthermore, our approach demonstrates the state-of-the-art performance on D4RL, a popular benchmark for offline reinforcement learning. In particular, our approach significantly improves over the prior state-of-the-art on challenging Ant Maze tasks that require to ``stitch'' several sub-optimal trajectories. Finally, we demonstrate that our approach is suitable for finetuning; after initialization from offline RL, \ourname is capable of improving policy performance utilizing additional interactions.
+
+
+\section{Related work}
+
+A significant portion of recently proposed offline RL methods are based on either constrained or regularized approximate dynamic programming (e.g., Q-learning or actor-critic methods), with the constraint or regularizer serving to limit deviation from the behavior policy. We will refer to these methods as ``multi-step dynamic programming'' algorithms, since they perform true dynamic programming for multiple iterations, and therefore can in principle recover the optimal policy if provided with high-coverage data.
+The constraints can be implemented via an explicit density model~\citep{wu2019behavior, fujimoto2019off, kumar2019stabilizing}, implicit divergence constraints~\citep{nair2020awac, wang2020critic, peters2007reinforcement, peng2019advantage}, or by adding a supervised learning term to the policy improvement objective~\citep{fujimoto2021minimalist}. Several works have also proposed to directly regularize the Q-function to produce low values for out-of-distribution actions~\citep{kostrikov2021offline, kumar2020conservative}. Our method is also a multi-step dynamic programming algorithm. However, in contrast to prior works, our method completely avoids directly querying the learned Q-function with unseen actions during training, removing the need for any constraint during this stage, though the subsequent policy extraction, which is based on advantage-weighted regression~\citep{peng2019advantage,nair2020awac}, does apply an implicit constraint. However, this policy does not actually influence value function training.
+
+
+In contrast to multi-step dynamic programming methods, several recent works have proposed methods that rely either on a single step of policy iteration, fitting the value function or Q-function of the behavior policy and then extracting the corresponding greedy policy~\citep{peng2019advantage,brandfonbrener2021offline}, or else avoid value functions completely and utilize behavioral cloning-style objectives~\citep{chen2021decision}. We collectively refer to these as ``single-step''
+approaches. These methods avoid needing to query unseen actions as well, since they either use no value function at all, or learn the value function of the behavior policy. Although these methods are simple to implement and effective on the MuJoCo locomotion tasks in D4RL, we show that such single-step methods perform very poorly on more complex datasets in D4RL, which require combining parts of suboptimal trajectories (``stitching''). Prior multi-step dynamic programming methods perform much better in such settings, as does our method. We discuss this distinction in more detail in \Cref{sec:example}. Our method also shares the simplicity and computational efficiency of single-step approaches, providing an appealing combination of the strengths of both types of methods.
+
+Our method is based on estimating the characteristics of a random variable. Several recent works involve approximating statistical quantities of the value function distribution. In particular, quantile regression~\citep{koenker2001quantile} has been previously used in reinforcement learning to estimate the quantile function of a state-action value function~\citep{dabney2018distributional, dabney2018implicit,kuznetsov2020controlling}.
+Although our method is related, in that we perform expectile regression, our aim is not to estimate the distribution of values that results from stochastic transitions, but rather estimate expectiles of the state value function with respect to random actions.
+This is a very different statistic: our aim is not to determine how the $Q$-value can vary with different future outcomes, but how the $Q$-value can vary with different actions \emph{while averaging together future outcomes due to stochastic dynamics}. While prior work on distributional RL can also be used for offline RL, it would suffer from the same action extrapolation issues as other methods, and would require similar constraints or regularization, while our method does not.
+
+
+
+\section{Preliminaries}
+
+The RL problem is formulated in the context of a Markov decision process (MDP) $(\St, \A, p_0(s), p(s'|s,a), r(s,a), \gamma)$, where $\St$ is a state space, $\A$ is an action space, $p_0(s)$ is a distribution of initial states, $p(s' | s, a)$ is the environment dynamics, $r(s,a)$ is a reward function, and $\gamma$ is a discount factor. The agent interacts with the MDP according to a policy $\pi(a|s)$. The goal is to obtain a policy that maximizes the cumulative discounted returns: 
+$$\pi^* = \argmax_\pi \E_\pi\left[\sum_{t=0}^\infty\gamma^t r(s_t, a_t) | \allowbreak s_0 \sim p_0(\cdot), \allowbreak  a_t \sim \pi(\cdot|s_t), \allowbreak s_{t+1} \sim p(\cdot|s_t, a_t) \right].$$
+Off-policy RL methods based on approximate dynamic programming typically utilize a state-action value function ($Q$-function), referred to as $Q(s, a)$, which corresponds to the discounted returns obtained by starting from the state $s$ and action $a$, and then following the policy $\pi$.
+
+\paragraph{Offline reinforcement learning.} In contrast to online (on-policy or off-policy) RL methods, offline RL uses previously collected data without any additional data collection. Like many recent offline RL methods, our work builds on approximate dynamic programming methods that minimize temporal difference error, according to the following loss:
+\begin{equation}
+L_{TD}(\theta) = \E_{(s, a, s')\sim\D}[(r(s,a) + \gamma \max_{a'}Q_{\hat{\theta}}(s',a') - Q_\theta(s,a))^2],
+\label{eqn:td}
+\end{equation}
+where $\D$ is the dataset,
+$Q_\theta(s,a)$ is a parameterized Q-function, $Q_{\hat{\theta}}(s,a)$ is a target network (e.g., with soft parameters updates defined via Polyak averaging), and the policy is defined as $\pi(s) = \argmax_a Q_\theta(s,a)$. Most recent offline RL methods modify either the value function loss (above) to regularize the value function in a way that keeps the resulting policy close to the data, or constrain the $\argmax$ policy directly. This is important because out-of-distribution actions $a'$ can produce erroneous values for $Q_{\hat{\theta}}(s',a')$ in the above objective, often leading to \emph{overestimation} as the policy is defined to maximize the (estimated) Q-value.
+
+
+\section{Implicit Q-Learning}
+
+In this work, we aim to entirely avoid querying \emph{out-of-sample} (unseen) actions in our TD loss.
+We start by considering fitted $Q$ evaluation with a SARSA-style objective, which simply aims to learn the value of the dataset policy $\pi_\beta$ (also called the behavior policy):
+\begin{equation}
+\label{eqn:td_sarsa}
+L(\theta)=\E_{(s,a,s',a')\sim\D}[(r(s,a) + \gamma Q_{\hat{\theta}}(s', a') - Q_\theta(s,a))^2].
+\end{equation}
+This objective never queries values for out-of-sample actions, in contrast to \Cref{eqn:td}. One specific property of this objective that is important for this work is that it uses mean squared error (MSE) that fits $Q_\theta(s,a)$ to predict the mean statistics of the TD targets. Thus, if we assume unlimited capacity and no sampling error, the optimal parameters should satisfy
+\begin{equation}
+    Q_{\theta^*}(s,a) \approx r(s,a) + \gamma \E_{\substack{s'\sim p(\cdot|s,a)\\a'\sim\pi_\beta(\cdot|s)}}[ Q_{\hat{\theta}}(s',a')].
+\label{eqn:q_star}
+\end{equation}
+Prior work~\citep{brandfonbrener2021offline, peng2019advantage}
+has proposed directly using this objective to learn $Q^{\pi_\beta}$, and then train the policy $\pi_\psi$ to maximize $Q^{\pi_\beta}$. This avoids any issues with out-of-distribution actions, since the TD loss only uses dataset actions. However, while this procedure works well empirically on simple MuJoCo locomotion tasks in D4RL, we will show that it performs very poorly on more complex tasks that benefit from multi-step dynamic programming. In our method, which we derive next, we retain the benefits of using this SARSA-like objective, but modify it so that it allows us to perform multi-step dynamic programming and learn a near-optimal Q-function.
+
+Our method will perform a $Q$-function update similar to \Cref{eqn:td_sarsa}, but we will aim to estimate the maximum $Q$-value over actions that are in the support of the data distribution. Crucially, we will show that it is possible to do this \emph{without ever querying the learned Q-function on out-of-sample actions} by utilizing expectile regression. Formally, the value function we aim to learn is given by:
+\begin{equation}
+L(\theta) = \E_{(s, a, s')\sim\D}[(r(s,a) + \gamma  \max_{\substack{a'\in \A \\\text{s.t. }\pi_\beta(a'|s') > 0}}Q_{\hat{\theta}}(s',a') - Q_\theta(s,a))^2].
+\label{eqn:bq_learning}
+\end{equation}
+Our algorithm, implicit Q-Learning (\ourname), aims to estimate this objective while evaluating the $Q$-function only on the state-action pairs in the dataset. To this end, we propose to fit $Q_\theta(s,a)$ to estimate state-conditional expectiles of the target values, and show that
+specific expectiles approximate the maximization defined above.
+In \Cref{sec:iql} we show that this approach performs multi-step dynamic programming in theory, and in \Cref{sec:example} we show that it does so in practice.
+
+\subsection{Expectile Regression} 
+Practical methods for estimating various statistics of a random variable have been thoroughly studies in applied statistics and econometrics. The $\tau \in (0, 1)$ expectile of some random variable $X$ is defined as a solution to the asymmetric least squares problem:
+
+$$\argmin_{m_\tau} \E_{x\sim X}[L_2^\tau(x-m_\tau)],$$
+where $L_2^\tau(u) = |\tau-\mathbbm{1}(u < 0)|u^2$.
+
+That is, for $\tau > 0.5$, this asymmetric loss function downweights the contributions of $x$ values smaller than $m_\tau$ while giving more weights to larger values (see \Cref{fig:expectiles}, left). 
+Expectile regression is closely related to quantile regression \citep{koenker2001quantile}, which is a popular technique for estimating quantiles of a distribution widely used in reinforcement learning~\citep{dabney2018distributional, dabney2018implicit}
+\footnote{Our method could also be derived with quantiles, but since we are not interested in learning all of the expectiles/quantiles, unlike prior work~\citep{dabney2018distributional, dabney2018implicit}, it is more convenient to estimate a single expectile because this involves a simple modification to the MSE loss that is already used in standard RL methods. We found it to work somewhat better than quantile regression with its corresponding $\ell_1$ loss.}.
+The quantile regression loss is defined as an asymmetric $\ell_1$ loss.
+
+\begin{figure}
+\centering
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/expectile_loss.pdf}
+\end{subfigure}
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/expectile_normal.pdf}
+\end{subfigure}
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/expectile_regression.pdf}
+\end{subfigure}
+\caption{\textbf{Left:} The asymmetric squared loss used for expectile regression. $\tau=0.5$ corresponds to the standard mean squared error loss, while $\tau=0.9$ gives more weight to positives differences.
+\textbf{Center:} Expectiles of a normal distribution.
+    \textbf{Right:} an example of estimating state conditional expectiles of a two-dimensional random variable. Each $x$ corresponds to a distribution over $y$. We can approximate a maximum of this random variable with expectile regression: $\tau=0.5$ correspond to the conditional mean statistics of the distribution, while $\tau \approx 1$ approximates the maximum operator over in-support values of $y$.\label{fig:expectiles}}
+\end{figure}
+
+
+
+We can also use this formulation to predict expectiles of a conditional distribution:
+$$\argmin_{m_\tau(x)} \E_{(x,y)\sim \D}[L_2^\tau(y-m_\tau(x))].$$
+\Cref{fig:expectiles} (right) illustrates conditional expectile regression on a simple two-dimensional distribution. Note that we can optimize this objective with stochastic gradient descent. It provides unbiased gradients and is easy to implement with standard machine learning libraries. 
+
+
+\subsection{Learning the Value Function with Expectile Regression}
+
+Expectile regression provides us with a powerful framework to estimate statistics of a random variable beyond mean regression. We can use expectile regression to modify the policy evaluation objective in \Cref{eqn:td_sarsa} to predict an upper expectile of the TD targets that approximates the maximum of $r(s,a) + \gamma Q_{\hat{\theta}}(s',a')$ over actions $a'$ constrained to the dataset actions, as in \Cref{eqn:bq_learning}.
+This leads to the following expectile regression objective:
+\begin{align*}
+&L(\theta)=\E_{(s,a,s',a')\sim\D}[L_2^\tau(r(s,a) + \gamma Q_{\hat{\theta}}(s', a')- Q_\theta(s,a))].
+\end{align*}
+However, this formulation has a significant drawback. Instead of estimating expectiles just with respect to the actions in the support of the data, it also incorporates stochasticity that comes from the environment dynamics $s'\sim p(\cdot|s,a)$. Therefore, a large target value might not necessarily reflect the existence of a single action that achieves that value, but rather a ``lucky'' sample that happened to have transitioned into a good state.
+We resolve this by introducing a separate value function that approximates an expectile only with respect to the action distribution, leading to the following loss:
+\begin{equation}
+    \label{eqn:fit_v}
+    L_V(\psi) = \E_{(s,a)~\sim \D}[L_2^\tau(Q_{\hat{\theta}}(s,a) - V_\psi(s))].
+\end{equation}
+We can then use this estimate to update the $Q$-functions with the MSE loss, which averages over the stochasticity from the transitions and avoids the ``lucky'' sample issue mentioned above:
+\begin{equation}
+    \label{eqn:fit_q}
+    L_Q(\theta) = \E_{(s,a,s')~\sim \D}[(r(s,a) + \gamma V_\psi(s') - Q_{\theta}(s,a))^2].
+\end{equation}
+Note that these losses do not use any explicit policy, and only utilize actions from the dataset for both objectives, similarly to SARSA-style policy evaluation.
+In \Cref{sec:analysis}, we will show that this procedure recovers the optimal Q-function under some assumptions.
+
+\subsection{Policy Extraction and Algorithm Summary}
+
+\begin{wrapfigure}{R}{0.35\textwidth}
+    \begin{minipage}{0.35\textwidth}
+        \begin{algorithm}[H]
+            \caption{Implicit Q-learning}
+            \begin{algorithmic}
+            \label{alg:iql}
+                \State Initialize parameters $\psi$, $\theta$, $\hat{\theta}$, $\phi$.
+                \State TD learning (IQL):
+                \For{each gradient step}
+                \State $\psi \leftarrow \psi - \lambda_V \nabla_\psi L_V(\psi)$ 
+                \State $\theta \leftarrow \theta - \lambda_Q \nabla_{\theta} L_Q(\theta)$
+                \State $\hat{\theta} \leftarrow (1-\alpha)\hat{\theta} + \alpha\theta$
+                \EndFor
+                \State Policy extraction (AWR):
+                \For{each gradient step}
+                \State $\phi \leftarrow \phi - \lambda_\pi \nabla_\phi L_\pi(\phi)$
+                \EndFor
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}
+\end{wrapfigure}
+
+While our modified TD learning procedure learns an approximation to the optimal Q-function, it does not explicitly represent the corresponding policy, and therefore requires a separate policy extraction step. In the spirit of preserving simplicity and efficiency, we aim for a simple method for policy extraction. As before, we aim to avoid using out-of-samples actions. Therefore, we extract the policy using advantage weighted regression~\citep{peters2007reinforcement,wang2018exponentially,peng2019advantage,nair2020awac}:
+\begin{equation}
+    L_\pi(\phi) = \E_{(s,a)~\sim \D}[\exp(\beta(Q_{\hat{\theta}}(s,a) - V_\psi(s)))\log \pi_\phi(a|s)],
+    \label{eqn:awr}
+\end{equation}
+where $\beta \in [0, \infty)$  is an inverse temperature. For smaller hyperparameter values, the objective behaves similarly to behavioral cloning, while for larger values, it attempts to recover the maximum of the $Q$-function.
+As shown in prior work, this objective learns a policy that maximizes the $Q$-values subject to a distribution constraint~\citep{peters2007reinforcement,peng2019advantage,nair2020awac}.
+
+Our final algorithm consists of two stages. First, we fit the value function and $Q$, performing a number of gradient updates alternating between Eqn.~(\ref{eqn:fit_v}) and (\ref{eqn:fit_q}). Second, we perform stochastic gradient descent on \Cref{eqn:awr}.
+For both steps, we use a version of clipped double Q-learning~\citep{fujimoto2018addressing}, taking a minimum of two $Q$-functions for $V$-function and policy updates.
+We summarize our final method in \Cref{alg:iql}. Note that the policy does not influence the value function in any way, and therefore extraction could be performed either concurrently or after TD learning. Concurrent learning provides a way to use \ourname with online finetuning, as we discuss in \Cref{sec:finetune}.
+
+\subsection{Analysis}
+
+\label{sec:analysis}
+
+
+In this section, we will show that \ourname can recover the optimal value function under the dataset support constraints.
+First, we prove a simple lemma that we will then use to show how our approach can enable learning the optimal value function.
+\begin{lemma}
+\label{lem:1}
+Let $X$ be a real-valued random variable with a bounded support
+and supremum of the support is $x^*$. Then,
+$$
+\lim_{\tau\rightarrow1} m_\tau = x^*
+$$
+\end{lemma}
+\begin{sproof}
+One can show that expectiles of a random variable have the same supremum $x^*$. Moreover, for all $\tau_1$ and $\tau_2$ such that $\tau_1 < \tau_2$, we get $m_{\tau_1} \le m_{\tau_2}$. Therefore, the limit follows from the properties of bounded monotonically non-decreasing functions.
+\end{sproof}
+
+In the following theorems, we show that under certain assumptions, our method indeed approximates the optimal state-action value $Q^*$ and performs multi-step dynamical programming.
+We first prove a technical lemma relating different expectiles of the Q-function, and then derive our main result regarding the optimality of our method.
+
+For the sake of simplicity, we introduce the following notation for our analysis. Let $\E^\tau_{x\sim X}[x]$ be a $\tau^\text{th}$ expectile of $X$ (e.g., $\E^{0.5}$ corresponds to the standard expectation). Then, we define $V_{\tau}(s)$ and $Q_\tau(s, a)$, which correspond to optimal solutions of Eqn. \ref{eqn:fit_v} and \ref{eqn:fit_q} correspondingly, recursively as:
+\begin{align*}
+    V_\tau(s) &= \E^\tau_{a\sim \mu(\cdot|s)} [Q_\tau(s, a)], \\
+    Q_\tau(s,a)&=r(s,a)+\gamma\E_{s'\sim p(\cdot|s,a)}[V_\tau(s')].
+\end{align*}
+
+
+\begin{lemma}
+\label{lem:2}
+For all $s$, $\tau_1$ and $\tau_2$ such that $\tau_1 < \tau_2$ we get
+$$
+V_{\tau_1}(s) \le V_{\tau_2} (s).
+$$
+\end{lemma}
+\begin{proof}
+The proof follows the policy improvement proof~\citep{sutton2018reinforcement}. See \Cref{app:proofs}.
+\end{proof}
+
+\label{sec:iql}
+\begin{corollary}
+For any $\tau$ and $s$ we have
+$$
+V_\tau(s)\le\max_{\substack{a\in \A \\\text{s.t. }\pi_\beta(a|s) > 0}}Q^*(s,a)
+$$
+where $V_\tau(s)$ is defined as above and $Q^*(s,a)$ is an optimal state-action value function constrained to the dataset and defined as
+$$
+Q^*(s, a) = r(s,a) + \gamma \E_{s'\sim p(\cdot|s,a)}\left[\max_{\substack{a'\in \A \\\text{s.t. }\pi_\beta(a'|s') > 0}}Q^*(s',a')\right].
+$$
+\label{theorem:cor}
+\end{corollary}
+\begin{proof}
+The proof follows from the observation that convex combination is smaller than maximum.
+\end{proof}
+\begin{theorem}
+\label{theorem:iql}
+$$
+\lim_{\tau \rightarrow 1} V_\tau(s) = \max_{\substack{a\in \A \\\text{s.t. }\pi_\beta(a|s) > 0}}Q^*(s,a).
+$$
+\end{theorem}
+\begin{proof}
+Follows from combining Lemma \ref{lem:1} and  \Cref{theorem:cor}.
+\end{proof}
+Therefore, for a larger value of $\tau < 1$, we get a better approximation of the maximum. On the other hand, it also becomes a more challenging optimization problem. Thus, we treat $\tau$ as a hyperparameter.
+Due to the property discussed in \Cref{theorem:iql} we dub our method implicit Q-learning (\ourname). We also emphasize that our value learning method defines the entire spectrum of methods between SARSA ($\tau=0.5$) and Q-Learning ($\tau \rightarrow 1$).
+
+
+\section{Experimental Evaluation}
+
+Our experiments aim to evaluate our method comparatively, in contrast to prior offline RL methods, and in particular to understand how our approach compares both to single-step methods and multi-step dynamic programming approaches. We will first demonstrate the benefits of multi-step dynamic programming methods, such as ours, in contrast to single-step methods, showing that on some problems this difference can be extremely large. We will then compare \ourname with state-of-the-art single-step and multi-step algorithms on the D4RL~\citep{fu2020d4rl} benchmark tasks, studying the degree to which we can learn effective policies using only the actions in the dataset. We examine domains that contain near-optimal trajectories, where single-step methods perform well, as well as domains with no optimal trajectories at all, which require multi-step dynamic programming. Finally, we will study how \ourname compares to prior methods when finetuning with online RL starting from an offline RL initialization.
+
+\subsection{The Difference Between One-Step Policy Improvement and \ourname}
+\label{sec:example}
+
+
+We first use a simple maze environment to illustrate the importance of multi-step dynamic programming for offline RL.
+The maze has a u-shape, a single start state, and a single goal state (see \Cref{fig:umaze}).
+The agent receives a reward of 10 for entering the goal state and zero reward for all other transitions. With a probability of $0.25$, the agent transitions to a random state, and otherwise to the commanded state.
+The dataset consists of 1 optimal trajectory and 99 trajectories with uniform random actions.
+Due to a short horizon of the problem, we use $\gamma=0.9$.
+
+
+\begin{figure}
+\begin{subfigure}{0.233\textwidth}
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/maze/umaze.png}
+    \caption{toy maze MDP \label{fig:umaze}}
+\end{subfigure}%
+\hspace{0.01mm}
+\begin{subfigure}{0.235\textwidth}
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/maze/umaze_ql.pdf}
+    \caption{true optimal $V^\star$}
+\end{subfigure}%
+\hspace{0.01mm}
+\begin{subfigure}{0.235\textwidth}
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/maze/maze_2.pdf}
+    \caption{One-step Policy Eval.}
+\end{subfigure}%
+\begin{subfigure}{0.28\textwidth}
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/maze/maze_1.pdf}
+    \caption{\ourname}
+\end{subfigure}
+\caption{Evaluation of our algorithm on a toy umaze environment (a).
+When the static dataset is heavily corrupted by suboptimal actions, one-step policy evaluation
+results in a value function that degrades to zero far from the rewarding states too quickly (c). Our algorithm aims to learn a near-optimal value function, combining the best properties of SARSA-style evaluation with the ability to perform multi-step dynamic programming, leading to value functions that are much closer to optimality (shown in (b)) and producing a much better policy (d).\label{fig:illustratiev}}
+\end{figure}
+
+
+\Cref{fig:illustratiev} (c, d) %
+illustrates the difference between single-step methods, in this case represented by 
+Onepstep RL~\citep{brandfonbrener2021offline, wang2018exponentially} and \ourname with $\tau=0.95$.
+Although states closer to the high reward state will still have higher values, these values decay much faster as we move further away than they would for the optimal value function, and the resulting policy is highly suboptimal.
+Since \ourname (d) performs iterative dynamic programming, it correctly propagates the signal, and the values are no longer dominated by noise. The resulting value function closely matches the true optimal value function (b).
+
+
+
+\subsection{Comparisons on Offline RL Benchmarks}
+
+
+\begin{table}[t]\centering
+\begin{threeparttable}
+\caption{Averaged normalized scores on MuJoCo locomotion and Ant Maze tasks. Our method outperforms prior methods on the challenging Ant Maze tasks, which require dynamic programming, and is competitive with the best prior methods on the locomotion tasks.  %
+}\label{tab:d4rl}
+\scriptsize
+\begin{tabular}{l||rrrrrrr|r}
+Dataset &BC &10\%BC &DT &AWAC &Onestep RL &TD3+BC &CQL & \ourname (Ours) \\\hline
+halfcheetah-medium-v2 &42.6 &42.5 &42.6 &43.5 &\textbf{48.4} &\textbf{48.3} &44.0 &\textbf{47.4} \\
+hopper-medium-v2 &52.9 &56.9 &\textbf{67.6} &57.0 &59.6 &59.3 &58.5 &\textbf{66.3} \\
+walker2d-medium-v2 &75.3 &75.0 &74.0 &72.4 &\textbf{81.8} &83.7 &72.5 &78.3 \\
+halfcheetah-medium-replay-v2 &36.6 &40.6 &36.6 &40.5 &38.1 &\textbf{44.6} &\textbf{45.5} &\textbf{44.2} \\
+hopper-medium-replay-v2 &18.1 &75.9 &82.7 &37.2 &\textbf{97.5} &60.9 &\textbf{95.0} &\textbf{94.7} \\
+walker2d-medium-replay-v2 &26.0 &62.5 &66.6 &27.0 &49.5 &\textbf{81.8} &77.2 &73.9 \\
+halfcheetah-medium-expert-v2 &55.2 &\textbf{92.9} &86.8 &42.8 &
+\textbf{93.4} &\textbf{90.7} &\textbf{91.6} &86.7 \\
+hopper-medium-expert-v2 &52.5 &\textbf{110.9} &\textbf{107.6} &55.8 &103.3 &98.0 &\textbf{105.4} &91.5 \\
+walker2d-medium-expert-v2 &\textbf{107.5} &\textbf{109.0} &\textbf{108.1} &74.5 &\textbf{113.0} &\textbf{110.1} &\textbf{108.8} &\textbf{109.6} \\ \hline
+locomotion-v2 total &466.7 &\textbf{666.2} &\textbf{672.6} &450.7 &\textbf{684.6} &\textbf{677.4} &\textbf{698.5} &\textbf{692.4} \\ \hline
+antmaze-umaze-v0 &54.6 &62.8 &59.2 &56.7 &64.3 &78.6 &74.0 &\textbf{87.5} \\
+antmaze-umaze-diverse-v0 &45.6 &50.2 &53.0 &49.3 &60.7 &71.4 &\textbf{84.0} &62.2 \\
+antmaze-medium-play-v0 &0.0 &5.4 &0.0 &0.0 &0.3 &10.6 &61.2 &\textbf{71.2} \\
+antmaze-medium-diverse-v0 &0.0 &9.8 &0.0 &0.7 &0.0 &3.0 &53.7 &\textbf{70.0} \\
+antmaze-large-play-v0 &0.0 &0.0 &0.0 &0.0 &0.0 &0.2 &15.8 &\textbf{39.6} \\
+antmaze-large-diverse-v0 &0.0 &6.0 &0.0 &1.0 &0.0 &0.0 &14.9 &\textbf{47.5} \\ \hline
+antmaze-v0 total &100.2 &134.2 &112.2 &107.7 &125.3 &163.8 &303.6 &\textbf{378.0} \\ 
+\hline \hline
+total &566.9 &800.4 &784.8 &558.4 &809.9 &841.2 &1002.1 &\textbf{1070.4} \\
+\hline \hline
+kitchen-v0 total & \textbf{154.5} & - & -& - & - & - & 144.6 & \textbf{159.8} \\
+adroit-v0 total & 104.5 & - & -& - & - & - & 93.6 & \textbf{118.1} \\
+\hline \hline
+total+kitchen+adroit &825.9 & - & - & - & - & - & 1240.3 &\textbf{1348.3} \\
+\hline
+runtime & 10m & 10m & 960m & 20m &$\approx$ 20m$^*$ & 20m & 80m & 20m
+\end{tabular}
+\begin{tablenotes}
+\item $^*$: Note that it is challenging to compare one-step and multi-step methods directly. Also, \cite{brandfonbrener2021offline} reports results for a set of hyperparameters, such as batch and network size, that is significantly different from other methods. We report results for the original hyperparameters and runtime for a comparable set of hyperparameters.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\begin{wrapfigure}{R}{0.5\textwidth}
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/antmaze_short.pdf}
+    \caption{Estimating a larger expectile $\tau$ is crucial for antmaze tasks that require dynamical programming ('stitching').
+    }
+    \label{fig:antmaze}
+\end{wrapfigure}
+
+Next, we evaluate our approach on the D4RL benchmark in comparison to prior methods (see \Cref{tab:d4rl}).
+The MuJoCo tasks in D4RL consist of the Gym locomotion tasks, the Ant Maze tasks, and the Adroit and Kitchen robotic manipulation environments. Some prior works, particularly those proposing one-step methods, focus entirely on the Gym locomotion tasks. However, these tasks include a significant fraction of near-optimal trajectories in the dataset. In contrast, the Ant Maze tasks, especially the medium and large ones, contain very few or no near-optimal trajectories, making them very challenging for one-step methods. These domains require ``stitching'' parts of suboptimal trajectories that travel between different states to find a path from the start to the goal of the maze~\citep{fu2020d4rl}. As we will show, multi-step dynamic programming is essential in these domains. The Adroit and Kitchen tasks are comparatively less discriminating, and we found that most RL methods perform similarly to imitation learning in these domains~\citep{florence2021implicit}. We therefore focus our analysis on the Gym locomotion and Ant Maze domains, but include full Adroit and Kitchen results in \Cref{app:experiments} for completeness.
+
+\paragraph{Comparisons and baselines.} We compare to methods that are representative of both multi-step dynamic programming and one-step approaches. In the former category, we compare to CQL~\citep{kumar2020conservative}, TD3+BC~\citep{fujimoto2021minimalist}, and AWAC~\citep{nair2020awac}. In the latter category, we compare to Onestep RL~\citep{brandfonbrener2021offline} and Decision Transformers~\citep{chen2021decision}. We obtained the Decision Transformers results on Ant Maze subsets of D4RL tasks using the author-provided implementation\footnote{https://github.com/kzl/decision-transformer} and following authors instructions communicated over email. We obtained results for TD3+BC and Onestep RL (Exp. Weight) directly from the authors. Note that \citet{chen2021decision} and \citet{brandfonbrener2021offline}
+incorrectly report results for some prior methods, such as CQL, using the ``-v0'' environments. These generally produce lower scores than the ``-v2'' environments that these papers use for their own methods. We use the ``-v2'' environments for all methods to ensure a fair comparison, resulting in higher values for CQL. Because of this fix, our reported CQL scores are higher than all other prior methods. We obtained results for ``-v2'' datasets using an author-suggested implementation.\footnote{https://github.com/young-geng/CQL}
+On the Gym locomotion tasks (halfcheetah, hopper, walker2d), we find that \ourname performs comparably to the best performing prior method, CQL. On the more challenging Ant Maze task, \ourname outperforms CQL, and outperforms the one-step methods by a very large margin.
+
+
+\paragraph{Runtime.} Our approach is also computationally faster than the baselines (see \Cref{tab:d4rl}). For the baselines, we measure runtime for our reimplementations of the methods in JAX~\citep{jax2018github} built on top of JAXRL~\citep{jaxrl}, which are typically faster than the original implementations. For example, the original implementation of CQL takes more than 4 hours to perform 1M updates, while ours takes only 80 minutes. Even so, \ourname still requires about 4x less time than our reimplementation of CQL on average, and is comparable to the fastest prior one-step methods. We did not reimplement Decision Transformers due to their complexity and report runtime of the original implementation.
+
+
+\paragraph{Effect of $\tau$ hyperparameter.} We also demonstrate that it is crucial to compute a larger expectile on tasks that require ``stitching'' (see \Cref{fig:antmaze}).
+With larger values of $\tau$, our method approximates $Q$-learning better, leading to better performance on the Ant Maze tasks.
+
+
+\subsection{Online Fine-tuning after Offline RL}
+\label{sec:finetune}
+
+\begin{wraptable}[19]{r}{0.65\textwidth}
+\scriptsize
+\begin{tabular}{ l ||p{1.5cm} |p{1.5cm} | p{1.5cm}  }
+    \centering
+    Dataset & AWAC & CQL & \ourname (Ours) \\
+    \hline
+    antmaze-umaze-v0 & 56.7 \; $\rightarrow$ 59.0 & 70.1 \; $\rightarrow$ \textbf{99.4} & \textbf{86.7} \; $\rightarrow$ \textbf{96.0} \\
+    antmaze-umaze-diverse-v0 & 49.3 \; $\rightarrow$ 49.0 & 31.1 \; $\rightarrow$ \textbf{99.4} & \textbf{75.0} \; $\rightarrow$ 84.0 \\
+    antmaze-medium-play-v0 & 0.0 \; \; $\rightarrow$ 0.0 & 23.0 \; $\rightarrow$ 0.0 & \textbf{72.0} \; $\rightarrow$ \textbf{95.0} \\
+    antmaze-medium-diverse-v0 & 0.7 \; \; $\rightarrow$ 0.3 & 23.0 \; $\rightarrow$ 32.3 & \textbf{68.3} \; $\rightarrow$ \textbf{92.0} \\
+    antmaze-large-play-v0 & 0.0 \; \; $\rightarrow$ 0.0 & 1.0 \; \; $\rightarrow$ 0.0 & \textbf{25.5} \; $\rightarrow$ \textbf{46.0} \\
+    antmaze-large-diverse-v0 & 1.0 \; \; $\rightarrow$ 0.0 & 1.0 \; \; $\rightarrow$ 0.0 & \textbf{42.6} \; $\rightarrow$ \textbf{60.7} \\ \hline
+    antmaze-v0 total & 107.7 $\rightarrow$ 108.3 & 151.5 $\rightarrow$ 231.1 & \textbf{370.1} $\rightarrow$ \textbf{473.7} \\ \hline
+    pen-binary-v0 & \textbf{44.6} \; $\rightarrow$ \textbf{70.3} & 31.2 \; $\rightarrow$ 9.9 & 37.4 \; $\rightarrow$ 60.7 \\
+    door-binary-v0 & \textbf{1.3} \; \; $\rightarrow$ \textbf{30.1} & 0.2 \; \; $\rightarrow$ 0.0 & 0.7 \; \; $\rightarrow$ \textbf{32.3} \\
+    relocate-binary-v0 & \textbf{0.8} \; \; $\rightarrow$ 2.7 & 0.1 \; \; $\rightarrow$ 0.0 & 0.0 \; \; $\rightarrow$ \textbf{31.0} \\ \hline
+    hand-v0 total & \textbf{46.7} \; $\rightarrow$ 103.1 & 31.5 \; $\rightarrow$ 9.9 & 38.1 \; $\rightarrow$ \textbf{124.0} \\ \hline \hline
+    total & 154.4 $\rightarrow$ 211.4 & 182.8 $\rightarrow$ 241.0 & \textbf{408.2} $\rightarrow$ \textbf{597.7}
+\end{tabular}
+\caption{Online finetuning results showing the initial performance after offline RL, and performance after 1M steps of online RL. In all tasks, \ourname is able to finetune to a significantly higher performance than the offline initialization, with final performance that is comparable to or better than the best of either AWAC or CQL on all tasks except pen-binary-v0.}
+\label{tab:finetuning}
+\end{wraptable}
+
+The policies obtained by offline RL can often be improved with a small amount of online interaction.
+\ourname is well-suited for online fine-tuning for two reasons.
+First, \ourname has strong offline performance, as shown in the previous section, which provides a good initialization.
+Second, \ourname implements a weighted behavioral cloning policy extraction step,
+which has previously been shown to allow for better online policy improvement compared to other types of offline constraints~\citep{nair2020awac}.
+To evaluate the finetuning capability of various RL algorithms, we first run offline RL on each dataset, then run 1M steps of online RL, and then report the final performance.
+We compare to AWAC~\citep{nair2020awac}, which has been proposed specifically for online finetuning, and CQL~\citep{kumar2020conservative}, which showed the best performance among prior methods in our experiments in the previous section. Exact experimental details are provided in Appendix~\ref{app:finetuning}. We use the challenging Ant Maze D4RL domains~\citep{fu2020d4rl}, as well as the high-dimensional dexterous manipulation environments from \citet{rajeswaran2018dextrous}, which \citet{nair2020awac} propose to use to study online adaptation with AWAC. Results are shown in Table~\ref{tab:finetuning}. 
+On the Ant Maze domains, \ourname significantly outperforms both prior methods after online finetuning. CQL attains the second best score, while AWAC performs comparatively worse due to much weaker offline initialization. On the dexterous hand tasks, \ourname performs significantly better than AWAC on relocate-binary-v0, comparably on door-binary-v0, and slightly worse on pen-binary-v0, with the best overall score.
+
+\section{Conclusion}
+
+We presented implicit Q-Learning (\ourname), a general algorithm for offline RL that completely avoids any queries to values of out-of-sample actions during training while still enabling multi-step dynamic programming. To our knowledge, this is the first method that combines both of these features. This has a number of important benefits. First, our algorithm is computationally efficient: we can perform 1M updates on one GTX1080 GPU in less than 20 minutes. Second, it is simple to implement, requiring only minor modifications over a standard SARSA-like TD algorithm, and performing policy extraction with a simple weighted behavioral cloning procedure resembling supervised learning. 
+Finally, despite the simplicity and efficiency of this method, we show that it attains excellent performance across all of the tasks in the D4RL benchmark, matching the best prior methods on the MuJoCo locomotion tasks, and exceeding the state-of-the-art performance on the challenging ant maze environments, where multi-step dynamic programming is essential for good performance.
+
+\bibliography{iclr2022_conference}
+\bibliographystyle{iclr2022_conference}
+
+
+\newpage
+\appendix
+
+\section{Proofs}
+
+\label{app:proofs}
+\subsection{Proof of Lemma \ref{lem:2}}
+\begin{proof}
+We can rewrite $V_{\tau_1}(s)$ as 
+
+\begin{align*}
+    V_{\tau_1}(s) &= \E^{\tau_1}_{a\sim\mu(\cdot|s)}[r(s,a)+\gamma\E_{s'\sim p(\cdot|s,a)}[V_{\tau_1}(s')]] \\
+    & \le \E^{\tau_2}_{a\sim\mu(\cdot|s)}[r(s,a)+\gamma\E_{s'\sim p(\cdot|s,a)}[V_{\tau_1}(s')]] \\
+    & = \E^{\tau_2}_{a\sim\mu(\cdot|s)}[r(s,a)+\gamma\E_{s'\sim p(\cdot|s,a)}\E^{\tau_1}_{a'\sim\mu(\cdot|s')}[r(s',a')+\gamma\E_{s''\sim p(\cdot|s',a')}[V_{\tau_1}(s'')]] \\
+    & \le \E^{\tau_2}_{a\sim\mu(\cdot|s)}[r(s,a)+\gamma\E_{s'\sim p(\cdot|s,a)}\E^{\tau_2}_{a'\sim\mu(\cdot|s')}[r(s',a')+\gamma\E_{s''\sim p(\cdot|s',a')}[V_{\tau_1}(s'')]] \\
+    & = \E^{\tau_2}_{a\sim\mu(\cdot|s)}[r(s,a)+\gamma\E_{s'\sim p(\cdot|s,a)}\E^{\tau_2}_{a'\sim\mu(\cdot|s')}[r(s',a')+\gamma\E_{s''\sim p(\cdot|s',a')}\E^{\tau_1}_{a''\sim\mu(\cdot|s'')}[r(s'', a'')+\ldots]] \\
+    \vdots \\
+    &\le V_{\tau_2}(s)
+\end{align*}
+\end{proof}
+
+
+\section{Experimental details}
+
+\label{app:experiments}
+
+
+\paragraph{Experimental details.} For the MuJoCo locomotion tasks, we average mean returns overs 10 evaluation trajectories and 10 random seeds. For the Ant Maze tasks, we average over 100 evaluation trajectories.  We standardize MuJoCo locomotion task rewards by dividing by the difference of returns of the best and worst trajectories in each dataset. Following the suggestions of the authors of the dataset, we subtract $1$ from rewards for the Ant Maze datasets. We use $\tau=0.9$ and $\beta=10.0$ for Ant Maze tasks and $\tau=0.7$ and $\beta=3.0$ for MuJoCo locomotion tasks.
+We use Adam optimizer~\citep{kingma2014adam} with a learning rate $3\cdot10^{-4}$ and 2 layer MLP with ReLU activations and 256 hidden units for all networks. We use cosine schedule for the actor learning rate. We parameterize the policy as a Gaussian distribution with a state-independent standard deviation. We update the target network with soft updates with parameter $\alpha=0.005$. And following \cite{brandfonbrener2021offline} we clip exponentiated advantages to $(-\infty, 100]$. We implemented our method in the JAX~\citep{jax2018github} framework using the Flax~\citep{flax2020github} neural networks library.
+
+
+\paragraph{Results on Franca Kitchen and Adoit tasks.}
+For Franca Kitchen and Adroit tasks we use $\tau=0.7$ and the inverse temperature $\beta=0.5$. Due to the size of the dataset, we also apply Dropout~\citep{srivastava2014dropout} with dropout rate of $0.1$ to regularize the policy network. See complete results in \Cref{tab:franca_adroit}.
+
+
+\begin{table}[!htp]\centering
+\caption{Evaluation on Franca Kitchen and Adroit tasks from D4RL}\label{tab:franca_adroit}
+\scriptsize
+\begin{tabular}{l||rrrrr|r}
+dataset &BC &BRAC-p &BEAR &Onestep RL &CQL &Ours \\ \hline
+kitchen-complete-v0 &\textbf{65.0} &0.0 &0.0 &- &43.8 &\textbf{62.5} \\
+kitchen-partial-v0 &38.0 &0.0 &0.0 &- &\textbf{49.8} &\textbf{46.3} \\
+kitchen-mixed-v0 &\textbf{51.5} &0.0 &0.0 &- &\textbf{51.0} &\textbf{51.0} \\ \hline
+kitchen-v0 total &\textbf{154.5} &0.0 &0.0 &- &144.6 &\textbf{159.8} \\ \hline
+pen-human-v0 &63.9 &8.1 &-1.0 &- &37.5 &\textbf{71.5} \\
+hammer-human-v0 &1.2 &0.3 &0.3 &- &\textbf{4.4} &1.4 \\
+door-human-v0 &2 &-0.3 &-0.3 &- &\textbf{9.9} &4.3 \\
+relocate-human-v0 &0.1 &-0.3 &-0.3 &- &0.2 &0.1 \\
+pen-cloned-v0 &37 &1.6 &26.5 &\textbf{60.0} &39.2 &37.3 \\
+hammer-cloned-v0 &0.6 &0.3 &0.3 &\textbf{2.1} &\textbf{2.1} &\textbf{2.1} \\
+door-cloned-v0 &0.0 &-0.1 &-0.1 &0.4 &0.4 &\textbf{1.6} \\
+relocate-cloned-v0 &-0.3 &-0.3 &-0.3 &-0.1 &-0.1 &-0.2 \\ \hline
+adroit-v0 total &104.5 &9.3 &25.1 &- &93.6 &\textbf{118.1} \\ \hline \hline
+total &259 &9.3 &25.1 &- &238.2 &\textbf{277.9} \\
+\end{tabular}
+\end{table}
+
+\section{Finetuning experimental details}
+\label{app:finetuning}
+For finetuning experiments, we first run offline RL for 1M gradient steps. Then we continue training while collecting data actively in the environment and adding that data to the replay buffer, running 1 gradient update / environment step. All other training details are kept the same between the offline RL phase and the online RL phase. For dextrous manipulation environments~\citep{rajeswaran2018dextrous}, we use $\tau=0.8$ and $\beta=3.0$, 25000 offline training steps, and add Gaussian noise with standard deviation $\sigma=0.03$ to the policy for exploration.
+
+For baselines we compare to the original implementations of AWAC~\citep{nair2020awac} and CQL~\citep{kumar2020conservative}. For AWAC we used \url{https://github.com/rail-berkeley/rlkit/tree/master/rlkit}. We found AWAC to overfit heavily with too many offline gradient steps, and instead used 25000 offline gradient steps as in the original paper. For the dextrous manipulation results, we report average return normalized from 0 to 100 for consistency, instead of success rate at the final timestep, as reported in~\citep{nair2020awac}. For CQL, we used \url{https://github.com/aviralkumar2907/CQL}. Our reproduced results offline are worse than the reported results, particularly on medium and large antmaze environments. We were not able to improve these results after checking for discrepancies with the CQL paper authors and running CQL with an alternative implementation (\url{https://github.com/tensorflow/agents}). Thus, although for offline experiments (Table~\ref{tab:finetuning}) we report results from the original paper, for finetuning experiments we did not have this option and report our own results running CQL in Table~\ref{tab:finetuning}.
+
+\section{Connections to prior work}
+In this section, we discuss how our approach is related to prior work on offline reinforcement learning. In particular, we discuss connections to BCQ~\cite{fujimoto2019off}.
+
+Our batch constrained optimization objective is similar to BCQ~\citep{fujimoto2019off}. In particular, the authors of BCQ build on the Q-learning framework and define the policy as
+\begin{equation}
+\label{eqn:bcq_policy}
+\pi(s) = \argmax_{\substack{a\\s.t.(s, a)\in \D}}Q(s,a).
+\end{equation}
+Note that in contrast to the standard Q-learning, maximization in \Cref{eqn:bcq_policy} is performed only over the state-action pairs that appear in the dataset. In \cite{fujimoto2019off}, these constraints are implemented via fitting a generative model $\mu(\cdot|s)$ on the dataset, sampling several candidate actions from this generative model, and taking an argmax over these actions:
+$$
+\pi(s) = \argmax_{\{a_i| a_i \sim \mu(\cdot|s), i=1\ldots N\}}Q(s,a_i).
+$$
+However, this generative model can still produce out-of-dataset actions that will lead to querying undefined Q-values. Thus, our work introduces an alternative way to optimize this objective without requiring an additional density model. Our approach avoids this issue by enforcing the hard constraints via estimating expectiles. Also, it is worth mentioning that a number of sampled actions $N$ in BCQ has similar properties to choosing a particular expectile $\tau$ in our approach.
+
+
+Note that our algorithm for optimal value approximation does not require an explicit policy, in contrast to other algorithms for offline reinforcement learning for continuous action spaces~\citep{fujimoto2019off, fujimoto2021minimalist, wu2019behavior, kostrikov2021offline, kumar2019stabilizing, kumar2020conservative}. Thus, we do not need to alternate between actor and critic updates, though with continuous actions, we must still extract an actor at the end once the critic converges.
+
+\end{document}

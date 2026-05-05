@@ -1,0 +1,312 @@
+\section{Methodology}
+\label{sec:method}
+
+% 我们的基于投影的NBV规划框架的整体流程如图x所示。
+% 机械臂首先移动到一个预设的初始观测位姿，然后开始NBV的迭代过程。
+The workflow of our projection-based NBV planning framework is shown in Fig. \ref{System_Overview}. 
+The robot arm first moves to a preset initial observation pose and then starts the iterative process of NBV planning.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=7in]{img/System_Overview.pdf}
+    % 系统单次迭代流程。其中橙色的箭头描述的是NBV的迭代过程的运行步骤。
+    % 设备采集点云后，进行数据预处理和点云配准。然后，将配准后的点云输入椭球表征模块，构建体素结构并进行椭球拟合。接着，利用投影评估函数评估所有候选视角，并通过全局分区策略选择下一帧的最佳视角。最后，机械臂移动至该视角并开始下一轮迭代。
+    \caption{Overview of NBV planning framework. The orange arrows describe the running steps of the NBV iteration process. 
+    After capturing the point cloud, the framework performs preprocessing and pose registration. The registered point cloud is then input into the ellipsoid representation module, where it is converted into a voxel structure and fitted into an ellipsoid. The projection evaluation function is used to assess all candidate viewpoints, and a global partitioning strategy selects the optimal viewpoint for the next frame. Finally, the robotic arm moves to the selected viewpoint and begins the next iteration.}
+    \label{System_Overview}
+    \vspace*{-1\baselineskip} 
+\end{figure*}
+
+% 候选视点提出
+\subsection{Proposal of Candidate Viewpoints}
+% 根据图1所示的实验环境，本文假设待重建物体的包围盒半径不会超过机械臂基座到转台的距离。
+% 针对3D相机的景深限制，我们提出了一种动态调整候选视角采样区域的策略，确保在3D相机最优拍摄距离内能完整重建目标物体。
+As shown in Fig. \ref{Experimental_platform} of the experimental setup, we assume that the bounding box radius of the object to be reconstructed will not exceed the distance from the robotic arm base to the turntable. Considering the depth of field limitations of the 3D camera, we propose a strategy to dynamically adjust the candidate view sampling area to ensure complete reconstruction of the object within the optimal shooting distance of the 3D camera.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=3.4in]{img/Proposal_of_Candidate_Viewpoints.pdf}
+    % 图中展示了候选视角的采样区域的半径构成部分，以及候选视角在该区域中采样的结果。
+    \caption{The components of the radius of the candidate viewpoint sampling region and the results of candidate viewpoint sampling within this region.}
+    \label{Proposal_of_Candidate_Viewpoints}
+    \vspace*{-1\baselineskip} 
+\end{figure}
+
+% 由于要考虑机械臂的可达性，我们将候选视角的采样区域设定为转台上方的部分半球区域。
+% 算法以机械臂的基坐标为世界坐标系，如图3所示。该半球的半径$R = d_c + d_b$，其中 $d_c$ 为3D相机的工作距离，$d_b$ 为未知目标边界框对角线长度的一半。
+% 受[][]，对未知目标扫描策略的启发，在我们重建的过程中，未知目标物体的边界框会变化，因此半球的大小也会动态调整，以此适应3D相机的景深限制。
+Considering the reachability of the robot arm, we set the sampling area of the candidate viewpoint to the partial hemisphere area above the turntable.
+The algorithm uses the base coordinates of the robot as the world coordinate system, as shown in Fig. \ref{Proposal_of_Candidate_Viewpoints}. 
+The radius of this hemisphere $R$ is the sum of the 3D camera's working distance  $d_c$ and half the diagonal length of the unknown object's bounding box $d_b$. 
+Inspired by unknown-target scanning strategies from \cite{daudelin2017adaptable, pan2024integrating}, the hemisphere dynamically resizes with the object's bounding box to fit the 3D camera's depth of field.
+% 我们从候选区域中选取了等间距的\(\alpha\)条纬线，并根据每条纬线的长度，将\(N\)个候选视点均匀分布在这些纬线上。
+% 所有视点都朝向边界框的中心。
+We selected \(\alpha\) equidistant parallels from the candidate area and distributed \(N\) candidate viewpoints proportionally along each parallel based on their lengths.
+All viewpoints are directed toward the center of the bounding box.
+
+% 体素表征构建
+\subsection{Voxel Structure Construction}
+% 3D相机捕获点云数据后，框架首先对数据进行预处理预处理。
+% 然后将预处理后的点云配准到点云集合\(P_f\)中，并进行体素构建。
+% 我们将未知目标包围盒内的体素分为五类：空体素\(V_e\)、占用体素\(V_o\)、未知体素\(V_u\)、前沿体素\(V_f\)和无用体素\(V_n\)，如图3所示。
+After the 3D camera captures a point cloud frame, the framework first performs preprocessing on the data.
+The preprocessed point cloud is then registered into the point cloud set \(P_f\) and subjected to voxel construction.
+We categorize voxels within the unknown object's bounding box into five types: Empty \(V_e\), Occupied \(V_o\), Unknown \(V_u\), Frontier \(V_f\), and None \(V_n\), as shown in Fig. \ref{Voxel_struct}.
+
+\begin{figure}[t]
+    \centering
+    \subfloat[]{\includegraphics[width=1.6in]{img/Voxel_struct_a.pdf}
+    \label{Voxel_struct_a}
+    }
+    \subfloat[]{\includegraphics[width=1.6in]{img/Voxel_struct_b.pdf}
+    \label{Voxel_struct_b}
+    }
+    % 用2维网格来描述Octomap中体素的分类规则。 (a) 捕获一帧数据时体素的分类结果。 (b) 捕获多帧数据时中体素的分类结果。 其中绿色的方框为目标的包围盒。
+    \caption{Use a 2D grid to describe the voxel classification. (a) Classification results of a single frame input. (b) Classification results of multiple frames input. The green box represents the object's bounding box.}
+    \label{Voxel_struct}
+    \vspace*{-1\baselineskip} 
+\end{figure}
+
+% 所有新生成的体素初始状态设为$V_n$。传感器完成观测后，通过射线投射（ray-travel）向目标区域发射多组射线，并依据以下规则更新体素状态：
+% 若点云数据$P_f$位于体素$V_n$内，则将该体素更新为$V_o$，标识为目标表面占据区域；
+% 当射线路径上存在$V_o$体素时，将该$V_o$体素后方所有被射线穿透的$V_n$体素标记为$V_u$，表示因目标遮挡导致状态不确定；
+% 把射线路径上没有遇到$V_o$体素之前的所有$V_n$体素更新为$V_e$，标识为经观测确认的空闲区域。
+
+All newly generated voxels are initialized to state $V_n$. Upon completion of sensor observation, multiple ray bundles are cast toward the target region through ray-travel\cite{amanatides1987fast}, with voxel states updated according to the following rules: 
+1) If point cloud data $P_f$ resides within a $V_n$ voxel, the voxel is updated to $V_o$, indicating an occupied region of the target surface; 
+2) When a $V_o$ voxel exists along the ray path, all $V_n$ voxels penetrated by the ray behind this $V_o$ voxel are labeled as $V_u$, representing occlusion-induced uncertainty; 
+3) All $V_n$ voxels along the ray path prior to encountering any $V_o$ voxel are updated to $V_e$, denoting observed free space.
+% V_f（前沿体素）的更新在V_u（未知体素）和V_o（占用体素）更新完成后进行。
+% 如果任意v_i\in V_u的空间邻域中同时存在空体素和占用体素，那么v_i被认定为前沿体素。
+4) The update of $V_f$ is carried out after the updates of $V_u$ and $V_o$. Any $v_i\in V_u$ is identified as a Frontier voxel if both empty and occupied voxels are present in its spatial neighborhood.
+\begin{equation}
+    V_f = \{v_u^{i} \mid \exists  v_e \in \mathcal{N}(u^{i}) \And v_o \in \mathcal{N}(u^{i})  \}
+\end{equation}
+where $v_u^{i} \in V_u$ and $\mathcal{N}(u^{i}) $represents the spatial neighborhood of $v_u^{i}$.
+
+% bounding box \mathbf{B}首先初始化在第一帧 $V_o$ 的 bounding box。
+% 然后把\mathbf{B}沿着当前viewpoint方向，将 $\mathbf{B}$ 的对角线扩展到当前的2倍。
+% 在后续的更新时会在每个 $v_i \in V_f$的体素周围生成一个半径为$ \gamma $的球$s_i$，将$\mathbf{B}$大小扩展成能包裹 $V_o$, $V_u$以及$s_i$。
+% 结果如图3(b)所示。
+The bounding box $\mathbf{B}$ is initialized to the bounding box of $V_o$ in the first frame.
+Then, $\mathbf{B}$ is expanded along the direction of the current viewpoint, doubling its diagonal length. 
+In subsequent updates, a sphere $s_i$ with a radius of $\gamma$ is generated around each voxel $v_i \in V_f$, and the size of $\mathbf{B}$ is expanded to cover $V_o$, $V_u$, and $s_i$. 
+The result is shown in Fig. \ref{Voxel_struct}\subref{Voxel_struct_b}.
+
+% 椭球表征
+\subsection{Ellipsoid Representation}
+
+% 在3D游戏中，实体的碰撞结构可以用椭球表示，更精细的碰撞结构可以通过多个椭球来表示不同部位。
+% 本文受其启发也采用多个椭球来描述一个目标结构。 
+% 由于目标是未知的，无法明确其结构特点,需要通过聚类的方式大致将目标分成$t$个簇，把每个簇都拟合成一个椭球用于表征目标的结构。
+% 图x用二维图演示了这一流程。
+In 3D games, an entity's collision structure can be represented by an ellipsoid\cite{fauerby2003improved}, and more complex structures can be achieved by using multiple ellipsoids for different parts of an entity.
+Inspired by this, we also use multiple ellipsoids to describe an object structure. 
+Since the object is unknown and its structural characteristics are unclear, it is necessary to roughly divide the object into \( t \) clusters and fit each cluster into an ellipsoid to represent the object structure. 
+Fig. \ref{Ellipsoid_representation} illustrates this process using a two-dimensional diagram.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=3.4in]{img/Ellipsoid_representation.pdf}
+    % 不同GMM聚类个数的结果。\( T_o \) 代表 Occupied 体素的聚类个数，\( T_f \) 代表 Frontier 体素的聚类个数。
+    \caption{Results of different GMM clustering numbers. \( T_o \) represents the number of clusters of occupied voxels, and \( T_f \) represents the number of clusters of frontier voxels.}
+    \label{Ellipsoid_representation}
+    \vspace*{-1\baselineskip} 
+\end{figure}
+
+% 受3DGS启发，我们知道3D高斯分布的等概率密度面是一个椭球。如果空间中的一组点符合3D高斯分布，其协方差矩阵能够显示这些点在各轴方向上的分散程度，从而方便地将这些点拟合成一个椭球。因此，本文将使用高斯混合模型（GMM）对体素进行聚类。
+Inspired by 3D Gaussian Splatting\cite{kerbl20233d}, we know that the equiprobability density surface of a 3D Gaussian distribution is an ellipsoid. Suppose a set of points in space follows a 3D Gaussian distribution. In that case, its covariance matrix can indicate the dispersion of these points along each axis, making it easy to fit these points into an ellipsoid. Hence, we will employ a Gaussian Mixture Model (GMM) for voxel clustering.
+
+% Occupied体素和Frontier体素会直接影响的视点质量评估结果。
+% 所以在每次更新完 $V_o$ 和 $V_f$ 后，我们针对每一种体素都会，初始化 $T$ 个3D高斯分布。
+% 然后，我们使用期望最大化 (EM) 算法对高斯分布进行训练，即可获得这两种体素聚类后的结果$C_o$和$C_f$。
+Occupied voxels and frontier voxels will directly affect the viewpoint quality evaluation results.
+Therefore, after each update of $V_o$ and $V_f$, we will initialize $T$ with 3D Gaussian distributions for each type of voxel ($V_o$ and $V_f$).
+We utilize the expectation-maximization (EM) algorithm to train a Gaussian distribution, which allows us to obtain the clustering results $C_o$ and $C_f$ after categorizing these two types of voxels.
+
+% 高斯分布 $T$ 的个数的选取将直接影响后续算法中拟合椭球的个数。
+% 过少的椭球数量会很难准确的的反映出物体的局部结构，过多的椭球数量会影响运行效率。
+% 为了能够让算法自适应的选择高斯分布的数量，我们使用贝叶斯信息准则(BIC)来评估模型参数。
+The selection of the number of Gaussian distributions $T$ will directly affect the number of fitted ellipsoids in the subsequent algorithm. 
+Too few ellipsoids will make it difficult to accurately reflect the local structure of the object, while too many can impact the efficiency. 
+To allow the algorithm to select the number of Gaussian distributions adaptively, we use the Bayesian Information Criterion (BIC)\cite{schwarz1978estimating} to evaluate the model parameters.
+\begin{equation}
+    \text{BIC} = k \ln (n) - 2 \ln *(L)
+\end{equation}
+% $k$为模型的参数量，$n$为样本个数，$L$为似然函数。
+$k$ is the number of model parameters, $n$ is the number of samples, and $L$ is the likelihood function.
+
+% BIC的核心思想为是在模型的参数数量与似然函数值之间寻找最优值。
+% 为了兼顾效率与精度， 我们设置T的取值范围为[0, T_max],$T_{max}$是人工设定的拟合椭球的数量的最大值。在两种体素$V_o$，$V_f$ 中选择对应BIC值最小的$T_o$，$T_f$，作为当前迭代中的高斯分布的个数，即：
+The core concept of BIC is to find the best trade-off between the number of model parameters and the likelihood function value. 
+To balance efficiency and accuracy, we set the value range of $T$ to [0, $T_{max}$], and $T_{max}$ is the manually set maximum ellipsoid number to be fitted. 
+Among the two voxels $V_o$, $V_f$, select $T_o$, $T_f$ with the smallest corresponding BIC value as the number of Gaussian distributions $T_{*}$ in the current iteration, that is:
+\begin{equation}
+    T_{*} = \arg \min_{T_{max}}BIC(GMM(V,T))
+\end{equation}
+
+% 在获取到 $C_o$ 和$C_f$之后，我们采用CGAL库中Gärtner提出的方法计算最小体积的闭合椭球模型(MVEE)。
+% 之后，我们能够得到 $E_o$ 和 $E_f$分别代表Occupied体素和Frontier体素的拟合结果。
+% 此时我们便可以把对目标用体素结构表示转换成用椭球的结构。
+% 每个椭球都用其对应的方程来描述。
+After obtaining $C_o$ and $C_f$, we use the method\cite{gartner1997smallest} in the CGAL library to calculate the minimum-volume enclosing ellipsoids (MVEE) model.
+Then, we can obtain $E_o$ and $E_f$, representing the fitting results of the occupied voxels and Frontier voxels.
+At this point, we can transform the representation of the object from a voxel structure to an ellipsoid structure.
+Each ellipsoid is described by its equation.
+
+% 基于投影的质量判评价函数
+\subsection{Projection-based Viewpoint Quality Evaluation Function}
+
+% 本文提出通过投影的视点的评价函数的目标是让视点能够观测到最多的frontier信息。
+% 在这个过程中必须要考虑的是在对目标进行观测时结构之间的遮挡问题。
+% 虽然ray-casting可以精确的给出每一个体素的遮挡关系，但是大量的ray-casting的使用会占用大量的计算资源。
+% To address this，本文使用了一种全新的策略，通过使用在当前视点下各个椭球的中心位置的顺序，计算可观测权重。
+% 而后通过对累加各个椭球进行单独的加权投影的结果获得最后的视点评估结果，对单个视角进行评价的细节可以分成三个部分：椭球观测权重计算，椭球加权投影计算，视点质量结果计算。
+The goal of the viewpoint quality evaluation function proposed in this paper is to enable the viewpoint to observe the most frontier information. 
+In this process, we must consider the occlusion problem between structures when observing the object.
+Although ray-casting can accurately give the occlusion relationship of each voxel, the extensive use of ray-casting will take up a lot of computing resources.
+To address this, we use a new strategy that calculates the observable weight by using the order of the center positions of each ellipsoid under the current viewpoint. 
+Then, the final viewpoint evaluation result is obtained by accumulating the results of individually weighted projections of each ellipsoid.
+The details of evaluating a single viewpoint can be divided into three parts: ellipsoid observation weight calculation, ellipsoid weighted projection calculation, and viewpoint quality result calculation.
+
+\begin{figure*}[!t]
+    \centering
+    \subfloat[]{\includegraphics[width=1.1in]{img/Viewpoint_quality_evaluation_function_a.pdf}
+    \label{Viewpoint_quality_evaluation_function_a}
+    }
+    \subfloat[]{\includegraphics[width=2.2in]{img/Viewpoint_quality_evaluation_function_b.pdf}
+    \label{Viewpoint_quality_evaluation_function_b}
+    }
+    \subfloat[]{\includegraphics[width=2.2in]{img/Viewpoint_quality_evaluation_function_c.pdf}
+    \label{Viewpoint_quality_evaluation_function_c}
+    }
+    \subfloat[]{\includegraphics[width=1.5in]{img/Viewpoint_quality_evaluation_function_d.pdf}
+    \label{Viewpoint_quality_evaluation_function_d}
+    }
+    % 对单个视点进行质量评价的细节。(a)换算每一个椭球的中心点到当前视点坐标系下。(b)把视点坐标系下的椭球按照中心位置的深度进行排序，并赋予可观测性权重。(c)结合可观测性权重对每个椭球进行投影，获取每个椭球的可观测性度量。(d)综合Occupied椭球和Frontier椭球给出当前视点质量的评价值。
+    \caption{Quality evaluation for a single viewpoint. (a) Transform each ellipsoid's center to the current viewpoint's coordinate system. (b) Sort ellipsoids by depth and assign observability weights. (c) Project each ellipsoid based on its observability weight. (d) Combine the occupied and frontier ellipsoids to obtain the viewpoint quality evaluation.}
+    \label{Viewpoint_quality_evaluation_function}
+    \vspace*{-1\baselineskip} 
+\end{figure*}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=3.4in]{img/Global_partitioning_strategy.pdf}
+    % 这张图展示了根据不同区域的扫描状态选择下一个最佳视角的过程。
+    \caption{This figure illustrates the process of selecting the next best view based on the scanning status of different regions.}
+    \label{Global_partitioning_strategy}
+    \vspace*{-1\baselineskip} 
+\end{figure}
+
+\subsubsection{Ellipsoid observation weight calculation}
+% 如图6(a)所示, 根据 $E_o$ 和 $E_f$，我们可以获得每个椭球中心在世界坐标系下的坐标$C_w$。
+% 在此基础上，已知相机的在世界坐标系中的位姿H。我们就可以获得每个椭球中心在相机坐标系的$C$.
+As shown in Fig. \ref{Viewpoint_quality_evaluation_function}\subref{Viewpoint_quality_evaluation_function_a}, using $E_o$ and $E_f$, we can determine the position $C_w$ of each ellipsoid center in the world coordinate system. With the camera's pose $H$ in the world coordinate system, we can calculate the position $C$ of these ellipsoid centers in the camera coordinate system.
+
+% 如图6(b)所示。
+% 我们对所有椭球中心 $C$ 按其z坐标进行从小到大的排序。
+% 每个椭球都会获得单独一个深度位次$r$。
+% 获得位次后，我们采用以下方式计算每个椭球的可观测权重$W$:
+As shown in Fig. \ref{Viewpoint_quality_evaluation_function}\subref{Viewpoint_quality_evaluation_function_b}, we sort all ellipsoid centers $C$ in ascending order according to their z-coordinates.
+Each ellipsoid is assigned a unique depth rank $r$.
+After obtaining the ranks, we calculate the observable weight $W$ for each ellipsoid as follows:
+\begin{equation}
+    W = 0.5^{r}
+\end{equation}
+% 椭球加权投影计算
+\subsubsection{Ellipsoid weighted projection calculation}
+% 空间中的任意一个椭球$E$，都可以用一个4阶方矩阵$Q$来描述，即:
+Any ellipsoid $E$ in space can be described by a 4th-order square matrix $Q$, that is:
+\begin{equation}
+    X^TQX=0
+\end{equation}
+% 其中$X=[x \ y \ z \ 1]^{T}$. 
+Where $X=[x \ y \ z \ 1]^{T}$.
+%对于任意一个椭球，其在摄像机投影矩阵$P$的作用下投影得到的椭圆可以通过矩阵描述$\Phi$来表示。
+For any given ellipsoid, the ellipse it projects onto under the action of the camera projection matrix $P$ can be represented by the matrix description $\Phi$.
+\begin{equation}
+    \Phi^* = PQ^*P^T
+    \label{projection}
+\end{equation}
+% 对于可逆二次矩阵 $Q$ 和 $\Phi$，它们的对偶表示满足 $Q^{*} = Q^{-1}$ 和 $\Phi^{*} = \Phi^{-1}$，其中对偶空间编码切平面（线）约束。
+
+% 摄影机矩阵$P$，可以由当前3D相机的内参$K$，以及相机相对与世界坐标系的位姿P计算得出。
+For invertible quadric matrices $Q$ and $\Phi$, their dual representations satisfy $Q^{*} = Q^{-1}$ and $\Phi^{*} = \Phi^{-1}$, where the dual space encodes tangent plane (line) constraints. 
+The camera matrix $P$ can be calculated by the internal parameter $K$ of the current 3D camera, and the camera's pose $H$ in the world coordinate system\cite{hartley2003multiple}.
+
+% 如图6(c)所示, 我们把场景的每个椭球按照公式6单独投影到相机的成像平面上。
+% 然后，我们计算每一个图像中椭圆区域的像素值的总和$L$与可观测性权重$w$相乘作为该椭球的 observability$\hat{L}$。
+As shown in Fig. \ref{Viewpoint_quality_evaluation_function}\subref{Viewpoint_quality_evaluation_function_c}, we project each ellipsoid individually onto the 3D camera's imaging plane, according to the eq. \ref{projection}.
+Then, we calculate the sum of pixel values $L$ within each elliptical region in the image and multiply it by the observability weight $w$ to obtain the observability of the ellipsoid, denoted as $\hat{L}$.
+\begin{equation}
+    \hat{L} = Lw 
+\end{equation}
+
+\subsubsection{Viewpoint quality evaluation function}
+% 为了让视点能够观测到尽可能多的前沿信息，
+% 我们需要让投影面积较大的前沿椭球排在占用椭球之前。
+% 为此，我们设计了一个简单的评价函数来实现这个目的。
+To maximize the observation of frontier information from the viewpoint,
+We need to prioritize the projection of larger frontier ellipsoids over occupied ones. 
+For this purpose, we designed a simple evaluation function to achieve this goal:
+\begin{equation}
+    F = \sum_{E_f} \hat{L} - \sum_{E_o}\hat{L}
+\end{equation}
+
+% 如图6(d)所示, frontier椭球的投影对观测质量评估是positive部分，occupied椭球的投影是negative部分。
+% 所以使用所有$E_f$个frontier椭球加权投影之和减去所有$E_o$个occupied椭球加权投影之和相就可以表征出在该视点下的质量$F$。
+As shown in Fig. \ref{Viewpoint_quality_evaluation_function}\subref{Viewpoint_quality_evaluation_function_d}, the projection of the frontier ellipsoid is the positive part of the observation quality assessment. In contrast, the projection of the occupied ellipsoid is the negative part.
+Therefore, the sum of the weighted projections of all $E_f$ frontier ellipsoids minus the sum of the weighted projections of all $E_o$ occupied ellipsoids can represent the quality $F$ of the viewpoint.
+
+\begin{figure}[t]
+    \centering
+    \subfloat[Simulation environment]{\includegraphics[width=1.5in]{img/Simulation_environment.pdf}
+    \label{Simulation_environment}
+    }%
+    \hfil
+    \subfloat[55 objects to be tested]{\includegraphics[width=1.5in]{img/Simulation_target.pdf}
+    \label{Simulation_target}
+    }%
+    % 对比实验的仿真环境。 (a) gazebo 对比实验环境。 (b) 待测目标共55个。
+    \caption{Simulation environments in Gazebo. }
+    \label{Simulation_environment_target}
+    \vspace*{-1\baselineskip} 
+\end{figure}
+
+% 全局区域的视角选取策略
+\subsection{Global Partitioning Strategy}
+% 我们框架需要使用ICP算法来修正点云的位姿。
+% 如果仅根据观测质量 F 最大来选择最佳视点，可能会导致扫描不连续，使得点云配准失败。
+% 此外，过于贪婪的选择策略可能会导致框架运行效率降低，甚至出现走回头路的情况。
+Our framework needs to use the ICP\cite{besl1992method} to correct the pose of the point cloud.
+Selecting the viewpoint with the highest observation quality F greedily as the best viewpoint can lead to discontinuous scanning and failure in point cloud registration. 
+Moreover, an overly greedy selection strategy may lead to backtracking, resulting in a reduction in the efficiency of our framework.
+
+% To address this，我们受到区域聚类（Region Clustering）的启发，引入了全局分区策略。
+% 我们的目标不仅是对候选区域进行分区，还要确保视点能够在连续的分区中进行选择，这对保证点云配准的成功率起到重要作用。
+To address this, inspired by the concept of region clustering\cite{lee2022uncertainty}, we introduce a global partitioning strategy.
+This strategy encompasses not only the partitioning of candidate regions but also the assurance that the viewpoint can be selected among consecutive partitions, which plays a significant role in ensuring the success rate of point cloud registration. Consecutive partitions are crucial for enhancing the success rate of point cloud registration.
+
+% 我们把候选视角采样的区域按照经度的均分成$\beta$个区域。
+% $\beta $的选取决于当前配准策略。
+% 在所有区域都被扫描过之后，下一帧最佳视角才可以选择观测质量F最大的viewpoint，作为best viewpoint。
+% 否则下一帧最佳视角只能在被扫描过的分区的未被扫描的邻域中选择，如图7所示。
+We divide the candidate view sampling area into $\beta$ regions according to longitude.
+The selection of $\beta$ depends on the current registration strategy. 
+After all regions have been scanned, the next best view can be selected from all partitions with the largest observation quality $F$.
+Otherwise, the next best view can only be selected in the unscanned neighborhood of the scanned partition, as shown in Fig. \ref{Global_partitioning_strategy}.
+
+\begin{figure*}[!t]
+    \centering
+    \subfloat[Coverage for each framework]{\includegraphics[width=3.4in]{img/Simulation_Comparison_Coverage.pdf}
+    \label{Simulation_Comparison_Coverage}
+    }%
+    \subfloat[Compute time for each framework]{\includegraphics[width=3.4in]{img/Simulation_Comparison_Times.pdf}
+    % real-world实验的数据图表。柱状图代表了每一次迭代的计算耗时，折线图代表了每一次迭代后的点云覆盖率。
+    \label{Simulation_Comparison_Times}
+    }%
+    % 针对55个目标的对比实验的每次迭代的仿真结果。
+    \caption{Comparison experiment tests 55 objects in the simulation environment, with results showing the average performance of all objects per iteration.}
+    \label{Comparison_Result_Chart}
+    \vspace*{-1\baselineskip} 
+\end{figure*}

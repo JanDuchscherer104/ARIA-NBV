@@ -1,0 +1,32 @@
+\section{Related Work}
+\label{sec:rel}
+
+The literature review mainly focuses on next-best-view methods that are formulated in 5 DoF or assume a drone as an agent.\\
+\textbf{Scene-specific next-best-view planners.} Next-best-view planners have demonstrated promising results in active 3D reconstruction by predicting the optimal viewpoint for data capture based on the current state.
+%(e.g., the reconstruction progress).
+Traditional approaches~\cite{monica2018contour, zha1997next, liu2018object, hardouin2020surface, hardouin2020next, dai2020fast, zhou2021fuel} rely on hand-crafted rules to determine the next-best viewpoint. 
+For instance, the method~\cite{zha1997next} selected the next-best viewpoint by maximizing a rating function favoring smooth regions, which may overlook fine-grained object details.
+Instead, the methods~\cite{monica2018contour, hardouin2020surface} collected data along boundaries between seen and unseen surfaces to capture finer details, but still require handcrafted parameter tuning for each scene.
+Another approach~\cite{liu2018object} scanned segmented objects sequentially using a predefined object database, reducing the need for handcrafted tuning, but its performance degrades in cluttered environments due to inaccurate object matching.
+Recent advances in deep learning and increased computational power have given rise to learning-based methods~\cite{lin2022active, pan2022activenerf, lee2022uncertainty, zhan2022activermap, jin2023neu, sunderhauf2023density, chen2024gennbv, peralta2020next, ran2023neurar, zeng2022efficient, tao2022seer, wilson2025pop, li2025activesplat}.
+Some studies~\cite{lin2022active, sunderhauf2023density} used NeRF~\cite{mildenhall2020nerf} ensembles to estimate uncertainty via model disagreement for viewpoint selection, resulting in linearly increasing computational overhead.
+Other works~\cite{pan2022activenerf, ran2023neurar, zeng2022efficient} avoid the computational overhead by incorporating Bayesian-based NeRF~\cite{shen2021stochastic, martin2021nerf} to estimate uncertainty for viewpoint selection.
+Meanwhile, other approaches~\cite{lee2022uncertainty, zhan2022activermap} defined the next-best viewpoint as the viewpoint that maximizes the entropy of the density field along the camera rays.
+Although these methods have shown outstanding performance in collecting data, they typically require sampling candidate viewpoints.
+In addition, their reliance on online learning makes them less suitable for real-time applications. \\
+\textbf{Generalizable next-best-view planners.} 
+Unlike the aforementioned online-learning approaches, the generalizable methods~\cite{jin2023neu, chen2024gennbv, peralta2020next} avoid the training process for new scenes, thereby enabling faster next-best-view selection. 
+Prediction time is important for real-world tasks where a robot may run out of battery within a few minutes.
+Among generalizable methods, prior work~\cite{jin2023neu} proposed a Bayesian-based NeRF that selects the next-best viewpoint to maximize view variance without additional training.
+However, it still requires candidate viewpoint sampling, resulting in performance unsuitable for real-time applications.
+Instead, another line of generalizable next-best-view approaches~\cite{chen2024gennbv, peralta2020next} utilized reinforcement learning to learn a next-best-view planner to bypass the need for sampling candidate viewpoints.
+Prior work~\cite{peralta2020next} proposed learning a 3-DoF next-best-view policy using a series of grayscale images as observations.
+Subsequently, prior work~\cite{chen2024gennbv} improved upon this method by incorporating occupancy grids into the observations, which provide explicit geometric information. 
+This enhancement enabled the development of a 5-DoF next-best-view planner, achieving an outstanding coverage ratio for unknown scenes.
+
+As shown in Tab.~S4, compared to the scene-specific methods, Hestia does not require candidate viewpoint sampling or inference-time optimization, thereby enabling more flexible viewpoint prediction. 
+Compared to the generalizable method~\cite{chen2024gennbv}, Hestia treats voxels as cubes rather than points, enabling more comprehensive capture. 
+In addition, Hestia adopts a close-greedy scheme to mitigate spurious correlations, introduces a hierarchical structure to model the action space, and uses a more diverse dataset to maintain robust performance across varying object shapes and positions.
+Notably, Hestia’s hierarchical structure addresses the challenge of high-dimensional continuous action search in RL-based generalizable next-best-view planning, which differs from traditional methods~\cite{monica2018contour, hardouin2020surface, dai2020fast, zhou2021fuel}.
+%Notably, Hestia’s hierarchical structure addresses the challenge of high-dimensional continuous action search in RL-based generalizable next-best-view planning. 
+%This differs from traditional methods~\cite{monica2018contour, hardouin2020surface, dai2020fast, zhou2021fuel}, which use hierarchical structures to traverse frontiers or optimize tour efficiency.

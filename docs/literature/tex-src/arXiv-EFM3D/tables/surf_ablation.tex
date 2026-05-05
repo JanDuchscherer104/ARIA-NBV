@@ -1,0 +1,39 @@
+% \begin{table}[]
+%     \centering
+%     \begin{tabular}{c|c|c|c|c|c|c|c|c|c}
+%          rgb & slam & points & mean & std & frozen & ASE Prec $\uparrow$ & ASE Recal $\uparrow$ & ADT Prec $\uparrow$ & ADT Recal $\uparrow$ \\ \hline
+%          % baseline
+%         \checkmark  &            & \checkmark & \checkmark & & \checkmark & 0.73 & 0.35 & 0.44 & 0.077 \\ \hline \hline
+%         % ablate input modality
+%         \checkmark  & \checkmark & \checkmark & \checkmark & & \checkmark &      &      &      &       \\ \hline
+%                     & \checkmark & \checkmark & \checkmark & & \checkmark &      &      &      &       \\ \hline
+%                     &            & \checkmark & \checkmark & & \checkmark &      &      &      &       \\ \hline
+%                     &            &            & \checkmark & & \checkmark &      &      &      &       \\ \hline \hline
+%         % ablate no points
+%         \checkmark  &            &            & \checkmark & & \checkmark & 0.47 & 0.18 & 0.14 &  0.023 \\ \hline
+%                     & \checkmark &            & \checkmark & & \checkmark &      &      &      &       \\ \hline
+%         \checkmark  & \checkmark &            & \checkmark & & \checkmark &      &      &      &       \\ \hline \hline
+%         % ablate Lifter
+%         \checkmark  &            &            &  & \checkmark & \checkmark &      &      &      &       \\ \hline
+%         \checkmark  &            & \checkmark & \checkmark & \checkmark & \checkmark &      &      &      &       \\ \hline \hline
+%         % ablate frozen backbone
+%         \checkmark  &            & \checkmark & \checkmark & & & 0.72 & 0.36 & 0.44 & 0.09 \\ \hline
+%         \checkmark  &            & & \checkmark & & & & & & \\ \hline
+        
+%     \end{tabular}
+%     \caption{We ablate different design choices for \OCCmodel{}: rgb video snippets, left and right slam stream snippets and semidense points. \TODO{Backbone DINO vs CLIP, and ViT sizes?}}
+%     \label{tab:surf_ablation}
+% \end{table}
+
+\begin{table}[]
+    \centering
+    \begin{tabular}{c|c|c|c|c|c}
+         points & freespace & ASE Prec $\uparrow$ & ASE Recal $\uparrow$ & ADT Prec $\uparrow$ & ADT Recal $\uparrow$ \\ \hline \hline
+        % https://www.internalfb.com/mlhub/experiment/eval_eccv_center3d_tracker_grid_seq_v0
+         \checkmark & \checkmark & 0.82 & 0.41 & 0.59 & 0.11\\ \hline
+        \checkmark & & 0.73 & 0.35 & 0.44 & 0.077\\ \hline
+             & & 0.47 & 0.18 & 0.14 & 0.023 \\ 
+    \end{tabular}
+    \caption{\EVL{} Surface regression ablation study. Adding point occupancy and freespace mask improves performance. }
+    \label{tab:surf_ablation}
+\end{table}

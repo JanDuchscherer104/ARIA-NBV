@@ -1,0 +1,38 @@
+\begin{comment}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.3\textwidth]{figures/rgb_rectification_adt.png}
+    \includegraphics[width=0.3\textwidth]{figures/rgb_rectification_ase.png}
+    \caption{We visualize the maximum linear ({\color{green}green}) and the ScanNet linear ({\color{red}red}) as well as the original non-linear ({\color{yellow}yellow}) camera model on top of Aria's RGB video stream. The regions in green and red are computed by projecting the undistorted images of linear camera models (max-linear and ScanNet linear) back to the original fisheye camera.}
+    \label{fig:camera_lin}
+\end{figure}
+\end{comment}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{0.22\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ase_fov.png}
+        \caption{\tiny \textbf{ASE FoV}}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.22\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/adt_fov.png}
+        \caption{\tiny \textbf{ADT FoV}}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.22 \textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/adt106_max_linear.png}
+        \caption{\tiny \textbf{Max-linear}}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.292 \textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/adt106_scannet.png}
+        \caption{\tiny \textbf{ScanNet linear}}
+    \end{subfigure}
+    \caption{We visualize (c) maximum linear (region in {\color{darkgreen}green}) and (d) ScanNet linear (region in {\color{red}red}), as well as the original fisheye (with a valid region in {\color{darkyellow}yellow}) camera models for (a) ASE and (d) ADT.}
+    \label{fig:camera_lin}
+\end{figure}

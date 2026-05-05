@@ -1,0 +1,8 @@
+\section{Limitations and Societal Impact}
+
+The \EFMmodel{} 3D feature lifting mechanism and semi-dense point geometry inputs assume a mostly static world. Though the model is robust to some dynamics and scene changes (as they are present in the ADT and \AOThree{} real-world datasets), the model cannot handle large scene dynamics. Additionally, the \EFMmodel{} model has a limited 3D viewing frustum (by default we use $4m\times 4m\times 4m$), which cannot process far away scene geometry. We believe that with long enough egocentric data capture we will observe the majority of indoor scenes with this assumption.
+% The proposed EFM3D benchmark focuses on 3D tasks of object bounding boxes and 3D surfaces, other related egocentric tasks such as scene recognition, activity recognition, and language understanding are also relevant for egocentric perception and are left for future work. 
+
+All real-world Project Aria sequences go through an anonymization pipeline that blurs all personally identifying information. In addition all data collectors gave consent to the publishing of their data. We believe EFMs are poised to provide a profound impact for bringing the context of the physical world to egocentric devices such as AR glasses. While our datasets are collected in fully consented environments, the profound fidelity at which \EFMmodel{} already reconstructs objects and scenes reveals the pervasive nature of egocentric sensor data. It is important as EFMs continue to improve and evolve that strong privacy and consent models are incorporated into the models.
+
+% \TODO{explain how human subjects data was collected and is used responsibly; We blur any personally identifiable data and made sure that no people are visible in the field of view.}

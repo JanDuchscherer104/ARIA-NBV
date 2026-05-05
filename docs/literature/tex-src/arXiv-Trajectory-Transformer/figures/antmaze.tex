@@ -1,0 +1,55 @@
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}llrrrrrr}
+\toprule
+\multicolumn{1}{c}{\bf Dataset} & \multicolumn{1}{c}{\bf Environment} &
+    \multicolumn{1}{c}{\bf BC} &
+    \multicolumn{1}{c}{\bf CQL} &
+    \multicolumn{1}{c}{\bf IQL} &
+    \multicolumn{1}{c}{\bf DT} &
+    \multicolumn{1}{c}{\bf TT \scriptsize{\textcolor{cgrey}{$\bm{(+Q)}$}}} \\ 
+\midrule
+Umaze & AntMaze & 
+    $54.6$ &
+    $74.0$ &
+    $87.5$  &
+    $59.2$ &
+    $100.0$ \scriptsize{\raisebox{1pt}{$\pm 0.0$}} \\ 
+Medium-Play & AntMaze &
+    $0.0$ &
+    $61.2$ &
+    $71.2$ &
+    $0.0$ &
+    $93.3$ \scriptsize{\raisebox{1pt}{$\pm 6.4$}} \\ 
+Medium-Diverse & AntMaze &
+    $0.0$ &
+    $53.7$ &
+    $70.0$ &
+    $0.0$ &
+    $100.0$ \scriptsize{\raisebox{1pt}{$\pm 0.0$}} \\
+Large-Play & AntMaze &
+    $0.0$ &
+    $15.8$ &
+    $39.6$ &
+    $0.0$ &
+    $66.7$ \scriptsize{\raisebox{1pt}{$\pm 12.2$}} \\ 
+Large-Diverse & AntMaze &
+    $0.0$ &
+    $14.9$ &
+    $47.5$ &
+    $0.0$ &
+    $60.0$ \scriptsize{\raisebox{1pt}{$\pm 12.7$}} \\
+\midrule
+\multicolumn{2}{c}{\bf Average} & 10.9 & 44.9 & 63.2 & 11.8 & 84.0 \hspace{.6cm} \\ 
+\bottomrule
+\end{tabular*}
+\caption{
+\textbf{(Combining with $Q$-functions)}
+Performance on the sparse-reward AntMaze (\texttt{v0}) navigation task.
+Using a $Q$-function as a search heuristic with the Trajectory Transformer ({TT~\scriptsize{\textcolor{cgrey}{$\bm{(+Q)}$}}}) outperforms policy extraction from the $Q$-function (IQL) and return-conditioning approaches like the Decision Transformer (DT).
+We report means and standard error over 15 random seeds for {TT \scriptsize{\textcolor{cgrey}{$\bm{(+Q)}$}}}; baseline results are taken from \cite{kostrikov2021implicit}.
+}
+\vspace{-.1cm}
+\label{table:antmaze}
+\end{table*}

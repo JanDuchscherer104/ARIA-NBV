@@ -1,0 +1,79 @@
+\section{Related Works}
+\label{sec:related}
+
+% 目前，研究者们通常将NBV规划问题建模为三个核心部分：目标特征描述、候选视角生成和最优视角选择。相关研究通过对这些部分的优化和创新，提出了不同的解决方法和策略。
+Currently, the NBV planning problem is typically modeled into three core components: object representation, candidate viewpoint proposal, and optimal viewpoint selection. Research has proposed various solutions and strategies by optimizing and innovating these components.
+
+\subsection{Object Representation}
+% 目标的表征是NBV规划问题的基础环节，不同的表征方法会直接影响NBV规划框架的精度和效率。
+% 对扫描目标的表征结构从简单到复杂排序通常包括点云、体素、表面结构。
+% 随着计算机图形学的发展，一些新兴结构如隐式神经表征也被应用于描述NBV规划目标。
+Object representation is a fundamental aspect of the NBV planning problem; different representation methods directly affect the accuracy and efficiency of the overall NBV planning framework.
+The object representation, ranging from simple to complex, typically include point clouds\cite{border2024surface, zeng2020pc,dhami2023pred}, voxels\cite{connolly1985determination,pan2021global,potthast2014probabilistic,vasquez2014view,pan2022scvp,mendoza2020supervised,song2020online,zhou2021fuel,batinovic2021multi,vasquez2018tree,deng2020frontier,batinovic2022shadowcasting}, and surface\cite{roberts2017submodular,peng2019adaptive,wu2014quality}structures.
+With the advancement of computer graphics, emerging structures such as Implicit Neural Representations (INR)\cite{ran2023neurar,lee2022uncertainty, jin2023neu} are also being utilized to describe NBV planning problems.
+% 体素结构因其简单直观和精度可控，是目标表征的常用结构。
+Voxel structures are commonly used for object representation due to their simplicity, intuitiveness, and controllable precision.
+
+\subsection{Candidate Viewpoint Proposal}
+% 直接从空间中通过最优化方法计算出一个具有6自由度的最优视角非常困难，因此研究者通常会先采样多个候选视角，再从中筛选出最优的一个。
+Finding an optimal 6-DOF viewpoint directly through optimization in space is very challenging, so researchers usually sample a number of candidate viewpoints and then choose the best one.
+% 目前，常见的候选视角采样策略根据其应用场景的不同大致可分为四类：随机采样，使用预设视角、基于路径的采样，以及基于场景信息的采样。
+Currently, common candidate viewpoint sampling strategies can generally be categorized into four types: random sampling\cite{pan2021global,potthast2014probabilistic}, predefined set\cite{connolly1985determination,mendoza2020supervised,pan2022scvp}, path-based sampling\cite{zhou2021fuel,vasquez2018tree,deng2020frontier,batinovic2022shadowcasting}, and scene-information-based sampling\cite{border2024surface,batinovic2021multi}.
+% 候选视角采样策略要根据当前的整体数据采集系统来做适当的调整。
+% 合适的策略将会提高NBV规划框架的收敛效率。
+The candidate viewpoint sampling strategy should be appropriately adjusted according to the current holistic data acquisition system.
+An appropriate strategy will enhance the convergence efficiency of the NBV planning framework.
+
+\subsection{Optimal Viewpoint Selection}
+% 仅凭目标的结构信息（只有位置数据）无法判断哪些区域含有更多潜在信息。
+% 为了衡量这些信息，研究者们通常结合传感器的观测位姿对每个结构单元进行分类，不同类别的单元代表其区域潜在信息量的不同。
+% 筛选候选视角的策略旨在最大化这些潜在信息。
+It's hard to tell which areas have more potential information just from the object's structure(which only includes position data).
+To measure this information, researchers usually classify each structural unit by the sensor's observation pose; different units indicate varying levels of potential information in their areas.
+The strategy for selecting candidate viewpoints aims to maximize this potential information.
+
+% 根据不同NBV问题和场景的需求，最优视角选择策略可以分为注重完整性和注重效率两种。
+Optimal viewpoint selection strategies for different NBV problems and scenarios can be divided into those focusing on completeness and those focusing on efficiency.
+\subsubsection{Completeness-focused strategies}
+% 以体素结构为例，注重完整性的最优视角选取策略，目前最常见的分类方法方法可以分成，基于位置分类[]和占用概率分类[]，以及二者相结合从策略。
+Focusing on voxel structures, the optimal viewpoint selection strategies that emphasize completeness are primarily divided into position-based classification\cite{song2020online, zhou2021fuel, batinovic2021multi, batinovic2022shadowcasting,deng2020frontier}, occupancy probability-based classification\cite{potthast2014probabilistic}, and a combination of both\cite{pan2021global}.
+
+% 基于位置的分类法聚焦于边缘信息，并从所有表征单元中分类出Frontier单元代表边缘位置，最优视角要测到最多Frontier单元。
+% 占用概率法要判断每一个表征单元是实体的概率，利用信息熵理论判断哪个视角将带来最大的信息增益。
+% 结合策略先分类表征单元，再赋予不同单元不同的占用概率，最后通过信息增益筛选最优视角。
+% 有些策略结合实际环境约束，使用效用函数调整贪婪指标，防止机器人无法到达某些视点。
+Position-based classification focuses on edge information and classifies frontier units representing edge locations from all representation units. The optimal viewpoint should capture the maximum number of Frontier units. 
+The occupancy probability method determines the probability of each representation unit being a solid object, using information entropy theory to judge which viewpoint will bring the greatest information gain. 
+The combined strategy first classifies the representation units, then assigns different occupancy probabilities to different units, and finally selects the optimal viewpoint through information gain.
+Also, some strategies incorporate practical environmental constraints and use utility functions to adjust greedy indicators, preventing robots from being unable to reach certain viewpoints\cite{vasquez2014view}.
+
+\subsubsection{Efficiency-focused strategies}
+% 在最优视角选择中，需迭代计算候选视角的潜在信息。
+% 常用的ray-casting算法通过发射多条光线判断单元可见性，但在复杂结构中计算负担大。
+% 注重效率的策略旨在解决此问题。
+In the process of selecting the optimal viewpoint, the potential information of each candidate viewpoint must be calculated iteratively. 
+The commonly used ray-casting algorithm judges the visibility of units by emitting multiple rays, but it poses a significant computational burden when dealing with complex structures. 
+Efficiency strategies aim to address these issues.
+
+% 策略一是降低表征结构复杂度，直接在点云层面分析潜在信息，避免结构构建和可见性查询的时间消耗。
+The first category of strategies focuses on simplifying the representation structure by directly analyzing potential information at the point cloud level\cite{border2024surface,zeng2020pc,dhami2023pred}, thereby reducing the time spent on structure construction and visibility queries.
+
+% 第二类策略通过改进ray-casting提升效率。Vasquez-Gomez 与 Batinovic 都提出了一些策略用于改进ray-casting的效率。Monica 使用GPU来加速ray-casting.
+% 一些深度学习策略可以避免使用光线追踪算法并快速提供最佳视点。
+% mendoza与zen都通过网络来预测信息增益用于选择下一这视角, pan提出的方法可以在只输入一帧观测的情况下推断出后续的所有观测视点。
+% 然而，将此类算法推广到其他与其训练集不同的未知物体具有挑战性。
+The second category of strategies enhances the efficiency of ray-casting.
+Both \cite{vasquez2014view} and \cite{batinovic2022shadowcasting} propose strategies to improve the efficiency of ray-casting itself. \cite{monica2018surfel} uses the GPU to accelerate ray-casting.
+Some deep learning strategies can avoid using ray-tracing algorithms and provide the best viewpoint at a fast speed.
+\cite{mendoza2020supervised} and \cite{zeng2020pc} use the network to predict the information gain for selecting the next perspective. \cite{pan2022scvp} can infer all subsequent observation viewpoints by inputting only one frame of observation.
+However, generalizing such algorithms to other unknown objects that differ from their training set is challenging \cite{border2024surface}.
+
+% 受到先前研究和3D Gaussian Splatting的启发，本文在体素结构的基础上提出了一种NBV planning framework。
+% This framework将分类的前沿体素和占用体素合成椭球，并通过投影法评估候选视角的观测质量.
+% 它在候选视点评估的过程中完全替代了ray-casting，显著提高了的计算效率。
+% 下一节将详细阐述该框架的具体内容。
+Inspired by previous research and the 3D Gaussian Splatting method\cite{kerbl20233d}, we propose an NBV planning framework based on voxel structures. 
+The framework consolidates classified frontier and occupied voxels into an ellipsoid and evaluates the potential observation quality of viewpoints through projection.
+It completely replaces ray-casting in the process of candidate viewpoint evaluation, significantly improving computational efficiency. 
+The next section will elaborate on the specifics of this framework in detail.
+

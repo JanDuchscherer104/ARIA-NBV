@@ -1,0 +1,167 @@
+\section{experiment}
+\label{sec:experiment}
+
+\begin{figure*}[!t]
+  \centering
+  \includegraphics[width=\linewidth]{figure/fig6_ver2.pdf}
+  % \fbox{\rule{0pt}{0.2\textwidth} \rule{0.9\textwidth}{0pt}}
+  \caption{\textbf{Left}: Cluttered scene with objects far from the center, labeled using cardinal directions (NW, NE, SW, SE). \textbf{Center}: Views selected by NBV (red camera frustum) targeting the entire scene versus object-centric NBV focusing on the SW and NW objects. While targeting the entire scene yields a near-uniform distribution of viewpoints, specifying a particular object (the SW or NW object) results in viewpoints clustering on the western side, from which the target object is best observed. \textbf{Right}: Reconstructions trained with these selected views yield improved RGB and depth renderings compared with whole scene NBV.}
+  % 왼쪽은 cluttered 씬에서 중심에서 떨어져 있는 물체들을 표시한 것으로, 방위를 이용하여 NW, NE, SW, SE로 나타낸 것이다. 가운데는 전체 scene을 목표로 NBV를 했을 때 선택되는 뷰 (빨간색 카메라 frustum)과 SW, NW 물체에 집중된 NBV를 했을 때 선택되는 뷰를 visualize한 것으로, 해당 물체를 주로 보는 뷰가 집중적으로 선택되는 것을 볼 수 있다. 이렇게 선택된 뷰로 학습한 reconstruction은 오른쪽에서 보는 것처럼 전체 scene을 목표로 했을 때보다 더 좋은 rgb 및 depth rendering 결과를 보여준다.
+  \label{fig:object centric recon}
+  \vspace{-5mm}
+\end{figure*}
+
+In this section, we evaluate the effectiveness of our view selection for both reconstruction and manipulation. First, we assess how closely the reconstructed scene obtained from the selected views matches the ground-truth geometry. Next, we evaluate the quality of reconstruction for a specific object of interest to determine whether the selected views effectively focus on that target. Finally, we apply our method to real-world robotic experiments.
+
+% 이 섹션에서는 앞에서 소개한 method에 따라 선택된 view가 reconstruction과 manipulation에 얼마나 효과적인지를 확인할 것이다. 우선 뷰를 고른 뒤 같은 방법으로 scene을 reconstruction 했을 때 fitting된 모델이 얼마나 실제와 비슷한지 비교할 것이다. 그 뒤, 집중하고 싶은 물체가 있을 때 고른 view들이 그 물체 한정으로 얼마나 잘 reconstruction하는 지 확인할 것이다. 마지막으로, 이 방법을 실제 robot experiment에 적용하여 잘 적용되는지 확인할 것이다.
+
+\subsection{Next Best View for Whole Scene Reconstruction}
+\subsubsection{Datasets and Metrics}
+
+We evaluate our method on both real and synthetic datasets. For the real-world data, we use 10 scenes from the GraspNet \cite{fang2020graspnet} training set and 4 robot-captured scenes of BOP objects. GraspNet provides ground-truth object masks, while the captured scenes we use pseudo ground-truth masks generated with manual SAM or Grounded SAM2 \cite{ren2024grounded} with text prompts. For the synthetic data, we construct 10 scenes using BlenderProc \cite{denninger2019blenderproc} with BOP objects introducing heavy occlusions, leaning, and stacking among objects. Candidate views are generated on a sphere centered at the scene centroid, by combining randomly sampled viewpoints with spiral-arranged viewpoints that are evenly spaced in longitude at the same latitude.
+
+% For the synthetic data, we construct 10 scenes using BlenderProc \cite{denninger2019blenderproc} with BOP objects. These synthetic scenes are specifically designed to challenge standard top-down perception by introducing heavy occlusions, leaning, and stacking among objects—conditions under which grasping points cannot be reliably determined from a single bird’s-eye view.
+
+% 우리는 우리의 purposed NBV system을 real과 synthetic 양쪽에서 확인하였다. real dataset은 GraspNet의 학습 데이터셋의 한 scene과 MipNeRF360의 kitchen scene을 사용하였다. Object mask에 관하여 GraspNet은 gt object mask를 제공하여 그것을 사용하였고, MipNeRF360은 Grounded SAM2 를 이용하여 pseudo gt object mask를 만들어서 사용하였다. synthetic dataset은 BlenderProc을 이용하여 BOP dataset의 물체들로 scene 2개를 만들어서 사용하였다. 특히나 synthetic dataset은 물체들이 서로 크게 가리거나 기대거나 위에 올려져있는 등 Bird eye view 만으로 grasping point를 제대로 알기 어렵도록 만들어졌다.
+
+% The primary evaluation metrics for reconstruction are PSNR, SSIM \cite{wang2004image}, and LPIPS \cite{zhang2018unreasonable}, computed from the rendered RGB images. To further assess geometric accuracy, we also compare the reconstructed depth MAE with the ground-truth depth. Since our method prunes Gaussians corresponding to background regions, depth comparisons are performed only on pixels that fall within the objects. All results are averaged over three runs.
+The primary evaluation metrics for reconstruction are PSNR, SSIM, and LPIPS, computed from the rendered RGB images. To further assess geometric accuracy, we also compare the reconstructed depth MAE with the ground-truth depth. Since our method prunes Gaussians corresponding to background regions, depth comparisons are performed only on pixels that fall within the objects. All results are averaged over three runs.
+
+% Reconstruction에 대한 기본적인 metric은 rgb rendering에 대한 psnr, ssim, lpips이다. 추가로, geometry에 집중하기 위해 gt depth에 대한 비교도 하여 MAE와 RMSE를 비교하였다. 우리의 방법은 background에 해당하는 gaussian들이 prune 되기 때문에 depth에 대한 비교는 gt object mask에 해당하는 부분에 대해서만 하였다.
+
+\subsubsection{Baseline and Implementation Details}
+For heuristic baselines, we use random sampling, evenly spaced spiral trajectories, and farthest point sampling. For information-based \ac{NBV}, we evaluate FisherRF \cite{jiang2024fisherrf} and the T-/D-optimality criteria from POp-GS \cite{wilson2025pop}, including a block-diagonal variant (B) that accounts for parameter correlations. (POp-T/D/B in table) Each baseline is tested with and without segmentation masks, which are used only for background removal without incorporating any additional features.
+
+% view를 선택하는 가장 기본적인 방법은 random과 spiral 모양으로 일정한 간격으로 찍는 것이 있다. 추가로, 우리는 candidate 중 camera들 간의 거리가 가장 먼 farthest point들을 추가하였다. 추가로 next best view를 고르기 위한 방법 중 FisherRF와 Pop-gs의 T-optimality, D-optimality를 선택했다. baseline들의 경우 segmentation mask를 포함한 것과 포함하지 않은 것을 모두 하였다. 
+
+Reconstruction follows the original \ac{3DGS} pipeline for initialization, rasterization, and densification, except for the object vector supervision, which is unique to our method. We set $\lambda_{Dice} = 0.5$, $\lambda_{obj}=0.1$, $\delta_{obj}=0.1$ for the reconstruction loss. For \ac{NBV}, confidence weights are $\alpha_{obj}=0.3$ and $\alpha_{opa}=0.3$. These values are selected through grid search and fixed for all scenes in our experiments. Information gain weights are $\beta_{d}=10$ and $\beta_{o}=1$ following \cite{strong2024next}.
+
+% reconstruction을 할 때에는 object vector에 관한 부분을 제외하면 기존의 \ac{3dgs}와 hyperparameter의 값과 iteration을 제외한 initialization, rasterization, densification 등의 과정은 동일하게 하였다. reconstruction 과정에서 추가적인 hyperparameter에 대해서 lambda_Dice는 0.5, lambda_obj는 0.1이었고, NBV 과정에서 alpha_obj는 3, alpha_opa는 1로 하였다. scaling을 제외한 render, depth, mask information gain의 weight는 동일하게 1이다.
+
+\subsubsection{Evaluation and Analysis}
+\tabref{tab:main} and \tabref{tab:main2} show the results of reconstructing the entire scene by adding 6 views to an initial 4 views. In both the synthetic and real datasets, our method outperforms other information-based approaches. While methods mostly benefit from using object masks to remove the background, our approach achieves a particularly significant reduction in depth error thanks to the incorporation and optimization of object features, which effectively encodes information from object mask. Moreover, even for the captured scenes in \tabref{tab:main2}, where pseudo ground-truth object masks are used instead of actual ground-truth, our method continues to demonstrate strong performance.
+
+% table 1,2는 한 쪽에 치우쳐진 4개의 initial view가 주어질 때 6개의 view를 추가하여 전체 scene을 reconstruction 했을 때의 결과이다. synthetic dataset과 real dataset 양쪽에서 우리의 방법이 다른 information-based method 보다 좋은 것을 확인할 수 있다. 모든 method에서 object mask를 이용하여 background를 없애는 것이 성능 향상을 이끌어냈지만, 특히 우리의 방법에서 one-hot object vector의 추가와 optimization으로 인해 semantic 정보가 담김으로서 depth error가 크게 줄어들었음을 확인할 수 있다. 또한, ground-truth가 아닌 grounded sam2로 얻은 pseudo ground-truth를 사용한 table 2의 captured scene들에 대해서도 여전히 좋은 성능을 보여준다.
+
+The “All” row, which uses all candidate views for training, can be regarded as the upper bound for reconstruction within the scene. The spiral selection strategy intuitively produces a set of views that provides a well-balanced coverage of the scene and indeed outperforms other heuristic selection methods and information-based baselines in terms of reconstruction quality. However, because the spiral pattern does not account for scene-specific characteristics such as objects located deep inside, so it fails to adapt to individual scene layouts. This limitation becomes more pronounced in the synthetic dataset, which is designed to be more dynamic, compared to the simpler GraspNet dataset where training and test view distributions are more similar.
+
+% 100장의 모든 candidate를 사용하여 학습한 'All' row는 해당 신에서 각 metric의 상한을 보여준다고 할 수 있다. spiral하게 view를 선택한 뷰는 직관적으로도 scene을 전반적으로 잘 표현하는 set이고, 실제로 다른 heuristic selection method들과 information 기반의 baseline들보다도 좋은 reconstruction 결과를 보여준다. 그러나 spiral view는 안쪽에 있는 물체 등은 고려하지 못하기 때문에 scene-specific하지 않고, 이는 scene이 단순하고 training view와 test view의 분포가 비슷한 graspnet dataset보다 더 역동적으로 설계된 synthetic dataset에서 강조된다.
+
+\figref{fig:fig5} provides a qualitative comparison of the results. In the outputs from other methods, the text printed on the boxes appears with a different depth from the surface it is on, making the text distinguishable in the depth image. This occurs because optimization is performed solely on RGB rendering without considering object-level consistency, often leading to local minima in sparse-view settings. In contrast, our method benefits from instance-aware supervision, preventing 3D Gaussians from falling into such local minima and ensuring that they are properly aligned with the surfaces of the boxes. Regarding next best view selection, our approach captures not only the top surfaces and larger objects but also occluded regions and smaller objects, demonstrating a balanced exploration capability and better reconstruction.
+
+% fig 5에서 정성적으로 결과를 비교할 수 있다. 다른 방법들에서의 결과를 보면 박스의 글씨가 그 글씨가 써져 있는 면과 depth가 달라 depth image에서도 글씨가 구분되는 것을 볼 수 있는데, 이는 optimization이 rgb rendering으로만 이뤄져서 같은 물체임을 고려하지 않아 sparse-view에서 자주 발생하는 local minima에 빠졌기 때문이다. 반면, 우리의 방법에서는 semantic supervision 덕에 3D gaussian들이 local minima에 쉽게 빠지지 않고 박스의 면에 따라 똑바르게 분포하여 이런 현상이 관찰되지 않는다. Next best view에 관해서도 우리의 방법이 물체의 윗부분이나 큰 물체 등의 exploitation에만 집중하지 않고 아랫부분이나 가려진 작은 물체 등도 잘 capture하는 것을 확인할 수 있다.
+
+\input{tab/ablation}
+% \input{tab/kroc_temp1}
+% \input{tab/kroc_temp2}
+
+\subsubsection{Ablation Study}
+
+\tabref{tab:ablation} provides an in-depth analysis of each design choice within the proposed method. Incorporating one-hot object vector yields more accurate reconstruction without requiring additional views. Compared to FisherRF results obtained with background-removed images, the improvement is particularly pronounced in depth accuracy which decreases significantly, highlighting the necessity of semantic information for reliable robotic manipulation.
+
+% tab 3은 propose된 pipeline에서 각 design choice들에 대하여 심층적으로 분석한 것이다. object vector의 추가는 같은 수의 view로도 더 정확한 reconstruction이 되는 것을 보여준다. background가 제거된 이미지를 사용한 fisherrf의 결과와 비교할 때 psnr 보다도 크게 줄어든 depth 정확도에서 드러나며, manipulation을 위해 semantic 정보가 필수적이라는 사실을 뒷받침한다. 
+
+Furthermore, we observe that scaling with confidence scores derived from the one-hot object vector and opacity, combined with the information gain from training views, is also effective. While Next Best Sense \cite{strong2024next} (NBS in table) heuristically balances RGB and depth contributions by defining $IG(T,c) = IG_{rgb}(T,c) + 10 IG_{d}(T,c)$, our approach adaptively determines these weights based on the training views, leading to improved robustness.
+
+% 또한 one-hot object vector와 opacity로부터 얻은 confidence score와 training view의 information gain을 이용한 scaling도 효과가 있음을 알 수 있다. Next best sense는 rgb와 depth rendering으로부터 얻은 Information gain을 임의로 scaling하여 $IG(T,c) = 0.1 IG_{rgb}(T,c) + IG_{d}(T,c)$ 를 사용하는데, 우리는 Training view를 이용하여 scaling을 adaptively 하기 때문에 다양한 scene에 대해 더 robust하다.
+
+\input{tab/object_wise_depth}
+
+\subsection{Next Best View for Object-centric Reconstruction}
+
+% \subsubsection{Object-centric Reconstruction Evaluation}
+
+Our method has the capability to select views that are specifically tailored to a designated target object. To clearly validate this effect, we select four corner objects in each scene that are spatially distant from one another as shown in \figref{fig:object centric recon}. This choice is intentional, as performing object-centric reconstruction on objects nearby center would likely result in overlapping visibility across most candidate views. 
+%, thereby diminishing the distinctiveness and effectiveness of targeted view selection.
+
+% 우리의 방법은 집중하고 싶은 물체가 있을 때 그 물체에 특화된 view를 select 할 수 있는 aspect를 가지고 있고, 이를 table 4에서 확인할 수 있다. 그 효과를 확실하게 확인하기 위해 각 Scene에서 서로 가장 멀리 떨어져있는 네 개의 물체를 골랐는데, 이는 서로 가까운 물체들에 대해 object-wise reconstruction을 하면 대부분의 candidate view에서 함께 보일 것이기 때문에 효과가 크지 않을 것이기 때문이다. 
+
+For comparison, we consider three setups: (1) using the entire scene as the reconstruction target, (2) targeting non-selected center objects, and (3) individually targeting each of the four distant corner objects. This comparison highlights how our object-wise \ac{NBV} strategy adapts to different reconstruction goals and spatial distributions.
+
+% Scene 1은 물체 간의 occlustion이 강한 좀 더 clutter된 환경에서, 2는 한 view에 scene의 일부만이 보일 수 있는 좀 더 scattered된 환경에서의 효과를 알 수 있다. 비교 대상은 reconstruction target만을 바꿔서 따로 target object를 정하지 않고 전체 scene에 대해서 했을 때, 떨어져 있는 네 물체가 아닌 나머지 물체 중 하나를 중심으로 했을 때, 그리고 네 물체 각각에 대해 따로 target으로 삼을 때를 비교했다.
+
+% \subsubsection{Evaluation and Analysis}
+
+As shown in \tabref{tab:object_wise} and \figref{fig:object centric recon}, when \ac{NBV} planning is targeted for a specific object rather than the entire scene, the selected viewpoints are concentrated on the corresponding object, leading to improved depth accuracy for the object.
+
+In manipulation tasks, where the target object and its surrounding regions are substantially more critical than distant areas, this strategy not only prevents unnecessary time spent on scanning irrelevant regions but also provides a decisive advantage in both efficiency and accuracy. Consequently, it represents a highly promising direction for achieving robust and task-oriented robotic manipulation.
+
+% \tabref{tab:object_wise}와 \figref{fig:object centric recon}에서 볼 수 있듯이 전체 씬을 목표로 NBV를 했을 때와 특정 물체를 목표로 NBV를 했을 때 그 물체에 대한 view가 집중적으로 뽑혀 depth 결과가 더 좋음을 확인할 수 있다. manipulation을 할 때 target object와 그 주변의 중요성이 멀리 떨어져 있는 부분보다 높다는 것을 생각하면, 이는 관계 없는 영역을 scan하느라 낭비되는 시간을 절약하면서 manipulation의 정확도를 높일 수 있는 아주 좋은 방법이다.
+
+% \begin{figure}[h!]
+%     \centering
+%     \begin{subfigure}{1.0\columnwidth}
+%         \centering
+%         \includegraphics[width=\columnwidth]{figure/fig7_1_ver3.pdf}
+%         \vspace{-5.5mm}
+%         \caption{Convergence analysis on BlenderProc synthetic scene}
+%         \label{syn}
+%     \end{subfigure}
+%     \begin{subfigure}{1.0\columnwidth}
+%         \centering
+%         % \fbox{\rule{0pt}{0.6\columnwidth} \rule{1.0\columnwidth}{0pt}}
+%         \includegraphics[width=\columnwidth]{figure/fig7_2_ver3.pdf}
+%         \vspace{-5.5mm}
+%         \caption{Convergence analysis on captured real scene}
+%         \label{real}
+%     \end{subfigure}
+%     \caption{PSNR and Depth MAE as the number of views increases.}
+%     \label{fig:convergence}
+%     \vspace{-5mm}
+% \end{figure}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\linewidth]{figure/fig7_ver4.pdf}
+  % \fbox{\rule{0pt}{0.3\columnwidth} \rule{0.9\columnwidth}{0pt}}
+  \caption{PSNR and Depth MAE as the number of views increases from 5 to 15 in both synthetic and real scenes.}
+  \label{fig:convergence}
+  \vspace{-5mm}
+\end{figure}
+
+\begin{figure}[!t]
+  \centering
+  % \fbox{\rule{0pt}{0.4\columnwidth} \rule{0.9\columnwidth}{0pt}}
+  \includegraphics[width=\columnwidth]{figure/fig8_ver3.pdf}
+  \caption{Left shows the top-5 aggregated grasp candidates from multi-view EconomicGrasp predictions, grouped by object. Target object can be selected using CLIP embedding similarity between a text prompt and object masks. Right shows execution snapshots of successful grasps on two target objects.}
+  % 왼쪽 부분은 select된 view로부터 얻은 grasping point들을 합친 뒤 object별로 구분한 것이다. coordinate는 robot base를 의미한다. 오른쪽 부분은 그 중 두 물체를 로봇이 성공적으로 집는 것을 보여준다.
+  \label{fig:grasping}
+  \vspace{-5mm}
+\end{figure}
+
+
+\subsection{Analysis on Convergence Speed of Reconstruction}
+
+\figref{fig:convergence} illustrates how the error with respect to the ground-truth depth decreases as the number of selected views increases, comparing our method with the baselines. 
+% During the incremental acquisition of views, we perform $100v$ optimization iterations with spherical harmonics of degree 0. After the complete set of views has been obtained, the reconstruction is refined through 3000 iterations with spherical harmonics of degree 3. 
+Only the final number of selected views is varied, ranging from 5 to 14, and the corresponding depth MAE is measured.
+
+% \figref{fig:convergence}는 baseline들과 우리의 방식으로 NBV를 했을 때 GT Depth와의 오차가 view 개수에 따라 얼마나 빠르게 감소하는 지 그린 것이다. 뷰의 개수가 v일 때 정해진 수가 모이기 전에는 sh degree 0으로 100v의 iteration으로, 모인 뒤에는 sh degree 3으로 3000 iteration으로 최종 reconstruction을 하는 것을 유지하고 최종 개수만 5개부터 14개로 바꿔서 depth MAE를 확인하였다.
+
+As shown in the graph, our method yields better initial results and ultimately achieves higher PSNR and lower depth MAE than all baselines as views increase.
+% As shown in the graph, our method converges more rapidly than the baselines as the number of views increases, and it ultimately achieves higher accuracy. 
+% This effect becomes even more pronounced in the case of object-centric reconstruction. 
+By leveraging an appropriate termination criterion or empirical tuning, the scanning process can be terminated earlier while still maintaining reconstruction quality, thereby significantly reducing the time required for robotic operation.
+
+% 그래프를 보면 개수가 늘어남에 따라 우리의 방법론이 baseline 보다 빠르게 수렴하고 최종적으로도 더 좋은 정확도를 가진다. 또한, object-centric reconstruction을 했을 때는 이런 현상이 더더욱 강하게 발생한다. 이는 적절한 termination criterion이나 경험적 tuning을 통해 scan 과정을 조기 종료하고 reconstructin을 진행하여 로봇이 작업하는 시간을 크게 줄일 수 있음을 시사한다.
+
+% \textcolor{blue}{\lipsum[23]\lipsum[23]\lipsum[23]}
+
+\subsection{Extension to Real-world Manipulation}
+We apply our method to real-world robotic manipulation. To obtain grasping point, we employ EconomicGrasp \cite{wu2024economic}, and the robot platform consists of a Franka Emika Panda arm equipped with an Intel RealSense L515 camera.
+
+% 이 섹션에서는 우리의 방법론을 실제 로봇팔 manipulation에 적용한 것이다. Grasping에는 GraspNet model을 사용하였고, view를 얻고 manipulation을 수행하는 로봇팔은 realsense L515가 mount된 Franka Emika Panda를 이용하였다. view에 대한 object mask는 mipnerf360 데이터셋에 대해서 한 것처럼 grounding sam2를 이용한 pseudo ground truth를 사용하였다.
+
+For multi-view grasping, grasping points are first predicted by using the depth maps rendered from the Gaussian maps of each view into the EconomicGrasp model. The resulting grasp candidates are then transformed and aggregated with the camera poses obtained from the robot arm. After transforming all grasp candidates into the world coordinate frame, we filter them to retain only those with feasible positions and orientations that the robot can safely approach.
+
+As shown in \figref{fig:grasping}, our NBV system successfully selects informative viewpoints and yields reliable grasping points from multiple views. This multi-view strategy is more robust than relying on a single predefined top-down view. In cluttered scenes, top-down views often suffer from severe occlusions, which limit the model’s ability to infer valid grasping points. In contrast, the views selected by our policy provide improved visibility of target objects, making them more suitable for accurate grasp prediction.
+
+Furthermore, when a language prompt specifying a target object is given, we use CLIP to compute the cosine similarity between the prompt embedding and the embeddings of the object masks. The object with the highest similarity is selected, and the NBV planning is performed with a focus on that object. This demonstrates that our object-wise reconstruction framework is well suited for integration with open-vocabulary vision-language models.
+
+% As shown in \figref{fig:grasping}, our NBV system successfully selects informative viewpoints and also returns reliable grasping points from multiple views. This approach is more robust than simply obtaining the grasping point from a top-down view. Furthermore, when a language prompt specifying a target object is given, we use CLIP to compute the cosine similarity between the prompt embedding and the embeddings of the object masks. The object with the highest similarity is selected, and the NBV planning is performed with a focus on that object. This demonstrates that our object-wise reconstruction framework is well suited for integration with open-vocabulary vision-language models.
+
+% fig에 따르면 NBV가 적절한 view를 선택하고 그렇게 뽑은 view에서 grasping point를 얻어 가장 reliable한 graspoing point를 얻음을 알 수 있다. 이는 단순히 graspoing point를 top view에서 얻는 것보다 robust하다. 또한 물체에 대한 prompt가 주어질 때 clip을 이용하여 어떤 object mask와 가장 비슷한지를 embedding의 cosine similarity를 이용하여 찾고 그 object를 위주로 NBV를 수행하는 것을 볼 수 있다. 이는 object-wise reconstruction은 open vocabulary의 활용을 위한 vlm 모델과 결합하기도 적합함을 의미한다.
+
+In real-world scenarios, such as bin picking or retrieving objects from the containers, the reasonable viewpoints are often physically constrained. We recommend watching the supplementary video showcasing examples where our method is applied to such restricted environments.
+
+% 특히, real-world scenario에는 bin picking이나 상자 안에 들어있는 물체들을 보는 등 물체를 볼 수 있는 view 자체가 한정적인 경우가 많다. supplementary로 제공된 비디오에서 상자 안, 책장 안 등에 대해 NBV가 되는 것을 소개했으니 보는 것을 추천한다.

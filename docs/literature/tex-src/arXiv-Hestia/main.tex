@@ -1,0 +1,91 @@
+% WACV 2026 Paper Template
+% based on the ICCV 2025 template (https://media.eventhosts.cc/Conferences/ICCV2025/ICCV2025-Author-Kit-Feb.zip) with
+% WACV-specific details (e.g., 2 tracks) from the WACV 2025 template (https://www.dropbox.com/scl/fi/su44zgdhrzik26p2xu37k/WACV-2025-Author-Kit-Template.zip?rlkey=5qcfimjhxnmx3wlyk7yhk8wg7&dl=0)
+
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+%%%%%%%%% PAPER TYPE  - PLEASE UPDATE FOR FINAL VERSION
+%\usepackage[review,algorithms]{wacv}      % To produce the REVIEW version for the algorithms track
+%\usepackage[review,applications]{wacv}      % To produce the REVIEW version for the applications track
+\usepackage{wacv}              % To produce the CAMERA-READY version
+%\usepackage[pagenumbers]{wacv} % To force page numbers, e.g. for an arXiv version
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{pifont}
+\usepackage[accsupp]{axessibility}  % Improves PDF readability for those with disabilities.
+
+% Import additional packages in the preamble file, before hyperref
+\input{preamble}
+
+% It is strongly recommended to use hyperref, especially for the review version.
+% hyperref with option pagebackref eases the reviewers' job.
+% Please disable hyperref *only* if you encounter grave issues, 
+% e.g. with the file validation for the camera-ready version.
+%
+% If you comment hyperref and then uncomment it, you should delete *.aux before re-running LaTeX.
+% (Or just hit 'q' on the first LaTeX run, let it finish, and you should be clear).
+\definecolor{wacvblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=wacvblue]{hyperref}
+
+%%%%%%%%% PAPER ID  - PLEASE UPDATE
+\def\wacvPaperID{2129} % *** Enter the WACV Paper ID here
+\def\confName{WACV}
+\def\confYear{2026}
+
+
+%%%%%%%%% TITLE - PLEASE UPDATE
+\title{Hestia: Voxel-Face-Aware Hierarchical Next-Best-View Acquisition for Efficient 3D Reconstruction}
+
+%%%%%%%%% AUTHORS - PLEASE UPDATE
+\author{
+Cheng-You Lu$^{1}$ \qquad
+Zhuoli Zhuang$^{1}$ \qquad
+Nguyen Thanh Trung Le$^{1}$ \qquad
+Da Xiao$^{1}$ \\
+Yu-Cheng Chang$^{1}$ \qquad
+Thomas Do$^{1}$ \qquad
+Srinath Sridhar$^{2}$ \qquad
+Chin-Teng Lin$^{1}$ \\
+$^{1}$University of Technology Sydney \qquad
+$^{2}$Brown University\\
+%{\tt\small cheng-you.lu@student.uts.edu.au, srinath@brown.edu}
+}
+
+%\author{Cheng-You Lu\qquad
+%\and
+%\and
+%Zhuoli Zhuang\\
+%University of Technology Sydney\\
+%\and
+%Srinath Sridhar \\
+%Brown University\\
+%Institution1 address\\
+%{\tt\small firstauthor@i1.org}
+% For a paper whose authors are all at the same institution,
+% omit the following lines up until the closing ``}''.
+% Additional authors and addresses can be added with ``\and'',
+% just like the second author.
+% To save space, use either the email address or home page, not both
+%University of Technology Sydney\\
+%First line of institution2 address\\
+%{\tt\small secondauthor@i2.org}
+%}
+
+\begin{document}
+\maketitle
+\input{sec/0_abstract}    
+\input{sec/1_intro}
+\input{sec/2_related}    
+\input{sec/3_method}
+\input{sec/4_result}
+\input{sec/5_conclusion}
+{
+    \small
+    \bibliographystyle{ieeenat_fullname}
+    \bibliography{main}
+}
+\clearpage
+\input{sec/supp}
+
+
+\end{document}

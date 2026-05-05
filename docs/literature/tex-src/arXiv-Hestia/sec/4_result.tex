@@ -1,0 +1,314 @@
+\section{Experiments}
+\label{sec:exp}
+
+\subsection{Experimental Setup}
+
+Hestia is trained on our processed Objaverse~\cite{deitke2024objaverse, Deitke_2023_CVPR} split to showcase its full capability and on our Houses3K~\cite{peralta2020next} split denoted as Hestia-H3K for fair comparison. 
+We use NVIDIA IsaacLab~\cite{mittal2023orbit} to randomly simulate 256 scenes in parallel, with each object scaled up to 8 meters and placed in a 20$\times$20$\times$20m scene.  
+Objects are placed at the origin and the four corners for benchmarking.
+%Objects are randomly translated during training and placed at the origin and the four corners for benchmarking.
+An RGB-D camera is ahead of the Crazyflie drone, which starts from a random collision-free position oriented toward the object center.
+%Unless otherwise specified, we benchmark all methods on three datasets~\cite{deitke2024objaverse, Deitke_2023_CVPR, wu2023omniobject3d, peralta2020next}, resulting in 400 diverse shapes for evaluation, which ensures a comprehensive and fair comparison across methods.
+See~\cref{asec:datasets,asec:train_det} for more details.
+
+\subsection{Overall Performance}
+
+This section addresses three questions: \underline{Q1}: Is Hestia’s improvement marginal? \underline{Q2}: Does the method outperform prior works~\cite{jin2023neu, guedon2023macarons, peralta2020next, chen2024gennbv} with and without large-scale training~\cite{deitke2024objaverse, Deitke_2023_CVPR}? \underline{Q3}: Does large-scale training further improve performance? 
+To answer these questions, we benchmark on three datasets~\cite{deitke2024objaverse, Deitke_2023_CVPR, wu2023omniobject3d, peralta2020next} comprising 400 diverse shapes, ensuring a comprehensive and fair comparison across methods for the point cloud reconstruction task.
+Given the large-scale test set, we select three generalizable baselines~\cite{jin2023neu, chen2024gennbv, peralta2020next} that do not require test-time optimization, along with one online-learning approach~\cite{guedon2023macarons} for benchmarking.
+We do not include 3DGS-based online-learning methods~\cite{wilson2025pop, li2025activesplat, khass2025active} as baselines due to differences in data modality, nor methods~\cite{li2025nextbestpath, chen2025gleam} that target non-object-centric scenes with fewer degrees of freedom.
+
+
+\cref{tab:avg_bench} shows that Hestia not only outperforms prior work on all three datasets, but also achieves at least 4\% and 6\% gains in coverage ratio (CR) and area under the coverage ratio curve (AUC), respectively, while reducing chamfer distance (CD) by 50\% compared to others.
+Hence, this answers \underline{Q1}, showing that Hestia’s improvement is not marginal.
+Hestia-H3K trained on a smaller, less diverse dataset (Houses3K) still outperforms prior work, demonstrating that the improvement comes not only from large-scale diverse training but also from the proposed designs, thus answering \underline{Q2}.
+On both OmniObject3D and Objaverse, Hestia surpasses Hestia-H3K, and even on Hestia-H3K’s own in-distribution set (Houses3K), it achieves slightly better CD, indicating that training on a larger and more diverse dataset provides additional benefits, thus answering \underline{Q3}.
+
+\begin{table*}[thb!]
+\centering
+\setlength{\tabcolsep}{3.1pt}
+\begin{tabular}{cl|
+  ccc|
+  ccc|
+  ccc|
+  ccc|c}
+\multirow{2}{*}{Train Data} &
+\multirow{2}{*}{Method} &
+\multicolumn{3}{c|}{OmniObject3D} &
+\multicolumn{3}{c|}{Objaverse} &
+\multicolumn{3}{c|}{Houses3K} &
+\multicolumn{3}{c|}{Overall} &
+\multirow{2}{*}{FPS$\uparrow$} \\
+& & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+  & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+  & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+  & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$ & \\
+    \specialrule{.1em}{.1em}{.1em}
+  DTU &  NeU-NBV~\cite{jin2023neu} & 77 & 48 & 73 & 79 & 33 & 75 & 78 & 38 & 75 & 78 & 40 & 74 & $<$1 \\
+    \specialrule{.1em}{.1em}{.1em}
+    \NA & MACARONS~\cite{guedon2023macarons} & 89 & 17 & 80 & 85 & 24 & 76 & 85 & 26 & 77 & 86 & 22 & 78 & $<$1 \\
+    \specialrule{.1em}{.1em}{.1em}
+  \multirow{4}{*}{Houses3K} &  ScanRL~\cite{peralta2020next}& 80 & 32 & 75 & 81 & 27 & 78 & 81 & 32 & 76 & 81 & 30 & 76 & 15 \\
+    & GenNBV~\cite{chen2024gennbv} & 93 & 12 & \cellcolor{lightyellow}{87} & 91 & 14 & 86 & 92 & 14 & 87 & 92 & 13 & 87 & \cellcolor{lightgreen}{27} \\
+    & GenNBV (Rep.)~\cite{chen2024gennbv}& 93 & 11 & \cellcolor{lightyellow}{87} & 92 & 13 & 86 & \cellcolor{lightyellow}{94} & 12 & 89 & 93 & 12 & 87 & \cellcolor{lightgreen}{27} \\
+    & Hestia-H3K (Ours) & \cellcolor{lightyellow}{96} & \cellcolor{lightyellow}{6} & \cellcolor{lightgreen}{93}
+ & \cellcolor{lightyellow}{95} & \cellcolor{lightyellow}{8} & \cellcolor{lightyellow}{91} & \cellcolor{lightgreen}{97} & \cellcolor{lightyellow}{7} & \cellcolor{lightgreen}{96} & \cellcolor{lightyellow}{96} & \cellcolor{lightyellow}{7} & \cellcolor{lightyellow}{92} & \cellcolor{lightyellow}{25} \\
+    \specialrule{.1em}{.1em}{.1em}
+    Objaverse & Hestia (Ours)& \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{4} & \cellcolor{lightgreen}{93} & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{7} & \cellcolor{lightgreen}{92} & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{6} & \cellcolor{lightyellow}{94} & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{6} & \cellcolor{lightgreen}{93} & \cellcolor{lightyellow}{25} \\
+    \specialrule{.1em}{.1em}{.1em}
+  \end{tabular}
+\caption{\textbf{Overall performance on OmniObject3D, Objaverse, and Houses3K with 30 images per object.} Results are reported as mean CR (\%), CD (cm), and AUC (\%) over five object center positions. Hestia and Hestia-H3K outperform prior approaches by at least 4\% and 3\% in CR and by 6\% and 5\% in AUC, respectively, while reducing CD by nearly 50\%. Interestingly, Hestia achieves slightly better CD than Hestia-H3K on in-distribution data (Houses3K).}
+\label{tab:avg_bench}
+\end{table*}
+
+
+
+\subsection{Qualitative Comparisons}
+\label{sec:qua}
+
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figures/overall_vis.png}
+  \caption{\textbf{Point cloud reconstruction on three datasets.} Hestia’s reconstructions are visibly better than those of prior approaches.}
+  \label{fig:vis_all}
+\end{figure*}
+
+% \begin{figure*}[tbh!]
+%   \centering
+%   \includegraphics[width=\linewidth]{figures/overall_vis.png}
+%   \caption{\textbf{Point cloud reconstruction on three datasets.} Hestia’s reconstructions are visibly better than those of prior approaches.}
+%   \label{fig:vis_all}
+% \end{figure*}
+
+This section highlights that Hestia’s improvement also extends to visualization in the point cloud reconstruction task. 
+\cref{fig:vis_all} shows that Hestia produces more comprehensive point clouds than prior work across diverse object shapes. 
+Specifically, prior methods fail to reconstruct parts of the teddy bear and anime figurine from OmniObject3D~\cite{wu2023omniobject3d}, the underside of the stair and the cactus's hat and hands from Objaverse~\cite{deitke2024objaverse, Deitke_2023_CVPR}, and self-occluded structures such as the roof soffit or window from Houses3K~\cite{peralta2020next}.
+In addition, Hestia performs well on the complex scenes (see~\cref{fig:vis_all2}).
+This improvement is largely attributed to our design, which incorporates a hierarchical structure that better identifies missing parts of objects and models voxels as cubes rather than points, thereby preserving geometric details.
+More qualitative results (see~\cref{asec:vis_res,asec:limit}), including failure cases, are provided in the supplementary material, and all reconstruction results are included in the supplementary video. 
+
+\subsection{Translation Robustness}
+
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figures/all_shift.png}
+  \caption{\textbf{Point cloud reconstruction on three datasets.} Hestia’s reconstructions are visibly better than those of prior approaches.}
+  \label{fig:vis_shift}
+\end{figure*}
+
+This section demonstrates that Hestia maintains robustness when objects are placed at different positions within the scenes. 
+\cref{atab:base_bench_omni,atab:base_bench_obj,atab:base_bench_h3k} provide detailed results across different object placement settings.
+Hestia exhibits less performance fluctuation, outperforming prior methods on all three datasets.
+The qualitative results (see~\cref{fig:vis_shift,asec:novel}) also show that Hestia's reconstruction is more robust.
+These results highlight the effectiveness of the hierarchical structure, which first predicts the look-at point and then determines the capture destination.
+
+% \begin{table*}[thb!]
+%   \centering
+%   \setlength{\tabcolsep}{3.1pt}
+% \begin{tabular}{l|
+%   ccc|ccc|ccc|ccc|ccc}
+%      & \multicolumn{15}{c}{OmniObject3D Test} \\
+%     \specialrule{.1em}{.1em}{.1em}
+%      \multirow{2}{*}{Method} 
+%      & \multicolumn{3}{c|}{(0, 0)} 
+%      & \multicolumn{3}{c|}{(4, 4)} 
+%      & \multicolumn{3}{c|}{(4, -4)} 
+%      & \multicolumn{3}{c|}{(-4, 4)} 
+%      & \multicolumn{3}{c}{(-4, -4)} \\
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$ \\
+%     \specialrule{.1em}{.1em}{.1em}
+%      NeU-NBV~\cite{jin2023neu} & 88 & 24 & 83 & 73 & 51 & 70 & 75 & 75 & 70 & 72 & 53 & 69 & 76 & 38 & 71 \\
+%     \specialrule{.1em}{.1em}{.1em}
+%      ScanRL~\cite{peralta2020next} & 87 & 21 & 80 & 79 & 37 & 76 & 84 & 21 & 78 & 72 & 47 & 71 & 76 & 35 & 72 \\
+%     MACARONS~\cite{guedon2023macarons} & 86 & 19 & 75 & 93 & 13 & 86 & 91 & 14 & 83 & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{10} & 88 & 80 & 29 & 69 \\
+%     GenNBV~\cite{chen2024gennbv} & 92 & 12 & \cellcolor{lightyellow}{88} & 92 & 14 & 86 & 91 & 15 & 83 & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{10} & \cellcolor{lightyellow}{89} & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{9} & \cellcolor{lightyellow}{88} \\
+%     GenNBV (Rep.)~\cite{chen2024gennbv} & \cellcolor{lightyellow}{93} & \cellcolor{lightyellow}{10} & 87 & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{9} & \cellcolor{lightyellow}{89} & \cellcolor{lightyellow}{92} & \cellcolor{lightyellow}{12} & \cellcolor{lightyellow}{85} & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{10} & 88 & 92 & 11 & 85 \\
+%     \specialrule{.1em}{.1em}{.1em}
+%     Hestia (Ours) & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{4} & \cellcolor{lightgreen}{94} 
+%            & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{4} & \cellcolor{lightgreen}{93} 
+%            & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{5} & \cellcolor{lightgreen}{92} 
+%            & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{4} & \cellcolor{lightgreen}{93} 
+%            & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{5} & \cellcolor{lightgreen}{93} \\
+%     \specialrule{.1em}{.1em}{.1em}
+%   \end{tabular}
+% \caption{\textbf{CR (\%) / CD (cm) / AUC (\%) comparison on the OmniObject3D test set.} Both Hestia and Hestia-H3K outperform other baselines and achieve robust performance across different object positions.}
+% \label{atab:base_bench_omni}
+% \end{table*}
+
+% \begin{table*}[thb!]
+%   \centering
+%   \setlength{\tabcolsep}{3.1pt}
+% \begin{tabular}{l|ccc|ccc|ccc|ccc|ccc}
+%      & \multicolumn{15}{c}{Objaverse Test} \\
+%     \specialrule{.1em}{.1em}{.1em}
+%      \multirow{2}{*}{Method} 
+%      & \multicolumn{3}{c|}{(0, 0)} 
+%      & \multicolumn{3}{c|}{(4, 4)} 
+%      & \multicolumn{3}{c|}{(4, -4)} 
+%      & \multicolumn{3}{c|}{(-4, 4)} 
+%      & \multicolumn{3}{c}{(-4, -4)} \\
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$ \\
+%     \specialrule{.1em}{.1em}{.1em}
+%      NeU-NBV~\cite{jin2023neu} & 88 & 20 & 83 & 76 & 41 & 74 & 77 & 31 & 72 & 77 & 41 & 74 & 78 & 31 & 72 \\
+%     \specialrule{.1em}{.1em}{.1em}
+%      ScanRL~\cite{peralta2020next} & 87 & 18 & 82 & 80 & 31 & 78 & 82 & 23 & 77 & 77 & 37 & 76 & 80 & 27 & 76 \\
+%     MACARONS~\cite{guedon2023macarons} & 88 & 17 & 79 & 91 & 16 & 86 & \cellcolor{lightyellow}{91} & \cellcolor{lightyellow}{15} & \cellcolor{lightyellow}{83} & 75 & 42 & 70 & 78 & 30 & 64 \\
+%     GenNBV~\cite{chen2024gennbv} & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{11} & \cellcolor{lightyellow}{89} & 90 & 15 & 85 & 89 & 17 & 82 & \cellcolor{lightyellow}{93} & \cellcolor{lightyellow}{12} & \cellcolor{lightyellow}{89} & \cellcolor{lightyellow}{91} & \cellcolor{lightyellow}{13} & \cellcolor{lightyellow}{86} \\
+%     GenNBV (Rep.)~\cite{chen2024gennbv} & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{11} & 88 & \cellcolor{lightyellow}{92} & \cellcolor{lightyellow}{12} & \cellcolor{lightyellow}{88} & 90 & \cellcolor{lightyellow}{15} & 82 & 92 & \cellcolor{lightyellow}{12} & 88 & 90 & 14 & 84 \\
+%     \specialrule{.1em}{.1em}{.1em}
+%     Hestia (Ours) & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{7} & \cellcolor{lightgreen}{93} 
+%            & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{7} & \cellcolor{lightgreen}{92} 
+%            & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{6} & \cellcolor{lightgreen}{91} 
+%            & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{7} & \cellcolor{lightgreen}{93} 
+%            & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{8} & \cellcolor{lightgreen}{91} \\
+%     \specialrule{.1em}{.1em}{.1em}
+%   \end{tabular}
+% \caption{\textbf{CR (\%) / CD (cm) / AUC (\%) comparison on the Objaverse test set.} Both Hestia and Hestia-H3K outperform other baselines and achieve robust performance across different object positions.}
+% \label{atab:base_bench_objaverse}
+% \end{table*}
+
+% \begin{table*}[thb!]
+%   \centering
+%   \setlength{\tabcolsep}{3.1pt}
+% \begin{tabular}{l|
+%   ccc|ccc|ccc|ccc|ccc}
+%      & \multicolumn{15}{c}{Houses3K Test} \\
+%     \specialrule{.1em}{.1em}{.1em}
+%      \multirow{2}{*}{Method} 
+%      & \multicolumn{3}{c|}{(0, 0)} 
+%      & \multicolumn{3}{c|}{(4, 4)} 
+%      & \multicolumn{3}{c|}{(4, -4)} 
+%      & \multicolumn{3}{c|}{(-4, 4)} 
+%      & \multicolumn{3}{c}{(-4, -4)} \\
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+%      & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$ \\
+%     \specialrule{.1em}{.1em}{.1em}
+%      NeU-NBV~\cite{jin2023neu} & 85 & 26 & 80 & 73 & 52 & 71 & 81 & 30 & 77 & 72 & 53 & 70 & 80 & 32 & 76 \\
+%     \specialrule{.1em}{.1em}{.1em}
+%      ScanRL~\cite{peralta2020next} & 86 & 21 & 79 & 77 & 40 & 75 & 88 & 19 & 82 & 72 & 50 & 69 & 81 & 28 & 76 \\
+%     MACARONS~\cite{guedon2023macarons} & 87 & 20 & 78 & 92 & 16 & 87 & 93 & 14 & 85 & 71 & 51 & 66 & 81 & 30 & 68 \\
+%     GenNBV~\cite{chen2024gennbv} & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{10} & \cellcolor{lightyellow}{89} & 90 & 18 & 83 & 91 & 16 & 84 & \cellcolor{lightyellow}{94} & 12 & \cellcolor{lightyellow}{89} & \cellcolor{lightyellow}{93} & \cellcolor{lightyellow}{12} & \cellcolor{lightyellow}{89} \\
+%     GenNBV (Rep.)~\cite{chen2024gennbv} & \cellcolor{lightyellow}{94} & 12 & 88 
+%                                          & \cellcolor{lightyellow}{95} & \cellcolor{lightyellow}{10} & \cellcolor{lightyellow}{90} 
+%                                          & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{13} & \cellcolor{lightyellow}{88} 
+%                                          & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{11} & \cellcolor{lightyellow}{89} 
+%                                          & 91 & 14 & 88 \\
+%     \specialrule{.1em}{.1em}{.1em}
+%     Hestia (Ours) & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{5} & \cellcolor{lightgreen}{96} 
+%            & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{5} & \cellcolor{lightgreen}{93} 
+%            & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{7} & \cellcolor{lightgreen}{93} 
+%            & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{5} & \cellcolor{lightgreen}{94} 
+%            & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{7} & \cellcolor{lightgreen}{93} \\
+%     \specialrule{.1em}{.1em}{.1em}
+%   \end{tabular}
+% \caption{\textbf{CR (\%) / CD (cm) / AUC (\%) comparison on the Houses3K test set.} Hestia consistently achieves the best performance across different object positions, while Hestia-H3K (not shown here) also outperforms prior baselines.}
+% \label{atab:base_bench_h3k}
+% \end{table*}
+
+\subsection{Limited Acquisitions}
+
+This section demonstrates the suitability of Hestia for efficient 3D reconstruction, where only a limited number of views can be acquired. 
+\cref{tab:limited_acq} shows that Hestia outperforms prior works by at least 12\% and 5\% in CR under 5-image and 15-image budgets, respectively. 
+Specifically, Hestia achieves 92\% CR with only 5 acquisitions, whereas prior work~\cite{chen2024gennbv} requires 15 images to reach comparable performance. 
+These gains stem from the close-greedy training strategy, which not only mitigates spurious correlations over time but also enables efficient capture during inference.
+
+% \begin{figure*}[tbh!]
+%   \centering
+%   \includegraphics[width=\linewidth]{figures/curves.png}
+%   \caption{\textbf{CR curves on three datasets.} Hestia outperforms prior approaches by nearly 10\% and 5\% in the first five captures and the first fifteen captures, respectively. The efficiency is particularly significant in real-world power-constrained scenarios, where a robot or agent may run out of battery in a short time.}
+%   \label{fig:fail}
+% \end{figure*}
+
+\begin{table}[thb!]
+\centering
+\setlength{\tabcolsep}{3.1pt}
+\begin{tabular}{l|cc}
+Method & 5 images & 15 images \\
+    \specialrule{.1em}{.1em}{.1em}
+    NeU-NBV~\cite{jin2023neu} & 71 & 76\\
+    ScanRL~\cite{peralta2020next} & 69 & 80\\
+    MACARONS~\cite{guedon2023macarons} & 63 & 82\\
+    GenNBV~\cite{chen2024gennbv} & 75 & \cellcolor{lightyellow}{91}\\
+    GenNBV (Rep.)~\cite{chen2024gennbv} & \cellcolor{lightyellow}{80} & \cellcolor{lightyellow}{91}\\
+    \specialrule{.1em}{.1em}{.1em}
+    Hestia (Ours) & \cellcolor{lightgreen}{92} & \cellcolor{lightgreen}{96}\\
+  \end{tabular}
+\caption{\textbf{Mean CR (\%) comparison across the three datasets with limited-view acquisition.} Hestia outperforms prior approaches by at least 12\% and 5\% with a 5-image budget and a 15-image budget. Such efficiency is crucial in real-world power-constrained settings, as robots or agents may exhaust their battery within a short time.}
+\label{tab:limited_acq}
+\end{table}
+
+\subsection{Inference Speed}
+
+Inference speed is critical for next-best-view planning because robots with onboard cameras must capture images for 3D reconstruction before their batteries are depleted. 
+As shown in \cref{tab:avg_bench}, Hestia achieves 25 FPS, which is suitable for real-time deployment. 
+Modeling voxels as cubes rather than points does not significantly reduce inference speed. 
+The speed also demonstrates the advantage of RL-based generalizable next-best-view approaches, since using a policy model to directly predict viewpoints removes the need to sample candidate views for prediction.
+
+\subsection{Ablation Study}
+\label{sec:abl}
+
+This section evaluates the effectiveness of Hestia’s core components through an ablation study (see~\cref{tab:ablation}). 
+We investigate three key ideas: face-aware design, a close-greedy training scheme, and a hierarchical structure. 
+For the non-hierarchical variant, the encoded grid information is fed directly into the policy model to predict 5-DoF viewpoints without feature interpolation, since interpolation requires the look-at point. 
+Applying the close-greedy strategy or the hierarchical structure alone eases the training process, whereas face-aware observation alone may make training more difficult but still provides complementary information. 
+Thus, the close-greedy strategy and hierarchical structure yield stronger gains when applied individually, while combining them with face-aware observation further enhances stability and capture quality. 
+Overall, each component contributes to performance improvements, and integrating all three delivers the best results.
+
+\begin{table}[thb!]
+  \centering
+\begin{tabular}{@{}l|ccc|cc|c}
+    & Face & Greedy & Hier. & CR $\uparrow$ & CD $\downarrow$ & \#Pa. \\
+    \specialrule{.1em}{.1em}{.1em}
+    \multirow{9}{*}{Hestia} &  & & & 88 & 20 & 6.2M \\
+    \cmidrule{2-7}
+    & \checkmark & & & 90 & 17 & 6.2M \\
+    & & \checkmark & & 92 & 13  & 6.2M \\
+    & & & \checkmark & 94 & 11 & 4.9M \\
+    \cmidrule{2-7}
+    & \checkmark & \checkmark & & 95 & 9 & 6.2M \\
+    & & \checkmark & \checkmark & 95 & 8 & 4.9M \\
+    & \checkmark & & \checkmark & 95 & 9 & 4.9M \\
+    \cmidrule{2-7}
+    & \checkmark & \checkmark & \checkmark & 96 & 7 & 4.9M\\
+    \specialrule{.1em}{.1em}{.1em}
+  \end{tabular}
+\caption{\textbf{Ablations on Objaverse~\cite{deitke2024objaverse, Deitke_2023_CVPR}.} Integrating the proposed ideas yields the best performance with fewer parameters.}
+  \label{tab:ablation}
+\end{table}
+
+\subsection{Application}
+
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figures/real_world_vis.png}
+  \caption{\textbf{Real-world demonstration of non-shifted and shifted scenes.} Red boxes indicate manually initialized viewpoints, while blue boxes denote viewpoints predicted by Hestia. The results demonstrate Hestia’s feasibility in real-world environments.}
+  \label{fig:vis_real}
+\end{figure*}
+
+% \begin{figure*}[tbh!]
+%   \centering
+%   \includegraphics[width=\linewidth]{figures/real_world_vis.png}
+%   \caption{\textbf{Real-world demonstration of non-shifted and shifted scenes.} Red boxes indicate manually initialized viewpoints, while blue boxes denote viewpoints predicted by Hestia. The results demonstrate Hestia’s feasibility in real-world environments.}
+%   \label{fig:vis_real}
+% \end{figure*}
+
+This section demonstrates that Hestia is feasible for real-world deployment even without a depth camera. 
+We use a drone equipped with an RGB camera as the mobile agent for data collection and employ a depth predictor~\cite{duisterhof2024mast3r, wang2024dust3r} to convert multi-view RGB images into depth maps. 
+The first three images are manually selected to synchronize the real-world and virtual-world settings. 
+As shown in \cref{fig:vis_real}, Hestia successfully operates in real-world scenarios for both shifted and non-shifted scenes.
+It is worth noting that some prior works~\cite{peralta2020next, chen2024gennbv, jin2023neu, guedon2023macarons} report only simulation results, and their real-world feasibility remains unknown. 
+Please see~\cref{asec:realworld_res,asec:realworld_sys} for more details.
+
+
+

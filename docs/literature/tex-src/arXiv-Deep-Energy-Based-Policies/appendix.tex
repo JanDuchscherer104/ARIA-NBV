@@ -1,0 +1,260 @@
+
+\makeatletter
+\def\mathcolor#1#{\@mathcolor{#1}}
+\def\@mathcolor#1#2#3{%
+  \protect\leavevmode
+  \begingroup
+    \color#1{#2}#3%
+  \endgroup
+}
+\makeatother
+
+\newcommand{\EE}[2]{\mathbb{E}_{#1}\left[#2\right]}
+\newcommand{\pitilde}{\tilde{\pi}}
+\newcommand{\pitildered}{\mathcolor{red}{\pitilde}}
+\newcommand{\Qpisoft}{Q^{\pi}_{\text{soft}}}
+\newcommand{\Qpitildesoft}{Q^{\tilde{\pi}}_{\text{soft}}}
+\newcommand{\Qpistarsoft}{Q^{\pi^*}_{\text{soft}}}
+\newcommand{\Vpisoft}{V^{\pi}_{\text{soft}}}
+\newcommand{\eps}{\varepsilon}
+
+
+\onecolumn
+
+\appendix
+\appendixpage
+%\section*{Appendices}
+%\addcontentsline{toc}{section}{Appendices}
+%\renewcommand{\thesubsection}{\Alph{subsection}}
+%\setcounter{subsection}{0}
+\section{Policy Improvement Proofs}
+\label{app:proofs}
+
+%\subsection{Policy Improvement Proofs}
+In this appendix, we present proofs for the theorems that allow us to show that soft Q-learning leads to policy improvement with respect to the maximum entropy objective.
+First, we define a slightly more nuanced version of the maximum entropy objective that allows us to incorporate a discount factor. This definition is complicated by the fact that, when using a discount factor for policy gradient methods, we typically do not discount the state distribution, only the rewards. In that sense, discounted policy gradients typically do not optimize the true discounted objective. Instead, they optimize average reward, with the discount serving to reduce variance, as discussed by \citet{thomas2014bias}. However, for the purposes of the derivation, we can define the objective that \emph{is} optimized under a discount factor as
+\begin{align*}
+\pi_\text{MaxEnt}^* = 
+\arg\max_\pi \sum_t \EE{(\st,\at) \sim \rho_\pi}{
+\sum_{l=t}^\infty \discount^{l-t} \EE{(\state_l,\action_l)}{ \reward(\st,\at) + \temp \ent(\pi(\sdots|\st)) | \st, \at }
+}.
+\end{align*}
+This objective corresponds to maximizing the discounted expected reward and entropy for future states originating from every state-action tuple $(\st,\at)$ weighted by its probability $\rho_\pi$ under the current policy. Note that this objective still takes into account the entropy of the policy at future states, in contrast to greedy objectives such as Boltzmann exploration or the approach proposed by \citet{o2016pgq}.
+
+We can now derive policy improvement results for soft Q-learning. We start with the definition of the soft Q-value $\Qpisoft$ for any policy $\pi$ as the expectation under $\pi$ of the discounted sum of rewards and entropy :
+\begin{equation}
+\begin{split}
+    \Qpisoft(\state,\action) \triangleq \rz + \E{\tau \sim \pi, \state_0=\state, \action_0=\action}{\sum_{t=1}^{\infty} \gamma^t (r_t + \entropy(\pi(\sdots | \state_t)))}.
+\end{split}
+\end{equation}
+Here, $\tau = (\state_0, \action_0, \state_1, \action_1, \ldots)$ denotes the trajectory originating at $(\state,\action)$. Notice that for convenience, we set the entropy parameter $\alpha$ to 1. The theory can be easily adapted by dividing rewards by $\alpha$. 
+
+The discounted maximum entropy policy objective can now be defined as
+\begin{equation}
+J(\pi)\triangleq \sum_t \EE{(\st,\at) \sim \rho_\pi}{\Qpisoft(\st,\at) + \temp\ent(\pi(\sdots|\st))}.
+\end{equation}
+%As we will see later, $\rho_0$ does not affect the form of the maximum entropy policy.
+
+%\subsubsection{The maximum entropy policy}
+\subsection{The Maximum Entropy Policy}
+\label{app:max_ent_policy}
+If the objective function is the expected discounted sum of rewards, the policy improvement theorem \cite{sutton1998reinforcement} describes how policies can be improved monotonically. There is a similar theorem we can derive for the maximum entropy objective:
+\begin{theorem}
+\label{the:policy_improvement}
+(Policy improvement theorem) Given a policy $\policy$, define a new policy $\pitilde$ as
+\begin{equation}
+\pitilde(\sdots |\state) \propto \exp\left(\Qpisoft(\state,\sdots)\right), \quad \forall\state.
+\end{equation}
+Assume that throughout our computation, $\Q$ is bounded and $\int \exp(\Q(\state,\action)) \ d\action$ is bounded for any $\state$ (for both $\pi$ and $\pitilde$). Then $\Qpitildesoft(\state,\action) \geq \Qpisoft(\state,\action)\ \forall \state,\action$. 
+\end{theorem}
+The proof relies on the following observation: if one greedily maximize the sum of entropy and value with one-step look-ahead, then one obtains $\pitilde$ from $\pi$:
+\begin{equation}
+\begin{split}
+\entropy(\pi(\sdots | \state)) + \EE{\action \sim \policy}{\Qpisoft(\state,\action)} \leq \entropy(\pitildered(\sdots | \state)) + \E{\action \sim \pitildered}{\Qpisoft(\state,\action)}.
+\end{split}
+\end{equation}
+The proof is straight-forward by noticing that 
+\begin{equation}
+\begin{split}
+\entropy(\pi(\sdots | \state)) + \E{\action \sim \pi}{\Qpisoft(\state,\action)} = - \kl{\pi(\sdots|\state)}{\pitilde(\sdots|\state)} + \log\int \exp\left(\Qpisoft(\state,\action)\right) \ d\action
+\end{split}
+\end{equation}
+% We write $\EEE_{\tau \sim \pitildered, \sz=\state,\az=\action}$ with a shorthand $\EEE$. 
+Then we can show that
+\begin{align}
+\Qpisoft(\state,\action) &= \E{\state_1}{\rz + \discount(\entropy(\pi(\sdots | \state_1)) + \E{\action_1 \sim \pi}{\Qpisoft(\state_1,\action_1)})} \notag\\
+&\leq \E{\state_1}{\rz + \discount(\entropy(\pitildered(\sdots | \state_1)) + \E{\action_1 \sim \pitildered}{\Qpisoft(\state_1,\action_1)})} \notag\\
+&= \E{\state_1}{\reward_0 + \discount(\entropy(\pitildered(\sdots | \state_1)) + \reward_1)}  + \discount^2\E{\state_2}{\entropy(\pi(\sdots | \state_2)) + \E{\action_2 \sim \pi}{\Qpisoft(\state_2,\action_2)}} \notag\\
+&\leq \E{\state_1}{\rz + \discount(\entropy(\pitildered(\sdots | \state_1)) +\reward_1} + \discount^2\E{\state_2}{\entropy(\pitildered(\sdots | \state_2)) + \E{\action_2 \sim \pitildered}{\Qpisoft(\state_2,\action_2)}} \notag\\
+&= \E{\state_1\, \action_2\sim\pitildered, \state_2}{\rz + \discount(\entropy(\pitildered(\sdots | \state_1)) + \reward_1) + \discount^2(\entropy(\pitildered(\sdots | \state_2)) + \reward_2)} + \discount^3\E{\state_3}{\entropy(\pitildered(\sdots | \state_3)) + \E{\action_3 \sim \pitildered}{\Qpisoft(\state_3,\action_3)}} \notag\\
+&\ \ \vdots \notag\\
+%&\quad (\text{continuing forever}) \notag\\
+&\leq \E{\tau \sim \pitildered}{\rz + \sum_{t=1}^{\infty}\discount^t(\entropy(\pitildered(\sdots | \st)) + \rt)} \notag\\
+&= \Qpitildesoft(\state,\action).
+\end{align}
+
+With \autoref{the:policy_improvement}, we start from an arbitrary policy $\pi_0$ and define the \textit{policy iteration} as
+\begin{equation}
+\pi_{i+1}(\sdots |\state) \propto \exp\left(\Q^{\pi_i}_{\mathrm{soft}}(\state,\sdots )\right).
+\end{equation}
+Then $\Q^{\pi_i}_{\text{soft}}(\state,\action)$ improves monotonically. Under certain regularity conditions, $\pi_i$ converges to $\pi_{\infty}$. Obviously, we have $\pi_{\infty}(\action|\state) \propto_\action \exp\left(\Q^{\pi_{\infty}}(\state,\action)\right)$. Since any non-optimal policy can be improved this way, the optimal policy must satisfy this energy-based form. Therefore we have proven \autoref{the:ebm}.
+
+%\subsubsection{Soft Bellman equation and soft value iteration}
+\subsection{Soft Bellman Equation and Soft Value Iteration}
+\label{app:soft_bellman_equation}
+Recall the definition of the soft value function:
+\begin{equation}
+\Vpisoft(\state)\triangleq \log \int \exp \left(\Qpisoft(\state,\action)\right) \ d\action.
+\end{equation}
+Suppose $\pi(\action|\state) = \exp\left(\Qpisoft(\state,\action) - \Vpisoft(\state)\right)$. Then we can show that
+\begin{align}
+    \Qpisoft(\state,\action) &= \reward(\state,\action) + \discount \E{\state' \sim \pdyn}{\entropy(\pi(\sdots | \state')) + \E{\action' \sim \pi (\sdots | \state')}{\Qpisoft(\state',\action')}} \notag\\
+    &=\reward(\state,\action) + \discount \E{\state' \sim \pdyn}{\Vpisoft(\state')}.
+\end{align}
+This completes the proof of \autoref{the:soft_bellman}.
+
+Finally, we show that the soft value iteration operator $\mathcal{T}$, defined as 
+\begin{equation}
+\mathcal{T}\Q(\state,\action)\triangleq \reward(\state,\action) + \discount \E{\state' \sim \pdyn}{\log \int \exp \Q(\state',\action') \ d\action'},
+\end{equation}
+is a contraction. Then \autoref{the:soft_q_iteration} follows immediately.
+
+The following proof has also been presented by \citet{fox2015taming}. Define a norm on Q-values as $\|\Q_1 - \Q_2\| \triangleq \max_{\state,\action} |\Q_1(\state,\action) - \Q_2(\state,\action)|$. Suppose $\eps = \|\Q_1 - \Q_2\|$. Then 
+\begin{align}
+    \log \int \exp (\Q_1(\state',\action')) \ d\action' &\leq \log \int \exp( \Q_2(\state',\action')  + \eps)\ d\action'\notag\\
+    &= \log \left(\exp(\eps)\int \exp \Q_2(\state',\action') \ d\action'\right) \notag\\
+    &= \eps + \log \int \exp \Q_2(\action',\action') \ d\action'.
+\end{align}
+Similarly, $\log \int \exp \Q_1(\state',\action') \ d\action' \geq -\eps + \log \int \exp \Q_2(\state',\action') \ d\action'$. Therefore $\|\mathcal{T}\Q_1 - \mathcal{T}\Q_2\| \leq \discount \eps = \discount \|\Q_1 - \Q_2\|$. So $\mathcal{T}$ is a contraction. As a consequence, only one Q-value satisfies the soft Bellman equation, and thus the optimal policy presented in \autoref{the:ebm} is unique.
+
+
+
+
+
+
+
+
+
+\section{Connection between Policy Gradient and Q-Learning}
+\label{app:pg}
+We show that entropy-regularized policy gradient can be viewed as performing soft Q-learning on the maximum-entropy objective. First, suppose that we parametrize a stochastic policy as
+\begin{align}
+\policy^\pgparams(\at|\st) \triangleq \exp\left(\energy^\pgparams(\st, \at) - \bar\energy^\pgparams(\st)\right),
+\label{eq:boltzmann_policy}
+\end{align}
+where $\energy^\pgparams(\st, \at)$ is an energy function with parameters $\pgparams$, and $\bar\energy^\pgparams(\st) =\log\int_\aspace \exp\energy^\pgparams(\st, \at)d\at$ is the corresponding partition function. This is the most general class of policies, as we can trivially transform any given distribution $p$ into exponential form by defining the energy as $\log p$. We can write an entropy-regularized policy gradient as follows:
+\begin{align}
+\nabla_\pgparams \pgloss(\pgparams) =  \E{(\st, \at)\sim\rho_{\policy^\pgparams}}{\nabla_\pgparams\log\policy^\pgparams(\at|\st)\left(\hat\Q_{\policy^\pgparams}(\st, \at)+ b^\pgparams(\st)\right)}   + \nabla_\pgparams\E{\st\sim\rho_{\policy^\pgparams}}{\ent(\policy^\pgparams(\sdots | \st))},
+\label{eq:pg_ent}
+\end{align}
+where $\rho_{\policy^\pgparams}(\st, \at)$ is the distribution induced by the policy, $\hat\Q_{\policy^\pgparams}(\st, \at)$ is an empirical estimate of the Q-value of the policy, and $b^\pgparams(\st)$ is a state-dependent baseline that we get to choose. The gradient of the entropy term is given by
+\begin{align}
+\nabla_\pgparams \ent(\policy^\pgparams) = &-\nabla_\pgparams\E{\st\sim\rho_{\policy^\pgparams}}{\E{\at\sim\policy^\pgparams(\at|\st)}{\log\policy^\pgparams(\at|\st)}}\notag\\
+=&-\E{(\st, \at)\sim\rho_{\policy^\pgparams}}{\nabla_\pgparams\log\policy^\pgparams(\at|\st)\log\policy^\pgparams(\at|\st) + \nabla_\pgparams\log\policy^\pgparams(\at|\st)}\notag\\
+=&-\E{(\st,\at)\sim\rho_{\policy^\pgparams}}{\nabla_\pgparams\log\policy^\pgparams(\at|\st)\left(1 + \log\policy^\pgparams(\at|\st)\right)},
+\end{align}
+and after substituting this back into \autoref{eq:pg_ent}, noting \autoref{eq:boltzmann_policy}, and choosing $b^\pgparams(\st) = \bar\energy^\pgparams(\st) + 1$, we arrive at a simple form for the policy gradient:
+\begin{align}
+%\nabla_\pgparams \pgloss(\pgparams)&=\E{(\st, \at)\sim\rho_{\policy^\pgparams}}{\nabla_\pgparams\log\policy^\pgparams(\at|\st)\left(\hat\Q_{\policy^\pgparams}(\st, \at) - b^\pgparams(\st) - 1 - \log\policy^\pgparams(\at|\st)\right)}\notag\\
+%&=\E{(\st, \at)\sim\rho_{\policy^\pgparams}}{\left(\nabla_\pgparams\energy^\pgparams(\st, \at) - \nabla_\pgparams\bar\energy^\pgparams(\st)\right)\left(\Q_{\policy^\pgparams}(\st, \at) - b^\pgparams(\st) - 1 + \bar\energy^\pgparams(\st)- \energy^\pgparams(\st, \at)\right)}\notag\\
+&=\E{(\st, \at)\sim\rho_{\policy^\pgparams}}{\left(\nabla_\pgparams\energy^\pgparams(\st, \at) - \nabla_\pgparams\bar\energy^\pgparams(\st)\right)\left(\hat\Q_{\policy^\pgparams}(\st, \at) - \energy^\pgparams(\st, \at)\right)}.
+\label{eq:pg}
+\end{align}
+
+To show that \autoref{eq:pg} indeed correponds to soft Q-learning update, we consider the Bellman error
+\begin{align}
+\qloss(\qparams) &= \E{\st\sim q_\st, \at \sim q_\at}{\frac{1}{2}\left(\Qhatsoft^\qparams(\st, \at)- \Qsoft^\qparams(\st, \at)\right)^2},
+\end{align}
+where $\Qhatsoft^\qparams$ is an empirical estimate of the soft Q-function. There are several valid alternatives for this estimate, but in order to show a connection to policy gradient, we choose a specific form
+\begin{align}
+\Qhatsoft^\qparams(\st, \at) = \Ahatsoft^\qtargetparams(\st, \at) + \Vsoft^\qparams(\st),
+\end{align}
+where $\Ahatsoft^\qtargetparams$ is an  empirical soft advantage function that is assumed not to contribute the gradient computation. With this choice, the gradient of the Bellman error becomes
+\begin{align}
+\nabla_\qparams\qloss(\qparams) &= \E{\st\sim q_\st, \at\sim q_\at}{\left(\nabla_\params \Qsoftparams(\st, \at) - \nabla_\qparams\Vsoftparams(\st)\right)\left(\Ahatsoft^\qtargetparams(\st, \at) + \Vsoft^\qparams(\st,\at) - \Qsoftparams(\st, \at) \right)}\notag\\
+&= \E{\st\sim q_\st, \at\sim q_\at}{\left(\nabla_\params \Qsoftparams(\st, \at) - \nabla_\qparams\Vsoftparams(\st)\right)\left(\Qhatsoft^\qparams(\st, \at) - \Qsoft^\qparams(\st, \at)\right)}.
+\label{eq:advantage_gradient}
+\end{align}
+Now, if we choose $\energy^\pgparams(\st, \at) \triangleq \Qsoftparams(\st, \at)$ and $q_\st(\st) q_\at(\at) \triangleq\rho_{\policy^\pgparams}(\st, \at)$, we recover the policy gradient in \autoref{eq:pg}. Note that the choice of using an empirical estimate of the soft advantage rather than soft Q-value makes the target independent of the soft value, and at convergence, $\Qsoftparams$ approximates the soft Q-value up to an additive constant. The resulting policy is still correct, since the Boltzmann distribution in \autoref{eq:boltzmann_policy} is independent of constant shift in the energy function.
+
+
+
+
+
+
+
+
+
+
+\section{Implementation}
+\label{app:implementation}
+
+\subsection{Computing the Policy Update}
+\label{app:compute_actor_update}
+
+Here we explain in full detail how the policy update direction $\hat\nabla_\pparams\ploss$ in \autoref{alg:soft-q-learning} is computed. We reuse the indices $i,j$ in this section with a different meaning than in the body of the paper for the sake of providing a cleaner presentation.
+
+Expectations appear in amortized SVGD in two places. First, SVGD approximates the optimal descent direction $\phi(\sdots)$ in Equation~\eqref{eq:stein_gradient} with an empirical average over the samples $\ati = f^\pparams(\smpli)$. Similarly, SVGD approximates the expectation in Equation \eqref{eq:actor_gradient} with samples $\attildej = f^\pparams(\smpltildej)$, which can be the same or different from $\ati$. Substituting \eqref{eq:stein_gradient} into \eqref{eq:actor_gradient} and taking the gradient gives the empirical estimate
+\begin{equation}
+\hat\nabla_\pparams \ploss (\pparams; \st) = \frac{1}{KM}\sum_{j=1}^K\sum_{i=1}^M\bigg( \kernel(\ati, \attildej)\nabla_{\action'} \Qsoft(\st, \action')\big|_{\action' = \ati}\bigg.\notag \bigg.+ \nabla_{\action'}\kernel(\action', \attildej)\big|_{\action'=\ati}\bigg)\nabla_\pparams f^\pparams(\smpltildej;\st).
+\label{eq:stein_approx_grad}
+\end{equation}
+Finally, the update direction $\hat\nabla_\pparams\ploss$ is the average of $\hat\nabla_\pparams \ploss (\pparams; \st)$, where $\st$ is drawn from a mini-batch.
+
+
+% \subsection{SVGD for Bounded Domains}
+% It is noteworthy that the original SVGD method only applies when the distributions are defined on $\mathbb{R}^d$. However, bounded action spaces appear in many practical situations and also throughout the simulation experiments in this paper. Applying SVGD directly on the actions will cause them to saturate at the boundary of the action space instead of approximating the distribution $\exp(Q(s,\sdots))$. A simple trick to avoid this problem is to let the sampling network $f^\pparams(\smpl; \st)$ output unbounded values, while the Q network applies a squashing operator $\sigma(\sdots)$ to those values before feeding them into a standard neural network. For example, if the action at each dimension is bounded by $-1$ and $1$, then we can choose $\sigma(x) = \tanh(x)$. 
+
+\subsection{Computing the Density of Sampled Actions}
+Equation \autoref{eq:soft_value_as_expectation} states that the soft value can be computed by sampling from a distribution $q_{\action'}$ and that $q_{\action'}(\sdots) \propto \exp\left(\frac{1}{\alpha}\Qsoft^\pparams(\state, \sdots)\right)$ is optimal. A direct solution is to obtain actions from the sampling network: $\action' = f^\pparams(\smpl'; \state)$. If the samples $\smpl'$ and actions $\action'$ have the same dimension, and if the jacobian matrix $\frac{\partial \action'}{\partial \smpl'}$ is non-singular, then the probability density is
+\begin{equation}
+q_{\action'}(\action') = p_{\smpl}(\smpl') \frac{1}{\left| \text{det}\left( \frac{\partial \action'}{\partial \smpl'} \right)\right|}.
+\end{equation}
+In practice, the Jacobian is usually singular at the beginning of training, when the sampler $f^\pparams$ is not fully trained. A simple solution is to begin with uniform action sampling and then switch to $f^\pparams$ later, which is reasonable, since an untrained sampler is unlikely to produce better samples for estimating the partition function anyway.
+
+
+
+
+
+\section{Experiments}
+\label{app:experiments}
+% Describe the environments and hyperparameters; present additional results if necessary
+
+\subsection{Hyperparameters}
+\label{app: hyperparameters}
+Throughout all experiments, we use the following parameters for both DDPG and soft Q-learning. The Q-values are updated using ADAM with learning rate $0.001$. The DDPG policy and soft Q-learning sampling network use ADAM with a learning rate of $0.0001$. The algorithm uses a replay pool of size one million. Training does not start until the replay pool has at least 10,000 samples. Every mini-batch has size $64$. Each training iteration consists of $10000$ time steps, and both the Q-values and policy / sampling network are trained at every time step. All experiments are run for $500$ epochs, except that the multi-goal task uses $100$ epochs and the fine-tuning tasks are trained for $200$ epochs. Both the Q-value and policy / sampling network are neural networks comprised of two hidden layers, with $200$ hidden units at each layer and ReLU nonlinearity. Both DDPG and soft Q-learning use additional OU Noise \cite{uhlenbeck1930theory, lillicrap2015continuous} to improve exploration. The parameters are $\theta = 0.15$ and $\sigma = 0.3$. In addition, we found that updating the target parameters too frequently can destabilize training. Therefore we freeze target parameters for every $1000$ time steps (except for the swimming snake experiment, which freezes for $5000$ epochs), and then copy the current network parameters to the target networks directly ($\tau = 1$).
+
+Soft Q-learning uses $K=M=32$ action samples (see \aref{app:compute_actor_update}) to compute the policy update, except that the multi-goal experiment uses $K=M=100$. The number of additional action samples to compute the soft value is $K_V = 50$. The kernel $\kernel$ is a radial basis function, written as $\kernel(\action,\action') = \exp(-\frac{1}{h}\|\action-\action'\|_2^2)$, where $h = \frac{d}{2\log(M+1)}$, with $d$ equal to the median of pairwise distance of sampled actions $\ati$. Note that the step size $h$ changes dynamically depending on the state $\state$, as suggested in \cite{liu2016stein}. 
+
+The entropy coefficient $\alpha$ is $10$ for multi-goal environment, and $0.1$ for the swimming snake, maze, hallway (pretraining) and U-shaped maze (pretraining) experiments.
+
+All fine-tuning tasks anneal the entropy coefficient $\alpha$ quickly in order to improve performance, since the goal during fine-tuning is to recover a near-deterministic policy on the fine-tuning task. In particular, $\alpha$ is annealed log-linearly to $0.001$ within $20$ epochs of fine-tuning. Moreover, the samples $\smpl$ are fixed to a set $\{\smpl_i\}_{i=1}^{K_{\smpl}}$ and $K_{\smpl}$ is reduced linearly to $1$ within $20$ epochs.
+
+\subsection{Task description}
+All tasks have a horizon of $T = 500$, except the multi-goal task, which uses $T=20$. We add an additional termination condition to the quadrupedal 3D robot to discourage it from flipping over.
+
+\subsection{Additional Results}
+\label{app:additional-results}
+
+\begin{figure}[h]
+    \centering
+     \subfigure[DDPG]
+    {\includegraphics[width=0.45\columnwidth]{figure/exploration/swimmer/progress_exp_011c4_freq_5k.pdf}}
+    \subfigure[Soft Q-learning]
+    {\includegraphics[width=0.45\columnwidth]{figure/exploration/swimmer/progress_exp_011g_freq_5k.pdf}}
+    \caption{ 
+    Forward swimming distance achieved by each policy. Each row is a policy with a unique random seed. x: training iteration, y: distance (positive: forward, negative: backward). Red line: the ``finish line.'' The blue shaded region is bounded by the maximum and minimum distance (which are equal for DDPG). The plot shows that our method is able to explore equally well in both directions before it commits to the better one.
+    \label{fig:swimmer_all_dist_plots}
+    }
+\end{figure}
+
+
+%%Haoran.02.21: (0) pick better figures; (1) change the axis limits and font sizes; (2) we could also show the trajs during fine-tuning if space allows
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figure/pretraining/pretrained/trajs_exp_004b_freq_1k_velocity.pdf}
+    \caption{The plot shows trajectories of the quadrupedal robot during maximum entropy pretraining. The robot has diverse behavior and explores multiple directions. The four columns correspond to entropy coefficients $\alpha = 10, 1, 0.1, 0.01$ respectively. Different rows correspond to policies trained with different random seeds. The x and y axes show the x and y coordinates of the center-of-mass.
+    As $\alpha$ decreases, the training process focuses more on high rewards, therefore exploring the training ground more extensively. However, low $\alpha$ also tends to produce less diverse behavior. Therefore the trajectories are more concentrated in the fourth column.
+    \label{fig:pretrain_trajs}
+    }
+\end{figure}

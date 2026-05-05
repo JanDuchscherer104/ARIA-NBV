@@ -1,0 +1,55 @@
+\section{Introduction}
+\label{sec:intro}
+
+%Throughout the years, 
+Multiview-based 3D scene reconstruction~\cite{schoenberger2016sfm, yao2018mvsnet, xie2019pix2vox, murez2020atlas, wang2021multi, sayed2022simplerecon, xu2023unifying, wang2024dust3r, duisterhof2024mast3r, pan2024glomap} and novel view synthesis~\cite{mildenhall2020nerf, yu2021pixelnerf, yu2022plenoxels, mueller2022instant, zheng2024gpsgaussian, gslrm2024, charatan2024pixelsplat, sabour2024spotlesssplats, flynn2024quark, chen2025mvsplat} have been central topics in computer vision. 
+These methods leverage multiview information to reconstruct high-fidelity scenes. 
+However, data acquisition remains a bottleneck. 
+Most data is collected manually, which is time-consuming and labor-intensive, follows preplanned camera trajectories, or relies on non-active capture systems~\cite{xu2023vr, broxton2020immersive, lin2021deep, yoon2020novel, li2022neural, lu2024diva, chen2024x360}.
+%that do not generalize well to diverse objects.
+%shapes.
+
+To reduce human effort, next-best-view (NBV) planning has been explored for active capture~\cite{monica2018contour, zha1997next, liu2018object, hardouin2020surface, hardouin2020next, lin2022active, pan2022activenerf, lee2022uncertainty, zhan2022activermap, jin2023neu, sunderhauf2023density, ran2023neurar, guedon2023macarons, jiang2023fisherrf}. 
+Traditional next-best-view methods rely on heuristic rules that can work well in specific scenarios but often fail to transfer because fixed rules or hyperparameters do not adapt across scenes~\cite{chen2024gennbv}. 
+Learning-based next-best-view planners, including online-learning and generalizable methods, improve over preplanned trajectories, which frequently miss occluded regions.
+Within learning-based approaches, reinforcement learning-based (RL-based) generalizable methods~\cite{peralta2020next, chen2024gennbv}, which pretrain on a dataset to avoid online learning and directly predict viewpoints as actions, show promising results.
+This removes candidate-viewpoint sampling, which may potentially miss the best views and slow viewpoint acquisition. 
+An occupancy-grid formulation~\cite{chen2024gennbv} further demonstrates strong coverage, viewpoint flexibility, and generalization. 
+Nevertheless, performance remains limited and insufficiently robust across diverse object geometries.
+
+To address the shortcomings, we propose Hestia, a Voxel-Face-Aware \underline{H}ierarchical N\underline{e}xt-Be\underline{s}\underline{t}-V\underline{i}ew \underline{A}cquisition for Efficient 3D Reconstruction. 
+Hestia actively collects data in object-centric scenes by predicting five-degree-of-freedom (5-DoF) viewpoints (x, y, z, yaw, pitch) from voxel-face observations.
+Specifically, Hestia systematically defines the next-best-view task by proposing core components such as dataset choice, observation and reward design, action space, and learning schemes, forming a foundation for the planner.
+
+\begin{figure}[t]  
+  \centering
+  \includegraphics[width=\linewidth]{figures/voxel_ray.png}
+  \caption{\textbf{A voxel is worth more than a ray.} 
+  Unlike the RL-based generalizable method~\cite{chen2024gennbv}, Hestia treats each voxel as a cube by considering its six faces, rather than a point. This reduces the information loss inherent in point approximations, ensuring a more accurate representation of the voxel.
+  }
+  \label{fig:voxel_ray}
+\end{figure}
+
+An idea is \underline{\textit{``A voxel is worth more than a ray''}}. 
+We incorporate the visibility of the six faces of each voxel into both the observation and the reward function (see~\cref{fig:voxel_ray,sec:methods}). 
+Theoretically, if we sample with a one-ray camera in a scene with \(k\) unit cubes and treat each voxel as a point, then from a coupon collector’s perspective~\cite{boneh1997coupon} approximately \(k^{-1/6}\) of the faces will be missed when sampling stops (see Sec.~\ref{asec:theory}). 
+Treating each voxel as a cube enables full face coverage, so Hestia accounts for individual voxel-face visibility and captures data more comprehensively. 
+This representation adds little computational overhead and still achieves real-time operation at 25 FPS (see~\cref{tab:avg_bench}).
+
+Hestia further improves learning by refining the observation, action, and learning process. 
+For observation, Hestia uses the largest dataset that we processed from Objaverse~\cite{Deitke_2023_CVPR, deitke2024objaverse} for the next-best-view task, exposing the policy to a broad range of surface geometries rather than mostly cubic shapes (see Sec.~S8). 
+For action, instead of predicting the full 5-DoF next-best view in one step, Hestia adopts a hierarchical structure. 
+The policy first predicts a look-at point as the target of attention, then determines the viewpoint position conditioned on this point. 
+For learning, Hestia formulates the task as a close-greedy optimization problem in which, given an occupancy grid, it selects the view that maximizes the current coverage ratio. 
+The policy relies only on the previous image, the previous camera pose, and the occupancy grid, rather than a long sequence of images and poses~\cite{peralta2020next, chen2024gennbv}. 
+We also use a small reward discount factor \(\gamma\) to prioritize immediate improvements without depending on an oversized terminal reward. 
+Similar to a greedy algorithm, this reduces spurious correlations\footnote{Spurious correlations~\cite{interpretation1971spurious, kim2024discovering} refer to certain groups contributing to model errors. In this study, spurious correlations refer to large positive future rewards assigned to suboptimal current next-best-view decisions, leading to ineffective policy learning.} between current actions and large future rewards (see Fig.~S8). 
+As a result, Hestia reaches higher coverage with fewer images than prior methods~\cite{guedon2023macarons, jin2023neu, chen2024gennbv, peralta2020next}.
+Finally, we demonstrate that Hestia, as a next-best-view planner, is feasible for real-world application using a drone with an RGB camera as a mobile agent and a depth predictor~\cite{duisterhof2024mast3r, wang2024dust3r} to convert RGB images into depth maps. 
+The contributions of this work are as follows:
+\begin{itemize}
+\item A RL-based generalizable next-best-view planner that considers voxels as cubes rather than points to avoid geometry overlooking.
+\item A hierarchical structure for handling the high-dimensional continuous action space, a larger and more diverse training set for promoting robustness, and a close-greedy strategy for reducing spurious correlations.
+\item Comprehensive evaluations on three datasets show that Hestia achieves non-marginal improvements and is suitable for 3D reconstruction under limited acquisition budgets.
+\end{itemize}
+

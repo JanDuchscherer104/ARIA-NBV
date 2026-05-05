@@ -1,0 +1,41 @@
+
+\begin{table}[]
+    \centering
+    \begin{tabular}{c|c|c|c| c|c|c|c|}
+           & Train & Modality & Decoder & \ASE{} mAP & \ASE{} mAP & \AOThree{} mAP \\ 
+           & Set   &          &         & Snippet  & Sequence  &  Sequence  \\ \hline    
+        % https://docs.google.com/spreadsheets/d/1-C4hIRjXC9phLz-k_BGhe0bWYeCYPMVtjMZgcpshQFs/edit#gid=0
+        Cube R-CNN   &  OTS & frame & 2D CNN & 0.01 & 0.02 & 0.05 \\ \hline
+        Cube R-CNN   &  ASE & frame & 2D CNN& 0.21 & 0.36 & 0.08 \\ 
+        % PARQ~\cite{Xie_2023_ICCV}            & snippet& Trans. & 0.11 &  0.18 & \TODO{0.07 check vid} \\
+        ImVoxelNet & ASE & snippet& 3D CNN  & 0.30 & 0.64 & 0.15 \\ 
+        3DETR       &  ASE   & pts & Transformer & 0.24 & 0.33 & 0.16 \\
+        \EFMmodel{} (ours)  &    ASE        & snip$+$pts & 3D CNN & \textbf{0.40} & \textbf{0.75} & \textbf{0.22} \\  % Slam Pts model
+        % TODO Euston~\cite{}  & all points &  &  NA &  &NA\\
+        %OpenOcc & & & & \\
+    \end{tabular}
+    \caption{The OTS Cube R-CNN model does not generalize well to egocentric data. 
+    Four models trained on \ASE{} training data are evaluated on the simulated \ASE{} validation dataset as well as real-world \AOThree{} dataset. }
+    \label{tab:obj_det_perf}
+    
+\end{table}
+
+
+% \begin{table}[]
+%     \centering
+%     \begin{tabular}{c|c|c| c|c|c|c|}
+%            & Modality & Decoder & \ASE{} mAP & \ASE{} mAP & \AOThree{} mAP \\ 
+%            & &  &  Snippet  & Sequence  &  Sequence  \\ \hline    
+%         % https://docs.google.com/spreadsheets/d/1-C4hIRjXC9phLz-k_BGhe0bWYeCYPMVtjMZgcpshQFs/edit#gid=0
+%         % OTS CubeRCNN~\cite{Brazil_2023_CVPR} & frame & 2D CNN & 0.01 & 0.02 & 0.05 \\
+%         CubeRCNN     & frame & 2D CNN& 0.21 & 0.36 & 0.08 \\ 
+%         % PARQ~\cite{Xie_2023_ICCV}            & snippet& Trans. & 0.11 &  0.18 & \TODO{0.07 check vid} \\
+%         ImVoxelNet & snippet& 3D CNN  & 0.30 & 0.64 & 0.15 \\ 
+%         3DETR            & pts & Trans. & \TODO{0.24} & \TODO{0.33} & 0.16 \\
+%         \EFMmodel{} (ours)              & snip$+$pts & 3D CNN & \TODO{0.39} & \TODO{0.73} & \TODO{0.25} \\  % Slam Pts model
+%         % TODO Euston~\cite{}  & all points &  &  NA &  &NA\\
+%         %OpenOcc & & & & \\
+%     \end{tabular}
+%     \caption{We show in domain performance on \ASE{} validation dataset as well as sim-to-real generalization performance on the \AOThree{} dataset. }
+%     \label{tab:obj_det_perf}
+% \end{table}

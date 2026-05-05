@@ -1,0 +1,23 @@
+\begin{figure}[t!]
+\centering
+\begin{tabular}{cccc}
+% Empty corner cell
+ & {\tiny GT} & {\tiny \EFMmodel{}} & {\tiny ImVoxelNet~\cite{rukhovich2022imvoxelnet}} \\
+% First row with rotated row header
+\begin{sideways}{\tiny ASE 100576}\end{sideways} & 
+\includegraphics[width=0.3\textwidth]{figures/ase_obb_viz/compressed/100576_gt.jpg}\hfill &
+\includegraphics[width=0.3\textwidth]{figures/ase_obb_viz/compressed/100576_pred.jpg}\hfill &
+\includegraphics[width=0.3\textwidth]{figures/ase_obb_viz/compressed/100576_pred_imv.jpg}\hfill \\
+% Second row with rotated row header
+\begin{sideways}{\tiny ASE 100303}\end{sideways} & 
+\includegraphics[width=0.3\textwidth]{figures/ase_obb_viz/compressed/100303_gt.jpg}\hfill &
+\includegraphics[width=0.3\textwidth]{figures/ase_obb_viz/compressed/100303_pred.jpg}\hfill &
+\includegraphics[width=0.3\textwidth]{figures/ase_obb_viz/compressed/100303_pred_imv.jpg}\hfill \\
+\begin{sideways}{\tiny \ \ \ \ \ \ \ \ \  ASE 11132}\end{sideways} & 
+\includegraphics[width=0.3\textwidth]{figures/ase_obb_viz/compressed/11132_gt.jpg}\hfill &
+\includegraphics[width=0.3\textwidth]{figures/ase_obb_viz/compressed/11132_pred.jpg}\hfill &
+\includegraphics[width=0.3\textwidth]{figures/ase_obb_viz/compressed/11132_pred_imv.jpg}\hfill \\
+\end{tabular}
+\caption{\ASE{} validation scenes overlaid with camera trajectories and the 3D OBB predictions from \EFMmodel{} and ImVoxelNet~\cite{rukhovich2022imvoxelnet}.
+\label{fig:obj_det_samples_ase}}
+\end{figure}

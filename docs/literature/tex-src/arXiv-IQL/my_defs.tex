@@ -1,0 +1,18 @@
+\usepackage{mathtools}
+
+\newcommand{\D}{\mathcal{D}}
+\newcommand{\U}{\mathcal{U}}
+\newcommand{\St}{\mathcal{S}}
+\newcommand{\A}{\mathcal{A}}
+\newcommand{\defeq}{\vcentcolon=}
+
+\newcommand*{\DRAFT}{}  %
+\newcommand{\ilya}[1]{\ifdefined\DRAFT \todo[inline,color=green!20!white]{\textbf{Ilya:} #1} \else \fi}
+\newcommand{\ofir}[1]{\ifdefined\DRAFT \todo[inline,color=red!20!white]{\textbf{Ofir:} #1}  \else \fi}
+\newcommand{\ofirc}[1]{\ifdefined\DRAFT \textcolor{magenta}{red: #1} \else \fi}
+
+\newcommand{\jonathan}[1]{\ifdefined\DRAFT \todo[inline,color=magenta!20!white]{\textbf{Jonathan:} #1} \else \fi}
+\newcommand{\jonathanc}[1]{\ifdefined\DRAFT \textcolor{magenta}{Jonathan: #1} \else \fi}
+
+\newcommand{\rob}[1]{\ifdefined\DRAFT \todo[inline,color=cyan!20!white]{\textbf{Rob:} #1} \else \fi}
+\newcommand{\robc}[1]{\ifdefined\DRAFT \textcolor{cyan}{Rob: #1} \else \fi}

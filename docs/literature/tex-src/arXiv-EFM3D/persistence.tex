@@ -1,0 +1,48 @@
+%\subsection{Persisting 3D Predictions}
+%We argue that persisting 3D inferences is
+%As argued in the introduction, persisting 3D inferences is critical to enable compressed context for AI assitants. 
+
+%Inferring the 3D scene state from individual frame or snippet-level 3D inferences is not only useful for downstream systems but also enables comparing different algorithms and measuring how consistent these 3D inferences are across the full sequence. 
+%We describe tracking and fusion systems for both 3D bounding box (3D OBBs) as well as surface predictions to enable accumulation and improvement of 3D OBBs as well as 3D surfaces estimates. 
+
+\subsection{Tracking and Fusion of 3D Bounding Box Predictions}
+
+Sequential object detectors predict an independent set of 3D OBBs per frame (e.g., CubeRCNN~\cite{Brazil_2023_CVPR}) or per snippet (e.g., ImVoxelNet~\cite{rukhovich2022imvoxelnet}). Directly appending all the independent sets of 3D OBBs to the scene state results in noisy and duplicated objects. Therefore, we propose a simple object tracker named \textit{ObbTracker} to track and update the objects in the scene from the sequential predictions.
+
+ObbTracker gets the raw predictions as the inputs and maintains a scene state which consists of a set of tracked 3D OBBs. Note that the raw predictions from the object detector are transformed into the world coordinate system using the camera poses. After filtering out the low-confidence predictions, ObbTracker performs 3 key steps: Association, Update, and Removal, which we will explain in detail.
+
+\noindent \textbf{Association}. We match the predictions that clear a matching score threshold of $p_{assoc}$ and the tracked OBBs in the scene using Hungarian Matching with the cost function:
+\begin{align}
+C_{assoc} = w_1 \cdot C_{class} + w_2 \cdot C_{bbox2} + w_3 \cdot C_{bbox3} + w_4 \cdot C_{iou2d} + w_5 \cdot C_{iou3d},
+\end{align}
+where $C_{class}$ measures the discrepancy between the classes of the predictions and the tracked 3D OBBs, which is implemented as the probability of tracked OBB’s class evaluated on the predicted class distribution, $C_{bbox2}$ is the distance between the 2D bounding box centers, $C_{bbox3}$ is the distance between the 3D bounding box centers, $C_{iou2d}$ is the 2D Intersection over Union (IoU) between the 2D bounding boxes, and $C_{ioui3d}$ is the 3D IoU between the 3D bounding boxes. 
+Specifically we set $w_1=8$, $w_2=0$, $w_3=1$, $w_4=2$, $w_5=0$ for all experiments.
+Then we further filter out the matches where the 2D and 3D IoUs are higher than predefined threshold of $0.2$ for both 2D and 3D IoU.
+Those good matches will be used for updating the tracked OBBs. The remaining predictions are added to the scene as new candidates if they clear an instantiation score threshold $p_{inst}$. We tune the instantiation and association score thresholds but typically keep $p_{assoc} = p_{inst} - 0.05$. 
+%For \EVL{}, ImVoxelNet, 3DETR we use $p_{inst}=0.3$ and for Cube R-CNN $p_{inst} = 0.55$.
+
+\noindent \textbf{Update}. The states of the tracked OBBs are updated with the associated predictions using running average. We define the states of an OBB as its scales $s \in \mathbb{R}^3$, pose in the world coordinate frame $T_{obj}^{w} \in SE(3)$, and the class probability distribution $c \in \mathbb{R}^k$ where $k$ is the number of total categories in the taxonomy. 
+Given a predicted set of parameters $s'$, $c'$, and ${T_{obj}^{w}}'$, the running average of the object parameters is computed as
+\begin{align}
+    n' &= n+1 \\
+    s &= (s n + s') / n'\\
+    c &=  (c n + c') / n'\\
+    T_{obj}^{w} &= T_{obj}^{w} \cdot \exp{({T_{obj}^{w}}' \boxminus T_{obj}^{w} / n')} \;,
+\end{align}
+where ${T_{obj}^{w}}'$ is the predicted object pose, $n$ is the number of observations of the tracked OBB, and $T_a \boxminus T_b = \log(T_a^{-1} T_b)$ is the difference between two poses on the pose manifold SE3 and $\exp{}$ is the exponential map to SE3. 
+
+%Please refer to the supplementary materials for the detailed definition of the $\boxminus$ operator.
+
+\noindent \textbf{Removal}. After the update step, we remove the tracked OBBs which do not get enough observations $w_{min}$ within a certain period of time $t_{inst}$ after it’s added to the scene. We set $n_{min}=2$ and $t_{inst} =1s$.  
+We further suppress duplicate scene OBBs by using both 3D non-maximum suppression (NMS) with IoU threshold of $0.1$ and 2D NMS with IoU threshold of $0.5$.
+
+\subsection{Fusion of Surface Predictions}
+To persist local surface observations into a globally consistent estimation, a fusion system is needed for either depth-based or volumetric methods.
+
+\noindent \textbf{Depth map fusion.} When evaluating depth-map-based surface reconstruction, we use a simple implementation from~\cite{zeng20163dmatch} to fuse per-frame observations into an TSDF volume~\cite{newcombe2011kinectfusion}. The method iteratively projects global volume to depth maps, and computes TSDF values by merging the current depth observations in a global averaging way. After getting the global TSDF volume, the meshes are extracted using the marching cubes algorithm~\cite{lorensen1998marching}. 
+
+\noindent \textbf{Occupancy fusion.} For volumetric methods like \EFMmodel{}, a local occupancy volume is predicted per snippet. We fuse the local occupancy grids into a global grid. Each local occupancy grid is iteratively fused into the global volume, by transforming the global volume to local ones and sampling from them. Similar to depth map fusion, We extract mesh surfaces using marching cubes algorithm.
+
+\noindent \textbf{Implementation details.} Both surface fusion algorithms follow an iterative style by feeding the current observations to a global TSDF (for depths) or occupancy (for \EFMmodel{}) volume. We use the iso-level of $0$ for TSDF fusion and $0.5$ for occupancy fusion. In surface extraction, we set a minimal number of observations for a voxel to be considered valid, which is $2$ for TSDF fusion and $5$ for occupancy fusion.
+
+% For the volumetric occupancy or TSDF predictions we resample local grid predictions into a global scene-wide grid and compute running averages. After this fusion we extract meshes using marching cubes~\cite{lorensen1998marching} with a iso-level of $0.5$ for occupancy and $0$ for TSDF fusion. 

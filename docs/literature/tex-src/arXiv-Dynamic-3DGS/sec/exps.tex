@@ -1,0 +1,283 @@
+\section{Experiments}
+In this section, we present a comprehensive evaluation of our proposed method. We first describe the experimental setup, including the datasets, baseline methods, and evaluation metrics. We then report results on two key scenarios: selecting a limited number of candidate camera poses from large-scale semantic datasets for static semantic 3DGS, and selecting informative frames from multi-camera sequences for dynamic and semantic 3DGS. Finally, we conduct ablation studies to analyze the impact of the log-prior regularization parameter and different feature choices for NBV selection, providing deeper insights into the design and effectiveness of our approach.
+
+\subsection{Experimental Set-up}
+\paragraph{Dataset}
+For semantic 3DGS active training, we choose Replica~\cite{replica}, which composes various indoor environments with semantic labels. We follow the dataset setting of Feature 3DGS ~\cite{feature3dgs} to pick 75-80 images for each scene and leave 15 of them for testing. \\
+For dynamic and semantic 3DGS active training, we choose Neu3D~\cite{dynerf}, which includes 15-21 synchronous camera videos. From each view, we sample 40 temporally synchronized frames. The central view, \texttt{cam00}, is reserved as the test view, and the remaining views are used for training. \\ 
+To gain the ground truth semantic features, we apply LSeg~\cite{Lseg} to semantic segmentation and attain pixel-level features for each image. We utilize Colmap~\cite{schoenberger2016mvs}~\cite{schoenberger2016sfm} to get sparse point clouds for training initialization. 
+
+\paragraph{Baselines}
+We compare our method against random view selection and semantic uncertainty-based selection. Following the approach of Magic Moments~\cite{MagicMoments}, we use feature covariance as a measure of uncertainty and implement the computation efficiently in CUDA. To estimate the second moment of semantic features, we first square each feature vector associated with a Gaussian and accumulate the results to compute the per-pixel second moment. The covariance is then obtained by subtracting the squared mean (i.e., the square of the rendered semantic output) from the second moment.
+
+\paragraph{Metrics}
+We evaluate our rendering quality with Structural Similarity Index Measure (SSIM)~\cite{ssim}, Peak-signal-to-noise ratio (PSNR), and Learned Perceptual Image Patch Similarity (LPIPS)~\cite{lpips}, and semantic segmentation quality with mean intersection-over-union (mIoU) and mean accuracy (mAcc).  
+To evaluate semantic segmentation, we first project Gaussian semantic features into rendered images to get per-pixel features. Then, we project feature maps into class probabilities by computing dot products between features and text features from predefined labels and assigning every pixel to the class with the highest logit per pixel.
+
+ \subsection{Static semantic 3DGS active training}
+For active training in static semantic Gaussian Splatting, we first start our training with two images. Then after 200 iterations, we compute Fisher Information for all the remained camera poses and add the one that yields the highest expected information gain to the training set, until adding 10 images every 200 iterations. The model is then trained for a total of 7,000 iterations. All experiments are conducted on an NVIDIA L40 GPU, requiring approximately 4GB of memory and 45 minutes of training per scene. For each NBV selection, it takes approximately 7 seconds.
+
+Table~\ref{tab:replica_results} summarizes the average performance of different view selection strategies on the Replica dataset. Our method, which incorporates Fisher Information computed with semantic information, achieves the best results across all metrics, indicating improved visual quality and semantic accuracy.
+
+Removing the semantic information from the Fisher Information calculation leads to a consistent decline in performance, highlighting the importance of incorporating semantic sensitivity when estimating view informativeness. The semantic covariance baseline Magic Moments ~\cite{MagicMoments}, which relies on second-order statistics of categorical features, underperforms compared to our Fisher Information-based method with semantic information. The random view selection baseline results in the weakest performance across all metrics, further emphasizing the advantage of principled, information-driven view selection.
+
+
+
+
+
+% \begin{figure}
+%   \centering
+%   \includegraphics[width=0.9\linewidth]{images/semantic1.png}
+%   \includegraphics[width=0.9\linewidth]{images/semantic2.png}
+%   \includegraphics[width=0.9\linewidth]{images/semantic3.png}
+%   \caption{\textbf{semantic segmentation results on Replica Dataset.} Images are the results of visualizing the feature maps of test set after being trained with 12 training views. All the methods are based on Feature 3DGS~\cite{feature3dgs} except for different view selection methods.}
+% \end{figure}
+
+% \begin{figure}[H]
+% \centering
+% \begin{tabular}{@{}c c c@{}}
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Random}}} &
+% \includegraphics[width=0.35\linewidth]{images/Replica/rep_rd1.png} &
+% \includegraphics[width=0.35\linewidth]{images/Replica/rep_rd2.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Magic} \\ \scriptsize \textbf{Moments}}} &
+% \includegraphics[width=0.35\linewidth]{images/Replica/rep_mm1.png} &
+% \includegraphics[width=0.35\linewidth]{images/Replica/rep_mm2.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{FisherRF}}} &
+% \includegraphics[width=0.35\linewidth]{images/Replica/rep_fish1.png} &
+% \includegraphics[width=0.35\linewidth]{images/Replica/rep_fish2.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Ours}}} &
+% \includegraphics[width=0.35\linewidth]{images/Replica/rep_our1.png} &
+% \includegraphics[width=0.35\linewidth]{images/Replica/rep_our2.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Ground} \\ \scriptsize \textbf{Truth}}} &
+% \includegraphics[width=0.35\linewidth]{images/Replica/rep_gt1.png} &
+% \includegraphics[width=0.35\linewidth]{images/Replica/rep_gt2.png} \\
+% \end{tabular}
+%   \caption{\textbf{semantic segmentation results on Replica Dataset.} Images are the results of visualizing the feature maps of test set after being trained with 12 training views. All the methods are based on Feature 3DGS~\cite{feature3dgs} except for different view selection methods to augment the training data.}
+% \end{figure}
+\begin{figure*}[h!]
+  \centering
+  \includegraphics[width=0.9\linewidth]{images/Replica/rep1.png}
+  \includegraphics[width=0.9\linewidth]{images/Replica/rep2.png}
+  \includegraphics[width=0.9\linewidth]{images/Replica/rep3.png}
+  \includegraphics[width=0.9\linewidth]{images/Replica/rep4.png}
+  \caption{\textbf{Semantic segmentation results on Replica dataset.} The first and third rows of images are the rendered results. The second and forth rows of images are the results of visualizing the feature maps of test set after being trained with 12 training views. All the methods are based on Feature 3DGS~\cite{feature3dgs} except for different view selection methods to augment the training data.}
+\end{figure*}
+
+
+
+\definecolor{tabfirst}{rgb}{1, 0.7, 0.7} % red
+\definecolor{tabsecond}{rgb}{1, 0.85, 0.7} % orange
+\definecolor{tabthird}{rgb}{1, 1, 0.7} % yellow
+
+\begin{table}[t]
+\centering
+\small % or \scriptsize if still too wide
+\setlength{\tabcolsep}{4pt} % default is 6pt
+\resizebox{\linewidth}{!}{%
+    \begin{tabular}{lccccc}
+    \toprule
+    Method & SSIM (↑) & PSNR (↑) & LPIPS (↓) & mAcc (↑) & mIoU (↑) \\
+    \midrule
+
+Random                             &                      0.9077 &                      29.6600 &                      0.1477  &                      0.9189 &                      0.7120 \\
+Magic Moments ~\cite{MagicMoments}                & \cellcolor{tabsecond}0.9615 & \cellcolor{tabsecond}33.5200 & \cellcolor{tabsecond}0.0591  & \cellcolor{tabsecond}0.9256 & \cellcolor{tabsecond}0.7593 \\
+FisherRF ~\cite{fisherrf}  &  \cellcolor{tabthird}0.9593 &  \cellcolor{tabthird}32.1700 &  \cellcolor{tabthird}0.0614  &  \cellcolor{tabthird}0.9230 &  \cellcolor{tabthird}0.7441 \\
+Ours &  \cellcolor{tabfirst}0.9626 &  \cellcolor{tabfirst}33.6000 &  \cellcolor{tabfirst}0.0572  &  \cellcolor{tabfirst}0.9289 &  \cellcolor{tabfirst}0.7648\\
+    \bottomrule
+
+    \end{tabular}
+    }
+    \caption{Average performance on Replica dataset under different view selection strategies. The \colorbox{tabfirst}{\textbf{best}}, \colorbox{tabsecond}{\textbf{second best}}, and \colorbox{tabthird}{\textbf{third best}} results are highlighted with light red, orange, and yellow backgrounds, respectively.}
+    \label{tab:replica_results}
+\end{table}
+
+
+ 
+ 
+ \subsection{Dynamic and semantic 3DGS active training}
+ For active training in dynamic and semantic 3DGS, we begin by training a static semantic model using the first frame from all cameras for 3000 iterations. Subsequently, to train the deformation network for dynamic, for each future timestep, we compute the Fisher Information across all candidate camera views and iteratively select the view with the highest information gain every 200 iterations. This process continues until all 39 remaining timesteps are each assigned a single informative camera frame. The dynamic training phase runs 14000 iterations. For regularization, here we set \( \lambda = 10^{-6} \). Training is conducted on an NVIDIA L40 GPU, requiring approximately 8GB of memory and 2 hours per scene. For each NBV selection, it takes approximately 20 seconds.
+
+ Table~\ref{tab:dynerf_results} presents the average performance across five dynamic scenes from the Neu3D dataset using different view selection strategies. The proposed method based on Fisher Information achieves the best performance across all evaluation metrics, presenting superior visual quality and semantic consistency. In contrast, the semantic covariance baseline consistently underperforms the Fisher-based method. The random selection baseline yields the weakest performance, especially in perceptual quality and segmentation accuracy, further validating the effectiveness of Fisher Information-guided view selection for dynamic and semantic 3DGS.
+
+We also analyze the attention patterns of the three selection methods. As shown in Fig.~\ref{heatmap}, which visualizes the interest heatmaps, the subject is in the process of closing the kitchen tongs. Magic Moments~\cite{MagicMoments} distributes attention evenly across the entire kitchen tongs. FisherRF~\cite{fisherrf} emphasizes the connection between the handles and the gripping ends. In contrast, our method focuses more on the handles, likely due to their dynamic motion during the closing action.
+
+\begin{figure*}
+  \centering
+  \includegraphics[width=0.9\linewidth]{images/flame_steak1.png}
+  \includegraphics[width=0.9\linewidth]{images/flame_steak2.png}
+  \includegraphics[width=0.9\linewidth]{images/cut_steak1.png}
+  \includegraphics[width=0.9\linewidth]{images/cut_steak2.png}
+  \caption{\textbf{Zoomed-in qualitative study of our method on Neu3D dataset.} The second and fourth rows are zoom-in figures. Visualizations are the results of the test set after being trained with 39 training views. All the methods are based on the same dynamic and semantic 3DGS, except for different view selection methods to augment the training data.}
+\end{figure*}
+
+% \begin{figure}[htbp]
+% \centering
+% \begin{tabular}{@{}c c c@{}}
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Random}}} &
+% \includegraphics[width=0.304\linewidth]{images/Neu3D/rd1.png} &
+% \includegraphics[width=0.231\linewidth]{images/Neu3D/rd2.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Magic} \\ \scriptsize \textbf{Moments}}} &
+% \includegraphics[width=0.304\linewidth]{images/Neu3D/mm1.png} &
+% \includegraphics[width=0.231\linewidth]{images/Neu3D/mm2.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{FisherRF}}} &
+% \includegraphics[width=0.304\linewidth]{images/Neu3D/fish1.png} &
+% \includegraphics[width=0.231\linewidth]{images/Neu3D/fish2.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Ours}}} &
+% \includegraphics[width=0.304\linewidth]{images/Neu3D/our1.png} &
+% \includegraphics[width=0.231\linewidth]{images/Neu3D/our2.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Ground} \\ \scriptsize \textbf{Truth}}} &
+% \includegraphics[width=0.304\linewidth]{images/Neu3D/gt1.png} &
+% \includegraphics[width=0.231\linewidth]{images/Neu3D/gt2.png} \\
+% \end{tabular}
+% \begin{tabular}{@{}c c c@{}}
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Random}}} &
+% \includegraphics[width=0.304\linewidth]{images/Neu3D/rd3.png} &
+% \includegraphics[width=0.231\linewidth]{images/Neu3D/rd4.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Magic} \\ \scriptsize \textbf{Moments}}} &
+% \includegraphics[width=0.304\linewidth]{images/Neu3D/mm3.png} &
+% \includegraphics[width=0.231\linewidth]{images/Neu3D/mm4.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{FisherRF}}} &
+% \includegraphics[width=0.304\linewidth]{images/Neu3D/fish3.png} &
+% \includegraphics[width=0.231\linewidth]{images/Neu3D/fish4.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Ours}}} &
+% \includegraphics[width=0.304\linewidth]{images/Neu3D/our3.png} &
+% \includegraphics[width=0.231\linewidth]{images/Neu3D/our4.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Ground} \\ \scriptsize \textbf{Truth}}} &
+% \includegraphics[width=0.304\linewidth]{images/Neu3D/gt3.png} &
+% \includegraphics[width=0.231\linewidth]{images/Neu3D/gt4.png} \\
+% \end{tabular}
+%   \caption{\textbf{Zoomed-in Qualitative Study of Our Method on Neu3D Dataset.} The second column is zoom-in figures. Visualizations are the results of the test set after being trained with 39 training views. All the methods are based on the same Dynamic semantic 3DGS, except for different view selection methods to augment the training data.}
+% \end{figure}
+
+
+% \begin{figure}[h!]
+% \centering
+% \begin{tabular}{l c c}
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Magic} \\ \scriptsize \textbf{Moments}}} &
+% \includegraphics[width=0.35\linewidth]{images/heat/heat_mm1.png} &
+% \includegraphics[width=0.35\linewidth]{images/heat/heat_mm2.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{FisherRF}}} &
+% \includegraphics[width=0.35\linewidth]{images/heat/heat_fish1.png} &
+% \includegraphics[width=0.35\linewidth]{images/heat/heat_fish2.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Ours}}} &
+% \includegraphics[width=0.35\linewidth]{images/heat/heat_our1.png} &
+% \includegraphics[width=0.35\linewidth]{images/heat/heat_our2.png} \\
+% \raisebox{0.9cm}{\makecell{\scriptsize \textbf{Ground} \\ \scriptsize \textbf{Truth}}} &
+% \includegraphics[width=0.35\linewidth]{images/heat/heat_gt1.png} &
+% \includegraphics[width=0.35\linewidth]{images/heat/heat_gt2.png} \\
+% \end{tabular}
+% \caption{\textbf{Heatmap for selection method interest on Neu3D dataset.} The second column is zoom-in figures.}
+% \label{heatmap}
+% \end{figure}
+\begin{figure*}
+  \centering
+  \includegraphics[width=0.9\linewidth]{images/heat1.png}
+  \includegraphics[width=0.9\linewidth]{images/heat2.png}
+  \caption{\textbf{Heatmap for selection method interest on Neu3D dataset.} The second row is zoom-in figures.}
+  \label{heatmap}
+\end{figure*}
+
+
+
+
+
+\begin{table}
+\centering
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+Method & SSIM (↑) & PSNR (↑) & LPIPS (↓) & mAcc (↑) & mIoU (↑) \\
+\midrule
+Random & 0.8831 & 26.7361 & 0.1933 & 0.8848 & 0.7284 \\
+Magic Moments~\cite{MagicMoments} & \cellcolor{tabthird}0.9184 & \cellcolor{tabsecond}28.3795 & \cellcolor{tabsecond}0.1581 & \cellcolor{tabsecond}0.8890 & \cellcolor{tabthird}0.7350 \\
+FisherRF~\cite{fisherrf} & \cellcolor{tabsecond}0.9186 & \cellcolor{tabthird}27.6743 & \cellcolor{tabthird}0.1605 & \cellcolor{tabthird}0.8863 & \cellcolor{tabsecond}0.7547 \\
+Ours & \cellcolor{tabfirst}0.9239 & \cellcolor{tabfirst}28.6191 & \cellcolor{tabfirst}0.1553 & \cellcolor{tabfirst}0.8963 & \cellcolor{tabfirst}0.7604 \\
+\bottomrule
+\end{tabular}
+}
+\caption{Average performance across Neu3D under different view selection strategies.}
+\label{tab:dynerf_results}
+\end{table}
+
+
+
+
+
+\subsection{Ablation study}
+
+% \begin{table}
+%     \centering
+%     \begin{tabular}{lccccc}
+%     \toprule
+%     Method & SSIM (↑) & PSNR (↑) & LPIPS (↓) & mAcc (↑) & mIoU (↑) \\
+%     \midrule
+% Ours (w/o regularization)  &  \cellcolor{tabthird}0.9173 &  \cellcolor{tabsecond}28.5853 &  \cellcolor{tabsecond}0.1589  &  \cellcolor{tabsecond}0.8929 &  \cellcolor{tabsecond}0.7413 \\
+% Ours (\( \lambda = 10^{-7} \))   &  \cellcolor{tabsecond}0.9184 &  \cellcolor{tabthird}28.0638 &  \cellcolor{tabthird}0.1594  &  \cellcolor{tabthird}0.8881 &  \cellcolor{tabthird}0.7387 \\
+% Ours (\( \lambda = 10^{-6} \)) &  \cellcolor{tabfirst}0.9239 &  \cellcolor{tabfirst}28.6191 &  \cellcolor{tabfirst}0.1553  &  \cellcolor{tabfirst}0.8963 &  \cellcolor{tabfirst}0.7604\\
+%     \bottomrule
+
+%     \end{tabular}
+%     \caption{Average performance on Neu3D dataset under our view selection strategy with and without regularization. }
+%     \label{tab:Ablative}
+% \end{table}
+\begin{table}[t]
+\centering
+\small % or \scriptsize if still too wide
+\setlength{\tabcolsep}{4pt} % default is 6pt
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+Method & SSIM (↑) & PSNR (↑) & LPIPS (↓) & mAcc (↑) & mIoU (↑) \\
+\midrule
+Ours (w/o reg.) & 0.9173 & \cellcolor{tabsecond}28.5853 & \cellcolor{tabthird}0.1589 & \cellcolor{tabsecond}0.8929 & \cellcolor{tabsecond}0.7413 \\
+Ours ($\lambda = 10^{-7}$) & \cellcolor{tabthird}0.9184 & 28.0638 & 0.1594 & 0.8881 & \cellcolor{tabthird}0.7387 \\
+Ours ($\lambda = 10^{-6}$) & \cellcolor{tabfirst}0.9239 & \cellcolor{tabfirst}28.6191 & \cellcolor{tabfirst}0.1553 & \cellcolor{tabfirst}0.8963 & \cellcolor{tabfirst}0.7604 \\
+Ours ($\lambda = 10^{-5}$) & \cellcolor{tabsecond}0.9186 & \cellcolor{tabthird}28.5295 & \cellcolor{tabsecond}0.1584 & \cellcolor{tabthird}0.8898 & 0.7374 \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Average performance on Neu3D dataset under our view selection strategy with and without regularization.}
+\label{tab:Ablative}
+\end{table}
+
+\begin{table}
+\centering
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+Method & SSIM (↑) & PSNR (↑) & LPIPS (↓) & mAcc (↑) & mIoU (↑) \\
+\midrule
+Geom~\cite{fisherrf} & 0.9186 & 27.6743 & 0.1605 & 0.8863 & \cellcolor{tabthird}0.7547 \\
+Geom+Sem & 
+\cellcolor{tabsecond}0.9200 & \cellcolor{tabsecond}28.2788 & \cellcolor{tabthird}0.1596 & \cellcolor{tabthird}0.8885 & \cellcolor{tabsecond}0.7571 \\
+Geo+Def & 
+\cellcolor{tabthird}0.9198 & \cellcolor{tabthird}28.1501 & \cellcolor{tabsecond}0.1578 & \cellcolor{tabsecond}0.8905 & 0.7367 \\
+Ours & \cellcolor{tabfirst}0.9239 & \cellcolor{tabfirst}28.6191 & \cellcolor{tabfirst}0.1553 & \cellcolor{tabfirst}0.8963 & \cellcolor{tabfirst}0.7604 \\
+\bottomrule
+\end{tabular}
+}
+\caption{Average performance across Neu3D under different view selection strategies.}
+\label{tab:Ablative2}
+\end{table}
+
+\noindent\textbf{Ablation on choice of log-prior regularization parameter.} 
+We conduct an ablation study to evaluate the effect of the log-prior regularization parameter \( \lambda \) in the Fisher Information computation (Eq.~\ref{eq:fisherreg}). This term is critical for stabilizing the diagonal approximation of the Hessian, especially in dynamic and semantic scenes. Table~\ref{tab:Ablative} compares four variants of our method on the Neu3D dataset: no regularization (\( \lambda = 0 \)), weak regularization (\( \lambda = 10^{-7} \)), and our default setting (\( \lambda = 10^{-6} \)), and  strong regularization (\( \lambda = 10^{-5} \)). The results show that the full model with \( \lambda = 10^{-6} \) consistently outperforms the other three across all metrics. Without regularization, the Fisher scores become noisier and less reliable, leading to degraded view selection and semantic accuracy. 
+
+\noindent\textbf{Ablation on Features Used for NBV Selection.} 
+We conduct an ablation study to evaluate the contribution of different features in the Fisher Information computation for NBV selection in 4DGS. Specifically, we compare four variants on the Neu3D dataset: 
+\textbf{Geom}, which uses Fisher information only on geometric parameters following \textit{FisherRF}~\cite{fisherrf}; 
+\textbf{Geom+Sem}, which additionally incorporates semantic features; 
+\textbf{Geom+Def}, which combines geometric and deformation parameters; and 
+\textbf{Ours}, which jointly considers geometric, semantic, and deformation parameters. 
+As shown in Table~\ref{tab:Ablative2}, adding semantic information improves fine-detail reconstruction and high-frequency texture fidelity, while adding deformation information enhances temporal consistency in dynamic regions. 
+Our full model, which integrates all three components, achieves the best performance across all metrics, confirming that semantic and deformation cues provide complementary benefits to purely geometric NBV selection.
+
+
+
+
+
+
+
+
+
+

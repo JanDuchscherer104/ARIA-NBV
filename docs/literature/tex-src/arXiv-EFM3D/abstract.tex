@@ -1,0 +1,21 @@
+
+% We present additional egocentric metadata for the Aria Synthetic Environments (ASE) dataset associated with 3D object detection and 3D surface estimation – two important tasks for egocentric machine perception. Along with this metadata we provide a baseline architecture. We show key architecture design decisions that allow the model to generalize from the simulated ASE dataset to the ADT dataset. We evaluate both methods on the real egocentric ADT dataset. We open source the dataset and models to help accelerate research.
+
+% Two core egocentric 3d perception tasks are object detection and surface regression in 3D.  To study these two tasks we propose a large simulated dataset and two real world validation datasets. We identify core properties of egocentric 3d perception. These guide targeted evaluation protocols as well as model and architecture choices. We show that by leveraging 2d foundation models and 3d point clouds a simple 3d lifting architecture can serve as a unifying architecture for both tasks. It performs well when compared to related work. 
+
+%Two core interrelated 3D perception tasks are object detection and surface regression. 
+%We propose the first benchmarks on real-world egocentric data to study these two tasks in the egocentric setting.
+%On this benchmark existing models trained on non-egocentric data do not perform well. 
+%To address this, we introduce \EFMmodel{}, a model designed for 3D perception on egocentric data.  
+%We show how \EFMmodel{} can be trained on a large simulated dataset to generalize well to the real data benchmark.
+
+The advent of wearable computers enables a new source of context for AI that is embedded in egocentric sensor data. This new egocentric data comes equipped with fine-grained 3D location information and thus presents the opportunity for a novel class of spatial foundation models that are rooted in 3D space. 
+To measure progress on what we term Egocentric Foundation Models (EFMs) we establish EFM3D, a benchmark with two core 3D egocentric perception tasks. EFM3D is the first benchmark for 3D object detection and surface regression on high quality annotated egocentric data of Project Aria. We propose Egocentric Voxel Lifting (\EVL{}), a baseline for 3D EFMs. \EVL{} leverages all available egocentric modalities and inherits foundational capabilities from 2D foundation models. This model, trained on a large simulated dataset, outperforms existing methods on the EFM3D benchmark.
+
+%\keywords{foundation model, 3d object detection, 3D reconstruction}
+
+
+% we propose a benchmark for egocentric detection and surface regression. 
+% And we show initial results that existing methods dont work well on this data.
+% since annotating real world data is 
+% we show how to use simulated data and using egocentric propoerties we get better performance

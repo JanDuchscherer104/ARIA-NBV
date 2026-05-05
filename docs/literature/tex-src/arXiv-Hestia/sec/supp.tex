@@ -1,0 +1,679 @@
+%\clearpage
+\newcommand{\xmark}{\ding{55}} % ×
+%\newcommand{\NA}{--} 
+\renewcommand{\theequation}{S\arabic{equation}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thesection}{S\arabic{section}}
+\renewcommand{\thesubsection}{S\arabic{section}.\arabic{subsection}}
+\renewcommand{\algorithmiccomment}[1]{\hspace{0.5em}\(\triangleright\) #1}
+\setcounter{figure}{0}
+\setcounter{table}{0}
+\setcounter{equation}{0}
+\setcounter{section}{0}
+\setcounter{subsection}{0}
+\setcounter{subsubsection}{0}
+%\appendix
+
+\section*{Supplementary Materials}
+
+In this supplementary material, we present the theoretical grounding for treating voxels as cubes in~\cref{asec:theory}, additional quantitative results in~\cref{asec:bench}, further qualitative results in~\cref{asec:vis_res}, more real-world demonstration results in~\cref{asec:realworld_res}, details of the reward design in~\cref{asec:rew}, the novelty of the proposed components in~\cref{asec:novel}, the impact of spurious correlations in~\cref{asec:spur}, dataset details and preparation in~\cref{asec:datasets}, the real-world system setup and associated costs in~\cref{asec:realworld_sys}, training and testing details in~\cref{asec:train_det}, and limitations in~\cref{asec:limit}.
+%We hope readers understand that the main paper is limited to 8 pages, and therefore, we have included 11 additional sections in the supplementary material.
+%We have made every effort to link the main paper with the supplementary material to improve the reading experience.
+
+\section{Theoretical Grounding}
+\label{asec:theory}
+
+Although treating a voxel as a cube rather than a point straightforwardly avoids overlooking surface geometry, we formalize the benefit through the following \textit{constrained example} from a theoretical perspective.
+Consider a scene composed of \(k\) unit cubes and a 1–ray camera that emits a single ray per sample, where each ray is assumed to intersect one of the cubes in the scene.
+We contrast two sampling rules:
+\begin{itemize}
+  \item \textbf{Scenario 1 (voxel as a point).} Continue sampling until every cube has been intersected by at least one ray.
+  \item \textbf{Scenario 2 (voxel as a cube).} Continue sampling until every face of every cube has been intersected by at least one ray.
+\end{itemize}
+
+Our goal is to compare the expected face visibility achieved after the scenarios terminate.
+Hitting each of the \(k\) cubes at least once can be treated as a classical coupon–collector problem~\cite{boneh1997coupon}, whose expectation is:
+\begin{equation}
+  k\Bigl(1+\frac{1}{2}+\dots+\frac{1}{k}\Bigr)
+    \approx k\ln k .
+  \label{eq:expected_rays_vox}
+\end{equation}
+
+Every ray that hits a cube intersects one of its six faces uniformly at random, so each ray can be viewed as a draw from:
+\begin{equation}
+  N \;=\; 6k
+  \label{eq:total_faces}
+\end{equation}
+distinct faces.
+After \(n\) rays, the probability that a specific face is still unseen is:
+\begin{equation}
+  \Bigl(1-\frac{1}{6k}\Bigr)^{n}
+    \;\approx\;
+    e^{-\frac{n}{6k}},
+  \qquad 6k\gg 1.
+  \label{eq:face_unseen_prob}
+\end{equation}
+Hence, through~\cref{eq:expected_rays_vox,eq:face_unseen_prob}, we know that after Scenario 1 stops, the ratio of the expected non-visible faces is: 
+\begin{equation}
+    e^{-\frac{ k\ln k}{6k}} = k^{-\frac{1}{6}}.
+  \label{eq:face_unseen_ratio}
+\end{equation}
+If \(k=8000\), roughly 22.3\% of the faces remain unseen for Scenario 1, while Scenario 2 can cover all the faces. 
+This theoretical result further motivates treating voxels as cubes rather than points when designing next‑best‑view policies.
+
+\section{Benchmark Details}
+\label{asec:bench}
+
+In this section, we present the detailed coverage ratio (CR), Chamfer Distance (CD), and area under the coverage ratio curve (AUC) from~\cref{tab:avg_bench}, broken down by each object position setting in~\cref{atab:base_bench_omni,atab:base_bench_obj,atab:base_bench_h3k}.
+Hestia outperforms other baselines across all object position settings in the OmniObject3D~\cite{wu2023omniobject3d}, Objaverse~\cite{Deitke_2023_CVPR}, and Houses3K~\cite{peralta2020next} test splits. 
+Moreover, Hestia is the only methods that demonstrate robust performance across all object position settings on all three datasets, with less than a 1\% coverage ratio difference across different object configurations.
+For efficient 3D reconstruction,~\cref{fig:curve} shows that Hestia outperforms other methods by nearly 10\% and 5\% in the first five and fifteen captures, respectively. 
+This efficiency is especially important in real-world power-constrained scenarios, where a robot or agent may quickly exhaust its battery.
+\begin{table*}[thb!]
+  \centering
+  \setlength{\tabcolsep}{3.1pt}
+\begin{tabular}{l|
+  ccc|ccc|ccc|ccc|ccc}
+     & \multicolumn{15}{c}{OmniObject3D Test} \\
+    \specialrule{.1em}{.1em}{.1em}
+     \multirow{2}{*}{Method} 
+     & \multicolumn{3}{c|}{(0, 0)} 
+     & \multicolumn{3}{c|}{(4, 4)} 
+     & \multicolumn{3}{c|}{(4, -4)} 
+     & \multicolumn{3}{c|}{(-4, 4)} 
+     & \multicolumn{3}{c}{(-4, -4)} \\
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$ \\
+    \specialrule{.1em}{.1em}{.1em}
+     NeU-NBV~\cite{jin2023neu} & 88 & 24 & 83 & 73 & 51 & 70 & 75 & 75 & 70 & 72 & 53 & 69 & 76 & 38 & 71 \\
+    \specialrule{.1em}{.1em}{.1em}
+     ScanRL~\cite{peralta2020next} & 87 & 21 & 80 & 79 & 37 & 76 & 84 & 21 & 78 & 72 & 47 & 71 & 76 & 35 & 72 \\
+    MACARONS~\cite{guedon2023macarons} & 86 & 19 & 75 & 93 & 13 & 86 & 91 & 14 & 83 & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{10} & 88 & 80 & 29 & 69 \\
+    GenNBV~\cite{chen2024gennbv} & 92 & 12 & \cellcolor{lightyellow}{88} & 92 & 14 & 86 & 91 & 15 & 83 & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{10} & \cellcolor{lightyellow}{89} & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{9} & \cellcolor{lightyellow}{88} \\
+    GenNBV (Rep.)~\cite{chen2024gennbv} & \cellcolor{lightyellow}{93} & \cellcolor{lightyellow}{10} & 87 & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{9} & \cellcolor{lightyellow}{89} & \cellcolor{lightyellow}{92} & \cellcolor{lightyellow}{12} & \cellcolor{lightyellow}{85} & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{10} & 88 & 92 & 11 & 85 \\
+    \specialrule{.1em}{.1em}{.1em}
+    Hestia (Ours) & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{4} & \cellcolor{lightgreen}{94} 
+           & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{4} & \cellcolor{lightgreen}{93} 
+           & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{5} & \cellcolor{lightgreen}{92} 
+           & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{4} & \cellcolor{lightgreen}{93} 
+           & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{5} & \cellcolor{lightgreen}{93} \\
+    \specialrule{.1em}{.1em}{.1em}
+  \end{tabular}
+\caption{\textbf{CR (\%) / CD (cm) / AUC (\%) comparison on the OmniObject3D test set.} Hestia outperforms other methods and is more robust across different object position settings.}
+\label{atab:base_bench_omni}
+\end{table*}
+\begin{table*}[thb!]
+  \centering
+  \setlength{\tabcolsep}{3.1pt}
+\begin{tabular}{l|ccc|ccc|ccc|ccc|ccc}
+     & \multicolumn{15}{c}{Objaverse Test} \\
+    \specialrule{.1em}{.1em}{.1em}
+     \multirow{2}{*}{Method} 
+     & \multicolumn{3}{c|}{(0, 0)} 
+     & \multicolumn{3}{c|}{(4, 4)} 
+     & \multicolumn{3}{c|}{(4, -4)} 
+     & \multicolumn{3}{c|}{(-4, 4)} 
+     & \multicolumn{3}{c}{(-4, -4)} \\
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$ \\
+    \specialrule{.1em}{.1em}{.1em}
+     NeU-NBV~\cite{jin2023neu} & 88 & 20 & 83 & 76 & 41 & 74 & 77 & 31 & 72 & 77 & 41 & 74 & 78 & 31 & 72 \\
+    \specialrule{.1em}{.1em}{.1em}
+     ScanRL~\cite{peralta2020next} & 87 & 18 & 82 & 80 & 31 & 78 & 82 & 23 & 77 & 77 & 37 & 76 & 80 & 27 & 76 \\
+    MACARONS~\cite{guedon2023macarons} & 88 & 17 & 79 & 91 & 16 & 86 & \cellcolor{lightyellow}{91} & \cellcolor{lightyellow}{15} & \cellcolor{lightyellow}{83} & 75 & 42 & 70 & 78 & 30 & 64 \\
+    GenNBV~\cite{chen2024gennbv} & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{11} & \cellcolor{lightyellow}{89} & 90 & 15 & 85 & 89 & 17 & 82 & \cellcolor{lightyellow}{93} & \cellcolor{lightyellow}{12} & \cellcolor{lightyellow}{89} & \cellcolor{lightyellow}{91} & \cellcolor{lightyellow}{13} & \cellcolor{lightyellow}{86} \\
+    GenNBV (Rep.)~\cite{chen2024gennbv} & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{11} & 88 & \cellcolor{lightyellow}{92} & \cellcolor{lightyellow}{12} & \cellcolor{lightyellow}{88} & 90 & \cellcolor{lightyellow}{15} & 82 & 92 & \cellcolor{lightyellow}{12} & 88 & 90 & 14 & 84 \\
+    \specialrule{.1em}{.1em}{.1em}
+    Hestia (Ours) & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{7} & \cellcolor{lightgreen}{93} 
+           & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{7} & \cellcolor{lightgreen}{92} 
+           & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{6} & \cellcolor{lightgreen}{91} 
+           & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{7} & \cellcolor{lightgreen}{93} 
+           & \cellcolor{lightgreen}{96} & \cellcolor{lightgreen}{8} & \cellcolor{lightgreen}{91} \\
+    \specialrule{.1em}{.1em}{.1em}
+  \end{tabular}
+\caption{\textbf{CR (\%) / CD (cm) / AUC (\%) comparison on the Objaverse test set.} Hestia outperforms other methods and is more robust across different object position settings.}
+\label{atab:base_bench_obj}
+\end{table*}
+\begin{table*}[thb!]
+  \centering
+  \setlength{\tabcolsep}{3.1pt}
+\begin{tabular}{l|
+  ccc|ccc|ccc|ccc|ccc}
+     & \multicolumn{15}{c}{Houses3K Test} \\
+    \specialrule{.1em}{.1em}{.1em}
+     \multirow{2}{*}{Method} 
+     & \multicolumn{3}{c|}{(0, 0)} 
+     & \multicolumn{3}{c|}{(4, 4)} 
+     & \multicolumn{3}{c|}{(4, -4)} 
+     & \multicolumn{3}{c|}{(-4, 4)} 
+     & \multicolumn{3}{c}{(-4, -4)} \\
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$
+     & CR$\uparrow$ & CD$\downarrow$ & AUC$\uparrow$ \\
+    \specialrule{.1em}{.1em}{.1em}
+     NeU-NBV~\cite{jin2023neu} & 85 & 26 & 80 & 73 & 52 & 71 & 81 & 30 & 77 & 72 & 53 & 70 & 80 & 32 & 76 \\
+    \specialrule{.1em}{.1em}{.1em}
+     ScanRL~\cite{peralta2020next} & 86 & 21 & 79 & 77 & 40 & 75 & 88 & 19 & 82 & 72 & 50 & 69 & 81 & 28 & 76 \\
+    MACARONS~\cite{guedon2023macarons} & 87 & 20 & 78 & 92 & 16 & 87 & 93 & 14 & 85 & 71 & 51 & 66 & 81 & 30 & 68 \\
+    GenNBV~\cite{chen2024gennbv} & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{10} & \cellcolor{lightyellow}{89} & 90 & 18 & 83 & 91 & 16 & 84 & \cellcolor{lightyellow}{94} & 12 & \cellcolor{lightyellow}{89} & \cellcolor{lightyellow}{93} & \cellcolor{lightyellow}{12} & \cellcolor{lightyellow}{89} \\
+    GenNBV (Rep.)~\cite{chen2024gennbv} & \cellcolor{lightyellow}{94} & 12 & 88 
+                                         & \cellcolor{lightyellow}{95} & \cellcolor{lightyellow}{10} & \cellcolor{lightyellow}{90} 
+                                         & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{13} & \cellcolor{lightyellow}{88} 
+                                         & \cellcolor{lightyellow}{94} & \cellcolor{lightyellow}{11} & \cellcolor{lightyellow}{89} 
+                                         & 91 & 14 & 88 \\
+    \specialrule{.1em}{.1em}{.1em}
+    Hestia (Ours) & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{5} & \cellcolor{lightgreen}{96} 
+           & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{5} & \cellcolor{lightgreen}{93} 
+           & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{7} & \cellcolor{lightgreen}{93} 
+           & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{5} & \cellcolor{lightgreen}{94} 
+           & \cellcolor{lightgreen}{97} & \cellcolor{lightgreen}{7} & \cellcolor{lightgreen}{93} \\
+    \specialrule{.1em}{.1em}{.1em}
+  \end{tabular}
+\caption{\textbf{CR (\%) / CD (cm) / AUC (\%) comparison on the Houses3K test set.} Hestia outperforms other methods and is more robust across different object position settings.}
+\label{atab:base_bench_h3k}
+\end{table*}
+
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=\linewidth]{figures/curves.png}
+  \caption{\textbf{CR curves on three datasets.} Hestia outperforms prior approaches by nearly 10\% and 5\% in the first five captures and the first fifteen captures, respectively. The efficiency is particularly significant in real-world power-constrained scenarios, where a robot or agent may run out of battery in a short time.}
+  \label{fig:curve}
+\end{figure*}
+
+\section{Qualitative Results}
+\label{asec:vis_res}
+In this section, we present additional qualitative results for OmniObject3D~\cite{wu2023omniobject3d}, Objaverse~\cite{Deitke_2023_CVPR}, and Houses3K~\cite{peralta2020next} in~\cref{afig:omni_all,afig:obj_all,afig:h3k_all,fig:vis_all,afig:shift_all}.
+\cref{afig:omni_all} shows that Hestia’s viewpoints successfully reconstruct the point clouds of real-world scanned objects, while other baselines often miss parts and perform less robustly across various object shapes. 
+Specifically, other baselines miss the starfish’s arms, the sofa’s front or bottom, the plant’s pot, the statue’s head or stand, the table’s surface, and the durian’s flesh.
+All these diverse missing parts are captured by Hestia.
+\cref{afig:obj_all} shows that Hestia’s viewpoints robustly cover various object shapes, while other baselines often miss finer details or parts underneath. 
+Specifically, other methods miss the wooden stand’s legs, the Lego man's face or arms, the lamp’s lampshade or neck, the underside of the wooden log, and the tree’s leaves. 
+In contrast, Hestia successfully captures all these diverse and challenging parts.
+\cref{afig:h3k_all} shows that Hestia’s viewpoints can effectively capture building-like structures, while other methods often miss features such as pillars, roof soffits, or windows.
+\cref{fig:vis_all2} shows that Hestia can capture the complex scene well.
+\cref{afig:shift_all} shows that Hestia is the only method that achieves consistent performance across different object position settings.
+These visualization results validate that our proposed core components, including dataset choice, observation design, action space, reward calculation, and learning scheme, form a significant foundation for the tasks and thereby bring a non-marginal impact.
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=\linewidth]{figures/omni12.png}
+  \caption{\textbf{Qualitative comparison on OmniObject3D~\cite{wu2023omniobject3d}.} Hestia's viewpoints reconstruct the point clouds of real-world scanned objects accurately, while other baselines exhibit less robustness across various object shapes, often missing parts in the reconstructed point clouds.}
+  \label{afig:omni_all}
+\end{figure*}
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=\linewidth]{figures/obj01c.png}
+  \caption{\textbf{Qualitative comparison on Objaverse~\cite{Deitke_2023_CVPR}.} Hestia’s viewpoints successfully reconstruct diverse and complex object shapes, while other baselines exhibit less robustness, often missing self-occluded regions or parts that require bottom-up viewpoints.}
+  \label{afig:obj_all}
+\end{figure*}
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=\linewidth]{figures/h3k01c.png}
+  \caption{\textbf{Qualitative comparison on Houses3K~\cite{peralta2020next}.} Compared to the baselines, the point clouds reconstructed from the depth maps collected by Hestia capture finer details, such as roof soffits, pillars, and windows, particularly in self-occluded areas.}
+  \label{afig:h3k_all}
+\end{figure*}
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=\linewidth]{figures/obj_main.png}
+  \caption{\textbf{Reconstruction on a complex scene.} Hestia captures the scene well.}
+  \label{fig:vis_all2}
+\end{figure*}
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=\linewidth]{figures/all_shift2.png}
+  \caption{\textbf{Qualitative comparison of objects at the four corners.} Hestia performs robustly across different object position settings, while other baselines fail to maintain consistent performance across positions.}
+  \label{afig:shift_all}
+\end{figure*}
+
+\section{Real-World Results}
+\label{asec:realworld_res}
+
+In this section, we present real-world images captured using Hestia operating within the drone system (see~\cref{asec:realworld_sys}).
+\cref{fig:vis_real} demonstrates that Hestia performs well in real-world object-centric scenes, even when the depth camera is unavailable, for both shifted and non-shifted cases. 
+Notably, without a depth camera to synchronize the virtual and real world, we manually set up three viewpoints, which are deliberately placed close to each other (e.g., the red boxes in~\cref{fig:vis_real}). 
+In addition, it is reasonable that some next-best viewpoints appear similar because we use a multi-view depth predictor~\cite{duisterhof2024mast3r, wang2024dust3r} to convert RGB images into depth maps.
+Therefore, it is common for certain viewpoints to overlap in order to obtain depth and update the input state.
+\cref{afig:real_world2} shows that Hestia robustly handles various real-world object shapes. 
+These results demonstrate that Hestia surpasses the prior works~\cite{guedon2023macarons, peralta2020next, chen2024gennbv, jin2023neu, lin2022active, sunderhauf2023density, pan2022activenerf, ran2023neurar, zhan2022activermap}, which have not been validated in real-world environments. 
+In addition, Hestia is suitable for use as a viewpoint predictor for real-world applications.
+% \begin{figure*}[tbh!]
+%   \centering
+%   \includegraphics[width=\linewidth]{figures/real_world_vis.png}
+%   \caption{\textbf{Real-world demonstration of non-shifted and shifted scenes.} Hestia can operate in real-world scenarios with three initial viewpoints (red rectangles) and predict the next-best viewpoints for capture (blue rectangles for the first six views), even when the depth camera is unavailable. Point cloud reconstruction results are shown on the left, with black rectangles representing camera poses.}
+%   \label{afig:real_world1}
+% \end{figure*}
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=\linewidth]{figures/realworld2.png}
+  \caption{\textbf{Real-world demonstration of various object-centric scenes.} Hestia operates in real-world object-centric scenes starting from three initial viewpoints (red rectangles) and predicts the next-best viewpoints for capture (blue rectangles for the first six views), even when the depth camera is unavailable. Point cloud reconstruction results are shown on the left, with black rectangles representing the camera poses.}
+  \label{afig:real_world2}
+\end{figure*}
+
+%\FloatBarrier
+\section{Reward Design}
+\label{asec:rew}
+
+In this section, we review the design of our reward function.
+The reward function in Hestia is formulated as
+\begin{equation}
+r_t = R(s_t, a_t) = r_{\text{coverage}}(s_t, a_t) + r_{\text{constraint}}(s_t, a_t).
+\end{equation}
+To promote the exploration of previously unseen surfaces, we define the positive reward as
+\begin{align}
+r_{\text{coverage}}(s_t, a_t) 
+&= \frac{\sum_{i=1}^N \sum_{j=1}^6 \left( F_t^{i,j} - F_{t-1}^{i,j} \right) \cdot M_{\text{col}}}{N \cdot 6} \notag \\
+&\quad \cdot 0.3
+\end{align}
+where $F_t^{i,j}$ and $F_{t-1}^{i,j}$ denote the visibility status of the $j$-th face of the $i$-th voxel at time $t$ and $t-1$, respectively. 
+The variable $M_{\text{col}} \in \{0, 1\}$ acts as a collision indicator, set to $0$ when a collision occurs, thereby nullifying any potential reward for unsafe actions.
+This reward is computed based on the increment in newly visible voxel faces at the current step. 
+By focusing on the increment rather than the accumulated visibility, the agent is better able to associate rewards with the immediate effects of its actions.
+To discourage unsafe or invalid decisions, we define a penalty as
+\begin{equation}
+r_{\text{constraint}}(s_t, a_t) =
+\begin{cases} 
+-0.01, & \text{if } r_{\text{coverage}}(s_t, a_t) = 0, \\
+       & \text{or } a_t[2] > H_t, \\
+       & \text{or } a_t \in \text{non-free voxels}, \\
+0,     & \text{otherwise.}
+\end{cases}
+\end{equation}
+In particular, a negative reward is assigned if the agent fails to reveal any new faces, attempts to move above the maximum allowable flight height $H_t$, or selects a viewpoint located within non-free voxels.
+To ensure a balance between positive and negative rewards, the positive reward is scaled by a factor of $0.3$.  
+This weighting is based on the observation that the maximum face ratio is 1 and each episode ends after 50 steps.  
+As a result, the total possible positive reward is approximately $0.3 \times 1 = 0.3$, which roughly aligns with the maximum overall value of the negative penalty $0.01 \times 50 = 0.5$.  
+If the episode ends earlier, such as after 30 steps, this reward structure maintains a perfect balance.
+
+
+\section{Novelty Justification}
+\label{asec:novel}
+
+\begin{table*}[tbh!]
+    \centering
+\begin{tabular}{
+    p{2.5cm}| 
+    >{\centering\arraybackslash}p{1.0cm}
+    >{\centering\arraybackslash}p{1.0cm}
+    >{\centering\arraybackslash}p{1.0cm}
+    >{\centering\arraybackslash}p{0.8cm}
+    >{\centering\arraybackslash}p{1.0cm}
+    >{\centering\arraybackslash}p{0.7cm}
+    >{\centering\arraybackslash}p{0.9cm}
+    >{\centering\arraybackslash}p{0.8cm}
+}
+        \multirow{3}{*}{Method} & No Cand. View & No Online Learn. & Voxel as Cube & Hier. Str. & Greedy & Div. Data. & Robust for Shift. & Real-World Demo. \\
+        \specialrule{.1em}{.1em}{.1em} 
+        Active3D~\cite{lin2022active} & \xmark & \xmark & \NA & \xmark & \NA & \xmark & \NA & \xmark \\
+        NeRF-En~\cite{sunderhauf2023density} & \xmark & \xmark & \NA & \xmark & \NA & \xmark & \NA & \xmark \\
+        ActiveNeRF~\cite{pan2022activenerf} & \xmark & \xmark & \NA & \xmark & \NA & \xmark & \NA & \xmark \\
+        NeurAR~\cite{ran2023neurar} & \xmark & \xmark & \NA & \xmark & \NA & \xmark & \NA & \xmark \\
+        EfficientView~\cite{zeng2022efficient} & \xmark & \xmark & \NA & \xmark & \NA & \xmark & \NA & \checkmark \\
+        UnGuide~\cite{lee2022uncertainty} & \xmark & \xmark & \NA & \xmark & \NA & \xmark & \NA & \checkmark \\
+        SEER~\cite{tao2022seer} & \xmark & \xmark & \NA & \checkmark & \NA & \xmark & \NA & \checkmark \\
+        ActiveRMAP~\cite{zhan2022activermap} & \xmark & \xmark & \NA & \xmark & \NA & \xmark & \NA & \xmark \\
+        MACARONS~\cite{guedon2023macarons} & \xmark & \xmark & \NA & \xmark & \NA & \NA & \NA & \xmark \\
+        \specialrule{.1em}{.1em}{.1em} 
+        NeU-NBV~\cite{jin2023neu} & \xmark & \checkmark & \NA & \xmark & \NA & \xmark & \xmark & \xmark \\
+        ScanRL~\cite{peralta2020next} & \checkmark & \checkmark & \NA & \xmark & \xmark & \xmark & \xmark & \xmark \\
+        GenNBV~\cite{chen2024gennbv} & \checkmark & \checkmark & \xmark & \xmark & \xmark & \xmark & \xmark & \xmark \\
+        \specialrule{.1em}{.1em}{.1em} 
+        Hestia & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+        \specialrule{.1em}{.1em}{.1em}
+    \end{tabular}
+    \caption{\textbf{Comparison of learning-based next-best-view methods.} Compared to online learning methods, Hestia achieves real-time inference speed. Compared to generalizable methods that predict five-degree-of-freedom viewpoints or assume a drone as the agent, Hestia exhibits robustness across different object position settings and demonstrates feasibility in real-world object-centric scenes.}
+    \label{atab:nbv_comparison}
+\end{table*}
+This section elaborates on the novelty of Hestia.
+Hestia is a generalizable next-best-view planner that can predict five-degree-of-freedom viewpoints and model a drone as an agent.
+Therefore, we mainly focus on comparing methods that also predict five-degree-of-freedom viewpoints or assume a drone as an agent.
+Unlike prior approaches, Hestia systematically addresses the next-best-view task by introducing core components such as dataset selection, observation design, action space formulation, reward computation, and learning schemes. 
+Together, these elements form a comprehensive and unified foundation for the planner (see~\cref{sec:abl}).
+As shown in~\cref{atab:nbv_comparison}, compared to online-learning methods~\cite{lin2022active, sunderhauf2023density, pan2022activenerf, ran2023neurar, lee2022uncertainty, zhan2022activermap, guedon2023macarons}, Hestia avoids the need to sample candidate views or perform online optimization. 
+This results in greater flexibility in viewpoint prediction and supports real-time inference.
+Additionally, in comparison to generalizable methods~\cite{jin2023neu, peralta2020next, chen2024gennbv}, Hestia is trained on a significantly larger and more diverse dataset, enabling it to generalize robustly to a wide variety of object shapes during testing. 
+Hestia is also the only method that consistently performs well under different object configurations, as demonstrated in~\cref{atab:base_bench_omni,atab:base_bench_obj,atab:base_bench_h3k}.
+These advantages stem from the key innovations in our design, including treating voxels as cubes rather than points, employing a hierarchical structure to manage the complexity of the action space, and using a greedy learning scheme to mitigate spurious correlations.
+Notably, the purpose of Hestia’s hierarchical structure is to address the high-dimensional continuous action search space problem in reinforcement learning-based generalizable next-best-view planning, which is fundamentally different from traditional methods that use hierarchical structures to move along frontiers. 
+One of the most recent works~\cite{chen2024gennbv} still lacks the designs we propose.
+
+\section{Spurious Correlation}
+\label{asec:spur}
+
+\begin{figure*}[tbh!]
+   \centering
+\includegraphics[width=0.95\linewidth]{figures/spur.png}
+   \caption{\textbf{Spurious correlation.} In this study, spurious correlation refers to the assignment of future positive rewards to current non-beneficial actions, resulting in suboptimal viewpoint predictions. For instance, the third, thirteenth, and fifteenth viewpoints are empty in the non-greedy design, while enabling the close-greedy design alleviates this issue.}
+   \label{fig:spur_cmp}
+\end{figure*}
+
+In this section, we present the spurious correlation caused by future positive rewards in the task.
+Spurious correlation has been widely observed across various tasks~\cite{interpretation1971spurious, kim2024discovering}.  
+In our task, we find that using a large discount factor and future goal rewards can lead to false associations between current actions and their rewards.  
+This creates an illusion for the reinforcement learning agent that the current action is beneficial, even when there is no information gain (e.g., empty views as shown in~\cref{fig:spur_cmp}) resulting from the current action.
+Enabling the close-greedy design mitigates this issue as shown in~\cref{fig:spur_cmp}.
+
+\section{Datasets}
+\label{asec:datasets}
+
+This section briefly introduces the three main datasets used in the Hestia benchmark: Houses3K~\cite{peralta2020next}, Objaverse~\cite{deitke2024objaverse, Deitke_2023_CVPR}, and OmniObject3D~\cite{wu2023omniobject3d}.
+
+%\subsection{Dataset Preparation}
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/datasets_all.png}
+  \caption{\textbf{Sample data from Houses3K~\cite{peralta2020next}, Objaverse~\cite{Deitke_2023_CVPR}, and OmniObject3D~\cite{wu2023omniobject3d}.}
+  Houses3K features building shapes with challenging self-occlusions, such as roof soffits. Objaverse includes a diverse range of object shapes. OmniObject3D contains high-quality real-world 3D scans.
+  }
+  \label{afig:datasets_all}
+\end{figure*}
+
+\subsection{Introduction to Datasets}
+
+\textbf{Houses3K Dataset.} Houses3K~\cite{peralta2020next} is designed for next-best-view policy learning.  
+The dataset contains 600 distinct buildings, each rendered with five texture variants, yielding a total of 3,000 FBX models.  
+Many buildings feature challenging self-occlusions, such as roof soffits, that can be fully observed only from bottom-up viewpoints (see~\cref{afig:datasets_all}). 
+However, because the dataset includes only a single cube-like object category (e.g., buildings), its diversity is limited, which may hinder the ability of next-best-view policies trained on Houses3K to generalize to other structures or everyday objects.
+\\
+\textbf{Objaverse Dataset.} 
+Objaverse~\cite{Deitke_2023_CVPR} is one of the largest open 3D datasets, containing more than 800,000 shapes across at least 18 high-level categories, including furniture, vehicles, animals, and plants (see~\cref{afig:datasets_all}).   
+Each category is further divided into several subcategories.  
+The dataset’s scale and diversity make it particularly well-suited for foundation model research, especially for 3D generative models.  
+To the best of our knowledge, we are the first to introduce Objaverse for next-best-view policy learning.  
+Its large-scale and diverse object coverage enables training next-best-view policies that perform robustly across a wide range of categories and shapes.
+\\
+\textbf{OmniObject3D Dataset.}
+OmniObject3D~\cite{wu2023omniobject3d} is a high-quality 3D object dataset collected through real-world scanning, consisting of approximately 6,000 objects across more than 190 categories (see~\cref{afig:datasets_all}).  
+Unlike synthetic datasets, OmniObject3D captures real-world geometry and texture details using high-resolution 2D and 3D sensors.  
+It provides accurate geometry and realistic material properties, making it commonly used for evaluating real-world transferability in vision tasks such as novel-view synthesis.  
+In this paper, we introduce OmniObject3D for benchmark purposes.
+
+\subsection{Dataset Preparation}
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/datasets.png}
+  \caption{\textbf{More diverse and large-scale training set.} The chamfer distance measures the discrepancy between the point cloud of the training data and the sphere point cloud.  
+  The logarithmic scale of the count represents the number of shapes within each distance range.  
+  The right portion displays sample shapes with the same chamfer distance, shown side by side for each dataset. 
+  The wider chamfer distance range, higher number of shapes per chunk, and varied shape categories demonstrate that our training data, processed from Objaverse~\cite{deitke2024objaverse, Deitke_2023_CVPR}, are more comprehensive and large-scale compared to Houses3K.
+  }
+  \label{fig:datasets}
+\end{figure*}
+We propose using Objaverse~\cite{deitke2024objaverse, Deitke_2023_CVPR} as the training dataset to ensure a diverse range of shapes during training (see~\cref{fig:datasets,fig:data_dis}).
+To achieve this, we filter out large meshes and download the remaining mesh files from Objaverse~\cite{deitke2024objaverse, Deitke_2023_CVPR}, resulting in a dataset comprising 120,000 shapes.  
+For each shape, we generate the occupancy grid and point cloud using Open3D~\cite{zhou2018open3d}.  
+To remove invisible voxels and points, we perform a breadth-first search (BFS) starting from external free voxels, retaining only reachable occupancy voxels and points as the ground truth.  
+The visible faces of each voxel are identified by examining the occupancy states of neighboring voxels.  
+We apply PCA~\cite{abdi2010principal} to reduce the point cloud to three components and use k-means clustering~\cite{macqueen1967some} to group the 120,000 shapes into 30,100 clusters.  
+The cluster centers of 30,000 clusters are designated as training data, while the remaining cluster centers are used for testing.  
+The same procedure is used to create 256 training samples and 100 test samples from the Houses3K dataset~\cite{peralta2020next} for our benchmark.  
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/data_dis.png}
+  \caption{\textbf{Dataset distribution.} Our training dataset, processed from Objaverse~\cite{deitke2024objaverse, Deitke_2023_CVPR}, includes a wide range of categories and is not limited to cubic-like shapes (e.g., buildings).
+  }
+  \label{fig:data_dis}
+\end{figure*}
+Our processed training set is two orders of magnitude larger than those used in previous studies~\cite{jin2023neu, chen2024gennbv, peralta2020next} and includes at least 18 more categories than prior datasets~\cite{chen2024gennbv, peralta2020next}.
+As for OmniObject3D~\cite{wu2023omniobject3d}, due to limited storage space, we randomly select one shape per category for evaluation, resulting in approximately 200 test samples.
+
+\begin{figure*}[tbh!]
+  \includegraphics[width=\linewidth]{figures/nbv_teaser.png}
+  \captionof{figure}{\textbf{Real-world drone system.} Hestia is a generalizable next-best-view planner that is feasible for real-world deployment.
+  \textit{Please refer to our demonstration video for further details.}}
+  \label{fig:teaser}
+\end{figure*}
+\label{sec:realworld_sys}
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=\linewidth]{figures/system.png}
+  \caption{\textbf{Overview of the real-world drone system.} The system uses a drone with an RGB camera for data capture, Lighthouse base stations and Crazyflie for localization, and a Wifi router for wireless communication.}
+  \label{fig:real_world}
+\end{figure*}
+
+\section{Real-World Drone System}
+\label{asec:realworld_sys}
+
+This section includes the setup and pseudo code of the real-world drone system we used.
+By integrating Hestia into the real-world drone system (see~\cref{fig:teaser}), Hestia demonstrates its feasibility under practical scenarios.  
+
+\begin{figure*}[tbh!]
+\centering
+\begin{minipage}{\linewidth}
+\begin{algorithm}[H]
+\caption{\textcolor[HTML]{D2EBF0}{Main}}
+\label{alg:main}
+\begin{algorithmic}[1]
+\Require A drone system 
+$\mathcal{D} = \{\mathcal{D}_\text{gs}, \mathcal{D}_\text{pi}, \mathcal{D}_\text{ad}, \mathcal{D}_\text{ct}, \mathcal{D}_\text{drone}\}$, \textbf{where:}
+\begin{flushleft}
+\hspace{1em} $\mathcal{D}_\text{gs}$: Ground station \\
+\hspace{1em} $\mathcal{D}_\text{pi}$: Raspberry Pi \\
+\hspace{1em} $\mathcal{D}_\text{ad}$: Android phone \\
+\hspace{1em} $\mathcal{D}_\text{ct}$: Remote controller \\
+\hspace{1em} $\mathcal{D}_\text{drone}$: Drone
+\end{flushleft}
+
+\State $\mathcal{X} \gets [x_1, x_2, x_3]$ \Comment{Initial viewpoints}
+\For{$x \in \mathcal{X}$}
+    \State $\mathcal{W} \gets [x]$ \Comment{Update waypoints}
+    \State \textcolor[HTML]{682C99}{\texttt{Set\_Waypoints($\mathcal{W}$)}} \Comment{\textcolor[HTML]{682C99}{Move the drone (Alg. 2)}}
+    \State \textcolor[HTML]{D00402}{$i \gets \texttt{Capture\_Image()}$} \Comment{\textcolor[HTML]{D00402}{Capture an image (Alg. 3)}}
+    \State \textcolor[HTML]{069F48}{\texttt{Receive\_Image(i)}} \Comment{\textcolor[HTML]{069F48}{Transmit image (Alg. 4)}}
+\EndFor
+
+\For{$k \in \{1, 2, \dots, K\}$}
+    \State \textcolor[HTML]{06AFF5}{$\mathcal{W} \gets \texttt{NBV\_Prediction()}$} \Comment{\textcolor[HTML]{06AFF5}{Predict NBV (Alg. 5)}}
+    \State \textcolor[HTML]{682C99}{\texttt{Set\_Waypoints($\mathcal{W}$)}} \Comment{\textcolor[HTML]{682C99}{Move to NBV (Alg. 2)}}
+    \State \textcolor[HTML]{D00402}{$i \gets \texttt{Capture\_Image()}$} \Comment{\textcolor[HTML]{D00402}{Capture an image (Alg. 3)}}
+    \State \textcolor[HTML]{069F48}{\texttt{Receive\_Image(i)}} \Comment{\textcolor[HTML]{069F48}{Transmit image (Alg. 4)}}
+\EndFor
+
+\end{algorithmic}
+\end{algorithm}
+\end{minipage}
+\end{figure*}
+
+\subsection{Real-World System Overview}
+
+To demonstrate Hestia's feasibility in a real-world environment, we use a real-world system (see~\cref{fig:real_world}), where a drone equipped with an RGB camera moves to the next-best viewpoint predicted by Hestia to capture images of an object. 
+The system uses four HTC Lighthouse base stations and a Crazyflie 2.1 for localization and transmits images to the ground control station via wireless communication.
+MASt3R~\cite{duisterhof2024mast3r} is integrated to convert RGB images into pointmaps (e.g., depth images), and three initial viewpoints are set for real-world and virtual-world synchronization~\cite{umeyama1991least}. 
+\cref{fig:real_world} and Alg.~\ref{alg:main} illustrate four key processes of the system. 
+Specifically, the drone captures images at three initial viewpoints, where the \textit{set waypoints process} navigates the drone using a heuristic trajectory planner based on prior knowledge of the environment. 
+Then, the \textit{capture image process} commands image capture, and the \textit{receive image process} transmits the image to the ground station. 
+After capturing the initial viewpoints, the \textit{nbv prediction process} predicts the next-best viewpoint based on the collected data.
+Four processes repeat until sufficient data is collected. 
+For more details, please refer to~\cref{asec:process}.
+
+\subsection{Real-World System Setup}
+
+The environment size of our object-centric scenes (e.g., an opera house) is approximately 2.6\,m\,$\times$\,2.6\,m\,$\times$\,2\,m.  
+To prevent the drone from exceeding the HTC Lighthouse base station range, the maximum height $H_t$ is restricted to 1.5\,m.
+Additionally, in the nearest collision-free voxel module, voxels below 0.4m are marked as occupied to avoid potential counterforces between the floor and the drone's quadrotor.
+In this system, we deploy the DJI Mini 3 Pro as the primary aircraft model. 
+
+We integrate the DJI Mobile SDK v5 to enable remote control and command transmission from the base station to the UAV.  
+This software development kit provides developers with comprehensive control capabilities over the UAV.  
+The SDK is embedded in an Android application package, where we develop a custom application capable of broadcasting aircraft data via the User Datagram Protocol (UDP) wireless network protocol.  
+The broadcast data is captured using a Raspberry Pi 4, which runs a ROS 2 node designed to receive UDP packets and convert them into ROS 2-compatible messages.  
+On the same Raspberry Pi 4, we implement an adaptive trajectory planning technique.  
+This method evaluates a pre-generated library of feasible offline trajectories, allowing the UAV to navigate autonomously by selecting the most appropriate path based on real-time conditions.  
+Integrating these components ensures a reliable flow of data and commands, enabling efficient autonomous navigation for the UAV.
+We utilize the Crazyflie v2.1, a nano UAV equipped with a Lighthouse Positioning Deck, to achieve precise localization within the experimental environment.  
+To integrate its capabilities with the primary aircraft, we remove the propellers and motors of the Crazyflie and securely mount it on top of the DJI Mini 3 Pro.  
+This setup enables the Crazyflie to serve as a localization beacon, providing accurate positional data for the main UAV within the tracking range of the Lighthouse base stations.  
+The positioning deck on the Crazyflie captures localization data using infrared signals from the Lighthouse system.  
+This data is transmitted wirelessly via the Crazyradio 2.0 module, which connects to a base station.  
+The base station, running the Crazyswarm 2.0 package on the ROS 2 framework, processes and publishes the localization data in real time.  
+This setup facilitates autonomous navigation and precise positioning of the main UAV by continuously updating its coordinates within the experimental space.
+
+The system is constructed entirely from publicly available, low-cost hardware.  
+The total cost of the additional components, including the Crazyflie v2.1 (approximately \$200), the Lighthouse Positioning Deck (around \$100), and the Crazyradio 2.0 module (about \$50), is approximately \$350.  
+When combined with the DJI Mini 3 Pro, which costs around \$800, the total system cost remains significantly lower than that of conventional localization solutions.  
+This cost-effective design, combined with open-source software such as ROS 2 and the Crazyswarm package, provides a reliable and accessible prototype for UAV-based data collection.
+
+\subsection{Real-World System Processes}
+\label{asec:process}
+
+The flowchart of the system in the right part of~\cref{fig:real_world}, highlights four main sub-processes: \textit{Set Waypoints Process}, \textit{Capture Image Process}, \textit{Receive Image Process}, and \textit{NBV Prediction Process}. 
+Each sub-process is represented by distinct colors in the diagram and described as follows:
+\begin{itemize}
+    \item \textbf{Setting Waypoints (Alg.~\ref{alg:set_w})}: Waypoints for the drone are pre-configured and stored on the ground station. These waypoints are transmitted to the drone through a communication channel comprising a Raspberry Pi, an Android mobile phone connected to the remote controller, and a remote controller. The drone navigates to each waypoint to align with the predicted NBV.
+
+    
+\begin{algorithm}[H]
+\caption{\textcolor[HTML]{682C99}{Set Waypoints}}
+\label{alg:set_w}
+\begin{algorithmic}[1]
+\Require Waypoints $\mathcal{W}$, and a drone system $\mathcal{D}$
+
+\State $\mathcal{D}_\text{gs} 
+\xrightarrow{\mathcal{W}} \mathcal{D}_\text{pi}
+\xrightarrow{\mathcal{W}} \mathcal{D}_\text{ad}
+\xrightarrow{\mathcal{W}} \mathcal{D}_\text{ct}
+\xrightarrow{\mathcal{W}} \mathcal{D}_\text{drone}$
+\Comment{Send waypoints to the drone}
+
+\For{$w \in \mathcal{W}$}
+    \State $\mathcal{D}_\text{drone}.\texttt{move\_to}(w)$ \Comment{Move to waypoint}
+\EndFor
+
+\end{algorithmic}
+\end{algorithm}
+
+    \item \textbf{Capturing Images (Alg.~\ref{alg:cap_img})}: Upon reaching a waypoint, the Raspberry Pi retrieves the drone's real-time position from the ground station. Once the waypoint is confirmed, the ground station sends a "capture image" command. The drone then captures the image using adjusted camera parameters.
+
+
+\begin{algorithm}[H]
+\caption{\textcolor[HTML]{D00402}{Capture Image}}
+\label{alg:cap_img}
+\begin{algorithmic}[1]
+\Require A drone system $\mathcal{D}$
+
+\While{$\mathcal{D}_\text{drone}.\text{loc} \not\approx \mathcal{D}_\text{pi}.\text{x}$}
+    \Comment{Wait until location matches NBV}
+    \State Continue
+\EndWhile
+
+\State $\mathcal{D}_\text{pi} \xrightarrow{\text{NBV\_reached}} \mathcal{D}_\text{gs}$ \Comment{Notify ground station}
+\State $i \gets \mathcal{D}_\text{drone}.\texttt{capture()}$
+\Comment{Capture image}
+\State \Return $i$ \Comment{Return image}
+
+\end{algorithmic}
+\end{algorithm}
+    
+    \item \textbf{Receiving Images (Alg.~\ref{alg:rec_img})}: After capturing an image, the drone transmits the image along with its real-time pose back to the ground station. These images are used to iteratively update the reconstruction model.
+
+\begin{algorithm}[H]
+\caption{\textcolor[HTML]{069F48}{Receive Image}}
+\label{alg:rec_img}
+\begin{algorithmic}[1]
+\Require Image $i$ and a drone system $\mathcal{D}$
+
+\State $\mathcal{D}_\text{drone} 
+\xrightarrow{i} \mathcal{D}_\text{ct} 
+\xrightarrow{i} \mathcal{D}_\text{ad}
+\xrightarrow{i} \mathcal{D}_\text{pi}
+\xrightarrow{i} \mathcal{D}_\text{gs}$
+\Comment{Transmit image to ground station}
+
+\State $\mathcal{D}_\text{gs}.\texttt{save}(i)$ \Comment{Save image}
+\State $\mathcal{D}_\text{gs}.\texttt{save}(x')$ \Comment{Save real-time position}
+
+\end{algorithmic}
+\end{algorithm}
+
+    \item \textbf{Predicting the NBV (Alg.~\ref{alg:nbv_pred})}: The ground station processes the captured image and the drone’s pose to predict the next-best-view using the NBV module. The newly determined viewpoint is then sent to the drone to continue the data collection process.
+
+\begin{algorithm}[H]
+\caption{\textcolor[HTML]{06AFF5}{NBV Prediction}}
+\label{alg:nbv_pred}
+\begin{algorithmic}[1]
+\Require A drone system $\mathcal{D}$
+
+\State $\mathcal{I} \gets [i_1, \dots, i_n]$ \Comment{Load images}
+\State $\mathcal{X}^{'} \gets [x^{'}_{1}, \dots, x^{'}_{n}]$ \Comment{Load positions}
+\State $\mathcal{G} \gets \mathcal{D}_\text{gs}.\texttt{MASt3R}(\mathcal{X}', \mathcal{I})$ \Comment{Compute grid}
+\State $x \gets \mathcal{D}_\text{gs}.\texttt{pred\_NBV}(\mathcal{G}, i_n, x^{'}_{n}, h)$ \Comment{Predict NBV}
+\State $\mathcal{W} \gets \mathcal{D}_\text{gs}.\texttt{generate\_waypoints}(x)$ \Comment{Generate waypoints}
+\State \Return $\mathcal{W}$ \Comment{Return waypoints}
+
+\end{algorithmic}
+\end{algorithm}
+\end{itemize}
+
+Alg.~\ref{alg:main} provides an overview of the entire process. 
+Initially, the drone visits three pre-defined viewpoints to synchronize the real-world and virtual-world data (lines 1-7). 
+Following these initial captures, the NBV module predicts subsequent viewpoints based on the collected data (lines 8-13), guiding the drone iteratively until sufficient data is acquired for reconstruction.
+Additionally, the MASt3R module is integrated into the ground station to convert RGB images into pointmaps (e.g., depth images). 
+By combining these components, the system enables efficient and intelligent data collection, demonstrating the potential of drones as autonomous agents for scalable and versatile real-world scenarios.
+
+\section{Training and Testing Details}
+\label{asec:train_det}
+\begin{figure*}[tbh!]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fail.png}
+  \caption{\textbf{Failure cases of Hestia.} Hestia may occasionally fail to capture finer 3D structures, highly
+self-occluded parts, nearly vertical bottom-up views, and small details on coarse object surfaces.}
+  \label{fig:fail}
+\end{figure*}
+This section includes the details of the training and testing.
+We employ PPO~\cite{schulman2017proximal} from stable-baselines3~\cite{stable-baselines3} as the reinforcement learning framework for Hestia.  
+The grid resolution $g$ is set to 20, and $h$ and $w$ are set to 300.  
+The initial learning rate is $3 \times 10^{-4}$ and is decayed by a factor of 2 every 500,000 iterations starting from 2,000,000 iterations until reaching 4,000,000, for a total of 5,000,000 training iterations.  
+During training, $H_t$ is randomly sampled from the initial viewpoint height, up to a maximum of 10 meters.  
+For testing, $H_t$ starts at 10 meters, is reduced to 5 meters during the last 10 to 5 steps, and further decreases to 2 meters in the final 5 steps.  
+A training episode ends and the scene resets either when the number of captured images reaches 50 or when the target face coverage ratio of 0.9 is achieved.  
+The complete training process takes approximately 24 hours on an NVIDIA RTX A6000 GPU.
+
+Our network architecture is lightweight, with only 4.9 million parameters (see~\cref{tab:ablation}, which is approximately half the size of a standard ResNet-18 model, which has around 11.7 million parameters.
+The proposal network consists of three 3D convolutional layers, each followed by a Leaky ReLU activation.
+This design progressively downsamples the 3D grid before further downstream operations.
+It is then followed by a 3D self-attention layer, again paired with a Leaky ReLU activation, to expand the receptive field.
+Finally, the network applies a reparameterization trick module, composed of linear layers, to generate the output distribution parameters.
+This design allows the look-at point to be sampled from a distribution rather than predicted deterministically.
+The grid encoder consists of three 3D convolutional layers, each followed by batch normalization and a Leaky ReLU activation.
+After encoding, trilinear interpolation is applied to each encoded grid feature, followed by feature concatenation.
+The image encoder is composed of three 2D convolutional layers, each followed by batch normalization and Leaky ReLU activation.
+The encoded features are then flattened and passed through a linear layer with Leaky ReLU activation.
+For the policy network, we adopt the default model provided in stable-baselines3.
+For more details about the network architecture, please refer to the code provided in the supplementary materials.
+The hierarchical design first predicts the look-at point, followed by the camera position.
+This design prioritizes the look-at point, as the primary objective in this task is to determine where to look rather than where to fly.
+It also resembles how a human pilot controls a drone during data capture, focusing first on the target of observation before planning the flight path.
+
+
+\section{Limitations}
+\label{asec:limit}
+
+Although the quantitative and qualitative results (see ~\cref{sec:qua,asec:vis_res}) demonstrate a nearly comprehensive point cloud reconstruction, there are still some failure cases of Hestia (see~\cref{fig:fail}).
+Hestia may occasionally fail to capture finer 3D structures, such as the window frames of the first-row house shown in~\cref{fig:fail}.
+It may also fail to reconstruct highly self-occluded parts, such as the pillar of the second-row house.
+In addition, Hestia sometimes struggles to capture bottom-up views that require extreme vertical viewing angles, for example, the Lego man's right hand and the underside of the pillar.
+Moreover, it may struggle to reconstruct shapes with fine details over coarse surfaces, such as tiny parts of the broccoli and anise.
+Adopting a multi-resolution grid structure or integrating octree-based methods to enhance the voxel grid resolution could be a potential future step to mitigate these issues.
+
+In addition to the above limitations, we hope that Hestia will not be misused for other types of next-best-view (NBV) tasks.
+In this study, we found that a close-greedy training scheme can effectively mitigate spurious correlations and is well-suited to our problem definition (see~\cref{asec:spur,sec:methods,sec:exp}).
+However, the next-best-view problem is a broad research topic with varying objectives.
+This finding may not generalize to other NBV tasks, such as next-best-view for object tracking or next-best-view for human aesthetics, where long-term planning is more critical.
+
+Due to hardware limitations (e.g., the absence of an RGB-D camera), Hestia cannot fully exhibit its potential in the real-world drone system.
+However, since we use a depth estimator to convert RGB images into depth maps, this limitation represents a trade-off rather than a fundamental constraint.
+Our experiments conducted in NVIDIA IsaacLab demonstrate the full capability of Hestia, while the real-world application highlights Hestia's robustness when a depth sensor is unavailable.
+Furthermore, due to drone regulations, the real-world application of Hestia is conducted indoors using an indoor GPS system (e.g., HTC Lighthouse base stations).
+Drone policies vary across countries, and obtaining outdoor flight approvals can take up to a year in our region.
+Additionally, outdoor trials require significant funding, such as renting a safe test site measuring approximately 100 meters by 100 meters.
+As a future step, we plan to test Hestia outdoors to further validate its performance.
+Another future step is to extend Hestia to a multi-agent setting for large-scale outdoor scanning (e.g., city-scale) under power-constrained scenarios.
+
+%\clearpage

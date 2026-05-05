@@ -1,0 +1,51 @@
+\begin{table}[]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{c|c|c|c|c|c|c|c|c|c}
+                                                  & sim/real & motion       & video  & points& poses  & \# scenes & \# sequences & \#3D OBBs   & surface  \\ \hline \hline
+        Ego4D~\cite{grauman2022ego4d}             &real      & egocentric & \cmark &       &        & 74        & 3k hrs       & \xmark      &    \xmark   \\
+        Ego-Exo4D~\cite{grauman2023egoexo}        &real      & egocentric & \cmark &\cmark & \cmark &   131     & 5,625        &  \xmark     &     \xmark \\
+        AEA~\cite{lv2024aria}                     &real      & egocentric & \cmark &\cmark & \cmark & 5         & 143          & \xmark      &  \xmark \\   
+        ScanNet~\cite{dai2017scannet}             &real      & scanning   & \cmark &       & \cmark & 707       & 1,513        & 36k         &  fused depth \\
+        ARKITScenes~\cite{dehghan2021arkitscenes} &real      & scanning   & \cmark &       & \cmark & 1,661     & 5,048        & 52k        &  fused depth \\
+        Hypersim~\cite{roberts2021hypersim}       &sim       & random     & \cmark &       & \cmark & 461       & 774          & 54k        & CAD mesh \\ \hline
+        % Omni3d~\cite{Brazil_2023_CVPR}            &real \& sim & mixed&       &       &        &      &      &          & 50 & \xmark \\ \hline
+        \ASE{}~\cite{ase2024web}                  &sim       & egocentric & \cmark &\cmark &\cmark  & 100k      & 100k         & 3M          & CAD mesh\\
+        \ADT{}~\cite{Pan_2023_ICCV}               &real      & egocentric &\cmark &\cmark &\cmark   &  1        & 6            & 281         & CAD mesh \\
+        \AOThree{}                                &real      & egocentric &\cmark &\cmark &\cmark   &  20       & 26           & 584        & \xmark \\
+        %\ASE{} Val                               &sim & egocentric & 500 & 500 & \todo{} & & CAD Mesh \\
+        %Replica                                   &real & scanning \todo & 18 &  &  & & fused depth \\
+    \end{tabular}
+    }
+    \caption{Related datasets either are egocentric or have 3D OBB and surface annotations. We fill this gap and contribute 3D OBB annotations for~\ASE{}, CAD meshes for a validation subset of~\ASE{} and~\ADT{} as well as \AOThree{}---an egocentric validation dataset with high quality 3D OBB annotations.}
+    %The \ASE{} dataset is a large scale simulation training dataset for 3D perception. \AOThree{} is a real-world validation datasets. 
+    %\TODO{more key metrics; add sim/real flag; make type more clear; remive videos col}}
+    \label{tab:datasets}
+    \vspace{-5mm}
+\end{table}
+
+
+% \begin{table}[]
+%     \centering
+%     \resizebox{\textwidth}{!}{%
+%     \begin{tabular}{c|c|c|c|c|c|c|c|c|c|c}
+%                                                   & sim/real & type & video & points & poses & \# scenes & \# sequences & \#3D OBBs & \#classes  & surface  \\ \hline \hline
+%         Ego4D~\cite{grauman2022ego4d}             &real & egocentric & \cmark &       &        & 74  &  3k hrs & \xmark &  \xmark  & \xmark \\
+%         Ego-Exo4D~\cite{grauman2023egoexo}        &real & egocentric & \cmark &\cmark & \cmark &   131   &   5625   & \xmark &  \xmark  & \xmark \\
+%         AEA~\cite{lv2024aria}                     &real & egocentric & \cmark &\cmark & \cmark & 5 & 143 & \xmark      & \xmark & \xmark \\   
+%         ScanNet~\cite{dai2017scannet}             &real & scanning   & \cmark &       & \cmark & 707  & 1513 & $>$36000  &  20  & fused depth \\
+%         ARKITScenes~\cite{dehghan2021arkitscenes} &real & scanning   & \cmark &       & \cmark & 1,661 & 5,048 & \todo{}  & 17 & fused depth \\
+%         Hypersim~\cite{roberts2021hypersim}       &sim  & random     & \cmark &       & \cmark & 461  & 774  & \todo    &    & \todo  \\ \hline
+%         % Omni3d~\cite{Brazil_2023_CVPR}            &real \& sim & mixed&       &       &        &      &      &          & 50 & \xmark \\ \hline
+%         \ASE{}~\cite{ase2024web}                  &sim  & egocentric & \cmark &\cmark &\cmark   & 100k & 100k & \todo{}  & 29 & CAD mesh\\
+%         \ADT{}~\cite{Pan_2023_ICCV}               &real & egocentric &\cmark &\cmark &\cmark   &  1   & 6    & \todo{}  & NA & CAD mesh \\
+%         \AOThree{}                                &real & egocentric &\cmark &\cmark &\cmark   &  20  & 26   & \todo{}  & 9 & \xmark \\
+%         %\ASE{} Val                               &sim & egocentric & 500 & 500 & \todo{} & & CAD Mesh \\
+%         %Replica                                   &real & scanning \todo & 18 &  &  & & fused depth \\
+%     \end{tabular}
+%     }
+%     \caption{Related datasets either are egocentric or have 3D OBB and surface annotations. We fill this gap and contribute 3D OBB annotations for~\ASE{}, CAD meshes for a validation subset of~\ASE{} and~\ADT{} as well as \AOThree{}---an egocentric validation dataset with high quality 3D OBB annotations.
+%     %The \ASE{} dataset is a large scale simulation training dataset for 3D perception. \AOThree{} is a real-world validation datasets. 
+%     \TODO{more key metrics; add sim/real flag; make type more clear; remive videos col}}
+%     \label{tab:datasets}
+% \end{table}

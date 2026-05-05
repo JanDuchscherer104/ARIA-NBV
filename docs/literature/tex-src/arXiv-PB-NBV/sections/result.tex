@@ -1,0 +1,150 @@
+\section{Experiments}
+\label{sec:result}
+
+\subsection{Simulation Experiments}
+% 为了评估我们框架的性能，我们在Ubuntu操作系统中利用Gazebo平台构建了一个仿真环境。
+% 计算在仅搭载 i7-14700F CPU 的设备上运行。
+% 仿真环境配置了一个RealSense相机，并选取了来自Stanford 3D Scanning Repository、Linemod和HomebrewedDB的55个目标作为待测对象。
+% 仿真环境如图x所示。
+To evaluate the performance of our framework, we constructed a simulation environment using the Gazebo platform on the Ubuntu operating system.
+Computations are conducted on a CPU-only device with an i7-14700F processor.
+The simulation environment is configured with a single RealSense camera and includes 55 objects selected from the Stanford 3D Scanning Repository\footnote{\href{https://graphics.stanford.edu/data/3Dscanrep/}{Stanford: https://graphics.stanford.edu/data/3Dscanrep/}}, Linemod, and HomebrewedDB\footnote{\href{https://bop.felk.cvut.cz/datasets/}{Linemod and HomebrewedDB: https://bop.felk.cvut.cz/datasets/}}.
+The simulation environment is depicted in Fig. \ref{Simulation_environment_target}.
+
+
+% 对比实验采用了两个指标：
+% 1. **点云覆盖率**：从模型文件中采样10000个点，遍历所有模型点，计算在输入点云中是否存在距离小于0.005m的点，并计算覆盖点的比例。
+% 2. **计算效率**：测量NBV规划器在接受一帧输入后，计算出下一帧视角所需的时间。测量NBV规划器单次迭代的计算耗时，包括更新场景表征和选择最优视角两个阶段。
+The Simulation experiment is based on two evaluation metrics:
+(1) Point Cloud Coverage: Sampling 10,000 points from the model file, traversing all model points, and calculating the proportion of model points that have a point in the input point cloud within a distance of 0.005m.
+(2) Computational Time: Measuring the computation time of the NBV planner per iteration, covering scene representation update and optimal viewpoint selection.
+
+\subsubsection{Comparison experiments}
+% 在对比实验中，我们的框架(搜索空间为整个球和半球)都将与基于体素结构MCMF(注重完整性)NBV-net和SCVP(注重效率)，以及基于点云结构的SEE进行比较。
+In Comparison experiments, our framework (with full-sphere and hemisphere candidate viewpoints sampling area) will be compared with the voxel-based MCMF\cite{pan2021global} (completeness-focused) NBV-Net\cite{mendoza2020supervised} and SCVP\cite{pan2022scvp} (efficiency-focused), and the point cloud-based SEE\cite{border2024surface}.
+% 关键实验参数的配置如 Table x 所示，其余的参数都按照其对应实验的默认参数设置。
+Key experimental parameters are specified in Tab. \ref{comparison_res}, with remaining parameters set to their default values.
+
+\begin{table}[ht]
+    \caption{Performance Comparison}
+    \centering
+    \begin{tabular}{cccccc}
+        \toprule
+        \textbf{Frame} & \textbf{Cov. (\%)} & 
+        \textbf{T. (s)} &
+        \textbf{Cand. Views} &  
+        \textbf{Area} &
+        \textbf{Res. (m)} \\
+        \midrule
+        SEE\tablefootnote{The direction SEE's viewpoint is defined by its planner, while the rest point to the object center. For resolution, SEE uses a point cloud density radius, while others use voxel size.} & 73.24 & 14.49 & 800 & Hemi & 0.03 \\
+        SCVP\tablefootnote{Both SCVP and NBV-Net utilize the pre-trained model from the SCVP open-source project. As the model requires input voxels of size 32×32×32, we uniformly set the voxel resolution to 0.006 m and employed a fixed set of 32 candidate viewpoints}     & 86.08 & 1.45 & 32  & Hemi & 0.006 \\
+        NBVNET   & 85.40 & 6.91 & 32  & Hemi & 0.006 \\
+        \textbf{Ours-H} & \textbf{88.66} & \textbf{5.15} & \textbf{800} & \textbf{Hemi} & \textbf{0.03} \\
+        \midrule
+        MCMF     & 88.46 & 27.16 & 800 & Full & 0.03 \\
+        \textbf{Ours-F} & \textbf{98.41} & \textbf{5.10} & \textbf{800} & \textbf{Full} & \textbf{0.03} \\
+        \bottomrule
+    \end{tabular}
+    \label{comparison_res}
+    
+    \smallskip
+    \begin{flushleft}
+        \textbf{Cov.}: Coverage; \textbf{T.}: Computation Time; \textbf{Cand. Views}: Candidate Views; \\
+        \textbf{Res.}: Resolution; \textbf{Hemi}: Hemisphere; \textbf{Full}: Full Sphere.
+    \end{flushleft}
+    \vspace*{-1\baselineskip} 
+\end{table}
+
+% 我们的全局分区数量被设置为4， T_{max}为10。由于在仿真实验中不存在机械臂的不可达问题，所以我们把候选视点采样空间设置为完整的球。本次实验中我们框架处理的平均体素数量为2123.40, 平均椭球数量(包括 Occupied 和 Frontier)为 11.06.
+In this experiment, our global partition number $\beta$ is 4, and $ T_{max}$ is 10, and our framework processed an average of 2123.40 voxels and an average of 11.06 ellipsoids (including occupied and frontier).
+% 所有算法均接收来自Realsense相机的数据，并依据各自NBV位姿的输出调整Realsense相机的位姿以进行迭代。因此，所有算法的初始位姿保持一致。每个算法都执行了十次迭代，并对其点云覆盖率和计算效率两个关键指标进行了分析。
+All frameworks receive data from the RealSense camera and adjust the camera's pose based on their NBV outputs for iteration, starting with the same initial pose. Each framework performs 10 iterations\footnote{If any framework produces fewer than 10 views for an object, we duplicate the last view until we reach 10 views.}, with point cloud coverage and computational time analyzed as key metrics. 
+% 本次实验以10次迭代结果为基准，着重对比不同框架快速提高目标扫描覆盖率的效率，而非其最终收敛性能。
+This experiment uses 10 iterations as the benchmark, emphasizing the comparison of how efficiently different frameworks rapidly improve object scan coverage, rather than their ultimate convergence performance.
+
+% 如图x所示，本研究提出的框架在测试的55个目标场景中展现出显著优势。与其他对比框架相比，本框架不仅实现了最高的点云覆盖率（point cloud coverage），同时保持了较低的计算耗时（computational time cost）。表x展示了在相同采样区域条件下的算法对比结果，数据表明无论是在半球采样空间（hemispherical sampling space）还是全局球体采样空间（global spherical sampling space）中，本算法均能保持更高的点云覆盖率和更优的计算效率。
+As illustrated in Fig. \ref{Comparison_Result_Chart}, comparative results show that our framework not only achieves the highest coverage but also maintains lower compute time compared to other benchmark frameworks. Table \ref{comparison_res} presents the comparisons in different sampling regions, revealing that our framework consistently exhibits superior coverage and better computational efficiency in both hemispherical and full spherical sampling spaces. 
+% 实验结果表明，采用椭球表征结构能够高效且灵活地描述前沿区域的空间分布特征。其结合基于投影的最优视角选择策略可快速、准确地确定下一帧最佳观测视点，从而显著提升对未知物体的扫描效率。
+The experimental results demonstrate that the ellipsoid representation structure can efficiently and flexibly characterize the spatial distribution features of frontier regions. Integrated with a projection-based optimal viewpoint selection strategy, our framework enables rapid and accurate determination of the next best observation viewpoint, thereby significantly improving the scanning efficiency for unknown objects.
+
+\subsubsection{Ablation experiment}
+% 最大椭球数量\(T{max}\)、分区数\(\beta\)和初始视点均由人为设定。为了验证这些设定的合理性，我们设计了三项消融实验对不同设定进行评估。
+The maximum number of ellipsoids \(T_{max}\), the number of partitions \(\beta\), and the initial viewpoints are all manually set. To validate the rationality of these settings, we designed three ablation experiments to evaluate different configurations.
+
+% 我们将 \(\beta\) 设置为 1（禁用全局分区策略），并分别将  设置为 5、10、20 和 40，与随机选择策略进行对比。实验结果如图 X 所示，表明策略对参数选择不敏感，因不同 \(T_{max}\) 设置对收敛效率影响较小，并且随着\(T_{max}\) 的增加，计算负担逐渐加重。
+We set \(\beta\) to 1 (disabling the global partition strategy) and varied \(T_{max}\) to 5, 10, 20, and 40, comparing them with the random selection strategy. The results shown in Fig.\ref{Albation}\subref{Albation_T_max_Coverage}\subref{Albation_T_max_Time} indicate that the strategy is not sensitive to parameter selection, as different \(T_{max}\) values have minimal impact on convergence efficiency, and increasing \(T_{max}\) leads to a higher computational burden.
+%当 \(T_{max}\) 设置为 10 时，我们分别对全局分区数量 \(\beta\) 为 1、2、4 和 8 进行对比验证。图中实验结果表明，较高的分区数量能够提高最终的收敛效率，但同时会降低收敛速度。
+When \(T_{max}\) is set to 10, we performed a comparison for global partition numbers \(\beta\) of 1, 2, 4, and 8. The results in Fig. \ref{Albation}\subref{Albation_Beta_Coverage}\subref{Albation_Beta_Time}  show that a higher partition number improves the final convergence efficiency but at the cost of a slower convergence rate.
+% 为了验证我们框架对不同初始条件的稳定性，我们在\(T{max}=10\)和\(\beta=4\)的情况下，针对四个不同的初始视点位置[0.9,0,0]、[0,0.9,0]、[0,0,0.9]和[0,0.63,0.63]进行了测试。结果如图所示，表明我们的算法在不同初始值状态下都是稳定的。
+To verify the stability of our framework under different initial conditions, we tested it with \(T_{max}=10\) and \(\beta=4\) using four different initial viewpoints: [0.9,0,0], [0,0.9,0], [0,0,0.9], and [0,0.63,0.63]. The results, as shown in Fig.\ref{Albation}\subref{Albation_Init_Pose_Coverage}\subref{Albation_Init_Pose_Time}, indicate that our framework is stable across different initial values.
+\begin{figure*}[!ht]
+    \centering
+    \subfloat[Effect of $T_{max}$ on coverage]{\includegraphics[width=2.3in]{img/Albation_T_max_Coverage.pdf}
+    \label{Albation_T_max_Coverage}
+    }%
+    \subfloat[Effect of $\beta$ on coverage]{\includegraphics[width=2.3in]{img/Albation_Beta_Coverage.pdf}
+    \label{Albation_Beta_Coverage}
+    }%
+    \subfloat[Effect of initial pose on coverage]{\includegraphics[width=2.3in]{img/Albation_Init_Pose_Coverage.pdf}
+    \label{Albation_Init_Pose_Coverage}
+    }%
+    \\
+    \vspace*{-0.9\baselineskip}
+    \centering
+    \subfloat[Effect of $T_{max}$ on compute time]{\includegraphics[width=2.3in]{img/Albation_T_max_Time.pdf}
+    \label{Albation_T_max_Time}
+    }%
+    \subfloat[Effect of $\beta$ on compute time]{\includegraphics[width=2.3in]{img/Albation_Beta_Time.pdf}
+    \label{Albation_Beta_Time}
+    }%
+    \subfloat[Effect of initial pose on compute time]{\includegraphics[width=2.3in]{img/Albation_Init_Pose_Time.pdf}
+    \label{Albation_Init_Pose_Time}
+    }%
+    % 在仿真环境中针对55个目标的消融实验。结果为每次迭代的平均值。
+    \caption{Ablation experiment tests 55 objects in the simulation environment, with results showing the average performance of all objects per iteration.}
+    \label{Albation}
+    \vspace*{-1\baselineskip} 
+\end{figure*}
+
+
+\subsection{Real-world Experiments}
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=3.4in]{img/Real-world_chart.pdf}
+    % real-world实验的数据图表。柱状图代表了每一次迭代的计算耗时，折线图代表了每一次迭代后的点云覆盖率。
+    \caption{Chart of result data from real-world experiments. The bar chart represents the computational time for each iteration, and the line chart represents the point cloud coverage after each iteration.}
+    \label{Real-world_chart}
+    \vspace*{-1\baselineskip} 
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=3.4in]{img/Real-world_result.pdf}
+    % real-world实验中使用用的模型和对其重建的结果，从上到下分别是雕像( 9,655 个点)，花瓶(3,013 个点)，犀牛(3,857 个点)和狗( 2,684 个点)。
+    \caption{The models used in the real-world experiment and their reconstruction results, from top to bottom: statue (9,655 points), vase (3,013 points), rhino (3,857 points), and dog (2,684 points).}
+    \label{Real-world_result}
+    \vspace*{-1\baselineskip} 
+\end{figure}
+
+% 如图1所示，我们的实验平台包括自制的结构光3D相机、六自由度机械臂，工作范围800毫米和一个可360度旋转的转台，用于覆盖整个半球形空间中的目标。
+% 为了提高数据配准质量，我们在转台上粘贴了高反光标志点。
+% NBV规划框架和控制程序运行在配备i9-14700HX处理器的笔记本电脑上。
+% 实验中，我们使用0.01m分辨率的Octomap，将分区数量$\beta$ 设为4，拟合最大椭球数量 $T_max$设置为50，初始观测位姿为图1所示的热工设定的位姿, 迭代次数为10.
+% 我们对四个不同大小的目标进行了重建实验，结果表明我们的框架在重建不同目标时都能取得良好效果，验证了框架的可行性。
+% 图 展示了真实实验的效果，我们使用0.005米体素滤波后的配准点云数量来表示目标尺寸。
+As shown in Fig. \ref{Experimental_platform}, our experimental platform includes a self-made structured light 3D camera, a six-axis robotic arm with 800 mm working envelope, and a 360-degree rotatable turntable to cover the entire hemispherical space of the object. 
+The NBV planning framework and control programs run on a laptop with an i9-14700HX processor. 
+The experiment used an Octomap resolution of 0.01m, with the number of partitions $\beta$ set to 4, the maximum number of fitted ellipsoids $T_{max}$ set to 50, the initial observation pose as shown in Fig. \ref{Experimental_platform}, and the number of iterations is 10.
+Reconstruction experiments on four objects of different sizes showed that our framework could achieve good results when reconstructing different objects, proving its feasibility.
+Fig. \ref{Real-world_result} presents the real-world experimental results, where the number of registered point clouds after voxel filtering (0.005m) is used to represent the object size.
+
+% 由于在实物实验中没有目标的真实值，我们采用了SEE的方法，将迭代最终结果的点云视为真实值，以此来评估NBV迭代过程的收敛效率。
+% 迭代流程如图x所示。
+Since there is no ground truth for objects in real-world experiments, we adopted the method from SEE\cite{border2024surface} by treating the final point cloud from the iterations as the ground truth to assess the convergence efficiency of the NBV process.
+The iteration process is shown in Fig. \ref{Real-world_chart}.
+
+% 由图x得，简单几何结构的对象（如图11中的vase和dog）的迭代计算耗时较低。
+% 相反，复杂结构的对象（如图11中的statue 和 rhino）由于需要更多的椭球来描述其几何形状，导致计算耗时增加。
+% 尽管statue的点云数量是rhino的两倍多，但其计算耗时与rhino相近，表明框架的计算耗时与目标体积大小的关联性不显著。
+Fig. \ref{Real-world_chart} shows that objects like the vase and dog have lower computation times. Complex objects like the statue and rhino need more ellipsoids, increasing computation times.
+Although the point cloud size of the statue is more than twice that of the rhino, the computation time is similar, indicating that the computational cost of the framework is not significantly related to the object volume size.

@@ -1,0 +1,59 @@
+\definecolor{darkblue}{rgb}{0,0.08,0.45}
+\definecolor{cred}{HTML}{D62728}
+\definecolor{cblue}{HTML}{1F77B4}
+\definecolor{cgreen}{HTML}{79AB76}
+\definecolor{cgrey}{rgb}{0.6,0.6,0.6}
+
+\newcommand{\todo}[1]{{\color{cred}{#1}}}
+\newcommand{\todoshort}[0]{\textbf{\todo{todo}}}
+
+\newcommand{\st}{\mathbf{s}_t}
+\newcommand{\stp}{\mathbf{s}_{t+1}}
+\newcommand{\stpp}{\mathbf{s}_{t+2}}
+\newcommand{\at}{\mathbf{a}_t}
+\newcommand{\rt}{\mathbf{r}_t}
+\newcommand{\atp}{\mathbf{a}_{t+1}}
+\newcommand{\atpp}{\mathbf{a}_{t+2}}
+\newcommand{\se}{\mathbf{s}_{e}}
+\newcommand{\bs}{\mathbf{s}}
+\newcommand{\ba}{\mathbf{a}}
+\newcommand{\bz}{\mathbf{z}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\sepos}{\mathbf{s}_e^+}
+\newcommand{\seneg}{\mathbf{s}_e^-}
+
+
+%% probability
+\newcommand{\expect}[2]{\mathbb{E}_{#1} \left[ #2 \right] }
+
+%% norms
+\newcommand{\jsd}[2]{D_\text{JSD}({#1} \parallel {#2})}
+\newcommand{\kld}[2]{D_\text{KL}({#1} \parallel {#2})}
+\newcommand{\fdiv}[2]{D_f({#1} \mid\mid {#2})}
+
+%% optimization
+\newcommand{\boydmax}[1]{\operatorname*{maximize}\limits_{#1}}
+\newcommand{\argmax}[1]{\operatorname*{argmax}\limits_{#1}}
+\newcommand{\grad}{\nabla}
+
+%% logic
+\newcommand{\indicator}[1]{\mathbbm{1}\left[#1\right]}
+
+%% proofs
+\newtheorem{thm}{Theorem}
+\newtheorem{prop}{Proposition}
+\newtheorem{lem}{Lemma}
+
+%% calculus
+\newcommand{\dd}[1]{\mathrm{d}#1}
+
+%% footnotes
+\newcommand\blfootnote[1]{%
+  \begingroup
+  \renewcommand\thefootnote{}\footnote{#1}%
+  \addtocounter{footnote}{-1}%
+  \endgroup
+}
+
+%% algorithm boxes
+\newcommand{\te}[1]{\texttt{#1}}

@@ -1,0 +1,97 @@
+\newpage
+\begin{appendices}
+
+\section{Model and Training Specification}
+\label{sec:details}
+
+\paragraph{Architecture and optimization details.}
+In all environments, we use a Transformer architecture with four layers and four self-attention heads.
+The total input vocabulary of the model is $V \times (N + M + 2)$ to account for states, actions, rewards, and rewards-to-go, but the output linear layer produces logits only over a vocabulary of size $V$; output tokens can be interpreted unambiguously because their offset is uniquely determined by that of the previous input.
+The dimension of each token embedding is 128.
+Dropout is applied at the end of each block with probability $0.1$.
+
+We follow the learning rate scheduling of \citep{radford2018improving}, increasing linearly from 0 to $\num{2.5e-4}$ over the course of $2000$ updates.
+We use a batch size of 256. 
+
+\paragraph{Hardware.}
+Model training took place on NVIDIA Tesla V100 GPUs (NCv3 instances on Microsoft Azure) for 80 epochs, taking approximately 6-12 hours (varying with dataset size) per model on one GPU.
+
+
+\section{Discrete Oracle}
+\label{app:oracle}
+The discrete oracle in Figure~\ref{fig:model_error} is the maximum log-likelihood attainable by a model under the uniform discretization granularity.
+For a single state dimension $i$, this maximum is achieved by a model that places all probability mass on the correct token, corresponding to a uniform distribution over an interval of size
+\[
+\frac{r_i - \ell_i}{V}.
+\]
+The total log-likelihood over the entire state is then given by:
+\[
+\sum_{i=1}^{N} \log\frac{V}{r_i - \ell_i}.
+\]
+
+\section{Baseline performance sources}
+\label{app:baselines}
+
+\paragraph{Offline reinforcement learning} The performance of MOPO is taken from Table 1 in \citet{yu2020mopo}. The performance of MBOP is taken from Table 1 in \citet{argenson2020model}. The performance of BC is taken from Table 1 in \citet{kumar2020conservative}. The performance of CQL is taken from Table 1 in \citet{kostrikov2021implicit}.
+
+\section{Datasets}
+\label{app:data}
+The D4RL dataset~\citep{fu2020d4rl} used in our experiments is under the Creative Commons Attribution 4.0 License (CC BY). The license information can be found at
+
+\begin{centering}
+    \url{https://github.com/rail-berkeley/d4rl/blob/master/README.md} \\
+\end{centering}
+\vspace{.2cm}
+
+under the ``Licenses'' section. 
+
+\newpage
+\section{Beam Search Hyperparameters}
+
+\begin{center}
+\def\arraystretch{1.35}
+\begin{tabular}{|l|l|c|} 
+\hline
+\textbf{Beam width} & maximum number of hypotheses retained during beam search & 256 \\
+\textbf{Planning horizon} & number of transitions predicted by the model during & 15 \\
+\textbf{Vocabulary size} & number of bins used for autoregressive discretization & 100 \\
+\textbf{Context size} & number of input $(\st, \at, \rt, R_t)$ transitions & 5 \\
+$\bm{k_\textbf{obs}}$ & top-$k$ tokens from which observations are sampled & 1 \\
+$\bm{k_\textbf{act}}$ & top-$k$ tokens from which actions & 20 \\
+\hline
+\end{tabular}
+\end{center}
+
+Beam width and context size are standard hyperparameters for decoding Transformer language models.
+Planning horizon is a standard trajectory optimization hyperparameter.
+The hyperparameters $k_\text{obs}$ and  $k_\text{act}$ indicate that actions are sampled from the most likely $20\%$ of action tokens and next observations are decoded greedily conditioned on previous observations and actions.
+
+In many environments, the beam width and horizon may be reduced to speed up planning without affecting performance.
+Examples of these configurations are provided in the reference implementation: \href{https://github.com/JannerM/trajectory-transformer}{\texttt{github.com/jannerm/trajectory-transformer}}.
+
+\newpage
+\section{Goal-Reaching on Procedurally-Generated Maps}
+\label{app:minigrid}
+
+The method evaluated here and the experimental setup is identical to that described in Section 3.2 (Goal-conditioned reinforcement learning), with one distinction: because the map changes each episode, the Transformer model has an additional context embedding that is a function of the current observation image. This embedding is the output of a small convolutional neural network and is added to the token embeddings analogously to the treatment of position embeddings. The agent position and goal state are not included in the map; these are provided as input tokens as described in Section 3.2.
+
+The action space of this environment is discrete. There are seven actions, but only four are required to complete the tasks: turning left, turning right, moving forward, and opening a door. The training data is a mixture of trajectories from a pre-trained goal-reaching policy and a uniform random policy.
+
+94\% of testing goals are reached by the model on held-out maps. Example paths are shown in Figure~\ref{fig:minigrid}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.25\linewidth]{images/rollout_0.png}
+    \includegraphics[width=0.25\linewidth]{images/rollout_1.png}
+    \includegraphics[width=0.25\linewidth]{images/rollout_2.png} \\
+    \includegraphics[width=0.25\linewidth]{images/rollout_3.png}
+    \includegraphics[width=0.25\linewidth]{images/rollout_4.png}
+    \includegraphics[width=0.25\linewidth]{images/rollout_5.png} \\
+    \includegraphics[width=0.25\linewidth]{images/rollout_6.png}
+    \includegraphics[width=0.25\linewidth]{images/rollout_7.png}
+    \includegraphics[width=0.25\linewidth]{images/rollout_8.png} \\
+    \caption{~\textbf{(Goal-Reaching in MiniGrid)} Example paths of the Trajectory Transformer planner in the \texttt{MiniGrid-MultiRoom-N4-S5}. Lock symbols indicate doors.}
+    \label{fig:minigrid}
+\end{figure}
+
+\end{appendices}

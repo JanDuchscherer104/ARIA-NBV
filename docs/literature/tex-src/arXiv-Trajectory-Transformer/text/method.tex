@@ -1,0 +1,122 @@
+\section{Reinforcement Learning and Control as Sequence Modeling}
+\label{sec:method}
+
+In this section, we describe the training procedure for our sequence model and discuss how it can be used for control.
+We refer to the model as a Trajectory Transformer for brevity, but emphasize that at the implementation level, both our model and search strategy are nearly identical to those common in natural language processing.
+As a result, modeling considerations are concerned less with architecture design and more with how to represent trajectory data -- potentially consisting of continuous states and actions -- for processing by a discrete-token architecture \citep{radford2018improving}.
+
+\subsection{Trajectory Transformer}
+
+At the core of our approach is the treatment of trajectory data as an unstructured sequence for modeling by a Transformer architecture.
+A trajectory $\bm{\tau}$ consists of $T$ states, actions, and scalar rewards:
+\[
+    \bm{\tau} = \big( \bs_1, \ba_1, r_1, \bs_2, \ba_2, r_2, \ldots, \bs_T, \ba_T, r_T \big).
+\]
+In the event of continuous states and actions, we discretize each dimension independently. Assuming $N$-dimensional states and $M$-dimensional actions, this turns $\tau$ into sequence of length $T(N+M+1)$:
+\[
+\bm{\tau} = \big(\ldots, s_t^1, s_t^2, \ldots, s_t^{N}, a_t^1, a_t^2, \ldots, a_t^{M}, r_t, \ldots \big)~~~~~~~~ t=1, \ldots, T.
+\]
+Subscripts on all tokens denote timestep and superscripts on states and actions denote dimension (\emph{i.e.}, $s_t^i$ is the $i^\text{th}$ dimension of the state at time $t$).
+While this choice may seem inefficient, it allows us to model the distribution over trajectories with more expressivity without simplifying assumptions such as Gaussian transitions. 
+
+\input{figures/beam_search}
+
+We investigate two simple discretization approaches:
+
+\begin{enumerate}
+    \item \textbf{Uniform:} All tokens for a given dimension correspond to a fixed width of the original continuous space. Assuming a per-dimension vocabulary size of $V$, the tokens for state dimension $i$ cover uniformly-spaced intervals of width $(\max \bs^i - \min \bs^i)/ V$.
+    \item \textbf{Quantile:} All tokens for a given dimension account for an equal amount of probability mass under the empirical data distribution; each token accounts for 1 out of every $V$ data points in the training set.
+\end{enumerate}
+
+Uniform discretization has the advantage that it retains information about Euclidean distance in the original continuous space, which may be more reflective of the structure of a problem than the training data distribution.
+However, outliers in the data may have outsize effects on the discretization size, leaving many tokens corresponding to zero training points.
+The quantile discretization scheme ensures that all tokens are represented in the data.
+We compare the two empirically in Section~\ref{sec:exp_rl}.
+
+Our model is a Transformer decoder mirroring the GPT architecture \citep{radford2018improving}.
+We use a smaller architecture than those typically used in large-scale language modeling, consisting of four layers and four self-attention heads.
+(A full architectural description is provided in Appendix~\ref{sec:details}.)
+Training is performed with the standard teacher-forcing procedure \citep{williams1989learning} used to train sequence models.
+Denoting the parameters of the Trajectory Transformer as $\theta$ and induced conditional probabilities as $P_\theta$, the objective maximized during training is:
+\[
+\mathcal{L}(\tau) = 
+    \sum_{t=1}^{T} \Big(
+    \sum_{i=1}^{N} \log P_\theta\big(s_{t}^i \mid         
+        \bs_{~t}^{<i},
+        \bm{\tau}_{<t}
+        \big) +
+    \sum_{j=1}^{M} \log P_\theta\big(a_{t}^j \mid
+        \ba_{t}^{<j},
+        \bs_{t},
+        \bm{\tau}_{<t}
+        \big) +
+    \log P_\theta\big(r_t \mid
+        \ba_t,
+        \bs_t,
+        \bm{\tau}_{<t}
+    \big)
+    \Big),
+\]
+in which we use $\bm{\tau}_{<t}$ to denote a trajectory from timesteps $0$ through $t-1$, $\st^{<i}$ to denote dimensions $0$ through $i-1$ of the state at timestep $t$, and similarly for $\at^{<j}$.
+We use the Adam optimizer \citep{ba2015adam} with a learning rate of $\num{2.5e-4}$ to train parameters $\theta$.
+
+\subsection{Planning with Beam Search}
+\label{sec:tto}
+
+We now describe how sequence generation with the Trajectory Transformer can be repurposed for control, focusing on three settings: imitation learning, goal-conditioned reinforcement learning, and offline reinforcement learning.
+These settings are listed in increasing amount of required modification on top of the sequence model decoding approach routinely used in natural language processing.
+
+The core algorithm providing the foundation of our planning techniques, beam search, is described in Algorithm~\ref{alg:beam} for generic sequences.
+Following the presentation in \cite{meister2020beam}, we have overloaded $\log P_\theta(\cdot \mid \mathbf{x})$ to define the likelihood of a set of sequences in addition to that of a single sequence: $\log P_\theta(Y \mid x) = \sum_{\mathbf{y} \in Y} \log P_\theta (\mathbf{y} \mid \mathbf{x})$.
+We use $(~)$ to denote the empty sequence and $\circ$ to represent concatenation.
+
+\paragraph{Imitation learning.}
+When the goal is to reproduce the distribution of trajectories in the training data, we can optimize directly for the probability of a trajectory $\bm{\tau}$.
+This situation matches the goal of sequence modeling exactly and as such we may use Algorithm~\ref{alg:beam} without modification by setting the conditioning input $\mathbf{x}$ to the current state $\st$ (and optionally previous history $\bm{\tau}_{<t}$).
+
+The result of this procedure is a tokenized trajectory $\bm{\tau}$, beginning from a current state $\st$, that has high probability under the data distribution.
+If the first action $\at$ in the sequence is enacted and beam search is repeated, we have a receding horizon-controller.
+This approach resembles a long-horizon model-based variant of behavior cloning, in which entire trajectories are optimized to match those of a reference behavior instead of only immediate state-conditioned actions.
+If we set the predicted sequence length to be the action dimension, our approach corresponds exactly to the simplest form of behavior cloning with an autoregressive policy.
+
+\paragraph{Goal-conditioned reinforcement learning.}
+Transformer architectures feature a ``causal'' attention mask to ensure that predictions only depend on previous tokens in a sequence.
+In the context of natural language, this design corresponds to generating sentences in the linear order in which they are spoken as opposed to an ordering reflecting their hierarchical syntactic structure
+(see, however, \citealt{gu2019insertion} for a discussion of non-left-to-right sentence generation with autoregressive models).
+In the context of trajectory prediction, this choice instead reflects physical causality, disallowing future events to affect the past.
+However, the conditional probabilities of the past given the future are still well-defined, allowing us to condition samples not only on the preceding states, actions, and rewards that have already been observed, but also any future context that we wish to occur.
+If the future context is a state at the end of a trajectory, we decode trajectories with probabilities of the form:
+\[
+    P_\theta(s_{t}^i \mid \bs_t^{<i}, \bm{\tau}_{<t}, {\color{cblue}\bs_T})
+\]
+We can use this directly as a goal-reaching method by conditioning on a desired final state $\color{cblue}\bs_T$.
+If we always condition sequences on a final goal state, we may leave the lower-diagonal attention mask intact and simply permute the input trajectory to $\{ {\color{cblue}\bs_{T}}, \bs_1, \bs_2, \ldots, \bs_{T-1} \}$.
+By prepending the goal state to the beginning of a sequence, we ensure that all other predictions may attend to it without modifying the standard attention implementation.
+This procedure for conditioning resembles prior methods that use supervised learning to train goal-conditioned policies \citep{ghosh2019gcsl} and is also related to relabeling techniques in model-free RL \citep{andrychowicz2017hindsight}.
+In our framework, it is identical to the standard subroutine in sequence modeling: inferring the most likely sequence given available evidence.
+
+\paragraph{Offline reinforcement learning.}
+
+The beam search method described in Algorithm~\ref{alg:beam} optimizes sequences for their probability under the data distribution.
+By replacing the log-probabilities of transitions with the predicted reward signal, we can use the same Trajectory Transformer and search strategy for reward-maximizing behavior.
+Appealing to the control as inference graphical model~\citep{levine2018reinforcement}, we are in effect replacing a transition's log-probability in beam search with its log-probability of optimality.
+
+Using beam-search as a reward-maximizing procedure has the risk of leading to myopic behavior.
+To address this issue, we augment each transition in the training trajectories with reward-to-go:
+$R_t = \sum_{t'=t}^{T} \gamma^{t'-t} r_{t'}$
+and include it as an additional quantity, discretized identically to the others, to be predicted after immediate rewards $r_t$.
+During planning, we then have access to value estimates from our model to add to cumulative rewards.
+While acting greedily with respect to such Monte Carlo value estimates is known to suffer from poor sample complexity and convergence to suboptimal behavior when online data collection is not allowed, we only use this reward-to-go estimate as a heuristic to guide beam search, and hence our method does not require the estimated values to be as accurate as in methods that rely solely on the value estimates to select actions.
+
+In offline RL, reward-to-go estimates are functions of the \emph{behavior} policy that collected the training data and do not, in general, correspond to the values achieved by the Trajectory Transformer-derived policy.
+Of course, it is much simpler to learn the value function of the behavior policy than that of the optimal policy, since we can simply use Monte Carlo estimates without relying on Bellman updates.
+A value function for an improved policy would provide a better search heuristic, though requires invoking the tools of dynamic programming.
+In Section~\ref{sec:exp_rl} we show that the simple reward-to-go estimates are sufficient for planning with the Trajectory Transformer in many environments, but that improved value functions are useful in the most challenging settings, such as sparse-reward tasks.
+
+Because the Trajectory Transformer predicts reward and reward-to-go only every $N+M+1$ tokens, we sample all intermediate tokens according to model log-probabilities, as in the imitation learning and goal-reaching settings.
+More specifically, we sample full transitions $(\bs_t, \ba_t, r_t, R_t)$ using likelihood-maximizing beam search, treat these transitions as our vocabulary, and filter sequences of transitions by those with the highest cumulative reward plus reward-to-go estimate.
+
+We have taken a sequence-modeling route to what could be described as a fairly simple-looking model-based planning algorithm, in that we sample candidate action sequences, evaluate their effects using a predictive model, and select the reward-maximizing trajectory.
+This conclusion is in part due to the close relation between sequence modeling and trajectory optimization.
+There is one dissimilarity, however, that is worth highlighting: by modeling actions jointly with states and sampling them using the same procedure, we can prevent the model from being queried on out-of-distribution actions.
+The alternative, of treating action sequences as unconstrained optimization variables that do not depend on state \citep{nagabandi2018mbmf}, can more readily lead to model exploitation, as the problem of maximizing reward under a learned model closely resembles that of finding adversarial examples for a classifier \citep{goodfellow2014explaining}.

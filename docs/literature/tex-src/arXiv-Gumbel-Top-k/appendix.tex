@@ -1,0 +1,197 @@
+\appendix
+\section{Proof of the Gumbel-Top-$k$ trick}
+\label{app:proof_gumbel_topk_trick}
+
+\begingroup
+\def\thetheorem{\ref{thm:gumbel_top_k}}
+\begin{theorem}
+For $k \le n$, let $I^*_1, ..., I^*_k = \argtop k \,{ G_{\phi_i} }$. Then $I^*_1, ..., I^*_k$ is an (ordered) sample without replacement from the $\text{Categorical} \left( \frac{\exp{\phi_i}}{\sum_{j \in N} \exp{\phi_j}}, i \in N \right)$ distribution, e.g. for a realization $i^*_1, ..., i^*_k$ it holds that
+\begin{equation}
+\label{eq:theorem_topk_trick_app}
+    P\left(I^*_1 = i^*_1, ..., I^*_k = i^*_k\right) = \prod_{j=1}^k \frac{\exp{\phi_{i^*_j}}}{\sum_{\ell \in N^*_j} \exp{\phi_\ell}}
+\end{equation}
+where $N^*_j = N \setminus \{i^*_1, ..., i^*_{j-1}\}$ is the domain (without replacement) for the $j$-th sampled element.
+\end{theorem}
+\addtocounter{theorem}{-1}
+\endgroup
+
+\begin{proof}
+\todoherke{repeat the theorem here?}First note that
+\begin{align}
+    & \, P\left(I^*_k = i^*_k \middle| I^*_1 = i^*_1, ..., I^*_{k-1} = i^*_{k-1} \right) \nonumber \\
+    =& \, P\left(i^*_k = \argmax_{i \in N^*_k}{ G_{\phi_i} } \middle| I^*_1 = i^*_1, ..., I^*_{k-1} = i^*_{k-1} \right) \nonumber \\
+    =& \, P\left(i^*_k = \argmax_{i \in N^*_k}{ G_{\phi_i} } \middle|  \max_{i \in N^*_k}{ G_{\phi_i} } < G_{\phi_{i^*_{k-1}}}\right) \label{eq:topk_proof_before_independence} \\
+    =& \, P\left(i^*_k = \argmax_{i \in N^*_k}{ G_{\phi_i} }\right) \label{eq:topk_proof_independence} \\
+    =& \, \frac{\exp{\phi_{i^*_k}}}{\sum_{\ell \in N^*_k} \exp{\phi_\ell}} \label{eq:proof_gumbel_max_trick}. 
+\end{align}
+The step from \eqref{eq:topk_proof_before_independence} to \eqref{eq:topk_proof_independence} follows from the independence of the $\max$ and $\argmax$ (Section \ref{sec:gumbel_max_trick}) and the step from \eqref{eq:topk_proof_independence} to \eqref{eq:proof_gumbel_max_trick} uses the Gumbel-Max trick.
+The proof follows by induction on $k$. The case $k = 1$ is the Gumbel-Max trick, while if we assume the result \eqref{eq:theorem_topk_trick_app} proven for $k - 1$, then
+\begin{align}
+    & \, P\left(I^*_1 = i^*_1, ..., I^*_k = i^*_k\right) \nonumber\\
+    = & \, P\left(I^*_k = i^*_k \middle| I^*_1 = i^*_1, ..., I^*_{k-1} = i^*_{k-1}\right) \nonumber\\
+    & \cdot P\left(I^*_1 = i^*_1, ..., I^*_{k-1} = i^*_{k-1}\right) \nonumber\\
+    = & \, \frac{\exp{\phi_{i^*_k}}}{\sum_{\ell \in N^*_k} \exp{\phi_\ell}} \cdot \prod_{j=1}^{k-1} \frac{\exp{\phi_{i^*_j}}}{\sum_{\ell \in N^*_j} \exp{\phi_\ell}} %\\
+    \label{eq:topk_induction_gumbel_max} \\
+    = & \, \prod_{j=1}^k \frac{\exp{\phi_{i^*_j}}}{\sum_{\ell \in N^*_j} \exp{\phi_\ell}}. \nonumber
+\end{align}
+In \eqref{eq:topk_induction_gumbel_max} we have used Equation \eqref{eq:proof_gumbel_max_trick} and Equation \eqref{eq:theorem_topk_trick_app} for $k - 1$ by induction.
+\end{proof}
+
+\newpage
+
+\section{Sampling set of Gumbels with maximum $T$}
+\label{app:sampling_gumbels_conditional}
+
+\subsection{The truncated Gumbel distribution}
+A random variable $G'$ has a \emph{truncated} Gumbel distribution with location $\phi$ and maximum $T$ (e.g. $G' \sim \text{TruncatedGumbel}(\phi, T)$) with CDF $F_{\phi,T}(g)$ if:
+\begin{align}
+    & \,F_{\phi,T}(g) \nonumber \\
+    =& \, P(G' \le g) \nonumber \\
+    =& \, P(G \le g | G \le T) \nonumber \\
+    =& \, \frac{P(G \le g \cap G \le T)}{P(G \le T)} \nonumber\\
+    =& \, \frac{P(G \le \min(g, T))}{P(G \le T)} \nonumber \\
+    =& \, \frac{F_\phi(\min(g, T))}{F_\phi(T)} \nonumber\\
+    =& \, \frac{\exp (- \exp (\phi - \min(g, T)))}{\exp (- \exp (\phi - T))} \nonumber \\
+    =& \, \exp (\exp (\phi - T) - \exp (\phi - \min(g, T))). \label{eq:trunc_gumb_cdf}
+\end{align}
+The inverse CDF is:
+\begin{equation}
+\label{eq:trunc_gumb_inv_cdf}
+    F^{-1}_{\phi,T}(u) = \phi - \log( \exp( \phi - T ) - \log u ).
+\end{equation}
+
+\subsection{Sampling set of Gumbels with maximum $T$}
+In order to sample a set of Gumbel variables $\{\tilde{G}_{\phi_i}|\max_i \tilde{G}_{\phi_i} = T\}$, e.g. with their maximum being \emph{exactly} $T$, we can first sample the $\argmax$, $i^*$ and then sample the Gumbels conditionally on both the $\max$ and $\argmax$:
+\begin{enumerate}
+    \item Sample $i^* \sim \text{Categorical} \left( \frac{\exp{\phi_i}}{\sum_{j} \exp{\phi_j}} \right)$. We do not need to condition on $T$ since the $\argmax$ $i^*$ is independent of the $\max$ $T$ (Section \ref{sec:gumbel_max_trick}).
+    \item Set $\tilde{G}_{\phi_{i^*}} = T$, since this follows from conditioning on the $\max$ $T$ and $\argmax$ $i^*$.
+    \item Sample $\tilde{G}_{\phi_i} \sim \text{TruncatedGumbel}(\phi_i, T)$ for $i \neq i^*$. This works because, conditioning on the $\max$ $T$ and $\argmax$ $i^*$, it holds that:
+\begin{align*}
+    &P(\tilde{G}_{\phi_i} < g | \max_i \tilde{G}_{\phi_i} = T, \argmax_i \tilde{G}_{\phi_i} = i^*, i \neq i^*) \\
+    &= P(\tilde{G}_{\phi_i} < g | \tilde{G}_{\phi_i} < T).
+\end{align*}
+\end{enumerate}
+
+Equivalently, we can let $G_{\phi_i} \sim \text{Gumbel}(\phi_i)$, let $Z = \max_i G_{\phi_i}$ and define
+\begin{align}
+    \tilde{G}_{\phi_i} &= F^{-1}_{\phi_i,T}(F_{\phi_i,Z}(G_{\phi_i})) \nonumber\\
+    &= \phi_i - \log( \exp( \phi_i - T ) \nonumber \\
+    &\phantom{{}=\phi_i \log (} - \exp (\phi_i - Z) + \exp (\phi_i - G_{\phi_i}) ) \notag \\
+    &= - \log( \exp( - T ) - \exp ( - Z) + \exp ( - G_{\phi_i}) ). \label{eq:app_trunc_gumb_transform_explicit}
+\end{align}
+Here we have used \eqref{eq:trunc_gumb_cdf} and \eqref{eq:trunc_gumb_inv_cdf}. Since the transformation \eqref{eq:app_trunc_gumb_transform_explicit} is monotonically increasing, it preserves the $\argmax$ and it follows from the Gumbel-Max trick \eqref{eq:gumbel_argmax} that 
+\begin{equation*}
+    \argmax_i \tilde{G}_{\phi_i} = \argmax_i G_{\phi_i} \sim \text{Categorical} \left( \frac{\exp{\phi_i}}{\sum_{j} \exp{\phi_j}} \right).
+\end{equation*}
+We can think of this as using the Gumbel-Max trick for step 1 (sampling the argmax) in the sampling process described above.
+Additionally, for $i = \argmax_i G_{\phi_i}$:
+\begin{equation*}
+    \tilde{G}_{\phi_{i}} = F^{-1}_{\phi_i,T}(F_{\phi_i,Z}(G_{\phi_i})) = F^{-1}_{\phi_i,T}(F_{\phi_i,Z}(Z)) = T
+\end{equation*}
+so here we recover step 2 (setting $\tilde{G}_{\phi_{i^*}} = T$). 
+For $i \neq \argmax_i G_{\phi_i}$ it holds that:
+\begin{align*}
+    &P(\tilde{G}_{\phi_i} \le g|i \neq \argmax_i G_{\phi_i}) \\
+    =& \mathbb{E}_Z(P(\tilde{G}_{\phi_i} \le g|Z, i \neq \argmax_i G_{\phi_i})) \\
+    =& \mathbb{E}_Z(P(\tilde{G}_{\phi_i} \le g|Z, G_{\phi_i} < Z)) \\
+    =& \mathbb{E}_Z(P(F^{-1}_{\phi_i,T}(F_{\phi_i,Z}(G_{\phi_i})) \le g|Z, G_{\phi_i} < Z)) \\
+    =& \mathbb{E}_Z(P(G_{\phi_i} \le F^{-1}_{\phi_i,Z}(F_{\phi_i,T}(g))|Z, G_{\phi_i} < Z)) \\
+    =& \mathbb{E}_Z(F_{\phi_i,Z}(F^{-1}_{\phi_i,Z}(F_{\phi_i,T}(g)))) \\
+    =& \mathbb{E}_Z(F_{\phi_i,T}(g)) = F_{\phi_i,T}(g).
+\end{align*}
+This means that $\tilde{G}_{\phi_i} \sim \text{TruncatedGumbel}(\phi_i, T)$, so this is equivalent to step 3 (sampling $\tilde{G}_{\phi_i} \sim \text{TruncatedGumbel}(\phi_i, T)$ for $i \neq i^*$).
+
+\subsection{Numeric stability of truncated Gumbel computation}
+\label{app:trunc_gumbel_numeric_stability}
+Direct computation of \eqref{eq:app_trunc_gumb_transform_explicit} can be unstable as large terms need to be exponentiated. Instead, we compute:
+\begin{align}
+    v_i &= T - G_{\phi_i} + \logonemexp(G_{\phi_i} - Z) \label{eq:sample_truncated_gumbel_vi} \\
+    \tilde{G}_{\phi_i} &= T - \max(0, v_i) - \logonepexp(-|v_i|)  \label{eq:sample_truncated_gumbel_stable}
+\end{align}
+where we have defined
+\begin{align*}
+    \logonemexp(a) &= \log(1-\exp(a)), \quad a \le 0 \\
+    \logonepexp(a) &= \log(1+\exp(a)).
+\end{align*}
+
+This is equivalent as
+\begin{align*}
+    & \, T - \max(0, v_i) - \log(1 + \exp(-|v_i|)) \\
+    =& \, T - \log(1 + \exp(v_i)) \\
+    =& \, T - \log\left(1 + \exp\left(T - G_{\phi_i} + \log\left(1-\exp\left(G_{\phi_i} - Z\right)\right)\right)\right) \\
+    =& \, T - \log\left(1 + \exp\left(T - G_{\phi_i}\right) \left(1-\exp\left(G_{\phi_i} - Z\right)\right)\right) \\
+    =& \, T - \log\left(1 + \exp\left(T - G_{\phi_i}\right) - \exp\left(T - Z\right)\right) \\
+    =& \, -\log\left(\exp(-T) + \exp(- G_{\phi_i}) - \exp(- Z)\right) \\
+    =& \, \tilde{G}_{\phi_i} \\
+\end{align*}
+The first step can be easily verified by considering the cases $v_i < 0$ and $v_i \ge 0$. 
+$\logonemexp$ and $\logonepexp$ can be computed accurately using $\logonep(a) = \log(1+a)$ and $\expmone(a) = \exp(a) - 1$ \citep{machler2012accurately}:
+\begin{align*}
+    \logonemexp(a) &= \begin{cases}
+    \log(-\expmone(a)) & a > -0.693 \\
+    \logonep(-\exp(a)) & \text{otherwise} \\
+    \end{cases} \\
+    \logonepexp(a) &= \begin{cases}
+    \logonep(\exp(a)) & a < 18 \\
+    x + \exp(a) & \text{otherwise} \\
+    \end{cases}
+\end{align*}
+
+\section{Numerical stability of importance weights}
+\label{app:importance_weights_numeric_stability}
+We have to take care computing the importance weights as depending on the entropy the terms in the quotient $\frac{p_{\bm{\theta}}(\bm{y}_i|\bm{x})}{q_{\bm{\theta}}(\bm{y}_i|\bm{x})}$ can become very small, and in our case the computation of $P(G_{\phi_i} > \kappa) = 1 - \exp (-\exp(\phi_i - \kappa))$ can suffer from catastrophic cancellation. We can rewrite this expression using the more numerically stable implementation $\text{exp1m}(x) = \exp(x) - 1$ as $p(G_{\phi_i} > \kappa) = -\text{exp1m}(-\exp(\phi_i - \kappa))$ but in some cases this still suffers from instability as $\exp(\phi_i - \kappa)$ can underflow if $\phi_i - \kappa$ is small. Instead, for $\phi_i - \kappa < -10$ we use the identity
+\begin{equation*}
+    \log (1 - \exp(-z)) = \log(z) - \frac{z}{2} + \frac{z^2}{24} - \frac{z^4}{2880} + \bigO(z^6)
+\end{equation*}
+to directly compute the log importance weight using $z = \exp(\phi_i - \kappa)$ and $\phi_i = \log p_{\bm{\theta}}(\bm{y}_i|\bm{x})$ (we assume $\phi_i$ is normalized):
+\begin{align*}
+    & \, \log\left(\frac{p_{\bm{\theta}}(\bm{y}_i|\bm{x})}{q_{\bm{\theta}}(\bm{y}_i|\bm{x})}\right) = \log p_{\bm{\theta}}(\bm{y}_i|\bm{x}) - \log q_{\bm{\theta}}(\bm{y}_i|\bm{x}) \\
+    =& \, \log p_{\bm{\theta}}(\bm{y}_i|\bm{x}) - \log \left( 1 - \exp (-\exp(\phi_i - \kappa)) \right) \\
+    =& \, \log p_{\bm{\theta}}(\bm{y}_i|\bm{x}) - \log \left( 1 - \exp (-z) \right) \\
+    =& \, \log p_{\bm{\theta}}(\bm{y}_i|\bm{x}) - \left( \log(z) - \frac{z}{2} + \frac{z^2}{24} - \frac{z^4}{2880} + \bigO(z^6) \right) \\
+    =& \, \log p_{\bm{\theta}}(\bm{y}_i|\bm{x})  - \left( \phi_i - \kappa - \frac{z}{2} + \frac{z^2}{24} - \frac{z^4}{2880} + \bigO(z^6) \right) \\
+    =& \, \kappa + \frac{z}{2} - \frac{z^2}{24} + \frac{z^4}{2880} + \bigO(z^6)
+\end{align*}
+If $\phi_i - \kappa < -10$ then $0 < z < 10^{-6}$ so this computation will not lose any significant digits.
+
+\clearpage
+\section{Proof of unbiasedness of priority sampling estimator}
+\label{app:unbiased_priority_sampling}
+The following proof is adapted from the proofs by \citet{duffield2007priority} and \citet{vieira2017estimating}. For generality of the proof, we write $f(i) = f(\bm{y}^i)$, $p_i = p_{\bm{\theta}}(\bm{y}^i|\bm{x})$ and $q_i(\kappa) = q_{\bm{\theta},\kappa}(\bm{y}^i|\bm{x})$, and we consider general keys $h_i$ (not necessarily Gumbel perturbations). 
+
+We assume we have a probability distribution over a finite domain $1, ..., n$ with normalized probabilities $p_i$, e.g. $\sum_{i=1}^n p_i = 1$. For a given function $f(i)$ we want to estimate the expectation
+\begin{equation*}
+    \mathbb{E}[f(i)] = \sum_{i=1}^n p_i f(i).
+\end{equation*}
+
+Each element $i$ has an associated random key $h_i$ and we define $q_i(a) = P(h_i > a)$. This way, if we \emph{know} the threshold $a$ it holds that $q_i(a) = P(i \in S)$ is the probability that element $i$ is in the sample $S$. As was noted by \citet{vieira2017estimating}, the actual distribution of the key does not influence the unbiasedness of the estimator but does determine the effective sampling scheme. Using the Gumbel perturbed log-probabilities as keys (e.g. $h_i = G_{\phi_i}$) is equivalent to the PPSWOR scheme described by \citet{vieira2017estimating}.
+
+We define shorthand notation $h_{1:n} = \{h_1, ..., h_n\}$, $h_{-i} = \{h_1, ..., h_{i-1}, h_{i+1}, ..., h_n\} = h_{1:n} \setminus \{h_i\}$. For a given sample size $k$, let $\kappa$ be the $(k+1)$-th largest element of $h_{1:n}$, so $\kappa$ is the \emph{empirical threshold}. Let $\kappa'_i$ be the $k$-th largest element of $h_{-i}$ (the $k$-th largest of all \emph{other} elements).
+
+Similar to \citet{duffield2007priority} we will show that every element $i$ in our sample contributes an unbiased estimate of $\mathbb{E}[f(i)]$, so that the total estimator is unbiased. Formally, we will prove that
+\begin{equation}
+\label{eq:each_term_unbiased}
+    \mathbb{E}_{h_{1:n}}\left[\frac{\mathbbm{1}_{\{i \in S\}}}{q_i(\kappa)}\right] = 1
+\end{equation}
+from which the result follows:
+\begin{align*}
+    & \, \mathbb{E}_{h_{1:n}} \left[ \sum_{i \in S} \frac{p_i}{q_i(\kappa)} f(i) \right] \\
+    = & \, \mathbb{E}_{h_{1:n}} \left[ \sum_{i=1}^n \frac{p_i}{q_i(\kappa)} f(i) \mathbbm{1}_{\{i \in S\}} \right] \\
+    = & \, \sum_{i=1}^n p_i f(i) \cdot \mathbb{E}_{h_{1:n}} \left[ \frac{\mathbbm{1}_{\{i \in S\}}}{q_i(\kappa)} \right] \\
+    = & \, \sum_{i=1}^n p_i f(i) \cdot 1 = \sum_{i=1}^n p_i f(i) = \mathbb{E}[f(i)]
+\end{align*}
+To prove \eqref{eq:each_term_unbiased}, we make use of the observation (slightly rephrased) by \citet{duffield2007priority} that conditioning on $h_{-i}$, we know $\kappa'_i$ and the event $i \in S$ implies that $\kappa = \kappa'_i$ since $i$ will only be in the sample if $h_i > \kappa'_i$ which means that $\kappa'_i$ is the $k+1$-th largest value of $h_{-i} \cup \{h_i\} = h_{1:n}$. The reverse is also true (if $\kappa = \kappa'_i$ then $h_i$ must be larger than $\kappa'_i$ since otherwise the $k+1$-th largest value of $h_{1:n}$ will be smaller than $\kappa'_i$).
+\begin{align*}
+    & \, \mathbb{E}_{h_{1:n}}\left[\frac{\mathbbm{1}_{\{i \in S\}}}{q_i(\kappa)}\right] \\
+    = & \, \mathbb{E}_{h_{-i}}\left[\mathbb{E}_{h_i}\left[\frac{\mathbbm{1}_{\{i \in S\}}}{q_i(\kappa)}\middle|h_i\right]\right] \\
+    \begin{split}
+    = & \, \mathbb{E}_{h_{-i}}\left[\mathbb{E}_{h_i}\left[\frac{\mathbbm{1}_{\{i \in S\}}}{q_i(\kappa)}\middle|h_{-i},i \in S\right]P(i \in S | h_{-i}) \right. \\
+    & \hphantom{\mathbb{E}_{h_{-i}}}\left. \, + \, \mathbb{E}_{h_i}\left[\frac{\mathbbm{1}_{\{i \in S\}}}{q_i(\kappa)}\middle|h_{-i},i \not\in S\right]P(i \not\in S | h_{-i})
+    \right]
+    \end{split} \\
+    = & \, \mathbb{E}_{h_{-i}}\left[\mathbb{E}_{h_i}\left[\frac{1}{q_i(\kappa)}\middle|h_{-i},i \in S\right]P(i \in S | h_{-i}) + 0 \right] \\
+    = & \, \mathbb{E}_{h_{-i}}\left[\mathbb{E}_{h_i}\left[\frac{1}{q_i(\kappa)}\middle|h_{-i},i \in S\right] q_i(\kappa'_i) \right] \\
+    = & \, \mathbb{E}_{h_{-i}}\left[\mathbb{E}_{h_i}\left[\frac{1}{q_i(\kappa)}\middle|\kappa = \kappa'_i \right] q_i(\kappa'_i) \right] \\
+    = & \, \mathbb{E}_{h_{-i}}\left[\mathbb{E}_{h_i}\left[\frac{1}{q_i(\kappa'_i)} \right] q_i(\kappa'_i) \right] \\
+    = & \, \mathbb{E}_{h_{-i}}\left[\frac{1}{q_i(\kappa'_i)} q_i(\kappa'_i) \right] = \mathbb{E}_{h_{-i}}\left[ 1 \right] = 1 \\
+\end{align*}

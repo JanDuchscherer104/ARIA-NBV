@@ -1,0 +1,196 @@
+\newcommand{\cmt}[1]{{\footnotesize\textcolor{red}{#1}}}
+\newcommand{\todo}[1]{\cmt{(TODO: #1)}}
+
+
+\newcommand{\eg}{e.g.\ }
+\newcommand{\ie}{i.e.\ }
+\newcommand{\etal}{et al.\ }
+
+% Math operators and functions
+\newcommand{\E}[2]{\operatorname{\mathbb{E}}_{#1}\left[#2\right]}
+\newcommand{\EEE}{\mathbb{E}}
+\newcommand{\density}{p}
+\newcommand{\proposal}{q}  % proposal distribution
+\newcommand{\target}{p}  % target distribution
+\newcommand{\prop}{P}
+%\newcommand{\kl}{\mathrm{D_{KL}}}
+\newcommand{\kl}[2]{\mathrm{D_{KL}}\left(#1\;\middle\|\;#2\right)}
+\newcommand{\entropy}{\mathcal{H}}
+\newcommand{\ent}{\mathcal{H}}
+\newcommand{\sdots}{\,\cdot\,}
+
+% Constant matrices and vectors.
+\newcommand{\ones}{\boldsymbol{1}}
+\newcommand{\eye}{\boldsymbol{I}}
+\newcommand{\zeros}{\boldsymbol{0}}
+
+
+% MDP
+\newcommand{\sspace}{\mathcal{S}}
+\newcommand{\aspace}{\mathcal{A}}
+\newcommand{\state}{\mathbf{s}}
+\newcommand{\sz}{{\state_0}}
+\newcommand{\stm}{{\state_{t-1}}}
+\newcommand{\st}{{\state_t}}
+\newcommand{\sti}{{\state_t^{(i)}}}
+\newcommand{\sT}{{\state_T}}
+\newcommand{\stp}{{\state_{t+1}}}
+\newcommand{\stpi}{{\state_{t+1}^{(i)}}}
+\newcommand{\pdyn}{\density_\state}
+\newcommand{\horizon}{T}
+\newcommand{\hm}{{T-1}}
+\newcommand{\action}{\mathbf{a}}
+\newcommand{\az}{{\action_0}}
+\newcommand{\atm}{{\action_{t-1}}}
+\newcommand{\at}{{\action_t}}
+\newcommand{\ati}{{\action_t^{(i)}}}
+\newcommand{\atj}{{\action_t^{(j)}}}
+\newcommand{\attildej}{{\tilde{\action}_t^{(j)}}}
+\newcommand{\atij}{{\action_t^{(i,j)}}}
+\newcommand{\atp}{{\action_{t+1}}}
+\newcommand{\aT}{{\action_T}}
+\newcommand{\atk}{{\action_t^{(k)}}}
+\newcommand{\aTm}{\action_{\horizon-1}}
+\newcommand{\opt}{^*}
+
+% Trajectories
+\newcommand{\traj}{\tau}
+\newcommand{\ptraj}{\density_\traj}
+\newcommand{\visits}{\rho}  % Discounted visittation frequency
+
+% Rewards
+\newcommand{\reward}{r}
+\newcommand{\rz}{\reward_0}
+\newcommand{\rt}{\reward_t}
+\newcommand{\rti}{\reward^{(i)}_t}
+\newcommand{\rmin}{r_\mathrm{min}}
+\newcommand{\rmax}{r_\mathrm{max}}
+\newcommand{\return}{\eta}
+
+% Optimality
+
+
+% Value and Q function
+\newcommand{\V}{V}
+\newcommand{\Vsoft}{V_\mathrm{soft}}
+\newcommand{\Vsoftparams}{V_\mathrm{soft}^\qparams}
+\newcommand{\Vhatsoftparams}{\hat V_\mathrm{soft}^\qparams}
+\newcommand{\Vhatsoft}{\hat V_\mathrm{soft}}
+\newcommand{\Vhard}{V^{\dagger}}
+\newcommand{\Q}{Q}
+\newcommand{\Qsoft}{Q_\mathrm{soft}}
+\newcommand{\Qsoftparams}{Q_\mathrm{soft}^\qparams}
+\newcommand{\Qhatsoft}{\hat Q_\mathrm{soft}}
+\newcommand{\Qhatsoftparams}{\hat Q_\mathrm{soft}^{\bar\qparams}}
+\newcommand{\Qhard}{Q^{\dagger}}
+\newcommand{\A}{A}
+\newcommand{\Asoft}{A_\mathrm{soft}}
+\newcommand{\Asoftparams}{A_\mathrm{soft}^\qparams}
+\newcommand{\Ahatsoft}{\hat A_\mathrm{soft}}
+
+% EBM
+\newcommand{\energy}{\mathcal{E}}
+
+% Policy and params
+\newcommand{\policy}{\pi}
+\newcommand{\policyme}{\pi_\mathrm{me}}
+\newcommand{\policyopt}{\pi^*}
+\newcommand{\paramsz}{{\theta_0}}
+\newcommand{\params}{\theta}
+\newcommand{\paramsi}{{\theta_i}}
+\newcommand{\paramsip}{{\theta_{i+1}}}
+\newcommand{\softpolicy}{{\policy_\mathrm{soft}}}
+\newcommand{\hardpolicy}{{\policy^{\dagger}}}
+\newcommand{\pparams}{{\phi}}   % policy parameters
+\newcommand{\qparams}{{\theta}}   % q function parameters
+\newcommand{\qtargetparams}{{\bar\theta}}   % q function parameters
+% \newcommand{\policy}{{\pi_\params}}
+
+% Policy gradient
+\newcommand{\pgparams}{\phi}
+
+% Losses
+\newcommand{\pgloss}{J_\mathrm{PG}}
+\newcommand{\qloss}{J_\Q}  % Bellman error loss (Q function loss).
+\newcommand{\aloss}{J_\A}  % Bellman error loss on advantage.
+\newcommand{\ploss}{J_\policy}  % Stein error loss (policy loss).
+
+
+
+% EBM
+\newcommand{\temp}{\alpha}  % temperature
+
+% Stein method
+\newcommand{\RKHSball}{\mathcal{F}}
+\newcommand{\kernel}{\kappa}
+%\newcommand{\sample}{\omega}  % generic sample
+%\newcommand{\samplek}{\omega^{(k)}}  % generic sample
+\newcommand{\smpl}{\mathbf{\xi}}  % generic sample
+\newcommand{\smpli}{\smpl^{(i)}}  % generic sample
+\newcommand{\smplj}{\xi^{(j)}}  % generic sample
+\newcommand{\smpltildej}{\tilde{\xi}^{(j)}}  % alternative generic sample
+\newcommand{\smplij}{\xi^{(i,j)}}  % generic sample
+
+
+% ----- old -------
+
+
+% losses
+\newcommand{\loss}{\eta}
+\newcommand{\lossi}{\loss_i}
+\newcommand{\lossip}{\loss_{i+1}}
+\newcommand{\meloss}{\loss_\mathrm{me}}
+
+% Random variables.
+\newcommand{\bopt}{\mathcal{O}}  % Binary random variable for optimality.
+\newcommand{\boptt}{\bopt_t}  % Binary random variable for optimality.
+\newcommand{\sinit}{\state_0}
+%\newcommand{\st}{{\state_t}}
+% \newcommand{\stp}{\state_{t+1}}
+%\newcommand{\traj}{\tau}
+
+
+
+
+
+
+
+% Policy.
+\newcommand{\muat}{\boldsymbol \mu_{\at}}
+\newcommand{\sigat}{\boldsymbol\Sigma_{\at}}
+
+% Distributions.
+%\newcommand{\dist}{p}
+\newcommand{\dyndist}{p}
+% \newcommand{\policy}{\pi_\theta}
+\newcommand{\gauss}{\mathcal{N}}
+
+
+% Other.
+\newcommand{\vlb}{\mathcal{L}}
+\newcommand{\const}{\mathrm{const}}
+
+\newcommand{\inv}{^{-1}}
+\newcommand{\T}{^\mathsf{T}}
+
+
+%\DeclareMathOperator{\E}{\mathbb{E}}
+
+% Spaces.
+%\newcommand{\sspace}{\mathcal{S}}
+%\newcommand{\aspace}{\mathcal{A}}
+%\newcommand{\sspace}{\reals^d}
+%\newcommand{\aspace}{\reals^p}
+\newcommand{\rkhs}{\mathcal{H}^d}
+\newcommand{\reals}{\mathbb{R}}
+
+% Kernels.
+%\newcommand{\kernel}{\kappa}
+\newcommand{\rbf}{\kernel_{\mathrm{rbf}}}
+\newcommand{\sigker}{\boldsymbol \Sigma_\traj}
+
+
+% \newcommand{\params}{\theta}
+\newcommand{\discount}{\gamma}
+\newcommand{\cost}{c}
+\newcommand{\totcost}{J}

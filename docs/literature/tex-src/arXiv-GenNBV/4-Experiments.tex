@@ -1,0 +1,238 @@
+\vspace{3pt}
+\section{Experiments}
+\label{sec:exp}
+
+    \begin{table*}[!t]
+    \small
+    \center
+    % \setlength\tabcolsep{7.5pt}
+    \setlength\tabcolsep{9pt}
+    \renewcommand{\arraystretch}{1.6}
+    \captionof{table}{Evaluation results of Next-Best-View policies for active 3D reconstruction on \textbf{Houses3K} and the house category from \textbf{OmniObject3D} (cross-dataset generalization). 
+    The number of views is set to 30 and 20 for Houses3K and OmniObject3D, respectively.\\
+    ``*": the policy is trained with the Houses3K training set and evaluated with holdout Houses3K test set and OmniObject3D house category. 
+    ``\dag": the policy heavily relies on optimized per-scene representation (NeRF), and thus is directly trained and evaluated on testing objects.}
+    \label{tab:main_table}
+
+    \begin{tabularx}{\textwidth}{ll|ccc|ccc}
+    % \toprule
+    & & \multicolumn{3}{c|}{\textbf{Houses3K Test Set}} & \multicolumn{3}{c}{\textbf{OmniObject3D}}\\ \hline \noalign{\vskip0.4ex}
+    & \textbf{NBV Policy} & \shortstack[l]{\textbf{Mean} \\ \textbf{AUC$~\uparrow$}}  & \shortstack[c]{\textbf{Final Coverage} \\ \textbf{Ratio$~\uparrow$}} & \shortstack[c]{\textbf{Accuracy} \\ (cm) $\downarrow$} & \shortstack[l]{\textbf{Mean} \\ \textbf{AUC$~\uparrow$}} & \shortstack[c]{\textbf{Final Coverage } \\ \textbf{Ratio$~\uparrow$}} & \shortstack[c]{\textbf{Accuracy} \\ (cm) $\downarrow$} \\ \hline
+
+    \parbox[c]{1.2mm}{\multirow{3}{*}{\rotatebox[origin=c]{90}{Heuristic~}}}
+    & Random & 48.53\% & 58.24\% & 1.38 & 60.13\% & 73.73\% & 0.62\\
+    & Random Hemisphere & 71.19\% & 79.72\% & 0.63 & 74.03\% & 84.74\% & 0.48\\
+    & Uniform Hemisphere & 82.91\% & 89.71\% & 0.44 & 83.09\% & 92.90\% & 0.41\\ \hline
+
+    \parbox[c]{1.2mm}{\multirow{2}{*}{\rotatebox[origin=c]{90}{InfoGain~}}}
+    & \dag Uncertainty-Guided~\citep{lee2022uncertainty} & 83.13\% & 89.31\% & 0.44 & 69.08\% & 92.85\% & 0.42 \\
+    & \dag ActiveRMap~\citep{zhan2022activermap} & 84.86\% & 90.77\% & 0.44 & 69.47\% & 93.15\% & 0.42 \\ \hline
+
+    \parbox[c]{1.2mm}{\multirow{4}{*}{\rotatebox[origin=c]{90}{RL-based~}}}
+    & *Scan-RL~\citep{peralta2020next} & 84.49\% & 91.61\% & 0.40 & 82.17\% & 92.53\% & 0.34 \\
+    & *Scan-RL w/ Our Repre. & 86.48\% & 92.20\% & \textbf{0.37} & 86.14\% & 93.73\% & 0.35\\
+    & *Ours w/ Scan-RL Repre. & 87.39\% & 95.63\% & 0.38 & 86.81\% & 93.64\% & 0.34\\
+    & \textbf{*GenNBV (Ours)} & \textbf{91.19\%} & \textbf{98.26\%} & \textbf{0.37} & \textbf{88.63\%} & \textbf{97.12\%} & \textbf{0.33} \\ \hline
+    \end{tabularx}
+    \vspace{-5pt}
+    \end{table*}
+    
+
+
+    In this section, we conduct experiments on Houses3K~\cite{houses3k}, OmniObject3D~\cite{wu2023omniobject3d}, and Objaverse~\cite{deitke2023objaverse}.
+    For our policy and other learning-based policies, we train them on Houses3K training set.
+    Then we evaluate all policies on the Houses3K test dataset and the OmniObject3D dataset for quantifying the in-distribution and out-of-distribution generalizability.
+    Finally, we show the visualization results on three datasets, demonstrating the effectiveness of the proposed method. 
+
+\subsection{Experimental Setup}
+    \noindent\textbf{Simulation Environment.}
+    We conduct all experiments in NVIDIA Isaac Gym~\citep{makoviychuk2021isaac}, a physics simulation platform designed for reinforcement learning and robotics research. 
+    With GPU-accelerated tensor API and sensor interaction API, we can easily implement customized CUDA kernels to calculate our geometric representation efficiently.
+    Moreover, the sensor simulation is efficient. 
+    It can run up to 1000 FPS, significantly reducing the training time.
+    We create the agent drone CrazyFlie~\citep{giernacki2017crazyflie} and equip it with sensors including RGB-D cameras and IMU. Considering memory limitations, we downsample the image resolution to $400\times 400$. The vertical field of view of this onboard camera is 90\textdegree. We also set up a point light source with a fixed position and constant intensity in Isaac Gym.
+
+    \vspace{1pt}
+    \noindent\textbf{Dataset.}
+    We conduct our experiments on Houses3K~\citep{houses3k}, OmniObject3D~\citep{wu2023omniobject3d}, Objaverse 1.0~\citep{deitke2023objaverse} and Replica~\citep{straub2019replica}. Our model is trained on large-scale 3D objects from Houses3K. To validate the effectiveness and generalizability of our model, we evaluate it on \textit{unseen} 3D objects from Houses3K and further on batches of \textit{unseen cross-domain} 3D objects from OmniObject3D, Objaverse, and Replica, which include both house and non-house categories.
+    % For testing the cross-dataset generalizability, we also evaluate it on batches of various objects from OmniObject3D and Objaverse datasets, which include both house and non-house categories.
+
+    % \vspace{-0.2cm}
+    \begin{table}[!htbp]
+        \center
+        \large
+        \caption{The cross-dataset generalization for \textbf{non-house categories}. We train the baseline Scan-RL and our GenNBV on Houses3K and generalize them to non-house categories from OmniObject3D and an indoor scene from Replica.}
+        \renewcommand{\arraystretch}{1.5}
+        % \renewcommand\arraystretch{2}
+        \resizebox{1.0\linewidth}{!}{
+            \begin{tabular}{l|c|c|ccc}
+            \hline
+            \label{tab:non_house}
+            \vspace{-0.1cm}
+            \textbf{Category} & \textbf{Dataset} & \textbf{NBV Policy} & \textbf{AUC $\uparrow$} & \textbf{FCR $\uparrow$} & \textbf{Acc. $\downarrow$} \\ \hline
+             \multirow{2}{*}{Animals} & \multirow{2}{*}{OmniObject3D} & Scan-RL & 76.43\% & 84.98\% & 0.17 \\
+             & & GenNBV & \textbf{84.28\%} & \textbf{94.07\%} & \textbf{0.16} \\ \hline
+             \multirow{2}{*}{Trucks} & \multirow{2}{*}{OmniObject3D}  & Scan-RL & 69.58\% & 76.37\% & 0.06 \\
+             & & GenNBV & \textbf{75.54\%} & \textbf{83.47\%} & \textbf{0.03} \\ \hline
+             \multirow{2}{*}{Dinosaurs} & \multirow{2}{*}{OmniObject3D}  & Scan-RL & 78.47\% & 86.89\% & 0.88 \\
+             & & GenNBV & \textbf{84.24\%} & \textbf{94.03\%} & \textbf{0.81} \\ \hline
+             \multirow{2}{*}{Room 0} & \multirow{2}{*}{Replica}  & Scan-RL & 69.21\% & 80.75\% & \textbf{3.12} \\
+             & & GenNBV & \textbf{88.53\%} & \textbf{99.16\%} & 3.59 \\ \hline
+            \end{tabular}
+        }
+    \vspace{-15pt}
+    \end{table}
+
+    Houses3K contains 3,000 textured 3D building models. They are divided into 12 batches, with each batch featuring 50 distinct geometries and 5 varying textures. We further eliminate poorly designed geometries based on the following two criteria: 1) objects with complex internal structures (as we are mostly focusing on the surface reconstruction), and 2) objects with redundant bases at the bottom. Following these criteria, the training set consists of 256 objects from 6 selected batches, and the test set consists of 50 objects from another batch. All these selected training and test objects have distinct geometries.
+
+    OmniObject3D offers a collection of 6K high-fidelity objects scanned from real-world sources across 190 typical categories. The house category from OmniObject3D for evaluation has 43 diverse objects. In contrast, Objaverse 1.0 comprises a vast library of 818K 3D synthetic objects spanning 21K categories. The diverse and high-quality nature of these datasets makes them ideal for evaluating our models and visualizing the results.
+
+    \begin{figure*}[htbp]
+      \centering
+      \includegraphics[width=1.0\textwidth]{Figure/Fig_Vis_v5.pdf}
+      \caption{\small The visualization results of unseen 3D objects reconstructed by Scan-RL~\citep{peralta2020next} and our model to compare the generalizability. (a) Unseen buildings from the test set of Houses3K. (b) Unseen buildings from OmniObject3D.
+      It's quite obvious that some parts of the model reconstructed by Scan-RL are wrong or missing. For example, the second object in the first row has a pillar in the wrong shape. Scan-RL fails to reconstruct the roof edge for the fourth object from OmniObject3D, as shown in the third row.}
+      \label{fig:visual}
+      \vspace{-9pt}
+    \end{figure*}
+
+    \vspace{1pt}
+    \noindent\textbf{Evaluation Metrics.}
+    The objective of NBV policies is to capture the most useful information for reconstruction, with the least number of views. We report the \textit{(1) Final Coverage Ratio (\%)}, \textit{(2) Mean AUC (\%)} of coverage ratio and \textit{(3) Reconstruction Accuracy (cm)} along with the consistent number of views in all tables.
+    Specifically, most prior works ~\citep{peralta2020next, guedonscone} separately use the coverage ratio (\%) and the number of views to evaluate the reconstruction completeness and efficiency for NBV policies. 
+    However, the coverage ratio is highly correlated with the number of views. Thus we propose to unify the number of views to a fixed value for all NBV policies during evaluation and use the area under the curve (AUC) of coverage ratio as the main metric for comparison. 
+    Also, we calculate the Chamfer Distance between scanned and ground-truth point clouds to represent the reconstruction accuracy (cm).
+
+    \vspace{1pt}
+    \noindent\textbf{Implementation Details.}
+    We conduct all experiments in Isaac Gym simulation engine with one NVIDIA Tesla V100 GPU. Our NBV policy is optimized through over 32 million iterations and uses approximately 24 hours of training time on an NVIDIA V100 GPU. All networks are randomly initialized and trained end-to-end. Our implementation refers to the codebase of Legged Gym~\citep{rudinlearning} and the PPO implementation in Stable Baseline3~\citep{raffin2021stable}, which is implemented by PyTorch~\citep{paszke2019pytorch}. The ground-truth point clouds on objects' surfaces are sampled by the Poisson Disk sampling method~\citep{yuksel2015sample} using Open3D API~\citep{Zhou2018}. The Chamfer Distance between the scanned point cloud and the ground-truth point cloud is calculated using PyTorch3D API~\citep{ravi2020pytorch3d}. Please refer to the Appendix for further details and experiments.
+
+
+\subsection{Performance Comparison}
+    \label{sec:main_result}
+    \vspace{-2pt}
+    To comprehensively demonstrate the effectiveness and generalizability of GenNBV, we design three levels of evaluation experiments: 1) As shown in Table~\ref{tab:main_table}, we show the performance of our NBV policy on the Houses3K test set; 2) We generalize the policy trained on Houses3K to the house category from OmniObject3D that has completely different geometric structures and textures compared to the training set. The quantitative result is at Table~\ref{tab:main_table} and the visualization result is as shown in Fig.~\ref{fig:visual}; 3) We also generalize GenNBV to non-house categories from OmniObject3D and scenes with enormous details from Objaverse and Replica~\citep{straub2019replica} to demonstrate its generalizability potential.
+
+    We implement the following policies as our baselines. 1) \textbf{Random}: This policy randomly generates 5-dim vector $(x, y, z, pitch, yaw)$ among the action space as the next viewpoint. 2) \textbf{Random Hemisphere}: This policy randomly generates the next positions on a pre-defined hemisphere that sufficiently covers all objects of the test set. The headings are constrained to point to the center of the hemisphere. 3) \textbf{Uniform Hemisphere}: All positions are evenly distributed on the previously mentioned hemispheres. 4) \textbf{Uncertainty-Guided Policy}~\citep{lee2022uncertainty}: This NBV policy iteratively selects the next view from a pre-defined viewpoint set according to the uncertainty based on a continually optimized neural radiance field. 5) \textbf{ActiveRMap}~\citep{zhan2022activermap}: This policy also adopts an iterative selection framework, with multiple objectives including information gain, to select the next viewpoints from the candidate set. 6) \textbf{Scan-RL}~\citep{peralta2020next}: This RL-based policy predicts the next viewpoint from a hemisphere space, relying on the historical RGB images. 7) \textbf{Ours with Scan-RL's Representation}: This free-space NBV policy replaces our representation with Scan-RL's representation only extracted from RGB images.
+
+
+    \begin{table}[ht]
+        \center
+        \setlength{\tabcolsep}{7.5pt}
+        \renewcommand{\arraystretch}{1.5}
+        \caption{Ablation studies of representation categories in our framework on unseen Houses3K test set.}
+        \label{tab:ablation_repre}
+        \resizebox{1.0\linewidth}{!}{
+        \begin{tabular}{lccc|cc}
+        \toprule
+            & \multicolumn{3}{c|}{\textbf{Representation Category}} & \multicolumn{2}{c}{\textbf{Evaluation Metrics}} \\
+            \cmidrule(lr){2-4} \cmidrule(lr){5-6}
+            & Probabilistic & 5-DoF & Semantic & Mean & Final Coverage \\
+            & 3D Grid & Pose & 2D Map & AUC & Ratio \\
+            \midrule
+            \parbox[c]{1.2mm}{\multirow{3}{*}{\rotatebox[origin=c]{90}{Uni-source~}}}
+            & \checkmark & & & 81.06\% & 84.56\% \\ % 1623
+            & & \checkmark & & 69.53\% & 76.61\% \\ % 1107
+            & & & \checkmark & 81.24\% & 87.90\% \\ % 1929
+            \midrule
+            \parbox[c]{1.2mm}{\multirow{4}{*}{\rotatebox[origin=c]{90}{Multi-source~}}}
+            & \checkmark & \checkmark & & 88.66\% & 96.67\% \\  % 2053
+            & \checkmark & & \checkmark & 89.77\% & 95.31\% \\  % 2054
+            & & \checkmark & \checkmark & 88.30\% & 96.29\% \\  % 2049
+            & \checkmark & \checkmark & \checkmark & \textbf{91.19\%} & \textbf{98.26\%} \\
+        \bottomrule
+        \end{tabular}}
+    \vspace{-20pt}
+    \end{table}
+
+
+    \begin{figure*}[t]
+    % \begin{figure*}[htbp]
+      \centering
+      \includegraphics[width=1.0\textwidth]{Figure/Fig_Vis_City_v2.pdf}
+      \caption{\small The visualization results of an unseen 3D outdoor scene with enormous details from Objaverse, reconstructed by Uncertainty-guided, Scan-RL and our model.
+      Compared to the uncertainty-guided method and Scan-RL, the scene reconstructed by our method is more watertight and has fewer holes on the ground and building surface, especially in the region highlighted by the red box.}
+      \label{fig:visual_obj_city}
+    \end{figure*}
+
+    As shown in Table~\ref{tab:main_table}, our GenNBV shows the best in-distribution and out-of-distribution generalizability in both coverage sufficiency and view efficiency, when evaluated on test sets consisting of unseen objects from Houses3K and OmniObject3D. In particular, the comparison in Table~\ref{tab:main_table} demonstrates the strength of the proposed representations and action space. Note that the Scan-RL's representation (`*' in the table) uses 6 frames, while our semantic representation only needs 2 frames.
+    Moreover, learning-based NBV policies such as GenNBV and Scan-RL, with much larger action space, outperform all rule-based baselines, even if ActiveRMap and Uncertainty-Guided baselines are trained and evaluated on the same 3D objects.
+
+    \noindent \textbf{Non-house Generalization} In Table~\ref{tab:non_house}, we introduce an experiment to evaluate the generalizability of our GenNBV trained on Houses3K to non-house categories. The targets include $74$ \textit{animals}, $43$ \textit{trucks} and $33$ \textit{dinosaurs} from OmniObject3D, and a challenging \textit{indoor scene (Room 0)} from Replica. The number of views is set to 20.
+
+    Our GenNBV almost outperforms Scan-RL in all metrics. Particularly, on Replica Room 0, which consists of numerous multi-sized objects with complex occlusion, our GenNBV is significantly better than Scan-RL. This shows the effectiveness of our free-space NBV policy.
+
+\subsection{Ablation Study}
+    We implement the ablation study about multi-source state embedding and depth-based representation. Please refer to the Appendix for further experiments.
+    
+    \noindent\textbf{Multi-source State Embedding.}
+    In Sec.~\ref{sec:method_state}, we introduce how to build our multi-source state embedding. Thanks to the same shape of representations and state embedding, we only need to adjust the input dimension of the linear layer of state embedding according to the modal type when ablating the model.
+    Here we reveal the importance of specific representations with the ablation results shown in Table~\ref{tab:ablation_repre}. In uni-source experiments, we design the 5-DoF Pose baseline that learns an empirically optimal trajectory, which helps understand the effectiveness of domain knowledge of the dataset.
+    We also evaluate different combinations of representation categories in Table~\ref{tab:ablation_repre}, demonstrating the effectiveness of our multi-source state embedding for policy learning in multi-source experiments.
+
+    \vspace{-2pt}
+    \begin{table}[h!]
+        \huge
+        \center
+        \setlength{\tabcolsep}{12pt}
+        \renewcommand{\arraystretch}{1.5}
+        \caption{Ablation studies of depth-based representations on unseen Houses3K test set, where depth map is the only sensory source.}
+        \label{tab:ablation_repre_depth}
+        \resizebox{1.0\linewidth}{!}{
+        \begin{tabular}{l|cc}
+        \toprule
+            \textbf{Depth-based Representation} & \textbf{Mean AUC} & \textbf{Final Coverage Ratio} \\ \hline
+            Geometric 2D Map & 71.86\% & 74.88\% \\
+            Binary 3D Grid & 77.28\% & 80.85\% \\
+            \textbf{Probabilistic 3D Grid} & \textbf{81.06\%} & \textbf{84.56\%} \\
+        \bottomrule
+        \end{tabular}}
+    \end{table}
+
+    \vspace{1pt}
+    \noindent\textbf{Depth-based Representation.}
+    Furthermore, we ablate the depth-based representations in Table~\ref{tab:ablation_repre_depth}. The experimental results demonstrate that our probabilistic 3D grid is more comprehensive than a binary 3D grid and a geometric 2D map to support the NBV prediction. 
+
+    % \vspace{1pt}
+    % \noindent\textbf{Number of Training Objects.}
+    % Motivated by generalizable RL-based policies~\citep{cobbe2020leveraging, li2023scenarionet, li2022metadrive}, we explore the impact of diversity of training data for generalizability. As shown in Table.~\ref{tab:ablation_obj} and Fig.~\ref{fig:scaling}, we found that increasing the diversity of training objects indeed leads to better generalizability for 3D reconstruction.
+
+    % \vspace{-2pt}
+    % \begin{table}[htbp]
+    % \center
+    % \setlength{\tabcolsep}{12pt}
+    % \renewcommand{\arraystretch}{1.1}
+    % \captionof{table}{Ablation studies of the number of training objects in our framework on unseen OmniObject3D house category.}
+    % \vspace{-5pt}
+    % \label{tab:ablation_obj}
+    % \resizebox{1.0\linewidth}{!}{
+    % \begin{tabular}{c|cc}
+    % \toprule
+    %     \textbf{\makecell{Number of \\ Training Objects}} & \textbf{Mean AUC} & \textbf{Final Coverage Ratio} \\ \hline
+    %     1 & 61.76\% & 67.32\% \\
+    %     2 & 71.03\% & 82.98\% \\
+    %     4 & 70.72\% & 89.53\% \\
+    %     8 & 73.71\% & 90.47\% \\
+    %     16 & 73.73\% & 88.23\% \\
+    %     32 & 82.39\% & 92.41\% \\
+    %     64 & 82.09\% & 93.70\% \\
+    %     128 & 87.21\% & 96.75\% \\
+    %     \textbf{256} & \textbf{88.63\%} & \textbf{97.12\%} \\
+    % \bottomrule
+    % \end{tabular}}
+    % \end{table}
+
+    % \vspace{-5pt}
+    % \begin{figure}[htbp]
+    % \vspace{-5pt}
+    %   \centering
+    %   \includegraphics[width=0.5\textwidth]{Figure/Fig_Exp_Scaling_v2.pdf}
+    %   \caption{The curve of coverage ratio with the increasing number of training objects on unseen OmniObject3D house category.}
+    %   \label{fig:scaling}
+    % \end{figure}
+
+
+\subsection{Qualitative Results}
+    We visualize the reconstruction results generated from the scanning trajectory of a single episode in Fig. \ref{fig:visual}. 
+    It demonstrates that our next-best-view policy can reconstruct objects better in terms of completeness and appearance quality compared to Scan-RL.
+    We further visualize the reconstruction results of an outdoor scene from Objaverse using 30 collected views in Fig. \ref{fig:visual_obj_city}. 

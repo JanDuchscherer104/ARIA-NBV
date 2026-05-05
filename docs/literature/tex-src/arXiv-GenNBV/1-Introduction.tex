@@ -1,0 +1,35 @@
+\section{Introduction}
+\label{sec:introduction}
+\vspace{-0.1cm}
+Recent advances in 3D reconstruction~\citep{park2019deepsdf, sun2021neuralrecon, sun2022neuconw} and neural rendering~\citep{mildenhall2020nerf, sun2022direct, zhang2022nerfusion} have significantly enhanced the quality of 3D digitization of large scenes, such as buildings and city landmarks~\citep{hardouin2020next, zhang2021continuous, liu2022learning, xiangli2022bungeenerf, li2023matrixcity}.
+However, image-capturing process still remains time-consuming and labor-intensive. To scan a building-scale scene using a drone, it may take several days' effort of a professional team to ensure full coverage. Moreover, even professional pilots may miss some areas at the first scan, leading to multiple rounds for rescanning.
+
+
+To alleviate the effort in manual scanning, active 3D reconstruction algorithms, especially the Next-Best-View (NBV) policy, have emerged as a promising approach to automate view planning. 
+However, typical rule-based NBV policies~\citep{lee2022uncertainty, pan2022activenerf, zhan2022activermap, peralta2020next, guedonscone, ran2023neurar} heavily rely on empirically designed view-selection criteria and hand-crafted action space, such as a hemisphere as shown in Fig.~\ref{fig:teaser}, which limit their generalizability to unseen scenes.
+To enhance generalization capacity, pioneering work on learning-based NBV policy has been proposed~\citep{peralta2020next, zhan2022activermap, chenlearning, chaplotlearning}. Nevertheless, they are constrained into impractical setups in real-world scenarios, such as object-centric capturing and limited action space for ground robots, resulting in incomplete 3D reconstruction because of significant self-occlusion.
+
+
+Therefore, in this work, we study this problem: \textit{``How to design an NBV policy that supports exploration in any space and also can generalize to unseen building-scale geometries?"} 
+Building upon the design of previous reinforcement learning-based (RL-based) NBV policies~\citep{peralta2020next, chenlearning, chaplotlearning}, our setup faces the following new challenges that were not fully studied before:
+1) Designing an easy-to-generalize action space, rather than object-specific spaces used in previous work, such as hand-crafted candidates or a constrained hemisphere;
+2) With a large action space, an informative representation is necessary to guide the policy to efficiently find an optimal capturing trajectory;
+3) Proposing generic reward functions and developing the distributed training procedure for better generalizability.
+
+To overcome these two challenges, we propose \textit{GenNBV}, an end-to-end generalizable NBV policy. It has a novel design of action spaces and state embeddings, which allows free-space exploration and ensures a large coverage when applied to unseen objects.
+We first extend the former limited action space, like a hemisphere, to 5D free space. As shown in Fig.~\ref{fig:teaser}, this new space is composed of a position subspace of approximately $20m$ x $20m$ x $10m$ and an omnidirectional heading subspace. This free space enables our agent drone to scan from any viewpoint.
+Moreover, with a much larger action space, our RL-based policy can be easily generalized to building-scale geometries without concerning the potential scale shift from training to evaluation. In contrast, many hand-crafted designs~\citep{pan2022activenerf, lee2022uncertainty} limit the available viewpoints to a small predefined set, and thus cannot generalize if there is a drastic change in scales.
+
+
+Second, in order to generalize a well-trained NBV policy to unseen scenes during evaluation, we propose a novel state representation directly from raw sensory inputs to guide the policy. In contrast to the widely used neural radiance field (NeRF)~\citep{pan2022activenerf, zhan2022activermap, lee2022uncertainty, smith2022uncertainty,ran2023neurar}, our representation does not need time-consuming per-scene optimization. 
+Specifically, our NBV policy incorporates a multi-source state embedding, which comprises three key components: a novel geometric embedding, a semantic embedding, and an action embedding. The geometric embedding is derived from multi-view depth maps and represents an encoded probabilistic 3D grid, while the semantic embedding is extracted from RGB images, and the action embedding is an encoded viewpoint sequence.
+In contrast to 2D representations used in previous RL-based NBV policies~\citep{chenlearning, chaplotlearning}, our multi-source state embedding, extracted from a probabilistic 3D grid, is a more comprehensive representation that supports a robust prediction of next viewpoints.
+
+
+% Our Experiments
+To validate the effectiveness of GenNBV, we construct a benchmark for training and evaluation with Houses3K~\citep{houses3k} dataset from the NVIDIA Isaac Gym~\citep{makoviychuk2021isaac} simulator. We further test its generalization ability on novel buildings and object categories from OmniObject3D~\citep{wu2023omniobject3d} and Objaverse~\citep{deitke2023objaverse} datasets.
+Our evaluation metrics quantify the completeness, accuracy, and efficiency of active 3D reconstruction.
+To consolidate completeness and efficiency into a single number, we also propose a metric, the Area Under the Curve (AUC) of the coverage. 
+Compared to heuristic~\citep{isler2016information}, information gain-based~\citep{isler2016information, lee2022uncertainty, zhan2022activermap}, and RL-based baselines~\citep{peralta2020next}, our method achieves the best result under different metrics.
+We also provide visualizations to demonstrate the generalizability of GenNBV.
+A demo video is attached in the appendix to further illustrate our method.

@@ -255,13 +255,17 @@ docs/_freeze/**/*.html
 .logs/*
 .logs/ckpts
 
-# Literature review - ignore non-documentation files
+# Literature review
 docs/literature/pdf/
-docs/literature/tex-src/
+docs/literature/tex-src/**
+!docs/literature/tex-src/
+!docs/literature/tex-src/**/
+!docs/literature/tex-src/**/*.tex
+!docs/literature/tex-src/**/*.bib
+!docs/literature/tex-src/**/*.md
 !docs/literature/**/*.md
-!docs/literature/**/*.bib
 !docs/literature/**/*.jsonl
-!docs/literature/**/
+!docs/literature/**/*.bib
 
 /.quarto/
 **/*.quarto_ipynb

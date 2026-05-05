@@ -1,0 +1,12 @@
+\begin{figure}
+    \centering
+    \includegraphics[width=1.0\linewidth]{images/error.pdf}
+    \caption{
+    \textbf{(Compounding model errors)}
+    We compare the accuracy of the Trajectory Transformer (with uniform discretization) to that of the probabilistic feedforward model ensemble \citep{chua2018pets} over the course of a planning horizon in the humanoid environment, corresponding to the trajectories visualized in Figure~\ref{fig:humanoid}.
+    The Trajectory Transformer has substantially better error compounding with respect to prediction horizon than the feedforward model.
+    The discrete oracle is the maximum log likelihood attainable given the discretization size; see Appendix~\ref{app:oracle} for a discussion.
+    }
+    \label{fig:model_error}
+    % \vspace{-.5cm}
+\end{figure}

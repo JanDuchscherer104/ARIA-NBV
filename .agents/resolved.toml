@@ -74,6 +74,48 @@ resolved_at = "2026-05-02"
 resolution_note = "The local vin_offline store is no longer version-blocked: manifest is v6, sample index has 48 rows, strict reader opens it, and nbv-summary --config-path offline_only.toml passes. Remaining partial-diagnostic caveats are covered by M1/Rerun/offline-store contracts."
 resolved_from = ".agents/issues.toml"
 
+[[issue]]
+id = "issue-015"
+title = "No first-class Rerun offline dataset inspector"
+description = "The project lacks a TOML-configurable Rerun CLI that can render an immutable VIN offline-store sample with semidense points, candidate frusta, RRI/validity metadata, optional mesh/OBBs, and stable recording output."
+type = "feature"
+priority = "high"
+status = "resolved"
+labels = ["diagnostics", "offline-store", "geometry", "rerun", "thesis"]
+context = ["The Rerun offline inspector note defines the needed visual smoke path for immutable offline samples, but the project still needs a first-class CLI/config workflow that produces stable recordings.", "This is a trust diagnostic for geometry, candidate ordering, validity, and labels before samples feed VIN training or rollout evidence."]
+references = ["repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:README.md#important-cli-commands", "repo:aria_nbv/aria_nbv/rerun_inspector/_cli.py", "url:https://rerun.io/docs"]
+resolved_at = "2026-05-04"
+resolution_note = "The first-class Rerun offline inspector now exists as a TOML-configurable CLI and documented smoke workflow with passing rerun_inspector tests."
+resolved_from = ".agents/issues.toml"
+
+[[issue]]
+id = "issue-016"
+title = "Rerun geometry logging lacks a frame-safe contract"
+description = "Candidate and reference camera visualization needs PoseTW/CameraTW-aware Rerun helpers and regression tests so manual frusta, native Pinhole logging, and display-only CW90 corrections cannot silently produce plausible but wrong geometry."
+type = "research-debt"
+priority = "high"
+status = "resolved"
+labels = ["geometry", "camera", "rerun", "tests", "contracts"]
+context = ["Pose/camera frames, LUF conventions, PyTorch3D cameras, and display-only CW90 corrections can all produce plausible but wrong visualizations if logged through raw matrices.", "Rerun helpers need typed PoseTW/CameraTW boundaries and tests so visual diagnostics do not silently bless corrupted geometry."]
+references = ["repo:.agents/skills/nbv-geometry-contracts/SKILL.md", "repo:docs/contents/impl/rerun_offline_inspector.qmd#frame-safety", "repo:aria_nbv/aria_nbv/rerun_inspector/_frusta.py", "url:https://docs.rs/rerun/latest/rerun/struct.LineStrips3D.html"]
+resolved_at = "2026-05-04"
+resolution_note = "Rerun geometry now has frame-safe helpers and regression coverage for frusta, root coordinates, top-oracle validity, metric depth camera context, and snippet-frame OBB transforms."
+resolved_from = ".agents/issues.toml"
+
+[[issue]]
+id = "issue-017"
+title = "Offline-store visual primitive inventory is missing"
+description = "Diagnostics currently have no single strict inventory that tells a viewer which sample primitives are present, which fields are required, and which optional visual layers should be reported as unavailable before rendering starts."
+type = "diagnostics"
+priority = "high"
+status = "resolved"
+labels = ["offline-store", "diagnostics", "data", "contracts"]
+context = ["The inspector should fail early when required offline-store fields are absent and report optional layers explicitly instead of guessing from ad hoc sample attributes.", "A visual primitive inventory also gives future rollout/entity diagnostics a reusable contract for what can be rendered and what remains unavailable."]
+references = ["repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:aria_nbv/aria_nbv/data_handling/_offline_visual_inventory.py", "repo:aria_nbv/tests/rerun_inspector/", "repo:.agents/skills/dataset-cache-ops/SKILL.md"]
+resolved_at = "2026-05-04"
+resolution_note = "Visual primitive inventory is implemented and used as a pre-logging contract for the Rerun offline inspector; optional payloads are surfaced through metadata."
+resolved_from = ".agents/issues.toml"
+
 [[todo]]
 id = "todo-009"
 title = "Bounded public docs identity cleanup"
@@ -382,6 +424,66 @@ acceptance = ["`uv run nbv-summary --config-path offline_only.toml` loads at lea
 verification = ["cd aria_nbv && uv run nbv-summary --config-path offline_only.toml", "cd aria_nbv && uv run pytest tests/vin/test_vin_utils.py tests/data_handling/test_vin_offline_store.py"]
 resolved_at = "2026-05-02"
 resolution_note = "Resolved by migrating the local vin_offline diagnostic store artifact from v5 to v6, appending five current-writer snippets 000043..000047 without recomputing old payloads, and verifying nbv-summary loads an offline train batch."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-020"
+title = "Add offline-store visual primitive inventory"
+description = "Create a strict inventory of visualizable primitives and required fields for immutable VIN offline-store samples."
+priority = "high"
+status = "resolved"
+labels = ["offline-store", "diagnostics", "data", "contracts", "rerun"]
+issue_ids = ["issue-017", "issue-007"]
+loc_min = 120
+loc_expected = 260
+loc_max = 520
+context = ["A Rerun inspector should be a contract verifier before it is a renderer.", "The review identified required fields such as sample_id, split, scene_id/snippet_id, reference_pose_world_rig, candidate_poses_world_cam, p3d_cameras or intrinsics, candidate_valid_mask, oracle_rri, accuracy_delta, completeness_delta, and semidense points.", "Optional visual layers include invalid_reason, candidate_depth, candidate_points, mesh references, OBBs, fused points, voxel bounds, EVL extents, and collision segments."]
+references = ["repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:aria_nbv/aria_nbv/data_handling/_offline_visual_inventory.py", "repo:aria_nbv/tests/rerun_inspector/", "repo:.agents/skills/dataset-cache-ops/SKILL.md"]
+implementation_notes = ["Add a typed inventory helper such as OfflineVisualInventory with booleans for semidense points, candidate poses, candidate points/depths, GT mesh refs, OBBs, oracle RRI, accuracy/completeness, masks, and warnings.", "Use active aria_nbv.data_handling immutable offline-store samples only; do not revive removed cache modules or online runtime training APIs.", "Make required-field failures actionable before any Rerun logging starts, and report missing optional fields in metadata.", "Keep this inventory small enough to be reusable by CLI, tests, and future diagnostics."]
+acceptance = ["One function returns the available visualizable fields for a loaded offline sample.", "Missing required pose/camera/RRI fields fail before rendering with rebuild or config guidance.", "Missing optional fields are reported as metadata warnings rather than guessed from ad hoc sample attributes.", "The inventory is covered by fixture-based tests and does not mutate derived store artifacts."]
+verification = ["cd aria_nbv && uv run pytest tests/rerun_inspector tests/data_handling/test_vin_offline_store.py", "ruff check aria_nbv/aria_nbv/rerun_inspector aria_nbv/tests/rerun_inspector"]
+resolved_at = "2026-05-04"
+resolution_note = "Implemented OfflineVisualInventory and required/optional visual payload reporting for immutable offline-store samples; covered by rerun_inspector and offline-store tests."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-021"
+title = "Add TOML-configurable Rerun offline inspector CLI"
+description = "Implement nbv-rerun-inspect as a CLI-generated Rerun recording workflow for immutable VIN offline-store samples."
+priority = "high"
+status = "resolved"
+labels = ["diagnostics", "offline-store", "geometry", "rerun", "thesis"]
+issue_ids = ["issue-015", "issue-017", "issue-016"]
+loc_min = 320
+loc_expected = 700
+loc_max = 1400
+context = ["Temporal, multimodal, 3D candidate-set debugging is not covered by the current Plotly/Streamlit diagnostics surface.", "The intended first tool should inspect one real offline sample/snippet with semidense points, candidate camera frusta, candidate validity, RRI labels, optional mesh/OBBs/geometric primitives, and metadata.", "The default viewer must avoid excessive entity counts by batching candidate frusta and downsampling point clouds or meshes by config."]
+references = ["repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:README.md#important-cli-commands", "repo:aria_nbv/aria_nbv/rerun_inspector/_cli.py", "url:https://rerun.io/docs"]
+implementation_notes = ["Add aria_nbv/aria_nbv/rerun_inspector with config, sample, frusta, color, logger, metadata, and CLI modules.", "Add RerunOfflineInspectorConfig with config-as-factory construction and `.configs/rerun_offline.toml` for dataset, output, timeline, world, geometry, cameras, metrics, and primitives sections.", "Add the `nbv-rerun-inspect = aria_nbv.rerun_inspector._cli:main` entry point and an optional pinned rerun-sdk dependency.", "Support spawn, save, and connect output modes plus split/index or sample-id selection.", "Use stable batched entity paths such as `/world/candidates/frusta_all`, `/world/candidates/frusta_top_oracle`, and `/world/candidates/selected/<candidate_id>`.", "Keep the inspector read-only and scoped to the current immutable offline store; do not support legacy cache modules, online datasets, or premature counterfactual fields."]
+acceptance = ["`nbv-rerun-inspect` exists and reads `.configs/rerun_offline.toml`.", "The CLI loads one immutable VIN offline-store sample and logs semidense points, candidate frusta, reference pose, optional mesh, and candidate RRI/validity metadata.", "Output modes include spawn, save, and connect.", "Candidate count, top-k, filter, coloring, line radius, labels, and point/mesh downsampling are TOML-configurable.", "Default rendering handles a 60-candidate sample with batched frusta and stable entity paths.", "Missing required sample fields fail with actionable errors before logging."]
+verification = ["cd aria_nbv && uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline.toml --split val --index 0 --save ../.artifacts/rerun/sample.rrd", "cd aria_nbv && uv run pytest tests/rerun_inspector", "ruff format aria_nbv/aria_nbv/rerun_inspector aria_nbv/tests/rerun_inspector", "ruff check aria_nbv/aria_nbv/rerun_inspector aria_nbv/tests/rerun_inspector"]
+resolved_at = "2026-05-04"
+resolution_note = "Implemented nbv-rerun-inspect, RerunOfflineInspectorConfig, TOML smoke config, stable Rerun entity paths, output modes, docs, and tests."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-022"
+title = "Add frame-safe Rerun geometry logging helpers"
+description = "Implement PoseTW/CameraTW-aware Rerun logging helpers for manual frusta and tested native camera logging."
+priority = "high"
+status = "resolved"
+labels = ["geometry", "camera", "rerun", "tests", "contracts"]
+issue_ids = ["issue-016", "issue-007"]
+loc_min = 160
+loc_expected = 360
+loc_max = 760
+context = ["ARIA/PyTorch3D/EFM coordinate conventions are fragile, and plausible-looking frusta can be wrong if logged through raw matrices or an untested native camera path.", "Manual batched LineStrips3D frusta are safer for candidate cameras until native rr.Pinhole alignment is proven.", "Display-only CW90 corrections must remain visual-only and never leak into logged model/cache geometry."]
+references = ["repo:.agents/skills/nbv-geometry-contracts/SKILL.md", "repo:docs/contents/impl/rerun_offline_inspector.qmd#frame-safety", "repo:aria_nbv/aria_nbv/rerun_inspector/_frusta.py", "url:https://docs.rs/rerun/latest/rerun/struct.LineStrips3D.html"]
+implementation_notes = ["Public helpers should accept PoseTW, CameraTW, or typed project DTOs rather than unlabelled raw matrices.", "Implement a manual_lines path that computes camera-center, image-plane corners, rectangle edges, center rays, and optional optical axes in world coordinates.", "Use batched rr.LineStrips3D for candidate frusta with colors, radii, and labels.", "Provide native rr.Transform3D plus rr.Pinhole logging only for tested reference/RGB/SLAM cameras.", "Keep candidate frustum helpers independent from Streamlit panels and reusable by tests."]
+acceptance = ["Manual candidate frusta are generated from the camera model and pose and are the default candidate mode.", "Native Pinhole logging exists only for camera relationships covered by tests.", "A synthetic-camera test verifies frustum endpoints against projected or unprojected rays.", "CW90/display-only corrections cannot alter model/cache pose or camera values."]
+verification = ["cd aria_nbv && uv run pytest tests/rerun_inspector/test_frusta.py tests/data_handling/test_vin_offline_store.py", "ruff check aria_nbv/aria_nbv/rerun_inspector aria_nbv/tests/rerun_inspector"]
+resolved_at = "2026-05-04"
+resolution_note = "Implemented PoseTW/CameraTW-aware Rerun frustum helpers plus tested world root coordinates, valid/all-invalid handling, OBB world transforms, and camera-context depth logging."
 resolved_from = ".agents/todos.toml"
 
 [[refactor]]

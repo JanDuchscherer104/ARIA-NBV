@@ -1,0 +1,221 @@
+\begin{table*}[ht]
+\centering
+
+\caption{Results of \ac{NBV} evaluation for whole scene reconstruction in captured scenes. Best results are highlighted in \textbf{bold}, and second-best results are \underline{underlined}. The “All” row, which uses all candidate views, is excluded from this comparison.}
+% N/A는 모든 실험에서 지나치게 많은 Gaussian으로 인해 memory ood가 된 경우이다.
+\vspace{-2mm}
+\label{tab:main2}
+
+\resizebox{\textwidth}{!}{
+\renewcommand{\arraystretch}{1.2}
+{\large
+\begin{tabular}{cc|cccccccc|cccccccc}
+\hline
+\toprule
+\multicolumn{2}{c|}{\multirow{3}{*}{\textbf{Methods}}} &
+  \multicolumn{8}{c|}{\textbf{Captured Scene - Grounded SAM2 Mask (2 scenes)}} &
+  \multicolumn{8}{c}{\textbf{Captured Scene - Manual SAM Mask (2 scenes)}} \\ \cline{3-18} 
+\multicolumn{2}{c|}{} &
+  \multicolumn{4}{c|}{\textbf{W/o Obj mask}} &
+  \multicolumn{4}{c|}{\textbf{With Obj mask}} &
+  \multicolumn{4}{c|}{\textbf{W/o Obj mask}} &
+  \multicolumn{4}{c}{\textbf{With Obj mask}} \\ \cline{3-18} 
+\multicolumn{2}{c|}{} &
+  PSNR $\uparrow$ &
+  SSIM$\uparrow$ &
+  LPIPS $\downarrow$ &
+  \multicolumn{1}{c|}{D-MAE $\downarrow$} &
+  PSNR $\uparrow$ &
+  SSIM$\uparrow$ &
+  LPIPS $\downarrow$ &
+  D-MAE $\downarrow$ &
+  PSNR $\uparrow$ &
+  SSIM$\uparrow$ &
+  LPIPS $\downarrow$ &
+  \multicolumn{1}{c|}{D-MAE $\downarrow$} &
+  PSNR $\uparrow$ &
+  SSIM$\uparrow$ &
+  LPIPS $\downarrow$ &
+  D-MAE $\downarrow$ \\
+  % \hline
+  \hline \midrule
+\multicolumn{2}{c|}{All} &
+  17.04 &
+  0.6439 &
+  0.5401 &
+  \multicolumn{1}{c|}{0.0985} &
+  17.23 &
+  0.8333 &
+  0.2053 &
+  \multicolumn{1}{c|}{0.1169} &
+  17.85 &
+  0.7049 &
+  0.5145 &
+  \multicolumn{1}{c|}{0.0561} &
+  18.27 &
+  0.7839 &
+  0.2936 &
+  0.0494  \\ 
+  % \hline
+  \midrule
+% \multicolumn{1}{c|}{\multirow{3}{*}{\begin{tabular}[c]{@{}c@{}}Heu\\ristic\end{tabular}}} &
+  % Spiral &
+\multicolumn{2}{c|}{Spiral} &
+  15.51 &
+  0.5706 &
+  0.5566 &
+  \multicolumn{1}{c|}{\underline{0.1066}} &
+  \underline{16.66} &
+  \underline{0.8072} &
+  \underline{0.2152} &
+  \multicolumn{1}{c|}{0.1128} &
+  14.56 &
+  0.5424 &
+  0.5714 &
+  \multicolumn{1}{c|}{0.0845} &
+  15.49 &
+  0.6554 &
+  0.3511 &
+  0.0792 \\
+% \multicolumn{1}{c|}{} &
+%   Random &
+\multicolumn{2}{c|}{Random} &
+  14.42 &
+  0.5318 &
+  0.5759 &
+  \multicolumn{1}{c|}{0.1178} &
+  16.22 &
+  0.7668 &
+  0.2315 &
+  \multicolumn{1}{c|}{0.1228} &
+  15.11 &
+  0.5807 &
+  0.5578 &
+  \multicolumn{1}{c|}{0.0841} &
+  15.57 &
+  0.6699 &
+  0.3397 &
+  0.0779 \\
+% \multicolumn{1}{c|}{} &
+%   FPS &
+\multicolumn{2}{c|}{FPS} &
+  14.67 &
+  0.5404 &
+  0.5736 &
+  \multicolumn{1}{c|}{0.1239} &
+  16.37 &
+  0.7787 &
+  0.2271 &
+  \multicolumn{1}{c|}{0.1336} &
+  14.23 &
+  0.5471 &
+  0.5775 &
+  \multicolumn{1}{c|}{0.0811} &
+  15.26 &
+  0.6554 &
+  0.3543 &
+  \underline{0.0637} \\ 
+  % \hline
+  \midrule
+% \multicolumn{1}{c|}{\multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}Info\\based\end{tabular}}} &
+%   FisherRF &
+\multicolumn{2}{c|}{FisherRF \cite{jiang2024fisherrf}} &
+  14.28 &
+  0.5127 &
+  0.5852 &
+  \multicolumn{1}{c|}{0.1283} &
+  15.60 &
+  0.7677 &
+  0.2405 &
+  \multicolumn{1}{c|}{0.1135} &
+  14.91 &
+  0.5739 &
+  0.5646 &
+  \multicolumn{1}{c|}{0.0857} &
+  15.34 &
+  0.6697 &
+  0.3472 &
+  0.0761 \\
+% \multicolumn{1}{c|}{} &
+%   POp-GS (T) &
+\multicolumn{2}{c|}{POp-T \cite{wilson2025pop}} &
+  14.70 &
+  0.5255 &
+  0.5728 &
+  \multicolumn{1}{c|}{0.1265} &
+  16.16 &
+  0.7883 &
+  0.2271 &
+  \multicolumn{1}{c|}{0.1291} &
+  14.96 &
+  0.5630 &
+  0.5638 &
+  \multicolumn{1}{c|}{0.0803} &
+  15.44 &
+  0.6837 &
+  0.3412 &
+  0.0766 \\
+% \multicolumn{1}{c|}{} &
+%   POp-GS (D) &
+\multicolumn{2}{c|}{POp-D \cite{wilson2025pop}} &
+  14.93 &
+  0.5319 &
+  0.5678 &
+  \multicolumn{1}{c|}{0.1224} &
+  16.28 &
+  0.7894 &
+  0.2264 &
+  \multicolumn{1}{c|}{0.1188} &
+  15.18 &
+  0.5783 &
+  0.5596 &
+  \multicolumn{1}{c|}{0.0864} &
+  \underline{15.65} &
+  \underline{0.6927} &
+  \underline{0.3350} &
+  0.0773 \\
+% \multicolumn{1}{c|}{} &
+%   POp-GS (B) &
+\multicolumn{2}{c|}{POp-B \cite{wilson2025pop}} &
+  14.50 &
+  0.5251 &
+  0.5761 &
+  \multicolumn{1}{c|}{0.1264} &
+  16.29 &
+  0.7902 &
+  0.2263 &
+  \multicolumn{1}{c|}{0.1214} &
+  15.20 &
+  0.5808 &
+  0.5618 &
+  \multicolumn{1}{c|}{0.0823} &
+  15.58 &
+  0.6895 &
+  0.3385 &
+  0.0747 \\
+% \multicolumn{1}{c|}{} &
+%   \textbf{Ours} &
+\multicolumn{2}{c|}{\textbf{Ours}} &
+  - &
+  - &
+  - &
+  \multicolumn{1}{c|}{-} &
+  \textbf{16.74} &
+  \textbf{0.8148} &
+  \textbf{0.2064} &
+  \multicolumn{1}{c|}{\textbf{0.0527}} &
+  - &
+  - &
+  - &
+  \multicolumn{1}{c|}{-} &
+  \textbf{16.71} &
+  \textbf{0.7280} &
+  \textbf{0.3102} &
+  \textbf{0.0461} \\ 
+  % \hline
+  \bottomrule
+\end{tabular}
+}
+}
+\vspace{-4mm}
+\end{table*}

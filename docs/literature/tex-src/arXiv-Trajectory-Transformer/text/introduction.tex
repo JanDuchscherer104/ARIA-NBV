@@ -1,0 +1,26 @@
+\section{Introduction}
+\label{sec:intro}
+
+The standard treatment of reinforcement learning relies on decomposing a long-horizon problem into smaller, more local subproblems.
+In model-free algorithms, this takes the form of the principle of optimality \citep{bellman1957dynamic}, a recursion that leads naturally to the class of dynamic programming methods like $Q$-learning.
+In model-based algorithms, this decomposition takes the form of single-step predictive models, which reduce the problem of predicting high-dimensional, policy-dependent state trajectories to that of estimating a comparatively simpler, policy-agnostic transition distribution.
+
+However, we can also view reinforcement learning as analogous to a sequence generation problem, with the goal being to produce a sequence of actions that, when enacted in an environment, will yield a sequence of high rewards.
+In this paper, we consider the logical extreme of this analogy: does the toolbox of contemporary sequence modeling itself provide a viable reinforcement learning algorithm?
+We investigate this question by treating trajectories as unstructured sequences of states, actions, and rewards.
+We model the distribution of these trajectories using a Transformer architecture \citep{vaswani2017attention}, the current tool of choice for capturing long-horizon dependencies.
+In place of the trajectory optimizers common in model-based control, we use beam search \citep{reddy1997beam}, a heuristic decoding scheme ubiquitous in natural language processing, as a planning algorithm.
+
+Posing reinforcement learning, and more broadly data-driven control, as a sequence modeling problem handles many of the considerations that typically require distinct solutions: actor-critic algorithms require separate actors and critics, model-based algorithms require predictive dynamics models, and offline RL methods often require estimation of the behavior policy \citep{fujimoto2019off}.
+These components estimate different densities or distributions, such as that over actions in the case of actors and behavior policies, or that over states in the case of dynamics models.
+Even value functions can be viewed as performing inference in a graphical model with auxiliary optimality variables, amounting to estimation of the distribution over future rewards~\citep{levine2018reinforcement}.
+All of these problems can be unified under a single sequence model, which treats states, actions, and rewards as simply a stream of data.
+The advantage of this perspective is that high-capacity sequence model architectures can be brought to bear on the problem, resulting in a more streamlined approach that could benefit from the same scalability underlying large-scale unsupervised learning results \citep{brown2020gpt3}.
+
+We refer to our model as a Trajectory Transformer (\autoref{fig:architecture}) and evaluate it in the offline regime so as to be able to make use of large amounts of prior interaction data.
+The Trajectory Transformer is a substantially more reliable long-horizon predictor than conventional dynamics models, even in Markovian environments for which the standard model parameterization is in principle sufficient.
+When decoded with a modified beam search procedure that biases trajectory samples according to their cumulative reward, the Trajectory Transformer attains results on offline RL benchmarks that are competitive with the best prior methods designed specifically for that setting.
+Additionally, we describe how variations of the same decoding procedure yield a model-based imitation learning method, a goal-reaching method, and, when combined with dynamic programming, a state-of-the-art planner for sparse-reward, long-horizon tasks.
+Our results suggest that the algorithms and architectural motifs that have been widely applicable in unsupervised learning carry similar benefits in RL.
+
+\input{figures/architecture}

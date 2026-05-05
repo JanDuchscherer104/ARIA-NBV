@@ -68,14 +68,14 @@ references = ["repo:.agents/AGENTS_INTERNAL_DB.md", "repo:AGENTS.md#instruction-
 
 [[issue]]
 id = "issue-012"
-title = "ARIA-specific agent skill suite is incomplete"
-description = "The scaffold cross-check recommends domain skills for geometry contracts, oracle RRI, VIN diagnostics, rollout planning, entity-aware RRI, docs curation, dataset/cache operations, and lifecycle workflows; only part of that suite exists today."
+title = "Two research skills still need ARIA-specific workflow coverage"
+description = "Most ARIA-specific research skills now exist, but oracle-RRI contracts and VIN training/evaluation still need compact repeatable skills before those workstreams resume."
 type = "maintenance"
 priority = "high"
 status = "open"
 labels = ["agent", "skills", "scaffold"]
-context = ["Root guidance routes work through domain-specific skills, but the ARIA-specific skill set has evolved incrementally and still has gaps around oracle, VIN, lifecycle, and KG-backed workflows.", "Missing or stale skills cause broad tasks to fall back to generic chat memory instead of narrow, repeatable repo guidance."]
-references = ["repo:AGENTS.md#routing", "repo:.agents/skills/", "repo:.agents/AGENTS_INTERNAL_DB.md", "repo:.agents/memory/state/DECISIONS.md"]
+context = ["Root guidance routes work through domain-specific skills, and geometry, rollout, entity-aware RRI, docs, LRZ, Rerun, and KG workflows now have dedicated ARIA-NBV skills.", "The remaining research-skill gap is narrower than the original issue: todo-003 covers oracle-RRI contract routing and todo-004 covers VIN training/evaluation routing.", "Keeping this issue open in narrowed form prevents stale broad-skill wording while preserving links from existing skill follow-up todos."]
+references = ["repo:AGENTS.md#routing", "repo:.agents/skills/", "repo:.agents/todos.toml#todo-003", "repo:.agents/todos.toml#todo-004", "repo:.agents/work/alignment-distillation-follow-up-review-gpt55pro.md#5-agent-db-review"]
 
 [[issue]]
 id = "issue-013"
@@ -89,48 +89,15 @@ context = ["Roadmap M7/M8 require final tables, figures, failure cases, configs,
 references = ["repo:docs/contents/thesis/roadmap.qmd#roadmap-m7", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m8", "repo:docs/contents/thesis/questions.qmd#rq7-scaling", "repo:.agents/memory/state/DECISIONS.md"]
 
 [[issue]]
-id = "issue-015"
-title = "No first-class Rerun offline dataset inspector"
-description = "The project lacks a TOML-configurable Rerun CLI that can render an immutable VIN offline-store sample with semidense points, candidate frusta, RRI/validity metadata, optional mesh/OBBs, and stable recording output."
-type = "feature"
-priority = "high"
-status = "open"
-labels = ["diagnostics", "offline-store", "geometry", "rerun", "thesis"]
-context = ["The Rerun offline inspector note defines the needed visual smoke path for immutable offline samples, but the project still needs a first-class CLI/config workflow that produces stable recordings.", "This is a trust diagnostic for geometry, candidate ordering, validity, and labels before samples feed VIN training or rollout evidence."]
-references = ["repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:README.md#important-cli-commands", "repo:aria_nbv/aria_nbv/rerun_inspector/_cli.py", "url:https://rerun.io/docs"]
-
-[[issue]]
-id = "issue-016"
-title = "Rerun geometry logging lacks a frame-safe contract"
-description = "Candidate and reference camera visualization needs PoseTW/CameraTW-aware Rerun helpers and regression tests so manual frusta, native Pinhole logging, and display-only CW90 corrections cannot silently produce plausible but wrong geometry."
-type = "research-debt"
-priority = "high"
-status = "open"
-labels = ["geometry", "camera", "rerun", "tests", "contracts"]
-context = ["Pose/camera frames, LUF conventions, PyTorch3D cameras, and display-only CW90 corrections can all produce plausible but wrong visualizations if logged through raw matrices.", "Rerun helpers need typed PoseTW/CameraTW boundaries and tests so visual diagnostics do not silently bless corrupted geometry."]
-references = ["repo:.agents/skills/nbv-geometry-contracts/SKILL.md", "repo:docs/contents/impl/rerun_offline_inspector.qmd#frame-safety", "repo:aria_nbv/aria_nbv/rerun_inspector/_frusta.py", "url:https://docs.rs/rerun/latest/rerun/struct.LineStrips3D.html"]
-
-[[issue]]
-id = "issue-017"
-title = "Offline-store visual primitive inventory is missing"
-description = "Diagnostics currently have no single strict inventory that tells a viewer which sample primitives are present, which fields are required, and which optional visual layers should be reported as unavailable before rendering starts."
-type = "diagnostics"
-priority = "high"
-status = "open"
-labels = ["offline-store", "diagnostics", "data", "contracts"]
-context = ["The inspector should fail early when required offline-store fields are absent and report optional layers explicitly instead of guessing from ad hoc sample attributes.", "A visual primitive inventory also gives future rollout/entity diagnostics a reusable contract for what can be rendered and what remains unavailable."]
-references = ["repo:docs/contents/impl/rerun_offline_inspector.qmd", "repo:aria_nbv/aria_nbv/data_handling/_offline_visual_inventory.py", "repo:aria_nbv/tests/rerun_inspector/", "repo:.agents/skills/dataset-cache-ops/SKILL.md"]
-
-[[issue]]
 id = "issue-018"
-title = "Rollout trace and cache schema are not first-class contracts"
-description = "The current counterfactual rollout code can produce trajectories, but the project lacks a durable rollout trace/cache schema with lineage, replay metadata, cumulative metrics, candidate tables, and storage rules before larger sequence datasets are generated."
+title = "Rollout dataset storage and reporting schema is not finalized"
+description = "RolloutTrace now covers replayable smoke traces, but large-scale rollout and Q_H generation still need a Zarr-first dataset/reporting contract with lineage, field retention policy, target-crop retention, and storage-footprint controls."
 type = "research-debt"
 priority = "high"
 status = "open"
 labels = ["rollouts", "data", "contracts", "storage", "thesis"]
-context = ["Bounded rollouts are now part of the thesis direction, but large sequence data should not be generated until per-step candidate tables, lineage, actor-visible state, oracle-only fields, and storage rules are explicit.", "The trace schema must bridge in-memory counterfactual results, replayable smoke stores, and future lean Zarr/PT layouts without caching full backbone tensors by default."]
-references = ["repo:docs/contents/thesis/questions.qmd#rq5-planning", "repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/aria_nbv/pose_generation/counterfactuals.py", "url:https://zarr-specs.readthedocs.io/en/latest/v3/core/index.html", "bib:TrajectoryTransformer-janner2021"]
+context = ["Bounded rollouts are now part of the thesis direction, and resolved todo-025 added typed RolloutTrace, RolloutStepTrace, RolloutLineage, MessagePack IO, a synthetic smoke command, and tests.", "The remaining gap is the large-scale dataset/reporting layer for ASE oracle rollouts and target-conditioned fitted Double-Q: Zarr-first groups, replay/evaluation payloads, lineage manifests, cumulative-metric reports, Q_H training fields, and storage-footprint summaries.", "The store must be rich enough for training and evaluation without duplicating raw ASE/ATEK products: full meshes are external path/hash/version references, while high-detail target mesh crops are embedded once per target with crop metadata.", "Large sequence data should not be generated until this storage/reporting contract is explicit and compatible with deterministic sharding."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq5-planning", "repo:docs/contents/thesis/questions.qmd#rq7-scaling", "repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/aria_nbv/pose_generation/rollout_trace.py", "repo:.agents/resolved.toml#todo-025", "repo:.agents/work/alignment-distillation-follow-up-review-gpt55pro.md#5-agent-db-review", "url:https://zarr-specs.readthedocs.io/en/latest/v3/core/index.html", "bib:TrajectoryTransformer-janner2021"]
 
 [[issue]]
 id = "issue-019"
@@ -146,12 +113,12 @@ references = ["repo:docs/contents/theory/rl_planning.qmd", "repo:.agents/skills/
 [[issue]]
 id = "issue-020"
 title = "Target-aware candidate generation and target selection are under-specified"
-description = "Object-centric LookAt, frontier or missing-surface candidates, sampler mixtures, target eligibility scoring, and candidate-realism diagnostics are planned but not yet represented as a trusted implementation contract."
+description = "Observed-only target selection, V0/V1 target contracts, object-centric candidate mixtures, and candidate-realism diagnostics are planned but not yet represented as a trusted implementation contract."
 type = "research-debt"
 priority = "high"
 status = "open"
 labels = ["candidate-generation", "entity-aware", "target", "diagnostics", "thesis"]
-context = ["RQ3 and RQ2 require object-centric candidate generation and target selection to become inspectable contracts, not only ad hoc sampler tweaks.", "The existing candidate generator has direction modes, but the missing piece is mixture provenance, entity/target eligibility, and strategy-level realism diagnostics."]
+context = ["RQ2 and RQ3 require target selection and object-centric candidate generation to become inspectable contracts, not ad hoc sampler tweaks.", "The thesis protocol is OBS-SEL / PRED-Q / GT-EVAL: target selection and Q_H/scorer inputs use observed or predicted OBBs/classes/confidence and semidense/EVL support, while GT OBBs define label crops and evaluation.", "V0 keeps GT OBB input as a sanity/upper-bound contract; V1 is mandatory for the main result and uses observed/predicted OBB input matched to GT target-RRI labels.", "The existing candidate generator has direction modes, but the missing piece is categorical-probability mixture provenance, observed target eligibility, GT LookAt upper-bound separation, and strategy-level realism diagnostics."]
 references = ["repo:docs/contents/thesis/questions.qmd#rq2-target-encoding", "repo:docs/contents/thesis/questions.qmd#rq3-candidates", "repo:.agents/skills/entity-aware-rri/SKILL.md", "repo:aria_nbv/aria_nbv/pose_generation/candidate_generation.py", "bib:EFM3D-straub2024"]
 
 [[issue]]
@@ -168,12 +135,12 @@ references = ["repo:docs/contents/thesis/questions.qmd#rq6-feasibility", "repo:d
 [[issue]]
 id = "issue-022"
 title = "Cluster-scale oracle and rollout generation plan is missing"
-description = "Scaling oracle labels and rollout datasets needs deterministic sharding, resumable writes, storage-footprint controls, SLURM/LRZ templates, and DSS-safe staging before multi-scene generation starts."
+description = "Scaling oracle labels, rollout datasets, and Q_H training data needs deterministic sharding, resumable writes, storage-footprint controls, SLURM/LRZ templates, and DSS-safe staging before full-scale generation starts."
 type = "infrastructure"
-priority = "medium"
+priority = "high"
 status = "open"
 labels = ["cluster", "slurm", "lrz", "storage", "data-generation"]
-context = ["Scaling oracle and rollout generation beyond smoke subsets requires deterministic sharding, idempotent writes, resumability, and storage-aware staging before cluster jobs run.", "LRZ Slurm, Enroot/Pyxis, and DSS constraints make naive multi-hundred-GB cache generation a practical thesis risk, not just infrastructure polish."]
+context = ["Scaling oracle and rollout generation beyond smoke subsets requires deterministic sharding, idempotent writes, resumability, and storage-aware staging before cluster jobs run.", "The final experiment scale bar is the full 100 GT-mesh ASE scenes and 4,608 snippet windows after small-subset correctness, so LRZ Slurm/DSS readiness is a hard M2/M3 gate before full target/RL generation.", "LRZ access exists and no workstation should be assumed as the scale path; Enroot/Pyxis and DSS constraints make naive multi-hundred-GB cache generation a practical thesis risk, not just infrastructure polish."]
 references = ["repo:.agents/skills/lrz-ai-systems/SKILL.md", "repo:.agents/skills/lrz-ai-systems/references/storage-dss.md", "repo:.agents/skills/lrz-ai-systems/references/containers-pyxis.md", "url:https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.plugins.environments.SLURMEnvironment.html"]
 
 [[issue]]
@@ -190,12 +157,12 @@ references = ["repo:AGENTS.md#routing", "repo:.agents/skills/semantic-scholar-li
 [[issue]]
 id = "issue-024"
 title = "Simulator and external-data expansion lacks a gated decision"
-description = "ASE-native simulation, Habitat, Isaac, Replica/HM3D/Matterport-style sidecars, and 3DGS/world-model options are useful extensions, but the thesis needs an explicit gate so simulator work does not displace the ASE mesh-supervised rollout evidence path."
+description = "Habitat, Isaac, Replica/HM3D/Matterport-style sidecars, and 3DGS/world-model options are useful extensions, but the thesis needs an explicit gate so external simulator work does not displace the ASE mesh/oracle rollout substrate."
 type = "research-debt"
 priority = "low"
 status = "open"
 labels = ["simulator", "datasets", "scope", "thesis", "future-work"]
-context = ["The thesis core remains ASE mesh-supervised target-aware rollout evidence, while simulator and external-dataset paths are useful but potentially schedule-consuming extensions.", "A decision gate should compare fidelity, reward availability, data licensing, setup cost, and thesis timing before Habitat, Isaac, or ASE-native simulation work expands."]
+context = ["The thesis-core simulator substrate is the ASE mesh/oracle counterfactual rollout loop used to generate target-conditioned rollouts and Q_H supervision.", "Habitat, Isaac, external datasets, 3DGS/world-models, and real-device guidance are extension paths that require an explicit gate by fidelity, reward availability, data licensing, setup cost, and thesis timing.", "Public thesis text should not imply simulator-backed online RL is core unless the ASE evidence path and the later M6 bridge justify it."]
 references = ["repo:docs/contents/thesis/questions.qmd#rq8-extensions", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m6", "url:https://aihabitat.org/docs/habitat-sim/habitat_sim.nav.html", "url:https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_getting_started", "bib:GenNBV-chen2024", "bib:Hestia-lu2026"]
 
 [[issue]]
@@ -208,3 +175,36 @@ status = "open"
 labels = ["agents-db", "kg", "litkg", "provenance", "semantic-scholar"]
 context = ["ARIA-NBV issues/todos are now source-backed and context-pack parsing preserves context/references, but graphify/Neo4j exports still need typed edges from backlog records to repo files, papers, external docs, Semantic Scholar IDs, generated context, and experiment evidence.", "The desired agent-memory loop also needs retrieval and consolidation surfaces: DB references should inform kg-query/kg-route results, claim checks should identify unsupported backlog-driven overclaims, and consolidate-memory should propose state/backlog patches instead of silently overwriting canonical memory.", "Authority and freshness metadata should be part of the edge contract so canonical state and active backlog outrank stale debriefs or archived notes while still preserving their evidential provenance."]
 references = ["repo:scripts/agents_db.py", "repo:.agents/skills/agents-db/SKILL.md#provenance-contract", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md#agents-db-integration", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/docs/architecture.md#adapter-output-contracts", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "litkg:context-pack", "url:https://www.semanticscholar.org/product/api"]
+
+[[issue]]
+id = "issue-026"
+title = "Candidate-to-label ordering is not independently guarded"
+description = "Large oracle and rollout generation still needs an explicit guard that candidate poses, validity masks, depths, point clouds, RRI labels, and diagnostics remain aligned after sampling, pruning, batching, shuffling, and serialization."
+type = "bug"
+priority = "high"
+status = "open"
+labels = ["data", "rri", "candidate-generation", "rollouts", "tests"]
+context = ["The alignment distillation called out a known candidate/RRI shuffling risk that should be fixed before generating large rollout datasets.", "Rerun and rollout traces now expose candidate tables, but the M1 contract gate still needs direct ordering tests across candidate generation, oracle labeling, offline stores, and trace serialization.", "If candidate order drifts, rankings and top-oracle diagnostics can look plausible while training labels are attached to the wrong view."]
+references = ["repo:.agents/work/alignment-distillation-gpt55pro.md#9-oracle-data-correctness-action-items", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m1", "repo:aria_nbv/aria_nbv/pose_generation/types.py", "repo:aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py", "repo:aria_nbv/aria_nbv/pose_generation/rollout_trace.py", "bib:VIN-NBV-frahm2025"]
+
+[[issue]]
+id = "issue-027"
+title = "Thesis proposal freeze and citation hygiene need an advisor-facing gate"
+description = "The thesis proposal exists, but proposal polish, bibliography cleanup, four-tier scope-boundary wording, hard Q_H deliverable framing, and render/PDF verification are not yet tracked as a first-class advisor-facing milestone."
+type = "research-debt"
+priority = "high"
+status = "open"
+labels = ["thesis", "proposal", "docs", "bibliography", "advisor"]
+context = ["The follow-up review identified the proposal as directionally aligned but not yet frozen: title/name consistency, examiner placeholders, dataset limits, invalidity semantics, and minimum/full/stretch path all need an advisor-grade pass.", "The newer alignment decision replaces the old three-tier boundary with implemented substrate, prerequisite core, hard thesis core, and stretch, and moves target-conditioned fitted Double-Q / Q_H into the hard thesis core.", "The same review found citation hygiene debt in docs/references.bib, including Wikipedia entries, a generated citation comment, duplicate FiLM entries, and metadata that should be externally audited before submission.", "Roadmap and questions should treat proposal freeze, primary-metadata bibliography audit, and tracked proposal PDF after freeze as part of M0/M1 groundwork rather than a late writing afterthought."]
+references = ["repo:.agents/work/alignment-distillation-follow-up-review-gpt55pro.md#3-thesis-proposal-review", "repo:.agents/work/alignment-distillation-follow-up-review-gpt55pro.md#6-concrete-proposal-edits", "repo:docs/typst/thesis/proposal.typ", "repo:docs/references.bib", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m0", "repo:Makefile#proposal-pdf"]
+
+[[issue]]
+id = "issue-028"
+title = "Target-conditioned fitted Double-Q Q_H is a hard thesis deliverable"
+description = "The thesis plan now requires a finite-candidate target-conditioned fitted Double-Q / Q_H model trained from ASE oracle rollout data, not only greedy rollouts or optional late RL."
+type = "research-debt"
+priority = "high"
+status = "open"
+labels = ["rl", "q-learning", "rollouts", "target", "thesis"]
+context = ["The accepted thesis scope makes ARIA-NBV a target-conditioned, quality-driven NBV system on ASE/EFM with strict M1 contracts and a mandatory multi-step Q_H deliverable.", "Q_H predicts bounded cumulative target RRI over finite candidate sets from ASE mesh/oracle counterfactual rollouts and must beat one-step greedy/model scoring under equal acquisition budget; bounded oracle lookahead remains the upper bound.", "This issue depends on M1 data/oracle correctness, V1 observed-target contracts, mixed observed candidate sets, invalidity masks/reason codes, Zarr-first rollout/Q storage, stochastic rollout data, and LRZ-scale generation."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq5-planning", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m5", "repo:.agents/memory/state/DECISIONS.md", "bib:DoubleDQN-vanHasselt2015", "bib:IQL-kostrikov2021", "bib:GumbelTopK-kool2019", "bib:VIN-NBV-frahm2025"]

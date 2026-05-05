@@ -1,0 +1,90 @@
+\begin{table}[ht]
+\centering
+
+\caption{Object-centric reconstruction results}       
+\vspace{-2mm}
+\label{tab:object_wise}
+
+\resizebox{\columnwidth}{!}{
+{\large
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{c|c|cccccc}
+\hline
+\toprule
+\multirow{3}{*}{\textbf{Scene}} &
+  \multirow{3}{*}{\textbf{Target}} &
+  \multicolumn{6}{c}{\textbf{Depth MAE} $\downarrow$} \\ \cline{3-8} 
+ &
+   &
+  \multicolumn{4}{c|}{\textbf{Corner objs}} &
+  \multicolumn{1}{c|}{\multirow{2}{*}{\textbf{\begin{tabular}[c]{@{}c@{}}Center\\ objs\end{tabular}}}} &
+  \multirow{2}{*}{\textbf{\begin{tabular}[c]{@{}c@{}}Total\\ objs\end{tabular}}} \\ \cline{3-6}
+ &
+   &
+  \multicolumn{1}{c|}{NW} &
+  \multicolumn{1}{c|}{NE} &
+  \multicolumn{1}{c|}{SW} &
+  \multicolumn{1}{c|}{SE} &
+  \multicolumn{1}{c|}{} &
+   \\ 
+   \hline
+   \midrule
+% \multirow{3}{*}{\begin{tabular}[c]{@{}c@{}}BlenderProc\\ Synthetic\\ Scene\end{tabular}} &
+\multirow{3}{*}{\begin{tabular}[c]{@{}c@{}}Syn.\end{tabular}} &
+  Whole &
+  \multicolumn{1}{c|}{0.0180} &
+  \multicolumn{1}{c|}{0.0365} &
+  \multicolumn{1}{c|}{0.0130} &
+  \multicolumn{1}{c|}{0.0215} &
+  \multicolumn{1}{c|}{0.0162} &
+  \textbf{0.0193} \\
+ &
+  Corner &
+  \multicolumn{1}{c|}{\textbf{0.0132}} &
+  \multicolumn{1}{c|}{\textbf{0.0124}} &
+  \multicolumn{1}{c|}{\textbf{0.0114}} &
+  \multicolumn{1}{c|}{\textbf{0.0166}} &
+  \multicolumn{1}{c|}{0.0149} &
+  0.0205 \\
+ &
+  Center &
+  \multicolumn{1}{c|}{0.0182} &
+  \multicolumn{1}{c|}{0.0503} &
+  \multicolumn{1}{c|}{0.0151} &
+  \multicolumn{1}{c|}{0.0286} &
+  \multicolumn{1}{c|}{\textbf{0.0148}} &
+  0.0225 \\
+  % \hline
+  \midrule
+% \multirow{3}{*}{\begin{tabular}[c]{@{}c@{}}Captured\\ Real\\ Scene\end{tabular}} &
+\multirow{3}{*}{\begin{tabular}[c]{@{}c@{}}Real\end{tabular}} &
+  Whole &
+  \multicolumn{1}{c|}{0.0621} &
+  \multicolumn{1}{c|}{0.2632} &
+  \multicolumn{1}{c|}{0.0695} &
+  \multicolumn{1}{c|}{0.0777} &
+  \multicolumn{1}{c|}{0.0334} &
+  \textbf{0.0517} \\
+ &
+  Corner &
+  \multicolumn{1}{c|}{\textbf{0.0490}} &
+  \multicolumn{1}{c|}{0.1963} &
+  \multicolumn{1}{c|}{\textbf{0.0624}} &
+  \multicolumn{1}{c|}{\textbf{0.0619}} &
+  \multicolumn{1}{c|}{0.0313} &
+  0.0540 \\
+ &
+  Center &
+  \multicolumn{1}{c|}{0.1000} &
+  \multicolumn{1}{c|}{\textbf{0.1816}} &
+  \multicolumn{1}{c|}{0.0683} &
+  \multicolumn{1}{c|}{0.0647} &
+  \multicolumn{1}{c|}{\textbf{0.0304}} &
+  0.0535 \\ 
+  % \hline
+  \bottomrule
+\end{tabular}
+}
+}
+\vspace{-4mm}
+\end{table}

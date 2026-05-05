@@ -1,0 +1,121 @@
+\vspace{1pt}
+\section{Methodology}
+\label{sec:method}
+    In this section, we deliver our active 3D reconstruction framework GenNBV, especially the pivotal Next-Best-View policy. An overview of our framework is illustrated in Fig.~\ref{fig:method}.
+    Firstly, we formulate the NBV problem as a Markov Decision Process (MDP), with a novel design of observations (blue boxes in Fig.~\ref{fig:method}) and action space in Sec.~\ref{sec:method_setup}.
+    Next, we elaborate our end-to-end NBV policy $\pi$ (orange box in  Fig.~\ref{fig:method}) in Sec.~\ref{sec:method_state}. Inspired by Curl~\citep{laskin2020curl}, we point out that generalizability greatly depends on how to extract embeddings (green box in Fig.~\ref{fig:method}), which reflect the reconstruction progress, from raw sensory observations like RGB images and camera poses.
+    In Sec.~\ref{sec:method_reward}, we introduce the reward function (right-hand side of  Fig.~\ref{fig:method}) reflecting the optimization objective and the details of policy optimization.
+
+\vspace{4pt}
+\subsection{Formulation of the Next-Best-View Problem}
+\label{sec:method_setup}
+    % Our goal is to learn an optimal policy $\pi$ to capture enough information for reconstructing large-scale scenes with limited decision-making budgets, which can be formulated as an optimization problem.
+    We formulate the NBV problem as learning an optimal policy $\pi$ that controls the capturing process, such that enough information is captured for large-scale scene reconstruction, with limited decision-making budgets.
+    As capturing, transferring, and processing a large set of captured images introduce significant computational costs, we also want to design a policy that also minimizes the number of captured images. Therefore, our policy only captures sparse keyframes that sufficiently record all details of objects.
+    % There is a trade-off during data collection for reconstruction between the number of views and the cost of capturing like storage and computation. % \textbf{consecutive frames and sparse multi-view keyframes}. 
+    % To reduce the cost and improve reconstruction efficiency, we tend to utilize sparse keyframes that sufficiently capture the details of objects.
+
+    As shown in Fig.~\ref{fig:method}, at each time step $t$, the agent receives a visual observation $o_t$, takes an action $a_t$, infers the action at the next time step $t+1$ to move to a new location, and then receives a new visual observation, repeating this interaction with the environment until the episode ends. Our simulated agent is embodied as CrazyFlie~\citep{giernacki2017crazyflie}, a type of unmanned aerial vehicle equipped with various sensors, including an RGB-D camera and an IMU, to execute data collection for reconstruction. We discussed the details of the observation space and action space below.
+
+    \vspace{1pt}
+    \noindent\textbf{Observation Space.} As shown in the left column of Fig.~\ref{fig:method}, at each time step, the agent receives an RGB image $I_t$, a depth map $D_t$, and a state vector including the heading (yaw and pitch) and position (x, y, z) of the onboard camera.
+    The observation $o_t$ (yellow box in Fig.~\ref{fig:method}) consists of all previously captured images in one episode, historical actions, and the current captures and actions. With this information as input, the policy network can estimate the progress of data collection and determine where to scan next.
+
+    \vspace{1pt}
+    \noindent\textbf{Action Space.} Unlike most previous NBV algorithms, we use larger action space in order to cover all details of objects. Specifically, we use the camera location and camera angle as our action space, which is a 5-dimension vector consisting of 3D position coordinates and 2D rotation angles (yaw-axis and pitch-axis). We restrict the roll-axis rotation as it is not supported in all drone platforms.
+
+    
+
+\subsection{Generalizable State Embedding}
+\label{sec:method_state}
+    To ensure that the policy learned on one set of 3D objects can generalize to objects with different appearances and structures, a smart state embedding of raw sensor observations is needed to capture invariant features across different objects. Previous methods ~\citep{peralta2020next, chaplotlearning} only extract representations in 2D space, which are very sensitive to appearance changes, and our experiments have shown that policies only trained on 2D features may not be generalized to different objects. Instead, we propose a multi-source representation that has better generalizability.
+
+    Specifically, we first build two mid-level representations that can better model the relationship between the objects and our agent: a 3D geometric representation $F^G$ from depth maps and a semantic representation $F^S$ from RGB images. Then we encode these representations and concatenate them with a pose embedding into state embedding $s_t$, guiding the NBV policy for subsequent decision-making. The overall encoder for state embedding is shown in Fig.~\ref{fig:method}, and details of each representation are discussed below.
+
+    \vspace{1pt}
+    \noindent\textbf{Geometric Representation}\quad  
+    One simple way to record the geometry of a 3D object is using a binary 3D occupancy map~\citep{chaplotlearning}, where the value of each cell in the 3D cube indicates whether a cell contains a 3D object or not. However, since the 3D representation is gradually updated with newly captured data, this simple binary occupancy map cannot differentiate a real unoccupied cell from an unscanned cell. An unscanned cell is a strong indicator that the agent should capture more data in this region, while no further scan is needed for a real unoccupied cell.
+    
+    Previous works~\citep{chaplotlearning, ye2022multi, guo2022asynchronous} simplify the 3D scene representation into a 2D Bird's Eye View map for actively reconstructing indoor scenes. However, the 2D BEV map lacks sufficient information for our large-scale outdoor scenes that contain many geometric details in 3D space. In addition, their wheeled robotic platforms are constrained to freely scan and represent these outdoor scenes.
+    Therefore, to model the scanning process in 3D free space, we employ the probabilistic 3D grid~\citep{thrun2002probabilistic} as our geometric 3D representation, which records the probability of each 3D voxel being captured or not. Specifically, we first obtain a 3D point cloud in the world coordinate by back-projecting all 2D pixels to 3D points, using the depth map $D_t$, camera intrinsic parameters, and camera pose $a_t$. By voxelizing the obtained point cloud, we then build a 3D occupancy grid that explicitly indicates the binary state (occupied or free) in this 3D space. 
+    Subsequently, we represent this 3D grid as a probabilistic occupancy grid $F^G_t$ and extend the state space of voxels with three states (occupied, free, unknown).
+
+    During each scanning (one episode in RL), at each step $t+1$, we update the probabilistic occupancy grid $F_{t+1}^G$ based on the preceding grid $F_{t}^G$ and the current observation. Specifically, the grid is updated through Bresenham's line algorithm~\citep{bresenham1965algorithm}, which casts the ray path in 3D space between the camera viewpoint and the endpoints among the point cloud back-projected from depth $D_{t+1}$. Following the classical occupancy grid mapping algorithm~\citep{thrun2002probabilistic}, we have the log-odds formulation of occupancy probability:
+        \begin{equation}
+        \log \mathrm{Odd}(v_i|z_j) = \log \mathrm{Odd}(v_i) + C,
+        \end{equation}
+    where $v_i$ denotes the occupancy probability of $i^{th}$ voxel in the grid $F^G_t$, $z_j$ is the measurement event that $j^{th}$ camera ray passes through this voxel and C is an empirical constant. The derivation can be found in Appendix.
+    % The item $\log\frac{p(z_j|v_i=1)}{p(z_j|v_i=0)}$ can be set as an empirical constant according to the confidence of ray casting.
+    Thus, we update the log-odds occupancy probability of each voxel in the grid $F^G_t$ by adding a constant one time when a single camera ray passes through this voxel. Note that the probabilistic occupancy grid $F^G$ is continually updated within one episode. Finally, the occupancy status of voxels is classified into three categories: unknown, occupied, and free, using preset probability thresholds.
+
+    % At last, the occupancy grid will be turned into a embedding vetcor by: 
+    % $s^G_t = \mathrm{Linear}(\mathrm{Flatten}(F^G_t))$
+
+    \vspace{1pt}
+    \noindent\textbf{Semantic Representation.} 
+    Geometric representation enables agents to comprehend spatial occupancy, yet it's insufficient for perceiving the environment. 
+    For example, when observing a hole in an object, the agent may struggle to differentiate between incomplete scanning and the actual presence of a hole in the object. In such cases, the semantic information contained in the captured RGB images can help the agent distinguish between these two scenarios.
+    % In addition, the feature matching of RGB images can also be used as evidence to identify the location.
+    
+    To provide semantic information, we employ a preprocessing module that takes as input the current frame of RGB image $I_t$ and preceding $K$ frames and converts these frames $[I_t, I_{t-1}, ..., I_{t-k}]$ to grayscale, and concatenate them as output, following \cite{peralta2020next}. Then the preprocessed frames are fed into a two-layer convolutional network for extracting the semantic representation $F^S_t$. 
+
+
+    \vspace{1pt}
+    \noindent\textbf{State Embedding.}
+    To further combine the semantic and geometric embeddings, we first encode them to $s^S_t=f^S(F^S_t)$ and $s^G_t=f^G(F^G_t)$ where $f^*$ are learnable networks $\mathrm{Linear}(\mathrm{Flatten}(x))$, as shown in Fig.~\ref{fig:method}. Subsequently, we combine them with the historical action embedding $s^A_t=\mathrm{Linear}(a_{1:t})$ to generate the final state embedding $s_t$, as the input to the policy network. This process can be formulated as: $s_t = \mathrm{Linear}(s^G_t; s^S_t; s^A_t)$.
+        % \begin{equation}
+        % \label{eqn:state}
+        % s_t = \mathrm{Linear}(s^G_t; s^S_t; s^A_t),
+        % \end{equation}
+
+
+    \vspace{1pt}
+    \noindent\textbf{Policy Network.} Taking the state embedding $s_t$ as input, the policy network is a 3-layer multi-layer perceptron network (MLP) whose output is used to parameterize a normal distribution over action space. In this way, the action can be drawn from the stochastic policy $a \sim \pi(\cdot |o_t)$.
+
+
+\subsection{Reward Function and Optimization}
+\label{sec:method_reward}
+    We train the end-to-end policy with reinforcement learning (RL) and hence design reward functions to precisely reflect the task objective for 3D reconstruction. The policy is optimized with proximal policy optimization~\cite{schulman2017proximal} (PPO) for parallelizing sampling.
+
+     \vspace{1pt}
+     \noindent\textbf{Reward Functions.}
+     With the occupancy probability $F^G_t$ at time step $t$, we can threshold each voxel with an empirical bound to determine if it is occupied.
+     This discrimination process outputs a binary occupancy grid with $\Tilde{N}_t$ voxels being occupied, which is used to calculate the coverage ratio: 
+        \begin{equation}
+        \text{CR}_t = \frac{\Tilde{N}_t}{N^*} \cdot 100\% ,
+        \end{equation}
+    where $N^*$ is the number of ground-truth occupied voxels representing the surface of objects.
+    % $N_{obs, t}$ is the number of observed occupied voxels among the ground-truth occupancy grid at the time step $t$.
+    To encourage our NBV policy to cover as many unseen areas of objects as possible, we use the difference of coverage ratio (CR) between two consecutive steps as the main reward function $r^{CR}$:
+    \begin{equation}
+    r^\text{CR}_{t+1} = \text{CR}_{t+1} - \text{CR}_t.
+    \end{equation}
+
+    % Compared with previous agents (Lee et al., 2022; Zhan et al., 2022; Guedon et al., 2022) safely searching in the limited space like a hemisphere, our embodied agent, exploring in a free space, should be prohibited from colliding with any objects or buildings. Thus we assign a negative reward and also terminate the episode if a collision happens. We also implement a negative reward when the number of captured keyframes is over an empirical threshold to improve the path efficiency.
+    In free-space exploration, we also need to avoid collision. Previous limited-space agents~\citep{lee2022uncertainty, zhan2022activermap, guedonscone} do not consider collision avoidance since their search space, like hemisphere, is by-design safe. Thus, we add a negative reward for collision and terminate the episode if a collision happens. We also implement a negative reward when the number of captured keyframes is over an empirical threshold to improve the path efficiency. % For further implementation details please refer to Appendix.~\ref{app:network}.
+    
+
+    \vspace{1pt}
+    \noindent\textbf{Policy Optimization.}
+    Once the reward functions has been specified, the policy can be learned through any off-the-shelf RL algorithm. 
+    In this work, we use PPO as thousands of workers can be parallelized to improve the sample efficiency. 
+    Specifically, given our parameterized policy $\pi_\theta$, the objective of PPO is to maximize the following function:
+        \begin{equation}
+        L(\theta) = \mathbb{E}_{t}\left[\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_\text{old}}(a_t|s_t)} A^{\pi_{\theta_\text{old}}}(s_t, a_t)\right],
+        \end{equation}
+     where $A^{\pi_{\theta_\text{old}}}(s_t, a_t)$ is the advantage function that measures the value of taking action $a_t$ at state $s_t$ under the current policy $\pi_{\theta_\text{old}}$.
+    To prevent significant deviation of the new policy from the old policy, PPO incorporates a clipped surrogate objective function:
+        % \begin{equation}
+        %     \begin{split}
+        %     L^\text{CLIP}(\theta) =  &\mathbb{E}_{t}\left[\text{min}\left(\eta_t(\theta) A^{\pi_{\theta_\text{old}}}(s_t, a_t), \\
+        %                             % &\text{clip}(r_t(\theta), 1 - \epsilon, 1 + \epsilon) A^{\pi_{\theta_\text{old}}}(s_t, a_t)\right) \right],
+        %     \end{split}
+        % \end{equation}
+        \begin{equation}
+            \begin{split}
+            L^\text{CLIP}(\theta) =  &\mathbb{E}_{t}[\text{min}(\eta_t(\theta) A^{\pi_{\theta_\text{old}}}(s_t, a_t), \\
+                                    &\text{clip}(r_t(\theta), 1 - \epsilon, 1 + \epsilon) A^{\pi_{\theta_\text{old}}}(s_t, a_t))] ,
+            \end{split}
+        \end{equation}
+        where $\eta_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_\text{old}}(a_t|s_t)}$ and $\epsilon$ is a hyper-parameter that controls the size of the trust region.  
+

@@ -1,0 +1,36 @@
+\begin{figure}
+    \centering
+    \includegraphics[width=0.35\linewidth]{images/markov.pdf}
+    \hspace{0.15\linewidth}
+    \includegraphics[width=0.35\linewidth]{images/striated.pdf}
+    \begin{flushleft}
+    \vspace{-5cm}
+    ${\color{cred}\st}$ \hspace{6.75cm} ${\color{cred}\st}$ \\
+    \vspace{.04cm}
+    ${\color{cblue}\at}$ \hspace{6.75cm} ${\color{cblue}\at}$ \\
+    \vspace{.95cm}
+    {\color{cred}\Large\vdots} \hspace{6.75cm} \\
+        \vspace{-0.95cm}\hspace{7.2cm}
+        {\color{cred}\Large\vdots} \\
+    \vspace{.1cm}
+    {\color{cblue}\Large\vdots}  \hspace{6.75cm} \\
+        \vspace{-0.95cm}\hspace{7.2cm}
+        {\color{cblue}\Large\vdots} \\
+    \vspace{.85cm}
+    ${\color{cred}\bs_{t+5}}$  \hspace{6.4cm} ${\color{cred}\bs_{t+5}}$ \\
+    \vspace{.02cm}
+    ${\color{cblue}\ba_{t+5}}$ \hspace{6.4cm} ${\color{cblue}\ba_{t+5}}$ \\
+    \vspace{.05cm}
+    \vspace{.2cm}
+    \end{flushleft}
+    \vspace{.05cm}
+    \caption{
+    \textbf{(Attention patterns)}
+    We observe two distinct types of attention masks during trajectory prediction.
+    In the first, both {\color{cred}states} and {\color{cblue}actions} are dependent primarily on the immediately preceding transition, corresponding to a model that has learned the Markov property.
+    The second strategy has a striated appearance, with state dimensions depending most strongly on the same dimension of multiple previous timesteps.
+    Surprisingly, actions depend more on past actions than they do on past states, reminiscent of the action smoothing used in some trajectory optimization algorithms \citep{nagabandi2019pddm}.
+    The above masks are produced by a first- and third-layer attention head during sequence prediction on the hopper benchmark; reward dimensions are omitted for this visualization.$^1$
+    }
+    \label{fig:attention}
+\end{figure}

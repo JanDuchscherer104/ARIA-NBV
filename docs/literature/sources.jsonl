@@ -7,10 +7,10 @@
 {"title":"PB-NBV: Efficient Projection-Based Next-Best-View Planning Framework for Reconstruction of Unknown Objects","short_title":"PB-NBV","arxiv_id":"2501.10663","tex_dir":"arXiv-PB-NBV","pdf_file":"PB-NBV.pdf"}
 {"title":"Next Best View Selections for Semantic and Dynamic 3D Gaussian Splatting","short_title":"Dynamic 3DGS NBV","arxiv_id":"2512.22771","tex_dir":"arXiv-Dynamic-3DGS","pdf_file":"Dynamic-3DGS.pdf"}
 {"title":"Hestia: Voxel-Face-Aware Hierarchical Next-Best-View Acquisition for Efficient 3D Reconstruction","short_title":"Hestia","arxiv_id":"2508.01014","tex_dir":"arXiv-Hestia","pdf_file":"Hestia.pdf"}
-{"title":"Offline Reinforcement Learning as One Big Sequence Modeling Problem","short_title":"Trajectory Transformer","arxiv_id":"2106.02039","tex_dir":"","pdf_file":""}
-{"title":"Deep Reinforcement Learning with Double Q-Learning","short_title":"Double DQN","arxiv_id":"1509.06461","tex_dir":"","pdf_file":""}
-{"title":"Offline Reinforcement Learning with Implicit Q-Learning","short_title":"IQL","arxiv_id":"2110.06169","tex_dir":"","pdf_file":""}
-{"title":"Reinforcement Learning with Deep Energy-Based Policies","short_title":"Deep Energy-Based Policies","arxiv_id":"1702.08165","tex_dir":"","pdf_file":""}
-{"title":"Stochastic Beams and Where to Find Them: The Gumbel-Top-k Trick for Sampling Sequences Without Replacement","short_title":"Gumbel-Top-k","arxiv_id":"1903.06059","tex_dir":"","pdf_file":""}
-{"title":"Next Best Sense: Guiding Vision and Touch with FisherRF for 3D Gaussian Splatting","short_title":"Next Best Sense","arxiv_id":"2410.04680","tex_dir":"","pdf_file":""}
+{"title":"Offline Reinforcement Learning as One Big Sequence Modeling Problem","short_title":"Trajectory Transformer","arxiv_id":"2106.02039","tex_dir":"arXiv-Trajectory-Transformer","pdf_file":"Trajectory-Transformer.pdf"}
+{"title":"Deep Reinforcement Learning with Double Q-Learning","short_title":"Double DQN","arxiv_id":"1509.06461","tex_dir":"arXiv-Double-DQN","pdf_file":"Double-DQN.pdf"}
+{"title":"Offline Reinforcement Learning with Implicit Q-Learning","short_title":"IQL","arxiv_id":"2110.06169","tex_dir":"arXiv-IQL","pdf_file":"IQL.pdf"}
+{"title":"Reinforcement Learning with Deep Energy-Based Policies","short_title":"Deep Energy-Based Policies","arxiv_id":"1702.08165","tex_dir":"arXiv-Deep-Energy-Based-Policies","pdf_file":"Deep-Energy-Based-Policies.pdf"}
+{"title":"Stochastic Beams and Where to Find Them: The Gumbel-Top-k Trick for Sampling Sequences Without Replacement","short_title":"Gumbel-Top-k","arxiv_id":"1903.06059","tex_dir":"arXiv-Gumbel-Top-k","pdf_file":"Gumbel-Top-k.pdf"}
+{"title":"Next Best Sense: Guiding Vision and Touch with FisherRF for 3D Gaussian Splatting","short_title":"Next Best Sense","arxiv_id":"2410.04680","tex_dir":"arXiv-Next-Best-Sense","pdf_file":"Next-Best-Sense.pdf"}
 {"title":"Finding Optimal Viewpoints for Monocular 3D Human Pose Estimation in Dynamic 3D Gaussian Splatting Space","short_title":"FOV-HPE","arxiv_id":"","tex_dir":"","pdf_file":"","doi":"10.1109/AVSS65446.2025.11149906","url":"https://doi.org/10.1109/AVSS65446.2025.11149906"}

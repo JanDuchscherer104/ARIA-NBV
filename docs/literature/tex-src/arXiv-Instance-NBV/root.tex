@@ -1,0 +1,152 @@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%2345678901234567890123456789012345678901234567890123456789012345678901234567890
+%        1         2         3         4         5         6         7         8
+
+\documentclass[letterpaper, 10 pt, conference]{ieeeconf}  % Comment this line out if you need a4paper
+% \usepackage{hyperref}
+%\documentclass[a4paper, 10pt, conference]{ieeeconf}      % Use this line for a4 paper
+
+\IEEEoverridecommandlockouts                              % This command is only needed if
+                                                          % you want to use the \thanks command
+
+\overrideIEEEmargins                                      % Needed to meet printer requirements.
+% \usepackage{hyperref}
+% this is to use \citeauthor comment (not compatible with cite package)
+% natbib hack
+% http://newsgroups.derkeiler.com/Archive/Comp/comp.text.tex/2006-02/msg00834.html
+\makeatletter
+\let\NAT@parse\undefined
+\makeatother
+\usepackage[numbers,sort&compress]{natbib}
+
+% See the \addtolength command later in the file to balance the column lengths
+% on the last page of the document
+%\makeatletter
+%\let\NAT@parse\undefined
+%\makeatother
+
+% The following packages can be found on http:\\www.ctan.org
+\usepackage[pdftex]{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}  % assumes amsmath package installed
+%\usepackage{subfigure}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{array,booktabs}
+\usepackage{diagbox}
+\usepackage{balance}
+\usepackage{xspace}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+%\usepackage{kotex} %한글
+%\usepackage{enumitem}
+%\usepackage{slashbox}
+\usepackage{adjustbox}
+\usepackage{romannum}
+%\captionsetup[subfigure]{labelformat=empty}
+% \usepackage{caption}
+% \usepackage{subcaption}
+\usepackage{mathtools}
+
+\usepackage[final]{hyperref}
+\hypersetup{
+ colorlinks=true,
+ linkcolor=blue,
+ filecolor=magenta,
+ urlcolor=blue,
+ citecolor=black
+}
+\usepackage{cleveref}
+\crefname{figure}{Fig.}{Figs.}
+\Crefname{figure}{Fig.}{Figs.}
+\usepackage[font=small]{caption}
+\usepackage{rpm_SIunits}
+\usepackage{rpm_acronyms}
+\usepackage{rpm_math}
+\usepackage{rpm_misc}
+\usepackage{bbm}
+
+\usepackage{textcomp}
+
+
+% for comments
+\usepackage{soul,color}
+\usepackage{lipsum}
+\usepackage{dsfont}
+
+% To highlight the revised MS
+\usepackage{xcolor}
+\usepackage{colortbl}
+
+\newcommand{\gr}[1]{{\textcolor{green}{#1}}}
+\newcommand{\bl}[1]{{\textcolor{blue}{#1}}}
+\newcommand{\B}[1]{{\textbf{#1}}}
+\newtheorem{theorem}{Theorem}
+
+\DeclareMathOperator*{\argmin}{argmin}
+\DeclareMathOperator{\Tr}{Tr}
+
+\usepackage{amssymb}% http://ctan.org/pkg/amssymb
+\usepackage{pifont}% http://ctan.org/pkg/pifont
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+% \usepackage[font=scriptsize]{caption}
+\usepackage{tikz} % \checkmark
+\usepackage{subcaption}
+\usepackage{caption}
+\title{\LARGE \bf Informative Object-centric Next Best View \\for Object-aware 3D Gaussian Splatting in Cluttered Scenes
+}     
+
+% \author{Anonymous Authors}
+\author{
+\makebox[\textwidth][c]{%
+    Seunghoon Jeong${}^{1}$, 
+    Eunho Lee${}^{1}$, 
+    Jeongyun Kim${}^{2}$, and 
+    Ayoung Kim${}^{2*}$
+}%
+\thanks{$^\dagger$This work was partly supported by Hyundai Motor Company and Kia, and the Institute of Information \& communications Technology Planning \& Evaluation (IITP) grant funded by the Korea government(MSIT) No.2022-0-00480, Development of Training and Inference Methods for Goal-Oriented Artificial Intelligence Agents and the Korea government(MSIT) [NO.RS-2021-II211343, Artificial Intelligence Graduate School Program (Seoul National University)].}
+\thanks{$^{1}$S. Jeong and E. Lee are with the Interdisciplinary Program in Artificial Intelligence, SNU, Seoul, S. Korea {\tt\small [shoon0602, eunho1124]@snu.ac.kr}}%
+\thanks{$^{2}$J. Kim and A. Kim are with the Dept. of Mechanical Engineering, SNU, Seoul, S. Korea {\tt\small [jeongyunkim, ayoungk]@snu.ac.kr}}%
+}
+
+\begin{document}
+
+%\onecolumn
+\maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
+
+% \input{ver2_firstsub/0_abstract_ver2_firstsub}
+% \input{ver2_firstsub/1_introduction_ver2_firstsub}
+% \input{ver2_firstsub/2_relatedwork_ver2_firstsub}
+% \input{ver2_firstsub/3_method_ver2_firstsub}
+% \input{ver2_firstsub/4_experiment_ver2_firstsub}
+% \input{ver2_firstsub/5_conclusion_ver2_firstsub}
+
+\input{ver3_rpm/0_abstract_ver3_rpm}
+\input{ver3_rpm/1_introduction_ver3_rpm}
+\input{ver3_rpm/2_relatedwork_ver3_rpm}
+\input{ver3_rpm/3_method_ver3_rpm}
+\input{ver3_rpm/4_experiment_ver3_rpm}
+\input{ver3_rpm/5_conclusion_ver3_rpm}
+
+% \input{ver4_finalsub/0_abstract}
+% \input{ver4_finalsub/1_introduction}
+% \input{ver4_finalsub/2_relatedwork}
+% \input{ver4_finalsub/3_method}
+% \input{ver4_finalsub/4_experiment}
+% \input{ver4_finalsub/5_conclusion}
+
+% \newpage
+% \newpage
+
+%\section*{ACKNOWLEDGMENT}
+% \balance
+\small
+\bibliographystyle{IEEEtranN} %citeauthor
+\bibliography{string-short,references}
+
+
+\end{document}

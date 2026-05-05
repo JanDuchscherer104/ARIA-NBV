@@ -1,0 +1,27 @@
+\begin{abstract}
+
+In cluttered scenes with inevitable occlusions and incomplete observations, selecting informative viewpoints is essential for building a reliable representation.
+% Since occlusions and incomplete observations are inevitable in cluttered scenes, a robot must select informative viewpoints to build a reliable representation of the environment. 
+% In this context, \ac{3DGS} offers a distinct advantage, as it can refine the representation with new observations while explicitly guiding the selection of subsequent viewpoints.
+In this context, \ac{3DGS} offers a distinct advantage, as it can explicitly guide the selection of subsequent viewpoints and then refine the representation with new observations.
+% Integration of \ac{NBV} and 3D reconstruction allows efficient viewpoint selection and fast scene updates, benefiting robotic manipulation in cluttered environments.
+% Integration of \ac{NBV} and 3D reconstruction allows efficient identification of informative viewpoints, benefiting robotic manipulation in cluttered environments.
+% Integration of \ac{NBV} and 3D reconstruction enables efficient identification of informative viewpoints and rapid incorporation of newly acquired observations into a scene representation, which is particularly beneficial for robotic manipulation in cluttered environments.
+% However, existing approaches often overlook semantic information that is crucial for manipulation and tend to prioritize exploitation over exploration, limiting their ability to complete object-level reconstructions.
+However, existing approaches rely solely on geometric cues, neglect manipulation-relevant semantics, and tend to prioritize exploitation over exploration.
+To tackle these limitations, we introduce an instance-aware \ac{NBV} policy that prioritizes underexplored regions by leveraging object features.
+Specifically, our object-aware \ac{3DGS} distills instance-level information into one-hot object vectors, which are used to compute confidence-weighted information gain that guides the identification of regions associated with erroneous and uncertain Gaussians.
+% To advance \ac{NBV} selection, we introduce a policy that explicitly prioritizes underexplored regions. This policy is enabled by a semantic 3D Gaussian Splatting framework, which distills instance-level information into one-hot object vectors and employs confidence-aware information gain to guide the NBV process with greater accuracy and robustness.
+% To address these limitations, we propose a semantic 3D Gaussian Splatting framework that distills instance-level information into one-hot object vector and leverages it to guide an NBV policy toward underexplored regions. 
+% Furthermore, our method can be easily adapted to an object-centric \ac{NBV}, which focuses view selection on a target object and its surrounding context.
+% This enables the robot to concentrate its scanning on task-relevant areas instead of the entire scene, thereby improving reconstruction robustness to object placement.
+Furthermore, our method can be easily adapted to an object-centric \ac{NBV}, which focuses view selection on a target object, thereby improving reconstruction robustness to object placement.
+% This demonstrates significant effectiveness in allowing the robot to focus scanning solely on task-relevant areas, thus accelerating execution.
+Experiments demonstrate that our \ac{NBV} policy reduces depth error by up to 77.14\% on the synthetic dataset and 34.10\% on the real-world GraspNet dataset compared to baselines. Moreover, compared to targeting the entire scene, performing \ac{NBV} on a specific object yields an additional reduction of 25.60\% in depth error for that object. We further validate the effectiveness of our approach through real-world robotic manipulation tasks.
+\end{abstract}
+
+% 새로운 정보를 많이 얻을 수 있는 뷰를 추정하고 얻은 뷰를 빠르게 지식에 반영할 수 있는 next best view 기술은 특히 cluttered scene에서의 manipulation에 효과적이다. 그러나 현존하는 연구는 manipulation에 유용한 semantic 정보를 활용하지 않을 뿐 아니라 물체 reconstruction을 완성하기 위한 exploration보다 exploitation에 집중한다. 
+
+% 이를 위해 우리는 instance 정보를 one-hot object vector로 distill한 semantic 3dgs와 그를 이용하여 못 봤던 부분에 더 집중하는 next best view method를 제안한다. 또한, 간단한 변경을 통해 특정 물체와 그 주변에 집중한 next best view도 가능하다. 이는 로봇이 필요한 부분만을 스캔하여 빠르게 작업을 수행하는 데 매우 효과적이다.
+
+% 우리는 여러 synthetic과 real dataset에서 이 nbv가 depth 오차를 00% 감소시켜줌을 확인하였고, 실제 robot experiment에서도 활용하여 manipulation task를 수행하였다.

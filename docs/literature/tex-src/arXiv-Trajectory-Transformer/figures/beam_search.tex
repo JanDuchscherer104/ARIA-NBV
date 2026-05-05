@@ -1,0 +1,27 @@
+%% http://www.phy.ohio.edu/~hadizade/blog_files/latex_algorithm.html
+\def\NoNumber#1{{\def\alglinenumber##1{}\STATE #1}\addtocounter{ALG@line}{-1}}
+
+{\centering
+\begin{minipage}{\linewidth}
+  \begin{algorithm}[H]
+    \caption{Beam search}
+    \label{alg:beam}
+    \begin{algorithmic}[1]
+    \STATE \textbf{Require} Input sequence $\mathbf{x}$, vocabulary $\mathcal{V}$, sequence length $T$, beam width $B$ \\
+    \STATE \textbf{Initialize} $Y_0 = \{~(~)~\}$ \\
+    \FOR{$t = 1, \ldots, T$}
+        \STATE $\mathcal{C}_t \gets \{
+            \mathbf{y}_{t-1} \circ y \mid 
+            \mathbf{y}_{t-1} \in Y_{t-1} \text{~and~} y \in \mathcal{V}
+        \}$ \hspace{0.75cm}\small{\color{gray}\te{// candidate single-token extensions}}
+        \STATE $Y_{t} \gets \argmax{
+            Y \subseteq \mathcal{C}_t, ~|Y| = B
+        }{
+            \log P_\theta(Y \mid \mathbf{x})
+        }$ \hspace{1.5cm}\small\hspace{-.0cm}{\color{gray}\te{// $B$ most likely sequences from candidates}} \\
+    \ENDFOR \\
+    \STATE \textbf{Return} $\argmax{\mathbf{y} \in Y_T}{\log P_\theta(\mathbf{y} \mid \mathbf{x})}$
+    \end{algorithmic}
+  \end{algorithm}
+\end{minipage}
+}

@@ -1,0 +1,52 @@
+\section{Introduction}
+\label{sec:intro}
+
+% 准确和高效地捕获目标的三维数据，无论是在工业领域应用中的的逆向工程、质量检测，还是在机器人领域应用中自主探索、自主交互，都起着重要的作用。
+{A}{cquiring} the complete and high-quality 3D geometric structure of an object is crucial for reverse engineering and quality inspection in industrial applications, as well as for autonomous exploration and interaction in robotics.
+% 在实际扫描过程中，由于遮挡或采集设备视场（Field of View, FOV）的限制，往往难以实现对目标的完整扫描。
+In practical scanning, achieving a complete scan can be challenging due to occlusions or limitations in the acquisition device's field of view (FOV).
+% 为此，connolly 最先提出了通过结合当前观测数据来推断下一帧的扫描视角以完成对目标的完整扫描的策略，被称之为NBV规划问题。
+In response, Connolly \cite{connolly1985determination} first introduced a strategy that leverages the observed data to identify the next optimal scanning viewpoint for achieving a comprehensive object scan, known as the NBV planning problem.
+% 随着对NBV规划问题研究的深入，NBV规划问题被逐渐建模为三个核心组成部分：目标表示、候选视点生成和最优视点选择。
+As research on the NBV planning problem advanced, it was gradually modeled into three core components: object representation, candidate viewpoint proposal, and optimal viewpoint selection.
+
+% 在许多现存的算法中，当目标被用体素结构表示后，在选择下一帧最优视点的过程中，通常会使用 Ray-casting 算法来判断每个候选视角对目标结构的可见性。
+In many existing algorithms, once the object is represented by a voxel structure, the ray-casting algorithm is typically used to assess the visibility of each candidate viewpoint to the object \cite{pan2021global,potthast2014probabilistic,batinovic2021multi,batinovic2022shadowcasting}.
+% 该算法包括从每一个候选视角发射若干射线，检查每条射线与目标结构的遮挡情况。
+This algorithm involves emitting multiple rays from each candidate viewpoint and examining the occlusion of each ray with the target structure.
+% 然而，这一过程需要进行大量的查询。且随着目标体积的增大以及对表征结构精度要求的提高, ray-casting 算法的使用将带来巨大的计算负担，限制了NBV规划算法在轻量化边缘计算机器人平台上的部署
+However, this process involves numerous queries, and as the object's volume and precision requirements increase, the use of the ray-casting algorithm imposes a significant computational burden \cite{mendoza2020supervised, pan2022scvp, border2024surface}, limiting the deployment of the NBV planning algorithm on lightweight edge computing robot platforms.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=3.4in]{img/Experimental_platform.pdf }
+    % NBV planning实验平台的概述。将一个待测目标放置在转盘上，机械臂末端配备了一个3d相机用于采集数据。本文提出的NBVplanning框架通过控制机械臂和转台完成对目标的完整重建。
+    \caption{Overview of the NBV planning experiment platform. An object to be measured is placed on a turntable, and a 3D camera is equipped at the end of the robotic arm for data acquisition. Our NBV planning framework accomplishes a complete reconstruction of the object by controlling the robotic arm and the turntable.
+    }
+    \label{Experimental_platform}
+\end{figure} 
+
+% 为了解决这个问题，我们提出了一种全新的 projection-based NBV planning framework。
+To address this issue, we propose a novel projection-based NBV planning framework.
+% 该框架基于体素结构，将体素进一步拟合为椭球。
+% 在选择下一帧最优视点的过程中，使用椭球独立投影的观测质量评估策略，取代了 ray-casting，从而显著减小了因目标体积增大或表征结构精度提高所带来的计算负担。
+The framework is based on voxel structures, where the voxels are further fitted into ellipsoids. 
+When selecting the next optimal viewpoint, an ellipsoid-based independent projection strategy for evaluating observation quality replaces ray-casting, significantly reducing the computational burden caused by an increase in object volume or higher precision requirements for the representation structure.
+% 框架中还引入了全局分区策略，来确保帧与帧之间点云配准的成功率，并减轻贪心选择最优视点所导致的回溯。
+The framework also introduces a global partitioning strategy to ensure the success of point cloud registration between frames and reduce backtracking caused by greedy viewpoint selection.
+
+% 为了评估我们算法的性能，我们搭建了一个仿真环境，用于进行消融实验以及与其他主流NBV框架的对比实验。此外，我们还进行了实物实验，证明了框架的可行性。实物实验参考了SEE实验环境，如图x所示。
+To evaluate the performance of our framework, we set up a simulation environment for ablation studies and comparisons with existing mainstream NBV frameworks. Additionally, the real-world experiments also confirm the efficiency and feasibility of the framework. The experiments were conducted in a real-world setup similar to SEE\cite{border2024surface}, as shown in Fig. \ref{Experimental_platform}.
+
+% 总而言之，本文的主要贡献如下所示：
+%- 我们提出了一种基于椭球拟合的对未知目标表征的结构, 可以实现再保留有效信息的基础上对体素结构做数据降维。
+%- 我们提出了一种椭球独立投影算法，替代了在选择最优视角过程中使用的ray-casting算法，从而显著降低了计算负担。
+%- 我们引入了全局分区策略，确保点云配准成功率，并减小贪心选择导致回溯对效率的影响。
+
+In summary, the main contributions of this paper are the following three:
+
+1) We propose an ellipsoid-fitting-based representation structure for unknown objects, enabling dimensionality reduction of voxel structures while retaining essential information.
+
+2) We propose an ellipsoid-based projection algorithm to replace the ray-casting in selecting the next optimal viewpoint, significantly reducing the computational burden.
+  
+3) We introduce a global partitioning strategy to ensure point cloud registration success and reduce the impact of backtracking from greedy selection on efficiency.
+

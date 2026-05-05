@@ -1,0 +1,109 @@
+\begin{table}[]
+    \centering
+    \begin{tabular}{c|c|c}
+           & ASE & ADT  \\ \hline
+        NeuralRecon & & \\
+        SimpleRecon & &\\
+        ZoeDepth & &\\
+        OpenOcc & &\\
+    \end{tabular}
+    \caption{We show in domain performance on ASE validation dataset as well as sim-to-real generalization performance on the ADT dataset.}
+    \label{tab:surf_perf}
+\end{table}
+
+\begin{table}[]
+    \centering
+    \begin{tabular}{c|c|c}
+           & ASE & ADT  \\ \hline
+        VegoNet only Points & &\\
+        VegoNet only Features & &\\
+        VegoNet & &\\
+    \end{tabular}
+        \begin{tabular}{c|c|c}
+           & ASE & ADT  \\ \hline
+        OpenOcc only Points & &\\
+        OpenOcc only Features & &\\
+        OpenOcc & &\\
+    \end{tabular}
+    \caption{We show that adding points and using frozen 2d foundation features helps.}
+    \label{tab:surf_perf}
+\end{table}
+
+
+\begin{table}[]
+\centering
+\small
+\begin{tabular}{|p{2cm}|l|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1.1cm}|}
+\hline
+Method     & Fusion        & Res (cm) & Acc. (cm) & Comp. (cm) & Prec @5cm & Recall @5cm & F-score @5cm\\ \hline
+GT depth   & TSDF       & 4                     &                &                  &         &      &   \\ \hline
+GT depth   & TSDF        & 1                     &                &                   &         &       &   \\ \hline
+ZoeDepth   & TSDF       & 4                     &                &                  &         &      &   \\ \hline
+ZoeDepth   & TSDF        & 1                     &                &                   &         &       &   \\ \hline
+TCD        & TSDF & 4                      &                     &                        &               &            &         \\ \hline
+TCD        & TSDF & 1                      &                     &                        &               &            &         \\ \hline
+SimpleRecon & TSDF          & 4                      &                     &                        &               &            &         \\ \hline
+SimpleRecon & TSDF          & 1                      &                     &                        &               &            &         \\ \hline
+NeuralRecon & Volume          & 4                      &                     &                        &               &            &         \\ \hline
+
+\end{tabular}
+\caption{We show the 3D surface reconstruction performance of the state-of-the-art methods on on the ADT test dataset. All the methods are evaluated using the best off-the-shelf models.}
+\end{table}
+
+\begin{table}[]
+\centering
+\small
+\begin{tabular}{|p{2cm}|l|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1.1cm}|}
+\hline
+Method     & Fusion        & Res (cm) & Acc. (cm) & Comp. (cm) & Prec @5cm & Recall @5cm & F-score @5cm\\ \hline
+GT depth   & TSDF       & 4                     &                &                  &         &      &   \\ \hline
+GT depth   & TSDF        & 1                     &                &                   &         &       &   \\ \hline
+OpenOcc & Volume        & 6.25                     &                 &                    &          &      &    \\ \hline
+OpenOcc \newline only Point & Volume        & 6.25                    &                 &                    &          &       &    \\ \hline
+OpenOcc \newline only Features & Volume        & 6.25                    &                 &                    &          &       &    \\ \hline
+NeuralRecon & Volume          & 4                     &                 &                   &          &       &    \\ \hline
+SimpleRecon & TSDF          & 4                     &                 &                   &          &       &    \\ \hline
+SimpleRecon & TSDF          & 1                     &                 &                   &          &       &    \\ \hline
+
+
+\end{tabular}
+\caption{We show the in-domain 3D surface reconstruction performance on the ASE dataset. All the methods are trained and evaluated on the simulated ASE dataset.}
+\end{table}
+
+\begin{table}[]
+\centering
+\small
+\begin{tabular}{|p{2cm}|l|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|p{1.1cm}|}
+\hline
+Method     & Fusion        & Res (cm) & Acc. (cm) & Comp. (cm) & Prec @5cm & Recall @5cm & F-score @5cm\\ \hline
+GT depth   & TSDF       & 4                     &                 &                   &          &       &    \\ \hline
+GT depth   & TSDF        & 1                     &                 &                    &          &       &    \\ \hline
+OpenOcc & Volume        & 6.25                     &                 &                    &          &      &    \\ \hline
+OpenOcc \newline only Point & Volume        & 6.25                    &                 &                    &          &       &    \\ \hline
+OpenOcc \newline only Features & Volume        & 6.25                    &                 &                    &          &       &    \\ \hline
+NeuralRecon & Volume          & 4                     &                 &                   &          &       &    \\ \hline
+SimpleRecon & TSDF          & 4                     &                 &                   &          &       &    \\ \hline
+SimpleRecon & TSDF          & 1                     &                 &                   &          &       &    \\ \hline
+
+\end{tabular}
+\caption{We show the sim-to-real 3D surface reconstruction performance on the ASE dataset. All the methods are trained on the simulated ASE dataset and evaluated on the real ADT dataset.}
+\end{table}
+
+\begin{table}[]
+\centering
+\small
+\begin{tabular}{|l|l|l|l|l|l|l|}
+\hline
+Method             & VoxRes (cm) & Acc. (cm) & Comp. (cm) & Prec@5cm & Recall@5cm & F-score \\ \hline
+GT depth           & 4                     & 2.03                & 11.83                  & 0.902         & 0.554      & 0.686   \\ \hline
+GT depth           & 1                     & 1.47                & 6.31                   & 0.957         & 0.691      & 0.802   \\ \hline
+Zoe depth          & 4                     & 50.06               & 61.05                  & 0.227         & 0.119      & 0.153   \\ \hline
+Zoe depth          & 1                     & 41.77               & 74.12                  & 0.235         & 0.075      & 0.109   \\ \hline
+TCD &                       &                     &                        &               &            &         \\ \hline
+TCD &                       &                     &                        &               &            &         \\ \hline
+SimpleRecon           & 4                     & ?                & ?                  & ?         & ?      & ?   \\ \hline
+SimpleRecon           & 1                     & ?                & ?                  & ?         & ?      & ?   \\ \hline
+
+\end{tabular}
+\caption{\TODO{\textbf{BACKUP}}:We show the 3D surface reconstruction performance for depth fusion based methods on ADT validation dataset.}
+\end{table}

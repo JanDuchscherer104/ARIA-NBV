@@ -1,0 +1,32 @@
+
+\usepackage{amsfonts}
+\usepackage{amsopn}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage{placeins}
+\usepackage{appendix}
+%\usepackage[ruled, linesnumbered]{algorithm2e}  %% ICML template does not liek 2e version.
+
+
+\newtheorem{theorem}{Theorem}
+
+\input{defs}
+
+%% Autorefs
+\newcommand{\algorithmautorefname}{Algorithm}%
+\renewcommand{\sectionautorefname}{Section}%
+\renewcommand{\subsectionautorefname}{Section}%
+\renewcommand{\theoremautorefname}{Theorem}
+
+%% Manual fix to make hyperrefs to appendices show up correctly
+\newcommand{\aref}[1]{\hyperref[#1]{Appendix~\ref{#1}}}
+
+\def\alignautorefname~#1\null{%
+  (#1)\null
+%  Equation~#1\null
+}\def\equationautorefname~#1\null{%
+  (#1)\null
+%  Equation~#1\null
+}

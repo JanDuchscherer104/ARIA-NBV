@@ -1,0 +1,10 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented an instance-aware \ac{3DGS}-based, confidence-aware \ac{NBV} policy that injects object masks into the \ac{3DGS} pipeline, prioritizes underexplored regions, and extends naturally to object-centric \ac{NBV}. By balancing the contributions of RGB, depth, and mask rendering, the selected views form a compact, informative set, which also yields clearer and more reliable grasping points in cluttered scenes.
+% 우리는 object mask가 주어질 때 이를 3DGS framework에 넣고 못 본 region에 대한 exploration에 유리한 confidence-aware Next best view를 제안하고 이를 object-centric NBV로 까지 확장하였다. RGB, depth, mask rendering에 대한 기여도가 적절히 balancing되어 선택된 이미지들은 scene을 잘 압축하고 더 명확한 grasping point를 얻는 데에도 도움이 되었다.
+
+A key limitation is the reliance on object masks. Although we observed good robustness with pseudo ground-truth on challenging real scenes, inaccuracies in the masks can propagate to both reconstruction and \ac{NBV} decisions. Future work will focus on online refinement of object mask via \ac{3DGS} or 3D foundation models as new views are acquired. We also plan to generate candidate viewpoints actively and to adopt principled termination criteria to enable early stopping.
+% 그러나, 우리는 object mask에 크게 의존한다는 문제를 가지고 있다. 강한 clutter가 있는 real-world scene에서 pseudo-gt mask로 여전히 유효함은 확인하였으나, supervision이 정확하지 않을수록 그로 인한 역효과가 커질 것이다. 후속 연구는 3dgs나 3d foundation model 등을 통해 object mask를 robust하게 구하거나 view를 뽑을 때마다 refine하는 방법에 집중할 것이다. 또한, NBV의 candidate를 직접 생성하고 termination criterion에 따라 early-stopping이 가능한 방향으로도 확장할 계획이다.
+
+% \newpage

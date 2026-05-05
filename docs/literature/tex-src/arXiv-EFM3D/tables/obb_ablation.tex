@@ -1,0 +1,94 @@
+% \begin{table}[]
+%     \centering
+%     % https://docs.google.com/spreadsheets/d/1-C4hIRjXC9phLz-k_BGhe0bWYeCYPMVtjMZgcpshQFs/edit#gid=789119799
+
+%     % after joint mAP computation for all but snippet results
+%     % TODO update the snippet results 
+%     \begin{tabular}{c|c|c}
+%                  & \ASE{} mAP & \ASE{} mAP \\ 
+%                  & Snippet    & Sequence   \\ \hline   
+%     full w/o images    & 0.24 & 0.42 \\
+%     full w/o std       & 0.26 & 0.52 \\
+%     full w/o points    & 0.31 & 0.62 \\ 
+%   % data & no geom aug  & 0.26 & 0.52 \\ \hline
+%     full w/o mean      & 0.37 & 0.66 \\
+%     full w/o freespace & 0.39 & 0.71 \\   \hline 
+%         full     & \textbf{0.4} & \textbf{0.75} \\ \hline
+
+%     %     \cmark & \cmark &        & 0.31 & 0.62 & 0.15 \\  
+%     % %   \cmark & \cmark &        & 0.32 & 0.61 & 0. \\  % with compression of features
+%     %     \cmark &        & \cmark & 0.38 & 0.72 & 0.22 \\
+%     %            & \cmark & \cmark & 0.39 & 0.73 & 0.25 \\
+%     %     \cmark & \cmark & \cmark & 0.40 & 0.75 & 0.22 \\ 
+%     % %   \cmark & \cmark & \cmark & 0.41 & 0.75 & 0.  \\ # with compression
+%     \end{tabular}
+%     \caption{Ablation study for \EFMmodel{}. Image inputs are more important than points. Standard deviation aggregation is more important than mean aggregation. }
+%     \label{tab:obb_ablation}
+% \end{table}
+
+
+% \begin{table}[]
+%     \centering
+%     % https://docs.google.com/spreadsheets/d/1-C4hIRjXC9phLz-k_BGhe0bWYeCYPMVtjMZgcpshQFs/edit#gid=789119799
+
+%     % after joint mAP computation for all but snippet results
+%     % TODO update the snippet results 
+%     \begin{tabular}{c|c|c| c|c|c|c|}
+%          rgb   & greys  & points & \ASE{} mAP & \ASE{} mAP & \AOThree{} mAP \\ 
+%                &        &        & Snippet  & Sequence  &   Sequence  \\ \hline           
+%                &        & \cmark & 0.24 & 0.42 & 0.19 \\
+%         \cmark &        &        & 0.26 & 0.52 & 0.13 \\
+%                & \cmark &        & 0.29 & 0.58 & 0.13 \\
+%         \cmark & \cmark &        & 0.31 & 0.62 & 0.15 \\  
+%     %   \cmark & \cmark &        & 0.32 & 0.61 & 0. \\  % with compression of features
+%         \cmark &        & \cmark & 0.38 & 0.72 & 0.22 \\
+%                & \cmark & \cmark & 0.39 & 0.73 & 0.25 \\
+%         \cmark & \cmark & \cmark & 0.40 & 0.75 & 0.22 \\ 
+%     %   \cmark & \cmark & \cmark & 0.41 & 0.75 & 0.  \\ # with compression
+%     \end{tabular}
+%     \caption{We ablate different input modalities for \EFMmodel{}: RGB video, left and right grey-scale streams and semidense points. }
+%     \label{tab:obj_modality_ablation}
+% \end{table}
+
+
+
+\begin{table}[]
+    \centering
+    % https://docs.google.com/spreadsheets/d/1-C4hIRjXC9phLz-k_BGhe0bWYeCYPMVtjMZgcpshQFs/edit#gid=789119799
+    \resizebox{\textwidth}{!}{%
+    \subfloat[][\textbf{Augmentation:} photometric and geometric augmentations help generalization.]{
+    \begin{tabular}{c|c|c|c|c|}
+        geom.      & photo      & \ASE{} mAP & \ASE{} mAP  \\ 
+        aug.       &  aug.      & Snippet  & Sequence    \\ \hline           
+                   &            & 0.26 & 0.52  \\
+        \cmark     &            & 0.38 & 0.67  \\
+        \cmark     &    \cmark  & 0.38 & 0.68  \\
+    \end{tabular}
+    }\quad 
+    \subfloat[][\textbf{Aggregation:} feature aggregation using mean and standard deviation is best.]{
+    \begin{tabular}{c|c|c|c|c|c|}
+         mean  & std    & \ASE{} mAP & \ASE{} mAP  \\ 
+               &           & Snippet  & Sequence    \\ \hline           
+        \cmark &           & 0.26 & 0.52  \\
+               & \cmark    & 0.37 & 0.66  \\
+        \cmark & \cmark    & 0.39 & 0.71  \\
+        % compress mean \& std    & 0.39 & 0.72 & 0.33 \\
+    \end{tabular}
+    }\quad 
+    \subfloat[][\textbf{Usage of Points:} concatenating a points and freespace mask helps generalization.]{
+    \begin{tabular}{c|c|c|c|c|c|}
+         pts   & free    & \ASE{} mAP & \ASE{} mAP  \\ 
+               &           & Snippet  & Sequence   \\ \hline   
+        %       &           & 0.26 & 0.52 & 0.13 \\
+        \cmark &           & 0.38 & 0.72  \\
+               & \cmark    & 0.36 & 0.69  \\
+        \cmark & \cmark    & 0.39 & 0.71  \\
+        % compress mean \& std    & 0.39 & 0.72 & 0.33 \\
+    \end{tabular}
+    }
+    }
+    \caption{We modify different hyperparameter settings based on the RGB stream \& points \EFMmodel{}. Turning on all augmentations, aggregating features in time using standard deviation (std) and mean, and concatenating both a points and freespace mask leads to the best model.}
+    \vspace{-5mm}
+    \label{tab:obb_ablation}
+\end{table}
+

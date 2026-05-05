@@ -1,0 +1,460 @@
+% CVPR 2024 Paper Template; see https://github.com/cvpr-org/author-kit
+
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+%%%%%%%%% PAPER TYPE  - PLEASE UPDATE FOR FINAL VERSION
+% \usepackage{cvpr}              % To produce the CAMERA-READY version
+% \usepackage[review]{cvpr}      % To produce the REVIEW version
+\usepackage[pagenumbers]{cvpr} % To force page numbers, e.g. for an arXiv version
+
+
+
+
+%
+% --- inline annotations
+%
+\usepackage[dvipsnames]{xcolor}
+\newcommand{\red}[1]{{\color{red}#1}}
+\newcommand{\todo}[1]{{\color{red}#1}}
+\newcommand{\TODO}[1]{\textbf{\color{red}[TODO: #1]}}
+% --- disable by uncommenting  
+% \renewcommand{\TODO}[1]{}
+% \renewcommand{\todo}[1]{#1}
+
+\newcommand{\model}{\textit{GenNBV}\xspace}
+
+
+% It is strongly recommended to use hyperref, especially for the review version.
+% hyperref with option pagebackref eases the reviewers' job.
+% Please disable hyperref *only* if you encounter grave issues, 
+% e.g. with the file validation for the camera-ready version.
+%
+% If you comment hyperref and then uncomment it, you should delete *.aux before re-running LaTeX.
+% (Or just hit 'q' on the first LaTeX run, let it finish, and you should be clear).
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,citecolor=cvprblue]{hyperref}
+\usepackage{color}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow} 
+\usepackage{caption}
+\usepackage{lipsum}
+\usepackage{tabularx}
+\usepackage{float}
+\usepackage{stfloats}
+\usepackage{makecell}
+
+% comment
+\newcommand{\tocite}{\textcolor{red}{[cite]~}}
+\renewcommand{\todo}[1]{{\color{red} TODO: {#1}}}
+
+\definecolor{darkred}{rgb}{0.7, 0.0, 0.0}
+\definecolor{darkgreen}{rgb}{0.0, 0.42, 0.24}
+\definecolor{darkblue}{rgb}{0.10, 0.17, 0.8}
+\definecolor{LQY_color}{RGB}{66, 84, 245}
+
+\newcommand{\xiao}[1]{{\color{red} [Xiao: #1]}}
+\newcommand{\tianfan}[1]{{\color{darkred} [Tianfan: #1]}}
+\newcommand{\jiangmiao}[1]{{\color{darkred} [Jiangmiao: #1]}}
+\newcommand{\tai}[1]{{\color{darkblue} [Tai: #1]}}
+\newcommand{\lqy}[1]{{\color{LQY_color} [LQY: #1]}}
+
+
+
+
+
+
+
+%%%%%%%%% PAPER ID  - PLEASE UPDATE
+\def\paperID{7858} % *** Enter the Paper ID here
+\def\confName{CVPR}
+\def\confYear{2024}
+
+%%%%%%%%% TITLE - PLEASE UPDATE
+\title{GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction}
+
+
+
+%%%%%%%%% AUTHORS - PLEASE UPDATE
+% \author{Xiao Chen\\
+% Shanghai AI Laboratory\\
+% Institution1 address\\
+% {\tt\small xiaochen.it@gmail.com}
+% % For a paper whose authors are all at the same institution,
+% % omit the following lines up until the closing ``}''.
+% % Additional authors and addresses can be added with ``\and'',
+% % just like the second author.
+% % To save space, use either the email address or home page, not both
+% \and
+% Second Author\\
+% Institution2\\
+% First line of institution2 address\\
+% {\tt\small secondauthor@i2.org}
+% }
+
+\author{Xiao Chen$^{1,2}$\quad Quanyi Li$^{1}$\quad Tai Wang$^{1}$ \quad Tianfan Xue$^{2,*}$ \quad Jiangmiao Pang$^{1,*}$ \vspace{0.1cm} \\
+% $^1$Shanghai AI Laboratory \quad $^2$The Chinese University of Hong Kong \quad $*$Corresponding Author \\
+$^1$Shanghai AI Laboratory \quad $^2$The Chinese University of Hong Kong \\
+% {\tt\small \{xiaochen.it,quanyili0057,jimmyxuetianfan\}@gmail.com \quad \{wangtai,pangjiangmiao\}@pjlab.org.cn} \vspace{0.2cm} \\
+{\tt\small \{cx123,tfxue\}@ie.cuhk.edu.hk \quad quanyili0057@gmail.com \quad \{wangtai,pangjiangmiao\}@pjlab.org.cn} \vspace{0.2cm} \\
+% \textbf{Project website}: \href{https://gennbv.tech}{gennbv.tech}
+\textbf{Project page}: \href{https://gennbv.github.io/}{gennbv.github.io}
+}
+
+
+
+
+
+
+
+\begin{document}
+
+
+% \twocolumn[{%
+% \renewcommand\twocolumn[1][]{#1}
+% \maketitle
+% \begin{center}
+%     \vspace{-0.8cm}
+%     \includegraphics[width=1.0\textwidth]{Figure/Fig_Teaser_v5.pdf}
+%     \caption{To determine the best view for 3D reconstruction, previous methods only chose from hand-crafted action space or based on object-centric capturing, lacking the ability to generalize to unforeseen scenes (Left). With our end-to-end trained, generalized free-space policy, it can generalize to unseen objects, enabling the captured drone to image from any viewpoint (Right).}
+%     \label{fig:teaser}
+% \end{center}
+% }
+% ]
+
+% \maketitle
+
+
+% \twocolumn[{
+
+%     \renewcommand\twocolumn[1][]{#1}  
+%   % \begin{figure}[h]
+%     \centering
+%     \vspace{-0.8cm}
+%     \includegraphics[width=1.0\textwidth]{Figure/Fig_Teaser_v5.pdf}
+%     \caption{To determine the best view for 3D reconstruction, previous methods only chose from hand-crafted action space or based on object-centric capturing, lacking the ability to generalize to unforeseen scenes (Left). With our end-to-end trained, generalized free-space policy, it can generalize to unseen objects, enabling the captured drone to image from any viewpoint (Right).}
+%     \label{fig:teaser}
+%   % \end{figure}
+% }]
+
+
+\twocolumn[{%
+    \maketitle
+    \begin{figure}[H]
+        \hsize=\textwidth
+        \centering
+        \vspace{-40pt}
+        \includegraphics[width=1.0\textwidth]{Figure/Fig_Teaser_v5.pdf}
+        \caption{To determine the best view for 3D reconstruction, previous methods only chose from hand-crafted action space or based on object-centric capturing, lacking the ability to generalize to unforeseen scenes (Left). With our end-to-end trained, generalized free-space policy, it can generalize to unseen objects, enabling the captured drone to image from any viewpoint (Right).}
+        \label{fig:teaser}        
+    \end{figure}
+}]
+
+
+
+\vspace{-2cm}
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+\footnotetext[1]{Corresponding author.}
+% \footnotetext[2]{\textbf{Project website:} \href{https://gennbv.tech/}{gennbv.tech}}
+
+% \maketitle
+
+\input{0-Abstract}
+\input{1-Introduction}
+\input{2-Related_Work}
+\input{3-Method}
+\input{4-Experiments}
+\input{5-Conclusion}
+
+
+
+
+{
+    \small
+    \bibliographystyle{ieeenat_fullname}
+    % \bibliographystyle{plainnat}
+    % \bibliography{main}
+    \begin{thebibliography}{52}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Adamkiewicz et~al.(2022)Adamkiewicz, Chen, Caccavale, Gardner, Culbertson, Bohg, and Schwager]{adamkiewicz2022vision}
+Michal Adamkiewicz, Timothy Chen, Adam Caccavale, Rachel Gardner, Preston Culbertson, Jeannette Bohg, and Mac Schwager.
+\newblock Vision-only robot navigation in a neural radiance world.
+\newblock \emph{IEEE Robotics and Automation Letters}, 7\penalty0 (2):\penalty0 4606--4613, 2022.
+
+\bibitem[Bresenham(1965)]{bresenham1965algorithm}
+Jack~E Bresenham.
+\newblock Algorithm for computer control of a digital plotter.
+\newblock \emph{IBM Systems journal}, 4\penalty0 (1):\penalty0 25--30, 1965.
+
+\bibitem[Chaplot et~al.(2020)Chaplot, Gandhi, Gupta, Gupta, and Salakhutdinov]{chaplotlearning}
+Devendra~Singh Chaplot, Dhiraj Gandhi, Saurabh Gupta, Abhinav Gupta, and Ruslan Salakhutdinov.
+\newblock Learning to explore using active neural slam.
+\newblock In \emph{International Conference on Learning Representations}, 2020.
+
+\bibitem[Chen et~al.(2022)Chen, Xu, Geiger, Yu, and Su]{chen2022tensorf}
+Anpei Chen, Zexiang Xu, Andreas Geiger, Jingyi Yu, and Hao Su.
+\newblock Tensorf: Tensorial radiance fields.
+\newblock In \emph{European Conference on Computer Vision}, pages 333--350. Springer, 2022.
+
+\bibitem[Chen et~al.(2019)Chen, Gupta, and Gupta]{chenlearning}
+Tao Chen, Saurabh Gupta, and Abhinav Gupta.
+\newblock Learning exploration policies for navigation.
+\newblock In \emph{International Conference on Learning Representations}, 2019.
+
+\bibitem[Cobbe et~al.(2020)Cobbe, Hesse, Hilton, and Schulman]{cobbe2020leveraging}
+Karl Cobbe, Chris Hesse, Jacob Hilton, and John Schulman.
+\newblock Leveraging procedural generation to benchmark reinforcement learning.
+\newblock In \emph{International conference on machine learning}, pages 2048--2056. PMLR, 2020.
+
+\bibitem[Deitke et~al.(2023)Deitke, Schwenk, Salvador, Weihs, Michel, VanderBilt, Schmidt, Ehsani, Kembhavi, and Farhadi]{deitke2023objaverse}
+Matt Deitke, Dustin Schwenk, Jordi Salvador, Luca Weihs, Oscar Michel, Eli VanderBilt, Ludwig Schmidt, Kiana Ehsani, Aniruddha Kembhavi, and Ali Farhadi.
+\newblock Objaverse: A universe of annotated 3d objects.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pages 13142--13153, 2023.
+
+\bibitem[Devrim~Kaba et~al.(2017)Devrim~Kaba, Gokhan~Uzunbas, and Nam~Lim]{devrim2017reinforcement}
+Mustafa Devrim~Kaba, Mustafa Gokhan~Uzunbas, and Ser Nam~Lim.
+\newblock A reinforcement learning approach to the view planning problem.
+\newblock In \emph{Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition}, pages 6933--6941, 2017.
+
+\bibitem[Giernacki et~al.(2017)Giernacki, Skwierczy{\'n}ski, Witwicki, Wro{\'n}ski, and Kozierski]{giernacki2017crazyflie}
+Wojciech Giernacki, Mateusz Skwierczy{\'n}ski, Wojciech Witwicki, Pawe{\l} Wro{\'n}ski, and Piotr Kozierski.
+\newblock Crazyflie 2.0 quadrotor as a platform for research and education in robotics and control engineering.
+\newblock In \emph{2017 22nd International Conference on Methods and Models in Automation and Robotics (MMAR)}, pages 37--42. IEEE, 2017.
+
+\bibitem[Guedon et~al.(2022)Guedon, Monasse, and Lepetit]{guedonscone}
+Antoine Guedon, Pascal Monasse, and Vincent Lepetit.
+\newblock Scone: Surface coverage optimization in unknown environments by volumetric integration.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2022.
+
+\bibitem[Guo et~al.(2022)Guo, Li, Xia, Hu, and Liu]{guo2022asynchronous}
+Junfu Guo, Changhao Li, Xi Xia, Ruizhen Hu, and Ligang Liu.
+\newblock Asynchronous collaborative autoscanning with mode switching for multi-robot scene reconstruction.
+\newblock \emph{ACM Transactions on Graphics (TOG)}, 41\penalty0 (6):\penalty0 1--13, 2022.
+
+\bibitem[Hardouin et~al.(2020)Hardouin, Moras, Morbidi, Marzat, and Mouaddib]{hardouin2020next}
+Guillaume Hardouin, Julien Moras, Fabio Morbidi, Julien Marzat, and El~Mustapha Mouaddib.
+\newblock Next-best-view planning for surface reconstruction of large-scale 3d environments with multiple uavs.
+\newblock In \emph{2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, pages 1567--1574. IEEE, 2020.
+
+\bibitem[Isler et~al.(2016)Isler, Sabzevari, Delmerico, and Scaramuzza]{isler2016information}
+Stefan Isler, Reza Sabzevari, Jeffrey Delmerico, and Davide Scaramuzza.
+\newblock An information gain formulation for active volumetric 3d reconstruction.
+\newblock In \emph{2016 IEEE International Conference on Robotics and Automation (ICRA)}, pages 3477--3484. IEEE, 2016.
+
+\bibitem[Johari et~al.(2023)Johari, Carta, and Fleuret]{johari2023eslam}
+Mohammad~Mahdi Johari, Camilla Carta, and Fran{\c{c}}ois Fleuret.
+\newblock Eslam: Efficient dense slam system based on hybrid representation of signed distance fields.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pages 17408--17419, 2023.
+
+\bibitem[Laskin et~al.(2020)Laskin, Srinivas, and Abbeel]{laskin2020curl}
+Michael Laskin, Aravind Srinivas, and Pieter Abbeel.
+\newblock Curl: Contrastive unsupervised representations for reinforcement learning.
+\newblock In \emph{International Conference on Machine Learning}, pages 5639--5650. PMLR, 2020.
+
+\bibitem[LaValle and Kuffner~Jr(2001)]{lavalle2001randomized}
+Steven~M LaValle and James~J Kuffner~Jr.
+\newblock Randomized kinodynamic planning.
+\newblock \emph{The international journal of robotics research}, 20\penalty0 (5):\penalty0 378--400, 2001.
+
+\bibitem[Lee et~al.(2022)Lee, Chen, Wang, Liniger, Kumar, and Yu]{lee2022uncertainty}
+Soomin Lee, Le Chen, Jiahao Wang, Alexander Liniger, Suryansh Kumar, and Fisher Yu.
+\newblock Uncertainty guided policy for active robotic 3d reconstruction using neural radiance fields.
+\newblock \emph{IEEE Robotics and Automation Letters}, 7\penalty0 (4):\penalty0 12070--12077, 2022.
+
+\bibitem[Li et~al.(2022{\natexlab{a}})Li, Peng, Feng, Duan, Mo, Zhou, et~al.]{li2023scenarionet}
+Quanyi Li, Zhenghao Peng, Lan Feng, Chenda Duan, Wenjie Mo, Bolei Zhou, et~al.
+\newblock Scenarionet: Open-source platform for large-scale traffic scenario simulation and modeling.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2022{\natexlab{a}}.
+
+\bibitem[Li et~al.(2022{\natexlab{b}})Li, Peng, Feng, Zhang, Xue, and Zhou]{li2022metadrive}
+Quanyi Li, Zhenghao Peng, Lan Feng, Qihang Zhang, Zhenghai Xue, and Bolei Zhou.
+\newblock Metadrive: Composing diverse driving scenarios for generalizable reinforcement learning.
+\newblock \emph{IEEE transactions on pattern analysis and machine intelligence}, 45\penalty0 (3):\penalty0 3461--3475, 2022{\natexlab{b}}.
+
+\bibitem[Li et~al.(2023)Li, Jiang, Xu, Xiangli, Wang, Lin, and Dai]{li2023matrixcity}
+Yixuan Li, Lihan Jiang, Linning Xu, Yuanbo Xiangli, Zhenzhi Wang, Dahua Lin, and Bo Dai.
+\newblock Matrixcity: A large-scale city dataset for city-scale neural rendering and beyond.
+\newblock \emph{arXiv e-prints}, pages arXiv--2308, 2023.
+
+\bibitem[Liu et~al.(2022)Liu, Lin, Hu, Xie, Fu, Zhang, and Huang]{liu2022learning}
+Yilin Liu, Liqiang Lin, Yue Hu, Ke Xie, Chi-Wing Fu, Hao Zhang, and Hui Huang.
+\newblock Learning reconstructability for drone aerial path planning.
+\newblock \emph{ACM Transactions on Graphics (TOG)}, 41\penalty0 (6):\penalty0 1--17, 2022.
+
+\bibitem[Makoviychuk et~al.(2021)Makoviychuk, Wawrzyniak, Guo, Lu, Storey, Macklin, Hoeller, Rudin, Allshire, Handa, and State]{makoviychuk2021isaac}
+Viktor Makoviychuk, Lukasz Wawrzyniak, Yunrong Guo, Michelle Lu, Kier Storey, Miles Macklin, David Hoeller, Nikita Rudin, Arthur Allshire, Ankur Handa, and Gavriel State.
+\newblock Isaac gym: High performance gpu-based physics simulation for robot learning, 2021.
+
+\bibitem[Mildenhall et~al.(2020)Mildenhall, Srinivasan, Tancik, Barron, Ramamoorthi, and Ng]{mildenhall2020nerf}
+Ben Mildenhall, Pratul~P Srinivasan, Matthew Tancik, Jonathan~T Barron, Ravi Ramamoorthi, and Ren Ng.
+\newblock Nerf: Representing scenes as neural radiance fields for view synthesis.
+\newblock In \emph{Computer Vision--ECCV 2020: 16th European Conference, Glasgow, UK, August 23--28, 2020, Proceedings, Part I 16}, pages 405--421. Springer, 2020.
+
+\bibitem[Ortiz et~al.(2022)Ortiz, Clegg, Dong, Sucar, Novotny, Zollhoefer, and Mukadam]{iSDF2022}
+Joseph Ortiz, Alexander Clegg, Jing Dong, Edgar Sucar, David Novotny, Michael Zollhoefer, and Mustafa Mukadam.
+\newblock isdf: Real-time neural signed distance fields for robot perception.
+\newblock \emph{Robotics: Science and Systems}, 2022.
+
+\bibitem[Pan et~al.(2022)Pan, Lai, Song, and Huang]{pan2022activenerf}
+Xuran Pan, Zihang Lai, Shiji Song, and Gao Huang.
+\newblock Activenerf: Learning where to see with uncertainty estimation.
+\newblock In \emph{Computer Vision--ECCV 2022: 17th European Conference, Tel Aviv, Israel, October 23--27, 2022, Proceedings, Part XXXIII}, pages 230--246. Springer, 2022.
+
+\bibitem[Park et~al.(2019)Park, Florence, Straub, Newcombe, and Lovegrove]{park2019deepsdf}
+Jeong~Joon Park, Peter Florence, Julian Straub, Richard Newcombe, and Steven Lovegrove.
+\newblock Deepsdf: Learning continuous signed distance functions for shape representation.
+\newblock In \emph{Proceedings of the IEEE/CVF conference on computer vision and pattern recognition}, pages 165--174, 2019.
+
+\bibitem[Peralta et~al.(2020{\natexlab{a}})Peralta, Casimiro, Nilles, Aguilar, Atienza, and Cajote]{houses3k}
+Daryl Peralta, Joel Casimiro, Aldrin~Michael Nilles, Justine~Aletta Aguilar, Rowel Atienza, and Rhandley Cajote.
+\newblock Houses3k dataset.
+\newblock \url{https://github.com/darylperalta/Houses3K}, 2020{\natexlab{a}}.
+
+\bibitem[Peralta et~al.(2020{\natexlab{b}})Peralta, Casimiro, Nilles, Aguilar, Atienza, and Cajote]{peralta2020next}
+Daryl Peralta, Joel Casimiro, Aldrin~Michael Nilles, Justine~Aletta Aguilar, Rowel Atienza, and Rhandley Cajote.
+\newblock Next-best view policy for 3d reconstruction.
+\newblock In \emph{Computer Vision--ECCV 2020 Workshops: Glasgow, UK, August 23--28, 2020, Proceedings, Part IV 16}, pages 558--573. Springer, 2020{\natexlab{b}}.
+
+\bibitem[Raffin et~al.(2021)Raffin, Hill, Gleave, Kanervisto, Ernestus, and Dormann]{raffin2021stable}
+Antonin Raffin, Ashley Hill, Adam Gleave, Anssi Kanervisto, Maximilian Ernestus, and Noah Dormann.
+\newblock Stable-baselines3: Reliable reinforcement learning implementations.
+\newblock \emph{The Journal of Machine Learning Research}, 22\penalty0 (1):\penalty0 12348--12355, 2021.
+
+\bibitem[Ran et~al.(2023)Ran, Zeng, He, Chen, Li, Chen, Lee, and Ye]{ran2023neurar}
+Yunlong Ran, Jing Zeng, Shibo He, Jiming Chen, Lincheng Li, Yingfeng Chen, Gimhee Lee, and Qi Ye.
+\newblock Neurar: Neural uncertainty for autonomous 3d reconstruction with implicit neural representations.
+\newblock \emph{IEEE Robotics and Automation Letters}, 2023.
+
+\bibitem[Ravi et~al.(2020)Ravi, Reizenstein, Novotny, Gordon, Lo, Johnson, and Gkioxari]{ravi2020pytorch3d}
+Nikhila Ravi, Jeremy Reizenstein, David Novotny, Taylor Gordon, Wan-Yen Lo, Justin Johnson, and Georgia Gkioxari.
+\newblock Accelerating 3d deep learning with pytorch3d.
+\newblock \emph{arXiv:2007.08501}, 2020.
+
+\bibitem[Rosinol et~al.(2022)Rosinol, Leonard, and Carlone]{rosinol2022nerf}
+Antoni Rosinol, John~J Leonard, and Luca Carlone.
+\newblock Nerf-slam: Real-time dense monocular slam with neural radiance fields.
+\newblock \emph{arXiv preprint arXiv:2210.13641}, 2022.
+
+\bibitem[Rudin et~al.(2021)Rudin, Hoeller, Reist, and Hutter]{rudinlearning}
+Nikita Rudin, David Hoeller, Philipp Reist, and Marco Hutter.
+\newblock Learning to walk in minutes using massively parallel deep reinforcement learning.
+\newblock In \emph{5th Annual Conference on Robot Learning}, 2021.
+
+\bibitem[Schulman et~al.(2017)Schulman, Wolski, Dhariwal, Radford, and Klimov]{schulman2017proximal}
+John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov.
+\newblock Proximal policy optimization algorithms.
+\newblock \emph{arXiv preprint arXiv:1707.06347}, 2017.
+
+\bibitem[Sethian(1996)]{sethian1996fast}
+James~A Sethian.
+\newblock A fast marching level set method for monotonically advancing fronts.
+\newblock \emph{proceedings of the National Academy of Sciences}, 93\penalty0 (4):\penalty0 1591--1595, 1996.
+
+\bibitem[Smith et~al.(2022)Smith, Drozdzal, Nowrouzezahrai, Meger, and Romero-Soriano]{smith2022uncertainty}
+Edward~J Smith, Michal Drozdzal, Derek Nowrouzezahrai, David Meger, and Adriana Romero-Soriano.
+\newblock Uncertainty-driven active vision for implicit scene reconstruction.
+\newblock \emph{arXiv preprint arXiv:2210.00978}, 2022.
+
+\bibitem[Straub et~al.(2019)Straub, Whelan, Ma, Chen, Wijmans, Green, Engel, Mur-Artal, Ren, Verma, et~al.]{straub2019replica}
+Julian Straub, Thomas Whelan, Lingni Ma, Yufan Chen, Erik Wijmans, Simon Green, Jakob~J Engel, Raul Mur-Artal, Carl Ren, Shobhit Verma, et~al.
+\newblock The replica dataset: A digital replica of indoor spaces.
+\newblock \emph{arXiv preprint arXiv:1906.05797}, 2019.
+
+\bibitem[Sucar et~al.(2021)Sucar, Liu, Ortiz, and Davison]{sucar2021imap}
+Edgar Sucar, Shikun Liu, Joseph Ortiz, and Andrew~J Davison.
+\newblock imap: Implicit mapping and positioning in real-time.
+\newblock In \emph{Proceedings of the IEEE/CVF International Conference on Computer Vision}, pages 6229--6238, 2021.
+
+\bibitem[Sun et~al.(2022{\natexlab{a}})Sun, Sun, and Chen]{sun2022direct}
+Cheng Sun, Min Sun, and Hwann-Tzong Chen.
+\newblock Direct voxel grid optimization: Super-fast convergence for radiance fields reconstruction.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pages 5459--5469, 2022{\natexlab{a}}.
+
+\bibitem[Sun et~al.(2021)Sun, Xie, Chen, Zhou, and Bao]{sun2021neuralrecon}
+Jiaming Sun, Yiming Xie, Linghao Chen, Xiaowei Zhou, and Hujun Bao.
+\newblock Neuralrecon: Real-time coherent 3d reconstruction from monocular video.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pages 15598--15607, 2021.
+
+\bibitem[Sun et~al.(2022{\natexlab{b}})Sun, Chen, Wang, Li, Averbuch-Elor, Zhou, and Snavely]{sun2022neuconw}
+Jiaming Sun, Xi Chen, Qianqian Wang, Zhengqi Li, Hadar Averbuch-Elor, Xiaowei Zhou, and Noah Snavely.
+\newblock Neural {3D} reconstruction in the wild.
+\newblock In \emph{SIGGRAPH Conference Proceedings}, 2022{\natexlab{b}}.
+
+\bibitem[Thrun(2002)]{thrun2002probabilistic}
+Sebastian Thrun.
+\newblock Probabilistic robotics.
+\newblock \emph{Communications of the ACM}, 45\penalty0 (3):\penalty0 52--57, 2002.
+
+\bibitem[Tobin et~al.(2017)Tobin, Fong, Ray, Schneider, Zaremba, and Abbeel]{tobin2017domain}
+Josh Tobin, Rachel Fong, Alex Ray, Jonas Schneider, Wojciech Zaremba, and Pieter Abbeel.
+\newblock Domain randomization for transferring deep neural networks from simulation to the real world.
+\newblock In \emph{2017 IEEE/RSJ international conference on intelligent robots and systems (IROS)}, pages 23--30. IEEE, 2017.
+
+\bibitem[Wu et~al.(2023)Wu, Zhang, Fu, Wang, Ren, Pan, Wu, Yang, Wang, Qian, et~al.]{wu2023omniobject3d}
+Tong Wu, Jiarui Zhang, Xiao Fu, Yuxin Wang, Jiawei Ren, Liang Pan, Wayne Wu, Lei Yang, Jiaqi Wang, Chen Qian, et~al.
+\newblock Omniobject3d: Large-vocabulary 3d object dataset for realistic perception, reconstruction and generation.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pages 803--814, 2023.
+
+\bibitem[Xiangli et~al.(2022)Xiangli, Xu, Pan, Zhao, Rao, Theobalt, Dai, and Lin]{xiangli2022bungeenerf}
+Yuanbo Xiangli, Linning Xu, Xingang Pan, Nanxuan Zhao, Anyi Rao, Christian Theobalt, Bo Dai, and Dahua Lin.
+\newblock Bungeenerf: Progressive neural radiance field for extreme multi-scale scene rendering.
+\newblock In \emph{The European Conference on Computer Vision (ECCV)}, 2022.
+
+\bibitem[Ye et~al.(2022)Ye, Dong, Fan, Wang, Yi, Xia, Wang, and Chen]{ye2022multi}
+Kai Ye, Siyan Dong, Qingnan Fan, He Wang, Li Yi, Fei Xia, Jue Wang, and Baoquan Chen.
+\newblock Multi-robot active mapping via neural bipartite graph matching.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pages 14839--14848, 2022.
+
+\bibitem[Yuksel(2015)]{yuksel2015sample}
+Cem Yuksel.
+\newblock Sample elimination for generating poisson disk sample sets.
+\newblock \emph{Computer Graphics Forum}, 34\penalty0 (2):\penalty0 25--32, 2015.
+
+\bibitem[Zhan et~al.(2022)Zhan, Zheng, Xu, Reid, and Rezatofighi]{zhan2022activermap}
+Huangying Zhan, Jiyang Zheng, Yi Xu, Ian Reid, and Hamid Rezatofighi.
+\newblock Activermap: Radiance field for active mapping and planning.
+\newblock \emph{arXiv preprint arXiv:2211.12656}, 2022.
+
+\bibitem[Zhang et~al.(2021)Zhang, Yao, Xie, Fu, Zhang, and Huang]{zhang2021continuous}
+Han Zhang, Yucong Yao, Ke Xie, Chi-Wing Fu, Hao Zhang, and Hui Huang.
+\newblock Continuous aerial path planning for 3d urban scene reconstruction.
+\newblock \emph{ACM Trans. Graph.}, 40\penalty0 (6):\penalty0 225--1, 2021.
+
+\bibitem[Zhang et~al.(2022)Zhang, Bi, Sunkavalli, Su, and Xu]{zhang2022nerfusion}
+Xiaoshuai Zhang, Sai Bi, Kalyan Sunkavalli, Hao Su, and Zexiang Xu.
+\newblock Nerfusion: Fusing radiance fields for large-scale scene reconstruction.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pages 5449--5458, 2022.
+
+\bibitem[Zhou et~al.(2018)Zhou, Park, and Koltun]{Zhou2018}
+Qian-Yi Zhou, Jaesik Park, and Vladlen Koltun.
+\newblock {Open3D}: {A} modern library for {3D} data processing.
+\newblock \emph{arXiv:1801.09847}, 2018.
+
+\bibitem[Zhu et~al.(2022)Zhu, Peng, Larsson, Xu, Bao, Cui, Oswald, and Pollefeys]{zhu2022nice}
+Zihan Zhu, Songyou Peng, Viktor Larsson, Weiwei Xu, Hujun Bao, Zhaopeng Cui, Martin~R Oswald, and Marc Pollefeys.
+\newblock Nice-slam: Neural implicit scalable encoding for slam.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pages 12786--12796, 2022.
+
+\bibitem[Paszke et~al.(2018)Paszke, Gross, Massa, Lerer, Bradbury, Chanan, Killeen, Lin, Gimelshein, Antiga, Desmaison, Kopf, Yang, DeVito, Raison, Tejani, Chilamkurthy, Steiner, Fang, Bai, and Chintala]{paszke2019pytorch}
+Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, Alban Desmaison, Andreas Kopf, Edward Yang, Zachary DeVito, Martin Raison, Alykhan Tejani, Sasank Chilamkurthy, Benoit Steiner, Lu Fang, Junjie Bai, Soumith Chintala
+\newblock Pytorch: An imperative style, high-performance deep learning library.
+\newblock \emph{arXiv:1801.09847}, 2018.
+
+
+\end{thebibliography}
+
+}
+
+
+
+% WARNING: do not forget to delete the supplementary pages from your submission 
+\input{Supp/supp}
+
+\end{document}

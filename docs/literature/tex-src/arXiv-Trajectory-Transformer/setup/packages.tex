@@ -1,0 +1,53 @@
+% if you need to pass options to natbib, use, e.g.:
+% \PassOptionsToPackage{numbers, compress}{natbib}
+\PassOptionsToPackage{compress}{natbib}
+% before loading neurips_2021
+
+% ready for submission
+\usepackage[final]{setup/neurips_2021}
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+%     \usepackage[preprint]{neurips_2021}
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+%     \usepackage[final]{neurips_2021}
+
+% to avoid loading the natbib package, add option nonatbib:
+%    \usepackage[nonatbib]{neurips_2021}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{graphicx}
+\usepackage{blindtext}
+\usepackage[labelformat=empty, position=top]{subcaption}
+\usepackage[export]{adjustbox}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage[labelfont=bf]{caption}
+\captionsetup[figure]{labelsep=space}
+\captionsetup[table]{labelsep=space}
+\usepackage{amsmath}
+\usepackage[title]{appendix}
+\usepackage{wrapfig}
+\usepackage{scalerel}
+\usepackage{siunitx}
+\usepackage{bm}
+
+\definecolor{mydarkblue}{rgb}{0,0.08,0.45}
+\hypersetup{ %
+    colorlinks=true,
+    linkcolor=mydarkblue,
+    citecolor=mydarkblue,
+    % linkcolor=black,
+    % citecolor=gray,
+    filecolor=mydarkblue,
+    urlcolor=mydarkblue,
+}

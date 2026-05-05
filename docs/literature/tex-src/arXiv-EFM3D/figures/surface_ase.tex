@@ -1,0 +1,80 @@
+\begin{comment}
+\begin{table}[ht]
+\centering
+\begin{tabular}{ccc} % Adjust for three columns
+{\tiny \textbf{GT Mesh}} & {\tiny \textbf{GT Depth Fusion}} & {\tiny \textbf{ZoeDepth$^*$}} \\ % Headers for the first row of images
+\includegraphics[width=0.3\textwidth]{figures/ase_mesh_viz/gt_mesh.jpg} & 
+\includegraphics[width=0.3\textwidth]{figures/ase_mesh_viz/gt_fusion.jpg} & 
+\includegraphics[width=0.3\textwidth]{figures/ase_mesh_viz/zoe.jpg} \\ 
+{\tiny \textbf{SimpleRecon}} & {\tiny \textbf{SimpleRecon$^*$}} & {\tiny \textbf{TCD}} \\ % Headers for the second row of images
+\includegraphics[width=0.3\textwidth]{figures/ase_mesh_viz/simplerecon.jpg} & 
+\includegraphics[width=0.3\textwidth]{figures/ase_mesh_viz/simplerecon_scaled.jpg} & 
+\includegraphics[width=0.3\textwidth]{figures/ase_mesh_viz/tcd.jpg} \\
+{\tiny \textbf{NeuralRecon}} & {\tiny \textbf{NeuralRecon OTS}} & {\tiny \textbf{\OCCmodel{}}} \\ % Headers for the second row of images
+\includegraphics[width=0.3\textwidth]{figures/ase_mesh_viz/neural_recon.jpg} & 
+\includegraphics[width=0.3\textwidth]{figures/ase_mesh_viz/neural_recon_ots.jpg} & 
+\includegraphics[width=0.3\textwidth]{figures/ase_mesh_viz/efm.jpg} \\
+\end{tabular}
+\caption{Surface reconstruction on the ASE 100077 validation sequence. For ZoeDepth and SimpleRecon we use the pretrained models while for \OCCmodel{} and NeuralRecon we re-trained on the ASE 1k training set. \TODO{highlight completeness, object prior.} \TODO{simplerecon doesn't work well; give it scale alignment; zoom-in view on the small objects; make insights}}
+\label{fig:mesh_ase}
+\end{table}
+\end{comment}
+
+%%%% ASE surface figure %%%%%
+
+
+%%%% ASE surface figure %%%%%
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{GT Mesh}}
+        \includegraphics[width=\textwidth]{figures/ase_mesh_viz/gt_mesh.jpg}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth \textwidth}
+        \centering
+        \caption{\tiny \textbf{GT Depth Fusion}}
+        \includegraphics[width=\textwidth]{figures/ase_mesh_viz/gt_fusion.jpg}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{\EFMmodel{}}}
+        \includegraphics[width=\textwidth]{figures/ase_mesh_viz/efm.jpg}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{NeuralRecon}}
+        \includegraphics[width=\textwidth]{figures/ase_mesh_viz/neural_recon.jpg}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{NeuralRecon OTS}}
+        \includegraphics[width=\textwidth]{figures/ase_mesh_viz/neural_recon_ots.jpg}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth \textwidth}
+        \centering
+        \caption{\tiny \textbf{ZoeDepth}}
+        \includegraphics[width=\textwidth]{figures/ase_mesh_viz/zoe.jpg}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{SimpleRecon}}
+        \includegraphics[width=\textwidth]{figures/ase_mesh_viz/simplerecon_scaled.jpg}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{\subfigwidth\textwidth}
+        \centering
+        \caption{\tiny \textbf{ConsistentDepth}}
+        \includegraphics[width=\textwidth]{figures/ase_mesh_viz/tcd.jpg}
+    \end{subfigure}
+    
+    \caption{Surface reconstruction on ASE-100077. 3D volumetric methods like NeuralRecon and \EFMmodel{} reconstruct flat floors and orthogonal walls with explicit 3D priors. \EFMmodel{} delivers a more complete and detailed reconstruction. Depth-based methods fail to produce flat surfaces and result in major holes.}
+    \label{fig:mesh_ase}
+    \vspace{-5mm}
+\end{figure}
