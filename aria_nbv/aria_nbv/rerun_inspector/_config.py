@@ -185,6 +185,125 @@ class RerunInspectorPerformanceConfig(BaseConfig):
         return limit
 
 
+class RerunInspectorCandidateConfig(BaseConfig):
+    """Candidate camera and selected-detail logging policy."""
+
+    subset_mode: Literal["all", "valid_only", "invalid_only", "top_k_oracle", "indices"] = "all"
+    """Candidate subset to log as native Rerun camera entities."""
+
+    subset_top_k: int = 5
+    """Number of candidates used when ``subset_mode='top_k_oracle'``."""
+
+    subset_indices: list[int] = Field(default_factory=list)
+    """Explicit candidate indices used when ``subset_mode='indices'``."""
+
+    selected_strategy: Literal["top_valid_oracle", "first_valid", "explicit_index"] = "top_valid_oracle"
+    """Strategy used for the single candidate that receives depth/point details."""
+
+    selected_index: int | None = None
+    """Explicit selected candidate index, overriding ``selected_strategy`` when set."""
+
+    @field_validator("subset_top_k")
+    @classmethod
+    def _validate_positive_top_k(cls, value: int) -> int:
+        """Validate positive candidate top-k counts."""
+
+        count = int(value)
+        if count <= 0:
+            raise ValueError("candidate.subset_top_k must be > 0.")
+        return count
+
+    @field_validator("subset_indices")
+    @classmethod
+    def _validate_subset_indices(cls, value: list[int]) -> list[int]:
+        """Reject negative candidate subset indices."""
+
+        indices = [int(item) for item in value]
+        if any(item < 0 for item in indices):
+            raise ValueError("candidate.subset_indices must be non-negative.")
+        return indices
+
+    @field_validator("selected_index")
+    @classmethod
+    def _validate_selected_index(cls, value: int | None) -> int | None:
+        """Reject negative selected candidate indices."""
+
+        if value is None:
+            return None
+        index = int(value)
+        if index < 0:
+            raise ValueError("candidate.selected_index must be >= 0.")
+        return index
+
+
+class RerunInspectorEfmVoxelConfig(BaseConfig):
+    """EFM voxel-field visualization policy."""
+
+    enabled: bool = True
+    """Whether to log curated EFM voxel fields when a backbone output is loaded."""
+
+    log_occ_pr: bool = True
+    """Log occupancy probabilities as thresholded voxel-center points."""
+
+    log_cent_pr: bool = True
+    """Log centerness probabilities as thresholded voxel-center points."""
+
+    log_cent_pr_nms: bool = True
+    """Log NMS-filtered centerness probabilities as thresholded voxel-center points."""
+
+    occ_threshold: float = 0.95
+    """Minimum ``occ_pr`` value to log."""
+
+    cent_threshold: float = 0.03
+    """Minimum ``cent_pr`` value to log."""
+
+    cent_nms_threshold: float = 0.01
+    """Minimum ``cent_pr_nms`` value to log."""
+
+    max_points_per_field: int = 10_000
+    """Maximum logged voxel centers per EFM field after thresholding."""
+
+    point_radius: float = 0.025
+    """Rerun point radius for logged voxel centers."""
+
+    @field_validator("occ_threshold", "cent_threshold", "cent_nms_threshold")
+    @classmethod
+    def _validate_threshold(cls, value: float) -> float:
+        """Validate probability thresholds."""
+
+        threshold = float(value)
+        if threshold < 0.0 or threshold > 1.0:
+            raise ValueError("EFM voxel thresholds must be in [0, 1].")
+        return threshold
+
+    @field_validator("max_points_per_field")
+    @classmethod
+    def _validate_non_negative_points(cls, value: int) -> int:
+        """Validate non-negative voxel point limits."""
+
+        limit = int(value)
+        if limit < 0:
+            raise ValueError("efm_voxels.max_points_per_field must be >= 0.")
+        return limit
+
+    @field_validator("point_radius")
+    @classmethod
+    def _validate_positive_radius(cls, value: float) -> float:
+        """Validate positive voxel point radius."""
+
+        radius = float(value)
+        if radius <= 0.0:
+            raise ValueError("efm_voxels.point_radius must be > 0.")
+        return radius
+
+
+class RerunInspectorAseKeyframeConfig(BaseConfig):
+    """ASE camera keyframe visualization policy."""
+
+    frame_policy: Literal["first_last"] = "first_last"
+    """Frame policy for the curated ASE camera stream view."""
+
+
 class RerunInspectorPrimitivesConfig(BaseConfig):
     """Primitive toggles for the Rerun recording."""
 
@@ -236,6 +355,9 @@ class RerunInspectorPrimitivesConfig(BaseConfig):
     log_depth_keyframes: bool = False
     """Log live-attached depth keyframes when a raw EFM snippet is attached."""
 
+    log_efm_voxels: bool = True
+    """Log curated EFM voxel evidence when available."""
+
 
 class RerunOfflineInspectorConfig(BaseConfig):
     """Top-level config-as-factory model for the offline Rerun inspector."""
@@ -263,6 +385,15 @@ class RerunOfflineInspectorConfig(BaseConfig):
     performance: RerunInspectorPerformanceConfig = Field(default_factory=RerunInspectorPerformanceConfig)
     """Runtime performance settings."""
 
+    candidate: RerunInspectorCandidateConfig = Field(default_factory=RerunInspectorCandidateConfig)
+    """Candidate subset and selected-detail logging policy."""
+
+    efm_voxels: RerunInspectorEfmVoxelConfig = Field(default_factory=RerunInspectorEfmVoxelConfig)
+    """EFM voxel-field visualization settings."""
+
+    ase_keyframes: RerunInspectorAseKeyframeConfig = Field(default_factory=RerunInspectorAseKeyframeConfig)
+    """ASE camera keyframe visualization settings."""
+
     primitives: RerunInspectorPrimitivesConfig = Field(default_factory=RerunInspectorPrimitivesConfig)
     """Primitive toggles."""
 
@@ -270,6 +401,9 @@ class RerunOfflineInspectorConfig(BaseConfig):
 __all__ = [
     "RerunInspectorDatasetConfig",
     "RerunInspectorGeometryConfig",
+    "RerunInspectorAseKeyframeConfig",
+    "RerunInspectorCandidateConfig",
+    "RerunInspectorEfmVoxelConfig",
     "RerunInspectorOutputConfig",
     "RerunInspectorPerformanceConfig",
     "RerunInspectorPrimitivesConfig",

@@ -14,6 +14,7 @@ from efm3d.aria.pose import PoseTW
 from efm3d.aria.tensor_wrapper import TensorWrapper
 from numpy.typing import DTypeLike, NDArray
 from pytorch3d.renderer.cameras import PerspectiveCameras
+from pytorch3d.transforms import matrix_to_quaternion
 from torch import Tensor
 
 from aria_nbv.data_handling import VinOfflineSample
@@ -30,6 +31,7 @@ class RerunModule(Protocol):
 
     Points3D: RerunEntityFactory
     LineStrips3D: RerunEntityFactory
+    Boxes3D: RerunEntityFactory
     TextDocument: RerunEntityFactory
     Transform3D: RerunEntityFactory
     Mesh3D: RerunEntityFactory
@@ -56,21 +58,19 @@ class RerunModule(Protocol):
 
 
 ENTITY_WORLD = "world"
-ENTITY_SEMIDENSE = "world/semidense"
-ENTITY_REFERENCE_POSE = "world/reference/rig"
-ENTITY_FRUSTA_ALL = "world/candidates/frusta/all"
-ENTITY_FRUSTA_TOP_ORACLE = "world/candidates/frusta/top_oracle"
-ENTITY_FRUSTA_INVALID = "world/candidates/frusta/invalid"
-ENTITY_CANDIDATE_CENTERS = "world/candidates/centers"
+ENTITY_SEMIDENSE = "world/ase/semidense"
+ENTITY_REFERENCE_POSE = "world/ase/reference/rig"
 ENTITY_METADATA_SAMPLE = "metadata/sample"
-ENTITY_MESH = "world/mesh"
-ENTITY_CANDIDATE_POINTS = "world/candidates/points"
-ENTITY_CANDIDATE_DEPTHS = "world/candidates"
+ENTITY_MESH = "world/gt/mesh"
+ENTITY_CANDIDATE_ROOT = "world/candidates"
 ENTITY_GT_OBBS = "world/gt/obbs"
-ENTITY_DETECTED_OBBS = "world/detected/obbs"
-ENTITY_TRAJECTORY = "world/trajectory/rig"
-ENTITY_RGB_KEYFRAMES = "world/keyframes/rgb"
-ENTITY_DEPTH_KEYFRAMES = "world/keyframes/depth"
+ENTITY_DETECTED_OBBS = "world/efm/obbs/detected"
+ENTITY_TRAJECTORY = "world/ase/trajectory/rig"
+ENTITY_RGB_KEYFRAMES = "world/ase/cameras/rgb"
+ENTITY_DEPTH_KEYFRAMES = "world/ase/cameras/rgb"
+ENTITY_ASE_KEYFRAME_MEDIA = "media/ase/cameras/rgb"
+ENTITY_EFM_VOXELS = "world/efm/voxels"
+ENTITY_EFM_VOXEL_EXTENT = "world/efm/voxels/extent"
 
 _FRUSTUM_EDGES = (
     (0, 1),
@@ -353,6 +353,29 @@ def _semidense_points(sample: VinOfflineSample) -> NDArray[Any]:
     return np.asarray(valid, dtype=np.float32).reshape(-1, 3)
 
 
+def _semidense_quality_colors(sample: VinOfflineSample, point_count: int) -> list[list[int]]:
+    """Return quality colors for VIN semidense points when a fourth channel exists."""
+
+    snippet = sample.vin_snippet
+    points = _to_numpy(snippet.points_world)
+    if points.ndim < 2 or points.shape[-1] < 4:
+        return _rgba("semidense", point_count)
+
+    quality = points[..., 3]
+    length_values = _to_numpy(snippet.lengths, dtype=np.int64).reshape(-1)
+    length = max(int(length_values[0]), 0) if length_values.size > 0 else None
+    if quality.ndim == 1:
+        valid = quality[:length] if length is not None else quality
+    else:
+        batches = quality.reshape(-1, quality.shape[-1])
+        valid = batches[:, :length] if length is not None else batches
+    values = np.asarray(valid, dtype=np.float32).reshape(-1)[:point_count]
+    colors = _score_rgba(values, low=[92, 118, 190, 120], high=[250, 224, 100, 230])
+    if len(colors) < point_count:
+        colors.extend(_rgba("semidense", point_count - len(colors)))
+    return colors
+
+
 def _validity_mask(sample: VinOfflineSample, candidate_count: int) -> NDArray[Any] | None:
     """Return a candidate validity mask when the sample exposes one."""
 
@@ -379,8 +402,97 @@ def _top_oracle_index(sample: VinOfflineSample, candidate_count: int, validity: 
     return int(np.argmax(scores))
 
 
-def _candidate_points(sample: VinOfflineSample, *, max_points: int, seed: int | None) -> NDArray[Any] | None:
-    """Return optional candidate point-cloud points, downsampled deterministically."""
+def _candidate_status(validity: NDArray[Any] | None, candidate_idx: int) -> str:
+    """Return the candidate validity path component for one candidate."""
+
+    if validity is not None and 0 <= candidate_idx < int(validity.shape[0]) and not bool(validity[candidate_idx]):
+        return "invalid"
+    return "valid"
+
+
+def _candidate_entity(candidate_idx: int, validity: NDArray[Any] | None) -> str:
+    """Return the semantic per-candidate entity path."""
+
+    status = _candidate_status(validity, candidate_idx)
+    return f"{ENTITY_CANDIDATE_ROOT}/{status}/candidate_{candidate_idx:03d}"
+
+
+def _candidate_camera_entity(candidate_idx: int, validity: NDArray[Any] | None = None) -> str:
+    """Return the stable per-candidate camera entity path."""
+
+    return f"{_candidate_entity(candidate_idx, validity)}/camera"
+
+
+def _candidate_scores(sample: VinOfflineSample, candidate_count: int) -> NDArray[Any]:
+    """Return candidate RRI scores clipped to the active candidate count."""
+
+    return _to_numpy(sample.oracle.rri).reshape(-1)[:candidate_count]
+
+
+def _selected_candidate_index(
+    sample: VinOfflineSample,
+    *,
+    candidate_count: int,
+    validity: NDArray[Any] | None,
+    config: RerunOfflineInspectorConfig,
+) -> int | None:
+    """Resolve the one candidate that receives expensive detail modalities."""
+
+    selected_index = config.candidate.selected_index
+    if selected_index is not None:
+        return int(selected_index) if 0 <= int(selected_index) < candidate_count else None
+    if config.candidate.selected_strategy == "explicit_index":
+        return None
+    if config.candidate.selected_strategy == "first_valid":
+        if validity is None:
+            return 0 if candidate_count > 0 else None
+        valid = np.flatnonzero(validity[:candidate_count])
+        return int(valid[0]) if valid.size > 0 else None
+    return _top_oracle_index(sample, candidate_count, validity)
+
+
+def _candidate_subset_indices(
+    sample: VinOfflineSample,
+    *,
+    candidate_count: int,
+    validity: NDArray[Any] | None,
+    config: RerunOfflineInspectorConfig,
+) -> list[int]:
+    """Resolve candidate indices to log as native camera entities."""
+
+    all_indices = list(range(candidate_count))
+    mode = config.candidate.subset_mode
+    if mode == "all":
+        return all_indices
+    if mode == "valid_only":
+        if validity is None:
+            return all_indices
+        return [idx for idx in all_indices if bool(validity[idx])]
+    if mode == "invalid_only":
+        if validity is None:
+            return []
+        return [idx for idx in all_indices if not bool(validity[idx])]
+    if mode == "indices":
+        requested = set(config.candidate.subset_indices)
+        return [idx for idx in all_indices if idx in requested]
+    scores = _candidate_scores(sample, candidate_count)
+    if scores.size == 0:
+        return []
+    ranking_scores = scores.copy()
+    if validity is not None and validity.shape[0] == scores.shape[0] and validity.any():
+        ranking_scores[~validity] = -np.inf
+    top_k = min(config.candidate.subset_top_k, len(all_indices))
+    return sorted(np.argsort(-ranking_scores)[:top_k].astype(np.int64).tolist())
+
+
+def _candidate_points_for_index(
+    sample: VinOfflineSample,
+    candidate_idx: int,
+    *,
+    max_points: int,
+    seed: int | None,
+) -> NDArray[Any] | None:
+    """Return one optional candidate point cloud, downsampled deterministically."""
 
     candidate_pcs = sample.candidate_pcs
     if candidate_pcs is None:
@@ -390,14 +502,16 @@ def _candidate_points(sample: VinOfflineSample, *, max_points: int, seed: int | 
     arr = (
         _to_numpy(points).reshape(points.shape[0], points.shape[1], 3)
         if isinstance(points, torch.Tensor)
-        else _to_numpy(points).reshape(-1, 3)
+        else _to_numpy(points)
     )
+    if arr.ndim != 3 or not (0 <= candidate_idx < arr.shape[0]):
+        return None
     if lengths is not None and arr.ndim == 3:
         len_arr = _to_numpy(lengths, dtype=np.int64).reshape(-1)
-        chunks = [arr[idx, : int(length)] for idx, length in enumerate(len_arr[: arr.shape[0]]) if int(length) > 0]
-        flat = np.concatenate(chunks, axis=0) if chunks else arr.reshape(0, 3)
+        length = int(len_arr[candidate_idx]) if candidate_idx < len_arr.shape[0] else arr.shape[1]
+        flat = arr[candidate_idx, : max(length, 0), :]
     else:
-        flat = arr.reshape(-1, 3)
+        flat = arr[candidate_idx].reshape(-1, 3)
     return deterministic_downsample(flat, max_points=max_points, seed=seed)
 
 
@@ -436,7 +550,7 @@ def _detected_obbs(sample: VinOfflineSample) -> Tensor | ObbTW | None:
 
     if sample.detected_obbs is not None:
         return sample.detected_obbs.obbs
-    backbone = sample.backbone_out
+    backbone = getattr(sample, "backbone_out", None)
     if backbone is None:
         return None
     return backbone.obb_pred_viz if backbone.obb_pred_viz is not None else backbone.obb_pred
@@ -491,6 +605,90 @@ def _obb_line_strips(obbs: Tensor | ObbTW, *, t_world_snippet: PoseTW) -> list[l
     return strips
 
 
+def _semantic_class_name(sem_id: float, sem_id_to_name: Sequence[str] | None) -> str:
+    """Return a display class name for one semantic id."""
+
+    if sem_id_to_name is None:
+        return "<unknown>"
+    index = int(sem_id)
+    if index < 0 or index >= len(sem_id_to_name):
+        return "<unknown>"
+    name = str(sem_id_to_name[index])
+    return name if name else "<unknown>"
+
+
+def _obb_boxes(
+    obbs: Tensor | ObbTW,
+    *,
+    t_world_snippet: PoseTW,
+    sem_id_to_name: Sequence[str] | None = None,
+) -> tuple[NDArray[Any], NDArray[Any], NDArray[Any], list[str]]:
+    """Convert EFM snippet-frame OBB tensors into native Rerun box fields.
+
+    Returns centers, half sizes, quaternions in Rerun ``xyzw`` order, and
+    compact labels. The input OBBs are never mutated; the snippet-to-world
+    transform is display-only for this recording.
+    """
+
+    world_obbs = _transform_snippet_obbs_to_world(obbs, t_world_snippet)
+    valid_mask_t = ~world_obbs.get_padding_mask().detach().cpu()
+    if not bool(valid_mask_t.any()):
+        empty = np.zeros((0, 3), dtype=np.float32)
+        return empty, empty, np.zeros((0, 4), dtype=np.float32), []
+
+    flat_obbs = world_obbs.reshape(-1, world_obbs.shape[-1])
+    flat_valid = valid_mask_t.reshape(-1)
+    valid_obbs = ObbTW(flat_obbs._data[flat_valid])
+    centers = valid_obbs.bb3_center_world.detach().cpu().numpy().reshape(-1, 3).astype(np.float32)
+    half_sizes = (0.5 * valid_obbs.bb3_diagonal).detach().cpu().numpy().reshape(-1, 3).astype(np.float32)
+    rotations = valid_obbs.T_world_object.R.detach().cpu()
+    quat_wxyz = matrix_to_quaternion(rotations).numpy().reshape(-1, 4).astype(np.float32)
+    quats_xyzw = quat_wxyz[:, [1, 2, 3, 0]]
+
+    sem_id = valid_obbs.sem_id.detach().cpu().numpy().reshape(-1)
+    inst_id = valid_obbs.inst_id.detach().cpu().numpy().reshape(-1)
+    prob = valid_obbs.prob.detach().cpu().numpy().reshape(-1)
+    labels = [
+        (
+            f"class={_semantic_class_name(float(sem), sem_id_to_name)} | "
+            f"sem_id={int(sem)} | inst_id={int(inst)} | prob={float(score):.3f}"
+        )
+        for sem, inst, score in zip(sem_id, inst_id, prob, strict=False)
+    ]
+    return centers, half_sizes, quats_xyzw, labels
+
+
+def _gt_obb_semantic_names(sample: VinOfflineSample) -> Sequence[str] | None:
+    """Return GT OBB semantic names when the offline payload exposes them."""
+
+    gt_obbs = getattr(sample, "gt_obbs", None)
+    return getattr(gt_obbs, "sem_id_to_name", None)
+
+
+def _detected_obb_semantic_names(sample: VinOfflineSample) -> Sequence[str] | None:
+    """Return detected OBB semantic names from compact or backbone payloads."""
+
+    detected_obbs = getattr(sample, "detected_obbs", None)
+    names = getattr(detected_obbs, "sem_id_to_name", None)
+    if names is not None:
+        return names
+    backbone = getattr(sample, "backbone_out", None)
+    if backbone is None:
+        return None
+    return getattr(backbone, "obb_pred_sem_id_to_name", None)
+
+
+def _voxel_extent_box_fields(voxel_extent: Tensor) -> tuple[NDArray[Any], NDArray[Any]]:
+    """Convert ``[x_min, x_max, y_min, y_max, z_min, z_max]`` to box fields."""
+
+    extent = _to_numpy(voxel_extent).reshape(-1, 6)[0].astype(np.float32)
+    mins = np.asarray([extent[0], extent[2], extent[4]], dtype=np.float32)
+    maxs = np.asarray([extent[1], extent[3], extent[5]], dtype=np.float32)
+    center = 0.5 * (mins + maxs)
+    half_size = 0.5 * (maxs - mins)
+    return center.reshape(1, 3), half_size.reshape(1, 3)
+
+
 def _trajectory_points(sample: VinOfflineSample) -> NDArray[Any]:
     """Return world-frame trajectory centers from compact metadata or VIN snippet."""
 
@@ -528,6 +726,12 @@ def _depth_hw(tensor: object, index: int) -> NDArray[Any]:
     return np.asarray(arr, dtype=np.float32)
 
 
+def _display_rot90_cw(array: NDArray[Any]) -> NDArray[Any]:
+    """Apply ARIA's display-only 90 degree clockwise image convention."""
+
+    return np.ascontiguousarray(np.rot90(array, k=-1))
+
+
 def _keyframe_indices(num_frames: int) -> list[int]:
     """Return the first/last keyframe indices used for compact inspection."""
 
@@ -536,10 +740,59 @@ def _keyframe_indices(num_frames: int) -> list[int]:
     return [0] if num_frames <= 1 else [0, num_frames - 1]
 
 
-def _candidate_camera_entity(candidate_idx: int) -> str:
-    """Return the stable per-candidate camera entity path."""
+def _score_rgba(values: NDArray[Any], *, low: Sequence[int], high: Sequence[int]) -> list[list[int]]:
+    """Map scalar scores to RGBA colors with a simple linear ramp."""
 
-    return f"{ENTITY_CANDIDATE_DEPTHS}/candidate_{candidate_idx:03d}/camera"
+    arr = np.asarray(values, dtype=np.float32).reshape(-1)
+    if arr.size == 0:
+        return []
+    finite = arr[np.isfinite(arr)]
+    lo = float(np.min(finite)) if finite.size else 0.0
+    hi = float(np.max(finite)) if finite.size else 1.0
+    denom = hi - lo if hi > lo else 1.0
+    alpha = np.clip((arr - lo) / denom, 0.0, 1.0)
+    low_arr = np.asarray(low, dtype=np.float32)
+    high_arr = np.asarray(high, dtype=np.float32)
+    colors = low_arr[None, :] * (1.0 - alpha[:, None]) + high_arr[None, :] * alpha[:, None]
+    return np.clip(colors, 0, 255).astype(np.uint8).tolist()
+
+
+def _field_voxel_centers_world(
+    field: Tensor,
+    *,
+    t_world_voxel: PoseTW,
+    voxel_extent: Tensor,
+    threshold: float,
+    max_points: int,
+) -> tuple[NDArray[Any], NDArray[Any]]:
+    """Return thresholded EFM voxel centers in world coordinates and their scores."""
+
+    if field.ndim != 5 or max_points <= 0:
+        return np.zeros((0, 3), dtype=np.float32), np.zeros((0,), dtype=np.float32)
+    values = field.detach().cpu().float()[0, 0]
+    mask = values >= float(threshold)
+    if not bool(mask.any()):
+        return np.zeros((0, 3), dtype=np.float32), np.zeros((0,), dtype=np.float32)
+
+    indices = torch.nonzero(mask, as_tuple=False)
+    scores = values[mask]
+    if scores.numel() > max_points:
+        top = torch.topk(scores, k=max_points, largest=True, sorted=False).indices
+        indices = indices[top]
+        scores = scores[top]
+
+    d, h, w = values.shape
+    extent = voxel_extent.detach().cpu().float().reshape(-1, 6)[0]
+    mins = torch.tensor([extent[0], extent[2], extent[4]], dtype=torch.float32)
+    maxs = torch.tensor([extent[1], extent[3], extent[5]], dtype=torch.float32)
+    dims = torch.tensor([d, h, w], dtype=torch.float32)
+    centers_voxel = mins + (indices.to(dtype=torch.float32) + 0.5) * ((maxs - mins) / dims)
+
+    pose = t_world_voxel
+    if pose.ndim != 1:
+        pose = PoseTW(pose._data.reshape(-1, 12)[:1])
+    centers_world = (pose * centers_voxel.to(device=pose._data.device)).detach().cpu().numpy().reshape(-1, 3)
+    return centers_world.astype(np.float32), scores.detach().cpu().numpy().astype(np.float32)
 
 
 class RerunOfflineLogger:
@@ -592,6 +845,30 @@ class RerunOfflineLogger:
             kwargs["axis_length"] = axis_length
         self.rr.log(entity_path, self.rr.Transform3D(**kwargs), static=True)
 
+    def _log_camera_pose_and_pinhole(
+        self,
+        entity_path: str,
+        pose_world_camera: PoseTW,
+        pinhole_kwargs: dict[str, list[float]],
+    ) -> None:
+        """Log one native Rerun camera entity with pose and ARIA LUF intrinsics."""
+
+        r, t = _pose_rt(pose_world_camera, [0])
+        self.rr.log(
+            entity_path,
+            self.rr.Transform3D(
+                translation=t[0].tolist(),
+                mat3x3=r[0].tolist(),
+                relation=self.rr.TransformRelation.ParentFromChild,
+            ),
+            self.rr.Pinhole(
+                **pinhole_kwargs,
+                camera_xyz=self.rr.ViewCoordinates.LUF,
+                image_plane_distance=self.config.geometry.frustum_scale,
+            ),
+            static=True,
+        )
+
     def start(self) -> None:
         """Initialize the Rerun recording and open the configured sink before logging."""
 
@@ -627,12 +904,7 @@ class RerunOfflineLogger:
             self._log_semidense(sample)
         if self.config.primitives.log_reference_pose:
             self._log_reference_pose(sample)
-        if (
-            self.config.primitives.log_candidate_frusta
-            or self.config.primitives.log_top_oracle_frustum
-            or self.config.primitives.log_invalid_frusta
-            or self.config.primitives.log_candidate_centers
-        ):
+        if self.config.primitives.log_candidate_frusta or self.config.primitives.log_candidate_centers:
             self._log_candidates(sample, inventory=inventory)
         if self.config.primitives.log_candidate_points and inventory.has_candidate_points:
             self._log_candidate_points(sample)
@@ -641,14 +913,23 @@ class RerunOfflineLogger:
         if (self.config.primitives.log_mesh or self.config.primitives.log_gt_mesh) and inventory.has_mesh:
             self._log_mesh(sample)
         if self.config.primitives.log_gt_obbs and inventory.has_gt_obbs:
-            self._log_obbs(sample, entity_path=ENTITY_GT_OBBS, obbs=_compact_or_live_gt_obbs(sample), palette="gt_obbs")
+            self._log_obbs(
+                sample,
+                entity_path=ENTITY_GT_OBBS,
+                obbs=_compact_or_live_gt_obbs(sample),
+                palette="gt_obbs",
+                sem_id_to_name=_gt_obb_semantic_names(sample),
+            )
         if self.config.primitives.log_detected_obbs and inventory.has_detected_obbs:
             self._log_obbs(
                 sample,
                 entity_path=ENTITY_DETECTED_OBBS,
                 obbs=_detected_obbs(sample),
                 palette="detected_obbs",
+                sem_id_to_name=_detected_obb_semantic_names(sample),
             )
+        if self.config.primitives.log_efm_voxels and self.config.efm_voxels.enabled:
+            self._log_efm_voxels(sample)
         if self.config.primitives.log_gt_trajectory and inventory.has_trajectory:
             self._log_trajectory(sample)
         if self.config.primitives.log_rgb_keyframes and inventory.has_rgb_keyframes:
@@ -687,7 +968,7 @@ class RerunOfflineLogger:
             self.rr.Points3D(
                 points,
                 radii=self.config.geometry.semidense_radius,
-                colors=_rgba("semidense", points.shape[0]),
+                colors=_semidense_quality_colors(sample, points.shape[0]),
             ),
             static=True,
         )
@@ -703,81 +984,53 @@ class RerunOfflineLogger:
         del inventory
         poses = sample.oracle.candidate_poses_world_cam
         cameras = sample.oracle.p3d_cameras
-        rri = sample.oracle.rri
         count = _candidate_count(sample)
-        indices = list(range(count))
         validity = _validity_mask(sample, count)
+        selected_idx = _selected_candidate_index(sample, candidate_count=count, validity=validity, config=self.config)
+        indices = _candidate_subset_indices(sample, candidate_count=count, validity=validity, config=self.config)
 
-        if self.config.primitives.log_candidate_frusta and indices:
-            strips, labels = _worker_c_frusta_line_strips(
-                poses,
-                indices=indices,
-                scale=self.config.geometry.frustum_scale,
-                cameras=cameras,
-                oracle_rri=rri,
-                validity=validity,
-            )
-            self.rr.log(
-                ENTITY_FRUSTA_ALL,
-                self.rr.LineStrips3D(strips, colors=_rgba("frusta_all", len(strips)), labels=labels),
-                static=True,
-            )
-
-        top_idx = _top_oracle_index(sample, count, validity)
-        if self.config.primitives.log_top_oracle_frustum and top_idx is not None:
-            strips, labels = _worker_c_frusta_line_strips(
-                poses,
-                indices=[top_idx],
-                scale=self.config.geometry.frustum_scale,
-                cameras=cameras,
-                oracle_rri=rri,
-                validity=validity,
-            )
-            self.rr.log(
-                ENTITY_FRUSTA_TOP_ORACLE,
-                self.rr.LineStrips3D(strips, colors=_rgba("frusta_top", len(strips)), labels=labels),
-                static=True,
-            )
-
-        if self.config.primitives.log_invalid_frusta and validity is not None and validity.shape[0] == count:
-            invalid = [idx for idx, is_valid in enumerate(validity.tolist()) if not is_valid]
-            if invalid:
-                strips, labels = _worker_c_frusta_line_strips(
-                    poses,
-                    indices=invalid,
-                    scale=self.config.geometry.frustum_scale,
-                    cameras=cameras,
-                    oracle_rri=rri,
-                    validity=validity,
-                )
-                self.rr.log(
-                    ENTITY_FRUSTA_INVALID,
-                    self.rr.LineStrips3D(strips, colors=_rgba("frusta_invalid", len(strips)), labels=labels),
-                    static=True,
+        if self.config.primitives.log_candidate_frusta:
+            for idx in indices:
+                camera_entity = _candidate_camera_entity(idx, validity)
+                self._log_camera_pose_and_pinhole(
+                    camera_entity,
+                    _subset_poses(poses, [idx]),
+                    _p3d_pinhole_kwargs(cameras, idx),
                 )
 
-        if self.config.primitives.log_candidate_centers and indices:
-            centers = _worker_c_candidate_centers(poses, indices)
+        if self.config.primitives.log_candidate_centers and selected_idx is not None:
+            center = _worker_c_candidate_centers(poses, [selected_idx])
             self.rr.log(
-                ENTITY_CANDIDATE_CENTERS,
+                f"{_candidate_entity(selected_idx, validity)}/center",
                 self.rr.Points3D(
-                    centers,
+                    center,
                     radii=self.config.geometry.candidate_center_radius,
-                    colors=_rgba("centers", centers.shape[0]),
+                    colors=_rgba("centers", center.shape[0]),
                 ),
                 static=True,
             )
 
     def _log_candidate_points(self, sample: VinOfflineSample) -> None:
-        points = _candidate_points(
+        count = _candidate_count(sample)
+        validity = _validity_mask(sample, count)
+        selected_idx = _selected_candidate_index(
             sample,
+            candidate_count=count,
+            validity=validity,
+            config=self.config,
+        )
+        if selected_idx is None:
+            return
+        points = _candidate_points_for_index(
+            sample,
+            selected_idx,
             max_points=self.config.performance.max_candidate_points,
             seed=self.config.performance.seed,
         )
         if points is None:
             return
         self.rr.log(
-            ENTITY_CANDIDATE_POINTS,
+            f"{_candidate_entity(selected_idx, validity)}/points",
             self.rr.Points3D(
                 points,
                 radii=self.config.geometry.candidate_point_radius,
@@ -808,6 +1061,7 @@ class RerunOfflineLogger:
         entity_path: str,
         obbs: Tensor | ObbTW | None,
         palette: str,
+        sem_id_to_name: Sequence[str] | None,
     ) -> None:
         if obbs is None:
             return
@@ -815,12 +1069,22 @@ class RerunOfflineLogger:
         if t_world_snippet is None:
             self._warn_metadata(f"{entity_path} skipped: missing T_world_snippet for snippet-frame OBBs.")
             return
-        strips = _obb_line_strips(obbs, t_world_snippet=t_world_snippet)
-        if not strips:
+        centers, half_sizes, quaternions, labels = _obb_boxes(
+            obbs,
+            t_world_snippet=t_world_snippet,
+            sem_id_to_name=sem_id_to_name,
+        )
+        if centers.shape[0] == 0:
             return
         self.rr.log(
             entity_path,
-            self.rr.LineStrips3D(strips, colors=_rgba(palette, len(strips))),
+            self.rr.Boxes3D(
+                centers=centers,
+                half_sizes=half_sizes,
+                quaternions=quaternions,
+                colors=_rgba(palette, centers.shape[0]),
+                labels=labels,
+            ),
             static=True,
         )
 
@@ -877,15 +1141,11 @@ class RerunOfflineLogger:
             _keyframe_indices(int(camera.images.shape[0])),
         ):
             camera_entity = f"{ENTITY_RGB_KEYFRAMES}/frame_{idx:03d}/camera"
-            image_entity = f"{camera_entity}/image"
-            self._log_pose_transform(camera_entity, pose_world_cam)
+            image_entity = f"{ENTITY_ASE_KEYFRAME_MEDIA}/frame_{idx:03d}/image"
+            self._log_camera_pose_and_pinhole(camera_entity, pose_world_cam, _camera_tw_pinhole_kwargs(camera_tw))
             self.rr.log(
                 image_entity,
-                self.rr.Pinhole(
-                    **_camera_tw_pinhole_kwargs(camera_tw),
-                    camera_xyz=self.rr.ViewCoordinates.LUF,
-                ),
-                self.rr.Image(_image_hwc(camera.images, idx)),
+                self.rr.Image(_display_rot90_cw(_image_hwc(camera.images, idx))),
                 static=True,
             )
 
@@ -903,15 +1163,11 @@ class RerunOfflineLogger:
             _keyframe_indices(int(depth.shape[0])),
         ):
             camera_entity = f"{ENTITY_DEPTH_KEYFRAMES}/frame_{idx:03d}/camera"
-            depth_entity = f"{camera_entity}/depth"
-            self._log_pose_transform(camera_entity, pose_world_cam)
+            depth_entity = f"{ENTITY_ASE_KEYFRAME_MEDIA}/frame_{idx:03d}/depth"
+            self._log_camera_pose_and_pinhole(camera_entity, pose_world_cam, _camera_tw_pinhole_kwargs(camera_tw))
             self.rr.log(
                 depth_entity,
-                self.rr.Pinhole(
-                    **_camera_tw_pinhole_kwargs(camera_tw),
-                    camera_xyz=self.rr.ViewCoordinates.LUF,
-                ),
-                self.rr.DepthImage(_depth_hw(depth, idx), meter=1.0),
+                self.rr.DepthImage(_display_rot90_cw(_depth_hw(depth, idx)), meter=1.0),
                 static=True,
             )
 
@@ -924,37 +1180,105 @@ class RerunOfflineLogger:
         candidate_count = min(_candidate_count(sample), int(arr.shape[0]))
         if candidate_count <= 0:
             return
-        indices = {0, candidate_count - 1}
-        top_idx = _top_oracle_index(sample, candidate_count, _validity_mask(sample, candidate_count))
-        if top_idx is not None:
-            indices.add(top_idx)
-        for idx in sorted(indices):
-            image = arr[idx]
-            if image.ndim == 3 and image.shape[0] == 1:
-                image = image[0]
-            camera_entity = _candidate_camera_entity(idx)
-            depth_entity = f"{camera_entity}/depth"
-            self._log_pose_transform(camera_entity, _subset_poses(sample.oracle.candidate_poses_world_cam, [idx]))
+        validity = _validity_mask(sample, candidate_count)
+        selected_idx = _selected_candidate_index(
+            sample,
+            candidate_count=candidate_count,
+            validity=validity,
+            config=self.config,
+        )
+        if selected_idx is None:
+            return
+        image = arr[selected_idx]
+        if image.ndim == 3 and image.shape[0] == 1:
+            image = image[0]
+        camera_entity = _candidate_camera_entity(selected_idx, validity)
+        depth_entity = f"{_candidate_entity(selected_idx, validity)}/depth"
+        self._log_camera_pose_and_pinhole(
+            camera_entity,
+            _subset_poses(sample.oracle.candidate_poses_world_cam, [selected_idx]),
+            _p3d_pinhole_kwargs(sample.oracle.p3d_cameras, selected_idx),
+        )
+        self.rr.log(
+            depth_entity,
+            self.rr.DepthImage(np.asarray(image, dtype=np.float32), meter=1.0),
+            static=True,
+        )
+
+    def _log_efm_voxels(self, sample: VinOfflineSample) -> None:
+        """Log curated EVL/EFM voxel evidence as thresholded world-space points."""
+
+        backbone = getattr(sample, "backbone_out", None)
+        if backbone is None:
+            return
+        cfg = self.config.efm_voxels
+        self._log_efm_voxel_extent(backbone)
+        field_specs = (
+            ("occ_pr", cfg.log_occ_pr, cfg.occ_threshold, [30, 70, 150, 80], [90, 180, 255, 210]),
+            ("cent_pr", cfg.log_cent_pr, cfg.cent_threshold, [80, 40, 130, 80], [245, 120, 255, 230]),
+            ("cent_pr_nms", cfg.log_cent_pr_nms, cfg.cent_nms_threshold, [80, 130, 80, 80], [130, 255, 150, 240]),
+        )
+        for name, enabled, threshold, low, high in field_specs:
+            if not enabled:
+                continue
+            field = getattr(backbone, name, None)
+            if field is None:
+                self._warn_metadata(f"{ENTITY_EFM_VOXELS}/{name} skipped: backbone field is missing.")
+                continue
+            points, scores = _field_voxel_centers_world(
+                field,
+                t_world_voxel=backbone.t_world_voxel,
+                voxel_extent=backbone.voxel_extent,
+                threshold=threshold,
+                max_points=cfg.max_points_per_field,
+            )
+            if points.shape[0] == 0:
+                self._warn_metadata(f"{ENTITY_EFM_VOXELS}/{name} skipped: no voxels passed threshold {threshold}.")
+                continue
             self.rr.log(
-                depth_entity,
-                self.rr.Pinhole(
-                    **_p3d_pinhole_kwargs(sample.oracle.p3d_cameras, idx),
-                    camera_xyz=self.rr.ViewCoordinates.LUF,
+                f"{ENTITY_EFM_VOXELS}/{name}",
+                self.rr.Points3D(
+                    points,
+                    radii=cfg.point_radius,
+                    colors=_score_rgba(scores, low=low, high=high),
                 ),
-                self.rr.DepthImage(np.asarray(image, dtype=np.float32), meter=1.0),
                 static=True,
             )
 
+    def _log_efm_voxel_extent(self, backbone: object) -> None:
+        """Log the EFM voxel extent as a native box posed by ``T_world_voxel``."""
+
+        t_world_voxel = getattr(backbone, "t_world_voxel", None)
+        voxel_extent = getattr(backbone, "voxel_extent", None)
+        if t_world_voxel is None or voxel_extent is None:
+            self._warn_metadata(f"{ENTITY_EFM_VOXEL_EXTENT} skipped: missing voxel pose or extent.")
+            return
+        centers, half_sizes = _voxel_extent_box_fields(voxel_extent)
+        r, t = _pose_rt(t_world_voxel, [0])
+        self.rr.log(
+            ENTITY_EFM_VOXEL_EXTENT,
+            self.rr.Transform3D(
+                translation=t[0].tolist(),
+                mat3x3=r[0].tolist(),
+                relation=self.rr.TransformRelation.ParentFromChild,
+            ),
+            self.rr.Boxes3D(
+                centers=centers,
+                half_sizes=half_sizes,
+                colors=[[255, 255, 255, 80]],
+                labels=["EFM voxel extent"],
+            ),
+            static=True,
+        )
+
 
 __all__ = [
-    "ENTITY_CANDIDATE_CENTERS",
-    "ENTITY_CANDIDATE_DEPTHS",
-    "ENTITY_CANDIDATE_POINTS",
+    "ENTITY_ASE_KEYFRAME_MEDIA",
+    "ENTITY_CANDIDATE_ROOT",
     "ENTITY_DETECTED_OBBS",
     "ENTITY_DEPTH_KEYFRAMES",
-    "ENTITY_FRUSTA_ALL",
-    "ENTITY_FRUSTA_INVALID",
-    "ENTITY_FRUSTA_TOP_ORACLE",
+    "ENTITY_EFM_VOXELS",
+    "ENTITY_EFM_VOXEL_EXTENT",
     "ENTITY_GT_OBBS",
     "ENTITY_MESH",
     "ENTITY_METADATA_SAMPLE",

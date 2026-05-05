@@ -99,6 +99,12 @@ class OfflineVisualInventory:
     has_trajectory: bool
     """Whether trajectory metadata is available."""
 
+    has_rgb_keyframes: bool
+    """Whether a live EFM RGB camera stream is available for keyframe logging."""
+
+    has_depth_keyframes: bool
+    """Whether a live EFM RGB depth stream is available for keyframe logging."""
+
     has_backbone_voxel_extent: bool
     """Whether cached backbone diagnostics include a voxel extent."""
 
@@ -382,6 +388,8 @@ def _optional_inventory(sample: VinOfflineSample, warnings: list[str], metadata:
         backbone_out is not None and (backbone_out.obb_pred_viz is not None or backbone_out.obb_pred is not None)
     )
     has_trajectory = compact_trajectory is not None
+    has_rgb_keyframes = False
+    has_depth_keyframes = False
     if compact_gt_obbs is not None:
         _shape_metadata(metadata, "gt_obbs.obbs", compact_gt_obbs.obbs)
         _shape_metadata(metadata, "gt_obbs.probs", compact_gt_obbs.probs)
@@ -397,6 +405,14 @@ def _optional_inventory(sample: VinOfflineSample, warnings: list[str], metadata:
         has_gt_mesh = has_gt_mesh or bool(efm_snippet.has_mesh or efm_snippet.mesh_verts is not None)
         has_gt_obbs = has_gt_obbs or efm_snippet.obbs is not None
         has_trajectory = True
+        try:
+            camera_rgb = efm_snippet.camera_rgb
+            has_rgb_keyframes = bool(camera_rgb.images.numel() > 0)
+            has_depth_keyframes = bool(camera_rgb.distance_m is not None and camera_rgb.distance_m.numel() > 0)
+            _shape_metadata(metadata, "efm.rgb.images", camera_rgb.images)
+            _shape_metadata(metadata, "efm.rgb.distance_m", camera_rgb.distance_m)
+        except Exception as exc:
+            warnings.append(f"Optional live RGB camera stream was not inspected: {exc}")
 
     backbone = sample.backbone_out
     if backbone is None:
@@ -420,6 +436,8 @@ def _optional_inventory(sample: VinOfflineSample, warnings: list[str], metadata:
         "has_gt_obbs": has_gt_obbs,
         "has_detected_obbs": has_detected_obbs,
         "has_trajectory": has_trajectory,
+        "has_rgb_keyframes": has_rgb_keyframes,
+        "has_depth_keyframes": has_depth_keyframes,
         "has_backbone_voxel_extent": has_backbone_voxel_extent,
         "has_backbone_points": has_backbone_points,
     }

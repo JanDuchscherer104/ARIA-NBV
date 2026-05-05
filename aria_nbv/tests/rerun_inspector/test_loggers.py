@@ -14,14 +14,12 @@ from pytorch3d.renderer.cameras import PerspectiveCameras
 
 from aria_nbv.rerun_inspector._config import RerunOfflineInspectorConfig
 from aria_nbv.rerun_inspector._loggers import (
-    ENTITY_CANDIDATE_CENTERS,
-    ENTITY_CANDIDATE_DEPTHS,
-    ENTITY_CANDIDATE_POINTS,
+    ENTITY_ASE_KEYFRAME_MEDIA,
+    ENTITY_CANDIDATE_ROOT,
     ENTITY_DEPTH_KEYFRAMES,
     ENTITY_DETECTED_OBBS,
-    ENTITY_FRUSTA_ALL,
-    ENTITY_FRUSTA_INVALID,
-    ENTITY_FRUSTA_TOP_ORACLE,
+    ENTITY_EFM_VOXEL_EXTENT,
+    ENTITY_EFM_VOXELS,
     ENTITY_GT_OBBS,
     ENTITY_METADATA_SAMPLE,
     ENTITY_REFERENCE_POSE,
@@ -47,6 +45,7 @@ class _FakeRerun:
 
     Points3D = _Archetype
     LineStrips3D = _Archetype
+    Boxes3D = _Archetype
     TextDocument = _Archetype
     Transform3D = _Archetype
     Mesh3D = _Archetype
@@ -107,7 +106,7 @@ def _sample(
     """Build a minimal VinOfflineSample-like object."""
 
     semidense = torch.arange(num_points * 3, dtype=torch.float32).reshape(num_points, 3)
-    candidate_points = torch.arange(2 * 5 * 3, dtype=torch.float32).reshape(2, 5, 3)
+    candidate_points = torch.arange(3 * 5 * 3, dtype=torch.float32).reshape(3, 5, 3)
     mask_valid = torch.tensor([True, False, True] if validity is None else validity)
     return SimpleNamespace(
         sample_key="sample-0",
@@ -133,19 +132,22 @@ def _sample(
             ),
         ),
         candidates=SimpleNamespace(mask_valid=mask_valid),
-        candidate_pcs=SimpleNamespace(points=candidate_points, lengths=torch.tensor([3, 4])),
+        candidate_pcs=SimpleNamespace(points=candidate_points, lengths=torch.tensor([3, 4, 5])),
         depths=SimpleNamespace(depths=torch.ones((3, 4, 4), dtype=torch.float32)),
         efm_snippet_view=None,
     )
 
 
-def _obb_tensor(offset: float = 0.0) -> torch.Tensor:
+def _obb_tensor(offset: float = 0.0, *, sem_id: int = 0, inst_id: int = 1, prob: float = 0.8) -> torch.Tensor:
     """Build one EFM-layout OBB tensor for line-strip logging."""
 
     data = torch.full((1, 34), -1.0, dtype=torch.float32)
     data[0, :6] = torch.tensor([-0.5, 0.5, -0.25, 0.25, -0.1, 0.9], dtype=torch.float32)
     data[0, 18:27] = torch.eye(3, dtype=torch.float32).reshape(-1)
     data[0, 27:30] = torch.tensor([offset, 0.0, 0.0], dtype=torch.float32)
+    data[0, 30] = float(sem_id)
+    data[0, 31] = float(inst_id)
+    data[0, 32] = float(prob)
     return data
 
 
@@ -177,10 +179,12 @@ def test_logger_initializes_save_sink_before_logging(tmp_path) -> None:
     assert ENTITY_SEMIDENSE in fake.logged  # noqa: S101
     assert ENTITY_REFERENCE_POSE in fake.logged  # noqa: S101
     assert fake.logged[ENTITY_REFERENCE_POSE].kwargs["relation"] == "ParentFromChild"  # noqa: S101
-    assert ENTITY_FRUSTA_ALL in fake.logged  # noqa: S101
-    assert ENTITY_FRUSTA_TOP_ORACLE in fake.logged  # noqa: S101
-    assert ENTITY_FRUSTA_INVALID in fake.logged  # noqa: S101
-    assert ENTITY_CANDIDATE_CENTERS in fake.logged  # noqa: S101
+    assert f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_000/camera" in fake.logged  # noqa: S101
+    assert f"{ENTITY_CANDIDATE_ROOT}/invalid/candidate_001/camera" in fake.logged  # noqa: S101
+    assert f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_002/camera" in fake.logged  # noqa: S101
+    assert f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_002/center" in fake.logged  # noqa: S101
+    assert not any(path.startswith("metadata/candidates") for path in fake.logged)  # noqa: S101
+    assert not any(path.startswith("plots/candidates") for path in fake.logged)  # noqa: S101
     assert ENTITY_METADATA_SAMPLE in fake.logged  # noqa: S101
 
 
@@ -200,7 +204,7 @@ def test_defaults_keep_candidate_point_clouds_opt_in() -> None:
         inventory=OfflineVisualInventory(has_candidate_validity=True, has_candidate_points=True),
         selection="sample_key=sample-0",
     )
-    assert ENTITY_CANDIDATE_POINTS not in fake.logged  # noqa: S101
+    assert not any(path.endswith("/points") for path in fake.logged)  # noqa: S101
 
 
 def test_normalized_inventory_preserves_worker_b_diagnostics() -> None:
@@ -326,7 +330,7 @@ def test_candidate_points_are_logged_only_when_inventory_reports_present() -> No
         inventory=OfflineVisualInventory(has_candidate_points=False),
         selection="sample_key=sample-0",
     )
-    assert ENTITY_CANDIDATE_POINTS not in missing.logged  # noqa: S101
+    assert not any(path.endswith("/points") for path in missing.logged)  # noqa: S101
 
     present = _FakeRerun()
     RerunOfflineLogger(cfg, rr_module=present).log_sample(
@@ -334,7 +338,30 @@ def test_candidate_points_are_logged_only_when_inventory_reports_present() -> No
         inventory=OfflineVisualInventory(has_candidate_points=True),
         selection="sample_key=sample-0",
     )
-    assert ENTITY_CANDIDATE_POINTS in present.logged  # noqa: S101
+    assert f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_002/points" in present.logged  # noqa: S101
+
+
+def test_selected_candidate_index_overrides_detail_layers() -> None:
+    """Explicit selected candidate index should control selected-only modalities."""
+
+    cfg = RerunOfflineInspectorConfig()
+    cfg.candidate.selected_index = 0
+    cfg.primitives.log_semidense = False
+    cfg.primitives.log_reference_pose = False
+    cfg.primitives.log_candidate_points = True
+    cfg.primitives.log_candidate_depths = True
+    sample = _sample()
+    fake = _FakeRerun()
+
+    RerunOfflineLogger(cfg, rr_module=fake).log_sample(
+        sample=sample,
+        inventory=OfflineVisualInventory(has_candidate_points=True, has_candidate_depths=True),
+        selection="sample_key=sample-0",
+    )
+
+    assert f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_000/points" in fake.logged  # noqa: S101
+    assert f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_000/depth" in fake.logged  # noqa: S101
+    assert f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_002/points" not in fake.logged  # noqa: S101
 
 
 def test_zero_candidate_samples_log_no_candidate_layers() -> None:
@@ -352,10 +379,7 @@ def test_zero_candidate_samples_log_no_candidate_layers() -> None:
         selection="sample_key=sample-0",
     )
 
-    assert ENTITY_FRUSTA_ALL not in fake.logged  # noqa: S101
-    assert ENTITY_FRUSTA_TOP_ORACLE not in fake.logged  # noqa: S101
-    assert ENTITY_FRUSTA_INVALID not in fake.logged  # noqa: S101
-    assert ENTITY_CANDIDATE_CENTERS not in fake.logged  # noqa: S101
+    assert not any(path.startswith(ENTITY_CANDIDATE_ROOT) for path in fake.logged)  # noqa: S101
 
 
 def test_all_invalid_candidates_do_not_log_top_oracle_frustum() -> None:
@@ -373,9 +397,10 @@ def test_all_invalid_candidates_do_not_log_top_oracle_frustum() -> None:
         selection="sample_key=sample-0",
     )
 
-    assert ENTITY_FRUSTA_ALL in fake.logged  # noqa: S101
-    assert ENTITY_FRUSTA_INVALID in fake.logged  # noqa: S101
-    assert ENTITY_FRUSTA_TOP_ORACLE not in fake.logged  # noqa: S101
+    assert f"{ENTITY_CANDIDATE_ROOT}/invalid/candidate_000/camera" in fake.logged  # noqa: S101
+    assert f"{ENTITY_CANDIDATE_ROOT}/invalid/candidate_001/camera" in fake.logged  # noqa: S101
+    assert f"{ENTITY_CANDIDATE_ROOT}/invalid/candidate_002/camera" in fake.logged  # noqa: S101
+    assert not any(path.endswith("/center") for path in fake.logged)  # noqa: S101
 
 
 def test_compact_modalities_log_to_stable_entity_paths() -> None:
@@ -409,19 +434,17 @@ def test_compact_modalities_log_to_stable_entity_paths() -> None:
     assert ENTITY_GT_OBBS in fake.logged  # noqa: S101
     assert ENTITY_DETECTED_OBBS in fake.logged  # noqa: S101
     assert ENTITY_TRAJECTORY in fake.logged  # noqa: S101
-    camera_path = f"{ENTITY_CANDIDATE_DEPTHS}/candidate_000/camera"
-    depth_path = f"{camera_path}/depth"
-    invalid_raw_top_path = f"{ENTITY_CANDIDATE_DEPTHS}/candidate_001/camera"
-    valid_top_path = f"{ENTITY_CANDIDATE_DEPTHS}/candidate_002/camera"
-    assert camera_path in fake.logged  # noqa: S101
+    invalid_raw_top_path = f"{ENTITY_CANDIDATE_ROOT}/invalid/candidate_001/camera"
+    camera_path = f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_002/camera"
+    depth_path = f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_002/depth"
+    first_path = f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_000/camera"
+    assert first_path not in fake.logged  # noqa: S101
     assert depth_path in fake.logged  # noqa: S101
     assert invalid_raw_top_path not in fake.logged  # noqa: S101
-    assert valid_top_path in fake.logged  # noqa: S101
     assert fake.logged[camera_path].kwargs["relation"] == "ParentFromChild"  # noqa: S101
-    assert isinstance(fake.logged[depth_path], _Archetype)  # noqa: S101
-    assert fake.logged[depth_path].kwargs["camera_xyz"] == "LUF"  # noqa: S101
-    assert fake.logged_extras[depth_path][0].kwargs["meter"] == 1.0  # noqa: S101
-    assert len(fake.logged[ENTITY_GT_OBBS].args[0]) == 12  # noqa: S101
+    assert fake.logged_extras[camera_path][0].kwargs["camera_xyz"] == "LUF"  # noqa: S101
+    assert fake.logged[depth_path].kwargs["meter"] == 1.0  # noqa: S101
+    assert np.asarray(fake.logged[ENTITY_GT_OBBS].kwargs["centers"]).shape == (1, 3)  # noqa: S101
 
 
 def test_obbs_are_transformed_from_snippet_to_world_before_logging() -> None:
@@ -445,9 +468,161 @@ def test_obbs_are_transformed_from_snippet_to_world_before_logging() -> None:
         selection="sample_key=sample-0",
     )
 
-    strips = np.asarray(fake.logged[ENTITY_GT_OBBS].args[0], dtype=np.float32)
-    assert np.allclose(strips[0, 0], np.asarray([9.5, -0.25, -0.1], dtype=np.float32))  # noqa: S101
-    assert np.allclose(strips[0, 1], np.asarray([10.5, -0.25, -0.1], dtype=np.float32))  # noqa: S101
+    centers = np.asarray(fake.logged[ENTITY_GT_OBBS].kwargs["centers"], dtype=np.float32)
+    assert np.allclose(centers[0], np.asarray([10.0, 0.0, 0.4], dtype=np.float32))  # noqa: S101
+
+
+def test_obb_labels_include_class_names_and_unknown_fallback() -> None:
+    """GT and detected OBB labels should expose class names when maps exist."""
+
+    cfg = RerunOfflineInspectorConfig()
+    cfg.primitives.log_semidense = False
+    cfg.primitives.log_reference_pose = False
+    cfg.primitives.log_candidate_frusta = False
+    cfg.primitives.log_candidate_centers = False
+    sample = _sample()
+    sample.gt_obbs = SimpleNamespace(
+        obbs=_obb_tensor(0.0, sem_id=3, inst_id=8, prob=0.7),
+        sem_id_to_name=["table", "sofa", "shelf", "chair"],
+    )
+    sample.detected_obbs = SimpleNamespace(
+        obbs=_obb_tensor(1.0, sem_id=99, inst_id=2, prob=0.4),
+        sem_id_to_name=["table"],
+    )
+    fake = _FakeRerun()
+
+    RerunOfflineLogger(cfg, rr_module=fake).log_sample(
+        sample=sample,
+        inventory=OfflineVisualInventory(has_gt_obbs=True, has_detected_obbs=True),
+        selection="sample_key=sample-0",
+    )
+
+    gt_label = fake.logged[ENTITY_GT_OBBS].kwargs["labels"][0]
+    detected_label = fake.logged[ENTITY_DETECTED_OBBS].kwargs["labels"][0]
+    assert gt_label == "class=chair | sem_id=3 | inst_id=8 | prob=0.700"  # noqa: S101
+    assert detected_label == "class=<unknown> | sem_id=99 | inst_id=2 | prob=0.400"  # noqa: S101
+
+
+def test_efm_voxel_fields_log_thresholded_points() -> None:
+    """Curated EFM voxel fields should be spatialized under world/efm."""
+
+    cfg = RerunOfflineInspectorConfig()
+    cfg.primitives.log_semidense = False
+    cfg.primitives.log_reference_pose = False
+    cfg.primitives.log_candidate_frusta = False
+    cfg.primitives.log_candidate_centers = False
+    cfg.efm_voxels.occ_threshold = 0.5
+    cfg.efm_voxels.cent_threshold = 0.5
+    cfg.efm_voxels.cent_nms_threshold = 0.5
+    cfg.efm_voxels.max_points_per_field = 2
+    field = torch.tensor([[[[[0.1, 0.9], [0.8, 0.0]], [[0.2, 0.7], [0.6, 0.3]]]]], dtype=torch.float32)
+    sample = _sample()
+    sample.backbone_out = SimpleNamespace(
+        t_world_voxel=_poses([[1.0, 0.0, 0.0]]),
+        voxel_extent=torch.tensor([0.0, 2.0, 0.0, 2.0, 0.0, 2.0], dtype=torch.float32),
+        occ_pr=field,
+        cent_pr=field,
+        cent_pr_nms=field,
+    )
+    fake = _FakeRerun()
+
+    RerunOfflineLogger(cfg, rr_module=fake).log_sample(
+        sample=sample,
+        inventory=OfflineVisualInventory(),
+        selection="sample_key=sample-0",
+    )
+
+    for name in ("occ_pr", "cent_pr", "cent_pr_nms"):
+        entity = f"{ENTITY_EFM_VOXELS}/{name}"
+        assert entity in fake.logged  # noqa: S101
+        assert np.asarray(fake.logged[entity].args[0]).shape == (2, 3)  # noqa: S101
+    assert ENTITY_EFM_VOXEL_EXTENT in fake.logged  # noqa: S101
+
+
+def test_efm_voxel_extent_logs_posed_native_box() -> None:
+    """The EFM voxel extent should be a local box posed by T_world_voxel."""
+
+    cfg = RerunOfflineInspectorConfig()
+    cfg.primitives.log_semidense = False
+    cfg.primitives.log_reference_pose = False
+    cfg.primitives.log_candidate_frusta = False
+    cfg.primitives.log_candidate_centers = False
+    cfg.efm_voxels.log_occ_pr = False
+    cfg.efm_voxels.log_cent_pr = False
+    cfg.efm_voxels.log_cent_pr_nms = False
+    sample = _sample()
+    sample.backbone_out = SimpleNamespace(
+        t_world_voxel=_poses([[1.0, 2.0, 3.0]]),
+        voxel_extent=torch.tensor([0.0, 2.0, -2.0, 2.0, 4.0, 8.0], dtype=torch.float32),
+    )
+    fake = _FakeRerun()
+
+    RerunOfflineLogger(cfg, rr_module=fake).log_sample(
+        sample=sample,
+        inventory=OfflineVisualInventory(),
+        selection="sample_key=sample-0",
+    )
+
+    transform = fake.logged[ENTITY_EFM_VOXEL_EXTENT]
+    box = fake.logged_extras[ENTITY_EFM_VOXEL_EXTENT][0]
+    assert transform.kwargs["translation"] == [1.0, 2.0, 3.0]  # noqa: S101
+    assert transform.kwargs["relation"] == "ParentFromChild"  # noqa: S101
+    np.testing.assert_allclose(np.asarray(box.kwargs["centers"]), np.asarray([[1.0, 0.0, 6.0]], dtype=np.float32))
+    np.testing.assert_allclose(np.asarray(box.kwargs["half_sizes"]), np.asarray([[1.0, 2.0, 2.0]], dtype=np.float32))
+
+
+def test_ase_keyframes_are_rotated_and_logged_outside_world_tree() -> None:
+    """ASE image/depth keyframes should use display CW90 media paths."""
+
+    cfg = RerunOfflineInspectorConfig()
+    cfg.primitives.log_semidense = False
+    cfg.primitives.log_reference_pose = False
+    cfg.primitives.log_candidate_frusta = False
+    cfg.primitives.log_candidate_centers = False
+    cfg.primitives.log_rgb_keyframes = True
+    cfg.primitives.log_depth_keyframes = True
+    image = torch.tensor(
+        [
+            [
+                [[0.0, 0.5, 1.0], [0.25, 0.75, 1.0]],
+                [[0.0, 0.5, 1.0], [0.25, 0.75, 1.0]],
+                [[0.0, 0.5, 1.0], [0.25, 0.75, 1.0]],
+            ]
+        ],
+        dtype=torch.float32,
+    )
+    depth = torch.tensor([[[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]]], dtype=torch.float32)
+    camera = SimpleNamespace(images=image, distance_m=depth)
+    sample = _sample()
+    sample.efm_snippet_view = SimpleNamespace(camera_rgb=camera)
+    camera_tw = SimpleNamespace(
+        size=torch.tensor([[3.0, 2.0]], dtype=torch.float32),
+        f=torch.tensor([[2.0, 2.0]], dtype=torch.float32),
+        c=torch.tensor([[1.5, 1.0]], dtype=torch.float32),
+    )
+    fake = _FakeRerun()
+    logger = RerunOfflineLogger(cfg, rr_module=fake)
+    logger._live_keyframe_contexts = lambda sample, frame_indices: [(0, _poses([[0.0, 0.0, 0.0]]), camera_tw)]  # type: ignore[method-assign]
+
+    logger.log_sample(
+        sample=sample,
+        inventory=OfflineVisualInventory(has_rgb_keyframes=True, has_depth_keyframes=True),
+        selection="sample_key=sample-0",
+    )
+
+    camera_path = f"{ENTITY_RGB_KEYFRAMES}/frame_000/camera"
+    image_path = f"{ENTITY_ASE_KEYFRAME_MEDIA}/frame_000/image"
+    depth_path = f"{ENTITY_ASE_KEYFRAME_MEDIA}/frame_000/depth"
+    assert camera_path in fake.logged  # noqa: S101
+    assert image_path in fake.logged  # noqa: S101
+    assert depth_path in fake.logged  # noqa: S101
+    assert f"{camera_path}/image" not in fake.logged  # noqa: S101
+    assert f"{camera_path}/depth" not in fake.logged  # noqa: S101
+    assert np.asarray(fake.logged[image_path].args[0]).shape == (3, 2, 3)  # noqa: S101
+    np.testing.assert_array_equal(
+        np.asarray(fake.logged[depth_path].args[0]),
+        np.asarray([[4.0, 1.0], [5.0, 2.0], [6.0, 3.0]], dtype=np.float32),
+    )
 
 
 def test_missing_keyframe_context_is_reported_in_metadata() -> None:

@@ -44,6 +44,26 @@ max_candidate_points = 20000
 seed                 = 0
 verbosity            = "normal"
 
+[candidate]
+subset_mode       = "all"
+subset_top_k     = 5
+subset_indices   = []
+selected_strategy = "top_valid_oracle"
+
+[efm_voxels]
+enabled              = true
+log_occ_pr           = true
+log_cent_pr          = true
+log_cent_pr_nms      = true
+occ_threshold        = 0.95
+cent_threshold       = 0.03
+cent_nms_threshold   = 0.01
+max_points_per_field = 10000
+point_radius         = 0.025
+
+[ase_keyframes]
+frame_policy = "first_last"
+
 [primitives]
 log_semidense          = true
 log_reference_pose     = true
@@ -53,11 +73,12 @@ log_invalid_frusta     = true
 log_candidate_centers  = true
 log_metadata           = true
 log_mesh               = true
-log_candidate_points   = false
+log_candidate_points   = true
 log_gt_mesh            = true
 log_gt_obbs            = true
 log_detected_obbs      = true
 log_gt_trajectory      = true
 log_candidate_depths   = true
-log_rgb_keyframes      = false
-log_depth_keyframes    = false
+log_rgb_keyframes      = true
+log_depth_keyframes    = true
+log_efm_voxels         = true

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import socket
+import subprocess
 from pathlib import Path
 
 from aria_nbv.configs import PathConfig
@@ -47,6 +49,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--split", choices=("all", "train", "val"), help="Override selection.split.")
     parser.add_argument("--index", type=int, help="Override selection.index.")
     parser.add_argument("--sample-id", help="Override selection.sample_key.")
+    parser.add_argument("--candidate-index", type=int, help="Override candidate.selected_index for detail layers.")
     parser.add_argument(
         "--save",
         nargs="?",
@@ -62,7 +65,49 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="ADDR",
         help="Override output mode to connect over Rerun gRPC. Optionally provide an address.",
     )
+    parser.add_argument(
+        "--view",
+        action="store_true",
+        help="Save the .rrd and open it in the native Rerun viewer in the foreground.",
+    )
+    parser.add_argument(
+        "--serve-web",
+        action="store_true",
+        help="Save the .rrd and serve it with Rerun's web viewer in the foreground.",
+    )
+    parser.add_argument(
+        "--web-viewer-port",
+        type=int,
+        default=0,
+        help="Rerun web viewer HTTP port for --serve-web. Use 0 to let Rerun choose.",
+    )
+    parser.add_argument(
+        "--ws-server-port",
+        type=int,
+        default=0,
+        help="Rerun websocket port for --serve-web. Use 0 to let Rerun choose.",
+    )
+    parser.add_argument(
+        "--lan",
+        action="store_true",
+        help="With --serve-web, bind to 0.0.0.0 and print a LAN URL hint.",
+    )
     return parser
+
+
+def _validate_viewer_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """Reject incompatible CLI viewer and SDK-sink combinations."""
+
+    if args.view and args.serve_web:
+        parser.error("--view and --serve-web are mutually exclusive.")
+    if (args.view or args.serve_web) and (args.spawn or args.connect is not None):
+        parser.error("--view/--serve-web are post-save viewer modes and cannot be combined with --spawn/--connect.")
+    if args.lan and not args.serve_web:
+        parser.error("--lan requires --serve-web.")
+    for name in ("web_viewer_port", "ws_server_port"):
+        port = int(getattr(args, name))
+        if port < 0 or port > 65535:
+            parser.error(f"--{name.replace('_', '-')} must be in [0, 65535].")
 
 
 def _apply_overrides(config: RerunOfflineInspectorConfig, args: argparse.Namespace) -> RerunOfflineInspectorConfig:
@@ -75,6 +120,8 @@ def _apply_overrides(config: RerunOfflineInspectorConfig, args: argparse.Namespa
         cfg.selection.index = args.index
     if args.sample_id is not None:
         cfg.selection.sample_key = args.sample_id
+    if args.candidate_index is not None:
+        cfg.candidate.selected_index = args.candidate_index
     if args.save is not None:
         cfg.output.mode = "save"
         if args.save:
@@ -85,7 +132,70 @@ def _apply_overrides(config: RerunOfflineInspectorConfig, args: argparse.Namespa
         cfg.output.mode = "connect"
         if args.connect:
             cfg.output.connect_addr = args.connect
+    if args.view or args.serve_web:
+        cfg.output.mode = "save"
     return RerunOfflineInspectorConfig.model_validate(cfg.model_dump())
+
+
+def _detect_lan_ip() -> str:
+    """Return the likely LAN-facing IPv4 address for user-facing hints."""
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            return str(sock.getsockname()[0])
+    except OSError:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except OSError:
+            return "127.0.0.1"
+
+
+def _viewer_command(
+    *,
+    save_path: Path,
+    serve_web: bool,
+    lan: bool,
+    web_viewer_port: int,
+    ws_server_port: int,
+) -> list[str]:
+    """Build the foreground Rerun viewer command."""
+
+    if not serve_web:
+        return ["rerun", str(save_path)]
+    return [
+        "rerun",
+        "--bind",
+        "0.0.0.0" if lan else "127.0.0.1",
+        "--serve-web",
+        "--web-viewer-port",
+        str(web_viewer_port),
+        "--ws-server-port",
+        str(ws_server_port),
+        str(save_path),
+    ]
+
+
+def _print_lan_hint(*, web_viewer_port: int) -> None:
+    """Print a LAN access hint for opt-in web serving."""
+
+    ip = _detect_lan_ip()
+    if web_viewer_port > 0:
+        print(f"ARIA-NBV Rerun LAN URL: http://{ip}:{web_viewer_port}/", flush=True)
+    else:
+        print(
+            "ARIA-NBV Rerun LAN mode enabled. Rerun will choose the web-viewer port; "
+            f"use host {ip} from another device.",
+            flush=True,
+        )
+
+
+def _run_viewer_command(command: list[str], *, lan: bool, web_viewer_port: int) -> None:
+    """Run Rerun in the foreground while preserving its stdout/stderr."""
+
+    if lan:
+        _print_lan_hint(web_viewer_port=web_viewer_port)
+    subprocess.run(command, check=True)
 
 
 class RerunOfflineInspector:
@@ -125,10 +235,25 @@ def run_inspector(config: RerunOfflineInspectorConfig, *, rr_module: RerunModule
 def main(argv: list[str] | None = None) -> None:
     """Run ``nbv-rerun-inspect`` from a TOML config and CLI overrides."""
 
-    args = _build_parser().parse_args(argv)
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    _validate_viewer_args(parser, args)
     config_path = _resolve_config_path(args.config_path)
     cfg = RerunOfflineInspectorConfig.from_toml(config_path)
-    run_inspector(_apply_overrides(cfg, args))
+    cfg = _apply_overrides(cfg, args)
+    run_inspector(cfg)
+    if args.view or args.serve_web:
+        _run_viewer_command(
+            _viewer_command(
+                save_path=cfg.output.save_path,
+                serve_web=bool(args.serve_web),
+                lan=bool(args.lan),
+                web_viewer_port=int(args.web_viewer_port),
+                ws_server_port=int(args.ws_server_port),
+            ),
+            lan=bool(args.lan),
+            web_viewer_port=int(args.web_viewer_port),
+        )
 
 
 __all__ = ["RerunOfflineInspector", "main", "run_inspector"]
