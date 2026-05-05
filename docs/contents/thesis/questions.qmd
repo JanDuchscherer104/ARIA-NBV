@@ -42,6 +42,19 @@ Related implementation nodes remain [VINv3](../impl/vin_nbv.qmd),
 [EVL literature notes](../literature/efm3d.qmd), and
 [candidate generation](../../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd).
 
+## Thesis Boundary {#rq-thesis-boundary}
+
+The thesis should remain explicit about what is already implemented, what is
+thesis-core work, and what is stretch work. This boundary protects the proposal
+and final thesis from presenting ARIA-NBV as a finished continuous-control or
+end-to-end RL policy before the evidence exists.
+
+| Status | Work included |
+|---|---|
+| Already implemented substrate | Scene-level oracle RRI, immutable VIN offline-store paths, VINv3-style one-step scoring, candidate generation, rollout scaffolding, RolloutTrace smoke storage, and Rerun offline inspection. |
+| Thesis-core work | M1 contract evidence, GT-OBB target RRI, target selector, target-aware candidate mixture, target-conditioned scorer comparison, and deterministic bounded oracle lookahead versus one-step greedy. |
+| Stretch work | Predicted OBBs, stochastic/Gumbel beams, VIN surrogate rewards, value/Q/IQL/PPO, Habitat/Isaac or ASE-native simulation, SceneScript-style semantic memory, and real-device guidance. |
+
 ## RQ1 - Objective {#rq1-objective}
 
 **Question.** How should {{< gls target-specific-rri >}} and
@@ -169,6 +182,11 @@ oracle-RRI lookahead versus one-step greedy selection under equal acquisition
 budget. This isolates whether planning depth helps before claiming that a
 learned model or policy improves trajectories.
 
+**Gate ordering.** Deterministic oracle-greedy and bounded oracle-lookahead
+rollouts must be trusted before stochastic/Gumbel branching, VIN-surrogate
+rollouts, value heads, Q heads, or return-conditioned models are treated as
+thesis evidence.
+
 ### Minimal ArgTopK Rollout Sequence {#rq5-argtopk-rollout-sequence}
 
 The current implementation already has the right abstraction for the next
@@ -254,6 +272,9 @@ successes and failures. If this gate is passed, the first value-learning
 references are masked Double-Q-style targets for overestimation control
 [@DoubleDQN-vanHasselt2015] and in-support offline value learning such as IQL
 [@IQL-kostrikov2021], not unconstrained continuous actor-critic training.
+This gate also requires the deterministic one-step versus bounded-lookahead
+oracle comparison from [RQ5](#rq5-planning) to be reportable; otherwise value or
+surrogate-learning work would optimize an unproven planning target.
 
 ## RQ7 - Scaling and Ablations {#rq7-scaling}
 
@@ -271,6 +292,13 @@ controlled ablations.
 - more candidates and broader candidate distributions;
 - target-aware labels for multiple objects per snippet;
 - stage-aware calibration and binning analysis.
+
+**Coverage reporting.** Every supervision-scale claim should report the actual
+mesh-supervised coverage used: the 100-scene GT-mesh ASE limit, the 4,608
+available snippet windows, the current/offline subset size where applicable,
+scene-level train/val split, number of anchor poses, number of candidates, and
+number of target entities per snippet. Architecture or rollout conclusions
+should not be compared across runs that silently change this coverage.
 
 **Ablation axes.** Surface reconstruction input, CORAL variant, auxiliary
 regression, candidate-relative pose encoding, target encoding, candidate sampler

@@ -50,16 +50,15 @@ claims.
 
 ## Milestone Timeline {#roadmap-milestones}
 
-<!-- TODO: This roadmap does not account for writing the thesis! -->
 | Dates | Milestone | Exit criteria |
 |---|---|---|
-| 2026-04-29 to 2026-05-10 | **M0 - Scope, repo, docs foundation** | Dirty worktree classified; available partial VIN offline store smoke path understood; Rerun inspector smoke command documented; KG-friendly doc and docstring rules documented. |
-| 2026-05-11 to 2026-05-31 | **M1 - Data, cache, oracle correctness** | Offline store and RRI contracts stable; frame/CW90 risks documented; oracle throughput measured. |
+| 2026-04-29 to 2026-05-10 | **M0 - Scope, repo, docs foundation** | Dirty worktree classified; available partial VIN offline store smoke path understood; Rerun inspector smoke command documented; KG-friendly doc and docstring rules documented; proposal-freeze and bibliography-audit work tracked as advisor deliverables. |
+| 2026-05-11 to 2026-05-31 | **M1 - Data, cache, oracle correctness** | Offline store and RRI contracts stable; M1 contract report records store/split/frame/CW90/candidate-alignment/Rerun-smoke evidence; oracle throughput measured. |
 | 2026-06-01 to 2026-06-21 | **M2 - VIN baseline and diagnostics** | One-step VIN baseline reproducible; calibration and ranking plots available; ablation matrix fixed. |
 | 2026-06-22 to 2026-07-12 | **M3 - Entity/target-aware RRI** | GT-OBB cropped RRI implemented and trusted on a small subset; target selection policy defined. |
 | 2026-07-13 to 2026-08-09 | **M4 - Target-conditioned VIN** | Model accepts a target encoding and predicts target-specific RRI; scene-level and target-level scorers compared. |
-| 2026-08-10 to 2026-08-30 | **M5 - Multi-step target-aware rollouts** | Greedy, stochastic/beam, and model-scored rollouts compared by cumulative target RRI and acquisition cost. |
-| 2026-08-31 to 2026-09-13 | **M6 - Value/RL gate** | If rollout evidence is strong, add masked discrete Q or close-greedy RL; otherwise deepen rollout/entity ablations. |
+| 2026-08-10 to 2026-08-30 | **M5 - Multi-step target-aware rollouts** | Deterministic oracle-greedy/lookahead comparison trusted first; stochastic/beam and model-scored rollouts added only after that baseline is reportable. |
+| 2026-08-31 to 2026-09-13 | **M6 - Value/RL gate** | If deterministic rollout and VIN evidence are strong, add masked discrete Q or close-greedy RL; otherwise deepen rollout/entity ablations. |
 | 2026-09-14 to 2026-09-27 | **M7 - Thesis experiments and writing** | Final tables, figures, failure cases, and thesis narrative frozen. |
 | 2026-09-28 to 2026-09-30 | **M8 - Release freeze** | Reproducible configs, docs, demo path, and final smoke checks complete. |
 
@@ -78,6 +77,9 @@ Rerun offline inspector, and the available VIN offline store.
 
 - classify existing worktree changes into data/cache cleanup, RL/rollout
   scaffold, docs cleanup, and unrelated operator work;
+- track proposal freeze and bibliography audit as M0/M1 advisor deliverables
+  through the agents DB, with `make proposal-pdf` as the proposal render
+  command;
 - validate that `offline_only.toml` can load the available VIN offline store
   into the [VIN diagnostics page](../../reference/aria_nbv.lightning.VinDataModule.qmd)
   once corrected command behavior and validation land;
@@ -102,8 +104,14 @@ the [RRI metric API](../../reference/rri_metrics.qmd), and the
 **Exit checks:**
 
 - one canonical offline store path, manifest, sample index, and split contract;
+- thesis-facing M1 contract report covering offline store version/sample count,
+  split source, sample-index semantics, pose frames, CW90/display-only
+  convention, candidate shell/valid/RRI alignment, depth render/backprojection,
+  known limitations, commands used, and pass/block status;
 - explicit frame semantics for candidate poses, rig poses, and display-only
   CW90 corrections;
+- one saved or referenced Rerun smoke recording path when available, without
+  committing generated `.rrd` artifacts;
 - oracle throughput report on representative snippets;
 - no aggressive mesh or point-cloud downsampling in fine-detail oracle runs.
 
@@ -171,8 +179,9 @@ candidate generation, target-aware scorer backends, and rollout diagnostics.
 
 **Exit checks:**
 
-- compare one-step greedy, random, oracle rollout, stochastic/beam rollout, and
-  model-scored rollout;
+- compare random-valid, deterministic one-step oracle greedy, and deterministic
+  bounded oracle lookahead before adding stochastic/beam or model-scored
+  rollout variants;
 - make bounded oracle-RRI lookahead versus one-step greedy under equal budget
   the first non-myopic comparison;
 - report cumulative target RRI, scene RRI, number of views, path length, invalid
@@ -195,6 +204,9 @@ experiments.
 
 **Exit checks:**
 
+- require the deterministic M5 oracle-greedy/lookahead comparison to be
+  reportable before adding stochastic/Gumbel, VIN-surrogate, value, Q, or return
+  heads;
 - if M5 shows meaningful headroom, add a masked discrete Q or close-greedy
   low-discount policy baseline;
 - if M5 does not show enough headroom, defer RL and spend the window on
