@@ -10,20 +10,24 @@ format: html
 # Master Thesis Roadmap {#roadmap}
 
 This roadmap covers full-time thesis work from **2026-04-29** through
-**2026-09-30**. The planned capacity is approximately 40 hours per week, with
-the final claim centered on target-conditioned, quality-driven
+**2026-09-30**. The planned capacity is approximately 40 hours per week. The
+system name is **ARIA-NBV**, and the final claim is centered on
+target-conditioned, quality-driven
 {{< glsfull next-best-view >}} planning:
 
-> Can we train a target-conditioned NBV model that produces
-> acquisition-cost-efficient trajectories maximizing
-> {{< glsfull relative-reconstruction-improvement >}} for a
-> {{< gls target-of-interest >}}?
+> Can ARIA-NBV train a target-conditioned NBV scorer and finite-candidate
+> fitted $Q_H$ policy that maximize cumulative
+> {{< glsfull target-specific-rri >}} for a
+> {{< gls target-of-interest >}} under a fixed acquisition budget?
 
-The technical spine follows the current Aria-NBV system: ASE snippets and
+The technical spine follows the current ARIA-NBV system: ASE snippets and
 ground-truth meshes [@ProjectAria-ASE-2025], frozen EVL/EFM3D features
 [@EFM3D-straub2024], {{< gls oracle-rri >}} supervision inspired by VIN-NBV
-[@VIN-NBV-frahm2025], and bounded multi-step planning before any full
-continuous-RL claim. See the [research questions](questions.qmd), the
+[@VIN-NBV-frahm2025], an ASE mesh/oracle counterfactual rollout loop, and a
+target-conditioned fitted Double-Q / $Q_H$ learner over finite candidate sets.
+Habitat, Isaac, online RL, and continuous actor-critic policies are later
+bridges or future-work substrates, not the thesis-core simulator path. See the
+[research questions](questions.qmd), the
 [RRI theory page](../theory/rri_theory.qmd), the
 [RL and bounded rollout theory page](../theory/rl_planning.qmd), the
 [VIN implementation note](../impl/vin_nbv.qmd), the
@@ -32,19 +36,31 @@ continuous-RL claim. See the [research questions](questions.qmd), the
 
 ## Thesis Outcome {#roadmap-thesis-outcome}
 
-The September deliverable is a reproducible target-aware {{< gls next-best-view >}} stack:
+The September deliverable is a reproducible target-aware
+{{< gls next-best-view >}} stack:
 
 - a trusted oracle for scene-level and {{< gls target-specific-rri >}};
-- a one-step VIN-style scorer that can be conditioned on a target encoding;
-- a multi-step rollout evaluator comparing greedy, stochastic/beam, and
-  model-scored target-aware trajectories;
+- a V0/V1 target contract where GT OBBs define target-RRI crops and
+  observed/predicted OBBs are the main actor-visible input;
+- an observed-only automatic target selector and mixed observed candidate set;
+- a one-step VIN-style scorer conditioned on the target encoding;
+- stable random-valid, greedy, bounded oracle-lookahead,
+  temperature-softmax, and Gumbel-Top-k rollout data;
+- a mandatory target-conditioned fitted Double-Q / $Q_H$ model trained from
+  ASE oracle rollout traces;
 - final figures, ablations, and failure cases that report cumulative target
-  RRI together with {{< gls acquisition-cost >}}.
+  RRI together with {{< gls acquisition-cost >}};
+- final experiments scaled to the full 100 GT-mesh ASE scenes and 4,608
+  snippet windows after small-subset correctness passes.
 
-Full continuous control, simulator-backed online RL, VLM/global planning, and
-real-device deployment remain stretch work unless the August evidence gate is
-passed. Hestia-style hierarchy [@Hestia-lu2026], GenNBV-style continuous
-control [@GenNBV-chen2024], and SceneScript-style semantic memory
+The quantitative success bar is that learned $Q_H$ beats one-step greedy and
+one-step model scoring on cumulative target RRI under the same acquisition
+budget; bounded oracle lookahead is the upper bound. Full continuous control,
+Habitat/Isaac simulation, VLM/global planning, SceneScript-style memory, and
+real-device deployment remain stretch work or M6 bridge design unless the M5
+evidence justifies them. Hestia-style hierarchy [@Hestia-lu2026],
+GenNBV-style continuous control [@GenNBV-chen2024], and SceneScript-style
+semantic memory
 [@SceneScript-avetisyan2024] are treated as design references, not thesis-core
 claims.
 
@@ -52,14 +68,14 @@ claims.
 
 | Dates | Milestone | Exit criteria |
 |---|---|---|
-| 2026-04-29 to 2026-05-10 | **M0 - Scope, repo, docs foundation** | Dirty worktree classified; available partial VIN offline store smoke path understood; Rerun inspector smoke command documented; KG-friendly doc and docstring rules documented; proposal-freeze and bibliography-audit work tracked as advisor deliverables. |
-| 2026-05-11 to 2026-05-31 | **M1 - Data, cache, oracle correctness** | Offline store and RRI contracts stable; M1 contract report records store/split/frame/CW90/candidate-alignment/Rerun-smoke evidence; oracle throughput measured. |
-| 2026-06-01 to 2026-06-21 | **M2 - VIN baseline and diagnostics** | One-step VIN baseline reproducible; calibration and ranking plots available; ablation matrix fixed. |
-| 2026-06-22 to 2026-07-12 | **M3 - Entity/target-aware RRI** | GT-OBB cropped RRI implemented and trusted on a small subset; target selection policy defined. |
-| 2026-07-13 to 2026-08-09 | **M4 - Target-conditioned VIN** | Model accepts a target encoding and predicts target-specific RRI; scene-level and target-level scorers compared. |
-| 2026-08-10 to 2026-08-30 | **M5 - Multi-step target-aware rollouts** | Deterministic oracle-greedy/lookahead comparison trusted first; stochastic/beam and model-scored rollouts added only after that baseline is reportable. |
-| 2026-08-31 to 2026-09-13 | **M6 - Value/RL gate** | If deterministic rollout and VIN evidence are strong, add masked discrete Q or close-greedy RL; otherwise deepen rollout/entity ablations. |
-| 2026-09-14 to 2026-09-27 | **M7 - Thesis experiments and writing** | Final tables, figures, failure cases, and thesis narrative frozen. |
+| 2026-04-29 to 2026-05-10 | **M0 - Scope, repo, docs foundation** | Dirty worktree classified; available partial VIN offline store smoke path understood; Rerun inspector smoke command documented; proposal freeze and bibliography audit tracked as advisor deliverables; four-tier thesis boundary adopted. |
+| 2026-05-11 to 2026-05-31 | **M1 - Data, cache, oracle correctness** | Offline store and RRI contracts stable; public M1 contract report records store/split/frame/CW90/candidate-alignment/depth-backprojection/Rerun normal-boundary-failure evidence; oracle throughput measured. |
+| 2026-06-01 to 2026-06-21 | **M2 - VIN baseline and scale gates** | One-step VIN baseline reproducible; calibration and ranking plots available; ablation matrix fixed; LRZ sharding/storage plan and Zarr rollout/Q schema are ready enough for M3 scale work. |
+| 2026-06-22 to 2026-07-12 | **M3 - Entity/target-aware RRI and generation gates** | V0 GT-OBB target RRI trusted on a small subset; V1 observed-target / GT-label contract and observed-only target selector defined; deterministic sharding, Slurm/DSS staging, and Zarr store gates pass before full-scale generation. |
+| 2026-07-13 to 2026-08-09 | **M4 - Target-conditioned VIN** | Model accepts observed/predicted target encoding and predicts target-specific RRI with matched GT labels; scene-level and target-level scorers compared. |
+| 2026-08-10 to 2026-08-30 | **M5 - Multi-step target-aware rollouts and Q_H** | Random-valid, oracle-greedy, bounded oracle-lookahead, temperature-softmax, and Gumbel rollout data are stable; fitted Double-Q / $Q_H$ is trained and evaluated; $Q_H$ beats one-step greedy/model scoring or produces a documented blocker under the thesis success bar. |
+| 2026-08-31 to 2026-09-13 | **M6 - Actor-critic and continuous bridge** | If M5 is strong, add IQL as a second offline-RL ablation or design the actor-critic/continuous-policy bridge; no quantitative continuous-control baseline is required for thesis success. |
+| 2026-09-14 to 2026-09-27 | **M7 - Full-scale experiments and writing** | Full 100 GT-mesh ASE scenes / 4,608 snippet windows are generated or the exact coverage gap is reported; final tables, figures, failure cases, and thesis narrative frozen. |
 | 2026-09-28 to 2026-09-30 | **M8 - Release freeze** | Reproducible configs, docs, demo path, and final smoke checks complete. |
 
 ## Milestone Details {#roadmap-details}
@@ -79,7 +95,9 @@ Rerun offline inspector, and the available VIN offline store.
   scaffold, docs cleanup, and unrelated operator work;
 - track proposal freeze and bibliography audit as M0/M1 advisor deliverables
   through the agents DB, with `make proposal-pdf` as the proposal render
-  command;
+  command and the generated proposal PDF tracked once frozen;
+- align proposal, roadmap, and questions on the four-tier boundary:
+  implemented substrate; prerequisite core; hard thesis core; and stretch;
 - validate that `offline_only.toml` can load the available VIN offline store
   into the [VIN diagnostics page](../../reference/aria_nbv.lightning.VinDataModule.qmd)
   once corrected command behavior and validation land;
@@ -110,12 +128,15 @@ the [RRI metric API](../../reference/rri_metrics.qmd), and the
   known limitations, commands used, and pass/block status;
 - explicit frame semantics for candidate poses, rig poses, and display-only
   CW90 corrections;
-- one saved or referenced Rerun smoke recording path when available, without
-  committing generated `.rrd` artifacts;
+- saved or referenced Rerun smoke recording paths for normal, boundary, and
+  failure samples when available, without committing generated `.rrd`
+  artifacts;
 - oracle throughput report on representative snippets;
 - no aggressive mesh or point-cloud downsampling in fine-detail oracle runs.
+- no target, rollout, stochastic, or Q_H scale-up until the report is passable
+  or the blockers are explicitly recorded.
 
-### M2 - VIN Baseline and Diagnostics {#roadmap-m2}
+### M2 - VIN Baseline and Scale Gates {#roadmap-m2}
 
 **Primary question:** What is the reproducible one-step baseline before adding
 target conditioning?
@@ -131,6 +152,10 @@ Lightning training surface, W&B/Optuna reports, and Streamlit diagnostics.
 - calibration, ordinal-bin, rank-correlation, and top-k selection diagnostics;
 - controlled ablation matrix for surface reconstruction inputs, CORAL variants,
   auxiliary regression, and candidate features.
+- Zarr-first rollout/Q storage schema drafted before large sequence data is
+  written;
+- LRZ deterministic sharding, Slurm/DSS staging, and full-scale storage budget
+  planned before M3/M5 generation.
 
 ### M3 - Entity/Target-Aware RRI {#roadmap-m3}
 
@@ -143,9 +168,14 @@ metrics.
 
 **Exit checks:**
 
-- target entity eligibility policy based on visibility, distance, crop size,
-  and mesh/point support;
-- GT-OBB cropped target RRI on a small trusted subset;
+- V0 target contract: GT OBB input plus GT crop/evaluation for sanity and
+  upper-bound runs;
+- V1 main contract: observed/predicted OBB input matched to GT OBB
+  target-RRI labels under OBS-SEL / PRED-Q / GT-EVAL;
+- observed-only target eligibility policy based on predicted OBBs/classes,
+  confidence, projected area, and semidense/EVL point support;
+- GT-OBB cropped target RRI on a small trusted subset, then full-scale label
+  generation only after the LRZ/Zarr gate passes;
 - diagnostics showing current points, candidate points, cropped mesh, target
   OBB, target RRI, and scene RRI side by side;
 - clear handling of invalid or unsupported targets.
@@ -160,15 +190,15 @@ offline-store payload extensions, and model diagnostics.
 
 **Exit checks:**
 
-- target encoding selected for the first controlled run: GT OBB plus class and
-  relative pose fields by default;
+- target encoding selected for the main controlled run: observed/predicted OBB
+  plus class, confidence, support signals, and relative pose fields;
 - target-specific RRI labels loaded through the data-handling surface;
 - baseline comparison: scene-level scorer, target-conditioned scorer, and oracle
   target RRI;
 - failure cases grouped by occlusion, small target, invalid candidates, and
   poor target encoding.
 
-### M5 - Multi-Step Target-Aware Rollouts {#roadmap-m5}
+### M5 - Multi-Step Target-Aware Rollouts and Q_H {#roadmap-m5}
 
 **Primary question:** Does planning beyond one step improve cumulative target
 RRI under the same acquisition budget?
@@ -179,41 +209,45 @@ candidate generation, target-aware scorer backends, and rollout diagnostics.
 
 **Exit checks:**
 
-- compare random-valid, deterministic one-step oracle greedy, and deterministic
-  bounded oracle lookahead before adding stochastic/beam or model-scored
-  rollout variants;
+- compare random-valid, deterministic one-step oracle greedy, one-step
+  model/VIN scoring, deterministic bounded oracle lookahead, temperature
+  softmax, Gumbel-Top-k, and fitted Double-Q / $Q_H$ under equal budget;
 - make bounded oracle-RRI lookahead versus one-step greedy under equal budget
-  the first non-myopic comparison;
+  the trusted upper-bound comparison before interpreting $Q_H$;
 - report cumulative target RRI, scene RRI, number of views, path length, invalid
   action rate, and runtime;
-- use an episode-normalized additive or log-improvement reward for multi-step
-  return while preserving current one-step RRI labels;
+- use cumulative target RRI as the main multi-step return while preserving
+  current one-step RRI labels; keep log-improvement and episode-normalized
+  rewards as follow-up ablations;
 - keep rollout complexity bounded by explicit horizon, branch factor, and beam
   width;
+- train $Q_H$ to predict bounded cumulative target RRI; scalar motion or rule
+  penalties are extensions;
+- require hard validity masks and explicit invalid reason codes in Q_H data;
+- require learned $Q_H$ to beat one-step greedy/model scoring on cumulative
+  target RRI under equal acquisition budget, with oracle lookahead reported as
+  an upper bound;
 - visualize representative successes and failures.
 
-### M6 - Value/RL Gate {#roadmap-m6}
+### M6 - Actor-Critic and Continuous Bridge {#roadmap-m6}
 
-**Primary question:** Is a learned value or policy baseline necessary and
-credible before thesis freeze?
+**Primary question:** What bridge remains after the mandatory finite-candidate
+Q_H result?
 
 **Implementation surfaces:** the
 [counterfactual RL API](../../reference/aria_nbv.pose_generation.CounterfactualRolloutResult.qmd),
-transition datasets, masked discrete Q, and optional close-greedy PPO/SB3
-experiments.
+transition datasets, IQL as a second offline-RL ablation, and optional
+actor-critic or continuous-control design notes.
 
 **Exit checks:**
 
-- require the deterministic M5 oracle-greedy/lookahead comparison to be
-  reportable before adding stochastic/Gumbel, VIN-surrogate, value, Q, or return
-  heads;
-- if M5 shows meaningful headroom, add a masked discrete Q or close-greedy
-  low-discount policy baseline;
-- if M5 does not show enough headroom, defer RL and spend the window on
-  target-aware ablations and rollout robustness;
-- require held-out ranking, oracle-evaluated VIN-selected rollouts, calibration
-  and stage-shift analysis, and Rerun failure visualization before adding value,
-  Q, or return heads;
+- require M5 Q_H evidence before spending time on IQL, actor-critic, or
+  continuous-control work;
+- if Q_H is strong, run IQL as a second offline-RL ablation only if the data
+  support and time budget are credible;
+- document how a future actor would propose continuous poses and project them
+  back into feasibility, but do not require a quantitative continuous baseline;
+- defer SB3/DQN/PPO/SAC until an online Gymnasium-style simulator exists;
 - do not claim full continuous RL unless online interaction, reward speed, and
   evaluation are all thesis-grade.
 
@@ -226,10 +260,12 @@ Quarto docs, and defense figures.
 
 **Exit checks:**
 
-- final experiment table for one-step vs multi-step and scene-level vs
-  target-aware scoring;
+- final experiment table for one-step vs multi-step, scene-level vs
+  target-aware scoring, and Q_H vs one-step greedy/model scoring;
 - final ablations for target encoding, candidate generation, invalid handling,
   and supervision scale;
+- final scale report over the full 100 GT-mesh ASE scenes / 4,608 snippets, or
+  an explicit pass/block coverage report if any subset is unavailable;
 - final failure-case catalog;
 - paper, docs, and slides use the same terminology and claims.
 

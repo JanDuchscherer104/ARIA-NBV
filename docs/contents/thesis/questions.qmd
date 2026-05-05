@@ -10,12 +10,12 @@ format: html
 # Master Thesis Research Questions {#research-questions}
 
 This page states the research questions for the master's thesis phase of
-Aria-NBV. The central question is:
+**ARIA-NBV**. The central question is:
 
-> Can we train a target-conditioned NBV model that produces
-> acquisition-cost-efficient trajectories maximizing
-> {{< glsfull relative-reconstruction-improvement >}} for a
-> {{< gls target-of-interest >}}?
+> Can ARIA-NBV train a target-conditioned NBV scorer and finite-candidate
+> fitted $Q_H$ policy that maximize cumulative
+> {{< glsfull target-specific-rri >}} for a
+> {{< gls target-of-interest >}} under a fixed acquisition budget?
 
 The questions are tied to the dated [roadmap](roadmap.qmd), the
 [RRI theory page](../theory/rri_theory.qmd), the
@@ -37,6 +37,9 @@ The core terms used by the research questions are maintained in the shared
 - {{< glsfull target-specific-rri >}}
 - {{< glsfull acquisition-cost >}}
 - {{< glsfull target-conditioned-scorer >}}
+- {{< glsfull observed-target-selection >}}
+- {{< glsfull predicted-target-q >}}
+- {{< glsfull ground-truth-target-evaluation >}}
 
 Related implementation nodes remain [VINv3](../impl/vin_nbv.qmd),
 [EVL literature notes](../literature/efm3d.qmd), and
@@ -44,39 +47,44 @@ Related implementation nodes remain [VINv3](../impl/vin_nbv.qmd),
 
 ## Thesis Boundary {#rq-thesis-boundary}
 
-The thesis should remain explicit about what is already implemented, what is
-thesis-core work, and what is stretch work. This boundary protects the proposal
-and final thesis from presenting ARIA-NBV as a finished continuous-control or
-end-to-end RL policy before the evidence exists.
+The thesis should remain explicit about what is already implemented, what must
+be completed before scale-up, what is the hard thesis core, and what remains
+stretch work. This boundary protects the proposal and final thesis from
+presenting ARIA-NBV as a finished continuous-control or real-device RL policy
+before the evidence exists.
 
 | Status | Work included |
 |---|---|
 | Already implemented substrate | Scene-level oracle RRI, immutable VIN offline-store paths, VINv3-style one-step scoring, candidate generation, rollout scaffolding, RolloutTrace smoke storage, and Rerun offline inspection. |
-| Thesis-core work | M1 contract evidence, GT-OBB target RRI, target selector, target-aware candidate mixture, target-conditioned scorer comparison, and deterministic bounded oracle lookahead versus one-step greedy. |
-| Stretch work | Predicted OBBs, stochastic/Gumbel beams, VIN surrogate rewards, value/Q/IQL/PPO, Habitat/Isaac or ASE-native simulation, SceneScript-style semantic memory, and real-device guidance. |
+| Prerequisite core | Proposal freeze, M1 contract report, V0/V1 target contracts, candidate-label/frame guards, invalidity masks/reasons, rollout/Q storage schema, and LRZ deterministic sharding/storage gates. |
+| Hard thesis core | Observed-only automatic target selector; OBS-SEL / PRED-Q / GT-EVAL protocol; target-conditioned one-step scorer; mixed observed candidate sets; random-valid, greedy, softmax, Gumbel, and bounded oracle-lookahead rollouts; fitted Double-Q / $Q_H$ over finite candidates; full-scale LRZ generation on the 100 GT-mesh ASE scenes and 4,608 snippet windows. |
+| Stretch work | IQL as a second offline-RL ablation, actor-critic or continuous-policy bridge design, Habitat/Isaac/external simulators, SceneScript-style semantic memory, VLM/global planning, real-device guidance, and quantitative continuous-control baselines. |
 
 ## RQ1 - Objective {#rq1-objective}
 
-**Question.** How should {{< gls target-specific-rri >}} and
-{{< gls acquisition-cost >}} be combined into a trajectory objective?
+**Question.** Can ARIA-NBV learn target-centric, RRI-based multi-step NBV
+prediction in complex indoor ASE scenes using finite candidate sets and
+target-conditioned state?
 
 **Working hypothesis.** The thesis should optimize cumulative target RRI first
-and report acquisition cost separately before introducing a weighted scalarized
-objective. This keeps metric interpretation clear while still allowing
-cost-aware trajectory comparison.
+and report acquisition cost or feasibility separately. Additional penalty terms
+can change the learned objective and should only be introduced as explicit
+scalarized ablations after the quality-only baseline is stable.
 
-**Concrete formulation.** For a target $e$, trajectory $\tau$, and acquisition
-cost $C(\tau)$:
+**Concrete formulation.** For a target $e$ and trajectory $\tau$:
 
 $$
-J_e(\tau) =
+J_e^{\mathrm{quality}}(\tau) =
 \sum_{t=1}^{T} \operatorname{RRI}_e(q_t \mid P_{t-1}, M_e)
-- \lambda C(\tau)
 $$
 
 where $P_{t-1}$ is the accumulated reconstruction state before selecting
 candidate view $q_t$, and $M_e$ is the target-specific ground-truth surface used
-only for oracle supervision and evaluation.
+only for oracle supervision and evaluation. Acquisition cost and feasibility
+terms such as view count, path length, runtime, and invalid-action rate are
+reported alongside $J_e^{\mathrm{quality}}$ under equal-budget comparisons. A
+scalarized objective $J_e^{\mathrm{quality}}(\tau) - \lambda C(\tau)$ is an
+extension, not the first training target.
 
 **Evaluation nodes.**
 
@@ -85,29 +93,60 @@ only for oracle supervision and evaluation.
 - comparison to one-step greedy selection under equal budget.
 
 **Multi-step reward convention.** Multi-step experiments should start with an
-episode-normalized additive reward or a log-improvement reward derived from
-RRI. The existing one-step RRI label remains unchanged for VIN compatibility and
-for comparison against the one-step greedy baseline.
+additive cumulative target-RRI reward. Episode normalization or log-improvement
+variants are ablations after the additive quality baseline is trusted. The
+existing one-step RRI label remains unchanged for VIN compatibility and for
+comparison against the one-step greedy baseline.
 
 ## RQ2 - Target Encoding {#rq2-target-encoding}
 
 **Question.** Which target representation works best for conditioning the NBV
-model: GT OBB, predicted OBB, crop descriptor, entity token, or target point?
+model and $Q_H$: GT OBB, predicted/observed OBB, crop descriptor, entity token,
+or target point?
 
-**Working hypothesis.** Start with GT OBB plus category and relative geometry
-because it is inspectable, stable, and directly available in ASE/EFM-derived
-data. Predicted OBBs and learned entity tokens are later realism ablations.
+**Working hypothesis.** Separate privileged labels from actor-visible target
+state. V0 starts with GT OBB input plus GT crop/evaluation as a sanity and
+upper-bound path. V1 is mandatory for the main result: target selection and
+scorer/$Q_H$ inputs use observed or predicted OBBs, class, confidence, relative
+geometry, projected area, and current semidense/EVL support, while matched GT
+OBBs define target-RRI labels and evaluation.
 
-**Candidate encodings.**
+**Main protocol.** The main thesis protocol is
+{{< gls observed-target-selection >}} / {{< gls predicted-target-q >}} /
+{{< gls ground-truth-target-evaluation >}}. Observed-only target selection and
+predicted/observed target-conditioned scoring are actor-visible; GT target crops
+are used for oracle labels and evaluation only. GT OBBs are never
+actor-visible in the main result.
+
+**Initial detector.** Actor-visible targets come from the employed
+{{< gls egocentric-foundation-model-3d >}} / {{< gls egocentric-voxel-lifting >}}
+stack, which exposes predicted or tracked {{< gls oriented-bounding-box >}}
+fields, semantic class probabilities, confidence-style scores, and voxel or
+semidense support signals.
+
+**Target descriptors.**
 
 - GT OBB: center, extents, orientation, class, confidence placeholder, and
-  pose relative to the reference rig.
-- Predicted OBB: same contract as GT OBB, but sourced from EVL predictions.
+  pose relative to the reference rig; V0 sanity and upper-bound only.
+- Predicted/observed OBB: same geometric contract, sourced from EVL/EFM
+  predictions or observed support signals; mandatory V1 actor-visible input.
 - Crop descriptor: pooled EVL/voxel features or point statistics inside the
   target crop.
 - Entity token: learned token for target identity, class, and geometry.
 - Target point: look-at point, object center, missing-surface centroid, or
   expected-RRI centroid.
+
+**Encoding functions.** Descriptor fields should be encoded separately from the
+choice of descriptor source. Candidate encodings include relative target
+translation and extent, R6D-style relative orientation, class-probability or
+semantic embeddings, projected-area/support scalars, and learned Fourier
+features or MLP encoders for continuous geometry. Crop descriptors can enter
+through pooled EVL/voxel features once the OBB-level contract is stable.
+
+**Matching rule.** Observed targets are matched to GT target labels by
+compatible class, OBB IoU, visibility/support, projected area, and semidense or
+EVL point support. The extra criterion `X` is intentionally deferred until M3
+evidence shows which failure mode is not covered by those signals.
 
 **Connected implementation surfaces.** Target fields should enter through
 data-handling containers, then flow into the
@@ -115,8 +154,9 @@ data-handling containers, then flow into the
 diagnostics rather than through ad hoc dictionaries.
 
 **First metric.** The first target-aware metric is GT-OBB-cropped target RRI.
-Predicted OBBs and learned target tokens are realism ablations after the
-GT-cropped oracle is trusted.
+The main thesis input path, however, must graduate from V0 GT input to V1
+observed/predicted target input before target-conditioned scorer or $Q_H$
+claims are made.
 
 ## RQ3 - Candidate and Action Space {#rq3-candidates}
 
@@ -129,19 +169,28 @@ exploration and reduce overfitting to a single view pattern.
 
 **Candidate families.**
 
-- Object look-at candidates around the target OBB, target point, or
-  missing-surface centroid.
-- Default shell candidates around the current reference pose.
-- Frontier or deficit candidates based on uncovered surfaces, directional
-  observability, or expected-RRI heatmaps.
+- `TARGET_POINT` candidates that look at a predicted/observed target point or
+  OBB center.
+- `RADIAL_AWAY` and `RADIAL_TOWARDS` shell candidates around the current
+  reference pose for default exploration and augmentation.
+- `FORWARD_RIG` candidates that preserve trajectory-forward view direction.
+- Position sampling with the existing `UNIFORM_SPHERE` and
+  `FORWARD_POWERSPHERICAL` strategies where appropriate.
+- Existing yaw, pitch, and roll jitter superimposed on the chosen base
+  orientation.
+- A categorical-probability mixture over the package-supported families above.
+
+Frontier, missing-surface, or expected-RRI heatmap candidates are stretch
+families unless they are implemented and validated in the generator.
 
 **Evaluation nodes.** Candidate realism, valid fraction, target visibility,
-target RRI distribution, scene RRI distribution, and selected-view diversity.
+target RRI distribution, scene RRI distribution, selected-view diversity, and
+strategy provenance for every candidate set.
 
 ## RQ4 - Target-Conditioned Model {#rq4-model}
 
-**Question.** Can a {{< gls target-conditioned-scorer >}} rank candidates by
-{{< gls target-specific-rri >}} better than a scene-level scorer?
+**Question.** Can a one-step {{< gls target-conditioned-scorer >}} rank
+candidates by {{< gls target-specific-rri >}} better than a scene-level scorer?
 
 **Working hypothesis.** Target conditioning should improve ranking for selected
 objects and regions, especially when scene-level RRI would prefer walls, floors,
@@ -150,32 +199,36 @@ or large background surfaces.
 **Baselines.**
 
 - Scene-level VIN scorer trained on scene RRI.
-- Target-conditioned scorer trained on target RRI.
+- Target-conditioned one-step scorer trained on target RRI.
 - Oracle target RRI ranking.
 - Simple geometric target-visibility heuristic.
 
 **Success criteria.** The target-conditioned scorer should improve target-level
 rank correlation, top-k oracle hit rate, and selected-target RRI without causing
-unacceptable scene-level regressions.
+unacceptable scene-level regressions. The $Q_H$ result is evaluated in
+[RQ5](#rq5-planning): it must beat one-step greedy/model scoring on cumulative
+target RRI under equal acquisition budget.
 
 ## RQ5 - Multi-Step Planning {#rq5-planning}
 
-**Question.** Do multi-step target-aware rollouts beat one-step greedy selection
-under equal acquisition budget?
+**Question.** Do multi-step target-aware rollouts and fitted $Q_H$ selection
+beat one-step greedy/model selection under equal acquisition budget?
 
 **Working hypothesis.** Bounded multi-step rollouts should improve cumulative
 target RRI when the first best target view is not locally obvious or when a
-short path must move around occlusion.
+short path must move around occlusion. Fitted Double-Q / $Q_H$ should learn
+enough of this bounded return structure from ASE oracle rollout traces to beat
+one-step greedy/model scoring under the same acquisition budget.
 
 **Planning variants.**
 
-- one-step greedy oracle and one-step model scoring;
 - random valid selection;
+- one-step greedy oracle and one-step model/VIN scoring;
 - bounded oracle-RRI lookahead under the same candidate and view budget as
-  one-step greedy;
-- stochastic softmax or beam rollout after the oracle comparison is trusted;
-- model-scored rollout with oracle evaluation;
-- optional value or Q scorer after the August gate.
+  one-step greedy, used as an upper bound;
+- temperature-softmax rollouts;
+- Gumbel-Top-k rollouts with explicit per-step branch schedules;
+- target-conditioned fitted Double-Q / $Q_H$ over finite candidate sets.
 
 **First comparison.** The first thesis-grade non-myopic comparison is bounded
 oracle-RRI lookahead versus one-step greedy selection under equal acquisition
@@ -183,9 +236,19 @@ budget. This isolates whether planning depth helps before claiming that a
 learned model or policy improves trajectories.
 
 **Gate ordering.** Deterministic oracle-greedy and bounded oracle-lookahead
-rollouts must be trusted before stochastic/Gumbel branching, VIN-surrogate
-rollouts, value heads, Q heads, or return-conditioned models are treated as
-thesis evidence.
+rollouts must be trusted before stochastic/Gumbel branching is treated as
+training data, and random-valid, greedy, bounded oracle lookahead,
+temperature-softmax, and Gumbel traces must be stable before $Q_H$ training.
+The $Q_H$ objective predicts bounded cumulative target RRI. Scalar motion,
+rule, or validity penalties are later extensions.
+
+**Simulator substrate.** The thesis-core simulator is the ASE mesh/oracle
+counterfactual rollout loop. Habitat, Isaac, and online Gymnasium/SB3 are not
+the substrate for the main $Q_H$ result.
+
+**Success bar.** Learned $Q_H$ must beat one-step greedy/model scoring on
+cumulative target RRI under equal acquisition budget. Bounded oracle lookahead
+is the upper bound and random-valid is the lower reference.
 
 ### Minimal ArgTopK Rollout Sequence {#rq5-argtopk-rollout-sequence}
 
@@ -239,8 +302,9 @@ $\operatorname{ArgTop1}_1$ under the same acquisition budget.
 
 **Actor-visible state.** The first rollout actor state is geometry-first:
 accumulated semidense/current points, candidate poses, candidate validity and
-diagnostic metadata, and bounded history. Oracle labels, GT mesh quantities, and
-GT OBB crops are supervision and evaluation signals, not actor-visible inputs.
+diagnostic metadata, observed/predicted target OBB fields, and bounded history.
+Oracle labels, GT mesh quantities, and GT OBB crops are supervision and
+evaluation signals, not actor-visible inputs in the main V1 protocol.
 
 **Connected implementation surfaces.** Use the
 [CounterfactualPoseGenerator](../../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd)
@@ -249,12 +313,13 @@ stays bounded.
 
 ## RQ6 - Feasibility and Invalid Actions {#rq6-feasibility}
 
-**Question.** How should invalid actions be handled: hard mask first, then
-validity head or penalty as an ablation?
+**Question.** How should invalid actions be handled in one-step scoring,
+rollout generation, and $Q_H$ training?
 
-**Working hypothesis.** Hard masking is the first trusted baseline because it
-preserves label semantics. A validity head or penalty should be added only after
-the oracle and candidate generator expose invalid reasons consistently.
+**Working hypothesis.** Hard masks and explicit reason codes are mandatory
+because they preserve label semantics. A validity head or penalty reward is an
+ablation only after the oracle and candidate generator expose invalid reasons
+consistently.
 
 **Invalidity is not a low RRI class.** Collision, out-of-bounds poses,
 insufficient target support, and missing candidate evidence are different from a
@@ -263,27 +328,28 @@ lowest ordinal RRI bin would blur feasibility and reconstruction quality.
 
 **Evaluation nodes.** Invalid fraction, invalid reason distribution,
 target-visible fraction, rank metrics with and without masks, and penalty/head
-ablation once labels are reliable.
+ablation once labels are reliable. $Q_H$ consumes the masks and reason codes;
+invalid rows are not trained as the lowest target-RRI return.
 
-**VIN evidence gate.** Before adding value, Q, or return heads, the VIN scorer
-needs held-out ranking evidence, oracle-evaluated VIN-selected rollouts,
-calibration and stage-shift analysis, and Rerun visualizations of representative
-successes and failures. If this gate is passed, the first value-learning
-references are masked Double-Q-style targets for overestimation control
-[@DoubleDQN-vanHasselt2015] and in-support offline value learning such as IQL
-[@IQL-kostrikov2021], not unconstrained continuous actor-critic training.
-This gate also requires the deterministic one-step versus bounded-lookahead
-oracle comparison from [RQ5](#rq5-planning) to be reportable; otherwise value or
-surrogate-learning work would optimize an unproven planning target.
+**Q evidence gate.** Before $Q_H$ is treated as a thesis result, the one-step
+model scorer needs held-out ranking evidence, oracle-evaluated model-selected
+rollouts, calibration and stage-shift analysis, and Rerun visualizations of
+representative successes and failures. The first value-learning reference is
+masked fitted Double-Q-style training for overestimation control
+[@DoubleDQN-vanHasselt2015]. IQL [@IQL-kostrikov2021] is a second offline-RL
+ablation after $Q_H$ is stable, not a prerequisite for the main result.
 
 ## RQ7 - Scaling and Ablations {#rq7-scaling}
 
-**Question.** Does more supervision coverage buy more than architecture changes?
+**Question.** Does more supervision coverage buy more than architecture changes,
+and can the final thesis evidence scale to the full ASE GT-mesh subset?
 
-**Working hypothesis.** Before large VIN rewrites, scale within the current
+**Working hypothesis.** Before large model rewrites, scale within the current
 mesh-supervised ASE subset: more snippets, more anchor poses, broader candidate
-sets, and target-aware labels. Architecture changes should be justified by
-controlled ablations.
+sets, target-aware labels, and rollout/Q_H traces. Architecture changes should
+be justified by controlled ablations. Small trusted subsets are for
+correctness; final experiments target the full 100 GT-mesh ASE scenes and 4,608
+snippet windows.
 
 **Scale axes.**
 
@@ -291,14 +357,28 @@ controlled ablations.
 - more anchor poses per trajectory;
 - more candidates and broader candidate distributions;
 - target-aware labels for multiple objects per snippet;
+- rollout and Q_H traces with stable lineage;
 - stage-aware calibration and binning analysis.
 
 **Coverage reporting.** Every supervision-scale claim should report the actual
 mesh-supervised coverage used: the 100-scene GT-mesh ASE limit, the 4,608
 available snippet windows, the current/offline subset size where applicable,
 scene-level train/val split, number of anchor poses, number of candidates, and
-number of target entities per snippet. Architecture or rollout conclusions
-should not be compared across runs that silently change this coverage.
+number of target entities per snippet. The final report should either use all
+100 GT-mesh scenes / 4,608 snippets or state the exact missing coverage and why
+it remains blocked. Architecture, rollout, or Q_H conclusions should not be
+compared across runs that silently change this coverage.
+
+**Storage and cluster gate.** Rollout and Q_H data should use a Zarr-first store
+that is rich enough for training and evaluation without duplicating raw
+ASE/ATEK. Full meshes are external path/hash/version references; high-detail
+target mesh crops are embedded once per target with crop metadata. LRZ
+deterministic sharding, Slurm/DSS staging, resume-safe writes, and storage
+budgeting are hard M2/M3 gates before full-scale generation.
+
+**Split protocol.** Train/validation/test boundaries are scene-level. The
+held-out test split remains an advisor decision, but sample-level leakage is
+not acceptable for final claims.
 
 **Ablation axes.** Surface reconstruction input, CORAL variant, auxiliary
 regression, candidate-relative pose encoding, target encoding, candidate sampler
@@ -310,12 +390,16 @@ mixture, and invalid-action handling.
 requirements?
 
 **Working boundary.** The thesis core is target-conditioned RRI plus
-multi-step rollouts. The following remain stretch work unless they become
-necessary and feasible before the roadmap gate:
+multi-step rollouts plus fitted $Q_H$ over finite candidate sets generated by
+the ASE mesh/oracle counterfactual rollout loop. The following remain stretch
+work unless they become necessary and feasible before the roadmap gate:
 
+- IQL as a second offline-RL ablation after $Q_H$ is stable;
+- actor-critic or continuous-policy bridge design, without requiring a
+  quantitative continuous-control baseline;
 - VLM/global planning over grounded portals, frontiers, entities, and regions;
 - continuous target-then-pose control inspired by Hestia;
-- simulator-backed online RL with Habitat, Isaac, or an ASE-native simulator;
+- simulator-backed online RL with Habitat, Isaac, or external datasets;
 - SceneScript or open-vocabulary entity memory as a global semantic layer;
 - real-device deployment and human-in-the-loop AR guidance.
 
@@ -330,10 +414,10 @@ experiment-grade evidence before the thesis freeze.
 | [RQ2](#rq2-target-encoding) | M3, M4 | target-encoding ablation | [EVL notes](../literature/efm3d.qmd) |
 | [RQ3](#rq3-candidates) | M3, M5 | candidate sampler ablation | [Candidate API](../../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd) |
 | [RQ4](#rq4-model) | M4 | scene vs target scorer ranking metrics | [VIN API](../../reference/aria_nbv.vin.model_v3.VinModelV3.qmd) |
-| [RQ5](#rq5-planning) | M5 | one-step vs multi-step cumulative RRI | [Rollout API](../../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd) |
-| [RQ6](#rq6-feasibility) | M3, M6 | invalid-action ablation | [Candidate API](../../reference/aria_nbv.pose_generation.CandidateSamplingResult.qmd) |
-| [RQ7](#rq7-scaling) | M2 to M7 | scale and ablation tables | [Data pipeline](../impl/data_pipeline_overview.qmd) |
-| [RQ8](#rq8-extensions) | M6 | gate decision and future-work text | [Roadmap](roadmap.qmd#roadmap-m6) |
+| [RQ5](#rq5-planning) | M5 | one-step vs multi-step cumulative RRI and Q_H success bar | [Rollout API](../../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd) |
+| [RQ6](#rq6-feasibility) | M3, M5 | invalid-action masks, reason codes, and ablations | [Candidate API](../../reference/aria_nbv.pose_generation.CandidateSamplingResult.qmd) |
+| [RQ7](#rq7-scaling) | M2 to M7 | full-scale coverage, Zarr/LRZ reports, and ablation tables | [Data pipeline](../impl/data_pipeline_overview.qmd) |
+| [RQ8](#rq8-extensions) | M6 | IQL/actor-critic bridge decision and future-work text | [Roadmap](roadmap.qmd#roadmap-m6) |
 
 ## KG-Friendly Question Writing {#rq-kg-writing}
 
