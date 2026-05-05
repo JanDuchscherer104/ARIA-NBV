@@ -1,6 +1,6 @@
 ---
 id: open_questions
-updated: 2026-03-31
+updated: 2026-05-05
 scope: repo
 owner: jan
 status: active
@@ -9,40 +9,38 @@ tags: [research, nbv, vin, training]
 
 # Open Questions
 
-## Advisor-Facing Scope and Priority Questions
-- Should the thesis be scoped around geometry-first non-myopic planning on the current ASE / EFM stack, or should a major share of time shift toward a VIN v4 or broader model-architecture rewrite?
-- Should the thesis core stay within the current mesh-supervised ASE ecosystem, or is there a strong reason to switch datasets, simulators, or supervision sources earlier?
-- Which external asks are worth escalating now: university workstation access, ASE simulator access, Aria Gen2 hardware, or some narrower subset?
-- After bounded oracle-RRI lookahead is compared with one-step greedy, should the next non-myopic baseline be beam search, close-greedy control, or discrete-shell RL?
+## Advisor-Facing Deferred Decisions
+- What exact held-out test split should be used for the final full-scale ASE GT-mesh experiment: train/val/test proportions, scene identities, and whether any scenes are reserved for qualitative-only failure cases?
+- What is the exact pass/fail threshold for the M5 Q_H success bar: absolute cumulative target-RRI gain, statistical test, effect size, number of scenes/snippets, and tolerated scene-level regression?
+- What is the minimum advisor-acceptable fallback if full 100-scene / 4,608-snippet coverage is blocked by data, storage, or LRZ failures after the small trusted subset passes?
 
-## Planning and RL Formulation
-- Which counterfactual modalities are acceptable in the first multi-step setting: GT mesh, SDF / visibility, normals, depth, synthetic SLAM, splats, or learned world models?
-- Can the critic use privileged GT signals such as OBBs, segmentation masks, or mesh-derived descriptors during training if the actor cannot?
-- Should the first RL variant be explicitly close-greedy, low-discount, and receding-horizon rather than full long-horizon RL?
-- When should the current discrete shell give way to hierarchical target-selection plus view realization or to continuous pose control?
-- How should invalid or infeasible actions be handled: hard masking, projected feasibility, penalties, or a mixed strategy?
+## Target and Matching Details
+- What additional target matching criterion `X` is needed beyond compatible class, OBB IoU, visibility/support, projected area, and semidense/EVL point support?
+- How should ambiguous multi-object matches be resolved when several predicted OBBs overlap one GT target or one predicted OBB overlaps several GT targets?
+- Which observed target support signals should enter V1 first: projected area, semidense point count, EVL voxel evidence, OBB confidence, class prior, or a compact crop descriptor?
+
+## Q_H and Offline RL Details
+- What exact horizon values, discount/normalization convention, target-RRI clipping, and return target definition should define $Q_H$?
+- Should Q_H use only cumulative target RRI in the main run, or should path length, motion rules, validity, and diversity penalties receive a small first ablation?
+- What is the exact IQL scope if Q_H is stable: report-only ablation, full comparison, or defer to future work?
+- When, if ever, should an online Gymnasium/SB3 baseline be created after the fitted Double-Q path exists?
+
+## Storage, Scale, and Reporting
+- What exact Zarr group layout should be used for rollouts, Q_H training fields, target crops, candidate masks, lineage, and optional heavy diagnostics?
+- How much detail must be embedded in target mesh crops to preserve fine supervision without causing avoidable storage blow-up?
+- Which LRZ storage target and retention policy should own active shards, final Zarr stores, generated reports, and non-committed Rerun recordings?
+- Which CI/pre-commit checks are mandatory before full-scale generation without blocking proposal and M1 groundwork?
+
+## Representation and Ablation Questions
+- How should stage dependence and label-distribution drift be handled: stage-aware features, dynamic binning, calibration analysis, or some combination?
+- Which candidate-specific signals should be prioritized for target-conditioned scoring and Q_H: directional observability, target-conditioned local reads, stronger projection encoders, or transformer-style query-centric fusion?
+- Which current VIN components actually help enough to keep: surface reconstruction input, modified CORAL, auxiliary Huber loss, pretrained projection encoders?
 - If semantic-global planning is pursued later, what grounded world-memory schema and verifier / replanner loop would be required?
 
-## Data, Supervision, and Robustness
-- Should fine-detail oracle experiments ban aggressive mesh or point-cloud downsampling outright?
-- How much of the 4608 mesh-supervised snippets should be brought into the immutable VIN offline store before model complexity increases further?
-- Is broader candidate generation more valuable right now than deeper VIN changes: more than 60 candidates, more anchor poses, wider azimuth coverage, or roll / backward-view variants?
-- How should stage dependence and label-distribution drift be handled: stage-aware features, dynamic binning, calibration analysis, or some combination?
-- What exactly caused the apparent overfitting or calibration-failure signals, including collapse in the lowest ordinal classes?
-
-## VIN and Representation Questions
-- Which candidate-specific signals should be prioritized next: directional observability, target-conditioned local reads, stronger projection encoders, or transformer-style query-centric fusion?
-- Which current VIN components actually help enough to keep: surface reconstruction input, modified CORAL, auxiliary Huber loss, pretrained projection encoders?
-- Should entity-aware or object-centric supervision become part of the thesis core or remain a phase-2 extension?
-
-## System Questions
-- Where should gravity-aligned sampling convenience end and physical rig-frame supervision begin?
-- Which diagnostics and acceptance checks are strong enough to catch pose-frame mismatches early?
-- What is the minimum stable context bundle Codex needs for code, paper, and experiment tasks without reintroducing large static dumps?
-
 ## Recently Locked Decisions
-- The first non-myopic comparison is bounded oracle-RRI lookahead versus one-step greedy under equal budget.
-- The first rollout actor-visible state is geometry-first; oracle labels, GT mesh quantities, and GT OBB crops are supervision/evaluation only.
-- Multi-step reward starts with episode-normalized additive RRI or log-improvement reward, while the current one-step RRI label remains compatible with VIN training.
-- The first target-aware metric is GT-OBB-cropped target RRI.
-- The VIN evidence gate is held-out ranking, oracle-evaluated VIN-selected rollouts, calibration/stage-shift analysis, Rerun failure visualization, and only then value, Q, or return heads.
+- The thesis/system name is ARIA-NBV.
+- The thesis core stays within ASE/EFM and the ASE mesh/oracle counterfactual rollout loop; Habitat, Isaac, online simulators, SceneScript, and real-device guidance are stretch or bridge work.
+- V0 uses GT OBB input as sanity/upper-bound; V1 OBS-SEL / PRED-Q / GT-EVAL is mandatory for the main target-conditioned scorer and Q_H result.
+- Invalidity is represented by hard masks and explicit reason codes, not by low RRI labels.
+- Fitted Double-Q / Q_H over finite candidates is a hard M5 deliverable, and IQL is only a second offline-RL ablation after Q_H is stable.
+- Full 100 GT-mesh ASE scenes / 4,608 snippet windows are the final scale bar after small-subset correctness and LRZ/Zarr gates pass.
