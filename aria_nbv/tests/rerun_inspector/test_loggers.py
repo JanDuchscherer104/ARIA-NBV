@@ -46,6 +46,7 @@ class _FakeRerun:
     Points3D = _Archetype
     LineStrips3D = _Archetype
     Boxes3D = _Archetype
+    AnyValues = _Archetype
     TextDocument = _Archetype
     Transform3D = _Archetype
     Mesh3D = _Archetype
@@ -498,9 +499,10 @@ def test_obb_labels_include_class_names_and_unknown_fallback() -> None:
     )
 
     gt_label = fake.logged[ENTITY_GT_OBBS].kwargs["labels"][0]
-    detected_label = fake.logged[ENTITY_DETECTED_OBBS].kwargs["labels"][0]
+    detected_labels = fake.logged_extras[ENTITY_DETECTED_OBBS][0].kwargs["obb_label"]
     assert gt_label == "class=chair | sem_id=3 | inst_id=8 | prob=0.700"  # noqa: S101
-    assert detected_label == "class=<unknown> | sem_id=99 | inst_id=2 | prob=0.400"  # noqa: S101
+    assert detected_labels == ["class=<unknown> | sem_id=99 | inst_id=2 | prob=0.400"]  # noqa: S101
+    assert "labels" not in fake.logged[ENTITY_DETECTED_OBBS].kwargs  # noqa: S101
 
 
 def test_efm_voxel_fields_log_thresholded_points() -> None:

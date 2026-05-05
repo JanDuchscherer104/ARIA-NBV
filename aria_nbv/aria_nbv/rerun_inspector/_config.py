@@ -343,6 +343,12 @@ class RerunInspectorPrimitivesConfig(BaseConfig):
     log_detected_obbs: bool = True
     """Log compact detected OBBs when available."""
 
+    show_gt_obb_labels: bool = True
+    """Show GT OBB labels directly in 3D; labels are always logged as metadata."""
+
+    show_detected_obb_labels: bool = False
+    """Show detected EFM OBB labels directly in 3D; labels are always logged as metadata."""
+
     log_gt_trajectory: bool = True
     """Log the snippet rig trajectory when available."""
 

@@ -32,6 +32,7 @@ class RerunModule(Protocol):
     Points3D: RerunEntityFactory
     LineStrips3D: RerunEntityFactory
     Boxes3D: RerunEntityFactory
+    AnyValues: RerunEntityFactory
     TextDocument: RerunEntityFactory
     Transform3D: RerunEntityFactory
     Mesh3D: RerunEntityFactory
@@ -919,6 +920,7 @@ class RerunOfflineLogger:
                 obbs=_compact_or_live_gt_obbs(sample),
                 palette="gt_obbs",
                 sem_id_to_name=_gt_obb_semantic_names(sample),
+                show_scene_labels=self.config.primitives.show_gt_obb_labels,
             )
         if self.config.primitives.log_detected_obbs and inventory.has_detected_obbs:
             self._log_obbs(
@@ -927,6 +929,7 @@ class RerunOfflineLogger:
                 obbs=_detected_obbs(sample),
                 palette="detected_obbs",
                 sem_id_to_name=_detected_obb_semantic_names(sample),
+                show_scene_labels=self.config.primitives.show_detected_obb_labels,
             )
         if self.config.primitives.log_efm_voxels and self.config.efm_voxels.enabled:
             self._log_efm_voxels(sample)
@@ -1062,6 +1065,7 @@ class RerunOfflineLogger:
         obbs: Tensor | ObbTW | None,
         palette: str,
         sem_id_to_name: Sequence[str] | None,
+        show_scene_labels: bool,
     ) -> None:
         if obbs is None:
             return
@@ -1076,15 +1080,18 @@ class RerunOfflineLogger:
         )
         if centers.shape[0] == 0:
             return
+        box_kwargs: dict[str, object] = {
+            "centers": centers,
+            "half_sizes": half_sizes,
+            "quaternions": quaternions,
+            "colors": _rgba(palette, centers.shape[0]),
+        }
+        if show_scene_labels:
+            box_kwargs["labels"] = labels
         self.rr.log(
             entity_path,
-            self.rr.Boxes3D(
-                centers=centers,
-                half_sizes=half_sizes,
-                quaternions=quaternions,
-                colors=_rgba(palette, centers.shape[0]),
-                labels=labels,
-            ),
+            self.rr.Boxes3D(**box_kwargs),
+            self.rr.AnyValues(obb_label=labels),
             static=True,
         )
 
