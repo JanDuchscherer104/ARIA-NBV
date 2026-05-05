@@ -7,79 +7,68 @@ owner: jan
 format: html
 ---
 
-## GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction {#gen-nbv}
+## GenNBV: Continuous 5-DoF Coverage-Reward RL {#gen-nbv}
 
-@GenNBV-chen2024 introduce GenNBV, an end-to-end reinforcement-learning policy that plans in a continuous five-degree-of-freedom view space.
+**Primary source.** [GenNBV: Generalizable Next-Best-View Policy for Active 3D Reconstruction](https://arxiv.org/abs/2402.16174) [@GenNBV-chen2024].
 
-**Links**: [Project Page](https://gennbv.tech/), [GitHub](https://github.com/zjwzcx/GenNBV)
+**Local source.** [`main.tex`](../../literature/tex-src/arXiv-GenNBV/main.tex) and [`Supp/supp.tex`](../../literature/tex-src/arXiv-GenNBV/Supp/supp.tex).
 
-- **Free-space control**: Actions are sampled from a learned 5D Gaussian over $(x,y,z,\text{yaw},\text{pitch})$, enabling collision-aware trajectories without hand-crafted candidates.
-- **Multi-source embedding**: Probabilistic occupancy, RGB semantics, and action history are fused into a shared state representation that predicts reconstruction progress.
-- **Training**: In Isaac Gym; 24h on an NVIDIA Tesla V100 (16GB VRAM)
-- **Benchmarking**: Established a benchmark using the Isaac Gym Simulator with the Houses3K (3k textured 3D building models) and OmniObject3D (4k high-fidelity scans of objects across 190 categories) datasets, yielding 98.3% AUC and 97.1% _final coverage ratio_ on unseen building-scale scenes.
+**External links.** [Project page](https://gennbv.tech/) and [GitHub](https://github.com/zjwzcx/GenNBV).
 
-### Local \LaTeX{} Sources
+**Related ARIA-NBV pages.** [VIN-NBV](vin_nbv.qmd), [Hestia](hestia.qmd), and [RL planning](rl_planning.qmd).
 
-- [`main.tex`](../../../literature/tex-src/arXiv-GenNBV/main.tex) – full CVPR submission.
-- [`Supp/supp.tex`](../../../literature/tex-src/arXiv-GenNBV/Supp/supp.tex) – supplemental material and AUC curves.
-- [`Figure/Fig_Teaser_v5.pdf`](../../../literature/tex-src/arXiv-GenNBV/Figure/Fig_Teaser_v5.pdf) – teaser used in our docs.
-- [`README.md`](../../../literature/tex-src/arXiv-GenNBV/README.md) – build instructions and compilation notes.
+### Core contribution
 
-### Problem Setup and I/O
+GenNBV is the main continuous-control contrast for ARIA-NBV. It trains a generalizable {{< gls next-best-view >}} policy with PPO over a continuous {{< gls five-degrees-of-freedom >}} action: 3D position plus yaw and pitch, with roll restricted [@GenNBV-chen2024]. Its reward is coverage gain, not reconstruction-quality gain.
 
-Each time step $t$ yields an observation
-$$
-o_t = \{I_{1:t}, D_{1:t}, a_{1:t}, p_t\},
-$$
-where $I$ and $D$ are RGB and depth frames, $a_{1:t} \in \mathcal{A} \subset \text{SE}(3)$ are historic actions, and $p_t \in \mathbb{R}^3$ encodes the current pose. The policy applies an encoder $\phi$ to produce a state embedding $s_t=\phi(o_t)$ and samples the next viewpoint from a Gaussian policy,
-$$
-a_t \sim \pi_\theta(a\,|\,s_t) = \mathcal{N}\!\left(\mu_\theta(s_t),\,\Sigma_\theta(s_t)\right),
-$$
-yielding a 5D camera pose that is executed by a CrazyFlie UAV in simulation.
-
-GenNBV’s geometric backbone maintains a probabilistic occupancy grid $F_t^G$ that is updated by log-odds accumulation along each sensor ray $z_j$:
-
-with constant $C$ reflecting ray confidence. Voxels are thresholded into $\{\text{occupied}, \text{free}, \text{unknown}\}$ to summarize coverage and guide planning.
-
-### State Embedding and Policy Architecture
-
-**Geometric encoder**:
-
-Depth maps are back-projected to obtain a 3D PC, voxelized, and mapped to a three-state occupancy grid:
-  $F_t^G \in \{\text{occupied}, \text{free}, \text{unknown}\}^{H\times W \times D }$, where each voxel is assigned to a state of it being _occupied_, _free_, or _unknown_ (i.e. to what degree the voxel has been observed). $F_t^G$ is updated at each step using [Bresenham's line algorithm](https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm) by tracing rays from the camera origin and the back-projected 3D points:
+The policy observes a multi-source state embedding from 3D occupancy, semantic/appearance cues, and action history, then samples a camera pose from a learned Gaussian policy:
 
 $$
-\log \mathrm{Odd}(v_i \mid z_j) = \log \mathrm{Odd}(v_i) + C,
+a_t =
+(x_t,y_t,z_t,\psi_t,\theta_t),
+\qquad
+a_t \sim \pi_\theta(a \mid s_t).
 $$
 
-where $v_i$ denotes the occupancy likelihood of the $i$-th voxel given the probability of the $j$-th ray from the camera passes through it. The classification into the three states is done by thresholding the log-odds values. The encoder network consists of a simple MLP after flattening the occupancy grid.
+### Verified paper signals
 
-**Semantic encoder**: A two-layer CNN, with consequent one-layer MLP consumes the concatenated $I_{t-k:t}$ grayscale frames to produce $s_t^S$.
+| signal | source-backed detail | ARIA-NBV relevance |
+|---|---|---|
+| Action space | The learned policy acts in free 5-DoF pose space: 3D position, yaw, and pitch. | Useful contrast to ARIA-NBV's finite candidate set; not the first thesis action space. |
+| State representation | GenNBV fuses a 3D occupancy grid, image/semantic cues, and action history. | Supports keeping rollout history and geometric state in ARIA-NBV's MDP contract. |
+| Reward | Coverage ratio gain is the primary reward, with collision/path penalties. | Baseline objective to compare against, but weaker than {{< gls relative-reconstruction-improvement >}} for quality-driven reconstruction. |
+| Training regime | The paper uses PPO with many parallel simulation environments and reports large-scale simulator training. | Confirms that continuous online RL depends on an interactive simulator/reward loop. |
+| Dataset/evaluation | Training uses Houses3K-style scenes; the paper tests generalization to object/scene categories and reports coverage/AUC metrics. | Dataset and metric mismatch prevent direct transfer of reported numbers to ASE target-RRI experiments. |
 
-**Action history encoder**: Recent 5D poses are linearly projected to $s_t^A$.
+The coverage reward can be summarized as:
 
-**State Embedding and Policy Network**: The concatenated vector $s_t = \mathrm{Linear}(s_t^G; s_t^S; s_t^A)$ feeds a three-layer MLP that outputs the mean and variance of the continuous action distribution.
-
-### Reward Design and Optimization
-
-Coverage is measured by thresholding $F_t^G$ to count occupied voxels $\tilde N_t$ relative to the ground-truth surface voxel count $N^*$:
 $$
-\text{CR}_t = \frac{\tilde N_t}{N^*}\cdot 100\%.
+r^{\mathrm{CR}}_{t+1}
+=
+\mathrm{CR}_{t+1}
+-
+\mathrm{CR}_{t},
+\qquad
+\mathrm{CR}_{t}
+=
+\frac{\tilde{N}_{t}}{N^\star}.
 $$
-The primary reward is the temporal gain in coverage, similar to TD(0):
-$$
-r^{\text{CR}}_{t+1} = \text{CR}_{t+1} - \text{CR}_t,
-$$
-augmented with penalties for collisions and overly long trajectories. Policy parameters are optimized with proximal policy optimization (PPO) using the clipped surrogate,
-$$
-L^{\text{CLIP}}(\theta) = \mathbb{E}_t\!\left[\min\!\big(\eta_t(\theta) A_t,\; \mathrm{clip}(\eta_t(\theta), 1-\epsilon, 1+\epsilon) A_t\big)\right],
-$$
-where $\eta_t(\theta)=\tfrac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t)}$ and $A_t$ is the advantage estimate.
 
-### Notes and Limitations
+### ARIA-NBV adoption
 
-- Coverage-centric rewards ignore reconstruction fidelity; surfaces with equal occupancy weight receive identical priority.
-- Semantic reasoning is limited to appearance cues and lacks task-driven surface weighting.
-- Architecture lacks explicit 3D spatial reasoning-
-- Doesn't leverage powerful geometric embeddings (e.g. Fourier features)
-- Primitive Architecture: simple MLPs and CNNs without leveraging pre-trained models or advanced architectures.1
+- **Background / stretch bridge:** use GenNBV to justify why continuous control is possible only when a simulator-grade reward loop exists.
+- **MDP contract signal:** keep state, history, action, reward, and termination explicit.
+- **Evaluation contrast:** compare coverage-gain reasoning against scene/target RRI reasoning, not against uncalibrated qualitative impressions.
+
+### Do not adopt
+
+- Do not make coverage ratio the thesis objective.
+- Do not start ARIA-NBV with PPO over continuous actions while oracle RRI is expensive and counterfactual observations are incomplete.
+- Do not transfer GenNBV's reported coverage/AUC numbers as evidence for ARIA-NBV's ASE target-RRI setting.
+- Do not ignore finite-candidate validity masks; GenNBV's free-space action handling does not solve ARIA-NBV candidate-order and oracle-label contracts.
+
+### Open risks / caveats
+
+- Coverage can improve while Chamfer-style reconstruction quality or target-specific quality does not.
+- Continuous-control benchmarks depend heavily on simulator fidelity, collision handling, and training distribution.
+- For ARIA-NBV, GenNBV becomes meaningful as a later bridge only after deterministic oracle rollouts and target-conditioned {{< gls finite-horizon-q-function >}} learning are stable.

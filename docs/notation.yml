@@ -13,6 +13,12 @@ symbols:
   oracle.candidates:
     tex: '\boldsymbol{\mathcal{Q}}'
     typst: '#symb.oracle.candidates'
+  oracle.candidates_t:
+    tex: 'Q_t'
+    typst: '#symb.oracle.candidates_t'
+  oracle.candidate_qti:
+    tex: 'q_{t,i}'
+    typst: '#symb.oracle.candidate_qti'
   oracle.depth_q:
     tex: '\boldsymbol{D}_q'
     typst: '#symb.oracle.depth_q'
@@ -22,9 +28,15 @@ symbols:
   oracle.comp:
     tex: '\mathcal{C}'
     typst: '#symb.oracle.comp'
+  rri.cd_value:
+    tex: '\mathrm{CD}'
+    typst: '#eqs.rri.cd'
   ase.mesh:
     tex: '\boldsymbol{\mathcal{M}}_{\mathrm{GT}}'
     typst: '#symb.ase.mesh'
+  ase.mesh_target:
+    tex: 'M_e'
+    typst: '#symb.ase.mesh_target'
   ase.faces:
     tex: '\boldsymbol{\mathcal{F}}_{\mathrm{GT}}'
     typst: '#symb.ase.faces'
@@ -46,6 +58,9 @@ symbols:
   vin.cand_valid:
     tex: 'm'
     typst: '#symb.vin.cand_valid'
+  entity.rri_e:
+    tex: '\mathrm{RRI}_e'
+    typst: '#symb.entity.rri_e'
   rl.s:
     tex: 's'
     typst: '#symb.rl.s'
@@ -58,6 +73,45 @@ symbols:
   rl.G:
     tex: 'G'
     typst: '#symb.rl.G'
+  rl.mdp_nbv:
+    tex: '\mathcal{M}_{\mathrm{NBV}}'
+    typst: '#symb.rl.mdp_nbv'
+  rl.action_set:
+    tex: '\mathcal{A}(s_t)'
+    typst: '#symb.rl.action_set'
+  rl.transition:
+    tex: 'T'
+    typst: '#symb.rl.transition'
+  rl.reward_target:
+    tex: 'r_t^e'
+    typst: '#symb.rl.reward_target'
+  rl.return_h:
+    tex: 'G_t^{(H)}'
+    typst: '#symb.rl.return_h'
+  rl.qh:
+    tex: 'Q_H'
+    typst: '#symb.rl.qh'
+  rl.gamma:
+    tex: '\gamma'
+    typst: '#symb.rl.gamma'
+  rl.H:
+    tex: 'H'
+    typst: '#symb.rl.H'
+  rl.validity_mask:
+    tex: 'm_{t,i}'
+    typst: '#symb.rl.validity_mask'
+  rl.invalid_reason:
+    tex: '\rho_{t,i}'
+    typst: '#symb.rl.invalid_reason'
+  rl.target:
+    tex: 'e_t'
+    typst: '#symb.rl.target'
+  rl.budget:
+    tex: 'b_t'
+    typst: '#symb.rl.budget'
+  rl.acquisition_cost:
+    tex: 'C(\tau)'
+    typst: '#symb.rl.b'
   shape.Nq:
     tex: 'N_q'
     typst: '#symb.shape.Nq'
@@ -81,6 +135,9 @@ equations:
   rri.rri:
     tex: '\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}'
     typst: '#eqs.rri.rri'
+  rri.target_rri:
+    tex: '\mathrm{RRI}_e(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e\cup\boldsymbol{\mathcal{P}}_q^e,M_e)}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)+\varepsilon}'
+    typst: '#eqs.rri.target_rri'
   rri.greedy:
     tex: 'q^*=\operatorname*{argmax}_{q\in\boldsymbol{\mathcal{Q}}}\mathrm{RRI}(q)'
     typst: '#eqs.rri.greedy'
@@ -111,9 +168,30 @@ equations:
   metrics.topk_acc:
     tex: '\mathrm{TopKAcc}(k)=\frac{1}{N}\sum_i\mathbb{1}[y_i\in\mathrm{TopK}(\boldsymbol{\pi}_i,k)]'
     typst: '#eqs.metrics.topk_acc'
+  metrics.candidate_validity:
+    tex: 'm_i=\mathbb{1}[\mathrm{finite}]\mathbb{1}[v_i>0]\mathbb{1}[v_i^{\mathrm{sem}}>0]'
+    typst: '#eqs.metrics.candidate_validity'
   rl.mdp:
     tex: '\mathcal{M}=(\mathcal{S},\mathcal{A},P,r,\gamma)'
     typst: '#eqs.rl.mdp'
+  rl.nbv_mdp:
+    tex: '\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)'
+    typst: '#eqs.rl.nbv_mdp'
+  rl.finite_action_set:
+    tex: '\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}'
+    typst: '#eqs.rl.finite_action_set'
+  rl.counterfactual_transition:
+    tex: 'P_{t+1}=P_t\cup P_{q_t}'
+    typst: '#eqs.rl.counterfactual_transition'
+  rl.target_rri_reward:
+    tex: 'r_t^e=\mathrm{RRI}_e(q_t\mid P_t,M_e)'
+    typst: '#eqs.rl.target_rri_reward'
+  rl.finite_horizon_return:
+    tex: 'G_t^{(H)}=\sum_{k=0}^{H-1}\gamma^k r_{t+k}^e'
+    typst: '#eqs.rl.finite_horizon_return'
+  rl.q_h:
+    tex: 'Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]'
+    typst: '#eqs.rl.q_h'
   rl.reward_geom:
     tex: 'r_t^{\mathrm{geom}}=\log(\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon)-\log(\mathrm{CD}(\boldsymbol{\mathcal{P}}_{t+1},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon)-\alpha\mathbb{1}[\mathrm{collision}(a_t)]-\beta c(a_t)'
     typst: '#eqs.rl.reward_geom'

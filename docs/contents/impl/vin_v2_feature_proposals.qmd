@@ -23,6 +23,34 @@ Related context:
 - VinModelV2 currently uses **pose R6D + translation**, **scene field channels** from EVL heads/evidence, and **pose-conditioned global pooling**. See `aria_nbv/aria_nbv/vin/experimental/model_v2.py`.
 - VIN predicts RRI as an **ordinal regression** problem via CORAL [@CORAL-cao2019]. [Wikipedia :: Ordinal regression](https://en.wikipedia.org/wiki/Ordinal_regression)
 
+## Source-backed EVL feature contract
+
+The literature review page should stay paper-facing; the implementation-level EVL tensor selection lives here. For a compact VIN scorer, prefer fields whose semantics are stable and directly tied to NBV evidence:
+
+| EVL field | use | reason |
+|---|---|---|
+| `voxel/T_world_voxel`, `voxel_extent` | required | maps candidate-frustum samples from world coordinates into the local EVL voxel frame |
+| `occ_pr` | default scene channel | compact surface/occupancy prediction from the surface head |
+| `voxel/occ_input` | default evidence channel | observed point/surface support from input semi-dense geometry |
+| `voxel/counts` | default evidence channel | projection/observation support across snippet frames and streams |
+| `voxel/feat[:, -1:]` | optional free-space channel | exposes ray-derived free-space evidence when available in the lifted feature tensor |
+| `neck/occ_feat`, `neck/obb_feat` | ablation only | richer but heavier pre-head features; compress before candidate-conditioned sampling |
+| decoded OBB outputs | entity-aware ablation | useful for observed target selection and target-conditioned scoring after the scene-level scorer is trusted |
+
+The minimal reliable bundle is therefore:
+
+$$
+x_{\mathrm{EVL}} =
+\left[
+  \mathrm{occ\_pr},
+  \mathrm{occ\_input},
+  \mathrm{counts}_{\mathrm{norm}},
+  \mathrm{free\_input}
+\right],
+$$
+
+plus the voxel transform/extent needed to sample those channels for candidate poses.
+
 # Design goals
 
 - Provide **high-signal scene cues** for RRI without over-reliance on heavy neck features.

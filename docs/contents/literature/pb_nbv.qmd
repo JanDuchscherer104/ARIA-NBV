@@ -1,0 +1,69 @@
+---
+title: "PB-NBV"
+phase: thesis
+audience: public
+status: current
+owner: jan
+format: html
+---
+
+## PB-NBV: Projection-Based Candidate Proposals {#pb-nbv-literature}
+
+**Primary source.** [PB-NBV: Efficient Projection-Based Next-Best-View Planning Framework for Reconstruction of Unknown Objects](https://doi.org/10.1109/LRA.2025.3573631) [@PB-NBV-jia2025].
+
+**Local source.** [`jzz_2025_ral_resub.tex`](../../literature/tex-src/arXiv-PB-NBV/jzz_2025_ral_resub.tex) and [`sections/method.tex`](../../literature/tex-src/arXiv-PB-NBV/sections/method.tex).
+
+**Related ARIA-NBV pages.** [NBV background](../theory/nbv_background.qmd), [RRI theory](../theory/rri_theory.qmd), [oracle RRI implementation](../impl/oracle_rri_impl.qmd), and [Hestia](hestia.qmd).
+
+### Core contribution
+
+PB-NBV is an efficient object-centric {{< gls next-best-view >}} framework that avoids dense per-candidate ray casting by fitting compact ellipsoid proxies to classified voxel clusters and scoring candidates through 2D projection [@PB-NBV-jia2025]. It is not a replacement for {{< gls relative-reconstruction-improvement >}}. It is a proposal heuristic for reducing candidate-evaluation cost.
+
+### Verified paper signals
+
+| signal | source-backed detail | ARIA-NBV relevance |
+|---|---|---|
+| Candidate region | The method samples candidate poses on a partial hemisphere around the object. | Useful as a reminder that candidate geometry is a controllable proposal distribution. |
+| Voxel taxonomy | The method separates empty/free, occupied, unknown, frontier, and unclassified voxels. | Maps to semi-dense surface support, EVL free-space evidence, and missing/frontier proxies. |
+| Ellipsoid proxy | Occupied and frontier voxel clusters are approximated by minimum-volume enclosing ellipsoids. | Suggests cheap proxy geometry before expensive oracle rendering/mesh-distance scoring. |
+| Projection score | Candidate views are scored by projected frontier/occupied evidence, with simple depth-rank weighting. | Useful as a shortlist score or diagnostic, not as the final thesis utility. |
+| Continuity | A global partitioning strategy supports scan continuity and registration stability. | Motivates motion/path and overlap constraints in multi-step ARIA-NBV rollouts. |
+
+PB-NBV's voxel-state distinction can be translated into ARIA-NBV as:
+
+| PB-NBV state | ARIA-NBV analogue |
+|---|---|
+| empty/free | EVL free-space evidence or known-free ray support |
+| occupied | semi-dense points or EVL occupancy evidence |
+| unknown | unobserved/incomplete regions inside candidate support |
+| frontier | boundary between observed support and unknown target/scene regions |
+| unclassified | out-of-support or insufficient-evidence regions |
+
+### ARIA-NBV adoption
+
+- **Proposal/diagnostic:** build cheap frontier/free-space projection scores to shortlist candidates before oracle RRI evaluation.
+- **Candidate strategy:** compare LookAway, LookAt target, frontier, random, and PB-NBV-style projection strategies by valid ratio, target visibility, and RRI histograms.
+- **Rollout constraint:** preserve motion continuity, overlap, and {{< gls validity-mask >}} diagnostics instead of optimizing utility alone.
+
+The transfer pattern is:
+
+```{mermaid}
+flowchart LR
+  A["Semi-dense / EVL evidence"] --> B["Frontier or missing-support proxy"]
+  B --> C["Projection score"]
+  C --> D["Candidate shortlist"]
+  D --> E["Oracle scene + target RRI"]
+```
+
+### Do not adopt
+
+- Do not replace scene or target RRI with projected frontier area.
+- Do not assume turntable/object-centric geometry for egocentric indoor ASE snippets.
+- Do not treat ellipsoid depth rank as ground-truth visibility.
+- Do not assume clean structured-light depth or ICP-style registration inputs.
+
+### Open risks / caveats
+
+- Projection scores can favor large visible areas rather than reconstruction-quality improvement.
+- Frontier proxies need calibration against {{< gls oracle-rri >}} and {{< gls target-specific-rri >}}.
+- PB-NBV is best read as a fast proposal mechanism, not as the thesis objective.

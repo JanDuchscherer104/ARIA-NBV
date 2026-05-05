@@ -9,56 +9,78 @@ format: html
 
 # Literature Review
 
-This section contains detailed reviews of key papers and methods related to Next-Best-View planning, active perception, egocentric foundation models, radiance-field view selection, and rollout planning.
+This section is a thesis-oriented distillation, not a general survey. Each page extracts what ARIA-NBV can adopt from the local paper corpus: {{< gls next-best-view >}} objectives, egocentric observation contracts, candidate proposal mechanisms, rollout/value-learning gates, and failure modes that affect target-conditioned reconstruction.
 
-## Key Papers
+The current project direction is deliberately narrow: keep {{< gls relative-reconstruction-improvement >}} and {{< gls target-specific-rri >}} as the authoritative utility signals; use {{< gls project-aria >}}, {{< gls aria-synthetic-environments >}}, {{< gls egocentric-foundation-model-3d >}}, and {{< gls egocentric-voxel-lifting >}} as the actor-visible state substrate; and treat learned sequence/value methods as gated extensions over trusted finite candidate sets.
 
-### Next-Best-View Planning
+## Adoption-State Overview
 
-- **[VIN-NBV](vin_nbv.qmd)**: Learning-based RRI prediction for quality-driven view planning. Source: [arXiv 2505.06219](https://arxiv.org/abs/2505.06219) [@VIN-NBV-frahm2025].
-- **[GenNBV](gen_nbv.qmd)**: Continuous 5-DoF policy learning for active 3D reconstruction. Source: [arXiv 2402.16174](https://arxiv.org/abs/2402.16174) [@GenNBV-chen2024].
-- **[Hestia](hestia.qmd)**: Face-aware hierarchical continuous NBV with look-at-point decomposition. Source: [project page](https://johnnylu305.github.io/hestia_web) [@Hestia-lu2026].
-- **[PB-NBV](https://arxiv.org/abs/2501.10663)**: Projection-based candidate evaluation for efficient unknown-object reconstruction [@PB-NBV-jia2025].
-- **[Receding-horizon NBV](https://doi.org/10.1109/ICRA.2016.7487281)** and **[shadowcasting NBV](https://doi.org/10.1109/LRA.2022.3146586)**: search-depth and efficient gain-estimation references for bounded planning [@RecedingHorizonNBV-bircher2016; @ShadowcastingNBV-batinovic2022].
-- **[RL and Rollout Planning](rl_planning.qmd)**: Sequence decoding, stochastic beams, offline RL, and value-learning gates.
-- **[Active 3DGS and Targeted NBV](active_3dgs_nbv.qmd)**: Fisher-information, object-centric, dynamic, and task-aware 3DGS view selection.
+| domain | papers | adoption state | core signal | do not adopt |
+|---|---|---|---|---|
+| {{< gls next-best-view >}} objective and candidate planning | [VIN-NBV](vin_nbv.qmd), [PB-NBV](pb_nbv.qmd), [GenNBV](gen_nbv.qmd), [Hestia](hestia.qmd), receding-horizon and shadowcasting NBV | thesis-core method for RRI ranking; proposal/diagnostic for projection and frontier heuristics; stretch/bridge for continuous policies | Mesh-supervised {{< gls oracle-rri >}}, finite {{< gls candidate-view >}} sets, efficient candidate shortlists, validity-aware motion constraints | Replacing {{< gls relative-reconstruction-improvement >}} with coverage, projected frontier area, or policy reward before calibration |
+| ARIA ecosystem and actor-visible state | [Project Aria](project_aria.qmd), [EFM3D/EVL](efm3d.qmd), {{< gls aria-synthetic-environments >}}, {{< gls machine-perception-services >}} | core substrate | Calibrated egocentric streams, trajectories, online calibration, semi-dense points, EVL voxel evidence, predicted {{< gls oriented-bounding-box >}} support | Leaking GT meshes or GT boxes into actor-visible selection/scoring |
+| Rollout, value learning, and RL | [RL and rollout planning](rl_planning.qmd), Trajectory Transformer, Gumbel-Top-k, Double DQN, IQL, soft Q-learning, PPO/SAC | thesis-core method for fitted Double-Q / {{< gls finite-horizon-q-function >}}; gated follow-up for IQL and actor-critic | Deterministic rollout traces first, stochastic rollout data second, masked target-conditioned fitted Double-Q over finite candidates third | Starting with continuous online RL before a trusted reward loop and support-aware offline store exist |
+| {{< gls three-dimensional-gaussian-splatting >}} / radiance-field active reconstruction | [Active 3DGS and targeted NBV](active_3dgs_nbv.qmd), ActiveNeRF, FisherRF, Next Best Sense, dynamic/object-centric 3DGS, FOV-HPE | proposal/diagnostic and stretch/bridge | Uncertainty, Fisher information, target/object weighting, downstream-task view selection | Treating 3DGS uncertainty or human-pose reward as a substitute for ASE mesh-supervised target RRI |
+| Semantic scene representations | [SceneScript](scene_script.qmd) | stretch/bridge | Structured scene language, editable entities, global layout priors, ASE-scale scene representation | Making SceneScript a thesis-core dependency before observed target contracts and target RRI are trusted |
 
-### Foundational Active Perception and View Planning
+Adoption-state labels used in the pages:
 
-- **[Active perception](https://doi.org/10.1109/5.5968)** and **[active vision](https://doi.org/10.1007/BF00133571)**: classical framing for perception as action-conditioned sensing [@ActivePerception-bajcsy1988; @ActiveVision-aloimonos1988].
-- **[View planning survey](https://doi.org/10.1145/641865.641868)** and **[autonomous 3D NBV system](https://doi.org/10.1109/3468.867866)**: classical generate-and-test NBV baselines and constraints [@ViewPlanningSurvey-scott2003; @NBVSystem-banta2000].
+- **core substrate**: required observation, dataset, or representation contract.
+- **thesis-core method**: needed for the current thesis claim.
+- **proposal/diagnostic**: useful for candidate proposals, reports, or sanity checks.
+- **gated follow-up**: useful only after prerequisite evidence exists.
+- **stretch/bridge**: future direction beyond the required thesis result.
+- **background**: context only.
 
-### Foundation Models & Scene Understanding  
+## Domain Hierarchy
 
-- **[EFM3D/EVL](efm3d.qmd)**: Egocentric foundation models for 3D perception and voxel lifting. Source: [arXiv 2406.10224](https://arxiv.org/abs/2406.10224) [@EFM3D-straub2024].
-- **[SceneScript](scene_script.qmd)**: Structured scene language for semantic scene manipulation. Source: [arXiv 2403.13064](https://arxiv.org/abs/2403.13064) [@SceneScript-avetisyan2024].
+### 1. NBV Objective And Candidate Planning
 
-### Radiance-Field and Gaussian-Splatting View Selection
+- [VIN-NBV](vin_nbv.qmd): source-backed {{< gls relative-reconstruction-improvement >}} objective, {{< gls oracle-rri >}} labels, CORAL ordinal training, and greedy candidate ranking [@VIN-NBV-frahm2025].
+- [PB-NBV](pb_nbv.qmd): projection/ellipsoid candidate shortlisting and frontier/occupied evidence separation [@PB-NBV-jia2025].
+- [GenNBV](gen_nbv.qmd): continuous {{< gls five-degrees-of-freedom >}} PPO baseline with coverage-gain rewards, useful as a simulator-gated contrast [@GenNBV-chen2024].
+- [Hestia](hestia.qmd): hierarchical look-at-then-fly control and directional voxel-face visibility, useful for continuous-policy bridge design [@Hestia-lu2026].
 
-- **[NeRF](https://arxiv.org/abs/2003.08934)** and **[3D Gaussian Splatting](https://doi.org/10.1145/3592433)**: representation foundations for active radiance-field and 3DGS view-selection work [@NeRF-mildenhall2020; @GaussianSplatting-kerbl2023].
-- **[ActiveNeRF](https://arxiv.org/abs/2209.08546)** and **[FisherRF](https://arxiv.org/abs/2311.17874)**: uncertainty and Fisher-information references for active neural/radiance-field selection [@ActiveNeRF-pan2022; @FisherRF-jiang2024].
-- **[Next Best Sense](https://arxiv.org/abs/2410.04680)**, **[Semantic and Dynamic 3DGS NBV](https://arxiv.org/abs/2512.22771)**, and **[Object-centric 3DGS NBV](https://arxiv.org/abs/2602.08266)**: task-aware, dynamic, and object-centric view-selection references [@NextBestSense-strong2024; @li2025bestviewselectionssemantic; @ObjectCentricNBV-jeong2026].
+### 2. ARIA Ecosystem And Actor-Visible State
 
-## Local \LaTeX{} Corpus
+- [Project Aria](project_aria.qmd): calibrated egocentric device, VRS/tooling path, {{< gls machine-perception-services >}} trajectories, online calibration, and semi-dense maps [@projectaria-engel2023].
+- [EFM3D/EVL](efm3d.qmd): frozen egocentric 3D representation for occupancy, surface regression, and {{< gls oriented-bounding-box >}} evidence [@EFM3D-straub2024].
 
-The local source mirrors that are currently tracked live under `literature/tex-src/`.
-Key entry points:
+### 3. Rollout, Value Learning, And RL
 
-- [`arXiv-EFM3D/main.tex`](../../literature/tex-src/arXiv-EFM3D/main.tex)
-- [`arXiv-GenNBV/main.tex`](../../literature/tex-src/arXiv-GenNBV/main.tex)
-- [`arXiv-VIN-NBV/main.tex`](../../literature/tex-src/arXiv-VIN-NBV/main.tex)
-- [`arXiv-Hestia/main.tex`](../../literature/tex-src/arXiv-Hestia/main.tex)
-- [`arXiv-Dynamic-3DGS/main.tex`](../../literature/tex-src/arXiv-Dynamic-3DGS/main.tex)
-- [`arXiv-Instance-NBV/root.tex`](../../literature/tex-src/arXiv-Instance-NBV/root.tex)
-- [`arXiv-project-aria/main.tex`](../../literature/tex-src/arXiv-project-aria/main.tex)
-- [`arXiv-scene-script/main.tex`](../../literature/tex-src/arXiv-scene-script/main.tex)
+- [RL and rollout planning](rl_planning.qmd): planning-as-sequence-decoding, stochastic beams, overestimation control, offline-RL support constraints, and the mandatory target-conditioned fitted Double-Q / {{< gls finite-horizon-q-function >}} gate.
 
-Each directory contains the canonical figures (`figures/`), tables, and supplemental PDFs required to reproduce results or cite specific numbers in our documentation.
+### 4. 3DGS / Radiance-Field Active Reconstruction
 
-## Research Context
+- [Active 3DGS and targeted NBV](active_3dgs_nbv.qmd): uncertainty, Fisher information, object-centric utility, dynamic scenes, and task-specific view selection as proposal/diagnostic signals.
 
-These literature reviews form the theoretical foundation for integrating pre-trained egocentric models with quality-driven NBV planning. The combination of VIN-NBV's RRI optimization with EFM3D's foundation model capabilities enables better generalization to complex indoor environments compared to traditional coverage-based approaches.
+### 5. Semantic Scene Representations
+
+- [SceneScript](scene_script.qmd): structured scene language and editable entity-level representation as stretch-only semantic/global planning context [@SceneScript-avetisyan2024].
+
+## Current Synthesis
+
+```{mermaid}
+flowchart LR
+  A["Project Aria / ASE observed state"] --> B["EVL and semi-dense reconstruction proxy"]
+  B --> C["Scene + target oracle RRI labels"]
+  C --> D["One-step candidate scorer"]
+  D --> E["Trusted finite-candidate rollouts"]
+  E --> F["Target-conditioned fitted Double-Q Q_H"]
+  F -. "after evidence" .-> G["IQL / actor-critic / simulator bridge"]
+```
+
+The thesis should first prove that deterministic bounded oracle lookahead improves cumulative {{< gls target-specific-rri >}} over one-step greedy under equal acquisition budget. It should then train a target-conditioned fitted Double-Q / {{< gls finite-horizon-q-function >}} model over finite candidate sets and require it to beat one-step greedy/model scoring on cumulative target RRI. IQL, actor-critic bridges, SB3/PPO/SAC, Habitat/Isaac, and 3DGS control remain gated follow-up or stretch work.
+
+## Local Corpus
+
+The local source mirrors and paper manifest are tracked under `docs/literature/`.
+
+- [`sources.jsonl`](../../literature/sources.jsonl): canonical paper manifest.
+- [`tex-src/`](../../literature/tex-src/): local LaTeX mirrors when available.
+
+Key local mirrors include VIN-NBV, GenNBV, Hestia, PB-NBV, EFM3D, Project Aria, SceneScript, Trajectory Transformer, Double DQN, IQL, Gumbel-Top-k, Deep Energy-Based Policies, Dynamic 3DGS, Next Best Sense, and Instance/Object-centric NBV. FOV-HPE is tracked as DOI/PDF evidence in the local corpus, not as a local TeX mirror.
 
 ## Navigation
 
-Return to [main documentation](../../index.qmd) or explore specific [metrics and evaluation](../theory/surface_metrics.qmd) approaches.
+Return to [main documentation](../../index.qmd), [research questions](../thesis/questions.qmd), [roadmap](../thesis/roadmap.qmd), or [RRI theory](../theory/rri_theory.qmd).

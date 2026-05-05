@@ -10,6 +10,10 @@ return {
       tex = "\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}}",
       typst = "#symb.ase.mesh",
     },
+    ["ase.mesh_target"] = {
+      tex = "M_e",
+      typst = "#symb.ase.mesh_target",
+    },
     ["ase.traj"] = {
       tex = "\\boldsymbol{T}_{\\mathrm{rig}}^{\\mathrm{w}}(t)",
       typst = "#symb.ase.traj",
@@ -18,13 +22,25 @@ return {
       tex = "\\boldsymbol{T}_{\\mathrm{rig}}^{\\mathrm{w}}(T)",
       typst = "#symb.ase.traj_final",
     },
+    ["entity.rri_e"] = {
+      tex = "\\mathrm{RRI}_e",
+      typst = "#symb.entity.rri_e",
+    },
     ["oracle.acc"] = {
       tex = "\\mathcal{A}",
       typst = "#symb.oracle.acc",
     },
+    ["oracle.candidate_qti"] = {
+      tex = "q_{t,i}",
+      typst = "#symb.oracle.candidate_qti",
+    },
     ["oracle.candidates"] = {
       tex = "\\boldsymbol{\\mathcal{Q}}",
       typst = "#symb.oracle.candidates",
+    },
+    ["oracle.candidates_t"] = {
+      tex = "Q_t",
+      typst = "#symb.oracle.candidates_t",
     },
     ["oracle.comp"] = {
       tex = "\\mathcal{C}",
@@ -50,17 +66,73 @@ return {
       tex = "G",
       typst = "#symb.rl.G",
     },
+    ["rl.H"] = {
+      tex = "H",
+      typst = "#symb.rl.H",
+    },
     ["rl.a"] = {
       tex = "a",
       typst = "#symb.rl.a",
+    },
+    ["rl.acquisition_cost"] = {
+      tex = "C(\\tau)",
+      typst = "#symb.rl.b",
+    },
+    ["rl.action_set"] = {
+      tex = "\\mathcal{A}(s_t)",
+      typst = "#symb.rl.action_set",
+    },
+    ["rl.budget"] = {
+      tex = "b_t",
+      typst = "#symb.rl.budget",
+    },
+    ["rl.gamma"] = {
+      tex = "\\gamma",
+      typst = "#symb.rl.gamma",
+    },
+    ["rl.invalid_reason"] = {
+      tex = "\\rho_{t,i}",
+      typst = "#symb.rl.invalid_reason",
+    },
+    ["rl.mdp_nbv"] = {
+      tex = "\\mathcal{M}_{\\mathrm{NBV}}",
+      typst = "#symb.rl.mdp_nbv",
+    },
+    ["rl.qh"] = {
+      tex = "Q_H",
+      typst = "#symb.rl.qh",
     },
     ["rl.r"] = {
       tex = "r",
       typst = "#symb.rl.r",
     },
+    ["rl.return_h"] = {
+      tex = "G_t^{(H)}",
+      typst = "#symb.rl.return_h",
+    },
+    ["rl.reward_target"] = {
+      tex = "r_t^e",
+      typst = "#symb.rl.reward_target",
+    },
     ["rl.s"] = {
       tex = "s",
       typst = "#symb.rl.s",
+    },
+    ["rl.target"] = {
+      tex = "e_t",
+      typst = "#symb.rl.target",
+    },
+    ["rl.transition"] = {
+      tex = "T",
+      typst = "#symb.rl.transition",
+    },
+    ["rl.validity_mask"] = {
+      tex = "m_{t,i}",
+      typst = "#symb.rl.validity_mask",
+    },
+    ["rri.cd_value"] = {
+      tex = "\\mathrm{CD}",
+      typst = "#eqs.rri.cd",
     },
     ["shape.K"] = {
       tex = "K",
@@ -116,6 +188,10 @@ return {
       tex = "\\mathrm{RRI}_{\\mathrm{total}}(q)=\\sum_{e\\in\\mathcal{E}}w_e\\mathrm{RRI}_e+\\lambda_{\\mathrm{scene}}\\mathrm{RRI}",
       typst = "#eqs.entity.objective",
     },
+    ["metrics.candidate_validity"] = {
+      tex = "m_i=\\mathbb{1}[\\mathrm{finite}]\\mathbb{1}[v_i>0]\\mathbb{1}[v_i^{\\mathrm{sem}}>0]",
+      typst = "#eqs.metrics.candidate_validity",
+    },
     ["metrics.spearman"] = {
       tex = "\\rho=\\operatorname{corr}(\\operatorname{rank}(\\hat{r}_i),\\operatorname{rank}(r_i))",
       typst = "#eqs.metrics.spearman",
@@ -124,17 +200,41 @@ return {
       tex = "\\mathrm{TopKAcc}(k)=\\frac{1}{N}\\sum_i\\mathbb{1}[y_i\\in\\mathrm{TopK}(\\boldsymbol{\\pi}_i,k)]",
       typst = "#eqs.metrics.topk_acc",
     },
+    ["rl.counterfactual_transition"] = {
+      tex = "P_{t+1}=P_t\\cup P_{q_t}",
+      typst = "#eqs.rl.counterfactual_transition",
+    },
+    ["rl.finite_action_set"] = {
+      tex = "\\mathcal{A}(s_t)=\\{q_{t,i}\\in Q_t:m_{t,i}=1\\}",
+      typst = "#eqs.rl.finite_action_set",
+    },
+    ["rl.finite_horizon_return"] = {
+      tex = "G_t^{(H)}=\\sum_{k=0}^{H-1}\\gamma^k r_{t+k}^e",
+      typst = "#eqs.rl.finite_horizon_return",
+    },
     ["rl.mdp"] = {
       tex = "\\mathcal{M}=(\\mathcal{S},\\mathcal{A},P,r,\\gamma)",
       typst = "#eqs.rl.mdp",
+    },
+    ["rl.nbv_mdp"] = {
+      tex = "\\mathcal{M}_{\\mathrm{NBV}}=(\\mathcal{S},\\mathcal{A},T,r_e,\\gamma,H)",
+      typst = "#eqs.rl.nbv_mdp",
     },
     ["rl.q_backup"] = {
       tex = "y_t^Q=r_t+\\gamma V(s_{t+1})",
       typst = "#eqs.rl.q_backup",
     },
+    ["rl.q_h"] = {
+      tex = "Q_H(s_t,q)=\\mathbb{E}\\left[G_t^{(H)}\\mid s_t,a_t=q\\right]",
+      typst = "#eqs.rl.q_h",
+    },
     ["rl.reward_geom"] = {
       tex = "r_t^{\\mathrm{geom}}=\\log(\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_t,\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}})+\\varepsilon)-\\log(\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_{t+1},\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}})+\\varepsilon)-\\alpha\\mathbb{1}[\\mathrm{collision}(a_t)]-\\beta c(a_t)",
       typst = "#eqs.rl.reward_geom",
+    },
+    ["rl.target_rri_reward"] = {
+      tex = "r_t^e=\\mathrm{RRI}_e(q_t\\mid P_t,M_e)",
+      typst = "#eqs.rl.target_rri_reward",
     },
     ["rri.acc"] = {
       tex = "\\mathcal{A}(\\boldsymbol{\\mathcal{P}},\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}})=\\frac{1}{\\lVert\\boldsymbol{\\mathcal{P}}\\rVert}\\sum_{\\boldsymbol{p}\\in\\boldsymbol{\\mathcal{P}}}\\min_{\\boldsymbol{f}\\in\\boldsymbol{\\mathcal{F}}_{\\mathrm{GT}}} d(\\boldsymbol{p},\\boldsymbol{f})^2",
@@ -155,6 +255,10 @@ return {
     ["rri.rri"] = {
       tex = "\\mathrm{RRI}(q)=\\frac{\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_t,\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}})-\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_t\\cup\\boldsymbol{\\mathcal{P}}_q,\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}})}{\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_t,\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}})+\\varepsilon}",
       typst = "#eqs.rri.rri",
+    },
+    ["rri.target_rri"] = {
+      tex = "\\mathrm{RRI}_e(q)=\\frac{\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_t^e,M_e)-\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_t^e\\cup\\boldsymbol{\\mathcal{P}}_q^e,M_e)}{\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_t^e,M_e)+\\varepsilon}",
+      typst = "#eqs.rri.target_rri",
     },
     ["rri.union"] = {
       tex = "\\boldsymbol{\\mathcal{P}}_{t\\cup q}=\\boldsymbol{\\mathcal{P}}_t\\cup\\boldsymbol{\\mathcal{P}}_q",

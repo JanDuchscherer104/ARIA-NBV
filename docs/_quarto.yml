@@ -97,13 +97,21 @@ website:
         - section: "Literature"
           contents:
             - contents/literature/index.qmd
-            - contents/literature/vin_nbv.qmd
-            - contents/literature/gen_nbv.qmd
-            - contents/literature/scene_script.qmd
-            - contents/literature/efm3d.qmd
-            - contents/literature/hestia.qmd
-            - contents/literature/rl_planning.qmd
-            - contents/literature/active_3dgs_nbv.qmd
+            - section: "NBV Methods"
+              contents:
+                - contents/literature/vin_nbv.qmd
+                - contents/literature/pb_nbv.qmd
+                - contents/literature/hestia.qmd
+                - contents/literature/gen_nbv.qmd
+                - contents/literature/active_3dgs_nbv.qmd
+            - section: "ARIA Ecosystem"
+              contents:
+                - contents/literature/project_aria.qmd
+                - contents/literature/efm3d.qmd
+                - contents/literature/scene_script.qmd
+            - section: "Rollout, Value, And RL"
+              contents:
+                - contents/literature/rl_planning.qmd
         - section: "Thesis State"
           contents:
             - contents/experiments/findings.qmd

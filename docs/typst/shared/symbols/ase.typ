@@ -1,6 +1,8 @@
 #let ase = (
     // GT mesh
     mesh: $bold(cal(M))_"GT"$,
+    // Target-specific GT surface / mesh crop.
+    mesh_target: $M_e$,
     // GT mesh faces / triangles.
     faces: $bold(cal(F))_"GT"$,
     // Trajectory

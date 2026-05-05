@@ -21,5 +21,10 @@
       ("CD"(#(symb.oracle.points) _t, #symb.ase.mesh) - "CD"(#(symb.oracle.points) _t union #symb.oracle.points_q, #symb.ase.mesh))
       / ("CD"(#(symb.oracle.points) _t, #symb.ase.mesh) + epsilon)
     $,
+    target_rri: $
+      "RRI"_e(q) =
+      ("CD"(#(symb.oracle.points) _t^e, #symb.ase.mesh_target) - "CD"(#(symb.oracle.points) _t^e union #(symb.oracle.points) _q^e, #symb.ase.mesh_target))
+      / ("CD"(#(symb.oracle.points) _t^e, #symb.ase.mesh_target) + epsilon)
+    $,
     greedy: $ q_star = op("argmax", limits: #true)_(q in #symb.oracle.candidates) "RRI"(q) $,
   )

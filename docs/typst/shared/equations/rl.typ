@@ -4,6 +4,9 @@
     mdp: $
       cal(M) = (cal(S), cal(A), P, #symb.rl.r, gamma)
     $,
+    nbv_mdp: $
+      #symb.rl.mdp_nbv = (cal(S), cal(A), T, r_e, #symb.rl.gamma, #symb.rl.H)
+    $,
     hist_ego: $
       #symb.rl.hist_ego
       =
@@ -62,6 +65,21 @@
         #(symb.rl.o) _(t+1),
         #(symb.rl.x) _(t+1)
       )
+    $,
+    finite_action_set: $
+      #symb.rl.action_set = {#symb.oracle.candidate_qti in #symb.oracle.candidates_t : #symb.rl.validity_mask = 1}
+    $,
+    counterfactual_transition: $
+      #(symb.oracle.points) _(t+1) = #(symb.oracle.points) _t union #(symb.oracle.points) _(q _t)
+    $,
+    target_rri_reward: $
+      #symb.rl.reward_target = "RRI"_e(q _t mid #(symb.oracle.points) _t, #symb.ase.mesh_target)
+    $,
+    finite_horizon_return: $
+      #symb.rl.return_h = sum_(k=0)^(#symb.rl.H - 1) #symb.rl.gamma^k r_(t+k)^e
+    $,
+    q_h: $
+      "Q"_H(s _t, q) = bb(E)[G _t^(H) mid s _t, a _t = q]
     $,
     reward_log: $
       #(symb.rl.r) _t

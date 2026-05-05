@@ -9,16 +9,65 @@ format: html
 
 ## Active 3DGS and Targeted NBV {#active-3dgs-targeted-nbv-literature}
 
-The recent 3D Gaussian Splatting (3DGS) NBV papers are useful for ARIA-NBV mainly because they sharpen the target-aware and information-gain parts of the roadmap. They do not replace the RRI objective: most of them optimize uncertainty, Fisher information, depth error, or task-specific downstream accuracy rather than mesh-supervised reconstruction improvement. They do, however, show that explicit scene representations can expose candidate-view utility directly, and that object- or task-conditioned view selection is becoming a concrete research pattern rather than a speculative extension. This line builds on the representation shift from NeRF-style continuous radiance fields to real-time 3D Gaussian Splatting, which made view-dependent scene models a practical substrate for active selection [@NeRF-mildenhall2020; @GaussianSplatting-kerbl2023].
+**Primary sources.** ActiveNeRF [@ActiveNeRF-pan2022], FisherRF [@FisherRF-jiang2024], Next Best Sense [@NextBestSense-strong2024], semantic/dynamic 3DGS NBV [@li2025bestviewselectionssemantic], object-centric 3DGS NBV [@ObjectCentricNBV-jeong2026], and FOV-HPE [@FOVHPE-bae2025].
 
-ActiveNeRF is the earliest source in the current expanded index that connects sparse-view neural scene reconstruction with an explicit uncertainty-driven acquisition loop [@ActiveNeRF-pan2022]. Its relevance is not the exact NeRF architecture, but the principle that the view selector should query where the current representation is uncertain under a limited capture budget. FisherRF makes the information-theoretic version of that idea more direct by estimating view utility through Fisher information in radiance-field parameters [@FisherRF-jiang2024]. For ARIA-NBV, these papers motivate uncertainty and information channels as diagnostics or proposal mechanisms, while keeping mesh-supervised RRI as the authoritative training and evaluation signal.
+**Source status.** The corpus has local TeX mirrors for several 3DGS/NBV papers, including Dynamic 3DGS, Next Best Sense, and Instance/Object-centric NBV. FOV-HPE is tracked through DOI/PDF evidence, not a local TeX mirror.
 
-Next Best Sense extends FisherRF-style active view selection to robotic 3DGS scenes with both vision and touch [@NextBestSense-strong2024]. The method improves few-view 3DGS by adding semantic depth alignment, then scores candidate views and touch poses through Fisher-information-based depth uncertainty. Its relevance to ARIA-NBV is diagnostic: it supports the idea that candidate views should be evaluated against geometric uncertainty fields, but it also highlights a difference in supervision. ARIA-NBV uses privileged ASE meshes to compute oracle RRI during training and evaluation, whereas FisherRF-style methods try to estimate informativeness from the current radiance-field parameter uncertainty.
+**Related ARIA-NBV pages.** [RRI theory](../theory/rri_theory.qmd), [RL planning](rl_planning.qmd), and [target-aware thesis questions](../thesis/questions.qmd).
 
-The semantic and dynamic 3DGS NBV paper generalizes this information-gain logic to Gaussian parameters, semantic features, and deformation-network parameters [@li2025bestviewselectionssemantic]. The paper frames NBV as active learning over candidate camera poses, approximates Fisher information to keep large Gaussian models tractable, and selects views that improve rendering, semantic segmentation, and dynamic deformation modeling. For ARIA-NBV, the useful abstraction is the separation of utility channels: geometry, semantics, and dynamics can have distinct information signals. Target-specific RRI can follow the same pattern by reporting scene-level RRI and target-level RRI side by side instead of collapsing them into one unlabeled score.
+### Core contribution
 
-The object-centric NBV paper by Jeong and coauthors is the closest match to the thesis target-aware direction [@ObjectCentricNBV-jeong2026]. It augments 3DGS with instance-level object features, weights information gain toward underexplored object regions, and shows that object-focused NBV improves depth reconstruction for a selected target compared with whole-scene selection. The immediate ARIA-NBV transfer is conceptual rather than architectural: a target of interest should be explicit in the state and objective, and object-conditioned utility should be evaluated separately from whole-scene utility. The current roadmap's GT-OBB-cropped target RRI is a mesh-supervised version of the same principle.
+Active NeRF and {{< gls three-dimensional-gaussian-splatting >}} papers are useful because they separate view utility into uncertainty, information, semantics, object focus, dynamics, or downstream-task loss. They do not replace ARIA-NBV's utility target. The thesis should keep {{< gls relative-reconstruction-improvement >}} and {{< gls target-specific-rri >}} as labels/evaluation, and use 3DGS-style signals as proposal or diagnostic channels.
 
-Bae, Lee, and Lee study NBV for monocular 3D human pose estimation in dynamic 3DGS space [@FOVHPE-bae2025]. Their task differs from ARIA-NBV because the reward is downstream pose-estimation error rather than reconstruction quality, but the paper is still relevant to the RL theory section: it uses 3DGS to create a continuous and photorealistic environment in which an RL agent can choose viewpoints that reduce an external task loss. This supports keeping simulator-backed or 3DGS-backed continuous control as a later extension, after the thesis has established whether discrete geometry-first rollouts improve RRI under equal acquisition budget.
+| method | verified paper signal | ARIA-NBV adoption | do not adopt |
+|---|---|---|---|
+| ActiveNeRF [@ActiveNeRF-pan2022] | Sparse-view NeRF acquisition uses uncertainty to choose views under a limited budget. | Use uncertainty-like scores as candidate proposal features and rank-agreement diagnostics. | Do not replace mesh-supervised RRI with NeRF uncertainty unless calibrated against RRI. |
+| FisherRF [@FisherRF-jiang2024] | Fisher information estimates how much a candidate view should reduce radiance-field uncertainty. | Treat Fisher-style information gain as a proposal channel for target-local evidence and uncertainty. | Do not treat Fisher information as GT reconstruction-quality improvement. |
+| Next Best Sense [@NextBestSense-strong2024] | Robotic 3DGS active sensing combines semantic depth alignment with Fisher-style depth uncertainty for view/touch selection. | Borrow the separation between representation uncertainty, semantic relevance, and downstream diagnostic value. | Do not import touch sensing or 3DGS scene state as thesis-core dependencies. |
+| Semantic/dynamic 3DGS NBV [@li2025bestviewselectionssemantic] | Active selection can score geometry, semantic Gaussian parameters, and dynamic/deformation parameters separately. | Report scene RRI, target RRI, validity, semantic relevance, and motion cost as separate channels. | Do not make dynamic 3DGS a dependency for static ASE target-conditioned reconstruction. |
+| Object-centric 3DGS NBV [@ObjectCentricNBV-jeong2026] | Instance/object features can focus view utility on underexplored target regions. | Adopt explicit target object, object-conditioned utility, and separate target metrics. | Do not use 3DGS object vectors as the first target representation; start with EVL/predicted OBB support. |
+| FOV-HPE [@FOVHPE-bae2025] | DOI/PDF evidence describes dynamic 3DGS novel-view rendering and RL viewpoint refinement for monocular 3D human-pose error. | Treat as evidence that 3DGS can become a downstream-task simulator bridge. | Do not use MPJPE, human-pose reward, or dynamic-human scenes as thesis-core objectives. |
 
-These 3DGS papers reinforce a narrow thesis design choice. ARIA-NBV should first keep RRI as the authoritative utility signal, because that is what connects candidate selection to reconstruction quality. Object features, Fisher information, semantic uncertainty, and 3DGS-based simulation should enter as later representation or proposal mechanisms, not as replacements for the oracle label until they are calibrated against target-level and scene-level RRI.
+### Verified paper signals
+
+The common transferable structure is utility-channel separation:
+
+$$
+U(q)
+=
+\lambda_{\mathrm{geom}} U_{\mathrm{geom}}(q)
++
+\lambda_{\mathrm{target}} U_{\mathrm{target}}(q)
++
+\lambda_{\mathrm{unc}} U_{\mathrm{unc}}(q)
++
+\lambda_{\mathrm{task}} U_{\mathrm{task}}(q).
+$$
+
+ARIA-NBV should not collapse these into one opaque score. The thesis-core version should log them separately:
+
+| ARIA-NBV channel | role |
+|---|---|
+| scene {{< gls relative-reconstruction-improvement >}} | global reconstruction-quality label/evaluation |
+| {{< gls target-specific-rri >}} | target-conditioned label/evaluation |
+| {{< gls validity-mask >}} and invalid reason | feasibility constraint |
+| uncertainty / Fisher / evidence count | proposal or diagnostic signal |
+| motion/path cost | optional planning penalty after quality evidence is trusted |
+
+### ARIA-NBV adoption
+
+- **Proposal/diagnostic:** uncertainty, Fisher information, object focus, semantic relevance, rank agreement, and candidate diversity.
+- **Gated follow-up:** radiance-field or 3DGS scene state only after the finite-candidate target-RRI path works.
+- **Stretch/bridge:** 3DGS-backed continuous-control or downstream-task simulators after an environment abstraction exists.
+
+### Do not adopt
+
+- Do not move the thesis objective from {{< gls target-specific-rri >}} to 3DGS uncertainty.
+- Do not make 3DGS a required reconstruction backend for ASE oracle rollout generation.
+- Do not claim local TeX verification for FOV-HPE; the current corpus has DOI/PDF evidence only.
+
+### Open risks / caveats
+
+- 3DGS uncertainty and Fisher metrics can disagree with mesh-supervised reconstruction quality.
+- Target-aware 3DGS methods often assume representation state and optimization loops that ARIA-NBV does not yet have.
+- These papers are most useful as target/proposal inspiration, not as replacements for the finite-candidate {{< gls finite-horizon-q-function >}} thesis path.

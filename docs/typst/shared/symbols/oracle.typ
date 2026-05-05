@@ -7,6 +7,10 @@
     points_q: $bold(cal(P))_q$,
     // Candidate pose set
     candidates: $bold(cal(Q))$,
+    // Candidate pose set at rollout step t.
+    candidates_t: $Q_t$,
+    // Candidate i at rollout step t.
+    candidate_qti: $q_(t,i)$,
     // Candidate depth maps.
     depth_q: $bold(D)_q$,
     // Pixel-wise valid mask for candidate depth maps / projections.

@@ -21,35 +21,1008 @@ execute:
 ::: {.glossary-page}
 
 ::: {.glossary-intro}
-**38 terms** across **9 categories**. The canonical source is
+**51 terms** across **10 categories**. The canonical source is
 `docs/typst/shared/glossary.typ`; generated Quarto, Typst, YAML, KG, and shortcode artifacts
 share the same definitions.
+
+Tier counts: **22 core**, **13 support**,
+and **16 background** terms. Core terms are the thesis math lookup;
+background terms remain linkable but are visually demoted.
 
 Use `{{{< gls term-id >}}}` for the linked short label and
 `{{{< glsfull term-id >}}}` for the linked full label in QMD pages.
 :::
 
 <nav class="glossary-category-index" aria-label="Glossary categories">
+<a class="glossary-chip glossary-category-chip" href="#glossary-tier-core">Core <span>22</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-core-math-lookup">Math lookup</a>
 <a class="glossary-chip glossary-category-chip" href="#glossary-category-dataset">Dataset <span>11</span></a>
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-entity">Entity <span>1</span></a>
 <a class="glossary-chip glossary-category-chip" href="#glossary-category-geometry">Geometry <span>5</span></a>
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-metrics">Metrics <span>6</span></a>
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-model">Model <span>4</span></a>
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-planning">Planning <span>4</span></a>
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-reconstruction">Reconstruction <span>5</span></a>
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-representation">Representation <span>1</span></a>
-<a class="glossary-chip glossary-category-chip" href="#glossary-category-supervision">Supervision <span>1</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-category-metrics">Metrics <span>3</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-category-model">Model <span>3</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-category-planning">Planning <span>1</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-category-reconstruction">Reconstruction <span>4</span></a>
+<a class="glossary-chip glossary-category-chip" href="#glossary-category-representation">Representation <span>2</span></a>
 </nav>
+
+## Core Math Lookup {#glossary-core-math-lookup}
+
+<div class="glossary-lookup-wrap">
+<table class="glossary-lookup-table">
+<thead>
+<tr>
+<th>Concept</th>
+<th>Meaning</th>
+<th>Symbols</th>
+<th>Equations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#term-next-best-view">NBV - Next-Best-View</a></td>
+<td>Problem of selecting the next sensor viewpoint to improve an active reconstruction or inspection objective under a limited acquisition budget.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}\)</span><code>rl.mdp_nbv</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)\)</span><code>rl.nbv_mdp</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-relative-reconstruction-improvement">RRI - Relative Reconstruction Improvement</a></td>
+<td>Metric quantifying the relative reconstruction-quality improvement obtained by adding a candidate observation to the current reconstruction.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}\)</span><code>oracle.rri</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}\)</span><code>rri.rri</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-chamfer-distance">CD - Chamfer Distance</a></td>
+<td>Bidirectional point-set distance commonly used to compare reconstructed points against reference geometry.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{CD}\)</span><code>rri.cd_value</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{M}}_{\mathrm{GT}}\)</span><code>ase.mesh</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{CD}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\mathcal{A}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\mathcal{C}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})\)</span><code>rri.cd</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-target-specific-rri">target RRI - Target-Specific RRI</a></td>
+<td>RRI computed only on the ground-truth and reconstructed geometry associated with a selected target of interest.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e\)</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e\cup\boldsymbol{\mathcal{P}}_q^e,M_e)}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)+\varepsilon}\)</span><code>rri.target_rri</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-target-of-interest">target - Target of Interest</a></td>
+<td>Selected entity, object crop, point, region, or surface-deficit hypothesis whose reconstruction quality should be improved.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(e_t\)</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></td>
+<td><span class="glossary-muted">-</span></td>
+</tr>
+<tr>
+<td><a href="#term-point-cloud">PC - Point Cloud</a></td>
+<td>Set of 3D points representing observed scene geometry.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}_q\)</span><code>oracle.points_q</code></span></div></td>
+<td><span class="glossary-muted">-</span></td>
+</tr>
+<tr>
+<td><a href="#term-candidate-view">candidate - Candidate View</a></td>
+<td>Proposed camera pose whose expected reconstruction utility is evaluated before selecting the next observation.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span></div></td>
+<td><span class="glossary-muted">-</span></td>
+</tr>
+<tr>
+<td><a href="#term-oracle-rri">oracle RRI - Oracle RRI</a></td>
+<td>RRI label computed with privileged ground-truth geometry, used for supervised training and evaluation.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}\)</span><code>oracle.rri</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{M}}_{\mathrm{GT}}\)</span><code>ase.mesh</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}\)</span><code>rri.rri</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-target-conditioned-scorer">target-conditioned scorer - Target-Conditioned Scorer</a></td>
+<td>VIN-style candidate scorer that receives scene state, a candidate view, and an encoding of the target of interest.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\hat{r}\)</span><code>vin.rri_hat</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho=\operatorname{corr}(\operatorname{rank}(\hat{r}_i),\operatorname{rank}(r_i))\)</span><code>metrics.spearman</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{TopKAcc}(k)=\frac{1}{N}\sum_i\mathbb{1}[y_i\in\mathrm{TopK}(\boldsymbol{\pi}_i,k)]\)</span><code>metrics.topk_acc</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-observed-target-selection">OBS-SEL - Observed Target Selection</a></td>
+<td>Main thesis protocol component requiring target selection to use only actor-visible observed or predicted target evidence.</td>
+<td><span class="glossary-muted">-</span></td>
+<td><span class="glossary-muted">-</span></td>
+</tr>
+<tr>
+<td><a href="#term-predicted-target-q">PRED-Q - Predicted-Target Q</a></td>
+<td>Main thesis protocol component requiring scorer or Q_H inputs to use predicted or observed target descriptors.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H\)</span><code>rl.qh</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]\)</span><code>rl.q_h</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-ground-truth-target-evaluation">GT-EVAL - Ground-Truth Target Evaluation</a></td>
+<td>Main thesis protocol component using ground-truth OBBs and target mesh crops only for labels and evaluation.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></td>
+<td><span class="glossary-muted">-</span></td>
+</tr>
+<tr>
+<td><a href="#term-acquisition-cost">cost - Acquisition Cost</a></td>
+<td>Budget consumed to acquire observations, measured by view count, path length, elapsed time, invalid-action rate, or a weighted combination.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(C(\tau)\)</span><code>rl.acquisition_cost</code></span></div></td>
+<td><span class="glossary-muted">-</span></td>
+</tr>
+<tr>
+<td><a href="#term-target-conditioned-nbv-mdp">NBV MDP - Target-Conditioned NBV MDP</a></td>
+<td>Finite-horizon MDP contract for target-conditioned ARIA-NBV rollouts and fitted Q_H training.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}\)</span><code>rl.mdp_nbv</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)\)</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(T\)</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\gamma\)</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(H\)</span><code>rl.H</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)\)</span><code>rl.nbv_mdp</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-rollout-state">state - Rollout State</a></td>
+<td>Actor-visible state bundle used by target-conditioned rollouts and Q_H.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho_{t,i}\)</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(e_t\)</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(b_t\)</span><code>rl.budget</code></span></div></td>
+<td><span class="glossary-muted">-</span></td>
+</tr>
+<tr>
+<td><a href="#term-finite-candidate-action-set">action set - Finite Candidate Action Set</a></td>
+<td>Masked finite action set over sampled candidate views.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)\)</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}\)</span><code>rl.finite_action_set</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-counterfactual-transition">transition - Counterfactual Transition</a></td>
+<td>Replayable state update after selecting a candidate view.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(T\)</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}_q\)</span><code>oracle.points_q</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(P_{t+1}=P_t\cup P_{q_t}\)</span><code>rl.counterfactual_transition</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-target-rri-reward">reward - Target-RRI Reward</a></td>
+<td>Quality-only immediate reward equal to target-specific RRI for the selected candidate.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e\)</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e=\mathrm{RRI}_e(q_t\mid P_t,M_e)\)</span><code>rl.target_rri_reward</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-finite-horizon-return">return - Finite-Horizon Return</a></td>
+<td>H-step discounted return over target-RRI rewards.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}\)</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\gamma\)</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(H\)</span><code>rl.H</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}=\sum_{k=0}^{H-1}\gamma^k r_{t+k}^e\)</span><code>rl.finite_horizon_return</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-finite-horizon-q-function">Q_H - Finite-Horizon Q Function</a></td>
+<td>Finite-horizon candidate-value function for target-conditioned ARIA-NBV.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H\)</span><code>rl.qh</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}\)</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]\)</span><code>rl.q_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(y_t^Q=r_t+\gamma V(s_{t+1})\)</span><code>rl.q_backup</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-validity-mask">mask - Validity Mask</a></td>
+<td>Hard mask that separates feasible candidate actions from invalid candidates.</td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho_{t,i}\)</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m\)</span><code>vin.cand_valid</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(m_i=\mathbb{1}[\mathrm{finite}]\mathbb{1}[v_i&gt;0]\mathbb{1}[v_i^{\mathrm{sem}}&gt;0]\)</span><code>metrics.candidate_validity</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}\)</span><code>rl.finite_action_set</code></span></div></td>
+</tr>
+<tr>
+<td><a href="#term-project-aria">Project Aria</a></td>
+<td>Egocentric research-device and tooling ecosystem for calibrated, time-aligned multimodal sensing.</td>
+<td><span class="glossary-muted">-</span></td>
+<td><span class="glossary-muted">-</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+## Core Concepts {#glossary-tier-core}
+
+<div class="glossary-card-grid glossary-card-grid-core">
+
+<article class="glossary-card glossary-tier-core" id="term-next-best-view">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Next-Best-View</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">NBV</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">planning.view_selection</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>next best view</code> <code>viewpoint selection</code> <code>view planning</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}\)</span><code>rl.mdp_nbv</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)\)</span><code>rl.nbv_mdp</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Problem of selecting the next sensor viewpoint to improve an active reconstruction or inspection objective under a limited acquisition budget.</p>
+
+<p class="glossary-detail-text">In ARIA-NBV, the preferred objective is reconstruction quality improvement rather than coverage alone, with candidate views ranked by oracle or learned RRI scores.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/nbv_background.html" title="docs/contents/theory/nbv_background.qmd">NBV Background</a> <a class="glossary-chip" href="thesis/roadmap.html" title="docs/contents/thesis/roadmap.qmd">Master Thesis Roadmap</a> <a class="glossary-chip" href="thesis/questions.html#research-questions" title="docs/contents/thesis/questions.qmd#research-questions">Master Thesis Research Questions</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a> <a class="glossary-chip glossary-citation" href="#ref-GenNBV-chen2024">&#64;GenNBV-chen2024</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-relative-reconstruction-improvement">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Relative Reconstruction Improvement</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">RRI</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">metrics.reconstruction_quality</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>reconstruction-quality gain</code> <code>relative quality improvement</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}\)</span><code>oracle.rri</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}\)</span><code>rri.rri</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Metric quantifying the relative reconstruction-quality improvement obtained by adding a candidate observation to the current reconstruction.</p>
+
+<p class="glossary-detail-text">ARIA-NBV computes RRI by comparing reconstruction error before and after fusing candidate-view geometry, usually against an ASE ground-truth mesh for oracle supervision and evaluation.</p>
+
+::: {.glossary-formula}
+$$
+\mathrm{RRI}(q)=\frac{d(P_t,M)-d(P_t\cup P_q,M)}{d(P_t,M)+\varepsilon}
+$$
+:::
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a> <a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-candidate-view">candidate</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rri_theory.html" title="docs/contents/theory/rri_theory.qmd">Relative Reconstruction Improvement (RRI) Theory</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="literature/vin_nbv.html" title="docs/contents/literature/vin_nbv.qmd">VIN-NBV</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-chamfer-distance">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Chamfer Distance</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">CD</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">metrics.reconstruction_quality</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>Chamfer metric</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{CD}\)</span><code>rri.cd_value</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{M}}_{\mathrm{GT}}\)</span><code>ase.mesh</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{CD}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\mathcal{A}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\mathcal{C}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})\)</span><code>rri.cd</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Bidirectional point-set distance commonly used to compare reconstructed points against reference geometry.</p>
+
+<p class="glossary-detail-text">ARIA-NBV uses point-to-mesh and Chamfer-style distances as reconstruction error components when deriving oracle RRI labels and diagnostics.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-point-cloud">PC</a> <a class="glossary-chip" href="#term-ground-truth">GT</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="theory/rri_theory.html" title="docs/contents/theory/rri_theory.qmd">Relative Reconstruction Improvement (RRI) Theory</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-target-specific-rri">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Target-Specific RRI</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">target RRI</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">metrics.reconstruction_quality</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>entity RRI</code> <code>object RRI</code> <code>target RRI</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e\)</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e\cup\boldsymbol{\mathcal{P}}_q^e,M_e)}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)+\varepsilon}\)</span><code>rri.target_rri</code></span></div></div>
+</div>
+
+<p class="glossary-definition">RRI computed only on the ground-truth and reconstructed geometry associated with a selected target of interest.</p>
+
+<p class="glossary-detail-text">Target-specific RRI lets the thesis compare views by how much they improve a selected object or region, even when scene-level RRI would prefer large background surfaces.</p>
+
+::: {.glossary-formula}
+$$
+\mathrm{RRI}_e(q)=\frac{d(P_t^e,M_e)-d(P_t^e\cup P_q^e,M_e)}{d(P_t^e,M_e)+\varepsilon}
+$$
+:::
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-target-of-interest">target</a> <a class="glossary-chip" href="#term-acquisition-cost">cost</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/rri_computation.html#entity-wise-rri" title="docs/contents/impl/rri_computation.qmd#entity-wise-rri">Computing RRI with Ground Truth Meshes</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-target-of-interest">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Target of Interest</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">target</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">entity.targeting</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>target entity</code> <code>object of interest</code> <code>inspection target</code> <code>task target</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(e_t\)</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Selected entity, object crop, point, region, or surface-deficit hypothesis whose reconstruction quality should be improved.</p>
+
+<p class="glossary-detail-text">Target-conditioned ARIA-NBV variants use this target as an explicit input to candidate scoring and planning instead of optimizing only scene-level RRI.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-target-conditioned-scorer">target-conditioned scorer</a> <a class="glossary-chip" href="#term-oriented-bounding-box">OBB</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq2-target-encoding" title="docs/contents/thesis/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_v2_feature_proposals.html" title="docs/contents/impl/vin_v2_feature_proposals.qmd">VIN v2 Feature + Encoding Proposals</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-point-cloud">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Point Cloud</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">PC</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">reconstruction.representation</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>3D points</code> <code>semi-dense point cloud</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}_q\)</span><code>oracle.points_q</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Set of 3D points representing observed scene geometry.</p>
+
+<p class="glossary-detail-text">ARIA-NBV compares current and candidate-fused point clouds against ground-truth meshes to compute oracle RRI and surface-distance diagnostics.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a> <a class="glossary-chip" href="#term-simultaneous-localization-and-mapping">SLAM</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/semi-dense-pc.html" title="docs/contents/theory/semi-dense-pc.qmd">Semi-Dense Point Clouds</a> <a class="glossary-chip" href="theory/surface_metrics.html" title="docs/contents/theory/surface_metrics.qmd">Surface Reconstruction Metrics</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-candidate-view">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Candidate View</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">candidate</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">planning.action</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>candidate pose</code> <code>candidate viewpoint</code> <code>next-view candidate</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Proposed camera pose whose expected reconstruction utility is evaluated before selecting the next observation.</p>
+
+<p class="glossary-detail-text">ARIA-NBV samples candidate views around a reference pose or target, renders candidate depths from the mesh for oracle labels, and scores candidates with RRI or learned VIN predictions.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-next-best-view">NBV</a> <a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a> <a class="glossary-chip" href="#term-target-conditioned-scorer">target-conditioned scorer</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq3-candidates" title="docs/contents/thesis/questions.qmd#rq3-candidates">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CandidateViewGenerator.html" title="docs/reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd">CandidateViewGenerator</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-oracle-rri">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Oracle RRI</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">oracle RRI</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">supervision.oracle</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>RRI oracle</code> <code>oracle label</code> <code>mesh-supervised RRI</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}\)</span><code>oracle.rri</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{M}}_{\mathrm{GT}}\)</span><code>ase.mesh</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}\)</span><code>rri.rri</code></span></div></div>
+</div>
+
+<p class="glossary-definition">RRI label computed with privileged ground-truth geometry, used for supervised training and evaluation.</p>
+
+<p class="glossary-detail-text">The current oracle renders candidate depth maps from ASE ground-truth meshes, backprojects candidate point clouds, fuses them with the current semi-dense reconstruction, and scores the resulting surface-distance improvement.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-aria-synthetic-environments">ASE</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="impl/data_pipeline_overview.html" title="docs/contents/impl/data_pipeline_overview.qmd">ASE Data Pipeline &amp; Streamlit Usage</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m1" title="docs/contents/thesis/roadmap.qmd#roadmap-m1">Master Thesis Roadmap</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a> <a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-target-conditioned-scorer">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Target-Conditioned Scorer</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">target-conditioned scorer</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">model.scoring</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>target-conditioned VIN</code> <code>target-aware scorer</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\hat{r}\)</span><code>vin.rri_hat</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho=\operatorname{corr}(\operatorname{rank}(\hat{r}_i),\operatorname{rank}(r_i))\)</span><code>metrics.spearman</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{TopKAcc}(k)=\frac{1}{N}\sum_i\mathbb{1}[y_i\in\mathrm{TopK}(\boldsymbol{\pi}_i,k)]\)</span><code>metrics.topk_acc</code></span></div></div>
+</div>
+
+<p class="glossary-definition">VIN-style candidate scorer that receives scene state, a candidate view, and an encoding of the target of interest.</p>
+
+<p class="glossary-detail-text">The scorer predicts target-specific utility so view ranking can prioritize a selected entity or region instead of only optimizing scene-level RRI.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-of-interest">target</a> <a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a> <a class="glossary-chip" href="#term-finite-horizon-q-function">Q_H</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.model_v3.VinModelV3.html" title="docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd">VinModelV3</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-observed-target-selection">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Observed Target Selection</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">OBS-SEL</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">protocol.targeting</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>observed-only target selection</code> <code>actor-visible target selection</code>
+</div>
+
+<p class="glossary-definition">Main thesis protocol component requiring target selection to use only actor-visible observed or predicted target evidence.</p>
+
+<p class="glossary-detail-text">Observed Target Selection uses predicted or tracked OBBs, class probabilities, confidence, projected area, and semidense or EVL support. Ground-truth target annotations are not visible to the selector in the main thesis protocol.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-of-interest">target</a> <a class="glossary-chip" href="#term-predicted-target-q">PRED-Q</a> <a class="glossary-chip" href="#term-ground-truth-target-evaluation">GT-EVAL</a> <a class="glossary-chip" href="#term-oriented-bounding-box">OBB</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq2-target-encoding" title="docs/contents/thesis/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq-thesis-boundary" title="docs/contents/thesis/questions.qmd#rq-thesis-boundary">Master Thesis Research Questions</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a> <a class="glossary-chip glossary-citation" href="#ref-ProjectAria-ASE-2025">&#64;ProjectAria-ASE-2025</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-predicted-target-q">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Predicted-Target Q</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">PRED-Q</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">protocol.learning</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>predicted-target scorer</code> <code>predicted-target Q_H</code> <code>actor-visible Q</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H\)</span><code>rl.qh</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]\)</span><code>rl.q_h</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Main thesis protocol component requiring scorer or Q_H inputs to use predicted or observed target descriptors.</p>
+
+<p class="glossary-detail-text">Predicted-Target Q covers target-conditioned one-step scoring and finite-candidate Q_H selection whose target inputs are actor-visible predicted or observed descriptors, not ground-truth target annotations.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-observed-target-selection">OBS-SEL</a> <a class="glossary-chip" href="#term-ground-truth-target-evaluation">GT-EVAL</a> <a class="glossary-chip" href="#term-target-conditioned-scorer">target-conditioned scorer</a> <a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-finite-horizon-q-function">Q_H</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq2-target-encoding" title="docs/contents/thesis/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a> <a class="glossary-chip glossary-citation" href="#ref-DoubleDQN-vanHasselt2015">&#64;DoubleDQN-vanHasselt2015</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-ground-truth-target-evaluation">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Ground-Truth Target Evaluation</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">GT-EVAL</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">protocol.evaluation</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>GT target evaluation</code> <code>GT target crop evaluation</code> <code>oracle target evaluation</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Main thesis protocol component using ground-truth OBBs and target mesh crops only for labels and evaluation.</p>
+
+<p class="glossary-detail-text">Ground-Truth Target Evaluation uses GT OBBs and target mesh crops for oracle target-RRI labels, matching checks, and evaluation while keeping those annotations hidden from the actor-visible selector, scorer, and Q_H model in the main result.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-ground-truth">GT</a> <a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-observed-target-selection">OBS-SEL</a> <a class="glossary-chip" href="#term-predicted-target-q">PRED-Q</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq2-target-encoding" title="docs/contents/thesis/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/rri_computation.html#entity-wise-rri" title="docs/contents/impl/rri_computation.qmd#entity-wise-rri">Computing RRI with Ground Truth Meshes</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-ProjectAria-ASE-2025">&#64;ProjectAria-ASE-2025</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-acquisition-cost">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Acquisition Cost</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">cost</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">planning.objective</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>capture budget</code> <code>view budget</code> <code>motion cost</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(C(\tau)\)</span><code>rl.acquisition_cost</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Budget consumed to acquire observations, measured by view count, path length, elapsed time, invalid-action rate, or a weighted combination.</p>
+
+<p class="glossary-detail-text">The thesis should first report cumulative target RRI and acquisition cost separately, then use scalarized objectives only when the tradeoff is explicit.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-next-best-view">NBV</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-target-conditioned-nbv-mdp">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Target-Conditioned NBV MDP</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">NBV MDP</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">planning.mdp</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>ARIA-NBV MDP</code> <code>rollout MDP</code> <code>finite-candidate NBV MDP</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}\)</span><code>rl.mdp_nbv</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)\)</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(T\)</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\gamma\)</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(H\)</span><code>rl.H</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)\)</span><code>rl.nbv_mdp</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Finite-horizon MDP contract for target-conditioned ARIA-NBV rollouts and fitted Q_H training.</p>
+
+<p class="glossary-detail-text">The ARIA-NBV MDP keeps actions restricted to sampled finite candidate views and keeps GT meshes or GT target crops outside the actor-visible state. It is the contract that connects target-conditioned rollout generation, reward computation, validity masks, and fitted finite-horizon Q learning.</p>
+
+::: {.glossary-formula}
+**ARIA-NBV MDP contract**
+
+$$
+\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)
+$$
+:::
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-rollout-state">state</a> <a class="glossary-chip" href="#term-finite-candidate-action-set">action set</a> <a class="glossary-chip" href="#term-counterfactual-transition">transition</a> <a class="glossary-chip" href="#term-target-rri-reward">reward</a> <a class="glossary-chip" href="#term-finite-horizon-return">return</a> <a class="glossary-chip" href="#term-finite-horizon-q-function">Q_H</a> <a class="glossary-chip" href="#term-validity-mask">mask</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a> <a class="glossary-chip glossary-citation" href="#ref-DoubleDQN-vanHasselt2015">&#64;DoubleDQN-vanHasselt2015</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-rollout-state">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Rollout State</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">state</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">planning.mdp</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>MDP state</code> <code>actor-visible state</code> <code>rollout observation</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho_{t,i}\)</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(e_t\)</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(b_t\)</span><code>rl.budget</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Actor-visible state bundle used by target-conditioned rollouts and Q_H.</p>
+
+<p class="glossary-detail-text">The rollout state contains accumulated semidense/current points, candidate poses, validity masks and reason codes, observed/predicted target fields, bounded history, and budget state. GT meshes, GT OBB crops, and oracle labels remain outside the actor-visible state in the main protocol.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-finite-candidate-action-set">action set</a> <a class="glossary-chip" href="#term-validity-mask">mask</a> <a class="glossary-chip" href="#term-observed-target-selection">OBS-SEL</a> <a class="glossary-chip" href="#term-predicted-target-q">PRED-Q</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-finite-candidate-action-set">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Finite Candidate Action Set</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">action set</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">planning.mdp</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>candidate action set</code> <code>masked candidate set</code> <code>finite NBV action space</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)\)</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}\)</span><code>rl.finite_action_set</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Masked finite action set over sampled candidate views.</p>
+
+<p class="glossary-detail-text">At each rollout step, ARIA-NBV samples a finite candidate set and exposes only valid candidates as admissible actions. This keeps planning bounded and preserves invalidity as a feasibility constraint.</p>
+
+::: {.glossary-formula}
+**Masked finite action set**
+
+$$
+\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}
+$$
+:::
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-validity-mask">mask</a> <a class="glossary-chip" href="#term-rollout-state">state</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq3-candidates" title="docs/contents/thesis/questions.qmd#rq3-candidates">Master Thesis Research Questions</a> <a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CandidateViewGenerator.html" title="docs/reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd">CandidateViewGenerator</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-counterfactual-transition">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Counterfactual Transition</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">transition</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">planning.mdp</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>rollout transition</code> <code>candidate fusion update</code> <code>counterfactual update</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(T\)</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}_q\)</span><code>oracle.points_q</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(P_{t+1}=P_t\cup P_{q_t}\)</span><code>rl.counterfactual_transition</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Replayable state update after selecting a candidate view.</p>
+
+<p class="glossary-detail-text">For the thesis-core ASE mesh/oracle loop, the transition uses candidate rendering or cached candidate observations to update the counterfactual point state and rollout history. It must be deterministic under the stored seed and lineage.</p>
+
+::: {.glossary-formula}
+**Point-state transition**
+
+$$
+P_{t+1}=P_t\cup P_{q_t}
+$$
+:::
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-rollout-state">state</a> <a class="glossary-chip" href="#term-point-cloud">PC</a> <a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.html" title="docs/reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd">CounterfactualPoseGenerator</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-target-rri-reward">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Target-RRI Reward</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">reward</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">metrics.reconstruction_quality</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>target reward</code> <code>quality reward</code> <code>target-specific RRI reward</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e\)</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e=\mathrm{RRI}_e(q_t\mid P_t,M_e)\)</span><code>rl.target_rri_reward</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Quality-only immediate reward equal to target-specific RRI for the selected candidate.</p>
+
+<p class="glossary-detail-text">The main thesis reward is cumulative target RRI under equal acquisition budget. Log-improvement and episode-normalized variants remain visible follow-up reward ablations, not the default target for the first Q_H result.</p>
+
+::: {.glossary-formula}
+**Target-RRI reward**
+
+$$
+r_t^e=\mathrm{RRI}_e(q_t\mid P_t,M_e)
+$$
+:::
+
+::: {.glossary-formula}
+**Log-improvement follow-up**
+
+$$
+r_t^{\log,e}=\log(d(P_t^e,M_e)+\varepsilon)-\log(d(P_{t+1}^e,M_e)+\varepsilon)
+$$
+:::
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-finite-horizon-return">return</a> <a class="glossary-chip" href="#term-acquisition-cost">cost</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-finite-horizon-return">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Finite-Horizon Return</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">return</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">planning.objective</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>H-step return</code> <code>bounded return</code> <code>cumulative target RRI</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}\)</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\gamma\)</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(H\)</span><code>rl.H</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}=\sum_{k=0}^{H-1}\gamma^k r_{t+k}^e\)</span><code>rl.finite_horizon_return</code></span></div></div>
+</div>
+
+<p class="glossary-definition">H-step discounted return over target-RRI rewards.</p>
+
+<p class="glossary-detail-text">The return definition keeps gamma symbolic so discounted ablations remain possible. The first thesis result should report cumulative target RRI under an equal acquisition budget and treat log-improvement or normalized rewards as follow-up analysis.</p>
+
+::: {.glossary-formula}
+**Finite-horizon return**
+
+$$
+G_t^{(H)}=\sum_{k=0}^{H-1}\gamma^k r_{t+k}^e
+$$
+:::
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-rri-reward">reward</a> <a class="glossary-chip" href="#term-finite-horizon-q-function">Q_H</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-finite-horizon-q-function">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Finite-Horizon Q Function</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">Q_H</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">model.value</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>Q_H</code> <code>bounded Q function</code> <code>finite-candidate Q</code> <code>fitted Double-Q head</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H\)</span><code>rl.qh</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}\)</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]\)</span><code>rl.q_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(y_t^Q=r_t+\gamma V(s_{t+1})\)</span><code>rl.q_backup</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Finite-horizon candidate-value function for target-conditioned ARIA-NBV.</p>
+
+<p class="glossary-detail-text">The mandatory M5 learned policy-like result is fitted Double-Q / Q_H over finite candidate sets. It must respect validity masks and beat one-step greedy or model scoring on cumulative target RRI under equal acquisition budget, with bounded oracle lookahead as an upper bound.</p>
+
+::: {.glossary-formula}
+**Finite-horizon candidate value**
+
+$$
+Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]
+$$
+:::
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-finite-horizon-return">return</a> <a class="glossary-chip" href="#term-predicted-target-q">PRED-Q</a> <a class="glossary-chip" href="#term-validity-mask">mask</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a> <a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-DoubleDQN-vanHasselt2015">&#64;DoubleDQN-vanHasselt2015</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-validity-mask">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Validity Mask</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">mask</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">planning.constraints</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>candidate validity mask</code> <code>action mask</code> <code>invalid action mask</code>
+</div>
+
+<div class="glossary-card-notation">
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho_{t,i}\)</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m\)</span><code>vin.cand_valid</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(m_i=\mathbb{1}[\mathrm{finite}]\mathbb{1}[v_i&gt;0]\mathbb{1}[v_i^{\mathrm{sem}}&gt;0]\)</span><code>metrics.candidate_validity</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}\)</span><code>rl.finite_action_set</code></span></div></div>
+</div>
+
+<p class="glossary-definition">Hard mask that separates feasible candidate actions from invalid candidates.</p>
+
+<p class="glossary-detail-text">The mask m_{t,i} gates candidate actions, while invalid reason codes rho_{t,i} preserve why a candidate was rejected. Collision, outside-bounds poses, no target visibility, bad frusta, no depth hits, and outside-EVL-extent cases are constraints rather than low target-RRI examples.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-finite-candidate-action-set">action set</a> <a class="glossary-chip" href="#term-finite-horizon-q-function">Q_H</a> <a class="glossary-chip" href="#term-target-rri-reward">reward</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq6-feasibility" title="docs/contents/thesis/questions.qmd#rq6-feasibility">Master Thesis Research Questions</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CandidateSamplingResult.html" title="docs/reference/aria_nbv.pose_generation.CandidateSamplingResult.qmd">CandidateSamplingResult</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-core" id="term-project-aria">
+<div class="glossary-card-header">
+<div class="glossary-term-title">Project Aria</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-core">core</span>
+<span class="glossary-badge">dataset.project_aria</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>Aria</code> <code>Project Aria ecosystem</code>
+</div>
+
+<p class="glossary-definition">Egocentric research-device and tooling ecosystem for calibrated, time-aligned multimodal sensing.</p>
+
+<p class="glossary-detail-text">ARIA-NBV treats Project Aria and its MPS-style products as the actor-visible sensing contract, while ASE meshes remain offline supervision and evaluation assets.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-machine-perception-services">MPS</a> <a class="glossary-chip" href="#term-aria-synthetic-environments">ASE</a> <a class="glossary-chip" href="#term-visual-inertial-odometry">VIO</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/project_aria.html" title="docs/contents/literature/project_aria.qmd">Project Aria</a> <a class="glossary-chip" href="ase_dataset.html" title="docs/contents/ase_dataset.qmd">Aria Synthetic Environments (ASE) Dataset</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-projectaria-engel2023">&#64;projectaria-engel2023</a></div></div>
+</div>
+</details>
+
+</article>
+
+</div>
 
 ## Dataset {#glossary-category-dataset}
 
 <div class="glossary-card-grid">
 
-<article class="glossary-card" id="term-aria-digital-twin">
+<article class="glossary-card glossary-tier-background" id="term-aria-digital-twin">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Aria Digital Twin</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">ADT</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">dataset.aria</span>
 </div>
 </div>
@@ -74,11 +1047,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-aria-everyday-objects">
+<article class="glossary-card glossary-tier-background" id="term-aria-everyday-objects">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Aria Everyday Objects</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">AEO</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">dataset.aria</span>
 </div>
 </div>
@@ -103,11 +1077,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-virtual-reality-standard">
+<article class="glossary-card glossary-tier-background" id="term-virtual-reality-standard">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Virtual Reality Standard</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">VRS</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">dataset.file_format</span>
 </div>
 </div>
@@ -132,11 +1107,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-central-pupil-frame">
+<article class="glossary-card glossary-tier-background" id="term-central-pupil-frame">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Central Pupil Frame</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">CPF</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">dataset.frames</span>
 </div>
 </div>
@@ -161,11 +1137,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-machine-perception-services">
+<article class="glossary-card glossary-tier-background" id="term-machine-perception-services">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Machine Perception Services</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">MPS</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">dataset.project_aria</span>
 </div>
 </div>
@@ -190,11 +1167,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-snippet">
+<article class="glossary-card glossary-tier-support" id="term-snippet">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Snippet</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">snippet</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">dataset.sample</span>
 </div>
 </div>
@@ -219,11 +1197,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-scene-script-language">
+<article class="glossary-card glossary-tier-background" id="term-scene-script-language">
 <div class="glossary-card-header">
 <div class="glossary-term-title">SceneScript Language</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">SSL</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">dataset.scene_representation</span>
 </div>
 </div>
@@ -248,11 +1227,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-motion-trajectory-data">
+<article class="glossary-card glossary-tier-background" id="term-motion-trajectory-data">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Motion Trajectory Data</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">MTD</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">dataset.stream</span>
 </div>
 </div>
@@ -277,11 +1257,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-multi-frame-camera-data">
+<article class="glossary-card glossary-tier-background" id="term-multi-frame-camera-data">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Multi-Frame Camera Data</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">MFCD</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">dataset.stream</span>
 </div>
 </div>
@@ -306,11 +1287,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-multi-semi-dense-point-data">
+<article class="glossary-card glossary-tier-background" id="term-multi-semi-dense-point-data">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Multi-Semi-Dense Point Data</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">MSDPD</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">dataset.stream</span>
 </div>
 </div>
@@ -335,11 +1317,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-aria-synthetic-environments">
+<article class="glossary-card glossary-tier-support" id="term-aria-synthetic-environments">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Aria Synthetic Environments</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">ASE</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">dataset.synthetic</span>
 </div>
 </div>
@@ -366,49 +1349,16 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </div>
 
-## Entity {#glossary-category-entity}
-
-<div class="glossary-card-grid">
-
-<article class="glossary-card" id="term-target-of-interest">
-<div class="glossary-card-header">
-<div class="glossary-term-title">Target of Interest</div>
-<div class="glossary-term-badges">
-<span class="glossary-badge glossary-badge-short">target</span>
-<span class="glossary-badge">entity.targeting</span>
-</div>
-</div>
-
-<div class="glossary-aliases">
-<span>Aliases</span>
-<code>target entity</code> <code>object of interest</code> <code>inspection target</code> <code>task target</code>
-</div>
-
-<p class="glossary-definition">Selected entity, object crop, point, region, or surface-deficit hypothesis whose reconstruction quality should be improved.</p>
-
-<p class="glossary-detail-text">Target-conditioned ARIA-NBV variants use this target as an explicit input to candidate scoring and planning instead of optimizing only scene-level RRI.</p>
-
-<details class="glossary-details">
-<summary>Links and references</summary>
-<div class="glossary-metadata">
-<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-target-conditioned-scorer">target-conditioned scorer</a> <a class="glossary-chip" href="#term-oriented-bounding-box">OBB</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq2-target-encoding" title="docs/contents/thesis/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_v2_feature_proposals.html" title="docs/contents/impl/vin_v2_feature_proposals.qmd">VIN v2 Feature + Encoding Proposals</a></div></div>
-</div>
-</details>
-
-</article>
-
-</div>
-
 ## Geometry {#glossary-category-geometry}
 
 <div class="glossary-card-grid">
 
-<article class="glossary-card" id="term-oriented-bounding-box">
+<article class="glossary-card glossary-tier-support" id="term-oriented-bounding-box">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Oriented Bounding Box</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">OBB</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">geometry.annotation</span>
 </div>
 </div>
@@ -433,11 +1383,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-frustum">
+<article class="glossary-card glossary-tier-support" id="term-frustum">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Frustum</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">frustum</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">geometry.camera</span>
 </div>
 </div>
@@ -462,11 +1413,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-left-up-forward">
+<article class="glossary-card glossary-tier-support" id="term-left-up-forward">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Left-Up-Forward</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">LUF</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">geometry.frames</span>
 </div>
 </div>
@@ -490,11 +1442,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-degrees-of-freedom">
+<article class="glossary-card glossary-tier-background" id="term-degrees-of-freedom">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Degrees of Freedom</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">DoF</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">geometry.pose</span>
 </div>
 </div>
@@ -518,11 +1471,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-six-degrees-of-freedom">
+<article class="glossary-card glossary-tier-background" id="term-six-degrees-of-freedom">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Six Degrees of Freedom</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">6DoF</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">geometry.pose</span>
 </div>
 </div>
@@ -552,11 +1506,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 <div class="glossary-card-grid">
 
-<article class="glossary-card" id="term-coverage-ratio">
+<article class="glossary-card glossary-tier-support" id="term-coverage-ratio">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Coverage Ratio</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">CR</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">metrics.coverage</span>
 </div>
 </div>
@@ -581,11 +1536,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-area-under-curve">
+<article class="glossary-card glossary-tier-support" id="term-area-under-curve">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Area Under Curve</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">AUC</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">metrics.evaluation</span>
 </div>
 </div>
@@ -609,110 +1565,12 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 
 </article>
 
-<article class="glossary-card" id="term-chamfer-distance">
-<div class="glossary-card-header">
-<div class="glossary-term-title">Chamfer Distance</div>
-<div class="glossary-term-badges">
-<span class="glossary-badge glossary-badge-short">CD</span>
-<span class="glossary-badge">metrics.reconstruction_quality</span>
-</div>
-</div>
-
-<div class="glossary-aliases">
-<span>Aliases</span>
-<code>Chamfer metric</code>
-</div>
-
-<p class="glossary-definition">Bidirectional point-set distance commonly used to compare reconstructed points against reference geometry.</p>
-
-<p class="glossary-detail-text">ARIA-NBV uses point-to-mesh and Chamfer-style distances as reconstruction error components when deriving oracle RRI labels and diagnostics.</p>
-
-<details class="glossary-details">
-<summary>Links and references</summary>
-<div class="glossary-metadata">
-<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-point-cloud">PC</a> <a class="glossary-chip" href="#term-ground-truth">GT</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="theory/rri_theory.html" title="docs/contents/theory/rri_theory.qmd">Relative Reconstruction Improvement (RRI) Theory</a></div></div>
-<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
-</div>
-</details>
-
-</article>
-
-<article class="glossary-card" id="term-relative-reconstruction-improvement">
-<div class="glossary-card-header">
-<div class="glossary-term-title">Relative Reconstruction Improvement</div>
-<div class="glossary-term-badges">
-<span class="glossary-badge glossary-badge-short">RRI</span>
-<span class="glossary-badge">metrics.reconstruction_quality</span>
-</div>
-</div>
-
-<div class="glossary-aliases">
-<span>Aliases</span>
-<code>reconstruction-quality gain</code> <code>relative quality improvement</code>
-</div>
-
-<p class="glossary-definition">Metric quantifying the relative reconstruction-quality improvement obtained by adding a candidate observation to the current reconstruction.</p>
-
-<p class="glossary-detail-text">ARIA-NBV computes RRI by comparing reconstruction error before and after fusing candidate-view geometry, usually against an ASE ground-truth mesh for oracle supervision and evaluation.</p>
-
-::: {.glossary-formula}
-$$
-\mathrm{RRI}(q)=\frac{d(P_t,M)-d(P_t\cup P_q,M)}{d(P_t,M)+\varepsilon}
-$$
-:::
-
-<details class="glossary-details">
-<summary>Links and references</summary>
-<div class="glossary-metadata">
-<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a> <a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-candidate-view">candidate</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rri_theory.html" title="docs/contents/theory/rri_theory.qmd">Relative Reconstruction Improvement (RRI) Theory</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="literature/vin_nbv.html" title="docs/contents/literature/vin_nbv.qmd">VIN-NBV</a></div></div>
-<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
-</div>
-</details>
-
-</article>
-
-<article class="glossary-card" id="term-target-specific-rri">
-<div class="glossary-card-header">
-<div class="glossary-term-title">Target-Specific RRI</div>
-<div class="glossary-term-badges">
-<span class="glossary-badge glossary-badge-short">target RRI</span>
-<span class="glossary-badge">metrics.reconstruction_quality</span>
-</div>
-</div>
-
-<div class="glossary-aliases">
-<span>Aliases</span>
-<code>entity RRI</code> <code>object RRI</code> <code>target RRI</code>
-</div>
-
-<p class="glossary-definition">RRI computed only on the ground-truth and reconstructed geometry associated with a selected target of interest.</p>
-
-<p class="glossary-detail-text">Target-specific RRI lets the thesis compare views by how much they improve a selected object or region, even when scene-level RRI would prefer large background surfaces.</p>
-
-::: {.glossary-formula}
-$$
-\mathrm{RRI}_e(q)=\frac{d(P_t^e,M_e)-d(P_t^e\cup P_q^e,M_e)}{d(P_t^e,M_e)+\varepsilon}
-$$
-:::
-
-<details class="glossary-details">
-<summary>Links and references</summary>
-<div class="glossary-metadata">
-<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-target-of-interest">target</a> <a class="glossary-chip" href="#term-acquisition-cost">cost</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/rri_computation.html#entity-wise-rri" title="docs/contents/impl/rri_computation.qmd#entity-wise-rri">Computing RRI with Ground Truth Meshes</a></div></div>
-<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
-</div>
-</details>
-
-</article>
-
-<article class="glossary-card" id="term-ground-truth">
+<article class="glossary-card glossary-tier-support" id="term-ground-truth">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Ground Truth</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">GT</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">metrics.reference</span>
 </div>
 </div>
@@ -743,11 +1601,12 @@ $$
 
 <div class="glossary-card-grid">
 
-<article class="glossary-card" id="term-egocentric-foundation-model-3d">
+<article class="glossary-card glossary-tier-support" id="term-egocentric-foundation-model-3d">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Egocentric Foundation Model 3D</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">EFM3D</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">model.backbone</span>
 </div>
 </div>
@@ -772,11 +1631,12 @@ $$
 
 </article>
 
-<article class="glossary-card" id="term-egocentric-voxel-lifting">
+<article class="glossary-card glossary-tier-support" id="term-egocentric-voxel-lifting">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Egocentric Voxel Lifting</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">EVL</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">model.backbone</span>
 </div>
 </div>
@@ -801,40 +1661,12 @@ $$
 
 </article>
 
-<article class="glossary-card" id="term-target-conditioned-scorer">
-<div class="glossary-card-header">
-<div class="glossary-term-title">Target-Conditioned Scorer</div>
-<div class="glossary-term-badges">
-<span class="glossary-badge glossary-badge-short">target-conditioned scorer</span>
-<span class="glossary-badge">model.scoring</span>
-</div>
-</div>
-
-<div class="glossary-aliases">
-<span>Aliases</span>
-<code>target-conditioned VIN</code> <code>target-aware scorer</code>
-</div>
-
-<p class="glossary-definition">VIN-style candidate scorer that receives scene state, a candidate view, and an encoding of the target of interest.</p>
-
-<p class="glossary-detail-text">The scorer predicts target-specific utility so view ranking can prioritize a selected entity or region instead of only optimizing scene-level RRI.</p>
-
-<details class="glossary-details">
-<summary>Links and references</summary>
-<div class="glossary-metadata">
-<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-of-interest">target</a> <a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.model_v3.VinModelV3.html" title="docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd">VinModelV3</a></div></div>
-<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
-</div>
-</details>
-
-</article>
-
-<article class="glossary-card" id="term-view-introspection-network">
+<article class="glossary-card glossary-tier-support" id="term-view-introspection-network">
 <div class="glossary-card-header">
 <div class="glossary-term-title">View Introspection Network</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">VIN</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">model.scoring</span>
 </div>
 </div>
@@ -865,40 +1697,12 @@ $$
 
 <div class="glossary-card-grid">
 
-<article class="glossary-card" id="term-candidate-view">
-<div class="glossary-card-header">
-<div class="glossary-term-title">Candidate View</div>
-<div class="glossary-term-badges">
-<span class="glossary-badge glossary-badge-short">candidate</span>
-<span class="glossary-badge">planning.action</span>
-</div>
-</div>
-
-<div class="glossary-aliases">
-<span>Aliases</span>
-<code>candidate pose</code> <code>candidate viewpoint</code> <code>next-view candidate</code>
-</div>
-
-<p class="glossary-definition">Proposed camera pose whose expected reconstruction utility is evaluated before selecting the next observation.</p>
-
-<p class="glossary-detail-text">ARIA-NBV samples candidate views around a reference pose or target, renders candidate depths from the mesh for oracle labels, and scores candidates with RRI or learned VIN predictions.</p>
-
-<details class="glossary-details">
-<summary>Links and references</summary>
-<div class="glossary-metadata">
-<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-next-best-view">NBV</a> <a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a> <a class="glossary-chip" href="#term-target-conditioned-scorer">target-conditioned scorer</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq3-candidates" title="docs/contents/thesis/questions.qmd#rq3-candidates">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CandidateViewGenerator.html" title="docs/reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd">CandidateViewGenerator</a></div></div>
-<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
-</div>
-</details>
-
-</article>
-
-<article class="glossary-card" id="term-five-degrees-of-freedom">
+<article class="glossary-card glossary-tier-background" id="term-five-degrees-of-freedom">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Five Degrees of Freedom</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">5DoF</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">planning.action_space</span>
 </div>
 </div>
@@ -923,74 +1727,18 @@ $$
 
 </article>
 
-<article class="glossary-card" id="term-acquisition-cost">
-<div class="glossary-card-header">
-<div class="glossary-term-title">Acquisition Cost</div>
-<div class="glossary-term-badges">
-<span class="glossary-badge glossary-badge-short">cost</span>
-<span class="glossary-badge">planning.objective</span>
-</div>
-</div>
-
-<div class="glossary-aliases">
-<span>Aliases</span>
-<code>capture budget</code> <code>view budget</code> <code>motion cost</code>
-</div>
-
-<p class="glossary-definition">Budget consumed to acquire observations, measured by view count, path length, elapsed time, invalid-action rate, or a weighted combination.</p>
-
-<p class="glossary-detail-text">The thesis should first report cumulative target RRI and acquisition cost separately, then use scalarized objectives only when the tradeoff is explicit.</p>
-
-<details class="glossary-details">
-<summary>Links and references</summary>
-<div class="glossary-metadata">
-<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-next-best-view">NBV</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a></div></div>
-</div>
-</details>
-
-</article>
-
-<article class="glossary-card" id="term-next-best-view">
-<div class="glossary-card-header">
-<div class="glossary-term-title">Next-Best-View</div>
-<div class="glossary-term-badges">
-<span class="glossary-badge glossary-badge-short">NBV</span>
-<span class="glossary-badge">planning.view_selection</span>
-</div>
-</div>
-
-<div class="glossary-aliases">
-<span>Aliases</span>
-<code>next best view</code> <code>viewpoint selection</code> <code>view planning</code>
-</div>
-
-<p class="glossary-definition">Problem of selecting the next sensor viewpoint to improve an active reconstruction or inspection objective under a limited acquisition budget.</p>
-
-<p class="glossary-detail-text">In ARIA-NBV, the preferred objective is reconstruction quality improvement rather than coverage alone, with candidate views ranked by oracle or learned RRI scores.</p>
-
-<details class="glossary-details">
-<summary>Links and references</summary>
-<div class="glossary-metadata">
-<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/nbv_background.html" title="docs/contents/theory/nbv_background.qmd">NBV Background</a> <a class="glossary-chip" href="thesis/roadmap.html" title="docs/contents/thesis/roadmap.qmd">Master Thesis Roadmap</a> <a class="glossary-chip" href="thesis/questions.html#research-questions" title="docs/contents/thesis/questions.qmd#research-questions">Master Thesis Research Questions</a></div></div>
-<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a> <a class="glossary-chip glossary-citation" href="#ref-GenNBV-chen2024">&#64;GenNBV-chen2024</a></div></div>
-</div>
-</details>
-
-</article>
-
 </div>
 
 ## Reconstruction {#glossary-category-reconstruction}
 
 <div class="glossary-card-grid">
 
-<article class="glossary-card" id="term-track">
+<article class="glossary-card glossary-tier-background" id="term-track">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Track</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">track</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">reconstruction.features</span>
 </div>
 </div>
@@ -1020,11 +1768,12 @@ $$
 
 </article>
 
-<article class="glossary-card" id="term-multi-view-stereo">
+<article class="glossary-card glossary-tier-background" id="term-multi-view-stereo">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Multi-view Stereo</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">MVS</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">reconstruction.geometry</span>
 </div>
 </div>
@@ -1048,11 +1797,12 @@ $$
 
 </article>
 
-<article class="glossary-card" id="term-visual-inertial-odometry">
+<article class="glossary-card glossary-tier-background" id="term-visual-inertial-odometry">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Visual-Inertial Odometry</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">VIO</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
 <span class="glossary-badge">reconstruction.pose</span>
 </div>
 </div>
@@ -1077,39 +1827,12 @@ $$
 
 </article>
 
-<article class="glossary-card" id="term-point-cloud">
-<div class="glossary-card-header">
-<div class="glossary-term-title">Point Cloud</div>
-<div class="glossary-term-badges">
-<span class="glossary-badge glossary-badge-short">PC</span>
-<span class="glossary-badge">reconstruction.representation</span>
-</div>
-</div>
-
-<div class="glossary-aliases">
-<span>Aliases</span>
-<code>3D points</code> <code>semi-dense point cloud</code>
-</div>
-
-<p class="glossary-definition">Set of 3D points representing observed scene geometry.</p>
-
-<p class="glossary-detail-text">ARIA-NBV compares current and candidate-fused point clouds against ground-truth meshes to compute oracle RRI and surface-distance diagnostics.</p>
-
-<details class="glossary-details">
-<summary>Links and references</summary>
-<div class="glossary-metadata">
-<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a> <a class="glossary-chip" href="#term-simultaneous-localization-and-mapping">SLAM</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/semi-dense-pc.html" title="docs/contents/theory/semi-dense-pc.qmd">Semi-Dense Point Clouds</a> <a class="glossary-chip" href="theory/surface_metrics.html" title="docs/contents/theory/surface_metrics.qmd">Surface Reconstruction Metrics</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a></div></div>
-</div>
-</details>
-
-</article>
-
-<article class="glossary-card" id="term-simultaneous-localization-and-mapping">
+<article class="glossary-card glossary-tier-support" id="term-simultaneous-localization-and-mapping">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Simultaneous Localization and Mapping</div>
 <div class="glossary-term-badges">
 <span class="glossary-badge glossary-badge-short">SLAM</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">reconstruction.state</span>
 </div>
 </div>
@@ -1140,10 +1863,41 @@ $$
 
 <div class="glossary-card-grid">
 
-<article class="glossary-card" id="term-occupancy-grid">
+<article class="glossary-card glossary-tier-background" id="term-three-dimensional-gaussian-splatting">
+<div class="glossary-card-header">
+<div class="glossary-term-title">3D Gaussian Splatting</div>
+<div class="glossary-term-badges">
+<span class="glossary-badge glossary-badge-short">3DGS</span>
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-background">background</span>
+<span class="glossary-badge">representation.radiance_field</span>
+</div>
+</div>
+
+<div class="glossary-aliases">
+<span>Aliases</span>
+<code>3D Gaussian Splatting</code> <code>3DGS</code> <code>Gaussian splatting</code>
+</div>
+
+<p class="glossary-definition">Explicit radiance-field representation using optimized 3D Gaussian primitives for real-time novel-view synthesis.</p>
+
+<p class="glossary-detail-text">ARIA-NBV treats active 3DGS work as proposal, uncertainty, and simulator-bridge literature, not as a replacement for ASE mesh-supervised RRI.</p>
+
+<details class="glossary-details">
+<summary>Links and references</summary>
+<div class="glossary-metadata">
+<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-next-best-view">NBV</a> <a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/active_3dgs_nbv.html" title="docs/contents/literature/active_3dgs_nbv.qmd">Active 3DGS and Targeted NBV</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-GaussianSplatting-kerbl2023">&#64;GaussianSplatting-kerbl2023</a></div></div>
+</div>
+</details>
+
+</article>
+
+<article class="glossary-card glossary-tier-support" id="term-occupancy-grid">
 <div class="glossary-card-header">
 <div class="glossary-term-title">Occupancy Grid</div>
 <div class="glossary-term-badges">
+<span class="glossary-badge glossary-tier-badge glossary-tier-badge-support">support</span>
 <span class="glossary-badge">representation.spatial</span>
 </div>
 </div>
@@ -1170,43 +1924,8 @@ $$
 
 </div>
 
-## Supervision {#glossary-category-supervision}
-
-<div class="glossary-card-grid">
-
-<article class="glossary-card" id="term-oracle-rri">
-<div class="glossary-card-header">
-<div class="glossary-term-title">Oracle RRI</div>
-<div class="glossary-term-badges">
-<span class="glossary-badge glossary-badge-short">oracle RRI</span>
-<span class="glossary-badge">supervision.oracle</span>
-</div>
-</div>
-
-<div class="glossary-aliases">
-<span>Aliases</span>
-<code>RRI oracle</code> <code>oracle label</code> <code>mesh-supervised RRI</code>
-</div>
-
-<p class="glossary-definition">RRI label computed with privileged ground-truth geometry, used for supervised training and evaluation.</p>
-
-<p class="glossary-detail-text">The current oracle renders candidate depth maps from ASE ground-truth meshes, backprojects candidate point clouds, fuses them with the current semi-dense reconstruction, and scores the resulting surface-distance improvement.</p>
-
-<details class="glossary-details">
-<summary>Links and references</summary>
-<div class="glossary-metadata">
-<div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-aria-synthetic-environments">ASE</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a> <a class="glossary-chip" href="impl/data_pipeline_overview.html" title="docs/contents/impl/data_pipeline_overview.qmd">ASE Data Pipeline &amp; Streamlit Usage</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m1" title="docs/contents/thesis/roadmap.qmd#roadmap-m1">Master Thesis Roadmap</a></div></div>
-<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a> <a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a></div></div>
-</div>
-</details>
-
-</article>
-
-</div>
-
 ::: {.glossary-citation-seed}
-[@EFM3D-straub2024]; [@EVL-Doc-2025]; [@Frustum-Wikipedia-2025]; [@GenNBV-chen2024]; [@ProjectAria-ASE-2025]; [@SceneScript-avetisyan2024]; [@VIN-NBV-frahm2025]
+[@DoubleDQN-vanHasselt2015]; [@EFM3D-straub2024]; [@EVL-Doc-2025]; [@Frustum-Wikipedia-2025]; [@GaussianSplatting-kerbl2023]; [@GenNBV-chen2024]; [@ProjectAria-ASE-2025]; [@SceneScript-avetisyan2024]; [@VIN-NBV-frahm2025]; [@projectaria-engel2023]
 :::
 
 :::

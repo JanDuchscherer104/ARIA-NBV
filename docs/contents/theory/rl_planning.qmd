@@ -42,15 +42,17 @@ This formulation is deliberately close to sequence decoding. Trajectory Transfor
 
 Gumbel-Top-k gives the natural stochastic extension of the deterministic branch set [@GumbelTopK-kool2019]. Deterministic top-k is best for the first trust experiment because it is reproducible and easy to inspect in Rerun. Once the oracle rollout path is stable, Gumbel-Top-k can sample candidate branches without replacement from a score distribution, preserving diversity while still favoring high-utility candidates. In ARIA-NBV terms, it should be treated as a stochastic beam proposal mechanism over candidate-view sequences, not as a replacement reward.
 
-The reward used for multi-step return should differ from the one-step training label only where the return semantics require it. The one-step VIN label remains the current RRI, because it is tied to the existing offline store and ranking diagnostics. For a horizon-$H$ rollout, an episode-normalized additive reward,
+The reward used for multi-step return should differ from the one-step training label only where the return semantics require it. The one-step VIN label remains the current RRI, because it is tied to the existing offline store and ranking diagnostics. The thesis-core return is cumulative target RRI under an equal acquisition budget,
 $$
-r_t = \frac{d(P_t, M) - d(P_{t+1}, M)}{d(P_0, M) + \epsilon},
+G_t^{(H)} = \sum_{k=0}^{H-1} \gamma^k r_{t+k}^e,
+\qquad
+r_t^e = \mathrm{RRI}_e(q_t \mid P_t, M_e),
 $$
-or a log-improvement reward,
+with $\gamma$ kept symbolic in the notation and cumulative target RRI used as the main comparison. Episode-normalized additive rewards and log-improvement rewards such as
 $$
-r_t = \log(d(P_t, M)+\epsilon) - \log(d(P_{t+1}, M)+\epsilon),
+r_t^{\log,e} = \log(d(P_t^e, M_e)+\epsilon) - \log(d(P_{t+1}^e, M_e)+\epsilon)
 $$
-is better suited to cumulative comparison because the terms add cleanly across steps. The same formulas can be restricted to a target crop $M_e$ when evaluating target-specific RRI, while scene-level RRI remains a parallel diagnostic.
+remain follow-up ablations for scale control or telescoping analysis. Scene-level RRI remains a parallel diagnostic.
 
 Value learning should remain behind an evidence gate. If a masked discrete Q-function is trained over candidate views, Double Q-learning is the relevant safeguard against overoptimistic candidate values, because it separates action selection from action evaluation in the bootstrap target [@DoubleDQN-vanHasselt2015]. If the training data is a fixed rollout store, IQL is the stronger offline-RL reference because it avoids evaluating unseen actions while still performing multi-step dynamic programming through expectile value learning and advantage-weighted policy extraction [@IQL-kostrikov2021]. In both cases, the core ARIA-NBV constraint is support: the learned value or policy must respect sampled candidate geometry and validity masks before it is allowed to generalize beyond the offline store.
 

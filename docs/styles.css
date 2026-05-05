@@ -57,6 +57,67 @@ main.content:has(.glossary-page) {
   font-size: 0.78rem;
 }
 
+.glossary-muted {
+  color: var(--glossary-muted);
+}
+
+.glossary-lookup-wrap {
+  max-width: 100%;
+  min-width: 0;
+  margin: 1rem 0 2rem;
+  overflow-x: auto;
+}
+
+.glossary-lookup-table {
+  width: 100%;
+  min-width: 54rem;
+  border-collapse: collapse;
+  border: 1px solid var(--glossary-border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.92rem;
+}
+
+.glossary-lookup-table th,
+.glossary-lookup-table td {
+  vertical-align: top;
+  padding: 0.62rem 0.7rem;
+  border-bottom: 1px solid var(--glossary-border);
+}
+
+.glossary-lookup-table th {
+  text-align: left;
+  background: color-mix(in srgb, currentColor 7%, transparent);
+}
+
+.glossary-lookup-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.glossary-notation-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.glossary-notation-item {
+  display: inline-grid;
+  grid-template-columns: auto;
+  gap: 0.1rem;
+  align-items: start;
+  max-width: 100%;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--glossary-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 3%, transparent);
+}
+
+.glossary-notation-math {
+  overflow-x: auto;
+  max-width: 18rem;
+}
+
 .glossary-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
@@ -74,6 +135,16 @@ main.content:has(.glossary-page) {
   max-width: 100%;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.glossary-tier-core {
+  border-color: color-mix(in srgb, #2f6feb 55%, var(--glossary-border));
+  background: color-mix(in srgb, #2f6feb 5%, transparent);
+}
+
+.glossary-tier-background {
+  opacity: 0.82;
+  background: color-mix(in srgb, currentColor 3%, transparent);
 }
 
 .glossary-card-header {
@@ -118,6 +189,15 @@ main.content:has(.glossary-page) {
   font-weight: 700;
 }
 
+.glossary-tier-badge-core {
+  color: #1f6feb;
+  border-color: color-mix(in srgb, #2f6feb 45%, var(--glossary-border));
+}
+
+.glossary-tier-badge-background {
+  color: var(--glossary-muted);
+}
+
 .glossary-aliases {
   display: flex;
   flex-wrap: wrap;
@@ -147,6 +227,20 @@ main.content:has(.glossary-page) {
 .glossary-detail-text {
   margin: 0.55rem 0 0;
   overflow-wrap: anywhere;
+}
+
+.glossary-card-notation {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.65rem 0 0;
+}
+
+.glossary-card-notation strong {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--glossary-muted);
+  font-size: 0.8rem;
+  letter-spacing: 0;
 }
 
 .glossary-formula {

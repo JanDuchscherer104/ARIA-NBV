@@ -9,4 +9,6 @@
     lambda_scene: $lambda_"scene"$,
     // Weighted objective (global + entity-specific terms).
     rri_total: $RRI_"total"$,
+    // Target/entity-specific RRI.
+    rri_e: $RRI_e$,
   )

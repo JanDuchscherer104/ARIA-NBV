@@ -1,0 +1,59 @@
+---
+title: "Project Aria"
+phase: thesis
+audience: public
+status: current
+owner: jan
+format: html
+---
+
+## Project Aria: Actor-Visible Egocentric Sensing {#project-aria-literature}
+
+**Primary source.** [Project Aria: A New Tool for Egocentric Multi-Modal AI Research](https://arxiv.org/abs/2308.13561) [@projectaria-engel2023].
+
+**Local source.** [`main.tex`](../../literature/tex-src/arXiv-project-aria/main.tex), [`device.tex`](../../literature/tex-src/arXiv-project-aria/device.tex), [`tools.tex`](../../literature/tex-src/arXiv-project-aria/tools.tex), and [`mps.tex`](../../literature/tex-src/arXiv-project-aria/mps.tex).
+
+**Related ARIA-NBV pages.** [EFM3D/EVL](efm3d.qmd), [ASE dataset](../ase_dataset.qmd), [semi-dense point clouds](../theory/semi-dense-pc.qmd), and [oracle RRI implementation](../impl/oracle_rri_impl.qmd).
+
+### Core contribution
+
+{{< gls project-aria >}} is not a {{< gls next-best-view >}} planner. It is the egocentric sensing contract behind ARIA-NBV. The paper introduces a wearable research device with calibrated, time-aligned multimodal streams and a tooling/MPS stack for trajectories, calibration, semi-dense mapping, gaze, and related perception products [@projectaria-engel2023].
+
+For ARIA-NBV, the key point is boundary-setting: Project Aria-style observations define what the actor may plausibly see, while {{< gls aria-synthetic-environments >}} meshes and GT annotations provide offline supervision/evaluation only.
+
+### Verified paper signals
+
+| signal | source-backed detail | ARIA-NBV relevance |
+|---|---|---|
+| Sensor suite | The device includes RGB, SLAM, eye-tracking, IMU, audio, and other sensor streams with calibration/time-alignment requirements. | Candidate scoring must respect calibrated egocentric camera streams rather than assuming perfect RGB-D input. |
+| VRS/tooling | Project Aria records and exposes sensor data through VRS and Project Aria tools. | Cache lineage should preserve stream identity, calibration, and source versions. |
+| {{< gls machine-perception-services >}} trajectories | MPS produces closed-loop trajectories and pose products. | Provides the actor-visible pose/reconstruction state for ASE-style snippets. |
+| Online calibration | The MPS/tooling stack handles online calibration products. | Frame lineage and calibration source must be stored with rollouts and offline labels. |
+| Semi-dense point clouds | MPS produces semi-dense maps rather than dense GT geometry. | ARIA-NBV's current reconstruction proxy is semi-dense point support, not a full mesh. |
+
+### ARIA-NBV adoption
+
+The actor-visible state should stay limited to deployment-plausible evidence:
+
+| actor-visible input | examples |
+|---|---|
+| calibrated streams | RGB/SLAM images, intrinsics, extrinsics, time alignment |
+| pose and history | current/historical rig poses, {{< gls motion-trajectory-data >}}, selected view history |
+| reconstruction proxy | semi-dense {{< gls point-cloud >}}, visibility/support metadata |
+| learned state | {{< gls egocentric-voxel-lifting >}} occupancy/evidence, predicted {{< gls oriented-bounding-box >}} support |
+| candidates | candidate poses, candidate cameras, feasibility and {{< gls validity-mask >}} metadata |
+
+GT meshes, GT OBBs, GT masks, and dense target crops are offline oracle/evaluation assets. They can produce labels, but they should not enter the actor-visible input for the main `OBS-SEL / PRED-Q / GT-EVAL` protocol.
+
+### Do not adopt
+
+- Do not assume dense depth at inference.
+- Do not treat MPS/semi-dense points as ground truth; they are observed reconstruction evidence.
+- Do not leak ASE meshes or GT object boxes into target selection or candidate scoring.
+- Do not claim real-time AR guidance before incremental state updates and lightweight scoring are demonstrated.
+
+### Open risks / caveats
+
+- Calibration, frame, and timestamp mistakes can make visually plausible recordings but invalid labels.
+- Semi-dense point support can be sparse or biased; RRI must remain explicit about the reconstruction proxy.
+- Any rollout/Q store should preserve source lineage: stream, pose, calibration, mesh/version hash, and candidate-generation config.

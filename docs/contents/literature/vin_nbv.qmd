@@ -7,188 +7,75 @@ owner: jan
 format: html
 ---
 
-## VIN-NBV: A View Introspection Network for Next-Best-View Selection {#vin-nbv}
+## VIN-NBV: Quality-Driven Candidate Ranking {#vin-nbv}
 
-VIN-NBV@VIN-NBV-frahm2025 presents a learning-based approach to NBV that directly optimizes for **reconstruction quality** rather than coverage. The key innovation is the View Introspection Network (VIN), which predicts the **Relative Reconstruction Improvement (RRI)** of candidate viewpoints without actually capturing new images.
+**Primary source.** [VIN-NBV: A View Introspection Network for Next-Best-View Selection](https://arxiv.org/abs/2505.06219) [@VIN-NBV-frahm2025].
 
-### Local \LaTeX{} Sources
+**Local source.** [`main.tex`](../../literature/tex-src/arXiv-VIN-NBV/main.tex), [`sec/3_methods.tex`](../../literature/tex-src/arXiv-VIN-NBV/sec/3_methods.tex), and [`sec/4_experiments.tex`](../../literature/tex-src/arXiv-VIN-NBV/sec/4_experiments.tex).
 
-- [`main.tex`](../../literature/tex-src/arXiv-VIN-NBV/main.tex) – complete manuscript (sections live in `sec/`).
-- [`sec/3_methods.tex`](../../literature/tex-src/arXiv-VIN-NBV/sec/3_methods.tex) – VIN architecture details.
-- [`sec/4_experiments.tex`](../../literature/tex-src/arXiv-VIN-NBV/sec/4_experiments.tex) – NBV benchmarks and Chamfer-distance evaluations.
-- [`Figures/VIN-NBV_diagram.png`](../../literature/tex-src/arXiv-VIN-NBV/Figures/VIN-NBV_diagram.png) – reference architecture figure.
-- [`main.bib`](../../literature/tex-src/arXiv-VIN-NBV/main.bib) – BibTeX entries for cross-referencing in our docs.
+**Related ARIA-NBV pages.** [RRI theory](../theory/rri_theory.qmd), [VIN implementation](../impl/vin_nbv.qmd), and [RL planning](rl_planning.qmd).
 
-### Key Contributions
+![VIN-NBV architecture](../../figures/external/arXiv-VIN-NBV/VIN_arch.png){#fig-vin-arch width=80%}
 
-1. **Reconstruction Quality Optimization**: First NBV method to directly maximize reconstruction quality (measured via Chamfer Distance) rather than coverage
-2. **View Introspection Network (VIN)**: Lightweight NN that predicts RRI of candidate views from current reconstruction state
-3. **Imitation Learning Approach**: Trained using pre-computed ground truth RRI values
-4. **Greedy Sequential Policy**: Simple sampling-based strategy that selects best view given n randomly sampled candidates
-5. **Performance**: 30% improvement over coverage-based baseline, 40% improvement over RL methods (GenNBV, ScanRL)
+### Core contribution
 
-![VIN-NBV Architecture](../../figures/arXiv-VIN-NBV/VIN_arch.png){#fig-vin-arch width=80%}
+VIN-NBV is the closest objective match for ARIA-NBV because it treats {{< gls next-best-view >}} selection as reconstruction-quality ranking rather than coverage maximization. The paper defines {{< gls relative-reconstruction-improvement >}} for a query view and trains a {{< gls view-introspection-network >}} to predict an ordinal RRI label for candidate views before acquiring them [@VIN-NBV-frahm2025].
 
-### Problem Formulation and RRI Metric
-
-**Input**: Initial base images $I_{base} = \{I_1, ..., I_k\}$ with camera parameters $C_{base}$ and depth maps $D_{base}$
-
-**Objective**: Find next best views $C_{nbv} = \{q_1, ..., q_m\} \subseteq \{c | c \in SE(3) \land c_{\phi} = 0\} ^ m$ that maximize reconstruction quality:
+For a current reconstruction $\mathcal{P}_{\mathrm{base}}$, a candidate observation $\mathcal{P}_{q}$, and ground-truth geometry $\mathcal{P}_{\mathrm{GT}}$, the paper's utility is:
 
 $$
-C^*_{nbv} = \text{argmax}_{C_{nbv}} \mathcal{RRI}(C_{nbv})
+\mathrm{RRI}(q)
+=
+\frac{
+  \mathrm{CD}(\mathcal{P}_{\mathrm{base}}, \mathcal{P}_{\mathrm{GT}})
+  -
+  \mathrm{CD}(\mathcal{P}_{\mathrm{base}}\cup\mathcal{P}_{q}, \mathcal{P}_{\mathrm{GT}})
+}{
+  \mathrm{CD}(\mathcal{P}_{\mathrm{base}}, \mathcal{P}_{\mathrm{GT}})
+}.
 $$
 
-**Relative Reconstruction Improvement (RRI)**:
+The paper then bins stage-normalized RRI values into 15 ordered classes and trains with CORAL ordinal classification. At inference, sampled candidate views are projected against the current reconstruction, scored by the learned VIN, and selected greedily.
 
-For a query view $q$, RRI quantifies reconstruction improvement:
+### Verified paper signals
+
+| signal | source-backed detail | ARIA-NBV relevance |
+|---|---|---|
+| Quality target | RRI compares Chamfer distance before and after adding a candidate view. GT is needed only for oracle label generation and evaluation. | Direct basis for scene-level {{< gls oracle-rri >}} and {{< gls target-specific-rri >}}. |
+| Candidate ranking | VIN-NBV samples candidate views and chooses the one with the largest predicted RRI. | Matches ARIA-NBV's current one-step candidate-ranking system. |
+| Feature design | Candidate-conditioned projections use current point cloud evidence, normals, visibility count, depth, and an empty-pixel coverage feature $F_{\mathrm{empty}}$. | Supports semi-dense projection features and EVL evidence channels as interpretable scorer inputs. |
+| Training target | Direct RRI regression is unstable; the paper uses stage-normalized, clipped, binned ordinal labels with CORAL. | Justifies ARIA-NBV's ordinal baseline and diagnostics for bins, calibration, and stage dependence. |
+| Reported comparison | The paper reports large quality gains over coverage and RL baselines in its object-centric setting, with caveats about reproduced baselines and dataset mismatch. | Use as motivation, not as direct evidence that ARIA-NBV will outperform scene-level or target-aware baselines. |
+
+### ARIA-NBV adoption
+
+- **Adopt as thesis-core method:** {{< gls relative-reconstruction-improvement >}}, {{< gls oracle-rri >}} labels, ordinal RRI prediction, and greedy candidate ranking.
+- **Adapt for ARIA-NBV:** replace object-centric dense RGB-D reconstruction with {{< gls aria-synthetic-environments >}} snippets, semi-dense {{< gls point-cloud >}} evidence, {{< gls egocentric-voxel-lifting >}} features, validity masks, and target crops.
+- **Extend carefully:** target-specific utility should use the same before/after reconstruction-quality logic, but with evaluation restricted to a GT {{< gls oriented-bounding-box >}} or matched target crop.
+
+For an entity or target $e$, the ARIA-NBV analogue is:
 
 $$
-\mathcal{RRI}(q) = \frac{CD(\mathcal{P}_{base}, \mathcal{P}_{GT}) - CD(\mathcal{P}_{base \cup q}, \mathcal{P}_{GT})}{CD(\mathcal{P}_{base}, \mathcal{P}_{GT})}
+\mathrm{RRI}_e(q)
+=
+\frac{
+  d(P_t^e, M_{\mathrm{GT}}^e)
+  -
+  d((P_t\cup P_q)^e, M_{\mathrm{GT}}^e)
+}{
+  d(P_t^e, M_{\mathrm{GT}}^e) + \varepsilon
+}.
 $$
 
-**Properties**:
+### Do not adopt
 
-- Range: $[0, 1]$ where higher is better
-- Normalized by current error $ \rightarrow $ scale/object-independent ??
-- Requires ground truth only during training
-- $CD(\mathcal{P}, \mathcal{P}_{GT})$ is Chamfer Distance between reconstruction $\mathcal{P}$ and ground truth $\mathcal{P}_{GT}$.
-- Candidate poses are sampled randomly around the latest pose; roll is fixed to 0°, such that the cameras optical axis is parallel to the ground plane.
+- Do not claim that imitation learning is generally more effective than RL; VIN-NBV supports a quality-driven ranking baseline, not a universal algorithm comparison.
+- Do not transfer object-centric benchmark numbers directly to egocentric indoor ASE scenes.
+- Do not treat invalid or infeasible candidates as low RRI. ARIA-NBV needs hard {{< gls validity-mask >}} handling and explicit invalid-reason labels.
+- Do not rely only on one-step greedy RRI once the thesis claims non-myopic target-conditioned planning.
 
-### VIN Architecture
+### Open risks / caveats
 
-**Three-Stage Pipeline**:
-
-1. **Scene Reconstruction**:
-   - Backproject RGB-D images to 3D point cloud $\mathcal{P}_{base}$
-   - Voxel downsample for efficiency
-2. **3D-Aware Featurization**:
-   - **Surface Normals**: Variance indicates geometric complexity (high variance = complex surfaces needing more views)
-   - **Visibility Count**: Tracks how many base views observe each point (low count = potentially informative)
-   - **Depth Values**: Distance information for surface consistency
-   - **Coverage Feature $F_{empty}$**: Empty pixel mask when projecting $\mathcal{P}_{base}$ to query view
-4. **RRI Prediction**:
-   - **Convolutional Encoder**: 4 layers, hidden dimension 256
-   - Processes featurized point cloud projected to query view
-   - **Ranking MLP**: 3 layers, hidden dimension 256
-   - **Output**: CORAL layer for ordinal classification (15 bins)
-
-**Network Signature**:
-$$
-\widehat{\mathcal{RRI}}(q) = \text{VIN}_\theta(\mathcal{P}_{base}, C_{base}, C_q)
-$$
-
-### VIN-NBV Policy (Algorithm)
-
-**Greedy Sequential Strategy**:
-
-```
-1. Start with k=2 base views (first random, second closest to first)
-2. Repeat until termination criterion:
-   a. Reconstruct R_base from current captures
-   b. Sample n query views around reconstruction
-   c. For each query q:
-      - Featurize reconstruction
-      - Predict RRI(q) using VIN
-   d. Select q* = argmax RRI(q)
-   e. Move to q*, capture image, update base views
-3. Return final reconstruction R_final
-```
-
-### Training Methodology
-
-**Dataset**:
-
-- **Train**: Modified subset of Houses3K
-- **Test**: House category from OmniObject3D (generalization test)
-- 120 rendered views per object
-
-**Ground Truth RRI Computation**:
-
-1. For each training scene, sample query views
-2. Explicitly reconstruct scene with query view added
-3. Compute actual RRI using Chamfer Distance
-4. Normalize via z-scores within capture stage groups
-5. Soft-clip with tanh, bin into 15 ordinal classes
-
-**Training Details**:
-
-- **Loss**: CORAL loss for ordinal classification
-- **Optimizer**: AdamW with learning rate 1e-3
-- **Scheduler**: Cosine annealing
-- **Epochs**: 60
-- **Hardware**: 4× A6000 GPUs, ~24 hours
-- **Batching**: By object (one point cloud per batch projected to all candidate views)
-
-**Key Features**:
-
-- **Flexible Constraints**: Can limit by number of captures, time, or distance
-- **Collision-Free**: Sampling strategy can avoid obstacles
-- **No Prior Knowledge**: Works without scene CAD models or preliminary scans
-- **Generalizable**: Trained on houses, tested on unseen categories (dinosaurs, trucks, animals)
-
-### Experimental Results
-
-**Limited Acquisitions (20 captures)**:
-
-- VIN-NBV: **0.20 cm** Chamfer Distance (houses)
-- GenNBV: **0.33 cm** (39% worse)
-- ScanRL: **0.37 cm** (41% worse)
-- Coverage baseline (Cov-NBV): **~30% worse** than VIN-NBV
-
-**Coverage vs Quality**:
-
-- Cov-NBV baseline uses same greedy strategy but scores views by empty pixel count:
-  $$Cov(q) = W \times H - \sum_{u,v} \mathbb{1}(C_q(\mathcal{P}_{base})_{u,v})$$
-
-- VIN-NBV achieves largest gains in early capture stages
-- Late stages: both converge (coverage becomes more important)
-
-**Ablation - Coverage Feature $F_{empty}$**:
-
-- Removing $F_{empty}$ hurts performance in later stages
-- Early stages: RRI dominates
-- Late stages: Coverage information becomes helpful
-
-**Generalization** (unseen categories):
-
-- Dinosaurs: Slightly behind GenNBV
-- Toy animals: **Significantly outperforms** both baselines
-- Toy trucks: **Significantly outperforms** both baselines
-
-### Comparison to Our NBV Research
-
-**Similarities**:
-
-- Both use Chamfer Distance for reconstruction quality
-- Both require pre-computed ground truth for training
-- Both focus on maximizing reconstruction improvement
-
-**Key Differences**:
-
-- **VIN-NBV**: Single objects, imitation learning, greedy sampling
-- **Our Approach**: Multi-entity scenes, entity-aware RRI, SceneScript integration
-- **VIN-NBV**: Coverage-agnostic (though includes $F_{empty}$ feature)
-- **Our Approach**: Hybrid visibility + Chamfer Distance, pre-computed occlusions from ASE
-
-**Lessons for Our Work**:
-
-1. ✅ Direct quality optimization (RRI) beats coverage by ~30%
-2. ✅ Imitation learning is simpler and more effective than RL
-3. ✅ 3D-aware featurization (normals, visibility) is crucial
-4. ✅ Coverage information still helps in later stages
-5. ⚠️ Greedy strategy works well but leaves ~20% gap to oracle
-
-**Integration Strategy**:
-
-- Adopt VIN's RRI formulation for entity-level metrics
-- Use ASE visibility data instead of VIN's visibility count
-- Extend to per-entity RRI: $\mathcal{RRI}_e$ for each entity $e$
-- Weighted combination: $\mathcal{RRI}_{total} = \sum_e w_e \cdot \mathcal{RRI}_e$
-
-### Limitations
-
-- **Ground truth depth**: Uses noise-free depth maps (not realistic)
-- **Real-world validation**: Not evaluated on real sensor data
-- **Single objects**: Not designed for multi-room scenes
-- **Gap to oracle**: ~20% performance gap in early stages indicates room for improvement
+- RRI distributions are stage-dependent; static bins can miscalibrate early vs. late acquisition.
+- Greedy ranking is intentionally myopic and can undervalue setup actions that expose later target views.
+- ARIA-NBV uses semi-dense Aria-style evidence rather than dense object RGB-D, so projection statistics and oracle labels require separate validation.

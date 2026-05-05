@@ -41,6 +41,11 @@ return {
     short = "CD",
     anchor = "term-chamfer-distance",
   },
+  ["counterfactual-transition"] = {
+    label = "Counterfactual Transition",
+    short = "transition",
+    anchor = "term-counterfactual-transition",
+  },
   ["coverage-ratio"] = {
     label = "Coverage Ratio",
     short = "CR",
@@ -61,6 +66,21 @@ return {
     short = "EVL",
     anchor = "term-egocentric-voxel-lifting",
   },
+  ["finite-candidate-action-set"] = {
+    label = "Finite Candidate Action Set",
+    short = "action set",
+    anchor = "term-finite-candidate-action-set",
+  },
+  ["finite-horizon-q-function"] = {
+    label = "Finite-Horizon Q Function",
+    short = "Q_H",
+    anchor = "term-finite-horizon-q-function",
+  },
+  ["finite-horizon-return"] = {
+    label = "Finite-Horizon Return",
+    short = "return",
+    anchor = "term-finite-horizon-return",
+  },
   ["five-degrees-of-freedom"] = {
     label = "Five Degrees of Freedom",
     short = "5DoF",
@@ -75,6 +95,11 @@ return {
     label = "Ground Truth",
     short = "GT",
     anchor = "term-ground-truth",
+  },
+  ["ground-truth-target-evaluation"] = {
+    label = "Ground-Truth Target Evaluation",
+    short = "GT-EVAL",
+    anchor = "term-ground-truth-target-evaluation",
   },
   ["left-up-forward"] = {
     label = "Left-Up-Forward",
@@ -111,6 +136,11 @@ return {
     short = "NBV",
     anchor = "term-next-best-view",
   },
+  ["observed-target-selection"] = {
+    label = "Observed Target Selection",
+    short = "OBS-SEL",
+    anchor = "term-observed-target-selection",
+  },
   ["occupancy-grid"] = {
     label = "Occupancy Grid",
     short = "Occupancy Grid",
@@ -131,10 +161,25 @@ return {
     short = "PC",
     anchor = "term-point-cloud",
   },
+  ["predicted-target-q"] = {
+    label = "Predicted-Target Q",
+    short = "PRED-Q",
+    anchor = "term-predicted-target-q",
+  },
+  ["project-aria"] = {
+    label = "Project Aria",
+    short = "Project Aria",
+    anchor = "term-project-aria",
+  },
   ["relative-reconstruction-improvement"] = {
     label = "Relative Reconstruction Improvement",
     short = "RRI",
     anchor = "term-relative-reconstruction-improvement",
+  },
+  ["rollout-state"] = {
+    label = "Rollout State",
+    short = "state",
+    anchor = "term-rollout-state",
   },
   ["scene-script-language"] = {
     label = "SceneScript Language",
@@ -156,6 +201,11 @@ return {
     short = "snippet",
     anchor = "term-snippet",
   },
+  ["target-conditioned-nbv-mdp"] = {
+    label = "Target-Conditioned NBV MDP",
+    short = "NBV MDP",
+    anchor = "term-target-conditioned-nbv-mdp",
+  },
   ["target-conditioned-scorer"] = {
     label = "Target-Conditioned Scorer",
     short = "target-conditioned scorer",
@@ -166,15 +216,30 @@ return {
     short = "target",
     anchor = "term-target-of-interest",
   },
+  ["target-rri-reward"] = {
+    label = "Target-RRI Reward",
+    short = "reward",
+    anchor = "term-target-rri-reward",
+  },
   ["target-specific-rri"] = {
     label = "Target-Specific RRI",
     short = "target RRI",
     anchor = "term-target-specific-rri",
   },
+  ["three-dimensional-gaussian-splatting"] = {
+    label = "3D Gaussian Splatting",
+    short = "3DGS",
+    anchor = "term-three-dimensional-gaussian-splatting",
+  },
   ["track"] = {
     label = "Track",
     short = "track",
     anchor = "term-track",
+  },
+  ["validity-mask"] = {
+    label = "Validity Mask",
+    short = "mask",
+    anchor = "term-validity-mask",
   },
   ["view-introspection-network"] = {
     label = "View Introspection Network",

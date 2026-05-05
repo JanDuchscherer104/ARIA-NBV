@@ -88,12 +88,16 @@ def _normalize_queried_term(raw: dict[str, Any]) -> dict[str, Any]:
         "related",
         "kg_tags",
         "formulae",
+        "symbol_refs",
+        "equation_refs",
     ):
         if term.get(field) is None:
             term[field] = []
     for field in ("notation", "formula"):
         if term.get(field) is None:
             term[field] = {}
+    if term.get("tier") is None:
+        term["tier"] = "support"
     if term.get("short") is None and term.get("label") is not None:
         term["short"] = term["label"]
     if term.get("parent") is None:
@@ -155,6 +159,19 @@ def _validate_terms(terms: list[dict[str, Any]]) -> None:
         for field in ("aliases", "internal_links", "citations", "related", "kg_tags"):
             if field in term and not isinstance(term[field], list):
                 raise GlossaryError(f"{term_id}: {field} must be a list")
+        for field in ("symbol_refs", "equation_refs"):
+            if field in term and not isinstance(term[field], list):
+                raise GlossaryError(f"{term_id}: {field} must be a list")
+        tier = term.get("tier")
+        if tier not in {"core", "support", "background"}:
+            raise GlossaryError(
+                f"{term_id}: tier must be one of core, support, background"
+            )
+        lookup_rank = term.get("lookup_rank")
+        if lookup_rank is not None and (
+            isinstance(lookup_rank, bool) or not isinstance(lookup_rank, (int, float))
+        ):
+            raise GlossaryError(f"{term_id}: lookup_rank must be numeric when set")
         typst_macro = term.get("typst_macro")
         if typst_macro is not None:
             if not isinstance(typst_macro, str) or not re.match(
@@ -186,6 +203,19 @@ def _validate_terms(terms: list[dict[str, Any]]) -> None:
                 raise GlossaryError(
                     f"{term_id}: formulae[{idx}].tex must be a non-empty string"
                 )
+
+
+def _validate_lookup_refs(
+    terms: list[dict[str, Any]], notation: dict[str, dict[str, dict[str, str]]]
+) -> None:
+    for term in terms:
+        term_id = _expect_string(term, "id")
+        for ref in _as_list(term, "symbol_refs"):
+            if ref not in notation["symbols"]:
+                raise GlossaryError(f"{term_id}: unknown symbol_ref {ref!r}")
+        for ref in _as_list(term, "equation_refs"):
+            if ref not in notation["equations"]:
+                raise GlossaryError(f"{term_id}: unknown equation_ref {ref!r}")
 
 
 def _expect_string(term: dict[str, Any], field: str) -> str:
@@ -297,18 +327,48 @@ def _term_title(term: dict[str, Any]) -> str:
     return label
 
 
-def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
+def _lookup_rank(term: dict[str, Any]) -> tuple[float, str]:
+    raw_rank = term.get("lookup_rank")
+    rank = float(raw_rank) if isinstance(raw_rank, (int, float)) else 9999.0
+    return (rank, str(term["label"]).lower())
+
+
+def _render_qmd(
+    terms: list[dict[str, Any]],
+    path: Path,
+    notation: dict[str, dict[str, dict[str, str]]],
+) -> None:
+    core_terms = sorted(
+        [term for term in terms if term.get("tier") == "core"],
+        key=_lookup_rank,
+    )
+    all_groups = {term["category"].split(".", 1)[0] for term in terms}
     grouped: dict[str, list[dict[str, Any]]] = {}
     for term in sorted(
-        terms, key=lambda item: (item["category"], item["label"].lower())
+        [term for term in terms if term.get("tier") != "core"],
+        key=lambda item: (
+            item["category"],
+            0 if item.get("tier") == "support" else 1,
+            item["label"].lower(),
+        ),
     ):
         grouped.setdefault(term["category"].split(".", 1)[0], []).append(term)
 
     term_by_id = {term["id"]: term for term in terms}
+    tier_counts = {
+        tier: len([term for term in terms if term.get("tier") == tier])
+        for tier in ("core", "support", "background")
+    }
     category_links = [
+        f'<a class="glossary-chip glossary-category-chip" href="#glossary-tier-core">'
+        f"Core <span>{len(core_terms)}</span></a>",
+        f'<a class="glossary-chip glossary-category-chip" href="#glossary-core-math-lookup">'
+        "Math lookup</a>",
+        *[
         f'<a class="glossary-chip glossary-category-chip" href="#glossary-category-{_slug(group)}">'
         f"{_html_text(_category_label(group))} <span>{len(group_terms)}</span></a>"
         for group, group_terms in grouped.items()
+        ],
     ]
     lines = [
         "---",
@@ -334,9 +394,13 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
         "::: {.glossary-page}",
         "",
         "::: {.glossary-intro}",
-        f"**{len(terms)} terms** across **{len(grouped)} categories**. The canonical source is",
+        f"**{len(terms)} terms** across **{len(all_groups)} categories**. The canonical source is",
         "`docs/typst/shared/glossary.typ`; generated Quarto, Typst, YAML, KG, and shortcode artifacts",
         "share the same definitions.",
+        "",
+        f"Tier counts: **{tier_counts['core']} core**, **{tier_counts['support']} support**,",
+        f"and **{tier_counts['background']} background** terms. Core terms are the thesis math lookup;",
+        "background terms remain linkable but are visually demoted.",
         "",
         "Use `{{{< gls term-id >}}}` for the linked short label and",
         "`{{{< glsfull term-id >}}}` for the linked full label in QMD pages.",
@@ -347,6 +411,17 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
         "</nav>",
         "",
     ]
+    lines += _render_core_lookup(core_terms, notation)
+    lines += [
+        "## Core Concepts {#glossary-tier-core}",
+        "",
+        '<div class="glossary-card-grid glossary-card-grid-core">',
+        "",
+    ]
+    for term in core_terms:
+        lines += _render_term_card(term, term_by_id, notation)
+    lines += ["</div>", ""]
+
     for group, group_terms in grouped.items():
         lines += [
             f"## {_category_label(group)} {{#glossary-category-{_slug(group)}}}",
@@ -355,57 +430,7 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
             "",
         ]
         for term in group_terms:
-            lines += [
-                f'<article class="glossary-card" id="{_html_attr(term["anchor"])}">',
-                '<div class="glossary-card-header">',
-                f'<div class="glossary-term-title">{_html_text(term["label"])}</div>',
-                '<div class="glossary-term-badges">',
-            ]
-            short = term.get("short")
-            if isinstance(short, str) and short and short != term["label"]:
-                lines.append(
-                    f'<span class="glossary-badge glossary-badge-short">{_html_text(short)}</span>'
-                )
-            lines += [
-                f'<span class="glossary-badge">{_html_text(term["category"])}</span>',
-                "</div>",
-                "</div>",
-                "",
-            ]
-            aliases = _as_list(term, "aliases")
-            if aliases:
-                lines += [
-                    '<div class="glossary-aliases">',
-                    "<span>Aliases</span>",
-                    " ".join(f"<code>{_html_text(alias)}</code>" for alias in aliases),
-                    "</div>",
-                    "",
-                ]
-            lines += [
-                f'<p class="glossary-definition">{_html_text(term["definition_short"].strip())}</p>',
-                "",
-            ]
-            if term.get("definition_long"):
-                lines += [
-                    f'<p class="glossary-detail-text">{_html_text(str(term["definition_long"]).strip())}</p>',
-                    "",
-                ]
-            for formula in _term_formulae(term):
-                label = str(formula.get("label") or "").strip()
-                lines += [
-                    "::: {.glossary-formula}",
-                ]
-                if label:
-                    lines += [f"**{_html_text(label)}**", ""]
-                lines += [
-                    "$$",
-                    str(formula["tex"]).strip(),
-                    "$$",
-                    ":::",
-                    "",
-                ]
-            lines += _render_metadata_details(term, term_by_id)
-            lines += ["</article>", ""]
+            lines += _render_term_card(term, term_by_id, notation)
         lines += ["</div>", ""]
     all_citations = sorted(
         {citation for term in terms for citation in _as_list(term, "citations")}
@@ -419,6 +444,144 @@ def _render_qmd(terms: list[dict[str, Any]], path: Path) -> None:
         ]
     lines += [":::", ""]
     _write_text(path, "\n".join(lines).rstrip() + "\n")
+
+
+def _render_core_lookup(
+    core_terms: list[dict[str, Any]],
+    notation: dict[str, dict[str, dict[str, str]]],
+) -> list[str]:
+    if not core_terms:
+        return []
+    lines = [
+        "## Core Math Lookup {#glossary-core-math-lookup}",
+        "",
+        '<div class="glossary-lookup-wrap">',
+        '<table class="glossary-lookup-table">',
+        "<thead>",
+        "<tr>",
+        "<th>Concept</th>",
+        "<th>Meaning</th>",
+        "<th>Symbols</th>",
+        "<th>Equations</th>",
+        "</tr>",
+        "</thead>",
+        "<tbody>",
+    ]
+    for term in core_terms:
+        term_link = (
+            f'<a href="#{_html_attr(term["anchor"])}">{_html_text(_term_title(term))}</a>'
+        )
+        symbols = _render_notation_refs(
+            _as_list(term, "symbol_refs"), notation["symbols"], "symbol"
+        )
+        equations = _render_notation_refs(
+            _as_list(term, "equation_refs"), notation["equations"], "equation"
+        )
+        empty = '<span class="glossary-muted">-</span>'
+        lines += [
+            "<tr>",
+            f"<td>{term_link}</td>",
+            f'<td>{_html_text(str(term["definition_short"]).strip())}</td>',
+            f"<td>{symbols or empty}</td>",
+            f"<td>{equations or empty}</td>",
+            "</tr>",
+        ]
+    lines += ["</tbody>", "</table>", "</div>", ""]
+    return lines
+
+
+def _render_notation_refs(
+    refs: list[str], entries: dict[str, dict[str, str]], kind: str
+) -> str:
+    items = []
+    for ref in refs:
+        entry = entries.get(ref)
+        if entry is None:
+            continue
+        tex = entry["tex"]
+        items.append(
+            '<span class="glossary-notation-item">'
+            f'<span class="glossary-notation-math">\\({_html_text(tex)}\\)</span>'
+            f'<code>{_html_text(ref)}</code>'
+            "</span>"
+        )
+    if not items:
+        return ""
+    return f'<div class="glossary-notation-list glossary-notation-{kind}s">{" ".join(items)}</div>'
+
+
+def _render_term_card(
+    term: dict[str, Any],
+    term_by_id: dict[str, dict[str, Any]],
+    notation: dict[str, dict[str, dict[str, str]]],
+) -> list[str]:
+    tier = str(term.get("tier") or "support")
+    lines = [
+        f'<article class="glossary-card glossary-tier-{_html_attr(tier)}" id="{_html_attr(term["anchor"])}">',
+        '<div class="glossary-card-header">',
+        f'<div class="glossary-term-title">{_html_text(term["label"])}</div>',
+        '<div class="glossary-term-badges">',
+    ]
+    short = term.get("short")
+    if isinstance(short, str) and short and short != term["label"]:
+        lines.append(
+            f'<span class="glossary-badge glossary-badge-short">{_html_text(short)}</span>'
+        )
+    lines += [
+        f'<span class="glossary-badge glossary-tier-badge glossary-tier-badge-{_html_attr(tier)}">{_html_text(tier)}</span>',
+        f'<span class="glossary-badge">{_html_text(term["category"])}</span>',
+        "</div>",
+        "</div>",
+        "",
+    ]
+    aliases = _as_list(term, "aliases")
+    if aliases:
+        lines += [
+            '<div class="glossary-aliases">',
+            "<span>Aliases</span>",
+            " ".join(f"<code>{_html_text(alias)}</code>" for alias in aliases),
+            "</div>",
+            "",
+        ]
+    symbol_refs = _render_notation_refs(
+        _as_list(term, "symbol_refs"), notation["symbols"], "symbol"
+    )
+    equation_refs = _render_notation_refs(
+        _as_list(term, "equation_refs"), notation["equations"], "equation"
+    )
+    if symbol_refs or equation_refs:
+        lines += ['<div class="glossary-card-notation">']
+        if symbol_refs:
+            lines += [f"<div><strong>Symbols</strong>{symbol_refs}</div>"]
+        if equation_refs:
+            lines += [f"<div><strong>Equations</strong>{equation_refs}</div>"]
+        lines += ["</div>", ""]
+    lines += [
+        f'<p class="glossary-definition">{_html_text(term["definition_short"].strip())}</p>',
+        "",
+    ]
+    if term.get("definition_long"):
+        lines += [
+            f'<p class="glossary-detail-text">{_html_text(str(term["definition_long"]).strip())}</p>',
+            "",
+        ]
+    for formula in _term_formulae(term):
+        label = str(formula.get("label") or "").strip()
+        lines += [
+            "::: {.glossary-formula}",
+        ]
+        if label:
+            lines += [f"**{_html_text(label)}**", ""]
+        lines += [
+            "$$",
+            str(formula["tex"]).strip(),
+            "$$",
+            ":::",
+            "",
+        ]
+    lines += _render_metadata_details(term, term_by_id)
+    lines += ["</article>", ""]
+    return lines
 
 
 def _render_metadata_details(
@@ -586,6 +749,8 @@ def _render_jsonl(terms: list[dict[str, Any]], path: Path) -> None:
                 "aliases": _as_list(term, "aliases"),
                 "category": term["category"],
                 "parent": term.get("parent"),
+                "tier": term.get("tier"),
+                "lookup_rank": term.get("lookup_rank"),
                 "definition_short": str(term["definition_short"]).strip(),
                 "definition_long": str(term.get("definition_long") or "").strip(),
                 "internal_links": _as_list(term, "internal_links"),
@@ -593,6 +758,8 @@ def _render_jsonl(terms: list[dict[str, Any]], path: Path) -> None:
                 "related": _as_list(term, "related"),
                 "kg_tags": _as_list(term, "kg_tags"),
                 "typst_macro": term.get("typst_macro"),
+                "symbol_refs": _as_list(term, "symbol_refs"),
+                "equation_refs": _as_list(term, "equation_refs"),
                 "notation": term.get("notation") or {},
                 "formula": term.get("formula") or {},
                 "formulae": term.get("formulae") or [],
@@ -617,11 +784,15 @@ def _render_compat_yaml(terms: list[dict[str, Any]], path: Path) -> None:
                 "aliases": _as_list(term, "aliases"),
                 "category": term["category"],
                 "parent": term.get("parent"),
+                "tier": term.get("tier"),
+                "lookup_rank": term.get("lookup_rank"),
                 "definition_short": str(term["definition_short"]).strip(),
                 "definition_long": str(term.get("definition_long") or "").strip(),
                 "formula": term.get("formula") or {},
                 "formulae": term.get("formulae") or [],
                 "notation": term.get("notation") or {},
+                "symbol_refs": _as_list(term, "symbol_refs"),
+                "equation_refs": _as_list(term, "equation_refs"),
                 "internal_links": _as_list(term, "internal_links"),
                 "citations": _as_list(term, "citations"),
                 "related": _as_list(term, "related"),
@@ -712,6 +883,7 @@ def build(args: argparse.Namespace) -> None:
     terms = _load_terms(args.terms)
     _validate_terms(terms)
     notation = _load_notation(args.notation)
+    _validate_lookup_refs(terms, notation)
     actions = set(args.actions)
     if "all" in actions:
         actions = {
@@ -725,7 +897,7 @@ def build(args: argparse.Namespace) -> None:
             "render-notation-typst",
         }
     if "render-quarto" in actions:
-        _render_qmd(terms, args.qmd_out)
+        _render_qmd(terms, args.qmd_out, notation)
     if "render-typst" in actions:
         _render_typst(terms, args.typst_out)
     if "render-jsonl" in actions:
