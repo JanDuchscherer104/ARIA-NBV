@@ -11,7 +11,7 @@ format: html
 
 This section is a thesis-oriented distillation, not a general survey. Each page extracts what ARIA-NBV can adopt from the local paper corpus: {{< gls next-best-view >}} objectives, egocentric observation contracts, candidate proposal mechanisms, rollout/value-learning gates, and failure modes that affect target-conditioned reconstruction.
 
-The current project direction is deliberately narrow: keep {{< gls relative-reconstruction-improvement >}} and {{< gls target-specific-rri >}} as the authoritative utility signals; use {{< gls project-aria >}}, {{< gls aria-synthetic-environments >}}, {{< gls egocentric-foundation-model-3d >}}, and {{< gls egocentric-voxel-lifting >}} as the actor-visible state substrate; and treat learned sequence/value methods as gated extensions over trusted finite candidate sets.
+The current project direction is deliberately narrow: keep {{< gls relative-reconstruction-improvement >}} and {{< gls target-specific-rri >}} as the authoritative utility signals; use {{< gls project-aria >}}, {{< gls aria-synthetic-environments >}}, {{< gls egocentric-foundation-model-3d >}}, and {{< gls egocentric-voxel-lifting >}} as the actor-visible state substrate; require target-conditioned fitted Double-Q / {{< gls finite-horizon-q-function >}} over trusted finite candidate sets; and keep IQL, continuous actor-critic, simulator-backed RL, and 3DGS control behind evidence gates.
 
 ## Adoption-State Overview
 

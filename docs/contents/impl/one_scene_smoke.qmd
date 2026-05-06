@@ -1,0 +1,170 @@
+---
+title: "One-Scene Smoke Checks"
+phase: thesis
+audience: developer
+status: current
+owner: code
+format: html
+---
+
+# One-Scene Smoke Checks {#one-scene-smoke-checks}
+
+This page defines the smallest real-data smoke path for ARIA-NBV: build one
+immutable VIN offline-store sample, inspect it in Rerun, and run VIN diagnostics
+against the configured offline source. Use it before generating larger oracle
+stores or trusting a training run.
+
+For environment setup, dataset placement, and checkpoint paths, start from
+[`SETUP.md`](https://github.com/JanDuchscherer104/ARIA-NBV/blob/main/SETUP.md)
+or the public [setup page](../setup.qmd).
+
+## What This Smoke Covers {#what-this-smoke-covers}
+
+The real one-scene path checks these contracts together:
+
+- ASE/ATEK shard discovery and GT mesh loading;
+- EVL backbone checkpoint resolution;
+- candidate sampling and validity metadata;
+- PyTorch3D candidate depth rendering;
+- oracle RRI labels and metric vectors;
+- immutable offline-store manifest, sample index, split arrays, and shards;
+- Rerun geometry logging for semidense points, reference pose, candidate
+  frusta, mesh, OBBs, and stored metrics;
+- VIN one-batch summary through the training-facing offline source.
+
+It does not prove full-store coverage, final thesis split quality, rollout data
+quality, or VIN training convergence.
+
+## Preconditions {#preconditions}
+
+Run from a synced `aria_nbv/` environment with at least one ASE EFM shard, its
+GT mesh, and the EVL checkpoint available:
+
+```text
+.data/ase_efm/<scene_id>/shards-*.tar
+.data/ase_meshes/scene_ply_<scene_id>.ply
+.logs/ckpts/model_lite.pth
+```
+
+The sidecar config `.configs/build_vin_offline_rerun_smoke_v6.toml` currently
+sets `max_samples = 1`, `samples_per_shard = 1`, `overwrite = true`, and
+`store_dir = "vin_offline_rerun_smoke_v6"`. It is intentionally separate from
+the default `vin_offline` training store.
+
+## Step 1: Validate the Writer Config {#step-1-validate-the-writer-config}
+
+```sh
+cd aria_nbv
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v6.toml --dry-run
+```
+
+The dry run should resolve the store under
+`.data/offline_cache/vin_offline_rerun_smoke_v6/` without loading snippets,
+running EVL, or writing shards.
+
+## Step 2: Build One Offline Sample {#step-2-build-one-offline-sample}
+
+```sh
+cd aria_nbv
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v6.toml
+```
+
+Expected files:
+
+```text
+.data/offline_cache/vin_offline_rerun_smoke_v6/manifest.json
+.data/offline_cache/vin_offline_rerun_smoke_v6/sample_index.jsonl
+.data/offline_cache/vin_offline_rerun_smoke_v6/splits/all.npy
+.data/offline_cache/vin_offline_rerun_smoke_v6/splits/val.npy
+.data/offline_cache/vin_offline_rerun_smoke_v6/shards/
+```
+
+The manifest should report one sample, one shard, and `interrupted = false`.
+If this step fails on a CPU-only machine, treat that as an environment/resource
+limit unless the same config also fails on a CUDA workstation.
+
+## Step 3: Save a Rerun Recording {#step-3-save-a-rerun-recording}
+
+```sh
+cd aria_nbv
+uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline_smoke_v6.toml --split val --index 0 --save ../.artifacts/rerun/offline_smoke_v6.rrd
+```
+
+The Rerun recording should show the reference camera, candidate frusta,
+semidense reconstruction points, GT mesh or OBB layers when present, and
+candidate metadata aligned with stored RRI values. The inspector is
+diagnostic-only: display downsampling must not mutate labels, rankings, cached
+geometry, or model inputs.
+
+Open the saved recording in the native viewer when available:
+
+```sh
+cd aria_nbv
+uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline_smoke_v6.toml --split val --index 0 --view
+```
+
+For browser-based review on a local machine:
+
+```sh
+cd aria_nbv
+uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline_smoke_v6.toml --split val --index 0 --serve-web --web-viewer-port 9877
+```
+
+## Step 4: Run VIN Diagnostics {#step-4-run-vin-diagnostics}
+
+Validate the default training-facing offline source:
+
+```sh
+cd aria_nbv
+uv run nbv-summary --config-path offline_only.toml
+```
+
+This command reads `.configs/offline_only.toml`, forces summary mode, disables
+W&B, uses one batch, and prints the VIN summary for a real oracle batch. Use it
+to catch missing store files, split issues, tensor-shape drift, checkpoint
+resolution errors, and obvious candidate/RRI mismatches before training.
+
+The default `vin_offline` store can be a partial diagnostic store. Confirm the
+manifest and sample index before using it for thesis figures or training
+claims.
+
+## Step 5: Optional Synthetic Rollout Trace {#step-5-optional-synthetic-rollout-trace}
+
+The rollout trace smoke is CPU-only and does not require ASE data:
+
+```sh
+cd aria_nbv
+uv run nbv-rollout-trace-smoke --output-path ../.artifacts/rollouts/synthetic_rollout_traces.msgpack
+```
+
+Use it to verify trace serialization and replay plumbing. It is not an oracle
+RRI, Rerun, VIN, or ASE data smoke substitute.
+
+## Pass Criteria {#pass-criteria}
+
+The smoke passes when:
+
+- the writer dry run resolves the expected sidecar store path;
+- the one-sample build writes a non-interrupted manifest and split files;
+- the Rerun command saves an `.rrd` under `.artifacts/rerun/`;
+- the Rerun view shows plausible frame alignment rather than hidden or inverted
+  geometry;
+- `nbv-summary --config-path offline_only.toml` yields one real oracle batch
+  summary without entering training mode.
+
+Failures should be fixed at the data, config, geometry, or inspector contract
+that produced them. Do not hide them by changing visualization-only
+downsampling or by silently switching to an online dataset.
+
+## Docs Sanity {#docs-sanity}
+
+After changing setup or smoke documentation:
+
+```sh
+make qmd-frontmatter-check
+cd docs
+quarto render contents/setup.qmd
+quarto render contents/impl/one_scene_smoke.qmd
+quarto render contents/impl/rerun_offline_inspector.qmd
+quarto check
+```

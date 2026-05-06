@@ -193,35 +193,16 @@ class CandidateDepthRenderer:
         self,
         candidates: CandidateSamplingResult,
     ) -> tuple[PoseTW, CameraTW, torch.Tensor]:
-        """
-        Select a subset of candidate poses for rendering, based on config.
+        """Select a subset of candidate poses for rendering.
 
         Returns:
-            - PoseTW: Selected candidate poses (world2cam).
-            - CameraTW: Selected candidate cameras (extrinsics are ref2cam).
-            - Tensor['K',]: Indices into original candidate array.
+            ``PoseTW`` world<-camera candidate poses, ``CameraTW`` candidate
+            cameras whose extrinsics are camera<-reference, and ``Tensor["K"]``
+            indices into the full sampled candidate shell.
         """
         device = self.renderer.device
         cam_views = candidates.views.to(device)
         num_candidates = cam_views.tensor().shape[0]
-        # Map rendered subset back to the original (pre-pruning) candidate order so that
-        # dashboard indices stay aligned with sampling diagnostics.
-        if candidates.mask_valid is None or candidates.shell_poses is None:
-            valid_global_idx = torch.arange(
-                num_candidates,
-                device=device,
-                dtype=torch.long,
-            )
-        else:
-            valid_mask = candidates.mask_valid.to(device)
-            valid_global_idx = torch.nonzero(valid_mask, as_tuple=False).squeeze(-1)
-            if valid_global_idx.numel() != num_candidates:
-                # Fallback to sequential if something went wrong; keeps ordering stable.
-                valid_global_idx = torch.arange(
-                    num_candidates,
-                    device=device,
-                    dtype=torch.long,
-                )
         if num_candidates == 0:
             raise ValueError("No candidates provided for rendering.")
 
@@ -234,8 +215,9 @@ class CandidateDepthRenderer:
 
         selected_views = cam_views[candidate_idx]
         poses_world_cam = candidates.poses_world_cam(device=device)[candidate_idx]
+        candidate_shell_idx = candidates.candidate_shell_indices(device=device)
 
-        return poses_world_cam, selected_views, valid_global_idx[candidate_idx]
+        return poses_world_cam, selected_views, candidate_shell_idx[candidate_idx]
 
 
 __all__ = [

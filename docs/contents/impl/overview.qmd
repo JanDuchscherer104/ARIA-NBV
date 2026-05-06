@@ -24,8 +24,11 @@ This section is organized into the following topics:
 
 1. **[Theory: Surface Reconstruction Metrics](../theory/surface_metrics.qmd)** - Core metrics: Accuracy, Completeness, Chamfer Distance, Precision/Recall
 2. **[RRI Computation](rri_computation.qmd)** - Complete pipeline for computing RRI oracle with ASE dataset
-3. **[RRI metric API](../../reference/rri_metrics.qmd)** - Generated package reference for the active ARIA-NBV metric surface
-4. **[EFM3D literature note](../literature/efm3d.qmd)** - Public context for EVL/EFM3D as the actor-visible state substrate
+3. **[Rollout storage and invalidity contract](rollout_storage_contract.qmd)** - Draft Zarr/Q_H schema for rollout datasets, target records, candidate tables, masks, reason codes, mesh references, and Q_H tensors
+4. **[LRZ dry-run templates](lrz_dry_runs.qmd)** - Documentary Slurm/Pyxis and DSS staging templates for oracle, rollout, training, and diagnostics jobs
+5. **[One-scene smoke checks](one_scene_smoke.qmd)** - Real-data sidecar store, Rerun, VIN summary, and synthetic rollout-trace smoke commands
+6. **[RRI metric API](../../reference/rri_metrics.qmd)** - Generated package reference for the active ARIA-NBV metric surface
+7. **[EFM3D literature note](../literature/efm3d.qmd)** - Public context for EVL/EFM3D as the actor-visible state substrate
 
 ## Quick Reference: Key Functions
 

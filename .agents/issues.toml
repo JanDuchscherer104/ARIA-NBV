@@ -12,28 +12,6 @@ context = ["Root guidance separates high-level paper truth, durable memory, acti
 references = ["repo:AGENTS.md#source-order", "repo:docs/AGENTS.md", "repo:docs/contents/thesis/questions.qmd#kg-friendly-question-writing"]
 
 [[issue]]
-id = "issue-004"
-title = "Missing root CI and pre-commit"
-description = "The repository lacks a root-level pre-commit configuration, make ci contract, and comprehensive CI workflow; the visible workflow coverage is Quarto-oriented."
-type = "feature"
-priority = "high"
-status = "open"
-labels = ["ci", "dev-ergonomics"]
-context = ["Root guidance names package tests, context refresh, KG checks, agent-memory checks, and docs renders as verification surfaces, but there is no single root CI/pre-commit contract that composes them.", "The only visible GitHub workflow is Quarto-oriented, so source, agent-memory, and package smoke checks can drift until run manually."]
-references = ["repo:AGENTS.md#commands", "repo:AGENTS.md#verification", "repo:Makefile", "repo:.github/workflows/quarto-publish.yml"]
-
-[[issue]]
-id = "issue-005"
-title = "Dedicated setup guide missing"
-description = "The README now provides a concise project front door, but setup details still need a dedicated portable guide for environment, CUDA, dataset access, cache paths, and first-run smoke commands."
-type = "maintenance"
-priority = "high"
-status = "open"
-labels = ["docs", "identity"]
-context = ["README.md is now a concise project front door, while setup.qmd and operator references hold pieces of environment, dataset, cache, and first-smoke guidance.", "A portable setup path needs to cite Project Aria/ASE access, uv-managed package setup, CUDA/device expectations, and offline-store smoke commands without committing host-local assumptions."]
-references = ["repo:README.md#documentation-map", "repo:docs/contents/setup.qmd", "url:https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_getting_started"]
-
-[[issue]]
 id = "issue-007"
 title = "M1 data/cache/oracle contract gate is not yet frozen"
 description = "The May milestone requires stable offline-store, split, frame/CW90, and oracle RRI contracts before target-conditioned VIN or rollout claims."
@@ -175,17 +153,6 @@ status = "open"
 labels = ["agents-db", "kg", "litkg", "provenance", "semantic-scholar"]
 context = ["ARIA-NBV issues/todos are now source-backed and context-pack parsing preserves context/references, but graphify/Neo4j exports still need typed edges from backlog records to repo files, papers, external docs, Semantic Scholar IDs, generated context, and experiment evidence.", "The desired agent-memory loop also needs retrieval and consolidation surfaces: DB references should inform kg-query/kg-route results, claim checks should identify unsupported backlog-driven overclaims, and consolidate-memory should propose state/backlog patches instead of silently overwriting canonical memory.", "Authority and freshness metadata should be part of the edge contract so canonical state and active backlog outrank stale debriefs or archived notes while still preserving their evidential provenance."]
 references = ["repo:scripts/agents_db.py", "repo:.agents/skills/agents-db/SKILL.md#provenance-contract", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md#agents-db-integration", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/docs/architecture.md#adapter-output-contracts", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "litkg:context-pack", "url:https://www.semanticscholar.org/product/api"]
-
-[[issue]]
-id = "issue-026"
-title = "Candidate-to-label ordering is not independently guarded"
-description = "Large oracle and rollout generation still needs an explicit guard that candidate poses, validity masks, depths, point clouds, RRI labels, and diagnostics remain aligned after sampling, pruning, batching, shuffling, and serialization."
-type = "bug"
-priority = "high"
-status = "open"
-labels = ["data", "rri", "candidate-generation", "rollouts", "tests"]
-context = ["The alignment distillation called out a known candidate/RRI shuffling risk that should be fixed before generating large rollout datasets.", "Rerun and rollout traces now expose candidate tables, but the M1 contract gate still needs direct ordering tests across candidate generation, oracle labeling, offline stores, and trace serialization.", "If candidate order drifts, rankings and top-oracle diagnostics can look plausible while training labels are attached to the wrong view."]
-references = ["repo:.agents/work/alignment-distillation-gpt55pro.md#9-oracle-data-correctness-action-items", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m1", "repo:aria_nbv/aria_nbv/pose_generation/types.py", "repo:aria_nbv/aria_nbv/pipelines/oracle_rri_labeler.py", "repo:aria_nbv/aria_nbv/pose_generation/rollout_trace.py", "bib:VIN-NBV-frahm2025"]
 
 [[issue]]
 id = "issue-027"

@@ -1,0 +1,370 @@
+# Rollout Zarr, Q_H, And Invalidity Contract
+
+This is the internal implementation contract for future ARIA-NBV rollout and
+Q_H dataset writers. It is a draft schema only. Do not treat it as evidence
+that writers, migrations, stochastic rollout generation, Q_H training, LRZ
+templates, or CI exist.
+
+Public-facing context lives in
+`docs/contents/impl/rollout_storage_contract.qmd`. This reference is allowed to
+be more mechanical because it is an internal developer contract.
+
+## Scope
+
+The store must support:
+
+- replayable bounded rollout chains from ASE mesh/oracle counterfactuals;
+- target-conditioned scene and target RRI labels;
+- full-shell candidate ordering with stable row ids;
+- hard validity masks and explicit reason codes;
+- optional selected-action or retained-chain diagnostics;
+- external full-mesh references and embedded target crops;
+- padded finite-candidate Q_H tensor views for training/evaluation.
+
+The store must not:
+
+- duplicate full ASE meshes;
+- encode invalid candidates as low RRI;
+- expose GT mesh, GT OBB crops, or oracle labels as actor-visible V1 inputs;
+- require heavy diagnostics for training;
+- hide mixed lineage behind a single manifest.
+
+## Root Metadata
+
+Root attributes:
+
+| Field | Required | Notes |
+|---|---:|---|
+| `schema_id` | yes | Suggested value: `aria_nbv.rollout_zarr_q_invalidity`. |
+| `schema_version` | yes | Start as `0.1-draft`; bump for incompatible changes. |
+| `zarr_format` | yes | Intended Zarr major format. |
+| `zarr_core_spec` | yes | Zarr core spec URI or version label used by the writer. |
+| `created_at_utc` | yes | ISO timestamp. |
+| `aria_nbv_git_revision` | yes | Commit or source-tree digest. |
+| `source_offline_store_version` | yes | VIN/offline-store version used as input. |
+| `split_manifest_hash` | yes | Scene-level split contract. |
+| `reason_code_version` | yes | Invalidity dictionary version. |
+| `target_protocol_version` | yes | V0/V1 target contract version. |
+| `return_semantics` | yes | Example: `cumulative_target_rri`. |
+| `field_retention_policy` | yes | Example: `compact`, `selected_heavy`, or `audit`. |
+
+Variable-length strings can be dictionary encoded. A future writer may use
+Zarr string dtypes where appropriate, but row linkage should not depend on
+string array behavior.
+
+## Group Layout
+
+```text
+rollouts.zarr/
+  metadata/
+    generation_manifest
+    reason_codes
+    field_retention_policy
+  dictionaries/
+    scene
+    snippet
+    rollout
+    target
+    policy
+    config
+    class_name
+  splits/
+    scene_split
+    rollout_split
+  lineage/
+    rollout_index
+    config_hashes
+  mesh_refs/
+    scene_mesh_index
+  targets/
+    target_index
+    crop_vertices
+    crop_vertex_offsets
+    crop_faces
+    crop_face_offsets
+  rollouts/
+    rollout_index
+  steps/
+    step_index
+    reason_histogram
+  candidates/
+    candidate_index
+    candidate_pose_world_cam
+    candidate_pose_relative
+    metric_vectors
+  q_h/
+    state_step_row_id
+    candidate_row_id
+    valid_action_mask
+    invalid_reason_bitset
+    one_step_target_rri
+    one_step_scene_rri
+    q_target_target_rri
+    q_target_scene_rri
+    selected_candidate_index
+    bootstrap_next_step_row_id
+    terminal_mask
+    discount
+  diagnostics/
+    depth
+    depth_valid_mask
+    face_index
+    point_cloud
+    point_cloud_offsets
+    collision_segments
+    rerun_artifact_index
+```
+
+`diagnostics/` groups are optional. Required table groups should exist even if
+some optional columns are all unavailable.
+
+## Row Identity
+
+Use signed 64-bit row ids unless a future implementation proves a smaller type
+is sufficient:
+
+- `target_row_id`: one target record for one scene/snippet target protocol.
+- `rollout_row_id`: one rollout chain for one root state and target.
+- `step_row_id`: one horizon step within a rollout chain.
+- `candidate_row_id`: one candidate from the full sampled shell at one step.
+
+Rows should be append-only within a shard. Joins must use row ids, not implicit
+array order alone. Candidate full-shell order is represented by
+`shell_index` within each `step_row_id`.
+
+## Target Records
+
+`targets/target_index` columns:
+
+| Column | Shape or type | Notes |
+|---|---|---|
+| `target_row_id` | `[T] int64` | Primary key. |
+| `scene_id`, `snippet_id` | `[T] dict/int` | Source identity. |
+| `target_id` | `[T] dict/int` | Stable within snippet where available. |
+| `target_protocol_version` | `[T] dict/int` | Separates V0 and V1. |
+| `actor_visible_source` | `[T] enum/int` | `gt_obb`, `pred_obb`, `tracked_obb`, etc. |
+| `class_id`, `class_name` | `[T] int/dict` | Actor-visible class prediction or GT for V0 only. |
+| `confidence` | `[T] float32` | Actor-visible confidence. |
+| `observed_obb_world` | `[T, O] float32` | OBB fields with frame/parameterization attrs. |
+| `observed_support` | `[T, K] float32` | Semidense/EVL/projected-area support summary. |
+| `matched_gt_target_id` | `[T] dict/int` | GT target id for evaluation. |
+| `gt_obb_world` | `[T, O] float32` | Oracle/evaluation only. |
+| `match_iou`, `match_score` | `[T] float32` | Matching diagnostics. |
+| `target_valid_mask` | `[T] bool` | True if target can be used for the protocol. |
+| `target_invalid_reason_bitset` | `[T] uint32` | Reason bitset. |
+| `primary_invalid_reason` | `[T] uint16` | Dominant reason for reporting. |
+| `target_crop_row_id` | `[T] int64` | Links to ragged crop arrays. |
+
+Target crop ragged arrays:
+
+- `crop_vertices`: `[sum_vertices, 3] float32`, world frame;
+- `crop_vertex_offsets`: `[num_crops + 1] int64`;
+- `crop_faces`: `[sum_faces, 3] int32`, local to the crop vertex span;
+- `crop_face_offsets`: `[num_crops + 1] int64`.
+
+Crop attributes must record source mesh hash, crop bounds, margin, face
+retention rule, unit convention, and coordinate frame.
+
+## Mesh References
+
+`mesh_refs/scene_mesh_index` columns:
+
+| Column | Notes |
+|---|---|
+| `scene_id` | Scene dictionary id. |
+| `mesh_role` | `ase_gt_full`, `scene_crop`, `diagnostic_decimated`, etc. |
+| `mesh_uri` | External path or URI under configured data roots. |
+| `mesh_sha256` | Content digest. |
+| `mesh_version` | Source or preprocessing version. |
+| `coordinate_frame` | Frame name, usually world. |
+| `unit_m` | Unit scale in meters. |
+| `bounds_world` | Optional AABB. |
+| `vertex_count`, `face_count` | Counts for sanity and budget reports. |
+| `preprocess_hash` | Hash of crop/simplification config, if derived. |
+
+Full scene meshes remain external. Only target crops may be embedded once per
+target.
+
+## Rollout And Step Tables
+
+`rollouts/rollout_index` columns:
+
+- `rollout_row_id`, `rollout_id`, `chain_id`;
+- `scene_id`, `snippet_id`, `target_row_id`, `split`;
+- `root_pose_world_rig`, `root_pose_world_cam` when defined;
+- `horizon`, `branch_factor`, `beam_width`, `candidate_count_budget`;
+- `policy_id`, `branch_schedule_id`, `temperature`, `random_seed`;
+- `candidate_config_hash`, `oracle_config_hash`, `rollout_config_hash`;
+- `model_checkpoint_hash` when learned scores are used;
+- `termination_reason`;
+- `final_cumulative_target_rri`, `final_cumulative_scene_rri`;
+- `path_length_m`, `view_count`, `invalid_action_rate`, `runtime_ms`.
+
+`steps/step_index` columns:
+
+- `step_row_id`, `rollout_row_id`, `step_index`;
+- `current_pose_world_rig`, `current_pose_world_cam` where defined;
+- `selected_candidate_row_id`, `selected_shell_index`,
+  `selected_compact_valid_index`;
+- `num_candidates`, `num_valid_candidates`;
+- `cumulative_target_rri`, `cumulative_scene_rri`, `path_length_m`;
+- `step_runtime_ms`;
+- `reason_histogram_offset` for compact per-step invalidity summaries.
+
+## Candidate Table
+
+`candidates/candidate_index` columns:
+
+| Column | Shape or type | Notes |
+|---|---|---|
+| `candidate_row_id` | `[N] int64` | Primary key. |
+| `step_row_id` | `[N] int64` | Parent state. |
+| `rollout_row_id` | `[N] int64` | Redundant join accelerator. |
+| `step_index` | `[N] int16` | Horizon index. |
+| `shell_index` | `[N] int16/int32` | Full sampled shell order. |
+| `compact_valid_index` | `[N] int16/int32` | `-1` for invalid candidates. |
+| `pose_world_cam` | `[N, 12] float32` | Match `PoseTW.tensor()` convention if used. |
+| `pose_relative_root` | `[N, R] float32` | Candidate-relative encoding attrs required. |
+| `strategy_id` | `[N] enum/int` | Candidate source strategy. |
+| `mixture_id` | `[N] enum/int` | Sampler mixture component. |
+| `sampler_probability` | `[N] float32` | Optional proposal probability. |
+| `candidate_valid_mask` | `[N] bool` | Required. |
+| `actor_action_mask` | `[N] bool` | Actor-selectable. |
+| `oracle_label_mask` | `[N] bool` | Oracle label exists and is valid. |
+| `q_train_mask` | `[N] bool` | Usable for configured Q_H target. |
+| `padded_mask` | `[N] bool` | False data for dense tensors only. |
+| `selected_mask` | `[N] bool` | Selected at this step. |
+| `heavy_diag_available_mask` | `[N] bool` | Heavy diagnostics available. |
+| `invalid_reason_bitset` | `[N] uint32` | Versioned reason bitset. |
+| `primary_invalid_reason` | `[N] uint16` | Reporting reason. |
+| `scene_rri`, `target_rri` | `[N] float32` | NaN when masked. |
+| `accuracy_delta`, `completeness_delta` | `[N] float32` | Optional oracle components. |
+| `target_visible_fraction` | `[N] float32` | Protocol-defined visibility. |
+| `oracle_rank`, `model_rank` | `[N] int16/int32` | `-1` when unavailable. |
+| `one_step_model_score` | `[N] float32` | Optional learned score. |
+| `model_uncertainty` | `[N] float32` | Optional calibration field. |
+
+Full-shell candidate rows remain present for invalid candidates. The masks
+define action/training eligibility.
+
+## Invalidity Reason Codes
+
+Reason codes are bit positions stored as `uint32` bitsets. Bit 0 is reserved
+for the all-clear value and is not combined with failures.
+
+| Bit | Code |
+|---:|---|
+| 0 | `VALID` |
+| 1 | `POSE_NONFINITE` |
+| 2 | `POSE_OUT_OF_EXTENT` |
+| 3 | `CAMERA_OUT_OF_EXTENT` |
+| 4 | `COLLISION_MESH` |
+| 5 | `CLEARANCE_TOO_SMALL` |
+| 6 | `PATH_SEGMENT_COLLISION` |
+| 7 | `FRUSTUM_OUT_OF_BOUNDS` |
+| 8 | `DEPTH_NO_HIT` |
+| 9 | `DEPTH_TOO_SPARSE` |
+| 10 | `BACKPROJECT_EMPTY` |
+| 11 | `CANDIDATE_DUPLICATE` |
+| 12 | `SAMPLER_RULE_REJECTED` |
+| 13 | `TARGET_NOT_ACTOR_VISIBLE` |
+| 14 | `TARGET_GT_UNMATCHED` |
+| 15 | `TARGET_CROP_EMPTY` |
+| 16 | `TARGET_SUPPORT_TOO_LOW` |
+| 17 | `TARGET_VISIBILITY_TOO_LOW` |
+| 18 | `SEMIDENSE_SUPPORT_TOO_LOW` |
+| 19 | `EVL_EVIDENCE_MISSING` |
+| 20 | `MESH_REFERENCE_MISSING` |
+| 21 | `ORACLE_DISTANCE_FAILED` |
+| 22 | `CANDIDATE_ORDER_GUARD_FAILED` |
+| 23 | `RUNTIME_ERROR` |
+
+Append new codes only at the end. Never reuse a meaning within a schema
+version family.
+
+## Mask Semantics
+
+Use these masks consistently:
+
+- `candidate_valid_mask`: required geometry, evidence, target, and oracle
+  checks pass for this protocol.
+- `actor_action_mask`: the actor or one-step scorer may select the action using
+  actor-visible state only.
+- `oracle_label_mask`: oracle scene/target RRI exists and is valid.
+- `q_train_mask`: the row is usable for the configured Q_H target tensor.
+- `target_valid_mask`: target record is usable under the protocol.
+- `padded_mask`: dense tensor filler, never a real candidate.
+- `heavy_diag_available_mask`: optional diagnostic arrays are present.
+
+For the first Q_H dataset, `q_train_mask` should require actor-selectability,
+valid oracle target RRI, valid target record, and non-padded candidate row.
+
+## Q_H Tensor View
+
+`q_h/` is a dense padded tensor view. The columnar candidate table is still the
+source of truth.
+
+Recommended tensor shapes:
+
+| Array | Shape | Dtype | Fill |
+|---|---|---|---|
+| `state_step_row_id` | `[S]` | `int64` | none |
+| `candidate_row_id` | `[S, C_max]` | `int64` | `-1` |
+| `valid_action_mask` | `[S, C_max]` | `bool` | `false` |
+| `invalid_reason_bitset` | `[S, C_max]` | `uint32` | `0` for padded plus `valid_action_mask=false` |
+| `target_row_id` | `[S]` | `int64` | none |
+| `selected_candidate_index` | `[S]` | `int16/int32` | `-1` |
+| `one_step_target_rri` | `[S, C_max]` | `float32` | `NaN` |
+| `one_step_scene_rri` | `[S, C_max]` | `float32` | `NaN` |
+| `q_target_target_rri` | `[S, H_max, C_max]` | `float32` | `NaN` |
+| `q_target_scene_rri` | `[S, H_max, C_max]` | `float32` | `NaN` |
+| `bootstrap_next_step_row_id` | `[S, C_max]` | `int64` | `-1` |
+| `terminal_mask` | `[S, C_max]` | `bool` | `true` for terminal or unavailable branch |
+| `discount` | `[H_max]` | `float32` | none |
+
+Array attributes must record:
+
+- horizon convention, for example horizons `1..H_max`;
+- return semantics, initially cumulative target RRI;
+- whether returns are oracle-computed, model-estimated, or bootstrapped;
+- target protocol version;
+- split protocol and scene-level split hash;
+- whether scalar motion/rule penalties are absent or included.
+
+Initial Q_H targets should be pure bounded cumulative target RRI. Scalar
+motion, rule, and invalidity penalties are separate ablations and require a
+different `return_semantics` attribute.
+
+## Optional Heavy Diagnostics
+
+Heavy diagnostics may be materialized for selected actions, retained chains, or
+audit samples:
+
+- `diagnostics/depth`: rendered depth, ragged or padded by image shape;
+- `diagnostics/depth_valid_mask`;
+- `diagnostics/face_index`;
+- `diagnostics/point_cloud` plus offsets;
+- target-cropped current/candidate point clouds;
+- collision segments and clearance samples;
+- Rerun artifact URI/index rows.
+
+Heavy diagnostics must have availability masks and row backlinks. Missing
+optional diagnostics must not change training masks unless the protocol
+declares them required.
+
+## Rejection Rules
+
+Reject a store or shard for Q_H training when:
+
+- schema id/version is unknown;
+- reason-code version is unknown;
+- split manifest hash is missing or incompatible;
+- candidate row ids do not align with Q_H `candidate_row_id` backlinks;
+- any selected action has `actor_action_mask=false`;
+- invalid candidates have finite Q targets without an explicit ablation
+  return-semantic;
+- target records lack valid matched GT evaluation where the protocol requires
+  target RRI;
+- full meshes are embedded instead of externally referenced;
+- target crops are duplicated per candidate instead of once per target;
+- mixed code/config/checkpoint hashes are not separated by lineage.

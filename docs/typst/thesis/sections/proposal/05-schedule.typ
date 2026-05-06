@@ -34,11 +34,11 @@ The planned thesis window runs from 29 April 2026 to 30 September 2026. The sche
     [Target-conditioned VIN],
     [The model accepts a target encoding and is evaluated against scene-level, target-level, oracle, and geometric baselines.],
     [10 Aug--30 Aug],
-    [Multi-step rollouts],
-    [Greedy, random, bounded oracle, stochastic or beam, and model-scored rollouts are compared by cumulative target #RRI and acquisition cost.],
+    [Multi-step rollouts and $Q_H$],
+    [Greedy, random, bounded oracle, stochastic or beam, model-scored, and fitted $Q_H$ selections are compared by cumulative target #RRI and acquisition cost.],
     [31 Aug--13 Sep],
-    [Value/RL gate],
-    [A masked discrete Q or close-greedy RL baseline is attempted only if rollout evidence and scorer calibration justify it.],
+    [Continuous bridge and optional IQL],
+    [IQL or actor-critic bridge design is attempted only after fitted $Q_H$ evidence is stable; no quantitative continuous-control baseline is required.],
     [14 Sep--30 Sep],
     [Thesis freeze and release],
     [Final figures, ablations, failure cases, reproducible configs, and demonstration smokes are complete.],
@@ -48,4 +48,4 @@ The planned thesis window runs from 29 April 2026 to 30 September 2026. The sche
 
 The main risk is that oracle or offline-store trust takes longer than expected. In that case, the thesis remains valid as a stronger geometry-first study of scene-level #RRI, target-specific #RRI, and one-step candidate scoring, while learned multi-step control is reduced to oracle rollout analysis. A second risk is that target-specific labels are too sparse or unstable for reliable model training. The fallback is to report target #RRI as an oracle evaluation and diagnostic tool while keeping the learned model scene-level. A third risk is that bounded lookahead does not improve over one-step greedy under the available candidate budget. That outcome is still scientifically useful if it is paired with failure analysis, because it identifies whether candidate generation, target observability, or the reward definition is the limiting factor.
 
-The stretch path is value learning or policy learning. It will be pursued only after held-out VIN ranking, oracle-evaluated VIN-selected rollouts, calibration and stage-shift analysis, and Rerun failure visualization are available. If those gates are not met by the end of August, the thesis will prioritize robust target-aware ablations and a defensible future-work discussion over a weak reinforcement-learning claim.
+The mandatory value-learning path is fitted Double-Q / $Q_H$ over finite candidate sets. It will be pursued only after held-out VIN ranking, oracle-evaluated VIN-selected rollouts, calibration and stage-shift analysis, and Rerun failure visualization are available. If those gates are not met by the end of August, the thesis will document the blocker explicitly rather than reclassifying $Q_H$ as optional. The stretch path after a stable $Q_H$ result is IQL, actor-critic bridge design, or continuous target-then-pose control; if the gates are weak, the thesis will prioritize robust target-aware ablations and a defensible future-work discussion over a weak continuous-RL claim.

@@ -246,6 +246,30 @@ def test_candidate_depth_renderer_reports_full_shell_candidate_indices() -> None
     assert candidate_indices.tolist() == [1, 3]
 
 
+def test_candidate_depth_renderer_rejects_ambiguous_candidate_index_mapping() -> None:
+    shell = PoseTW(
+        torch.cat(
+            [
+                torch.eye(3, dtype=torch.float32).reshape(1, 9).repeat(4, 1),
+                torch.arange(4, dtype=torch.float32).reshape(4, 1).expand(4, 3),
+            ],
+            dim=1,
+        )
+    )
+    camera = _dummy_camera()
+    candidates = CandidateSamplingResult(
+        views=CameraTW(camera.tensor().repeat(3, 1)),
+        reference_pose=_identity_pose(),
+        mask_valid=torch.tensor([False, True, False, True]),
+        masks={},
+        shell_poses=shell,
+    )
+    renderer = CandidateDepthRendererConfig(device="cpu", max_candidates_final=3, verbosity=0).setup_target()
+
+    with pytest.raises(ValueError, match="Candidate views cannot be mapped"):
+        renderer._select_candidate_views(candidates)  # noqa: SLF001
+
+
 def test_rollout_trace_maps_scores_to_full_candidate_shell_and_roundtrips(tmp_path: Path) -> None:
     rollouts = _run_rollouts(horizon=2, branch_factor=1, score_candidates=_fake_rri_evaluator)
     traces = traces_from_rollout_result(
@@ -268,11 +292,22 @@ def test_rollout_trace_maps_scores_to_full_candidate_shell_and_roundtrips(tmp_pa
     first_step = trace.steps[0]
     assert first_step.candidate_valid.shape[0] == first_step.candidate_poses_world_cam.shape[0]
     assert first_step.candidate_scores is not None
+    valid_indices = torch.nonzero(first_step.candidate_valid, as_tuple=False).reshape(-1)
+    expected_valid_scores = torch.linspace(
+        0.1,
+        0.1 * valid_indices.numel(),
+        valid_indices.numel(),
+        dtype=first_step.candidate_scores.dtype,
+    )
+    assert torch.allclose(first_step.candidate_scores[valid_indices], expected_valid_scores)
+    assert torch.isnan(first_step.candidate_scores[~first_step.candidate_valid]).all()
     assert torch.isclose(
         first_step.candidate_scores[first_step.selected_shell_index],
         torch.tensor(first_step.selection_score, dtype=first_step.candidate_scores.dtype),
     )
     assert first_step.metric_vectors["rri"].shape == first_step.candidate_valid.shape
+    assert torch.allclose(first_step.metric_vectors["rri"][valid_indices], expected_valid_scores)
+    assert torch.isnan(first_step.metric_vectors["rri"][~first_step.candidate_valid]).all()
     assert first_step.cumulative_rri == pytest.approx(first_step.selected_metrics["rri"])
 
     path = write_rollout_traces(tmp_path / "rollouts.msgpack", traces)
@@ -281,3 +316,9 @@ def test_rollout_trace_maps_scores_to_full_candidate_shell_and_roundtrips(tmp_pa
     assert decoded[0].lineage.scene_id == "scene"
     assert decoded[0].steps[0].selected_shell_index == first_step.selected_shell_index
     assert torch.equal(decoded[0].steps[0].candidate_valid, first_step.candidate_valid)
+    assert decoded[0].steps[0].candidate_scores is not None
+    assert torch.allclose(
+        decoded[0].steps[0].candidate_scores,
+        first_step.candidate_scores,
+        equal_nan=True,
+    )

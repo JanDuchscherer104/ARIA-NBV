@@ -4,12 +4,15 @@
 #import "../shared/glossary.typ": *
 #import "sections/proposal/_style.typ": *
 
-#set document(title: titleEnglish + " Proposal", author: author)
+#let proposalTitleEnglish = "ARIA-NBV: Quality-Driven Next-Best-View Planning with Egocentric Foundation Models"
+#let proposalTitleGerman = "ARIA-NBV: Qualitaetsgetriebene Next-Best-View-Planung mit egozentrischen Foundation-Modellen"
+
+#set document(title: proposalTitleEnglish + " Proposal", author: author)
 #set text(font: "New Computer Modern")
 
 #show: proposal.with(
-  title: titleEnglish,
-  titleGerman: "Aria-NBV: Qualitaetsgetriebene Next-Best-View-Planung mit egozentrischen Foundation-Modellen",
+  title: proposalTitleEnglish,
+  titleGerman: proposalTitleGerman,
   thesisKindEnglish: thesisKindEnglish + " Proposal",
   thesisKindGerman: "Proposal zur " + thesisKindGerman,
   academicDegree: academicDegree,

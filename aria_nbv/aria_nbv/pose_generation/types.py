@@ -142,8 +142,47 @@ class CandidateSamplingResult:
         t_cam_ref = self.views.T_camera_rig.to(device=device)  # camera <- reference
         t_world_ref = self.reference_pose.to(t_cam_ref.device)  # world <- reference
 
-        # Compose to world2camera
+        # Compose to world <- camera.
         return t_world_ref @ t_cam_ref.inverse()
+
+    def candidate_shell_indices(self, *, device: torch.device | None = None) -> torch.Tensor:
+        """Return full-shell indices aligned with ``views`` and labels.
+
+        ``CandidateViewGenerator`` stores ``views`` as the compact valid-candidate
+        table and keeps ``mask_valid``/``shell_poses`` as full-shell diagnostics.
+        Some synthetic diagnostics use full-shell ``views`` directly. This helper
+        accepts those two explicit layouts and rejects ambiguous combinations so
+        candidate poses, depth renders, oracle labels, and serialized diagnostics
+        cannot silently drift out of order.
+
+        Args:
+            device: Optional destination device for the returned indices.
+
+        Returns:
+            ``Tensor["N"]`` integer indices into the full sampled shell.
+
+        Raises:
+            ValueError: If ``views`` cannot be mapped unambiguously to the full
+                candidate shell.
+        """
+
+        view_count = int(self.views.tensor().shape[0])
+        target_device = device or self.views.tensor().device
+        if self.mask_valid is None:
+            return torch.arange(view_count, device=target_device, dtype=torch.long)
+
+        valid_mask = self.mask_valid.to(device=target_device, dtype=torch.bool).reshape(-1)
+        valid_indices = torch.nonzero(valid_mask, as_tuple=False).reshape(-1)
+        if valid_indices.numel() == view_count:
+            return valid_indices
+        if valid_mask.numel() == view_count:
+            return torch.arange(view_count, device=target_device, dtype=torch.long)
+
+        raise ValueError(
+            "Candidate views cannot be mapped to full-shell indices: "
+            f"views={view_count}, valid_count={valid_indices.numel()}, mask_width={valid_mask.numel()}. "
+            "Expected compact valid views or full-shell views.",
+        )
 
     def get_offsets_and_dirs_ref(
         self,

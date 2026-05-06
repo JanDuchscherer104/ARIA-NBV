@@ -1,0 +1,37 @@
+minimum_pre_commit_version: "3.6.0"
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+
+repos:
+  - repo: local
+    hooks:
+      - id: agents-db-validate
+        name: agents-db validate
+        entry: make agents-db-validate
+        language: system
+        pass_filenames: false
+        files: ^(\.agents/(issues|todos|refactors|resolved)\.toml|scripts/agents_db\.py|Makefile)$
+
+      - id: qmd-frontmatter-check
+        name: qmd frontmatter check
+        entry: make qmd-frontmatter-check
+        language: system
+        pass_filenames: false
+        files: ^(docs/contents/.*\.qmd|scripts/validate_qmd_frontmatter\.py|Makefile)$
+
+      - id: check-agent-memory
+        name: agent memory check
+        entry: make check-agent-memory
+        language: system
+        pass_filenames: false
+        files: ^(\.agents/memory/|\.agents/references/agent_memory_templates\.md|scripts/validate_agent_memory\.py|AGENTS\.md|Makefile)$
+
+      - id: docs-render-core
+        name: core docs render
+        entry: make docs-render-core
+        language: system
+        pass_filenames: false
+        stages:
+          - pre-push
+        files: ^(docs/|scripts/(glossary_build|quarto_generate_api_docs|validate_qmd_frontmatter)\.(py|sh)|Makefile)$

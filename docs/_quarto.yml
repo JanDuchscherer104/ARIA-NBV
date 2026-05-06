@@ -140,7 +140,10 @@ website:
                 - contents/impl/data_pipeline_overview.qmd
                 - contents/impl/oracle_rri_impl.qmd
                 - contents/impl/rri_computation.qmd
+                - contents/impl/rollout_storage_contract.qmd
                 - contents/impl/rerun_offline_inspector.qmd
+                - contents/impl/one_scene_smoke.qmd
+                - contents/impl/lrz_dry_runs.qmd
             - section: "Scorer And Training"
               contents:
                 - contents/impl/coral_integration.qmd

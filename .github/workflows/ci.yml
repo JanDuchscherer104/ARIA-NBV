@@ -1,0 +1,62 @@
+name: Root Verification
+
+on:
+  pull_request:
+    paths:
+      - ".agents/**"
+      - ".github/workflows/**"
+      - ".pre-commit-config.yaml"
+      - "AGENTS.md"
+      - "Makefile"
+      - "docs/**"
+      - "scripts/agents_db.py"
+      - "scripts/validate_agent_memory.py"
+      - "scripts/validate_qmd_frontmatter.py"
+  push:
+    branches:
+      - main
+    paths:
+      - ".agents/**"
+      - ".github/workflows/**"
+      - ".pre-commit-config.yaml"
+      - "AGENTS.md"
+      - "Makefile"
+      - "docs/**"
+      - "scripts/agents_db.py"
+      - "scripts/validate_agent_memory.py"
+      - "scripts/validate_qmd_frontmatter.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: root-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      PYTHON_INTERPRETER: python
+      CI_RENDER_DIR: ${{ runner.temp }}/aria-nbv-ci-renders
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install validation dependencies
+        run: python -m pip install --upgrade pip PyYAML
+
+      - name: Set up Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Set up Typst
+        uses: typst-community/setup-typst@v5.1.0
+
+      - name: Run root CI contract
+        run: make ci

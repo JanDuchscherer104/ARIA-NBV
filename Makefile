@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help
+.PHONY: help ci agents-db-validate docs-render-core quarto-docs-ci typst-paper-ci
 .PHONY: context-qmd-tree qmd-frontmatter-check
 .PHONY: context-index context-get context-contracts context-modules context-classes context-functions
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
@@ -29,6 +29,7 @@ TYPST_THESIS_PDF ?= $(DOCS_DIR)/typst/thesis/main.pdf
 TYPST_PROPOSAL ?= $(DOCS_DIR)/typst/thesis/proposal.typ
 TYPST_PROPOSAL_PDF ?= $(DOCS_DIR)/typst/thesis/proposal.pdf
 TYPST_SLIDES_DIR ?= $(DOCS_DIR)/typst/seminar_slides
+CI_RENDER_DIR ?= $(CURDIR)/.cache/ci-renders
 SLIDES ?= slides_4.typ
 SLIDES_FILE := $(if $(filter %.typ,$(SLIDES)),$(SLIDES),$(SLIDES).typ)
 SLIDES_SRC := $(if $(findstring /,$(SLIDES_FILE)),$(SLIDES_FILE),$(TYPST_SLIDES_DIR)/$(SLIDES_FILE))
@@ -163,6 +164,9 @@ glossary: _check_python ## 📖 Build shared Quarto/Typst/KG glossary artifacts
 
 qmd-frontmatter-check: _check_python ## 📖 Validate taxonomy frontmatter for rendered Quarto content
 	@$(PYTHON_INTERPRETER) scripts/validate_qmd_frontmatter.py docs/contents
+
+agents-db-validate: _check_python ## Validate the agents DB schema
+	@$(PYTHON_INTERPRETER) scripts/agents_db.py validate
 
 memory-mine: _check_python ## 🧠 Mine current repo state (docs, code, history) into repo-local MemPalace
 	@echo "$(BLUE)Mining project into MemPalace...$(NC)"
@@ -622,6 +626,9 @@ docs-lint: _check_python ## Format QMD lists, then run Quarto checks
 quarto-docs: ## Render the Quarto website into docs/_site
 	@cd docs && quarto render .
 
+quarto-docs-ci: ## Render the Quarto website without executing notebooks
+	@quarto render $(DOCS_DIR) --no-execute
+
 quarto-preview: ## Preview the Quarto website locally
 	@cd docs && quarto preview
 
@@ -632,6 +639,10 @@ quarto-preview: ## Preview the Quarto website locally
 .PHONY: typst-paper typst-slide thesis-pdf thesis-watch proposal-pdf proposal-watch
 typst-paper: ## Compile the Typst paper (docs/typst/seminar_paper/main.typ)
 	@$(TYPST) compile --root $(TYPST_ROOT) $(TYPST_PAPER) $(TYPST_PAPER_PDF)
+
+typst-paper-ci: ## Compile the Typst paper into an ignored CI artifact path
+	@mkdir -p "$(CI_RENDER_DIR)"
+	@$(TYPST) compile --root $(TYPST_ROOT) $(TYPST_PAPER) "$(CI_RENDER_DIR)/seminar_paper.pdf"
 
 typst-slide: ## Compile a Typst slide deck (make typst-slide SLIDES=slides_4.typ or SLIDES=docs/typst/thesis_slides/slides_thesis_outlook.typ)
 	@$(TYPST) compile --root $(TYPST_ROOT) $(SLIDES_SRC) $(SLIDES_PDF)
@@ -647,6 +658,10 @@ proposal-pdf: ## Compile the Typst thesis proposal (docs/typst/thesis/proposal.t
 
 proposal-watch: ## Watch and recompile the Typst thesis proposal
 	@$(TYPST) watch --root $(TYPST_ROOT) $(TYPST_PROPOSAL) $(TYPST_PROPOSAL_PDF)
+
+docs-render-core: quarto-docs-ci typst-paper-ci ## Render the core docs surfaces used by root CI
+
+ci: agents-db-validate qmd-frontmatter-check check-agent-memory docs-render-core ## Run the minimal root CI contract
 
 #  ═══════════════════════════════════════════════════════════════════════
 #  ℹ️  Help

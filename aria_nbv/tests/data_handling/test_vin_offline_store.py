@@ -37,12 +37,14 @@ from aria_nbv.data_handling._offline_format import VinOfflineBlockSpec
 from aria_nbv.data_handling._offline_store import VinOfflineStoreReader
 from aria_nbv.data_handling._offline_writer import _assign_splits
 from aria_nbv.lightning.lit_datamodule import VinDataModuleConfig
+from aria_nbv.pose_generation.types import CandidateSamplingResult
 from aria_nbv.rendering.candidate_depth_renderer import CandidateDepths
 from aria_nbv.rri_metrics.types import RriResult
 from aria_nbv.utils import Console, Stage
 from aria_nbv.vin.types import EvlBackboneOutput
 
 PoseTW = pytest.importorskip("efm3d.aria.pose").PoseTW
+CameraTW = pytest.importorskip("efm3d.aria.camera").CameraTW
 ObbTW = pytest.importorskip("efm3d.aria.obb").ObbTW
 aria_constants = pytest.importorskip("efm3d.aria.aria_constants")
 ARIA_OBB_PADDED = aria_constants.ARIA_OBB_PADDED
@@ -69,6 +71,15 @@ def _read_sample_index_rows(path: Path) -> list[dict[str, object]]:
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _read_indexed_record(shard_dir: Path, block: VinOfflineBlockSpec, *, row: int = 0) -> object:
+    """Read one indexed msgpack record from a shard-local block."""
+
+    payload_path, offsets_path = block.paths
+    offsets = np.load(shard_dir / offsets_path, allow_pickle=False)
+    payload_bytes = (shard_dir / payload_path).read_bytes()
+    return msgspec.msgpack.decode(payload_bytes[int(offsets[row]) : int(offsets[row + 1])])
 
 
 def _make_pose_batch(num: int, *, offset: float = 0.0) -> PoseTW:
@@ -106,6 +117,50 @@ def _make_stub_depths(num_candidates: int, *, offset: float = 0.0) -> CandidateD
         camera=None,
         p3d_cameras=p3d,
     )
+
+
+def _make_camera_views_for_world_poses(poses_world_cam: PoseTW) -> CameraTW:
+    """Build candidate camera views whose extrinsics align with world poses."""
+
+    num = int(poses_world_cam.tensor().shape[0])
+    return CameraTW.from_surreal(
+        width=torch.full((num,), 4.0, dtype=torch.float32),
+        height=torch.full((num,), 4.0, dtype=torch.float32),
+        type_str="Pinhole",
+        params=torch.tensor([[50.0, 50.0, 2.0, 2.0]], dtype=torch.float32).repeat(num, 1),
+        gain=torch.zeros(num, dtype=torch.float32),
+        exposure_s=torch.zeros(num, dtype=torch.float32),
+        valid_radius=torch.full((num,), 4.0, dtype=torch.float32),
+        T_camera_rig=poses_world_cam.inverse(),
+    )
+
+
+def _make_ordered_candidates_and_depths() -> tuple[CandidateSamplingResult, CandidateDepths]:
+    """Build a full-shell fixture where valid candidates are shell rows 1 and 3."""
+
+    reference = PoseTW(_make_pose_batch(1).tensor().squeeze(0))
+    selected_poses = _make_pose_batch(2, offset=30.0)
+    shell_data = _make_pose_batch(4, offset=100.0).tensor().clone()
+    shell_data[1] = selected_poses.tensor()[0]
+    shell_data[3] = selected_poses.tensor()[1]
+    candidates = CandidateSamplingResult(
+        views=_make_camera_views_for_world_poses(selected_poses),
+        reference_pose=reference,
+        mask_valid=torch.tensor([False, True, False, True], dtype=torch.bool),
+        masks={},
+        shell_poses=PoseTW(shell_data),
+    )
+    base_depths = _make_stub_depths(2)
+    depths = CandidateDepths(
+        depths=base_depths.depths,
+        depths_valid_mask=base_depths.depths_valid_mask,
+        poses=selected_poses,
+        reference_pose=reference,
+        candidate_indices=torch.tensor([1, 3], dtype=torch.long),
+        camera=base_depths.camera,
+        p3d_cameras=base_depths.p3d_cameras,
+    )
+    return candidates, depths
 
 
 def _make_stub_rri(num_candidates: int) -> RriResult:
@@ -262,6 +317,104 @@ def test_prepare_vin_offline_sample_filters_backbone_blocks_and_payload() -> Non
     assert set(payload) == {"t_world_voxel", "voxel_extent", "occ_pr", "bbox_pr"}  # noqa: S101
     assert "voxel_feat" not in payload  # noqa: S101
     assert "feat2d_upsampled" not in payload  # noqa: S101
+
+
+def test_prepare_vin_offline_sample_preserves_candidate_label_order_in_payloads(tmp_path: Path) -> None:
+    """Numeric blocks and rich payloads should share one candidate ordering."""
+
+    candidates, depths = _make_ordered_candidates_and_depths()
+    row = prepare_vin_offline_sample(
+        scene_id="scene-a",
+        snippet_id="snippet-000",
+        vin_snippet=_make_vin_snippet(offset=0.0),
+        candidates=candidates,
+        depths=depths,
+        rri=_make_stub_rri(2),
+        candidate_pcs=None,
+        backbone_out=None,
+        max_candidates=4,
+        include_depths=True,
+        include_candidate_pcs=False,
+        include_backbone=False,
+        include_diagnostic_payloads=True,
+        sample_key="sample-0",
+    )
+
+    assert row.numeric_blocks["oracle.candidate_indices"].tolist() == [1, 3, -1, -1]  # noqa: S101
+    assert row.numeric_blocks["oracle.rri"][:2].tolist() == pytest.approx([0.1, 0.2])  # noqa: S101
+    assert np.isnan(row.numeric_blocks["oracle.rri"][2:]).all()  # noqa: S101
+    assert np.allclose(  # noqa: S101
+        row.numeric_blocks["oracle.candidate_poses_world_cam"][:2],
+        depths.poses.tensor().numpy(),
+    )
+
+    shard_dir = tmp_path / "shard-000000"
+    shard_spec, _ = flush_prepared_samples_to_shard(
+        shard_index=0,
+        shard_dir=shard_dir,
+        rows=[row],
+    )
+    decoded_depths = CandidateDepths.from_serializable(
+        _read_indexed_record(shard_dir, shard_spec.blocks["oracle.depths_payload"]),
+        device=torch.device("cpu"),
+    )
+    decoded_candidates = CandidateSamplingResult.from_serializable(
+        _read_indexed_record(shard_dir, shard_spec.blocks["oracle.candidates"]),
+        device=torch.device("cpu"),
+    )
+
+    assert decoded_depths.candidate_indices.tolist() == [1, 3]  # noqa: S101
+    assert decoded_candidates.candidate_shell_indices().tolist() == [1, 3]  # noqa: S101
+    assert torch.allclose(decoded_depths.poses.tensor(), decoded_candidates.poses_world_cam().tensor())  # noqa: S101
+
+
+def test_prepare_vin_offline_sample_rejects_candidate_index_drift() -> None:
+    """Writer should reject candidates and labels that no longer share order."""
+
+    candidates, depths = _make_ordered_candidates_and_depths()
+    depths.candidate_indices = torch.tensor([0, 1], dtype=torch.long)
+
+    with pytest.raises(ValueError, match="candidate_indices"):
+        prepare_vin_offline_sample(
+            scene_id="scene-a",
+            snippet_id="snippet-000",
+            vin_snippet=_make_vin_snippet(offset=0.0),
+            candidates=candidates,
+            depths=depths,
+            rri=_make_stub_rri(2),
+            candidate_pcs=None,
+            backbone_out=None,
+            max_candidates=4,
+            include_depths=True,
+            include_candidate_pcs=False,
+            include_backbone=False,
+            include_diagnostic_payloads=True,
+            sample_key="sample-0",
+        )
+
+
+def test_prepare_vin_offline_sample_rejects_label_length_drift() -> None:
+    """Oracle RRI vectors must have the same length as rendered candidates."""
+
+    candidates, depths = _make_ordered_candidates_and_depths()
+
+    with pytest.raises(ValueError, match="oracle.rri length 1"):
+        prepare_vin_offline_sample(
+            scene_id="scene-a",
+            snippet_id="snippet-000",
+            vin_snippet=_make_vin_snippet(offset=0.0),
+            candidates=candidates,
+            depths=depths,
+            rri=_make_stub_rri(1),
+            candidate_pcs=None,
+            backbone_out=None,
+            max_candidates=4,
+            include_depths=True,
+            include_candidate_pcs=False,
+            include_backbone=False,
+            include_diagnostic_payloads=True,
+            sample_key="sample-0",
+        )
 
 
 def test_flush_vin_offline_payloads_normalizes_numpy_scalars(tmp_path: Path) -> None:

@@ -1,0 +1,258 @@
+---
+title: "Rollout Storage And Invalidity Contract"
+phase: thesis
+audience: developer
+status: planned
+owner: code
+format: html
+---
+
+# Rollout Storage And Invalidity Contract {#rollout-storage-contract}
+
+This page drafts the storage contract for large rollout and $Q_H$ datasets. It
+is a schema target, not a writer implementation. The purpose is to keep rollout
+generation, invalidity handling, target records, and fitted $Q_H$ tensors
+compatible before any large ASE sequence data is written.
+
+The contract is Zarr-first for dense numeric data and small columnar tables. It
+should track the [Zarr v3 core model](https://zarr-specs.readthedocs.io/en/latest/v3/core/index.html)
+for groups, arrays, metadata, and attributes, while allowing compact JSON or
+JSONL sidecars for dictionaries and manifest text that is awkward to encode as
+dense arrays. The root store attribute should name the ARIA-NBV schema, schema
+version, Zarr format version, creation time, code revision, and the source
+offline-store version.
+
+## Store Shape {#rollout-store-shape}
+
+The draft store has one root group per generated dataset:
+
+```text
+rollouts.zarr/
+  attrs
+  metadata/
+  dictionaries/
+  splits/
+  lineage/
+  mesh_refs/
+  targets/
+  rollouts/
+  steps/
+  candidates/
+  q_h/
+  diagnostics/
+```
+
+`metadata/` records schema version, generation manifest, code/config hashes,
+field-retention policy, and reason-code dictionary. `dictionaries/` stores
+string ids such as scenes, snippets, policies, configs, target classes, and
+rollout ids when implementation chooses integer dictionary encoding. Numeric
+arrays should use stable row ids so tables can be joined without relying on
+array order alone.
+
+The canonical row order is:
+
+1. `target_row_id` indexes target records.
+2. `rollout_row_id` indexes one rollout chain for one root state and target.
+3. `step_row_id` indexes one horizon step inside a rollout chain.
+4. `candidate_row_id` indexes one sampled candidate inside the full candidate
+   shell for one step.
+
+Candidate order is part of the label contract. `shell_index`, validity masks,
+oracle labels, predicted scores, selected actions, rendered depths, point
+clouds, and $Q_H$ tensors must remain aligned through these row ids.
+
+## Lineage {#rollout-lineage}
+
+Lineage is mandatory and must be rejectable. A store that mixes incompatible
+lineage should be treated as multiple datasets or invalid input.
+
+Required lineage fields include:
+
+- dataset schema id and version;
+- ASE scene id, snippet id, source shard uri, and source shard digest where
+  available;
+- source VIN/offline-store version, manifest hash, sample-index hash, and split
+  manifest hash;
+- package git revision or source tree digest;
+- candidate generator config hash, oracle config hash, rollout config hash,
+  target protocol version, and invalidity reason-code version;
+- rollout policy name, horizon, branch factor, beam width, random seed, and
+  branch schedule id where applicable;
+- model checkpoint hash and feature/extractor config hash when learned scores
+  or EVL features are stored;
+- $Q_H$ target horizon, discount, return semantics, and bootstrap policy id
+  when $Q_H$ tensors are materialized.
+
+The root `lineage/rollout_index` table should hold one row per rollout chain:
+`rollout_row_id`, `rollout_id`, `chain_id`, `scene_id`, `snippet_id`,
+`target_row_id`, `split`, `root_pose_world_rig`, `root_pose_world_cam` when
+defined, configured horizon and budgets, policy id, seed, termination reason,
+runtime summary, invalid-action summary, and final cumulative metrics.
+
+## Mesh References And Target Crops {#rollout-mesh-targets}
+
+Full ASE meshes are external references. The rollout store must not duplicate
+full scene meshes. `mesh_refs/scene_mesh_index` should record:
+
+- scene id and mesh role, such as `ase_gt_full` or `scene_crop`;
+- URI or relative path under the data root;
+- content hash, mesh version, unit convention, and coordinate frame;
+- optional crop bounds or preprocessing hash;
+- vertex/face counts and downsampling policy, if a derived mesh is used.
+
+Target records are stored separately from full meshes. `targets/target_index`
+should include:
+
+- `target_row_id`, scene id, snippet id, and target id;
+- target protocol version, for example V0 GT input or V1 observed input with
+  GT evaluation;
+- actor-visible target source, class id/name, confidence, observed OBB pose and
+  extents, projected area, semidense support, EVL support, and pose-relative
+  target features;
+- matched GT target id, GT OBB pose and extents, match score, IoU, class match,
+  and match-failure reason;
+- `target_valid_mask`, `target_invalid_reason_bitset`, and primary invalid
+  reason;
+- target-crop row id and crop policy metadata.
+
+High-detail target mesh crops may be embedded once per target because target
+RRI depends on the crop. Store them as ragged arrays with offsets, not as a copy
+per candidate:
+
+- `targets/crop_vertices`, `targets/crop_vertex_offsets`;
+- `targets/crop_faces`, `targets/crop_face_offsets`;
+- crop source mesh hash, crop bounds, margin, face-retention rule, and units.
+
+Empty target crops are invalid target records, not scene-level fallback labels.
+
+## Candidate Tables {#rollout-candidate-tables}
+
+`steps/step_index` stores state-level rollout rows: `step_row_id`,
+`rollout_row_id`, `step_index`, current pose, accumulated view count, path
+length, cumulative target RRI, cumulative scene RRI, runtime, number of sampled
+candidates, number of valid candidates, and invalid reason histogram.
+
+`candidates/candidate_index` stores the full sampled shell for every step:
+
+- `candidate_row_id`, `step_row_id`, `rollout_row_id`, `step_index`, and
+  `shell_index`;
+- candidate pose as world-from-camera and relative-to-root fields, with frame
+  names in attributes;
+- candidate strategy id, sampler mixture id, sampler probability, and optional
+  parent branch id;
+- `candidate_valid_mask`, `actor_action_mask`, `oracle_label_mask`,
+  `q_train_mask`, `padded_mask`, `selected_mask`, and
+  `heavy_diag_available_mask`;
+- `invalid_reason_bitset`, `primary_invalid_reason`, and optional secondary
+  reason count;
+- scene RRI, target RRI, accuracy/completeness deltas, target-visible fraction,
+  and oracle runtime when labels exist;
+- one-step model score, uncertainty/calibration fields, and checkpoint hash
+  when learned scores exist;
+- selected action rank fields such as selected shell index, selected compact
+  valid index, oracle rank, and model rank.
+
+Invalid candidates stay in the table so the full-shell order is replayable.
+They are masked out of action selection and $Q_H$ targets instead of being
+encoded as the lowest RRI bin.
+
+## Invalidity Contract {#rollout-invalidity-contract}
+
+Invalidity is a constraint label. It is not low reconstruction quality. The
+store should carry both boolean masks and reason codes:
+
+- `candidate_valid_mask`: true only when the candidate passes required geometry,
+  target, oracle, and evidence checks for the selected protocol.
+- `actor_action_mask`: candidates an actor or scorer may choose without seeing
+  oracle-only information.
+- `oracle_label_mask`: candidates with valid scene/target oracle labels.
+- `q_train_mask`: candidates usable as $Q_H$ targets for the configured
+  horizon and target protocol.
+- `target_valid_mask`: target record has a valid actor-visible input and
+  matched GT evaluation crop for the protocol.
+- `padded_mask`: false data inserted only to fill dense tensors.
+
+Reason codes are versioned bit positions. A draft initial dictionary is:
+
+| Bit | Code | Meaning |
+|---:|---|---|
+| 0 | `VALID` | No invalid reason. |
+| 1 | `POSE_NONFINITE` | Pose contains NaN or infinity. |
+| 2 | `POSE_OUT_OF_EXTENT` | Candidate center is outside supported scene or snippet bounds. |
+| 3 | `CAMERA_OUT_OF_EXTENT` | Camera frustum violates configured camera/scene support. |
+| 4 | `COLLISION_MESH` | Camera center or body intersects the mesh. |
+| 5 | `CLEARANCE_TOO_SMALL` | Candidate is closer to geometry than the configured clearance. |
+| 6 | `PATH_SEGMENT_COLLISION` | Motion segment to the candidate violates collision/clearance rules. |
+| 7 | `FRUSTUM_OUT_OF_BOUNDS` | Frustum support is outside the trusted volume. |
+| 8 | `DEPTH_NO_HIT` | Renderer produced no valid mesh hits. |
+| 9 | `DEPTH_TOO_SPARSE` | Renderer produced too few valid depth pixels. |
+| 10 | `BACKPROJECT_EMPTY` | Valid depth did not produce usable world points. |
+| 11 | `CANDIDATE_DUPLICATE` | Candidate duplicates an existing shell pose under tolerance. |
+| 12 | `SAMPLER_RULE_REJECTED` | Candidate failed a named sampler rule. |
+| 13 | `TARGET_NOT_ACTOR_VISIBLE` | V1 target input is not actor-visible or eligible. |
+| 14 | `TARGET_GT_UNMATCHED` | Observed target could not be matched to GT evaluation. |
+| 15 | `TARGET_CROP_EMPTY` | GT target crop has no usable mesh surface. |
+| 16 | `TARGET_SUPPORT_TOO_LOW` | Target has insufficient observed, semidense, or EVL support. |
+| 17 | `TARGET_VISIBILITY_TOO_LOW` | Candidate does not see enough of the target for the protocol. |
+| 18 | `SEMIDENSE_SUPPORT_TOO_LOW` | Candidate or state lacks required semidense support. |
+| 19 | `EVL_EVIDENCE_MISSING` | Required EVL evidence or checkpoint provenance is absent. |
+| 20 | `MESH_REFERENCE_MISSING` | Required mesh reference or hash is unavailable. |
+| 21 | `ORACLE_DISTANCE_FAILED` | Oracle distance/RRI computation failed. |
+| 22 | `CANDIDATE_ORDER_GUARD_FAILED` | A row-alignment guard failed before serialization. |
+| 23 | `RUNTIME_ERROR` | Required generation failed with an explicit runtime error. |
+
+Bit `0` is the all-clear value, not a bit to combine with failures. Additional
+codes may be appended, but existing meanings should not be reused.
+
+## Optional Heavy Diagnostics {#rollout-heavy-diagnostics}
+
+Heavy diagnostics are opt-in and should be stored only for selected actions,
+retained chains, or explicitly sampled audit rows:
+
+- rendered candidate depth and depth-valid mask;
+- rendered face-index image;
+- selected or retained candidate point cloud in world coordinates;
+- target-cropped current points and candidate points;
+- collision segments and clearance samples;
+- Rerun `.rrd` artifact references;
+- per-candidate OBB, voxel, or EVL support summaries.
+
+The presence of heavy diagnostics is not a training prerequisite. Missing heavy
+diagnostics should be represented by availability masks, not by recomputing or
+guessing from ad hoc fields.
+
+## Q_H Tensors {#rollout-qh-tensors}
+
+The columnar candidate table is canonical. `q_h/` is a padded tensor view for
+finite-candidate training and evaluation. It should be derivable from the
+candidate and step tables and should include row-id backlinks:
+
+- `state_step_row_id[S]`;
+- `candidate_row_id[S, C_max]`;
+- `valid_action_mask[S, C_max]`;
+- `invalid_reason_bitset[S, C_max]`;
+- `target_row_id[S]`;
+- `selected_candidate_index[S]`;
+- `one_step_target_rri[S, C_max]`;
+- `one_step_scene_rri[S, C_max]`;
+- `q_target_target_rri[S, H_max, C_max]`;
+- `q_target_scene_rri[S, H_max, C_max]` as a diagnostic;
+- `bootstrap_next_step_row_id[S, C_max]` when a materialized branch exists,
+  otherwise `-1`;
+- `terminal_mask[S, C_max]`;
+- `discount[H_max]` and return-semantics attributes.
+
+Invalid and padded candidates should contain `NaN` targets and false masks.
+$Q_H$ predicts bounded cumulative target RRI over finite candidate sets. Motion,
+rule, or scalar invalidity penalties are later ablations and should not be
+mixed into the first target-RRI tensor unless the return-semantics attribute is
+changed.
+
+## Retention Policy {#rollout-retention-policy}
+
+Default stores should retain lineage, target records, candidate tables, masks,
+reason codes, compact metrics, and $Q_H$ target tensors. They should reference
+full meshes externally, embed target crops once per target, and omit heavy
+per-candidate diagnostics unless explicitly requested. This keeps the dataset
+trainable, auditable, and storage-bounded while preserving the ability to
+reject mixed or invalid lineage.

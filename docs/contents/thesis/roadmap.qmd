@@ -16,7 +16,7 @@ target-conditioned, quality-driven
 {{< glsfull next-best-view >}} planning:
 
 > Can ARIA-NBV train a target-conditioned NBV scorer and finite-candidate
-> fitted $Q_H$ policy that maximize cumulative
+> fitted $Q_H$ policy that maximizes cumulative
 > {{< glsfull target-specific-rri >}} for a
 > {{< gls target-of-interest >}} under a fixed acquisition budget?
 
@@ -93,9 +93,16 @@ Rerun offline inspector, and the available VIN offline store.
 
 - classify existing worktree changes into data/cache cleanup, RL/rollout
   scaffold, docs cleanup, and unrelated operator work;
-- track proposal freeze and bibliography audit as M0/M1 advisor deliverables
-  through the agents DB, with `make proposal-pdf` as the proposal render
-  command and the generated proposal PDF tracked once frozen;
+- freeze the advisor proposal checklist before M1 scale-up: ARIA-NBV name and
+  title capitalization, examiner/supervisor placeholders or explicit blockers,
+  dataset limits, invalidity semantics, V0/V1 target contract, mandatory
+  finite-candidate $Q_H$, and the continuous/simulator/3DGS stretch boundary;
+- audit `docs/references.bib` for proposal-critical citation hygiene: no
+  generated `contentReference` comments, no Wikipedia support for
+  proposal-critical claims, primary metadata for cited papers/datasets, and
+  any legacy duplicate aliases explicitly quarantined;
+- render the proposal with `make proposal-pdf` and track the generated proposal
+  PDF once the advisor-facing text is frozen;
 - align proposal, roadmap, and questions on the four-tier boundary:
   implemented substrate; prerequisite core; hard thesis core; and stretch;
 - validate that `offline_only.toml` can load the available VIN offline store
@@ -152,8 +159,8 @@ Lightning training surface, W&B/Optuna reports, and Streamlit diagnostics.
 - calibration, ordinal-bin, rank-correlation, and top-k selection diagnostics;
 - controlled ablation matrix for surface reconstruction inputs, CORAL variants,
   auxiliary regression, and candidate features.
-- Zarr-first rollout/Q storage schema drafted before large sequence data is
-  written;
+- [Zarr-first rollout/Q storage schema](../impl/rollout_storage_contract.qmd)
+  drafted before large sequence data is written;
 - LRZ deterministic sharding, Slurm/DSS staging, and full-scale storage budget
   planned before M3/M5 generation.
 
@@ -205,7 +212,8 @@ RRI under the same acquisition budget?
 
 **Implementation surfaces:** the
 [counterfactual rollout API](../../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd),
-candidate generation, target-aware scorer backends, and rollout diagnostics.
+candidate generation, target-aware scorer backends, rollout diagnostics, and
+the [rollout storage and invalidity contract](../impl/rollout_storage_contract.qmd).
 
 **Exit checks:**
 

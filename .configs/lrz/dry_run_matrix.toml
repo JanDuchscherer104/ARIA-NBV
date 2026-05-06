@@ -1,0 +1,55 @@
+# Documentary LRZ workflow matrix.
+#
+# This file is not loaded by aria_nbv. It exists so operators and agents can
+# compare dry-run templates without inventing concrete generation CLI names.
+
+[defaults]
+dry_run_only = true
+aria_dss = "/ABS/PATH/TO/ARIA_DSS"
+aria_repo = "$HOME/src/ARIA-NBV"
+container_image = "nvcr.io#nvidia/pytorch:24.10-py3"
+slurm_log_root = "$ARIA_DSS/logs/slurm"
+
+[[workflows]]
+name = "oracle_generation"
+template = "scripts/templates/lrz/oracle_generation_dry_run.sbatch"
+partition_hint = "lrz-v100x2 for smoke, A100/H100 80GB class partitions for scale"
+gres = "gpu:1"
+array = "one deterministic shard per array task"
+manifest = "$ARIA_DSS/data/staging/manifests/oracle_shards.jsonl"
+final_root = "$ARIA_DSS/caches/oracle/staging/$RUN_ID/shards"
+temp_root = "$ARIA_DSS/tmp/$SLURM_JOB_ID/oracle/$RUN_ID"
+placeholder_command = "uv run <ORACLE_GENERATION_ENTRYPOINT> ..."
+
+[[workflows]]
+name = "rollout_generation"
+template = "scripts/templates/lrz/rollout_generation_dry_run.sbatch"
+partition_hint = "lrz-v100x2 for smoke, A100/H100 80GB class partitions for scale"
+gres = "gpu:1"
+array = "one deterministic scene/snippet shard per array task"
+manifest = "$ARIA_DSS/data/staging/manifests/rollout_shards.jsonl"
+final_root = "$ARIA_DSS/data/staging/rollouts/$RUN_ID/shards"
+temp_root = "$ARIA_DSS/tmp/$SLURM_JOB_ID/rollouts/$RUN_ID"
+placeholder_command = "uv run <ROLLOUT_GENERATION_ENTRYPOINT> ..."
+
+[[workflows]]
+name = "vin_training"
+template = "scripts/templates/lrz/vin_training_dry_run.sbatch"
+partition_hint = "single GPU smoke first, then one-node multi-GPU after input store checks pass"
+gres = "gpu:2"
+array = "none by default"
+input_store = "$ARIA_DSS/caches/vin/$DATASET_VERSION"
+checkpoint_root = "$ARIA_DSS/checkpoints/vin/$RUN_ID"
+wandb_root = "$ARIA_DSS/logs/wandb"
+placeholder_command = "torchrun --standalone --nproc_per_node=$SLURM_GPUS_ON_NODE <VIN_TRAINING_MODULE_OR_SCRIPT> ..."
+
+[[workflows]]
+name = "diagnostics"
+template = "scripts/templates/lrz/diagnostics_dry_run.sbatch"
+partition_hint = "lrz-cpu for manifest-only checks, lrz-v100x2 when rendering diagnostics need GPU"
+gres = "gpu:1"
+array = "one diagnostic shard per array task when checking generated datasets"
+manifest = "$ARIA_DSS/data/staging/manifests/diagnostics_shards.jsonl"
+report_root = "$ARIA_DSS/logs/diagnostics/$RUN_ID"
+temp_root = "$ARIA_DSS/tmp/$SLURM_JOB_ID/diagnostics/$RUN_ID"
+placeholder_command = "uv run <DIAGNOSTICS_ENTRYPOINT> ..."

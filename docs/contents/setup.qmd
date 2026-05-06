@@ -7,90 +7,202 @@ owner: jan
 format: html
 ---
 
-# Dependencies
+# Setup Instructions {#setup-instructions}
 
-- [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) or conda
-- uv
-- `git submodule --init --update` to clone the external dependencies (EFM3D is installed from local source)
-- For [`efm3d`](https://github.com/facebookresearch/efm3d), our [fork](https://github.com/JanDuchscherer104/efm3d/tree/main)
-  needs to be used. After cloning and updating submodules, ensure that `git remote -v` in `external/efm3d` points to
-  our fork, not the original repo. If it does not, add the fork as remote.
-  and pull.
+This page mirrors the portable root setup guide in
+[`SETUP.md`](https://github.com/JanDuchscherer104/ARIA-NBV/blob/main/SETUP.md).
+Keep host-specific mounts and private machine notes out of public docs.
 
-  ```bash
-  cd aria_nbv/external/efm3d
-  git remote -v
-  # If the fork is not listed, add it:
-  git remote add fork git remote add fork https://github.com/JanDuchscherer104/efm3d/tree/main
-  git pull fork main
-  ```
+## Clone and Environment {#clone-and-environment}
 
-# Setup Instructions
+Clone the repository, initialize submodules, and build the package environment
+from `aria_nbv/`:
 
-## Installation via separate uv envirnoment
+```sh
+git clone https://github.com/JanDuchscherer104/ARIA-NBV.git
+cd ARIA-NBV
+git submodule update --init --recursive
 
-```bash
 cd aria_nbv
-# create conda environment for cuda toolkit 12.1
-mamba create -f environment.yml
+mamba env create -f environment.yml
 mamba activate aria-nbv
-
-uv sync --extra dev --extra notebook --extra pytorch3d
-# or simply
 uv sync --all-extras
 ```
 
-This will install all dependencies and create a new python environment in `aria_nbv/.venv`.
+`environment.yml` provides Python 3.11 plus a CUDA 12.1 build toolchain on
+Linux. If `uv` cannot resolve Python 3.11 automatically, pass a local
+interpreter:
 
-## Optional: xFormers (Linux only)
+```sh
+cd aria_nbv
+UV_PYTHON=/path/to/python3.11 uv sync --all-extras
+```
 
-EFM3D's DinoV2 attention utilities can optionally use [xFormers](https://github.com/facebookresearch/xformers) for memory-efficient attention / nested tensor support. Install it via:
+Check the interpreter before diagnosing missing dependencies:
 
-```bash
+```sh
+cd aria_nbv
+uv run python --version
+uv run python - <<'PY'
+import torch
+print("torch", torch.__version__)
+print("cuda_available", torch.cuda.is_available())
+print("cuda_version", torch.version.cuda)
+PY
+```
+
+## CUDA and CPU Expectations {#cuda-and-cpu-expectations}
+
+CPU-only machines are suitable for docs work, config validation, lightweight
+tests, immutable-store reads, and the synthetic rollout trace smoke command.
+They are not the expected path for full ASE oracle generation, EVL backbone
+materialization, PyTorch3D depth rendering, or VIN training.
+
+Linux GPU machines are the expected path for the thesis data loop. The package
+pins PyTorch CUDA 12.1 wheels on Linux, and several configs use
+`device = "auto"` so they can fall back to CPU for debugging. Treat CPU fallback
+as a diagnostic convenience rather than the performance target.
+
+Optional xFormers can be installed on Linux when EFM3D attention utilities need
+it:
+
+```sh
 cd aria_nbv
 uv sync --extra xformers
 ```
 
-## Optional: OpenPoints (Linux only)
+OpenPoints is built through `external/openpoints_shim` during `uv sync`.
+If CUDA extension builds cannot find `nvcc`, set `CUDA_HOME` or
+`OPENPOINTS_TORCH_CUDA_ARCH_LIST` for the local machine.
 
-```bash
-# OpenPoints is built via the openpoints-shim dependency during uv sync.
-# Ensure the submodule is present (PointNeXt lives in external/PointNeXt).
-git submodule update --init --recursive external/PointNeXt
+## Dataset and Cache Paths {#dataset-and-cache-paths}
 
-# Default: builds pointnet2_batch + chamfer ops needed by OpenPoints imports.
-uv sync --all-extras
+ARIA-NBV defaults to repository-rooted paths:
 
-# Optional toggles (re-run uv sync to rebuild):
-  OPENPOINTS_BUILD_POINTOPS=1 uv sync --all-extras
-  OPENPOINTS_BUILD_SUBSAMPLING=1 uv sync --all-extras
-  # Chamfer is enabled by default; override only if you want to skip it:
-  OPENPOINTS_BUILD_CHAMFER_DIST=0 uv sync --all-extras
-  OPENPOINTS_BUILD_EMD=1 uv sync --all-extras
+| Path | Purpose |
+| --- | --- |
+| `.data/aria_download_urls/` | Project Aria download URL JSON files. |
+| `.data/ase_efm/<scene_id>/shards-*.tar` | ATEK EFM WebDataset shards. |
+| `.data/ase_meshes/scene_ply_<scene_id>.ply` | ASE ground-truth meshes. |
+| `.data/ase_meshes_processed/` | Generated cropped or simplified meshes. |
+| `.data/offline_cache/vin_offline/` | Default immutable VIN offline store. |
+| `.data/offline_cache/vin_offline_rerun_smoke_v6/` | One-sample sidecar smoke store. |
+| `.logs/ckpts/` | External model checkpoints. |
+| `.logs/checkpoints/` | Lightning checkpoints produced by training. |
+| `.artifacts/rerun/` | Saved Rerun `.rrd` recordings. |
+| `.artifacts/rollouts/` | Rollout trace artifacts. |
+
+Relative immutable-store names such as `vin_offline` resolve under
+`PathConfig().offline_cache_dir`, whose default is `.data/offline_cache`.
+Use copied local TOML configs with absolute paths when a machine needs a
+different data mount.
+
+## ASE Access and Weights {#ase-access-and-weights}
+
+Request ASE access through the
+[Project Aria ASE download page](https://www.projectaria.com/datasets/ase/#download-dataset),
+then place the download manifests here:
+
+```text
+.data/aria_download_urls/ase_mesh_download_urls.json
+.data/aria_download_urls/AriaSyntheticEnvironment_ATEK_download_urls.json
 ```
 
-The build uses the CUDA toolkit found on `PATH` (aria-nbv provides CUDA 12.1). If `nvcc` is not found, set `CUDA_HOME` or `OPENPOINTS_TORCH_CUDA_ARCH_LIST` explicitly.
+List available GT-mesh scenes and download a small local subset:
 
-
-# Data Setup
-
-## Aria Synthetic Environments
-
-- Go to [ASE Downloads](https://www.projectaria.com/datasets/ase/#download-dataset), enter your email, and download the
-  following scene manifests and move them to `.data/aria_download_urls`:
-  - EFM3D Eval Meshes: `ase_mesh_download_urls.json`
-  - Aria Synthetic Environments in ATEK format (PyTorch ready): `AriaSyntheticEnvironment_ATEK_download_urls.json`
-
-The ATEK subset for which GT meshes are available can be downloaded as follows:
-
-```bash
-uv run nbv-downloader -m download -c efm
+```sh
+cd aria_nbv
+uv run nbv-downloader -m list -c efm -n 10
+uv run nbv-downloader -m download -c efm --ns 1 --max-shards 1
 ```
 
+External checkpoints belong in `.logs/ckpts/`:
 
-# Model Weights
+```text
+.logs/ckpts/model_lite.pth
+.logs/ckpts/dinov2_vitb14_reg4_pretrain.pth
+.logs/ckpts/s3dis-train-pointnext-s-ngpus1-seed1742-20220525-162639-Gz4ViiL95b6KP9MMH2ytG3_ckpt_best.pth
+```
 
-- download the [DINOv2 ViT-B/14 checkpoint](https://dl.fbaipublicfiles.com/dinov2/dinov2_vitb14/dinov2_vitb14_reg4_pretrain.pth) and place it in `.logs/ckpts/`
-- PointNeXt-S checkpoint:
-  - [Google Drive Link](https://drive.google.com/drive/folders/1UG8hh_CrUf-OhrYbcDd0zvDtoInrGP1u) - download, and move `s3dis-train-pointnext-s-ngpus1-seed1742-20220525-162639-Gz4ViiL95b6KP9MMH2ytG3_ckpt_best.pth` to `.logs/ckpts/`
-  - [Model Zoo](https://guochengqian.github.io/PointNeXt/modelzoo/)
+## Offline Store and VIN Diagnostics {#offline-store-and-vin-diagnostics}
+
+Validate the default VIN offline store before training from it:
+
+```sh
+cd aria_nbv
+uv run nbv-summary --config-path offline_only.toml
+```
+
+The summary command forces `run_mode = "summarize_vin"`, disables W&B, uses one
+batch, and reads the configured offline store. The current default config points
+at `vin_offline`. Treat a manifest with `"interrupted": true` as a diagnostic
+store rather than a full training store.
+
+Build immutable stores through the writer CLI:
+
+```sh
+cd aria_nbv
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_81286.toml --dry-run
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_81286.toml
+```
+
+## One-Scene Smoke {#one-scene-smoke}
+
+Use the focused [one-scene smoke checks](impl/one_scene_smoke.qmd) before
+touching larger stores. The sidecar smoke config writes one sample to
+`vin_offline_rerun_smoke_v6`:
+
+```sh
+cd aria_nbv
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v6.toml --dry-run
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v6.toml
+uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline_smoke_v6.toml --split val --index 0 --save ../.artifacts/rerun/offline_smoke_v6.rrd
+```
+
+The Rerun inspector is diagnostic-only. Its downsampling is display-only and
+must not be treated as label, ranking, or training behavior.
+
+For CPU-only rollout trace plumbing without ASE data:
+
+```sh
+cd aria_nbv
+uv run nbv-rollout-trace-smoke --output-path ../.artifacts/rollouts/synthetic_rollout_traces.msgpack
+```
+
+## Entry Points {#entry-points}
+
+```sh
+cd aria_nbv
+
+# Streamlit diagnostics app
+uv run nbv-st
+
+# VIN one-batch diagnostic summary
+uv run nbv-summary --config-path offline_only.toml
+
+# VIN training from the immutable offline store
+uv run nbv-train --config-path offline_only.toml
+
+# Fit and save the ordinal binner
+uv run nbv-fit-binner --config-path offline_only.toml
+
+# Dump resolved config
+uv run nbv-cli --run-mode dump-config --config-path offline_only.toml
+```
+
+Use the Streamlit VIN diagnostics page to inspect offline-store coverage,
+tensor shapes, candidate/RRI alignment, and model debug outputs before trusting
+new training runs.
+
+## Docs Sanity {#docs-sanity}
+
+Run these after setup-doc or smoke-doc edits:
+
+```sh
+make qmd-frontmatter-check
+cd docs
+quarto render contents/setup.qmd
+quarto render contents/impl/one_scene_smoke.qmd
+quarto render contents/impl/rerun_offline_inspector.qmd
+quarto check
+```

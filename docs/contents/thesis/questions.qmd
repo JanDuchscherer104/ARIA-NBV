@@ -13,7 +13,7 @@ This page states the research questions for the master's thesis phase of
 **ARIA-NBV**. The central question is:
 
 > Can ARIA-NBV train a target-conditioned NBV scorer and finite-candidate
-> fitted $Q_H$ policy that maximize cumulative
+> fitted $Q_H$ policy that maximizes cumulative
 > {{< glsfull target-specific-rri >}} for a
 > {{< gls target-of-interest >}} under a fixed acquisition budget?
 
@@ -59,6 +59,25 @@ before the evidence exists.
 | Prerequisite core | Proposal freeze, M1 contract report, V0/V1 target contracts, candidate-label/frame guards, invalidity masks/reasons, rollout/Q storage schema, and LRZ deterministic sharding/storage gates. |
 | Hard thesis core | Observed-only automatic target selector; OBS-SEL / PRED-Q / GT-EVAL protocol; target-conditioned one-step scorer; mixed observed candidate sets; random-valid, greedy, softmax, Gumbel, and bounded oracle-lookahead rollouts; fitted Double-Q / $Q_H$ over finite candidates; full-scale LRZ generation on the 100 GT-mesh ASE scenes and 4,608 snippet windows. |
 | Stretch work | IQL as a second offline-RL ablation, actor-critic or continuous-policy bridge design, Habitat/Isaac/external simulators, SceneScript-style semantic memory, VLM/global planning, real-device guidance, and quantitative continuous-control baselines. |
+
+## Proposal Freeze Gate {#rq-proposal-freeze-gate}
+
+Before M1 scale-up, the proposal, roadmap, research questions, and literature
+pages must state the same advisor-facing contract:
+
+- ARIA-NBV uses target-specific RRI as the thesis utility signal, with scene
+  RRI and acquisition cost reported separately;
+- V1 OBS-SEL / PRED-Q / GT-EVAL is mandatory for the main result, while V0 GT
+  OBB input is only a sanity or upper-bound path;
+- target-conditioned fitted Double-Q / $Q_H$ over finite candidate sets is a
+  hard thesis deliverable after the M1/M3/M4 gates, and any blocker must be
+  documented explicitly;
+- continuous actor-critic policies, online Gymnasium/SB3, Habitat/Isaac,
+  3DGS-backed control, SceneScript/global memory, and real-device deployment
+  remain bridge or future work unless M5 evidence justifies them;
+- proposal-critical citations must resolve through `docs/references.bib` to
+  primary paper, dataset, or library metadata rather than generated comments or
+  Wikipedia references.
 
 ## RQ1 - Objective {#rq1-objective}
 
@@ -145,8 +164,9 @@ through pooled EVL/voxel features once the OBB-level contract is stable.
 
 **Matching rule.** Observed targets are matched to GT target labels by
 compatible class, OBB IoU, visibility/support, projected area, and semidense or
-EVL point support. The extra criterion `X` is intentionally deferred until M3
-evidence shows which failure mode is not covered by those signals.
+EVL point support. If M3 evidence exposes a systematic mismatch not covered by
+those signals, the matching contract should add a named criterion with an
+explicit failure mode rather than carrying an unnamed placeholder.
 
 **Connected implementation surfaces.** Target fields should enter through
 data-handling containers, then flow into the
@@ -369,12 +389,13 @@ number of target entities per snippet. The final report should either use all
 it remains blocked. Architecture, rollout, or Q_H conclusions should not be
 compared across runs that silently change this coverage.
 
-**Storage and cluster gate.** Rollout and Q_H data should use a Zarr-first store
-that is rich enough for training and evaluation without duplicating raw
-ASE/ATEK. Full meshes are external path/hash/version references; high-detail
-target mesh crops are embedded once per target with crop metadata. LRZ
-deterministic sharding, Slurm/DSS staging, resume-safe writes, and storage
-budgeting are hard M2/M3 gates before full-scale generation.
+**Storage and cluster gate.** Rollout and Q_H data should use a
+[Zarr-first rollout/Q store](../impl/rollout_storage_contract.qmd) that is rich
+enough for training and evaluation without duplicating raw ASE/ATEK. Full
+meshes are external path/hash/version references; high-detail target mesh crops
+are embedded once per target with crop metadata. LRZ deterministic sharding,
+Slurm/DSS staging, resume-safe writes, and storage budgeting are hard M2/M3
+gates before full-scale generation.
 
 **Split protocol.** Train/validation/test boundaries are scene-level. The
 held-out test split remains an advisor decision, but sample-level leakage is

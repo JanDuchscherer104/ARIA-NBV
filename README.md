@@ -26,8 +26,12 @@ The public documentation is published at
   thesis questions and evaluation criteria.
 - [Implementation Notes](docs/contents/impl/overview.qmd): data, RRI, VIN, and
   diagnostics entry points.
+- [Local Setup](SETUP.md): portable environment, data/cache, and smoke-check
+  instructions.
 - [Rerun Offline Inspector](docs/contents/impl/rerun_offline_inspector.qmd):
   visual smoke path for one immutable VIN offline-store sample.
+- [One-Scene Smoke Checks](docs/contents/impl/one_scene_smoke.qmd): one-sample
+  offline-store, Rerun, and VIN diagnostic sequence.
 - [API Reference](docs/reference/index.qmd): generated `aria_nbv` reference
   pages.
 - [Setup](docs/contents/setup.qmd): environment and dependency notes.

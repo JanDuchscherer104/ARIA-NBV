@@ -263,6 +263,117 @@ def _probabilities_to_numpy(values: torch.Tensor | Sequence[torch.Tensor] | None
     return _to_numpy(torch.stack(list(values), dim=0), dtype=np.float32)
 
 
+def _validate_candidate_vector(name: str, value: torch.Tensor, *, candidate_count: int) -> None:
+    """Ensure one oracle vector is aligned with the rendered candidate table."""
+
+    actual = int(value.reshape(-1).shape[0])
+    if actual != candidate_count:
+        raise ValueError(f"{name} length {actual} must match rendered candidate count {candidate_count}.")
+
+
+def _validate_candidate_first_axis(
+    name: str,
+    value: torch.Tensor,
+    *,
+    candidate_count: int,
+) -> None:
+    """Ensure one candidate-major tensor starts with the rendered candidate count."""
+
+    if value.ndim == 0:
+        raise ValueError(f"{name} must have a candidate dimension.")
+    actual = int(value.shape[0])
+    if actual != candidate_count:
+        raise ValueError(f"{name} first dimension {actual} must match rendered candidate count {candidate_count}.")
+
+
+def _validate_candidate_label_alignment(
+    *,
+    candidate_count: int,
+    candidates: CandidateSamplingResult | None,
+    depths: CandidateDepths,
+    rri: RriResult,
+    candidate_pcs: CandidatePointClouds | None,
+) -> None:
+    """Fail fast when candidate-major oracle payloads are not in lockstep.
+
+    The immutable offline store is a training contract: candidate poses, depth
+    renders, point clouds, RRI labels, and optional diagnostic payloads must
+    describe the same ordered candidate table. This guard catches shape and
+    shell-index drift before an on-disk row can be materialized.
+    """
+
+    _validate_candidate_first_axis("oracle.depths", depths.depths, candidate_count=candidate_count)
+    if tuple(depths.depths_valid_mask.shape) != tuple(depths.depths.shape):
+        raise ValueError(
+            "oracle.depths_valid_mask shape "
+            f"{tuple(depths.depths_valid_mask.shape)} must match oracle.depths {tuple(depths.depths.shape)}.",
+        )
+
+    for field_name in (
+        "rri",
+        "pm_dist_before",
+        "pm_dist_after",
+        "pm_acc_before",
+        "pm_comp_before",
+        "pm_acc_after",
+        "pm_comp_after",
+    ):
+        _validate_candidate_vector(f"oracle.{field_name}", getattr(rri, field_name), candidate_count=candidate_count)
+    if rri.fscore_tau is not None:
+        _validate_candidate_first_axis("oracle.fscore_tau", rri.fscore_tau, candidate_count=candidate_count)
+
+    camera = depths.p3d_cameras
+    for field_name in ("R", "T", "focal_length", "principal_point", "image_size"):
+        _validate_candidate_first_axis(
+            f"oracle.p3d.{field_name}",
+            getattr(camera, field_name),
+            candidate_count=candidate_count,
+        )
+
+    if candidate_pcs is not None:
+        _validate_candidate_first_axis(
+            "oracle.candidate_pcs.points",
+            candidate_pcs.points,
+            candidate_count=candidate_count,
+        )
+        _validate_candidate_vector(
+            "oracle.candidate_pcs.lengths",
+            candidate_pcs.lengths,
+            candidate_count=candidate_count,
+        )
+
+    if candidates is None:
+        return
+
+    actual_indices = depths.candidate_indices.detach().to(device="cpu", dtype=torch.long).reshape(-1)
+    expected_indices = candidates.candidate_shell_indices(device=torch.device("cpu"))
+    if expected_indices.numel() < candidate_count:
+        raise ValueError(
+            "CandidateSamplingResult exposes fewer shell indices "
+            f"({expected_indices.numel()}) than rendered candidates ({candidate_count}).",
+        )
+    if not torch.equal(actual_indices, expected_indices[:candidate_count]):
+        raise ValueError(
+            "CandidateDepths.candidate_indices must match the rendered prefix "
+            "of CandidateSamplingResult.candidate_shell_indices().",
+        )
+
+    actual_poses = depths.poses.tensor().detach().to(device="cpu", dtype=torch.float32)
+    expected_poses = candidates.poses_world_cam(device=torch.device("cpu")).tensor().detach().to(dtype=torch.float32)
+    if expected_poses.shape[0] < candidate_count:
+        raise ValueError(
+            "CandidateSamplingResult exposes fewer world-camera poses "
+            f"({expected_poses.shape[0]}) than rendered candidates ({candidate_count}).",
+        )
+    if actual_poses.shape != expected_poses[:candidate_count].shape:
+        raise ValueError(
+            "CandidateDepths.poses shape "
+            f"{tuple(actual_poses.shape)} must match candidate poses {tuple(expected_poses[:candidate_count].shape)}.",
+        )
+    if not torch.allclose(actual_poses, expected_poses[:candidate_count], atol=1e-5, rtol=1e-5):
+        raise ValueError("CandidateDepths.poses must align with CandidateSamplingResult.poses_world_cam().")
+
+
 def _semantic_names_payload(
     value: Mapping[object, object] | Sequence[object] | None,
 ) -> list[str] | dict[str, str] | None:
@@ -399,6 +510,13 @@ def prepare_vin_offline_sample(
     candidate_indices = _to_numpy(depths.candidate_indices.reshape(-1), dtype=np.int64)
     if candidate_indices.shape[0] != candidate_count:
         raise ValueError("CandidateDepths.candidate_indices must align with rendered candidates.")
+    _validate_candidate_label_alignment(
+        candidate_count=candidate_count,
+        candidates=candidates,
+        depths=depths,
+        rri=rri,
+        candidate_pcs=candidate_pcs,
+    )
 
     numeric_blocks: dict[str, NDArray[Any]] = {
         "vin.points_world": points_world,

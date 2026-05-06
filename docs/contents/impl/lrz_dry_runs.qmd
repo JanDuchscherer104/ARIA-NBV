@@ -1,0 +1,135 @@
+---
+title: LRZ Dry-Run Templates
+phase: thesis
+audience: developer
+status: current
+owner: docs
+---
+
+# LRZ Dry-Run Templates {#lrz-dry-run-templates}
+
+This page defines the documentary LRZ dry-run surface for scaling ARIA-NBV
+oracle generation, rollout generation, VIN training, and diagnostics. It is not
+a setup guide and does not implement any generation code. The goal is to make
+the cluster submission shape, DSS staging layout, shard ownership, resume
+behavior, and atomic-write expectations reviewable before large jobs exist.
+
+The template files live under `scripts/templates/lrz/`. The companion planning
+notes live under `.configs/lrz/`. Both surfaces use placeholders for current
+ARIA entry points because the implementation command names must be inspected
+from the active checkout before real jobs are created.
+
+## Template Index
+
+| Workflow | Template | Launch shape | Large output root |
+| --- | --- | --- | --- |
+| Oracle generation | `scripts/templates/lrz/oracle_generation_dry_run.sbatch` | Slurm array, Pyxis container, one GPU per shard | `$ARIA_DSS/caches/oracle/staging/$RUN_ID/shards/` |
+| Rollout generation | `scripts/templates/lrz/rollout_generation_dry_run.sbatch` | Slurm array, Pyxis container, one GPU per shard | `$ARIA_DSS/data/staging/rollouts/$RUN_ID/shards/` |
+| VIN training | `scripts/templates/lrz/vin_training_dry_run.sbatch` | One-node multi-GPU Pyxis container | `$ARIA_DSS/checkpoints/vin/$RUN_ID/` |
+| Diagnostics | `scripts/templates/lrz/diagnostics_dry_run.sbatch` | CPU or GPU Slurm array, Pyxis container | `$ARIA_DSS/logs/diagnostics/$RUN_ID/` |
+
+Each template prints the `srun --container-image ... --container-mounts ...`
+shape that Pyxis would use with an Enroot image URI such as
+`nvcr.io#nvidia/pytorch:24.10-py3`. The printed command includes `--dry-run`
+and placeholder entry points, so copying the structure into a real job requires
+an explicit implementation pass.
+
+## DSS Layout
+
+Use `$ARIA_DSS` as the root for large artifacts and keep `$HOME` for source,
+small config, shell setup, SSH/git config, and private credentials. The dry-run
+planning layout is:
+
+```text
+$ARIA_DSS/
+  data/raw/
+    ase/
+    atek/
+  data/processed/<dataset_version>/
+  data/staging/
+    manifests/
+    rollouts/<run_id>/
+      shards/
+      _tmp/
+      manifests/
+  caches/oracle/
+    staging/<run_id>/
+      shards/
+      _tmp/
+      manifests/
+  caches/vin/<offline_store_version>/
+  checkpoints/vin/<run_id>/
+  logs/
+    slurm/
+    diagnostics/<run_id>/
+    wandb/
+  containers/
+  tmp/<slurm_job_id>/
+  .cache/{uv,pip,huggingface,torch}/
+```
+
+This layout is a staging convention for LRZ planning, not a package storage
+schema. It intentionally keeps future rollout staging under `data/staging/`
+until the rollout dataset/reporting contract is finalized.
+
+## Quotas And Inodes
+
+Before any scale submission, inspect the active DSS allocation with
+`dssusrinfo all` and record both byte quota and inode pressure in the run notes.
+Do not hard-code quota or inode numbers in templates because LRZ allocations and
+project containers can differ.
+
+The generated artifacts should be shard-oriented. Prefer archive shards,
+HDF5/Zarr-style stores, WebDataset-style shards, or compact JSONL manifests over
+millions of loose files. Package caches, model caches, temporary extraction, and
+intermediate writer state belong under `$ARIA_DSS/tmp/` or `$ARIA_DSS/.cache/`,
+not under `$HOME`.
+
+## Shard Ownership
+
+One Slurm array task owns one final shard path. The shard ID should come from
+`SLURM_ARRAY_TASK_ID` plus a deterministic manifest, not from broad directory
+scans. Two jobs must never write the same final shard path.
+
+Every final shard should carry owner metadata, for example `_owner.json`, with
+the run ID, Slurm job ID, array task ID, template name, source dataset or cache
+version, git commit, and config hash. Final manifests should reference shard IDs
+and content hashes rather than temp paths.
+
+## Resume
+
+A shard is complete only when its final completion marker exists and validates.
+Recommended marker names are `_SUCCESS.json` for generated shards and a
+workflow-specific marker for dry-run training reports. Resume code should skip
+validated completed shards, retry failed shards explicitly, and leave stale temp
+directories for operator review or deliberate cleanup.
+
+Failed attempts should write a `_FAILED.json` sidecar or a failed-manifest entry
+outside the completed shard root. Large retry jobs should be launched from a
+manifest of missing or failed shard IDs rather than by re-scanning the whole DSS
+tree.
+
+## Atomic Writes
+
+Heavy outputs should be written to a temp directory on the same DSS filesystem,
+validated, and then promoted into the final path by rename. The completion
+marker is written last. Final shards and immutable VIN offline stores must not
+be mutated in place; if a writer cannot update atomically, create a new
+versioned shard and update the manifest only after validation.
+
+VIN training jobs should treat the offline store as read-only. Checkpoints may
+be resumed from explicit paths under `$ARIA_DSS/checkpoints/vin/$RUN_ID/`, but
+`latest` or `best` pointers should be updated only after the checkpoint file is
+fully written.
+
+## Pre-Flight Checks
+
+Before turning a dry-run template into a real job:
+
+1. Inspect current ARIA console scripts from the LRZ checkout.
+2. Replace placeholder entry points and arguments in a copied template.
+3. Confirm `ARIA_DSS`, `ARIA_REPO`, `LRZ_CONTAINER_IMAGE`, and the shard
+   manifest.
+4. Run a one-shard smoke first, then scale arrays only after the output marker,
+   owner sidecar, and resume behavior are verified.
+5. Keep the real command under review until the package writer contract exists.
