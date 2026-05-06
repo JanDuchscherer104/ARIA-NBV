@@ -3,8 +3,8 @@ title: "Ideas and Future Directions Archive"
 id: ideas
 updated: 2026-04-11
 phase: archive
-audience: internal
-status: archive
+audience: public
+status: deprecated
 owner: jan
 format: html
 scope: repo
