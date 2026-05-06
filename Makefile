@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help ci agents-db-validate docs-render-core quarto-docs-ci typst-paper-ci
+.PHONY: help ci agents-db-validate package-smoke docs-render-core quarto-docs-ci typst-paper-ci
 .PHONY: context-qmd-tree qmd-frontmatter-check
 .PHONY: context-index context-get context-contracts context-modules context-classes context-functions
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
@@ -81,6 +81,21 @@ KG_PAPER ?=
 KG_LIMIT ?= 24
 KG_FORMAT ?= text
 KG_DOC_PATHS ?=
+PACKAGE_SMOKE_RUFF_PATHS := \
+	aria_nbv/data_handling/_offline_writer.py \
+	aria_nbv/pose_generation/types.py \
+	aria_nbv/rendering/candidate_depth_renderer.py \
+	tests/data_handling/test_vin_offline_store.py \
+	tests/data_handling/test_public_api_contract.py \
+	tests/pose_generation/test_counterfactuals.py \
+	tests/rendering/test_candidate_renderer_cpu_backend.py \
+	tests/lightning/test_vin_batch_collate.py
+PACKAGE_SMOKE_TESTS := \
+	tests/data_handling/test_vin_offline_store.py \
+	tests/data_handling/test_public_api_contract.py \
+	tests/pose_generation/test_counterfactuals.py \
+	tests/rendering/test_candidate_renderer_cpu_backend.py \
+	tests/lightning/test_vin_batch_collate.py
 
 #  ══════════════════════════════════════════════════════════════════════
 #  Agent Context helpers
@@ -661,7 +676,12 @@ proposal-watch: ## Watch and recompile the Typst thesis proposal
 
 docs-render-core: quarto-docs-ci typst-paper-ci ## Render the core docs surfaces used by root CI
 
-ci: agents-db-validate qmd-frontmatter-check check-agent-memory docs-render-core ## Run the minimal root CI contract
+package-smoke: ## Run CPU-only package lint and smoke tests for M1 contracts
+	@cd $(PKG_DIR) && uv run --extra dev ruff format --check $(PACKAGE_SMOKE_RUFF_PATHS)
+	@cd $(PKG_DIR) && uv run --extra dev ruff check $(PACKAGE_SMOKE_RUFF_PATHS)
+	@cd $(PKG_DIR) && uv run --extra dev pytest $(PACKAGE_SMOKE_TESTS)
+
+ci: agents-db-validate qmd-frontmatter-check check-agent-memory package-smoke docs-render-core ## Run the root CI contract
 
 #  ═══════════════════════════════════════════════════════════════════════
 #  ℹ️  Help

@@ -12,8 +12,9 @@ format: html
 This is the working M1 contract report for the data/cache/oracle correctness
 gate. Status is current as of 2026-05-06; the roadmap M1 window is
 2026-05-11 to 2026-05-31. The report separates code-level contract checks that
-now pass on synthetic fixtures from real-store and GPU-backed evidence that
-still has to be collected before scale-up.
+now pass on synthetic fixtures from local-store evidence that is useful for
+diagnostics but still blocks M1 exit, Rerun evidence, and GPU-backed throughput
+evidence that must be collected before scale-up.
 
 ## Status Summary {#m1-status-summary}
 
@@ -25,9 +26,33 @@ still has to be collected before scale-up.
 | Candidate-label alignment | Pass for synthetic guard | `prepare_vin_offline_sample()` validates candidate poses, depth rows, camera rows, RRI vectors, optional point clouds, and candidate shell indices before writing rows. |
 | Rollout trace alignment | Pass for synthetic guard | `RolloutStepTrace` stores full-shell poses, validity, scores, and metric vectors with invalid rows masked as `NaN`; round-trip tests preserve this table. |
 | Frame and CW90 semantics | Pass for documented source contract | Candidate generation applies `rotate_yaw_cw90` once to the reference pose; plotting/Rerun display corrections remain display-only. `VinModelV3` requires a `cw90_corrected` camera tag if model-side CW90 undo is enabled. |
-| Current local store evidence | Blocked | `.configs/offline_only.toml` points at a partial/interrupted local `vin_offline` store. This report does not yet claim a fresh full-store sample count. |
+| Current local store evidence | Blocked for M1 exit | `.configs/offline_only.toml` resolves to `.data/offline_cache/vin_offline`; the evidence snapshot below records manifest v6, 48 sample-index rows, and an interrupted/partial one-scene store. |
+| Scene-level split evidence | Blocked | The local store has one scene (`81286`) and a 38/10 train/val sample split, so it cannot prove the final scene-level split contract. |
 | Rerun smoke recordings | Blocked | Normal, boundary, and failure `.rrd` recordings are not collected in this pass. |
 | Oracle throughput | Blocked | No representative GPU/dataset timing was run in this pass. |
+
+## Evidence Snapshot {#m1-evidence-snapshot}
+
+The current configured store is a diagnostic smoke asset, not final M1
+training evidence.
+
+| Evidence item | Status | Value |
+|---|---|---|
+| Config source | Pass for local smoke | `.configs/offline_only.toml` uses `datamodule_config.source.kind = "offline"` and `store_dir = "vin_offline"`. |
+| Resolved store root | Pass for local smoke | `.data/offline_cache/vin_offline`; the manifest records the same repo-local store as an operator-local absolute path. |
+| Manifest version | Pass for reader compatibility | `version = 6`, matching the current immutable reader contract. |
+| Manifest hash | Recorded | `sha256:9b72f7203942db28f613f4c921ee26eba7ba753c91c5967aae404a933bb3ff00` for `manifest.json`. |
+| Manifest created time | Recorded | `2026-04-30T11:37:11Z`. |
+| Store status | Blocked for M1 exit | `stats.interrupted = true`; manifest metadata also says the version-6 migration rewrote only `manifest.json`, not shard arrays, payloads, index rows, or split files. |
+| Sample-index rows | Recorded | `48` JSONL rows, with global `sample_index` values `0..47`. |
+| Scene/snippet coverage | Blocked for scale | One scene (`81286`) and 48 snippet ids; this is not the full 100 GT-mesh ASE / 4,608 snippet target. |
+| Split counts | Blocked for scene split | `splits/all.npy = 48`, `splits/train.npy = 38`, `splits/val.npy = 10`; the split policy is `sha1(sample_key)`, and the current one-scene store cannot prove scene-level isolation. |
+| Shards | Recorded | 4 shard directories with backbone, depth, candidate, and candidate point-cloud blocks. |
+| Materialized blocks | Partial | `backbone`, `depths`, and `candidate_pcs` are present; counterfactuals, detected OBBs, GT OBBs, and trajectory blocks are absent. |
+| Rerun normal recording | Blocked | Expected artifact path: `.artifacts/rerun/m1-normal.rrd`; not collected in this pass. |
+| Rerun boundary recording | Blocked | Expected artifact path: `.artifacts/rerun/m1-boundary.rrd`; not collected in this pass. |
+| Rerun failure recording | Blocked | Expected artifact path: `.artifacts/rerun/m1-failure.rrd`; not collected in this pass. |
+| Oracle throughput | Blocked | No representative GPU timing has been recorded for mesh loading, candidate rendering, backprojection, and RRI scoring. |
 
 ## Contract Map {#m1-contract-map}
 
@@ -75,6 +100,8 @@ These are not solved by the synthetic guard pass:
 - collect fresh diagnostics for the configured immutable store: manifest
   version, sample count, scene count, block inventory, split counts, candidate
   count distribution, and RRI summaries;
+- replace the current one-scene sample split evidence with a scene-level
+  train/val split or mark the exact scene-level split blocker in the agents DB;
 - produce normal, boundary, and failure Rerun recordings through
   `nbv-rerun-inspect` without committing generated `.rrd` artifacts;
 - measure oracle throughput on representative snippets with the intended mesh,
@@ -87,6 +114,32 @@ These are not solved by the synthetic guard pass:
 ## Command Ledger {#m1-command-ledger}
 
 Use these commands to update the report evidence as M1 progresses:
+
+```sh
+# Evidence snapshot collected from the repo root on 2026-05-06.
+sha256sum .data/offline_cache/vin_offline/manifest.json
+wc -l .data/offline_cache/vin_offline/sample_index.jsonl
+aria_nbv/.venv/bin/python - <<'PY'
+from __future__ import annotations
+import json
+from pathlib import Path
+import numpy as np
+
+root = Path(".data/offline_cache/vin_offline")
+manifest = json.loads((root / "manifest.json").read_text())
+records = [
+    json.loads(line)
+    for line in (root / "sample_index.jsonl").read_text().splitlines()
+    if line
+]
+print("version", manifest["version"])
+print("stats", manifest["stats"])
+print("scenes", sorted({record["scene_id"] for record in records}))
+print("snippet_count", len({record["snippet_id"] for record in records}))
+for split in ("all", "train", "val"):
+    print(split, int(np.load(root / "splits" / f"{split}.npy").shape[0]))
+PY
+```
 
 ```sh
 cd aria_nbv
