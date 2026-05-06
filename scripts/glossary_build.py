@@ -501,7 +501,7 @@ def _render_notation_refs(
         tex = entry["tex"]
         items.append(
             '<span class="glossary-notation-item">'
-            f'<span class="glossary-notation-math">\\({_html_text(tex)}\\)</span>'
+            f'<span class="glossary-notation-math">${tex}$</span>'
             f'<code>{_html_text(ref)}</code>'
             "</span>"
         )

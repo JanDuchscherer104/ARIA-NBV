@@ -61,56 +61,56 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 <tr>
 <td><a href="#term-next-best-view">NBV - Next-Best-View</a></td>
 <td>Problem of selecting the next sensor viewpoint to improve an active reconstruction or inspection objective under a limited acquisition budget.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}\)</span><code>rl.mdp_nbv</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)\)</span><code>rl.nbv_mdp</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{M}_{\mathrm{NBV}}$</span><code>rl.mdp_nbv</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)$</span><code>rl.nbv_mdp</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-relative-reconstruction-improvement">RRI - Relative Reconstruction Improvement</a></td>
 <td>Metric quantifying the relative reconstruction-quality improvement obtained by adding a candidate observation to the current reconstruction.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}\)</span><code>oracle.rri</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}\)</span><code>rri.rri</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}$</span><code>oracle.rri</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}$</span><code>rri.rri</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-chamfer-distance">CD - Chamfer Distance</a></td>
 <td>Bidirectional point-set distance commonly used to compare reconstructed points against reference geometry.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{CD}\)</span><code>rri.cd_value</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{M}}_{\mathrm{GT}}\)</span><code>ase.mesh</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{CD}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\mathcal{A}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\mathcal{C}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})\)</span><code>rri.cd</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{CD}$</span><code>rri.cd_value</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}$</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{M}}_{\mathrm{GT}}$</span><code>ase.mesh</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{CD}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\mathcal{A}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\mathcal{C}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})$</span><code>rri.cd</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-target-specific-rri">target RRI - Target-Specific RRI</a></td>
 <td>RRI computed only on the ground-truth and reconstructed geometry associated with a selected target of interest.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e\)</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e\cup\boldsymbol{\mathcal{P}}_q^e,M_e)}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)+\varepsilon}\)</span><code>rri.target_rri</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}_e$</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$M_e$</span><code>ase.mesh_target</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}_e(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e\cup\boldsymbol{\mathcal{P}}_q^e,M_e)}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)+\varepsilon}$</span><code>rri.target_rri</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-target-of-interest">target - Target of Interest</a></td>
 <td>Selected entity, object crop, point, region, or surface-deficit hypothesis whose reconstruction quality should be improved.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(e_t\)</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$e_t$</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$M_e$</span><code>ase.mesh_target</code></span></div></td>
 <td><span class="glossary-muted">-</span></td>
 </tr>
 <tr>
 <td><a href="#term-point-cloud">PC - Point Cloud</a></td>
 <td>Set of 3D points representing observed scene geometry.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}_q\)</span><code>oracle.points_q</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}$</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}_q$</span><code>oracle.points_q</code></span></div></td>
 <td><span class="glossary-muted">-</span></td>
 </tr>
 <tr>
 <td><a href="#term-candidate-view">candidate - Candidate View</a></td>
 <td>Proposed camera pose whose expected reconstruction utility is evaluated before selecting the next observation.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$Q_t$</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$q_{t,i}$</span><code>oracle.candidate_qti</code></span></div></td>
 <td><span class="glossary-muted">-</span></td>
 </tr>
 <tr>
 <td><a href="#term-oracle-rri">oracle RRI - Oracle RRI</a></td>
 <td>RRI label computed with privileged ground-truth geometry, used for supervised training and evaluation.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}\)</span><code>oracle.rri</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{M}}_{\mathrm{GT}}\)</span><code>ase.mesh</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}\)</span><code>rri.rri</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}$</span><code>oracle.rri</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{M}}_{\mathrm{GT}}$</span><code>ase.mesh</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}$</span><code>rri.rri</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-target-conditioned-scorer">target-conditioned scorer - Target-Conditioned Scorer</a></td>
 <td>VIN-style candidate scorer that receives scene state, a candidate view, and an encoding of the target of interest.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\hat{r}\)</span><code>vin.rri_hat</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho=\operatorname{corr}(\operatorname{rank}(\hat{r}_i),\operatorname{rank}(r_i))\)</span><code>metrics.spearman</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{TopKAcc}(k)=\frac{1}{N}\sum_i\mathbb{1}[y_i\in\mathrm{TopK}(\boldsymbol{\pi}_i,k)]\)</span><code>metrics.topk_acc</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\hat{r}$</span><code>vin.rri_hat</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\rho=\operatorname{corr}(\operatorname{rank}(\hat{r}_i),\operatorname{rank}(r_i))$</span><code>metrics.spearman</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{TopKAcc}(k)=\frac{1}{N}\sum_i\mathbb{1}[y_i\in\mathrm{TopK}(\boldsymbol{\pi}_i,k)]$</span><code>metrics.topk_acc</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-observed-target-selection">OBS-SEL - Observed Target Selection</a></td>
@@ -121,68 +121,68 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 <tr>
 <td><a href="#term-predicted-target-q">PRED-Q - Predicted-Target Q</a></td>
 <td>Main thesis protocol component requiring scorer or Q_H inputs to use predicted or observed target descriptors.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H\)</span><code>rl.qh</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]\)</span><code>rl.q_h</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$Q_H$</span><code>rl.qh</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]$</span><code>rl.q_h</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-ground-truth-target-evaluation">GT-EVAL - Ground-Truth Target Evaluation</a></td>
 <td>Main thesis protocol component using ground-truth OBBs and target mesh crops only for labels and evaluation.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$M_e$</span><code>ase.mesh_target</code></span></div></td>
 <td><span class="glossary-muted">-</span></td>
 </tr>
 <tr>
 <td><a href="#term-acquisition-cost">cost - Acquisition Cost</a></td>
 <td>Budget consumed to acquire observations, measured by view count, path length, elapsed time, invalid-action rate, or a weighted combination.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(C(\tau)\)</span><code>rl.acquisition_cost</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$C(\tau)$</span><code>rl.acquisition_cost</code></span></div></td>
 <td><span class="glossary-muted">-</span></td>
 </tr>
 <tr>
 <td><a href="#term-target-conditioned-nbv-mdp">NBV MDP - Target-Conditioned NBV MDP</a></td>
 <td>Finite-horizon MDP contract for target-conditioned ARIA-NBV rollouts and fitted Q_H training.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}\)</span><code>rl.mdp_nbv</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)\)</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(T\)</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\gamma\)</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(H\)</span><code>rl.H</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)\)</span><code>rl.nbv_mdp</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{M}_{\mathrm{NBV}}$</span><code>rl.mdp_nbv</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$s$</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{A}(s_t)$</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$T$</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$r_t^e$</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\gamma$</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$H$</span><code>rl.H</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)$</span><code>rl.nbv_mdp</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-rollout-state">state - Rollout State</a></td>
 <td>Actor-visible state bundle used by target-conditioned rollouts and Q_H.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho_{t,i}\)</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(e_t\)</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(b_t\)</span><code>rl.budget</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$s$</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}$</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$Q_t$</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$m_{t,i}$</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\rho_{t,i}$</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$e_t$</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$b_t$</span><code>rl.budget</code></span></div></td>
 <td><span class="glossary-muted">-</span></td>
 </tr>
 <tr>
 <td><a href="#term-finite-candidate-action-set">action set - Finite Candidate Action Set</a></td>
 <td>Masked finite action set over sampled candidate views.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)\)</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}\)</span><code>rl.finite_action_set</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{A}(s_t)$</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$q_{t,i}$</span><code>oracle.candidate_qti</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$Q_t$</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$m_{t,i}$</span><code>rl.validity_mask</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}$</span><code>rl.finite_action_set</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-counterfactual-transition">transition - Counterfactual Transition</a></td>
 <td>Replayable state update after selecting a candidate view.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(T\)</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}_q\)</span><code>oracle.points_q</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(P_{t+1}=P_t\cup P_{q_t}\)</span><code>rl.counterfactual_transition</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$T$</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}$</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}_q$</span><code>oracle.points_q</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$P_{t+1}=P_t\cup P_{q_t}$</span><code>rl.counterfactual_transition</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-target-rri-reward">reward - Target-RRI Reward</a></td>
 <td>Quality-only immediate reward equal to target-specific RRI for the selected candidate.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e\)</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e=\mathrm{RRI}_e(q_t\mid P_t,M_e)\)</span><code>rl.target_rri_reward</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$r_t^e$</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}_e$</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}$</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$M_e$</span><code>ase.mesh_target</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$r_t^e=\mathrm{RRI}_e(q_t\mid P_t,M_e)$</span><code>rl.target_rri_reward</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-finite-horizon-return">return - Finite-Horizon Return</a></td>
 <td>H-step discounted return over target-RRI rewards.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}\)</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\gamma\)</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(H\)</span><code>rl.H</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}=\sum_{k=0}^{H-1}\gamma^k r_{t+k}^e\)</span><code>rl.finite_horizon_return</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$G_t^{(H)}$</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$r_t^e$</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\gamma$</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$H$</span><code>rl.H</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$G_t^{(H)}=\sum_{k=0}^{H-1}\gamma^k r_{t+k}^e$</span><code>rl.finite_horizon_return</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-finite-horizon-q-function">Q_H - Finite-Horizon Q Function</a></td>
 <td>Finite-horizon candidate-value function for target-conditioned ARIA-NBV.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H\)</span><code>rl.qh</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}\)</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]\)</span><code>rl.q_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(y_t^Q=r_t+\gamma V(s_{t+1})\)</span><code>rl.q_backup</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$Q_H$</span><code>rl.qh</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$G_t^{(H)}$</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$s$</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$q_{t,i}$</span><code>oracle.candidate_qti</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]$</span><code>rl.q_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$y_t^Q=r_t+\gamma V(s_{t+1})$</span><code>rl.q_backup</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-validity-mask">mask - Validity Mask</a></td>
 <td>Hard mask that separates feasible candidate actions from invalid candidates.</td>
-<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho_{t,i}\)</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m\)</span><code>vin.cand_valid</code></span></div></td>
-<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(m_i=\mathbb{1}[\mathrm{finite}]\mathbb{1}[v_i&gt;0]\mathbb{1}[v_i^{\mathrm{sem}}&gt;0]\)</span><code>metrics.candidate_validity</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}\)</span><code>rl.finite_action_set</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$m_{t,i}$</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\rho_{t,i}$</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$m$</span><code>vin.cand_valid</code></span></div></td>
+<td><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$m_i=\mathbb{1}[\mathrm{finite}]\mathbb{1}[v_i>0]\mathbb{1}[v_i^{\mathrm{sem}}>0]$</span><code>metrics.candidate_validity</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}$</span><code>rl.finite_action_set</code></span></div></td>
 </tr>
 <tr>
 <td><a href="#term-project-aria">Project Aria</a></td>
@@ -214,8 +214,8 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}\)</span><code>rl.mdp_nbv</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)\)</span><code>rl.nbv_mdp</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{M}_{\mathrm{NBV}}$</span><code>rl.mdp_nbv</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)$</span><code>rl.nbv_mdp</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Problem of selecting the next sensor viewpoint to improve an active reconstruction or inspection objective under a limited acquisition budget.</p>
@@ -249,8 +249,8 @@ Use `{{{< gls term-id >}}}` for the linked short label and
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}\)</span><code>oracle.rri</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}\)</span><code>rri.rri</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}$</span><code>oracle.rri</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}$</span><code>rri.rri</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Metric quantifying the relative reconstruction-quality improvement obtained by adding a candidate observation to the current reconstruction.</p>
@@ -290,8 +290,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{CD}\)</span><code>rri.cd_value</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{M}}_{\mathrm{GT}}\)</span><code>ase.mesh</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{CD}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\mathcal{A}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\mathcal{C}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})\)</span><code>rri.cd</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{CD}$</span><code>rri.cd_value</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}$</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{M}}_{\mathrm{GT}}$</span><code>ase.mesh</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{CD}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\mathcal{A}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\mathcal{C}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})$</span><code>rri.cd</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Bidirectional point-set distance commonly used to compare reconstructed points against reference geometry.</p>
@@ -325,8 +325,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e\)</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e\cup\boldsymbol{\mathcal{P}}_q^e,M_e)}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)+\varepsilon}\)</span><code>rri.target_rri</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}_e$</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$M_e$</span><code>ase.mesh_target</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}_e(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e\cup\boldsymbol{\mathcal{P}}_q^e,M_e)}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)+\varepsilon}$</span><code>rri.target_rri</code></span></div></div>
 </div>
 
 <p class="glossary-definition">RRI computed only on the ground-truth and reconstructed geometry associated with a selected target of interest.</p>
@@ -366,7 +366,7 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(e_t\)</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$e_t$</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$M_e$</span><code>ase.mesh_target</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Selected entity, object crop, point, region, or surface-deficit hypothesis whose reconstruction quality should be improved.</p>
@@ -399,7 +399,7 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}_q\)</span><code>oracle.points_q</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}$</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}_q$</span><code>oracle.points_q</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Set of 3D points representing observed scene geometry.</p>
@@ -432,7 +432,7 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$Q_t$</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$q_{t,i}$</span><code>oracle.candidate_qti</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Proposed camera pose whose expected reconstruction utility is evaluated before selecting the next observation.</p>
@@ -466,8 +466,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}\)</span><code>oracle.rri</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{M}}_{\mathrm{GT}}\)</span><code>ase.mesh</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}\)</span><code>rri.rri</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}$</span><code>oracle.rri</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{M}}_{\mathrm{GT}}$</span><code>ase.mesh</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}$</span><code>rri.rri</code></span></div></div>
 </div>
 
 <p class="glossary-definition">RRI label computed with privileged ground-truth geometry, used for supervised training and evaluation.</p>
@@ -501,8 +501,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\hat{r}\)</span><code>vin.rri_hat</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho=\operatorname{corr}(\operatorname{rank}(\hat{r}_i),\operatorname{rank}(r_i))\)</span><code>metrics.spearman</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{TopKAcc}(k)=\frac{1}{N}\sum_i\mathbb{1}[y_i\in\mathrm{TopK}(\boldsymbol{\pi}_i,k)]\)</span><code>metrics.topk_acc</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\hat{r}$</span><code>vin.rri_hat</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\rho=\operatorname{corr}(\operatorname{rank}(\hat{r}_i),\operatorname{rank}(r_i))$</span><code>metrics.spearman</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{TopKAcc}(k)=\frac{1}{N}\sum_i\mathbb{1}[y_i\in\mathrm{TopK}(\boldsymbol{\pi}_i,k)]$</span><code>metrics.topk_acc</code></span></div></div>
 </div>
 
 <p class="glossary-definition">VIN-style candidate scorer that receives scene state, a candidate view, and an encoding of the target of interest.</p>
@@ -566,8 +566,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H\)</span><code>rl.qh</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]\)</span><code>rl.q_h</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$Q_H$</span><code>rl.qh</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]$</span><code>rl.q_h</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Main thesis protocol component requiring scorer or Q_H inputs to use predicted or observed target descriptors.</p>
@@ -601,7 +601,7 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$M_e$</span><code>ase.mesh_target</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Main thesis protocol component using ground-truth OBBs and target mesh crops only for labels and evaluation.</p>
@@ -635,7 +635,7 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(C(\tau)\)</span><code>rl.acquisition_cost</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$C(\tau)$</span><code>rl.acquisition_cost</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Budget consumed to acquire observations, measured by view count, path length, elapsed time, invalid-action rate, or a weighted combination.</p>
@@ -668,8 +668,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}\)</span><code>rl.mdp_nbv</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)\)</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(T\)</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\gamma\)</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(H\)</span><code>rl.H</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)\)</span><code>rl.nbv_mdp</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{M}_{\mathrm{NBV}}$</span><code>rl.mdp_nbv</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$s$</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{A}(s_t)$</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$T$</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$r_t^e$</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\gamma$</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$H$</span><code>rl.H</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{M}_{\mathrm{NBV}}=(\mathcal{S},\mathcal{A},T,r_e,\gamma,H)$</span><code>rl.nbv_mdp</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Finite-horizon MDP contract for target-conditioned ARIA-NBV rollouts and fitted Q_H training.</p>
@@ -711,7 +711,7 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho_{t,i}\)</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(e_t\)</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(b_t\)</span><code>rl.budget</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$s$</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}$</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$Q_t$</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$m_{t,i}$</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\rho_{t,i}$</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$e_t$</span><code>rl.target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$b_t$</span><code>rl.budget</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Actor-visible state bundle used by target-conditioned rollouts and Q_H.</p>
@@ -744,8 +744,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)\)</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_t\)</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}\)</span><code>rl.finite_action_set</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{A}(s_t)$</span><code>rl.action_set</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$q_{t,i}$</span><code>oracle.candidate_qti</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$Q_t$</span><code>oracle.candidates_t</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$m_{t,i}$</span><code>rl.validity_mask</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}$</span><code>rl.finite_action_set</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Masked finite action set over sampled candidate views.</p>
@@ -786,8 +786,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(T\)</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}_q\)</span><code>oracle.points_q</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(P_{t+1}=P_t\cup P_{q_t}\)</span><code>rl.counterfactual_transition</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$T$</span><code>rl.transition</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}$</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}_q$</span><code>oracle.points_q</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$P_{t+1}=P_t\cup P_{q_t}$</span><code>rl.counterfactual_transition</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Replayable state update after selecting a candidate view.</p>
@@ -828,8 +828,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathrm{RRI}_e\)</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\boldsymbol{\mathcal{P}}\)</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(M_e\)</span><code>ase.mesh_target</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e=\mathrm{RRI}_e(q_t\mid P_t,M_e)\)</span><code>rl.target_rri_reward</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$r_t^e$</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\mathrm{RRI}_e$</span><code>entity.rri_e</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\boldsymbol{\mathcal{P}}$</span><code>oracle.points</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$M_e$</span><code>ase.mesh_target</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$r_t^e=\mathrm{RRI}_e(q_t\mid P_t,M_e)$</span><code>rl.target_rri_reward</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Quality-only immediate reward equal to target-specific RRI for the selected candidate.</p>
@@ -879,8 +879,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}\)</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(r_t^e\)</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\gamma\)</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(H\)</span><code>rl.H</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}=\sum_{k=0}^{H-1}\gamma^k r_{t+k}^e\)</span><code>rl.finite_horizon_return</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$G_t^{(H)}$</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$r_t^e$</span><code>rl.reward_target</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\gamma$</span><code>rl.gamma</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$H$</span><code>rl.H</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$G_t^{(H)}=\sum_{k=0}^{H-1}\gamma^k r_{t+k}^e$</span><code>rl.finite_horizon_return</code></span></div></div>
 </div>
 
 <p class="glossary-definition">H-step discounted return over target-RRI rewards.</p>
@@ -921,8 +921,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H\)</span><code>rl.qh</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(G_t^{(H)}\)</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(s\)</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(q_{t,i}\)</span><code>oracle.candidate_qti</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]\)</span><code>rl.q_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(y_t^Q=r_t+\gamma V(s_{t+1})\)</span><code>rl.q_backup</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$Q_H$</span><code>rl.qh</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$G_t^{(H)}$</span><code>rl.return_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$s$</span><code>rl.s</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$q_{t,i}$</span><code>oracle.candidate_qti</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]$</span><code>rl.q_h</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$y_t^Q=r_t+\gamma V(s_{t+1})$</span><code>rl.q_backup</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Finite-horizon candidate-value function for target-conditioned ARIA-NBV.</p>
@@ -964,8 +964,8 @@ $$
 </div>
 
 <div class="glossary-card-notation">
-<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">\(m_{t,i}\)</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\rho_{t,i}\)</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(m\)</span><code>vin.cand_valid</code></span></div></div>
-<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">\(m_i=\mathbb{1}[\mathrm{finite}]\mathbb{1}[v_i&gt;0]\mathbb{1}[v_i^{\mathrm{sem}}&gt;0]\)</span><code>metrics.candidate_validity</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">\(\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}\)</span><code>rl.finite_action_set</code></span></div></div>
+<div><strong>Symbols</strong><div class="glossary-notation-list glossary-notation-symbols"><span class="glossary-notation-item"><span class="glossary-notation-math">$m_{t,i}$</span><code>rl.validity_mask</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\rho_{t,i}$</span><code>rl.invalid_reason</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$m$</span><code>vin.cand_valid</code></span></div></div>
+<div><strong>Equations</strong><div class="glossary-notation-list glossary-notation-equations"><span class="glossary-notation-item"><span class="glossary-notation-math">$m_i=\mathbb{1}[\mathrm{finite}]\mathbb{1}[v_i>0]\mathbb{1}[v_i^{\mathrm{sem}}>0]$</span><code>metrics.candidate_validity</code></span> <span class="glossary-notation-item"><span class="glossary-notation-math">$\mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}$</span><code>rl.finite_action_set</code></span></div></div>
 </div>
 
 <p class="glossary-definition">Hard mask that separates feasible candidate actions from invalid candidates.</p>
