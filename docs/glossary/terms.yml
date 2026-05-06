@@ -754,8 +754,8 @@
     occupancy, centerness, semantic, and OBB evidence for VIN-style RRI prediction.
   internal_links:
   - docs/contents/literature/efm3d.qmd
-  - docs/contents/ext-impl/efm3d_implementation.qmd
   - docs/contents/impl/vin_nbv.qmd
+  - docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd
   citations:
   - EFM3D-straub2024
   related:
@@ -783,8 +783,8 @@
     for VIN-style RRI prediction.
   internal_links:
   - docs/contents/literature/efm3d.qmd
-  - docs/contents/ext-impl/efm3d_implementation.qmd
   - docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd
+  - docs/contents/impl/vin_nbv.qmd
   citations:
   - EFM3D-straub2024
   - EVL-Doc-2025

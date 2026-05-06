@@ -43,10 +43,10 @@ issue_ids = ["issue-003"]
 loc_min = 180
 loc_expected = 420
 loc_max = 1000
-context = ["The bounded cleanup removed generated scaffold and TODO pages from primary public navigation, but the full docs tree still needed a firm public/internal render boundary.", "docs/AGENTS.md says generated agent scaffold mirrors are internal operator artifacts under .agents/generated/ and must not be written under docs/contents/**."]
-implementation_notes = ["Keep public docs focused on curated thesis/advisor material.", "Raw scratch, backlog history, and generated agent mirrors belong under .agents/, not rendered Quarto content."]
-acceptance = ["Primary public docs navigation focuses on thesis, setup, theory, implementation, literature, and API reference.", "Agent scaffolding remains available to agents through .agents and generated mirrors when explicitly regenerated.", "Rendered docs/contents pages carry taxonomy frontmatter and no agent/internal audience."]
-verification = ["cd docs && quarto render index.qmd contents/thesis/roadmap.qmd contents/thesis/questions.qmd contents/archive/index.qmd", "rg -n \"Agent Scaffolding|old public agent-scaffold path\" docs/_quarto.yml docs/index.qmd", "make qmd-frontmatter-check"]
+context = ["The bounded cleanup removed generated scaffold and TODO pages from primary public navigation, but the full docs tree still needed a firm public/internal render boundary.", "docs/AGENTS.md says generated agent scaffold mirrors are internal operator artifacts under .agents/generated/ and must not be written under docs/contents/**.", "Raw external implementation pages under docs/contents/ext-impl also violated the public/internal boundary because they were vendor-stack scratch, tutorials, and symbol dumps rather than current thesis evidence."]
+implementation_notes = ["Keep public docs focused on curated thesis/advisor material.", "Raw scratch, backlog history, generated agent mirrors, and raw vendor-stack notes belong under .agents/, not rendered Quarto content.", "Keep distilled implementation facts either in package docstrings, public API reference, or .agents/references when they are developer-only."]
+acceptance = ["Primary public docs navigation focuses on thesis, setup, theory, implementation evidence, literature, and API reference.", "Agent scaffolding and archived vendor-stack notes remain available to agents through .agents when explicitly needed.", "Rendered docs/contents pages carry taxonomy frontmatter and no agent/internal audience.", "Public docs no longer link to docs/contents/ext-impl pages."]
+verification = ["cd docs && quarto render index.qmd contents/thesis/roadmap.qmd contents/thesis/questions.qmd contents/archive/index.qmd", "rg -n \"Agent Scaffolding|old public agent-scaffold path|contents/ext-impl|External Implementations\" docs/_quarto.yml docs/index.qmd docs/contents -g '!_site/**'", "make qmd-frontmatter-check"]
 
 [[refactor]]
 id = "refactor-008"

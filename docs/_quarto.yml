@@ -131,24 +131,24 @@ website:
         - section: "Implementations"
           contents:
             - contents/impl/overview.qmd
-            - contents/impl/aria_nbv_overview.qmd
-            - contents/impl/aria_nbv_package.qmd
-            - contents/impl/data_pipeline_overview.qmd
-            - contents/impl/oracle_rri_impl.qmd
-            - contents/impl/rri_computation.qmd
-            - contents/impl/coral_integration.qmd
-            - contents/impl/vin_nbv.qmd
-            - contents/impl/rerun_offline_inspector.qmd
-            - contents/impl/vin_v2_feature_proposals.qmd
+            - section: "System And Package"
+              contents:
+                - contents/impl/aria_nbv_overview.qmd
+                - contents/impl/aria_nbv_package.qmd
+            - section: "Data, Oracle, And Diagnostics"
+              contents:
+                - contents/impl/data_pipeline_overview.qmd
+                - contents/impl/oracle_rri_impl.qmd
+                - contents/impl/rri_computation.qmd
+                - contents/impl/rerun_offline_inspector.qmd
+            - section: "Scorer And Training"
+              contents:
+                - contents/impl/coral_integration.qmd
+                - contents/impl/vin_nbv.qmd
+                - contents/impl/vin_v2_feature_proposals.qmd
         - section: "Architecture Diagrams"
           contents:
             - contents/diagrams.qmd
-        - section: "External Implementations"
-          contents:
-            - contents/ext-impl/atek_implementation.qmd
-            - contents/ext-impl/efm3d_implementation.qmd
-            - contents/ext-impl/prj_aria_tools_impl.qmd
-            - contents/ext-impl/efm3d_symbol_index.qmd
         - section: "Presentations"
           contents:
             - text: "Project Slides 1"

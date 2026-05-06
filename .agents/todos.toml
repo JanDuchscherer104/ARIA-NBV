@@ -11,11 +11,11 @@ issue_ids = ["issue-003"]
 loc_min = 200
 loc_expected = 700
 loc_max = 1600
-context = ["Current docs expose roadmap, TODOs, ideas, generated agent scaffold mirrors, literature notes, implementation guides, and scratchpad-like pages in the same public tree.", "docs/AGENTS.md says docs/typst/paper/main.typ is ground truth and Quarto should not introduce competing top-level narratives."]
-references = ["repo:docs/AGENTS.md", "repo:docs/_quarto.yml", "repo:docs/contents/thesis/questions.qmd#kg-friendly-question-writing"]
-implementation_notes = ["Start with scripts/nbv_qmd_outline.sh --compact and docs/_quarto.yml navigation instead of broad manual browsing.", "Keep source pages until there is an explicit archive/move decision; first remove public navigation pressure and stale links.", "Do not delete history records under .agents/memory/history/."]
-acceptance = ["Each docs subtree has an explicit role: public, paper, slides, generated, internal mirror, or archive.", "Public nav no longer surfaces internal agent scaffolding or stale work-management pages as primary project content.", "Stale typo links such as coral_intergarion and hesita are either renamed or intentionally documented."]
-verification = ["scripts/nbv_qmd_outline.sh --compact", "cd docs && quarto render index.qmd contents/thesis/roadmap.qmd contents/thesis/questions.qmd contents/archive/index.qmd", "rg -n \"Seminar|hesita|coral_intergarion|old NBV repo URL\" README.md docs"]
+context = ["Current docs expose roadmap, TODOs, ideas, generated agent scaffold mirrors, literature notes, implementation guides, and scratchpad-like pages in the same public tree.", "docs/AGENTS.md says docs/typst/paper/main.typ is ground truth and Quarto should not introduce competing top-level narratives.", "The raw docs/contents/ext-impl vendor-stack pages were identified as public-doc role mixing: their retained ATEK/EFM3D/Project Aria facts belong in an internal developer reference or code docstrings, not public thesis navigation."]
+references = ["repo:docs/AGENTS.md", "repo:docs/_quarto.yml", "repo:docs/contents/thesis/questions.qmd#kg-friendly-question-writing", "repo:.agents/references/external_stack_contracts.md"]
+implementation_notes = ["Start with scripts/nbv_qmd_outline.sh --compact and docs/_quarto.yml navigation instead of broad manual browsing.", "Keep source pages until there is an explicit archive/move decision; first remove public navigation pressure and stale links.", "Move raw internal/vendor scratch to .agents/archive/docs/ and retain only curated public thesis pages under docs/contents.", "Do not delete history records under .agents/memory/history/."]
+acceptance = ["Each docs subtree has an explicit role: public, paper, slides, generated, internal mirror, or archive.", "Public nav no longer surfaces internal agent scaffolding, raw vendor-stack dumps, or stale work-management pages as primary project content.", "Stale typo links such as coral_intergarion and hesita are either renamed or intentionally documented."]
+verification = ["scripts/nbv_qmd_outline.sh --compact", "cd docs && quarto render index.qmd contents/thesis/roadmap.qmd contents/thesis/questions.qmd contents/archive/index.qmd", "rg -n \"Seminar|hesita|coral_intergarion|old NBV repo URL|contents/ext-impl|External Implementations\" README.md docs -g '!_site/**'"]
 
 [[todo]]
 id = "todo-002"
@@ -577,3 +577,20 @@ references = ["repo:docs/contents/thesis/questions.qmd#rq2-target-encoding", "re
 implementation_notes = ["Define a typed target record that stores observed/predicted OBB input, matched GT OBB, class/confidence/support signals, match metadata, and invalid target reasons.", "Keep target selector and candidate generator from inspecting GT crops before action selection.", "Persist target protocol version and match metadata into rollout/Q_H stores and diagnostics.", "Make Rerun diagnostics display observed target, matched GT target, target crop, and failure/mismatch reasons."]
 acceptance = ["A small trusted subset can produce OBS-SEL / PRED-Q / GT-EVAL samples with observed/predicted target inputs and matched GT target-RRI labels.", "V0 GT-input and V1 observed-input paths are named separately in configs, traces, reports, and docs.", "Unmatched, unsupported, or empty-crop targets fail with explicit reasons rather than falling back to scene-level labels.", "The target record is consumable by the target-conditioned scorer and Q_H training payload."]
 verification = ["cd aria_nbv && uv run pytest tests/rri_metrics tests/data_handling tests/pose_generation", "rg -n \"OBS-SEL|PRED-Q|GT-EVAL|target_protocol|matched_gt|observed.*OBB\" aria_nbv docs .agents"]
+
+[[todo]]
+id = "todo-054"
+title = "Enrich package docstrings from external stack contracts"
+description = "Move the useful ATEK, EFM3D, and Project Aria contract facts into concise package docstrings on the owning ARIA-NBV surfaces."
+priority = "medium"
+status = "todo"
+labels = ["docs", "docstrings", "data", "geometry", "rri", "simplification"]
+issue_ids = ["issue-003", "issue-007", "issue-010"]
+loc_min = 120
+loc_expected = 360
+loc_max = 900
+context = ["The noisy public ext-impl pages were archived and distilled into .agents/references/external_stack_contracts.md.", "The retained facts are most useful at owning package contracts: data views, dataset loading, candidate generation, rendering, RRI metrics, and VIN/EVL feature provenance.", "The cleanup decision explicitly deferred Python edits so the docs/archive change can stay separate from package API docstring work."]
+references = ["repo:.agents/references/external_stack_contracts.md", "repo:aria_nbv/aria_nbv/data_handling/efm_views.py", "repo:aria_nbv/aria_nbv/data_handling/efm_dataset.py", "repo:aria_nbv/aria_nbv/pose_generation/candidate_generation.py", "repo:aria_nbv/aria_nbv/rendering/unproject.py", "repo:aria_nbv/aria_nbv/rri_metrics/oracle_rri.py", "repo:aria_nbv/aria_nbv/vin/types.py"]
+implementation_notes = ["Use concise Google-style docstrings; do not paste vendor catalogs or tutorial examples into Python.", "Prioritize shapes, frames, units, actor-visible versus oracle-only boundaries, upstream provenance, and failure modes.", "Keep `PoseTW`, `CameraTW`, and `ObbTW` semantics explicit where they cross package boundaries.", "Link package references and public docs rather than reintroducing public ext-impl pages."]
+acceptance = ["Core data/geometry/RRI/VIN package surfaces expose the relevant ATEK/EFM3D/Project Aria contract facts in concise docstrings.", "No public docs regain raw vendor-stack dumps or ext-impl links.", "Docstrings distinguish observed EVL/MPS evidence from GT mesh/OBB supervision and evaluation assets.", "Generated API docs can surface the enriched contracts without needing separate public ext-impl pages."]
+verification = ["cd aria_nbv && uv run ruff check aria_nbv/data_handling aria_nbv/pose_generation aria_nbv/rendering aria_nbv/rri_metrics aria_nbv/vin", "cd aria_nbv && uv run pytest tests/data_handling tests/pose_generation tests/rendering tests/rri_metrics tests/vin", "rg -n \"contents/ext-impl|External Implementations\" docs aria_nbv/aria_nbv -g '!docs/_site/**'"]

@@ -1036,8 +1036,8 @@
       definition_long: "The current project uses EFM3D and its EVL architecture to expose voxel occupancy, centerness, semantic, and OBB evidence for VIN-style RRI prediction.",
       internal_links: (
         "docs/contents/literature/efm3d.qmd",
-        "docs/contents/ext-impl/efm3d_implementation.qmd",
         "docs/contents/impl/vin_nbv.qmd",
+        "docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd",
       ),
       citations: (
         "EFM3D-straub2024",
@@ -1076,8 +1076,8 @@
       definition_long: "ARIA-NBV uses EVL head outputs and voxel evidence as the frozen scene representation for VIN-style RRI prediction.",
       internal_links: (
         "docs/contents/literature/efm3d.qmd",
-        "docs/contents/ext-impl/efm3d_implementation.qmd",
         "docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd",
+        "docs/contents/impl/vin_nbv.qmd",
       ),
       citations: (
         "EFM3D-straub2024",

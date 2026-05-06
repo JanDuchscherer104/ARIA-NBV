@@ -1624,7 +1624,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-egocentric-voxel-lifting">EVL</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a> <a class="glossary-chip" href="#term-aria-synthetic-environments">ASE</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">EFM3D and EVL</a> <a class="glossary-chip" href="ext-impl/efm3d_implementation.html" title="docs/contents/ext-impl/efm3d_implementation.qmd">EFM3D Implementation Index</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">EFM3D and EVL</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.backbone_evl.EvlBackbone.html" title="docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd">EvlBackbone</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a></div></div>
 </div>
 </details>
@@ -1654,7 +1654,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-egocentric-foundation-model-3d">EFM3D</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a> <a class="glossary-chip" href="#term-oriented-bounding-box">OBB</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">EFM3D and EVL</a> <a class="glossary-chip" href="ext-impl/efm3d_implementation.html" title="docs/contents/ext-impl/efm3d_implementation.qmd">EFM3D Implementation Index</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.backbone_evl.EvlBackbone.html" title="docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd">EvlBackbone</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">EFM3D and EVL</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.backbone_evl.EvlBackbone.html" title="docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd">EvlBackbone</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a> <a class="glossary-chip glossary-citation" href="#ref-EVL-Doc-2025">&#64;EVL-Doc-2025</a></div></div>
 </div>
 </details>

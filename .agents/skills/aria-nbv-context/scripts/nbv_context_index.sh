@@ -111,7 +111,7 @@ memory_history_count="$(count_files '*.md' "${ROOT_DIR}/.agents/memory/history")
   echo "| Setup and resources | \`docs/contents/setup.qmd\`, \`resources.qmd\` | You need environment/bootstrap help or external resource links. |"
   echo "| Findings and glossary | \`docs/contents/experiments/findings.qmd\`, \`glossary.qmd\` | You need prior experiment outcomes or project terminology. |"
   echo "| Internal implementation | \`docs/contents/impl/overview.qmd\`, \`rri_computation.qmd\` | You need package architecture or oracle/RRI computation details. |"
-  echo "| External stack notes | \`docs/contents/ext-impl/efm3d_symbol_index.qmd\`, \`prj_aria_tools_impl.qmd\` | You need vendor symbol maps or Project Aria tooling details. |"
+  echo "| External stack notes | \`.agents/references/external_stack_contracts.md\`, vendored source under \`external/\` | You need ATEK, EFM3D, EVL, or Project Aria tooling contracts. |"
   echo
   echo "## Secondary/on-demand references"
   echo "- .agents/references/operator_quick_reference.md"

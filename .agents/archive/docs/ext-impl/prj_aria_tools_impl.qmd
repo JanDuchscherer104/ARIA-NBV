@@ -1,12 +1,18 @@
 ---
-title: "ProjectAria Tools: Complete Reference"
-phase: thesis
-audience: public
-status: current
-owner: jan
+title: "Archived Project Aria Tools Reference"
+phase: archive
+audience: agent
+status: deprecated
+owner: agent
 subtitle: "Data Loading, Transforms, Calibration & Visualization"
 format: html
 ---
+
+> Archive note: this page is historical raw vendor-stack scratch from an
+> earlier public docs pass. It is deprecated and is not current thesis or
+> implementation guidance. Use
+> `../../../references/external_stack_contracts.md` for the maintained
+> ATEK/EFM3D/Project Aria developer contract.
 
 ```{python}
 # | echo: false

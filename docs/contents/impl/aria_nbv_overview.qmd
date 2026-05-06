@@ -106,5 +106,5 @@ classDiagram
 
 - Data ingestion & typed views: `data_pipeline_overview.qmd`
 - Oracle metric details: `rri_computation.qmd`
-- External libraries: `../ext-impl/atek_implementation.qmd`, `../ext-impl/efm3d_implementation.qmd`
+- External state substrate: `../literature/efm3d.qmd` and the generated API reference under `../../reference/`
 - Notebook reference: `../notebooks/ase_oracle_rri_simplified.ipynb`

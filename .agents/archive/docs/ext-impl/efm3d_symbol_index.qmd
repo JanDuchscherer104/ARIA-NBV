@@ -1,12 +1,17 @@
 ---
-title: "EFM3D Symbol Index"
-phase: thesis
-audience: public
-status: current
-owner: jan
+title: "Archived EFM3D Symbol Index"
+phase: archive
+audience: agent
+status: deprecated
+owner: agent
 format: html
-bibliography: ../../references.bib
 ---
+
+> Archive note: this page is historical raw vendor-stack scratch from an
+> earlier public docs pass. It is deprecated and is not current thesis or
+> implementation guidance. Use
+> `../../../references/external_stack_contracts.md` for the maintained
+> ATEK/EFM3D/Project Aria developer contract.
 
 # Purpose
 
