@@ -18,6 +18,8 @@ Apply this file when working under `aria_nbv/`.
 - Contracts: `make context-contracts`
 
 ## Core Rules
+- For non-trivial package edits, apply the root `agent-behavior` skill before
+  implementation and keep the change scoped to the touched contract.
 - Use `pathlib.Path` for filesystem paths.
 - Use `PoseTW` and `CameraTW` instead of raw matrices.
 - Use `Console` from `aria_nbv.utils` for structured logging.

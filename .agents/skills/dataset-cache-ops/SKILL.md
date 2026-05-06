@@ -1,6 +1,26 @@
 ---
 name: dataset-cache-ops
 description: Use when operating or documenting ARIA-NBV ASE downloads, ATEK shards, meshes, immutable VIN offline stores, dataset-version updates, split manifests, storage estimates, and data smoke checks.
+metadata:
+  applies_to:
+    - "aria_nbv/aria_nbv/data_handling/**"
+    - ".configs/**"
+    - "docs/contents/setup.qmd"
+    - "docs/contents/impl/**"
+  triggers:
+    - "ASE download"
+    - "ATEK shard"
+    - "offline store"
+    - "manifest"
+    - "split"
+    - "data smoke"
+  must_read:
+    - "aria_nbv/aria_nbv/data_handling/AGENTS.md"
+    - ".agents/memory/state/GOTCHAS.md"
+    - ".agents/references/verification_matrix.md"
+  verification:
+    - "cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py"
+    - "make check-agent-memory for dataset guidance changes"
 ---
 
 # Dataset Cache Ops

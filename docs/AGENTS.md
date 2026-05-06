@@ -3,8 +3,16 @@
 Apply this file when working under `docs/`.
 
 ## Priorities
-- Treat `docs/typst/seminar_paper/main.typ` as the highest-level project ground truth.
-- Keep Quarto docs aligned to the paper instead of introducing competing top-level narratives.
+- Treat source order as role-split; see `.agents/references/source_order.md`.
+- Treat `docs/typst/seminar_paper/main.typ` as the implemented-substrate
+  ground truth.
+- Treat `docs/contents/thesis/roadmap.qmd`,
+  `docs/contents/thesis/questions.qmd`, and `.agents/memory/state/` as the
+  current thesis-direction ground truth.
+- Treat `docs/typst/thesis/proposal.typ` as the advisor proposal narrative
+  when proposal work is in scope.
+- Keep Quarto docs aligned to the correct source role instead of introducing
+  competing top-level narratives.
 - Keep `docs/references.bib` as the single bibliography source of truth.
 - Preserve established Quarto and Typst structure unless the task explicitly changes it.
 - Prefer links to canonical state docs in `.agents/memory/state/` over re-explaining the same guidance in multiple places.
@@ -14,7 +22,9 @@ Apply this file when working under `docs/`.
   `docs/contents/**`.
 
 ## Default Workflow
-- Start from `docs/typst/seminar_paper/main.typ`.
+- Start from `.agents/references/source_order.md` and then the source that owns
+  the touched role.
+- Use `docs/typst/seminar_paper/main.typ` for implemented substrate claims.
 - Use `scripts/nbv_qmd_outline.sh --compact` to localize the exact Quarto page before opening it.
 - Use `scripts/nbv_typst_includes.py --paper --mode outline` to localize the exact Typst section before opening it.
 - Open `docs/index.qmd`, `docs/contents/thesis/roadmap.qmd`, and
@@ -22,6 +32,8 @@ Apply this file when working under `docs/`.
   narrative, priorities, or roadmap. Historical scratch pages live under
   `.agents/archive/docs/`.
 - If you need current project truth beyond the paper, open the relevant doc in `.agents/memory/state/` instead of scanning broad doc trees.
+- Run `make kg-claim-check KG_CLAIM="..."` for advisor-facing proposal,
+  roadmap, research-question, or literature-synthesis claims.
 
 ## Commands
 - Context refresh: `make context`

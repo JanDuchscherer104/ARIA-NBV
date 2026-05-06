@@ -1,6 +1,24 @@
 ---
 name: rerun-nbv-inspector
 description: Use when creating, reviewing, or fixing ARIA-NBV Rerun integrations for immutable VIN offline-store inspection, NBV candidate/frustum visualization, RRI/validity diagnostics, depth/RGB/keyframe layers, OBB/mesh/trajectory logging, `.rrd` smoke artifacts, or Rerun frame-coordinate issues involving PoseTW, CameraTW, PyTorch3D cameras, and display-only CW90 handling.
+metadata:
+  applies_to:
+    - "aria_nbv/aria_nbv/app/**"
+    - "aria_nbv/aria_nbv/**/rerun*.py"
+    - "docs/contents/impl/**"
+    - ".agents/skills/rerun-nbv-inspector/**"
+  triggers:
+    - "Rerun"
+    - "offline inspector"
+    - ".rrd"
+    - "candidate frustum"
+    - "visual diagnostics"
+  must_read:
+    - "AGENTS.md"
+    - "aria_nbv/AGENTS.md"
+    - ".agents/skills/rerun-nbv-inspector/references/nbv-inspector-contract.md"
+  verification:
+    - "focused Rerun inspector tests or smoke command for changed surface"
 ---
 
 # Rerun NBV Inspector

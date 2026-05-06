@@ -1,6 +1,26 @@
 ---
 name: nbv-geometry-contracts
 description: Use when ARIA-NBV work touches pose, camera, coordinate-frame, CW90, PyTorch3D projection, depth backprojection, candidate frusta, or geometry diagnostics contracts.
+metadata:
+  applies_to:
+    - "aria_nbv/aria_nbv/pose_generation/**"
+    - "aria_nbv/aria_nbv/rendering/**"
+    - "aria_nbv/aria_nbv/rri_metrics/**"
+    - "aria_nbv/aria_nbv/utils/data_plotting.py"
+  triggers:
+    - "PoseTW"
+    - "CameraTW"
+    - "CW90"
+    - "PyTorch3D"
+    - "backprojection"
+    - "frustum"
+  must_read:
+    - "AGENTS.md"
+    - "aria_nbv/AGENTS.md"
+    - ".agents/memory/state/GOTCHAS.md"
+  verification:
+    - "cd aria_nbv && uv run pytest tests/pose_generation tests/rendering"
+    - "cd aria_nbv && uv run pytest tests/rri_metrics when labels change"
 ---
 
 # NBV Geometry Contracts

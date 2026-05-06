@@ -24,5 +24,8 @@ machine-usable by the litkg-rs context-pack/KG pipeline.
 
 1. **Scaffold Hygiene**: Fix stale skills and dense root guidance.
 2. **Docs Discipline**: Triage `docs/` tree by role.
-3. **Research Core**: Build entity-aware oracle RRI and the NBV Gym simulator.
+3. **Research Core**: Freeze M1 contracts, build entity-aware target RRI,
+   observed-only target selection, bounded oracle rollouts, and finite-candidate
+   fitted Double-Q / Q_H. Gym-style online simulators are stretch or bridge
+   work after the ASE rollout/Q_H path is stable.
 4. **Agentic Lifecycle**: Port PR and issue lifecycle workflows.

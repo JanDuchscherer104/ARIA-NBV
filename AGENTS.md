@@ -4,9 +4,13 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
 `AGENTS.md`, `.agents/skills/`, and `.agents/references/`.
 
 ## Source Order
-- High-level project truth: `docs/typst/seminar_paper/main.typ`.
-- Current durable state: `.agents/memory/state/PROJECT_STATE.md`,
-  `DECISIONS.md`, `OPEN_QUESTIONS.md`, and `GOTCHAS.md`.
+- Source order is role-split; see `.agents/references/source_order.md`.
+- Implemented substrate: `docs/typst/seminar_paper/main.typ`.
+- Current thesis direction: `docs/contents/thesis/roadmap.qmd`,
+  `docs/contents/thesis/questions.qmd`, and
+  `.agents/memory/state/PROJECT_STATE.md`, `DECISIONS.md`,
+  `OPEN_QUESTIONS.md`, and `GOTCHAS.md`.
+- Advisor proposal narrative: `docs/typst/thesis/proposal.typ`.
 - Active backlog: `.agents/issues.toml`, `.agents/todos.toml`,
   `.agents/refactors.toml`, and `.agents/resolved.toml` via `make agents-db`.
 - Lightweight generated routing: `docs/_generated/context/source_index.md`,
@@ -17,24 +21,25 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
   `.agents/references/human_owner_intent.md`.
 
 ## Routing
+- Non-trivial coding, docs, scaffold, research, or memory edits: apply
+  `agent-behavior` first.
 - Package work under `aria_nbv/`: read `aria_nbv/AGENTS.md`, then the nested
   guide for `data_handling`, `rri_metrics`, or `vin` when that contract is
   touched.
 - Docs, bibliography, Typst, or Quarto work: read `docs/AGENTS.md`.
-- Broad cross-surface questions: use the `aria-nbv-context` skill first.
-- Broad memory retrieval, claim checks, source-backed routing, or consolidation:
-  use the `aria-litkg-memory` skill.
-- Broad cross-surface coding, docs, KG, or thesis work: run a `litkg
-  context-pack` first so Codex/Gemini get the same action/evidence contract.
-  Already-localized one-file edits are exempt.
+- Need file localization or deterministic local discovery:
+  use `aria-nbv-context`.
+- Need KG-backed retrieval, source-backed routing, claim checks, or
+  consolidation: use `aria-litkg-memory`.
+- Need to modify litkg-rs, KG source coverage, KG config, or KG operation:
+  use `semantic-scholar-litkg`; keep repo-independent implementation in
+  `.agents/external/litkg-rs`.
 - Vague, high-impact, or advisor-facing plans: use `plan-grill`.
 - Bugs, regressions, suspicious metrics, or failing docs/data/KG checks: use
   `diagnose-aria`.
 - Backlog or memory changes: use the `agents-db` skill.
 - Cleanup, pruning, or simplification: use the `simplification` skill.
 - LRZ AI Systems, Slurm, DSS, Pyxis, or remote compute work: use `lrz-ai-systems`.
-- KG/literature/code graph work: use `semantic-scholar-litkg`; keep
-  repo-independent implementation in `.agents/external/litkg-rs`.
 - OMX is optional operator orchestration. Use
   `.agents/references/omx_quick_reference.md`; do not make OMX required for
   normal repo work.
@@ -43,9 +48,14 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
 - Do not use `git restore` or `git reset --hard` unless explicitly requested.
 - Assume the worktree can be dirty; never revert unrelated user or agent
   changes.
-- Keep public docs aligned with the Typst paper and current code.
+- Keep public docs aligned with the implemented substrate, current thesis
+  direction, and current code.
 - Internal agent memory, generated context, and OMX runtime state are not public
   documentation surfaces.
+- Do not treat V0 GT actor-visible target runs as main V1 performance.
+- Invalidity is a hard mask/reason contract, not low RRI.
+- Gymnasium/SB3/online simulator work is stretch or M6 bridge work unless the
+  task explicitly targets that gate.
 
 ## Instruction Capture
 - Repo invariant: update this file or the nearest nested `AGENTS.md`.
@@ -63,18 +73,10 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
 - Package tests: `cd aria_nbv && uv run pytest <path>`
 - Context refresh: `make context`
 - Contract surface: `make context-contracts`
-- KG profile: `.configs/litkg.toml`; use `make kg-sync`,
-  `make kg-materialize`, `make kg-semantic-enrich`, `make kg-export-neo4j`,
-  and `make kg-index-code` for the ARIA-NBV litkg-rs integration.
-- litkg agent retrieval: `make kg-capabilities`, `make kg-search
-  KG_QUERY="..."`, `make kg-query KG_QUERY="..."`, `make kg-brief
-  KG_TOPIC="..."`, `make kg-route KG_TASK="..."`, `make kg-related
-  KG_RELATED_PATH="..."`, `make kg-claim-check KG_CLAIM="..."`, and
-  `make kg-show-paper KG_PAPER="..."`.
-- litkg action pack:
-  `cargo run --manifest-path .agents/external/litkg-rs/Cargo.toml -p litkg-cli -- context-pack --config .configs/litkg.toml --repo-root . --task "<task>" --profile thesis-coding --format text`
-- litkg backend contract:
-  `cargo run --manifest-path .agents/external/litkg-rs/Cargo.toml -p litkg-cli -- capabilities --config .configs/litkg.toml --repo-root . --format json`
+- litkg default subset: `make kg-capabilities`, `make kg-route
+  KG_TASK="..."`, `make kg-query KG_QUERY="..."`, `make kg-search
+  KG_QUERY="..."`, `make kg-claim-check KG_CLAIM="..."`, and
+  `make kg-consolidate`; see `.agents/references/litkg_quick_reference.md`.
 - Agent memory check: `make check-agent-memory`
 - Agents DB: `make agents-db` or `make agents-db AGENTS_ARGS='validate'`
 
@@ -88,6 +90,10 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
 - Data-handling, RRI, or VIN contract edits: follow the nearest nested guide and
   update docs/memory when behavior changes.
 - Docs edits: render the touched Quarto or Typst surface when non-trivial.
+- Use `.agents/references/verification_matrix.md` for the surface-specific
+  command matrix.
+- Advisor-facing proposal, roadmap, research-question, or literature-synthesis
+  claims require `make kg-claim-check KG_CLAIM="..."`.
 
 ## Debriefs
 - Non-trivial work leaves a debrief under `.agents/memory/history/YYYY/MM/`.

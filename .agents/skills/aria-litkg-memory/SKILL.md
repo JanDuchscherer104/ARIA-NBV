@@ -1,71 +1,72 @@
 ---
 name: aria-litkg-memory
-description: Use when answering broad ARIA-NBV project questions, planning cross-surface work, debugging multi-surface issues, checking current truth, retrieving related code/docs/papers/backlog state, or consolidating agent debriefs through the litkg agent-memory layer.
+description: Use for KG-backed ARIA-NBV retrieval, source-backed task routing, claim checks, current-truth checks, active-backlog lookup, and memory/backlog consolidation proposals. Do not use for local-only file discovery or litkg-rs implementation.
+metadata:
+  applies_to:
+    - "**"
+  triggers:
+    - "kg-route"
+    - "claim check"
+    - "source-backed"
+    - "current truth"
+    - "consolidate memory"
+    - "litkg retrieval"
+  must_read:
+    - "AGENTS.md"
+    - ".agents/references/source_order.md"
+    - ".agents/references/litkg_quick_reference.md"
+  verification:
+    - "make kg-capabilities KG_FORMAT=json"
+    - "make kg-route KG_TASK=\"<task>\" KG_FORMAT=json"
+    - "make kg-claim-check KG_CLAIM=\"<claim>\""
 ---
 
 # ARIA litkg Memory
 
-Use this skill when litkg should act as the project memory router, not when you
-are changing litkg-rs internals. Use `semantic-scholar-litkg` for toolkit,
-TOML-ingestion, Semantic Scholar, backend, or code-graph implementation work.
+Use this skill when litkg should act as the project memory router. Use
+`aria-nbv-context` for deterministic local discovery and `semantic-scholar-litkg`
+when changing KG tooling, source coverage, or backend contracts.
 
 ## Protocol
 
-1. Start at repo root and read `AGENTS.md` if the current task did not already
-   provide it.
-2. Check backend/source readiness when the task depends on KG freshness:
-   `make kg-capabilities` or `make kg-capabilities KG_FORMAT=json`.
-3. For broad questions, run `make kg-query KG_QUERY="<question>"`.
-4. For task routing, run `make kg-route KG_TASK="<task>"`.
-5. For quick retrieval, run `make kg-search KG_QUERY="<terms>"`.
-6. Inspect cited canonical sources before treating a retrieved statement as
+1. Read `AGENTS.md`, `.agents/references/source_order.md`, and
+   `.agents/references/litkg_quick_reference.md`.
+2. Check backend/source readiness with `make kg-capabilities KG_FORMAT=json`
+   when freshness matters.
+3. Use `make kg-route KG_TASK="<task>"` for broad task routing.
+4. Use `make kg-query KG_QUERY="<question>"` or `make kg-search
+   KG_QUERY="<terms>"` for retrieval.
+5. Use `make kg-claim-check KG_CLAIM="<claim>"` for advisor-facing proposal,
+   roadmap, research-question, or literature-synthesis claims.
+6. Inspect cited canonical sources before treating retrieved statements as
    current truth.
-7. Prefer canonical state, code/tests/configs, and active backlog over debriefs,
-   generated context, archives, or external papers when sources conflict.
-8. After non-trivial work, update durable memory/backlog when truth changed,
-   write the required debrief, and run `make check-agent-memory`.
+7. Use `make kg-consolidate` for proposal-style memory/backlog updates; do not
+   silently promote episodic notes.
 
 ## Source Authority
 
-Treat source tiers as a ranking contract until litkg retrieval exposes explicit
-authority scores:
+Until litkg retrieval exposes explicit authority/freshness metadata everywhere,
+rank sources using `.agents/references/source_order.md`:
 
-1. Code, tests, and current configs.
-2. `.agents/memory/state/PROJECT_STATE.md`, `DECISIONS.md`,
-   `OPEN_QUESTIONS.md`, and `GOTCHAS.md`.
-3. Root and nested `AGENTS.md` plus `.agents/skills/**/*.md`.
-4. Active `.agents/issues.toml`, `.agents/todos.toml`,
-   `.agents/refactors.toml`, and `.agents/resolved.toml`.
-5. Current Typst/Quarto authored docs.
-6. Generated context artifacts.
-7. Debrief history, work notes, and archived scratchpads.
-8. External papers and web docs, unless the question is specifically about the
-   literature or an external API.
+1. Current code, tests, configs, and active generated artifacts for implemented
+   behavior.
+2. `.agents/memory/state/` for durable current truth.
+3. Root/nested `AGENTS.md` and `.agents/skills/` for workflow contracts.
+4. Active `.agents/*.toml` backlog.
+5. Current Typst/Quarto authored docs for their source role.
+6. Generated context.
+7. Debrief history, work notes, archives, and external papers unless the query
+   specifically asks for them.
 
-## Common Commands
+## Fallback
 
-```bash
-make kg-query KG_QUERY="What is the current entity-aware RRI plan?"
-make kg-brief KG_TOPIC="VIN offline-store diagnostics"
-make kg-route KG_TASK="debug candidate pose frame mismatch"
-make kg-search KG_QUERY="CW90 candidate pose"
-make kg-related KG_RELATED_PATH="aria_nbv/aria_nbv/rri_metrics/oracle_rri.py"
-make kg-claim-check KG_CLAIM="ARIA-NBV is an end-to-end RL policy"
-```
+If litkg is stale, unavailable, or too noisy for a localized task, fall back to
+`aria-nbv-context` plus targeted file reads. Record KG debt only when the failure
+blocks the task or exposes durable scaffold drift.
 
-Use `KG_FORMAT=json` when another tool or agent needs machine-readable output.
+## Verification
 
-## Consolidation
-
-When a debrief, experiment report, or changed code/docs surface should update
-durable truth, retrieve related context first, then propose explicit edits to:
-
-- `.agents/memory/state/PROJECT_STATE.md`
-- `.agents/memory/state/DECISIONS.md`
-- `.agents/memory/state/OPEN_QUESTIONS.md`
-- `.agents/memory/state/GOTCHAS.md`
-- `.agents/issues.toml`, `.agents/todos.toml`, or `.agents/refactors.toml`
-
-Do not silently promote episodic notes into canonical memory. Use patch-like
-proposals or direct edits only when the user asked for implementation and the
-source evidence is clear.
+- `make kg-capabilities KG_FORMAT=json`
+- `make kg-route KG_TASK="<task>" KG_FORMAT=json`
+- `make kg-claim-check KG_CLAIM="<claim>"` for advisor-facing claims
+- `make check-agent-memory` after non-trivial memory or guidance changes

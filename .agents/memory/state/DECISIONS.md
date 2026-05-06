@@ -1,6 +1,6 @@
 ---
 id: decisions
-updated: 2026-05-05
+updated: 2026-05-06
 scope: repo
 owner: jan
 status: active
@@ -12,19 +12,33 @@ tags: [codex, workflow, architecture]
 ## Durable Repo Decisions
 - Codex repo guidance uses repo-root and nested `AGENTS.md` files, not `.codex/AGENTS.md`.
 - Repo skills live in `.agents/skills/` and use progressive disclosure.
+- Non-trivial coding, docs, scaffold, research, or memory edits start from the
+  `agent-behavior` skill: state assumptions, prefer the simplest sufficient
+  change, make surgical edits, and define verification.
+- Repo-local skills carry routing metadata under the skill frontmatter
+  `metadata` key: `applies_to`, `triggers`, `must_read`, and `verification`.
 - Shared repo guidance must stay machine-portable; operator-specific interpreter or host paths belong in `.agents/references/` or user-local notes, not repo-root or nested `AGENTS.md` files.
 - Canonical project memory lives in `.agents/memory/state/`; episodic notes live in `.agents/memory/history/`.
 - Generated context is derived output under `docs/_generated/context/` and should remain untracked.
 - `make context` is the lightweight scaffold refresh for `source_index.md`, `literature_index.md`, and `data_contracts.md`.
 - `make context-heavy` is explicit fallback for bundled heavy artifacts such as UML, bulk docstrings, and directory trees.
 - `docs/_generated/context/source_index.md` is a compact routing index; broad file inventories stay discoverable through commands, not the hot path.
-- The Codex hot path stays limited to `docs/typst/seminar_paper/main.typ` + `.agents/memory/state/` + `docs/_generated/context/source_index.md`.
+- The Codex hot path starts from role-split source order: seminar paper for implemented substrate, thesis roadmap/questions plus canonical memory for active thesis direction, proposal Typst for advisor proposal narrative, and generated context only for lightweight routing.
 - Progressive disclosure routes from the root `AGENTS.md` into package, docs, and module-specific guides only after the touched surface is localized; agents should not load all nested guides up front.
+- Broad scaffold routing is split by role: `aria-nbv-context` owns local
+  deterministic file discovery, `aria-litkg-memory` owns KG-backed retrieval,
+  claim checks, and consolidation, and `semantic-scholar-litkg` owns KG
+  implementation/config/operation.
 - `.agents/references/` holds operator aids and long-form conventions; those docs are on-demand references, not default bootstrap context.
-- `docs/typst/seminar_paper/main.typ` is the highest-level project truth when it disagrees with Quarto summaries.
+- `docs/typst/seminar_paper/main.typ` is authoritative for implemented substrate and seminar-paper evidence. Current thesis direction is owned by `docs/contents/thesis/roadmap.qmd`, `docs/contents/thesis/questions.qmd`, and `.agents/memory/state/`; do not promote planned work to implemented results.
 - Native debriefs under `.agents/memory/history/` must include `canonical_updates_needed`; existing `status: legacy-imported` notes are grandfathered archive evidence.
 - Ad hoc `.codex/*.md` notes are invalid; migrate them into `.agents/memory/history/` or archive them under `archive/codex-legacy/`.
 - Verification in shared repo guidance is selected by touched surface rather than by a single global checklist.
+- litkg keeps the consolidated `kg-*` command surface for agents; no
+  `agent-route`/`agent-retrieve` aliases are introduced. The default subset and
+  expected context-pack fields live in `.agents/references/litkg_quick_reference.md`.
+- Advisor-facing proposal, thesis roadmap/question, and literature-synthesis
+  claims require `kg-claim-check` before being treated as supported.
 
 ## Technical Decisions
 - Runtime objects are instantiated through config `.setup_target()` factories.

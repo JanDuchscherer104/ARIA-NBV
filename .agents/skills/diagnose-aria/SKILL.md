@@ -1,6 +1,23 @@
 ---
 name: diagnose-aria
 description: Diagnose ARIA-NBV bugs, regressions, failing metrics, Streamlit issues, docs builds, KG ingestion failures, or performance regressions through a reproducible feedback loop. Use when something is broken, flaky, slow, miscalibrated, or producing suspicious geometry/RRI/VIN outputs.
+metadata:
+  applies_to:
+    - "**"
+  triggers:
+    - "bug"
+    - "regression"
+    - "failing test"
+    - "suspicious metric"
+    - "broken docs"
+    - "KG failure"
+  must_read:
+    - "AGENTS.md"
+    - ".agents/memory/state/GOTCHAS.md"
+    - ".agents/references/verification_matrix.md"
+  verification:
+    - "the narrowest reproducer for the failing surface"
+    - "focused regression test after fixes"
 ---
 
 # Diagnose ARIA

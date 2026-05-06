@@ -8,8 +8,8 @@ type = "maintenance"
 priority = "high"
 status = "open"
 labels = ["docs", "hygiene"]
-context = ["Root guidance separates high-level paper truth, durable memory, active backlog, generated context, and operator references, so public docs should not collapse those roles.", "The docs guide asks Quarto to stay aligned with the Typst paper and keep internal agent guidance/generated context out of public navigation."]
-references = ["repo:AGENTS.md#source-order", "repo:docs/AGENTS.md", "repo:docs/contents/thesis/questions.qmd#kg-friendly-question-writing"]
+context = ["Root guidance now uses role-split source order: seminar paper for implemented substrate, thesis docs and canonical memory for active direction, proposal Typst for advisor narrative, and active backlog/generated context/operator references as separate internal roles.", "The docs guide asks Quarto to stay aligned with the owning source role and keep internal agent guidance/generated context out of public navigation."]
+references = ["repo:AGENTS.md#source-order", "repo:docs/AGENTS.md", "repo:.agents/references/source_order.md", "repo:docs/contents/thesis/questions.qmd#kg-friendly-question-writing"]
 
 [[issue]]
 id = "issue-007"
@@ -46,14 +46,14 @@ references = ["repo:.agents/AGENTS_INTERNAL_DB.md", "repo:AGENTS.md#instruction-
 
 [[issue]]
 id = "issue-012"
-title = "Two research skills still need ARIA-specific workflow coverage"
-description = "Most ARIA-specific research skills now exist, but oracle-RRI contracts and VIN training/evaluation still need compact repeatable skills before those workstreams resume."
+title = "Research skills and scaffold routing coverage still need tightening"
+description = "Most ARIA-specific research skills now exist and all repo-local skills now carry routing metadata, but oracle-RRI contracts, VIN training/evaluation, and future skill metadata consumption still need compact repeatable coverage."
 type = "maintenance"
 priority = "high"
 status = "open"
 labels = ["agent", "skills", "scaffold"]
-context = ["Root guidance routes work through domain-specific skills, and geometry, rollout, entity-aware RRI, docs, LRZ, Rerun, and KG workflows now have dedicated ARIA-NBV skills.", "The remaining research-skill gap is narrower than the original issue: todo-003 covers oracle-RRI contract routing and todo-004 covers VIN training/evaluation routing.", "Keeping this issue open in narrowed form prevents stale broad-skill wording while preserving links from existing skill follow-up todos."]
-references = ["repo:AGENTS.md#routing", "repo:.agents/skills/", "repo:.agents/todos.toml#todo-003", "repo:.agents/todos.toml#todo-004", "repo:.agents/work/alignment-distillation-follow-up-review-gpt55pro.md#5-agent-db-review"]
+context = ["Root guidance now routes non-trivial work through agent-behavior and separates local discovery, KG-backed retrieval, and KG implementation skills.", "All repo-local skills now carry applies_to/triggers/must_read/verification under frontmatter metadata for future litkg routing, but litkg-rs does not yet consume those fields as first-class routing data.", "The remaining research-skill gap is narrower than the original issue: todo-003 covers oracle-RRI contract routing and todo-004 covers VIN training/evaluation routing."]
+references = ["repo:AGENTS.md#routing", "repo:.agents/skills/agent-behavior/SKILL.md", "repo:.agents/references/skill_style_guide.md", "repo:.agents/skills/", "repo:.agents/todos.toml#todo-003", "repo:.agents/todos.toml#todo-004", "repo:.agents/work/agents-scaffold/review-scaffold-against-kaparthy-skills-gpt55pro.md"]
 
 [[issue]]
 id = "issue-013"
@@ -124,13 +124,13 @@ references = ["repo:.agents/skills/lrz-ai-systems/SKILL.md", "repo:.agents/skill
 [[issue]]
 id = "issue-023"
 title = "litkg agent-memory routing and source coverage have drift"
-description = "litkg remains partly an operator toolkit instead of the default agent context router: root query surfaces, source coverage, staged refresh paths, and authority/freshness ranking are incomplete alongside stale config and Semantic Scholar enrichment gaps."
+description = "litkg remains partly an operator toolkit instead of a concise agent context router: the root keeps consolidated kg-* commands, but context-pack output, staged refresh paths, authority/freshness ranking, and documented fallback behavior still need implementation alignment."
 type = "maintenance"
 priority = "medium"
 status = "open"
 labels = ["kg", "litkg", "semantic-scholar", "docs", "tooling"]
-context = ["litkg-rs is the shared action/evidence contract for broad ARIA-NBV tasks, but agents still need explicit root commands for query, brief, route, claim-check, and related-source retrieval.", "The ARIA DB is configured as an agent-memory source, yet source coverage should distinguish canonical state, active backlog, workflow skills, episodic debriefs, generated context, and experiment/cache evidence instead of treating memory as one flat bucket.", "Capability checks also report stale or missing leaves such as graphify/codegraph refresh, Context7, and Semantic Scholar enrichment, so retrieval output needs freshness and authority cues before agents trust it as current."]
-references = ["repo:AGENTS.md#routing", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.configs/litkg.toml", "repo:.agents/kg/README.md", "repo:Makefile", "repo:.agents/external/litkg-rs/docs/architecture.md#semantic-scholar-contract", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "url:https://www.semanticscholar.org/product/api"]
+context = ["litkg-rs is the shared action/evidence contract for broad ARIA-NBV tasks, and root guidance now exposes the default kg-* subset instead of adding new agent-* aliases.", "The documented agent-facing context-pack schema still needs implementation support for task summary, assumptions, authority/freshness-ranked top sources, required reads, active backlog, risk flags, suggested next action, verification commands, and missing context.", "Capability checks can still report stale or missing leaves such as graphify/codegraph refresh, Context7, and Semantic Scholar enrichment, so retrieval output needs freshness and authority cues before agents trust it as current."]
+references = ["repo:AGENTS.md#routing", "repo:.agents/references/litkg_quick_reference.md", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.configs/litkg.toml", "repo:.agents/kg/README.md", "repo:Makefile", "repo:.agents/external/litkg-rs/docs/architecture.md#semantic-scholar-contract", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "url:https://www.semanticscholar.org/product/api"]
 
 [[issue]]
 id = "issue-024"
@@ -152,7 +152,7 @@ priority = "medium"
 status = "open"
 labels = ["agents-db", "kg", "litkg", "provenance", "semantic-scholar"]
 context = ["ARIA-NBV issues/todos are now source-backed and context-pack parsing preserves context/references, but graphify/Neo4j exports still need typed edges from backlog records to repo files, papers, external docs, Semantic Scholar IDs, generated context, and experiment evidence.", "The desired agent-memory loop also needs retrieval and consolidation surfaces: DB references should inform kg-query/kg-route results, claim checks should identify unsupported backlog-driven overclaims, and consolidate-memory should propose state/backlog patches instead of silently overwriting canonical memory.", "Authority and freshness metadata should be part of the edge contract so canonical state and active backlog outrank stale debriefs or archived notes while still preserving their evidential provenance."]
-references = ["repo:scripts/agents_db.py", "repo:.agents/skills/agents-db/SKILL.md#provenance-contract", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md#agents-db-integration", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/docs/architecture.md#adapter-output-contracts", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "litkg:context-pack", "url:https://www.semanticscholar.org/product/api"]
+references = ["repo:scripts/agents_db.py", "repo:.agents/skills/agents-db/references/provenance.md", "repo:.agents/skills/semantic-scholar-litkg/references/integration-spec.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/docs/architecture.md#adapter-output-contracts", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "litkg:context-pack", "url:https://www.semanticscholar.org/product/api"]
 
 [[issue]]
 id = "issue-027"

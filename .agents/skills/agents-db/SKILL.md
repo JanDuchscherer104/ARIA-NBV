@@ -1,144 +1,74 @@
 ---
 name: agents-db
 description: Use when working with ARIA-NBV's internal agent memory (`.agents/AGENTS_INTERNAL_DB.md`, `.agents/issues.toml`, `.agents/todos.toml`, `.agents/refactors.toml`, `.agents/resolved.toml`) or triaging, resolving, and maintaining the backlog with `make agents-db`.
+metadata:
+  applies_to:
+    - ".agents/AGENTS_INTERNAL_DB.md"
+    - ".agents/issues.toml"
+    - ".agents/todos.toml"
+    - ".agents/refactors.toml"
+    - ".agents/resolved.toml"
+  triggers:
+    - "agents DB"
+    - "backlog"
+    - "todo"
+    - "issue triage"
+    - "resolved work"
+  must_read:
+    - ".agents/AGENTS_INTERNAL_DB.md"
+    - ".agents/skills/agents-db/references/schema.md"
+    - ".agents/skills/agents-db/references/provenance.md"
+  verification:
+    - "make agents-db AGENTS_ARGS='validate'"
+    - "make agents-db"
+    - "make check-agent-memory when memory or guidance changed"
 ---
 
 # AGENTS DB
 
-## When To Use
+Use this skill when work depends on the internal agent-memory surfaces under
+`.agents/`, active backlog ranking, or durable maintenance debt capture.
 
-Use this skill when work in ARIA-NBV depends on any of these:
+For behavior-preserving pruning or LOC reduction, also use `simplification`.
 
-- reading or updating the internal agent-memory surfaces under `.agents/`
-- triaging or resolving issues, todos, and refactor candidates with `make agents-db`
-- validating new repo facts, defects, integration gaps, or architectural debt that should be recorded in the agents DB
-- backlog-guided work that needs the current ranked issue or todo state
+## Read First
 
-For behavior-preserving code cleanup, pruning, or LOC reduction, also use `simplification`.
+1. `.agents/AGENTS_INTERNAL_DB.md`
+2. `.agents/skills/agents-db/references/schema.md`
+3. `.agents/skills/agents-db/references/provenance.md`
+4. `.agents/skills/agents-db/references/modes.md` for `triage`,
+   `to-issues`, or `to-prd` style work
 
-## What This Skill Owns
+## Workflow
 
-This skill is the canonical workflow source for:
+1. Run or inspect `make agents-db` to understand active ranking.
+2. Prefer amending existing records over creating duplicates.
+3. Add or amend a record only when the work materially changes the repo's
+   maintenance picture.
+4. Keep records compact but auditable with `context` plus stable `references`.
+5. Resolve or retire completed records into `.agents/resolved.toml`; do not
+   delete records outright.
 
-- using `.agents/AGENTS_INTERNAL_DB.md` as stable repo memory that should eventually be reflected in canonical repo guidance when appropriate
-- using `.agents/issues.toml`, `.agents/todos.toml`, `.agents/refactors.toml`, and `.agents/resolved.toml` as working memory
-- using `make agents-db` to inspect, resolve, and maintain the active backlog
-
-This skill is not the canonical source for general package style or architecture rules; use the nearest `AGENTS.md` for that.
-
-## Grounding
-
-Before DB work:
-
-1. Read `README.md`, `docs/contents/thesis/questions.qmd`, and the nearest `AGENTS.md`.
-2. Read `.agents/AGENTS_INTERNAL_DB.md` for mission, configuration, ownership, and stable repo facts.
-3. Use `rg` and narrow file reads instead of bulk-loading the repository.
-4. Keep the change scoped to the requested task; record validated debt instead of opportunistically editing unrelated code.
-
-## DB Workflow
-
-Use the repo-local files under `.agents/` as follows:
-
-- `.agents/issues.toml`
-  - active validated defects, integration gaps, and architectural debt
-  - every issue must define `context` and `references` so the record can be
-    audited from internal docs, code, papers, KG output, or external API docs
-- `.agents/todos.toml`
-  - active actionable follow-up work linked to issue IDs
-  - every todo must define `loc_min`, `loc_expected`, `loc_max`, `issue_ids`,
-    `context`, `references`, `implementation_notes`, `acceptance`, and
-    `verification`
-- `.agents/refactors.toml`
-  - active suggested refactors and simplifications that are worth considering but are not necessarily defect-driven
-  - every refactor must define `loc_min`, `loc_expected`, `loc_max`, `issue_ids`, `context`, `implementation_notes`, `acceptance`, and `verification`
-- `.agents/resolved.toml`
-  - resolved or intentionally retired issues, todos, and refactors
-  - move completed work here instead of deleting records
-
-Update the DB only when the work materially changes the repo's maintenance picture:
-
-- add or amend an issue when you validate a new defect, integration gap, architectural debt, or materially change an existing issue
-- add or amend a todo when you identify, reprioritize, shrink, complete, or retire concrete follow-up work
-- add or amend a refactor when you identify, reprioritize, shrink, complete, or retire a high-value cleanup or simplification candidate that materially changes the maintenance picture
-- do not churn the DB for tiny local cleanups that do not change the active maintenance picture
-
-Use the backlog helper through `make agents-db`:
+## Commands
 
 - `make agents-db`
-  - prints the ranked active issues, todos, and refactors
 - `make agents-db AGENTS_ARGS='validate'`
-  - validates DB schema, required fields, and active issue references
 - `make agents-db AGENTS_ARGS='resolve issue issue-XXXX --note "..."'`
-  - moves an issue into `.agents/resolved.toml`
 - `make agents-db AGENTS_ARGS='resolve todo todo-XXXX --note "..."'`
-  - moves a todo into `.agents/resolved.toml`
 - `make agents-db AGENTS_ARGS='resolve refactor refactor-XXXX --note "..."'`
-  - moves a refactor into `.agents/resolved.toml`
 
-## Provenance Contract
+## Rules
 
-Every active issue and todo needs enough context for a future agent to verify
-why it exists without relying on chat memory. Put short explanatory prose in
-`context` and stable source pointers in `references`.
+- Use vertical slices for concrete follow-up work.
+- Keep `.agents/*.toml` as the local source of truth unless the user explicitly
+  asks to publish GitHub issues.
+- Do not churn the DB for tiny local cleanup that does not change active debt.
+- For broad or literature-backed additions, run a litkg route/query first and
+  cite the relevant sources.
 
-Use these `references` prefixes:
+## Verification
 
-- `repo:<path>#<anchor-or-section>` for internal files, docs, code, tests,
-  skills, or generated context
-- `bib:<citation-key>` for papers in `docs/references.bib`
-- `arxiv:<id>`, `doi:<doi>`, or `s2:<paperId>` for durable paper identifiers
-- `url:<https-url>` for external API or tool documentation
-- `context7:<library-id>` for Context7-resolved external library docs
-- `litkg:<profile-or-command>` for litkg-rs context-pack, capability, or KG
-  command evidence
-
-For broad or literature-backed DB additions, run a litkg context pack before
-editing and copy the relevant internal paths, citation keys, Semantic Scholar
-IDs, or external-doc URLs into `references`. Prefer source pointers over long
-summaries; the DB should be compact but auditable.
-
-Ranking rules:
-
-- issues sort by priority first, then status, then ID
-- todos sort by priority first, then status, then lower `loc_expected`, then ID
-- refactors sort by priority first, then status, then lower `loc_expected`, then ID
-
-## Backlog Slicing
-
-When converting a plan into backlog work, use vertical slices rather than
-horizontal layer tasks:
-
-- each slice should deliver one narrow behavior or decision path end to end
-- mark HITL work through `labels` or `implementation_notes` when human/advisor
-  judgment is required
-- prefer `.agents/todos.toml` for concrete implementation work and
-  `.agents/refactors.toml` for optional cleanup candidates
-- include acceptance criteria that can be verified from commands, docs renders,
-  tests, or reviewable artifacts
-- do not create a parallel public-docs or GitHub-only tracker for local
-  scaffold work
-
-Use this workflow for Matt-style `to-issues` requests in ARIA-NBV unless the
-user explicitly asks to publish GitHub issues.
-
-## Matt-Style Workflow Modes
-
-Use these names as modes inside this skill, not as separate trackers:
-
-- `triage`: classify incoming work by updating existing `priority`, `status`,
-  and `labels`; do not add new TOML schema fields for triage state.
-- `to-issues`: split a plan into independently grabbable vertical slices in
-  `.agents/todos.toml` or `.agents/refactors.toml`.
-- `to-prd`: synthesize the current conversation into a problem statement,
-  solution, affected modules, implementation decisions, testing decisions,
-  out-of-scope list, and follow-up TOML slices. For non-trivial work, preserve
-  the narrative in `.agents/memory/history/` rather than public docs.
-
-Do not publish GitHub issues from these modes unless the user explicitly asks
-for GitHub publication.
-
-## Validation
-
-- run `make agents-db` after DB edits to confirm the files still parse and rank correctly
-- never delete records outright; resolve or retire them with history
-- never use destructive git commands unless the user explicitly requests them
+- `make agents-db AGENTS_ARGS='validate'`
+- `make agents-db`
+- `make check-agent-memory` when canonical memory, skills, debriefs, or guidance
+  changed

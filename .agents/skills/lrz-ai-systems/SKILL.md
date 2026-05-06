@@ -1,6 +1,26 @@
 ---
 name: lrz-ai-systems
 description: "Use when working with LRZ AI Systems remote compute for ARIA-NBV: SSH/login.ai.lrz.de, DSS storage, Slurm GPU/CPU allocations, Enroot/Pyxis containers, dataset/cache/training batch jobs, or debugging remote job failures."
+metadata:
+  applies_to:
+    - ".configs/lrz/**"
+    - "scripts/templates/**"
+    - ".agents/skills/lrz-ai-systems/**"
+    - "docs/contents/impl/lrz_dry_runs.qmd"
+  triggers:
+    - "LRZ"
+    - "Slurm"
+    - "DSS"
+    - "Pyxis"
+    - "Enroot"
+    - "remote compute"
+  must_read:
+    - ".agents/skills/lrz-ai-systems/references/cheatsheet.md"
+    - ".agents/skills/lrz-ai-systems/references/storage-dss.md"
+    - ".agents/skills/lrz-ai-systems/references/slurm-partitions.md"
+  verification:
+    - "shellcheck or dry-run checks for changed scripts where available"
+    - "make check-agent-memory for LRZ guidance changes"
 ---
 
 # LRZ AI Systems

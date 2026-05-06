@@ -1,6 +1,29 @@
 ---
 name: entity-aware-rri
 description: Use when ARIA-NBV work touches target/entity selection, GT OBB crops, target-specific RRI labels, target-conditioned VIN fields, or entity-aware diagnostics.
+metadata:
+  applies_to:
+    - "aria_nbv/aria_nbv/rri_metrics/**"
+    - "aria_nbv/aria_nbv/data_handling/**"
+    - "aria_nbv/aria_nbv/vin/**"
+    - "docs/contents/thesis/**"
+  triggers:
+    - "target RRI"
+    - "entity-aware"
+    - "GT OBB"
+    - "V0 target"
+    - "V1 observed target"
+    - "OBS-SEL"
+    - "PRED-Q"
+    - "GT-EVAL"
+  must_read:
+    - "docs/contents/thesis/roadmap.qmd#roadmap-m3"
+    - "docs/contents/thesis/questions.qmd#rq2-target-encoding"
+    - "aria_nbv/aria_nbv/rri_metrics/AGENTS.md"
+    - "aria_nbv/aria_nbv/data_handling/AGENTS.md"
+  verification:
+    - "cd aria_nbv && uv run pytest tests/rri_metrics"
+    - "cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py"
 ---
 
 # Entity-Aware RRI
@@ -27,8 +50,14 @@ involved.
 
 ## Rules
 
-- Start with GT OBBs and a small trusted subset before predicted-OBB realism
-  ablations.
+- V0 sanity/upper-bound: actor input may use GT OBB; label and evaluation crop
+  use GT OBB; claim only oracle upper-bound or target-RRI correctness.
+- V1 main protocol: selector and scorer/Q_H input use observed or predicted OBB
+  descriptors, confidence, geometry, projected area, and support signals; label
+  and evaluation use matched GT OBB crops under OBS-SEL / PRED-Q / GT-EVAL.
+- Do not claim main target-conditioned performance from V0-only GT-input runs.
+- Start correctness on a small trusted subset before predicted-OBB realism
+  ablations or scale-up.
 - Keep unsupported targets explicit with invalid reasons; do not encode them as
   low-RRI valid samples.
 - Log scene and target RRI separately.

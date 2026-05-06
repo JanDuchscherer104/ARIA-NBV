@@ -1,6 +1,20 @@
 ---
 name: code-review-aria-nbv
 description: Use when reviewing ARIA-NBV changes in the working tree or on a GitHub pull request, especially to produce severity-ranked findings with file and line references for Python, Quarto, Typst, config, and agent-memory changes.
+metadata:
+  applies_to:
+    - "**"
+  triggers:
+    - "review"
+    - "PR review"
+    - "working tree review"
+    - "requested changes"
+  must_read:
+    - "AGENTS.md"
+    - ".agents/references/source_order.md"
+    - ".agents/references/verification_matrix.md"
+  verification:
+    - "surface-specific checks for reviewed changes"
 ---
 
 # Code Review For ARIA-NBV

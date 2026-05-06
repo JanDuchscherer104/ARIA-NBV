@@ -1,6 +1,28 @@
 ---
 name: docs-curator
 description: Use when ARIA-NBV work changes README, SETUP, Quarto docs, Typst paper/slides, bibliography, generated context, public navigation, or canonical memory alignment.
+metadata:
+  applies_to:
+    - "README.md"
+    - "SETUP.md"
+    - "docs/**"
+    - ".agents/memory/state/**"
+    - ".agents/references/**"
+  triggers:
+    - "docs"
+    - "Quarto"
+    - "Typst"
+    - "bibliography"
+    - "public navigation"
+    - "memory alignment"
+  must_read:
+    - "docs/AGENTS.md"
+    - ".agents/references/source_order.md"
+    - ".agents/references/verification_matrix.md"
+  verification:
+    - "make qmd-frontmatter-check for Quarto docs"
+    - "cd docs && quarto render <page.qmd> for changed pages"
+    - "make kg-claim-check KG_CLAIM=\"<claim>\" for advisor-facing claims"
 ---
 
 # Docs Curator
@@ -20,15 +42,19 @@ Do not use it for a localized typo fix unless source-of-truth alignment is at ri
 ## Read First
 
 1. `docs/AGENTS.md`
-2. `docs/typst/seminar_paper/main.typ`
-3. `.agents/memory/state/PROJECT_STATE.md`
+2. `.agents/references/source_order.md`
+3. The source that owns the touched role: seminar paper for implemented
+   substrate, thesis roadmap/questions plus memory for active direction, or the
+   thesis proposal for advisor proposal wording
 4. `.agents/memory/state/GOTCHAS.md` when behavior or workflow claims are involved
 5. `.agents/references/agent_memory_templates.md` for debriefs
 
 ## Rules
 
-- Treat the Typst paper as the highest-level project narrative.
+- Treat docs source order as role-split, not as one global narrative.
 - Keep public Quarto docs reader-facing; internal agent guidance, generated context, raw scratch history, and OMX runtime notes stay under `.agents/` unless explicitly curated.
+- Run litkg claim checks for advisor-facing proposal, roadmap,
+  research-question, or literature-synthesis claims.
 - Link to canonical state or owning implementation docs instead of repeating long explanations.
 - Keep bibliography additions in `docs/references.bib`.
 - Update canonical memory when the current truth changes; otherwise record `canonical_updates_needed: []` in the debrief.

@@ -1,6 +1,22 @@
 ---
 name: python-docstrings
 description: Write and refactor concise, contract-focused Python docstrings for modules, public classes, functions, methods, protocols, config models, DTOs, wrappers, and streaming or session APIs. Use when Python docstrings are missing, sparse, misleading, or need better cross-references, examples, units, shapes, lifecycle notes, or boundary semantics.
+metadata:
+  applies_to:
+    - "aria_nbv/aria_nbv/**/*.py"
+  triggers:
+    - "docstring"
+    - "API docs"
+    - "module docs"
+    - "shape docs"
+    - "contract docs"
+  must_read:
+    - "aria_nbv/AGENTS.md"
+    - ".agents/references/python_conventions.md"
+    - ".agents/skills/python-docstrings/references/general-style.md"
+  verification:
+    - "ruff format <file>"
+    - "ruff check <file>"
 ---
 
 # Python Docstrings

@@ -1,6 +1,27 @@
 ---
 name: counterfactual-rollout-planner
-description: Use when ARIA-NBV work touches bounded counterfactual rollouts, non-myopic planning evaluation, invalid-action handling, Gymnasium/SB3 scaffolds, or the roadmap value/RL gate.
+description: Use when ARIA-NBV work touches ASE counterfactual rollouts, non-myopic planning evaluation, invalid-action handling, stochastic branches, finite-candidate fitted Double-Q / Q_H, or the roadmap value/RL gate. Gymnasium/SB3 is post-M6 bridge work only.
+metadata:
+  applies_to:
+    - "aria_nbv/aria_nbv/pose_generation/**"
+    - "aria_nbv/aria_nbv/rl/**"
+    - "docs/contents/thesis/**"
+    - ".agents/references/rollout_zarr_q_invalidity_contract.md"
+  triggers:
+    - "counterfactual rollout"
+    - "bounded lookahead"
+    - "Q_H"
+    - "fitted Double-Q"
+    - "stochastic rollout"
+    - "invalid action"
+  must_read:
+    - "docs/contents/thesis/roadmap.qmd#roadmap-m5"
+    - "docs/contents/thesis/questions.qmd#rq5-planning"
+    - ".agents/memory/state/PROJECT_STATE.md"
+    - ".agents/references/rollout_zarr_q_invalidity_contract.md"
+  verification:
+    - "cd aria_nbv && uv run pytest tests/pose_generation/test_counterfactuals.py"
+    - "cd aria_nbv && uv run pytest tests/rl/test_counterfactual_env.py"
 ---
 
 # Counterfactual Rollout Planner
@@ -9,13 +30,17 @@ description: Use when ARIA-NBV work touches bounded counterfactual rollouts, non
 
 Use this skill for:
 
-- greedy, stochastic, beam, model-scored, or oracle rollouts
+- deterministic oracle, greedy, stochastic, beam, model-scored, or oracle
+  rollouts over ASE finite candidate sets
 - cumulative RRI, path cost, invalid action rate, and runtime metrics
-- Gymnasium/SB3 discrete-shell baselines
-- M5/M6 planning or value/RL gate decisions
+- finite-candidate fitted Double-Q / `Q_H` training and evaluation
+- M5 planning/value decisions and M6 bridge boundaries
 
 Do not use it for one-step VIN scoring unless the output drives rollout
 selection or evaluation.
+
+Use Gymnasium/SB3 only when the task explicitly targets the post-M6 online
+simulator bridge after the ASE rollout and Q_H path is stable.
 
 ## Read First
 
@@ -38,9 +63,13 @@ selection or evaluation.
   for selected actions or retained chains.
 - Report cumulative target or scene RRI together with acquisition cost,
   invalid action rate, and runtime.
-- Treat full continuous control and simulator-backed online RL as stretch work
-  until the roadmap evidence gate passes.
+- Treat full continuous control and simulator-backed online RL as stretch or
+  bridge work until the roadmap evidence gate passes.
 - Keep actor-visible, critic-visible, and oracle-only signals separate.
+- Mask invalid candidates before selection and preserve explicit invalid reason
+  summaries.
+- Oracle-evaluate selected learned rollouts before using them for claims.
+- Log equal acquisition budget and candidate-budget parity for comparisons.
 - Rollout traces should record scene/snippet, horizon step, chain id, selected
   candidate id, score source, predicted RRI, oracle RRI when available,
   cumulative RRI, path cost, validity mask summary, invalid reason summary, and
