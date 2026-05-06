@@ -236,29 +236,29 @@
     [
       #color-block(title: [Historical vs Counterfactual State], spacing: 0.45em)[
         #set text(size: 12.7pt)
-        - use the *logged ego history* we already have, but keep the *implemented counterfactual view* geometry-safe
+        - use the *logged historic state* we already have, but keep the *implemented counterfactual view* geometry-safe
         - phase-1 state can stay *current pose + visited poses + shell candidates + valid mask*; no real RGB, #SLAM, or semantics at unvisited poses unless we synthesize them
         - rollout trees and RL episodes already instantiate this contract, but the canonical offline dataset is still *one-step*
         #set text()
         $
-          #(symb.rl.s) _t = {#symb.rl.hist_ego, #(symb.oracle.points) _t, #symb.oracle.candidates}
+          #symb.rl.s_hist = {#symb.obs.img_rgb, #symb.obs.pose, #(symb.oracle.points) _t, #symb.oracle.candidates}
         $
         $
-          #(symb.rl.s) _t^"cf" = {#symb.rl.hist_cf, #(symb.oracle.points) _t, #symb.oracle.candidates}
+          #symb.rl.s_cf0 = {#(symb.vin.field_v)^"root", #(symb.oracle.points) _t, #symb.oracle.candidates_t, #symb.rl.validity_mask}
         $
       ]
     ],
     [
       #color-block(title: [Action, Reward, Return Proxy], spacing: 0.45em)[
         #set text(size: 12.7pt)
-        - today the *implemented* action is a *discrete shell slot*; phase 2 can factor it into target $#(symb.rl.z) _t$ plus pose $#(symb.rl.x) _t$, reusing the same env contract (#gh("aria_nbv/aria_nbv/rl/counterfactual_env.py"))
+        - today the *implemented* action is a finite candidate-table index; phase 2 can factor it into target $#(symb.rl.z) _t$ plus pose $#(symb.rl.x) _t$, reusing the same env contract (#gh("aria_nbv/aria_nbv/rl/counterfactual_env.py"))
         - default reward is *oracle* #RRI, *not* VIN; VIN remains the future surrogate / critic hook
         - the current regime is *short-horizon / close-greedy*; the clean next step is to persist `top-k` chains plus discounted return into `vin_offline.counterfactuals`
         #set text()
         $
-          #(symb.rl.a) _t in {0, dots, N_"shell"-1},
+          #(symb.rl.a) _t in #symb.rl.action_set,
           quad
-          q_t = "shell"[#(symb.rl.a) _t]
+          q_t = q_(t, #(symb.rl.a) _t)
         $
         $
           #(symb.rl.a) _t^"phase2" = {#(symb.rl.z) _t, #(symb.rl.x) _t},

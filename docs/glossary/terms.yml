@@ -409,25 +409,42 @@
   parent: target-conditioned-nbv-mdp
   tier: core
   lookup_rank: 140
-  definition_short: Actor-visible state bundle used by target-conditioned rollouts and Q_H.
-  definition_long: The rollout state contains accumulated semidense/current points, candidate
-    poses, validity masks and reason codes, observed/predicted target fields, bounded history,
-    and budget state. GT meshes, GT OBB crops, and oracle labels remain outside the actor-visible
-    state in the main protocol.
+  definition_short: Rollout state family separating actor-visible state from oracle-only supervision.
+  definition_long: ARIA-NBV distinguishes raw historic snippet state, persisted VIN offline
+    sample state, minimal counterfactual actor state, geometry-rich counterfactual ablation
+    state, and privileged oracle rollout state. The main Q_H actor input starts from the minimal
+    counterfactual state; all-candidate GT renders, GT mesh crops, and oracle RRI labels remain
+    outside the actor-visible state.
   notation:
     typst: $s_t$
   symbol_refs:
   - rl.s
+  - rl.s_hist
+  - rl.s_off
+  - rl.s_cf0
+  - rl.s_cf_geom
+  - rl.s_oracle
   - oracle.points
   - oracle.candidates_t
   - rl.validity_mask
   - rl.invalid_reason
   - rl.target
   - rl.budget
+  equation_refs:
+  - rl.s_hist
+  - rl.s_off
+  - rl.s_cf0
+  - rl.s_cf_geom
+  - rl.s_oracle
   internal_links:
-  - docs/contents/theory/rl_planning.qmd#rl-planning-theory
+  - docs/contents/theory/rl_planning.qmd#state-and-action-space-contract
   - docs/contents/thesis/questions.qmd#rq5-planning
   related:
+  - historic-snippet-state
+  - persisted-offline-state
+  - minimal-counterfactual-state
+  - geometry-rich-counterfactual-state
+  - oracle-rollout-state
   - finite-candidate-action-set
   - validity-mask
   - observed-target-selection
@@ -436,6 +453,186 @@
   - planning
   - state
   - actor-visible
+- id: historic-snippet-state
+  anchor: term-historic-snippet-state
+  label: Historic Snippet State
+  short: historic state
+  aliases:
+  - raw historic state
+  - logged snippet state
+  - historic observed state
+  category: planning.state
+  parent: rollout-state
+  tier: core
+  lookup_rank: 141
+  definition_short: Raw actor-visible state from the logged ASE/Project Aria snippet trajectory.
+  definition_long: The historic snippet state is the richest non-privileged state because
+    it comes from the original logged trajectory. It may contain calibrated camera streams,
+    timestamps, trajectory and gravity estimates, semidense points with support fields, frozen
+    EVL/EFM evidence, and observed or predicted OBBs. It must not contain the GT mesh or GT
+    OBB crops as actor inputs.
+  notation:
+    typst: $s_t^"hist"$
+  symbol_refs:
+  - rl.s_hist
+  equation_refs:
+  - rl.s_hist
+  internal_links:
+  - docs/contents/theory/rl_planning.qmd#state-and-action-space-contract
+  - docs/contents/literature/project_aria.qmd
+  - docs/contents/literature/efm3d.qmd
+  citations:
+  - projectaria-engel2023
+  - EFM3D-straub2024
+  related:
+  - persisted-offline-state
+  - egocentric-voxel-lifting
+  - oriented-bounding-box
+  kg_tags:
+  - planning
+  - state
+  - historic
+- id: persisted-offline-state
+  anchor: term-persisted-offline-state
+  label: Persisted Offline Sample State
+  short: offline state
+  aliases:
+  - offline sample state
+  - VIN offline state
+  - persisted VIN state
+  category: planning.state
+  parent: rollout-state
+  tier: core
+  lookup_rank: 142
+  definition_short: Compact persisted state used by VIN training and offline diagnostics.
+  definition_long: 'The persisted offline sample state is not the full raw snippet. It is
+    the compact immutable training and diagnostic payload: VinSnippetView, candidate poses/cameras/counts,
+    labels and oracle metrics, optional candidate depths, compact OBB fields, trajectory metadata,
+    and selected EVL numeric tensors needed to reproduce scoring diagnostics.'
+  notation:
+    typst: $s_t^"off"$
+  symbol_refs:
+  - rl.s_off
+  equation_refs:
+  - rl.s_off
+  internal_links:
+  - docs/contents/theory/rl_planning.qmd#state-and-action-space-contract
+  - docs/contents/impl/vin_nbv.qmd
+  related:
+  - historic-snippet-state
+  - vin-nbv
+  - oracle-rri
+  kg_tags:
+  - planning
+  - offline-store
+  - vin
+- id: minimal-counterfactual-state
+  anchor: term-minimal-counterfactual-state
+  label: Minimal Counterfactual Actor State
+  short: CF0 state
+  aliases:
+  - minimal counterfactual state
+  - counterfactual actor state
+  - CF0 rollout state
+  category: planning.state
+  parent: rollout-state
+  tier: core
+  lookup_rank: 143
+  definition_short: Main Q_H actor state for mesh-supervised counterfactual rollouts.
+  definition_long: The minimal counterfactual actor state is the default input to target-conditioned
+    Q_H. It contains frozen root EVL context, the accumulated counterfactual point proxy,
+    selected-action history, observed or predicted target descriptor, budget state, finite
+    candidate table, validity masks, reason codes, and current-state candidate-query features.
+    Synthetic observations update the state only after their candidate is selected.
+  notation:
+    typst: $s_t^"cf0"$
+  symbol_refs:
+  - rl.s_cf0
+  equation_refs:
+  - rl.s_cf0
+  internal_links:
+  - docs/contents/theory/rl_planning.qmd#state-and-action-space-contract
+  - docs/contents/thesis/questions.qmd#rq5-planning
+  related:
+  - geometry-rich-counterfactual-state
+  - finite-candidate-action-set
+  - counterfactual-transition
+  - finite-horizon-q-function
+  kg_tags:
+  - planning
+  - counterfactual
+  - actor-visible
+- id: geometry-rich-counterfactual-state
+  anchor: term-geometry-rich-counterfactual-state
+  label: Geometry-Rich Counterfactual State
+  short: CF+ state
+  aliases:
+  - geometry-rich counterfactual state
+  - counterfactual geometry state
+  - CF+ rollout state
+  category: planning.state
+  parent: rollout-state
+  tier: core
+  lookup_rank: 144
+  definition_short: Counterfactual ablation state with selected synthetic geometry observations.
+  definition_long: The geometry-rich counterfactual state adds only selected prior synthetic
+    observations to the minimal state. It may include rendered depth, depth-valid masks, backprojected
+    points, derived normals, and local support summaries for views that have already been
+    selected. It does not include oracle renders for unselected candidates.
+  notation:
+    typst: $s_t^"cf+"$
+  symbol_refs:
+  - rl.s_cf_geom
+  equation_refs:
+  - rl.s_cf_geom
+  internal_links:
+  - docs/contents/theory/rl_planning.qmd#state-and-action-space-contract
+  - docs/contents/thesis/questions.qmd#rq5-planning
+  related:
+  - minimal-counterfactual-state
+  - counterfactual-transition
+  - oracle-rollout-state
+  kg_tags:
+  - planning
+  - counterfactual
+  - geometry
+- id: oracle-rollout-state
+  anchor: term-oracle-rollout-state
+  label: Oracle Rollout State
+  short: oracle state
+  aliases:
+  - oracle state
+  - privileged rollout state
+  - GT rollout state
+  category: planning.state
+  parent: rollout-state
+  tier: core
+  lookup_rank: 145
+  definition_short: Privileged rollout state for labels, upper bounds, and evaluation.
+  definition_long: The oracle rollout state may contain GT mesh geometry, GT target crops,
+    GT OBBs, all-candidate synthetic depth and point clouds, derived normals, mesh-face visibility,
+    Chamfer/RRI terms, and oracle scores. These fields support label generation and diagnostics
+    but are not actor-visible inputs for the main scorer or Q_H model.
+  notation:
+    typst: $s_t^"oracle"$
+  symbol_refs:
+  - rl.s_oracle
+  equation_refs:
+  - rl.s_oracle
+  internal_links:
+  - docs/contents/theory/rl_planning.qmd#state-and-action-space-contract
+  - docs/contents/impl/rri_computation.qmd
+  citations:
+  - ProjectAria-ASE-2025
+  related:
+  - ground-truth-target-evaluation
+  - oracle-rri
+  - target-specific-rri
+  - minimal-counterfactual-state
+  kg_tags:
+  - planning
+  - oracle
+  - supervision
 - id: finite-candidate-action-set
   anchor: term-finite-candidate-action-set
   label: Finite Candidate Action Set
@@ -448,13 +645,15 @@
   parent: target-conditioned-nbv-mdp
   tier: core
   lookup_rank: 150
-  definition_short: Masked finite action set over sampled candidate views.
-  definition_long: At each rollout step, ARIA-NBV samples a finite candidate set and exposes
-    only valid candidates as admissible actions. This keeps planning bounded and preserves
-    invalidity as a feasibility constraint.
+  definition_short: Masked finite action-index set over sampled candidate views.
+  definition_long: At each rollout step, ARIA-NBV samples a finite candidate table Q_t={q_{t,i}}.
+    The admissible action set contains indices i whose validity mask m_{t,i} is true, and
+    selecting a_t chooses pose q_t=q_{t,a_t}. This keeps planning bounded and preserves invalidity
+    as a feasibility constraint rather than a low-quality RRI label.
   formula:
-    label: Masked finite action set
-    tex: \mathcal{A}(s_t)=\{q_{t,i}\in Q_t:m_{t,i}=1\}
+    label: Masked finite action-index set
+    tex: Q_t=\{q_{t,i}\}_{i=1}^{N_t},\quad \mathcal{A}(s_t)=\{i\in\{1,\ldots,N_t\}:m_{t,i}=1\},\quad
+      q_t=q_{t,a_t}
   notation:
     typst: $cal(A)(s_t)$
   symbol_refs:
@@ -488,15 +687,17 @@
   parent: target-conditioned-nbv-mdp
   tier: core
   lookup_rank: 160
-  definition_short: Replayable state update after selecting a candidate view.
-  definition_long: For the thesis-core ASE mesh/oracle loop, the transition uses candidate
-    rendering or cached candidate observations to update the counterfactual point state and
-    rollout history. It must be deterministic under the stored seed and lineage.
+  definition_short: Replayable state update after selecting a candidate index.
+  definition_long: For the thesis-core ASE mesh/oracle loop, the transition uses the selected
+    candidate index to render or retrieve that candidate's depth, backproject points, and
+    update the counterfactual point state and selected-view history. All-candidate GT renders
+    and scores remain oracle-only before selection. The update must be deterministic under
+    the stored seed and lineage.
   formula:
     label: Point-state transition
     tex: P_{t+1}=P_t\cup P_{q_t}
   notation:
-    typst: $T(s_t,q_t)$
+    typst: $T(s_t,a_t)$
   symbol_refs:
   - rl.transition
   - oracle.points
@@ -614,19 +815,20 @@
   lookup_rank: 190
   definition_short: Finite-horizon candidate-value function for target-conditioned ARIA-NBV.
   definition_long: The mandatory M5 learned policy-like result is fitted Double-Q / Q_H over
-    finite candidate sets. It must respect validity masks and beat one-step greedy or model
-    scoring on cumulative target RRI under equal acquisition budget, with bounded oracle lookahead
-    as an upper bound.
+    finite candidate sets. The main actor input is the minimal counterfactual state s_t^{cf0};
+    the geometry-rich state is an explicit ablation. Q_H must respect validity masks and beat
+    one-step greedy or model scoring on cumulative target RRI under equal acquisition budget,
+    with bounded oracle lookahead as an upper bound.
   formula:
     label: Finite-horizon candidate value
-    tex: Q_H(s_t,q)=\mathbb{E}\left[G_t^{(H)}\mid s_t,a_t=q\right]
+    tex: Q_H(s_t^{\mathrm{cf0}},a_t)=\mathbb{E}\left[G_t^{(H)}\mid s_t=s_t^{\mathrm{cf0}},a_t\right]
   notation:
     typst: $Q_H$
   symbol_refs:
   - rl.qh
   - rl.return_h
-  - rl.s
-  - oracle.candidate_qti
+  - rl.s_cf0
+  - rl.a
   equation_refs:
   - rl.q_h
   - rl.q_backup
@@ -638,6 +840,7 @@
   - DoubleDQN-vanHasselt2015
   related:
   - finite-horizon-return
+  - minimal-counterfactual-state
   - predicted-target-q
   - validity-mask
   kg_tags:

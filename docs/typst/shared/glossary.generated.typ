@@ -19,10 +19,13 @@
   (id: "finite-horizon-return", label: "Finite-Horizon Return", short: "return", anchor: "term-finite-horizon-return"),
   (id: "five-degrees-of-freedom", label: "Five Degrees of Freedom", short: "5DoF", anchor: "term-five-degrees-of-freedom"),
   (id: "frustum", label: "Frustum", short: "frustum", anchor: "term-frustum"),
+  (id: "geometry-rich-counterfactual-state", label: "Geometry-Rich Counterfactual State", short: "CF+ state", anchor: "term-geometry-rich-counterfactual-state"),
   (id: "ground-truth", label: "Ground Truth", short: "GT", anchor: "term-ground-truth"),
   (id: "ground-truth-target-evaluation", label: "Ground-Truth Target Evaluation", short: "GT-EVAL", anchor: "term-ground-truth-target-evaluation"),
+  (id: "historic-snippet-state", label: "Historic Snippet State", short: "historic state", anchor: "term-historic-snippet-state"),
   (id: "left-up-forward", label: "Left-Up-Forward", short: "LUF", anchor: "term-left-up-forward"),
   (id: "machine-perception-services", label: "Machine Perception Services", short: "MPS", anchor: "term-machine-perception-services"),
+  (id: "minimal-counterfactual-state", label: "Minimal Counterfactual Actor State", short: "CF0 state", anchor: "term-minimal-counterfactual-state"),
   (id: "motion-trajectory-data", label: "Motion Trajectory Data", short: "MTD", anchor: "term-motion-trajectory-data"),
   (id: "multi-frame-camera-data", label: "Multi-Frame Camera Data", short: "MFCD", anchor: "term-multi-frame-camera-data"),
   (id: "multi-semi-dense-point-data", label: "Multi-Semi-Dense Point Data", short: "MSDPD", anchor: "term-multi-semi-dense-point-data"),
@@ -30,8 +33,10 @@
   (id: "next-best-view", label: "Next-Best-View", short: "NBV", anchor: "term-next-best-view"),
   (id: "observed-target-selection", label: "Observed Target Selection", short: "OBS-SEL", anchor: "term-observed-target-selection"),
   (id: "occupancy-grid", label: "Occupancy Grid", short: "Occupancy Grid", anchor: "term-occupancy-grid"),
+  (id: "oracle-rollout-state", label: "Oracle Rollout State", short: "oracle state", anchor: "term-oracle-rollout-state"),
   (id: "oracle-rri", label: "Oracle RRI", short: "oracle RRI", anchor: "term-oracle-rri"),
   (id: "oriented-bounding-box", label: "Oriented Bounding Box", short: "OBB", anchor: "term-oriented-bounding-box"),
+  (id: "persisted-offline-state", label: "Persisted Offline Sample State", short: "offline state", anchor: "term-persisted-offline-state"),
   (id: "point-cloud", label: "Point Cloud", short: "PC", anchor: "term-point-cloud"),
   (id: "predicted-target-q", label: "Predicted-Target Q", short: "PRED-Q", anchor: "term-predicted-target-q"),
   (id: "project-aria", label: "Project Aria", short: "Project Aria", anchor: "term-project-aria"),
@@ -114,10 +119,13 @@
   } else if id == "finite-horizon-return" { [return]
   } else if id == "five-degrees-of-freedom" { [5DoF]
   } else if id == "frustum" { [frustum]
+  } else if id == "geometry-rich-counterfactual-state" { [CF+ state]
   } else if id == "ground-truth" { [GT]
   } else if id == "ground-truth-target-evaluation" { [GT-EVAL]
+  } else if id == "historic-snippet-state" { [historic state]
   } else if id == "left-up-forward" { [LUF]
   } else if id == "machine-perception-services" { [MPS]
+  } else if id == "minimal-counterfactual-state" { [CF0 state]
   } else if id == "motion-trajectory-data" { [MTD]
   } else if id == "multi-frame-camera-data" { [MFCD]
   } else if id == "multi-semi-dense-point-data" { [MSDPD]
@@ -125,8 +133,10 @@
   } else if id == "next-best-view" { [NBV]
   } else if id == "observed-target-selection" { [OBS-SEL]
   } else if id == "occupancy-grid" { [Occupancy Grid]
+  } else if id == "oracle-rollout-state" { [oracle state]
   } else if id == "oracle-rri" { [oracle RRI]
   } else if id == "oriented-bounding-box" { [OBB]
+  } else if id == "persisted-offline-state" { [offline state]
   } else if id == "point-cloud" { [PC]
   } else if id == "predicted-target-q" { [PRED-Q]
   } else if id == "project-aria" { [Project Aria]
@@ -169,10 +179,13 @@
   } else if id == "finite-horizon-return" { [Finite-Horizon Return (return)]
   } else if id == "five-degrees-of-freedom" { [Five Degrees of Freedom (5DoF)]
   } else if id == "frustum" { [Frustum (frustum)]
+  } else if id == "geometry-rich-counterfactual-state" { [Geometry-Rich Counterfactual State (CF+ state)]
   } else if id == "ground-truth" { [Ground Truth (GT)]
   } else if id == "ground-truth-target-evaluation" { [Ground-Truth Target Evaluation (GT-EVAL)]
+  } else if id == "historic-snippet-state" { [Historic Snippet State (historic state)]
   } else if id == "left-up-forward" { [Left-Up-Forward (LUF)]
   } else if id == "machine-perception-services" { [Machine Perception Services (MPS)]
+  } else if id == "minimal-counterfactual-state" { [Minimal Counterfactual Actor State (CF0 state)]
   } else if id == "motion-trajectory-data" { [Motion Trajectory Data (MTD)]
   } else if id == "multi-frame-camera-data" { [Multi-Frame Camera Data (MFCD)]
   } else if id == "multi-semi-dense-point-data" { [Multi-Semi-Dense Point Data (MSDPD)]
@@ -180,8 +193,10 @@
   } else if id == "next-best-view" { [Next-Best-View (NBV)]
   } else if id == "observed-target-selection" { [Observed Target Selection (OBS-SEL)]
   } else if id == "occupancy-grid" { [Occupancy Grid]
+  } else if id == "oracle-rollout-state" { [Oracle Rollout State (oracle state)]
   } else if id == "oracle-rri" { [Oracle RRI (oracle RRI)]
   } else if id == "oriented-bounding-box" { [Oriented Bounding Box (OBB)]
+  } else if id == "persisted-offline-state" { [Persisted Offline Sample State (offline state)]
   } else if id == "point-cloud" { [Point Cloud (PC)]
   } else if id == "predicted-target-q" { [Predicted-Target Q (PRED-Q)]
   } else if id == "project-aria" { [Project Aria]
@@ -215,20 +230,23 @@
   - *candidate - Candidate View*: Proposed camera pose whose expected reconstruction utility is evaluated before selecting the next observation.
   - *CPF - Central Pupil Frame*: Coordinate frame placed at the midpoint between the left and right eye boxes of Project Aria glasses.
   - *CD - Chamfer Distance*: Bidirectional point-set distance commonly used to compare reconstructed points against reference geometry.
-  - *transition - Counterfactual Transition*: Replayable state update after selecting a candidate view.
+  - *transition - Counterfactual Transition*: Replayable state update after selecting a candidate index.
   - *CR - Coverage Ratio*: Fraction of a target surface, scene, or region treated as observed under a chosen visibility or distance threshold.
   - *DoF - Degrees of Freedom*: Number of independent pose parameters available to a camera, object, or action representation.
   - *EFM3D - Egocentric Foundation Model 3D*: Egocentric 3D foundation-model stack used as the frozen spatial backbone for ARIA-NBV candidate scoring.
   - *EVL - Egocentric Voxel Lifting*: EFM3D architecture that lifts synchronized egocentric observations into a gravity-aligned 3D voxel feature volume.
-  - *action set - Finite Candidate Action Set*: Masked finite action set over sampled candidate views.
+  - *action set - Finite Candidate Action Set*: Masked finite action-index set over sampled candidate views.
   - *Q_H - Finite-Horizon Q Function*: Finite-horizon candidate-value function for target-conditioned ARIA-NBV.
   - *return - Finite-Horizon Return*: H-step discounted return over target-RRI rewards.
   - *5DoF - Five Degrees of Freedom*: Reduced camera-action parameterization commonly used when roll is fixed or otherwise constrained.
   - *frustum - Frustum*: Truncated pyramidal camera-visible volume bounded by near and far clipping planes plus lateral field-of-view planes.
+  - *CF+ state - Geometry-Rich Counterfactual State*: Counterfactual ablation state with selected synthetic geometry observations.
   - *GT - Ground Truth*: Reference data or annotations treated as the trusted target for training, validation, or evaluation.
   - *GT-EVAL - Ground-Truth Target Evaluation*: Main thesis protocol component using ground-truth OBBs and target mesh crops only for labels and evaluation.
+  - *historic state - Historic Snippet State*: Raw actor-visible state from the logged ASE/Project Aria snippet trajectory.
   - *LUF - Left-Up-Forward*: Camera coordinate convention whose x axis points left, y axis points up, and z axis points forward.
   - *MPS - Machine Perception Services*: Project Aria processing services that derive pose, mapping, gaze, hand, and related perception outputs from sensor recordings.
+  - *CF0 state - Minimal Counterfactual Actor State*: Main Q_H actor state for mesh-supervised counterfactual rollouts.
   - *MTD - Motion Trajectory Data*: Device poses over time, usually represented as a sequence of 6-DoF transformations.
   - *MFCD - Multi-Frame Camera Data*: Synchronized camera streams from multiple Project Aria cameras over a temporal window.
   - *MSDPD - Multi-Semi-Dense Point Data*: Semi-dense 3D point observations generated by SLAM-style processing across a snippet or trajectory window.
@@ -236,13 +254,15 @@
   - *NBV - Next-Best-View*: Problem of selecting the next sensor viewpoint to improve an active reconstruction or inspection objective under a limited acquisition budget.
   - *OBS-SEL - Observed Target Selection*: Main thesis protocol component requiring target selection to use only actor-visible observed or predicted target evidence.
   - *Occupancy Grid*: Spatial grid whose cells encode whether space is occupied, free, unknown, or represented by a related occupancy probability.
+  - *oracle state - Oracle Rollout State*: Privileged rollout state for labels, upper bounds, and evaluation.
   - *oracle RRI - Oracle RRI*: RRI label computed with privileged ground-truth geometry, used for supervised training and evaluation.
   - *OBB - Oriented Bounding Box*: 3D bounding box with arbitrary orientation, used to represent object extent more tightly than an axis-aligned box.
+  - *offline state - Persisted Offline Sample State*: Compact persisted state used by VIN training and offline diagnostics.
   - *PC - Point Cloud*: Set of 3D points representing observed scene geometry.
   - *PRED-Q - Predicted-Target Q*: Main thesis protocol component requiring scorer or Q_H inputs to use predicted or observed target descriptors.
   - *Project Aria*: Egocentric research-device and tooling ecosystem for calibrated, time-aligned multimodal sensing.
   - *RRI - Relative Reconstruction Improvement*: Metric quantifying the relative reconstruction-quality improvement obtained by adding a candidate observation to the current reconstruction.
-  - *state - Rollout State*: Actor-visible state bundle used by target-conditioned rollouts and Q_H.
+  - *state - Rollout State*: Rollout state family separating actor-visible state from oracle-only supervision.
   - *SSL - SceneScript Language*: Structured language representation for indoor scene layout using primitives such as walls, doors, windows, and objects.
   - *SLAM - Simultaneous Localization and Mapping*: Method for estimating sensor motion while building a map of the surrounding scene.
   - *6DoF - Six Degrees of Freedom*: Pose parameterization with three translational and three rotational degrees of freedom.

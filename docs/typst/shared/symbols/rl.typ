@@ -14,6 +14,11 @@
     mdp_nbv: $cal(M)_"NBV"$,
     action_set: $cal(A)(s_t)$,
     transition: $T$,
+    s_hist: $s_t^"hist"$,
+    s_off: $s_t^"off"$,
+    s_cf0: $s_t^"cf0"$,
+    s_cf_geom: $s_t^"cf+"$,
+    s_oracle: $s_t^"oracle"$,
     reward_target: $r_t^e$,
     return_h: $G_t^(H)$,
     qh: $Q_H$,
@@ -29,7 +34,4 @@
     b: $b$,
     target: $e_t$,
     budget: $b_t$,
-    // History bundles for the two state formulations.
-    hist_ego: $cal(O)^"ego"_(1:t)$,
-    hist_cf: $(cal(O)^"ego", cal(O)^"cf")_(1:t)$,
   )

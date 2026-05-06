@@ -91,6 +91,11 @@ return {
     short = "frustum",
     anchor = "term-frustum",
   },
+  ["geometry-rich-counterfactual-state"] = {
+    label = "Geometry-Rich Counterfactual State",
+    short = "CF+ state",
+    anchor = "term-geometry-rich-counterfactual-state",
+  },
   ["ground-truth"] = {
     label = "Ground Truth",
     short = "GT",
@@ -101,6 +106,11 @@ return {
     short = "GT-EVAL",
     anchor = "term-ground-truth-target-evaluation",
   },
+  ["historic-snippet-state"] = {
+    label = "Historic Snippet State",
+    short = "historic state",
+    anchor = "term-historic-snippet-state",
+  },
   ["left-up-forward"] = {
     label = "Left-Up-Forward",
     short = "LUF",
@@ -110,6 +120,11 @@ return {
     label = "Machine Perception Services",
     short = "MPS",
     anchor = "term-machine-perception-services",
+  },
+  ["minimal-counterfactual-state"] = {
+    label = "Minimal Counterfactual Actor State",
+    short = "CF0 state",
+    anchor = "term-minimal-counterfactual-state",
   },
   ["motion-trajectory-data"] = {
     label = "Motion Trajectory Data",
@@ -146,6 +161,11 @@ return {
     short = "Occupancy Grid",
     anchor = "term-occupancy-grid",
   },
+  ["oracle-rollout-state"] = {
+    label = "Oracle Rollout State",
+    short = "oracle state",
+    anchor = "term-oracle-rollout-state",
+  },
   ["oracle-rri"] = {
     label = "Oracle RRI",
     short = "oracle RRI",
@@ -155,6 +175,11 @@ return {
     label = "Oriented Bounding Box",
     short = "OBB",
     anchor = "term-oriented-bounding-box",
+  },
+  ["persisted-offline-state"] = {
+    label = "Persisted Offline Sample State",
+    short = "offline state",
+    anchor = "term-persisted-offline-state",
   },
   ["point-cloud"] = {
     label = "Point Cloud",

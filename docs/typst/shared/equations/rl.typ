@@ -7,49 +7,60 @@
     nbv_mdp: $
       #symb.rl.mdp_nbv = (cal(S), cal(A), T, r_e, #symb.rl.gamma, #symb.rl.H)
     $,
-    hist_ego: $
-      #symb.rl.hist_ego
+    s_hist: $
+      #symb.rl.s_hist
       =
       (
         #symb.obs.img_rgb,
         #symb.obs.pose,
         #symb.obs.points_semi,
-        #(symb.vin.field_v)^"ego"
-      )_(1:t)
-    $,
-    hist_cf: $
-      #symb.rl.hist_cf
-      =
-      (
-        #symb.rl.hist_ego,
-        (
-          #(symb.obs.depth)^"cf",
-          #(symb.obs.vis)^"cf",
-          #symb.obs.points_cf
-        )_(1:t)
+        #symb.vin.field_v,
+        #symb.rl.target,
+        #symb.rl.budget
       )
     $,
-    state_ego: $
-      #(symb.rl.s) _t^"ego"
+    s_off: $
+      #symb.rl.s_off
       =
       (
-        #symb.rl.hist_ego,
-        #(symb.rl.x) _t,
-        #(symb.ase.points_semi) _t,
-        #(symb.vin.field_v) _t,
-        #(symb.rl.e) _t,
-        #(symb.rl.b) _t
+        #(symb.obs.points_semi)_t,
+        #symb.ase.traj,
+        #symb.oracle.candidates_t,
+        #symb.rl.validity_mask,
+        #symb.vin.field_v
       )
     $,
-    state_cf: $
-      #(symb.rl.s) _t^"cf"
+    s_cf0: $
+      #symb.rl.s_cf0
       =
       (
-        #symb.rl.hist_cf,
-        #(symb.rl.x) _t,
-        #(symb.rl.m) _t,
-        #(symb.rl.e) _t,
-        #(symb.rl.b) _t
+        #(symb.vin.field_v)^"root",
+        #(symb.oracle.points)_t,
+        #symb.oracle.candidates_t,
+        #symb.rl.validity_mask,
+        #symb.rl.invalid_reason,
+        #symb.rl.target,
+        #symb.rl.budget
+      )
+    $,
+    s_cf_geom: $
+      #symb.rl.s_cf_geom
+      =
+      (
+        #symb.rl.s_cf0,
+        (#symb.obs.depth, #symb.obs.vis, #symb.obs.points_cf, #symb.obs.face_normal)_(1:t)
+      )
+    $,
+    s_oracle: $
+      #symb.rl.s_oracle
+      =
+      (
+        #symb.rl.s_cf_geom,
+        #symb.ase.mesh,
+        #symb.ase.mesh_target,
+        #symb.oracle.depth_q,
+        #symb.oracle.points_q,
+        #symb.oracle.rri
       )
     $,
     obs_render: $
@@ -67,19 +78,25 @@
       )
     $,
     finite_action_set: $
-      #symb.rl.action_set = {#symb.oracle.candidate_qti in #symb.oracle.candidates_t : #symb.rl.validity_mask = 1}
+      #symb.oracle.candidates_t = {q_(t,i)}_(i=1)^(#symb.shape.Nq),
+      quad
+      #symb.rl.action_set = {i in {1, dots, #symb.shape.Nq} : #symb.rl.validity_mask = 1},
+      quad
+      q_t = q_(t, #(symb.rl.a)_t)
     $,
     counterfactual_transition: $
-      #(symb.oracle.points) _(t+1) = #(symb.oracle.points) _t union #(symb.oracle.points) _(q _t)
+      #(symb.oracle.points)_(t+1) = #(symb.oracle.points)_t union #(symb.oracle.points)_(q_t)
     $,
     target_rri_reward: $
-      #symb.rl.reward_target = "RRI"_e(q _t mid #(symb.oracle.points) _t, #symb.ase.mesh_target)
+      #symb.rl.reward_target = "RRI"_e(q_t mid #(symb.oracle.points)_t, #symb.ase.mesh_target)
     $,
     finite_horizon_return: $
       #symb.rl.return_h = sum_(k=0)^(#symb.rl.H - 1) #symb.rl.gamma^k r_(t+k)^e
     $,
     q_h: $
-      "Q"_H(s _t, q) = bb(E)[G _t^(H) mid s _t, a _t = q]
+      "Q"_H(#symb.rl.s_cf0, #(symb.rl.a)_t)
+      =
+      bb(E)[G_t^(H) mid s_t = #symb.rl.s_cf0, a_t = #(symb.rl.a)_t]
     $,
     reward_log: $
       #(symb.rl.r) _t

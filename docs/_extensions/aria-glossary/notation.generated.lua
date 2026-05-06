@@ -118,6 +118,26 @@ return {
       tex = "s",
       typst = "#symb.rl.s",
     },
+    ["rl.s_cf0"] = {
+      tex = "s_t^{\\mathrm{cf0}}",
+      typst = "#symb.rl.s_cf0",
+    },
+    ["rl.s_cf_geom"] = {
+      tex = "s_t^{\\mathrm{cf+}}",
+      typst = "#symb.rl.s_cf_geom",
+    },
+    ["rl.s_hist"] = {
+      tex = "s_t^{\\mathrm{hist}}",
+      typst = "#symb.rl.s_hist",
+    },
+    ["rl.s_off"] = {
+      tex = "s_t^{\\mathrm{off}}",
+      typst = "#symb.rl.s_off",
+    },
+    ["rl.s_oracle"] = {
+      tex = "s_t^{\\mathrm{oracle}}",
+      typst = "#symb.rl.s_oracle",
+    },
     ["rl.target"] = {
       tex = "e_t",
       typst = "#symb.rl.target",
@@ -205,7 +225,7 @@ return {
       typst = "#eqs.rl.counterfactual_transition",
     },
     ["rl.finite_action_set"] = {
-      tex = "\\mathcal{A}(s_t)=\\{q_{t,i}\\in Q_t:m_{t,i}=1\\}",
+      tex = "Q_t=\\{q_{t,i}\\}_{i=1}^{N_t},\\quad \\mathcal{A}(s_t)=\\{i\\in\\{1,\\ldots,N_t\\}:m_{t,i}=1\\},\\quad q_t=q_{t,a_t}",
       typst = "#eqs.rl.finite_action_set",
     },
     ["rl.finite_horizon_return"] = {
@@ -225,12 +245,32 @@ return {
       typst = "#eqs.rl.q_backup",
     },
     ["rl.q_h"] = {
-      tex = "Q_H(s_t,q)=\\mathbb{E}\\left[G_t^{(H)}\\mid s_t,a_t=q\\right]",
+      tex = "Q_H(s_t^{\\mathrm{cf0}},a_t)=\\mathbb{E}\\left[G_t^{(H)}\\mid s_t=s_t^{\\mathrm{cf0}},a_t\\right]",
       typst = "#eqs.rl.q_h",
     },
     ["rl.reward_geom"] = {
       tex = "r_t^{\\mathrm{geom}}=\\log(\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_t,\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}})+\\varepsilon)-\\log(\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_{t+1},\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}})+\\varepsilon)-\\alpha\\mathbb{1}[\\mathrm{collision}(a_t)]-\\beta c(a_t)",
       typst = "#eqs.rl.reward_geom",
+    },
+    ["rl.s_cf0"] = {
+      tex = "s_t^{\\mathrm{cf0}}=(V^{\\mathrm{root}},P_t,Q_t,m_{t,i},\\rho_{t,i},e_t,b_t)",
+      typst = "#eqs.rl.s_cf0",
+    },
+    ["rl.s_cf_geom"] = {
+      tex = "s_t^{\\mathrm{cf+}}=(s_t^{\\mathrm{cf0}},D_{1:t}^{\\mathrm{sel}},P_{1:t}^{\\mathrm{sel}},N_{1:t}^{\\mathrm{sel}})",
+      typst = "#eqs.rl.s_cf_geom",
+    },
+    ["rl.s_hist"] = {
+      tex = "s_t^{\\mathrm{hist}}=(I_{1:t},T_{1:t},P_{1:t}^{\\mathrm{semi}},V^{\\mathrm{root}},e_t,b_t)",
+      typst = "#eqs.rl.s_hist",
+    },
+    ["rl.s_off"] = {
+      tex = "s_t^{\\mathrm{off}}=(\\mathrm{VinSnippetView},Q_t,N_t,m_{t,i},\\ell_{t,i})",
+      typst = "#eqs.rl.s_off",
+    },
+    ["rl.s_oracle"] = {
+      tex = "s_t^{\\mathrm{oracle}}=(s_t^{\\mathrm{cf+}},M_{\\mathrm{GT}},M_e,\\{D_{t,i}^{\\mathrm{GT}},P_{t,i}^{\\mathrm{GT}},\\mathrm{RRI}_{t,i}\\}_{i=1}^{N_t})",
+      typst = "#eqs.rl.s_oracle",
     },
     ["rl.target_rri_reward"] = {
       tex = "r_t^e=\\mathrm{RRI}_e(q_t\\mid P_t,M_e)",

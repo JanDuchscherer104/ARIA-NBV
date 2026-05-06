@@ -9,12 +9,63 @@ format: html
 
 # RL and Bounded Rollout Theory {#rl-planning-theory}
 
-ARIA-NBV should formulate its first non-myopic experiment as finite-horizon planning over discrete candidate views, not as full continuous reinforcement learning. At time $t$, the rollout state $s_t$ contains the accumulated geometry-first reconstruction state, the current reference pose, the candidate poses and masks, and any actor-visible diagnostic fields that can be obtained without privileged ground truth. The action set $\mathcal{A}(s_t)$ is the valid subset of sampled candidate views. A transition $T(s_t, q)$ appends the selected candidate observation to the counterfactual point state, and the immediate reward is a reconstruction-quality improvement signal such as scene-level RRI or target-specific RRI. Oracle labels, GT meshes, and GT OBB crops define supervision and evaluation; they should not become actor-visible inputs in the first rollout state.
+ARIA-NBV should formulate its first non-myopic experiment as finite-horizon planning over discrete candidate views, not as full continuous reinforcement learning. At time $t$, the {{< gls rollout-state >}} contains the accumulated geometry-first reconstruction state, target descriptor, finite candidate table, validity masks, and any actor-visible diagnostic fields that can be obtained without privileged ground truth. Oracle labels, GT meshes, all-candidate GT renders, and GT OBB crops define supervision and evaluation; they should not become actor-visible inputs in the first rollout state.
+
+## State and Action Space Contract {#state-and-action-space-contract}
+
+The state contract separates what ARIA-NBV can observe from what the ASE mesh oracle may use to create labels. The notation uses explicit variants instead of a generic egocentric/counterfactual alias:
+
+$$
+s_t^{\mathrm{hist}},\quad
+s_t^{\mathrm{off}},\quad
+s_t^{\mathrm{cf0}},\quad
+s_t^{\mathrm{cf+}},\quad
+s_t^{\mathrm{oracle}}.
+$$
+
+| State variant | Role | Modalities and boundary |
+|---|---|---|
+| {{< gls historic-snippet-state >}} $s_t^{\mathrm{hist}}$ | Raw actor-visible state from the logged ASE/Project Aria trajectory. | Camera streams, calibration, timestamps, trajectory/gravity, semidense points with uncertainty/support, EVL/EFM evidence, and detected or predicted OBBs. No GT mesh or GT OBB is an actor input. |
+| {{< gls persisted-offline-state >}} $s_t^{\mathrm{off}}$ | Compact immutable state used by the current VIN offline sample store. | `VinSnippetView`, candidate poses/cameras/counts, oracle metrics as labels, optional depths, compact OBBs, trajectory metadata, and selected EVL numeric fields. It is a training/diagnostic payload, not the full raw snippet. |
+| {{< gls minimal-counterfactual-state >}} $s_t^{\mathrm{cf0}}$ | Main thesis-core actor input for target-conditioned rollouts and $Q_H$. | Frozen root EVL context, fused point proxy $P_t$, selected-view history, target descriptor, budget, candidate table, validity masks/reason codes, and current-state candidate-query features. EVL is not recomputed after synthetic observations. |
+| {{< gls geometry-rich-counterfactual-state >}} $s_t^{\mathrm{cf+}}$ | Explicit ablation state. | $s_t^{\mathrm{cf0}}$ plus selected prior synthetic observations only: rendered depth, valid mask, backprojected point cloud, and derived local normals/support summaries. Unselected-candidate GT renders remain hidden. |
+| {{< gls oracle-rollout-state >}} $s_t^{\mathrm{oracle}}$ | Privileged label/evaluation state. | GT mesh and target crops, all-candidate renders/points/normals/mesh-face visibility, RRI/CD metrics, oracle scores, and GT OBBs. This state supports oracle labels, upper bounds, and diagnostics only. |
+
+The finite {{< gls finite-candidate-action-set >}} is an index set over the candidate table:
+
+$$
+Q_t=\{q_{t,i}\}_{i=1}^{N_t},\qquad
+a_t\in\mathcal{A}(s_t)=\{i\in\{1,\ldots,N_t\}:m_{t,i}=1\},\qquad
+q_t=q_{t,a_t}.
+$$
+
+This matters because validity is a hard feasibility mask. Collision, no-depth, outside-bounds, unsupported-target, and outside-EVL-extent cases should stay in masks and reason codes, not be converted into low RRI labels.
+
+The {{< gls counterfactual-transition >}} updates the actor-visible state only after selecting an admissible candidate index. For the ASE mesh-supervised loop, the oracle may render the selected pose to perform the transition,
+
+$$
+o_{t+1}^{\mathrm{sel}}=\mathcal{G}(M_{\mathrm{GT}},q_{t,a_t}),
+\qquad
+P_{t+1}=P_t\cup P(o_{t+1}^{\mathrm{sel}},q_{t,a_t}),
+$$
+
+but all-candidate GT renders and all-candidate target-RRI labels are oracle-only fields before selection. The main $Q_H$ actor input is therefore
+
+$$
+Q_H(s_t^{\mathrm{cf0}},a_t)
+\approx
+\mathbb{E}\!\left[
+  \sum_{k=0}^{H-1-t}\gamma^k r_{t+k}^{e}
+  \mid s_t=s_t^{\mathrm{cf0}},a_t
+\right],
+$$
+
+with $s_t^{\mathrm{cf+}}$ reserved for a geometry-rich ablation.
 
 The one-step greedy baseline is the depth-one selector
 $$
 \operatorname{ArgTop1}_1(s_t) =
-\arg\max_{q \in \mathcal{A}(s_t)} r(s_t, q),
+\arg\max_{i \in \mathcal{A}(s_t)} r(s_t, q_{t,i}),
 $$
 where $r$ is the trusted oracle RRI during the first planning experiment. A bounded non-myopic rollout first restricts the search tree to the $K$ strongest valid branches,
 $$
@@ -23,17 +74,17 @@ $$
 then computes a finite-horizon value over that pruned branch set:
 $$
 V_h(s_t) =
-\max_{q \in \operatorname{ArgTopK}(s_t)}
+\max_{i \in \operatorname{ArgTopK}(s_t)}
 \left[
-r(s_t, q) + V_{h-1}(T(s_t, q))
+r(s_t, q_{t,i}) + V_{h-1}(T(s_t, i))
 \right].
 $$
 The selected action at horizon $h$ is therefore
 $$
 \operatorname{ArgTop1}_h(s_t) =
-\arg\max_{q \in \operatorname{ArgTopK}(s_t)}
+\arg\max_{i \in \operatorname{ArgTopK}(s_t)}
 \left[
-r(s_t, q) + V_{h-1}(T(s_t, q))
+r(s_t, q_{t,i}) + V_{h-1}(T(s_t, i))
 \right].
 $$
 This creates the experimental ladder $\operatorname{ArgTopK} \rightarrow \operatorname{ArgTop1}_1 \rightarrow \operatorname{ArgTop1}_2 \rightarrow \cdots \rightarrow \operatorname{ArgTop1}_H$. The scientific question is whether the first action chosen by an $h$-step oracle rollout improves cumulative RRI over the depth-one greedy action under the same candidate budget, horizon, and acquisition cost.
@@ -46,7 +97,7 @@ The reward used for multi-step return should differ from the one-step training l
 $$
 G_t^{(H)} = \sum_{k=0}^{H-1} \gamma^k r_{t+k}^e,
 \qquad
-r_t^e = \mathrm{RRI}_e(q_t \mid P_t, M_e),
+r_t^e = \mathrm{RRI}_e(q_{t,a_t} \mid P_t, M_e),
 $$
 with $\gamma$ kept symbolic in the notation and cumulative target RRI used as the main comparison. Episode-normalized additive rewards and log-improvement rewards such as
 $$
