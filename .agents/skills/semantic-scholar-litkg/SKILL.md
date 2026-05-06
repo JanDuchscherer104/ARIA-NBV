@@ -21,7 +21,8 @@ metadata:
     - ".agents/skills/semantic-scholar-litkg/references/integration-spec.md"
   verification:
     - "make kg-capabilities KG_FORMAT=json"
-    - "cargo test --manifest-path .agents/external/litkg-rs/Cargo.toml"
+    - "cd .agents/external/litkg-rs && cargo fmt --all"
+    - "cd .agents/external/litkg-rs && cargo test"
     - "make check-agent-memory when ARIA guidance changes"
 ---
 
@@ -73,6 +74,7 @@ project retrieval, route, claim-check, or consolidation work, use
 
 - ARIA guidance/config changes: `make kg-capabilities KG_FORMAT=json` and
   `make check-agent-memory`.
-- litkg-rs toolkit edits: `cargo fmt --all`, `cargo test`, and the narrow
-  litkg-rs smoke command for the changed capability.
+- litkg-rs toolkit edits: `cd .agents/external/litkg-rs && cargo fmt --all`,
+  `cd .agents/external/litkg-rs && cargo test`, and the narrow litkg-rs smoke
+  command for the changed capability.
 - Agents DB integration: `make agents-db AGENTS_ARGS='validate'`.

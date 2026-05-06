@@ -14,7 +14,6 @@ files_touched:
   - .agents/skills/
   - .agents/references/
   - .agents/issues.toml
-  - .agents/todos.toml
   - .agents/AGENTS_INTERNAL_DB.md
 ---
 
@@ -42,8 +41,12 @@ post-M6 bridge.
 ## Backlog Impact
 
 Existing issues were amended instead of creating a duplicate scaffold epic.
-`todo-056` now tracks the deferred litkg-rs implementation needed for the
+Existing `todo-056` tracks the deferred litkg-rs implementation needed for the
 documented agent-facing context-pack schema.
+
+Follow-up PR review fixes kept the same scope and corrected stale source-order
+generation, overly broad docs routing metadata, portable skill validation
+wording, Rerun inspector routing globs, and litkg-rs validation commands.
 
 ## Verification
 
@@ -57,3 +60,5 @@ Completed:
 - `make kg-route KG_TASK="review agents-scaffold against Karpathy-style skills and plan scaffold cleanup" KG_FORMAT=json`;
 - targeted stale-text search for the old seminar-paper, NBV Gym simulator, and
   Gym/SB3 core-activation wording.
+- follow-up validation covered changed skills, agent memory, agents DB, a
+  regenerated context index preview, and targeted stale-text searches.

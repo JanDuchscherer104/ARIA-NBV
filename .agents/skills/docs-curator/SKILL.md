@@ -1,20 +1,21 @@
 ---
 name: docs-curator
-description: Use when ARIA-NBV work changes README, SETUP, Quarto docs, Typst paper/slides, bibliography, generated context, public navigation, or canonical memory alignment.
+description: Use when ARIA-NBV work changes README, SETUP, public Quarto docs, Typst paper/slides, bibliography, public navigation, docs source-order alignment, or the public/internal docs boundary.
 metadata:
   applies_to:
     - "README.md"
     - "SETUP.md"
     - "docs/**"
-    - ".agents/memory/state/**"
-    - ".agents/references/**"
+    - "docs/AGENTS.md"
+    - ".agents/references/source_order.md"
   triggers:
     - "docs"
     - "Quarto"
     - "Typst"
     - "bibliography"
     - "public navigation"
-    - "memory alignment"
+    - "public/internal docs boundary"
+    - "docs source-order alignment"
   must_read:
     - "docs/AGENTS.md"
     - ".agents/references/source_order.md"
@@ -34,10 +35,13 @@ Use this skill for documentation or narrative work that crosses any of:
 - `README.md`, setup docs, Quarto pages, Typst paper, or slides
 - bibliography and literature references
 - generated context routing artifacts
-- canonical state docs or debriefs
+- docs/source-order alignment that explicitly affects public narrative
 - public/internal docs boundary decisions
 
 Do not use it for a localized typo fix unless source-of-truth alignment is at risk.
+Do not use it for memory-only, backlog-only, KG-consolidation, or internal
+operator-reference edits; use `agents-db`, `aria-litkg-memory`, or the owning
+skill instead.
 
 ## Read First
 
@@ -57,7 +61,8 @@ Do not use it for a localized typo fix unless source-of-truth alignment is at ri
   research-question, or literature-synthesis claims.
 - Link to canonical state or owning implementation docs instead of repeating long explanations.
 - Keep bibliography additions in `docs/references.bib`.
-- Update canonical memory when the current truth changes; otherwise record `canonical_updates_needed: []` in the debrief.
+- Update canonical memory only when docs work changes current truth; otherwise
+  record `canonical_updates_needed: []` in the debrief.
 - Use QMD frontmatter to classify rendered pages:
   `phase: thesis | seminar | archive | generated`,
   `audience: public | advisor | developer | agent`,

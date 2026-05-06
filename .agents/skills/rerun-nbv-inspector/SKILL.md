@@ -4,6 +4,7 @@ description: Use when creating, reviewing, or fixing ARIA-NBV Rerun integrations
 metadata:
   applies_to:
     - "aria_nbv/aria_nbv/app/**"
+    - "aria_nbv/aria_nbv/rerun_inspector/**"
     - "aria_nbv/aria_nbv/**/rerun*.py"
     - "docs/contents/impl/**"
     - ".agents/skills/rerun-nbv-inspector/**"

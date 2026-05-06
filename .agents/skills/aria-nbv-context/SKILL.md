@@ -13,7 +13,6 @@ metadata:
   must_read:
     - "AGENTS.md"
     - ".agents/references/source_order.md"
-    - "docs/_generated/context/source_index.md"
   verification:
     - "make context when generated context is stale or missing"
 ---
@@ -30,7 +29,9 @@ source-backed claim checking, active backlog routing, or consolidation.
 ## Retrieval Ladder
 
 1. Read `AGENTS.md` and `.agents/references/source_order.md`.
-2. Use `docs/_generated/context/source_index.md` for source-family routing.
+2. Use `docs/_generated/context/source_index.md` for source-family routing only
+   when it exists; run `make context` first only if the generated index is
+   needed and missing or stale.
 3. Open the nearest nested `AGENTS.md` once the surface is known.
 4. Use source-specific outline tools before broad raw reads:
    - Quarto: `scripts/nbv_qmd_outline.sh --compact`

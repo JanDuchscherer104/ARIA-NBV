@@ -3,9 +3,11 @@
 Use this map to pick the smallest relevant set of files before broad search.
 
 ## Fixed entrypoints
-- Highest-level ground truth: `docs/typst/seminar_paper/main.typ`
-- Canonical current truth: `.agents/memory/state/PROJECT_STATE.md`, `.agents/memory/state/DECISIONS.md`, `.agents/memory/state/OPEN_QUESTIONS.md`, `.agents/memory/state/GOTCHAS.md`
-- Hot-path reference: `.agents/references/python_conventions.md`
+- Source order and conflict rule: `.agents/references/source_order.md`
+- Implemented substrate: `docs/typst/seminar_paper/main.typ`
+- Current thesis direction: `docs/contents/thesis/roadmap.qmd`, `docs/contents/thesis/questions.qmd`, and `.agents/memory/state/PROJECT_STATE.md`, `.agents/memory/state/DECISIONS.md`, `.agents/memory/state/OPEN_QUESTIONS.md`, `.agents/memory/state/GOTCHAS.md`
+- Advisor proposal narrative: `docs/typst/thesis/proposal.typ`
+- Hot-path package reference: `.agents/references/python_conventions.md`
 - Broad source family index: `docs/_generated/context/source_index.md`
 - Secondary references: `.agents/references/agent_memory_templates.md`, `.agents/references/context7_library_ids.md`
 
@@ -24,7 +26,7 @@ Only the non-obvious cross-surface routes live here. Obvious file-name or headin
 | VIN offline stores and dataset splits | `.agents/memory/state/DECISIONS.md`, `.agents/memory/state/GOTCHAS.md` | `.agents/references/python_conventions.md` | `docs/typst/seminar_paper/sections/12h-appendix-offline-cache.typ` | `docs/contents/impl/data_pipeline_overview.qmd`, `docs/contents/setup.qmd` | `literature/tex-src/arXiv-EFM3D/dataset.tex` | `aria_nbv/aria_nbv/data_handling/_offline_dataset.py`, `aria_nbv/aria_nbv/data_handling/_offline_store.py`, `aria_nbv/aria_nbv/data_handling/_offline_writer.py` | `scripts/nbv_get_context.sh match VinOffline` |
 
 ## Reveal order by source family
-- Conceptual or architectural question: `main.typ` -> `.agents/memory/state/` -> `.agents/references/` -> this map -> source-specific outline/index
+- Conceptual or architectural question: `.agents/references/source_order.md` -> the source owning the touched role -> this map -> source-specific outline/index
 - Paper or doc structure question: `scripts/nbv_typst_includes.py --paper --mode outline` or `scripts/nbv_qmd_outline.sh --compact`
 - Literature-backed question: `scripts/nbv_literature_index.sh` -> `scripts/nbv_literature_search.sh "<term>"`
 - Code-backed question: `aria_nbv/AGENTS.md` -> `.agents/references/python_conventions.md` -> `.agents/memory/state/GOTCHAS.md` -> `scripts/nbv_get_context.sh contracts` -> `modules` or `match <term>` -> `functions` or `classes` -> raw file reads

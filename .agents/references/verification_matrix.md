@@ -6,7 +6,7 @@ when behavior crosses boundaries.
 ## Agent Scaffold, Skills, Memory
 
 - Skill validation:
-  `python3 /home/jd/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/<skill>`
+  `python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" .agents/skills/<skill>`
 - Agent memory:
   `make check-agent-memory`
 - Agents DB:
