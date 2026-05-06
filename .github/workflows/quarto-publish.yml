@@ -42,6 +42,9 @@ jobs:
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
+      - name: Set up Typst
+        uses: typst-community/setup-typst@v5.1.0
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
