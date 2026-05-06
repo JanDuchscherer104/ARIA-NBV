@@ -1,4 +1,4 @@
-# Immutable VIN offline-store build for the full local ASE scene 81286.
+# Immutable VIN offline-store build for all local ASE scenes.
 #
 # Usage:
 #   cd aria_nbv
@@ -50,7 +50,7 @@ store_dir = "vin_offline"
 
 [dataset]
 atek_variant = "efm"
-scene_ids    = ["81286"]
+scene_ids    = []
 batch_size   = 1
 wds_shuffle  = false
 wds_repeat   = false

@@ -7,10 +7,8 @@
         "gateway",
         "run",
         "--profile",
-        "codex"
-      ],
-      "startup_timeout_sec": 30,
-      "tool_timeout_sec": 120
+        "default"
+      ]
     },
     "code-index": {
       "command": "uvx",

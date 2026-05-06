@@ -119,6 +119,9 @@ def load_manifest(path: Path) -> list[ArxivSourceSpec]:
         if not isinstance(payload, dict):
             msg = f"Manifest line {line_number} in {path} must decode to a JSON object."
             raise ValueError(msg)
+        if not payload.get("arxiv_id"):
+            print(f"Skipping entry on line {line_number} (no arxiv_id)")
+            continue
         try:
             specs.append(ArxivSourceSpec.from_json(payload))
         except ValueError as exc:
