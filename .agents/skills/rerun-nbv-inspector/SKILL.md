@@ -13,7 +13,6 @@ metadata:
     - "offline inspector"
     - ".rrd"
     - "candidate frustum"
-    - "visual diagnostics"
   must_read:
     - "AGENTS.md"
     - "aria_nbv/AGENTS.md"

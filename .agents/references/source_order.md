@@ -1,18 +1,22 @@
 # ARIA-NBV Source Order
 
-Use this reference when a task needs current project truth or when sources
-appear to disagree.
+Use this reference when a task needs current project truth or sources disagree.
 
 ## Role Split
 
-- Implemented substrate: `docs/typst/seminar_paper/main.typ` and included
-  seminar-paper sections describe the system already written up and evaluated.
 - Current thesis direction: `docs/contents/thesis/roadmap.qmd`,
   `docs/contents/thesis/questions.qmd`, and `.agents/memory/state/` describe
   the active thesis plan, locked decisions, open questions, gotchas, and current
   state.
+- Current terminology: `docs/typst/shared/glossary.typ` owns terms and symbols;
+  `docs/contents/glossary.qmd` is generated public output.
+- Idea archive: `docs/contents/ideas.qmd` is read-only scratch/history, not
+  current direction.
 - Advisor proposal narrative: `docs/typst/thesis/proposal.typ` and its included
   sections own proposal-facing wording once proposal work is in scope.
+- Seminar evidence: `docs/typst/seminar_paper/main.typ` and included sections
+  describe the older implemented substrate and past seminar writeup. Use them
+  for historical evidence, not for current thesis priority.
 - Active maintenance work: `.agents/issues.toml`, `.agents/todos.toml`,
   `.agents/refactors.toml`, and `.agents/resolved.toml` via `make agents-db`.
 - Generated routing artifacts: `docs/_generated/context/source_index.md`,
@@ -22,10 +26,9 @@ appear to disagree.
 
 ## Conflict Rule
 
-When a source about future thesis scope conflicts with the seminar paper, keep
-the seminar paper authoritative for implemented evidence and use current thesis
-docs plus canonical memory for planned or locked future direction. Do not
-silently promote planned work to implemented results.
+When current thesis docs or canonical memory conflict with the seminar paper,
+prefer the current source for direction and keep the seminar paper as historical
+implemented evidence. Do not promote planned work to implemented results.
 
 ## Capture Rule
 

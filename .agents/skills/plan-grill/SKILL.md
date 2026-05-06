@@ -1,16 +1,14 @@
 ---
 name: plan-grill
-description: Stress-test ARIA-NBV plans, thesis-scope decisions, advisor questions, and cross-surface refactors before implementation. Use when the request is vague, high-impact, research-facing, or needs one decision at a time against the paper, glossary, roadmap, memory state, and package guides.
+description: Stress-test vague, high-impact, research-facing, advisor-facing, or cross-surface ARIA-NBV decisions before implementation.
 metadata:
   applies_to:
     - "**"
   triggers:
-    - "plan"
-    - "advisor"
-    - "scope decision"
-    - "thesis"
+    - "advisor-facing decision"
+    - "thesis scope"
     - "high-impact refactor"
-    - "KG architecture"
+    - "scaffold ownership"
   must_read:
     - ".agents/references/source_order.md"
     - "docs/contents/thesis/roadmap.qmd"
@@ -36,17 +34,10 @@ Do not use it for an already-localized bug with a concrete failing command; use
 
 ## Grounding
 
-Before asking the user, answer discoverable questions from:
-
-1. `.agents/references/source_order.md`
-2. `docs/typst/seminar_paper/main.typ` for implemented substrate claims
-3. `.agents/memory/state/PROJECT_STATE.md`
-4. `.agents/memory/state/DECISIONS.md`
-5. `.agents/memory/state/OPEN_QUESTIONS.md`
-6. `docs/typst/shared/glossary.typ`
-7. `docs/contents/thesis/roadmap.qmd`
-8. `docs/contents/thesis/questions.qmd`
-9. the nearest `AGENTS.md` for touched code or docs
+Before asking the user, resolve discoverable facts from
+`.agents/references/source_order.md` and the owning source for the decision.
+Use `docs/typst/shared/glossary.typ` for overloaded terms and the nearest
+`AGENTS.md` for touched code or docs.
 
 Use `aria-nbv-context` if the relevant surface is not yet localized.
 

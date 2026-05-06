@@ -5,8 +5,7 @@ title: "Karpathy-Style Agent Scaffold Cleanup"
 status: done
 topics: [scaffold, skills, litkg, agents-db, docs]
 confidence: high
-canonical_updates_needed:
-  - .agents/memory/state/DECISIONS.md
+canonical_updates_needed: []
 files_touched:
   - AGENTS.md
   - docs/AGENTS.md
@@ -19,8 +18,8 @@ files_touched:
 
 ## Task
 
-Implement the planned Karpathy-style scaffold cleanup against the review in
-`.agents/work/agents-scaffold/review-scaffold-against-kaparthy-skills-gpt55pro.md`.
+Implement the planned Karpathy-style scaffold cleanup against local review notes
+and PR feedback.
 
 ## Method
 
@@ -33,7 +32,7 @@ KG-backed retrieval, and KG implementation.
 ## Findings
 
 The stale scaffold claims were real: root/docs guidance over-elevated the
-seminar paper as all-purpose truth, `AGENTS_INTERNAL_DB.md` still named the NBV
+seminar paper, `AGENTS_INTERNAL_DB.md` still named the NBV
 Gym simulator as research core, and rollout skill activation still treated
 Gymnasium/SB3 as too central. Those were corrected while keeping Gym/SB3 as a
 post-M6 bridge.
@@ -47,6 +46,11 @@ documented agent-facing context-pack schema.
 Follow-up PR review fixes kept the same scope and corrected stale source-order
 generation, overly broad docs routing metadata, portable skill validation
 wording, Rerun inspector routing globs, and litkg-rs validation commands.
+
+A later ruthless simplification pass demoted the seminar paper to historical
+implemented evidence, collapsed duplicated source-order ladders, tightened
+noisy routing triggers, and removed unresolved `.agents/work/` provenance from
+tracked backlog records.
 
 ## Verification
 

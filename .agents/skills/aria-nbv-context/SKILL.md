@@ -8,7 +8,6 @@ metadata:
     - "locate files"
     - "cross-surface context"
     - "where is this implemented"
-    - "architecture map"
     - "source family"
   must_read:
     - "AGENTS.md"
@@ -26,23 +25,19 @@ diagnostic workflow.
 Use `aria-litkg-memory` instead when the task needs KG-backed retrieval,
 source-backed claim checking, active backlog routing, or consolidation.
 
-## Retrieval Ladder
+## Workflow
 
 1. Read `AGENTS.md` and `.agents/references/source_order.md`.
-2. Use `docs/_generated/context/source_index.md` for source-family routing only
-   when it exists; run `make context` first only if the generated index is
-   needed and missing or stale.
-3. Open the nearest nested `AGENTS.md` once the surface is known.
-4. Use source-specific outline tools before broad raw reads:
+2. Use `docs/_generated/context/source_index.md` only when it already exists or
+   source-family routing is unclear; refresh with `make context` only when
+   needed.
+3. Use source-specific outline tools before broad raw reads:
    - Quarto: `scripts/nbv_qmd_outline.sh --compact`
-   - Typst paper: `scripts/nbv_typst_includes.py --paper --mode outline`
+   - Typst: `scripts/nbv_typst_includes.py --paper --mode outline`
    - Literature: `scripts/nbv_literature_index.sh`
-   - Code: `scripts/nbv_get_context.sh modules|contracts|match <term>`
+   - Code/contracts: `scripts/nbv_get_context.sh modules|contracts|match <term>`
+4. Open the nearest nested `AGENTS.md` once the surface is known.
 5. Use targeted `rg` inside the narrowed file set.
-6. Refresh with `make context` only when lightweight generated context is stale
-   or missing.
-7. Use `make context-heavy` or specific heavy context targets only after lighter
-   discovery fails.
 
 ## Do Not Use When
 
@@ -66,4 +61,3 @@ When asked to map a surface, return:
 ## References
 
 - `references/context_map.md` for non-obvious concept-to-source routing.
-- `.agents/references/source_order.md` for role-specific truth ownership.

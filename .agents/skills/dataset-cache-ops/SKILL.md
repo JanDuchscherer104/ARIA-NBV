@@ -11,8 +11,6 @@ metadata:
     - "ASE download"
     - "ATEK shard"
     - "offline store"
-    - "manifest"
-    - "split"
     - "data smoke"
   must_read:
     - "aria_nbv/aria_nbv/data_handling/AGENTS.md"

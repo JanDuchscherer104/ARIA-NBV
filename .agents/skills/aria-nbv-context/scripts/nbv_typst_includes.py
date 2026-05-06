@@ -88,7 +88,7 @@ def main() -> int:
     script_dir = Path(__file__).resolve().parent
     repo_root = (script_dir / "../../../../").resolve()
     default_typst_root = (repo_root / "docs" / "typst").resolve()
-    default_paper = default_typst_root / "paper" / "main.typ"
+    default_paper = default_typst_root / "seminar_paper" / "main.typ"
     default_slides = default_typst_root / "seminar_slides"
 
     parser = argparse.ArgumentParser(

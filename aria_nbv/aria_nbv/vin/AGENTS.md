@@ -12,7 +12,7 @@ Apply this file when working under `aria_nbv/aria_nbv/vin/`.
 - Core scorer surface: `aria_nbv/aria_nbv/vin/model_v3.py`, `vin_utils.py`, `summarize_v3.py`
 - Shared batch and snippet containers: `aria_nbv/aria_nbv/data_handling/efm_views.py`, `aria_nbv/aria_nbv/data_handling/vin_oracle_types.py`
 - Training integration: `aria_nbv/aria_nbv/lightning/lit_module.py`, `lit_datamodule.py`
-- Narrative surfaces: `docs/typst/paper/sections/06-architecture.typ`, `07-training-objective.typ`, `12g-appendix-vin-v3-streamline.typ`
+- Narrative surfaces: `docs/typst/seminar_paper/sections/06-architecture.typ`, `docs/typst/seminar_paper/sections/07-training-objective.typ`, `docs/typst/seminar_paper/sections/12g-appendix-vin-v3-streamline.typ`
 
 ## Boundary Rules
 - Treat scorer inputs, prediction semantics, and shared batch/container shapes as cross-surface contracts across VIN, Lightning, diagnostics, and docs.

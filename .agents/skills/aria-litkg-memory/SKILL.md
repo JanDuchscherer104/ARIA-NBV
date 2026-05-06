@@ -8,9 +8,7 @@ metadata:
     - "kg-route"
     - "claim check"
     - "source-backed"
-    - "current truth"
     - "consolidate memory"
-    - "litkg retrieval"
   must_read:
     - "AGENTS.md"
     - ".agents/references/source_order.md"
@@ -46,17 +44,8 @@ when changing KG tooling, source coverage, or backend contracts.
 ## Source Authority
 
 Until litkg retrieval exposes explicit authority/freshness metadata everywhere,
-rank sources using `.agents/references/source_order.md`:
-
-1. Current code, tests, configs, and active generated artifacts for implemented
-   behavior.
-2. `.agents/memory/state/` for durable current truth.
-3. Root/nested `AGENTS.md` and `.agents/skills/` for workflow contracts.
-4. Active `.agents/*.toml` backlog.
-5. Current Typst/Quarto authored docs for their source role.
-6. Generated context.
-7. Debrief history, work notes, archives, and external papers unless the query
-   specifically asks for them.
+rank sources with `.agents/references/source_order.md` and inspect cited
+canonical sources before treating retrieved statements as current truth.
 
 ## Fallback
 

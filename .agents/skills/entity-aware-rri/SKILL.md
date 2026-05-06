@@ -11,11 +11,7 @@ metadata:
     - "target RRI"
     - "entity-aware"
     - "GT OBB"
-    - "V0 target"
-    - "V1 observed target"
     - "OBS-SEL"
-    - "PRED-Q"
-    - "GT-EVAL"
   must_read:
     - "docs/contents/thesis/roadmap.qmd#roadmap-m3"
     - "docs/contents/thesis/questions.qmd#rq2-target-encoding"

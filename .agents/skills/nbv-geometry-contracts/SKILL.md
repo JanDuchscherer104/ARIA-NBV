@@ -11,9 +11,7 @@ metadata:
     - "PoseTW"
     - "CameraTW"
     - "CW90"
-    - "PyTorch3D"
     - "backprojection"
-    - "frustum"
   must_read:
     - "AGENTS.md"
     - "aria_nbv/AGENTS.md"
@@ -21,6 +19,7 @@ metadata:
   verification:
     - "cd aria_nbv && uv run pytest tests/pose_generation tests/rendering"
     - "cd aria_nbv && uv run pytest tests/rri_metrics when labels change"
+    - "make context-contracts when generated contract context is needed"
 ---
 
 # NBV Geometry Contracts
@@ -43,6 +42,8 @@ Do not use it for pure model-head, docs-only, or non-geometry app changes.
 3. `.agents/memory/state/GOTCHAS.md`
 4. `aria_nbv/aria_nbv/vin/AGENTS.md` when VIN batch/candidate fields are touched
 5. The focused rendering or pose-generation tests for the changed path
+6. `docs/_generated/context/data_contracts.md` only after `make
+   context-contracts` when you need the generated contract index
 
 ## Contract Rules
 

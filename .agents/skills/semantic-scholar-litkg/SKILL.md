@@ -11,9 +11,7 @@ metadata:
     - "litkg-rs implementation"
     - "Semantic Scholar"
     - "KG config"
-    - "graphify"
     - "Neo4j export"
-    - "source adapter"
   must_read:
     - "AGENTS.md"
     - ".agents/references/litkg_quick_reference.md"

@@ -9,8 +9,6 @@ metadata:
     - "regression"
     - "failing test"
     - "suspicious metric"
-    - "broken docs"
-    - "KG failure"
   must_read:
     - "AGENTS.md"
     - ".agents/memory/state/GOTCHAS.md"

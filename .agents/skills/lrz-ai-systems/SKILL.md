@@ -12,8 +12,6 @@ metadata:
     - "Slurm"
     - "DSS"
     - "Pyxis"
-    - "Enroot"
-    - "remote compute"
   must_read:
     - ".agents/skills/lrz-ai-systems/references/cheatsheet.md"
     - ".agents/skills/lrz-ai-systems/references/storage-dss.md"

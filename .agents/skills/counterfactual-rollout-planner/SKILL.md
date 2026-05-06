@@ -11,8 +11,6 @@ metadata:
     - "counterfactual rollout"
     - "bounded lookahead"
     - "Q_H"
-    - "fitted Double-Q"
-    - "stochastic rollout"
     - "invalid action"
   must_read:
     - "docs/contents/thesis/roadmap.qmd#roadmap-m5"

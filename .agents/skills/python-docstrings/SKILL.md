@@ -7,7 +7,6 @@ metadata:
   triggers:
     - "docstring"
     - "API docs"
-    - "module docs"
     - "shape docs"
     - "contract docs"
   must_read:

@@ -11,7 +11,6 @@ metadata:
   triggers:
     - "agents DB"
     - "backlog"
-    - "todo"
     - "issue triage"
     - "resolved work"
   must_read:

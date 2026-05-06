@@ -8,8 +8,8 @@ type = "maintenance"
 priority = "high"
 status = "open"
 labels = ["docs", "hygiene"]
-context = ["Root guidance now uses role-split source order: seminar paper for implemented substrate, thesis docs and canonical memory for active direction, proposal Typst for advisor narrative, and active backlog/generated context/operator references as separate internal roles.", "The docs guide asks Quarto to stay aligned with the owning source role and keep internal agent guidance/generated context out of public navigation."]
-references = ["repo:AGENTS.md#source-order", "repo:docs/AGENTS.md", "repo:.agents/references/source_order.md", "repo:docs/contents/thesis/questions.qmd#kg-friendly-question-writing"]
+context = ["Root guidance now points to canonical source order instead of restating a ladder: thesis docs and canonical memory own active direction, glossary source owns terminology, proposal Typst owns advisor wording, and the seminar paper is historical implemented evidence.", "The docs guide asks Quarto to stay aligned with the owning source role and keep internal agent guidance/generated context out of public navigation."]
+references = ["repo:AGENTS.md#source-order", "repo:docs/AGENTS.md", "repo:.agents/references/source_order.md", "repo:docs/contents/thesis/questions.qmd#rq-kg-writing"]
 
 [[issue]]
 id = "issue-007"
@@ -53,7 +53,7 @@ priority = "high"
 status = "open"
 labels = ["agent", "skills", "scaffold"]
 context = ["Root guidance now routes non-trivial work through agent-behavior and separates local discovery, KG-backed retrieval, and KG implementation skills.", "All repo-local skills now carry applies_to/triggers/must_read/verification under frontmatter metadata for future litkg routing, but litkg-rs does not yet consume those fields as first-class routing data.", "The remaining research-skill gap is narrower than the original issue: todo-003 covers oracle-RRI contract routing and todo-004 covers VIN training/evaluation routing."]
-references = ["repo:AGENTS.md#routing", "repo:.agents/skills/agent-behavior/SKILL.md", "repo:.agents/references/skill_style_guide.md", "repo:.agents/skills/", "repo:.agents/todos.toml#todo-003", "repo:.agents/todos.toml#todo-004", "repo:.agents/work/agents-scaffold/review-scaffold-against-kaparthy-skills-gpt55pro.md"]
+references = ["repo:AGENTS.md#routing", "repo:.agents/skills/agent-behavior/SKILL.md", "repo:.agents/references/skill_style_guide.md", "repo:.agents/skills/", "repo:.agents/todos.toml#todo-003", "repo:.agents/todos.toml#todo-004"]
 
 [[issue]]
 id = "issue-013"
@@ -75,7 +75,7 @@ priority = "high"
 status = "open"
 labels = ["rollouts", "data", "contracts", "storage", "thesis"]
 context = ["Bounded rollouts are now part of the thesis direction, and resolved todo-025 added typed RolloutTrace, RolloutStepTrace, RolloutLineage, MessagePack IO, a synthetic smoke command, and tests.", "The remaining gap is the large-scale dataset/reporting layer for ASE oracle rollouts and target-conditioned fitted Double-Q: Zarr-first groups, replay/evaluation payloads, lineage manifests, cumulative-metric reports, Q_H training fields, and storage-footprint summaries.", "The store must be rich enough for training and evaluation without duplicating raw ASE/ATEK products: full meshes are external path/hash/version references, while high-detail target mesh crops are embedded once per target with crop metadata.", "Large sequence data should not be generated until this storage/reporting contract is explicit and compatible with deterministic sharding."]
-references = ["repo:docs/contents/thesis/questions.qmd#rq5-planning", "repo:docs/contents/thesis/questions.qmd#rq7-scaling", "repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/aria_nbv/pose_generation/rollout_trace.py", "repo:.agents/resolved.toml#todo-025", "repo:.agents/work/alignment-distillation-follow-up-review-gpt55pro.md#5-agent-db-review", "url:https://zarr-specs.readthedocs.io/en/latest/v3/core/index.html", "bib:TrajectoryTransformer-janner2021"]
+references = ["repo:docs/contents/thesis/questions.qmd#rq5-planning", "repo:docs/contents/thesis/questions.qmd#rq7-scaling", "repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/aria_nbv/pose_generation/rollout_trace.py", "repo:.agents/resolved.toml#todo-025", "url:https://zarr-specs.readthedocs.io/en/latest/v3/core/index.html", "bib:TrajectoryTransformer-janner2021"]
 
 [[issue]]
 id = "issue-019"
@@ -163,7 +163,7 @@ priority = "high"
 status = "open"
 labels = ["thesis", "proposal", "docs", "bibliography", "advisor"]
 context = ["The follow-up review identified the proposal as directionally aligned but not yet frozen: title/name consistency, examiner placeholders, dataset limits, invalidity semantics, and minimum/full/stretch path all need an advisor-grade pass.", "The newer alignment decision replaces the old three-tier boundary with implemented substrate, prerequisite core, hard thesis core, and stretch, and moves target-conditioned fitted Double-Q / Q_H into the hard thesis core.", "The same review found citation hygiene debt in docs/references.bib, including Wikipedia entries, a generated citation comment, duplicate FiLM entries, and metadata that should be externally audited before submission.", "Roadmap and questions should treat proposal freeze, primary-metadata bibliography audit, and tracked proposal PDF after freeze as part of M0/M1 groundwork rather than a late writing afterthought."]
-references = ["repo:.agents/work/alignment-distillation-follow-up-review-gpt55pro.md#3-thesis-proposal-review", "repo:.agents/work/alignment-distillation-follow-up-review-gpt55pro.md#6-concrete-proposal-edits", "repo:docs/typst/thesis/proposal.typ", "repo:docs/references.bib", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m0", "repo:Makefile#proposal-pdf"]
+references = ["repo:docs/typst/thesis/proposal.typ", "repo:docs/references.bib", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m0", "repo:Makefile#proposal-pdf"]
 
 [[issue]]
 id = "issue-028"

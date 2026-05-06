@@ -10,8 +10,6 @@ metadata:
     - "simplify"
     - "prune"
     - "dead code"
-    - "reduce LOC"
-    - "remove boilerplate"
     - "ruthless simplification"
   must_read:
     - "AGENTS.md"

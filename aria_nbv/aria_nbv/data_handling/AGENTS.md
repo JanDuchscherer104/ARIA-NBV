@@ -13,7 +13,7 @@ Apply this file when working under `aria_nbv/aria_nbv/data_handling/`.
 - Raw snippet and typed container surface: `efm_dataset.py`, `efm_views.py`, `efm_snippet_loader.py`
 - Immutable offline store contracts: `_offline_format.py`, `_offline_store.py`, `_offline_writer.py`, `_offline_dataset.py`
 - VIN datamodule source contracts: `_vin_sources.py`, `_vin_runtime.py`, `_vin_oracle_dataset.py`, `_vin_oracle_types.py`
-- Narrative surfaces: `aria_nbv/aria_nbv/data_handling/README.md`, `docs/contents/impl/data_pipeline_overview.qmd`, `docs/typst/paper/sections/12h-appendix-offline-cache.typ`
+- Narrative surfaces: `aria_nbv/aria_nbv/data_handling/README.md`, `docs/contents/impl/data_pipeline_overview.qmd`, `docs/typst/seminar_paper/sections/12h-appendix-offline-cache.typ`
 
 ## Boundary Rules
 - `aria_nbv.data_handling` is the active owner of raw snippets, VIN oracle batches, and the immutable VIN offline store.
