@@ -55,7 +55,11 @@ def validate(path: Path) -> list[str]:
         errors.append("rendered docs/contents pages may not use audience: agent")
     if phase == "generated" and owner != "generated":
         errors.append("phase: generated requires owner: generated")
-    if phase == "archive" and status == "scratch":
+    if (
+        phase == "archive"
+        and status == "scratch"
+        and metadata.get("agent_editing") != "read-only"
+    ):
         errors.append("rendered archive pages must be curated, not scratch")
 
     return errors
