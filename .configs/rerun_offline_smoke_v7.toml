@@ -11,12 +11,11 @@
     load_gt_obbs             = true
     load_detected_obbs       = true
     load_trajectory_metadata = true
-    load_counterfactuals     = false
     return_format            = "sample"
     map_location             = "cpu"
 
         [dataset.offline.store]
-        store_dir = "vin_offline_rerun_smoke_v6"
+        store_dir = "vin_offline_rerun_smoke_v7"
 
 [selection]
 split = "val"
@@ -25,7 +24,7 @@ index = 0
 [output]
 mode                = "save"
 application_id      = "aria-nbv-rerun-inspector"
-save_path           = "../.artifacts/rerun/offline_smoke_v6.rrd"
+save_path           = "../.artifacts/rerun/offline_smoke_v7.rrd"
 spawn_port          = 9876
 spawn_memory_limit  = "75%"
 hide_welcome_screen = true

@@ -58,17 +58,24 @@ embedding_dim = 2560
 chat_model = "gemma4:26b"
 
 [authority_tiers]
-".agents/memory/state/*.md" = 1.5
-".agents/*.toml" = 1.2
-"AGENTS.md" = 1.2
-"**/AGENTS.md" = 1.2
+".agents/memory/state/*.md" = 1.7
+"docs/contents/thesis/roadmap.qmd" = 1.6
+"docs/contents/thesis/questions.qmd" = 1.6
+"docs/typst/thesis/proposal.typ" = 1.6
+"docs/typst/thesis/**/*.typ" = 1.4
+"aria_nbv/**/*.py" = 1.6
+".agents/*.toml" = 1.3
+"AGENTS.md" = 1.3
+"**/AGENTS.md" = 1.3
 ".agents/skills/**/*.md" = 1.1
 ".agents/references/**/*.md" = 1.1
-"aria_nbv/**/*.py" = 1.5
-"docs/typst/seminar_paper/main.typ" = 1.5
-"docs/contents/thesis/*.qmd" = 1.2
+"docs/typst/seminar_paper/**/*.typ" = 0.8
 "docs/_generated/context/*.md" = 0.8
 ".agents/memory/history/**/*.md" = 0.5
+".agents/memory/transcripts/distilled/**/*.jsonl" = 0.95
+".agents/memory/transcripts/user/**/*.jsonl" = 0.6
+".agents/memory/transcripts/raw/**/*.jsonl" = 0.25
+".agents/work/**/*.md" = 0.2
 
 [project]
 id = "aria-nbv"
@@ -77,6 +84,7 @@ root = "."
 
 [sources.agent_guidance]
 required = true
+authority = "current_guidance"
 include = [
   "AGENTS.md",
   "aria_nbv/AGENTS.md",
@@ -89,6 +97,7 @@ include = [
 
 [sources.agent_memory]
 required = true
+authority = "agent_memory"
 include = [
   ".agents/memory/state/*.md",
   ".agents/issues.toml",
@@ -125,7 +134,21 @@ required = false
 authority = "episodic"
 include = [
   ".agents/memory/history/**/*.md",
-  ".agents/work/**/*.md",
+]
+
+[sources.codex_transcript_distillates]
+required = false
+authority = "distilled_transcript"
+include = [
+  ".agents/memory/transcripts/distilled/**/*.jsonl",
+]
+
+[sources.codex_transcript_raw]
+required = false
+authority = "raw_transcript"
+include = [
+  ".agents/memory/transcripts/user/**/*.jsonl",
+  ".agents/memory/transcripts/raw/**/*.jsonl",
 ]
 
 [sources.agent_skills]
@@ -163,6 +186,7 @@ exclude = [
 
 [sources.python]
 required = true
+authority = "implementation"
 include = ["aria_nbv/aria_nbv/**/*.py"]
 exclude = [
   "**/.venv/**",
@@ -174,6 +198,7 @@ edges = "codegraphcontext"
 
 [sources.quarto]
 required = true
+authority = "public_docs"
 include = [
   "docs/index.qmd",
   "docs/contents/**/*.qmd",
@@ -184,8 +209,17 @@ exclude = [
   "docs/_site/**",
 ]
 
+[sources.current_thesis]
+required = true
+authority = "current_thesis"
+include = [
+  "docs/contents/thesis/roadmap.qmd",
+  "docs/contents/thesis/questions.qmd",
+]
+
 [sources.glossary]
 required = true
+authority = "terminology"
 include = [
   "docs/typst/shared/glossary.typ",
   "docs/glossary/terms.yml",
@@ -194,6 +228,7 @@ include = [
 
 [sources.typst]
 required = true
+authority = "typst_docs"
 include = [
   "docs/typst/seminar_paper/**/*.typ",
   "docs/typst/seminar_slides/**/*.typ",
@@ -209,8 +244,29 @@ entrypoints = [
   "docs/typst/thesis_slides/slides_thesis_outlook.typ",
 ]
 
+[sources.thesis_proposal]
+required = true
+authority = "advisor_proposal"
+include = [
+  "docs/typst/thesis/**/*.typ",
+]
+entrypoints = [
+  "docs/typst/thesis/proposal.typ",
+]
+
+[sources.seminar_paper]
+required = false
+authority = "historical_evidence"
+include = [
+  "docs/typst/seminar_paper/**/*.typ",
+]
+entrypoints = [
+  "docs/typst/seminar_paper/main.typ",
+]
+
 [sources.literature]
 required = true
+authority = "literature"
 manifest = "docs/literature/sources.jsonl"
 bib = "docs/references.bib"
 pdfs = "docs/literature/pdf/*.pdf"
@@ -245,6 +301,7 @@ urls = []
 # - Neo4j is an optional traversal/runtime DB over exported bundles.
 # - Graphiti is optional temporal ingestion.
 # - MemPalace remains separate episodic memory mining through make memory-mine.
+# - Static kg-route/kg-query/claim-check quality comes before live graph UX.
 [representation]
 primary = "graphify"
 durable_exports = ["graphify", "neo4j_export"]

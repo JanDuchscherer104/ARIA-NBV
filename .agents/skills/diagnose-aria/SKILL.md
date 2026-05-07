@@ -1,7 +1,21 @@
 ---
 name: diagnose-aria
-description: Diagnose ARIA-NBV bugs, regressions, failing metrics, Streamlit issues, docs builds, KG ingestion failures, or performance regressions through a reproducible feedback loop. Use when something is broken, flaky, slow, miscalibrated, or producing suspicious geometry/RRI/VIN outputs.
+description: Use to diagnose ARIA-NBV bugs, regressions, failing metrics, Streamlit issues, docs builds, KG failures, or suspicious outputs.
 metadata:
+  mode: diagnostic
+  not_when:
+    - "broad planning without a concrete symptom"
+    - "pure source localization with no failure"
+    - "reviewing concrete diffs rather than reproducing a symptom"
+  handoff_to:
+    - "plan-grill for broad planning without a concrete symptom"
+    - "aria-nbv-context for localizing an unknown failure surface"
+    - "code-review for diff review"
+    - "specialized contract skills after the failing surface is known"
+  evidence_required:
+    - "smallest reproducible failing loop or explicit reason none exists"
+    - "exact command, traceback, metric, or bad output"
+    - "passing loop after the fix"
   applies_to:
     - "**"
   triggers:
@@ -28,9 +42,6 @@ Use this skill for hard bugs or regressions in:
 - immutable VIN offline stores, manifests, split files, or data smoke checks
 - Streamlit panels, Quarto / Typst renders, KG ingestion, or CLI failures
 - metric drift, calibration collapse, performance regressions, or flaky tests
-
-Do not use it for broad planning without a concrete symptom; use `plan-grill`
-for that.
 
 ## Feedback Loop First
 
@@ -69,13 +80,10 @@ through `agents-db`.
 If no good test seam exists, record that as architecture debt in
 `.agents/issues.toml` or `.agents/refactors.toml` through `agents-db`.
 
-## ARIA Checks
+## Specialized Evidence
 
-- Geometry changes should also use `nbv-geometry-contracts`.
-- Data/offline-store changes should also use `dataset-cache-ops`.
-- Target/entity RRI changes should also use `entity-aware-rri`.
-- Rollout/RL failures should also use `counterfactual-rollout-planner`.
-- Docs or memory changes should also use `docs-curator`.
+After the failing surface is known, include the relevant contract skill named
+by root routing or nested package guidance in the repro and verification loop.
 
 ## Completion
 

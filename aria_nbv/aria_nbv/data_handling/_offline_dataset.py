@@ -113,9 +113,6 @@ class VinOfflineSample:
     candidate_pcs: CandidatePointClouds | None = None
     """Optional cached candidate point clouds."""
 
-    counterfactuals: dict[str, Any] | None = None
-    """Optional future counterfactual trajectory payload."""
-
     efm_snippet_view: EfmSnippetView | None = None
     """Optional raw EFM snippet view attached live from the source dataset."""
 
@@ -205,9 +202,6 @@ class VinOfflineDatasetConfig(BaseConfig):
 
     load_candidate_pcs: bool = True
     """Whether to decode cached candidate point clouds."""
-
-    load_counterfactuals: bool = True
-    """Whether to decode future counterfactual blocks when present."""
 
     load_gt_obbs: bool = True
     """Whether to decode compact GT OBB blocks."""
@@ -647,20 +641,6 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
             return None
         return CandidatePointClouds.from_serializable(payload, device=self.config.map_location)
 
-    def _build_counterfactuals(self, record: VinOfflineIndexRecord) -> dict[str, Any] | None:
-        """Decode future counterfactual payloads when requested.
-
-        Args:
-            record: Sample-index record.
-
-        Returns:
-            Stored counterfactual payload or ``None``.
-        """
-
-        if not self.config.load_counterfactuals:
-            return None
-        return self._store.read_optional_record(record, "counterfactuals")
-
     def _build_gt_obbs(self, record: VinOfflineIndexRecord) -> CompactObbBlock | None:
         """Decode compact GT OBB tensors when requested and available."""
 
@@ -803,7 +783,6 @@ class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
             backbone_out=self._build_backbone(record),
             depths=self._build_depths(record, oracle),
             candidate_pcs=self._build_candidate_pcs(record),
-            counterfactuals=self._build_counterfactuals(record),
             efm_snippet_view=self._attach_efm_snippet(record, vin_snippet),
             gt_obbs=self._build_gt_obbs(record),
             detected_obbs=self._build_detected_obbs(record),

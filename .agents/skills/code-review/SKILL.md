@@ -1,7 +1,20 @@
 ---
 name: code-review-aria-nbv
-description: Use when reviewing ARIA-NBV changes in the working tree or on a GitHub pull request, especially to produce severity-ranked findings with file and line references for Python, Quarto, Typst, config, and agent-memory changes.
+description: Use when reviewing ARIA-NBV working-tree or PR diffs and producing severity-ranked findings with file and line references.
 metadata:
+  mode: review
+  not_when:
+    - "pure implementation without a review request"
+    - "architecture brainstorming without concrete diffs"
+    - "GitHub review-thread state matters but gh-address-comments is unavailable"
+  handoff_to:
+    - "github:gh-address-comments for unresolved GitHub review threads"
+    - "plan-grill for architecture decisions without concrete diffs"
+    - "diagnose-aria when a finding needs reproduction"
+  evidence_required:
+    - "review surface from git diff, PR diff, or named files"
+    - "nearest owner guidance for touched surfaces"
+    - "line-referenced findings or explicit no-findings statement"
   applies_to:
     - "**"
   triggers:
@@ -27,12 +40,6 @@ Use this skill when the task is to:
 - review a GitHub pull request diff or requested-review state
 - review agent-memory, docs, data-contract, RRI, VIN, or Streamlit changes
 - aggregate accepted review feedback into follow-up edits or agents DB records
-
-Do not use this skill for:
-
-- pure implementation without a review ask
-- general architecture brainstorming without concrete diffs
-- replying to GitHub review threads without also using `github:gh-address-comments` when thread state matters
 
 ## Grounding
 

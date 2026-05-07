@@ -8,7 +8,6 @@ include_backbone            = true
 include_depths              = true
 include_pointclouds         = true
 include_diagnostic_payloads = true
-include_counterfactuals     = false
 vin_pad_points              = 50000
 semidense_max_points        = 16384
 semidense_include_obs_count = false

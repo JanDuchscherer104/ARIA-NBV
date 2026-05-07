@@ -272,7 +272,6 @@ class VinDataModule(pl.LightningDataModule):
                     "load_candidates": cfg.load_candidates,
                     "load_depths": cfg.load_depths,
                     "load_candidate_pcs": cfg.load_candidate_pcs,
-                    "load_counterfactuals": cfg.load_counterfactuals,
                     "limit": cfg.limit,
                 }
             )

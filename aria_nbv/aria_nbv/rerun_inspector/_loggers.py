@@ -34,6 +34,7 @@ class RerunModule(Protocol):
     Boxes3D: RerunEntityFactory
     AnyValues: RerunEntityFactory
     TextDocument: RerunEntityFactory
+    Scalar: RerunEntityFactory
     Transform3D: RerunEntityFactory
     Mesh3D: RerunEntityFactory
     Image: RerunEntityFactory
@@ -56,6 +57,9 @@ class RerunModule(Protocol):
 
     def log(self, entity_path: str, entity: object, *args: object, **kwargs: object) -> None:
         """Log one entity."""
+
+    def set_time_sequence(self, timeline: str, sequence: int, **kwargs: object) -> None:
+        """Set an integer timeline for subsequent logs."""
 
 
 ENTITY_WORLD = "world"
@@ -121,6 +125,44 @@ def deterministic_downsample(points: object, *, max_points: int, seed: int | Non
     rng = np.random.default_rng(seed)
     indices = np.sort(rng.choice(arr.shape[0], size=max_points, replace=False))
     return arr[indices]
+
+
+def log_default_inspector_blueprint(rr_module: RerunModule) -> None:
+    """Send the default inspector layout when the installed Rerun SDK supports blueprints."""
+
+    send_blueprint = getattr(rr_module, "send_blueprint", None)
+    if send_blueprint is None:
+        return
+    try:
+        import rerun.blueprint as rrb
+
+        blueprint = rrb.Blueprint(
+            rrb.Horizontal(
+                rrb.Spatial3DView(
+                    name="World",
+                    origin="world",
+                    contents=["world/**"],
+                ),
+                rrb.Vertical(
+                    rrb.TimeSeriesView(
+                        name="Rollout Scalars",
+                        origin="plots/rollout",
+                        contents=["plots/rollout/**"],
+                    ),
+                    rrb.TextDocumentView(
+                        name="Metadata",
+                        origin="metadata",
+                        contents=["metadata/**"],
+                    ),
+                    row_shares=[2, 1],
+                ),
+                column_shares=[3, 1],
+            ),
+            collapse_panels=False,
+        )
+        send_blueprint(blueprint, make_active=True, make_default=True)
+    except Exception:
+        return
 
 
 def _candidate_count(sample: VinOfflineSample) -> int:
@@ -889,6 +931,7 @@ class RerunOfflineLogger:
             self.rr.connect_grpc(output.connect_addr)
         else:  # pragma: no cover - pydantic constrains this.
             raise ValueError(f"Unsupported Rerun output mode: {output.mode}")
+        log_default_inspector_blueprint(self.rr)
         self._log_world_coordinates()
 
     def log_sample(
@@ -1296,4 +1339,5 @@ __all__ = [
     "ENTITY_WORLD",
     "RerunOfflineLogger",
     "deterministic_downsample",
+    "log_default_inspector_blueprint",
 ]

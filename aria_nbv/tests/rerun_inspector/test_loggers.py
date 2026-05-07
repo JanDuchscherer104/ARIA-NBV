@@ -48,6 +48,7 @@ class _FakeRerun:
     Boxes3D = _Archetype
     AnyValues = _Archetype
     TextDocument = _Archetype
+    Scalar = _Archetype
     Transform3D = _Archetype
     Mesh3D = _Archetype
     Image = _Archetype
@@ -88,6 +89,9 @@ class _FakeRerun:
         self.logged[entity_path] = entity
         self.logged_extras[entity_path] = args
         self.logged_kwargs[entity_path] = kwargs
+
+    def set_time_sequence(self, *args: Any, **kwargs: Any) -> None:
+        self.calls.append(("set_time_sequence", args, kwargs))
 
 
 def _poses(translations: list[list[float]]) -> PoseTW:

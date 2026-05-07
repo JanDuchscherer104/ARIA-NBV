@@ -29,7 +29,7 @@ Use one repo-level TOML config as the operator entrypoint. Keep names stable and
 ```toml
 [repo]
 id = "aria-nbv"
-root = "/home/jd/repos/ARIA-NBV"
+root = "."
 
 [literature]
 bib_path = "docs/references.bib"

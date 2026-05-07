@@ -1,7 +1,20 @@
 ---
 name: semantic-scholar-litkg
-description: Use when designing, implementing, reviewing, or operating ARIA-NBV litkg-rs knowledge-graph ingestion, KG config, backend/export contracts, Semantic Scholar enrichment, source adapters, or generated KG artifacts.
+description: Use when changing or operating ARIA-NBV litkg-rs ingestion, KG config, backend/export contracts, source adapters, or generated KG artifacts.
 metadata:
+  mode: implementation
+  not_when:
+    - "ordinary KG retrieval, task routing, claim checks, or consolidation"
+    - "local source discovery without KG tooling changes"
+    - "agent backlog edits without litkg integration impact"
+  handoff_to:
+    - "aria-litkg-memory for retrieval, routing, claim checks, or consolidation"
+    - "aria-nbv-context for deterministic local discovery"
+    - "agents-db for backlog-only records"
+  evidence_required:
+    - "litkg-rs owner boundary or existing adapter inspection"
+    - "official API documentation for Semantic Scholar behavior changes"
+    - "KG capability or smoke output for ARIA config changes"
   applies_to:
     - ".agents/external/litkg-rs/**"
     - ".configs/litkg.toml"
@@ -19,16 +32,14 @@ metadata:
     - ".agents/skills/semantic-scholar-litkg/references/integration-spec.md"
   verification:
     - "make kg-capabilities KG_FORMAT=json"
-    - "cd .agents/external/litkg-rs && cargo fmt --all"
+    - "cd .agents/external/litkg-rs && cargo fmt --all --check"
     - "cd .agents/external/litkg-rs && cargo test"
     - "make check-agent-memory when ARIA guidance changes"
 ---
 
 # Semantic Scholar litkg
 
-Use this skill when changing or operating the KG tooling itself. For ordinary
-project retrieval, route, claim-check, or consolidation work, use
-`aria-litkg-memory`.
+Use this skill when changing or operating the KG tooling itself.
 
 ## Read First
 
@@ -72,7 +83,7 @@ project retrieval, route, claim-check, or consolidation work, use
 
 - ARIA guidance/config changes: `make kg-capabilities KG_FORMAT=json` and
   `make check-agent-memory`.
-- litkg-rs toolkit edits: `cd .agents/external/litkg-rs && cargo fmt --all`,
-  `cd .agents/external/litkg-rs && cargo test`, and the narrow litkg-rs smoke
-  command for the changed capability.
+- litkg-rs toolkit edits: `cd .agents/external/litkg-rs && cargo fmt --all
+  --check`, `cd .agents/external/litkg-rs && cargo test`, and the narrow
+  litkg-rs smoke command for the changed capability.
 - Agents DB integration: `make agents-db AGENTS_ARGS='validate'`.

@@ -28,9 +28,6 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
 - Backlog or memory changes: use the `agents-db` skill.
 - Cleanup, pruning, or simplification: use the `simplification` skill.
 - LRZ AI Systems, Slurm, DSS, Pyxis, or remote compute work: use `lrz-ai-systems`.
-- OMX is optional operator orchestration. Use
-  `.agents/references/omx_quick_reference.md`; do not make OMX required for
-  normal repo work.
 
 ## Non-Negotiables
 - Do not use `git restore` or `git reset --hard` unless explicitly requested.
@@ -44,6 +41,12 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
 - Invalidity is a hard mask/reason contract, not low RRI.
 - Gymnasium/SB3/online simulator work is stretch or M6 bridge work unless the
   task explicitly targets that gate.
+
+## Optional Operator Tools
+- OMX remains optional operator orchestration. Use
+  `.agents/references/omx_quick_reference.md` only when the task explicitly
+  asks for OMX or operator orchestration; do not make OMX required for normal
+  repo work.
 
 ## Instruction Capture
 - Repo invariant: update this file or the nearest nested `AGENTS.md`.

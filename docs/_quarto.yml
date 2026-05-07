@@ -65,6 +65,8 @@ website:
             href: contents/thesis/roadmap.qmd
           - text: Research Questions
             href: contents/thesis/questions.qmd
+          - text: M1 Contract Report
+            href: contents/thesis/m1_contract_report.qmd
       - text: Aria NBV API
         file: reference/index.qmd
       - text: Resources
@@ -114,6 +116,7 @@ website:
           contents:
             - contents/thesis/questions.qmd
             - contents/thesis/roadmap.qmd
+            - contents/thesis/m1_contract_report.qmd
         - section: "Resources"
           contents:
             - contents/setup.qmd

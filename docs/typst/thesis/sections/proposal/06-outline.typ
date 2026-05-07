@@ -25,7 +25,7 @@ The thesis will be written as an empirical methods thesis. It starts from the qu
     [Present the VIN-style scorer, target encoding, ordinal objective, and calibration analysis.],
     [Held-out ranking, top-k oracle hit rate, calibration, ablations, and failure cases.],
     [Bounded rollout and $Q_H$ evaluation],
-    [Compare one-step greedy, random, oracle rollout, stochastic or beam rollout, model-scored rollout, and fitted Double-Q / $Q_H$ under equal budget.],
+    [Compare one-step greedy, random, oracle rollout, temperature-softmax rollout, model-scored rollout, and candidate-query Transformer $Q_H$ under equal budget.],
     [Cumulative target #RRI, scene #RRI, $Q_H$ success bar, acquisition cost, invalid-action rate, runtime, and trajectory visualizations.],
     [Discussion and conclusion],
     [Interpret limits, failure modes, simulator and deployment gaps, and future continuous-control or entity-aware extensions.],
@@ -34,4 +34,4 @@ The thesis will be written as an empirical methods thesis. It starts from the qu
   caption: [Preliminary thesis chapter outline.],
 ) <tab:proposal-outline>
 
-The expected final contribution is a reproducible target-aware finite-candidate view-selection study, not a broad claim that continuous reinforcement learning has been solved for egocentric reconstruction. The thesis will therefore separate implemented results from extensions. The required result includes fitted Double-Q / $Q_H$ over finite candidate sets if the prerequisite gates pass; SceneScript-style semantic memory, 3D Gaussian Splatting simulators, open-vocabulary targets, actor-critic control, and real-device guidance are future directions unless they become necessary to explain the core target-aware #RRI and $Q_H$ results.
+The expected final contribution is a reproducible target-aware finite-candidate view-selection study, not a broad claim that continuous reinforcement learning has been solved for egocentric reconstruction. The thesis will therefore separate implemented results from extensions. The required result includes candidate-query Transformer $Q_H$ over finite candidate sets if the prerequisite gates pass; SceneScript-style semantic memory, 3D Gaussian Splatting simulators, open-vocabulary targets, actor-critic control, and real-device guidance are future directions unless they become necessary to explain the core target-aware #RRI and $Q_H$ results.

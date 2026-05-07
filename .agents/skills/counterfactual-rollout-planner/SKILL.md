@@ -1,6 +1,6 @@
 ---
 name: counterfactual-rollout-planner
-description: Use when ARIA-NBV work touches ASE counterfactual rollouts, non-myopic planning evaluation, invalid-action handling, stochastic branches, finite-candidate fitted Double-Q / Q_H, or the roadmap value/RL gate. Gymnasium/SB3 is post-M6 bridge work only.
+description: Use when ARIA-NBV work touches ASE counterfactual rollouts, non-myopic planning evaluation, invalid-action handling, stochastic branches, finite-candidate candidate-query Transformer Q_H, or the roadmap value/RL gate. Gymnasium/SB3 is post-M6 bridge work only.
 metadata:
   applies_to:
     - "aria_nbv/aria_nbv/pose_generation/**"
@@ -14,7 +14,7 @@ metadata:
     - "invalid action"
   must_read:
     - "docs/contents/thesis/roadmap.qmd#roadmap-m5"
-    - "docs/contents/thesis/questions.qmd#rq5-planning"
+    - "docs/contents/thesis/questions.qmd#rq4-planning"
     - ".agents/memory/state/PROJECT_STATE.md"
     - ".agents/references/rollout_zarr_q_invalidity_contract.md"
   verification:
@@ -31,7 +31,7 @@ Use this skill for:
 - deterministic oracle, greedy, stochastic, beam, model-scored, or oracle
   rollouts over ASE finite candidate sets
 - cumulative RRI, path cost, invalid action rate, and runtime metrics
-- finite-candidate fitted Double-Q / `Q_H` training and evaluation
+- finite-candidate candidate-query Transformer `Q_H` training and evaluation
 - M5 planning/value decisions and M6 bridge boundaries
 
 Do not use it for one-step VIN scoring unless the output drives rollout
@@ -43,7 +43,8 @@ simulator bridge after the ASE rollout and Q_H path is stable.
 ## Read First
 
 1. `docs/contents/thesis/roadmap.qmd` sections M5 and M6
-2. `docs/contents/thesis/questions.qmd` sections RQ5 and RQ6
+2. `docs/contents/thesis/questions.qmd` sections RQ4, RQ5, and the shared
+   evidence protocol
 3. `aria_nbv/AGENTS.md`
 4. `.agents/memory/state/PROJECT_STATE.md`
 5. Relevant `pose_generation` and `rl` tests
@@ -55,8 +56,8 @@ simulator bridge after the ASE rollout and Q_H path is stable.
   not as unbounded tree branching. The default bounded cost model is
   `O(B * L * N)` for beam width `B`, horizon `L`, and candidates per state `N`.
 - For stochastic planning, score all valid candidates, sample with explicit
-  softmax temperature, and use Gumbel-Top-k only when distinct sampled roots or
-  chains are required.
+  softmax temperature for the first `Q_H` rollout-diversity source, and use
+  Gumbel-Top-k when distinct sampled roots or chains are required later.
 - Score all candidates but materialize expensive counterfactual modalities only
   for selected actions or retained chains.
 - Report cumulative target or scene RRI together with acquisition cost,

@@ -76,6 +76,15 @@ def test_public_api_omits_legacy_vin_oracle_dataset_alias() -> None:
     assert not hasattr(module, "VinOracleDatasetConfig")  # noqa: S101
 
 
+def test_offline_configs_omit_premature_counterfactual_knobs() -> None:
+    """Rollout storage should stay out of the immutable VIN offline-store schema."""
+
+    module = importlib.import_module("aria_nbv.data_handling")
+    assert "include_counterfactuals" not in module.VinOfflineWriterConfig.model_fields  # noqa: S101
+    assert "load_counterfactuals" not in module.VinOfflineDatasetConfig.model_fields  # noqa: S101
+    assert "load_counterfactuals_for_batch" not in module.VinOfflineSourceConfig.model_fields  # noqa: S101
+
+
 def test_pyproject_omits_legacy_cache_entrypoints() -> None:
     """Removed cache CLIs should stay out of project scripts."""
 

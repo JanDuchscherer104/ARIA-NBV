@@ -2,6 +2,20 @@
 name: plan-grill
 description: Stress-test vague, high-impact, research-facing, advisor-facing, or cross-surface ARIA-NBV decisions before implementation.
 metadata:
+  mode: router
+  not_when:
+    - "a concrete failing command, traceback, or metric owns the task"
+    - "the edit is already localized and low impact"
+    - "the user asks for code review of concrete diffs"
+  handoff_to:
+    - "diagnose-aria for concrete failures"
+    - "aria-nbv-context when the affected surface is unknown"
+    - "code-review for concrete diff review"
+    - "docs-curator for public narrative edits after the decision"
+  evidence_required:
+    - "source-order owner for the decision"
+    - "success criteria, in/out of scope, and deferred decisions"
+    - "claim-check output for advisor-facing claims"
   applies_to:
     - "**"
   triggers:
@@ -29,17 +43,12 @@ Use this skill before implementing ambiguous or high-impact work:
 - docs/public-internal partitioning, scaffold changes, or KG architecture
 - broad cleanup where ownership, compatibility, or evidence bar is unclear
 
-Do not use it for an already-localized bug with a concrete failing command; use
-`diagnose-aria` instead.
-
 ## Grounding
 
 Before asking the user, resolve discoverable facts from
 `.agents/references/source_order.md` and the owning source for the decision.
 Use `docs/typst/shared/glossary.typ` for overloaded terms and the nearest
 `AGENTS.md` for touched code or docs.
-
-Use `aria-nbv-context` if the relevant surface is not yet localized.
 
 ## Interview Rules
 
@@ -54,13 +63,8 @@ Use `aria-nbv-context` if the relevant surface is not yet localized.
   `.agents/memory/state/DECISIONS.md`. Do not add a parallel root context file
   or ADR tree as a second source of truth.
 - Distinguish `current`, `planned`, `scratch`, and `archive` docs.
-- Capture durable outcomes in the smallest correct surface:
-  - invariant -> `AGENTS.md`
-  - workflow -> `.agents/skills/`
-  - current truth -> `.agents/memory/state/`
-  - backlog -> `.agents/*.toml`
-  - public narrative -> `docs/` or Typst
-  - human preference -> `.agents/references/human_owner_intent.md`
+- Capture durable outcomes through the root `AGENTS.md` Instruction Capture
+  lanes.
 
 ## Output
 

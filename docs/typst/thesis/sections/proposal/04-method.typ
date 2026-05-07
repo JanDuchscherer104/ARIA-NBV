@@ -1,29 +1,39 @@
 #import "../../../shared/macros.typ": *
 
-= Proposed Method
+= Method and Timeline
 
-The proposed method follows a staged diagnostics-first pipeline. The first stage fixes the data substrate. ARIA-NBV reads fixed-length #ASE snippets through the active data-handling path, builds immutable VIN offline stores for expensive oracle products, and validates that train and validation samples expose the fields needed for reconstruction-quality supervision. The sample contract includes scene and snippet metadata, reference pose, candidate poses, camera intrinsics or PyTorch3D cameras, semi-dense points, candidate validity information, oracle #RRI, accuracy and completeness components, and optional diagnostics such as candidate point clouds, depth maps, meshes, object boxes, and voxel bounds.
+The method proceeds through gates rather than a single end-to-end rewrite. First, ARIA-NBV validates the immutable offline-store and oracle contracts. Second, it implements target-specific #RRI by matching actor-visible observed/predicted targets to GT target crops for labels and evaluation. Third, it trains a target-conditioned one-step scorer as the comparator for planning. Fourth, it generates replayable rollout traces from random-valid, oracle-greedy/lookahead, and oracle-scored temperature-softmax policies. Temperature-softmax is a data-diversity policy over scored candidates, not the final objective.
 
-The second stage computes scene-level and target-level oracle labels. Scene-level #RRI follows VIN-NBV by evaluating how much a candidate view reduces the Chamfer-style distance between the current reconstruction and the ground-truth mesh @VIN-NBV-frahm2025. Target-level #RRI uses the same metric but restricts the evaluation to the selected target crop. The first target definition is a ground-truth OBB crop because it is inspectable and directly available in the #ASE/EFM3D data. Predicted boxes, target tokens, or open-vocabulary selection are treated as realism ablations after the ground-truth target oracle is trusted.
+The fifth gate trains $Q_H$ as a candidate-query Transformer. Scene, target, history, and candidate fields are encoded as tokens; hard masks suppress invalid candidates; the output is one finite-horizon Q value per candidate. The target is bounded cumulative target #RRI from ASE oracle rollouts. Double-Q-style selection/evaluation separation is the first target-construction strategy because max-based finite-candidate learning is vulnerable to overestimation @DoubleDQN-vanHasselt2015. CQL and BCQ remain useful offline-RL references for distribution-shift risk, while Decision Transformer is a useful sequence-modeling reference if later trajectory decoding becomes justified @CQL-kumar2020 @BCQ-fujimoto2019 @DecisionTransformer-chen2021.
 
-#block[#align(center)[#eqs.entity.objective]]
+#figure(
+  table(
+    columns: (0.92fr, 1.18fr, 1.9fr),
+    inset: 4.5pt,
+    table.header([*Dates*], [*Milestone*], [*Decision gate*]),
+    [29 Apr--10 May],
+    [M0 scope/proposal],
+    [Compact proposal, bibliography/source policy, and mandatory $Q_H$ scope frozen.],
+    [11 May--31 May],
+    [M1 data/oracle],
+    [Offline-store, geometry, candidate-label, Rerun, and throughput evidence pass or block scale-up.],
+    [1 Jun--21 Jun],
+    [M2 scorer baseline],
+    [Scene-level VIN-style scorer is reproducible and calibration/ranking evidence is available.],
+    [22 Jun--12 Jul],
+    [M3 target #RRI],
+    [V0 sanity and V1 actor-visible target protocol are trusted on a small subset.],
+    [13 Jul--9 Aug],
+    [M4 target scorer],
+    [Observed/predicted target encoding improves target ranking or exposes a documented limitation.],
+    [10 Aug--30 Aug],
+    [M5 rollouts/$Q_H$],
+    [$Q_H$ is trained and oracle-evaluated against one-step baselines under equal budget.],
+    [31 Aug--30 Sep],
+    [M6--M8 evidence/freeze],
+    [Optional bridge work only after $Q_H$ evidence; final coverage, figures, configs, and thesis text freeze.],
+  ),
+  caption: [Compact thesis timeline.],
+)
 
-The third stage trains and analyzes a VIN-style candidate scorer. The current implementation already uses frozen EVL/EFM3D features, candidate-relative pose information, semi-dense projection cues, and an ordinal prediction head. The thesis will keep this architecture bounded and evidence-driven. It will first establish the reproducible one-step scene-level baseline, then add target conditioning through explicit target fields. The model will be judged by ranking and calibration metrics on held-out snippets, not by loss alone. This is important because #NBV acts through ordering: a model that predicts approximate scalar values but ranks candidates poorly is not useful for view selection.
-
-The fourth stage evaluates bounded non-myopic planning. For a state $s_t$ and valid candidate set $C(s_t)$, the one-step oracle baseline selects the best immediate candidate. A bounded rollout first chooses the top $K$ candidates under the one-step score and searches only those branches to horizon $H$. This is closer to receding-horizon and projection-efficient #NBV planning than to unrestricted policy learning: horizon and branch factor are explicit compute budgets, and every transition can be inspected @RecedingHorizonNBV-bircher2016 @PB-NBV-jia2025. The value recursion is
-
-#block[#align(center)[
-  $ V_h(s_t) = max_(q in "ArgTopK"(s_t)) (r(s_t, q) + V_(h-1)(T(s_t, q))) $
-]]
-
-and the selected action is
-
-#block[#align(center)[
-  $ "ArgTop1"_h(s_t) = op("argmax", limits: #true)_(q in "ArgTopK"(s_t)) (r(s_t, q) + V_(h-1)(T(s_t, q))) $.
-]]
-
-This formulation imports the useful part of sequence-model planning without immediately training a trajectory model. Trajectory Transformer shows that offline control can be treated as sequence decoding with beam search @TrajectoryTransformer-janner2021, while Gumbel-Top-k provides a principled stochastic beam extension for diverse samples without replacement @GumbelTopK-kool2019. ARIA-NBV will first use deterministic bounded rollout because it is easier to reproduce and inspect. Stochastic beams diversify the rollout data after deterministic traces are trusted.
-
-The fifth stage gates and then trains the required finite-candidate value model. If the M1 data/oracle contract is passable, target-aware labels are trusted, deterministic rollouts show headroom, and the VIN scorer ranks held-out candidates reliably, ARIA-NBV trains a target-conditioned fitted Double-Q / $Q_H$ model on masked finite candidate sets. Double Q-learning is the first value method because selector/evaluator separation reduces overestimation in max-based targets @DoubleDQN-vanHasselt2015. $Q_H$ predicts bounded cumulative target #RRI and must beat one-step greedy/model scoring under the same acquisition budget or produce an explicit blocker. IQL is a second offline-RL ablation only after $Q_H$ is stable @IQL-kostrikov2021. PPO and SAC remain later references for simulator-backed continuous control rather than first thesis baselines, because they assume a reward loop and interaction regime that the current expensive oracle does not yet provide @PPO-schulman2017 @SAC-haarnoja2018. These methods will not be used to claim unrestricted continuous control unless the data support, reward speed, simulator access, and evaluation protocol are all sufficient.
-
-Diagnostics are part of the method. A Rerun offline inspector will render semi-dense points, reference poses, candidate frusta, optional meshes, target boxes, and RRI-colored candidate layers from the immutable offline store. Candidate frusta should default to batched manual line strips until pose and camera regression tests prove that native camera logging is frame-safe. This inspector is intended to catch frame mistakes, invalid candidates, label pathologies, and missing fields before they contaminate training or rollout results.
+The main risk is substrate fragility: frame mistakes, invalid candidates, or sparse target labels could make learned planning claims meaningless. The fallback is not to switch to continuous actor-critic control, but to report the exact failing gate and preserve a defensible target-aware oracle/scorer/rollout study. Continuous control, online Gymnasium/SB3, Habitat/Isaac, SceneScript-style semantic memory, and real-device guidance remain post-$Q_H$ bridge designs unless the M5 evidence and time budget make them credible.

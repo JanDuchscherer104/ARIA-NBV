@@ -2,6 +2,19 @@
 name: docs-curator
 description: Use when ARIA-NBV work changes public docs, Typst/Quarto narrative, bibliography, navigation, or the public/internal docs boundary.
 metadata:
+  mode: implementation
+  not_when:
+    - "localized typo with no source-of-truth risk"
+    - "memory-only, backlog-only, or KG-consolidation work"
+    - "internal operator-reference edits outside public docs"
+  handoff_to:
+    - "agents-db for backlog-only changes"
+    - "aria-litkg-memory for KG-backed claim checks or consolidation"
+    - "owning skill for internal operator references"
+  evidence_required:
+    - "docs/AGENTS.md and source-order owner for changed claims"
+    - "render or outline check for non-trivial docs edits"
+    - "claim-check output for advisor-facing claims"
   applies_to:
     - "README.md"
     - "SETUP.md"
@@ -27,11 +40,6 @@ metadata:
 
 Use this skill for reader-facing docs, bibliography, Typst/Quarto narrative,
 navigation, and public/internal boundary decisions.
-
-Do not use it for a localized typo fix unless source-of-truth alignment is at risk.
-Do not use it for memory-only, backlog-only, KG-consolidation, or internal
-operator-reference edits; use `agents-db`, `aria-litkg-memory`, or the owning
-skill instead.
 
 ## Read First
 

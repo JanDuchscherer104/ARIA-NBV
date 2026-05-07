@@ -29,7 +29,6 @@ class RerunInspectorDatasetConfig(BaseConfig):
             load_gt_obbs=True,
             load_detected_obbs=True,
             load_trajectory_metadata=True,
-            load_counterfactuals=False,
         ),
     )
     """Immutable VIN offline dataset reader used by the inspector."""
@@ -60,6 +59,9 @@ class RerunInspectorSelectionConfig(BaseConfig):
 
     index: int = 0
     """Zero-based index inside ``split`` when no higher-precedence selector is set."""
+
+    rollout_context_mode: Literal["auto", "required", "off"] = "auto"
+    """VIN context policy for rollout-Zarr inspection."""
 
     @field_validator("index")
     @classmethod

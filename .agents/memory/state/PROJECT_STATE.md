@@ -1,6 +1,6 @@
 ---
 id: project_state
-updated: 2026-05-06
+updated: 2026-05-07
 scope: repo
 owner: jan
 status: active
@@ -35,7 +35,7 @@ This repository develops **ARIA-NBV**, an active next-best-view planner for egoc
 - *Issue / blocker:* Calibration and label-distribution issues remain unresolved. Stage dependence, possible overfitting, and collapse in the lowest ordinal classes are all plausible explanations, and they are not yet cleanly separated.
 - *Issue / blocker:* Candidate-generation realism versus generalization is still under-specified. Tight azimuth / elevation bounds improve realism, but they may also bias the learned policy and under-expose exploratory views.
 - *Issue / blocker:* Oracle throughput is still the main scaling bottleneck. The paper explicitly notes that oracle cost makes direct on-policy continuous control impractical in the current system.
-- *Issue / blocker:* `.configs/offline_only.toml` now points at a local `vin_offline` store with manifest, sample index, split arrays, and shards, but the store is partial/interrupted. Local smoke is blocked on corrected command behavior and validation rather than a known missing manifest.
+- *Issue / blocker:* `.configs/offline_only.toml` now points at a local strict-v7 `vin_offline` store with manifest, sample index, split arrays, and shards. The store opens under `nbv-summary` but remains partial/interrupted diagnostic evidence rather than a complete training-scale store.
 - *Issue / blocker:* Counterfactual multi-step states still lack full RGB, SLAM, and semantic modalities unless they are synthesized or approximated from geometry.
 - *Issue / blocker:* Engineering friction still matters: data-handling cleanup, doc synchronization, and better compute access directly affect iteration speed even though they are not thesis contributions by themselves.
 
@@ -49,6 +49,7 @@ This repository develops **ARIA-NBV**, an active next-best-view planner for egoc
 - *Current truth / active direction:* Keep one oracle candidate-budget owner in candidate generation; the depth renderer now only caps already-pruned candidates at `max_candidates_final`.
 - *Current truth / active direction:* Treat `rendering.unproject.backproject_depths_p3d_batch` as the canonical PyTorch3D depth-to-world unprojection path.
 - *Current truth / active direction:* Keep immutable VIN offline stores lean by default: numeric blocks are canonical, and rich msgpack diagnostic DTO payloads are opt-in.
+- *Current truth / active direction:* The immutable VIN offline dataset format is strict version 7. Readers do not carry backward-compatibility paths, and the VIN offline store does not advertise no-op counterfactual blocks; multi-step rollout replay lives in standalone rollout artifacts.
 - *Current truth / active direction:* Empty oracle mesh crops are invalid inputs, not scene-level fallback labels.
 - *Current truth / active direction:* Preserve the current geometry-first interpretation of counterfactual state while clarifying which missing modalities should be synthesized later.
 - *Current truth / active direction:* Use GT-OBB-cropped target RRI as the V0 sanity/upper-bound metric, then move the main result to V1 observed/predicted OBB input with matched GT target-RRI labels under OBS-SEL / PRED-Q / GT-EVAL.

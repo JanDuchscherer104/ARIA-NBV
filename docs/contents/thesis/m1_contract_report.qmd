@@ -26,7 +26,7 @@ evidence that must be collected before scale-up.
 | Candidate-label alignment | Pass for synthetic guard | `prepare_vin_offline_sample()` validates candidate poses, depth rows, camera rows, RRI vectors, optional point clouds, and candidate shell indices before writing rows. |
 | Rollout trace alignment | Pass for synthetic guard | `RolloutStepTrace` stores full-shell poses, validity, scores, and metric vectors with invalid rows masked as `NaN`; round-trip tests preserve this table. |
 | Frame and CW90 semantics | Pass for documented source contract | Candidate generation applies `rotate_yaw_cw90` once to the reference pose; plotting/Rerun display corrections remain display-only. `VinModelV3` requires a `cw90_corrected` camera tag if model-side CW90 undo is enabled. |
-| Current local store evidence | Blocked for M1 exit | `.configs/offline_only.toml` resolves to `.data/offline_cache/vin_offline`; the evidence snapshot below records manifest v6, 48 sample-index rows, and an interrupted/partial one-scene store. |
+| Current local store evidence | Blocked for M1 exit | `.configs/offline_only.toml` resolves to `.data/offline_cache/vin_offline`; the evidence snapshot below records manifest v7, 48 sample-index rows, and a partial one-scene diagnostic store. |
 | Scene-level split evidence | Blocked | The local store has one scene (`81286`) and a 38/10 train/val sample split, so it cannot prove the final scene-level split contract. |
 | Rerun smoke recordings | Blocked | Normal, boundary, and failure `.rrd` recordings are not collected in this pass. |
 | Oracle throughput | Blocked | No representative GPU/dataset timing was run in this pass. |

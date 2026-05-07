@@ -781,3 +781,22 @@ verification = ["cd aria_nbv && uv run pytest tests/rri_metrics/test_oracle_rri_
 resolved_at = "2026-04-29"
 resolution_note = "Changed oracle mesh AABB cropping to tensor-native bounds and explicit empty-crop failure instead of full-mesh fallback."
 resolved_from = ".agents/refactors.toml"
+
+[[refactor]]
+id = "refactor-012"
+title = "Remove premature counterfactual offline-store hooks"
+description = "Delete future counterfactual flags and readers from the immutable offline store until rollout artifacts have a concrete M5 contract."
+priority = "medium"
+status = "resolved"
+labels = ["data", "offline-store", "rollouts", "simplification"]
+issue_ids = ["issue-007", "issue-010"]
+loc_min = 60
+loc_expected = 180
+loc_max = 420
+context = ["VinOfflineManifest and VinOfflineDataset contained counterfactual metadata, load flags, and readers, but VinOfflineWriter never materialized a real counterfactual block.", "The roadmap puts multi-step rollouts in standalone rollout artifacts rather than the immutable VIN offline store.", "Premature storage hooks created stale contract surface before rollout artifacts had a concrete contract."]
+implementation_notes = ["Removed VinOfflineCounterfactuals, materialized_blocks.counterfactuals, include_counterfactuals, load_counterfactuals, load_counterfactuals_for_batch, and _build_counterfactuals.", "Bumped OFFLINE_DATASET_VERSION from 6 to 7 and updated the local vin_offline and Rerun smoke stores to strict v7 manifests with no compatibility reader.", "Renamed the Rerun smoke sidecar config and store from vin_offline_rerun_smoke_v6 to vin_offline_rerun_smoke_v7."]
+acceptance = ["The offline-store schema no longer advertises counterfactual data.", "Training, diagnostics, and Rerun configs no longer carry no-op counterfactual toggles.", "The current local persisted stores open under the strict v7 reader and old v6 manifests are rejected."]
+verification = ["cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py tests/data_handling/test_public_api_contract.py", "cd aria_nbv && uv run nbv-summary --config-path offline_only.toml", "cd aria_nbv && uv run pytest tests/rerun_inspector -q", "cd docs && quarto render contents/setup.qmd", "cd docs && quarto render contents/impl/one_scene_smoke.qmd", "cd docs && quarto render contents/thesis/m1_contract_report.qmd"]
+resolved_at = "2026-05-07"
+resolution_note = "Removed premature counterfactual offline-store hooks, bumped the immutable VIN offline dataset format to v7, upgraded local persisted manifests without leaving migration code, and verified strict data/Rerun/doc checks."
+resolved_from = ".agents/refactors.toml"

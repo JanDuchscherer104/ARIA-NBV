@@ -36,6 +36,32 @@ by `.configs/offline_only.toml`; it has a manifest, sample index, split arrays,
 and shards, but it is marked as an interrupted partial store. Treat that as a
 small diagnostic store until a full M1 store is materialized and smoke-checked.
 
+For multistep rollout replay, use the same inspector entry point with a
+standalone `rollouts.zarr` store:
+
+```sh
+uv run nbv-rerun-inspect \
+  --config-path ../.configs/rerun_offline.toml \
+  --rollout-store ../.artifacts/rerun_rollout_inspector/2026-05-06_multistep/rollouts.zarr \
+  --rollout-index 0 \
+  --save ../.artifacts/rerun/rollout_multistep.rrd
+```
+
+This mode logs one rollout chain on a `rollout_step` timeline. By default it
+first tries to resolve the rollout's `scene_id` and `snippet_id` back to the
+matching VIN offline sample, then logs the normal single-step modalities before
+adding rollout-step overlays. Synthetic rollout stores remain valid smoke
+inputs; if their lineage does not resolve locally, the inspector records a
+metadata warning and continues with rollout-only layers. Use
+`--rollout-context required` to fail on missing VIN context or
+`--rollout-context off` for purely synthetic replay checks.
+
+Rollout candidate poses are logged as native Rerun camera entities, not manual
+line strips. The entity path separates selected, valid, and invalid candidates
+under `world/rollout/step/...`, while selected-view paths, per-step metadata,
+and scalar plots show valid candidate count, selected probability, and selected
+target RRI.
+
 Required sample fields should be validated before Rerun logging starts:
 
 - sample id, split, scene id, and snippet id;
@@ -65,12 +91,14 @@ auditable:
   optional top-k candidate highlighting;
 - **metrics:** candidate coloring by RRI, validity, rank, or selected candidate;
 - **primitives:** toggles for semidense points, current points, candidate
-  frusta, candidate depths/points, mesh, OBBs, and metadata panels.
+  cameras, candidate depths/points, mesh, OBBs, and metadata panels.
 
 Use explicit paths and stable entity names so recordings can be compared across
-runs. Candidate frusta should be batched under stable paths such as
-`/world/candidates/frusta_all`, with separate highlighted paths for the top
-oracle candidates or a selected candidate.
+runs. Normal VIN sample candidates live under `world/candidates/...`; rollout
+replay candidates live under `world/rollout/step/{selected,valid,invalid}/...`.
+Verbose candidate row ids, probabilities, logits, target RRI, and invalid
+reason bitsets are attached as entity metadata through Rerun components rather
+than as default 3D labels.
 
 ## Output Modes {#rerun-output-modes}
 
@@ -90,9 +118,11 @@ diagnostics.
 
 Rerun views can look plausible even when frame conventions are wrong. The
 inspector should therefore log geometry through typed pose and camera contracts,
-preferably `PoseTW` and `CameraTW`, instead of unlabelled matrices. Manual
-candidate frusta are the safest default until native `rr.Pinhole` logging has
-tests proving the expected transform direction and camera convention.
+preferably `PoseTW` and `CameraTW`, instead of unlabelled matrices. Candidate
+cameras use native `rr.Transform3D` plus `rr.Pinhole` with explicit
+parent-from-child transform direction; rollout stores provide generic pinhole
+camera objects for pose inspection, while VIN samples use stored camera
+intrinsics when available.
 
 Display-only CW90 corrections must stay display-only. They must not alter
 offline-store poses, candidate poses, cached camera values, RRI labels, or model

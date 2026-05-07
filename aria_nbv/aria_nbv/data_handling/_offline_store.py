@@ -30,7 +30,7 @@ from ._offline_format import (
     VinOfflineShardSpec,
 )
 
-OFFLINE_DATASET_VERSION = 6
+OFFLINE_DATASET_VERSION = 7
 """Version of the immutable VIN offline dataset format."""
 
 

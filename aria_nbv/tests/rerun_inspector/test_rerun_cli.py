@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from aria_nbv.rerun_inspector import _cli
+from aria_nbv.rerun_inspector import _cli, _rollout_zarr
 from aria_nbv.rerun_inspector._config import RerunOfflineInspectorConfig
 from aria_nbv.rerun_inspector._metadata import OfflineVisualInventory
 
@@ -39,6 +39,10 @@ def test_cli_applies_selection_and_save_overrides(
             "7",
             "--sample-id",
             "scene/snippet/sample",
+            "--scene-id",
+            "scene-a",
+            "--snippet-id",
+            "snippet-b",
             "--candidate-index",
             "2",
             "--save",
@@ -50,6 +54,8 @@ def test_cli_applies_selection_and_save_overrides(
     assert cfg.selection.split == "train"  # noqa: S101
     assert cfg.selection.index == 7  # noqa: S101
     assert cfg.selection.sample_key == "scene/snippet/sample"  # noqa: S101
+    assert cfg.selection.scene_id == "scene-a"  # noqa: S101
+    assert cfg.selection.snippet_id == "snippet-b"  # noqa: S101
     assert cfg.candidate.selected_index == 2  # noqa: S101
     assert cfg.output.mode == "save"  # noqa: S101
     assert cfg.output.save_path == save_path  # noqa: S101
@@ -85,6 +91,50 @@ def test_cli_applies_output_mode_overrides(
     cfg = captured["config"]
     assert cfg.output.mode == mode  # noqa: S101
     assert cfg.output.connect_addr == addr  # noqa: S101
+
+
+def test_cli_routes_rollout_store_to_multistep_inspector(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--rollout-store should bypass VIN sample selection and inspect rollouts.zarr."""
+
+    config_path = tmp_path / "rerun.toml"
+    store_path = tmp_path / "rollouts.zarr"
+    RerunOfflineInspectorConfig().save_toml(config_path)
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(_cli, "run_inspector", lambda *args, **kwargs: pytest.fail("VIN inspector should not run"))
+
+    def _capture_rollout(config, *, store_dir, rollout_index=0, rollout_row_id=None, rr_module=None):
+        del rr_module
+        captured["config"] = config
+        captured["store_dir"] = store_dir
+        captured["rollout_index"] = rollout_index
+        captured["rollout_row_id"] = rollout_row_id
+
+    monkeypatch.setattr(_rollout_zarr, "run_rollout_zarr_inspector", _capture_rollout)
+
+    _cli.main(
+        [
+            "--config-path",
+            str(config_path),
+            "--rollout-store",
+            str(store_path),
+            "--rollout-index",
+            "2",
+            "--rollout-row-id",
+            "7",
+            "--rollout-context",
+            "required",
+        ],
+    )
+
+    assert isinstance(captured["config"], RerunOfflineInspectorConfig)  # noqa: S101
+    assert captured["store_dir"] == store_path  # noqa: S101
+    assert captured["rollout_index"] == 2  # noqa: S101
+    assert captured["rollout_row_id"] == 7  # noqa: S101
+    assert captured["config"].selection.rollout_context_mode == "required"  # noqa: S101
 
 
 def test_cli_view_opens_saved_recording_in_native_viewer(

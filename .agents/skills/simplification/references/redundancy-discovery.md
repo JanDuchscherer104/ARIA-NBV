@@ -20,7 +20,11 @@ Use this reference when `simplification` needs a deeper workflow for finding goo
    - Use `search_code_advanced` on the helper name to estimate whether it is a one-use function or trivial wrapper candidate.
 5. Escalate only when needed.
    - Look for multiple wrappers around the same concept, repeated DTO shaping, parallel service helpers, or temporary paths that still leak into first-class code.
-   - Use the `graphify` skill when the simplification depends on broader ownership or architecture context.
+   - Use `aria-nbv-context` when ownership or source-family routing is unclear.
+   - Use `plan-grill` when the simplification depends on a high-impact
+     architecture or compatibility decision.
+   - Use `aria-litkg-memory` when source-backed KG routing or claim checks are
+     needed before pruning.
    - Use `analyze_python_package`, `get_package_metrics`, and `find_package_issues` only after code-index narrows the package.
    - Use `analyze_python_file`, `find_long_functions`, and `get_extraction_guidance` only after code-index narrows the file.
    - Use `analyze_test_coverage` and `tdd_refactoring_guidance` before risky cleanup or when test confidence is weak.
@@ -52,7 +56,7 @@ One-use / trivial-wrapper check:
 3. if the body is only forwarding, renaming, or tiny glue logic, prefer inlining or deletion
 4. if the helper is used in multiple places or provides a real semantic boundary, keep it
 
-## Escalate To `graphify` When
+## Escalate Beyond Local Search When
 
 - local `rg` results show multiple plausible owners for the same behavior
 - you need ownership mapping before collapsing duplicate logic

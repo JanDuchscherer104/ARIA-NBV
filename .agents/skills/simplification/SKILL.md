@@ -1,7 +1,20 @@
 ---
 name: simplification
-description: Use when reducing redundancy, boilerplate, dead code, stale compatibility surfaces, unused config, overcomplicated control flow, or Python LOC through behavior-preserving pruning or refactoring in this repo.
+description: Use for ARIA-NBV behavior-preserving pruning of redundancy, dead code, stale compatibility, unused config, or excess LOC.
 metadata:
+  mode: implementation
+  not_when:
+    - "behavior is intended to change"
+    - "ownership is unclear and needs a high-impact decision first"
+    - "the task is only general surgical-edit discipline"
+  handoff_to:
+    - "plan-grill for unclear ownership or high-impact cleanup choices"
+    - "agent-behavior for general surgical-edit discipline"
+    - "agents-db when cleanup materially changes active debt"
+  evidence_required:
+    - "current contract and baseline verification for touched surface"
+    - "usage or redundancy evidence before pruning"
+    - "focused verification after the cut"
   applies_to:
     - "aria_nbv/**"
     - ".agents/**"
@@ -24,8 +37,6 @@ metadata:
 # Simplification
 
 Use this skill for behavior-preserving pruning of the current intended surface.
-Use `agent-behavior` for general simplicity/surgical-change principles on
-ordinary work.
 
 ## Modes
 
@@ -43,7 +54,7 @@ ordinary work.
 4. Prefer deleting, merging, or inlining over adding new abstraction.
 5. Validate with focused tests and formatting/lint checks for the touched
    surface.
-6. Record backlog changes only when the cleanup materially changes active debt.
+6. Record durable debt only when the cleanup materially changes active debt.
 
 ## Rules
 

@@ -814,9 +814,6 @@ class VinOfflineWriterConfig(BaseConfig):
     include_diagnostic_payloads: bool = False
     """Whether to write rich msgpack diagnostic records alongside numeric blocks."""
 
-    include_counterfactuals: bool = False
-    """Whether to materialize future counterfactual payloads."""
-
     include_gt_obbs: bool = True
     """Whether to persist compact GT OBB tensors from raw snippets."""
 
@@ -1095,7 +1092,6 @@ class VinOfflineWriter:
                 backbone=bool(self.config.include_backbone),
                 depths=bool(self.config.include_depths),
                 candidate_pcs=bool(self.config.include_diagnostic_payloads and self.config.include_pointclouds),
-                counterfactuals=bool(self.config.include_counterfactuals),
                 gt_obbs="gt.obbs" in materialized_block_names,
                 detected_obbs="detected.obbs" in materialized_block_names,
                 trajectory=(

@@ -741,7 +741,6 @@ def _batch_shape_preview(store: VinOfflineStoreConfig) -> dict[str, str]:
         load_candidates=False,
         load_depths=False,
         load_candidate_pcs=False,
-        load_counterfactuals=False,
         return_format="vin_batch",
         map_location=torch.device("cpu"),
     ).setup_target()
@@ -859,7 +858,6 @@ def collect_vin_offline_dataset_stats(
             "backbone": bool(reader.manifest.materialized_blocks.backbone),
             "depths": bool(reader.manifest.materialized_blocks.depths),
             "candidate_pcs": bool(reader.manifest.materialized_blocks.candidate_pcs),
-            "counterfactuals": bool(reader.manifest.materialized_blocks.counterfactuals),
         },
         candidate_count=_summary(candidate_counts),
         rri=_summary(rri_values),

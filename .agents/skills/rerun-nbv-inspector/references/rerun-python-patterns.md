@@ -20,10 +20,12 @@ Use stable, low-cardinality paths:
 world
 world/semidense
 world/reference/pose
-world/candidates/frusta_all
-world/candidates/frusta_invalid
-world/candidates/frusta_top_oracle
-world/candidates/centers
+world/candidates/valid/candidate_000/camera
+world/candidates/invalid/candidate_001/camera
+world/candidates/valid/candidate_002/center
+world/rollout/step/selected/candidate_002/camera
+world/rollout/step/valid/candidate_003/camera
+world/rollout/selected_path
 world/mesh
 world/gt/obbs
 world/detected/obbs
@@ -34,8 +36,9 @@ frames/depth/<frame_id>/image
 metadata/sample
 ```
 
-Batch repeated geometry where possible. Avoid one entity per candidate unless
-isolating a selected or failed candidate is the point of the recording.
+Batch repeated point clouds, OBBs, and paths where possible. Candidate cameras
+may use one stable entity per candidate so Rerun can show native camera frusta
+and per-candidate metadata without visible 3D text labels.
 
 ## Coordinates And Transforms
 

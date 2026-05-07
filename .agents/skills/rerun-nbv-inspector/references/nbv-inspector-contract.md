@@ -48,7 +48,8 @@ Missing optional fields should appear as metadata warnings, not guessed payloads
 
 - Candidate poses are world-from-camera: `T_world_cam`.
 - Reference poses are world-from-rig: `T_world_rig`.
-- Manual candidate frusta are world-frame `LineStrips3D`.
+- Candidate cameras are native `Transform3D` + `Pinhole` entities when the
+  logger has tests for transform direction and camera convention.
 - Display-only CW90 corrections must operate on copied output arrays only.
 - Downsampling must be deterministic and display-only.
 - Mesh and OBB logging is diagnostic; GT mesh is not a training payload.

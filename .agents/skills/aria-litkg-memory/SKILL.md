@@ -1,7 +1,20 @@
 ---
 name: aria-litkg-memory
-description: Use for KG-backed ARIA-NBV retrieval, source-backed task routing, claim checks, current-truth checks, active-backlog lookup, and memory/backlog consolidation proposals. Do not use for local-only file discovery or litkg-rs implementation.
+description: Use for KG-backed ARIA-NBV retrieval, task routing, claim checks, current-truth checks, backlog lookup, and consolidation proposals.
 metadata:
+  mode: router
+  not_when:
+    - "local file discovery alone is enough"
+    - "litkg-rs implementation, KG config, or backend contracts are changing"
+    - "a concrete failure loop owns the task"
+  handoff_to:
+    - "aria-nbv-context for local-only discovery"
+    - "semantic-scholar-litkg for litkg-rs, KG config, or backend edits"
+    - "diagnose-aria for KG ingestion failures"
+  evidence_required:
+    - "litkg command output or cited KG result"
+    - "canonical source inspection before promoting retrieved truth"
+    - "claim-check command for advisor-facing claims"
   applies_to:
     - "**"
   triggers:
@@ -21,9 +34,7 @@ metadata:
 
 # ARIA litkg Memory
 
-Use this skill when litkg should act as the project memory router. Use
-`aria-nbv-context` for deterministic local discovery and `semantic-scholar-litkg`
-when changing KG tooling, source coverage, or backend contracts.
+Use this skill when litkg should act as the project memory router.
 
 ## Protocol
 

@@ -128,7 +128,7 @@
   - ase.mesh_target
   internal_links:
   - docs/contents/thesis/questions.qmd#rq2-target-encoding
-  - docs/contents/thesis/questions.qmd#rq4-model
+  - docs/contents/thesis/questions.qmd#rq4-planning
   - docs/contents/impl/vin_v2_feature_proposals.qmd
   related:
   - target-specific-rri
@@ -164,7 +164,7 @@
   - rri.target_rri
   internal_links:
   - docs/contents/thesis/questions.qmd#rq1-objective
-  - docs/contents/thesis/questions.qmd#rq4-model
+  - docs/contents/thesis/questions.qmd#rq4-planning
   - docs/contents/impl/rri_computation.qmd#entity-wise-rri
   citations:
   - VIN-NBV-frahm2025
@@ -226,7 +226,7 @@
   - metrics.spearman
   - metrics.topk_acc
   internal_links:
-  - docs/contents/thesis/questions.qmd#rq4-model
+  - docs/contents/thesis/questions.qmd#rq4-planning
   - docs/contents/impl/vin_nbv.qmd
   - docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd
   citations:
@@ -296,8 +296,8 @@
   - rl.q_h
   internal_links:
   - docs/contents/thesis/questions.qmd#rq2-target-encoding
-  - docs/contents/thesis/questions.qmd#rq4-model
-  - docs/contents/thesis/questions.qmd#rq5-planning
+  - docs/contents/thesis/questions.qmd#rq4-planning
+  - docs/contents/thesis/questions.qmd#rq4-planning
   citations:
   - VIN-NBV-frahm2025
   - DoubleDQN-vanHasselt2015
@@ -380,7 +380,7 @@
   - rl.nbv_mdp
   internal_links:
   - docs/contents/theory/rl_planning.qmd#rl-planning-theory
-  - docs/contents/thesis/questions.qmd#rq5-planning
+  - docs/contents/thesis/questions.qmd#rq4-planning
   - docs/contents/thesis/roadmap.qmd#roadmap-m5
   citations:
   - VIN-NBV-frahm2025
@@ -438,7 +438,7 @@
   - rl.s_oracle
   internal_links:
   - docs/contents/theory/rl_planning.qmd#state-and-action-space-contract
-  - docs/contents/thesis/questions.qmd#rq5-planning
+  - docs/contents/thesis/questions.qmd#rq4-planning
   related:
   - historic-snippet-state
   - persisted-offline-state
@@ -552,7 +552,7 @@
   - rl.s_cf0
   internal_links:
   - docs/contents/theory/rl_planning.qmd#state-and-action-space-contract
-  - docs/contents/thesis/questions.qmd#rq5-planning
+  - docs/contents/thesis/questions.qmd#rq4-planning
   related:
   - geometry-rich-counterfactual-state
   - finite-candidate-action-set
@@ -587,7 +587,7 @@
   - rl.s_cf_geom
   internal_links:
   - docs/contents/theory/rl_planning.qmd#state-and-action-space-contract
-  - docs/contents/thesis/questions.qmd#rq5-planning
+  - docs/contents/thesis/questions.qmd#rq4-planning
   related:
   - minimal-counterfactual-state
   - counterfactual-transition
@@ -706,7 +706,7 @@
   - rl.counterfactual_transition
   internal_links:
   - docs/contents/theory/rl_planning.qmd#rl-planning-theory
-  - docs/contents/thesis/questions.qmd#rq5-planning
+  - docs/contents/thesis/questions.qmd#rq4-planning
   - docs/reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd
   related:
   - rollout-state
@@ -792,7 +792,7 @@
   - rl.finite_horizon_return
   internal_links:
   - docs/contents/theory/rl_planning.qmd#rl-planning-theory
-  - docs/contents/thesis/questions.qmd#rq5-planning
+  - docs/contents/thesis/questions.qmd#rq4-planning
   related:
   - target-rri-reward
   - finite-horizon-q-function
@@ -806,6 +806,7 @@
   short: Q_H
   aliases:
   - Q_H
+  - candidate-query Q_H
   - bounded Q function
   - finite-candidate Q
   - fitted Double-Q head
@@ -814,14 +815,24 @@
   tier: core
   lookup_rank: 190
   definition_short: Finite-horizon candidate-value function for target-conditioned ARIA-NBV.
-  definition_long: The mandatory M5 learned policy-like result is fitted Double-Q / Q_H over
-    finite candidate sets. The main actor input is the minimal counterfactual state s_t^{cf0};
-    the geometry-rich state is an explicit ablation. Q_H must respect validity masks and beat
-    one-step greedy or model scoring on cumulative target RRI under equal acquisition budget,
-    with bounded oracle lookahead as an upper bound.
+  definition_long: 'The mandatory M5 learned policy-like result is Q_H over finite candidate
+    sets. The first-path architecture is a candidate-query Transformer: encode s_t^{cf0},
+    actor-visible target descriptor z_e, selected-view history, budget state, and candidate
+    tokens, then emit one value per candidate. DQN contributes replayed transition learning
+    and Bellman-style finite-action value targets; Double DQN contributes the masked online-selector
+    / target-evaluator backup to reduce max-over-candidate overestimation; IQL contributes
+    the offline support rule that value learning must not query invalid, ungenerated, or unavailable
+    actions. Q_H must respect validity masks and beat one-step greedy or model scoring on
+    cumulative target RRI under equal acquisition budget, with bounded oracle lookahead as
+    an upper bound.'
   formula:
     label: Finite-horizon candidate value
-    tex: Q_H(s_t^{\mathrm{cf0}},a_t)=\mathbb{E}\left[G_t^{(H)}\mid s_t=s_t^{\mathrm{cf0}},a_t\right]
+    tex: Q_H(s_t^{\mathrm{cf0}},a_t,z_e)=\mathbb{E}\left[G_t^{(H)}\mid s_t=s_t^{\mathrm{cf0}},a_t,z_e\right]
+  formulae:
+  - label: Masked Double-DQN selector
+    tex: j^*=\arg\max_{j:m_{t+1,j}=1}Q_\theta(s_{t+1}^{\mathrm{cf0}},a_{t+1,j},z_e)
+  - label: Masked Double-DQN target
+    tex: y_t=r_t^e+\gamma(1-d_t)Q_{\bar\theta}(s_{t+1}^{\mathrm{cf0}},a_{t+1,j^*},z_e)
   notation:
     typst: $Q_H$
   symbol_refs:
@@ -833,11 +844,14 @@
   - rl.q_h
   - rl.q_backup
   internal_links:
-  - docs/contents/thesis/questions.qmd#rq5-planning
+  - docs/contents/thesis/questions.qmd#rq4-planning
   - docs/contents/thesis/roadmap.qmd#roadmap-m5
-  - docs/contents/theory/rl_planning.qmd#rl-planning-theory
+  - docs/contents/theory/rl_planning.qmd#q-h-training-contract
+  - docs/contents/literature/rl_planning.qmd#q-h-and-dqn
   citations:
+  - DBLP:journals/corr/MnihKSGAWR13
   - DoubleDQN-vanHasselt2015
+  - IQL-kostrikov2021
   related:
   - finite-horizon-return
   - minimal-counterfactual-state
@@ -874,7 +888,7 @@
   - metrics.candidate_validity
   - rl.finite_action_set
   internal_links:
-  - docs/contents/thesis/questions.qmd#rq6-feasibility
+  - docs/contents/thesis/questions.qmd#rq-evidence-protocol
   - docs/reference/aria_nbv.pose_generation.CandidateSamplingResult.qmd
   related:
   - finite-candidate-action-set

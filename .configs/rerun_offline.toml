@@ -8,7 +8,6 @@
     load_candidates        = true
     load_depths            = true
     load_candidate_pcs     = true
-    load_counterfactuals   = false
     return_format          = "sample"
     map_location           = "cpu"
 

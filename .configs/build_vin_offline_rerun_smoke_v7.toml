@@ -2,13 +2,12 @@
 #
 # Usage:
 #   cd aria_nbv
-#   uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v6.toml
+#   uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v7.toml
 
 include_backbone              = true
 include_depths                = true
 include_pointclouds           = true
 include_diagnostic_payloads   = true
-include_counterfactuals       = false
 include_gt_obbs               = true
 include_detected_obbs         = true
 include_trajectory_metadata   = true
@@ -50,7 +49,7 @@ backbone_payload_keep_fields = [
 ]
 
 [store]
-store_dir = "vin_offline_rerun_smoke_v6"
+store_dir = "vin_offline_rerun_smoke_v7"
 
 [dataset]
 atek_variant = "efm"

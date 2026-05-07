@@ -4,8 +4,8 @@
 #import "../shared/glossary.typ": *
 #import "sections/proposal/_style.typ": *
 
-#let proposalTitleEnglish = "ARIA-NBV: Quality-Driven Next-Best-View Planning with Egocentric Foundation Models"
-#let proposalTitleGerman = "ARIA-NBV: Qualitaetsgetriebene Next-Best-View-Planung mit egozentrischen Foundation-Modellen"
+#let proposalTitleEnglish = "ARIA-NBV: Target-Conditioned, Quality-Driven Next-Best-View Planning"
+#let proposalTitleGerman = "ARIA-NBV: Zielkonditionierte, qualitaetsgetriebene Next-Best-View-Planung"
 
 #set document(title: proposalTitleEnglish + " Proposal", author: author)
 #set text(font: "New Computer Modern")
@@ -38,10 +38,6 @@
 
 #show: proposal-style
 
-#include "sections/proposal/01-motivation.typ"
-#include "sections/proposal/02-related-work.typ"
 #include "sections/proposal/02-problem.typ"
 #include "sections/proposal/03-objectives.typ"
 #include "sections/proposal/04-method.typ"
-#include "sections/proposal/05-schedule.typ"
-#include "sections/proposal/06-outline.typ"

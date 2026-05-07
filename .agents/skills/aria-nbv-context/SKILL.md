@@ -1,7 +1,20 @@
 ---
 name: aria-nbv-context
-description: Gather deterministic local context for ARIA-NBV by localizing unknown files, symbols, docs, and source families before handing off to narrower skills. Do not use for already-localized one-file edits or KG-backed claim checks.
+description: Use to localize unknown ARIA-NBV files, symbols, docs, or source families through deterministic local discovery before handoff.
 metadata:
+  mode: router
+  not_when:
+    - "exact file and owner are already known"
+    - "KG-backed authority, freshness, or claim checking is required"
+    - "a concrete failure command or traceback owns the task"
+  handoff_to:
+    - "aria-litkg-memory for KG-backed retrieval, routing, or claim checks"
+    - "diagnose-aria for concrete failures"
+    - "nearest AGENTS.md or narrow skill after localization"
+  evidence_required:
+    - "localized owning files or source family"
+    - "nearest applicable AGENTS.md"
+    - "targeted rg or generated context evidence"
   applies_to:
     - "**"
   triggers:
@@ -22,9 +35,6 @@ Use this skill as the local discovery layer. It should identify the smallest
 relevant set of files, then hand off to a narrower implementation, docs, KG, or
 diagnostic workflow.
 
-Use `aria-litkg-memory` instead when the task needs KG-backed retrieval,
-source-backed claim checking, active backlog routing, or consolidation.
-
 ## Workflow
 
 1. Read `AGENTS.md` and `.agents/references/source_order.md`.
@@ -38,14 +48,6 @@ source-backed claim checking, active backlog routing, or consolidation.
    - Code/contracts: `scripts/nbv_get_context.sh modules|contracts|match <term>`
 4. Open the nearest nested `AGENTS.md` once the surface is known.
 5. Use targeted `rg` inside the narrowed file set.
-
-## Do Not Use When
-
-- The user already named the exact file to edit or review.
-- The task is a localized code change inside one module.
-- The task needs KG authority/freshness, claim-checking, or memory
-  consolidation.
-- The task has a concrete failure command; use `diagnose-aria`.
 
 ## Zoom-Out Output
 

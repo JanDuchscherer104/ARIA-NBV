@@ -67,8 +67,9 @@ and run fixture/fake-Rerun tests instead of weakening validation.
   for ARIA-NBV world-space diagnostics unless the code documents another choice.
 - Treat `PoseTW` candidate poses as `T_world_cam` and reference rig poses as
   `T_world_rig`; do not pass raw matrices across public Rerun helper boundaries.
-- Prefer manual batched `rr.LineStrips3D` frusta for candidate cameras until a
-  native `rr.Transform3D` + `rr.Pinhole` path is covered by tests.
+- Prefer native `rr.Transform3D` + `rr.Pinhole` camera entities for candidate
+  cameras when transform direction and camera convention are covered by tests.
+  Keep `rr.LineStrips3D` for trajectories and selected-view paths.
 - Put `Pinhole`, RGB, and metric `DepthImage(..., meter=1.0)` on matching
   camera/image entities when depth is meant for 3D interpretation.
 - Keep camera-local points under posed camera entities; keep world-space

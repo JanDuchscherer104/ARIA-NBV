@@ -97,22 +97,6 @@ acceptance = ["The oracle/data public API contains one active name per concept."
 verification = ["cd aria_nbv && uv run pytest tests/data_handling/test_public_api_contract.py tests/rri_metrics tests/vin/test_vin_utils.py", "rg -n \"score_batch|DistanceAggregation|fscore_tau|semidense_length|VinOnlineDatasetConfig|empty_vin_snippet|vin_snippet_cache_config_hash\" aria_nbv/aria_nbv aria_nbv/tests docs/reference"]
 
 [[refactor]]
-id = "refactor-012"
-title = "Remove premature counterfactual offline-store hooks"
-description = "Delete future counterfactual flags and readers from the immutable offline store until rollout artifacts have a concrete M5 contract."
-priority = "medium"
-status = "todo"
-labels = ["data", "offline-store", "rollouts", "simplification"]
-issue_ids = ["issue-007", "issue-010"]
-loc_min = 60
-loc_expected = 180
-loc_max = 420
-context = ["VinOfflineManifest and VinOfflineDataset contain counterfactual metadata, load flags, and readers, but VinOfflineWriter does not materialize a real counterfactual block.", "The roadmap puts multi-step rollouts in M5, after M1/M2 contracts are stable.", "Premature storage hooks create stale contract surface before the rollout artifact shape is known."]
-implementation_notes = ["Remove VinOfflineCounterfactuals, materialized_blocks.counterfactuals, include_counterfactuals, load_counterfactuals, and _build_counterfactuals unless a current test proves a real block exists.", "Bump OFFLINE_DATASET_VERSION if manifest schema changes.", "Reintroduce rollout storage later through a concrete trajectory/result DTO after M5 planning evidence."]
-acceptance = ["The offline-store schema does not advertise counterfactual data until it can actually be written and read.", "Training and diagnostics configs no longer carry no-op counterfactual toggles.", "Roadmap stretch work remains documented without widening the current data contract."]
-verification = ["cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py tests/data_handling/test_public_api_contract.py", "rg -n \"counterfactuals|include_counterfactuals|load_counterfactuals|VinOfflineCounterfactuals\" aria_nbv/aria_nbv aria_nbv/tests docs/contents"]
-
-[[refactor]]
 id = "refactor-014"
 title = "Scope graph and memory tooling as KG support, not public docs"
 description = "Clarify litkg-rs, graphify/JSONL, Neo4j, Graphiti, CodeGraphContext, and MemPalace as internal KG/memory infrastructure while keeping public docs and canonical memory as the source of truth."

@@ -15,8 +15,8 @@ system name is **ARIA-NBV**, and the final claim is centered on
 target-conditioned, quality-driven
 {{< glsfull next-best-view >}} planning:
 
-> Can ARIA-NBV train a target-conditioned NBV scorer and finite-candidate
-> fitted $Q_H$ policy that maximizes cumulative
+> Can ARIA-NBV perform target-conditioned, RRI-based multi-step NBV by training
+> a finite-candidate candidate-query Transformer $Q_H$ that maximizes cumulative
 > {{< glsfull target-specific-rri >}} for a
 > {{< gls target-of-interest >}} under a fixed acquisition budget?
 
@@ -24,15 +24,20 @@ The technical spine follows the current ARIA-NBV system: ASE snippets and
 ground-truth meshes [@ProjectAria-ASE-2025], frozen EVL/EFM3D features
 [@EFM3D-straub2024], {{< gls oracle-rri >}} supervision inspired by VIN-NBV
 [@VIN-NBV-frahm2025], an ASE mesh/oracle counterfactual rollout loop, and a
-target-conditioned fitted Double-Q / $Q_H$ learner over finite candidate sets.
-Habitat, Isaac, online RL, and continuous actor-critic policies are later
-bridges or future-work substrates, not the thesis-core simulator path. See the
+target-conditioned candidate-query Transformer $Q_H$ learner over finite
+candidate sets.
+Online discrete $Q_H$, Habitat, Isaac, and continuous actor-critic policies are
+later bridge or future-work substrates, not the thesis-core quantitative path.
+See the
 [research questions](questions.qmd), the
 [RRI theory page](../theory/rri_theory.qmd), the
-[RL and bounded rollout theory page](../theory/rl_planning.qmd), the
+[finite-candidate rollout and Q_H contract](../theory/rl_planning.qmd), the
 [VIN implementation note](../impl/vin_nbv.qmd), the
 [Rerun offline inspector note](../impl/rerun_offline_inspector.qmd), and the
-[Typst paper source](../../typst/seminar_paper/main.typ) for the main connected nodes.
+[M1 contract report](m1_contract_report.qmd) for the main connected nodes. The
+advisor-facing proposal is maintained in
+`docs/typst/thesis/proposal.typ`; the seminar paper is historical implemented
+evidence, not the current thesis contract.
 
 ## Thesis Outcome {#roadmap-thesis-outcome}
 
@@ -44,23 +49,26 @@ The September deliverable is a reproducible target-aware
   observed/predicted OBBs are the main actor-visible input;
 - an observed-only automatic target selector and mixed observed candidate set;
 - a one-step VIN-style scorer conditioned on the target encoding;
-- stable random-valid, greedy, bounded oracle-lookahead,
-  temperature-softmax, and Gumbel-Top-k rollout data;
-- a mandatory target-conditioned fitted Double-Q / $Q_H$ model trained from
-  ASE oracle rollout traces;
+- stable random-valid, oracle-greedy/lookahead, and oracle-scored
+  temperature-softmax rollout data, with Gumbel-Top-k as preferred later
+  diversity evidence;
+- a mandatory target-conditioned candidate-query Transformer $Q_H$ trained
+  from ASE oracle rollout traces;
 - final figures, ablations, and failure cases that report cumulative target
   RRI together with {{< gls acquisition-cost >}};
-- final experiments scaled to the full 100 GT-mesh ASE scenes and 4,608
-  snippet windows after small-subset correctness passes.
+- final experiments scaled toward the full 100 GT-mesh ASE scenes and 4,608
+  snippet windows after small-subset correctness passes, or a scene-level
+  held-out subset with explicit coverage reporting if full coverage is blocked.
 
-The quantitative success bar is that learned $Q_H$ beats one-step greedy and
-one-step model scoring on cumulative target RRI under the same acquisition
-budget; bounded oracle lookahead is the upper bound. Full continuous control,
-Habitat/Isaac simulation, VLM/global planning, SceneScript-style memory, and
-real-device deployment remain stretch work or M6 bridge design unless the M5
-evidence justifies them. Hestia-style hierarchy [@Hestia-lu2026],
-GenNBV-style continuous control [@GenNBV-chen2024], and SceneScript-style
-semantic memory
+The quantitative success bar is that learned $Q_H$ beats one-step greedy, the
+learned one-step target-conditioned scorer, and one-step model scoring on
+cumulative target RRI under the same acquisition budget after oracle evaluation
+of selected actions; bounded oracle lookahead is the upper bound. Online
+discrete $Q_H$, full continuous control, Habitat/Isaac simulation, VLM/global
+planning, SceneScript-style memory, and real-device deployment remain bridge
+design or future work unless the M5 evidence justifies experiment-grade
+escalation. Hestia-style hierarchy [@Hestia-lu2026], GenNBV-style continuous control
+[@GenNBV-chen2024], and SceneScript-style semantic memory
 [@SceneScript-avetisyan2024] are treated as design references, not thesis-core
 claims.
 
@@ -68,14 +76,14 @@ claims.
 
 | Dates | Milestone | Exit criteria |
 |---|---|---|
-| 2026-04-29 to 2026-05-10 | **M0 - Scope, repo, docs foundation** | Dirty worktree classified; available partial VIN offline store smoke path understood; Rerun inspector smoke command documented; proposal freeze and bibliography audit tracked as advisor deliverables; four-tier thesis boundary adopted. |
+| 2026-04-29 to 2026-05-10 | **M0 - Scope, repo, docs foundation** | Dirty worktree classified; available partial VIN offline store smoke path understood; Rerun inspector smoke command documented; compact proposal freeze and bibliography/source-policy audit tracked as advisor deliverables; candidate-query $Q_H$ thesis boundary adopted. |
 | 2026-05-11 to 2026-05-31 | **M1 - Data, cache, oracle correctness** | Offline store and RRI contracts stable; public M1 contract report records store/split/frame/CW90/candidate-alignment/depth-backprojection/Rerun normal-boundary-failure evidence; oracle throughput measured. |
 | 2026-06-01 to 2026-06-21 | **M2 - VIN baseline and scale gates** | One-step VIN baseline reproducible; calibration and ranking plots available; ablation matrix fixed; LRZ sharding/storage plan and Zarr rollout/Q schema are ready enough for M3 scale work. |
 | 2026-06-22 to 2026-07-12 | **M3 - Entity/target-aware RRI and generation gates** | V0 GT-OBB target RRI trusted on a small subset; V1 observed-target / GT-label contract and observed-only target selector defined; deterministic sharding, Slurm/DSS staging, and Zarr store gates pass before full-scale generation. |
 | 2026-07-13 to 2026-08-09 | **M4 - Target-conditioned VIN** | Model accepts observed/predicted target encoding and predicts target-specific RRI with matched GT labels; scene-level and target-level scorers compared. |
-| 2026-08-10 to 2026-08-30 | **M5 - Multi-step target-aware rollouts and Q_H** | Random-valid, oracle-greedy, bounded oracle-lookahead, temperature-softmax, and Gumbel rollout data are stable; fitted Double-Q / $Q_H$ is trained and evaluated; $Q_H$ beats one-step greedy/model scoring or produces a documented blocker under the thesis success bar. |
-| 2026-08-31 to 2026-09-13 | **M6 - Actor-critic and continuous bridge** | If M5 is strong, add IQL as a second offline-RL ablation or design the actor-critic/continuous-policy bridge; no quantitative continuous-control baseline is required for thesis success. |
-| 2026-09-14 to 2026-09-27 | **M7 - Full-scale experiments and writing** | Full 100 GT-mesh ASE scenes / 4,608 snippet windows are generated or the exact coverage gap is reported; final tables, figures, failure cases, and thesis narrative frozen. |
+| 2026-08-10 to 2026-08-30 | **M5 - Multi-step target-aware rollouts and Q_H** | Random-valid, oracle-greedy/lookahead, and oracle-scored temperature-softmax rollout data are stable; candidate-query Transformer $Q_H$ is trained and oracle-evaluated; $Q_H$ beats one-step greedy/model scoring or produces a documented blocker under the thesis success bar. |
+| 2026-08-31 to 2026-09-13 | **M6 - Actor-critic and continuous bridge** | Deliver the bridge design from fitted finite-candidate $Q_H$ toward online discrete $Q_H$, IQL, actor-critic, and simulator-backed control; no quantitative continuous-control baseline is required for thesis success. |
+| 2026-09-14 to 2026-09-27 | **M7 - Full-scale experiments and writing** | Full 100 GT-mesh ASE scenes / 4,608 snippet windows are generated, or a scene-level held-out subset reports scenes, snippets, targets, trajectories, rollout seeds, transitions, and exact coverage gaps; final tables, figures, failure cases, and thesis narrative frozen. |
 | 2026-09-28 to 2026-09-30 | **M8 - Release freeze** | Reproducible configs, docs, demo path, and final smoke checks complete. |
 
 ## Milestone Details {#roadmap-details}
@@ -93,18 +101,21 @@ Rerun offline inspector, and the available VIN offline store.
 
 - classify existing worktree changes into data/cache cleanup, RL/rollout
   scaffold, docs cleanup, and unrelated operator work;
-- freeze the advisor proposal checklist before M1 scale-up: ARIA-NBV name and
+- freeze the compact advisor proposal before M1 scale-up: ARIA-NBV name and
   title capitalization, examiner/supervisor placeholders or explicit blockers,
   dataset limits, invalidity semantics, V0/V1 target contract, mandatory
-  finite-candidate $Q_H$, and the continuous/simulator/3DGS stretch boundary;
+  finite-candidate candidate-query Transformer $Q_H$, a compact timeline, and
+  the continuous/simulator/3DGS stretch boundary;
 - audit `docs/references.bib` for proposal-critical citation hygiene: no
   generated `contentReference` comments, no Wikipedia support for
   proposal-critical claims, primary metadata for cited papers/datasets, and
   any legacy duplicate aliases explicitly quarantined;
-- render the proposal with `make proposal-pdf` and track the generated proposal
-  PDF once the advisor-facing text is frozen;
-- align proposal, roadmap, and questions on the four-tier boundary:
-  implemented substrate; prerequisite core; hard thesis core; and stretch;
+- render the approximately 2.5 content-page proposal contract with
+  `make proposal-pdf` and track the generated proposal PDF once the
+  advisor-facing text is frozen;
+- align proposal, roadmap, and questions on the five-role boundary:
+  implemented substrate; prerequisite/evidence protocol; hard quantitative
+  thesis core; mandatory bridge design; and future-work extensions;
 - validate that `offline_only.toml` can load the available VIN offline store
   into the [VIN diagnostics page](../../reference/aria_nbv.lightning.VinDataModule.qmd)
   once corrected command behavior and validation land;
@@ -113,7 +124,8 @@ Rerun offline inspector, and the available VIN offline store.
 - record KG-friendly authoring rules in this roadmap and use them in new public
   docstrings;
 - keep thesis scope aligned with [RQ1](questions.qmd#rq1-objective) through
-  [RQ8](questions.qmd#rq8-extensions).
+  [RQ5](questions.qmd#rq5-bridge) and the
+  [shared evidence protocol](questions.qmd#rq-evidence-protocol).
 
 ### M1 - Data, Cache, Oracle Correctness {#roadmap-m1}
 
@@ -190,7 +202,7 @@ metrics.
 ### M4 - Target-Conditioned VIN {#roadmap-m4}
 
 **Primary question:** Can a VIN-style scorer rank candidates by target-specific
-RRI when conditioned on a target encoding?
+RRI when conditioned on the first actor-visible target encoding?
 
 **Implementation surfaces:** VIN target encoder, target-aware batch fields,
 offline-store payload extensions, and model diagnostics.
@@ -198,7 +210,8 @@ offline-store payload extensions, and model diagnostics.
 **Exit checks:**
 
 - target encoding selected for the main controlled run: observed/predicted OBB
-  plus class, confidence, support signals, and relative pose fields;
+  geometry plus class, confidence, projected area, semidense support, EVL
+  support, and relative pose fields;
 - target-specific RRI labels loaded through the data-handling surface;
 - baseline comparison: scene-level scorer, target-conditioned scorer, and oracle
   target RRI;
@@ -217,9 +230,11 @@ the [rollout storage and invalidity contract](../impl/rollout_storage_contract.q
 
 **Exit checks:**
 
-- compare random-valid, deterministic one-step oracle greedy, one-step
-  model/VIN scoring, deterministic bounded oracle lookahead, temperature
-  softmax, Gumbel-Top-k, and fitted Double-Q / $Q_H$ under equal budget;
+- compare random-valid, deterministic one-step oracle greedy, the learned
+  one-step target-conditioned scorer, deterministic bounded oracle lookahead,
+  oracle-scored temperature-softmax, and candidate-query Transformer $Q_H$
+  under equal budget; add Gumbel-Top-k as preferred later evidence when
+  schedule permits;
 - make bounded oracle-RRI lookahead versus one-step greedy under equal budget
   the trusted upper-bound comparison before interpreting $Q_H$;
 - report cumulative target RRI, scene RRI, number of views, path length, invalid
@@ -229,12 +244,14 @@ the [rollout storage and invalidity contract](../impl/rollout_storage_contract.q
   rewards as follow-up ablations;
 - keep rollout complexity bounded by explicit horizon, branch factor, and beam
   width;
-- train $Q_H$ to predict bounded cumulative target RRI; scalar motion or rule
-  penalties are extensions;
+- train $Q_H$ as a candidate-query Transformer over scene, target, history, and
+  candidate tokens to predict one masked bounded-horizon Q value per candidate;
+  scalar motion or rule penalties are extensions;
 - require hard validity masks and explicit invalid reason codes in Q_H data;
-- require learned $Q_H$ to beat one-step greedy/model scoring on cumulative
-  target RRI under equal acquisition budget, with oracle lookahead reported as
-  an upper bound;
+- require learned $Q_H$ selected actions to be oracle-evaluated and to beat the
+  learned one-step target-conditioned scorer plus one-step greedy/model scoring
+  on cumulative target RRI under equal acquisition budget, with oracle lookahead
+  reported as an upper bound;
 - visualize representative successes and failures.
 
 ### M6 - Actor-Critic and Continuous Bridge {#roadmap-m6}
@@ -244,13 +261,16 @@ Q_H result?
 
 **Implementation surfaces:** the
 [counterfactual RL API](../../reference/aria_nbv.pose_generation.CounterfactualRolloutResult.qmd),
-transition datasets, IQL as a second offline-RL ablation, and optional
-actor-critic or continuous-control design notes.
+transition datasets, online discrete $Q_H$ in the ASE mesh/oracle loop, IQL as
+a second offline-RL ablation, and actor-critic or continuous-control design
+notes.
 
 **Exit checks:**
 
-- require M5 Q_H evidence before spending time on IQL, actor-critic, or
-  continuous-control work;
+- require M5 Q_H evidence before spending time on quantitative IQL,
+  actor-critic, or continuous-control work;
+- document online discrete $Q_H$ as the first bridge step because it can reuse
+  the current finite candidate/action contract and ASE mesh/oracle loop;
 - if Q_H is strong, run IQL as a second offline-RL ablation only if the data
   support and time budget are credible;
 - document how a future actor would propose continuous poses and project them
@@ -273,7 +293,9 @@ Quarto docs, and defense figures.
 - final ablations for target encoding, candidate generation, invalid handling,
   and supervision scale;
 - final scale report over the full 100 GT-mesh ASE scenes / 4,608 snippets, or
-  an explicit pass/block coverage report if any subset is unavailable;
+  an explicit pass/block coverage report that separates scenes, snippets,
+  targets, trajectories, rollout seeds, transitions, and missing gaps if any
+  subset is unavailable;
 - final failure-case catalog;
 - paper, docs, and slides use the same terminology and claims.
 

@@ -86,7 +86,7 @@ ARIA-NBV defaults to repository-rooted paths:
 | `.data/ase_meshes/scene_ply_<scene_id>.ply` | ASE ground-truth meshes. |
 | `.data/ase_meshes_processed/` | Generated cropped or simplified meshes. |
 | `.data/offline_cache/vin_offline/` | Default immutable VIN offline store. |
-| `.data/offline_cache/vin_offline_rerun_smoke_v6/` | One-sample sidecar smoke store. |
+| `.data/offline_cache/vin_offline_rerun_smoke_v7/` | One-sample sidecar smoke store. |
 | `.logs/ckpts/` | External model checkpoints. |
 | `.logs/checkpoints/` | Lightning checkpoints produced by training. |
 | `.artifacts/rerun/` | Saved Rerun `.rrd` recordings. |
@@ -150,13 +150,13 @@ uv run nbv-build-offline --config-path ../.configs/build_vin_offline_81286.toml
 
 Use the focused [one-scene smoke checks](impl/one_scene_smoke.qmd) before
 touching larger stores. The sidecar smoke config writes one sample to
-`vin_offline_rerun_smoke_v6`:
+`vin_offline_rerun_smoke_v7`:
 
 ```sh
 cd aria_nbv
-uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v6.toml --dry-run
-uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v6.toml
-uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline_smoke_v6.toml --split val --index 0 --save ../.artifacts/rerun/offline_smoke_v6.rrd
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v7.toml --dry-run
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v7.toml
+uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline_smoke_v7.toml --split val --index 0 --save ../.artifacts/rerun/offline_smoke_v7.rrd
 ```
 
 The Rerun inspector is diagnostic-only. Its downsampling is display-only and

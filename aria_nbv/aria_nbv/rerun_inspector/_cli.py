@@ -49,7 +49,30 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--split", choices=("all", "train", "val"), help="Override selection.split.")
     parser.add_argument("--index", type=int, help="Override selection.index.")
     parser.add_argument("--sample-id", help="Override selection.sample_key.")
+    parser.add_argument("--scene-id", help="Override selection.scene_id.")
+    parser.add_argument("--snippet-id", help="Override selection.snippet_id.")
     parser.add_argument("--candidate-index", type=int, help="Override candidate.selected_index for detail layers.")
+    parser.add_argument(
+        "--rollout-store",
+        type=Path,
+        help="Inspect a standalone rollouts.zarr replay store instead of a VIN offline sample.",
+    )
+    parser.add_argument(
+        "--rollout-index",
+        type=int,
+        default=0,
+        help="Zero-based rollout row position to inspect when --rollout-store is set.",
+    )
+    parser.add_argument(
+        "--rollout-row-id",
+        type=int,
+        help="Explicit rollouts/rollout_row_id to inspect when --rollout-store is set.",
+    )
+    parser.add_argument(
+        "--rollout-context",
+        choices=("auto", "required", "off"),
+        help="VIN context policy for --rollout-store: auto, required, or off.",
+    )
     parser.add_argument(
         "--save",
         nargs="?",
@@ -104,6 +127,10 @@ def _validate_viewer_args(parser: argparse.ArgumentParser, args: argparse.Namesp
         parser.error("--view/--serve-web are post-save viewer modes and cannot be combined with --spawn/--connect.")
     if args.lan and not args.serve_web:
         parser.error("--lan requires --serve-web.")
+    if args.rollout_index is not None and int(args.rollout_index) < 0:
+        parser.error("--rollout-index must be >= 0.")
+    if args.rollout_row_id is not None and int(args.rollout_row_id) < 0:
+        parser.error("--rollout-row-id must be >= 0.")
     for name in ("web_viewer_port", "ws_server_port"):
         port = int(getattr(args, name))
         if port < 0 or port > 65535:
@@ -114,12 +141,21 @@ def _apply_overrides(config: RerunOfflineInspectorConfig, args: argparse.Namespa
     """Apply CLI overrides while preserving TOML defaults."""
 
     cfg = config.model_copy(deep=True)
+    selection_updates: dict[str, object] = {}
     if args.split is not None:
-        cfg.selection.split = args.split
+        selection_updates["split"] = args.split
     if args.index is not None:
-        cfg.selection.index = args.index
+        selection_updates["index"] = args.index
     if args.sample_id is not None:
-        cfg.selection.sample_key = args.sample_id
+        selection_updates["sample_key"] = args.sample_id
+    if args.scene_id is not None:
+        selection_updates["scene_id"] = args.scene_id
+    if args.snippet_id is not None:
+        selection_updates["snippet_id"] = args.snippet_id
+    if args.rollout_context is not None:
+        selection_updates["rollout_context_mode"] = args.rollout_context
+    if selection_updates:
+        cfg.selection = type(cfg.selection).model_validate({**cfg.selection.model_dump(), **selection_updates})
     if args.candidate_index is not None:
         cfg.candidate.selected_index = args.candidate_index
     if args.save is not None:
@@ -241,7 +277,17 @@ def main(argv: list[str] | None = None) -> None:
     config_path = _resolve_config_path(args.config_path)
     cfg = RerunOfflineInspectorConfig.from_toml(config_path)
     cfg = _apply_overrides(cfg, args)
-    run_inspector(cfg)
+    if args.rollout_store is not None:
+        from ._rollout_zarr import run_rollout_zarr_inspector
+
+        run_rollout_zarr_inspector(
+            cfg,
+            store_dir=args.rollout_store,
+            rollout_index=int(args.rollout_index),
+            rollout_row_id=args.rollout_row_id,
+        )
+    else:
+        run_inspector(cfg)
     if args.view or args.serve_web:
         _run_viewer_command(
             _viewer_command(

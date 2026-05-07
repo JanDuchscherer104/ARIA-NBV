@@ -373,7 +373,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-relative-reconstruction-improvement">RRI</a> <a class="glossary-chip" href="#term-target-of-interest">target</a> <a class="glossary-chip" href="#term-acquisition-cost">cost</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/rri_computation.html#entity-wise-rri" title="docs/contents/impl/rri_computation.qmd#entity-wise-rri">Computing RRI with Ground Truth Meshes</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/rri_computation.html#entity-wise-rri" title="docs/contents/impl/rri_computation.qmd#entity-wise-rri">Computing RRI with Ground Truth Meshes</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
 </div>
 </details>
@@ -407,7 +407,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-target-conditioned-scorer">target-conditioned scorer</a> <a class="glossary-chip" href="#term-oriented-bounding-box">OBB</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq2-target-encoding" title="docs/contents/thesis/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_v2_feature_proposals.html" title="docs/contents/impl/vin_v2_feature_proposals.qmd">VIN v2 Feature + Encoding Proposals</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq2-target-encoding" title="docs/contents/thesis/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_v2_feature_proposals.html" title="docs/contents/impl/vin_v2_feature_proposals.qmd">VIN v2 Feature + Encoding Proposals</a></div></div>
 </div>
 </details>
 
@@ -543,7 +543,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-of-interest">target</a> <a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-view-introspection-network">VIN</a> <a class="glossary-chip" href="#term-finite-horizon-q-function">Q_H</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.model_v3.VinModelV3.html" title="docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd">VinModelV3</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a> <a class="glossary-chip" href="../reference/aria_nbv.vin.model_v3.VinModelV3.html" title="docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd">VinModelV3</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
 </div>
 </details>
@@ -608,7 +608,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-observed-target-selection">OBS-SEL</a> <a class="glossary-chip" href="#term-ground-truth-target-evaluation">GT-EVAL</a> <a class="glossary-chip" href="#term-target-conditioned-scorer">target-conditioned scorer</a> <a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-finite-horizon-q-function">Q_H</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq2-target-encoding" title="docs/contents/thesis/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-model" title="docs/contents/thesis/questions.qmd#rq4-model">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq2-target-encoding" title="docs/contents/thesis/questions.qmd#rq2-target-encoding">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a> <a class="glossary-chip glossary-citation" href="#ref-DoubleDQN-vanHasselt2015">&#64;DoubleDQN-vanHasselt2015</a></div></div>
 </div>
 </details>
@@ -718,7 +718,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-rollout-state">state</a> <a class="glossary-chip" href="#term-finite-candidate-action-set">action set</a> <a class="glossary-chip" href="#term-counterfactual-transition">transition</a> <a class="glossary-chip" href="#term-target-rri-reward">reward</a> <a class="glossary-chip" href="#term-finite-horizon-return">return</a> <a class="glossary-chip" href="#term-finite-horizon-q-function">Q_H</a> <a class="glossary-chip" href="#term-validity-mask">mask</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a> <a class="glossary-chip glossary-citation" href="#ref-DoubleDQN-vanHasselt2015">&#64;DoubleDQN-vanHasselt2015</a></div></div>
 </div>
 </details>
@@ -753,7 +753,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-historic-snippet-state">historic state</a> <a class="glossary-chip" href="#term-persisted-offline-state">offline state</a> <a class="glossary-chip" href="#term-minimal-counterfactual-state">CF0 state</a> <a class="glossary-chip" href="#term-geometry-rich-counterfactual-state">CF+ state</a> <a class="glossary-chip" href="#term-oracle-rollout-state">oracle state</a> <a class="glossary-chip" href="#term-finite-candidate-action-set">action set</a> <a class="glossary-chip" href="#term-validity-mask">mask</a> <a class="glossary-chip" href="#term-observed-target-selection">OBS-SEL</a> <a class="glossary-chip" href="#term-predicted-target-q">PRED-Q</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a></div></div>
 </div>
 </details>
 
@@ -787,7 +787,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-persisted-offline-state">offline state</a> <a class="glossary-chip" href="#term-egocentric-voxel-lifting">EVL</a> <a class="glossary-chip" href="#term-oriented-bounding-box">OBB</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="literature/project_aria.html" title="docs/contents/literature/project_aria.qmd">Project Aria</a> <a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">EFM3D and EVL</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="literature/project_aria.html" title="docs/contents/literature/project_aria.qmd">Project Aria</a> <a class="glossary-chip" href="literature/efm3d.html" title="docs/contents/literature/efm3d.qmd">EFM3D and EVL</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-projectaria-engel2023">&#64;projectaria-engel2023</a> <a class="glossary-chip glossary-citation" href="#ref-EFM3D-straub2024">&#64;EFM3D-straub2024</a></div></div>
 </div>
 </details>
@@ -822,7 +822,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-historic-snippet-state">historic state</a> <a class="glossary-chip" href="#term-vin-nbv">vin-nbv</a> <a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="impl/vin_nbv.html" title="docs/contents/impl/vin_nbv.qmd">Aria-VIN-NBV (VINv3)</a></div></div>
 </div>
 </details>
 
@@ -856,7 +856,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-geometry-rich-counterfactual-state">CF+ state</a> <a class="glossary-chip" href="#term-finite-candidate-action-set">action set</a> <a class="glossary-chip" href="#term-counterfactual-transition">transition</a> <a class="glossary-chip" href="#term-finite-horizon-q-function">Q_H</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a></div></div>
 </div>
 </details>
 
@@ -890,7 +890,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-minimal-counterfactual-state">CF0 state</a> <a class="glossary-chip" href="#term-counterfactual-transition">transition</a> <a class="glossary-chip" href="#term-oracle-rollout-state">oracle state</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a></div></div>
 </div>
 </details>
 
@@ -924,7 +924,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-ground-truth-target-evaluation">GT-EVAL</a> <a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a> <a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-minimal-counterfactual-state">CF0 state</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#state-and-action-space-contract" title="docs/contents/theory/rl_planning.qmd#state-and-action-space-contract">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="impl/rri_computation.html" title="docs/contents/impl/rri_computation.qmd">Computing RRI with Ground Truth Meshes</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-ProjectAria-ASE-2025">&#64;ProjectAria-ASE-2025</a></div></div>
 </div>
 </details>
@@ -967,7 +967,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-candidate-view">candidate</a> <a class="glossary-chip" href="#term-validity-mask">mask</a> <a class="glossary-chip" href="#term-rollout-state">state</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq3-candidates" title="docs/contents/thesis/questions.qmd#rq3-candidates">Master Thesis Research Questions</a> <a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CandidateViewGenerator.html" title="docs/reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd">CandidateViewGenerator</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq3-candidates" title="docs/contents/thesis/questions.qmd#rq3-candidates">Master Thesis Research Questions</a> <a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CandidateViewGenerator.html" title="docs/reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd">CandidateViewGenerator</a></div></div>
 </div>
 </details>
 
@@ -1009,7 +1009,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-rollout-state">state</a> <a class="glossary-chip" href="#term-point-cloud">PC</a> <a class="glossary-chip" href="#term-oracle-rri">oracle RRI</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.html" title="docs/reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd">CounterfactualPoseGenerator</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.html" title="docs/reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd">CounterfactualPoseGenerator</a></div></div>
 </div>
 </details>
 
@@ -1059,7 +1059,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-specific-rri">target RRI</a> <a class="glossary-chip" href="#term-finite-horizon-return">return</a> <a class="glossary-chip" href="#term-acquisition-cost">cost</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq1-objective" title="docs/contents/thesis/questions.qmd#rq1-objective">Master Thesis Research Questions</a> <a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a></div></div>
 <div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-VIN-NBV-frahm2025">&#64;VIN-NBV-frahm2025</a></div></div>
 </div>
 </details>
@@ -1102,7 +1102,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-target-rri-reward">reward</a> <a class="glossary-chip" href="#term-finite-horizon-q-function">Q_H</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a> <a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a></div></div>
 </div>
 </details>
 
@@ -1120,7 +1120,7 @@ $$
 
 <div class="glossary-aliases">
 <span>Aliases</span>
-<code>Q_H</code> <code>bounded Q function</code> <code>finite-candidate Q</code> <code>fitted Double-Q head</code>
+<code>Q_H</code> <code>candidate-query Q_H</code> <code>bounded Q function</code> <code>finite-candidate Q</code> <code>fitted Double-Q head</code>
 </div>
 
 <div class="glossary-card-notation">
@@ -1130,13 +1130,29 @@ $$
 
 <p class="glossary-definition">Finite-horizon candidate-value function for target-conditioned ARIA-NBV.</p>
 
-<p class="glossary-detail-text">The mandatory M5 learned policy-like result is fitted Double-Q / Q_H over finite candidate sets. The main actor input is the minimal counterfactual state s_t^{cf0}; the geometry-rich state is an explicit ablation. Q_H must respect validity masks and beat one-step greedy or model scoring on cumulative target RRI under equal acquisition budget, with bounded oracle lookahead as an upper bound.</p>
+<p class="glossary-detail-text">The mandatory M5 learned policy-like result is Q_H over finite candidate sets. The first-path architecture is a candidate-query Transformer: encode s_t^{cf0}, actor-visible target descriptor z_e, selected-view history, budget state, and candidate tokens, then emit one value per candidate. DQN contributes replayed transition learning and Bellman-style finite-action value targets; Double DQN contributes the masked online-selector / target-evaluator backup to reduce max-over-candidate overestimation; IQL contributes the offline support rule that value learning must not query invalid, ungenerated, or unavailable actions. Q_H must respect validity masks and beat one-step greedy or model scoring on cumulative target RRI under equal acquisition budget, with bounded oracle lookahead as an upper bound.</p>
 
 ::: {.glossary-formula}
 **Finite-horizon candidate value**
 
 $$
-Q_H(s_t^{\mathrm{cf0}},a_t)=\mathbb{E}\left[G_t^{(H)}\mid s_t=s_t^{\mathrm{cf0}},a_t\right]
+Q_H(s_t^{\mathrm{cf0}},a_t,z_e)=\mathbb{E}\left[G_t^{(H)}\mid s_t=s_t^{\mathrm{cf0}},a_t,z_e\right]
+$$
+:::
+
+::: {.glossary-formula}
+**Masked Double-DQN selector**
+
+$$
+j^*=\arg\max_{j:m_{t+1,j}=1}Q_\theta(s_{t+1}^{\mathrm{cf0}},a_{t+1,j},z_e)
+$$
+:::
+
+::: {.glossary-formula}
+**Masked Double-DQN target**
+
+$$
+y_t=r_t^e+\gamma(1-d_t)Q_{\bar\theta}(s_{t+1}^{\mathrm{cf0}},a_{t+1,j^*},z_e)
 $$
 :::
 
@@ -1144,8 +1160,8 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-finite-horizon-return">return</a> <a class="glossary-chip" href="#term-minimal-counterfactual-state">CF0 state</a> <a class="glossary-chip" href="#term-predicted-target-q">PRED-Q</a> <a class="glossary-chip" href="#term-validity-mask">mask</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq5-planning" title="docs/contents/thesis/questions.qmd#rq5-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a> <a class="glossary-chip" href="theory/rl_planning.html#rl-planning-theory" title="docs/contents/theory/rl_planning.qmd#rl-planning-theory">RL and Bounded Rollout Theory</a></div></div>
-<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-DoubleDQN-vanHasselt2015">&#64;DoubleDQN-vanHasselt2015</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq4-planning" title="docs/contents/thesis/questions.qmd#rq4-planning">Master Thesis Research Questions</a> <a class="glossary-chip" href="thesis/roadmap.html#roadmap-m5" title="docs/contents/thesis/roadmap.qmd#roadmap-m5">Master Thesis Roadmap</a> <a class="glossary-chip" href="theory/rl_planning.html#q-h-training-contract" title="docs/contents/theory/rl_planning.qmd#q-h-training-contract">Finite-Candidate Rollout And Q_H Contract</a> <a class="glossary-chip" href="literature/rl_planning.html#q-h-and-dqn" title="docs/contents/literature/rl_planning.qmd#q-h-and-dqn">RL Sources For Rollout And Q_H</a></div></div>
+<div class="glossary-metadata-row"><span>References</span><div><a class="glossary-chip glossary-citation" href="#ref-DBLP:journals/corr/MnihKSGAWR13">&#64;DBLP:journals/corr/MnihKSGAWR13</a> <a class="glossary-chip glossary-citation" href="#ref-DoubleDQN-vanHasselt2015">&#64;DoubleDQN-vanHasselt2015</a> <a class="glossary-chip glossary-citation" href="#ref-IQL-kostrikov2021">&#64;IQL-kostrikov2021</a></div></div>
 </div>
 </details>
 
@@ -1179,7 +1195,7 @@ $$
 <summary>Links and references</summary>
 <div class="glossary-metadata">
 <div class="glossary-metadata-row"><span>Related</span><div><a class="glossary-chip" href="#term-finite-candidate-action-set">action set</a> <a class="glossary-chip" href="#term-finite-horizon-q-function">Q_H</a> <a class="glossary-chip" href="#term-target-rri-reward">reward</a></div></div>
-<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq6-feasibility" title="docs/contents/thesis/questions.qmd#rq6-feasibility">Master Thesis Research Questions</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CandidateSamplingResult.html" title="docs/reference/aria_nbv.pose_generation.CandidateSamplingResult.qmd">CandidateSamplingResult</a></div></div>
+<div class="glossary-metadata-row"><span>Docs</span><div><a class="glossary-chip" href="thesis/questions.html#rq-evidence-protocol" title="docs/contents/thesis/questions.qmd#rq-evidence-protocol">Master Thesis Research Questions</a> <a class="glossary-chip" href="../reference/aria_nbv.pose_generation.CandidateSamplingResult.html" title="docs/reference/aria_nbv.pose_generation.CandidateSamplingResult.qmd">CandidateSamplingResult</a></div></div>
 </div>
 </details>
 
@@ -2128,7 +2144,7 @@ $$
 </div>
 
 ::: {.glossary-citation-seed}
-[@DoubleDQN-vanHasselt2015]; [@EFM3D-straub2024]; [@EVL-Doc-2025]; [@Frustum-Wikipedia-2025]; [@GaussianSplatting-kerbl2023]; [@GenNBV-chen2024]; [@ProjectAria-ASE-2025]; [@SceneScript-avetisyan2024]; [@VIN-NBV-frahm2025]; [@projectaria-engel2023]
+[@DBLP:journals/corr/MnihKSGAWR13]; [@DoubleDQN-vanHasselt2015]; [@EFM3D-straub2024]; [@EVL-Doc-2025]; [@Frustum-Wikipedia-2025]; [@GaussianSplatting-kerbl2023]; [@GenNBV-chen2024]; [@IQL-kostrikov2021]; [@ProjectAria-ASE-2025]; [@SceneScript-avetisyan2024]; [@VIN-NBV-frahm2025]; [@projectaria-engel2023]
 :::
 
 :::

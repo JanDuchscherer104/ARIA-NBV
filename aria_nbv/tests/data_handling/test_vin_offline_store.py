@@ -469,7 +469,6 @@ def test_vin_offline_writer_finalizes_prepared_rows_on_keyboard_interrupt(tmp_pa
         include_depths=True,
         include_pointclouds=False,
         include_diagnostic_payloads=False,
-        include_counterfactuals=False,
         include_gt_obbs=False,
         include_detected_obbs=False,
         include_trajectory_metadata=False,
@@ -657,7 +656,6 @@ def _write_test_store(
             backbone=include_backbone,
             depths=True,
             candidate_pcs=False,
-            counterfactuals=False,
             gt_obbs=True,
             detected_obbs=include_backbone,
             trajectory=True,
@@ -1027,6 +1025,17 @@ def test_vin_offline_store_rejects_unsupported_manifest_version(tmp_path: Path) 
         VinOfflineStoreReader(store_cfg)
 
 
+def test_vin_offline_manifest_omits_counterfactual_placeholders(tmp_path: Path) -> None:
+    """The current store schema should not advertise unwritten counterfactual blocks."""
+
+    store_cfg = _write_test_store(tmp_path)
+    manifest_payload = json.loads(store_cfg.manifest_path.read_text(encoding="utf-8"))
+
+    assert OFFLINE_DATASET_VERSION == 7  # noqa: S101
+    assert "counterfactuals" not in manifest_payload  # noqa: S101
+    assert "counterfactuals" not in manifest_payload["materialized_blocks"]  # noqa: S101
+
+
 def test_vin_offline_store_rejects_unsupported_record_block_kind(tmp_path: Path) -> None:
     """Runtime readers should reject unsupported optional-record block encodings."""
 
@@ -1130,7 +1139,6 @@ def test_vin_offline_source_config_disables_diagnostic_blocks_for_vin_batches(tm
     assert dataset.config.load_candidates is False  # noqa: S101
     assert dataset.config.load_depths is False  # noqa: S101
     assert dataset.config.load_candidate_pcs is False  # noqa: S101
-    assert dataset.config.load_counterfactuals is False  # noqa: S101
     assert dataset.config.load_gt_obbs is True  # noqa: S101
     assert dataset.config.load_detected_obbs is True  # noqa: S101
     assert dataset.config.load_trajectory_metadata is True  # noqa: S101

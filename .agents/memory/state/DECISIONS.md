@@ -121,6 +121,21 @@ tags: [codex, workflow, architecture]
   provenance. Scene RRI, model scores, random scores, and distance heuristic
   scores must not silently become target-RRI labels.
 
+### 2026-05-07 VIN Offline Store V7 Decisions
+- The immutable VIN offline dataset format is strict `OFFLINE_DATASET_VERSION =
+  7`; readers accept only the current version and fail fast for older manifests.
+- Premature VIN offline-store counterfactual hooks are removed. The format no
+  longer includes `VinOfflineCounterfactuals`,
+  `materialized_blocks.counterfactuals`, `include_counterfactuals`,
+  `load_counterfactuals`, `load_counterfactuals_for_batch`, or
+  `_build_counterfactuals`.
+- Multi-step rollout replay belongs in standalone rollout artifacts such as
+  `rollouts.zarr`, not in immutable VIN offline-store counterfactual blocks.
+- The local default `vin_offline` store and one-sample Rerun smoke sidecar were
+  upgraded to v7 manifests without leaving migration code or compatibility
+  readers behind. The default store remains partial/interrupted diagnostic
+  evidence, not final training-scale evidence.
+
 - The core thesis claim is target-conditioned, quality-driven NBV on ASE/EFM with strict M1 data/cache/oracle contracts.
 - RRI is the primary project objective for next-best-view research in this repo. Coverage-style objectives remain baselines or diagnostics, not the main thesis target.
 - The canonical training and evaluation surface remains finite candidate ranking/selection anchored on prerecorded ASE trajectory snippets with oracle supervision derived from GT meshes where available.

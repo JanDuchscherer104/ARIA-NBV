@@ -197,9 +197,6 @@ class VinOfflineMaterializedBlocks:
     candidate_pcs: bool
     """Whether candidate point clouds are materialized."""
 
-    counterfactuals: bool
-    """Whether future counterfactual trajectory blocks are materialized."""
-
     gt_obbs: bool = False
     """Whether compact GT OBB blocks are materialized."""
 
@@ -208,26 +205,6 @@ class VinOfflineMaterializedBlocks:
 
     trajectory: bool = False
     """Whether trajectory timing/gravity blocks are materialized."""
-
-
-@dataclass(slots=True)
-class VinOfflineCounterfactuals:
-    """Counterfactual trajectory metadata reserved for future extensions."""
-
-    enabled: bool = False
-    """Whether counterfactual trajectories are materialized."""
-
-    k: int | None = None
-    """Optional number of counterfactual trajectories per snippet."""
-
-    horizon: int | None = None
-    """Optional rollout horizon in steps."""
-
-    selection_policy: str | None = None
-    """Optional policy used to choose counterfactual trajectories."""
-
-    materialized_modalities: list[str] = field(default_factory=list)
-    """Optional modalities materialized for each counterfactual trajectory."""
 
 
 @dataclass(slots=True)
@@ -241,7 +218,6 @@ class VinOfflineManifest:
         oracle: Oracle-label pipeline provenance and storage policy.
         vin: VIN-specific materialization settings.
         materialized_blocks: Flags for optional stored blocks.
-        counterfactuals: Reserved future counterfactual trajectory metadata.
         stats: Aggregate dataset statistics.
         provenance: Writer provenance and build hints.
         shards: Immutable shard descriptors.
@@ -264,9 +240,6 @@ class VinOfflineManifest:
 
     materialized_blocks: VinOfflineMaterializedBlocks
     """Flags describing which optional blocks are materialized."""
-
-    counterfactuals: VinOfflineCounterfactuals = field(default_factory=VinOfflineCounterfactuals)
-    """Reserved future counterfactual trajectory metadata."""
 
     stats: dict[str, Any] = field(default_factory=dict)
     """Aggregate dataset statistics."""
@@ -369,7 +342,6 @@ class VinOfflineIndexRecord:
 
 __all__ = [
     "VinOfflineBlockSpec",
-    "VinOfflineCounterfactuals",
     "VinOfflineIndexRecord",
     "VinOfflineManifest",
     "VinOfflineMaterializedBlocks",

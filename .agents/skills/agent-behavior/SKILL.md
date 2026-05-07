@@ -1,7 +1,19 @@
 ---
 name: agent-behavior
-description: Use before non-trivial ARIA-NBV work to state assumptions, inspect first, keep scope small, and verify the result.
+description: Use before non-trivial ARIA-NBV work to choose a lane, state assumptions, inspect owners, keep diffs traceable, and verify.
 metadata:
+  mode: scaffold
+  not_when:
+    - "obvious one-line answer or command output with no durable edit"
+  handoff_to:
+    - "aria-nbv-context for unknown local ownership"
+    - "aria-litkg-memory for KG-backed routing or claim checks"
+    - "diagnose-aria for concrete failures"
+    - "plan-grill for ambiguous high-impact decisions"
+  evidence_required:
+    - "root or nearest AGENTS.md for touched surface"
+    - "request-traceable edit scope"
+    - "surface-specific verification or explicit blocker"
   applies_to:
     - "**"
   triggers:
@@ -27,6 +39,17 @@ obvious one-line fixes.
 3. Prefer the simplest sufficient change.
 4. Preserve unrelated user or agent work.
 5. Verify the touched behavior before claiming completion.
+
+## Lane Rule
+
+- Do not guess silently. If ownership, evidence, or route is ambiguous, name
+  the ambiguity before editing.
+- Choose one lane from root `AGENTS.md` or the active skill metadata, state why
+  it owns the work, and name the handoff if evidence disproves that choice.
+- Keep diffs request-traceable: every changed file must map to the user
+  request, the owning guidance surface, or required verification.
+- Verify before done. If verification cannot run, report the exact blocker or
+  missing evidence.
 
 ## Workflow
 

@@ -1,7 +1,7 @@
 // Canonical ARIA-NBV glossary source.
 // Humans edit this file; `make glossary` regenerates Quarto, Typst, YAML, and KG artifacts.
 
-#import "@preview/glossarium:0.5.10": register-glossary, print-glossary, gls, glspl
+#import "@preview/glossarium:0.5.10": gls, glspl, print-glossary, register-glossary
 #import "symbols.typ": symb
 #import "equations.typ": eqs
 
@@ -171,7 +171,7 @@
       definition_long: "Target-conditioned ARIA-NBV variants use this target as an explicit input to candidate scoring and planning instead of optimizing only scene-level RRI.",
       internal_links: (
         "docs/contents/thesis/questions.qmd#rq2-target-encoding",
-        "docs/contents/thesis/questions.qmd#rq4-model",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
         "docs/contents/impl/vin_v2_feature_proposals.qmd",
       ),
       citations: (),
@@ -215,7 +215,7 @@
       definition_long: "Target-specific RRI lets the thesis compare views by how much they improve a selected object or region, even when scene-level RRI would prefer large background surfaces.",
       internal_links: (
         "docs/contents/thesis/questions.qmd#rq1-objective",
-        "docs/contents/thesis/questions.qmd#rq4-model",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
         "docs/contents/impl/rri_computation.qmd#entity-wise-rri",
       ),
       citations: (
@@ -245,6 +245,7 @@
         typst: "$RRI_e$",
       ),
       formula: (
+        /* TODO: must also have valid typst formula! */
         tex: "\\mathrm{RRI}_e(q)=\\frac{d(P_t^e,M_e)-d(P_t^e\\cup P_q^e,M_e)}{d(P_t^e,M_e)+\\varepsilon}",
       ),
       formulae: (),
@@ -310,7 +311,7 @@
       definition_short: "VIN-style candidate scorer that receives scene state, a candidate view, and an encoding of the target of interest.",
       definition_long: "The scorer predicts target-specific utility so view ranking can prioritize a selected entity or region instead of only optimizing scene-level RRI.",
       internal_links: (
-        "docs/contents/thesis/questions.qmd#rq4-model",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
         "docs/contents/impl/vin_nbv.qmd",
         "docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd",
       ),
@@ -405,8 +406,8 @@
       definition_long: "Predicted-Target Q covers target-conditioned one-step scoring and finite-candidate Q_H selection whose target inputs are actor-visible predicted or observed descriptors, not ground-truth target annotations.",
       internal_links: (
         "docs/contents/thesis/questions.qmd#rq2-target-encoding",
-        "docs/contents/thesis/questions.qmd#rq4-model",
-        "docs/contents/thesis/questions.qmd#rq5-planning",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
       ),
       citations: (
         "VIN-NBV-frahm2025",
@@ -506,7 +507,7 @@
       definition_long: "The ARIA-NBV MDP keeps actions restricted to sampled finite candidate views and keeps GT meshes or GT target crops outside the actor-visible state. It is the contract that connects target-conditioned rollout generation, reward computation, validity masks, and fitted finite-horizon Q learning.",
       internal_links: (
         "docs/contents/theory/rl_planning.qmd#rl-planning-theory",
-        "docs/contents/thesis/questions.qmd#rq5-planning",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
         "docs/contents/thesis/roadmap.qmd#roadmap-m5",
       ),
       citations: (
@@ -571,7 +572,7 @@
       definition_long: "ARIA-NBV distinguishes raw historic snippet state, persisted VIN offline sample state, minimal counterfactual actor state, geometry-rich counterfactual ablation state, and privileged oracle rollout state. The main Q_H actor input starts from the minimal counterfactual state; all-candidate GT renders, GT mesh crops, and oracle RRI labels remain outside the actor-visible state.",
       internal_links: (
         "docs/contents/theory/rl_planning.qmd#state-and-action-space-contract",
-        "docs/contents/thesis/questions.qmd#rq5-planning",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
       ),
       citations: (),
       related: (
@@ -740,7 +741,7 @@
       definition_long: "The minimal counterfactual actor state is the default input to target-conditioned Q_H. It contains frozen root EVL context, the accumulated counterfactual point proxy, selected-action history, observed or predicted target descriptor, budget state, finite candidate table, validity masks, reason codes, and current-state candidate-query features. Synthetic observations update the state only after their candidate is selected.",
       internal_links: (
         "docs/contents/theory/rl_planning.qmd#state-and-action-space-contract",
-        "docs/contents/thesis/questions.qmd#rq5-planning",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
       ),
       citations: (),
       related: (
@@ -789,7 +790,7 @@
       definition_long: "The geometry-rich counterfactual state adds only selected prior synthetic observations to the minimal state. It may include rendered depth, depth-valid masks, backprojected points, derived normals, and local support summaries for views that have already been selected. It does not include oracle renders for unselected candidates.",
       internal_links: (
         "docs/contents/theory/rl_planning.qmd#state-and-action-space-contract",
-        "docs/contents/thesis/questions.qmd#rq5-planning",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
       ),
       citations: (),
       related: (
@@ -943,7 +944,7 @@
       definition_long: "For the thesis-core ASE mesh/oracle loop, the transition uses the selected candidate index to render or retrieve that candidate's depth, backproject points, and update the counterfactual point state and selected-view history. All-candidate GT renders and scores remain oracle-only before selection. The update must be deterministic under the stored seed and lineage.",
       internal_links: (
         "docs/contents/theory/rl_planning.qmd#rl-planning-theory",
-        "docs/contents/thesis/questions.qmd#rq5-planning",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
         "docs/reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd",
       ),
       citations: (),
@@ -1059,7 +1060,7 @@
       definition_long: "The return definition keeps gamma symbolic so discounted ablations remain possible. The first thesis result should report cumulative target RRI under an equal acquisition budget and treat log-improvement or normalized rewards as follow-up analysis.",
       internal_links: (
         "docs/contents/theory/rl_planning.qmd#rl-planning-theory",
-        "docs/contents/thesis/questions.qmd#rq5-planning",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
       ),
       citations: (),
       related: (
@@ -1097,12 +1098,13 @@
     key: "finite-horizon-q-function",
     short: "Q_H",
     long: "Finite-Horizon Q Function",
-    description: "Target-conditioned finite-candidate value function trained from ASE oracle rollout data. Q_H predicts bounded cumulative target-RRI return for choosing a valid candidate-table action index in a rollout state.",
+    description: "Target-conditioned candidate-query Transformer value function trained from ASE oracle rollout traces. Q_H emits one masked finite-horizon value per valid candidate-table action, using DQN-style replayed Bellman targets, Double-DQN selector/evaluator backups, and offline support constraints.",
     group: "Model",
     custom: (
       anchor: "term-finite-horizon-q-function",
       aliases: (
         "Q_H",
+        "candidate-query Q_H",
         "bounded Q function",
         "finite-candidate Q",
         "fitted Double-Q head",
@@ -1110,14 +1112,17 @@
       category: "model.value",
       parent: "target-conditioned-nbv-mdp",
       definition_short: "Finite-horizon candidate-value function for target-conditioned ARIA-NBV.",
-      definition_long: "The mandatory M5 learned policy-like result is fitted Double-Q / Q_H over finite candidate sets. The main actor input is the minimal counterfactual state s_t^{cf0}; the geometry-rich state is an explicit ablation. Q_H must respect validity masks and beat one-step greedy or model scoring on cumulative target RRI under equal acquisition budget, with bounded oracle lookahead as an upper bound.",
+      definition_long: "The mandatory M5 learned policy-like result is Q_H over finite candidate sets. The first-path architecture is a candidate-query Transformer: encode s_t^{cf0}, actor-visible target descriptor z_e, selected-view history, budget state, and candidate tokens, then emit one value per candidate. DQN contributes replayed transition learning and Bellman-style finite-action value targets; Double DQN contributes the masked online-selector / target-evaluator backup to reduce max-over-candidate overestimation; IQL contributes the offline support rule that value learning must not query invalid, ungenerated, or unavailable actions. Q_H must respect validity masks and beat one-step greedy or model scoring on cumulative target RRI under equal acquisition budget, with bounded oracle lookahead as an upper bound.",
       internal_links: (
-        "docs/contents/thesis/questions.qmd#rq5-planning",
+        "docs/contents/thesis/questions.qmd#rq4-planning",
         "docs/contents/thesis/roadmap.qmd#roadmap-m5",
-        "docs/contents/theory/rl_planning.qmd#rl-planning-theory",
+        "docs/contents/theory/rl_planning.qmd#q-h-training-contract",
+        "docs/contents/literature/rl_planning.qmd#q-h-and-dqn",
       ),
       citations: (
+        "DBLP:journals/corr/MnihKSGAWR13",
         "DoubleDQN-vanHasselt2015",
+        "IQL-kostrikov2021",
       ),
       related: (
         "finite-horizon-return",
@@ -1148,9 +1153,18 @@
       ),
       formula: (
         label: "Finite-horizon candidate value",
-        tex: "Q_H(s_t^{\\mathrm{cf0}},a_t)=\\mathbb{E}\\left[G_t^{(H)}\\mid s_t=s_t^{\\mathrm{cf0}},a_t\\right]",
+        tex: "Q_H(s_t^{\\mathrm{cf0}},a_t,z_e)=\\mathbb{E}\\left[G_t^{(H)}\\mid s_t=s_t^{\\mathrm{cf0}},a_t,z_e\\right]",
       ),
-      formulae: (),
+      formulae: (
+        (
+          label: "Masked Double-DQN selector",
+          tex: "j^*=\\arg\\max_{j:m_{t+1,j}=1}Q_\\theta(s_{t+1}^{\\mathrm{cf0}},a_{t+1,j},z_e)",
+        ),
+        (
+          label: "Masked Double-DQN target",
+          tex: "y_t=r_t^e+\\gamma(1-d_t)Q_{\\bar\\theta}(s_{t+1}^{\\mathrm{cf0}},a_{t+1,j^*},z_e)",
+        ),
+      ),
     ),
   ),
   (
@@ -1171,7 +1185,7 @@
       definition_short: "Hard mask that separates feasible candidate actions from invalid candidates.",
       definition_long: "The mask m_{t,i} gates candidate actions, while invalid reason codes rho_{t,i} preserve why a candidate was rejected. Collision, outside-bounds poses, no target visibility, bad frusta, no depth hits, and outside-EVL-extent cases are constraints rather than low target-RRI examples.",
       internal_links: (
-        "docs/contents/thesis/questions.qmd#rq6-feasibility",
+        "docs/contents/thesis/questions.qmd#rq-evidence-protocol",
         "docs/reference/aria_nbv.pose_generation.CandidateSamplingResult.qmd",
       ),
       citations: (),

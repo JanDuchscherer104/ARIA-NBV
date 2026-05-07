@@ -191,9 +191,6 @@ class VinOfflineSourceConfig(BaseConfig):
     load_candidate_pcs_for_batch: bool = False
     """Whether VIN-batch reads should decode candidate point-cloud diagnostics."""
 
-    load_counterfactuals_for_batch: bool = False
-    """Whether VIN-batch reads should decode counterfactual diagnostics."""
-
     load_gt_obbs_for_batch: bool = True
     """Whether VIN-batch reads should decode compact GT OBB blocks."""
 
@@ -215,7 +212,6 @@ class VinOfflineSourceConfig(BaseConfig):
         offline_cfg.load_candidates = bool(self.load_candidates_for_batch)
         offline_cfg.load_depths = bool(self.load_depths_for_batch)
         offline_cfg.load_candidate_pcs = bool(self.load_candidate_pcs_for_batch)
-        offline_cfg.load_counterfactuals = bool(self.load_counterfactuals_for_batch)
         offline_cfg.load_gt_obbs = bool(self.load_gt_obbs_for_batch)
         offline_cfg.load_detected_obbs = bool(self.load_detected_obbs_for_batch)
         offline_cfg.load_trajectory_metadata = bool(self.load_trajectory_metadata_for_batch)

@@ -1,16 +1,31 @@
 ---
 name: agents-db
-description: Use when working with ARIA-NBV's internal agent memory (`.agents/AGENTS_INTERNAL_DB.md`, `.agents/issues.toml`, `.agents/todos.toml`, `.agents/refactors.toml`, `.agents/resolved.toml`) or triaging, resolving, and maintaining the backlog with `make agents-db`.
+description: Use when triaging or maintaining ARIA-NBV internal agent-memory and backlog TOML surfaces with `make agents-db`.
 metadata:
+  mode: maintenance
+  not_when:
+    - "public documentation or thesis narrative is the primary output"
+    - "ordinary KG retrieval or claim checking without backlog edits"
+    - "tiny cleanup that does not change active debt"
+  handoff_to:
+    - "docs-curator for public docs or thesis narrative"
+    - "aria-litkg-memory for KG-backed consolidation proposals"
+    - "simplification for behavior-preserving pruning"
+  evidence_required:
+    - "existing record search before adding duplicates"
+    - "compact context plus stable references for each changed record"
+    - "agents-db validation output"
   applies_to:
     - ".agents/AGENTS_INTERNAL_DB.md"
     - ".agents/issues.toml"
     - ".agents/todos.toml"
     - ".agents/refactors.toml"
     - ".agents/resolved.toml"
+    - ".agents/memory/README.md"
   triggers:
     - "agents DB"
     - "backlog"
+    - "memory consolidation"
     - "issue triage"
     - "resolved work"
   must_read:
@@ -26,9 +41,8 @@ metadata:
 # AGENTS DB
 
 Use this skill when work depends on the internal agent-memory surfaces under
-`.agents/`, active backlog ranking, or durable maintenance debt capture.
-
-For behavior-preserving pruning or LOC reduction, also use `simplification`.
+`.agents/`, active backlog ranking, proposal/review requirement consolidation,
+or durable maintenance debt capture.
 
 ## Read First
 
@@ -45,7 +59,10 @@ For behavior-preserving pruning or LOC reduction, also use `simplification`.
 3. Add or amend a record only when the work materially changes the repo's
    maintenance picture.
 4. Keep records compact but auditable with `context` plus stable `references`.
-5. Resolve or retire completed records into `.agents/resolved.toml`; do not
+5. Route extracted requirements to the smallest owner: `.agents/*.toml` for
+   active work, `.agents/memory/state/` for durable current truth, and dated
+   history debriefs for episodic task records.
+6. Resolve or retire completed records into `.agents/resolved.toml`; do not
    delete records outright.
 
 ## Commands
@@ -62,8 +79,8 @@ For behavior-preserving pruning or LOC reduction, also use `simplification`.
 - Keep `.agents/*.toml` as the local source of truth unless the user explicitly
   asks to publish GitHub issues.
 - Do not churn the DB for tiny local cleanup that does not change active debt.
-- For broad or literature-backed additions, run a litkg route/query first and
-  cite the relevant sources.
+- For broad or literature-backed additions, include source-backed evidence
+  before changing records.
 
 ## Verification
 

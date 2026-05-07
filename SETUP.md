@@ -115,7 +115,7 @@ ARIA-NBV expects paths to be rooted at the repository by default:
 | `.data/ase_meshes/scene_ply_<scene_id>.ply` | ASE ground-truth meshes. |
 | `.data/ase_meshes_processed/` | Generated cropped or simplified mesh artifacts. |
 | `.data/offline_cache/vin_offline/` | Default immutable VIN offline store. |
-| `.data/offline_cache/vin_offline_rerun_smoke_v6/` | One-sample sidecar store used by Rerun smoke docs. |
+| `.data/offline_cache/vin_offline_rerun_smoke_v7/` | One-sample sidecar store used by Rerun smoke docs. |
 | `.logs/ckpts/` | External model checkpoints such as EVL, DINOv2, and PointNeXt. |
 | `.logs/checkpoints/` | Lightning checkpoints produced by training. |
 | `.artifacts/rerun/` | Saved Rerun `.rrd` recordings. |
@@ -187,26 +187,26 @@ uv run nbv-build-offline --config-path ../.configs/build_vin_offline_81286.toml
 ## 6. One-scene smoke path
 
 Use the sidecar smoke config first. It writes exactly one sample to
-`.data/offline_cache/vin_offline_rerun_smoke_v6/` and is safe to overwrite.
+`.data/offline_cache/vin_offline_rerun_smoke_v7/` and is safe to overwrite.
 
 ```sh
 cd aria_nbv
-uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v6.toml --dry-run
-uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v6.toml
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v7.toml --dry-run
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v7.toml
 ```
 
 Save a Rerun recording from that one sample:
 
 ```sh
 cd aria_nbv
-uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline_smoke_v6.toml --split val --index 0 --save ../.artifacts/rerun/offline_smoke_v6.rrd
+uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline_smoke_v7.toml --split val --index 0 --save ../.artifacts/rerun/offline_smoke_v7.rrd
 ```
 
 Open the saved recording in the native viewer when available:
 
 ```sh
 cd aria_nbv
-uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline_smoke_v6.toml --split val --index 0 --view
+uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline_smoke_v7.toml --split val --index 0 --view
 ```
 
 The Rerun inspector is diagnostic-only. Its point and mesh downsampling are

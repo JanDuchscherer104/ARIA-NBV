@@ -1,5 +1,5 @@
 ---
-title: "RL and Rollout Planning"
+title: "RL Sources For Rollout And Q_H"
 phase: thesis
 audience: public
 status: current
@@ -7,92 +7,62 @@ owner: jan
 format: html
 ---
 
-## RL and Rollout Planning for ARIA-NBV {#rl-rollout-planning-literature}
+## RL Sources For Rollout And Q_H {#rl-rollout-planning-literature}
 
-**Primary sources.** Trajectory Transformer [@TrajectoryTransformer-janner2021], Gumbel-Top-k / stochastic beam search [@GumbelTopK-kool2019], Double DQN [@DoubleDQN-vanHasselt2015], Implicit Q-Learning [@IQL-kostrikov2021], Deep Energy-Based Policies / soft Q-learning [@DeepEnergyPolicies-haarnoja2017], PPO [@PPO-schulman2017], and SAC [@SAC-haarnoja2018].
+This page owns the source-backed RL distillation used for thesis writing. The formal ARIA-NBV rollout notation, replay fields, masks, $Q_H$ targets, and implementation acceptance checks live in the [finite-candidate rollout and $Q_H$ contract](../theory/rl_planning.qmd).
 
-**Related ARIA-NBV pages.** [VIN-NBV](vin_nbv.qmd), [GenNBV](gen_nbv.qmd), [Hestia](hestia.qmd), [roadmap](../thesis/roadmap.qmd), and [research questions](../thesis/questions.qmd).
+**Primary sources.** Trajectory Transformer [@TrajectoryTransformer-janner2021], Gumbel-Top-k / stochastic beam search [@GumbelTopK-kool2019], DQN [@DBLP:journals/corr/MnihKSGAWR13], Double DQN [@DoubleDQN-vanHasselt2015], Implicit Q-Learning [@IQL-kostrikov2021], Deep Energy-Based Policies / soft Q-learning [@DeepEnergyPolicies-haarnoja2017], PPO [@PPO-schulman2017], and SAC [@SAC-haarnoja2018].
+
+**Related ARIA-NBV pages.** [rollout contract](../theory/rl_planning.qmd), [VIN-NBV](vin_nbv.qmd), [GenNBV](gen_nbv.qmd), [Hestia](hestia.qmd), [roadmap](../thesis/roadmap.qmd), and [research questions](../thesis/questions.qmd).
 
 ### Core contribution
 
-The RL literature is useful for ARIA-NBV only after the finite-candidate rollout substrate is trusted. The current thesis core is not unrestricted continuous control. It is a target-conditioned finite-candidate value problem over offline {{< gls oracle-rri >}} rollout data.
+The RL literature is useful for ARIA-NBV only after the finite-candidate rollout substrate is trusted. The current thesis core is not unrestricted continuous control. It is target-conditioned finite-candidate value learning over offline {{< gls oracle-rri >}} rollout data, with the formal model defined in the [contract page](../theory/rl_planning.qmd#q-h-training-contract).
 
 ```{mermaid}
 flowchart TD
-  A["Deterministic RolloutTrace"] --> B["Random-valid, one-step greedy, bounded oracle lookahead"]
-  B --> C["Temperature-softmax and Gumbel-Top-k rollout data"]
-  C --> D["Target-conditioned fitted Double-Q / Q_H over finite candidates"]
-  D --> E["IQL as second offline-RL ablation"]
-  E --> F["Online Gymnasium / SB3 / PPO / SAC only after a simulator exists"]
+  A["Paper signals"] --> B["Rollout data contract"]
+  B --> C["Masked candidate-query Q_H"]
+  C --> D["Optional IQL / actor-critic bridge"]
 ```
 
-The mandatory learned value target is a bounded cumulative target-RRI return:
+### Local source anchors {#local-source-anchors}
 
-$$
-Q_H(s_t, q_t, z_e)
-\approx
-\mathbb{E}\!\left[
-  \sum_{k=0}^{H-1-t}
-  \gamma^k r^{\mathrm{target}}_{t+k}
-  \,\middle|\,
-  s_t, q_t, z_e
-\right],
-$$
+Use these local source files when tracing thesis claims back to papers:
 
-where $s_t$ is the rollout state, $q_t$ is a valid candidate view, $z_e$ is the actor-visible target input, and $r^{\mathrm{target}}$ is derived from {{< gls target-specific-rri >}}.
-
-### Verified paper signals
-
-| paper family | source-backed signal | ARIA-NBV adoption |
+| paper | local source anchors | claim to reuse |
 |---|---|---|
-| Trajectory Transformer | Offline control can be modeled as sequences of states, actions, and rewards; beam search can decode high-return trajectories. | Use bounded rollout/beam search as a planning primitive before training a large sequence model. |
-| Gumbel-Top-k | Ordered size-$k$ samples can be drawn without replacement, and stochastic beam search avoids enumerating the full sequence space. | Use Gumbel-Top-k after deterministic lookahead to diversify rollout data and avoid duplicate root-greedy traces. |
-| Double DQN | Separating action selection from action evaluation reduces max-operator overestimation. | Use fitted Double-Q as the first mandatory learned {{< gls finite-horizon-q-function >}} method over finite candidate sets. |
-| IQL | Offline RL should avoid querying unseen actions; value fitting uses an upper expectile over dataset actions before advantage-weighted policy extraction. | Keep as a second offline-RL ablation after the fitted Double-Q dataset and masks are stable. |
-| Soft Q / energy policies | Maximum-entropy policies can represent multimodal action distributions through energy/Q-shaped sampling. | Use as conceptual support for temperature-softmax candidate selection, not as the first thesis algorithm. |
-| PPO / SAC | Practical online actor-critic methods assume an interactive reward loop and a simulator or environment abstraction. | Simulator-gated bridge only; not a required quantitative continuous-control result. |
+| DQN | `docs/literature/tex-src/arXiv-DQN/intro.tex`, `background.tex`, `method.tex`, `experiments.tex` | delayed rewards, correlated samples, behavior-distribution drift, experience replay, Bellman Q-learning, random minibatches, transition reuse, held-out predicted-Q diagnostics |
+| Double DQN | `docs/literature/tex-src/arXiv-Double-DQN/DoubleDQN_aaai2016_total.tex` | max-operator overestimation and online-selector / target-evaluator decoupling |
+| IQL | `docs/literature/tex-src/arXiv-IQL/iclr2022_conference.tex` | offline support constraint, in-sample SARSA-style targets, upper expectile value fitting, $Q$ backup through $V(s')$, advantage-weighted extraction |
 
-For the Double-Q gate, the finite-candidate target should mirror the Double DQN selector/evaluator separation:
+### DQN, Double DQN, and IQL for Q_H {#q-h-and-dqn}
 
-$$
-Y_t^{\mathrm{DoubleQ}}
-=
-r_t
-+
-\gamma\,
-Q_{\bar{\theta}}\!\left(
-  s_{t+1},
-  \arg\max_{q'\in\mathcal{Q}_{t+1}^{\mathrm{valid}}}
-  Q_{\theta}(s_{t+1}, q', z_e),
-  z_e
-\right).
-$$
+DQN contributes the basic learning pattern for ARIA-NBV's {{< gls finite-horizon-q-function >}}. It identifies sparse or delayed rewards, correlated streams, and non-stationary behavior distributions as stability problems for deep RL, then uses experience replay to store transitions and train from random minibatches. It also motivates batched discrete-action scoring: the Atari network emits one value per valid action in one forward pass, while ARIA-NBV replaces those fixed heads with candidate-query tokens over a variable candidate table [@DBLP:journals/corr/MnihKSGAWR13].
 
-Invalid candidates must be excluded from the maximization through {{< gls validity-mask >}} values and explicit reason codes.
+Double DQN is the first-path overestimation safeguard. Its source argues that Q-learning's maximization step can prefer overestimated action values and shows that separating action selection from evaluation reduces this bias. ARIA-NBV adopts that idea as a masked selector/evaluator backup over valid candidate-table entries; the exact equations live in the [training contract](../theory/rl_planning.qmd#q-h-training-contract) [@DoubleDQN-vanHasselt2015].
 
-### ARIA-NBV adoption
+IQL contributes the offline support rule. Its source emphasizes that offline RL should avoid querying values for unseen or out-of-distribution actions, then uses upper-expectile value fitting and a $Q$ backup through the learned state value to perform multi-step dynamic programming without direct out-of-sample action queries. ARIA-NBV keeps this as a gated ablation after masked fitted Double-Q, because the first need is a reliable rollout store and support-aware candidate table [@IQL-kostrikov2021].
 
-- **Thesis-core method:** deterministic oracle rollout, stochastic rollout data generation, and fitted Double-Q / {{< gls finite-horizon-q-function >}} over finite candidate sets.
-- **Gated follow-up:** IQL once the offline rollout store has enough behavioral diversity and scene-level split integrity.
-- **Stretch/bridge:** PPO, SAC, SB3, continuous action policies, and simulator-backed online RL after a true environment loop exists.
+### Paper signals for ARIA-NBV
 
-The required ordering is:
+| paper family | source-backed signal | ARIA-NBV adoption | deferred or rejected |
+|---|---|---|---|
+| Trajectory Transformer | Offline control can be modeled as sequences of states, actions, and rewards; beam search can decode high-return trajectories. | Use bounded rollout and beam-search abstractions before training a large sequence model. | Do not start with a trajectory Transformer before typed rollout traces and oracle labels are trusted. |
+| Gumbel-Top-k | Ordered size-$k$ samples can be drawn without replacement, and stochastic beam search avoids enumerating the full sequence space. | Use after deterministic lookahead to diversify rollout data and reduce duplicate root-greedy traces. | Do not present stochastic beams as a substitute for deterministic oracle lookahead. |
+| DQN | Replayed minibatch Q-learning can reuse transitions, decorrelate sequential samples, and score all discrete valid actions in one forward pass. | Adopt replayed transition learning and batched finite-candidate scoring with candidate-query tokens. | Do not import Atari CNNs, epsilon-greedy schedules, score clipping, or emulator hyperparameters as defaults. |
+| Double DQN | Separating action selection from action evaluation reduces max-operator overestimation. | Use masked fitted Double-Q as the first mandatory learned $Q_H$ method. | It reduces overestimation but does not solve offline support mismatch by itself. |
+| IQL | Offline RL should avoid querying unseen actions; value fitting uses an upper expectile over dataset actions before advantage-weighted policy extraction. | Keep as a second offline-RL ablation after the fitted Double-Q dataset and masks are stable. | Do not use IQL to skip the required finite-candidate $Q_H$ result. |
+| Soft Q / energy policies | Maximum-entropy policies can represent multimodal action distributions through energy/Q-shaped sampling. | Use as conceptual support for temperature-softmax candidate selection. | Not a first thesis algorithm. |
+| PPO / SAC | Practical online actor-critic methods assume an interactive reward loop and simulator or environment abstraction. | Simulator-gated bridge only. | Not a required quantitative continuous-control result. |
 
-```{mermaid}
-flowchart LR
-  A["Trusted oracle labels"] --> B["Replayable rollout traces"]
-  B --> C["Deterministic lookahead upper bound"]
-  C --> D["Stochastic rollout coverage"]
-  D --> E["Masked fitted Double-Q Q_H"]
-  E -. "optional after Q_H" .-> F["IQL / actor-critic bridge"]
-```
+### Thesis-writing use
 
-### Do not adopt
+For writing, cite DQN when motivating replayed finite-action value learning, Double DQN when motivating the masked selector/evaluator backup, and IQL when motivating the offline support constraint. Cite Trajectory Transformer and Gumbel-Top-k when justifying bounded beams, branch schedules, and stochastic rollout data diversity. Cite PPO/SAC and GenNBV/Hestia only to position continuous actor-critic work as bridge or stretch work after the oracle rollout and $Q_H$ contract is stable.
 
-- Do not start with PPO/SAC on an expensive oracle without a simulator-grade reward loop.
-- Do not train value heads before deterministic rollouts expose real headroom over one-step greedy.
-- Do not let Q-learning evaluate invalid, out-of-support, or ungenerated actions.
-- Do not present stochastic beams as a substitute for deterministic oracle lookahead; they are data-diversification tools after the trusted comparison exists.
+The compact thesis claim is:
+
+> ARIA-NBV adapts deep RL ideas to a constrained NBV setting: DQN supplies replayed finite-action value learning, Double DQN supplies support-aware overestimation control for candidate-table backups, and IQL supplies the offline warning that learned values must not optimize over unsupported actions.
 
 ### Open risks / caveats
 
