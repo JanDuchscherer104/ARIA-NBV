@@ -3,16 +3,47 @@
 
 = Motivation
 
-Active 3D reconstruction is limited not only by the quality of the reconstruction algorithm, but also by the choice of viewpoints that provide its input. A mobile or wearable camera cannot observe all surfaces at once, and each additional acquisition consumes time, motion budget, and operator attention. The next-best-view (#NBV) problem therefore asks which view should be selected next so that a reconstruction improves as much as possible under a constrained acquisition budget. This question is especially important for egocentric indoor capture, where observations are partial, clutter is common, and many useful surfaces are visible only from a narrow range of viewpoints. The active-perception literature makes the same point at a broader level: perception improves when the agent can choose actions that change what is observable @ActivePerception-bajcsy1988 @ActiveVision-aloimonos1988.
+Active reconstruction is a coupled sensing and inference problem: the
+reconstruction error after a fixed budget depends as much on the selected
+viewpoints as on the downstream surface estimator. Classical active perception
+therefore treats sensing actions as part of perception itself, and view-planning
+surveys formalize the dominant generate-score-select loop for three-dimensional
+inspection @ActivePerception-bajcsy1988 @ActiveVision-aloimonos1988
+@ViewPlanningSurvey-scott2003. ARIA-NBV adopts that loop for egocentric indoor
+data, but asks a narrower scientific question: can finite candidate views be
+scored and planned by reconstruction-quality improvement rather than by coverage
+or uncertainty proxies alone?
 
-Many NBV systems use coverage or information gain as a proxy objective. These objectives are attractive because they can often be computed from occupancy, uncertainty, or visibility fields, but they do not necessarily measure whether the final reconstructed surface becomes more accurate. VIN-NBV introduced a more direct quality-driven objective by learning to rank candidate views according to Relative Reconstruction Improvement (#RRI), an oracle signal derived from the reduction in Chamfer-style reconstruction error after adding a candidate observation @VIN-NBV-frahm2025. This idea is a strong foundation for the thesis because it separates the desired scientific target, reconstruction-quality improvement, from convenient but weaker proxies such as the number of newly covered voxels.
+The key empirical precedent is VIN-NBV, which replaces pure coverage with
+Relative Reconstruction Improvement (#RRI), an oracle label computed from the
+reduction in Chamfer-style reconstruction error after adding a query view
+@VIN-NBV-frahm2025. This is the right axis for ARIA-NBV because target indoor
+surfaces can remain poorly reconstructed even when many voxels or pixels are
+already covered. The thesis extends this idea from object-centric RGB-D
+benchmarks to the Project Aria / #ASE ecosystem, where calibrated egocentric
+streams, trajectories, semi-dense points, predicted object boxes, and a
+mesh-supervised subset support controlled oracle labels @projectaria-engel2023
+@ProjectAria-ASE-2025 @EFM3D-straub2024.
 
-ARIA-NBV extends this quality-driven view-ranking idea to egocentric indoor data from the Project Aria ecosystem. Aria Synthetic Environments (#ASE) provides synthetic egocentric trajectories, calibrated camera streams, semi-dense SLAM points, object annotations, and ground-truth meshes for a supervised subset @ProjectAria-ASE-2025. EFM3D and EVL provide a compatible egocentric foundation-model representation that lifts multi-stream observations into a local 3D voxel field @EFM3D-straub2024. This makes it possible to compute expensive oracle #RRI labels in simulation, train a lightweight candidate scorer on frozen egocentric features, and keep the data representation close to real Aria recordings.
-
-The thesis is motivated by the gap between one-step candidate ranking and useful multi-step view planning. The current implementation already supports discrete candidate generation, oracle label computation, immutable offline stores, VIN-style scoring, and early counterfactual rollout scaffolding. However, the learned scorer is still preliminary and should not be presented as a finished #NBV policy. The next credible step is to make the data and geometry trustworthy, then test whether bounded non-myopic search over trusted candidate views improves cumulative reconstruction quality over one-step greedy selection.
+The current gap is not a lack of possible algorithms; it is the lack of a
+trustworthy target-conditioned, multi-step evidence chain. GenNBV and Hestia
+show that continuous 5-DoF and hierarchical #NBV policies are plausible when an
+online simulator and coverage reward are mature @GenNBV-chen2024
+@Hestia-lu2026. Radiance-field and Gaussian-splatting papers show that view
+utility can be decomposed into uncertainty, Fisher information, semantics,
+dynamics, object identity, or downstream task error @ActiveNeRF-pan2022
+@FisherRF-jiang2024 @NextBestSense-strong2024
+@li2025bestviewselectionssemantic @ObjectCentricNBV-jeong2026 @FOVHPE-bae2025.
+ARIA-NBV should use those papers to sharpen the model, not to replace its
+objective: the thesis utility remains scene and target #RRI, with validity and
+cost reported as separate constraints.
 
 #thesis-box([Thesis position])[
-  The core claim is deliberately narrow: ARIA-NBV should first prove that trusted, mesh-supervised candidate utility supports better one-step scoring, bounded multi-step selection, and a target-conditioned fitted $Q_H$ model over finite candidates in egocentric snippets. Continuous control, external simulators, and actor-critic policies become credible only after that finite-candidate foundation is reproducible.
+  The thesis contribution is a target-conditioned, quality-driven finite-candidate
+  #NBV study on #ASE/EFM. The hard result is a candidate-query $Q_H$ model that
+  predicts bounded cumulative target #RRI over valid candidates and improves on
+  one-step greedy/model scoring under the same acquisition budget. Continuous
+  actor-critic control, Gymnasium/SB3, Habitat/Isaac, SceneScript-style global
+  memory, and real-device guidance are bridge or future work unless this
+  finite-candidate result is already stable.
 ]
-
-The long-term research direction includes target-aware and task-aware view planning. Indoor reconstruction is rarely uniform in importance: a user may care more about an object, doorway, appliance, or region of missing surface than about a large already-visible wall. The thesis therefore proposes target-conditioned, quality-driven #NBV as its central direction. It keeps full continuous reinforcement learning, simulator-backed online control, and real-device deployment as later extensions, while focusing the thesis core on target-specific #RRI, discrete candidate scoring, bounded rollout evaluation, and candidate-query Transformer $Q_H$ over finite candidate sets.

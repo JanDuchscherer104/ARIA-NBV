@@ -2,36 +2,39 @@
 
 = Preliminary Thesis Outline
 
-The thesis will be written as an empirical methods thesis. It starts from the quality-driven #NBV problem, introduces the Aria data and geometry contracts, then develops the oracle, model, and rollout components in the same order in which they are validated. The preliminary bibliography is rendered at the end of this proposal from the shared repository bibliography.
+The thesis will be written as an empirical methods thesis. The chapter order
+mirrors the validation order so that claims are introduced only after the
+corresponding contract is established.
 
 #figure(
   table(
-    columns: (0.8fr, 1.55fr, 1.45fr),
-    inset: 5pt,
+    columns: (0.78fr, 1.45fr, 1.58fr),
     table.header([*Chapter*], [*Purpose*], [*Expected evidence*]),
     [Introduction],
-    [Motivate target-conditioned, quality-driven #NBV for egocentric indoor reconstruction and state the thesis questions.],
-    [Problem definition, scope boundary, and contribution summary.],
-    [Background and related work],
-    [Review active perception, classical view planning, #NBV, #RRI, egocentric foundation models, target-aware reconstruction, bounded rollout, and offline value learning.],
-    [Literature synthesis centered on VIN-NBV, EFM3D, GenNBV, Hestia, radiance-field #NBV, Trajectory Transformer, Gumbel-Top-k, Double Q-learning, and IQL.],
+    [Motivate target-conditioned, quality-driven #NBV for egocentric indoor reconstruction and state the finite-candidate thesis claim.],
+    [Research questions, contribution boundary, and source-backed scope.],
+    [Background],
+    [Review active perception, #NBV, #RRI, #ASE/Project Aria, EFM3D/EVL, target-aware 3DGS, and offline value learning.],
+    [Literature synthesis with adoption/rejection decisions.],
     [Data and geometry contracts],
-    [Describe #ASE snippets, camera and pose frames, immutable offline stores, candidate generation, and Rerun inspection.],
-    [Offline-store inventory, frame-safety checks, and visual diagnostics.],
-    [Oracle #RRI and target-specific #RRI],
-    [Define scene-level and target-level reconstruction-quality labels, invalid cases, and accuracy/completeness components.],
-    [Trusted oracle examples, label distributions, target crops, and throughput measurements.],
-    [Target-conditioned candidate scoring],
-    [Present the VIN-style scorer, target encoding, ordinal objective, and calibration analysis.],
-    [Held-out ranking, top-k oracle hit rate, calibration, ablations, and failure cases.],
-    [Bounded rollout and $Q_H$ evaluation],
-    [Compare one-step greedy, random, oracle rollout, temperature-softmax rollout, model-scored rollout, and candidate-query Transformer $Q_H$ under equal budget.],
-    [Cumulative target #RRI, scene #RRI, $Q_H$ success bar, acquisition cost, invalid-action rate, runtime, and trajectory visualizations.],
+    [Describe snippets, calibration, frames, offline stores, candidates, rendered depths, backprojection, masks, and Rerun inspection.],
+    [M1 contract report, visual diagnostics, throughput, and known limitations.],
+    [Oracle #RRI and target #RRI],
+    [Define scene/target distances, crop matching, invalidity, and label generation.],
+    [Label distributions, target crops, target/scene divergence, and failure cases.],
+    [Target-conditioned scoring],
+    [Present actor-visible target encoding, candidate features, VIN-style model, ordinal/regression losses, and calibration.],
+    [Held-out ranking, top-$k$ oracle hit, ablations, calibration, and target-specific failures.],
+    [Bounded rollout and $Q_H$],
+    [Compare random-valid, one-step greedy, learned one-step scorer, oracle lookahead, temperature-softmax traces, and candidate-query $Q_H$.],
+    [Cumulative target #RRI, endpoint target gain, scene #RRI, cost, invalidity, runtime, and rollout visualizations.],
     [Discussion and conclusion],
-    [Interpret limits, failure modes, simulator and deployment gaps, and future continuous-control or entity-aware extensions.],
-    [Evidence-gated conclusion and reproducibility notes.],
+    [Interpret limits, scale blockers, simulator gaps, semantic/global planning, and real-device bridge paths.],
+    [Evidence-gated conclusion and reproducibility package.],
   ),
   caption: [Preliminary thesis chapter outline.],
 ) <tab:proposal-outline>
 
-The expected final contribution is a reproducible target-aware finite-candidate view-selection study, not a broad claim that continuous reinforcement learning has been solved for egocentric reconstruction. The thesis will therefore separate implemented results from extensions. The required result includes candidate-query Transformer $Q_H$ over finite candidate sets if the prerequisite gates pass; SceneScript-style semantic memory, 3D Gaussian Splatting simulators, open-vocabulary targets, actor-critic control, and real-device guidance are future directions unless they become necessary to explain the core target-aware #RRI and $Q_H$ results.
+The expected final contribution is a reproducible target-aware finite-candidate
+view-selection study, not a broad claim that continuous reinforcement learning
+has been solved for egocentric reconstruction.

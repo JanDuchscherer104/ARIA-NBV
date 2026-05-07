@@ -38,6 +38,10 @@
 
 #show: proposal-style
 
+#include "sections/proposal/01-motivation.typ"
 #include "sections/proposal/02-problem.typ"
+#include "sections/proposal/02-related-work.typ"
 #include "sections/proposal/03-objectives.typ"
 #include "sections/proposal/04-method.typ"
+#include "sections/proposal/05-schedule.typ"
+#include "sections/proposal/06-outline.typ"

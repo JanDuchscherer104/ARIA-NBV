@@ -1,0 +1,12 @@
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
+flowchart TD
+  A["Project Aria / ASE snippet: poses, calibration, semidense points"] --> B["Actor-visible state: EVL field, predicted OBBs, target descriptor"]
+  B --> C["Finite candidate table: pose, provenance, validity mask, reason code"]
+  C --> D["Oracle labeler: scene RRI and target RRI from GT mesh crops"]
+  D --> E["One-step target scorer: myopic learned control"]
+  D --> F["Trusted oracle rollouts: random-valid, greedy, lookahead, temperature-softmax"]
+  F --> G["Rollout / Q store: lineage, masks, targets, selected transitions"]
+  G --> H["Candidate-query Q_H: one masked bounded-horizon value per candidate"]
+  H --> I["Oracle re-evaluation: equal acquisition and candidate budget"]
+  I --> J["Thesis result: target RRI, scene RRI, cost, invalidity, failures"]
+  H -. "after M5 evidence" .-> K["Bridge paths: IQL, online discrete Q_H, actor-critic, simulators"]

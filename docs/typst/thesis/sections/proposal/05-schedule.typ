@@ -1,51 +1,60 @@
 #import "../../../shared/macros.typ": *
+#import "_style.typ": *
 
-= Schedule
+= Schedule and Risk Control
 
-The planned thesis window runs from 29 April 2026 to 30 September 2026. The schedule mirrors the current roadmap and keeps the highest-risk dependencies early: offline-store trust, geometry inspection, and oracle correctness precede target-conditioned modeling and rollout claims. Writing and figure preparation run throughout the project, but the final thesis narrative is frozen only after the August evidence gate.
+The planned thesis window runs from 29 April 2026 to 30 September 2026. The
+schedule is organized around evidence gates rather than feature optimism:
+offline-store trust and oracle correctness precede target-conditioned modeling;
+target #RRI and observed target selection precede $Q_H$ data generation; bridge
+work begins only after the finite-candidate planning evidence is interpretable.
+
+#figure(
+  image("../../figures/proposal_gantt.png", width: 100%),
+  caption: [Mermaid Gantt chart for the proposal timeline and evidence gates.],
+) <fig:proposal-gantt>
 
 #figure(
   table(
-    columns: (1.15fr, 1.2fr, 1.8fr),
-    inset: 5pt,
+    columns: (0.9fr, 1.18fr, 1.78fr),
     table.header([*Dates*], [*Milestone*], [*Exit condition*]),
-    [29 Apr--10 May],
-    [Scope and diagnostics foundation],
-    [The worktree is classified, the partial offline-store smoke path is understood, and the Rerun inspector workflow is documented.],
-    [11 May--31 May],
-    [Data, cache, and oracle correctness],
-    [Offline-store contracts, split handling, frame conventions, candidate validity, and oracle throughput are stable enough for model claims.],
-    [1 Jun--21 Jun],
-    [VIN baseline and calibration],
-    [A reproducible one-step VIN baseline is trained and evaluated with rank, calibration, ordinal-bin, and top-k diagnostics.],
-    [22 Jun--12 Jul],
-    [Target-specific #RRI],
-    [Ground-truth OBB-cropped target #RRI is implemented, inspected, and compared with scene-level #RRI on a trusted subset.],
+    [2026-04-29 to 2026-05-10],
+    [M0 scope/proposal],
+    [Proposal, roadmap, questions, source policy, and hard $Q_H$ boundary are aligned and renderable.],
+    [2026-05-11 to 2026-05-31],
+    [M1 data/oracle],
+    [Offline-store, split, frame/CW90, candidate-label, depth/backprojection, Rerun, and throughput evidence pass or block scale-up.],
+    [2026-06-01 to 2026-06-21],
+    [M2 one-step baseline],
+    [Scene-level VIN baseline, calibration/ranking plots, LRZ sharding plan, and Zarr rollout/Q schema are ready.],
+    [2026-06-22 to 2026-07-12],
+    [M3 target #RRI],
+    [V0 GT-OBB target labels and V1 OBS-SEL / PRED-Q / GT-EVAL contract are trusted on a small subset.],
+    [2026-07-13 to 2026-08-09],
+    [M4 target scorer],
+    [Target-conditioned one-step scorer is evaluated against scene-level scoring and oracle target #RRI.],
+    [2026-08-10 to 2026-08-30],
+    [M5 rollouts/$Q_H$],
+    [Random-valid, oracle-greedy/lookahead, and temperature-softmax traces are stable; candidate-query $Q_H$ is trained and oracle-evaluated.],
+    [2026-08-31 to 2026-09-13],
+    [M6 bridge design],
+    [Online discrete $Q_H$, IQL, actor-critic, hierarchy, and simulator bridge are written as designs or gated ablations.],
+    [2026-09-14 to 2026-09-27],
+    [M7 experiments/writing],
+    [Final tables, figures, failure cases, coverage report, and thesis narrative are frozen.],
+    [2026-09-28 to 2026-09-30],
+    [M8 release],
+    [Configs, smoke checks, demo path, and final PDF artifacts are reproducible.],
   ),
-  caption: [Planned thesis schedule through the target-specific oracle milestone.],
-) <tab:proposal-schedule-a>
+  caption: [Milestone exit criteria.],
+) <tab:proposal-schedule>
 
-#figure(
-  table(
-    columns: (1.15fr, 1.2fr, 1.8fr),
-    inset: 5pt,
-    table.header([*Dates*], [*Milestone*], [*Exit condition*]),
-    [13 Jul--9 Aug],
-    [Target-conditioned VIN],
-    [The model accepts a target encoding and is evaluated against scene-level, target-level, oracle, and geometric baselines.],
-    [10 Aug--30 Aug],
-    [Multi-step rollouts and $Q_H$],
-    [Greedy, random, bounded oracle, stochastic or beam, model-scored, and fitted $Q_H$ selections are compared by cumulative target #RRI and acquisition cost.],
-    [31 Aug--13 Sep],
-    [Continuous bridge and optional IQL],
-    [IQL or actor-critic bridge design is attempted only after fitted $Q_H$ evidence is stable; no quantitative continuous-control baseline is required.],
-    [14 Sep--30 Sep],
-    [Thesis freeze and release],
-    [Final figures, ablations, failure cases, reproducible configs, and demonstration smokes are complete.],
-  ),
-  caption: [Planned thesis schedule from target-conditioned modeling to release freeze.],
-) <tab:proposal-schedule-b>
-
-The main risk is that oracle or offline-store trust takes longer than expected. In that case, the thesis remains valid as a stronger geometry-first study of scene-level #RRI, target-specific #RRI, and one-step candidate scoring, while learned multi-step control is reduced to oracle rollout analysis. A second risk is that target-specific labels are too sparse or unstable for reliable model training. The fallback is to report target #RRI as an oracle evaluation and diagnostic tool while keeping the learned model scene-level. A third risk is that bounded lookahead does not improve over one-step greedy under the available candidate budget. That outcome is still scientifically useful if it is paired with failure analysis, because it identifies whether candidate generation, target observability, or the reward definition is the limiting factor.
-
-The mandatory value-learning path is candidate-query Transformer $Q_H$ over finite candidate sets, trained with masked bounded-horizon targets. It will be pursued only after held-out VIN ranking, oracle-evaluated VIN-selected rollouts, calibration and stage-shift analysis, and Rerun failure visualization are available. If those gates are not met by the end of August, the thesis will document the blocker explicitly rather than reclassifying $Q_H$ as optional. The stretch path after a stable $Q_H$ result is Gumbel diversity evidence, IQL, actor-critic bridge design, or continuous target-then-pose control; if the gates are weak, the thesis will prioritize robust target-aware ablations and a defensible future-work discussion over a weak continuous-RL claim.
+The most likely failure mode is not that continuous RL is needed too early; it
+is that target labels, validity masks, or scale generation are not trusted
+enough for learned planning. The fallback policy is therefore conservative. If
+M1 fails, the thesis remains a geometry/oracle contract and one-step scorer
+study. If M3 target matching is sparse, target #RRI remains an oracle diagnostic
+while scene-level scoring is reported honestly. If $Q_H$ fails to beat myopic
+controls, the thesis reports whether the limiting factor is candidate support,
+target observability, reward definition, or model capacity. None of these
+fallbacks reclassifies the mandatory $Q_H$ attempt as optional.

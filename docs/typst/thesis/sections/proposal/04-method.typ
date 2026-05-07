@@ -1,39 +1,129 @@
 #import "../../../shared/macros.typ": *
+#import "_style.typ": *
 
-= Method and Timeline
+= Method
 
-The method proceeds through gates rather than a single end-to-end rewrite. First, ARIA-NBV validates the immutable offline-store and oracle contracts. Second, it implements target-specific #RRI by matching actor-visible observed/predicted targets to GT target crops for labels and evaluation. Third, it trains a target-conditioned one-step scorer as the comparator for planning. Fourth, it generates replayable rollout traces from random-valid, oracle-greedy/lookahead, and oracle-scored temperature-softmax policies. Temperature-softmax is a data-diversity policy over scored candidates, not the final objective.
+The method is a sequence of gates. Each gate either produces a trusted artifact
+for the next gate or records an explicit blocker.
 
-The fifth gate trains $Q_H$ as a candidate-query Transformer. Scene, target, history, and candidate fields are encoded as tokens; hard masks suppress invalid candidates; the output is one finite-horizon Q value per candidate. The target is bounded cumulative target #RRI from ASE oracle rollouts. Double-Q-style selection/evaluation separation is the first target-construction strategy because max-based finite-candidate learning is vulnerable to overestimation @DoubleDQN-vanHasselt2015. CQL and BCQ remain useful offline-RL references for distribution-shift risk, while Decision Transformer is a useful sequence-modeling reference if later trajectory decoding becomes justified @CQL-kumar2020 @BCQ-fujimoto2019 @DecisionTransformer-chen2021.
+== M1/M2: Data, Geometry, and One-Step Baseline
+
+The first phase freezes the geometry contracts. Candidate poses, rig poses,
+rendered depths, backprojected point clouds, semidense support, EVL fields, and
+Rerun diagnostics must agree in frame and indexing. The oracle computes
+scene-level and target-level labels from
+
+#eqs.rri.cd
+
+and
+
+#eqs.rri.target_rri
+
+without aggressive mesh or point-cloud downsampling in fine-detail runs. The
+one-step VIN-style scorer then serves as the learned myopic baseline, not as
+the final policy. Its main purpose is to test whether actor-visible state and
+candidate features predict oracle #RRI well enough to justify planning.
+
+== M3/M4: Target Contract and Target-Conditioned Scoring
+
+Target selection produces a small top-$K$ set of actor-visible observed/predicted
+targets per snippet. For V1, the selector scores predicted OBB confidence,
+projected visibility, semidense/EVL support, support deficit, distance, and
+class eligibility; it refuses GT OBB input. The labeler then matches selected
+targets to GT crops using class compatibility, OBB overlap, visibility/support,
+projected area, and semidense/EVL support. Ambiguous matches and the exact
+near-solved-target threshold remain advisor-facing details.
+
+The target-conditioned one-step scorer receives the same finite candidate set
+as $Q_H$ and predicts target #RRI. Its ablations are bounded: target descriptor
+choice, surface reconstruction input, CORAL variant, auxiliary regression,
+candidate-relative pose encoding, and calibration/stage features. This keeps
+model work from becoming unbounded architecture search before the planning
+question is answered.
+
+== M5: Bounded Rollout and $Q_H$ Training
+
+For each root state, deterministic oracle one-step greedy and bounded oracle
+lookahead are generated first. Let $B$ be branch factor, $H$ horizon, and
+$cal(A)(s_t)={i:m_(t,i)=1}$. Greedy selection is
+
+$ a_t^"greedy"
+  = op("argmax", limits: #true)_(i in cal(A)(s_t)) r_t^e(i). $
+
+Bounded lookahead selects the first action of the best rollout:
+
+$ a_t^"look"
+  = pi_0(
+      op("argmax", limits: #true)_(a_(t:t+H-1))
+      sum_(k=0)^(H-1) gamma^k r_(t+k)^e
+    ), $
+
+where $pi_0(.)$ extracts the first action. Temperature-softmax traces then add
+support:
+
+$ P(a_t=i | s_t)
+  = exp(beta u_(t,i)) / sum_(j: m_(t,j)=1) exp(beta u_(t,j)), $
+
+where $u_(t,i)$ may be oracle immediate #RRI, oracle lookahead value, or a
+trusted scorer. The rollout store preserves logits, probabilities, entropy,
+temperature, selected action, RNG seed, target identity, candidate provenance,
+and invalid reasons.
+
+$Q_H$ is trained as masked fitted Double-Q over finite candidates. With online
+parameters $theta$ and target parameters $bar(theta)$,
+
+$ i^star
+  = op("argmax", limits: #true)_(i: m_(t+1,i)=1)
+    Q_(H,theta)(s_(t+1)^"cf0", z_e, q_(t+1,i)), $
+
+$ y_t
+  = r_t^e
+    + gamma Q_(H,bar(theta))(s_(t+1)^"cf0", z_e, q_(t+1,i^star)), $
+
+$ cal(L)_Q(theta)
+  = (1)/(|cal(D)|)
+    sum_((s,a,r,s') in cal(D))
+    m_(t,a)
+    (Q_(H,theta)(s_t^"cf0", z_e, q_(t,a)) - y_t)^2. $
+
+This target family uses the Double-DQN selector/evaluator separation to reduce
+max-operator overestimation @DoubleDQN-vanHasselt2015. CQL, BCQ, IQL, Decision
+Transformer, soft/energy policies, PPO, and SAC are comparison references or
+later ablations because they require stronger support assumptions, sequence
+decoding, or an online simulator @CQL-kumar2020 @BCQ-fujimoto2019
+@IQL-kostrikov2021 @DecisionTransformer-chen2021
+@DeepEnergyPolicies-haarnoja2017 @PPO-schulman2017 @SAC-haarnoja2018.
+
+== Evaluation
+
+All selected actions are oracle-evaluated under the same budget. The main table
+compares random-valid, one-step oracle greedy, learned one-step target scorer,
+bounded oracle lookahead, temperature-softmax rollouts, and learned $Q_H$ on
+scene-level splits. Required columns are endpoint target gain $J_e^(H)$,
+cumulative target return $G_0^(H)$, scene #RRI, view count, path length,
+invalid-action rate, runtime, scenes, snippets, targets, trajectories, rollout
+seeds, transitions, and coverage gaps. Quality-cost curves are used when
+budgets differ.
 
 #figure(
   table(
-    columns: (0.92fr, 1.18fr, 1.9fr),
-    inset: 4.5pt,
-    table.header([*Dates*], [*Milestone*], [*Decision gate*]),
-    [29 Apr--10 May],
-    [M0 scope/proposal],
-    [Compact proposal, bibliography/source policy, and mandatory $Q_H$ scope frozen.],
-    [11 May--31 May],
-    [M1 data/oracle],
-    [Offline-store, geometry, candidate-label, Rerun, and throughput evidence pass or block scale-up.],
-    [1 Jun--21 Jun],
-    [M2 scorer baseline],
-    [Scene-level VIN-style scorer is reproducible and calibration/ranking evidence is available.],
-    [22 Jun--12 Jul],
-    [M3 target #RRI],
-    [V0 sanity and V1 actor-visible target protocol are trusted on a small subset.],
-    [13 Jul--9 Aug],
-    [M4 target scorer],
-    [Observed/predicted target encoding improves target ranking or exposes a documented limitation.],
-    [10 Aug--30 Aug],
-    [M5 rollouts/$Q_H$],
-    [$Q_H$ is trained and oracle-evaluated against one-step baselines under equal budget.],
-    [31 Aug--30 Sep],
-    [M6--M8 evidence/freeze],
-    [Optional bridge work only after $Q_H$ evidence; final coverage, figures, configs, and thesis text freeze.],
+    columns: (0.72fr, 1.28fr, 1.55fr),
+    table.header([*Gate*], [*Artifact*], [*Fail-safe*]),
+    [M1],
+    [contract report, Rerun examples, throughput and frame checks],
+    [block target/RL scale-up if geometry or labels are not trustworthy],
+    [M3],
+    [V0/V1 target #RRI and observed-only target selector],
+    [fall back to target oracle diagnostics if actor-visible matching is sparse],
+    [M4],
+    [target-conditioned one-step scorer],
+    [use as myopic baseline even if accuracy is modest, provided calibration is reported],
+    [M5],
+    [rollout store, oracle lookahead, and candidate-query $Q_H$],
+    [report the exact blocker if $Q_H$ does not beat myopic controls],
+    [M6+],
+    [online/IQL/actor-critic/simulator bridge design],
+    [do not promote bridge work to thesis core without M5 evidence],
   ),
-  caption: [Compact thesis timeline.],
-)
-
-The main risk is substrate fragility: frame mistakes, invalid candidates, or sparse target labels could make learned planning claims meaningless. The fallback is not to switch to continuous actor-critic control, but to report the exact failing gate and preserve a defensible target-aware oracle/scorer/rollout study. Continuous control, online Gymnasium/SB3, Habitat/Isaac, SceneScript-style semantic memory, and real-device guidance remain post-$Q_H$ bridge designs unless the M5 evidence and time budget make them credible.
+  caption: [Method gates and fail-safe interpretation.],
+) <tab:proposal-method-gates>

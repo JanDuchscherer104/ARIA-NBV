@@ -3,8 +3,86 @@
 
 = Problem and Research Contract
 
-ARIA-NBV studies target-conditioned #NBV for egocentric indoor reconstruction. At each decision step, an agent has a partial ASE trajectory, accumulated semi-dense or rendered geometry, frozen logged EFM/EVL context, a selected target, and a finite set of candidate camera poses. The privileged ground-truth mesh and GT target crop are oracle and evaluation assets only. The main actor-visible protocol is OBS-SEL / PRED-Q / GT-EVAL: select a target from observed or predicted evidence, condition scoring and planning on the predicted/observed target record, and evaluate with matched GT target #RRI.
+ARIA-NBV is formulated as a finite-candidate, target-conditioned #NBV problem.
+At rollout step $t$, the actor-visible counterfactual state is
 
-The thesis question is whether this setup can support target-conditioned, RRI-based multi-step view selection rather than only one-step scoring. The minimal quantitative success bar is therefore not a continuous policy. It is a discrete finite-candidate $Q_H$ model that predicts bounded cumulative target #RRI and whose selected actions are re-evaluated by the oracle. If learned $Q_H$ does not beat one-step greedy or one-step model scoring under the same acquisition budget, the thesis must report the blocker rather than reclassifying $Q_H$ as optional. The boundary is fixed: ASE snippets, GT meshes for oracle labels, EVL/EFM context, discrete candidates, and Rerun inspection are in scope; GT OBBs/crops are V0 sanity or GT-EVAL labels, not main actor input; Gumbel-Top-k, IQL, actor-critic, online simulators, and real-device runs are bridge work.
+$ s_t^"cf0"
+  = (
+      F_v^"root",
+      P_t,
+      Q_t,
+      m_t,
+      rho_t,
+      z_e,
+      b_t
+    ) $
 
-The literature role is correspondingly narrow. VIN-NBV provides the quality-driven #RRI candidate-ranking precedent @VIN-NBV-frahm2025. ASE and EFM3D provide the egocentric synthetic data and frozen representation substrate @ProjectAria-ASE-2025 @EFM3D-straub2024. GenNBV and Hestia show why continuous and hierarchical #NBV are important, but they rely on simulator/control assumptions that ARIA-NBV should not claim before the finite-candidate result exists @GenNBV-chen2024 @Hestia-lu2026. Offline RL references such as Double DQN, CQL, BCQ, Decision Transformer, and IQL guide value-learning and sequence-modeling baselines, but the first thesis path is a masked finite-candidate $Q_H$ trained from ASE oracle traces @DoubleDQN-vanHasselt2015 @CQL-kumar2020 @BCQ-fujimoto2019 @DecisionTransformer-chen2021 @IQL-kostrikov2021.
+where $F_v^"root"$ is the frozen EVL/EFM voxel-field context at the snippet
+root, $P_t$ is accumulated semi-dense or rendered/fused geometry, $Q_t =
+{q_(t,i)}_(i=1)^(N_q)$ is the finite candidate table, $m_(t,i) in {0,1}$ is the
+validity mask, $rho_(t,i)$ is the invalidity reason, $z_e$ is the actor-visible
+descriptor of the selected target $e$, and $b_t$ is the remaining acquisition
+budget. The oracle-only state augments this with the #ASE GT mesh $M$ and target
+mesh crop $M_e$; these are label/evaluation assets and are not actor inputs in
+the main V1 protocol.
+
+Target-conditioned evaluation uses OBS-SEL / PRED-Q / GT-EVAL. Target selection
+uses only observed or predicted evidence. Scoring and $Q_H$ receive the
+predicted/observed target descriptor $z_e$. Labels and final evaluation are
+computed by matching that actor-visible target to a GT target crop $M_e$.
+V0 may use GT boxes as a sanity or upper-bound path, but V1 is the main thesis
+claim.
+
+For a target crop operator $C_e(.)$, define the target distance
+
+$ D_e(P) = "CD"(C_e(P), M_e), $
+
+with the same accuracy/completeness surface-distance family used by the shared
+#RRI equations. If action $a_t=i$ selects valid candidate $q_(t,i)$, the
+counterfactual geometry transition is
+
+$ P_(t+1) = P_t union P_(q_(t,i)). $
+
+The immediate target reward is state-relative target #RRI:
+
+$ r_t^e
+  = (D_e(P_t) - D_e(P_(t+1))) / (D_e(P_t) + epsilon). $
+
+The endpoint quality metric for a rollout sequence
+$tau=(a_0,dots,a_(H-1))$ is instead root-relative:
+
+$ J_e^(H)(tau)
+  = (D_e(P_0) - D_e(P_H)) / (D_e(P_0) + epsilon). $
+
+The learning return is additive:
+
+$ G_t^(H)
+  = sum_(k=0)^(H-1) gamma^k r_(t+k)^e. $
+
+Thus $G_t^(H)$ trains the finite-horizon value function, while $J_e^(H)$ reports
+the fraction of initial target error removed at the fixed budget. Negative
+target #RRI remains a valid signal when a view worsens target distance; invalid
+actions are constraints and are hard-masked before argmax, softmax, loss, and
+bootstrap operations.
+
+The central research question is:
+
+#thesis-box([Main question])[
+  Can ARIA-NBV train a target-conditioned candidate-query Transformer
+  $Q_(H,theta)(s_t^"cf0", z_e, q_(t,i))$ that predicts one masked bounded-horizon
+  value per finite candidate and whose selected actions, when re-evaluated by
+  the #ASE oracle, beat one-step greedy/model scoring on cumulative target #RRI
+  under equal acquisition and candidate budgets?
+]
+
+The contract is deliberately conservative. The implemented substrate covers
+scene-level oracle #RRI, immutable VIN-style offline stores, candidate
+generation, one-step scoring, early rollout scaffolding, and Rerun inspection.
+The prerequisite evidence protocol covers M1 data/oracle correctness, V0/V1
+target contracts, invalidity masks/reasons, Zarr-first rollout/Q storage,
+LRZ-scale generation gates, scene-level splits, and exact coverage reporting.
+The hard quantitative core is observed target selection, mixed candidate sets,
+target #RRI labels, a target-conditioned one-step scorer, trusted oracle
+rollouts, and mandatory $Q_H$. Online discrete $Q_H$, IQL, actor-critic,
+continuous control, SceneScript, 3DGS simulators, and real-device guidance are
+bridge or future-work surfaces unless the M5 evidence justifies escalation.
