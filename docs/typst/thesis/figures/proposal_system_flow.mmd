@@ -1,12 +1,12 @@
-%%{init: {"flowchart": {"htmlLabels": false, "nodeSpacing": 28, "rankSpacing": 34}}}%%
+%%{init: {"flowchart": {"htmlLabels": true, "nodeSpacing": 28, "rankSpacing": 34}}}%%
 flowchart LR
-  A["M1\ns_t^obs, z_e"] --> B["M2\nQ_t, m_t, rho_t"]
-  B --> C["M3\nDelta_t^e, r_t^e(i)"]
-  C --> D["M4\nhat r_t^e(i)"]
-  C --> E["M5\nG_t^(H)"]
-  E --> F["Q_H,theta\nmasked value"]
-  F --> G["Eval\nJ_(e,H), G_0^(H)"]
-  F -. "M6+" .-> H["Bridge\nIQL / online Q_H\nactor-critic / sim"]
+  A["<b>M1</b><br/><b>s</b><sub>t</sub><sup>obs</sup>, <b>z</b><sub>e</sub>"] --> B["<b>M2</b><br/><b>Q</b><sub>t</sub>, <b>m</b><sub>t</sub>, <b>ρ</b><sub>t</sub>"]
+  B --> C["<b>M3</b><br/>Δ<sub>t</sub><sup>e</sup>, r<sub>t</sub><sup>e</sup>(i)"]
+  C --> D["<b>M4</b><br/>r̂<sub>t</sub><sup>e</sup>(i)"]
+  C --> E["<b>M5</b><br/>G<sub>t</sub><sup>(H)</sup>"]
+  E --> F["Q<sub>H,θ</sub><br/>masked value"]
+  F --> G["<b>Eval</b><br/>J<sub>e,H</sub>, G<sub>0</sub><sup>(H)</sup>"]
+  F -. "M6+" .-> H["<b>Bridge</b><br/>IQL / online Q<sub>H</sub><br/>actor-critic / sim"]
 
   classDef core fill:#f9fbff,stroke:#0b4f8a,stroke-width:1.4px,color:#111;
   classDef bridge fill:#fffaf0,stroke:#8a5a00,stroke-width:1.4px,stroke-dasharray:5 4,color:#111;
