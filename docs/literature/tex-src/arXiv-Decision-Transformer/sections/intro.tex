@@ -1,0 +1,41 @@
+
+\section{Introduction}
+
+Recent work has shown transformers \citep{vaswani2017attention} can model high-dimensional distributions of semantic concepts at scale, including effective zero-shot generalization in language \citep{brown2020gpt3} and out-of-distribution image generation \citep{ramesh2021dalle}.
+% This stands in sharp contrast to much work in reinforcement learning (RL), which learns a single policy to model a particular narrow behavior distribution.
+Given the diversity of successful applications of such models, we seek to examine their application to sequential decision making problems formalized as reinforcement learning (RL).
+In contrast to prior work using transformers as an architectural choice for components within traditional RL algorithms~\cite{parisotto2020stabilizing,zambaldi2018deep}, we seek to study if generative trajectory modeling -- i.e. modeling the joint distribution of the sequence of states, actions, and rewards -- can serve as a \emph{replacement} for conventional RL algorithms.
+
+We consider the following shift in paradigm: instead of training a policy through conventional RL algorithms like temporal difference (TD) learning~\cite{sutton2018reinforcement}, we will train transformer models on collected experience using a sequence modeling objective.
+This will allow us to bypass the need for bootstrapping for long term credit assignment -- thereby avoiding one of the ``deadly triad''~\citep{sutton2018reinforcement} known to destabilize RL.
+It also avoids the need for discounting future rewards, as typically done in TD learning, which can induce undesirable short-sighted behaviors.
+Additionally, we can make use of existing transformer frameworks widely used in language and vision that are easy to scale, utilizing a large body of work studying stable training of transformer models.
+
+In addition to their demonstrated ability to model long sequences, transformers also have other advantages.
+Transformers can perform credit assignment directly via self-attention, in contrast to Bellman backups which slowly propagate rewards and are prone to ``distractor'' signals~\citep{hung2019optimizing}.
+This can enable transformers to still work effectively in the presence of sparse or distracting rewards.
+Finally, empirical evidence suggest that a transformer modeling approach can model a wide distribution of behaviors, enabling better generalization and transfer~\citep{ramesh2021dalle}.
+
+We explore our hypothesis by considering {\em offline RL,} where we will task agents with learning policies from suboptimal data -- producing maximally effective behavior from fixed, limited experience.
+This task is traditionally challenging due to error propagation and value overestimation \citep{levine2020offline}.
+However, it is a natural task when training with a sequence modeling objective.
+By training an autoregressive model on sequences of states, actions, and returns, we reduce policy sampling to autoregressive generative modeling.
+We can specify the expertise of the policy -- which ``skill'' to query -- by selecting the desired return tokens, acting as a prompt for generation.
+
+\begin{figure*} [b] \centering
+\includegraphics[width=1.00\textwidth]{figures/graph.pdf}
+\caption{
+Illustrative example of finding shortest path for a fixed graph (left) posed as reinforcement learning. Training dataset consists of random walk trajectories and their per-node returns-to-go (middle). Conditioned on a starting state and generating largest possible return at each node, Decision Transformer sequences optimal paths.
+}
+\label{fig:graph_fig}
+\end{figure*}
+
+\textbf{Illustrative example.}
+To get an intuition for our proposal, consider the task of finding the shortest path on a directed graph, which can be posed as an RL problem. The reward is $0$ when the agent is at the goal node and $-1$ otherwise. We train a GPT \citep{radford2018gpt} model to predict next token in a sequence of returns-to-go (sum of future rewards), states, and actions. Training only on random walk data -- with no expert demonstrations -- we can generate \emph{optimal} trajectories at test time by adding a prior to generate highest possible returns (see more details and empirical results in the Appendix) and subsequently generate the corresponding sequence of actions via conditioning. Thus, by combining the tools of sequence modeling with hindsight return information, we achieve policy improvement without the need for dynamic programming.
+
+Motivated by this observation, we propose Decision Transformer, where we use the GPT architecture to autoregressively model trajectories (shown in Figure \ref{fig:main_fig}).
+We study whether sequence modeling can perform policy optimization by evaluating Decision Transformer on offline RL benchmarks in Atari~\citep{bellemare2013arcade}, OpenAI Gym~\citep{brockman2016openai}, and Key-to-Door~\citep{mesnard2020counterfactual} environments.
+We show that -- \emph{without using dynamic programming} -- Decision Transformer matches or exceeds the performance of state-of-the-art model-free offline RL algorithms~\citep{agarwal2020optimistic,
+kumar2020conservative}.
+Furthermore, in tasks where long-term credit assignment is required, Decision Transformer capably outperforms the RL baselines.
+With this work, we aim to bridge sequence modeling and transformers with RL, and hope that sequence modeling serves as a strong algorithmic paradigm for RL.

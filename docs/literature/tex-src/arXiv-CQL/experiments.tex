@@ -1,0 +1,145 @@
+\section{Experimental Evaluation}
+\label{sec:experiments}
+
+
+
+
+We compare CQL to prior offline RL methods on a range of domains and dataset compositions, including continuous and discrete action spaces, state observations of varying dimensionality, and high-dimensional image inputs. We first evaluate actor-critic CQL, using CQL($\mathcal{H}$) from Algorithm~\ref{alg:practical_alg}, on continuous control datasets from the D4RL benchmark~\citep{d4rl}.
+We compare to: prior offline RL methods that use a policy constraint -- BCQ~\citep{fujimoto2018off}, BEAR~\citep{kumar2019stabilizing} and BRAC~\citep{wu2019behavior}; standard SAC~\citep{haarnoja}, an off-policy actor-critic method that we adapt to offline setting; and a behavioral cloning (BC) baseline that imitates the data distribution. 
+
+\begin{table*}[h]
+\centering
+\fontsize{8}{8}\selectfont
+
+\begin{tabular}{l|r|r|r|r|r|r||r}
+\hline
+\textbf{Task Name} & \textbf{SAC} & \textbf{BC} & \textbf{BCQ} & \textbf{BEAR} & \textbf{BRAC-p} & \textbf{BRAC-v} & \textbf{CQL($\mathcal{H}$)}\\ \hline
+halfcheetah-random &  2.1 & 30.5 & 2.2 & 25.5 & 23.5 & 28.1 & \textbf{35.4} \\
+hopper-random & 9.8 & \textbf{11.3} & 9.2 & 9.5 & \textbf{11.1} & \textbf{12.0} & \textbf{10.8}\\
+walker2d-random & 1.6 & 4.1 & 4.8 &  \textbf{6.7} & 0.8 & 0.5 & \textbf{7.0}\\ \hline
+halfcheetah-medium & -4.3 & 36.1 & 35.4 & 38.6 & \textbf{44.0} & \textbf{45.5} & \textbf{44.4}\\
+walker2d-medium & 0.9 & 6.6 & 19.2 & 33.2 & 72.7 & \textbf{81.3} & {79.2}\\
+hopper-medium & 0.8 & 29.0 & 37.1 & 47.6 & 31.2 & 32.3 & \textbf{65.2}\\ \hline
+halfcheetah-expert & -1.9 & \textbf{107.0} & \textbf{106.0} & \textbf{108.2} & 3.8 & -1.1 & {104.8}\\
+hopper-expert & 0.7 & \textbf{109.0} & \textbf{107.6} & \textbf{110.3} & 6.6 & 3.7 & \textbf{109.9} \\
+walker2d-expert & -0.3 & 125.7 & 128.5 & 106.1 & -0.2 & -0.0 & \textbf{153.9} \\ \hline
+halfcheetah-medium-expert & 1.8 & 35.8 & 59.2 & 51.7 & 43.8 & 45.3 & \textbf{62.4}\\
+walker2d-medium-expert & 1.9 & 11.3 & 19.1 & 10.8 & -0.3 & 0.9 & \textbf{98.7}\\
+hopper-medium-expert & 1.6 & \textbf{111.9} & 66.6 & 4.0 & 1.1 & 0.8 & \textbf{111.0}\\ \hline
+halfcheetah-random-expert & 53.0 & 1.3 & 59.6 & 24.6 & 30.2 & 2.2 & \textbf{92.5}\\
+walker2d-random-expert & 0.8 & 0.7 & 0.0 & 1.9 & 0.2 & 2.7 & \textbf{91.1}\\
+hopper-random-expert & 5.6 & 10.1 & 9.8 & 10.1 & 5.8 & 11.1 & \textbf{110.5} \\ \hline
+halfcheetah-mixed & -2.4 & 38.4 & 29.5 & 36.2 & \textbf{45.6} & \textbf{45.9} & \textbf{46.2}\\
+hopper-mixed & 3.5 & 11.8 & 15.7 & 25.3 & 0.7 & 0.8 & \textbf{70.3}\\
+walker2d-mixed & 1.9 & 11.3 & 8.3 & 10.8 & -0.3 & 0.9 & \textbf{33.4}\\
+\hline
+\end{tabular}
+\caption{\label{table:mujoco}{\small Performance of CQL($\mathcal{H}$) and prior methods on MuJoCo tasks from D4RL, on the normalized return metric. Note that CQL performs similarly or better than the best prior method with simple datasets, and greatly outperforms prior methods with complex distributions (``--mixed'', ``--random-expert'', ``--medium-expert'').}}
+\normalsize
+\vspace{-10pt}
+\end{table*}
+
+
+Results for the simpler gym domains are shown in Table~\ref{table:mujoco}. The results for BEAR, BRAC and BC are based on numbers reported by \citet{d4rl}. On the datasets generated from a single policy, marked as ``-random'', ``-expert'' and ``-medium'', CQL matches or exceeds the best prior methods, but by a small margin. However, on datasets that combine multiple policies (``-mixed'', ``-medium-expert'' and ``-random-expert''), that are more likely to be common in practical datasets, CQL outperforms prior methods by large margins, sometimes as much as \textbf{2-3x}.  
+
+
+
+
+The more complex Adroit~\citep{rajeswaran2018dapg} tasks (Figure~\ref{fig:d4rl_tasks}) in D4RL require the agent to control a 24-DoF robotic hand, using limited data generated from real-world human demonstrations. These tasks are substantially more difficult than the gym tasks in terms of both the dataset composition and high-dimensionality. Prior offline RL methods generally struggle to learn meaningful behaviors on 
+\begin{wrapfigure}{l}{0.55\textwidth}
+  \vspace{-18pt}
+  \begin{center}
+    \includegraphics[width=0.2\textwidth]{images/antmaze_all.png}
+    \includegraphics[width=0.16\textwidth]{images/adroit_all.png}
+    \includegraphics[width=0.17\textwidth]{images/adept_franka_kitchen.png}
+  \end{center}
+  \vspace{-7pt}
+  \caption{{\small Evaluation tasks in the D4RL suite (from L to R: AntMaze navigation, Adroit, Franka Kitchen tasks).}}
+  \vspace{-14pt}
+ \label{fig:d4rl_tasks}
+\end{wrapfigure}
+these tasks, and the strongest baseline is actually na\"{i}ve behavioral cloning. As shown in Table~\ref{table:adroit_antmaze}, CQL variants are the only methods that improves over na\"{i}ve behavioral
+cloning, attaining scores that are \textbf{2-9x} those of the next best offline RL method. As discussed in Section~\ref{sec:framework}, CQL($\rho$), witrh $\rho = \policy^{k}$, i.e. the previous policy, outperforms CQL($\mathcal{H}$) on a number of these adroit tasks, due to the higher action dimensionality resulting in higher variance for the CQL($\mathcal{H}$) importance weights. However, both variants outperform prior methods.
+
+
+The maze tasks in D4RL require composing pieces of suboptimal trajectories to form more optimal policies for traveling from a start state to a goal. 
+While prior methods sometimes learn meaningful policies on the simpler U-maze, only CQL is able to make meaningful progress on the substantially harder medium and large mazes, achieving nearly \textbf{2-5x} higher return as compared to prior methods.
+
+Finally, we evaluate CQL on the Franka kitchen domain~\citep{gupta2019relay} from D4RL~\citep{d4rl_repo}.
+The goal is to control a 9-DoF robot in a kitchen environment. These tasks require manipulating multiple objects (microwave, kettle, etc.) sequentially in a single episode to reach a desired goal. The agent receives a sparse 0-1 completion reward. These tasks are especially challenging, since they require composing different parts of trajectories, precise long-horizon manipulation, and handling human-provided teleoperation data. As shown in Table~\ref{table:adroit_antmaze}, CQL outperforms prior methods in this setting, and is the only method that outperforms behavioral cloning, attaining over 40\% success rate on all tasks.
+
+
+
+\begin{table}[]
+\centering
+
+\fontsize{8}{8}\selectfont
+
+\begin{tabular}{l|l|r|r|r|r|r||r|r}
+\hline
+\textbf{Domain} & \textbf{Task Name} & \textbf{BC} & \textbf{SAC} & \textbf{BEAR} & \textbf{BRAC-p} & \textbf{BRAC-v} & \textbf{CQL($\mathcal{H}$)} & \textbf{CQL($\rho$)}\\ \hline
+\multirow{6}*{AntMaze}
+& antmaze-umaze & 65.0 & 0.0 & \textbf{73.0} & 50.0 & 70.0 & \textbf{74.0} & \textbf{73.5}\\
+& antmaze-umaze-diverse  & 55.0 & 0.0 & 61.0 & 40.0 & 70.0 & \textbf{84.0} & 61.0\\
+& antmaze-medium-play  & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & \textbf{61.2} & 4.6 \\
+& antmaze-medium-diverse  & 0.0 & 0.0 & 8.0 & 0.0 & 0.0 & \textbf{53.7} & 5.1 \\
+& antmaze-large-play & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & \textbf{15.8} &  3.2\\
+& antmaze-large-diverse & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & \textbf{14.9} & 2.3 \\
+\hline
+\multirow{8}*{Adroit}
+& pen-human  & 34.4 & 6.3 & -1.0 & 8.1 & 0.6 & 37.5 & \textbf{55.8}\\
+& hammer-human & 1.5 & 0.5 & 0.3 & 0.3 & 0.2 & \textbf{4.4} & {2.1}\\
+& door-human & 0.5 & 3.9 & -0.3 & -0.3 & -0.3 & \textbf{9.9} & \textbf{9.1} \\
+& relocate-human & 0.0 & 0.0 & -0.3 & -0.3 & -0.3 & 0.20 & \textbf{0.35}\\
+& pen-cloned  & \textbf{56.9} & 23.5 & 26.5 & 1.6 & -2.5 & 39.2 & 40.3\\
+& hammer-cloned & 0.8 & 0.2 & 0.3 & 0.3 & 0.3 & 2.1 & \textbf{5.7} \\
+& door-cloned & -0.1 & 0.0 & -0.1 & -0.1 & -0.1 & 0.4 & \textbf{3.5}\\
+& relocate-cloned & \textbf{-0.1} & -0.2 & -0.3 & -0.3 & -0.3 & \textbf{-0.1} & \textbf{-0.1}\\
+\hline
+\multirow{3}*{Kitchen}
+& kitchen-complete & 33.8 & 15.0 & 0.0 & 0.0 & 0.0 & \textbf{43.8} & 31.3\\
+& kitchen-partial & 33.8 & 0.0 & 13.1 & 0.0 & 0.0 & \textbf{49.8} & \textbf{50.1} \\
+& kitchen-undirected & 47.5 & 2.5 & 47.2 & 0.0 & 0.0 & \textbf{51.0} & \textbf{52.4} \\ \hline
+\end{tabular}
+\normalsize
+\caption{\label{table:adroit_antmaze}{\small Normalized scores of all methods on AntMaze, Adroit, and kitchen domains from D4RL, averaged across 4 seeds. On the harder mazes, CQL is the \textit{only} method that attains non-zero returns, and is the only method to outperform simple behavioral cloning on Adroit tasks with human demonstrations.
+The CQL($\rho$) variant, which avoids importance weights, is more stable on the higher-dimensional Adroit tasks.}}
+\vspace{-25pt}
+\end{table}
+
+
+Lastly, we evaluate a discrete-action Q-learning variant of CQL (Algorithm~\ref{alg:practical_alg}) on image-based Atari games~\citep{bellemare2013arcade}. We compare CQL to REM~\citep{agarwal2019optimistic} and QR-DQN~\citep{dabney2018distributional} on the four Atari tasks that are evaluated in detail by \citet{agarwal2019optimistic}, using the dataset released by the authors: Pong, Breakout, Qbert and Seaquest. We were not able to reproduce the QR-DQN and REM results on Asterix using the official implementation and data from \citet{agarwal2019optimistic}, and no method was able to perform well on the provided data for this task, but we include the scores in Table~\ref{table:atari_reduced_size}.
+\begin{figure*}[h]
+\vspace{-10pt}
+  \includegraphics[width=0.23\linewidth]{images/pong.pdf}  
+  \includegraphics[width=.23\linewidth]{images/breakout.pdf}  
+  \includegraphics[width=.23\linewidth]{images/qbert.pdf}  
+  \includegraphics[width=.23\linewidth]{images/seaquest.pdf}  
+\caption{\label{fig:cql_20m_atari}{\footnotesize Performance of CQL, QR-DQN and REM as a function of training steps (x-axis) in setting \textbf{(2)} when provided with only the first 20\% of the samples of an online DQN run. Note that CQL is able to learn stably on 3 out of 4 games, and its performance does not degrade as steeply as QR-DQN on Seaquest.}}
+\vspace{-10pt}
+\end{figure*}
+Following the evaluation protocol of \citet{agarwal2019optimistic}, we evaluated on two types of datasets, both of which were generated from the DQN-replay dataset:
+\textbf{(1)} a dataset consisting of the first 20\% of the samples observed by an online DQN agent (Fig. 7 in \citep{agarwal2019optimistic}) and 
+\textbf{(2)} datasets consisting of only 1\%  and 10\% of the samples in the replay buffer of an online DQN agent (Fig. 6 in \citep{agarwal2019optimistic}). In setting \textbf{(1)}, shown in Figure~\ref{fig:cql_20m_atari}, CQL generally achieves similar or better performance over the course of training as QR-DQN and REM.
+When only using only 1\% or 10\% of the data, in setting \textbf{(2)}, we see in Table~\ref{table:atari_reduced_size} that CQL substantially outperforms REM and QR-DQN, especially in the harder 1\% condition, where performance exceeds the best prior method by as much as \textbf{28x} on Q*bert, and \textbf{6x} on Breakout.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l|r|r|r|||r|r|r}
+    \hline
+        \textbf{Task Name} & \textbf{QR-DQN} & \textbf{REM} & \textbf{CQL($\mathcal{H}$)}  & \textbf{QR-DQN} & \textbf{REM} & \textbf{CQL($\mathcal{H}$)}  \\
+        \hline
+         Pong & 3.0 & 6.0 & \textbf{19.3} & 16.7 & 16.8 & \textbf{18.5} \\
+         Breakout & 7.8 & 9.2 & \textbf{61.1} & 176.0 & 96.0 & \textbf{269.3} \\
+         Q*bert & 500.0 & 500.0 & \textbf{14012.0}& 11201.8 & 8070.2 & \textbf{13855.6}\\
+         Seaquest & 480.2 & 390.1 & \textbf{779.4} & 3300.0 & \textbf{4290.4} & 3674.1 \\
+         Asterix\footnote{No method (CQL or prior methods, REM and QR-DQN, were able to attain non-trivial performance on this game using the dataset provided by \citet{agarwal2019optimistic}} & 166.3 & 386.5 & \textbf{592.4} & 189.2 & 75.1 & 156.3 \\
+         \hline
+    \end{tabular}
+    \caption{{\footnotesize CQL, REM and QR-DQN in setting \textbf{(1)} with 1\% data (left), and 10\% data (right). CQL drastically outperforms prior methods with 1\% data, and usually attains better performance with 10\%.}}
+    \label{table:atari_reduced_size}
+\end{table}
+
+
+
+

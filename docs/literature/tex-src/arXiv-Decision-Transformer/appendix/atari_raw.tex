@@ -1,0 +1,83 @@
+
+\section{Atari Task Scores} \label{appendix:atari_raw}
+Table \ref{tbl:atari_baselines} shows the normalized scores used for normalization used in \citet{hafner2020mastering}. Tables \ref{tbl:atari_main_raw} and \ref{tbl:atari_percentile_bc_raw} show the raw scores corresponding to Tables \ref{tbl:atari_main} and \ref{tbl:atari_percentile_bc}, respectively. For \%BC scores, we use the same hyperparameters as Decision Transformer for fair comparison.  For REM and QR-DQN, there is a slight discrepancy between \citet{agarwal2020optimistic} and \citet{kumar2020conservative}; we report raw data provided to us by REM authors.
+
+\begin{table*}[h]
+\centering
+\small
+\begin{tabular}{lrr}
+\toprule
+\multicolumn{1}{c}{\bf Game} & \multicolumn{1}{c}{\bf Random} & \multicolumn{1}{c}{\bf Gamer} \\
+  \midrule
+Breakout & $2$ & $30$ \\
+Qbert & $164$ & $13455$ \\ 
+Pong & $-21$ & $15$ \\
+Seaquest & $68$ & $42055$ \\
+ \bottomrule
+ \end{tabular}
+ \caption{Atari baseline scores used for normalization.}
+ \label{tbl:atari_baselines}
+\end{table*}
+
+% \begin{table*}[h]
+% \centering
+% \small
+% \begin{tabular}{lrrrrr}
+% \toprule
+% \multicolumn{1}{c}{\bf Game} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c}{\bf CQL} & \multicolumn{1}{c}{\bf QR-DQN} & \multicolumn{1}{c}{\bf REM} & \multicolumn{1}{c}{\bf BC} \\
+% \midrule
+% Breakout  & $\bf{76.9} \pm 27.3$ & $61.1$ & $7.9$ & $11.0$& $40.9 \pm 17.3$ \\
+% Qbert     & $3498.3 \pm 2402.1$ & $\bf{14012.0}$ & $383.6$ & $343.4$ & $2464.1 \pm 1948.2$ \\
+% Pong      & $17.1 \pm 2.9$ & $\bf{19.3}$ & $-13.8$ & $-6.9$ & $9.7 \pm 7.2$ \\
+% Seaquest  & $\bf{1063.3} \pm 274.8$ & $779.4$ & $672.9$  & $499.8$   & $968.6 \pm 133.8$ \\
+% \bottomrule
+% \end{tabular}
+% \caption{
+% Raw scores for the 1\% DQN-replay Atari dataset.
+% We report the mean and variance across 3 seeds.
+% Best mean scores are highlighted in bold.
+% Decision Transformer (DT) performs comparably to CQL on 3 out of 4 games, and outperforms other baselines.}
+% \label{tbl:atari_main_raw}
+% \end{table*}
+
+% updated QR-DQN / REM numbers as per Rishabh Agarwal's email (results from CQL paper were incorrect)
+% also using RTG conditioning not based on CQL numbers
+\begin{table*}[h]
+\centering
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+\multicolumn{1}{c}{\bf Game} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c}{\bf CQL} & \multicolumn{1}{c}{\bf QR-DQN} & \multicolumn{1}{c}{\bf REM} & \multicolumn{1}{c}{\bf BC} \\
+\midrule
+Breakout  & $\bf{76.9} \pm 27.3$ & $61.1$ & $6.8$ & $4.5$& $40.9 \pm 17.3$ \\
+Qbert     & $2215.8 \pm 1523.7$ & $\bf{14012.0}$ & $156.0$ & $160.1$ & $2464.1 \pm 1948.2$ \\
+Pong      & $17.1 \pm 2.9$ & $\bf{19.3}$ & $-14.5$ & $-20.8$ & $9.7 \pm 7.2$ \\
+Seaquest  & $\bf{1129.3} \pm 189.0$ & $779.4$ & $250.1$  & $370.5$   & $968.6 \pm 133.8$ \\
+\bottomrule
+\end{tabular}
+\caption{
+Raw scores for the 1\% DQN-replay Atari dataset.
+We report the mean and variance across 3 seeds.
+Best mean scores are highlighted in bold.
+Decision Transformer performs comparably to CQL on 3 out of 4 games, and usually outperforms other baselines.}
+\label{tbl:atari_main_raw}
+\end{table*}
+
+
+\begin{table*}[h]
+\centering
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+\multicolumn{1}{c}{\bf Game} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c}{\bf 10\%BC} & \multicolumn{1}{c}{\bf 25\%BC} & \multicolumn{1}{c}{\bf 40\%BC} & \multicolumn{1}{c}{\bf 100\%BC} \\
+  \midrule
+Breakout  & $\bf{76.9} \pm 27.3$ & $10.0 \pm 2.3$ & $22.6 \pm 1.8$ & $32.3 \pm 18.9$ &  $40.9 \pm 17.3$ \\
+Qbert    & $2215.8 \pm 1523.7$ & $1045 \pm 232.0$ & $2302.5 \pm 1844.1$ & $1674.1 \pm 776.0$ & $\bf{2464.1} \pm 1948.2$ \\
+Pong      & $\bf{17.1} \pm 2.9$ & $-20.3 \pm 0.1$ & $-16.2 \pm 1.0$ & $5.2 \pm 4.8$ & $9.7 \pm 7.2$ \\
+Seaquest  & $\bf{1129.3} \pm 189.0$ & $521.3 \pm 103.0$ & $549.3 \pm 96.2$ & $758 \pm 169.1$ & $968.6 \pm 133.8$ \\
+\bottomrule
+\end{tabular}
+\caption{\%BC scores for Atari. We report the mean and variance across 3 seeds.
+Decision Transformer usually outperforms \%BC.}
+\label{tbl:atari_percentile_bc_raw}
+\end{table*}

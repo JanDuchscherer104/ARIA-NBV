@@ -1,0 +1,201 @@
+
+\section{Discussion}
+
+\subsection{Does Decision Transformer perform behavior cloning on a subset of the data?}
+\label{sec:pct_bc}
+
+In this section, we seek to gain insight into whether Decision Transformer can be thought of as performing imitation learning on a subset of the data with a certain return.
+To investigate this, we propose a new method, Percentile Behavior Cloning (\%BC), where we run behavior cloning on only the top $X\%$ of timesteps in the dataset, ordered by episode returns.
+The percentile $X\%$ interpolates between standard BC ($X=100\%$) that trains on the entire dataset and only cloning the best observed trajectory ($X\to0\%$), trading off between better generalization by training on more data with training a specialized model that focuses on a desirable subset of the data.
+
+We show full results comparing \%BC to Decision Transformer and CQL in Table \ref{tbl:pct_bc}, sweeping over $X \in [10\%, 25\%, 40\%, 100\%]$.
+Note that the only way to choose the optimal subset for cloning is to evaluate using rollouts from the environment, so \%BC is not a realistic approach; rather, it serves to provide insight into the behavior of Decision Transformer.
+When data is plentiful -- as in the D4RL regime -- we find \%BC can match or beat other offline RL methods.
+On most environments, Decision Transformer is competitive with the performance of the best \%BC, indicating it can hone in on a particular subset after training on the entire dataset distribution.
+
+\begin{table*}[h]
+\centering
+\small
+\begin{tabular}{llrrrrrr}
+\toprule
+\multicolumn{1}{c}{\bf Dataset} & \multicolumn{1}{c}{\bf Environment} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c}{\bf 10\%BC} & \multicolumn{1}{c}{\bf 25\%BC} & \multicolumn{1}{c}{\bf 40\%BC} & \multicolumn{1}{c}{\bf 100\%BC} & \multicolumn{1}{c}{\bf CQL} \\
+\midrule
+Medium        & HalfCheetah &  $42.6 \pm 0.1$  & $42.9$ & $43.0$ & $43.1$ & $43.1$ & $\bf 44.4$ \\
+Medium        & Hopper      &  $\bf 67.6 \pm 1.0$  & $65.9$ & $65.2$ & $65.3$ & $63.9$ & $58.0$ \\
+Medium        & Walker      &  $74.0 \pm 1.4$  & $78.8$ & $\bf 80.9$ & $78.8$ & $77.3$ & $79.2$ \\
+Medium        & Reacher     &  $51.2 \pm 3.4$  & $51.0$ & $48.9$ & $58.2$ & $\bf 58.4$ & $26.0$ \\
+\midrule
+Medium-Replay & HalfCheetah &  $36.6 \pm 0.8$  & $40.8$ & $40.9$ & $41.1$ &  $4.3$ & $\bf 46.2$ \\
+Medium-Replay & Hopper      &  $\bf 82.7 \pm 7.0$  & $70.6$ & $58.6$ & $31.0$ & $27.6$ & $48.6$ \\
+Medium-Replay & Walker      &  $66.6 \pm 3.0$  & $\bf 70.4$ & $67.8$ & $67.2$ & $36.9$ & $26.7$ \\
+Medium-Replay & Reacher     &  $18.0 \pm 2.4$  & $\bf 33.1$ & $16.2$ & $10.7$ &  $5.4$ & $19.0$ \\
+\midrule
+\multicolumn{2}{c}{\bf Average} &  $56.1$ & $\bf{56.7}$ & $52.7$ & $49.4$ & $39.5$ & $43.5$ \\
+\bottomrule
+\end{tabular}
+\caption{
+Comparison between Decision Transformer (DT) and Percentile Behavior Cloning (\%BC).}
+\label{tbl:pct_bc}
+\end{table*}
+
+In contrast, when we study low data regimes -- such as Atari, where we use 1\% of a replay buffer as the dataset -- \%BC is weak (shown in Table \ref{tbl:atari_percentile_bc}).
+This suggests that in scenarios with relatively low amounts of data, Decision Transformer can outperform \%BC by using all trajectories in the dataset to improve generalization, even if those trajectories are dissimilar from the return conditioning target.
+Our results indicate that Decision Transformer can be more effective than simply performing imitation learning on a subset of the dataset.
+On the tasks we considered, Decision Transformer either outperforms or is competitive to \%BC, without the confound of having to select the optimal subset.
+
+\begin{table*}[h]
+\centering
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+\multicolumn{1}{c}{\bf Game} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c}{\bf 10\%BC} & \multicolumn{1}{c}{\bf 25\%BC} & \multicolumn{1}{c}{\bf 40\%BC} & \multicolumn{1}{c}{\bf 100\%BC} \\
+  \midrule
+Breakout  & $\bf{267.5} \pm 97.5$ & $28.5 \pm 8.2$ & $73.5 \pm 6.4$ & $108.2 \pm 67.5$ & $138.9 \pm 61.7$ \\
+Qbert    & $15.4 \pm 11.4$ & $6.6 \pm 1.7$ & $16.0 \pm 13.8$ & $11.8 \pm 5.8$ & $\bf{17.3} \pm 14.7$ \\
+Pong      & $\bf{106.1} \pm 8.1$ & $2.5 \pm 0.2$ & $13.3 \pm 2.7$ & $72.7 \pm 13.3$ & $85.2 \pm 20.0$ \\
+Seaquest  & $\bf{2.5} \pm 0.4$ & $1.1 \pm 0.2$ & $1.1 \pm 0.2$ & $1.6 \pm 0.4$ & $2.1 \pm 0.3$ \\
+\bottomrule
+\end{tabular}
+\caption{\%BC scores for Atari. We report the mean and variance across 3 seeds.
+Decision Transformer (DT) outperforms all versions of \%BC in most games.}
+\label{tbl:atari_percentile_bc}
+\end{table*}
+
+\subsection{How well does Decision Transformer model the distribution of returns?}
+
+We evaluate the ability of Decision Transformer to understand return-to-go tokens by varying the desired target return over a wide range -- evaluating the multi-task distribution modeling capability of transformers.
+Figure \ref{fig:atari_return} shows the average sampled return accumulated by the agent over the course of the evaluation episode for varying values of target return.
+On every task, the desired target returns and the true observed returns are highly correlated. On some tasks like Pong, HalfCheetah and Walker, Decision Transformer generates trajectories that almost perfectly match the desired returns (as indicated by the overlap with the oracle line).
+Furthermore, on some Atari tasks like Seaquest, we can prompt the Decision Transformer with higher returns than the maximum episode return available in the dataset, demonstrating that Decision Transformer is sometimes capable of extrapolation.
+
+\begin{figure*}[h]
+\centering
+\includegraphics[width=1\linewidth]{figures/retcond/plots.pdf} \\
+\vspace{.5em}
+\includegraphics[width=0.7\linewidth]{figures/retcond/legend.pdf}
+\caption{
+Sampled (evaluation) returns accumulated by Decision Transformer when conditioned on the specified target (desired) returns.
+\textbf{Top:} Atari.
+\textbf{Bottom:} D4RL medium-replay datasets.
+}
+\label{fig:atari_return}
+\end{figure*}
+
+\subsection{What is the benefit of using a longer context length?}
+\label{sec:context_atari}
+
+To assess the importance of access to previous states, actions, and returns, we ablate on the context length $K$.
+This is interesting since it is generally considered that the previous state (i.e. $K=1$) is enough for reinforcement learning algorithms when frame stacking is used, as we do.
+Table \ref{tbl:atari_history} shows that performance of Decision Transformer is significantly worse when $K=1$, indicating that past information is useful for Atari games.
+One hypothesis is that when we are representing a distribution of policies -- like with sequence modeling -- the context allows the transformer to identify which policy generated the actions, enabling better learning and/or improving the training dynamics.
+
+\begin{table*}[h]
+\centering
+\small
+\begin{tabular}{lrrr}
+\toprule
+\multicolumn{1}{c}{\bf Game} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c}{\bf DT with no context ($K=1$)} &  \\
+  \midrule
+Breakout  & $\bf{267.5} \pm 97.5$ & $73.9 \pm 10$  \\
+Qbert    & $\bf{15.1} \pm 11.4$ & $13.6 \pm 11.3$ \\
+Pong      & $\bf{106.1} \pm 8.1$ & $2.5 \pm 0.2$ \\
+Seaquest  & $\bf{2.5} \pm 0.4$ & $0.6 \pm 0.1$ \\
+\bottomrule
+\end{tabular}
+\caption{Ablation on context length.
+Decision Transformer (DT) performs better when using a longer context length ($K=50$ for Pong, $K=30$ for others).}
+\label{tbl:atari_history}
+\end{table*}
+
+\subsection{Does Decision Transformer perform effective long-term credit assignment?}
+\label{sec:key_to_door}
+
+To evaluate long-term credit assignment capabilities of our model, we consider a variant of the Key-to-Door environment proposed in \citet{mesnard2020counterfactual}.
+This is a grid-based environment with a sequence of three phases: (1) in the first phase, the agent is placed in a room with a key; (2) then, the agent is placed in an empty room; (3) and finally, the agent is placed in a room with a door.
+The agent receives a binary reward when reaching the door in the third phase, but \textbf{only} if it picked up the key in the first phase.
+This problem is difficult for credit assignment because credit must be propagated from the beginning to the end of the episode, skipping over actions taken in the middle.
+
+We train on datasets of trajectories generated by applying random actions and report success rates in Table \ref{tbl:key_to_door}.
+Furthermore, for the Key-to-Door environment we use the entire episode length as the context, rather than having a fixed content window as in the other environments.
+Methods that use highsight return information: our Decision Transformer model and \%BC (trained only on successful episodes) are able to learn effective policies -- producing near-optimal paths, despite only training on random walks.
+TD learning (CQL) cannot effectively propagate Q-values over the long horizons involved and gets poor performance.
+\clearpage
+
+\begin{table*}[h]
+\centering
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+\multicolumn{1}{c}{\bf Dataset} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c}{\bf CQL} & \multicolumn{1}{c}{\bf BC} & \multicolumn{1}{c}{\bf \%BC} & \multicolumn{1}{c}{\bf Random}\\
+\midrule
+1K Random Trajectories & $\bf{71.8}\%$ & $13.1\%$ & $1.4\%$ & $69.9\%$ & $3.1\%$      \\
+10K Random Trajectories & $94.6\%$ & $13.3\%$ & $1.6\%$ & $\bf{95.1}\%$ & $3.1\%$      \\
+\bottomrule
+\end{tabular}
+\caption{
+Success rate for Key-to-Door environment.
+Methods using hindsight (Decision Transformer, \%BC) can learn successful policies, while TD learning struggles to perform credit assignment.
+}
+\label{tbl:key_to_door}
+\end{table*}
+
+\subsection{Can transformers be accurate critics in sparse reward settings?}
+
+In previous sections, we established that decision transformer can produce effective policies (actors).
+We now evaluate whether transformer models can also be effective critics.
+We modify Decision Transformer to output return tokens in addition to action tokens on the Key-to-Door environment.
+Additionally, the first return token is not given, but it is predicted instead (i.e. the model learns the initial distribution $p(\hat{R}_1)$), similar to standard autoregressive generative models.
+We find that the transformer continuously updates reward probability based on events during the episode, shown in Figure \ref{fig:key_critic} (Left).
+Furthermore, we find the transformer attends to critical events in the episode (picking up the key or reaching the door), shown in Figure \ref{fig:key_critic} (Right), indicating formation of state-reward associations as discussed in \citet{raposo2021synthetic} and enabling accurate value prediction.
+
+\begin{figure*}[h]
+\centering
+\includegraphics[width=0.40\textwidth]{figures/key_rew_onehead.pdf}
+\includegraphics[width=0.40\textwidth]{figures/key_att_onehead.pdf}
+\caption{
+\textbf{Left:} Averages of running return probabilities predicted by the transformer model for three types of episode outcomes.
+\textbf{Right:} Transformer attention weights from all timesteps superimposed for a particular successful episode.
+The model attends to steps near pivotal events in the episode, such as picking up the key and reaching the door.}
+\label{fig:key_critic}
+\end{figure*}
+
+\subsection{Does Decision Transformer perform well in sparse reward settings?}
+
+A known weakness of TD learning algorithms is that they require densely populated rewards in order to perform well, which can be unrealistic and/or expensive.
+In contrast, Decision Transformer can improve robustness in these settings since it makes minimal assumptions on the density of the reward.
+To evaluate this, we consider a delayed return version of the D4RL benchmarks where the agent does not receive any rewards along the trajectory, and instead receives the cumulative reward of the trajectory in the final timestep.
+Our results for delayed returns are shown in Table \ref{tbl:mujoco_delayed_results}.
+Delayed returns minimally affect Decision Transformer; and due to the nature of the training process, while imitation learning methods are reward agnostic.
+While TD learning collapses, Decision Transformer and \%BC still perform well, indicating that Decision Transformer can be more robust to delayed rewards.
+
+\begin{table*}[h]
+\centering
+\small
+\begin{tabular}{llrr|rr|rr}
+\toprule
+& & \multicolumn{2}{c|}{Delayed (Sparse)} & \multicolumn{2}{c|}{Agnostic} & \multicolumn{2}{c}{Original (Dense)} \\
+\multicolumn{1}{c}{\bf Dataset} & \multicolumn{1}{c}{\bf Environment} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c|}{\bf CQL} & \multicolumn{1}{c}{\bf BC} & \multicolumn{1}{c|}{\bf \%BC} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c}{\bf CQL} \\
+\midrule
+Medium-Expert & Hopper      & $\bf{107.3 \pm 3.5}$ & $9.0$ & $59.9$ & $102.6$     & $107.6$ & $111.0$ \\
+Medium        & Hopper      &  $60.7 \pm 4.5$      & $5.2$ & $63.9$ & $\bf{65.9}$ &  $67.6$ &  $58.0$ \\
+Medium-Replay & Hopper      &  $\bf{78.5 \pm 3.7}$ & $2.0$ & $27.6$ & $70.6$      &  $82.7$ &  $48.6$ \\
+\bottomrule
+\end{tabular}
+\caption{
+Results for D4RL datasets with delayed (sparse) reward.
+Decision Transformer (DT) and imitation learning are minimally affected by the removal of dense rewards, while CQL fails.}
+\label{tbl:mujoco_delayed_results}
+\end{table*}
+
+\subsection{Why does Decision Transformer avoid the need for value pessimism or behavior regularization?}
+
+One key difference between Decision Transformer and prior offline RL algorithms is that we do not require policy regularization or conservatism to achieve good performance.
+Our conjecture is that TD-learning based algorithms learn an approximate value function and improve the policy by optimizing this value function.
+This act of optimizing a learned function can exacerbate and exploit any inaccuracies in the value function approximation, causing failures in policy improvement.
+Since Decision Transformer does not require explicit optimization using learned functions as objectives, it avoids the need for regularization or conservatism.
+
+\subsection{How can Decision Transformer benefit online RL regimes?}
+
+Offline RL and the ability to model behaviors has the potential to enable sample-efficient online RL for downstream tasks.
+Works studying the transition from offline to online generally find that likelihood-based approaches, like our sequence modeling objective, are more successful~\citep{gao2018normalizedpg, nair2020awac}.
+As a result, although we studied offline RL in this work, we believe Decision Transformer can meaningfully improve online RL methods by serving as a strong model for behavior generation. For instance, Decision Transformer can serve as a powerful ``memorization engine'' and in conjunction with powerful exploration algorithms like Go-Explore~\cite{ecoffet2019goexplore}, has the potential to simultaneously model and generative a diverse set of behaviors.

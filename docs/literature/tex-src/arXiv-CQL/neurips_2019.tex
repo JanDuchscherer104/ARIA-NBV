@@ -1,0 +1,92 @@
+
+\documentclass{article}
+
+
+
+
+\usepackage[nonatbib,preprint]{neurips_2019}
+\usepackage[numbers]{natbib}
+
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc} %
+\usepackage[T1]{fontenc}    %
+\usepackage{hyperref}       %
+\usepackage{url}            %
+\usepackage{booktabs}       %
+\usepackage{amsfonts}       %
+\usepackage{nicefrac}       %
+\usepackage{microtype}      %
+\usepackage{amsmath}
+\usepackage{color}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{subcaption}
+\usepackage{wrapfig}
+\usepackage{multirow}
+\usepackage{tikz}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usetikzlibrary{positioning}
+\usepackage{mathtools}
+
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{assumption}{Assumption}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{definition}{Definition}[section]
+\newtheorem{corollary}{Corollary}[theorem]
+\newtheorem{lemma}{Lemma}[theorem]
+\newtheorem{definition1}{Definition}[section]
+
+\include{defs}
+\let\svthefootnote\thefootnote
+
+\setlength{\abovedisplayskip}{1pt}
+\setlength{\belowdisplayskip}{1pt}
+
+\title{Conservative Q-Learning\\ for Offline Reinforcement Learning}
+
+
+\author{%
+  Aviral Kumar$^1$, Aurick Zhou$^1$, George Tucker$^2$, Sergey Levine$^{1,2}$ \\
+  $^1$UC Berkeley, $^2$Google Research, Brain Team\\
+  \texttt{aviralk@berkeley.edu}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Effectively leveraging large, previously collected datasets in reinforcement learning (RL) is a key challenge for large-scale real-world applications. Offline RL algorithms promise to learn effective policies from previously-collected, static datasets without further interaction. However, in practice, offline RL presents a major challenge, and standard off-policy RL methods can fail due to overestimation of values induced by the distributional shift between the dataset and the learned policy, especially when training on complex and multi-modal data distributions. In this paper, we propose \emph{conservative Q-learning (CQL)}, which aims to address these limitations by learning a conservative Q-function such that the expected value of a policy under this Q-function lower-bounds its true value. 
+We theoretically show that CQL produces a lower bound on the value of the current policy and that it can be incorporated into a policy learning procedure with theoretical improvement guarantees. In practice, CQL augments the standard Bellman error objective with a simple Q-value regularizer which is straightforward to implement on top of existing deep Q-learning and actor-critic implementations. On both discrete and continuous control domains, we show that CQL substantially outperforms existing offline RL methods, often learning policies that attain 2-5 times higher final return, especially when learning from complex and multi-modal data distributions.
+\end{abstract}
+
+\input{introduction.tex}
+\input{background.tex}
+\input{method_new.tex}
+\input{method_part2.tex}
+\input{related.tex}
+\input{experiments_shortened.tex}
+
+\vspace{-8pt}
+\section{Discussion}
+\vspace{-5pt}
+We proposed conservative Q-learning (CQL), an algorithmic framework for offline RL that learns a lower bound on the policy value.
+Empirically, we demonstrate that CQL outperforms prior offline RL methods on a wide range of offline RL benchmark tasks, including complex control tasks and tasks with raw image observations. In many cases, the performance of CQL is substantially better than the best-performing prior methods, exceeding their final returns by 2-5x.
+The simplicity and efficacy of CQL make it a promising choice for a wide range of real-world offline RL problems. However, a number of challenges remain. While we prove that CQL learns lower bounds on the Q-function in the tabular, linear, and a subset of non-linear function approximation cases, a rigorous theoretical analysis of CQL with deep neural nets, is left for future work. Additionally, offline RL methods are liable to suffer from overfitting in the same way as standard supervised methods, so another important challenge for future work is to devise simple and effective early stopping methods, analogous to validation error in supervised learning.
+
+
+\section*{Acknowledgements}
+We thank Mohammad Norouzi, Oleh Rybkin, Anton Raichuk, Vitchyr Pong and anonymous reviewers from the Robotic AI and Learning Lab at UC Berkeley for their feedback on an earlier version of this paper. We thank Rishabh Agarwal for help with the Atari QR-DQN/REM codebase and for sharing baseline results. This research was funded by the DARPA Assured Autonomy program, and compute support from Google, Amazon, and NVIDIA.
+
+
+
+\bibliography{main.bib}
+\bibliographystyle{plainnat}
+
+\newpage
+\appendix
+\input{appendix.tex}
+
+\end{document}

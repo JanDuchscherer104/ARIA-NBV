@@ -1,0 +1,131 @@
+\documentclass{article}
+
+% added by Kimin
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{bbm}
+\usepackage{enumitem}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[export]{adjustbox}
+\usepackage{changes}
+\usepackage{multirow}
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% if you need to pass options to natbib, use, e.g.:
+% \PassOptionsToPackage{authoryear}{natbib}
+% before loading neurips_2021
+
+% ready for submission
+\input{defs.tex}
+% \usepackage[nonatbib]{neurips_2021}
+
+\usepackage[numbers]{natbib}
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+    \usepackage[preprint]{neurips_2021}
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+%     \usepackage[final]{neurips_2021}
+
+% to avoid loading the natbib package, add option nonatbib:
+%    \usepackage[nonatbib]{neurips_2021}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+
+\usepackage{listings}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\hypersetup{
+ colorlinks=False,
+ linkcolor=blue,
+ citecolor=blue,
+ urlcolor=blue}
+
+\newcommand{\kl}[1]{{\color{red}[KL: #1]}}
+\newcommand{\lc}[1]{{\color{blue}[LC: #1]}}
+\newcommand{\ag}[1]{{\color{brown}[AG: #1]}}
+\newcommand{\km}[1]{{\color{purple}[KM: #1]}}
+\newcommand{\ml}[1]{\textcolor{magenta} { [ML: #1]}}
+\newcommand{\im}[1]{\textcolor{cyan} { [IM: #1]}}
+\newcommand{\ar}[1]{\textcolor{magenta} {[AR: #1]}}
+
+\newcommand{\vs}[1]{\vspace{#1}}
+
+\definechangesauthor[color=purple, name=kimin]{KM}
+
+\title{Decision Transformer: Reinforcement \\ Learning via Sequence Modeling}
+
+\author{%
+  Lili Chen$^{* , 1}$,
+  Kevin Lu$^{* , 1}$,
+  \textbf{Aravind Rajeswaran}$^{2}$,
+  \textbf{Kimin Lee}$^{1}$,
+  \vspace{3pt}
+  \\
+  \textbf{Aditya Grover}$^{2}$,
+  \textbf{Michael Laskin}$^{1}$,
+  \textbf{Pieter Abbeel}$^{1}$,
+  \textbf{Aravind Srinivas}$^{\dagger, 1}$,
+  \textbf{Igor Mordatch}$^{\dagger, 3}$
+  \vspace{3pt}
+  \\
+  $^{*}$equal contribution \vspace{.1em} \hspace{4pt}
+  $^{\dagger}$equal advising
+  \vspace{3pt}
+  \\
+  $^{1}$UC Berkeley \vspace{.1em} \hspace{4pt}
+  $^{2}$Facebook AI Research \vspace{.1em} \hspace{4pt}
+  $^{3}$Google Brain
+  \vspace{3pt}
+  \\
+  \texttt{\{lilichen, kzl\}@berkeley.edu}
+}
+
+\begin{document}
+
+\maketitle
+\input{sections/abstract}
+
+\clearpage
+\tableofcontents
+\clearpage
+
+\input{sections/intro}
+\input{sections/preliminaries}
+\input{sections/method}
+\clearpage
+\input{sections/experiments}
+\input{sections/discussion}
+\input{sections/relatedwork}
+\input{sections/conclusion}
+\input{sections/acknowledgements}
+
+\clearpage  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\bibliography{reference}
+\bibliographystyle{unsrtnat}
+
+\clearpage %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\appendix
+
+% \input{sections/checklist}
+% \newpage
+
+% \input{appendix/experimental_details}
+
+\input{appendix/atari_hyperparameters}
+
+\input{appendix/atari_raw}
+
+\end{document}

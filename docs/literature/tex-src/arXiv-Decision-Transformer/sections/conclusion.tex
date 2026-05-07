@@ -1,0 +1,14 @@
+
+\section{Conclusion}
+
+We proposed Decision Transformer, seeking to unify ideas in language/sequence modeling and reinforcement learning.
+On standard offline RL benchmarks, we showed Decision Transformer can match or outperform strong algorithms designed explicitly for offline RL with minimal modifications from standard language modeling architectures.
+
+We hope this work inspires more investigation into using large transformer models for RL. 
+We used a simple supervised loss that was effective in our experiments, but applications to large-scale datasets could benefit from self-supervised pretraining tasks.
+In addition, one could consider more sophisticated embeddings for returns, states, and actions -- for instance, conditioning on return distributions to model stochastic settings instead of deterministic returns.
+Transformer models can also be used to model the state evolution of trajectory, potentially serving as an alternative to model-based RL, and we hope to explore this in future work.
+
+For real-world applications, it is important to understand the types of errors transformers make in MDP settings and possible negative consequences, which are underexplored.
+It will also be important to consider the datasets we train models on, which can potentially add destructive biases, particularly as we consider studying augmenting RL agents with more data which may come from questionable sources.
+For instance, reward design by nefarious actors can potentially generate unintended behaviors as our model generates behaviors by conditioning on desired returns.

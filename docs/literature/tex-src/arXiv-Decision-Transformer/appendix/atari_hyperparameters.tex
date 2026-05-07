@@ -1,0 +1,200 @@
+
+\section{Experimental Details}
+
+% Code for experiments can be found at: \texttt{\url{https://github.com/kzl/decision-transformer}}.
+
+Code for experiments can be found in the supplementary material.
+
+\subsection{Atari} \label{appendix:atari_hyperparameters}
+
+We build our Decision Transformer implementation for Atari games off of minGPT (\url{https://github.com/karpathy/minGPT}), a publicly available re-implementation of GPT. We use most of the default hyperparameters from their character-level GPT example (\url{https://github.com/karpathy/minGPT/blob/master/play_char.ipynb}).
+We reduce the batch size (except in Pong), block size, number of layers, attention heads, and embedding dimension for faster training.
+For processing the observations, we use the DQN encoder from \citet{mnih2015human} with an additional linear layer to project to the embedding dimension.
+
+% For return-to-go conditioning, we use either $1\times$ or $1.5\times$ CQL performance. We selected these values as our primary focus was comparison to CQL, but more possibilities exist for principled return-to-go conditioning.
+For return-to-go conditioning, we use either $1\times$ or $5\times$ the maximum return in the dataset, but more possibilities exist for principled return-to-go conditioning.
+In Atari experiments, we use Tanh instead of LayerNorm (as described in Section \ref{section:method}) after embedding each modality, but did this does not make a significant difference in performance.
+The full list of hyperparameters can be found in Table \ref{tbl:atari_hyperparameters}.
+
+% \begin{table}[ht]
+% \caption{Hyperparameters of DT (and \%BC) for Atari experiments.}
+% \vskip 0.15in
+% \begin{center}
+% \begin{small}
+% \begin{tabular}{ll}
+% \toprule
+% \textbf{Hyperparameter} & \textbf{Value}  \\
+% \midrule
+% Number of layers & $6$  \\ 
+% Number of attention heads    & $8$  \\
+% Embedding dimension    & $128$  \\ 
+% Batch size   & $512$ Pong \\
+% & $128$ Breakout, Qbert, Seaquest\\ 
+% Context length $K$ & $50$ Pong \\
+% & $30$ Breakout, Qbert, Seaquest\\
+% Return-to-go conditioning & $90$ Breakout ($\approx 1.5\times$ CQL performance) \\
+% & $14000$ Qbert ($\approx 1\times$ CQL performance) \\
+% & $20$ Pong ($\approx 1\times$ CQL performance) \\
+% & $1150$ Seaquest ($\approx 1.5\times$ CQL performance) \\
+% Nonlinearity & ReLU, encoder \\
+% & GeLU, otherwise \\
+% Encoder channels & $32, 64, 64$ \\
+% Encoder filter sizes & $8 \times 8, 4 \times 4, 3 \times 3$ \\
+% Encoder strides & $4, 2, 1$ \\
+% Max epochs & $5$ \\
+% Dropout & $0.1$ \\
+% Learning rate & $6*10^{-4}$ \\
+% Adam betas & $(0.9, 0.95)$ \\
+% Grad norm clip & $1.0$ \\
+% Weight decay & $0.1$ \\
+% Learning rate decay & Linear warmup and cosine decay (see code for details) \\
+% Warmup tokens & $512*20$ \\
+% Final tokens & $2*500000*K$ \\
+
+% \bottomrule
+% \end{tabular}
+% \end{small}
+% \label{tbl:atari_hyperparameters}
+% \end{center}
+% % \vskip -0.1in
+% \end{table} 
+
+% not using CQL numbers for conditioning
+\begin{table}[ht]
+\caption{Hyperparameters of DT (and \%BC) for Atari experiments.}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{tabular}{ll}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value}  \\
+\midrule
+Number of layers & $6$  \\ 
+Number of attention heads    & $8$  \\
+Embedding dimension    & $128$  \\ 
+Batch size   & $512$ Pong \\
+& $128$ Breakout, Qbert, Seaquest\\ 
+Context length $K$ & $50$ Pong \\
+& $30$ Breakout, Qbert, Seaquest\\
+Return-to-go conditioning & $90$ Breakout ($\approx 1\times$ max in dataset) \\
+& $2500$ Qbert ($\approx 5\times$ max in dataset) \\
+& $20$ Pong ($\approx 1\times$ max in dataset) \\
+& $1450$ Seaquest ($\approx 5\times$ max in dataset) \\
+Nonlinearity & ReLU, encoder \\
+& GeLU, otherwise \\
+Encoder channels & $32, 64, 64$ \\
+Encoder filter sizes & $8 \times 8, 4 \times 4, 3 \times 3$ \\
+Encoder strides & $4, 2, 1$ \\
+Max epochs & $5$ \\
+Dropout & $0.1$ \\
+Learning rate & $6*10^{-4}$ \\
+Adam betas & $(0.9, 0.95)$ \\
+Grad norm clip & $1.0$ \\
+Weight decay & $0.1$ \\
+Learning rate decay & Linear warmup and cosine decay (see code for details) \\
+Warmup tokens & $512*20$ \\
+Final tokens & $2*500000*K$ \\
+
+\bottomrule
+\end{tabular}
+\end{small}
+\label{tbl:atari_hyperparameters}
+\end{center}
+% \vskip -0.1in
+\end{table} 
+
+\subsection{OpenAI Gym}
+
+\subsubsection{Decision Transformer}
+
+Our code is based on the Huggingface Transformers library \citep{wolf-etal-2020-transformers}.
+Our hyperparameters on all OpenAI Gym tasks are shown below in Table \ref{tbl:gym_hyperparameters}.
+Heuristically, we find using larger models helps to model the distribution of returns, compared to standard RL model sizes (which learn one policy).
+For reacher we use a smaller context length than the other environments, which we find to be helpful as the environment is goal-conditioned and the episodes are shorter.
+We choose return targets based on expert performance for each environment, except for HalfCheetah where we find 50\% performance to be better due to the datasets containing lower relative returns to the other environments.
+Models were trained for $10^5$ gradient steps using the AdamW optimizer \citep{loshchilov2017adamw} following PyTorch defaults.
+
+\begin{table}[ht]
+\caption{Hyperparameters of Decision Transformer for OpenAI Gym experiments.}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{tabular}{ll}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value}  \\
+\midrule
+Number of layers & $3$  \\ 
+Number of attention heads    & $1$  \\
+Embedding dimension    & $128$  \\
+Nonlinearity function & ReLU \\
+Batch size   & $64$ \\
+Context length $K$ & $20$ HalfCheetah, Hopper, Walker \\
+               & $5$ Reacher \\
+Return-to-go conditioning   & $6000$ HalfCheetah \\
+                            & $3600$ Hopper \\
+                            & $5000$ Walker \\
+                            & $50$ Reacher \\
+Dropout & $0.1$ \\
+Learning rate & $10^{-4}$ \\
+Grad norm clip & $0.25$ \\
+Weight decay & $10^{-4}$ \\
+Learning rate decay & Linear warmup for first $10^5$ training steps \\
+\bottomrule
+\end{tabular}
+\end{small}
+\label{tbl:gym_hyperparameters}
+\end{center}
+% \vskip -0.1in
+\end{table} 
+
+\subsubsection{Behavior Cloning}
+
+As briefly mentioned in Section \ref{sec:gym_results}, we found previously reported behavior cloning baselines to be weak, and so run them ourselves using a similar setup as Decision Transformer.
+We tried using a transformer architecture, but found using an MLP (as in previous work) to be stronger.
+We train for $2.5 \times 10^4$ gradient steps; training more did not improve performance.
+Other hyperparameters are shown in Table \ref{tbl:gym_bc_hyperparameters}.
+The percentile behavior cloning experiments use the same hyperparameters.
+
+\begin{table}[ht]
+\caption{Hyperparameters of Behavior Cloning for OpenAI Gym experiments.}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{tabular}{ll}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value}  \\
+\midrule
+Number of layers & $3$ \\
+Embedding dimension & $256$  \\ 
+Nonlinearity function & ReLU \\
+Batch size   & $64$ \\
+Dropout & $0.1$ \\
+Learning rate & $10^{-4}$ \\
+Weight decay & $10^{-4}$ \\
+Learning rate decay & Linear warmup for first $10^5$ training steps \\
+\bottomrule
+\end{tabular}
+\end{small}
+\label{tbl:gym_bc_hyperparameters}
+\end{center}
+% \vskip -0.1in
+\end{table} 
+
+\subsection{Graph Shortest Path}
+
+We give details of the illustrative example discussed in the introduction. The task is to find the shortest path on a fixed directed graph, which can be formulated as an MDP where reward is $0$ when the agent is at the goal node and $-1$ otherwise. The observation is the integer index of the graph node the agent is in. The action is the integer index of the graph node to move to next. The transition dynamics transport the agent to the action's node index if there is an edge in the graph, while the agent remains at the past node otherwise. The returns-to-go in this problem correspond to negative path lengths and maximizing them corresponds to generating shortest paths. 
+
+In this environment, we use the GPT model as described in Section \ref{section:method} to generate both actions and return-to-go tokens. This makes it possible for the model it generate its own (realizable) returns-to-go $\hat{R}$. Since we require a return prompt to generate actions and we do assume knowledge of the optimal path length upfront, we use a simple prior over returns that favors shorter paths: $P_\text{prior}(\hat{R}=k) \propto T+1-k$, where $T$ is the maximum trajectory length. Then, it is combined with the return probabilities generated by the GPT model: $P(\hat{R}_t | s_{0:t}, a_{0:t-1}, \hat{R}_{0:t-1}) = P_\text{GPT}(\hat{R}_t | s_{0:t}, a_{0:t-1}, \hat{R}_{0:t-1}) \times P_\text{prior}(\hat{R}_t)^{10}$. Note that the prior and return-to-go predictions are entirely computable by the model, and thus avoids the need for any external or oracle information like the optimal path length. Adjustment of generation by a prior has also been used for similar purposes in controllable text generation in prior work~\citep{krause2020gedi}. 
+
+We train on a dataset of $1,000$ graph random walk trajectories of $T=10$ steps each with a random graph of $20$ nodes and edge sparsity coefficient of $0.1$. We report the results in Figure \ref{fig:graph_length}, where we find that transformer model is able to significantly improve upon the number of steps required to reach the goal, closely matching performance of optimal paths.
+
+\begin{figure*}
+\centering
+\includegraphics[width=0.6\textwidth]{figures/graph_length.pdf}
+\caption{Histogram of steps to reach the goal node for random walks on the graph, shortest possible paths to the goal, and attempted shortest paths generated by the transformer model. $\infty$ indicates the goal was not reached during the trajectory.}
+\label{fig:graph_length}
+\end{figure*}
+
+There are two reasons for the favorable performance on this task. In one case, the training dataset of random walk trajectories may contain a segment that directly corresponds to the desired shortest path, in which case it will be generated by the model. In the second case, generated paths are entirely original and are not subsets of trajectories in the training dataset - they are generated from stitching sub-optimal segments. We find this case accounts for $15.8\%$ of generated paths in the experiment.
+
+While this is a simple example and uses a prior on generation that we do not use in other experiments for simplicity, it illustrates how hindsight return information can be used with generation priors to avoid the need for explicit dynamic programming.

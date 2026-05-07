@@ -1,0 +1,139 @@
+
+\section{Evaluations on Offline RL Benchmarks}
+
+In this section, we investigate the performance of Decision Transformer relative to dedicated offline RL and imitation learning algorithms. In particular, our primary points of comparison are model-free offline RL algorithms based on TD-learning, since our Decision Transformer architecture is fundamentally model-free in nature as well. Furthermore, TD-learning is the dominant paradigm in RL for sample efficiency, and also features prominently as a sub-routine in many model-based RL algorithms~\cite{Dyna, janner2019mbpo}. We also compare with behavior cloning and variants, since it also involves a likelihood based policy learning formulation similar to ours. The exact algorithms depend on the environment but our motivations are as follows:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{TD learning}: most of these methods use an action-space constraint or value pessimism, and will be the most faithful comparison to Decision Transformer, representing standard RL methods.
+    A state-of-the-art model-free method is Conservative Q-Learning (CQL)~\citep{kumar2020conservative} which serves as our primary comparison. In addition, we also compare against other prior model-free RL algorithms like BEAR~\cite{kumar2019bear} and BRAC~\cite{wu2019brac}.
+    
+    \item \textbf{Imitation learning}: this regime similarly uses supervised losses for training, rather than Bellman backups.
+        We use behavior cloning here, and include a more detailed discussion in Section \ref{sec:pct_bc}.
+\end{itemize}
+
+We evaluate on both discrete (Atari~\citep{bellemare2013arcade}) and continuous (OpenAI Gym~\citep{brockman2016openai}) control tasks.
+The former involves high-dimensional observation spaces and requires long-term credit assignment, while the latter requires fine-grained continuous control, representing a diverse set of tasks.
+Our main results are summarized in Figure \ref{fig:main_results}, where we show averaged normalized performance for each domain.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=1.0\linewidth]{figures/results_summary}
+\caption{
+Results comparing Decision Transformer (ours) to TD learning (CQL) and behavior cloning across Atari, OpenAI Gym, and Minigrid.
+On a diverse set of tasks, Decision Transformer performs comparably or better than traditional approaches.
+Performance is measured by normalized episode return (see text for details).
+}
+\label{fig:main_results}
+\end{figure*}
+
+\subsection{Atari}
+
+% In this section, we consider Atari games \citep{bellemare2013arcade}, a widely-used RL benchmark.
+The Atari benchmark \citep{bellemare2013arcade} is challenging due to its high-dimensional visual inputs and difficulty of credit assignment arising from the delay between actions and resulting rewards.
+We evaluate our method on 1\% of all samples in the DQN-replay dataset as per \citet{agarwal2020optimistic}, representing 500 thousand of the 50 million transitions observed by an online DQN agent~\citep{mnih2015human} during training; we report the mean and standard deviation of 3 seeds.
+We normalize scores based on a professional gamer, following the protocol of \citet{hafner2020mastering}, where 100 represents the professional gamer score and 0 represents a random policy.
+
+% \begin{table*}[h]
+% \centering
+% \small
+% \begin{tabular}{lrrrrr}
+% \toprule
+% \multicolumn{1}{c}{\bf Game} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c}{\bf CQL} & \multicolumn{1}{c}{\bf QR-DQN} & \multicolumn{1}{c}{\bf REM} & \multicolumn{1}{c}{\bf BC} \\ %  & \multicolumn{1}{c}{\bf BC} \\
+% \midrule
+% Breakout  & $\bf{267.5} \pm 97.5$ & $211.1$ & $21.1$ & $32.1$ & $138.9 \pm 61.7$ \\ % & $54.6 \pm 2.5$  \\
+% Qbert     & $25.1 \pm 18.1$ & $\bf{104.2}$ & $1.7$ & $1.4$  & $17.3 \pm 14.7$ \\ % & $16.7 \pm 8.0$ \\ 
+% Pong      & $106.1 \pm 8.1$ & $\bf{111.9}$ & $20.0$ & $39.1$ & $85.2 \pm 20.0$ \\ % &  $2.8 \pm 0.8$  \\
+% Seaquest  & $\bf{2.4} \pm 0.7$ & $1.7$ &  $1.4$ &  $1.0$  & $2.1 \pm 0.3$ \\ % &  $0.7 \pm 0.1$\\
+% \bottomrule
+% \end{tabular}
+% \caption{
+% Gamer-normalized scores for the 1\% DQN-replay Atari dataset.
+% We report the mean and variance across 3 seeds.
+% Best mean scores are highlighted in bold.
+% Decision Transformer (DT) performs comparably to CQL on 3 out of 4 games, and outperforms other baselines.}
+% \label{tbl:atari_main}
+% \end{table*}
+
+% updated QR-DQN / REM numbers as per Rishabh Agarwal's email (results from CQL paper were incorrect)
+% also using RTG conditioning not based on CQL numbers
+\begin{table*}[h]
+\centering
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+\multicolumn{1}{c}{\bf Game} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c}{\bf CQL} & \multicolumn{1}{c}{\bf QR-DQN} & \multicolumn{1}{c}{\bf REM} & \multicolumn{1}{c}{\bf BC} \\ %  & \multicolumn{1}{c}{\bf BC} \\
+\midrule
+Breakout  & $\bf{267.5} \pm 97.5$ & $211.1$ & $17.1$ & $8.9$ & $138.9 \pm 61.7$ \\ % & $54.6 \pm 2.5$  \\
+Qbert     & $15.4 \pm 11.4$ & $\bf{104.2}$ & $0.0$ & $0.0$ & $17.3 \pm 14.7$ \\ % & $16.7 \pm 8.0$ \\ 
+Pong      & $106.1 \pm 8.1$ & $\bf{111.9}$ & $18.0$ & $0.5$ & $85.2 \pm 20.0$ \\ % &  $2.8 \pm 0.8$  \\
+Seaquest  & $\bf{2.5} \pm 0.4$ & $1.7$ &  $0.4$ & $0.7$  & $2.1 \pm 0.3$ \\ % &  $0.7 \pm 0.1$\\
+\bottomrule
+\end{tabular}
+\caption{
+Gamer-normalized scores for the 1\% DQN-replay Atari dataset.
+We report the mean and variance across 3 seeds.
+Best mean scores are highlighted in bold.
+Decision Transformer (DT) performs comparably to CQL on 3 out of 4 games, and outperforms other baselines in most games.}
+\label{tbl:atari_main}
+\end{table*}
+
+We compare to CQL \citep{kumar2020conservative}, REM \citep{agarwal2020optimistic}, and QR-DQN \citep{dabney2018distributional} on four Atari tasks (Breakout, Qbert, Pong, and Seaquest) that are evaluated in \citet{agarwal2020optimistic}.
+We use context lengths of $K=30$ for Decision Transformer (except $K=50$ for Pong).
+We also report the performance of behavior cloning (BC), which utilizes the same network architecture and hyperparameters as Decision Transformer but does not have return-to-go conditioning\footnote{We also tried using an MLP with $K=1$ as in prior work, but found this was worse than the transformer.}.
+For CQL, REM, and QR-DQN baselines, we report numbers directly from the CQL and REM papers.
+We show results in Table \ref{tbl:atari_main}.
+Our method is competitive with CQL in 3 out of 4 games and outperforms or matches REM, QR-DQN, and BC on all 4 games. 
+
+
+\subsection{OpenAI Gym} \label{sec:gym_results}
+
+In this section, we consider the continuous control tasks from the D4RL benchmark \citep{fu2020d4rl}.
+We also consider a 2D reacher environment that is not part of the benchmark, and generate the datasets using a similar methodology to the D4RL benchmark.
+Reacher is a goal-conditioned task and has sparse rewards, so it represents a different setting than the standard locomotion environments (HalfCheetah, Hopper, and Walker).
+The different dataset settings are described below.
+\begin{enumerate}[leftmargin=*]
+    \item Medium: 1 million timesteps generated by a ``medium'' policy that achieves approximately one-third the score of an expert policy.
+    \item Medium-Replay: the replay buffer of an agent trained to the performance of a medium policy (approximately 25k-400k timesteps in our environments).
+    \item Medium-Expert: 1 million timesteps generated by the medium policy concatenated with 1 million timesteps generated by an expert policy.
+\end{enumerate}
+
+We compare to CQL~\citep{kumar2020conservative}, BEAR~\citep{kumar2019bear}, BRAC~\citep{wu2019brac}, and AWR~\citep{peng2019awr}.
+CQL represents the state-of-the-art in model-free offline RL, an instantiation of TD learning with value pessimism.
+Score are normalized so that 100 represents an expert policy, as per \citet{fu2020d4rl}.
+CQL numbers are reported from the original paper; BC numbers are run by us; and the other methods are reported from the D4RL paper.
+Our results are shown in Table \ref{tbl:mujoco_results}.
+Decision Transformer achieves the highest scores in a majority of the tasks and is competitive with the state of the art in the remaining tasks.
+
+\addtocounter{footnote}{-1}
+\begin{table*}[h]
+\centering
+\small
+\begin{tabular}{llrrrrrrr}
+\toprule
+\multicolumn{1}{c}{\bf Dataset} & \multicolumn{1}{c}{\bf Environment} & \multicolumn{1}{c}{\bf DT (Ours)} & \multicolumn{1}{c}{\bf CQL} & \multicolumn{1}{c}{\bf BEAR} & \multicolumn{1}{c}{\bf BRAC-v} & \multicolumn{1}{c}{\bf AWR} & \multicolumn{1}{c}{\bf BC} \\
+\midrule
+Medium-Expert & HalfCheetah &  $\bf{86.8} \pm 1.3$ &  $62.4$ &  $53.4$ &  $41.9$ & $52.7$ & $59.9$ \\
+Medium-Expert & Hopper      & $107.6 \pm 1.8$ & $\bf{111.0}$ &  $96.3$ &   $0.8$ & $27.1$ & $79.6$ \\
+Medium-Expert & Walker      & $\bf{108.1} \pm 0.2$ &  $98.7$ &  $40.1$ &  $81.6$ & $53.8$ & $36.6$ \\
+Medium-Expert & Reacher     &  $\bf{89.1 \pm 1.3}$ &  $30.6$ &       - &       - &      - & $73.3$ \\
+\midrule
+Medium        & HalfCheetah &  $42.6 \pm 0.1$ &  $44.4$ &  $41.7$ &  $\bf{46.3}$ & $37.4$ & $43.1$ \\
+Medium        & Hopper      &  $\bf{67.6} \pm 1.0$ &  $58.0$ &  $52.1$ &  $31.1$ & $35.9$ & $63.9$ \\
+Medium        & Walker      &   $74.0 \pm 1.4$ &  $79.2$ &  $59.1$ & $\bf{81.1}$ & $17.4$ & $77.3$ \\
+Medium        & Reacher     &  $\bf{51.2 \pm 3.4}$ &     $26.0$ &       - &    - &      - & $\bf{48.9}$  \\
+\midrule
+Medium-Replay & HalfCheetah &  $36.6 \pm 0.8$ &  $46.2$ &  $38.6$ &  $\bf{47.7}$ & $40.3$ & $4.3$ \\
+Medium-Replay & Hopper      &  $\bf{82.7 \pm 7.0}$ &  $48.6$ &  $33.7$ &   $0.6$ & $28.4$ & $27.6$ \\
+Medium-Replay & Walker      &  $\bf{66.6 \pm 3.0}$ &  $26.7$ &  $19.2$ &   $0.9$ & $15.5$ & $36.9$ \\
+Medium-Replay & Reacher     &  $\bf{18.0 \pm 2.4}$ & $\bf{19.0}$ &       - &   - &      - & $5.4$ \\
+\midrule
+\multicolumn{2}{c}{\bf Average (Without Reacher)} &  $\bf{74.7}$      & $63.9$ & $48.2$ & $36.9$ & $34.3$ & $46.4$ \\
+\multicolumn{2}{c}{\bf Average (All Settings)}    &  $\bf{69.2}$      & $54.2$ &    -   &    -   & - & $47.7$ \\
+\bottomrule
+\end{tabular}
+\caption{
+Results for D4RL datasets\protect\footnotemark.
+We report the mean and variance for three seeds.
+Decision Transformer (DT) outperforms conventional RL algorithms on almost all tasks.}
+\label{tbl:mujoco_results}
+\end{table*}
+\footnotetext{Given that CQL is generally the strongest TD learning method, for Reacher we only run the CQL baseline.}

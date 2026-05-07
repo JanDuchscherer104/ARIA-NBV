@@ -1,0 +1,42 @@
+
+\section{Related Work}
+
+\subsection{Offline reinforcement learning}
+
+To mitigate the impact of distribution shift in offline RL, prior algorithms either (a) constrain the policy action space~\citep{fujimoto2019off, kumar2019stabilizing, siegel2020keep} or (b) incorporate value pessimism~\citep{fujimoto2019off,kumar2020conservative}, or (c) incorporate pessimism into learned dynamics models~\cite{kidambi2020morel, yu2020mopo}.
+Since we do not use Decision Transformers to explicitly learn the dynamics model, we primarily compare against model-free algorithms in our work; in particular, adding a dynamics model tends to improve the performance of model-free algorithms.
+Another line of work explores learning wide behavior distribution from an offline dataset by learning a task-agnostic set of skills, either with likelihood-based approaches \citep{ajay2020opal, campos2020edl,pertsch2020spirl,singh2021parrot} or by maximizing mutual information \citep{eysenbach2018diversity, lu2020lisp, sharmaGLKH20dads}.
+Our work is similar to the likelihood-based approaches, which do not use iterative Bellman updates -- although we use a simpler sequence modeling objective instead of a variational method, and use rewards for conditional generation of behaviors.
+
+\subsection{Supervised learning in reinforcement learning settings}
+
+Some prior methods for reinforcement learning bear more resemblance to static supervised learning, such as Q-learning \citep{watkins1989qlearning, mnih2013dqn}, which still uses iterative backups, or likelihood-based methods such as behavior cloning, which do not (discussed in previous section).
+Recent work \citep{srivastava2019udrl, kumar2019rcp, ogma2019blog} studies ``upside-down'' reinforcement learning (UDRL), which are similar to our method in seeking to model behaviors with a supervised loss conditioned on the target return.
+A key difference in our work is the shift of motivation to sequence modeling rather than supervised learning: while the practical methods differ primarily in the context length and architecture, sequence modeling enables behavior modeling even without access to the reward, in a similar style to language \citep{radford2018gpt} or images \citep{chen2020igpt}, and is known to scale well \citep{brown2020gpt3}.
+The method proposed by \citet{kumar2019rcp} is most similar to our method with $K=1$, which we find sequence modeling/long contexts to outperform (see Section \ref{sec:context_atari}).
+\citet{ghosh2019gcsl} extends prior UDRL methods to use state goal conditioning, rather than rewards, and \citet{paster2020glamor} further use an LSTM with state goal conditioning for goal-conditoned online RL settings.
+
+Concurrent to our work, \citet{janner2021tto} propose Trajectory Transformer, which is similar to Decision Transformer but additionally uses state and return prediction, as well as discretization, which incorporates model-based components.
+We believe that their experiments, in addition to our results, highlight the potential for sequence modeling to be a generally applicable idea for reinforcement learning.
+
+\subsection{Credit assignment}
+
+Many works have studied better credit assignment via state-association, learning an architecture which decomposes the reward function such that certain ``important'' states comprise most of the credit \citep{ferret2019self, harutyunyan2019hindsight,  mesnard2020counterfactual}.
+They use the learned reward function to change the reward of an actor-critic algorithm to help propagate signal over long horizons.
+In particular, similar to our long-term setting, some works have specifically shown such state-associative architectures can perform better in delayed reward settings \citep{arjona2018rudder, hung2019optimizing, liu2019sequence, raposo2021synthetic}.
+In contrast, we allow these properties to naturally emerge in a transformer architecture, without having to explicitly learn a reward function or a critic.
+
+\subsection{Conditional language generation}
+
+Various works have studied guided generation for images~\citep{karras2019stylegan} and language~\citep{ghazvininejad2017hafez, weng2021conditional}. Several works~\citep{ficler2017controlling, hu2017toward, rajani2019explain, yu2016sequence,ziegler2019fine, keskar2019ctrl} have explored training or fine-tuning of models for controllable text generation.
+Class-conditional language models can also be used to learn disciminators to guide generation~\citep{dathathri2019plug, ghazvininejad2017hafez, holtzman2018learning,  krause2020gedi}.
+However, these approaches mostly assume constant ``classes'', while in reinforcement learning the reward signal is time-varying.
+Furthermore, it is more natural to prompt the model desired target return and continuously decrease it by the observed rewards over time, since the transformer model and environment jointly generate the trajectory.
+
+\subsection{Attention and transformer models}
+Transformers~\citep{vaswani2017attention} have been applied successfully to many tasks in natural language processing \citep{devlin2018bert,radford2018gpt} and computer vision \citep{carion2020detr,dosovitskiy2020vit}.
+However, transformers are relatively unstudied in RL, mostly due to differing nature of the problem, such as higher variance in training.
+\citet{zambaldi2018deep} showed that augmenting transformers with relational reasoning improve performance in combinatorial environments and \citet{ritter2020epn} showed iterative self-attention allowed for RL agents to better utilize episodic memories.
+\citet{parisotto2020stabilizing} discussed design decisions for more stable training of transformers in the high-variance RL setting.
+Unlike our work, these still use actor-critic algorithms for optimization, focusing on novelty in architecture.
+Additionally, in imitation learning, some works have studied transformers as a replacement for LSTMs: \citet{dasari2020transformers} study one-shot imitation learning, and \citet{abramson2020imitating} combine language and image modalities for text-conditioned behavior generation.

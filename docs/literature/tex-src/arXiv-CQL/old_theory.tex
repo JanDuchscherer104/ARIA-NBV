@@ -1,0 +1,109 @@
+\section{Why are Actor Constraints Insufficient with Function Approximation?}
+
+Prior work has used actor constraints or penalties to prevent out-of-distribution action queries in the Q-function backup in the absence of function approximation. However, in this section, we demonstrate that actor constraints may be insufficient to provide effective learning progress in the presence of function approximation.
+Our reasoning behind this statement is based on two reasons.
+First, typical actor constraints or penalties aim at penalizing the learned actor, $\pi_\phi$ against
+the effective Markovian policy for the dataset
+defined as, $\pi_b(a|s) = \frac{\mu(s, a)}{\mu(s)}$. $\pi_b$ can be a highly multimodal and complex distribution, and the performance of most prior methods that rely on fitting an accurate parametric model for $\pi_b$, may thus be bottlenecked by the inability to fit this behavior distribution.
+
+The second reason is more subtle. In scenarios where the dataset distribution, $\mu(s, a)$ is ``narrow'',
+actor constraints or penalties may be insufficient to constrain the critic in the presence of function approximation, since the critic is trained by minimizing squared Bellman error on a narrow set of in-distribution actions (i.e., actions with $\mu(a|s) > 0$), and the Q-value outputs on other actions are pretty much uncontrolled.
+Thus, generalization effects of the Q-function approximator may give rise erroneously over-optimistic Q-values on out-of-distribution actions, even when the target values are constrained to utilize in-distribution actions. When these erroneously high Q-values on out-of-distribution actions are then used to update the actor, it introduces errors in the actor, even in the presence of an actor penalty, which can slow down the amount of error accumulation in the actor, but not completely prevent it in certain scenarios.
+
+In order to build intuition for the argument presented above, we will now present a simple didactic example of a 1D ``line-world'' MDP. This MDP has continuous states in the interval $[-1, 1]$ on the 1D number-line. At any state, there are two available actions: $a_1$, which transitions the agent to the left by $0.2$ units, and $a_2$ that transits the agent to the right by $0.2$ units.
+The features provided for training a linear Q-function approximator are given by: $\phi(s, a_1) = s, \phi(s, a_2) = s + \varepsilon$, and the Q-function is parameterized via two scalar parameters, $w, b$. By suitably choosing the behavior policy density and the initialization of the Q-functions, for any given policy penalty coefficient, $\beta$,
+we can set $\varepsilon$, such that a single gradient step on a uniform over actions initial policy, updates the actor towards choosing an out-of-distribution action $a$, for which $\pi_b(a|s) << 1$. 
+
+The example provides some intuition for why actor penalties may not suffice when narrow distributions can induce erroneous critic generalization. In order to formally quantify the generalization effects induced in the Q-function, we assume that the Q-function is parameterized by $\theta \in \mathbb{R}^d$, and is updated via gradient descent, and 
+compute the change in Q-values for a state action pair $(\bar{s}, \bar{a})$ due to a change in the parameter vector $\theta$ caused by the critic update, up to first order, as
+\begin{equation}
+\label{eqn:first_order}
+    Q_{k+1}(\bar{s}, \bar{a}) \approx Q_{k}(\bar{s}, \bar{a}) - \alpha_k \expec_{s, a \sim \mu} [(Q_k(s, a) - \bellman^\pi \bar{Q}_k(s, a) ) \cdot k_\theta((s, a), (\bar{s}, \bar{a}))]
+\end{equation}
+where $k_\theta((s, a), (\bar{s}, \bar{a})) := \nabla_\theta Q_\theta(s, a)^T \nabla_\theta Q_\theta(\bar{s}, \bar{a})$ is the neural tangent kernel (NTK)~\citep{jacot18ntk}. 
+When function approximation is not used, the corresponding Q-function iterate is given by:
+\begin{equation}
+\label{eqn:regular_update}
+    Q_{k+1}(\bar{s}, \bar{a}) = Q_k(\bar{s}, \bar{a}) + \alpha_k \mu(\bar{s}, \bar{a}) (\bellman^\pi \bar{Q}_k(\bar{s}, \bar{a}) - Q_k(\bar{s}, \bar{a}))
+\end{equation}
+Now, we may ask: how does an update in Equation~\ref{eqn:first_order} affect the actor, which uses these new Q-values for its update? The policy update is:
+\begin{equation}
+\label{eqn:policy_constraint}
+    \pi_{k+1} \leftarrow \max_{\pi}~~ \expec_{s \sim \mu(s)}\left[\expec_{a \sim \pi(\cdot|s)} [Q_{k+1}(s, a)] \right] + \beta D(\pi, \mu).
+\end{equation}
+Denoting $Q_{k+1}^{\text{no}}$ as the updated Q-function, $Q_{k+1}$, from Equation~\ref{eqn:regular_update}, and re-writing the policy update, we obtain:
+\begin{equation}
+    \pi_{k+1} \leftarrow \max_{\pi}~~~ \expec_{s \sim \mu(s)} \left[\expec_{a \sim \pi(\cdot|s)}[Q_{k+1}^{\text{no}}(s, a) + \alpha_k (K_\theta - I) \text{diag}(\mu) (\bellman^{\pi_k}\bar{Q}_k - Q_k)(s, a)] + \beta D(\pi, \mu) \right]
+\end{equation}
+Observe that the additional error in the Q-function due to function approximation can accidently lead to overestimated Q-values at out-of-distribution actions, as shown in the example discussed previously. Even when an actor penalty is used, as shown in Equation~\ref{eqn:policy_constraint}, the additional error in the Q-values can bias the policy towards actions that are sub-optimal. Note that this phenomenon is absent without function approximation, if Q-values at OOD actions are initialized to pessimistic values, since these are unaffected with the update shown in Equation~\ref{eqn:regular_update}. 
+
+To summarize, the key issue here is the inability to control the function approximation error in the Q-function only via an actor constraint that can control target values, and the ability of this function approximation error to bias the policy towards OOD actions. As shown in our example, even in the presence of penalties on the actor, certain choices of features and initialization may prevent the actor from learning meaningfully, and enter into a cycle of gradual error accumulation. 
+\textcolor{red}{AK: Probably add some stuff about how in an iterative sense this error accumulates. And put an example on a 1D lineworld, with linear function approximation that shows this issue. Or show a gridworld example.}
+
+
+\section{Controlling Function Approximation Error via Penalized Q-Learning}
+
+Now that we have seen that function approximation error in the Q-function -- which arises when backups are performed on certain choices of data distribution $\mu$ -- can cause problems with learning even in the presence of constrained bootstrapped target values, we seek a solution to this issue. A na\"ive solution would be to simply mimic tabular updates but with function approximators as previously explored in \citet{achiam2019towards}, however, this scheme is not desirable since computing gradient inner products ($K_\theta$) over all the states and empirically inverting the matrix $K_\theta$ is computationally extremely expensive. One can choose to just account for $K_\theta$ within a mini-batch, analogous to \citet{achiam2019towards}, however, this is not known to provide huge benefits and requires modifying substantial architectural details and design details for numerical stability reasons.
+
+Instead, our approach, which we refer to as ALGONAME, chooses to penalize the Q-function under a suitably chosen ``negative'' distribution, and upweights Q-function values at in-distribution actions.
+This ensures that the Bellman error minimization procedure does not erroneously downweight the Q-values at in-distribution actions and upweight those at out-of-distribution actions, as a consequence of function approximation. More concretely, our objective for training the Q-function, as shown in Equations~\ref{eqn:generic_new_update} and \ref{eqn:generic_new_update_2} now minimizes the Bellman error, subject to explicitly up-weighting Q-values on in-distribution actions while penalizing them on actions drawn from a different distribution $\nu$, which is of our choice. We refer to this family of optimization problems as: $\mathsf{PenalizedQ(\nu)}$. 
+\begin{align}
+    \label{eqn:generic_new_update}
+    \mathsf{PenalizedQ(\nu)}:~~ \theta_{k+1} = \arg\min_{\theta} ~~& \sum_{i=1}^N \left( Q_\theta(s_i, a_i) - \bellman^\pi \bar{Q}(s_i, a_i) \right)^2 \\ %
+    \text{s.t.}~~ & \expec_{s \sim \mu(s)}\left[ \expec_{a \sim \nu(\cdot|s)} [Q_\theta(s, a)] - \expec_{a \sim \mu(\cdot|s)}[Q_\theta(s, a)] \right] \leq \varepsilon
+    \label{eqn:generic_new_update_2}
+\end{align}
+For different choices of the negative distribution $\nu$,
+this objective amounts to solving different problems: If $\mu$
+is chosen to be the Boltzmann distribution corresponding to the Q-function, i.e. $\nu(a|s) \propto \exp(Q_\theta(s, a))$, then, Equation~\ref{eqn:generic_new_update_2} is equivalent to penalizing the suboptimality of in-distribution actions,
+$\mu(a|s)$ under the learned Q-function. If $\nu$ is chosen to be a function that is inversely proportional to the dataset action marginal, $\mu$, this amounts to penalizing the least likely actions in the dataset.
+
+More generally, we can choose $\nu$ via a separate optimization procedure that optimizes $\mu$ subject to a concave regularizer $\mathcal{R}(\nu)$, giving rise to:
+\begin{equation}
+    \min_\theta~~ \max_\nu \sum_{i=1}^N \left( Q_\theta(s_i, a_i) - \bellman^\pi \bar{Q}\right)^2 + \beta \cdot \expec_{s \sim \mu}\left[ \expec_{a \sim \nu} [Q_\theta(s, a)] - \expec_{a \sim \mu}[Q_\theta(s, a)] \right] + \mathcal{R}(\nu)
+\end{equation}
+We provide two examples that are of special interest in our setting. When $\mathcal{R}(\nu)$ is chosen to be the Shannon entropy, $\mathcal{H}(\nu)$, we obtain the following objective:
+\begin{equation}
+\label{eqn:logsumexp_obj}
+    \ell_{\mathcal{H}}(\theta) = \sum_{i=1}^N \left( Q_\theta(s_i, a_i) - \bellman^\pi \bar{Q}(s_i, a_i) \right)^2 + \beta \cdot \expec_{s \sim \mu}\left[\log \left( \int_{a} \exp(Q_\theta) \right) - \expec_{a' \sim \mu}[Q_\theta]\right]
+\end{equation}
+When $\mathcal{R}(\nu) = -\kldiv(\nu || \hat{\mu})$, where $\hat{\mu}$ denotes the empirical distribution of actions at a state, i.e. $\hat{\mu}(a_0|s_0) = \sum_{s_i, a_i \in \mathcal{D}} 1\{s_i = s_0, a_i = a_0 \} / \sum_{s_i} 1\{s_i = s_0\}$, then using the result from \citet{duchi2017variance}, we obtain the following variance-regularized objective:
+\begin{equation}
+\label{eqn:variance_regularized}
+    \ell_{\mathcal{\kldiv(\hat{\mu})}}(\theta) = \sum_{i=1}^{|\mathcal{D}|} \left( Q_\theta(s_i, a_i) - \bellman^\pi \bar{Q}(s_i, a_i) \right)^2 + \beta \cdot \expec_{s \sim \mu} \sqrt{\frac{\var_{\hat{\mu}}\left( Q_\theta(s, \cdot) \right)}{|\mathcal{D}|}}
+\end{equation}
+We discuss several more objectives of the family arising from different choices of $\mathcal{R}$ in Appendix ??.
+
+Next, we present our argument to show that our objective $\mathsf{Penalized}(\nu)$ solves the problem of incorrect generalization
+in Q-functions, building on the argument from the previous section. As before, we compute an expression for Q-values after a gradient update.
+For a particular state-action pair, $(\bar{s}, \bar{a})$, we can write:
+\begin{equation}
+\label{eqn:new_kernelized_update}
+    Q_{k+1}(\bar{s}, \bar{a}) = Q_{k+1}^{\text{FQI}}(\bar{s}, \bar{a}) + \alpha_k \cdot \beta \cdot \expec_{s \sim \mu} [(\mu(a|s) - \nu(a|s)) \cdot k_\theta((s, a), (\bar{s}, \bar{a}))]
+\end{equation}
+We now provide an explanation centered around objective $\ell_\mathcal{H}(\theta)$ shown in Equation~\ref{eqn:logsumexp_obj}, but an explanation similarly follows for $\ell_{\mathcal{\kldiv(\hat{\mu})}}(\theta)$. If action $\bar{a}$ is out-of-distribution at state $\bar{s}$, an overestimation error that appears in $Q_{k+1}^{\text{FQI}}$ now gets nullified by an underestimation bias caused by $\mu(\bar{a}|\bar{s}) - \nu(\bar{a}|\bar{s})$, which will be a negative quantity if Q-value $Q_k(\bar{s}, \bar{a})$ is overestimated (since, $\nu(\bar{a}|\bar{s}) > \mu(\bar{a}|\bar{s})$). By suitably choosing weights $\beta$, we can ensure that Q-values are not high
+for out-of-distribution actions. 
+
+
+Finally, we present our practical actor-critic algorithm, ALGONAME, that uses Equation~\ref{eqn:logsumexp_obj} for learning effective policies for offline RL. Our algorithm is shown in Algorithm ??. It utilizes the framework of the soft-actor critic (SAC) algorithm, with the difference that the Q-function is trained via $\ell_\mathcal{H}(\theta)$ instead of simple Bellman error. The actor update is void of any special constraint, since the Q-function is trained to output smaller values for OOD actions.    
+
+
+\subsection{Lower-Bound Argument}
+While our motivation for optimization problems of the form of $\mathsf{Penalized}(\nu)$ was primarily based on considerations arising due to undesirable effects of function approximation,
+in this section, we show that in settings without function approximation, ALGONAME that trains
+Q-functions by optimizing $\ell_\mathcal{H}(\theta)$ and then using the corresponding Boltzmann policy for evaluation, gives rise to the strongest lower bound on the policy optimization objective.
+
+First, note that the optimal solution to minimizing $\ell_\mathcal{H}$ at iteration $k$ of learning gives rise to the following Q-function iterate $Q_{k+1}$:
+\begin{equation}
+    \label{eqn:Q_iterate_tabular}
+    Q_{k+1} = \bellman^{\pi_k} Q_{k} - \beta \cdot \left[\frac{\nu_k(a|s) - \mu(a|s)}{n(a|s)} \right]_{|S| \times |A|}
+\end{equation}
+where $n(a|s)$ denotes the number of times action $a$ is observed at state $s$ in dataset $\mathcal{D}$. Furthermore, note that $\nu_k(\cdot|s) = \pi_k(\cdot|s)$, since $\ell_{\mathcal{H}}$ is the chosen objective. Note also that the objective for training the actor via a gradient step
+is given by $J_k(\pi) = \expec_{s \sim \mu(s)} \left[ \expec_{a \sim \pi_k(\cdot|s)}[Q_{k+1}(s, a) \right]$. By substituting Equation~\ref{eqn:Q_iterate_tabular} into this expression, we obtain
+\begin{equation}
+    J_k(\pi) = \expec_{s \sim \mu(s)} \left[ \expec_{a \sim \pi_k(\cdot|s)}[\bellman^{\pi_k} Q_k(s, a) - \beta (\pi_k(a|s) - \mu(a|s)) \right]
+\end{equation}
+Since the inner product of two vectors $\pi_k$, and $\mu$ cannot be more than the norm of $\pi_k$, we observe that $J_k(\pi) \leq \expec_{s \sim \mu(s)} \left[ \expec_{a \sim \pi_k(\cdot|s)}[\bellman^{\pi_k} Q_k(s, a)] \right] = \expec_{s \sim \mu(s)} \left[ \expec_{a \sim \pi_k(\cdot|s)}[Q_{k+1}(s, a)] \right]$, where the right hand side denotes the objective for policy improvement at iteration $k$ without any constraint. Note that this condition is strong, in that if $\nu_k(a|s) \neq \pi_k(a|s)$, then $J_k(\pi)$ may not be a lower bound for atleast one choice of the dataset distribution $\mu$.
+
+Finally, we note that prior methods that penalize the target values instead incur an additional penalty due to the conservative estimates of target values used for backups. We discuss this in detail for two methods: BEAR and BRAC in Appendix ??.
+

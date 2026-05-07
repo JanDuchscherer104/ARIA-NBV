@@ -1,0 +1,111 @@
+\vspace{-5pt}
+\subsection{Conservative Q-Learning for Offline RL}
+\label{sec:framework}
+\vspace{-5pt}
+We now present a general approach for offline policy learning, which we refer to as conservative Q-learning (CQL). 
+As discussed in Section~\ref{sec:policy_eval}, we can obtain Q-values that lower-bound the value of a policy $\policy$
+by solving Equation~\ref{eqn:modified_policy_eval} with $\mu = \policy$. How should we utilize this for policy optimization? We could alternate between performing full off-policy evaluation for each policy iterate, $\hat{\policy}^k$, and one step of policy improvement. However, this can be computationally expensive. Alternatively, since the policy $\hat{\policy}^k$ is typically derived from the Q-function, we could instead choose $\mu(\ba|\bs)$ to approximate the policy that would maximize the current Q-function iterate, 
+thus giving rise to an online algorithm.
+
+We can formally capture such online algorithms by defining a family of optimization problems over $\mu(\ba|\bs)$, presented below, with modifications from Equation~\ref{eqn:modified_policy_eval} marked in red. An instance of this family is denoted by CQL($\mathcal{R}$) and is characterized by a particular choice of regularizer $\mathcal{R}(\mu)$:
+\begin{multline}
+    \label{eqn:cql_framework}
+    \small{\min_{Q} \textcolor{red}{\max_{\mu}}~~ \alpha \left(\E_{\bs \sim \mathcal{D}, \ba \sim \textcolor{red}{\mu(\ba|\bs)}}\left[Q(\bs, \ba)\right] - \E_{\bs \sim \mathcal{D}, \ba \sim \hatbehavior(\ba|\bs)}\left[Q(\bs, \ba)\right] \right)}\\
+    \small{+ \frac{1}{2}~ \E_{\bs, \ba, \bs' \sim \mathcal{D}}\left[\left(Q(\bs, \ba) - \hat{\bellman}^{\policy_k} \hat{Q}^{k} (\bs, \ba) \right)^2 \right] + \textcolor{red}{\mathcal{R}(\mu)} ~~~ \left(\text{CQL}(\mathcal{R})\right).}
+\end{multline}
+
+\textbf{Variants of CQL.} To demonstrate the generality of the CQL family of optimization problems, we discuss two specific instances within this family that are of special interest, and we evaluate them empirically in Section~\ref{sec:experiments}. 
+If we choose $\mathcal{R}(\mu)$ to be the KL-divergence against a prior distribution, $\rho(\ba|\bs)$, i.e., $\mathcal{R}(\mu) = -D_{\mathrm{KL}}(\mu, \rho)$, then we get $\mu(\ba|\bs) \propto \rho(\ba|\bs) \cdot \exp (Q(\bs, \ba))$ (for a derivation, see Appendix~\ref{app:cql_variants}). Frist, if $\rho = \text{Unif}(\ba)$,
+then the first term in Equation~\ref{eqn:cql_framework} corresponds to a soft-maximum of the Q-values at any state $\bs$ and gives rise to the following variant of Equation~\ref{eqn:cql_framework}, called CQL($\mathcal{H}$):
+\begin{equation}
+    \small{\min_{Q}~ \alpha \E_{\bs \sim \mathcal{D}}\left[\log \sum_{\ba} \exp(Q(\bs, \ba))\!-\!\E_{\ba \sim \hatbehavior(\ba|\bs)}\left[Q(\bs, \ba)\right]\right]\!+\!\frac{1}{2} \E_{\bs, \ba, \bs' \sim \mathcal{D}}\left[\left(Q - \hat{\bellman}^{\policy_k} \hat{Q}^{k} \right)^2 \right]\!.}
+    \label{eqn:practical_objective}
+\end{equation}
+Second, if $\rho(\ba|\bs)$ is chosen to be the previous policy $\hat{\policy}^{k-1}$, the first term in Equation~\ref{eqn:practical_objective} is replaced by an exponential weighted average of Q-values of actions from the chosen $\hat{\policy}^{k-1}(\ba|\bs)$. Empirically, we find that this variant can be more stable with high-dimensional action spaces (e.g., Table~\ref{table:adroit_antmaze}) where it is challenging to estimate $\log \sum_{\ba} \exp$ via sampling due to high variance. In Appendix~\ref{app:cql_variants}, we discuss an additional variant of CQL, drawing connections to distributionally robust optimization~\citep{namkoong2017variance}.  
+We will discuss a practical instantiation of a CQL deep RL algorithm in Section~\ref{sec:practical_alg}. CQL can be instantiated as either a Q-learning algorithm (with $\bellman^*$ instead of $\bellman^{\policy}$ in Equations~\ref{eqn:cql_framework}, \ref{eqn:practical_objective}) or as an actor-critic algorithm. 
+
+\textbf{Theoretical analysis of CQL.}
+Next, we will theoretically analyze CQL to show that the policy updates derived in this way are indeed ``conservative'', in the sense that each successive policy iterate is optimized against a lower bound on its value. For clarity, we state the results in the absence of finite-sample error, in this section, but sampling error can be incorporated in the same way as Theorems~\ref{thm:min_q_underestimates} and \ref{thm:cql_underestimates}, and we discuss this in Appendix~\ref{app:missing_proofs}.   Theorem~\ref{thm:cql_underestimation} shows that any variant of the CQL family learns Q-value estimates that lower-bound the actual Q-function under the action-distribution defined by the policy, $\policy^{k}$, under mild regularity conditions (slow updates on the policy).
+\begin{theorem}[CQL learns lower-bounded Q-values]
+\label{thm:cql_underestimation}
+Let $\policy_{\hat{Q}^k}(\ba | \bs) \propto \exp(\hat{Q}^k(\bs, \ba))$ and assume that $D_{\mathrm{TV}}(\hat{\policy}^{k+1}, \pi_{\hat{Q}^k}) \leq \varepsilon$ (i.e., $\hat{\policy}^{k+1}$ changes slowly w.r.t to $\hat{Q}^k$). Then, the policy value under $\hat{Q}^k$, lower-bounds the actual policy value, \mbox{$\hat{V}^{k+1}(\bs) \leq V^{k+1}(\bs) \forall \bs$} if
+\begin{equation*}
+\small{\E_{\pi_{\hat{Q}^k}(\ba | \bs)} \left[ \frac{\pi_{\hat{Q}^k}(\ba | \bs)}{\hatbehavior(\ba|\bs)} -1 \right] \geq \max_{\ba \text{~s.t.~} \hatbehavior(\ba|\bs) > 0} \left(\frac{\pi_{\hat{Q}^k}(\ba | \bs)}{\hatbehavior(\ba|\bs)} \right) \cdot \varepsilon}. 
+\end{equation*}
+\end{theorem}
+The LHS of this inequality is equal to the amount of conservatism induced in the value, $\hat{V}^{k+1}$ in iteration $k+1$ of the CQL update,
+if the learned policy were equal to soft-optimal policy for $\hat{Q}^k$, i.e., when $\hat{\policy}^{k+1} = \pi_{\hat{Q}^k}$. However, as the actual policy, $\hat{\policy}^{k+1}$, may be different, the RHS is the maximal amount of potential overestimation due to this difference. To get a lower bound, we require the amount of underestimation to be higher, which is obtained if $\varepsilon$ is small, i.e. the policy changes slowly.  
+
+Our final result shows that CQL Q-function update is ``gap-expanding'', by which we mean that the difference in Q-values at in-distribution actions and over-optimistically erroneous out-of-distribution actions is higher than the corresponding difference under the actual Q-function. This implies that the policy $\policy^k(\ba|\bs) \propto \exp(\hat{Q}^k(\bs, \ba))$, is constrained to be closer to the dataset distribution, $\hatbehavior(\ba|\bs)$, thus the CQL update implicitly prevents the detrimental effects of OOD action and distribution shift, which has been a major concern in offline RL settings~\citep{kumar2019stabilizing,levine2020offline,fujimoto2018off}.
+\begin{theorem}[CQL is gap-expanding] 
+\label{thm:gap_amplify}
+At any iteration $k$, CQL expands the difference in expected Q-values under the behavior policy $\behavior(\ba|\bs)$ and $\mu_k$, such that for large enough values of $\alpha_k$, we have that \mbox{$\forall \bs, ~\E_{\behavior(\ba|\bs)}[\hat{Q}^k(\bs, \ba)] - \E_{\mu_k(\ba|\bs)}[\hat{Q}^k(\bs, \ba)] > \E_{\behavior(\ba|\bs)}[{Q}^k(\bs, \ba)] - \E_{\mu_k(\ba|\bs)}[{Q}^k(\bs, \ba)]$}.
+\end{theorem}
+When function approximation or sampling error makes OOD actions have higher learned Q-values, CQL backups are expected to be more robust, in that the policy is updated using Q-values that prefer in-distribution actions. 
+As we will empirically show in Appendix~\ref{app:gap_amplify}, prior offline RL methods that do not explicitly constrain or regularize the Q-function may not enjoy such robustness properties.
+
+\textbf{To summarize}, we showed that the CQL RL algorithm learns lower-bound Q-values with large enough $\alpha$, meaning that the final policy attains \emph{at least} the estimated value. We also showed that the Q-function is \emph{gap-expanding}, meaning that it should only ever \emph{over-estimate} the gap between in-distribution and out-of-distribution actions, preventing OOD actions.
+
+\subsection{Safe Policy Improvement Guarantees}
+In Section~\ref{sec:policy_eval} we proposed novel objectives for Q-function training such that the expected value of a policy under the resulting Q-function lower bounds the actual performance of the policy. In Section~\ref{sec:framework}, we used the learned conservative Q-function for policy improvement. In this section, we show that this procedure actually optimizes a well-defined objective and provide a safe policy improvement result for CQL, along the lines of Theorems 1 and 2 in \citet{laroche2017safe}.
+
+To begin with, we define \emph{empirical return} of any policy $\policy$, ${J}(\policy, \hat{M})$, which is equal to the discounted return of a policy $\policy$ in the \emph{empirical} MDP, $\hat{M}$, that is induced by the transitions observed in the dataset $\mathcal{D}$, i.e. $\hat{M} = \{s, a, r, s' \in \mathcal{D}\}$. $J(\policy, M)$ refers to the expected discounted return attained by a policy $\policy$ in the actual underlying MDP, $M$. In Theorem~\ref{thm:well_defined_obj}, we first show that CQL (Equation~\ref{eqn:modified_policy_eval}) optimizes a well-defined penalized RL empirical objective. All proofs are found in Appendix~\ref{app:safe_pi}. 
+
+\begin{theorem}
+\label{thm:well_defined_obj}
+Let $\hat{Q}^\pi$ be the fixed point of Equation~\ref{eqn:modified_policy_eval}, then $\policy^*(\ba|\bs) := \arg\max_{\policy} \mathbb{E}_{\bs \sim \rho(\bs)}[\hat{V}^\pi(\bs)]$ is equivalently obtained by solving:
+\begin{equation}
+\label{eqn:policy_optimality_main}
+    \small{\policy^*(\ba|\bs) \leftarrow \arg \max_{\policy}~~ J(\pi, \hat{M}) - \alpha \frac{1}{1 - \gamma} \mathbb{E}_{\bs \sim d^\policy_{\hat{M}}(\bs)}\left[D_{\text{CQL}}(\policy, \hatbehavior)(\bs) \right]},
+\end{equation}
+where $D_{\text{CQL}}(\policy, \behavior)(\bs) := \sum_{\ba} \policy(\ba|\bs) \cdot \left(\frac{\policy(\ba|\bs)}{\behavior(\ba|\bs)} - 1 \right)$.
+\end{theorem}
+Intuitively, Theorem~\ref{thm:well_defined_obj} says that CQL optimizes the return of a policy in the empirical MDP, $\hat{M}$, while also ensuring that the learned policy $\policy$ is not too different from the behavior policy, $\hatbehavior$ via a penalty that depends on $D_{\text{CQL}}$. Note that this penalty is implicitly introduced by virtue by the gap-expanding (Theorem~\ref{thm:gap_amplify}) behavior of CQL. Next, building upon Theorem~\ref{thm:well_defined_obj} and the analysis of CPO~\citep{achiam2017constrained}, we show that CQL provides a $\zeta$-safe policy improvement over $\hatbehavior$.   
+
+\begin{theorem}
+\label{thm:zeta_safe}
+Let $\policy^*(\ba|\bs)$ be the policy obtained by optimizing Equation~\ref{eqn:policy_optimality_main}. Then, the policy $\policy^*(\ba|\bs)$ is a $\zeta$-safe policy improvement over $\hatbehavior$ in the actual MDP $M$, i.e., $J(\policy^*, M) \geq J(\hatbehavior, M) - \zeta$ with high probability $1 - \delta$, where $\zeta$ is given by,
+\begin{multline}
+    \label{eqn:performance_relation}
+    \small{\zeta = 2\left({\frac{C_{r, \delta}}{1 - \gamma} + \frac{\gamma R_{\max} C_{T, \delta}}{(1 - \gamma)^2}}  \right) \mathbb{E}_{\bs \sim d^{\policy^*}_{\hat{M}}(\bs)}\left[ \frac{\sqrt{|\mathcal{A}|}}{\sqrt{|\mathcal{D}(\bs)|}} \sqrt{ D_{\text{CQL}}(\policy^*, \hatbehavior)(\bs) + 1} \right]} - \\ \small{\underbrace{\left( J(\policy^*, \hat{M}) - J(\hatbehavior, \hat{M})  \right)}_{\geq \alpha \frac{1}{1 - \gamma} \mathbb{E}_{\bs \sim d^{\policy^*}_{\hat{M}}(\bs)}\left[D_{\text{CQL}}(\policy^*, \hatbehavior)(\bs) \right]}.}
+\end{multline}
+\end{theorem}
+The expression of $\zeta$ in Theorem~\ref{thm:zeta_safe} consists of two terms: the first term captures the decrease in policy performance in $M$, that occurs due to the mismatch between $\hat{M}$ and $M$, also referred to as \emph{sampling error}. The second term captures the increase in policy performance due to CQL in empirical MDP, $\hat{M}$. The policy $\policy^*$ obtained by optimizing $\policy$ against the CQL Q-function improves upon the behavior policy, $\hatbehavior$ for suitably chosen values of $\alpha$. When sampling error is small, i.e., $|\mathcal{D}(\bs)|$ is large, then smaller values of $\alpha$ are enough to provide an improvement over the behavior policy. 
+
+\textbf{To summarize,} CQL optimizes a well-defined, penalized empirical RL objective, and performs high-confidence safe policy improvement over the behavior policy. The extent of improvement is negatively influenced by higher sampling error, which decays as more samples are observed.  
+
+\vspace{-7pt}
+\section{Practical Algorithm and Implementation Details}
+\label{sec:practical_alg}
+\vspace{-7pt}
+\begin{wrapfigure}{r}{0.6\textwidth}
+\begin{small}
+\vspace{-24pt}
+\begin{minipage}[t]{0.99\linewidth}
+\begin{algorithm}[H]
+\small
+\caption{Conservative Q-Learning (both variants)}
+\label{alg:practical_alg}
+\begin{algorithmic}[1]
+    \STATE Initialize Q-function, $Q_\theta$, and optionally a policy, $\pi_\phi$.
+    \FOR{step $t$ in \{1, \dots, N\}}
+        \STATE Train the Q-function using $G_Q$ gradient steps on objective from Equation~\ref{eqn:practical_objective} \\
+        \mbox{$\theta_t := \theta_{t-1} - \eta_Q \nabla_\theta \textcolor{red}{\text{CQL}(\mathcal{R})(\theta)}$}\\
+        (Use $\bellman^*$ for Q-learning, $\bellman^{\policy_{\phi_t}}$ for actor-critic)
+        \STATE \underline{(only with actor-critic)} Improve policy $\pi_\phi$ via $G_\pi$ gradient steps on $\phi$ with SAC-style entropy regularization:\\
+        \mbox{$\phi_{t} := \phi_{t-1} + \eta_\pi \mathbb{E}_{\bs \sim \mathcal{D}, \ba \sim \pi_\phi(\cdot|\bs)}[Q_\theta(\bs, \ba)\! -\! \log \pi_\phi(\ba|\bs)] $}
+    \ENDFOR
+\end{algorithmic}
+\end{algorithm}
+\end{minipage}
+\vspace{-14pt}
+\end{small}
+\end{wrapfigure}
+We now describe two practical offline deep reinforcement learning methods based on CQL: an actor-critic variant and a Q-learning variant. Pseudocode is shown in Algorithm~\ref{alg:practical_alg}, with differences from conventional actor-critic algorithms (e.g., SAC~\citep{haarnoja}) and deep Q-learning algorithms (e.g., DQN~\citep{mnih2013playing}) in red.
+Our algorithm uses the CQL($\mathcal{H}$) (or CQL($\mathcal{R}$) in general) objective from the CQL framework for training the Q-function $Q_\theta$, which is parameterized by a neural network with parameters $\theta$. For the actor-critic algorithm, a policy $\pi_\phi$ is trained as well. Our algorithm modifies the objective for the Q-function (swaps out Bellman error with CQL($\mathcal{H}$)) or CQL($\rho$)
+in a standard actor-critic or Q-learning setting, as shown in Line 3. As discussed in Section~\ref{sec:framework}, due to the explicit penalty on the Q-function, CQL methods do not use a policy constraint,
+unlike prior offline RL methods~\citep{kumar2019stabilizing,wu2019behavior,siegel2020keep,levine2020offline}.
+Hence, we do not require fitting an additional behavior policy estimator, simplifying our method. %
+
+\textbf{Implementation details.} Our algorithm requires an addition of only \textbf{20} lines of code on top of standard implementations of soft actor-critic (SAC)~\citep{haarnoja} for continuous control experiments and on top of QR-DQN~\citep{dabney2018distributional} for the discrete control experiments. The tradeoff factor, $\alpha$
+is automatically tuned via Lagrangian dual gradient descent for continuous control, and is fixed at constant values described in Appendix~\ref{sec:experimental_details} for discrete control. We use default hyperparameters from SAC, except that the learning rate for the policy is chosen to be 3e-5 (vs 3e-4 or 1e-4 for the Q-function), as dictated by Theorem~\ref{thm:cql_underestimation}. Elaborate details are provided in Appendix~\ref{sec:experimental_details}.  

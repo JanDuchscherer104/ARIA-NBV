@@ -14,8 +14,12 @@ This directory stores extracted arXiv LaTeX source bundles for papers that direc
 - [Next Best View Selections for Semantic and Dynamic 3D Gaussian Splatting](https://arxiv.org/abs/2512.22771): Next-Best-View selection for dynamic and semantic 3D Gaussian Splatting using Fisher Information to quantify view informativeness. Local source tree: `arXiv-Dynamic-3DGS/`.
 - [Hestia: Voxel-Face-Aware Hierarchical Next-Best-View Acquisition for Efficient 3D Reconstruction](https://arxiv.org/abs/2508.01014): Hierarchical Next-Best-View system using voxel-face visibility and a "close-greedy" strategy for efficient reconstruction. Local source tree: `arXiv-Hestia/`.
 - [Offline Reinforcement Learning as One Big Sequence Modeling Problem](https://arxiv.org/abs/2106.02039): Frames reinforcement learning as a sequence modeling problem, using Transformers and beam search for trajectory planning. Local source tree: `arXiv-Trajectory-Transformer/`.
+- [Playing Atari with Deep Reinforcement Learning](https://arxiv.org/abs/1312.5602): Introduces Deep Q-Networks with experience replay and minibatch Q-learning from high-dimensional observations. Local source tree: `arXiv-DQN/`.
 - [Deep Reinforcement Learning with Double Q-learning](https://arxiv.org/abs/1509.06461): Mitigates overestimation bias in deep Q-learning by decoupling action selection from evaluation. Local source tree: `arXiv-Double-DQN/`.
 - [Offline Reinforcement Learning with Implicit Q-Learning](https://arxiv.org/abs/2110.06169): Enables offline RL without querying out-of-distribution actions by using an expectile-based implicit value function. Local source tree: `arXiv-IQL/`.
+- [Conservative Q-Learning for Offline Reinforcement Learning](https://arxiv.org/abs/2006.04779): Regularizes learned Q-functions to reduce overestimation under offline distribution shift. Local source tree: `arXiv-CQL/`.
+- [Off-Policy Deep Reinforcement Learning without Exploration](https://arxiv.org/abs/1812.02900): Introduces batch-constrained Q-learning for fixed offline datasets. Local source tree: `arXiv-BCQ/`.
+- [Decision Transformer: Reinforcement Learning via Sequence Modeling](https://arxiv.org/abs/2106.01345): Casts offline RL as return-conditioned sequence modeling with a Transformer. Local source tree: `arXiv-Decision-Transformer/`.
 - [Reinforcement Learning with Deep Energy-Based Policies](https://arxiv.org/abs/1702.08165): Connects maximum entropy RL with energy-based models to learn expressive, multi-modal policies. Local source tree: `arXiv-Deep-Energy-Based-Policies/`.
 - [Stochastic Beams and Where to Find Them: The Gumbel-Top-k Trick for Sampling Sequences Without Replacement](https://arxiv.org/abs/1903.06059): Introduces the Gumbel-Top-k trick for sampling sequences without replacement from autoregressive models. Local source tree: `arXiv-Gumbel-Top-k/`.
 - [Next Best Sense: Guiding Vision and Touch with FisherRF for 3D Gaussian Splatting](https://arxiv.org/abs/2410.04680): Guides multi-modal active sensing (vision and touch) for 3D Gaussian Splatting using Fisher Information (FisherRF). Local source tree: `arXiv-Next-Best-Sense/`.
@@ -91,6 +95,13 @@ By default the script writes extracted source trees into `docs/literature/tex-sr
 ### Trajectory Transformer
 - `arXiv-Trajectory-Transformer/ms.tex`
 - `arXiv-Trajectory-Transformer/text/method.tex`
+
+### DQN
+- `arXiv-DQN/deepqnet.tex`
+- `arXiv-DQN/intro.tex`
+- `arXiv-DQN/background.tex`
+- `arXiv-DQN/method.tex`
+- `arXiv-DQN/experiments.tex`
 
 ### Double DQN
 - `arXiv-Double-DQN/DoubleDQN_aaai2016_total.tex`

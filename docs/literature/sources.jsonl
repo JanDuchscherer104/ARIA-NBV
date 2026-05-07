@@ -8,8 +8,12 @@
 {"title":"Next Best View Selections for Semantic and Dynamic 3D Gaussian Splatting","short_title":"Dynamic 3DGS NBV","arxiv_id":"2512.22771","tex_dir":"arXiv-Dynamic-3DGS","pdf_file":"Dynamic-3DGS.pdf"}
 {"title":"Hestia: Voxel-Face-Aware Hierarchical Next-Best-View Acquisition for Efficient 3D Reconstruction","short_title":"Hestia","arxiv_id":"2508.01014","tex_dir":"arXiv-Hestia","pdf_file":"Hestia.pdf"}
 {"title":"Offline Reinforcement Learning as One Big Sequence Modeling Problem","short_title":"Trajectory Transformer","arxiv_id":"2106.02039","tex_dir":"arXiv-Trajectory-Transformer","pdf_file":"Trajectory-Transformer.pdf"}
+{"title":"Playing Atari with Deep Reinforcement Learning","short_title":"DQN","arxiv_id":"1312.5602","tex_dir":"arXiv-DQN","pdf_file":"DQN.pdf"}
 {"title":"Deep Reinforcement Learning with Double Q-Learning","short_title":"Double DQN","arxiv_id":"1509.06461","tex_dir":"arXiv-Double-DQN","pdf_file":"Double-DQN.pdf"}
 {"title":"Offline Reinforcement Learning with Implicit Q-Learning","short_title":"IQL","arxiv_id":"2110.06169","tex_dir":"arXiv-IQL","pdf_file":"IQL.pdf"}
+{"title":"Conservative Q-Learning for Offline Reinforcement Learning","short_title":"CQL","arxiv_id":"2006.04779","tex_dir":"arXiv-CQL","pdf_file":"CQL.pdf"}
+{"title":"Off-Policy Deep Reinforcement Learning without Exploration","short_title":"BCQ","arxiv_id":"1812.02900","tex_dir":"arXiv-BCQ","pdf_file":"BCQ.pdf"}
+{"title":"Decision Transformer: Reinforcement Learning via Sequence Modeling","short_title":"Decision Transformer","arxiv_id":"2106.01345","tex_dir":"arXiv-Decision-Transformer","pdf_file":"Decision-Transformer.pdf"}
 {"title":"Reinforcement Learning with Deep Energy-Based Policies","short_title":"Deep Energy-Based Policies","arxiv_id":"1702.08165","tex_dir":"arXiv-Deep-Energy-Based-Policies","pdf_file":"Deep-Energy-Based-Policies.pdf"}
 {"title":"Stochastic Beams and Where to Find Them: The Gumbel-Top-k Trick for Sampling Sequences Without Replacement","short_title":"Gumbel-Top-k","arxiv_id":"1903.06059","tex_dir":"arXiv-Gumbel-Top-k","pdf_file":"Gumbel-Top-k.pdf"}
 {"title":"Next Best Sense: Guiding Vision and Touch with FisherRF for 3D Gaussian Splatting","short_title":"Next Best Sense","arxiv_id":"2410.04680","tex_dir":"arXiv-Next-Best-Sense","pdf_file":"Next-Best-Sense.pdf"}

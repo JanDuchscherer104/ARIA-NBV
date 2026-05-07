@@ -1,0 +1,88 @@
+
+\section{Method} \label{section:method}
+
+In this section, we present Decision Transformer, which models trajectories autoregressively with minimal modification to the transformer architecture, as summarized in Figure \ref{fig:main_fig} and Algorithm \ref{alg:decisiontransformer}.
+
+\textbf{Trajectory representation.}
+The key desiderata in our choice of trajectory representation are
+that it should enable transformers to learn meaningful patterns and we should be able to conditionally generate actions at test time.
+It is nontrivial to model rewards since we would like the model to generate actions based on \emph{future} desired returns, rather than past rewards.
+As a result, instead of feeding the rewards directly, we feed the model with the returns-to-go $\widehat{R}_t = \sum_{t'=t}^T r_{t'}$.
+This leads to the following trajectory representation which is amenable to autoregressive training and generation:
+\begin{equation}
+    \tau = \left(\widehat{R}_1, s_1, a_1, \widehat{R}_2, s_2, a_2, \dots, \widehat{R}_T, s_T, a_T\right).
+\end{equation}
+
+At test time, we can specify the desired performance (e.g. 1 for success or 0 for failure), as well as the environment starting state, as the conditioning information to initiate generation.
+After executing the generated action for the current state, we decrement the target return by the achieved reward and repeat until episode termination.
+
+\textbf{Architecture.}
+We feed the last $K$ timesteps into Decision Transformer, for a total of $3K$ tokens (one for each modality: return-to-go, state, or action).
+To obtain token embeddings, we learn a linear layer for each modality, which projects raw inputs to the embedding dimension, followed by layer normalization~\citep{ba2016layernorm}. 
+For environments with visual inputs, the state is fed into a convolutional encoder instead of a linear layer.
+Additionally, an embedding for each timestep is learned and added to each token -- note this is different than the standard positional embedding used by transformers, as one timestep corresponds to three tokens.
+The tokens are then processed by a GPT \citep{radford2018gpt} model, which predicts future action tokens via autoregressive modeling.
+
+\textbf{Training.}
+We are given a dataset of offline trajectories.
+We sample minibatches of sequence length $K$ from the dataset.
+The prediction head corresponding to the input token $s_t$ is trained to predict $a_t$ -- either with cross-entropy loss for discrete actions or mean-squared error for continuous actions -- and the losses for each timestep are averaged.
+We did not find predicting the states or returns-to-go to improve performance, although
+it is easily permissible within our framework (as shown in Section \ref{sec:key_to_door}) and would be an interesting study for future work.
+
+\begin{algorithm}[hb]
+\caption{Decision Transformer Pseudocode (for continuous actions)}
+\label{alg:decisiontransformer}
+\definecolor{codeblue}{rgb}{0.28125,0.46875,0.8125}
+\lstset{
+    basicstyle=\fontsize{9pt}{9pt}\ttfamily\bfseries,
+    commentstyle=\fontsize{9pt}{9pt}\color{codeblue},
+    keywordstyle=
+}
+\begin{lstlisting}[language=python]
+# R, s, a, t: returns-to-go, states, actions, or timesteps
+# transformer: transformer with causal masking (GPT)
+# embed_s, embed_a, embed_R: linear embedding layers
+# embed_t: learned episode positional embedding
+# pred_a: linear action prediction layer
+
+# main model
+def DecisionTransformer(R, s, a, t):
+    # compute embeddings for tokens
+    pos_embedding = embed_t(t)  # per-timestep (note: not per-token)
+    s_embedding = embed_s(s) + pos_embedding
+    a_embedding = embed_a(a) + pos_embedding
+    R_embedding = embed_R(R) + pos_embedding
+    
+    # interleave tokens as (R_1, s_1, a_1, ..., R_K, s_K)
+    input_embeds = stack(R_embedding, s_embedding, a_embedding)
+    
+    # use transformer to get hidden states
+    hidden_states = transformer(input_embeds=input_embeds)
+    
+    # select hidden states for action prediction tokens
+    a_hidden = unstack(hidden_states).actions
+    
+    # predict action
+    return pred_a(a_hidden)
+
+# training loop
+for (R, s, a, t) in dataloader:  # dims: (batch_size, K, dim)
+    a_preds = DecisionTransformer(R, s, a, t)
+    loss = mean((a_preds - a)**2)  # L2 loss for continuous actions
+    optimizer.zero_grad(); loss.backward(); optimizer.step()
+
+# evaluation loop
+target_return = 1  # for instance, expert-level return
+R, s, a, t, done = [target_return], [env.reset()], [], [1], False
+while not done:  # autoregressive generation/sampling
+    # sample next action
+    action = DecisionTransformer(R, s, a, t)[-1]  # for cts actions
+    new_s, r, done, _ = env.step(action)
+    
+    # append new tokens to sequence
+    R = R + [R[-1] - r]  # decrement returns-to-go with reward
+    s, a, t = s + [new_s], a + [action], t + [len(R)]
+    R, s, a, t = R[-K:], ...  # only keep context length of K
+\end{lstlisting}
+\end{algorithm}

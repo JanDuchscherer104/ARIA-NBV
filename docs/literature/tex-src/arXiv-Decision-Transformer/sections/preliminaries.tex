@@ -1,0 +1,22 @@
+
+\section{Preliminaries}
+
+\subsection{Offline reinforcement learning}
+We consider learning in a Markov decision process (MDP) described by the tuple ($\mathcal{S}$, $\mathcal{A}$, $P$, $\mathcal{R}$). The MDP tuple consists of states $s \in \mathcal{S}$, actions $a \in \mathcal{A}$, transition dynamics $P(s'|s,a)$, and a reward function $r = \mathcal{R}(s,a)$. 
+We use $s_t$, $a_t$, and $r_t=\mathcal{R}(s_t, a_t)$ to denote the state, action, and reward at timestep $t$, respectively. A trajectory is made up of a sequence of states, actions, and rewards: $\tau = (s_0, a_0, r_0, s_1, a_1, r_1, \ldots, s_T, a_T, r_T)$. The return of a trajectory at timestep $t$, $R_t = \sum_{t'=t}^T r_{t'}$, is the sum of future rewards from that timestep.
+The goal in reinforcement learning is to learn a policy which maximizes the expected return $\mathbb{E}\Bigl[\sum_{t=1}^T r_t\Bigr]$ in an MDP.
+In offline reinforcement learning, instead of obtaining data via environment interactions, we only have access to some fixed limited dataset consisting of trajectory rollouts of arbitrary policies.
+This setting is harder as it removes the ability for agents to explore the environment and collect additional feedback.
+
+\subsection{Transformers}
+Transformers were proposed by \citet{vaswani2017attention} as an architecture to efficiently model sequential data.
+These models consist of stacked self-attention layers with residual connections.
+Each self-attention layer receives $n$ embeddings $\{x_i\}_{i=1}^n$ corresponding to unique input tokens, and outputs $n$ embeddings $\{z_i\}_{i=1}^n$, preserving the input dimensions.
+The $i$-th token is mapped via linear transformations to a key $k_i$, query $q_i$, and value $v_i$.
+The $i$-th output of the self-attention layer is given by weighting the values $v_j$ by the normalized dot product between the query $q_i$ and other keys $k_j$:
+\begin{equation}
+    z_i = \sum_{j=1}^n \texttt{softmax}(\{\langle q_i, k_{j'} \rangle\}_{j'=1}^n)_j \cdot v_j.
+\end{equation}
+As we shall see later, this allows the layer to assign ``credit'' by implicitly forming state-return associations via similarity of the query and key vectors (maximizing the dot product).
+In this work, we use the GPT architecture \citep{radford2018gpt}, which modifies the transformer architecture with a causal self-attention mask to enable autoregressive generation, replacing the summation/softmax over the $n$ tokens with only the previous tokens in the sequence ($j \in [1, i]$).
+We defer the other architecture details to the original papers.
