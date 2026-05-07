@@ -1,7 +1,10 @@
 ---
 id: 2026-05-07_litkg_probation_router
 date: 2026-05-07
-status: completed
+title: "LitKG Probation Router"
+status: done
+topics: [litkg, kg, scaffold, memory, routing]
+confidence: medium
 owner: codex
 tags: [litkg, kg, scaffold, memory, routing]
 canonical_updates_needed: []
@@ -34,7 +37,18 @@ skills, `rg`, and direct file reads.
 
 ## Verification
 
-- Pending in this pass: litkg-rs scorer/context-pack tests and KG route smoke
-  checks after implementation integration.
-- Pending in this pass: `make agents-db AGENTS_ARGS='validate'`, `make
-  agents-db`, and `make check-agent-memory`.
+- `cargo fmt --all --check` in `.agents/external/litkg-rs` passed.
+- `cargo test -p litkg-core context_pack`, `cargo test -p litkg-cli
+  context_pack`, `cargo test -p litkg-viewer
+  search_penalizes_generated_context_below_code_for_equal_matches`, and full
+  `cargo test` in `.agents/external/litkg-rs` passed.
+- `make kg-capabilities KG_FORMAT=json` passed.
+- `make kg-route KG_TASK="fix rerun inspector rollout zarr logging"
+  KG_FORMAT=json` now starts from Rerun/code/backlog/current-thesis sources and
+  does not default to optional backend repair.
+- `make kg-route KG_TASK="write thesis claim about target-conditioned Q_H"
+  KG_FORMAT=json` now includes canonical memory, roadmap/questions, thesis
+  proposal, active backlog, and literature without audit/generated docs
+  masquerading as papers.
+- `make agents-db AGENTS_ARGS='validate'`, `make agents-db`, and `make
+  check-agent-memory` passed.
