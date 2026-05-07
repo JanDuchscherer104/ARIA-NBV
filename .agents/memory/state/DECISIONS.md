@@ -62,12 +62,56 @@ tags: [codex, workflow, architecture]
 
 ## Working Project Decisions
 - The thesis/system name is **ARIA-NBV**.
+
+### 2026-05-06 Thesis Sharpening Decisions
+- The thesis asks whether ARIA-NBV can perform **target-conditioned,
+  RRI-based multi-step NBV**.
+- Minimal thesis success requires training a discrete finite-candidate `Q_H`
+  model; `Q_H` is not optional.
+- `Q_H` is a candidate-query Transformer: encode scene, target, history, and
+  candidate tokens, then output one masked finite-horizon Q value per
+  candidate.
+- `Q_H` predicts bounded cumulative target RRI from ASE oracle rollout traces;
+  learned selected actions must be oracle-evaluated.
+- Main actor-visible target protocol is V1 **OBS-SEL / PRED-Q / GT-EVAL**.
+- Target input starts with observed/predicted OBB geometry plus class,
+  confidence, projected area, semidense support, and EVL support.
+- Compact actor-visible crop descriptors are the first planned target-input
+  ablation after the observed/predicted OBB plus support first path; entity
+  tokens remain later ablations.
+- Counterfactual state is geometry-only: frozen logged EFM/EVL context plus
+  accumulated rendered/fused points and selected-view history.
+- Temperature-softmax is a rollout data-diversity policy over oracle/model
+  scored candidates, not the final objective.
+- Mandatory first rollout sources before `Q_H` are random-valid,
+  oracle-greedy/lookahead, and oracle-scored temperature-softmax; Gumbel-Top-k
+  remains preferred later evidence.
+- Online discrete `Q_H` in the ASE mesh/oracle loop is the first bridge step
+  after offline fitted `Q_H`; continuous actor-critic, external simulator, and
+  online RL baselines are bridge/future work, not required quantitative thesis
+  success.
+- The proposal should be a compact approximately 2.5 content-page research
+  contract with RQs/objectives, literature pointers, and a compact timeline.
+- Source policy: add all cited sources to `docs/references.bib`; add to
+  `docs/literature/sources.jsonl` only implementation-shaping local corpus
+  sources.
+- Local manifest additions for this pass are CQL, BCQ, and Decision
+  Transformer. Keep POMCP and submodularity references bibliography-only unless
+  later needed locally.
+- First thesis-grade scale may be a scene-level held-out subset with multiple
+  targets/trajectories, but coverage must report scenes, snippets, targets,
+  trajectories, rollout seeds, transitions, and gaps separately.
+- Scaling is an evidence protocol rather than a standalone research question:
+  scene-level splits, target diversity, snippets, trajectories, rollout seeds,
+  transitions, invalid gaps, coverage gaps, and ablation axes must be reported
+  wherever empirical thesis claims are made.
+
 - The core thesis claim is target-conditioned, quality-driven NBV on ASE/EFM with strict M1 data/cache/oracle contracts.
 - RRI is the primary project objective for next-best-view research in this repo. Coverage-style objectives remain baselines or diagnostics, not the main thesis target.
 - The canonical training and evaluation surface remains finite candidate ranking/selection anchored on prerecorded ASE trajectory snippets with oracle supervision derived from GT meshes where available.
 - The thesis-core simulator substrate is the ASE mesh/oracle counterfactual rollout loop. Habitat, Isaac, external datasets, online Gymnasium/SB3, continuous actor-critic policies, SceneScript, VLM planning, and real-device guidance are stretch or bridge work unless later evidence changes the scope.
-- The proposal/thesis boundary has four tiers: implemented substrate; prerequisite core covering proposal freeze, M1, V0/V1 target contracts, rollout/Q storage, and LRZ gates; hard thesis core covering observed target selection, target-conditioned scorer/Q_H, greedy/softmax/Gumbel rollouts, fitted Double-Q, and full-scale generation; stretch covering IQL second ablation, actor-critic bridge, continuous policies, external simulators, SceneScript, and real-device guidance.
-- Proposal freeze precedes M1 scale-up. The proposal must use primary metadata in the bibliography, remove generated/Wikipedia citation slop, render with `make proposal-pdf`, and track the generated proposal PDF once frozen.
+- The proposal/thesis boundary has five roles: implemented substrate; prerequisite and evidence protocol covering proposal freeze, M1, V0/V1 target contracts, masks/reasons, rollout/Q storage, LRZ gates, scene-level splits, and coverage reporting; hard quantitative thesis core covering observed target selection, one-step target scorer baseline, mixed candidates, rollout sources, candidate-query Transformer `Q_H`, and scale generation with exact coverage reporting; mandatory bridge design covering online discrete `Q_H`, IQL, actor-critic, hierarchy, and simulator paths; and future-work extensions covering SceneScript, VLM/global planning, real-device guidance, and quantitative continuous-control experiments.
+- Proposal freeze precedes M1 scale-up. The proposal must be a compact research contract, use primary metadata in the bibliography, remove generated/Wikipedia citation slop, render with `make proposal-pdf`, and track the generated proposal PDF once frozen.
 - M1 is a hard stop before target/RL scaling: offline store, split, frame/CW90, candidate-label ordering, depth/backprojection, Rerun normal/boundary/failure recordings, and oracle throughput evidence must be reported in a public M1 contract artifact or explicit blockers.
 - The final experiment scale bar is full 100 GT-mesh ASE scenes and 4,608 snippet windows after small-subset correctness. Final supervision coverage must be reported exactly, and train/validation/test boundaries must be scene-level; the exact held-out test split remains an advisor decision.
 - LRZ deterministic sharding, Slurm/DSS staging, resumable writes, storage budgeting, and Zarr-first rollout/Q schema are hard M2/M3 gates before full-scale target/RL generation. No workstation should be assumed as the thesis scale path.
@@ -76,13 +120,36 @@ tags: [codex, workflow, architecture]
 - Automatic target selection is mandatory and actor-visible only: use predicted OBBs/classes/confidence, projected area, current semidense/EVL point support, and related observed signals. GT is label/evaluation only.
 - Target matching starts with compatible class, OBB IoU, visibility/support, projected area, and semidense/EVL point support. Extra criterion `X` is deferred.
 - Candidate generation is a mandatory mixed observed candidate set with categorical-probability strategy hyperparameters. The thesis-core vocabulary follows the current ARIA-NBV generator modes: `TARGET_POINT`, `RADIAL_AWAY`, `RADIAL_TOWARDS`, `FORWARD_RIG`, `UNIFORM_SPHERE`, `FORWARD_POWERSPHERICAL`, and bounded view jitter. Frontier or missing-surface samplers are stretch unless implemented and validated.
-- RQ4 is a target-conditioned one-step scoring question only. Fitted Double-Q / Q_H policy success belongs to RQ5, where Q_H must beat one-step greedy/model scoring on cumulative target RRI under equal acquisition budget.
+- The one-step target-conditioned scorer is no longer a standalone research
+  question. It is the required learned myopic baseline/control for the revised
+  Q_H planning RQ, where `Q_H` must beat the learned one-step target scorer and
+  one-step greedy/model scoring on cumulative target RRI under equal acquisition
+  budget.
 - Invalidity is a hard mask plus explicit reason-code contract, not a low RRI class. Validity heads or scalar penalty rewards are ablations after masks/reasons are reliable.
 - The first thesis-grade non-myopic comparison is bounded oracle-RRI lookahead versus one-step greedy under equal acquisition and candidate budget; bounded oracle lookahead is an upper-bound baseline for learned Q_H.
-- Rollout data must include random-valid, one-step greedy/model scoring, bounded oracle lookahead, temperature-softmax, and Gumbel-Top-k traces with deterministic replay and per-step branch schedules before Q_H training.
+- Rollout data before the first `Q_H` training must include random-valid,
+  oracle-greedy/lookahead, and oracle-scored temperature-softmax traces with
+  deterministic replay. Gumbel-Top-k traces remain preferred later evidence
+  for diversity, but they are not a blocker for the first `Q_H` attempt.
 - Multi-step reward and Q targets start with bounded cumulative target RRI. Gamma remains symbolic in formulas, but the thesis-core comparison reports cumulative target RRI under equal acquisition budget. Log-improvement, episode normalization, and scalar motion/rule/validity/diversity penalties are extensions; the current one-step RRI label remains unchanged for VIN compatibility.
-- A target-conditioned fitted Double-Q / Q_H model over finite candidate sets is a mandatory M5 thesis deliverable, trained from ASE oracle rollout data. Q_H must beat one-step greedy/model scoring on cumulative target RRI under equal acquisition budget, while oracle lookahead is reported as the upper bound.
-- Fitted Double-Q is the first Q algorithm. IQL is a second offline-RL ablation only after Q_H is stable; SB3 DQN/PPO/SAC are deferred until an online Gymnasium simulator exists.
+- A target-conditioned candidate-query Transformer `Q_H` model over finite
+  candidate sets is a mandatory M5 thesis deliverable, trained from ASE oracle
+  rollout data. It predicts one masked bounded-horizon Q value per candidate
+  and must beat one-step greedy/model scoring on cumulative target RRI under
+  equal acquisition budget, while oracle lookahead is reported as the upper
+  bound.
+- Fitted Double-Q-style targets are the first value-learning target family for
+  `Q_H`. IQL is a second offline-RL ablation only after `Q_H` is stable; SB3
+  DQN/PPO/SAC are deferred until an online Gymnasium simulator exists.
 - Zarr is the first-choice rollout/Q store. It should contain replay/training/evaluation payloads and lineage without duplicating raw ASE/ATEK; full meshes are external path/hash/version references, and high-detail target mesh crops are embedded once per target with crop metadata.
+- The first implemented rollout replay path uses a standalone `rollouts.zarr`
+  store, not VIN offline-store embedded counterfactual blocks.
+- Masked oracle temperature-softmax is the first stochastic rollout
+  data-diversity policy. It samples discrete selected actions from valid
+  candidate distributions and persists logits, probabilities, log-probs,
+  entropy, temperature, score source, and RNG replay metadata.
+- The first `Q_H` data store is selected-action transition replay. Dense
+  all-action oracle-Q tensors are schema-ready but remain unavailable and
+  `NaN`/masked until a later oracle-lookahead converter materializes them.
 - The public glossary is a tiered math lookup table generated from `docs/typst/shared/glossary.typ`: core thesis math terms render first with shared symbol/equation refs, support terms remain normal glossary entries, and peripheral background terms stay linkable but visually demoted.
 - CI/pre-commit becomes required before full-scale generation, not before proposal/M1 groundwork. GitHub issue mirroring remains a local TODO; `.agents/*.toml` stays the source of truth.

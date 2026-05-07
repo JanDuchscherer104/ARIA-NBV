@@ -1,6 +1,6 @@
 ---
 id: open_questions
-updated: 2026-05-05
+updated: 2026-05-06
 scope: repo
 owner: jan
 status: active
@@ -17,13 +17,17 @@ tags: [research, nbv, vin, training]
 ## Target and Matching Details
 - What additional target matching criterion `X` is needed beyond compatible class, OBB IoU, visibility/support, projected area, and semidense/EVL point support?
 - How should ambiguous multi-object matches be resolved when several predicted OBBs overlap one GT target or one predicted OBB overlaps several GT targets?
-- Which observed target support signals should enter V1 first: projected area, semidense point count, EVL voxel evidence, OBB confidence, class prior, or a compact crop descriptor?
+- What exact compact actor-visible crop descriptor should be used for the first target-input ablation: pooled EVL/voxel features, semidense point statistics, projected feature pooling, or a smaller diagnostic descriptor?
 
 ## Q_H and Offline RL Details
-- What exact horizon values, discount/normalization convention, target-RRI clipping, and return target definition should define $Q_H$?
+- What exact horizon values, discount/default gamma, return target definition, and target-RRI clipping convention should define $Q_H$ after RQ1 separates endpoint target-quality gain from finite-horizon cumulative target-RRI return?
+- What epsilon, clipping, and near-solved-target eligibility policy should be used when $D_e(P_0)$ is close to zero in endpoint gain or log target-error gain?
+- Should log target-error gain be a reported primary companion metric, a diagnostic-only ablation, or deferred until stage-dependence evidence requires it?
 - Should Q_H use only cumulative target RRI in the main run, or should path length, motion rules, validity, and diversity penalties receive a small first ablation?
+- Should invalidity remain hard-mask-only for all finite-candidate Q_H experiments, or should a validity head, scalar invalidity penalty, or learned feasibility signal be tried before the continuous-action bridge?
 - What is the exact IQL scope if Q_H is stable: report-only ablation, full comparison, or defer to future work?
-- When, if ever, should an online Gymnasium/SB3 baseline be created after the fitted Double-Q path exists?
+- What exact scope should online discrete Q_H have after offline fitted Q_H: bridge design only, smoke experiment in the ASE mesh/oracle loop, or quantitative comparator before continuous actor-critic work?
+- When, if ever, should an online Gymnasium/SB3 baseline be created after the candidate-query Q_H path exists?
 
 ## Storage, Scale, and Reporting
 - What exact Zarr group layout should be used for rollouts, Q_H training fields, target crops, candidate masks, lineage, and optional heavy diagnostics?
