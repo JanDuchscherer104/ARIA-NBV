@@ -164,6 +164,45 @@ class RolloutLineage:
     selection_rng_state_hash: str | None = None
     """Optional digest of the selection RNG state after generation."""
 
+    target_selection_policy: str | None = None
+    """Actor-visible target selector policy used before this rollout, if known."""
+
+    target_selection_rank: int | None = None
+    """Zero-based selected target rank inside the selector's top-K table."""
+
+    target_selection_score: float | None = None
+    """Final actor-visible target selector score for the rollout target."""
+
+    target_selection_probability: float | None = None
+    """Selection probability for stochastic target policies, if applicable."""
+
+    target_selection_temperature: float | None = None
+    """Temperature used by stochastic target selection, if applicable."""
+
+    target_invalid_reason_bitset: int | None = None
+    """Target-selector invalidity bitset for the selected target row."""
+
+    target_primary_invalid_reason: int | None = None
+    """Dominant target-selector invalidity reason for the selected target row."""
+
+    target_reason_code_version: str | None = None
+    """Version of the target-selector invalidity reason-code dictionary."""
+
+    matched_gt_target_row_id: int | None = None
+    """Matched GT target row id used for oracle/evaluation labels, if any."""
+
+    matched_gt_target_id: str | None = None
+    """Matched GT target identifier used for oracle/evaluation labels, if any."""
+
+    gt_match_iou: float | None = None
+    """Sampled 3D IoU of the selected actor-visible target to the matched GT target."""
+
+    gt_match_score: float | None = None
+    """Selector-recorded GT match score, when distinct from IoU."""
+
+    gt_match_status: str | None = None
+    """GT match status such as ``matched``, ``unmatched_gt``, or ``ambiguous_gt``."""
+
 
 @dataclass(slots=True)
 class RolloutStepTrace:
@@ -427,6 +466,19 @@ def traces_from_rollout_result(
     target_protocol_version: str | None = None,
     reason_code_version: str = INVALID_REASON_VERSION,
     selection_rng_state_hash: str | None = None,
+    target_selection_policy: str | None = None,
+    target_selection_rank: int | None = None,
+    target_selection_score: float | None = None,
+    target_selection_probability: float | None = None,
+    target_selection_temperature: float | None = None,
+    target_invalid_reason_bitset: int | None = None,
+    target_primary_invalid_reason: int | None = None,
+    target_reason_code_version: str | None = None,
+    matched_gt_target_row_id: int | None = None,
+    matched_gt_target_id: str | None = None,
+    gt_match_iou: float | None = None,
+    gt_match_score: float | None = None,
+    gt_match_status: str | None = None,
 ) -> list[RolloutTrace]:
     """Convert all retained trajectories from one rollout call into traces."""
 
@@ -454,6 +506,19 @@ def traces_from_rollout_result(
             target_protocol_version=target_protocol_version,
             reason_code_version=reason_code_version,
             selection_rng_state_hash=selection_rng_state_hash,
+            target_selection_policy=target_selection_policy,
+            target_selection_rank=target_selection_rank,
+            target_selection_score=target_selection_score,
+            target_selection_probability=target_selection_probability,
+            target_selection_temperature=target_selection_temperature,
+            target_invalid_reason_bitset=target_invalid_reason_bitset,
+            target_primary_invalid_reason=target_primary_invalid_reason,
+            target_reason_code_version=target_reason_code_version,
+            matched_gt_target_row_id=matched_gt_target_row_id,
+            matched_gt_target_id=matched_gt_target_id,
+            gt_match_iou=gt_match_iou,
+            gt_match_score=gt_match_score,
+            gt_match_status=gt_match_status,
         )
         traces.append(RolloutTrace.from_trajectory(result=result, trajectory=trajectory, lineage=lineage))
     return traces

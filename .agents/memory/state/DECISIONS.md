@@ -136,6 +136,19 @@ tags: [codex, workflow, architecture]
   readers behind. The default store remains partial/interrupted diagnostic
   evidence, not final training-scale evidence.
 
+### 2026-05-07 Top-K Target Selector Decisions
+- The first automatic target selector returns top-K actor-visible
+  observed/predicted OBB targets per snippet. `K` is configurable and defaults
+  to 3.
+- Default selection is `greedy_top_k` over confidence, projected visibility,
+  semidense/EVL support, and support deficit; `temperature_softmax_top_k` is
+  the stochastic target-diversity option.
+- V1 refuses GT OBBs as selector input. GT OBBs are only V0 sanity input or
+  post-selection matching/evaluation data for target-RRI labels.
+- Rollout target rows preserve selector rank, score, policy, probability,
+  temperature, target invalidity bits, and GT match metadata so target identity
+  can be audited in `rollouts.zarr`.
+
 - The core thesis claim is target-conditioned, quality-driven NBV on ASE/EFM with strict M1 data/cache/oracle contracts.
 - RRI is the primary project objective for next-best-view research in this repo. Coverage-style objectives remain baselines or diagnostics, not the main thesis target.
 - The canonical training and evaluation surface remains finite candidate ranking/selection anchored on prerecorded ASE trajectory snippets with oracle supervision derived from GT meshes where available.

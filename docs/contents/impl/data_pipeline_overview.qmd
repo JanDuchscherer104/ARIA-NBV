@@ -75,6 +75,15 @@ Actions:
 - **Run previous**: ensures data + candidates exist
 - **Run / refresh renders**: background thread; stores `CandidateDepthBatch`
 
+# Target selection (rollout/VIN diagnostics)
+
+The V1 target selector is actor-visible: it consumes compact `detected_obbs`
+first, then EVL `backbone_out.obb_pred_viz`/`obb_pred` when detected OBBs are
+absent. It ranks eligible OBBs with configurable top-K selection (`K=3` by
+default) using confidence, projected area, semidense support, EVL support, and a
+support-deficit term. GT OBBs are not V1 selector inputs; they are only an
+opt-in V0 sanity source or post-selection matching data for target-RRI labels.
+
 # Logging & scratchpad
 
 - Console logs collected via `Console.set_sink` into a textarea; clearable per page.

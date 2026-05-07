@@ -111,6 +111,9 @@ should include:
 - actor-visible target source, class id/name, confidence, observed OBB pose and
   extents, projected area, semidense support, EVL support, and pose-relative
   target features;
+- top-K selector policy, selected rank, selection score, stochastic selection
+  probability/log-probability when applicable, temperature, and selector
+  invalidity reason bits;
 - matched GT target id, GT OBB pose and extents, match score, IoU, class match,
   and match-failure reason;
 - `target_valid_mask`, `target_invalid_reason_bitset`, and primary invalid
@@ -126,6 +129,15 @@ per candidate:
 - crop source mesh hash, crop bounds, margin, face-retention rule, and units.
 
 Empty target crops are invalid target records, not scene-level fallback labels.
+
+The first implemented V1 selector is actor-visible top-K over observed or
+predicted OBBs. It ranks eligible rows with a deterministic target-deficit
+score built from OBB confidence, projected area, semidense/EVL support, and
+support deficit. `greedy_top_k` is the default policy; `temperature_softmax_top_k`
+uses the same masked score table for stochastic target diversity. GT OBBs are
+never V1 selector inputs: they are used only by the V0 sanity selector or by
+post-selection matching that decides whether selected V1 rows can receive
+target-RRI labels.
 
 ## Candidate Tables {#rollout-candidate-tables}
 
@@ -170,8 +182,10 @@ store should carry both boolean masks and reason codes:
 - `oracle_label_mask`: candidates with valid scene/target oracle labels.
 - `q_train_mask`: candidates usable as $Q_H$ targets for the configured
   horizon and target protocol.
-- `target_valid_mask`: target record has a valid actor-visible input and
-  matched GT evaluation crop for the protocol.
+- `target_valid_mask`: target record passes the configured target protocol
+  checks represented by the target invalidity bitset.
+- `gt_label_valid_mask`: selected target has an unambiguous matched GT
+  evaluation target/crop for target-RRI labels.
 - `padded_mask`: false data inserted only to fill dense tensors.
 
 Reason codes are versioned bit positions. A draft initial dictionary is:

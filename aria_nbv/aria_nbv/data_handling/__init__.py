@@ -28,6 +28,7 @@ from ._raw import (
 )
 
 _LAZY_EXPORTS = {
+    "ActorVisibleTargetSelector": "._target_selection",
     "DEFAULT_VIN_SNIPPET_PAD_POINTS": "._vin_runtime",
     "CompactObbBlock": ".vin_oracle_types",
     "CompactTrajectoryBlock": ".vin_oracle_types",
@@ -42,6 +43,13 @@ _LAZY_EXPORTS = {
     "RolloutZarrStoreWriter": "._rollout_zarr_store",
     "RolloutZarrValidationResult": "._rollout_zarr_store",
     "RolloutZarrWriteResult": "._rollout_zarr_store",
+    "TARGET_INVALID_REASON_CODES": "._target_selection",
+    "TARGET_INVALID_REASON_VERSION": "._target_selection",
+    "TargetCandidateRow": "._target_selection",
+    "TargetSelectionPolicy": "._target_selection",
+    "TargetSelectionResult": "._target_selection",
+    "TargetSelectorConfig": "._target_selection",
+    "TargetSourceMode": "._target_selection",
     "VinDatasetSourceConfig": "._vin_sources",
     "VinOfflineBackboneDiagnostic": "._offline_diagnostics",
     "VinOfflineBlockDiagnostic": "._offline_diagnostics",
@@ -91,6 +99,7 @@ def __getattr__(name: str) -> object:
 
 
 __all__ = [
+    "ActorVisibleTargetSelector",
     "AseEfmDataset",
     "AseEfmDatasetConfig",
     "CompactObbBlock",
@@ -113,6 +122,13 @@ __all__ = [
     "RolloutZarrStoreWriter",
     "RolloutZarrValidationResult",
     "RolloutZarrWriteResult",
+    "TARGET_INVALID_REASON_CODES",
+    "TARGET_INVALID_REASON_VERSION",
+    "TargetCandidateRow",
+    "TargetSelectionPolicy",
+    "TargetSelectionResult",
+    "TargetSelectorConfig",
+    "TargetSourceMode",
     "VinDatasetSourceConfig",
     "VinOfflineDataset",
     "VinOfflineBackboneDiagnostic",

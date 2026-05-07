@@ -15,6 +15,7 @@ pytest.importorskip("efm3d")
 from efm3d.aria.pose import PoseTW
 
 from aria_nbv.data_handling import (
+    TARGET_INVALID_REASON_VERSION,
     RolloutZarrStoreReader,
     validate_rollout_zarr_store,
     write_rollout_zarr_store,
@@ -122,8 +123,26 @@ def test_rollout_zarr_preserves_multi_target_identity_in_qh_view(tmp_path) -> No
     traces = build_synthetic_rollout_traces(horizon=1, num_samples=6, seed=13)[:2]
     traces[0].lineage.target_row_id = 7
     traces[0].lineage.target_id = "target-a"
+    traces[0].lineage.target_selection_policy = "greedy_top_k"
+    traces[0].lineage.target_selection_rank = 0
+    traces[0].lineage.target_selection_score = 0.75
+    traces[0].lineage.target_invalid_reason_bitset = 1
+    traces[0].lineage.target_primary_invalid_reason = 0
+    traces[0].lineage.target_reason_code_version = TARGET_INVALID_REASON_VERSION
+    traces[0].lineage.matched_gt_target_row_id = 70
+    traces[0].lineage.matched_gt_target_id = "gt-target-a"
+    traces[0].lineage.gt_match_iou = 0.8
+    traces[0].lineage.gt_match_score = 0.8
+    traces[0].lineage.gt_match_status = "matched"
     traces[1].lineage.target_row_id = 9
     traces[1].lineage.target_id = "target-b"
+    traces[1].lineage.target_selection_policy = "greedy_top_k"
+    traces[1].lineage.target_selection_rank = 1
+    traces[1].lineage.target_selection_score = 0.5
+    traces[1].lineage.target_invalid_reason_bitset = 1
+    traces[1].lineage.target_primary_invalid_reason = 0
+    traces[1].lineage.target_reason_code_version = TARGET_INVALID_REASON_VERSION
+    traces[1].lineage.gt_match_status = "unmatched_gt"
 
     result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", traces)
     reader = RolloutZarrStoreReader(result.store_dir)
@@ -136,6 +155,16 @@ def test_rollout_zarr_preserves_multi_target_identity_in_qh_view(tmp_path) -> No
     assert {target_names[int(index)] for index in target_name_ids.tolist()} == {"target-a", "target-b"}
     assert set(reader.array("rollouts/target_row_id").tolist()) == {7, 9}
     assert set(reader.array("q_h/target_row_id").tolist()) == {7, 9}
+    assert reader.array("targets/target_selection_rank").tolist() == [0, 1]
+    assert np.allclose(reader.array("targets/target_selection_score"), np.asarray([0.75, 0.5], dtype=np.float32))
+    assert reader.array("targets/matched_gt_target_row_id").tolist() == [70, -1]
+    assert reader.array("targets/gt_label_valid_mask").tolist() == [True, False]
+    config_names = _json_list(reader, "dictionaries/config")
+    reason_version_ids = reader.array("targets/target_reason_code_version_id")
+    assert {config_names[int(index)] for index in reason_version_ids.tolist()} == {TARGET_INVALID_REASON_VERSION}
+    match_status = _json_list(reader, "dictionaries/target_match_status")
+    status_ids = reader.array("targets/gt_match_status_id")
+    assert [match_status[int(index)] for index in status_ids.tolist()] == ["matched", "unmatched_gt"]
 
 
 def test_rollout_zarr_relative_pose_root_is_pose_transform(tmp_path) -> None:

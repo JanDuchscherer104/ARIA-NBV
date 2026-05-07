@@ -368,9 +368,16 @@ def _write_metadata_group(group: Any, *, field_retention_policy: str) -> None:
 def _build_dictionaries(traces: list[RolloutTrace]) -> dict[str, list[str]]:
     policy_values = {trace.selection_policy for trace in traces}
     policy_values.update(step.selection_policy for trace in traces for step in trace.steps)
+    policy_values.update(
+        trace.lineage.target_selection_policy for trace in traces if trace.lineage.target_selection_policy is not None
+    )
     target_values = {trace.lineage.target_id or "synthetic-target" for trace in traces}
+    target_values.update(
+        trace.lineage.matched_gt_target_id for trace in traces if trace.lineage.matched_gt_target_id is not None
+    )
     score_source_values = {step.score_source or step.selection_score_label for trace in traces for step in trace.steps}
     split_values = {trace.lineage.split or "synthetic" for trace in traces}
+    target_match_status_values = {trace.lineage.gt_match_status or "not_requested" for trace in traces}
     return {
         "scene": sorted({trace.lineage.scene_id or "" for trace in traces}),
         "snippet": sorted({trace.lineage.snippet_id or "" for trace in traces}),
@@ -394,6 +401,7 @@ def _build_dictionaries(traces: list[RolloutTrace]) -> dict[str, list[str]]:
                     trace.lineage.split_manifest_hash,
                     trace.lineage.branch_schedule_id,
                     trace.lineage.target_protocol_version,
+                    trace.lineage.target_reason_code_version,
                     trace.lineage.reason_code_version,
                     trace.lineage.selection_rng_state_hash,
                 )
@@ -401,6 +409,7 @@ def _build_dictionaries(traces: list[RolloutTrace]) -> dict[str, list[str]]:
             }
         ),
         "class_name": ["unknown"],
+        "target_match_status": sorted(target_match_status_values),
         "termination_reason": sorted({trace.termination_reason for trace in traces}),
         "transition": [step.transition_id or "" for trace in traces for step in trace.steps],
     }
@@ -418,37 +427,217 @@ def _write_targets(
     *,
     target_protocol_version: str,
 ) -> None:
-    target_name_by_row = {
-        trace.lineage.target_row_id if trace.lineage.target_row_id is not None else 0: trace.lineage.target_id
-        or "synthetic-target"
-        for trace in traces
-    }
-    target_ids = sorted(target_name_by_row)
+    target_rows = _target_rows_from_traces(traces)
+    target_ids = sorted(target_rows)
     if not target_ids:
         target_ids = [0]
+        target_rows[0] = {}
     _write_array(group, "target_row_id", np.asarray(target_ids, dtype=np.int64))
     _write_array(
         group,
         "target_id",
         np.asarray(
             [
-                _dict_id(dictionaries["target"], target_name_by_row.get(target_row_id, "synthetic-target"))
+                _dict_id(
+                    dictionaries["target"],
+                    str(target_rows[target_row_id].get("target_id") or "synthetic-target"),
+                )
                 for target_row_id in target_ids
             ],
             dtype=np.int32,
         ),
     )
-    _write_array(group, "target_valid_mask", np.ones((len(target_ids),), dtype=np.bool_))
+    _write_array(
+        group,
+        "target_selection_policy_id",
+        np.asarray(
+            [
+                _dict_id(dictionaries["policy"], str(target_rows[target_row_id].get("target_selection_policy") or ""))
+                for target_row_id in target_ids
+            ],
+            dtype=np.int32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_selection_rank",
+        np.asarray(
+            [
+                _int_or_default(target_rows[target_row_id].get("target_selection_rank"), default=-1)
+                for target_row_id in target_ids
+            ],
+            dtype=np.int32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_selection_score",
+        np.asarray(
+            [_float_or_nan(target_rows[target_row_id].get("target_selection_score")) for target_row_id in target_ids],
+            dtype=np.float32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_selection_probability",
+        np.asarray(
+            [
+                _float_or_nan(target_rows[target_row_id].get("target_selection_probability"))
+                for target_row_id in target_ids
+            ],
+            dtype=np.float32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_selection_temperature",
+        np.asarray(
+            [
+                _float_or_nan(target_rows[target_row_id].get("target_selection_temperature"))
+                for target_row_id in target_ids
+            ],
+            dtype=np.float32,
+        ),
+    )
+    target_reason = np.asarray(
+        [
+            _int_or_default(
+                target_rows[target_row_id].get("target_invalid_reason_bitset"),
+                default=1 << INVALID_REASON_CODES["VALID"],
+            )
+            for target_row_id in target_ids
+        ],
+        dtype=np.uint32,
+    )
+    _write_array(group, "target_valid_mask", target_reason == np.uint32(1 << INVALID_REASON_CODES["VALID"]))
     _write_array(
         group,
         "target_invalid_reason_bitset",
-        np.full((len(target_ids),), 1 << INVALID_REASON_CODES["VALID"], dtype=np.uint32),
+        target_reason,
+    )
+    _write_array(
+        group,
+        "target_primary_invalid_reason",
+        np.asarray(
+            [
+                _int_or_default(
+                    target_rows[target_row_id].get("target_primary_invalid_reason"),
+                    default=INVALID_REASON_CODES["VALID"],
+                )
+                for target_row_id in target_ids
+            ],
+            dtype=np.uint16,
+        ),
+    )
+    _write_array(
+        group,
+        "target_reason_code_version_id",
+        np.asarray(
+            [
+                _dict_id(
+                    dictionaries["config"], str(target_rows[target_row_id].get("target_reason_code_version") or "")
+                )
+                for target_row_id in target_ids
+            ],
+            dtype=np.int32,
+        ),
+    )
+    _write_array(
+        group,
+        "matched_gt_target_row_id",
+        np.asarray(
+            [
+                _int_or_default(target_rows[target_row_id].get("matched_gt_target_row_id"), default=-1)
+                for target_row_id in target_ids
+            ],
+            dtype=np.int64,
+        ),
+    )
+    _write_array(
+        group,
+        "matched_gt_target_id",
+        np.asarray(
+            [
+                _dict_id(dictionaries["target"], str(target_rows[target_row_id].get("matched_gt_target_id") or ""))
+                for target_row_id in target_ids
+            ],
+            dtype=np.int32,
+        ),
+    )
+    _write_array(
+        group,
+        "gt_match_iou",
+        np.asarray(
+            [_float_or_nan(target_rows[target_row_id].get("gt_match_iou")) for target_row_id in target_ids],
+            dtype=np.float32,
+        ),
+    )
+    _write_array(
+        group,
+        "gt_match_score",
+        np.asarray(
+            [_float_or_nan(target_rows[target_row_id].get("gt_match_score")) for target_row_id in target_ids],
+            dtype=np.float32,
+        ),
+    )
+    _write_array(
+        group,
+        "gt_match_status_id",
+        np.asarray(
+            [
+                _dict_id(
+                    dictionaries["target_match_status"],
+                    str(target_rows[target_row_id].get("gt_match_status") or "not_requested"),
+                )
+                for target_row_id in target_ids
+            ],
+            dtype=np.int32,
+        ),
+    )
+    _write_array(
+        group,
+        "gt_label_valid_mask",
+        np.asarray(
+            [
+                str(target_rows[target_row_id].get("gt_match_status") or "") in {"matched", "v0_gt_input"}
+                and _int_or_default(target_rows[target_row_id].get("matched_gt_target_row_id"), default=-1) >= 0
+                for target_row_id in target_ids
+            ],
+            dtype=np.bool_,
+        ),
     )
     _write_string_array(group, "target_protocol_version", [target_protocol_version])
     _write_array(group, "crop_vertices", np.empty((0, 3), dtype=np.float32))
     _write_array(group, "crop_vertex_offsets", np.asarray([0], dtype=np.int64))
     _write_array(group, "crop_faces", np.empty((0, 3), dtype=np.int32))
     _write_array(group, "crop_face_offsets", np.asarray([0], dtype=np.int64))
+
+
+def _target_rows_from_traces(traces: list[RolloutTrace]) -> dict[int, dict[str, Any]]:
+    rows: dict[int, dict[str, Any]] = {}
+    for trace in traces:
+        row_id = trace.lineage.target_row_id if trace.lineage.target_row_id is not None else 0
+        existing = rows.setdefault(int(row_id), {})
+        values = {
+            "target_id": trace.lineage.target_id or "synthetic-target",
+            "target_selection_policy": trace.lineage.target_selection_policy,
+            "target_selection_rank": trace.lineage.target_selection_rank,
+            "target_selection_score": trace.lineage.target_selection_score,
+            "target_selection_probability": trace.lineage.target_selection_probability,
+            "target_selection_temperature": trace.lineage.target_selection_temperature,
+            "target_invalid_reason_bitset": trace.lineage.target_invalid_reason_bitset,
+            "target_primary_invalid_reason": trace.lineage.target_primary_invalid_reason,
+            "target_reason_code_version": trace.lineage.target_reason_code_version,
+            "matched_gt_target_row_id": trace.lineage.matched_gt_target_row_id,
+            "matched_gt_target_id": trace.lineage.matched_gt_target_id,
+            "gt_match_iou": trace.lineage.gt_match_iou,
+            "gt_match_score": trace.lineage.gt_match_score,
+            "gt_match_status": trace.lineage.gt_match_status,
+        }
+        for name, value in values.items():
+            if value is not None or name not in existing:
+                existing[name] = value
+    return rows
 
 
 def _write_mesh_refs(group: Any) -> None:
@@ -488,6 +677,19 @@ def _flatten_traces(traces: list[RolloutTrace], dictionaries: dict[str, list[str
         "target_protocol_version_id": [],
         "reason_code_version_id": [],
         "selection_rng_state_hash_id": [],
+        "target_selection_policy_id": [],
+        "target_selection_rank": [],
+        "target_selection_score": [],
+        "target_selection_probability": [],
+        "target_selection_temperature": [],
+        "target_invalid_reason_bitset": [],
+        "target_primary_invalid_reason": [],
+        "target_reason_code_version_id": [],
+        "matched_gt_target_row_id": [],
+        "matched_gt_target_id": [],
+        "gt_match_iou": [],
+        "gt_match_score": [],
+        "gt_match_status_id": [],
     }
     step_rows: dict[str, list[Any]] = {
         "step_row_id": [],
@@ -563,6 +765,39 @@ def _flatten_traces(traces: list[RolloutTrace], dictionaries: dict[str, list[str
         )
         rollout_rows["selection_rng_state_hash_id"].append(
             _dict_id(dictionaries["config"], trace.lineage.selection_rng_state_hash or "")
+        )
+        rollout_rows["target_selection_policy_id"].append(
+            _dict_id(dictionaries["policy"], trace.lineage.target_selection_policy or "")
+        )
+        rollout_rows["target_selection_rank"].append(
+            -1 if trace.lineage.target_selection_rank is None else trace.lineage.target_selection_rank
+        )
+        rollout_rows["target_selection_score"].append(_nan_if_none(trace.lineage.target_selection_score))
+        rollout_rows["target_selection_probability"].append(_nan_if_none(trace.lineage.target_selection_probability))
+        rollout_rows["target_selection_temperature"].append(_nan_if_none(trace.lineage.target_selection_temperature))
+        rollout_rows["target_invalid_reason_bitset"].append(
+            1 << INVALID_REASON_CODES["VALID"]
+            if trace.lineage.target_invalid_reason_bitset is None
+            else trace.lineage.target_invalid_reason_bitset
+        )
+        rollout_rows["target_primary_invalid_reason"].append(
+            INVALID_REASON_CODES["VALID"]
+            if trace.lineage.target_primary_invalid_reason is None
+            else trace.lineage.target_primary_invalid_reason
+        )
+        rollout_rows["target_reason_code_version_id"].append(
+            _dict_id(dictionaries["config"], trace.lineage.target_reason_code_version or "")
+        )
+        rollout_rows["matched_gt_target_row_id"].append(
+            -1 if trace.lineage.matched_gt_target_row_id is None else trace.lineage.matched_gt_target_row_id
+        )
+        rollout_rows["matched_gt_target_id"].append(
+            _dict_id(dictionaries["target"], trace.lineage.matched_gt_target_id or "")
+        )
+        rollout_rows["gt_match_iou"].append(_nan_if_none(trace.lineage.gt_match_iou))
+        rollout_rows["gt_match_score"].append(_nan_if_none(trace.lineage.gt_match_score))
+        rollout_rows["gt_match_status_id"].append(
+            _dict_id(dictionaries["target_match_status"], trace.lineage.gt_match_status or "not_requested")
         )
 
         for step in trace.steps:
@@ -826,7 +1061,15 @@ def _to_numpy_table(prefix: str, rows: dict[str, list[Any]]) -> dict[str, np.nda
     arrays: dict[str, np.ndarray] = {}
     for name, values in rows.items():
         dtype: Any
-        if name.endswith("_id") or name in {"chain_id", "horizon", "branch_factor", "beam_width", "random_seed"}:
+        if name.endswith("_id") or name in {
+            "chain_id",
+            "horizon",
+            "branch_factor",
+            "beam_width",
+            "random_seed",
+            "target_selection_rank",
+            "matched_gt_target_row_id",
+        }:
             dtype = np.int64
         elif name in {
             "step_index",
@@ -834,8 +1077,11 @@ def _to_numpy_table(prefix: str, rows: dict[str, list[Any]]) -> dict[str, np.nda
             "selected_compact_valid_index",
             "num_candidates",
             "num_valid_candidates",
+            "target_primary_invalid_reason",
         }:
             dtype = np.int32
+        elif name == "target_invalid_reason_bitset":
+            dtype = np.uint32
         else:
             dtype = np.float32
         arrays[f"{prefix}{name}"] = np.asarray(values, dtype=dtype)
@@ -879,6 +1125,14 @@ def _first_temperature(trace: RolloutTrace) -> float:
 
 def _nan_if_none(value: float | None) -> float:
     return float("nan") if value is None else float(value)
+
+
+def _float_or_nan(value: Any) -> float:
+    return float("nan") if value is None else float(value)
+
+
+def _int_or_default(value: Any, *, default: int) -> int:
+    return int(default) if value is None else int(value)
 
 
 def _compact_valid_index(step: Any, shell_index: int) -> int:
