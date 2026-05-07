@@ -3,86 +3,87 @@
 
 = Problem and Research Contract
 
-ARIA-NBV is formulated as a finite-candidate, target-conditioned #NBV problem.
-At rollout step $t$, the actor-visible counterfactual state is
+ARIA-NBV is a target-conditioned, finite-candidate #NBV problem in the
+Project Aria / ASE / EFM observation regime. The thesis is deliberately not a
+first-order continuous-control claim: it tests whether bounded planning over a
+finite valid candidate table improves target reconstruction quality beyond
+myopic view selection.
 
-$ s_t^"cf0"
-  = (
-      F_v^"root",
-      P_t,
-      Q_t,
-      m_t,
-      rho_t,
-      z_e,
-      b_t
-    ) $
+The actor-visible state at decision step $t$ is
 
-where $F_v^"root"$ is the frozen EVL/EFM voxel-field context at the snippet
-root, $P_t$ is accumulated semi-dense or rendered/fused geometry, $Q_t =
-{q_(t,i)}_(i=1)^(N_q)$ is the finite candidate table, $m_(t,i) in {0,1}$ is the
-validity mask, $rho_(t,i)$ is the invalidity reason, $z_e$ is the actor-visible
-descriptor of the selected target $e$, and $b_t$ is the remaining acquisition
-budget. The oracle-only state augments this with the #ASE GT mesh $M$ and target
-mesh crop $M_e$; these are label/evaluation assets and are not actor inputs in
-the main V1 protocol.
+$ bold(s)_t^"obs" =
+  (bold(P)_t^"semi", bold(F)_t^"EVL", bold(O)_t^"pred",
+   bold(h)_t, b_t), $
 
-Target-conditioned evaluation uses OBS-SEL / PRED-Q / GT-EVAL. Target selection
-uses only observed or predicted evidence. Scoring and $Q_H$ receive the
-predicted/observed target descriptor $z_e$. Labels and final evaluation are
-computed by matching that actor-visible target to a GT target crop $M_e$.
-V0 may use GT boxes as a sanity or upper-bound path, but V1 is the main thesis
-claim.
+where $bold(P)_t^"semi"$ is the accumulated semi-dense or fused point evidence,
+$bold(F)_t^"EVL"$ is the frozen local EFM/EVL evidence field, $bold(O)_t^"pred"$ are
+observed or predicted target hypotheses, $bold(h)_t$ is selected-view history, and
+$b_t$ is remaining budget. The oracle state augments this with ASE GT assets:
 
-For a target crop operator $C_e(.)$, define the target distance
+$ bold(s)_t^"oracle" =
+  (bold(s)_t^"obs", bold(M)_"GT", {bold(M)_e^"GT"}_(e in cal(E)),
+   {bold(P)_(t,i)^"cand"}_(i=1)^(N_q)). $
 
-$ D_e(P) = "CD"(C_e(P), M_e), $
+GT meshes, GT OBBs, GT crops, GT semantic labels, and all-candidate GT renders
+are label/evaluation assets only. They are not V1 actor inputs.
 
-with the same accuracy/completeness surface-distance family used by the shared
-#RRI equations. If action $a_t=i$ selects valid candidate $q_(t,i)$, the
-counterfactual geometry transition is
+The planner state is
 
-$ P_(t+1) = P_t union P_(q_(t,i)). $
+$ bold(s)_t^"cf0" =
+  (bold(F)_0^"EVL", bold(P)_t, bold(z)_e, bold(h)_t, b_t,
+   bold(Q)_t, bold(m)_t, bold(rho)_t), $
 
-The immediate target reward is state-relative target #RRI:
+where $bold(Q)_t={bold(q)_(t,i)}_(i=1)^(N_q)$ is the finite candidate table,
+$m_(t,i) in {0,1}$ is a hard validity mask, and $rho_(t,i)$ is an invalid
+reason. The admissible actions are candidate indices:
 
-$ r_t^e
-  = (D_e(P_t) - D_e(P_(t+1))) / (D_e(P_t) + epsilon). $
+$ cal(A)_t = {i in {1,dots,N_q}: m_(t,i)=1}. $
 
-The endpoint quality metric for a rollout sequence
-$tau=(a_0,dots,a_(H-1))$ is instead root-relative:
+Invalidity is a constraint, not low utility. Masks apply before argmax,
+softmax, loss targets, and bootstrap maximization.
 
-$ J_e^(H)(tau)
-  = (D_e(P_0) - D_e(P_H)) / (D_e(P_0) + epsilon). $
+The V1 target protocol is OBS-SEL / PRED-Q / GT-EVAL. Target selection and
+model input use an actor-visible descriptor
 
-The learning return is additive:
+$ bold(z)_e =
+  phi(hat(bold(B))_e, hat(bold(y))_e, hat(p)_e, A_e^"proj",
+      n_e^"semi", n_e^"EVL", bold(T)_e^"rel"), $
 
-$ G_t^(H)
-  = sum_(k=0)^(H-1) gamma^k r_(t+k)^e. $
+covering predicted/observed OBB geometry, class, confidence, projected area,
+semi-dense support, EVL support, and relative pose. GT crops $bold(M)_e$ are used only
+after matching $bold(z)_e$ to GT by class compatibility, OBB overlap, and support.
+Unmatched or ambiguous targets are reported as target-invalid cases.
 
-Thus $G_t^(H)$ trains the finite-horizon value function, while $J_e^(H)$ reports
-the fraction of initial target error removed at the fixed budget. Negative
-target #RRI remains a valid signal when a view worsens target distance; invalid
-actions are constraints and are hard-masked before argmax, softmax, loss, and
-bootstrap operations.
+For target $e$, the implemented oracle error is the point-mesh accuracy plus
+mesh-to-point completeness diagnostic:
 
-The central research question is:
+$ Delta_t^e = cal(A)_t^e + cal(C)_t^e. $
+
+This is the `pm_acc_*` / `pm_comp_*` distance used by `aria_nbv`, not generic
+point-cloud Chamfer distance. If valid action $a_t=i$ selects $bold(q)_(t,i)$, then
+
+$ bold(P)_(t+1) = bold(P)_t union bold(P)_(t,i)^"cand",
+  quad
+  r_t^e = (Delta_t^e - Delta_(t+1)^e) / (Delta_t^e + epsilon). $
+
+The value-learning return and endpoint metric stay separate:
+
+$ G_t^(H) = sum_(k=0)^(H-1) gamma^k r_(t+k)^e,
+  quad
+  J_(e,H) = (Delta_0^e - Delta_H^e) / (Delta_0^e + epsilon). $
+
+The log-gain companion
+$L_(e,H)=log(Delta_0^e+epsilon)-log(Delta_H^e+epsilon)$ is only an ablation.
 
 #thesis-box([Main question])[
-  Can ARIA-NBV train a target-conditioned candidate-query Transformer
-  $Q_(H,theta)(s_t^"cf0", z_e, q_(t,i))$ that predicts one masked bounded-horizon
-  value per finite candidate and whose selected actions, when re-evaluated by
-  the #ASE oracle, beat one-step greedy/model scoring on cumulative target #RRI
+  Can a target-conditioned candidate-query Transformer
+  $Q_(H,theta)(bold(s)_t^"cf0", bold(z)_e, bold(q)_(t,i))$ choose valid candidate views whose
+  oracle-evaluated cumulative target #RRI beats one-step greedy/model scoring
   under equal acquisition and candidate budgets?
 ]
 
-The contract is deliberately conservative. The implemented substrate covers
-scene-level oracle #RRI, immutable VIN-style offline stores, candidate
-generation, one-step scoring, early rollout scaffolding, and Rerun inspection.
-The prerequisite evidence protocol covers M1 data/oracle correctness, V0/V1
-target contracts, invalidity masks/reasons, Zarr-first rollout/Q storage,
-LRZ-scale generation gates, scene-level splits, and exact coverage reporting.
-The hard quantitative core is observed target selection, mixed candidate sets,
-target #RRI labels, a target-conditioned one-step scorer, trusted oracle
-rollouts, and mandatory $Q_H$. Online discrete $Q_H$, IQL, actor-critic,
-continuous control, SceneScript, 3DGS simulators, and real-device guidance are
-bridge or future-work surfaces unless the M5 evidence justifies escalation.
+The hard quantitative core is observed target selection, target #RRI labels, a
+target-conditioned one-step scorer, replayable oracle rollouts, and mandatory
+$Q_H$. Online discrete $Q_H$, IQL, actor-critic control, external simulators,
+3DGS control, SceneScript, VLM planning, and real-device guidance are bridge or
+future-work surfaces unless M5 evidence justifies escalation.

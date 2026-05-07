@@ -72,6 +72,209 @@ escalation. Hestia-style hierarchy [@Hestia-lu2026], GenNBV-style continuous con
 [@SceneScript-avetisyan2024] are treated as design references, not thesis-core
 claims.
 
+## Scientific Claim and Literature Grounding {#roadmap-literature-grounding}
+
+**Primary claim to test.** Given a logged egocentric snippet, an actor-visible
+target record, a finite feasible candidate table, and a fixed acquisition
+budget, a learned finite-horizon candidate-query value model can choose views
+whose oracle-evaluated endpoint target-quality gain exceeds myopic learned or
+greedy one-step selection under the same candidate and acquisition budgets.
+
+**Explicit non-claims.** The thesis does not claim real-device deployment,
+continuous actor-critic performance, Habitat/Isaac simulator performance,
+3DGS-backed control, VLM planning, or full semantic world modeling unless these
+are produced as post-$Q_H$ bridge experiments. Invalid candidates are not the
+lowest RRI class; invalidity is a hard mask and reason-code contract.
+
+| Source family | Role in ARIA-NBV | Adopt | Do not adopt as thesis core |
+|---|---|---|---|
+| Project Aria / ASE / ATEK [@projectaria-engel2023; @ProjectAria-ASE-2025; @ATEK-DataStore-2025] | Actor-visible egocentric sensing and mesh-supervised substrate. | Poses, calibration, camera streams, semi-dense points, snippets, GT meshes for oracle labels. | Dense GT geometry, GT OBBs, or semantic labels as V1 actor input. |
+| EFM3D / EVL [@EFM3D-straub2024; @EVL-Doc-2025] | Frozen egocentric representation and predicted object support. | Local voxel evidence, OBB predictions, actor-visible target descriptors, support masks. | Treating predicted OBBs as GT or ignoring local extent limits. |
+| VIN-NBV [@VIN-NBV-frahm2025] | Closest quality-driven one-step candidate-ranking precedent. | Oracle RRI labels, ordinal ranking, learned myopic scorer baseline. | One-step greedy as sufficient for multi-step thesis claims. |
+| GenNBV / Hestia [@GenNBV-chen2024; @Hestia-lu2026] | Continuous-control and hierarchy references. | 5-DoF notation, target-then-pose factorization, directional observability ideas. | Coverage reward or continuous actor-critic as the first thesis-core result. |
+| PB-NBV / active 3DGS / downstream NBV [@PB-NBV-jia2025; @ActiveNeRF-pan2022; @FisherRF-jiang2024; @NextBestSense-strong2024; @li2025bestviewselectionssemantic; @ObjectCentricNBV-jeong2026; @FOVHPE-bae2025] | Proposal, uncertainty, semantic, object-focus, and simulator-bridge signals. | Utility-channel separation, candidate shortlist diagnostics, target-focus arguments. | Replacing mesh-supervised target RRI with projection, uncertainty, or downstream-task proxy labels. |
+| Offline value learning and sequence planning [@DBLP:journals/corr/MnihKSGAWR13; @DoubleDQN-vanHasselt2015; @IQL-kostrikov2021; @CQL-kumar2020; @BCQ-fujimoto2019; @DecisionTransformer-chen2021; @TrajectoryTransformer-janner2021; @DeepEnergyPolicies-haarnoja2017; @GumbelTopK-kool2019] | Finite-action value learning, replay, support, and stochastic rollout guardrails. | Masked Double-Q first, replay rows, support-aware ablations, stochastic diversity after deterministic lookahead. | Optimizing unsupported or invalid actions, or replacing typed $Q_H$ before rollout data is trusted. |
+| SceneScript and HITL structured scenes [@SceneScript-avetisyan2024; @HITL-SceneScript-xie2025] | Future semantic/global memory and human correction. | Grounded entity, region, and portal tokens for later planning narratives. | GT semantic commands as actor-visible target inputs. |
+
+## Mathematical Model {#roadmap-mathematical-model}
+
+The thesis-core decision process is a finite-horizon constrained NBV surrogate
+
+$$
+\mathcal{M}_{\mathrm{NBV}}
+=
+(\mathcal{S}, \mathcal{A}, T, r_e, \gamma, H).
+$$
+
+At step $t$, the actor-visible logged state is
+
+$$
+s_t^{\mathrm{obs}}
+=
+\left(P_t^{\mathrm{semi}}, F_t^{\mathrm{EVL}}, O_t^{\mathrm{pred}}, h_t, b_t\right),
+$$
+
+while the privileged oracle state augments it with ASE GT assets:
+
+$$
+s_t^{\mathrm{oracle}}
+=
+\left(s_t^{\mathrm{obs}}, M_{\mathrm{GT}}, \{M_e^{\mathrm{GT}}\}_{e\in\mathcal{E}}, \{P_{q_{t,i}}\}_{i=1}^{N_t}\right).
+$$
+
+Only `s_t^{obs}` and counterfactual geometry derived from selected history are
+actor-visible. GT meshes, GT OBBs, GT crops, and all-candidate GT renders are
+label/evaluation assets. The planner state is
+
+$$
+s_t^{\mathrm{cf0}}
+=
+\left(F_0^{\mathrm{EVL}}, P_t, z_e, h_t, b_t, Q_t, m_t, \rho_t\right),
+$$
+
+where $Q_t=\{q_{t,i}\}_{i=1}^{N_t}$ is the finite candidate table,
+$m_{t,i}\in\{0,1\}$ is the hard validity mask, and $\rho_{t,i}$ is the
+invalid-reason code. The admissible actions are candidate indices:
+
+$$
+\mathcal{A}(s_t)
+=
+\{i\in\{1,\ldots,N_t\}:m_{t,i}=1\}.
+$$
+
+The V1 target protocol is OBS-SEL / PRED-Q / GT-EVAL:
+
+$$
+z_e =
+\psi_{\mathrm{obs}}\!\left(O_t^{\mathrm{pred}}, P_t^{\mathrm{semi}}, F_t^{\mathrm{EVL}}, I_{1:t}\right),
+\qquad
+M_e =
+\operatorname{crop}\!\left(M_{\mathrm{GT}}, \operatorname{match}(z_e,O_{\mathrm{GT}})\right).
+$$
+
+`z_e` may contain predicted/observed OBB center, orientation, extents, class,
+confidence, projected area, semi-dense support, EVL support, and relative pose.
+`M_e` is hidden from the actor and used only for labels and endpoint metrics.
+
+Candidate generation is modeled as a logged finite mixture:
+
+$$
+q_{t,i}\sim
+\sum_{k=1}^{K_{\mathrm{fam}}}
+\pi_k(s_t,z_e)\,
+\mathcal{G}_k(q\mid s_t,z_e;\eta_k),
+\qquad
+\sum_k\pi_k=1.
+$$
+
+The first sampler should mix target-centric `TARGET_POINT` candidates with
+`RADIAL_AWAY`, `RADIAL_TOWARDS`, and `FORWARD_RIG` exploration/continuity
+families. Candidate provenance, pose jitter, target support, validity, and
+invalid reason are stored per row.
+
+Let $\Delta_t^e$ be the target-cropped point-mesh oracle error at step $t$:
+
+$$
+\Delta_t^e =
+\mathcal{A}_t^e + \mathcal{C}_t^e,
+$$
+
+where $\mathcal{A}_t^e$ is point-to-mesh accuracy and $\mathcal{C}_t^e$ is
+mesh-to-point completeness for the matched target crop. For a selected valid
+candidate,
+
+$$
+P_{t+1}=P_t\cup P_{q_{t,a_t}},
+\qquad
+r_t^e =
+\frac{\Delta_t^e-\Delta_{t+1}^e}{\Delta_t^e+\varepsilon}.
+$$
+
+The additive value-learning return and endpoint reporting metric are kept
+separate:
+
+$$
+G_t^{(H)}=\sum_{k=0}^{H-1}\gamma^k r_{t+k}^e,
+\qquad
+J_{e,\Delta}^{(H)}
+=
+\frac{\Delta_0^e-\Delta_H^e}{\Delta_0^e+\varepsilon}.
+$$
+
+The one-step target scorer is the myopic control:
+
+$$
+\hat r_{t,i}^e
+=
+f_\theta^{\mathrm{VIN}}(s_t^{\mathrm{cf0}},z_e,q_{t,i}).
+$$
+
+The mandatory planner is a masked candidate-query Transformer:
+
+$$
+Q_{H,\theta}(s_t^{\mathrm{cf0}},z_e,q_{t,i})
+\approx
+\mathbb{E}\!\left[G_t^{(H)}\mid s_t^{\mathrm{cf0}},z_e,a_t=i\right],
+$$
+
+decoded from candidate tokens and selected only over valid indices. The first
+backup is masked Double-Q:
+
+$$
+j^\star
+=
+\arg\max_{j:m_{t+1,j}=1}
+Q_\theta(s_{t+1}^{\mathrm{cf0}},z_e,q_{t+1,j}),
+$$
+
+$$
+y_t =
+r_t^e+\gamma(1-d_t)
+Q_{\bar\theta}(s_{t+1}^{\mathrm{cf0}},z_e,q_{t+1,j^\star}).
+$$
+
+All selected actions, including learned actions, are re-evaluated by the oracle
+before they become thesis evidence.
+
+## Evidence Flow Diagrams {#roadmap-evidence-flow}
+
+```{mermaid}
+flowchart LR
+  ASE["ASE / Project Aria snippet<br/>RGB, poses, calibration, semidense points"] --> EVL["Frozen EFM3D / EVL<br/>local voxel evidence + OBB predictions"]
+  ASE --> OracleMesh["GT mesh + GT OBBs<br/>oracle and evaluation only"]
+  EVL --> TargetSel["OBS-SEL<br/>actor-visible target selection"]
+  TargetSel --> CandidateGen["Mixed finite candidates<br/>target-centric + exploration"]
+  CandidateGen --> Validity["Validity masks + reasons<br/>collision, bounds, no-depth, support"]
+  OracleMesh --> RRIOracle["Oracle scene + target RRI<br/>render, fuse, crop, score"]
+  Validity --> RRIOracle
+  EVL --> OneStep["Target-conditioned VIN scorer<br/>ordinal RRI ranking"]
+  RRIOracle --> OneStep
+  OneStep --> Rollouts["Replayable rollout traces<br/>random-valid, greedy, lookahead, temp-softmax"]
+  RRIOracle --> Rollouts
+  Rollouts --> QH["Candidate-query Transformer Q_H<br/>masked finite-candidate value learning"]
+  QH --> Eval["Oracle re-evaluation<br/>endpoint target gain, cumulative target RRI, cost"]
+  Eval --> Thesis["Thesis figures, ablations, failure cases"]
+```
+
+```{mermaid}
+gantt
+    title ARIA-NBV thesis roadmap
+    dateFormat  YYYY-MM-DD
+    axisFormat  %d %b
+    section Foundation
+    M0 scope and proposal freeze        :m0, 2026-04-29, 2026-05-10
+    M1 data cache oracle correctness    :m1, 2026-05-11, 2026-05-31
+    M2 VIN baseline and scale gates     :m2, 2026-06-01, 2026-06-21
+    section Target and Planning Core
+    M3 entity target RRI                :m3, 2026-06-22, 2026-07-12
+    M4 target conditioned VIN           :m4, 2026-07-13, 2026-08-09
+    M5 rollouts and Q_H                 :crit, m5, 2026-08-10, 2026-08-30
+    section Bridge and Freeze
+    M6 continuous and online bridge     :m6, 2026-08-31, 2026-09-13
+    M7 final experiments and writing    :crit, m7, 2026-09-14, 2026-09-27
+    M8 release freeze                   :crit, m8, 2026-09-28, 2026-09-30
+```
+
 ## Milestone Timeline {#roadmap-milestones}
 
 | Dates | Milestone | Exit criteria |
@@ -314,6 +517,67 @@ script.
   claims;
 - no release-critical placeholder, stale path, or wrong repo link remains.
 
+## Required Ablations {#roadmap-ablations}
+
+Ablations should isolate scientific questions rather than accumulate
+architecture toggles.
+
+| Axis | Levels | Primary evidence |
+|---|---|---|
+| Target input | V0 GT OBB sanity; V1 observed/predicted OBB; V1 plus crop descriptor; optional entity token | target-RRI rank correlation, target top-k hit, endpoint target gain |
+| Candidate mixture | generic shell; target-point only; mixed target plus exploration; PB-NBV/frontier shortlist | valid fraction, target visibility, RRI distribution, selected-view diversity |
+| Objective | scene RRI; target RRI; target RRI plus cost; log-gain ablation | endpoint target gain, cumulative target RRI, quality-cost curves |
+| Planner | random-valid; learned one-step scorer; one-step oracle greedy; bounded oracle lookahead; $Q_H$ | oracle-evaluated cumulative target RRI under equal budget |
+| Invalidity | hard mask; hard mask plus validity head; scalar penalty only after masks work | invalid-action rate, value leakage, invalid-reason distribution |
+| Ordinal/scalar loss | CORAL; balanced CORAL; focal threshold; auxiliary Huber | calibration, Spearman correlation, top-k hit, confusion structure |
+| State richness | CF0 geometry-only; selected synthetic observations; optional directional observability | planning improvement, support gap, overfitting gap |
+| Scale | small trusted subset; scene-level held-out subset; full 100 GT-mesh scenes | confidence intervals and coverage report |
+
+## Evidence Reporting Contract {#roadmap-evidence-contract}
+
+Every thesis-grade table must report the amount of evidence behind the claim:
+
+$$
+\left(
+N_{\mathrm{scene}},
+N_{\mathrm{snippet}},
+N_{\mathrm{target}},
+N_{\mathrm{candidate}},
+N_{\mathrm{transition}},
+N_{\mathrm{seed}},
+\mathrm{split},
+\mathrm{invalid\_rate},
+\mathrm{coverage\_gap}
+\right).
+$$
+
+Final figures should include a candidate-table diagnostic, an oracle-label
+diagnostic, a one-step ranking/calibration figure, a multi-step trajectory
+comparison for greedy/lookahead/$Q_H$, and a failure-case catalog. Paired
+method comparisons should use identical roots and candidate budgets:
+
+$$
+\Delta_e^{(H)}(A,B)
+=
+J_{e,\Delta}^{(H)}(\tau_A)-J_{e,\Delta}^{(H)}(\tau_B),
+$$
+
+with bootstrap confidence intervals over scene-level or target-level units.
+Raw endpoint gains are not interpretable unless horizon, target count,
+candidate distribution, invalidity, and coverage gaps are reported.
+
+## Risk Register {#roadmap-risks}
+
+| Risk | Scientific consequence | Mitigation / fallback |
+|---|---|---|
+| Frame, CW90, or projection mismatch | Labels and visualizations can look plausible while measuring the wrong geometry. | M1 frame report, Rerun normal/boundary/failure recordings, pose/camera consistency assertions. |
+| Target labels are sparse or ambiguous | Target RRI becomes unstable or actor leakage creeps in through GT matching. | Eligibility thresholds, V0/V1 separation, explicit unmatched-target counts, matched-GT diagnostics. |
+| Candidate valid fraction is low | $Q_H$ learns feasibility artifacts instead of utility. | Mixed sampler tuning, reason codes, minimum valid-count gates, candidate provenance diagnostics. |
+| Greedy oracle dominates all horizons | Multi-step improvement may be scientifically weak. | Identify occlusion/setup-action cases; report when target RRI is approximately myopic. |
+| Offline rollouts are narrow | Value learning overfits behavior support and overestimates unsupported actions. | Random-valid, oracle-scored temperature-softmax, later Gumbel-Top-k, scene-level splits, support-aware ablations. |
+| Oracle throughput blocks scale | Final evidence may be too small for broad claims. | Zarr-first storage, LRZ deterministic sharding, subset confidence intervals, exact coverage-gap reporting. |
+| $Q_H$ fails to beat myopic controls | The hard planning claim is falsified or blocked. | Report the failing gate and preserve a defensible target-aware oracle, one-step scorer, and rollout-data study; do not replace it with unvalidated continuous RL. |
+
 ## KG-Friendly Authoring Rules {#kg-authoring-rules}
 
 These rules apply to new roadmap, research-question, docstring, and thesis
@@ -342,6 +606,9 @@ quarto render contents/thesis/questions.qmd
 cd ..
 scripts/nbv_qmd_outline.sh --compact
 ```
+
+For Mermaid edits, validate each diagram source with Mermaid CLI before
+committing.
 
 For package work, use the verification row in the nearest `AGENTS.md`; for
 roadmap or canonical-memory changes, run the matching memory or docs checks.
