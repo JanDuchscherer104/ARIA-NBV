@@ -1,12 +1,14 @@
-%%{init: {"flowchart": {"htmlLabels": false}}}%%
-flowchart TD
-  A["Project Aria / ASE snippet: poses, calibration, semidense points"] --> B["Actor-visible state: EVL field, predicted OBBs, target descriptor"]
-  B --> C["Finite candidate table: pose, provenance, validity mask, reason code"]
-  C --> D["Oracle labeler: scene RRI and target RRI from GT mesh crops"]
-  D --> E["One-step target scorer: myopic learned control"]
-  D --> F["Trusted oracle rollouts: random-valid, greedy, lookahead, temperature-softmax"]
-  F --> G["Rollout / Q store: lineage, masks, targets, selected transitions"]
-  G --> H["Candidate-query Q_H: one masked bounded-horizon value per candidate"]
-  H --> I["Oracle re-evaluation: equal acquisition and candidate budget"]
-  I --> J["Thesis result: target RRI, scene RRI, cost, invalidity, failures"]
-  H -. "after M5 evidence" .-> K["Bridge paths: IQL, online discrete Q_H, actor-critic, simulators"]
+%%{init: {"flowchart": {"htmlLabels": false, "nodeSpacing": 28, "rankSpacing": 34}}}%%
+flowchart LR
+  A["M1\ns_t^obs, z_e"] --> B["M2\nQ_t, m_t, rho_t"]
+  B --> C["M3\nDelta_t^e, r_t^e(i)"]
+  C --> D["M4\nhat r_t^e(i)"]
+  C --> E["M5\nG_t^(H)"]
+  E --> F["Q_H,theta\nmasked value"]
+  F --> G["Eval\nJ_(e,H), G_0^(H)"]
+  F -. "M6+" .-> H["Bridge\nIQL / online Q_H\nactor-critic / sim"]
+
+  classDef core fill:#f9fbff,stroke:#0b4f8a,stroke-width:1.4px,color:#111;
+  classDef bridge fill:#fffaf0,stroke:#8a5a00,stroke-width:1.4px,stroke-dasharray:5 4,color:#111;
+  class A,B,C,D,E,F,G core;
+  class H bridge;

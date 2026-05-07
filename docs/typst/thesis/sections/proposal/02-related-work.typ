@@ -45,11 +45,7 @@ space. Its scientific contribution is the controlled replacement of proxy
 utility by target-conditioned reconstruction-quality utility under a finite
 candidate contract. The closest methodological lineage is
 
-$ "coverage / uncertainty NBV"
-  -> "oracle RRI candidate ranking"
-  -> "target RRI"
-  -> "bounded rollout"
-  -> "masked finite-candidate " Q_H. $
+$ cal(U)_"cov/unc" -> hat(r)_t^e (i) -> r_t^e -> G_t^((H)) -> Q_(H,theta). $
 
 This lineage makes three negative claims explicit. First, coverage is a useful
 diagnostic but not the thesis objective. Second, GT meshes and GT target boxes
@@ -57,6 +53,6 @@ are oracle assets, not actor inputs. Third, offline/continuous RL methods are
 not safe shortcuts until rollout support, masks, and evaluation are reliable.
 
 #figure(
-  image("../../figures/proposal_system_flow.png", width: 100%),
-  caption: [Mermaid flowchart of the thesis evidence chain. Rectangular nodes are thesis-core gates; dashed nodes are bridge paths after $Q_H$ evidence.],
+  align(center, image("../../figures/proposal_system_flow.png", width: 82%)),
+  caption: [Thesis evidence chain. Core gates move from $bold(s)_t^"obs"$ and $bold(Q)_t, bold(m)_t$ to $r_t^e$, $G_t^((H))$, and $Q_(H,theta)$; the dashed node is post-$Q_H$ bridge work.],
 ) <fig:proposal-system-flow>
