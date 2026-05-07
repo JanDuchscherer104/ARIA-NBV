@@ -25,8 +25,6 @@ generic context, treat it as advisory and inspect the concrete owner directly.
 
 - Route a broad task:
   `make kg-route KG_TASK="<task>"`
-- Retrieve context for a question:
-  `make kg-query KG_QUERY="<question>"`
 - Search indexed context quickly:
   `make kg-search KG_QUERY="<terms>"`
 - Claim-check advisor-facing or thesis claims:
@@ -82,6 +80,10 @@ and code become current truth.
   `.agents/external/litkg-rs/target/debug/litkg-cli context-pack --config .configs/litkg.toml --repo-root . --task "<task>" --profile thesis-coding --format json`
 - Inspect a broad source/backlog query:
   `make kg-search KG_QUERY="<terms>" KG_FORMAT=json KG_LIMIT=10`
+
+Question-answer synthesis is deferred until there is a real synthesis layer.
+Use `kg-search` for fast retrieval and `kg-route` when an agent needs a context
+pack with source ranking, backlog, risks, and verification.
 
 ## Fallback
 

@@ -28,7 +28,6 @@ Useful commands:
 ```bash
 make kg-capabilities
 make kg-search KG_QUERY="entity-aware RRI"
-make kg-query KG_QUERY="current RRI contract"
 make kg-brief KG_TOPIC="VIN offline-store diagnostics"
 make kg-route KG_TASK="debug candidate pose frame mismatch"
 make kg-show-paper KG_PAPER="VIN-NBV-frahm2025"

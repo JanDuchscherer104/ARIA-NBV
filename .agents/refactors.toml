@@ -127,3 +127,51 @@ context = ["The alignment distillation listed dependency extras, old hard-coded 
 implementation_notes = ["Inventory pyproject dependencies and classify them into minimal runtime, train, viz/diagnostics, dev/test, notebooks, EFM/ATEK, and all extras.", "Keep default install compatible with current CLI expectations or document the exact extra needed for each CLI.", "Search shared docs/configs for old /home/jandu/repos/NBV and similar host-local paths; move unavoidable operator examples into .agents/references.", "Avoid changing scientific behavior while splitting dependency declarations."]
 acceptance = ["Optional heavy dependencies are grouped into documented extras without breaking existing dev setup.", "README/SETUP/docs name which extras are required for training, Rerun diagnostics, KG/docs work, and notebooks.", "Shared tracked files no longer contain stale NBV repo paths or personal absolute paths except in explicitly operator-scoped references.", "CI/pre-commit planning can choose a lightweight install target."]
 verification = ["rg -n \"/home/jandu/repos/NBV|/home/.*/repos/NBV|miniforge|conda env\" README.md SETUP.md docs .configs aria_nbv/pyproject.toml .agents/references", "cd aria_nbv && uv run pytest tests/data_handling/test_public_api_contract.py", "ruff check aria_nbv/pyproject.toml || true"]
+
+[[refactor]]
+id = "refactor-016"
+title = "Distill agent scaffold ownership and DB record style"
+description = "Reduce PR #13 scaffold noise by making one surface own each concept and keeping memory, DB records, skills, and quick references compact."
+priority = "high"
+status = "todo"
+labels = ["agent", "scaffold", "simplification", "kg", "backlog"]
+issue_ids = ["issue-012", "issue-023", "issue-025"]
+loc_min = 180
+loc_expected = 420
+loc_max = 1000
+context = ["The updated PR #13 review says the scaffold has the right macro-shape but still repeats policy across root guidance, source order, human-owner intent, canonical memory, backlog records, litkg references, and history.", "The cleanup should add no new queue sprawl: compact the existing surfaces and keep this record as the single review-derived simplification target."]
+implementation_notes = ["Condense DECISIONS.md to durable deltas and PROJECT_STATE.md to a short current snapshot without duplicating roadmap/questions thesis narration.", "Simplify agents-db schema and record style so ordinary backlog work is problem, why-now, references, acceptance, and verification; keep currently required validator fields until the schema/tooling change lands.", "Make skill_style_guide define a universal metadata floor plus optional broad-skill routing fields, and remove unsupported or misleading mode values.", "Move generic instruction-capture policy to one owner and keep human_owner_intent.md preference-only.", "Keep litkg_quick_reference.md quick-use only; move full context-pack schema, authority/freshness policy, and transcript trust tiers to the normative litkg integration/spec/config owner.", "Shorten docs/AGENTS.md, code-review grounding, and simplification redundancy-discovery hot paths by moving long taxonomy, archive, diagram, and operator-tool choreography into optional references.", "Trim root AGENTS.md to repo-wide operational invariants and leave V0/V1, invalidity, and Gym/SB3 gates in domain skills and current thesis sources.", "Rewrite or split the PR #13 body so the review unit matches the branch's actual scaffold, DB, and litkg-rs scope."]
+acceptance = ["Canonical memory is delta-oriented: DECISIONS.md contains durable decisions and PROJECT_STATE.md is a one-screen snapshot rather than a thesis paraphrase.", "Backlog records and schema no longer encourage essay-like context or pseudo-precise LOC triplets for ordinary work once validator support is updated.", "Exactly one source owns instruction-capture policy, and human_owner_intent.md contains only Jan-specific preferences plus a pointer to that owner.", "The skill metadata contract matches actual skills: all skills keep the minimum metadata and broad/router skills carry optional arbitration fields consistently.", "The litkg quick reference covers when to use litkg, commands, fallback, and mandatory claim checks; full trust/schema details live in one deeper owner.", "Root, docs, code-review, and simplification hot paths load only essential routing or method guidance before optional references.", "Domain research guardrails are absent from root AGENTS.md and present in the owning domain skills or thesis/current-state sources.", "PR #13 description either matches the current broad branch scope or the scaffold-only work is split into a crisp review unit."]
+verification = ["make agents-db AGENTS_ARGS='validate'", "make agents-db", "make check-agent-memory", "rg -n \"trust ladder|raw agent messages|top_sources|missing_context\" .agents/references/litkg_quick_reference.md .agents/issues.toml .agents/todos.toml", "rg -n \"Instruction Capture|smallest surface\" AGENTS.md .agents/references/source_order.md .agents/references/human_owner_intent.md", "rg -n \"^  mode: scaffold|Required Frontmatter|Optional broad\" .agents/references/skill_style_guide.md .agents/skills/*/SKILL.md"]
+
+[[refactor]]
+id = "refactor-017"
+title = "Delete kg-query alias and references"
+description = "Remove kg-query from the agent-facing Make/doc/skill surface because it duplicated kg-route without synthesis."
+priority = "medium"
+status = "todo"
+labels = ["kg", "litkg", "scaffold", "simplification"]
+issue_ids = ["issue-030", "issue-023"]
+loc_min = 30
+loc_expected = 80
+loc_max = 200
+context = ["kg-query trained agents to expect answer synthesis while returning the same context-pack shape as kg-route.", "The narrowed command surface keeps kg-search for fast retrieval and kg-route for context packs; synthesis is deferred until a real answer layer exists."]
+implementation_notes = ["Remove kg-query from Makefile and .PHONY.", "Remove active quick-reference and skill guidance that tells agents to invoke kg-query.", "Keep historical resolved/debrief/generated mentions as archive evidence unless a separate generated-artifact refresh owns them."]
+acceptance = ["No active Make target or active agent guidance tells agents to use kg-query.", "litkg_quick_reference names kg-search for retrieval and kg-route for context packs.", "semantic-scholar-litkg explicitly says synthesis is deferred."]
+verification = ["! rg -n \"make kg-query|KG_QUERY=.*kg-query\" Makefile .agents/references .agents/skills .agents/kg/README.md docs", "make kg-search KG_QUERY=\"bounded oracle RRI\" KG_FORMAT=json", "make kg-route KG_TASK=\"bounded oracle RRI\" KG_FORMAT=json"]
+
+[[refactor]]
+id = "refactor-018"
+title = "Add genre and precedent ranking for litkg routes"
+description = "Add an optional document-genre/precedent tier so process-shaped tasks can surface prior report templates such as m1_contract_report.qmd."
+priority = "low"
+status = "todo"
+labels = ["kg", "litkg", "ranking", "docs"]
+issue_ids = ["issue-023"]
+loc_min = 120
+loc_expected = 320
+loc_max = 800
+context = ["The current ranking can miss structurally relevant precedent docs when lexical overlap is weak.", "This is lower priority than claim verdicts, backlog filtering, task-grounded risks, verification-path injection, worktree exclusion, and confidence floors."]
+implementation_notes = ["Define a small optional QMD genre frontmatter enum such as contract_report, runbook, architecture, thesis_section, and scratch.", "Parse frontmatter into litkg source metadata and add configurable genre boosts for matching task terms.", "Seed the first useful precedent tag on docs/contents/thesis/m1_contract_report.qmd after docs-frontmatter validation is updated."]
+acceptance = ["A task like design experiment evidence registry surfaces m1_contract_report.qmd as a precedent when it is tagged.", "Docs without genre frontmatter keep current ranking behavior.", "The optional genre key is documented and validated before relying on it."]
+verification = ["make qmd-frontmatter-check", "cd .agents/external/litkg-rs && cargo test -p litkg-core context_pack::genre_boost", "make kg-route KG_TASK=\"design experiment evidence registry\" KG_FORMAT=json"]

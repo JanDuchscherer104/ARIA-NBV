@@ -63,6 +63,8 @@ Use this skill when changing or operating the KG tooling itself.
   separate episodic memory-mining path.
 - Do not create a second agent retrieval workflow when `kg-*` or
   `context-pack` can express the need.
+- Do not reintroduce a `kg-query` alias until a real synthesis layer exists;
+  use `kg-search` for retrieval and `kg-route` for context packs.
 - Generated KG artifacts remain internal unless explicitly curated into public
   docs.
 

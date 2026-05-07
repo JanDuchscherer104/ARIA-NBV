@@ -77,6 +77,11 @@ chat_model = "gemma4:26b"
 ".agents/memory/transcripts/raw/**/*.jsonl" = 0.25
 ".agents/work/**/*.md" = 0.2
 
+[context_pack]
+max_active_backlog_items = 5
+min_top_source_score = 0.4
+backlog_min_score = 0.25
+
 [project]
 id = "aria-nbv"
 name = "ARIA-NBV"
@@ -159,6 +164,10 @@ include = [
   "**/AGENTS.md",
   ".agents/skills/**/*.md",
   ".agents/references/**/*.md",
+]
+exclude = [
+  ".claude/worktrees/**",
+  ".git/**",
 ]
 
 [sources.generated_context]

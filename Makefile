@@ -5,7 +5,7 @@
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory
 .PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory
-.PHONY: memory-mine agents-db glossary kg-up kg-down kg-capabilities kg-ollama-check kg-search kg-query kg-brief kg-route kg-claim-check kg-consolidate kg-related kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-docs-smoke kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-full
+.PHONY: memory-mine agents-db glossary kg-up kg-down kg-capabilities kg-ollama-check kg-search kg-brief kg-route kg-claim-check kg-consolidate kg-related kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-docs-smoke kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-full
 .PHONY: lrz-probe lrz-resources lrz-resources-gpu lrz-resources-cpu lrz-jobs lrz-dss-init lrz-container-shell lrz-sbatch-cpu lrz-sbatch-single-gpu lrz-sbatch-multigpu
 
 # Color codes
@@ -217,18 +217,6 @@ kg-search: ## 📚 Search litkg-indexed code/docs/memory/backlog/literature (set
 		--limit "$(KG_LIMIT)" \
 		--format "$(KG_FORMAT)" \
 		"$(KG_QUERY)"
-
-kg-query: ## 📚 Build a litkg context pack for a project question (set KG_QUERY='...')
-	@if [ -z "$(strip $(KG_QUERY))" ]; then \
-		echo "$(RED)KG_QUERY is required, e.g. make kg-query KG_QUERY='current RRI contract'$(NC)"; \
-		exit 2; \
-	fi
-	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
-		--config "$(LITKG_CONFIG)" \
-		--repo-root "$(LITKG_REPO_ROOT)" \
-		--task "$(KG_QUERY)" \
-		--profile "$(LITKG_PROFILE)" \
-		--format "$(KG_FORMAT)"
 
 kg-brief: ## 📚 Build a litkg brief for a topic (set KG_TOPIC='...')
 	@if [ -z "$(strip $(KG_TOPIC))" ]; then \

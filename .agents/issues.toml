@@ -47,13 +47,13 @@ references = ["repo:.agents/AGENTS_INTERNAL_DB.md", "repo:AGENTS.md#instruction-
 [[issue]]
 id = "issue-012"
 title = "Research skills and scaffold routing coverage still need tightening"
-description = "Research-skill and scaffold-routing coverage still needs compact repeatable gaps filled, while future litkg metadata consumption is owned by the litkg routing and provenance records."
+description = "The scaffold now has the right routing shape, but repeated ownership, hot-path overload, and inconsistent skill metadata still need ruthless distillation."
 type = "maintenance"
 priority = "high"
 status = "open"
 labels = ["agent", "skills", "scaffold"]
-context = ["Root guidance now routes non-trivial work through agent-behavior and separates local discovery, KG-backed retrieval, and KG implementation skills.", "All repo-local skills now carry applies_to/triggers/must_read/verification frontmatter metadata, so issue-012 should only track missing or stale research-skill/scaffold routing coverage.", "Future litkg consumption of skill metadata, context-pack fields, backlog evidence, and source-reference diagnostics belongs to issue-023, issue-025, and todo-056.", "The remaining research-skill gap is narrower than the original issue: todo-003 covers oracle-RRI contract routing and todo-004 covers VIN training/evaluation routing."]
-references = ["repo:AGENTS.md#routing", "repo:.agents/skills/agent-behavior/SKILL.md", "repo:.agents/references/skill_style_guide.md", "repo:.agents/skills/", "repo:.agents/todos.toml#todo-003", "repo:.agents/todos.toml#todo-004", "repo:.agents/issues.toml#issue-023", "repo:.agents/issues.toml#issue-025", "repo:.agents/todos.toml#todo-056"]
+context = ["Root guidance now separates local discovery, KG-backed retrieval, KG implementation, docs curation, and DB maintenance; remaining scaffold debt is repetition across those owners, not missing structure.", "The next cleanup should define one universal skill metadata floor plus optional broad-skill routing extras, move domain guardrails out of root, slim docs/code-review/simplification hot paths, and keep human_owner_intent preference-only."]
+references = ["repo:AGENTS.md#routing", "repo:.agents/skills/agent-behavior/SKILL.md", "repo:.agents/references/skill_style_guide.md", "repo:.agents/skills/", "repo:.agents/refactors.toml#refactor-016", "repo:.agents/issues.toml#issue-023", "repo:.agents/issues.toml#issue-025", "repo:.agents/todos.toml#todo-056"]
 
 [[issue]]
 id = "issue-013"
@@ -124,13 +124,13 @@ references = ["repo:.agents/skills/lrz-ai-systems/SKILL.md", "repo:.agents/skill
 [[issue]]
 id = "issue-023"
 title = "litkg probation-router output is still too noisy for default agent use"
-description = "litkg should stay as a source-backed router, claim checker, and research-memory layer, but context-pack and search output must become discriminative before agents rely on it for localized coding."
+description = "litkg should stay as a source-backed router, claim checker, and research-memory layer, but routing output and guidance ownership must stay discriminative and non-duplicative."
 type = "maintenance"
 priority = "medium"
 status = "open"
 labels = ["kg", "litkg", "semantic-scholar", "docs", "tooling"]
-context = ["litkg-rs is useful for broad ARIA-NBV thesis/research/backlog tasks, but recent sessions show it is not yet reliable as the default first step for localized coding, Rerun, plotting, or one-file cleanup.", "The probation role is source-backed routing, claim checks, research-memory lookup, and consolidation; localized implementation should start with nearest AGENTS.md, owning skills, aria-nbv-context, and targeted rg/file reads unless the task crosses source families.", "context-pack and routing output should converge on an agent-facing schema with verb, assumptions, authority/freshness-ranked top_sources, required_reads, active_backlog, risk_flags, suggested_next_action, verification_commands, and missing_context.", "Routing quality must drop stopword-only matches, boost concrete owning skills/code/backlog/nested guides for coding tasks, keep canonical memory high-authority without letting weak generic matches dominate, and treat optional Context7/Graphiti/Semantic Scholar/CodeGraphContext gaps as warnings unless task-required.", "This issue owns litkg routing/context-pack output quality and static-router probation; issue-025 owns the deeper provenance, transcript trust, and source-reference edge contract."]
-references = ["repo:AGENTS.md#routing", "repo:.agents/references/litkg_quick_reference.md", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.configs/litkg.toml", "repo:.agents/kg/README.md", "repo:Makefile", "repo:.agents/external/litkg-rs/docs/architecture.md#semantic-scholar-contract", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "url:https://www.semanticscholar.org/product/api"]
+context = ["The probation lane is correct: use litkg for broad source-backed routing, claim checks, research-memory lookup, and consolidation; localized implementation starts with nearest guides, owning skills, aria-nbv-context, and targeted file reads.", "The quick reference, config comments, issues, and debriefs still repeat trust/schema policy; quick reference should stay quick-use only while issue-025 owns the normative provenance/schema contract."]
+references = ["repo:AGENTS.md#routing", "repo:.agents/references/litkg_quick_reference.md", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.configs/litkg.toml", "repo:.agents/refactors.toml#refactor-016", "repo:.agents/issues.toml#issue-025", "repo:.agents/issues.toml#issue-029", "repo:.agents/issues.toml#issue-030", "repo:.agents/todos.toml#todo-056", "repo:Makefile", "repo:.agents/external/litkg-rs/docs/architecture.md#semantic-scholar-contract"]
 
 [[issue]]
 id = "issue-024"
@@ -146,13 +146,13 @@ references = ["repo:docs/contents/thesis/questions.qmd#rq5-bridge", "repo:docs/c
 [[issue]]
 id = "issue-025"
 title = "Agents DB and transcript provenance are not yet full KG retrieval contracts"
-description = "Active backlog records carry context and references, but litkg-rs still needs typed DB/source-reference edges and transcript trust tiers before retrieved memory can be promoted safely."
+description = "Active backlog records carry context and references, but one normative litkg provenance contract must own schema, trust tiers, authority/freshness, and typed source edges."
 type = "integration"
 priority = "medium"
 status = "open"
 labels = ["agents-db", "kg", "litkg", "provenance", "semantic-scholar"]
-context = ["ARIA-NBV issues/todos are now source-backed and context-pack parsing preserves context/references, but graphify/Neo4j exports still need typed edges from backlog records to repo files, papers, external docs, Semantic Scholar IDs, generated context, and experiment evidence.", "The DB provenance/source-reference contract should parse repo, bib, arxiv, doi, s2, url, context7, and litkg references into typed KG entities while preserving source authority, freshness, status, and owning backlog record metadata.", "Transcript mining needs explicit trust tiers: raw agent messages are private low-trust search material, raw user messages are higher signal but not canonical, distilled user intent plus later agent-grounded agreement is a high-trust candidate memory, and only checked-in memory/backlog/docs/code become current truth.", "Stale-reference linting should be warning-first: unresolved anchors, renamed files, stale generated context, optional backend gaps, missing enrichment, or transcript-only evidence should surface as actionable diagnostics without blocking unrelated agent routing by default.", "The desired agent-memory loop also needs retrieval and consolidation surfaces: DB references and distilled transcript candidates should inform kg-query/kg-route results, claim checks should identify unsupported backlog-driven or transcript-only overclaims, and consolidate-memory should propose state/backlog patches instead of silently overwriting canonical memory.", "Authority and freshness metadata should be part of the edge contract so canonical state and active backlog outrank stale debriefs, generated/audit artifacts, raw transcripts, or archived notes while still preserving their evidential provenance."]
-references = ["repo:scripts/agents_db.py", "repo:.agents/skills/agents-db/references/provenance.md", "repo:.agents/skills/semantic-scholar-litkg/references/integration-spec.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/docs/architecture.md#adapter-output-contracts", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "litkg:context-pack", "url:https://www.semanticscholar.org/product/api"]
+context = ["The normative contract should live in the litkg integration/spec/config layer: context-pack schema, transcript trust tiers, source authority/freshness, typed repo/bib/url/context7/litkg edges, and warning-first stale-reference diagnostics.", "Issues and todos should track implementation gaps instead of restating the full trust ladder; checked-in memory, backlog, docs, and code remain the only current truth."]
+references = ["repo:scripts/agents_db.py", "repo:.agents/skills/agents-db/references/provenance.md", "repo:.agents/skills/semantic-scholar-litkg/references/integration-spec.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/refactors.toml#refactor-016", "repo:.agents/issues.toml#issue-029", "repo:.agents/todos.toml#todo-061", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/docs/architecture.md#adapter-output-contracts", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "litkg:context-pack", "url:https://www.semanticscholar.org/product/api"]
 
 [[issue]]
 id = "issue-027"
@@ -175,3 +175,25 @@ status = "open"
 labels = ["rl", "q-learning", "rollouts", "target", "thesis"]
 context = ["The accepted thesis scope makes ARIA-NBV a target-conditioned, quality-driven NBV system on ASE/EFM with strict M1 contracts and a mandatory multi-step Q_H deliverable.", "Q_H is a candidate-query Transformer over scene, target, history, and candidate tokens; it predicts bounded cumulative target RRI over finite candidate sets from ASE mesh/oracle counterfactual rollouts and must beat one-step greedy/model scoring under equal acquisition budget after oracle evaluation.", "Bounded oracle lookahead remains the upper bound; random-valid, oracle-greedy/lookahead, and oracle-scored temperature-softmax traces are mandatory first rollout sources, while Gumbel is preferred later evidence.", "This issue depends on M1 data/oracle correctness, V1 observed-target contracts, mixed observed candidate sets, invalidity masks/reason codes, Zarr-first rollout/Q storage, and LRZ-scale generation."]
 references = ["repo:docs/contents/thesis/questions.qmd#rq4-planning", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m5", "repo:.agents/memory/state/DECISIONS.md", "bib:DoubleDQN-vanHasselt2015", "bib:IQL-kostrikov2021", "bib:GumbelTopK-kool2019", "bib:VIN-NBV-frahm2025"]
+
+[[issue]]
+id = "issue-029"
+title = "kg-claim-check verdict contract was missing"
+description = "The kg-claim-check wrapper used the context-pack route without a verdict, confidence, supporting_evidence, or contradicting_evidence fields, making advisor-facing claim discipline unenforceable."
+type = "integration"
+priority = "high"
+status = "open"
+labels = ["kg", "litkg", "claim-check", "thesis"]
+context = ["Read-only agent probes on todo-026 and issue-013 showed kg-claim-check returned a generic context pack with verb=check instead of checking the claim.", "DECISIONS.md requires kg-claim-check for advisor-facing proposal, roadmap, research-question, and literature-synthesis claims, so the verdict shape is load-bearing."]
+references = ["repo:.agents/memory/state/DECISIONS.md", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/crates/litkg-cli/src/main.rs", "repo:.agents/issues.toml#issue-023", "repo:.agents/issues.toml#issue-025", "repo:.agents/refactors.toml#refactor-016", "repo:.agents/todos.toml#todo-061"]
+
+[[issue]]
+id = "issue-030"
+title = "kg-query duplicated kg-route without synthesis"
+description = "The kg-query Make target promised question retrieval but called the same context-pack path as kg-route without answer synthesis or a distinct contract."
+type = "maintenance"
+priority = "medium"
+status = "open"
+labels = ["kg", "litkg", "tooling", "scaffold"]
+context = ["The command produced the same context-pack shape as kg-route and trained agents to expect synthesis that did not exist.", "The chosen fix is deletion: keep kg-search for fast retrieval and kg-route for context packs; reserve synthesis for a future real answer layer."]
+references = ["repo:Makefile", "repo:.agents/references/litkg_quick_reference.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/issues.toml#issue-023", "repo:.agents/refactors.toml#refactor-016", "repo:.agents/refactors.toml#refactor-017"]

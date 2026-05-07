@@ -34,7 +34,9 @@ metadata:
 
 # ARIA litkg Memory
 
-Use this skill when litkg should act as the project memory router.
+Use this skill when litkg should act as a probationary source-backed router,
+claim-check layer, or research-memory retrieval surface for work that crosses
+source families.
 
 ## Protocol
 
@@ -43,8 +45,8 @@ Use this skill when litkg should act as the project memory router.
 2. Check backend/source readiness with `make kg-capabilities KG_FORMAT=json`
    when freshness matters.
 3. Use `make kg-route KG_TASK="<task>"` for broad task routing.
-4. Use `make kg-query KG_QUERY="<question>"` or `make kg-search
-   KG_QUERY="<terms>"` for retrieval.
+4. Use `make kg-search KG_QUERY="<terms>"` for fast retrieval, or `kg-route`
+   when the agent needs a full context pack.
 5. Use `make kg-claim-check KG_CLAIM="<claim>"` for advisor-facing proposal,
    roadmap, research-question, or literature-synthesis claims.
 6. Inspect cited canonical sources before treating retrieved statements as
