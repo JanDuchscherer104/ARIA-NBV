@@ -149,15 +149,18 @@ uv run nbv-rerun-inspect \
   --config-path ../.configs/rerun_offline.toml \
   --rollout-store ../.artifacts/rerun_rollout_inspector/2026-05-06_multistep/rollouts.zarr \
   --rollout-index 0 \
-  --rollout-context auto \
+  --rollout-context required \
+  --split val \
+  --index 0 \
   --save ../.artifacts/rerun/rollout_multistep.rrd
 ```
 
 The rollout-Zarr view is still diagnostic-only; it checks replay rows, masks,
 selected action paths, and Q_H-ready metadata rather than proving real ASE
-target-RRI quality. When rollout lineage resolves to a local VIN offline
-sample, the same recording also includes the normal single-step semidense,
-mesh, OBB, trajectory, and candidate modalities before the rollout overlays.
+target-RRI quality. `required` plus an explicit VIN sample selector overlays
+synthetic rollout rows on the selected offline sample; real rollout stores can
+also resolve their own scene/snippet lineage when it matches the local VIN
+offline store.
 
 ## Pass Criteria {#pass-criteria}
 

@@ -295,5 +295,7 @@ def test_rollout_zarr_logger_required_context_uses_selection_for_synthetic_store
 
     assert [name for name, _ in calls] == ["select", "log_sample", "log_metadata"]
     selection = calls[0][1]
+    assert selection.scene_id is None
+    assert selection.snippet_id is None
     assert selection.split == "val"
     assert selection.index == 3

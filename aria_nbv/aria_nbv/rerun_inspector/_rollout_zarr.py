@@ -111,8 +111,10 @@ class RerunRolloutZarrLogger:
         if mode == "off":
             self._context_warnings.append("VIN context logging disabled by selection.rollout_context_mode='off'.")
             return
-        if _synthetic_rollout_store(reader) and mode == "auto" and not _has_explicit_context_selector(
-            self.config.selection
+        if (
+            _synthetic_rollout_store(reader)
+            and mode == "auto"
+            and not _has_explicit_context_selector(self.config.selection)
         ):
             message = "VIN context logging skipped for synthetic rollout store."
             self._context_warnings.append(message)
@@ -475,6 +477,13 @@ def _rollout_context_selection(
     rows: SelectedRolloutRows,
     fallback: RerunInspectorSelectionConfig,
 ) -> RerunInspectorSelectionConfig | None:
+    if fallback.sample_key or (fallback.scene_id and fallback.snippet_id):
+        return fallback.model_copy(deep=True)
+    if _synthetic_rollout_store(reader):
+        if fallback.rollout_context_mode == "required":
+            return fallback.model_copy(deep=True)
+        return None
+
     scene_id = _rollout_dictionary_value(reader, group="scene", array_path="rollouts/scene_id", row=rows.rollout_index)
     snippet_id = _rollout_dictionary_value(
         reader,
@@ -486,7 +495,7 @@ def _rollout_context_selection(
         return fallback.model_copy(
             deep=True, update={"scene_id": scene_id, "snippet_id": snippet_id, "sample_key": None}
         )
-    if fallback.sample_key or (fallback.scene_id and fallback.snippet_id) or fallback.rollout_context_mode == "required":
+    if fallback.rollout_context_mode == "required":
         return fallback.model_copy(deep=True)
     return None
 
@@ -501,7 +510,7 @@ def _synthetic_rollout_store(reader: RolloutZarrStoreReader) -> bool:
         str(attrs.get("source_offline_store_version", "")).lower(),
         str(attrs.get("target_protocol_version", "")).lower(),
     }
-    return "synthetic" in synthetic_values
+    return any("synthetic" in value for value in synthetic_values)
 
 
 def _rollout_dictionary_value(

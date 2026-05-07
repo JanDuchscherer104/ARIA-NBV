@@ -51,10 +51,11 @@ This mode logs one rollout chain on a `rollout_step` timeline. By default it
 first tries to resolve the rollout's `scene_id` and `snippet_id` back to the
 matching VIN offline sample, then logs the normal single-step modalities before
 adding rollout-step overlays. Synthetic rollout stores remain valid smoke
-inputs; if their lineage does not resolve locally, the inspector records a
-metadata warning and continues with rollout-only layers. Use
-`--rollout-context required` to fail on missing VIN context or
-`--rollout-context off` for purely synthetic replay checks.
+inputs; in `auto` mode they stay rollout-only unless an explicit sample key or
+scene/snippet selector is supplied. Use
+`--rollout-context required --split val --index 0` to force an explicit VIN
+offline sample under the rollout overlays, or `--rollout-context off` for
+purely synthetic replay checks.
 
 Rollout candidate poses are logged as native Rerun camera entities, not manual
 line strips. The entity path separates selected, valid, and invalid candidates
