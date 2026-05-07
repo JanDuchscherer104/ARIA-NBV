@@ -14,7 +14,9 @@ import torch
 
 pytest.importorskip("efm3d")
 
-from aria_nbv.data_handling import write_rollout_zarr_store
+from efm3d.aria.pose import PoseTW
+
+from aria_nbv.data_handling import RolloutZarrStoreReader, write_rollout_zarr_store
 from aria_nbv.pose_generation import INVALID_REASON_CODES, build_synthetic_rollout_traces
 from aria_nbv.rerun_inspector._config import RerunOfflineInspectorConfig
 from aria_nbv.rerun_inspector._loggers import ENTITY_WORLD
@@ -62,6 +64,7 @@ class _FakeRerun:
     def __init__(self) -> None:
         self.calls: list[tuple[str, Any]] = []
         self.logged: dict[str, _Archetype] = {}
+        self.logged_extras: dict[str, tuple[Any, ...]] = {}
 
     def init(self, *args: Any, **kwargs: Any) -> None:
         self.calls.append(("init", args, kwargs))
@@ -81,6 +84,7 @@ class _FakeRerun:
     def log(self, entity_path: str, entity: _Archetype, *args: Any, **kwargs: Any) -> None:
         self.calls.append(("log", entity_path, args, kwargs))
         self.logged[entity_path] = entity
+        self.logged_extras[entity_path] = args
 
 
 def _synthetic_rollout_store(tmp_path: Path, *, synthetic_attrs: bool = True) -> Path:
@@ -190,10 +194,13 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(tmp_path: Path) -> 
     assert step_metadata["q_h"]["state_row_found"]
     assert not step_metadata["q_h"]["dense_q_targets_available"]
     assert step_metadata["invalid_candidate_count"] > 0
+    assert step_metadata["display_validity_trusted"]
 
     selected_path = fake.logged[ENTITY_ROLLOUT_SELECTED_PATH]
-    assert len(selected_path.args[0]) == 1
-    np.testing.assert_equal(np.asarray(selected_path.args[0][0]).shape[1], 3)
+    assert len(selected_path.args[0]) == 2
+    np.testing.assert_equal(np.asarray(selected_path.args[0][0]).shape, (2, 3))
+    assert len(selected_path.kwargs["colors"]) == 2
+    assert selected_path.kwargs["colors"][0] != selected_path.kwargs["colors"][1]
 
 
 def test_rollout_zarr_logger_logs_matching_static_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -220,7 +227,14 @@ def test_rollout_zarr_logger_logs_matching_static_context(tmp_path: Path, monkey
     )
 
     class _FakeOfflineLogger:
-        def __init__(self, config: RerunOfflineInspectorConfig, *, rr_module: object | None = None) -> None:
+        def __init__(
+            self,
+            config: RerunOfflineInspectorConfig,
+            *,
+            rr_module: object | None = None,
+            target_obb_hint: str | None = None,
+        ) -> None:
+            del target_obb_hint
             calls.append(("logger_init", rr_module))
 
         def log_sample(self, *, sample: object, inventory: object, selection: str) -> None:
@@ -278,8 +292,14 @@ def test_rollout_zarr_logger_required_context_uses_selection_for_synthetic_store
     )
 
     class _FakeOfflineLogger:
-        def __init__(self, config: RerunOfflineInspectorConfig, *, rr_module: object | None = None) -> None:
-            pass
+        def __init__(
+            self,
+            config: RerunOfflineInspectorConfig,
+            *,
+            rr_module: object | None = None,
+            target_obb_hint: str | None = None,
+        ) -> None:
+            del config, rr_module, target_obb_hint
 
         def log_sample(self, *, sample: object, inventory: object, selection: str) -> None:
             calls.append(("log_sample", selection))
@@ -299,3 +319,113 @@ def test_rollout_zarr_logger_required_context_uses_selection_for_synthetic_store
     assert selection.snippet_id is None
     assert selection.split == "val"
     assert selection.index == 3
+
+
+def test_rollout_zarr_logger_aligns_synthetic_poses_to_context_world(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Synthetic rollout overlays should be transformed into the selected VIN world frame."""
+
+    store_dir = _synthetic_rollout_store(tmp_path)
+    reader = RolloutZarrStoreReader(store_dir)
+    store_root = reader.array("rollouts/root_pose_world")[0].astype(np.float32)
+    step_rollout_ids = reader.array("steps/rollout_row_id").astype(np.int64)
+    step_ids = reader.array("steps/step_row_id").astype(np.int64)
+    step_indices = reader.array("steps/step_index").astype(np.int64)
+    rollout_step_rows = np.nonzero(step_rollout_ids == 0)[0]
+    final_step_row = rollout_step_rows[np.argmax(step_indices[rollout_step_rows])]
+    final_step_id = int(step_ids[final_step_row])
+    candidate_step_ids = reader.array("candidates/step_row_id").astype(np.int64)
+    shell_indices = reader.array("candidates/shell_index").astype(np.int64)
+    candidate_row = np.nonzero((candidate_step_ids == final_step_id) & (shell_indices == 0))[0][0]
+    final_store_pose = reader.array("candidates/pose_world_cam")[candidate_row].astype(np.float32)
+    context_root = store_root.copy()
+    context_root[9:12] = np.asarray([10.0, 20.0, 30.0], dtype=np.float32)
+    expected_pose = (
+        PoseTW(torch.as_tensor(context_root))
+        .compose(PoseTW(torch.as_tensor(store_root)).inverse().compose(PoseTW(torch.as_tensor(final_store_pose))))
+        .tensor()
+        .numpy()
+        .reshape(12)
+    )
+
+    cfg = RerunOfflineInspectorConfig()
+    cfg.output.save_path = tmp_path / "rollout.rrd"
+    cfg.selection.rollout_context_mode = "required"
+    fake = _FakeRerun()
+
+    monkeypatch.setattr(
+        "aria_nbv.rerun_inspector._rollout_zarr.select_rerun_sample",
+        lambda **kwargs: type(
+            "Selected",
+            (),
+            {
+                "sample": type(
+                    "Sample",
+                    (),
+                    {
+                        "oracle": type(
+                            "Oracle", (), {"reference_pose_world_rig": PoseTW(torch.as_tensor(context_root))}
+                        )()
+                    },
+                )(),
+                "description": "split=val index=0",
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "aria_nbv.rerun_inspector._rollout_zarr.collect_visual_inventory",
+        lambda sample: object(),
+    )
+    monkeypatch.setattr(
+        "aria_nbv.rerun_inspector._rollout_zarr.validate_required_inventory",
+        lambda config, inventory: None,
+    )
+
+    class _FakeOfflineLogger:
+        def __init__(
+            self,
+            config: RerunOfflineInspectorConfig,
+            *,
+            rr_module: object | None = None,
+            target_obb_hint: str | None = None,
+        ) -> None:
+            del config, rr_module, target_obb_hint
+
+        def log_sample(self, *, sample: object, inventory: object, selection: str) -> None:
+            pass
+
+        def log_metadata(self, *, sample: object, inventory: object, selection: str) -> None:
+            pass
+
+    monkeypatch.setattr("aria_nbv.rerun_inspector._rollout_zarr.RerunOfflineLogger", _FakeOfflineLogger)
+
+    logger = RerunRolloutZarrLogger(cfg, rr_module=fake)
+    logger.start()
+    logger.log_store(store_dir=store_dir, rollout_index=0)
+
+    camera_path = next(path for path in fake.logged if path.endswith("/candidate_000/camera"))
+    transform = fake.logged[camera_path]
+    np.testing.assert_allclose(
+        np.asarray(transform.kwargs["translation"], dtype=np.float32),
+        expected_pose[9:12],
+        atol=1e-5,
+    )
+
+    candidate_values = [
+        extras[1].kwargs
+        for path, extras in fake.logged_extras.items()
+        if path.startswith("world/rollout/step/") and path.endswith("/camera")
+    ]
+    assert candidate_values
+    assert not any(values["valid_mask"] for values in candidate_values)
+    assert any(values["stored_valid_mask"] for values in candidate_values)
+    assert not any(values["display_validity_trusted"] for values in candidate_values)
+
+    metadata = json.loads(fake.logged[ENTITY_ROLLOUT_METADATA].args[0])
+    assert any("stored candidate validity" in warning for warning in metadata["context"]["warnings"])
+    step_metadata = json.loads(fake.logged[ENTITY_ROLLOUT_STEP_METADATA].args[0])
+    assert step_metadata["num_valid_candidates"] == 0
+    assert step_metadata["stored_num_valid_candidates"] > 0
+    assert not step_metadata["display_validity_trusted"]

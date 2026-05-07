@@ -55,13 +55,22 @@ inputs; in `auto` mode they stay rollout-only unless an explicit sample key or
 scene/snippet selector is supplied. Use
 `--rollout-context required --split val --index 0` to force an explicit VIN
 offline sample under the rollout overlays, or `--rollout-context off` for
-purely synthetic replay checks.
+purely synthetic replay checks. When a synthetic store is overlaid on a VIN
+sample, the inspector maps `rollouts/root_pose_world` to the selected sample's
+reference pose before logging rollout cameras. The stored synthetic validity
+masks are not reused as real scene validity in that mode: candidates are shown
+with untrusted/invalid display validity because collision, outside-mesh, and
+free-space checks were not run against the selected VIN scene. Real rollout
+stores should already store `candidates/pose_world_cam` in the shared scene
+world frame and carry validity masks computed against that same scene.
 
 Rollout candidate poses are logged as native Rerun camera entities, not manual
 line strips. The entity path separates selected, valid, and invalid candidates
 under `world/rollout/step/...`, while selected-view paths, per-step metadata,
 and scalar plots show valid candidate count, selected probability, and selected
-target RRI.
+target RRI. Candidate centers and selected rollout path segments are colored by
+rollout step; the historical ASE trajectory uses a separate muted trajectory
+color so it does not read as part of the selected rollout interpolation.
 
 Required sample fields should be validated before Rerun logging starts:
 
@@ -88,6 +97,8 @@ auditable:
   path for saved recordings;
 - **timeline:** sample, frame, or candidate timeline choices;
 - **world:** world-frame axis conventions and root entity path;
+- **geometry:** primitive scales and `mesh_alpha` for transparent GT mesh
+  inspection; the default mesh alpha is about 20%;
 - **geometry:** point and mesh display budgets, frustum sizes, line radii, and
   optional top-k candidate highlighting;
 - **metrics:** candidate coloring by RRI, validity, rank, or selected candidate;

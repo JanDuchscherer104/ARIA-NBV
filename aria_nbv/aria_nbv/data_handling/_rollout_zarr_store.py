@@ -232,6 +232,14 @@ def validate_rollout_zarr_store(store_dir: Path | str) -> RolloutZarrValidationR
     rollout_target_row_id = np.asarray(root["rollouts/target_row_id"])
     if not np.isin(rollout_target_row_id, target_row_id).all():
         errors.append("Rollout target_row_id contains ids not present in targets/target_row_id.")
+    if "root_pose_world" not in root["rollouts"]:
+        errors.append("Missing required rollout root_pose_world field.")
+    else:
+        root_pose_world = np.asarray(root["rollouts/root_pose_world"])
+        if root_pose_world.shape != (int(np.asarray(root["rollouts/rollout_row_id"]).shape[0]), 12):
+            errors.append("rollouts/root_pose_world must have shape (num_rollouts, 12).")
+        elif not np.isfinite(root_pose_world).all():
+            errors.append("rollouts/root_pose_world contains non-finite values.")
     q_target_row_id = np.asarray(root["q_h/target_row_id"])
     step_rollout_row_id = np.asarray(root["steps/rollout_row_id"])
     rollout_row_id = np.asarray(root["rollouts/rollout_row_id"])
@@ -246,7 +254,7 @@ def validate_rollout_zarr_store(store_dir: Path | str) -> RolloutZarrValidationR
     elif q_target_row_id.shape != expected_q_target.shape:
         errors.append("Q_H target_row_id shape does not match the steps table.")
 
-    if root.attrs.get("target_protocol_version") != "synthetic":
+    if "synthetic" not in str(root.attrs.get("target_protocol_version", "")).lower():
         for attr_name in ("source_offline_store_version", "split_manifest_hash", "target_protocol_version"):
             if _missing_lineage_token(root.attrs.get(attr_name)):
                 errors.append(f"Non-synthetic rollout store is missing required root attr {attr_name!r}.")
@@ -454,6 +462,7 @@ def _flatten_traces(traces: list[RolloutTrace], dictionaries: dict[str, list[str
         "rollout_row_id": [],
         "rollout_id": [],
         "chain_id": [],
+        "root_pose_world": [],
         "scene_id": [],
         "snippet_id": [],
         "target_row_id": [],
@@ -501,6 +510,9 @@ def _flatten_traces(traces: list[RolloutTrace], dictionaries: dict[str, list[str
         rollout_rows["rollout_row_id"].append(rollout_row_id)
         rollout_rows["rollout_id"].append(_dict_id(dictionaries["rollout"], trace.lineage.rollout_id))
         rollout_rows["chain_id"].append(trace.lineage.chain_id)
+        rollout_rows["root_pose_world"].append(
+            trace.root_pose_world.detach().cpu().to(dtype=torch.float32).reshape(-1).numpy()
+        )
         rollout_rows["scene_id"].append(_dict_id(dictionaries["scene"], trace.lineage.scene_id or ""))
         rollout_rows["snippet_id"].append(_dict_id(dictionaries["snippet"], trace.lineage.snippet_id or ""))
         rollout_rows["target_row_id"].append(

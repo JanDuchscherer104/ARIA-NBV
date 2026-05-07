@@ -85,9 +85,11 @@ Required lineage fields include:
 
 The root `lineage/rollout_index` table should hold one row per rollout chain:
 `rollout_row_id`, `rollout_id`, `chain_id`, `scene_id`, `snippet_id`,
-`target_row_id`, `split`, `root_pose_world_rig`, `root_pose_world_cam` when
-defined, configured horizon and budgets, policy id, seed, termination reason,
-runtime summary, invalid-action summary, and final cumulative metrics.
+`target_row_id`, `split`, `root_pose_world`, configured horizon and budgets,
+policy id, seed, termination reason, runtime summary, invalid-action summary,
+and final cumulative metrics. `root_pose_world` is mandatory because rollout
+diagnostics need an explicit root transform to audit whether candidate poses
+share the same scene world frame as ASE, GT mesh, EFM voxels, and OBB layers.
 
 ## Mesh References And Target Crops {#rollout-mesh-targets}
 

@@ -160,7 +160,13 @@ selected action paths, and Q_H-ready metadata rather than proving real ASE
 target-RRI quality. `required` plus an explicit VIN sample selector overlays
 synthetic rollout rows on the selected offline sample; real rollout stores can
 also resolve their own scene/snippet lineage when it matches the local VIN
-offline store.
+offline store. Synthetic overlays are visual-only: the inspector aligns the
+stored synthetic rollout root pose to the selected VIN reference pose so the
+rollout cameras appear in the same world frame as mesh, ASE, and EFM layers.
+The synthetic store's validity bits remain synthetic-scene diagnostics; when
+overlaid onto a real VIN sample they are displayed as untrusted/invalid rather
+than as evidence that path-collision or outside-mesh checks passed in the real
+scene.
 
 ## Pass Criteria {#pass-criteria}
 

@@ -12,6 +12,7 @@ from efm3d.aria.aria_constants import ARIA_SNIPPET_T_WORLD_SNIPPET
 from efm3d.aria.pose import PoseTW
 from pytorch3d.renderer.cameras import PerspectiveCameras
 
+from aria_nbv.rerun_inspector._colors import TARGET_OBB_RGBA
 from aria_nbv.rerun_inspector._config import RerunOfflineInspectorConfig
 from aria_nbv.rerun_inspector._loggers import (
     ENTITY_ASE_KEYFRAME_MEDIA,
@@ -21,6 +22,7 @@ from aria_nbv.rerun_inspector._loggers import (
     ENTITY_EFM_VOXEL_EXTENT,
     ENTITY_EFM_VOXELS,
     ENTITY_GT_OBBS,
+    ENTITY_MESH,
     ENTITY_METADATA_SAMPLE,
     ENTITY_REFERENCE_POSE,
     ENTITY_RGB_KEYFRAMES,
@@ -450,6 +452,37 @@ def test_compact_modalities_log_to_stable_entity_paths() -> None:
     assert fake.logged_extras[camera_path][0].kwargs["camera_xyz"] == "LUF"  # noqa: S101
     assert fake.logged[depth_path].kwargs["meter"] == 1.0  # noqa: S101
     assert np.asarray(fake.logged[ENTITY_GT_OBBS].kwargs["centers"]).shape == (1, 3)  # noqa: S101
+    assert (
+        fake.logged[ENTITY_GT_OBBS].kwargs["colors"][0][:3] != fake.logged[ENTITY_DETECTED_OBBS].kwargs["colors"][0][:3]
+    )  # noqa: E501, S101
+
+
+def test_mesh_logging_uses_configured_alpha() -> None:
+    """GT mesh transparency should be configurable without changing the palette RGB."""
+
+    cfg = RerunOfflineInspectorConfig()
+    cfg.geometry.mesh_alpha = 48
+    cfg.primitives.log_semidense = False
+    cfg.primitives.log_reference_pose = False
+    cfg.primitives.log_candidate_frusta = False
+    cfg.primitives.log_top_oracle_frustum = False
+    cfg.primitives.log_invalid_frusta = False
+    cfg.primitives.log_candidate_centers = False
+    sample = _sample()
+    sample.efm_snippet_view = SimpleNamespace(
+        mesh_verts=torch.tensor([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], dtype=torch.float32),
+        mesh_faces=torch.tensor([[0, 1, 2]], dtype=torch.int64),
+    )
+    fake = _FakeRerun()
+
+    RerunOfflineLogger(cfg, rr_module=fake).log_sample(
+        sample=sample,
+        inventory=OfflineVisualInventory(has_mesh=True),
+        selection="sample_key=sample-0",
+    )
+
+    assert ENTITY_MESH in fake.logged  # noqa: S101
+    assert fake.logged[ENTITY_MESH].kwargs["albedo_factor"] == [130, 138, 150, 48]  # noqa: S101
 
 
 def test_obbs_are_transformed_from_snippet_to_world_before_logging() -> None:
@@ -496,7 +529,7 @@ def test_obb_labels_include_class_names_and_unknown_fallback() -> None:
     )
     fake = _FakeRerun()
 
-    RerunOfflineLogger(cfg, rr_module=fake).log_sample(
+    RerunOfflineLogger(cfg, rr_module=fake, target_obb_hint="inst_id=8").log_sample(
         sample=sample,
         inventory=OfflineVisualInventory(has_gt_obbs=True, has_detected_obbs=True),
         selection="sample_key=sample-0",
@@ -507,6 +540,8 @@ def test_obb_labels_include_class_names_and_unknown_fallback() -> None:
     assert gt_label == "class=chair | sem_id=3 | inst_id=8 | prob=0.700"  # noqa: S101
     assert detected_labels == ["class=<unknown> | sem_id=99 | inst_id=2 | prob=0.400"]  # noqa: S101
     assert "labels" not in fake.logged[ENTITY_DETECTED_OBBS].kwargs  # noqa: S101
+    assert fake.logged[ENTITY_GT_OBBS].kwargs["colors"][0] == TARGET_OBB_RGBA.tolist()  # noqa: S101
+    assert fake.logged_extras[ENTITY_GT_OBBS][0].kwargs["obb_is_target"] == [True]  # noqa: S101
 
 
 def test_efm_voxel_fields_log_thresholded_points() -> None:

@@ -32,7 +32,7 @@ def test_rollout_zarr_store_writes_reads_and_validates_synthetic_traces(tmp_path
         tmp_path / "rollouts.zarr",
         traces,
         discount_gamma=0.95,
-        target_protocol_version="synthetic",
+        target_protocol_version="synthetic-rerun-smoke",
     )
 
     assert result.num_rollouts == 3
@@ -46,6 +46,9 @@ def test_rollout_zarr_store_writes_reads_and_validates_synthetic_traces(tmp_path
     reader = RolloutZarrStoreReader(result.store_dir)
     assert reader.root.attrs["schema_id"] == "aria_nbv.rollout_zarr_q_invalidity"
     assert reader.root.attrs["return_semantics"] == "cumulative_target_rri"
+    root_pose = reader.array("rollouts/root_pose_world")
+    assert root_pose.shape == (result.num_rollouts, 12)
+    assert np.isfinite(root_pose).all()
 
     candidate_valid = reader.array("candidates/candidate_valid_mask")
     selection_probabilities = reader.array("candidates/selection_probabilities")
@@ -147,8 +150,10 @@ def test_rollout_zarr_relative_pose_root_is_pose_transform(tmp_path) -> None:
 
     pose = reader.array("candidates/pose_world_cam")[0]
     relative = reader.array("candidates/pose_relative_root")[0]
+    stored_root = reader.array("rollouts/root_pose_world")[0]
     expected = PoseTW(traces[0].root_pose_world).inverse().compose(PoseTW(torch.as_tensor(pose))).tensor().numpy()
 
+    assert np.allclose(stored_root, traces[0].root_pose_world.numpy(), atol=1e-5)
     assert np.allclose(relative, expected, atol=1e-5)
     assert not np.allclose(relative, pose - traces[0].root_pose_world.numpy(), atol=1e-5)
 

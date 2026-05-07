@@ -29,6 +29,9 @@ INVALID_RGBA = np.array([148, 163, 184, 96], dtype=np.uint8)
 UNKNOWN_RGBA = np.array([100, 116, 139, 160], dtype=np.uint8)
 """Fallback RGBA color used for non-finite scalar values."""
 
+TARGET_OBB_RGBA = np.array([255, 55, 95, 255], dtype=np.uint8)
+"""Distinct RGBA color used when a target OBB can be identified."""
+
 _RRI_STOPS = np.array(
     [
         [68, 1, 84],
@@ -50,6 +53,48 @@ _RANK_PALETTE = np.array(
         [20, 184, 166],
         [236, 72, 153],
         [107, 114, 128],
+    ],
+    dtype=np.uint8,
+)
+
+_STEP_PALETTE = np.array(
+    [
+        [56, 189, 248],
+        [251, 191, 36],
+        [168, 85, 247],
+        [34, 197, 94],
+        [244, 114, 182],
+        [249, 115, 22],
+        [20, 184, 166],
+        [239, 68, 68],
+    ],
+    dtype=np.uint8,
+)
+
+_GT_OBB_PALETTE = np.array(
+    [
+        [245, 158, 11],
+        [250, 204, 21],
+        [234, 179, 8],
+        [251, 146, 60],
+        [252, 211, 77],
+        [217, 119, 6],
+        [253, 186, 116],
+        [202, 138, 4],
+    ],
+    dtype=np.uint8,
+)
+
+_DETECTED_OBB_PALETTE = np.array(
+    [
+        [59, 130, 246],
+        [14, 165, 233],
+        [6, 182, 212],
+        [99, 102, 241],
+        [45, 212, 191],
+        [37, 99, 235],
+        [34, 211, 238],
+        [129, 140, 248],
     ],
     dtype=np.uint8,
 )
@@ -142,6 +187,38 @@ def validity_to_rgba(validity: BoolArrayLike1D) -> RGBAArray:
     mask = _as_bool_array(validity, count=None)
     colors = np.tile(INVALID_RGBA, (mask.shape[0], 1))
     colors[mask] = VALID_RGBA
+    return colors
+
+
+def step_to_rgba(step_indices: ArrayLike1D, *, alpha: int = 255) -> RGBAArray:
+    """Map rollout step indices to a stable categorical RGBA palette."""
+
+    values = _as_1d_array(step_indices, name="step_indices", dtype=np.int64)
+    alpha_u8 = _validate_uint8_scalar(alpha, name="alpha")
+    colors = np.empty((values.shape[0], 4), dtype=np.uint8)
+    colors[:, :3] = _STEP_PALETTE[np.mod(values, _STEP_PALETTE.shape[0])]
+    colors[:, 3] = alpha_u8
+    return colors
+
+
+def obb_semantic_rgba(
+    sem_ids: ArrayLike1D,
+    *,
+    family: Literal["gt", "detected"],
+    target_mask: BoolArrayLike1D | None = None,
+    alpha: int = 235,
+) -> RGBAArray:
+    """Map OBB semantic ids into GT or detected/predicted color spaces."""
+
+    values = _as_1d_array(sem_ids, name="sem_ids", dtype=np.int64)
+    alpha_u8 = _validate_uint8_scalar(alpha, name="alpha")
+    palette = _GT_OBB_PALETTE if family == "gt" else _DETECTED_OBB_PALETTE
+    colors = np.empty((values.shape[0], 4), dtype=np.uint8)
+    colors[:, :3] = palette[np.mod(values, palette.shape[0])]
+    colors[:, 3] = alpha_u8
+    if target_mask is not None:
+        mask = _as_bool_array(target_mask, count=colors.shape[0])
+        colors[mask] = TARGET_OBB_RGBA
     return colors
 
 
@@ -239,9 +316,12 @@ __all__ = [
     "RGBAArray",
     "VALID_RGBA",
     "INVALID_RGBA",
+    "TARGET_OBB_RGBA",
     "UNKNOWN_RGBA",
     "candidate_rgba",
+    "obb_semantic_rgba",
     "oracle_rri_to_rgba",
     "rank_to_rgba",
+    "step_to_rgba",
     "validity_to_rgba",
 ]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol, TypeAlias, cast
 
@@ -19,6 +20,7 @@ from torch import Tensor
 
 from aria_nbv.data_handling import VinOfflineSample
 
+from ._colors import obb_semantic_rgba
 from ._config import RerunOfflineInspectorConfig
 from ._metadata import OfflineVisualInventory, build_sample_metadata_document
 
@@ -368,10 +370,10 @@ def _rgba(name: str, count: int) -> list[list[int]]:
         "frusta_invalid": [240, 90, 85, 220],
         "centers": [255, 235, 120, 255],
         "candidate_points": [160, 225, 205, 150],
-        "mesh": [130, 138, 150, 90],
-        "gt_obbs": [255, 195, 80, 235],
-        "detected_obbs": [120, 220, 255, 220],
-        "trajectory": [255, 255, 255, 230],
+        "mesh": [130, 138, 150, 51],
+        "gt_obbs": [245, 158, 11, 235],
+        "detected_obbs": [59, 130, 246, 220],
+        "trajectory": [148, 163, 184, 180],
     }
     return [palette.get(name, [255, 255, 255, 255]) for _ in range(count)]
 
@@ -665,7 +667,7 @@ def _obb_boxes(
     *,
     t_world_snippet: PoseTW,
     sem_id_to_name: Sequence[str] | None = None,
-) -> tuple[NDArray[Any], NDArray[Any], NDArray[Any], list[str]]:
+) -> tuple[NDArray[Any], NDArray[Any], NDArray[Any], list[str], NDArray[Any], NDArray[Any]]:
     """Convert EFM snippet-frame OBB tensors into native Rerun box fields.
 
     Returns centers, half sizes, quaternions in Rerun ``xyzw`` order, and
@@ -677,7 +679,17 @@ def _obb_boxes(
     valid_mask_t = ~world_obbs.get_padding_mask().detach().cpu()
     if not bool(valid_mask_t.any()):
         empty = np.zeros((0, 3), dtype=np.float32)
-        return empty, empty, np.zeros((0, 4), dtype=np.float32), []
+        return (
+            empty,
+            empty,
+            np.zeros((0, 4), dtype=np.float32),
+            [],
+            np.zeros((0,), dtype=np.int64),
+            np.zeros(
+                (0,),
+                dtype=np.int64,
+            ),
+        )
 
     flat_obbs = world_obbs.reshape(-1, world_obbs.shape[-1])
     flat_valid = valid_mask_t.reshape(-1)
@@ -698,7 +710,48 @@ def _obb_boxes(
         )
         for sem, inst, score in zip(sem_id, inst_id, prob, strict=False)
     ]
-    return centers, half_sizes, quats_xyzw, labels
+    return centers, half_sizes, quats_xyzw, labels, sem_id.astype(np.int64), inst_id.astype(np.int64)
+
+
+def _obb_family(palette: str) -> str:
+    """Return the visual OBB color family for a palette name."""
+
+    return "gt" if palette == "gt_obbs" else "detected"
+
+
+def _target_obb_mask(
+    *,
+    labels: Sequence[str],
+    sem_ids: NDArray[Any],
+    inst_ids: NDArray[Any],
+    target_hint: str | None,
+) -> NDArray[np.bool_]:
+    """Return a best-effort target OBB mask from a rollout/sample target hint."""
+
+    mask = np.zeros((len(labels),), dtype=np.bool_)
+    if target_hint is None:
+        return mask
+    normalized = str(target_hint).strip().lower()
+    if not normalized or "synthetic" in normalized:
+        return mask
+    tokens = set(re.findall(r"[a-z0-9_:-]+", normalized))
+    for index, label in enumerate(labels):
+        label_lower = label.lower()
+        sem = int(sem_ids[index])
+        inst = int(inst_ids[index])
+        exact_tokens = {
+            str(sem),
+            str(inst),
+            f"sem_id={sem}",
+            f"sem:{sem}",
+            f"sem_id:{sem}",
+            f"inst_id={inst}",
+            f"inst:{inst}",
+            f"inst_id:{inst}",
+        }
+        if normalized in label_lower or tokens.intersection(exact_tokens):
+            mask[index] = True
+    return mask
 
 
 def _gt_obb_semantic_names(sample: VinOfflineSample) -> Sequence[str] | None:
@@ -841,12 +894,20 @@ def _field_voxel_centers_world(
 class RerunOfflineLogger:
     """Stateful logger that writes one selected offline sample to Rerun."""
 
-    def __init__(self, config: RerunOfflineInspectorConfig, *, rr_module: RerunModule | None = None) -> None:
+    def __init__(
+        self,
+        config: RerunOfflineInspectorConfig,
+        *,
+        rr_module: RerunModule | None = None,
+        target_obb_hint: str | None = None,
+    ) -> None:
         """Create the logger.
 
         Args:
             config: Inspector configuration.
             rr_module: Optional fake or imported ``rerun`` module.
+            target_obb_hint: Optional rollout/sample target id used to highlight
+                a matching OBB in diagnostics when labels expose the id.
         """
 
         self.config = config
@@ -857,6 +918,7 @@ class RerunOfflineLogger:
         else:
             self.rr = rr_module
         self._metadata_warnings: list[str] = []
+        self._target_obb_hint = target_obb_hint
 
     def _warn_metadata(self, message: str) -> None:
         """Record a non-fatal visualization warning for the metadata panel."""
@@ -1090,12 +1152,14 @@ class RerunOfflineLogger:
         if mesh is None:
             return
         verts, faces = mesh
+        mesh_color = _rgba("mesh", 1)[0]
+        mesh_color[3] = self.config.geometry.mesh_alpha
         self.rr.log(
             ENTITY_MESH,
             self.rr.Mesh3D(
                 vertex_positions=verts,
                 triangle_indices=faces,
-                albedo_factor=_rgba("mesh", 1)[0],
+                albedo_factor=mesh_color,
             ),
             static=True,
         )
@@ -1116,25 +1180,42 @@ class RerunOfflineLogger:
         if t_world_snippet is None:
             self._warn_metadata(f"{entity_path} skipped: missing T_world_snippet for snippet-frame OBBs.")
             return
-        centers, half_sizes, quaternions, labels = _obb_boxes(
+        centers, half_sizes, quaternions, labels, sem_ids, inst_ids = _obb_boxes(
             obbs,
             t_world_snippet=t_world_snippet,
             sem_id_to_name=sem_id_to_name,
         )
         if centers.shape[0] == 0:
             return
+        target_mask = _target_obb_mask(
+            labels=labels,
+            sem_ids=sem_ids,
+            inst_ids=inst_ids,
+            target_hint=self._target_obb_hint,
+        )
         box_kwargs: dict[str, object] = {
             "centers": centers,
             "half_sizes": half_sizes,
             "quaternions": quaternions,
-            "colors": _rgba(palette, centers.shape[0]),
+            "colors": obb_semantic_rgba(
+                sem_ids,
+                family=cast(Any, _obb_family(palette)),
+                target_mask=target_mask,
+                alpha=235 if palette == "gt_obbs" else 220,
+            ).tolist(),
         }
         if show_scene_labels:
             box_kwargs["labels"] = labels
         self.rr.log(
             entity_path,
             self.rr.Boxes3D(**box_kwargs),
-            self.rr.AnyValues(obb_label=labels),
+            self.rr.AnyValues(
+                obb_label=labels,
+                obb_sem_id=sem_ids.astype(int).tolist(),
+                obb_inst_id=inst_ids.astype(int).tolist(),
+                obb_is_target=target_mask.astype(bool).tolist(),
+                target_obb_hint=self._target_obb_hint or "",
+            ),
             static=True,
         )
 

@@ -140,6 +140,9 @@ class RerunInspectorGeometryConfig(BaseConfig):
     trajectory_radius: float = 0.02
     """Line radius for trajectory paths."""
 
+    mesh_alpha: int = 51
+    """Alpha channel for the GT mesh albedo factor in ``[0, 255]``."""
+
     @field_validator(
         "frustum_scale",
         "reference_axis_length",
@@ -156,6 +159,16 @@ class RerunInspectorGeometryConfig(BaseConfig):
         if scalar <= 0:
             raise ValueError("geometry scales and radii must be > 0.")
         return scalar
+
+    @field_validator("mesh_alpha")
+    @classmethod
+    def _validate_mesh_alpha(cls, value: int) -> int:
+        """Validate the GT mesh alpha channel."""
+
+        alpha = int(value)
+        if alpha < 0 or alpha > 255:
+            raise ValueError("geometry.mesh_alpha must be in [0, 255].")
+        return alpha
 
 
 class RerunInspectorPerformanceConfig(BaseConfig):
