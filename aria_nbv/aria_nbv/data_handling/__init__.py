@@ -37,6 +37,11 @@ _LAZY_EXPORTS = {
     "OfflineVisualInventoryError": "._offline_visual_inventory",
     "ProcessedMesh": ".mesh_cache",
     "NumericSummary": "._offline_diagnostics",
+    "RolloutZarrStoreConfig": "._rollout_zarr_store",
+    "RolloutZarrStoreReader": "._rollout_zarr_store",
+    "RolloutZarrStoreWriter": "._rollout_zarr_store",
+    "RolloutZarrValidationResult": "._rollout_zarr_store",
+    "RolloutZarrWriteResult": "._rollout_zarr_store",
     "VinDatasetSourceConfig": "._vin_sources",
     "VinOfflineBackboneDiagnostic": "._offline_diagnostics",
     "VinOfflineBlockDiagnostic": "._offline_diagnostics",
@@ -68,6 +73,8 @@ _LAZY_EXPORTS = {
     "flush_prepared_samples_to_shard": "._offline_writer",
     "load_or_process_mesh": ".mesh_cache",
     "prepare_vin_offline_sample": "._offline_writer",
+    "validate_rollout_zarr_store": "._rollout_zarr_store",
+    "write_rollout_zarr_store": "._rollout_zarr_store",
 }
 
 
@@ -101,6 +108,11 @@ __all__ = [
     "OfflineVisualInventory",
     "OfflineVisualInventoryError",
     "ProcessedMesh",
+    "RolloutZarrStoreConfig",
+    "RolloutZarrStoreReader",
+    "RolloutZarrStoreWriter",
+    "RolloutZarrValidationResult",
+    "RolloutZarrWriteResult",
     "VinDatasetSourceConfig",
     "VinOfflineDataset",
     "VinOfflineBackboneDiagnostic",
@@ -136,4 +148,6 @@ __all__ = [
     "is_vin_snippet_view_instance",
     "load_or_process_mesh",
     "prepare_vin_offline_sample",
+    "validate_rollout_zarr_store",
+    "write_rollout_zarr_store",
 ]

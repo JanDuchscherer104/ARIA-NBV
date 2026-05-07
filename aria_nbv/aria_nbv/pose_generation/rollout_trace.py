@@ -37,6 +37,8 @@ from .types import SamplingStrategy
 ACTOR_VISIBLE_STEP_FIELDS = (
     "candidate_poses_world_cam",
     "candidate_valid",
+    "candidate_invalid_reason_bitset",
+    "candidate_primary_invalid_reason",
     "selected_shell_index",
     "selected_pose_world_cam",
 )
@@ -46,11 +48,53 @@ ORACLE_ONLY_STEP_FIELDS = (
     "candidate_scores",
     "metric_vectors",
     "selected_metrics",
+    "selection_logits",
+    "selection_probabilities",
+    "selection_log_probabilities",
+    "selection_entropy",
+    "selected_log_probability",
 )
 """Step fields that should be treated as supervision/evaluation only."""
 
 OPTIONAL_HEAVY_STEP_FIELDS = ("selected_point_cloud_world",)
 """Optional heavy diagnostics stored only for selected or retained actions."""
+
+INVALID_REASON_CODES: dict[str, int] = {
+    "VALID": 0,
+    "POSE_NONFINITE": 1,
+    "POSE_OUT_OF_EXTENT": 2,
+    "CAMERA_OUT_OF_EXTENT": 3,
+    "COLLISION_MESH": 4,
+    "CLEARANCE_TOO_SMALL": 5,
+    "PATH_SEGMENT_COLLISION": 6,
+    "FRUSTUM_OUT_OF_BOUNDS": 7,
+    "DEPTH_NO_HIT": 8,
+    "DEPTH_TOO_SPARSE": 9,
+    "BACKPROJECT_EMPTY": 10,
+    "CANDIDATE_DUPLICATE": 11,
+    "SAMPLER_RULE_REJECTED": 12,
+    "TARGET_NOT_ACTOR_VISIBLE": 13,
+    "TARGET_GT_UNMATCHED": 14,
+    "TARGET_CROP_EMPTY": 15,
+    "TARGET_SUPPORT_TOO_LOW": 16,
+    "TARGET_VISIBILITY_TOO_LOW": 17,
+    "SEMIDENSE_SUPPORT_TOO_LOW": 18,
+    "EVL_EVIDENCE_MISSING": 19,
+    "MESH_REFERENCE_MISSING": 20,
+    "ORACLE_DISTANCE_FAILED": 21,
+    "CANDIDATE_ORDER_GUARD_FAILED": 22,
+    "RUNTIME_ERROR": 23,
+}
+"""Version-1 invalidity reason bit positions for rollout replay tables."""
+
+INVALID_REASON_VERSION = "rollout-invalidity-v1"
+"""Version label for :data:`INVALID_REASON_CODES`."""
+
+_RULE_REASON_BITS = {
+    "FreeSpaceRule": INVALID_REASON_CODES["POSE_OUT_OF_EXTENT"],
+    "MinDistanceToMeshRule": INVALID_REASON_CODES["CLEARANCE_TOO_SMALL"],
+    "PathCollisionRule": INVALID_REASON_CODES["PATH_SEGMENT_COLLISION"],
+}
 
 
 @dataclass(slots=True)
@@ -90,6 +134,36 @@ class RolloutLineage:
     source_cache_version: str | None = None
     """Source offline-cache or dataset version used to build the trace."""
 
+    split: str | None = None
+    """Dataset split inherited from the source snippet or rollout manifest."""
+
+    source_offline_store_manifest_hash: str | None = None
+    """Hash of the source offline-store manifest, when the rollout came from one."""
+
+    split_manifest_hash: str | None = None
+    """Hash of the scene/snippet split manifest used for this rollout."""
+
+    rollout_config_hash: str | None = None
+    """Stable hash of rollout-generation settings."""
+
+    branch_schedule_id: str | None = None
+    """Identifier for the branch schedule used by stochastic or beam rollout generation."""
+
+    target_row_id: int | None = None
+    """Optional row id of the actor-visible target record used by this rollout."""
+
+    target_id: str | None = None
+    """Stable source target id when available."""
+
+    target_protocol_version: str | None = None
+    """Target protocol used for actor input and GT evaluation."""
+
+    reason_code_version: str = INVALID_REASON_VERSION
+    """Version of candidate invalidity reason codes used by this trace."""
+
+    selection_rng_state_hash: str | None = None
+    """Optional digest of the selection RNG state after generation."""
+
 
 @dataclass(slots=True)
 class RolloutStepTrace:
@@ -118,6 +192,12 @@ class RolloutStepTrace:
     candidate_valid: torch.Tensor
     """Boolean full-shell validity mask with shape ``(N,)``."""
 
+    candidate_invalid_reason_bitset: torch.Tensor | None = None
+    """Full-shell invalidity bitsets with shape ``(N,)`` and dtype ``uint32``."""
+
+    candidate_primary_invalid_reason: torch.Tensor | None = None
+    """Dominant invalidity reason bit with shape ``(N,)`` and dtype ``uint16``."""
+
     candidate_scores: torch.Tensor | None = None
     """Full-shell score vector; invalid or unscored candidates are ``NaN``."""
 
@@ -126,6 +206,36 @@ class RolloutStepTrace:
 
     selection_score_label: str = "score"
     """Semantic label for :attr:`selection_score`, for example ``oracle_rri``."""
+
+    selection_policy: str = "unknown"
+    """Selection policy used at this step."""
+
+    score_source: str = "score"
+    """Source of selection scores, for example ``oracle_rri`` or ``model_score``."""
+
+    selection_temperature: float | None = None
+    """Temperature used for softmax selection, if applicable."""
+
+    selection_logits: torch.Tensor | None = None
+    """Full-shell selection logits; invalid candidates are ``NaN``."""
+
+    selection_probabilities: torch.Tensor | None = None
+    """Full-shell selection probabilities; invalid candidates are exactly zero."""
+
+    selection_log_probabilities: torch.Tensor | None = None
+    """Full-shell log probabilities for the selection draw."""
+
+    selection_entropy: float | None = None
+    """Entropy of the valid-candidate selection distribution."""
+
+    selected_log_probability: float | None = None
+    """Log probability assigned to the selected action."""
+
+    selection_rng_seed: int | None = None
+    """Seed used for stochastic rollout selection, when configured."""
+
+    transition_id: str | None = None
+    """Stable selected-action transition id inside one rollout trace."""
 
     metric_vectors: dict[str, torch.Tensor] = field(default_factory=dict)
     """Full-shell metric vectors aligned with :attr:`candidate_valid`."""
@@ -154,6 +264,25 @@ class RolloutStepTrace:
         if step.selection_scores is not None:
             candidate_scores = _full_candidate_vector(step.selection_scores, candidate_valid)
 
+        selection_logits = None
+        if step.selection_logits is not None:
+            selection_logits = _full_candidate_vector(step.selection_logits, candidate_valid)
+        selection_probabilities = None
+        if step.selection_probabilities is not None:
+            selection_probabilities = _full_candidate_vector(
+                step.selection_probabilities,
+                candidate_valid,
+                fill_value=0.0,
+            )
+        selection_log_probabilities = None
+        if step.selection_log_probabilities is not None:
+            selection_log_probabilities = _full_candidate_vector(
+                step.selection_log_probabilities,
+                candidate_valid,
+                fill_value=float("-inf"),
+            )
+        reason_bitset, primary_reason = _candidate_invalid_reasons(step.candidates)
+
         return cls(
             step_index=int(step.step_index),
             selected_valid_index=int(step.selected_valid_index),
@@ -161,9 +290,20 @@ class RolloutStepTrace:
             selected_pose_world_cam=selected_pose,
             candidate_poses_world_cam=candidate_poses,
             candidate_valid=candidate_valid,
+            candidate_invalid_reason_bitset=reason_bitset,
+            candidate_primary_invalid_reason=primary_reason,
             candidate_scores=candidate_scores,
             selection_score=float(step.selection_score),
             selection_score_label=str(step.selection_score_label),
+            selection_policy=str(step.selection_policy),
+            score_source=str(step.selection_score_label),
+            selection_temperature=step.selection_temperature,
+            selection_logits=selection_logits,
+            selection_probabilities=selection_probabilities,
+            selection_log_probabilities=selection_log_probabilities,
+            selection_entropy=step.selection_entropy,
+            selected_log_probability=step.selected_log_probability,
+            selection_rng_seed=step.selection_rng_seed,
             metric_vectors={
                 name: _full_candidate_vector(values, candidate_valid) for name, values in step.metric_vectors.items()
             },
@@ -245,6 +385,9 @@ class RolloutTrace:
             trace_step = RolloutStepTrace.from_step(step)
             trace_step.cumulative_score = float(running_score)
             trace_step.cumulative_rri = running_rri
+            trace_step.transition_id = (
+                f"{lineage.rollout_id}:step={trace_step.step_index}:shell={trace_step.selected_shell_index}"
+            )
             steps.append(trace_step)
 
         return cls(
@@ -274,6 +417,16 @@ def traces_from_rollout_result(
     model_checkpoint_hash: str | None = None,
     random_seed: int | None = None,
     source_cache_version: str | None = None,
+    split: str | None = None,
+    source_offline_store_manifest_hash: str | None = None,
+    split_manifest_hash: str | None = None,
+    rollout_config_hash: str | None = None,
+    branch_schedule_id: str | None = None,
+    target_row_id: int | None = None,
+    target_id: str | None = None,
+    target_protocol_version: str | None = None,
+    reason_code_version: str = INVALID_REASON_VERSION,
+    selection_rng_state_hash: str | None = None,
 ) -> list[RolloutTrace]:
     """Convert all retained trajectories from one rollout call into traces."""
 
@@ -291,6 +444,16 @@ def traces_from_rollout_result(
             random_seed=random_seed,
             rollout_policy=_policy_name(result.selection_policy),
             source_cache_version=source_cache_version,
+            split=split,
+            source_offline_store_manifest_hash=source_offline_store_manifest_hash,
+            split_manifest_hash=split_manifest_hash,
+            rollout_config_hash=rollout_config_hash,
+            branch_schedule_id=branch_schedule_id,
+            target_row_id=target_row_id,
+            target_id=target_id,
+            target_protocol_version=target_protocol_version,
+            reason_code_version=reason_code_version,
+            selection_rng_state_hash=selection_rng_state_hash,
         )
         traces.append(RolloutTrace.from_trajectory(result=result, trajectory=trajectory, lineage=lineage))
     return traces
@@ -329,7 +492,7 @@ def build_synthetic_rollout_traces(
     num_samples: int = 8,
     seed: int = 0,
 ) -> list[RolloutTrace]:
-    """Build greedy and random-valid rollout traces on a synthetic box scene.
+    """Build greedy, random-valid, and temperature-softmax traces on a synthetic box scene.
 
     This helper backs the trace smoke CLI. It is not a simulator; it only verifies
     that the current rollout generator and trace writer can produce replayable
@@ -338,8 +501,9 @@ def build_synthetic_rollout_traces(
 
     traces: list[RolloutTrace] = []
     for policy in (
-        CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY,
-        CounterfactualSelectionPolicy.RANDOM,
+        CounterfactualSelectionPolicy.ORACLE_GREEDY,
+        CounterfactualSelectionPolicy.RANDOM_VALID,
+        CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
     ):
         cfg = CounterfactualPoseGeneratorConfig(
             candidate_config=CandidateViewGeneratorConfig(
@@ -360,6 +524,7 @@ def build_synthetic_rollout_traces(
             horizon=horizon,
             branch_factor=1,
             selection_policy=policy,
+            selection_temperature=1.0,
             seed=seed,
             verbosity=0,
         )
@@ -382,8 +547,15 @@ def build_synthetic_rollout_traces(
                 snippet_id="smoke",
                 candidate_config_hash=_config_hash(cfg.candidate_config),
                 oracle_config_hash="synthetic-smoke",
+                rollout_config_hash=_config_hash(cfg),
+                branch_schedule_id=cfg.branch_schedule_id,
                 random_seed=seed,
                 source_cache_version="synthetic",
+                split="synthetic",
+                source_offline_store_manifest_hash="synthetic",
+                split_manifest_hash="synthetic",
+                selection_rng_state_hash="synthetic",
+                target_protocol_version="synthetic",
             )
         )
     return traces
@@ -408,13 +580,19 @@ def smoke_main(argv: list[str] | None = None) -> None:
     Console.with_prefix("rollout-trace-smoke").log(f"Wrote {len(traces)} traces to {output_path}")
 
 
-def _full_candidate_vector(values: torch.Tensor, candidate_valid: torch.Tensor) -> torch.Tensor:
+def _full_candidate_vector(
+    values: torch.Tensor,
+    candidate_valid: torch.Tensor,
+    *,
+    fill_value: float | int | None = None,
+) -> torch.Tensor:
     valid_values = values.detach().cpu().reshape(-1)
     valid_mask = candidate_valid.detach().cpu().to(dtype=torch.bool).reshape(-1)
     valid_count = int(valid_mask.sum().item())
     if valid_values.numel() != valid_count:
         raise ValueError(f"Expected {valid_count} valid values, got {valid_values.numel()}.")
-    fill_value = float("nan") if torch.is_floating_point(valid_values) else 0
+    if fill_value is None:
+        fill_value = float("nan") if torch.is_floating_point(valid_values) else 0
     full = torch.full(
         valid_mask.shape,
         fill_value,
@@ -423,6 +601,35 @@ def _full_candidate_vector(values: torch.Tensor, candidate_valid: torch.Tensor) 
     )
     full[valid_mask] = valid_values
     return full
+
+
+def _candidate_invalid_reasons(candidates: Any) -> tuple[torch.Tensor, torch.Tensor]:
+    valid_mask = candidates.mask_valid.detach().cpu().to(dtype=torch.bool).reshape(-1)
+    bitset = torch.zeros(valid_mask.shape, dtype=torch.int64)
+    primary = torch.full(valid_mask.shape, INVALID_REASON_CODES["SAMPLER_RULE_REJECTED"], dtype=torch.int64)
+    bitset[valid_mask] = 1 << INVALID_REASON_CODES["VALID"]
+    primary[valid_mask] = INVALID_REASON_CODES["VALID"]
+
+    previous = torch.ones_like(valid_mask)
+    for rule_name, cumulative_mask in candidates.masks.items():
+        current = cumulative_mask.detach().cpu().to(dtype=torch.bool).reshape(-1)
+        if current.shape != valid_mask.shape:
+            continue
+        failed_here = previous & (~current)
+        reason_bit = _RULE_REASON_BITS.get(rule_name, INVALID_REASON_CODES["SAMPLER_RULE_REJECTED"])
+        bitset[failed_here] = bitset[failed_here] | (1 << reason_bit)
+        primary[failed_here] = reason_bit
+        previous = current
+
+    unresolved_invalid = (~valid_mask) & (bitset == 0)
+    bitset[unresolved_invalid] = 1 << INVALID_REASON_CODES["SAMPLER_RULE_REJECTED"]
+
+    shell = candidates.shell_poses.tensor().detach().cpu()
+    nonfinite = ~torch.isfinite(shell.reshape(shell.shape[0], -1)).all(dim=1)
+    bitset[nonfinite] = bitset[nonfinite] | (1 << INVALID_REASON_CODES["POSE_NONFINITE"])
+    primary[nonfinite] = INVALID_REASON_CODES["POSE_NONFINITE"]
+
+    return bitset.to(dtype=torch.int64), primary.to(dtype=torch.int64)
 
 
 def _termination_reason(result: CounterfactualRolloutResult, trajectory: CounterfactualTrajectory) -> str:
@@ -474,11 +681,17 @@ def _smoke_scores(
     centers = valid_poses.t.reshape(-1, 3)
     scores = torch.linspace(0.1, 0.1 * centers.shape[0], centers.shape[0], device=centers.device)
     scores = scores + float(step_index)
-    return CounterfactualCandidateEvaluation(scores=scores, score_label="oracle_rri", metric_vectors={"rri": scores})
+    return CounterfactualCandidateEvaluation(
+        scores=scores,
+        score_label="oracle_rri",
+        metric_vectors={"rri": scores, "scene_rri": scores, "target_rri": scores},
+    )
 
 
 __all__ = [
     "ACTOR_VISIBLE_STEP_FIELDS",
+    "INVALID_REASON_CODES",
+    "INVALID_REASON_VERSION",
     "OPTIONAL_HEAVY_STEP_FIELDS",
     "ORACLE_ONLY_STEP_FIELDS",
     "RolloutLineage",

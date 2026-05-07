@@ -73,6 +73,8 @@ def _make_rollout_config(
     horizon: int = 3,
     branch_factor: int = 1,
     beam_width: int | None = None,
+    selection_policy: CounterfactualSelectionPolicy = CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY,
+    selection_temperature: float = 1.0,
 ) -> CounterfactualPoseGeneratorConfig:
     candidate_cfg = CandidateViewGeneratorConfig(
         num_samples=16,
@@ -93,7 +95,8 @@ def _make_rollout_config(
         horizon=horizon,
         branch_factor=branch_factor,
         beam_width=beam_width,
-        selection_policy=CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY,
+        selection_policy=selection_policy,
+        selection_temperature=selection_temperature,
         verbosity=0,
     )
 
@@ -103,9 +106,17 @@ def _run_rollouts(
     horizon: int = 3,
     branch_factor: int = 1,
     beam_width: int | None = None,
+    selection_policy: CounterfactualSelectionPolicy = CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY,
+    selection_temperature: float = 1.0,
     score_candidates=None,
 ):
-    cfg = _make_rollout_config(horizon=horizon, branch_factor=branch_factor, beam_width=beam_width)
+    cfg = _make_rollout_config(
+        horizon=horizon,
+        branch_factor=branch_factor,
+        beam_width=beam_width,
+        selection_policy=selection_policy,
+        selection_temperature=selection_temperature,
+    )
     generator = CounterfactualPoseGenerator(cfg)
     mesh, verts, faces = _mesh_triplet(cfg.candidate_config.device)
     return generator.generate(
@@ -177,6 +188,57 @@ def test_counterfactual_rollout_tracks_cumulative_rri_and_selected_point_clouds(
     assert trajectory.cumulative_score == pytest.approx(expected_rri)
     assert trajectory.accumulated_points_world().shape == (4, 3)
     assert rollouts.score_label == "oracle_rri"
+
+
+def test_temperature_softmax_masks_invalid_candidates_and_reproduces_selection() -> None:
+    rollouts_a = _run_rollouts(
+        horizon=1,
+        branch_factor=1,
+        selection_policy=CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
+        selection_temperature=1.0,
+        score_candidates=_fake_rri_evaluator,
+    )
+    rollouts_b = _run_rollouts(
+        horizon=1,
+        branch_factor=1,
+        selection_policy=CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
+        selection_temperature=1.0,
+        score_candidates=_fake_rri_evaluator,
+    )
+
+    step_a = rollouts_a.trajectories[0].steps[0]
+    step_b = rollouts_b.trajectories[0].steps[0]
+
+    assert step_a.selection_policy == CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX.value
+    assert step_a.selection_probabilities is not None
+    assert torch.all(step_a.selection_probabilities >= 0)
+    assert torch.isclose(step_a.selection_probabilities.sum(), torch.tensor(1.0))
+    assert step_a.selected_valid_index == step_b.selected_valid_index
+    assert step_a.selected_shell_index == step_b.selected_shell_index
+
+    trace = traces_from_rollout_result(rollouts_a, rollout_id_prefix="temp-softmax")[0]
+    trace_step = trace.steps[0]
+    assert trace_step.selection_probabilities is not None
+    invalid_probs = trace_step.selection_probabilities[~trace_step.candidate_valid]
+    assert torch.equal(invalid_probs, torch.zeros_like(invalid_probs))
+    assert torch.isclose(trace_step.selection_probabilities[trace_step.candidate_valid].sum(), torch.tensor(1.0))
+    assert trace_step.selection_temperature == pytest.approx(1.0)
+    assert trace_step.selected_log_probability is not None
+
+
+def test_temperature_softmax_branch_factor_samples_distinct_candidates() -> None:
+    rollouts = _run_rollouts(
+        horizon=1,
+        branch_factor=3,
+        selection_policy=CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
+        selection_temperature=1.0,
+        score_candidates=_fake_rri_evaluator,
+    )
+
+    selected = [trajectory.steps[0].selected_shell_index for trajectory in rollouts.trajectories]
+
+    assert len(selected) == 3
+    assert len(set(selected)) == 3
 
 
 def test_counterfactual_path_plot_uses_rri_colorbar_when_available() -> None:

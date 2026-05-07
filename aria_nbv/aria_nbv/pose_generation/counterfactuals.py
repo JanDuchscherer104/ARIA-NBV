@@ -49,6 +49,21 @@ class CounterfactualSelectionPolicy(StrEnum):
     FARTHEST_FROM_HISTORY = "farthest_from_history"
     FARTHEST_FROM_REFERENCE = "farthest_from_reference"
     RANDOM = "random"
+    RANDOM_VALID = "random_valid"
+    ORACLE_GREEDY = "oracle_greedy"
+    TEMPERATURE_SOFTMAX = "temperature_softmax"
+
+
+@dataclass(slots=True)
+class CounterfactualSelectionRecord:
+    """Selected valid-candidate index plus the distribution used to draw it."""
+
+    valid_index: int
+    logits: torch.Tensor
+    probabilities: torch.Tensor
+    log_probabilities: torch.Tensor
+    entropy: float
+    selected_log_probability: float
 
 
 @dataclass(slots=True)
@@ -143,6 +158,14 @@ class CounterfactualStepResult:
     selection_score: float
     selection_score_label: str = "score"
     selection_scores: torch.Tensor | None = None
+    selection_policy: str = "unknown"
+    selection_temperature: float | None = None
+    selection_logits: torch.Tensor | None = None
+    selection_probabilities: torch.Tensor | None = None
+    selection_log_probabilities: torch.Tensor | None = None
+    selection_entropy: float | None = None
+    selected_log_probability: float | None = None
+    selection_rng_seed: int | None = None
     selected_metrics: dict[str, float] = field(default_factory=dict)
     metric_vectors: dict[str, torch.Tensor] = field(default_factory=dict)
     selected_point_cloud_world: torch.Tensor | None = None
@@ -243,6 +266,8 @@ class CounterfactualPoseGeneratorConfig(BaseConfig):
     branch_factor: int = 2
     beam_width: int | None = None
     selection_policy: CounterfactualSelectionPolicy = CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY
+    selection_temperature: float = 1.0
+    branch_schedule_id: str | None = None
     min_history_distance_m: float = 0.0
     min_sibling_distance_m: float = 0.0
     seed: int | None = 0
@@ -274,6 +299,14 @@ class CounterfactualPoseGeneratorConfig(BaseConfig):
         value = float(value)
         if value < 0.0:
             raise ValueError("Distance thresholds must be >= 0.")
+        return value
+
+    @field_validator("selection_temperature")
+    @classmethod
+    def _positive_temperature(cls, value: float) -> float:
+        value = float(value)
+        if value <= 0.0:
+            raise ValueError("selection_temperature must be > 0.")
         return value
 
 
@@ -451,16 +484,17 @@ class CounterfactualPoseGenerator:
                     score_candidates=score_candidates,
                 )
                 score_label = evaluation.score_label
-                valid_indices = self._select_valid_indices(
+                selection_records = self._select_valid_candidates(
                     scores=evaluation.scores,
                     valid_poses=candidates.poses_world_cam(),
                     trajectory=trajectory,
                 )
-                if not valid_indices:
+                if not selection_records:
                     next_frontier.append(trajectory.mark_terminated())
                     continue
 
-                for valid_index in valid_indices:
+                for selection in selection_records:
+                    valid_index = selection.valid_index
                     shell_valid = torch.nonzero(candidates.mask_valid, as_tuple=False).reshape(-1)
                     selected_shell_index = int(shell_valid[valid_index].item())
                     step = CounterfactualStepResult(
@@ -471,6 +505,18 @@ class CounterfactualPoseGenerator:
                         selection_score=float(evaluation.scores[valid_index].item()),
                         selection_score_label=evaluation.score_label,
                         selection_scores=evaluation.scores.detach().clone(),
+                        selection_policy=self.config.selection_policy.value,
+                        selection_temperature=(
+                            self.config.selection_temperature
+                            if self.config.selection_policy is CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX
+                            else None
+                        ),
+                        selection_logits=selection.logits.detach().clone(),
+                        selection_probabilities=selection.probabilities.detach().clone(),
+                        selection_log_probabilities=selection.log_probabilities.detach().clone(),
+                        selection_entropy=selection.entropy,
+                        selected_log_probability=selection.selected_log_probability,
+                        selection_rng_seed=self.config.seed,
                         selected_metrics=evaluation.selected_metrics(valid_index),
                         metric_vectors={
                             name: values.detach().clone() for name, values in evaluation.metric_vectors.items()
@@ -533,7 +579,10 @@ class CounterfactualPoseGenerator:
         trajectory: CounterfactualTrajectory,
     ) -> torch.Tensor:
         centers = valid_poses.t.reshape(-1, 3)
-        if self.config.selection_policy is CounterfactualSelectionPolicy.RANDOM:
+        if self.config.selection_policy in (
+            CounterfactualSelectionPolicy.RANDOM,
+            CounterfactualSelectionPolicy.RANDOM_VALID,
+        ):
             return torch.rand(centers.shape[0], generator=self._selection_generator, device="cpu").to(
                 device=centers.device,
                 dtype=centers.dtype,
@@ -547,13 +596,28 @@ class CounterfactualPoseGenerator:
         distances = torch.cdist(centers, history)
         return distances.min(dim=1).values
 
-    def _select_valid_indices(
+    def _select_valid_candidates(
         self,
         *,
         scores: torch.Tensor,
         valid_poses: PoseTW,
         trajectory: CounterfactualTrajectory,
-    ) -> list[int]:
+    ) -> list[CounterfactualSelectionRecord]:
+        if self.config.selection_policy in (
+            CounterfactualSelectionPolicy.RANDOM,
+            CounterfactualSelectionPolicy.RANDOM_VALID,
+            CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
+        ):
+            return self._sample_valid_candidates(scores=scores, valid_poses=valid_poses, trajectory=trajectory)
+        return self._greedy_valid_candidates(scores=scores, valid_poses=valid_poses, trajectory=trajectory)
+
+    def _greedy_valid_candidates(
+        self,
+        *,
+        scores: torch.Tensor,
+        valid_poses: PoseTW,
+        trajectory: CounterfactualTrajectory,
+    ) -> list[CounterfactualSelectionRecord]:
         order = torch.argsort(scores, descending=True)
         centers = valid_poses.t.reshape(-1, 3)
         history = trajectory.history_centers_world().to(device=centers.device, dtype=centers.dtype)
@@ -572,7 +636,130 @@ class CounterfactualPoseGenerator:
 
         if not selected and order.numel() > 0:
             selected.append(int(order[0].item()))
-        return selected
+        return [self._one_hot_selection_record(scores=scores, valid_index=index) for index in selected]
+
+    def _sample_valid_candidates(
+        self,
+        *,
+        scores: torch.Tensor,
+        valid_poses: PoseTW,
+        trajectory: CounterfactualTrajectory,
+    ) -> list[CounterfactualSelectionRecord]:
+        centers = valid_poses.t.reshape(-1, 3)
+        history = trajectory.history_centers_world().to(device=centers.device, dtype=centers.dtype)
+        remaining = torch.ones(scores.shape[0], device=scores.device, dtype=torch.bool)
+        selected_centers: list[torch.Tensor] = []
+        records: list[CounterfactualSelectionRecord] = []
+
+        for _draw_index in range(self.config.branch_factor):
+            if not bool(remaining.any().item()):
+                break
+            eligible = remaining & self._distance_guard_mask(
+                centers=centers,
+                history=history,
+                selected_centers=selected_centers,
+            )
+            if not bool(eligible.any().item()):
+                eligible = remaining.clone()
+            if not bool(eligible.any().item()):
+                break
+
+            if self.config.selection_policy in (
+                CounterfactualSelectionPolicy.RANDOM,
+                CounterfactualSelectionPolicy.RANDOM_VALID,
+            ):
+                logits = torch.zeros_like(scores)
+                distribution = self._masked_softmax(logits=logits, mask=eligible)
+            else:
+                logits = scores / float(self.config.selection_temperature)
+                distribution = self._masked_softmax(logits=logits, mask=eligible)
+
+            selected_tensor = torch.multinomial(
+                distribution.probabilities.detach().cpu(),
+                num_samples=1,
+                replacement=False,
+                generator=self._selection_generator,
+            )
+            selected_index = int(selected_tensor.item())
+            records.append(
+                replace(
+                    distribution,
+                    valid_index=selected_index,
+                    selected_log_probability=float(
+                        distribution.log_probabilities[selected_index].detach().cpu().item()
+                    ),
+                )
+            )
+            remaining[selected_index] = False
+            selected_centers.append(centers[selected_index])
+
+        return records
+
+    def _one_hot_selection_record(
+        self,
+        *,
+        scores: torch.Tensor,
+        valid_index: int,
+    ) -> CounterfactualSelectionRecord:
+        probabilities = torch.zeros_like(scores)
+        probabilities[valid_index] = 1.0
+        log_probabilities = torch.full_like(scores, float("-inf"))
+        log_probabilities[valid_index] = 0.0
+        return CounterfactualSelectionRecord(
+            valid_index=int(valid_index),
+            logits=scores.detach().clone(),
+            probabilities=probabilities,
+            log_probabilities=log_probabilities,
+            entropy=0.0,
+            selected_log_probability=0.0,
+        )
+
+    def _masked_softmax(
+        self,
+        *,
+        logits: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> CounterfactualSelectionRecord:
+        if logits.ndim != 1:
+            raise ValueError("Selection logits must be a 1-D tensor aligned with valid candidates.")
+        mask = mask.to(device=logits.device, dtype=torch.bool).reshape(-1)
+        if mask.shape != logits.shape:
+            raise ValueError(f"Selection mask shape {tuple(mask.shape)} must match logits {tuple(logits.shape)}.")
+        if not bool(mask.any().item()):
+            raise ValueError("Cannot sample from an empty valid-candidate mask.")
+
+        masked_logits = torch.where(mask, logits, torch.full_like(logits, float("-inf")))
+        probabilities = torch.softmax(masked_logits, dim=0)
+        log_probabilities = torch.log(probabilities.clamp_min(torch.finfo(probabilities.dtype).tiny))
+        log_probabilities = torch.where(mask, log_probabilities, torch.full_like(logits, float("-inf")))
+        entropy = -(probabilities[mask] * log_probabilities[mask]).sum()
+        return CounterfactualSelectionRecord(
+            valid_index=-1,
+            logits=masked_logits,
+            probabilities=probabilities,
+            log_probabilities=log_probabilities,
+            entropy=float(entropy.detach().cpu().item()),
+            selected_log_probability=float("nan"),
+        )
+
+    def _distance_guard_mask(
+        self,
+        *,
+        centers: torch.Tensor,
+        history: torch.Tensor,
+        selected_centers: list[torch.Tensor],
+    ) -> torch.Tensor:
+        mask = torch.ones(centers.shape[0], device=centers.device, dtype=torch.bool)
+        if self.config.min_history_distance_m > 0.0 and history.numel() > 0:
+            history_dists = torch.cdist(centers, history)
+            mask &= ~(history_dists < self.config.min_history_distance_m).any(dim=1)
+
+        if self.config.min_sibling_distance_m > 0.0 and selected_centers:
+            sibling = torch.stack(selected_centers, dim=0)
+            sibling_dists = torch.cdist(centers, sibling)
+            mask &= ~(sibling_dists < self.config.min_sibling_distance_m).any(dim=1)
+
+        return mask
 
     def _passes_distance_guards(
         self,
@@ -610,6 +797,7 @@ __all__ = [
     "CounterfactualPoseGenerator",
     "CounterfactualPoseGeneratorConfig",
     "CounterfactualRolloutResult",
+    "CounterfactualSelectionRecord",
     "CounterfactualSelectionPolicy",
     "CounterfactualStepResult",
     "CounterfactualTrajectory",

@@ -1,6 +1,6 @@
 ---
 id: decisions
-updated: 2026-05-06
+updated: 2026-05-07
 scope: repo
 owner: jan
 status: active
@@ -105,6 +105,21 @@ tags: [codex, workflow, architecture]
   scene-level splits, target diversity, snippets, trajectories, rollout seeds,
   transitions, invalid gaps, coverage gaps, and ablation axes must be reported
   wherever empirical thesis claims are made.
+
+### 2026-05-07 Rollout DTO And Store Decisions
+- The first implemented rollout replay path is a standalone `rollouts.zarr`
+  store, not counterfactual blocks embedded inside the VIN offline store.
+- Masked temperature-softmax is a stochastic rollout data-diversity policy over
+  valid oracle/model-scored finite candidates. It persists logits,
+  probabilities, log-probabilities, entropy, selected log-probability,
+  temperature, score source, and RNG metadata, but the environment transition is
+  still the sampled discrete selected action.
+- The first `Q_H` store materializes selected-action transition replay. Dense
+  all-action oracle-Q arrays remain schema-ready, `NaN`, and masked until a
+  later oracle-lookahead converter fills them.
+- `Q_H` trainable one-step target labels require explicit target-RRI metric
+  provenance. Scene RRI, model scores, random scores, and distance heuristic
+  scores must not silently become target-RRI labels.
 
 - The core thesis claim is target-conditioned, quality-driven NBV on ASE/EFM with strict M1 data/cache/oracle contracts.
 - RRI is the primary project objective for next-best-view research in this repo. Coverage-style objectives remain baselines or diagnostics, not the main thesis target.

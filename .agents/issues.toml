@@ -20,7 +20,7 @@ priority = "high"
 status = "open"
 labels = ["data", "rri", "thesis", "contracts"]
 context = ["Roadmap M1 requires the offline store, split, frame/CW90, and oracle RRI contracts to be stable before target-conditioned VIN or rollout evidence is trusted.", "The thesis questions keep actor-visible state, oracle-only signals, target RRI, and invalidity semantics separate, which makes M1 a contract gate rather than a cleanup preference."]
-references = ["repo:docs/contents/thesis/roadmap.qmd#roadmap-m1", "repo:docs/contents/thesis/questions.qmd#rq1-objective", "repo:docs/contents/thesis/questions.qmd#rq6-feasibility", "bib:ProjectAria-ASE-2025", "bib:VIN-NBV-frahm2025"]
+references = ["repo:docs/contents/thesis/roadmap.qmd#roadmap-m1", "repo:docs/contents/thesis/questions.qmd#rq1-objective", "repo:docs/contents/thesis/questions.qmd#rq-evidence-protocol", "bib:ProjectAria-ASE-2025", "bib:VIN-NBV-frahm2025"]
 
 [[issue]]
 id = "issue-010"
@@ -47,13 +47,13 @@ references = ["repo:.agents/AGENTS_INTERNAL_DB.md", "repo:AGENTS.md#instruction-
 [[issue]]
 id = "issue-012"
 title = "Research skills and scaffold routing coverage still need tightening"
-description = "Most ARIA-specific research skills now exist and all repo-local skills now carry routing metadata, but oracle-RRI contracts, VIN training/evaluation, and future skill metadata consumption still need compact repeatable coverage."
+description = "Research-skill and scaffold-routing coverage still needs compact repeatable gaps filled, while future litkg metadata consumption is owned by the litkg routing and provenance records."
 type = "maintenance"
 priority = "high"
 status = "open"
 labels = ["agent", "skills", "scaffold"]
-context = ["Root guidance now routes non-trivial work through agent-behavior and separates local discovery, KG-backed retrieval, and KG implementation skills.", "All repo-local skills now carry applies_to/triggers/must_read/verification under frontmatter metadata for future litkg routing, but litkg-rs does not yet consume those fields as first-class routing data.", "The remaining research-skill gap is narrower than the original issue: todo-003 covers oracle-RRI contract routing and todo-004 covers VIN training/evaluation routing."]
-references = ["repo:AGENTS.md#routing", "repo:.agents/skills/agent-behavior/SKILL.md", "repo:.agents/references/skill_style_guide.md", "repo:.agents/skills/", "repo:.agents/todos.toml#todo-003", "repo:.agents/todos.toml#todo-004"]
+context = ["Root guidance now routes non-trivial work through agent-behavior and separates local discovery, KG-backed retrieval, and KG implementation skills.", "All repo-local skills now carry applies_to/triggers/must_read/verification frontmatter metadata, so issue-012 should only track missing or stale research-skill/scaffold routing coverage.", "Future litkg consumption of skill metadata, context-pack fields, backlog evidence, and source-reference diagnostics belongs to issue-023, issue-025, and todo-056.", "The remaining research-skill gap is narrower than the original issue: todo-003 covers oracle-RRI contract routing and todo-004 covers VIN training/evaluation routing."]
+references = ["repo:AGENTS.md#routing", "repo:.agents/skills/agent-behavior/SKILL.md", "repo:.agents/references/skill_style_guide.md", "repo:.agents/skills/", "repo:.agents/todos.toml#todo-003", "repo:.agents/todos.toml#todo-004", "repo:.agents/issues.toml#issue-023", "repo:.agents/issues.toml#issue-025", "repo:.agents/todos.toml#todo-056"]
 
 [[issue]]
 id = "issue-013"
@@ -64,7 +64,7 @@ priority = "medium"
 status = "open"
 labels = ["experiments", "thesis", "reproducibility"]
 context = ["Roadmap M7/M8 require final tables, figures, failure cases, configs, docs, and smoke checks to freeze into a reproducible thesis package.", "Without a claim matrix or experiment registry, final paper statements can become detached from run IDs, cache hashes, split manifests, and source artifacts."]
-references = ["repo:docs/contents/thesis/roadmap.qmd#roadmap-m7", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m8", "repo:docs/contents/thesis/questions.qmd#rq7-scaling", "repo:.agents/memory/state/DECISIONS.md"]
+references = ["repo:docs/contents/thesis/roadmap.qmd#roadmap-m7", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m8", "repo:docs/contents/thesis/questions.qmd#rq-evidence-protocol", "repo:.agents/memory/state/DECISIONS.md"]
 
 [[issue]]
 id = "issue-018"
@@ -74,18 +74,18 @@ type = "research-debt"
 priority = "high"
 status = "open"
 labels = ["rollouts", "data", "contracts", "storage", "thesis"]
-context = ["Bounded rollouts are now part of the thesis direction, and resolved todo-025 added typed RolloutTrace, RolloutStepTrace, RolloutLineage, MessagePack IO, a synthetic smoke command, and tests.", "The remaining gap is the large-scale dataset/reporting layer for ASE oracle rollouts and target-conditioned fitted Double-Q: Zarr-first groups, replay/evaluation payloads, lineage manifests, cumulative-metric reports, Q_H training fields, and storage-footprint summaries.", "The store must be rich enough for training and evaluation without duplicating raw ASE/ATEK products: full meshes are external path/hash/version references, while high-detail target mesh crops are embedded once per target with crop metadata.", "Large sequence data should not be generated until this storage/reporting contract is explicit and compatible with deterministic sharding."]
-references = ["repo:docs/contents/thesis/questions.qmd#rq5-planning", "repo:docs/contents/thesis/questions.qmd#rq7-scaling", "repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/aria_nbv/pose_generation/rollout_trace.py", "repo:.agents/resolved.toml#todo-025", "url:https://zarr-specs.readthedocs.io/en/latest/v3/core/index.html", "bib:TrajectoryTransformer-janner2021"]
+context = ["Bounded rollouts are now part of the thesis direction, and resolved todo-025 added typed RolloutTrace, RolloutStepTrace, RolloutLineage, MessagePack IO, a synthetic smoke command, and tests.", "The remaining gap is the large-scale dataset/reporting layer for ASE oracle rollouts and target-conditioned candidate-query Q_H: Zarr-first groups, replay/evaluation payloads, lineage manifests, cumulative-metric reports, Q_H training fields, and storage-footprint summaries.", "The first standalone rollouts.zarr tracer bullet now has review hardening for explicit target-RRI provenance, multi-target q_h target identity, PoseTW root-relative transforms, per-rollout split/lineage fields, and validator-backed regression tests.", "The store must be rich enough for training and evaluation without duplicating raw ASE/ATEK products: full meshes are external path/hash/version references, while high-detail target mesh crops are embedded once per target with crop metadata.", "Large sequence data should not be generated until this storage/reporting contract is explicit, review-clean, and compatible with deterministic sharding."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq4-planning", "repo:docs/contents/thesis/questions.qmd#rq-evidence-protocol", "repo:docs/contents/theory/rl_planning.qmd", "repo:docs/contents/impl/rollout_storage_contract.qmd", "repo:aria_nbv/aria_nbv/data_handling/_rollout_zarr_store.py", "repo:aria_nbv/aria_nbv/pose_generation/rollout_trace.py", "repo:aria_nbv/tests/data_handling/test_rollout_zarr_store.py", "repo:.agents/resolved.toml#todo-025", "repo:.agents/resolved.toml#todo-057", "repo:.agents/memory/history/2026/05/2026-05-06_rollout_softmax_zarr_store.md", "url:https://zarr-specs.readthedocs.io/en/latest/v3/core/index.html", "bib:TrajectoryTransformer-janner2021"]
 
 [[issue]]
 id = "issue-019"
-title = "Stochastic rollout branching is not implemented"
-description = "The roadmap and literature synthesis call for temperature-softmax selection, Gumbel-Top-k stochastic beams, branch schedules, and late exploration, but the current rollout selector is still deterministic or simple random over valid candidates."
+title = "Stochastic rollout branching still needs Gumbel and schedule evidence"
+description = "Temperature-softmax rollout sampling now exists, but the roadmap and literature synthesis still call for Gumbel-Top-k stochastic beams, explicit branch schedules, late exploration, and scale-ready evidence."
 type = "feature"
 priority = "high"
 status = "open"
 labels = ["rollouts", "planning", "stochastic", "rl", "thesis"]
-context = ["The first non-myopic baseline is deterministic bounded lookahead, but the roadmap and literature path also need stochastic selectors that can diversify near-tied or late-unlocking branches.", "Without temperature/Gumbel branch schedules, rollout generation risks over-representing root-greedy behavior and missing later surprise views."]
+context = ["The first stochastic rollout-diversity source is masked oracle temperature-softmax, with invalid candidates hard-masked before sampling.", "The remaining stochastic evidence gap is Gumbel-Top-k or equivalent distinct stochastic beam selection, explicit branch schedules, late-exploration policy variants, and reports that show whether these diversify near-tied or late-unlocking branches.", "Without Gumbel/branch schedule evidence, rollout generation can still over-represent root-greedy behavior and miss later surprise views."]
 references = ["repo:docs/contents/theory/rl_planning.qmd", "repo:.agents/skills/counterfactual-rollout-planner/SKILL.md", "bib:GumbelTopK-kool2019", "bib:DeepEnergyPolicies-haarnoja2017", "bib:TrajectoryTransformer-janner2021"]
 
 [[issue]]
@@ -107,8 +107,8 @@ type = "research-debt"
 priority = "high"
 status = "open"
 labels = ["validity", "rri", "rollouts", "candidate-generation", "contracts"]
-context = ["RQ6 explicitly states that invalidity is not a low RRI class, because feasibility failures and low reconstruction utility are different labels.", "Rollouts, target-aware RRI, and future VIN heads need masks and reason codes that survive serialization and candidate/RRI order changes."]
-references = ["repo:docs/contents/thesis/questions.qmd#rq6-feasibility", "repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py", "repo:aria_nbv/aria_nbv/rri_metrics/types.py"]
+context = ["The shared evidence protocol states that invalidity is not a low RRI class, because feasibility failures and low reconstruction utility are different labels.", "Rollouts, target-aware RRI, and future VIN heads need masks and reason codes that survive serialization and candidate/RRI order changes."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq-evidence-protocol", "repo:docs/contents/theory/rl_planning.qmd", "repo:aria_nbv/aria_nbv/pose_generation/candidate_generation_rules.py", "repo:aria_nbv/aria_nbv/rri_metrics/types.py"]
 
 [[issue]]
 id = "issue-022"
@@ -124,12 +124,12 @@ references = ["repo:.agents/skills/lrz-ai-systems/SKILL.md", "repo:.agents/skill
 [[issue]]
 id = "issue-023"
 title = "litkg agent-memory routing and source coverage have drift"
-description = "litkg remains partly an operator toolkit instead of a concise agent context router: the root keeps consolidated kg-* commands, but context-pack output, staged refresh paths, authority/freshness ranking, and documented fallback behavior still need implementation alignment."
+description = "litkg remains partly an operator toolkit instead of a concise agent context router: context-pack/routing output has drift from the documented agent schema, and stale or missing context diagnostics need warning-first behavior."
 type = "maintenance"
 priority = "medium"
 status = "open"
 labels = ["kg", "litkg", "semantic-scholar", "docs", "tooling"]
-context = ["litkg-rs is the shared action/evidence contract for broad ARIA-NBV tasks, and root guidance now exposes the default kg-* subset instead of adding new agent-* aliases.", "The documented agent-facing context-pack schema still needs implementation support for task summary, assumptions, authority/freshness-ranked top sources, required reads, active backlog, risk flags, suggested next action, verification commands, and missing context.", "Capability checks can still report stale or missing leaves such as graphify/codegraph refresh, Context7, and Semantic Scholar enrichment, so retrieval output needs freshness and authority cues before agents trust it as current."]
+context = ["litkg-rs is the shared action/evidence contract for broad ARIA-NBV tasks, and root guidance now exposes the default kg-* subset instead of adding new agent-* aliases.", "context-pack and routing output should converge on an agent-facing schema with verb, assumptions, authority/freshness-ranked top_sources, required_reads, active_backlog, risk_flags, suggested_next_action, verification_commands, and missing_context.", "Capability and context-pack diagnostics should treat stale or missing KG leaves, generated context, Context7, Semantic Scholar enrichment, and backlog evidence as warning-level stale/missing context unless a task-blocking required read is unavailable.", "This issue owns litkg routing/context-pack output drift; issue-025 owns the deeper DB provenance and source-reference contract."]
 references = ["repo:AGENTS.md#routing", "repo:.agents/references/litkg_quick_reference.md", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.configs/litkg.toml", "repo:.agents/kg/README.md", "repo:Makefile", "repo:.agents/external/litkg-rs/docs/architecture.md#semantic-scholar-contract", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "url:https://www.semanticscholar.org/product/api"]
 
 [[issue]]
@@ -141,37 +141,37 @@ priority = "low"
 status = "open"
 labels = ["simulator", "datasets", "scope", "thesis", "future-work"]
 context = ["The thesis-core simulator substrate is the ASE mesh/oracle counterfactual rollout loop used to generate target-conditioned rollouts and Q_H supervision.", "Habitat, Isaac, external datasets, 3DGS/world-models, and real-device guidance are extension paths that require an explicit gate by fidelity, reward availability, data licensing, setup cost, and thesis timing.", "Public thesis text should not imply simulator-backed online RL is core unless the ASE evidence path and the later M6 bridge justify it."]
-references = ["repo:docs/contents/thesis/questions.qmd#rq8-extensions", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m6", "url:https://aihabitat.org/docs/habitat-sim/habitat_sim.nav.html", "url:https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_getting_started", "bib:GenNBV-chen2024", "bib:Hestia-lu2026"]
+references = ["repo:docs/contents/thesis/questions.qmd#rq5-bridge", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m6", "url:https://aihabitat.org/docs/habitat-sim/habitat_sim.nav.html", "url:https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_getting_started", "bib:GenNBV-chen2024", "bib:Hestia-lu2026"]
 
 [[issue]]
 id = "issue-025"
 title = "Agents DB provenance is not yet a full KG edge and retrieval contract"
-description = "Active backlog records carry context and references, but litkg-rs still needs deeper validation, typed source resolution, graph edges, source-authority metadata, and query/consolidation integration for DB records."
+description = "Active backlog records carry context and references, but litkg-rs still needs a DB provenance/source-reference contract with typed resolution, graph edges, source-authority metadata, and warning-first stale-reference linting."
 type = "integration"
 priority = "medium"
 status = "open"
 labels = ["agents-db", "kg", "litkg", "provenance", "semantic-scholar"]
-context = ["ARIA-NBV issues/todos are now source-backed and context-pack parsing preserves context/references, but graphify/Neo4j exports still need typed edges from backlog records to repo files, papers, external docs, Semantic Scholar IDs, generated context, and experiment evidence.", "The desired agent-memory loop also needs retrieval and consolidation surfaces: DB references should inform kg-query/kg-route results, claim checks should identify unsupported backlog-driven overclaims, and consolidate-memory should propose state/backlog patches instead of silently overwriting canonical memory.", "Authority and freshness metadata should be part of the edge contract so canonical state and active backlog outrank stale debriefs or archived notes while still preserving their evidential provenance."]
+context = ["ARIA-NBV issues/todos are now source-backed and context-pack parsing preserves context/references, but graphify/Neo4j exports still need typed edges from backlog records to repo files, papers, external docs, Semantic Scholar IDs, generated context, and experiment evidence.", "The DB provenance/source-reference contract should parse repo, bib, arxiv, doi, s2, url, context7, and litkg references into typed KG entities while preserving source authority, freshness, status, and owning backlog record metadata.", "Stale-reference linting should be warning-first: unresolved anchors, renamed files, stale generated context, or missing enrichment should surface as actionable diagnostics without blocking unrelated agent routing by default.", "The desired agent-memory loop also needs retrieval and consolidation surfaces: DB references should inform kg-query/kg-route results, claim checks should identify unsupported backlog-driven overclaims, and consolidate-memory should propose state/backlog patches instead of silently overwriting canonical memory.", "Authority and freshness metadata should be part of the edge contract so canonical state and active backlog outrank stale debriefs or archived notes while still preserving their evidential provenance."]
 references = ["repo:scripts/agents_db.py", "repo:.agents/skills/agents-db/references/provenance.md", "repo:.agents/skills/semantic-scholar-litkg/references/integration-spec.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/docs/architecture.md#adapter-output-contracts", "repo:.agents/external/litkg-rs/docs/kg-stack.md", "litkg:context-pack", "url:https://www.semanticscholar.org/product/api"]
 
 [[issue]]
 id = "issue-027"
 title = "Thesis proposal freeze and citation hygiene need an advisor-facing gate"
-description = "The thesis proposal exists, but proposal polish, bibliography cleanup, four-tier scope-boundary wording, hard Q_H deliverable framing, and render/PDF verification are not yet tracked as a first-class advisor-facing milestone."
+description = "The thesis proposal exists, but proposal polish, bibliography cleanup, five-role scope-boundary wording, hard Q_H deliverable framing, and advisor-freeze/PDF verification are not yet tracked as a first-class advisor-facing milestone."
 type = "research-debt"
 priority = "high"
 status = "open"
 labels = ["thesis", "proposal", "docs", "bibliography", "advisor"]
-context = ["The follow-up review identified the proposal as directionally aligned but not yet frozen: title/name consistency, examiner placeholders, dataset limits, invalidity semantics, and minimum/full/stretch path all need an advisor-grade pass.", "The newer alignment decision replaces the old three-tier boundary with implemented substrate, prerequisite core, hard thesis core, and stretch, and moves target-conditioned fitted Double-Q / Q_H into the hard thesis core.", "The same review found citation hygiene debt in docs/references.bib, including Wikipedia entries, a generated citation comment, duplicate FiLM entries, and metadata that should be externally audited before submission.", "Roadmap and questions should treat proposal freeze, primary-metadata bibliography audit, and tracked proposal PDF after freeze as part of M0/M1 groundwork rather than a late writing afterthought."]
+context = ["The follow-up review identified the proposal as directionally aligned but not yet frozen: title/name consistency, examiner placeholders, dataset limits, invalidity semantics, and implemented/prerequisite/core/bridge/future scope boundaries still need an advisor-grade pass.", "The current compiled proposal includes the problem/research-contract, objectives, and method/timeline sections; other proposal section drafts exist but are not part of the current compiled contract unless re-included deliberately.", "The newer alignment decision uses five roles: implemented substrate, prerequisite and evidence protocol, hard quantitative thesis core, mandatory bridge design, and future-work extensions, with target-conditioned candidate-query Transformer Q_H in the hard thesis core.", "The same review found citation hygiene debt in docs/references.bib, including Wikipedia entries, a generated citation comment, duplicate FiLM entries, and metadata that should be externally audited before submission.", "Roadmap and questions should treat proposal freeze, primary-metadata bibliography audit, and tracked proposal PDF after advisor freeze as part of M0/M1 groundwork rather than a late writing afterthought."]
 references = ["repo:docs/typst/thesis/proposal.typ", "repo:docs/references.bib", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m0", "repo:Makefile#proposal-pdf"]
 
 [[issue]]
 id = "issue-028"
-title = "Target-conditioned fitted Double-Q Q_H is a hard thesis deliverable"
-description = "The thesis plan now requires a finite-candidate target-conditioned fitted Double-Q / Q_H model trained from ASE oracle rollout data, not only greedy rollouts or optional late RL."
+title = "Target-conditioned candidate-query Transformer Q_H is a hard thesis deliverable"
+description = "The thesis plan now requires a finite-candidate target-conditioned candidate-query Transformer Q_H model trained from ASE oracle rollout data, not only greedy rollouts or optional late RL."
 type = "research-debt"
 priority = "high"
 status = "open"
 labels = ["rl", "q-learning", "rollouts", "target", "thesis"]
-context = ["The accepted thesis scope makes ARIA-NBV a target-conditioned, quality-driven NBV system on ASE/EFM with strict M1 contracts and a mandatory multi-step Q_H deliverable.", "Q_H predicts bounded cumulative target RRI over finite candidate sets from ASE mesh/oracle counterfactual rollouts and must beat one-step greedy/model scoring under equal acquisition budget; bounded oracle lookahead remains the upper bound.", "This issue depends on M1 data/oracle correctness, V1 observed-target contracts, mixed observed candidate sets, invalidity masks/reason codes, Zarr-first rollout/Q storage, stochastic rollout data, and LRZ-scale generation."]
-references = ["repo:docs/contents/thesis/questions.qmd#rq5-planning", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m5", "repo:.agents/memory/state/DECISIONS.md", "bib:DoubleDQN-vanHasselt2015", "bib:IQL-kostrikov2021", "bib:GumbelTopK-kool2019", "bib:VIN-NBV-frahm2025"]
+context = ["The accepted thesis scope makes ARIA-NBV a target-conditioned, quality-driven NBV system on ASE/EFM with strict M1 contracts and a mandatory multi-step Q_H deliverable.", "Q_H is a candidate-query Transformer over scene, target, history, and candidate tokens; it predicts bounded cumulative target RRI over finite candidate sets from ASE mesh/oracle counterfactual rollouts and must beat one-step greedy/model scoring under equal acquisition budget after oracle evaluation.", "Bounded oracle lookahead remains the upper bound; random-valid, oracle-greedy/lookahead, and oracle-scored temperature-softmax traces are mandatory first rollout sources, while Gumbel is preferred later evidence.", "This issue depends on M1 data/oracle correctness, V1 observed-target contracts, mixed observed candidate sets, invalidity masks/reason codes, Zarr-first rollout/Q storage, and LRZ-scale generation."]
+references = ["repo:docs/contents/thesis/questions.qmd#rq4-planning", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m5", "repo:.agents/memory/state/DECISIONS.md", "bib:DoubleDQN-vanHasselt2015", "bib:IQL-kostrikov2021", "bib:GumbelTopK-kool2019", "bib:VIN-NBV-frahm2025"]
