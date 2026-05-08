@@ -1,4 +1,6 @@
 #import "../../../shared/macros.typ": *
+#import "../../../shared/symbols.typ": symb
+#import "../../../shared/equations.typ": eqs
 #import "_style.typ": *
 
 = Method
@@ -10,11 +12,16 @@ backprojected point clouds, semi-dense support, EVL fields, and Rerun
 diagnostics that must agree in frame and indexing. Oracle labels use the
 implemented point-mesh terms
 
-$ Delta_t = cal(A)_t + cal(C)_t,
+$
+  Delta_t = cal(A)_t + cal(C)_t,
   quad
-  Delta_t^e = cal(A)_t^e + cal(C)_t^e,
+  #symb.entity.target_error = cal(A)_t^e + cal(C)_t^e,
   quad
-  r_t^e = (Delta_t^e - Delta_(t+1)^e) / (Delta_t^e + epsilon). $
+  #symb.entity.target_reward =
+  (#symb.entity.target_error - #symb.entity.target_error_next)
+  /
+  (#symb.entity.target_error + epsilon).
+$
 
 The target stage adds the V1 contract. The selector returns a small top-$K$ set
 of observed or predicted targets and refuses GT OBB input for the main result.
@@ -25,18 +32,19 @@ CORAL variants @CORAL-cao2019, and becomes the myopic learned control.
 == Candidate and Replay Contract
 
 Each decision state carries a finite candidate table $bold(Q)_t$, hard mask
-$bold(m)_t$, invalid-reason vector $bold(rho)_t$, target descriptor
-$bold(z)_e$, selected-view history, and remaining budget. Candidate generation
-is logged as a mixture over target-point, radial-shell, and forward-rig
+$bold(m)_t$, invalid-reason vector $bold(rho)_t$, and the target descriptor
+#symb.entity.target_desc. It also stores selected-view history and remaining
+budget. Candidate generation is logged as a mixture over target-point, radial-shell, and forward-rig
 families. Each row stores provenance, pose, target/scene support, path
 increment, validity, reason code, and oracle labels. Candidate order has no
 semantics, so shuffled-candidate evaluation is required.
 
 The minimum replay row is
 
-$ ("scene", "snippet", "target", t, bold(s)_t^"cf0", bold(z)_e,
-   bold(Q)_t, bold(m)_t, bold(rho)_t, a_t, r_t^e,
-   bold(s)_(t+1)^"cf0", bold(Q)_(t+1), bold(m)_(t+1), "policy", "seed"). $
+$ ("scene", "snippet", "target", t, #symb.rl.s_cf0, #symb.entity.target_desc,
+   #symb.rl.candidate_table, #symb.rl.candidate_mask, #symb.rl.invalid_reasons,
+   a_t, #symb.entity.target_reward, #symb.rl.s_cf0_next, bold(Q)_(t+1),
+   bold(m)_(t+1), "policy", "seed"). $
 
 This row reproduces the mask, selected transition, value target, and oracle
 re-evaluation.
@@ -65,30 +73,20 @@ The learned planner is a candidate-query Transformer over scene, target,
 history, and candidate tokens @Transformer-vaswani2017 @DeepSets-zaheer2017
 @SetTransformer-lee2019:
 
-$ bold(u)_(t,i) = op("Transformer")_theta(bold(X)_t)_i, $
+#block[#align(center)[#eqs.rl.qh_candidate_token]]
 
-$ Q_(H,theta)(bold(s)_t^"cf0", bold(z)_e, bold(q)_(t,i)) =
-  bold(w)_Q^top bold(u)_(t,i). $
+#block[#align(center)[#eqs.rl.qh_candidate_value]]
 
 Invalid candidates are filled with $-infinity$ before argmax, softmax, loss
 targets, and bootstrap maximization. With online parameters $theta$ and target
 parameters $theta^-$, the first backup is masked Double-Q
 #cite(label("DBLP:journals/corr/MnihKSGAWR13")) @DoubleDQN-vanHasselt2015:
 
-$ i^star =
-  op("argmax", limits: #true)_(i in cal(A)_(t+1))
-  Q_(H,theta)(bold(s)_(t+1)^"cf0", bold(z)_e, bold(q)_(t+1,i)), $
+#block[#align(center)[#eqs.rl.qh_doubleq_index]]
 
-$ y_t =
-  r_t^e
-  + gamma (1 - d_t)
-    Q_(H,theta^-)(bold(s)_(t+1)^"cf0", bold(z)_e, bold(q)_(t+1,i^star)), $
+#block[#align(center)[#eqs.rl.qh_doubleq_target]]
 
-$ cal(L)_Q(theta) =
-  (1)/(|cal(D)|)
-  sum_((s,a,r,s') in cal(D))
-  m_(t,a)
-  (Q_(H,theta)(bold(s)_t^"cf0", bold(z)_e, bold(q)_(t,a)) - y_t)^2. $
+#block[#align(center)[#eqs.rl.qh_loss]]
 
 IQL, CQL, BCQ, sequence decoding, soft/energy policies, PPO, and SAC remain
 later comparison references unless the finite-candidate rollout store is stable
@@ -131,5 +129,5 @@ candidate budgets. The proposal uses one canonical comparison table:
     [$H$],
     [learned recovery of lookahead headroom],
   ),
-  caption: [Policy comparison and leakage boundary. Report $J_e^(H)$, $G_0^(H)$, scene #RRI, cost, invalidity, runtime, and coverage for each row.],
+  caption: [Policy comparison and leakage boundary. Report #symb.entity.endpoint_gain, #symb.entity.return_h, scene #RRI, cost, invalidity, runtime, and coverage for each row.],
 ) <tab:proposal-policy-eval>

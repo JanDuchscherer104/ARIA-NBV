@@ -96,7 +96,50 @@
     q_h: $
       "Q"_H(#symb.rl.s_cf0, #(symb.rl.a)_t)
       =
-      bb(E)[G_t^(H) mid s_t = #symb.rl.s_cf0, a_t = #(symb.rl.a)_t]
+      bb(E)[G_t^((H)) mid s_t = #symb.rl.s_cf0, a_t = #(symb.rl.a)_t]
+    $,
+    qh_candidate_token: $
+      #symb.rl.candidate_token
+      =
+      (op("Transformer")_theta (#symb.rl.candidate_features))_i
+    $,
+    qh_candidate_value: $
+      Q_(H,theta) (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)
+      =
+      #symb.rl.q_weight^top #symb.rl.candidate_token
+    $,
+    qh_masked_argmax: $
+      #symb.rl.selected_action_theta
+      =
+      arg max_(i : m_(t,i) = 1)
+      Q_(H,theta) (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)
+    $,
+    qh_doubleq_index: $
+      i^star
+      =
+      arg max_(i : m_(t+1,i) = 1)
+      Q_(H,theta) (#symb.rl.s_cf0_next, #symb.entity.target_desc, bold(q)_(t+1,i))
+    $,
+    qh_doubleq_target: $
+      #symb.rl.td_target
+      =
+      #symb.entity.target_reward
+      +
+      gamma
+      (1 - d_t)
+      Q_(H,theta^-) (#symb.rl.s_cf0_next, #symb.entity.target_desc, bold(q)_(t+1,i^star))
+    $,
+    qh_loss: $
+      #symb.rl.q_loss
+      =
+      (1) / (abs(cal(D)))
+      sum_((s,a,r,s') in cal(D))
+      m_(t,a)
+      (
+        Q_(H,theta) (#symb.rl.s_cf0, #symb.entity.target_desc, bold(q)_(t,a))
+        -
+        #symb.rl.td_target
+      )^2
     $,
     reward_log: $
       #(symb.rl.r) _t

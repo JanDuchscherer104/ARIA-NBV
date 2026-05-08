@@ -11,6 +11,12 @@
     meta: $bold(M)$,
     // Semidense point-cloud observation stream.
     points_semi: $bold(cal(P))^"semi"$,
+    // Time-indexed semi-dense evidence used in proposal state notation.
+    points_semi_t: $bold(P)_t^"semi"$,
+    // Time-indexed accumulated and candidate geometry proxies.
+    points_t: $bold(P)_t$,
+    points_next: $bold(P)_(t+1)$,
+    points_cand_ti: $bold(P)_(t,i)^"cand"$,
     // Counterfactual / rendered geometry point-cloud stream.
     points_cf: $bold(cal(P))^"cf"$,
     // Geometry / voxel-grid observation bundle.

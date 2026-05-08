@@ -1,15 +1,21 @@
-%%{init: {"flowchart": {"htmlLabels": true, "nodeSpacing": 24, "rankSpacing": 30}}}%%
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": true, "nodeSpacing": 28, "rankSpacing": 34, "curve": "basis"}, "themeVariables": {"background": "#ffffff", "fontFamily": "Inter, DejaVu Sans, Arial, sans-serif", "fontSize": "18px", "primaryTextColor": "#111827", "lineColor": "#64748b"}}}%%
 flowchart LR
   A["<b>OBS</b><br/><b>s</b><sub>t</sub><sup>obs</sup>, <b>z</b><sub>e</sub>"] --> B["<b>CAND</b><br/><b>Q</b><sub>t</sub>, <b>m</b><sub>t</sub>, <b>&rho;</b><sub>t</sub>"]
-  B --> C["<b>ORACLE</b><br/>&Delta;<sub>t</sub><sup>e</sup>, r<sub>t</sub><sup>e</sup>(i)"]
-  C --> D["<b>1-step</b><br/>r&#770;<sub>t</sub><sup>e</sup>(i)"]
+  B --> C["<b>ORACLE</b><br/>&Delta;<sub>t</sub><sup>e</sup>, r<sub>t</sub><sup>e</sup>"]
+  C --> D["<b>1-step</b><br/>pred r<sub>t</sub><sup>e</sup>(i)"]
   C --> E["<b>Lookahead</b><br/>&Delta;<sub>look</sub>"]
-  D --> F["<b>Q</b><sub>H,&theta;</sub><br/>masked value"]
+  D --> F["<b>Q</b><sub>H,&theta;</sub><br/>masked argmax"]
   E --> F
   F --> G["<b>Eval</b><br/>J<sub>e</sub><sup>(H)</sup>, &eta;<sub>Q</sub>"]
-  F -. "M6+" .-> H["<b>Follow-up</b><br/>IQL / online <b>Q</b><sub>H</sub><br/>continuous / sim"]
+  F -. "M6+" .-> H["<b>Follow-up</b><br/>IQL / online / continuous"]
 
-  classDef core fill:#f9fbff,stroke:#0b4f8a,stroke-width:1.4px,color:#111;
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
   classDef bridge fill:#fffaf0,stroke:#8a5a00,stroke-width:1.4px,stroke-dasharray:5 4,color:#111;
-  class A,B,C,D,E,F,G core;
+  class A input;
+  class B data;
+  class C,D,E,F compute;
+  class G output;
   class H bridge;

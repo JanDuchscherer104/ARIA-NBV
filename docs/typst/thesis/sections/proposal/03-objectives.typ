@@ -1,26 +1,28 @@
 #import "../../../shared/macros.typ": *
+#import "../../../shared/symbols.typ": symb
+#import "../../../shared/equations.typ": eqs
 #import "_style.typ": *
 
 = Objectives and Hypotheses
 
 The thesis objective is a leakage-safe target-aware #NBV stack whose selected
 views reduce target point-mesh error under a fixed acquisition budget. The
-primary endpoint metric is $J_e^(H)$; the additive return $G_t^(H)$ is the
+endpoint metric #symb.entity.endpoint_gain is primary, and the additive return #symb.entity.return_h is the
 training target for value learning.
 
 == Aim 1: Target Oracle and Leakage Boundary
 
 Define target-specific oracle #RRI while keeping target selection and model
 input actor-visible. V1 uses observed or predicted target descriptors
-$bold(z)_e$; GT crops, boxes, meshes, and all-candidate renders are restricted
+#symb.entity.target_desc. GT crops, boxes, meshes, and all-candidate renders are restricted
 to labels, upper bounds, and evaluation. The required evidence is target
-eligibility, match score, unmatched/ambiguous counts, endpoint $J_e^(H)$, and
+eligibility, match score, unmatched/ambiguous counts, endpoint #symb.entity.endpoint_gain, and
 separate scene #RRI and acquisition cost.
 
 == Aim 2: Target-Conditioned One-Step Control
 
 Train a VIN-style myopic scorer over the same candidate table that later feeds
-$Q_H$. The scorer predicts target #RRI from actor-visible scene, target, and
+#symb.rl.qh. The scorer predicts target #RRI from actor-visible scene, target, and
 candidate features. It is the required learned one-step control, evaluated by
 rank correlation, top-$k$ oracle hit rate, calibration, selected-candidate
 oracle #RRI, target visibility, invalid fraction, and grouped failures.
@@ -30,36 +32,22 @@ oracle #RRI, target visibility, invalid fraction, and grouped failures.
 First estimate whether bounded oracle lookahead has headroom over one-step
 oracle greedy:
 
-$
-  Delta_"look" =
-  J_e^(H)(pi_"oracle-look") - J_e^(H)(pi_"oracle-1").
-$
+#block[#align(center)[#eqs.entity.lookahead_headroom]]
 
-Only if this headroom is positive is $Q_H$ expected to recover part of it from
+Only if this headroom is positive is #symb.rl.qh expected to recover part of it from
 offline rollout traces. The candidate-query model emits one masked value per
 candidate:
 
-// TODO: subscript issue in "op("Transformer")_theta(bold(X)_t)_i," - (bold(X)_t)_i are part of the subscript, not argument to op Transformer!
-$
-  bold(u)_(t,i) =
-  op("Transformer")_theta(bold(X)_t)_i,
-$
+#block[#align(center)[#eqs.rl.qh_candidate_token]]
 
-$
-  Q_(H,theta)(bold(s)_t^"cf0", bold(z)_e, bold(q)_(t,i)) =
-  bold(w)_Q^top bold(u)_(t,i),
-$
+#block[#align(center)[#eqs.rl.qh_candidate_value]]
 
-$
-  a_t^theta =
-  op("argmax", limits: #true)_(i in cal(A)_t)
-  Q_(H,theta)(bold(s)_t^"cf0", bold(z)_e, bold(q)_(t,i)).
-$
+#block[#align(center)[#eqs.rl.qh_masked_argmax]]
 
 Success is measured by oracle-rescored selected actions, not predicted values.
 If oracle lookahead itself has little headroom, the thesis reports that the
 current objective and candidate distribution are effectively myopic. If
-lookahead has headroom but $Q_H$ fails to recover it, the analysis reports
+lookahead has headroom but #symb.rl.qh fails to recover it, the analysis reports
 whether the limiting factor is target observability, candidate support, rollout
 coverage, reward definition, or model capacity.
 
@@ -68,20 +56,20 @@ coverage, reward definition, or model capacity.
     columns: (0.86fr, 1.32fr, 1.48fr),
     table.header([*Claim*], [*Primary evidence*], [*Decision rule*]),
     [Target utility],
-    [$J_e^(H)$, $G_t^(H)$, scene #RRI, cost],
-    [$J_e^(H)$ decides endpoint quality; $G_t^(H)$ trains and ranks rollouts.],
+    [#symb.entity.endpoint_gain, #symb.entity.return_h, scene #RRI, cost],
+    [#symb.entity.endpoint_gain decides endpoint quality; #symb.entity.return_h trains and ranks rollouts.],
 
     [Input safety],
-    [actor-visible $bold(z)_e$, match score, support, leakage checks],
+    [actor-visible #symb.entity.target_desc, match score, support, leakage checks],
     [GT is label/evaluation only for the V1 result.],
 
     [Myopic control],
     [target-rank metrics, selected-candidate oracle #RRI, calibration],
-    [One-step target scoring is the comparator for $Q_H$, not the final policy claim.],
+    [One-step target scoring is the comparator for #symb.rl.qh, not the final policy claim.],
 
     [Planning headroom],
-    [$Delta_"look"$ and recovered fraction $eta_Q$],
-    [$Q_H$ is meaningful only relative to measured oracle-lookahead headroom.],
+    [#symb.entity.lookahead_headroom and recovered fraction #symb.entity.q_recovery],
+    [#symb.rl.qh is meaningful only relative to measured oracle-lookahead headroom.],
   ),
   caption: [Objective-to-evidence matrix.],
 ) <tab:proposal-objective-evidence>

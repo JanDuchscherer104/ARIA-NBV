@@ -1,4 +1,6 @@
 #import "../../../shared/macros.typ": *
+#import "../../../shared/symbols.typ": symb
+#import "../../../shared/equations.typ": eqs
 #import "_style.typ": *
 
 = Problem and Research Contract
@@ -12,20 +14,20 @@ myopic view selection.
 The actor-visible state at decision step $t$ is
 
 $
-  bold(s)_t^"obs" =
-  (bold(P)_t^"semi", bold(F)_t^"EVL", bold(O)_t^"pred",
+  #symb.rl.s_obs =
+  (#symb.obs.points_semi_t, #symb.vin.field_evl_t, #symb.entity.target_hyp_pred_t,
     bold(h)_t, b_t),
 $
 
-where $bold(P)_t^"semi"$ is the accumulated semi-dense or fused point evidence,
-$bold(F)_t^"EVL"$ is the frozen local EFM/EVL evidence field, $bold(O)_t^"pred"$ are
+where #symb.obs.points_semi_t is the accumulated semi-dense or fused point evidence,
+#symb.vin.field_evl_t is the frozen local EFM/EVL evidence field, #symb.entity.target_hyp_pred_t are
 observed or predicted target hypotheses, $bold(h)_t$ is selected-view history, and
 $b_t$ is remaining budget. The oracle state augments this with ASE GT assets:
 
 $
-  bold(s)_t^"oracle" =
-  (bold(s)_t^"obs", bold(M)_"GT", {bold(M)_e^"GT"}_(e in cal(E)),
-    {bold(P)_(t,i)^"cand"}_(i=1)^(N_q)).
+  #symb.rl.s_oracle =
+  (#symb.rl.s_obs, bold(M)_"GT", {bold(M)_e^"GT"}_(e in cal(E)),
+    {#symb.obs.points_cand_ti}_(i=1)^(N_q)).
 $
 
 GT meshes, GT OBBs, GT crops, GT semantic labels, and all-candidate GT renders
@@ -34,16 +36,16 @@ are label/evaluation assets only. They are not V1 actor inputs.
 The planner state is
 
 $
-  bold(s)_t^"cf0" =
-  (bold(F)_0^"EVL", bold(P)_t, bold(z)_e, bold(h)_t, b_t,
-    bold(Q)_t, bold(m)_t, bold(rho)_t),
+  #symb.rl.s_cf0 =
+  (#symb.vin.field_evl_0, #symb.obs.points_t, #symb.entity.target_desc, bold(h)_t, b_t,
+    #symb.rl.candidate_table, #symb.rl.candidate_mask, #symb.rl.invalid_reasons),
 $
 
-where $bold(Q)_t={bold(q)_(t,i)}_(i=1)^(N_q)$ is the finite candidate table,
+where #symb.rl.candidate_table $={#symb.rl.candidate_qti}_(i=1)^(N_q)$ is the finite candidate table,
 $m_(t,i) in {0,1}$ is a hard validity mask, and $rho_(t,i)$ is an invalid
 reason. The admissible actions are candidate indices:
 
-$ cal(A)_t = {i in {1,dots,N_q}: m_(t,i)=1}. $
+$ #symb.rl.action_set_t = {i in {1,dots,N_q}: m_(t,i)=1}. $
 
 Invalidity is a constraint, not low utility. Masks apply before argmax,
 softmax, loss targets, and bootstrap maximization.
@@ -58,7 +60,7 @@ The V1 target protocol is OBS-SEL / PRED-Q / GT-EVAL. Target selection and
 model input use an actor-visible descriptor
 
 $
-  bold(z)_e =
+  #symb.entity.target_desc =
   phi(
     hat(bold(B))_e, hat(bold(y))_e, hat(p)_e, A_e^"proj",
     n_e^"semi", n_e^"EVL", bold(T)_e^"rel"
@@ -67,7 +69,7 @@ $
 
 covering predicted/observed OBB geometry, class, confidence, projected area,
 semi-dense support, EVL support, and relative pose. GT crops $bold(M)_e$ are used only
-after matching $bold(z)_e$ to GT. The matching score is protocol-level, not an
+after matching #symb.entity.target_desc to GT. The matching score is protocol-level, not an
 actor input:
 
 $
@@ -83,57 +85,49 @@ separately from low target #RRI.
 For target $e$, the implemented oracle error is the point-mesh accuracy plus
 mesh-to-point completeness diagnostic:
 
-$ Delta_t^e = cal(A)_t^e + cal(C)_t^e. $
+#block[#align(center)[#eqs.entity.target_error]]
 
 These are the `pm_acc_*` / `pm_comp_*` point-mesh terms used by `aria_nbv`,
 not a point-cloud-to-point-cloud distance. If valid action $a_t=i$ selects
-$bold(q)_(t,i)$, then
+#symb.rl.candidate_qti, then
 
 $
-  bold(P)_(t+1) = bold(P)_t union bold(P)_(t,i)^"cand",
+  #symb.obs.points_next = #symb.obs.points_t union #symb.obs.points_cand_ti,
   quad
-  r_t^e = (Delta_t^e - Delta_(t+1)^e) / (Delta_t^e + epsilon).
+  #symb.entity.target_reward =
+  (#symb.entity.target_error - #symb.entity.target_error_next)
+  /
+  (#symb.entity.target_error + epsilon).
 $
 
 The value-learning return and endpoint metric stay separate:
 
-$
-  G_t^(H) = sum_(k=0)^(H-1) gamma^k r_(t+k)^e,
-  quad
-  J_(e,H) = (Delta_0^e - Delta_H^e) / (Delta_0^e + epsilon).
-$
+#block[#align(center)[#eqs.entity.finite_horizon_return]]
+#block[#align(center)[#eqs.entity.endpoint_gain]]
 
 The log-gain companion
-$L_(e,H)=log(Delta_0^e+epsilon)-log(Delta_H^e+epsilon)$ is only an ablation.
+#symb.entity.log_gain is only an ablation.
 
 The non-myopic headroom estimate is
 
-$
-  Delta_"look" =
-  J_e^(H)(pi_"oracle-look") - J_e^(H)(pi_"oracle-1").
-$
+#block[#align(center)[#eqs.entity.lookahead_headroom]]
 
-If $Delta_"look"$ is approximately zero, the thesis reports that the current
+If #symb.entity.lookahead_headroom is approximately zero, the thesis reports that the current
 candidate distribution and target-#RRI objective are effectively myopic. If it
 is positive, the learned planner is judged by recovery over the one-step
 actor-visible target scorer:
 
-$
-  eta_Q =
-  (J_e^(H)(pi_Q) - J_e^(H)(pi_"learned-1"))
-  /
-  (J_e^(H)(pi_"oracle-look") - J_e^(H)(pi_"learned-1") + epsilon).
-$
+#block[#align(center)[#eqs.entity.q_recovery]]
 
 #thesis-box([Main question])[
   Can a target-conditioned candidate-query Transformer
-  $Q_(H,theta)(bold(s)_t^"cf0", bold(z)_e, bold(q)_(t,i))$ recover measurable
+  #symb.rl.qh_theta (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti) recover measurable
   oracle-lookahead headroom over learned one-step target scoring under equal
   candidate and acquisition budgets?
 ]
 
 The thesis-core evidence is observed target selection, target #RRI labels,
 target-conditioned one-step scoring, replayable oracle rollouts, and masked
-finite-candidate $Q_H$. Continuous control, external simulators, 3DGS control,
+finite-candidate #symb.rl.qh. Continuous control, external simulators, 3DGS control,
 SceneScript, VLM planning, and real-device guidance are follow-up designs unless
 the finite-candidate result first justifies them.

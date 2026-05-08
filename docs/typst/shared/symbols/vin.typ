@@ -93,6 +93,9 @@
     new_surface_prior: $bold(V)_"new"$,
     // VIN scene field after lightweight 3D projection/assembly (multi-channel).
     field_v: $bold(F)_v$,
+    // Time-indexed EVL/EFM evidence field used by proposal rollouts.
+    field_evl_t: $bold(F)_t^"EVL"$,
+    field_evl_0: $bold(F)_0^"EVL"$,
     // Per-candidate voxel features sampled/pooled from the scene field.
     field_q: $bold(F)_q^("vox")$,
   )
