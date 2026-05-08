@@ -242,6 +242,7 @@ docs/_freeze/**/*.html
 .agents/kg/generated/
 .agents/tmp/*
 .agents/work/
+.claude/worktrees/
 
 # Large download manifests
 !.data/
