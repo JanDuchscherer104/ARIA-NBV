@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "hooks": {
     "SessionStart": [
       {
@@ -6,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "make check-agent-memory >/dev/null || true"
+            "command": "make check-agent-memory >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -17,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "make agents-db AGENTS_ARGS='validate' >/dev/null || true"
+            "command": "make agents-db AGENTS_ARGS='validate' >/dev/null 2>&1 || true"
           }
         ]
       }

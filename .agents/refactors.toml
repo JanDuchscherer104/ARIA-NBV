@@ -145,33 +145,17 @@ acceptance = ["Canonical memory is delta-oriented: DECISIONS.md contains durable
 verification = ["make agents-db AGENTS_ARGS='validate'", "make agents-db", "make check-agent-memory", "rg -n \"trust ladder|raw agent messages|top_sources|missing_context\" .agents/references/litkg_quick_reference.md .agents/issues.toml .agents/todos.toml", "rg -n \"Instruction Capture|smallest surface\" AGENTS.md .agents/references/source_order.md .agents/references/human_owner_intent.md", "rg -n \"^  mode: scaffold|Required Frontmatter|Optional broad\" .agents/references/skill_style_guide.md .agents/skills/*/SKILL.md"]
 
 [[refactor]]
-id = "refactor-017"
-title = "Delete kg-query alias and references"
-description = "Remove kg-query from the agent-facing Make/doc/skill surface because it duplicated kg-route without synthesis."
+id = "refactor-019"
+title = "Land Claude Code first-class agent scaffold and debrief automation"
+description = "Make Claude Code a first-class agent surface (CLAUDE.md, .claude/settings.json hooks, slash commands, sub-agents, skills bridge) and add debrief/health automation (make new-debrief, make kg-status, agents-db search, debrief-nudge hook, worktree policy doc)."
 priority = "medium"
 status = "todo"
-labels = ["kg", "litkg", "scaffold", "simplification"]
-issue_ids = ["issue-030", "issue-023"]
-loc_min = 30
-loc_expected = 80
-loc_max = 200
-context = ["kg-query trained agents to expect answer synthesis while returning the same context-pack shape as kg-route.", "The narrowed command surface keeps kg-search for fast retrieval and kg-route for context packs; synthesis is deferred until a real answer layer exists."]
-implementation_notes = ["Remove kg-query from Makefile and .PHONY.", "Remove active quick-reference and skill guidance that tells agents to invoke kg-query.", "Keep historical resolved/debrief/generated mentions as archive evidence unless a separate generated-artifact refresh owns them."]
-acceptance = ["No active Make target or active agent guidance tells agents to use kg-query.", "litkg_quick_reference names kg-search for retrieval and kg-route for context packs.", "semantic-scholar-litkg explicitly says synthesis is deferred."]
-verification = ["! rg -n \"make kg-query|KG_QUERY=.*kg-query\" Makefile .agents/references .agents/skills .agents/kg/README.md docs", "make kg-search KG_QUERY=\"bounded oracle RRI\" KG_FORMAT=json", "make kg-route KG_TASK=\"bounded oracle RRI\" KG_FORMAT=json"]
-
-[[refactor]]
-id = "refactor-018"
-title = "Add genre and precedent ranking for litkg routes"
-description = "Add an optional document-genre/precedent tier so process-shaped tasks can surface prior report templates such as m1_contract_report.qmd."
-priority = "low"
-status = "todo"
-labels = ["kg", "litkg", "ranking", "docs"]
-issue_ids = ["issue-023"]
-loc_min = 120
-loc_expected = 320
-loc_max = 800
-context = ["The current ranking can miss structurally relevant precedent docs when lexical overlap is weak.", "This is lower priority than claim verdicts, backlog filtering, task-grounded risks, verification-path injection, worktree exclusion, and confidence floors."]
-implementation_notes = ["Define a small optional QMD genre frontmatter enum such as contract_report, runbook, architecture, thesis_section, and scratch.", "Parse frontmatter into litkg source metadata and add configurable genre boosts for matching task terms.", "Seed the first useful precedent tag on docs/contents/thesis/m1_contract_report.qmd after docs-frontmatter validation is updated."]
-acceptance = ["A task like design experiment evidence registry surfaces m1_contract_report.qmd as a precedent when it is tagged.", "Docs without genre frontmatter keep current ranking behavior.", "The optional genre key is documented and validated before relying on it."]
-verification = ["make qmd-frontmatter-check", "cd .agents/external/litkg-rs && cargo test -p litkg-core context_pack::genre_boost", "make kg-route KG_TASK=\"design experiment evidence registry\" KG_FORMAT=json"]
+labels = ["agent", "scaffold", "claude", "tooling", "memory"]
+issue_ids = ["issue-012"]
+loc_min = 240
+loc_expected = 600
+loc_max = 1400
+context = ["The Codex/Gemini scaffolds had first-class entrypoints (.codex-plugin, .gemini/settings.json, .codex/hooks.example.json), but Claude Code had no equivalent: empty .claude/, no CLAUDE.md, no hooks, no slash commands, no sub-agents.", "The work also folds in cross-vendor scaffold polish: a debrief scaffolder (make new-debrief), a fast KG health probe (make kg-status), a resolved-precedent search subcommand (agents_db.py search), a Stop hook nudging non-trivial sessions to write a debrief, a worktree-merge policy doc, a peer-skill diagnose-aria openai.yaml stub, and removal of the empty default_profile.yaml."]
+implementation_notes = ["CLAUDE.md redirects Claude Code to AGENTS.md with a 5-line behavior summary.", ".claude/settings.json mirrors .codex/hooks.example.json: SessionStart -> make check-agent-memory, PreCompact -> make agents-db AGENTS_ARGS='validate', Stop -> scripts/debrief_nudge.sh.", ".claude/commands/ holds /check-memory, /agents-db, /debrief, /diagnose, /plan-grill, /kg-claim-check, /context-refresh.", ".claude/agents/ holds aria-reviewer, aria-diagnoser, aria-plan-grill, aria-debrief-writer.", ".claude/skills/ symlinks every .agents/skills/<name> via scripts/sync_claude_skills.sh + make claude-skills.", "scripts/new_debrief.py + make new-debrief scaffold today's history file with valid frontmatter and absolute date.", "scripts/debrief_nudge.sh warns when >=N tracked files changed but no new debrief exists; never blocks.", "scripts/kg/status.sh + make kg-status: fast 0/1 KG health probe.", "scripts/agents_db.py grows a search subcommand covering active and resolved records.", "scripts/agents_db.py also patches _dump_records to guard missing optional fields (refactors lack `references`).", ".agents/references/worktree_policy.md documents how parallel agent sessions reconcile memory state and agents-db IDs.", ".agents/references/agent_memory_templates.md mandates absolute ISO dates.", ".agents/skills/diagnose-aria/agents/openai.yaml stub for parity with peer skills.", "Empty default_profile.yaml deleted."]
+acceptance = ["Claude Code sessions auto-load CLAUDE.md and discover .claude/{settings.json, commands, agents, skills} without manual setup.", "make check-agent-memory passes; make agents-db AGENTS_ARGS='validate' passes; make kg-status returns 0/1 cleanly.", "make new-debrief TITLE='smoke' produces a frontmatter file that validate_agent_memory.py accepts.", "scripts/agents_db.py search '<term>' returns matched records across active and resolved with correct status decoration.", "scripts/sync_claude_skills.sh is idempotent (run twice produces no new symlinks)."]
+verification = ["test -f CLAUDE.md && test -f .claude/settings.json && test -x scripts/new_debrief.py && test -x scripts/debrief_nudge.sh && test -x scripts/kg/status.sh && test -x scripts/sync_claude_skills.sh", "ls .claude/commands | wc -l", "ls .claude/agents | wc -l", "make claude-skills", "make kg-status", "python3 scripts/agents_db.py validate", "python3 scripts/validate_agent_memory.py", "python3 scripts/agents_db.py search 'kg-claim-check'"]

@@ -42,13 +42,18 @@ source families.
 
 1. Read `AGENTS.md`, `.agents/references/source_order.md`, and
    `.agents/references/litkg_quick_reference.md`.
-2. Check backend/source readiness with `make kg-capabilities KG_FORMAT=json`
-   when freshness matters.
-3. Use `make kg-route KG_TASK="<task>"` for broad task routing.
-4. Use `make kg-search KG_QUERY="<terms>"` for fast retrieval, or `kg-route`
-   when the agent needs a full context pack.
-5. Use `make kg-claim-check KG_CLAIM="<claim>"` for advisor-facing proposal,
-   roadmap, research-question, or literature-synthesis claims.
+2. Default first read: `make kg-search KG_QUERY="<terms>"` for fast,
+   score-ranked retrieval over code/docs/memory/backlog/literature. Empirical
+   verdict: this is the killer verb for localized lookups.
+3. Escalate to `make kg-route KG_TASK="<task>"` only when the agent needs a
+   full context pack (top_sources + required_reads + active_backlog +
+   verification_commands + missing_context).
+4. Use `make kg-claim-check KG_CLAIM="<claim>"` for advisor-facing proposal,
+   roadmap, research-question, or literature-synthesis claims; expect
+   `verdict, confidence, supporting_evidence, contradicting_evidence`.
+5. When KG output looks degraded or empty, run `make kg-status` first as a
+   fast 0/1 health probe. If non-zero, fall back to `aria-nbv-context` plus
+   targeted reads and record the outage in the debrief.
 6. Inspect cited canonical sources before treating retrieved statements as
    current truth.
 7. Use `make kg-consolidate` for proposal-style memory/backlog updates; do not
@@ -68,7 +73,12 @@ blocks the task or exposes durable scaffold drift.
 
 ## Verification
 
+- `make kg-status` first as a fast 0/1 probe; if non-zero, fall back to
+  `aria-nbv-context` plus targeted reads and record the KG outage in the
+  debrief instead of waiting for the heavier commands below.
 - `make kg-capabilities KG_FORMAT=json`
-- `make kg-route KG_TASK="<task>" KG_FORMAT=json`
-- `make kg-claim-check KG_CLAIM="<claim>"` for advisor-facing claims
-- `make check-agent-memory` after non-trivial memory or guidance changes
+- `make kg-search KG_QUERY="<terms>" KG_FORMAT=json` for retrieval verification.
+- `make kg-route KG_TASK="<task>" KG_FORMAT=json` for context-pack verification.
+- `make kg-claim-check KG_CLAIM="<claim>" KG_FORMAT=json` for advisor-facing
+  claims; expect `verdict` and `confidence` populated.
+- `make check-agent-memory` after non-trivial memory or guidance changes.

@@ -27,6 +27,13 @@ aria_nbv/.venv/bin/python --version
 uv run python --version
 ```
 
+## litkg Health Probe
+Run `make kg-status` first when KG output looks degraded or empty. It is a
+fast 0/1 probe (checks `.configs/litkg.toml`, the litkg-rs submodule, and
+`cargo` on PATH). Exit 0 = healthy, exit 1 = degraded with a one-line reason
+on stderr; never blocks. If degraded, fall back to `aria-nbv-context` plus
+targeted reads instead of waiting for the heavier `make kg-*` commands.
+
 ## Mac-Offloaded litkg Ollama
 Use the Mac as the Ollama model host while keeping ARIA-NBV sources, Neo4j,
 Graphiti, and generated KG artifacts on the Ubuntu workstation.

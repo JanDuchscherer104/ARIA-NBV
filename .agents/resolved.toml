@@ -158,6 +158,34 @@ resolved_at = "2026-05-06"
 resolution_note = "Candidate-to-label ordering now has independent synthetic guards plus renderer/offline-writer fail-fast checks; remaining real-store proof is tracked under the M1 contract gate."
 resolved_from = ".agents/issues.toml"
 
+[[issue]]
+id = "issue-029"
+title = "kg-claim-check verdict contract was missing"
+description = "The kg-claim-check wrapper used the context-pack route without a verdict, confidence, supporting_evidence, or contradicting_evidence fields, making advisor-facing claim discipline unenforceable."
+type = "integration"
+priority = "high"
+status = "resolved"
+labels = ["kg", "litkg", "claim-check", "thesis"]
+context = ["Read-only agent probes on todo-026 and issue-013 showed kg-claim-check returned a generic context pack with verb=check instead of checking the claim.", "DECISIONS.md requires kg-claim-check for advisor-facing proposal, roadmap, research-question, and literature-synthesis claims, so the verdict shape is load-bearing."]
+references = ["repo:.agents/memory/state/DECISIONS.md", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/crates/litkg-cli/src/main.rs", "repo:.agents/issues.toml#issue-023", "repo:.agents/issues.toml#issue-025", "repo:.agents/refactors.toml#refactor-016", "repo:.agents/todos.toml#todo-061"]
+resolved_at = "2026-05-08"
+resolution_note = "claim-verdict logic shipped in litkg-rs commit 152f13b (ClaimVerdictParts at context_pack.rs:1627, claim_verdict at line 1634); DB-side scaffolding shipped in commit d3e980d. Smoke confirmed: V0-OBB claim verdict=supported(1.0); V1-actor-visible verdict=contradicted(0.9); Habitat claim verdict=unverifiable(0.2)."
+resolved_from = ".agents/issues.toml"
+
+[[issue]]
+id = "issue-030"
+title = "kg-query duplicated kg-route without synthesis"
+description = "The kg-query Make target promised question retrieval but called the same context-pack path as kg-route without answer synthesis or a distinct contract."
+type = "maintenance"
+priority = "medium"
+status = "resolved"
+labels = ["kg", "litkg", "tooling", "scaffold"]
+context = ["The command produced the same context-pack shape as kg-route and trained agents to expect synthesis that did not exist.", "The chosen fix is deletion: keep kg-search for fast retrieval and kg-route for context packs; reserve synthesis for a future real answer layer."]
+references = ["repo:Makefile", "repo:.agents/references/litkg_quick_reference.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/issues.toml#issue-023", "repo:.agents/refactors.toml#refactor-016", "repo:.agents/refactors.toml#refactor-017"]
+resolved_at = "2026-05-08"
+resolution_note = "kg-query duplication eliminated by deleting the Make target (commit d3e980d) and the supporting refactor record (refactor-017). Documented in litkg_quick_reference.md and aria-litkg-memory/SKILL.md updates from the same pass."
+resolved_from = ".agents/issues.toml"
+
 [[todo]]
 id = "todo-009"
 title = "Bounded public docs identity cleanup"
@@ -668,6 +696,26 @@ resolved_at = "2026-05-07"
 resolution_note = "Implemented rollout Zarr hardening: explicit target-RRI provenance for q_train labels, multi-target q_h target propagation, PoseTW root-relative transforms, per-rollout split/lineage fields, validator checks, and regression tests."
 resolved_from = ".agents/todos.toml"
 
+[[todo]]
+id = "todo-061"
+title = "Implement kg-claim-check verdict logic"
+description = "Add deterministic verdict, confidence, supporting_evidence, and contradicting_evidence output to kg-claim-check context packs."
+priority = "high"
+status = "resolved"
+labels = ["kg", "litkg", "claim-check", "thesis"]
+issue_ids = ["issue-025"]
+loc_min = 180
+loc_expected = 420
+loc_max = 900
+context = ["Advisor-facing claim discipline depends on kg-claim-check returning a verdict instead of a generic context pack.", "Heuristic v1 should be deterministic and source-backed; LLM-backed multi-claim checking remains deferred under issue-025."]
+references = ["repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/crates/litkg-cli/src/main.rs", "repo:.agents/external/litkg-rs/crates/litkg-cli/tests/inspect_cli.rs", "repo:.agents/references/litkg_quick_reference.md", "repo:.agents/issues.toml#issue-023", "repo:.agents/issues.toml#issue-025", "repo:.agents/issues.toml#issue-029", "repo:.agents/refactors.toml#refactor-016"]
+implementation_notes = ["Populate check-only ContextPack fields: verdict, confidence, supporting_evidence, and contradicting_evidence.", "Classify trusted top-source spans with lexical overlap plus negation/limitation markers, including V0/V1 GT-OBB actor-visibility language.", "Render verdict in text output before top sources.", "Keep kg-route output behavior unchanged except for shared routing-quality hardening."]
+acceptance = ["A known true V0 GT-OBB target-RRI claim returns verdict=supported with non-empty supporting_evidence.", "A false V1 GT-OBB actor-visible main-result claim returns verdict=contradicted with non-empty contradicting_evidence.", "An unsupported simulator claim returns verdict=unverifiable with low confidence.", "Text output prints the verdict and confidence for claim-check packs."]
+verification = ["cd .agents/external/litkg-rs && cargo test -p litkg-core context_pack::tests::context_pack_claim_check_returns_supported_contradicted_and_unverifiable", "cd .agents/external/litkg-rs && cargo test -p litkg-cli claim_check_context_pack_reports_verdict_in_json_and_text", "make kg-claim-check KG_CLAIM=\"ARIA-NBV uses GT-OBB-cropped target RRI as V0 sanity/upper-bound\" KG_FORMAT=json", "make kg-claim-check KG_CLAIM=\"GT OBBs are actor-visible in the V1 main thesis result\" KG_FORMAT=json"]
+resolved_at = "2026-05-08"
+resolution_note = "Verdict logic shipped in litkg-rs commit 152f13b: ClaimVerdictParts struct (context_pack.rs:1627), claim_verdict() helper (line 1634), trusted_claim_source filter, classify_claim_span with negation detection. Smoke confirmed all three plan-grill scenarios: V0-OBB GT support claim verdict=supported(1.0); V1-actor-visible claim verdict=contradicted(0.9); Habitat-as-main-simulator verdict=unverifiable(0.2). Closes the issue-029 contract gap noted before resolution."
+resolved_from = ".agents/todos.toml"
+
 [[refactor]]
 id = "refactor-013"
 title = "Pilot optional OMX and Codex templates after scaffold cleanup"
@@ -799,4 +847,42 @@ acceptance = ["The offline-store schema no longer advertises counterfactual data
 verification = ["cd aria_nbv && uv run pytest tests/data_handling/test_vin_offline_store.py tests/data_handling/test_public_api_contract.py", "cd aria_nbv && uv run nbv-summary --config-path offline_only.toml", "cd aria_nbv && uv run pytest tests/rerun_inspector -q", "cd docs && quarto render contents/setup.qmd", "cd docs && quarto render contents/impl/one_scene_smoke.qmd", "cd docs && quarto render contents/thesis/m1_contract_report.qmd"]
 resolved_at = "2026-05-07"
 resolution_note = "Removed premature counterfactual offline-store hooks, bumped the immutable VIN offline dataset format to v7, upgraded local persisted manifests without leaving migration code, and verified strict data/Rerun/doc checks."
+resolved_from = ".agents/refactors.toml"
+
+[[refactor]]
+id = "refactor-017"
+title = "Delete kg-query alias and references"
+description = "Remove kg-query from the agent-facing Make/doc/skill surface because it duplicated kg-route without synthesis."
+priority = "medium"
+status = "resolved"
+labels = ["kg", "litkg", "scaffold", "simplification"]
+issue_ids = ["issue-023"]
+loc_min = 30
+loc_expected = 80
+loc_max = 200
+context = ["kg-query trained agents to expect answer synthesis while returning the same context-pack shape as kg-route.", "The narrowed command surface keeps kg-search for fast retrieval and kg-route for context packs; synthesis is deferred until a real answer layer exists."]
+implementation_notes = ["Remove kg-query from Makefile and .PHONY.", "Remove active quick-reference and skill guidance that tells agents to invoke kg-query.", "Keep historical resolved/debrief/generated mentions as archive evidence unless a separate generated-artifact refresh owns them."]
+acceptance = ["No active Make target or active agent guidance tells agents to use kg-query.", "litkg_quick_reference names kg-search for retrieval and kg-route for context packs.", "semantic-scholar-litkg explicitly says synthesis is deferred."]
+verification = ["! rg -n \"make kg-query|KG_QUERY=.*kg-query\" Makefile .agents/references .agents/skills .agents/kg/README.md docs", "make kg-search KG_QUERY=\"bounded oracle RRI\" KG_FORMAT=json", "make kg-route KG_TASK=\"bounded oracle RRI\" KG_FORMAT=json"]
+resolved_at = "2026-05-08"
+resolution_note = "kg-query Make target deleted in commit d3e980d. kg-search remains the killer retrieval verb; kg-route owns context packs. Synthesis deferred until LLM-backed implementation lands; semantic-scholar-litkg note pending in this same cleanup pass."
+resolved_from = ".agents/refactors.toml"
+
+[[refactor]]
+id = "refactor-018"
+title = "Add genre and precedent ranking for litkg routes"
+description = "Add an optional document-genre/precedent tier so process-shaped tasks can surface prior report templates such as m1_contract_report.qmd."
+priority = "low"
+status = "resolved"
+labels = ["kg", "litkg", "ranking", "docs"]
+issue_ids = ["issue-023"]
+loc_min = 120
+loc_expected = 320
+loc_max = 800
+context = ["The current ranking can miss structurally relevant precedent docs when lexical overlap is weak.", "This is lower priority than claim verdicts, backlog filtering, task-grounded risks, verification-path injection, worktree exclusion, and confidence floors."]
+implementation_notes = ["Define a small optional QMD genre frontmatter enum such as contract_report, runbook, architecture, thesis_section, and scratch.", "Parse frontmatter into litkg source metadata and add configurable genre boosts for matching task terms.", "Seed the first useful precedent tag on docs/contents/thesis/m1_contract_report.qmd after docs-frontmatter validation is updated."]
+acceptance = ["A task like design experiment evidence registry surfaces m1_contract_report.qmd as a precedent when it is tagged.", "Docs without genre frontmatter keep current ranking behavior.", "The optional genre key is documented and validated before relying on it."]
+verification = ["make qmd-frontmatter-check", "cd .agents/external/litkg-rs && cargo test -p litkg-core context_pack::genre_boost", "make kg-route KG_TASK=\"design experiment evidence registry\" KG_FORMAT=json"]
+resolved_at = "2026-05-08"
+resolution_note = "Smoke evidence (2026-05-08): make kg-route KG_TASK='design final experiment evidence registry...' KG_FORMAT=json now returns m1_contract_report.qmd 4x in evidence_spans and required_reads. The verification-injection + lexical-filter changes in litkg-rs 152f13b solved the precedent-discovery gap that motivated this refactor without requiring a genre frontmatter scheme. top_sources still does not promote precedents structurally; re-open if a future task surfaces an unrecoverable miss."
 resolved_from = ".agents/refactors.toml"

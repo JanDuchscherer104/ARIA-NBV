@@ -13,6 +13,11 @@ Existing records with `status: legacy-imported` are grandfathered archive eviden
 - `confidence`
 - `canonical_updates_needed`
 
+Use absolute ISO dates (`2026-05-08`) in both frontmatter and prose; never
+relative dates ("Thursday", "yesterday", "last week"). Debriefs outlive the
+session that wrote them. Use `make new-debrief TITLE='...'` to scaffold a
+file with today's absolute date pre-filled.
+
 ## Native Debrief With No Canonical Updates
 
 ```yaml

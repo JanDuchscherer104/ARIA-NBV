@@ -170,7 +170,8 @@ def _dump_records(title: str, kind: str, records: list[dict[str, Any]]) -> str:
     for record in records:
         lines.append(f"[[{kind}]]")
         for key in _field_order(kind, record):
-            lines.append(f"{key} = {_format_value(record[key])}")
+            if key in record:
+                lines.append(f"{key} = {_format_value(record[key])}")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -340,11 +341,66 @@ def resolve(kind: str, record_id: str, note: str) -> int:
     return 0
 
 
+def search(query: str, *, scope: str = "all") -> int:
+    """Case-insensitive search across active and resolved records.
+
+    Use this before planning new work or diagnosing a symptom: prior decisions
+    in `.agents/resolved.toml` are gold for "has this been tried?".
+    """
+    needle = query.casefold()
+    if not needle:
+        print("agents-db search: empty query", file=sys.stderr)
+        return 2
+
+    def _matches(record: dict[str, Any]) -> bool:
+        for key in ("id", "title", "description"):
+            if needle in str(record.get(key, "")).casefold():
+                return True
+        for key in ("labels", "context", "implementation_notes", "acceptance"):
+            for item in record.get(key, []) or []:
+                if needle in str(item).casefold():
+                    return True
+        return False
+
+    active = _load_active() if scope in {"all", "active"} else {"issue": [], "todo": [], "refactor": []}
+    resolved = _load_resolved() if scope in {"all", "resolved"} else {"issue": [], "todo": [], "refactor": []}
+
+    hits = 0
+    for label, store in (("Active", active), ("Resolved", resolved)):
+        for kind in ("issue", "todo", "refactor"):
+            matches = [record for record in store.get(kind, []) if _matches(record)]
+            if not matches:
+                continue
+            print(f"\n## {label} {kind}s")
+            for record in matches:
+                hits += 1
+                priority = record.get("priority", "?")
+                status = record.get("status", "?")
+                print(f"- {record['id']} [{priority}/{status}]: {record.get('title', '')}")
+                if label == "Resolved" and record.get("resolution_note"):
+                    print(f"  resolved {record.get('resolved_at', '?')}: {record['resolution_note']}")
+    if hits == 0:
+        print(f"agents-db search: no matches for {query!r}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser("list", help="Print ranked active records.")
     subparsers.add_parser("validate", help="Validate DB schema and references.")
+
+    search_parser = subparsers.add_parser(
+        "search",
+        help="Case-insensitive search across active and resolved records.",
+    )
+    search_parser.add_argument("query")
+    search_parser.add_argument(
+        "--scope",
+        choices=["all", "active", "resolved"],
+        default="all",
+        help="Restrict search to active, resolved, or both (default: all).",
+    )
 
     resolve_parser = subparsers.add_parser("resolve", help="Move a record to resolved.toml.")
     resolve_parser.add_argument("kind", choices=sorted(ACTIVE_FILES))
@@ -360,6 +416,8 @@ def main(argv: list[str] | None = None) -> int:
         return list_ranked()
     if command == "validate":
         return validate()
+    if command == "search":
+        return search(args.query, scope=args.scope)
     if command == "resolve":
         return resolve(args.kind, args.record_id, args.note)
     raise AssertionError(f"unhandled command: {command}")

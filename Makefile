@@ -4,8 +4,8 @@
 .PHONY: context-index context-get context-contracts context-modules context-classes context-functions
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory
-.PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory
-.PHONY: memory-mine agents-db glossary kg-up kg-down kg-capabilities kg-ollama-check kg-search kg-brief kg-route kg-claim-check kg-consolidate kg-related kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-docs-smoke kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-full
+.PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory new-debrief claude-skills
+.PHONY: memory-mine agents-db glossary kg-up kg-down kg-status kg-capabilities kg-ollama-check kg-search kg-brief kg-route kg-claim-check kg-consolidate kg-related kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-docs-smoke kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-full
 .PHONY: lrz-probe lrz-resources lrz-resources-gpu lrz-resources-cpu lrz-jobs lrz-dss-init lrz-container-shell lrz-sbatch-cpu lrz-sbatch-single-gpu lrz-sbatch-multigpu
 
 # Color codes
@@ -171,6 +171,13 @@ migrate-codex-memory: _check_python ## 🗺️ Migrate legacy .codex notes into 
 check-agent-memory: _check_python ## 🗺️ Validate agent memory scaffolding and debrief hygiene
 	@$(PYTHON_INTERPRETER) scripts/validate_agent_memory.py
 
+new-debrief: _check_python ## 🗺️ Scaffold a dated debrief under .agents/memory/history/ (set TITLE='...')
+	@if [ -z "$(TITLE)" ]; then echo "usage: make new-debrief TITLE='short title'" >&2; exit 2; fi
+	@$(PYTHON_INTERPRETER) scripts/new_debrief.py "$(TITLE)"
+
+claude-skills: ## 🤖 Symlink .agents/skills/* into .claude/skills/ for Claude Code activation
+	@scripts/sync_claude_skills.sh
+
 agents-db: _check_python ## 🧠 Inspect or maintain .agents/issues,todos,refactors,resolved (set AGENTS_ARGS='validate')
 	@$(PYTHON_INTERPRETER) scripts/agents_db.py $(AGENTS_ARGS)
 
@@ -195,6 +202,9 @@ kg-up: ## 📚 Start the optional litkg Neo4j runtime
 
 kg-down: ## 📚 Stop the optional litkg Neo4j runtime
 	@.agents/external/litkg-rs/scripts/kg/down.sh
+
+kg-status: ## 📚 Fast 0/1 litkg health probe (no full capabilities run); prints reason on stderr
+	@scripts/kg/status.sh
 
 kg-capabilities: ## 📚 Show litkg backend/source readiness (set KG_FORMAT=json for machine output)
 	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- capabilities \

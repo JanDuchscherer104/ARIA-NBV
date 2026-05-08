@@ -175,25 +175,3 @@ status = "open"
 labels = ["rl", "q-learning", "rollouts", "target", "thesis"]
 context = ["The accepted thesis scope makes ARIA-NBV a target-conditioned, quality-driven NBV system on ASE/EFM with strict M1 contracts and a mandatory multi-step Q_H deliverable.", "Q_H is a candidate-query Transformer over scene, target, history, and candidate tokens; it predicts bounded cumulative target RRI over finite candidate sets from ASE mesh/oracle counterfactual rollouts and must beat one-step greedy/model scoring under equal acquisition budget after oracle evaluation.", "Bounded oracle lookahead remains the upper bound; random-valid, oracle-greedy/lookahead, and oracle-scored temperature-softmax traces are mandatory first rollout sources, while Gumbel is preferred later evidence.", "This issue depends on M1 data/oracle correctness, V1 observed-target contracts, mixed observed candidate sets, invalidity masks/reason codes, Zarr-first rollout/Q storage, and LRZ-scale generation."]
 references = ["repo:docs/contents/thesis/questions.qmd#rq4-planning", "repo:docs/contents/thesis/roadmap.qmd#roadmap-m5", "repo:.agents/memory/state/DECISIONS.md", "bib:DoubleDQN-vanHasselt2015", "bib:IQL-kostrikov2021", "bib:GumbelTopK-kool2019", "bib:VIN-NBV-frahm2025"]
-
-[[issue]]
-id = "issue-029"
-title = "kg-claim-check verdict contract was missing"
-description = "The kg-claim-check wrapper used the context-pack route without a verdict, confidence, supporting_evidence, or contradicting_evidence fields, making advisor-facing claim discipline unenforceable."
-type = "integration"
-priority = "high"
-status = "open"
-labels = ["kg", "litkg", "claim-check", "thesis"]
-context = ["Read-only agent probes on todo-026 and issue-013 showed kg-claim-check returned a generic context pack with verb=check instead of checking the claim.", "DECISIONS.md requires kg-claim-check for advisor-facing proposal, roadmap, research-question, and literature-synthesis claims, so the verdict shape is load-bearing."]
-references = ["repo:.agents/memory/state/DECISIONS.md", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/crates/litkg-cli/src/main.rs", "repo:.agents/issues.toml#issue-023", "repo:.agents/issues.toml#issue-025", "repo:.agents/refactors.toml#refactor-016", "repo:.agents/todos.toml#todo-061"]
-
-[[issue]]
-id = "issue-030"
-title = "kg-query duplicated kg-route without synthesis"
-description = "The kg-query Make target promised question retrieval but called the same context-pack path as kg-route without answer synthesis or a distinct contract."
-type = "maintenance"
-priority = "medium"
-status = "open"
-labels = ["kg", "litkg", "tooling", "scaffold"]
-context = ["The command produced the same context-pack shape as kg-route and trained agents to expect synthesis that did not exist.", "The chosen fix is deletion: keep kg-search for fast retrieval and kg-route for context packs; reserve synthesis for a future real answer layer."]
-references = ["repo:Makefile", "repo:.agents/references/litkg_quick_reference.md", "repo:.agents/skills/aria-litkg-memory/SKILL.md", "repo:.agents/skills/semantic-scholar-litkg/SKILL.md", "repo:.agents/issues.toml#issue-023", "repo:.agents/refactors.toml#refactor-016", "repo:.agents/refactors.toml#refactor-017"]
