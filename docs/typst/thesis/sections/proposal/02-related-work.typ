@@ -3,56 +3,45 @@
 
 = Related Work and Positioning
 
-The local paper manifest and shared bibliography were treated as a design
-corpus, not as a citation list to pad the proposal. The scientific pattern that
-emerges is consistent: older active-perception and view-planning work motivates
-action-conditioned sensing; modern #NBV work splits between continuous
-coverage-driven policies, quality-driven finite candidate ranking, projection
-shortlists, and radiance-field uncertainty; offline RL contributes support and
-overestimation warnings for finite-candidate value learning.
+The literature is used here to assign roles, not to broaden the thesis claim.
+Older active perception motivates action-conditioned sensing; VIN-NBV supplies
+the quality-driven candidate-ranking precedent; Project Aria, #ASE, and EFM3D
+define the egocentric state; and offline value learning supplies replay and
+overestimation controls for the finite candidate table.
 
 #figure(
   table(
-    columns: (1.08fr, 1.36fr, 1.65fr),
-    table.header([*Corpus family*], [*Main technical signal*], [*ARIA-NBV use*]),
-    [Active perception and classical view planning @ActivePerception-bajcsy1988 @ActiveVision-aloimonos1988 @ViewPlanningSurvey-scott2003 @NBVSystem-banta2000],
-    [Viewpoint choice changes what constraints are observable; candidate generation and feasibility are first-class parts of perception.],
-    [Keep a finite candidate table, explicit validity, and acquisition budget instead of hiding planning behind a black-box policy.],
-    [Receding, projection, and finite-candidate #NBV @RecedingHorizonNBV-bircher2016 @ShadowcastingNBV-batinovic2022 @PB-NBV-jia2025 @VIN-NBV-frahm2025],
-    [Evaluator cost, horizon, branch factor, and reconstruction-quality labels determine whether deeper search is meaningful.],
-    [Use mesh-supervised #RRI as the utility label; use projection/frontier ideas only as proposal or diagnostic channels.],
+    columns: (1.05fr, 1.32fr, 1.48fr),
+    table.header([*Role*], [*Relevant signal*], [*Adopt / defer*]),
+    [Quality-driven #NBV @VIN-NBV-frahm2025 @CORAL-cao2019],
+    [Oracle #RRI and ordinal one-step candidate ranking are the closest implemented precedent.],
+    [Adopt point-mesh #RRI labels and a learned one-step target scorer; test whether one-step ranking is enough.],
     [Egocentric substrate @projectaria-engel2023 @ProjectAria-ASE-2025 @EFM3D-straub2024],
-    [Project Aria supplies calibrated egocentric streams; #ASE adds synthetic scale, GT meshes, OBBs, trajectories, and EVL-style 3D state.],
-    [Use predicted/observed OBB and EVL support as actor-visible target state; keep GT meshes/boxes for labels and evaluation only.],
-    [Continuous and hierarchical learned #NBV @GenNBV-chen2024 @Hestia-lu2026 @PPO-schulman2017],
-    [Coverage-driven PPO and hierarchical look-at-then-fly policies become powerful when simulator state, reward, and dynamics are mature.],
-    [Use as bridge design and baseline context after finite-candidate #RRI evidence shows headroom.],
-    [Radiance-field / 3DGS active selection @NeRF-mildenhall2020 @GaussianSplatting-kerbl2023 @ActiveNeRF-pan2022 @FisherRF-jiang2024 @NextBestSense-strong2024 @li2025bestviewselectionssemantic @ObjectCentricNBV-jeong2026 @FOVHPE-bae2025],
-    [Uncertainty, Fisher information, depth, semantic, dynamic, object-specific, and downstream-task utilities can be logged separately.],
-    [Adopt utility-channel separation and target focus; do not replace target #RRI with 3DGS uncertainty before calibration.],
-    [Offline value learning and sequence planning @TrajectoryTransformer-janner2021 @GumbelTopK-kool2019 #cite(label("DBLP:journals/corr/MnihKSGAWR13")) @DoubleDQN-vanHasselt2015 @CQL-kumar2020 @BCQ-fujimoto2019 @DecisionTransformer-chen2021 @IQL-kostrikov2021 @DeepEnergyPolicies-haarnoja2017 @SAC-haarnoja2018],
-    [Replay, beam decoding, stochastic sampling without replacement, max-over-action overestimation, and offline support mismatch are the relevant hazards.],
-    [Train masked fitted Double-Q $Q_H$ first; keep IQL, sequence decoding, soft/energy policies, and actor-critic control as gated ablations.],
-    [Structured semantic scene representations @SceneScript-avetisyan2024 @HITL-SceneScript-xie2025],
-    [Autoregressive scene languages and editable layouts support semantic/global memory and human correction.],
-    [Use as future global planner context only after observed target contracts and target #RRI are stable.],
+    [Calibrated egocentric streams, semi-dense points, predicted OBBs, EVL fields, and GT meshes coexist.],
+    [Use observed/predicted target descriptors as actor input; keep GT geometry for labels and evaluation.],
+    [Greedy sensing and finite candidates @RecedingHorizonNBV-bircher2016 @PB-NBV-jia2025 @KrauseSensorPlacement2008 @AdaptiveSubmodularity-golovin2011 @SubmodularNBV-lauri2020],
+    [When utility has diminishing returns, greedy selection can be strong; deeper search must earn its cost empirically.],
+    [Measure oracle-lookahead headroom before claiming a learnable non-myopic advantage.],
+    [Continuous and radiance-field #NBV @GenNBV-chen2024 @Hestia-lu2026 @ActiveNeRF-pan2022 @FisherRF-jiang2024 @ObjectCentricNBV-jeong2026],
+    [Continuous policies, target-then-pose hierarchies, and uncertainty/semantic utility channels are useful comparisons.],
+    [Use as follow-up design pressure; do not replace target #RRI with coverage or uncertainty rewards.],
+    [Finite-action value learning #cite(label("DBLP:journals/corr/MnihKSGAWR13")) @DoubleDQN-vanHasselt2015 @IQL-kostrikov2021 @Transformer-vaswani2017 @DeepSets-zaheer2017 @SetTransformer-lee2019],
+    [Replay, masked Bellman targets, overestimation control, offline support, and permutation-aware candidate-token modeling shape $Q_H$.],
+    [Train masked fitted Double-Q first; keep IQL, sequence decoding, and continuous actor-critic variants as later ablations.],
   ),
-  caption: [Source-backed literature positioning for the ARIA-NBV thesis scope.],
+  caption: [Source-backed literature roles for the proposal scope.],
 ) <tab:proposal-source-positioning>
 
-The thesis therefore does not claim novelty through a larger continuous action
-space. Its scientific contribution is the controlled replacement of proxy
-utility by target-conditioned reconstruction-quality utility under a finite
-candidate contract. The closest methodological lineage is
+The resulting lineage is deliberately narrow:
 
 $ cal(U)_"cov/unc" -> hat(r)_t^e (i) -> r_t^e -> G_t^((H)) -> Q_(H,theta). $
 
-This lineage makes three negative claims explicit. First, coverage is a useful
-diagnostic but not the thesis objective. Second, GT meshes and GT target boxes
-are oracle assets, not actor inputs. Third, offline/continuous RL methods are
-not safe shortcuts until rollout support, masks, and evaluation are reliable.
+Coverage and uncertainty remain diagnostics, not the thesis utility. GT meshes
+and GT target boxes remain oracle assets, not V1 actor inputs. Offline and
+continuous RL references become meaningful only after candidate support, masks,
+and oracle re-evaluation are trustworthy.
 
 #figure(
   align(center, image("../../figures/proposal_system_flow.png", width: 82%)),
-  caption: [Thesis evidence chain. Core gates move from $bold(s)_t^"obs"$ and $bold(Q)_t, bold(m)_t$ to $r_t^e$, $G_t^((H))$, and $Q_(H,theta)$; the dashed node is post-$Q_H$ bridge work.],
+  caption: [Compact evidence chain. The proposal moves from actor-visible $bold(s)_t^"obs"$ and $bold(z)_e$ through masked candidates, target #RRI, lookahead headroom $Delta_"look"$, and masked $Q_H$; the dashed path is post-$Q_H$ follow-up work.],
 ) <fig:proposal-system-flow>

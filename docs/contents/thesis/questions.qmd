@@ -13,9 +13,9 @@ This page states the research questions for the master's thesis phase of
 **ARIA-NBV**. The central question is:
 
 > Can ARIA-NBV perform target-conditioned, RRI-based multi-step NBV by training
-> a finite-candidate candidate-query Transformer $Q_H$ that maximizes cumulative
-> {{< glsfull target-specific-rri >}} for a
-> {{< gls target-of-interest >}} under a fixed acquisition budget?
+> a finite-candidate candidate-query Transformer $Q_H$ that improves endpoint
+> target reconstruction quality, after first measuring oracle-lookahead
+> headroom over one-step selection under a fixed acquisition budget?
 
 The questions are tied to the dated [roadmap](roadmap.qmd), the
 [RRI theory page](../theory/rri_theory.qmd), the
@@ -126,18 +126,20 @@ P_0\cup\bigcup_{k=0}^{t-1}P_{q_k},
 \qquad
 t=1,\ldots,H,
 $$
-so $P_H=P_0\cup\bigcup_{k=0}^{H-1}P_{q_k}$. Define the target-cropped distance
+so $P_H=P_0\cup\bigcup_{k=0}^{H-1}P_{q_k}$. Define the target-cropped oracle error
 $$
-D_e(P)=d(C_e(P),M_e),
+\Delta_t^e=
+\mathcal{A}_t^e+\mathcal{C}_t^e,
 $$
-where $C_e$ filters reconstructed points to the matched target crop and $M_e$
-is the target-specific ground-truth surface used only for oracle supervision and
-evaluation.
+where $\mathcal{A}_t^e$ is point-to-mesh accuracy and $\mathcal{C}_t^e$ is
+mesh-to-point completeness for the points in $P_t$ and the matched
+target-specific ground-truth surface. The target surface is used only for
+oracle supervision and evaluation.
 
 The endpoint metric is
 $$
 J_{e,\Delta}^{(H)}(\tau)=
-\frac{D_e(P_0)-D_e(P_H)}{D_e(P_0)+\varepsilon}.
+\frac{\Delta_0^e-\Delta_H^e}{\Delta_0^e+\varepsilon}.
 $$
 Conceptually, $J_{e,\Delta}^{(H)}$ is the fraction of the initial target error
 removed after $H$ selected views. It is relative to the rollout root $P_0$ and
@@ -148,7 +150,7 @@ counterfactual state:
 $$
 r_t^e =
 \operatorname{RRI}_e(q_t \mid P_t,M_e)=
-\frac{D_e(P_t)-D_e(P_{t+1})}{D_e(P_t)+\varepsilon}.
+\frac{\Delta_t^e-\Delta_{t+1}^e}{\Delta_t^e+\varepsilon}.
 $$
 The finite-horizon learning return is
 $$
@@ -163,13 +165,13 @@ hard-masked constraints, not low-RRI examples.
 The log-gain companion remains an explicit ablation:
 $$
 L_e^{(H)}(\tau)=
-\log(D_e(P_0)+\varepsilon)-\log(D_e(P_H)+\varepsilon)
+\log(\Delta_0^e+\varepsilon)-\log(\Delta_H^e+\varepsilon)
 =
 \sum_{t=0}^{H-1}
 \left[
-\log(D_e(P_t)+\varepsilon)
+\log(\Delta_t^e+\varepsilon)
 -
-\log(D_e(P_{t+1})+\varepsilon)
+\log(\Delta_{t+1}^e+\varepsilon)
 \right].
 $$
 The exact $\gamma$, $\varepsilon$, clipping policy, and near-solved-target
@@ -267,13 +269,24 @@ $Q_{H,\theta}$ perform against learned one-step target scoring, oracle
 greedy/lookahead planning, and oracle-scored stochastic rollout references under
 the same acquisition and candidate budgets?
 
-**Working hypothesis.** Bounded planning should improve cumulative target RRI
-when the locally best target view is not the best first step, for example around
-occlusion or when the target becomes visible after an intermediate move.
-$Q_{H,\theta}$ should learn enough of this bounded return structure from ASE
-oracle rollout traces to beat the learned myopic target-conditioned scorer and
-one-step greedy/model selection under equal budget. Bounded oracle lookahead is
-reported as an upper bound, not as an actor-visible learned policy.
+**Working hypothesis.** Bounded planning should improve target endpoint gain
+only when the locally best target view is not the best first step, for example
+around occlusion or when the target becomes visible after an intermediate move.
+M5 therefore first estimates oracle-lookahead headroom:
+
+$$
+\Delta_{\mathrm{look}}
+=
+J_{e,\Delta}^{(H)}(\pi_{\mathrm{oracle\text{-}look}})
+-
+J_{e,\Delta}^{(H)}(\pi_{\mathrm{oracle\text{-}1}}).
+$$
+
+If $\Delta_{\mathrm{look}}\approx 0$, the thesis reports that the current
+candidate distribution and target-RRI objective are effectively myopic. If
+$\Delta_{\mathrm{look}}>0$, $Q_{H,\theta}$ should learn enough bounded return
+structure from ASE oracle rollout traces to recover measurable headroom over
+the learned one-step target-conditioned scorer.
 
 **Q_H formulation.** $Q_H$ is the glossary-level concept; the learned network in
 the thesis is $Q_{H,\theta}(s_t^{\mathrm{cf0}},z_e,a_t)$. It encodes the
@@ -305,11 +318,27 @@ CQL [@CQL-kumar2020], BCQ [@BCQ-fujimoto2019], Decision Transformer
 [@DecisionTransformer-chen2021], and IQL [@IQL-kostrikov2021] remain later
 evidence or ablation references unless the M5 result is stable.
 
-**Success bar.** Learned $Q_{H,\theta}$ must beat the learned one-step
-target-conditioned scorer and one-step greedy/model scoring on cumulative target
-RRI under equal acquisition budget, after oracle evaluation of selected actions.
-The exact effect-size or pass/fail threshold remains an advisor-facing open
-decision.
+**Success bar.** Learned $Q_{H,\theta}$ selected actions must be
+oracle-evaluated under equal acquisition budget. When
+$\Delta_{\mathrm{look}}>0$, report absolute gain over the learned one-step
+target-conditioned scorer and the recovered headroom fraction:
+
+$$
+\eta_Q
+=
+\frac{
+J_{e,\Delta}^{(H)}(\pi_Q)
+-
+J_{e,\Delta}^{(H)}(\pi_{\mathrm{learned\text{-}1}})
+}{
+J_{e,\Delta}^{(H)}(\pi_{\mathrm{oracle\text{-}look}})
+-
+J_{e,\Delta}^{(H)}(\pi_{\mathrm{learned\text{-}1}})
++\varepsilon
+}.
+$$
+
+The exact effect-size threshold remains an advisor-facing open decision.
 
 ## RQ5 - Bridge Beyond Finite Candidates {#rq5-bridge}
 

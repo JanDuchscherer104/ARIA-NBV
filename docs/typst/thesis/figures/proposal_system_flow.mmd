@@ -1,12 +1,13 @@
-%%{init: {"flowchart": {"htmlLabels": true, "nodeSpacing": 28, "rankSpacing": 34}}}%%
+%%{init: {"flowchart": {"htmlLabels": true, "nodeSpacing": 24, "rankSpacing": 30}}}%%
 flowchart LR
-  A["<b>M1</b><br/><b>s</b><sub>t</sub><sup>obs</sup>, <b>z</b><sub>e</sub>"] --> B["<b>M2</b><br/><b>Q</b><sub>t</sub>, <b>m</b><sub>t</sub>, <b>ρ</b><sub>t</sub>"]
-  B --> C["<b>M3</b><br/>Δ<sub>t</sub><sup>e</sup>, r<sub>t</sub><sup>e</sup>(i)"]
-  C --> D["<b>M4</b><br/>r̂<sub>t</sub><sup>e</sup>(i)"]
-  C --> E["<b>M5</b><br/>G<sub>t</sub><sup>(H)</sup>"]
-  E --> F["Q<sub>H,θ</sub><br/>masked value"]
-  F --> G["<b>Eval</b><br/>J<sub>e,H</sub>, G<sub>0</sub><sup>(H)</sup>"]
-  F -. "M6+" .-> H["<b>Bridge</b><br/>IQL / online Q<sub>H</sub><br/>actor-critic / sim"]
+  A["<b>OBS</b><br/><b>s</b><sub>t</sub><sup>obs</sup>, <b>z</b><sub>e</sub>"] --> B["<b>CAND</b><br/><b>Q</b><sub>t</sub>, <b>m</b><sub>t</sub>, <b>&rho;</b><sub>t</sub>"]
+  B --> C["<b>ORACLE</b><br/>&Delta;<sub>t</sub><sup>e</sup>, r<sub>t</sub><sup>e</sup>(i)"]
+  C --> D["<b>1-step</b><br/>r&#770;<sub>t</sub><sup>e</sup>(i)"]
+  C --> E["<b>Lookahead</b><br/>&Delta;<sub>look</sub>"]
+  D --> F["<b>Q</b><sub>H,&theta;</sub><br/>masked value"]
+  E --> F
+  F --> G["<b>Eval</b><br/>J<sub>e</sub><sup>(H)</sup>, &eta;<sub>Q</sub>"]
+  F -. "M6+" .-> H["<b>Follow-up</b><br/>IQL / online <b>Q</b><sub>H</sub><br/>continuous / sim"]
 
   classDef core fill:#f9fbff,stroke:#0b4f8a,stroke-width:1.4px,color:#111;
   classDef bridge fill:#fffaf0,stroke:#8a5a00,stroke-width:1.4px,stroke-dasharray:5 4,color:#111;

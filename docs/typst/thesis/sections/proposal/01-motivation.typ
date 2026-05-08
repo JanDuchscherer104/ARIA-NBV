@@ -10,40 +10,39 @@ therefore treats sensing actions as part of perception itself, and view-planning
 surveys formalize the dominant generate-score-select loop for three-dimensional
 inspection @ActivePerception-bajcsy1988 @ActiveVision-aloimonos1988
 @ViewPlanningSurvey-scott2003. ARIA-NBV adopts that loop for egocentric indoor
-data, but asks a narrower scientific question: can finite candidate views be
-scored and planned by reconstruction-quality improvement rather than by coverage
-or uncertainty proxies alone?
+data, but asks a narrower question: when views are restricted to a finite
+feasible candidate table, does reconstruction-quality improvement contain
+planning structure beyond one-step selection?
 
 The key empirical precedent is VIN-NBV, which replaces pure coverage with
-Relative Reconstruction Improvement (#RRI), an oracle label computed from the
-reduction in Chamfer-style reconstruction error after adding a query view
-@VIN-NBV-frahm2025. This is the right axis for ARIA-NBV because target indoor
-surfaces can remain poorly reconstructed even when many voxels or pixels are
-already covered. The thesis extends this idea from object-centric RGB-D
-benchmarks to the Project Aria / #ASE ecosystem, where calibrated egocentric
-streams, trajectories, semi-dense points, predicted object boxes, and a
-mesh-supervised subset support controlled oracle labels @projectaria-engel2023
-@ProjectAria-ASE-2025 @EFM3D-straub2024.
+Relative Reconstruction Improvement (#RRI), an oracle label computed from
+point-mesh reconstruction-error reduction after adding a query view
+@VIN-NBV-frahm2025. ARIA-NBV uses the same quality-driven axis because target
+indoor surfaces can remain poor even when coverage proxies look saturated. The
+thesis transfers this idea to the Project Aria / #ASE regime, where calibrated
+egocentric streams, trajectories, semi-dense points, predicted object boxes,
+and mesh-supervised assets support controlled oracle labels
+@projectaria-engel2023 @ProjectAria-ASE-2025 @EFM3D-straub2024.
 
-The current gap is not a lack of possible algorithms; it is the lack of a
-trustworthy target-conditioned, multi-step evidence chain. GenNBV and Hestia
-show that continuous 5-DoF and hierarchical #NBV policies are plausible when an
-online simulator and coverage reward are mature @GenNBV-chen2024
-@Hestia-lu2026. Radiance-field and Gaussian-splatting papers show that view
-utility can be decomposed into uncertainty, Fisher information, semantics,
-dynamics, object identity, or downstream task error @ActiveNeRF-pan2022
-@FisherRF-jiang2024 @NextBestSense-strong2024
-@li2025bestviewselectionssemantic @ObjectCentricNBV-jeong2026 @FOVHPE-bae2025.
-ARIA-NBV should use those papers to sharpen the model, not to replace its
-objective: the thesis utility remains scene and target #RRI, with validity and
-cost reported as separate constraints.
+The implemented seminar substrate already provides scene-level oracle #RRI
+labels and a VINv3-style one-step candidate scorer on frozen EVL features. This
+proposal treats that as the starting point, not the final thesis result. The
+extension is target-specific: actor-visible target selection, target-cropped
+oracle labels, replayable counterfactual rollouts, and a finite-horizon value
+model over candidate rows.
+
+Continuous and hierarchical #NBV papers motivate later directions, but they do
+not define the first thesis test. GenNBV and Hestia assume mature simulator
+dynamics and reward loops @GenNBV-chen2024 @Hestia-lu2026; active NeRF and 3DGS
+work motivates utility-channel diagnostics rather than replacing the
+mesh-supervised #RRI objective @ActiveNeRF-pan2022 @FisherRF-jiang2024
+@NextBestSense-strong2024 @li2025bestviewselectionssemantic
+@ObjectCentricNBV-jeong2026 @FOVHPE-bae2025.
 
 #thesis-box([Thesis position])[
-  The thesis contribution is a target-conditioned, quality-driven finite-candidate
-  #NBV study on #ASE/EFM. The hard result is a candidate-query $Q_H$ model that
-  predicts bounded cumulative target #RRI over valid candidates and improves on
-  one-step greedy/model scoring under the same acquisition budget. Continuous
-  actor-critic control, Gymnasium/SB3, Habitat/Isaac, SceneScript-style global
-  memory, and real-device guidance are bridge or future work unless this
-  finite-candidate result is already stable.
+  ARIA-NBV tests target-conditioned, quality-driven #NBV on #ASE/EFM as a
+  finite-candidate planning problem. The core experiment first measures whether
+  bounded oracle lookahead exposes non-myopic target-#RRI headroom. If it does,
+  a masked candidate-query $Q_H$ model is evaluated by how much of that headroom
+  it recovers from actor-visible rollout data.
 ]

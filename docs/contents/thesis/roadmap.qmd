@@ -16,9 +16,9 @@ target-conditioned, quality-driven
 {{< glsfull next-best-view >}} planning:
 
 > Can ARIA-NBV perform target-conditioned, RRI-based multi-step NBV by training
-> a finite-candidate candidate-query Transformer $Q_H$ that maximizes cumulative
-> {{< glsfull target-specific-rri >}} for a
-> {{< gls target-of-interest >}} under a fixed acquisition budget?
+> a finite-candidate candidate-query Transformer $Q_H$ that improves endpoint
+> target reconstruction quality, after first measuring oracle-lookahead
+> headroom over one-step selection under a fixed acquisition budget?
 
 The technical spine follows the current ARIA-NBV system: ASE snippets and
 ground-truth meshes [@ProjectAria-ASE-2025], frozen EVL/EFM3D features
@@ -60,14 +60,18 @@ The September deliverable is a reproducible target-aware
   snippet windows after small-subset correctness passes, or a scene-level
   held-out subset with explicit coverage reporting if full coverage is blocked.
 
-The quantitative success bar is that learned $Q_H$ beats one-step greedy, the
-learned one-step target-conditioned scorer, and one-step model scoring on
-cumulative target RRI under the same acquisition budget after oracle evaluation
-of selected actions; bounded oracle lookahead is the upper bound. Online
-discrete $Q_H$, full continuous control, Habitat/Isaac simulation, VLM/global
-planning, SceneScript-style memory, and real-device deployment remain bridge
-design or future work unless the M5 evidence justifies experiment-grade
-escalation. Hestia-style hierarchy [@Hestia-lu2026], GenNBV-style continuous control
+M5 first measures non-myopic headroom:
+bounded oracle lookahead must improve endpoint target-quality gain over
+one-step oracle greedy before learned $Q_H$ gains are interpreted as planning
+gains. If that headroom is positive, learned $Q_H$ is evaluated by oracle
+re-evaluation of its selected actions and by recovered headroom over the
+learned one-step target-conditioned scorer under the same acquisition budget.
+If headroom is near zero, the thesis reports that the current candidate
+distribution and target-RRI objective are effectively myopic. Online discrete
+$Q_H$, full continuous control, Habitat/Isaac simulation, VLM/global planning,
+SceneScript-style memory, and real-device deployment remain bridge design or
+future work unless the M5 evidence justifies experiment-grade escalation.
+Hestia-style hierarchy [@Hestia-lu2026], GenNBV-style continuous control
 [@GenNBV-chen2024], and SceneScript-style semantic memory
 [@SceneScript-avetisyan2024] are treated as design references, not thesis-core
 claims.
@@ -76,9 +80,10 @@ claims.
 
 **Primary claim to test.** Given a logged egocentric snippet, an actor-visible
 target record, a finite feasible candidate table, and a fixed acquisition
-budget, a learned finite-horizon candidate-query value model can choose views
-whose oracle-evaluated endpoint target-quality gain exceeds myopic learned or
-greedy one-step selection under the same candidate and acquisition budgets.
+budget, bounded oracle lookahead first exposes whether target-specific RRI has
+non-myopic headroom. When it does, a learned finite-horizon candidate-query
+value model should recover measurable headroom over myopic learned one-step
+selection after oracle re-evaluation.
 
 **Explicit non-claims.** The thesis does not claim real-device deployment,
 continuous actor-critic performance, Habitat/Isaac simulator performance,
@@ -201,6 +206,34 @@ J_{e,\Delta}^{(H)}
 \frac{\Delta_0^e-\Delta_H^e}{\Delta_0^e+\varepsilon}.
 $$
 
+Non-myopic planning is interpreted through oracle-lookahead headroom:
+
+$$
+\Delta_{\mathrm{look}}
+=
+J_{e,\Delta}^{(H)}(\pi_{\mathrm{oracle\text{-}look}})
+-
+J_{e,\Delta}^{(H)}(\pi_{\mathrm{oracle\text{-}1}}).
+$$
+
+When $\Delta_{\mathrm{look}}>0$, learned $Q_H$ is reported by recovered
+headroom over the learned one-step target scorer:
+
+$$
+\eta_Q
+=
+\frac{
+J_{e,\Delta}^{(H)}(\pi_Q)
+-
+J_{e,\Delta}^{(H)}(\pi_{\mathrm{learned\text{-}1}})
+}{
+J_{e,\Delta}^{(H)}(\pi_{\mathrm{oracle\text{-}look}})
+-
+J_{e,\Delta}^{(H)}(\pi_{\mathrm{learned\text{-}1}})
++\varepsilon
+}.
+$$
+
 The one-step target scorer is the myopic control:
 
 $$
@@ -251,26 +284,29 @@ flowchart LR
   RRIOracle --> OneStep
   OneStep --> Rollouts["Replayable rollout traces<br/>random-valid, greedy, lookahead, temp-softmax"]
   RRIOracle --> Rollouts
-  Rollouts --> QH["Candidate-query Transformer Q_H<br/>masked finite-candidate value learning"]
-  QH --> Eval["Oracle re-evaluation<br/>endpoint target gain, cumulative target RRI, cost"]
+  Rollouts --> Headroom["Oracle headroom<br/>lookahead vs one-step greedy"]
+  Headroom --> QH["Candidate-query Transformer Q_H<br/>masked finite-candidate value learning"]
+  QH --> Eval["Oracle re-evaluation<br/>endpoint target gain, recovered headroom, cost"]
   Eval --> Thesis["Thesis figures, ablations, failure cases"]
 ```
 
 ```{mermaid}
 gantt
-    title ARIA-NBV thesis roadmap
+    title ARIA-NBV thesis roadmap: contracts, target RRI, headroom, Q_H
     dateFormat  YYYY-MM-DD
     axisFormat  %d %b
-    section Foundation
-    M0 scope and proposal freeze        :m0, 2026-04-29, 2026-05-10
-    M1 data cache oracle correctness    :m1, 2026-05-11, 2026-05-31
-    M2 VIN baseline and scale gates     :m2, 2026-06-01, 2026-06-21
-    section Target and Planning Core
-    M3 entity target RRI                :m3, 2026-06-22, 2026-07-12
-    M4 target conditioned VIN           :m4, 2026-07-13, 2026-08-09
-    M5 rollouts and Q_H                 :crit, m5, 2026-08-10, 2026-08-30
-    section Bridge and Freeze
-    M6 continuous and online bridge     :m6, 2026-08-31, 2026-09-13
+    excludes    weekends
+    section Scope and contracts
+    M0 proposal contract                :m0, 2026-04-29, 2026-05-10
+    M1 oracle and geometry trust        :m1, 2026-05-11, 2026-05-31
+    M2 one-step scorer and scale check  :m2, 2026-06-01, 2026-06-21
+    section Target RRI
+    M3 V1 target oracle and selector    :m3, 2026-06-22, 2026-07-12
+    M4 target-conditioned one-step      :m4, 2026-07-13, 2026-08-09
+    section Planning evidence
+    M5 lookahead headroom and Q_H       :crit, m5, 2026-08-10, 2026-08-30
+    section Bridge and freeze
+    M6 follow-up design                 :m6, 2026-08-31, 2026-09-13
     M7 final experiments and writing    :crit, m7, 2026-09-14, 2026-09-27
     M8 release freeze                   :crit, m8, 2026-09-28, 2026-09-30
 ```
@@ -281,10 +317,10 @@ gantt
 |---|---|---|
 | 2026-04-29 to 2026-05-10 | **M0 - Scope, repo, docs foundation** | Dirty worktree classified; available partial VIN offline store smoke path understood; Rerun inspector smoke command documented; compact proposal freeze and bibliography/source-policy audit tracked as advisor deliverables; candidate-query $Q_H$ thesis boundary adopted. |
 | 2026-05-11 to 2026-05-31 | **M1 - Data, cache, oracle correctness** | Offline store and RRI contracts stable; public M1 contract report records store/split/frame/CW90/candidate-alignment/depth-backprojection/Rerun normal-boundary-failure evidence; oracle throughput measured. |
-| 2026-06-01 to 2026-06-21 | **M2 - VIN baseline and scale gates** | One-step VIN baseline reproducible; calibration and ranking plots available; ablation matrix fixed; LRZ sharding/storage plan and Zarr rollout/Q schema are ready enough for M3 scale work. |
-| 2026-06-22 to 2026-07-12 | **M3 - Entity/target-aware RRI and generation gates** | V0 GT-OBB target RRI trusted on a small subset; V1 observed-target / GT-label contract and observed-only target selector defined; deterministic sharding, Slurm/DSS staging, and Zarr store gates pass before full-scale generation. |
+| 2026-06-01 to 2026-06-21 | **M2 - VIN baseline and scale check** | One-step VIN baseline reproducible; calibration and ranking plots available; ablation matrix fixed; LRZ sharding/storage plan and Zarr rollout/Q schema are ready enough for M3 scale work. |
+| 2026-06-22 to 2026-07-12 | **M3 - Entity/target-aware RRI and generation readiness** | V0 GT-OBB target RRI trusted on a small subset; V1 observed-target / GT-label contract and observed-only target selector defined; deterministic sharding, Slurm/DSS staging, and Zarr store checks pass before full-scale generation. |
 | 2026-07-13 to 2026-08-09 | **M4 - Target-conditioned VIN** | Model accepts observed/predicted target encoding and predicts target-specific RRI with matched GT labels; scene-level and target-level scorers compared. |
-| 2026-08-10 to 2026-08-30 | **M5 - Multi-step target-aware rollouts and Q_H** | Random-valid, oracle-greedy/lookahead, and oracle-scored temperature-softmax rollout data are stable; candidate-query Transformer $Q_H$ is trained and oracle-evaluated; $Q_H$ beats one-step greedy/model scoring or produces a documented blocker under the thesis success bar. |
+| 2026-08-10 to 2026-08-30 | **M5 - Multi-step target-aware rollouts and Q_H** | Random-valid, oracle-greedy/lookahead, and oracle-scored temperature-softmax rollout data are stable; oracle lookahead headroom is measured; if headroom is positive, candidate-query Transformer $Q_H$ is trained and oracle-evaluated by recovered headroom over learned one-step scoring. |
 | 2026-08-31 to 2026-09-13 | **M6 - Actor-critic and continuous bridge** | Deliver the bridge design from fitted finite-candidate $Q_H$ toward online discrete $Q_H$, IQL, actor-critic, and simulator-backed control; no quantitative continuous-control baseline is required for thesis success. |
 | 2026-09-14 to 2026-09-27 | **M7 - Full-scale experiments and writing** | Full 100 GT-mesh ASE scenes / 4,608 snippet windows are generated, or a scene-level held-out subset reports scenes, snippets, targets, trajectories, rollout seeds, transitions, and exact coverage gaps; final tables, figures, failure cases, and thesis narrative frozen. |
 | 2026-09-28 to 2026-09-30 | **M8 - Release freeze** | Reproducible configs, docs, demo path, and final smoke checks complete. |
@@ -423,8 +459,8 @@ offline-store payload extensions, and model diagnostics.
 
 ### M5 - Multi-Step Target-Aware Rollouts and Q_H {#roadmap-m5}
 
-**Primary question:** Does planning beyond one step improve cumulative target
-RRI under the same acquisition budget?
+**Primary question:** Does bounded oracle lookahead expose target endpoint-gain
+headroom over one-step selection, and can learned $Q_H$ recover that headroom?
 
 **Implementation surfaces:** the
 [counterfactual rollout API](../../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd),
@@ -439,7 +475,9 @@ the [rollout storage and invalidity contract](../impl/rollout_storage_contract.q
   under equal budget; add Gumbel-Top-k as preferred later evidence when
   schedule permits;
 - make bounded oracle-RRI lookahead versus one-step greedy under equal budget
-  the trusted upper-bound comparison before interpreting $Q_H$;
+  the trusted headroom estimate before interpreting $Q_H$;
+- report $\Delta_{\mathrm{look}}$ and, when it is positive, the recovered
+  headroom $\eta_Q$ of $Q_H$ over the learned one-step target scorer;
 - report cumulative target RRI, scene RRI, number of views, path length, invalid
   action rate, and runtime;
 - use cumulative target RRI as the main multi-step return while preserving
@@ -451,10 +489,9 @@ the [rollout storage and invalidity contract](../impl/rollout_storage_contract.q
   candidate tokens to predict one masked bounded-horizon Q value per candidate;
   scalar motion or rule penalties are extensions;
 - require hard validity masks and explicit invalid reason codes in Q_H data;
-- require learned $Q_H$ selected actions to be oracle-evaluated and to beat the
-  learned one-step target-conditioned scorer plus one-step greedy/model scoring
-  on cumulative target RRI under equal acquisition budget, with oracle lookahead
-  reported as an upper bound;
+- require learned $Q_H$ selected actions to be oracle-evaluated under equal
+  acquisition budget; if $\Delta_{\mathrm{look}}\approx 0$, report the regime
+  as effectively myopic instead of overstating a learned planning failure;
 - visualize representative successes and failures.
 
 ### M6 - Actor-Critic and Continuous Bridge {#roadmap-m6}
@@ -492,7 +529,8 @@ Quarto docs, and defense figures.
 **Exit checks:**
 
 - final experiment table for one-step vs multi-step, scene-level vs
-  target-aware scoring, and Q_H vs one-step greedy/model scoring;
+  target-aware scoring, oracle-lookahead headroom, and $Q_H$ recovered
+  headroom;
 - final ablations for target encoding, candidate generation, invalid handling,
   and supervision scale;
 - final scale report over the full 100 GT-mesh ASE scenes / 4,608 snippets, or
@@ -527,7 +565,7 @@ architecture toggles.
 | Target input | V0 GT OBB sanity; V1 observed/predicted OBB; V1 plus crop descriptor; optional entity token | target-RRI rank correlation, target top-k hit, endpoint target gain |
 | Candidate mixture | generic shell; target-point only; mixed target plus exploration; PB-NBV/frontier shortlist | valid fraction, target visibility, RRI distribution, selected-view diversity |
 | Objective | scene RRI; target RRI; target RRI plus cost; log-gain ablation | endpoint target gain, cumulative target RRI, quality-cost curves |
-| Planner | random-valid; learned one-step scorer; one-step oracle greedy; bounded oracle lookahead; $Q_H$ | oracle-evaluated cumulative target RRI under equal budget |
+| Planner | random-valid; learned one-step scorer; one-step oracle greedy; bounded oracle lookahead; $Q_H$ | oracle-lookahead headroom, recovered headroom, and oracle-evaluated endpoint gain under equal budget |
 | Invalidity | hard mask; hard mask plus validity head; scalar penalty only after masks work | invalid-action rate, value leakage, invalid-reason distribution |
 | Ordinal/scalar loss | CORAL; balanced CORAL; focal threshold; auxiliary Huber | calibration, Spearman correlation, top-k hit, confusion structure |
 | State richness | CF0 geometry-only; selected synthetic observations; optional directional observability | planning improvement, support gap, overfitting gap |
@@ -573,10 +611,10 @@ candidate distribution, invalidity, and coverage gaps are reported.
 | Frame, CW90, or projection mismatch | Labels and visualizations can look plausible while measuring the wrong geometry. | M1 frame report, Rerun normal/boundary/failure recordings, pose/camera consistency assertions. |
 | Target labels are sparse or ambiguous | Target RRI becomes unstable or actor leakage creeps in through GT matching. | Eligibility thresholds, V0/V1 separation, explicit unmatched-target counts, matched-GT diagnostics. |
 | Candidate valid fraction is low | $Q_H$ learns feasibility artifacts instead of utility. | Mixed sampler tuning, reason codes, minimum valid-count gates, candidate provenance diagnostics. |
-| Greedy oracle dominates all horizons | Multi-step improvement may be scientifically weak. | Identify occlusion/setup-action cases; report when target RRI is approximately myopic. |
 | Offline rollouts are narrow | Value learning overfits behavior support and overestimates unsupported actions. | Random-valid, oracle-scored temperature-softmax, later Gumbel-Top-k, scene-level splits, support-aware ablations. |
 | Oracle throughput blocks scale | Final evidence may be too small for broad claims. | Zarr-first storage, LRZ deterministic sharding, subset confidence intervals, exact coverage-gap reporting. |
-| $Q_H$ fails to beat myopic controls | The hard planning claim is falsified or blocked. | Report the failing gate and preserve a defensible target-aware oracle, one-step scorer, and rollout-data study; do not replace it with unvalidated continuous RL. |
+| Oracle lookahead has little headroom | The current candidate/objective regime is effectively myopic. | Report $\Delta_{\mathrm{look}}$ honestly, catalog cases where setup actions matter, and do not overclaim $Q_H$ planning gains. |
+| $Q_H$ fails despite positive headroom | The learned value model or offline support is insufficient. | Report the failing gate and preserve a defensible target-aware oracle, one-step scorer, and rollout-data study; do not replace it with unvalidated continuous RL. |
 
 ## KG-Friendly Authoring Rules {#kg-authoring-rules}
 
