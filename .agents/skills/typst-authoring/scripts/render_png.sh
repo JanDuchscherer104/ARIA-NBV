@@ -3,17 +3,20 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: render_png.sh -i <input.typ> [-o <out_dir>] [-p <ppi>] [--pages <ranges>]
+Usage: render_png.sh -i <input.typ> [-o <out_dir>] [-p <ppi>] [--pages <ranges>] [--root <dir>]
 
 Options:
   -i, --input     Path to .typ file (required)
   -o, --out       Output directory (default: ./out)
   -p, --ppi       Pixels per inch (default: 300)
       --pages     Page ranges (e.g., "1", "2,3,7-9,11-")
+      --root      Typst project root passed to `typst compile --root`
+  -h, --help      Show this help
 
 Examples:
-  render_png.sh -i figure.typ
-  render_png.sh -i table.typ -o /tmp/renders --ppi 600 --pages 1
+  .agents/skills/typst-authoring/scripts/render_png.sh -i figure.typ
+  .agents/skills/typst-authoring/scripts/render_png.sh -i docs/typst/thesis/proposal.typ -o /tmp/renders --root docs --ppi 600 --pages 1
+  .agents/skills/typst-authoring/scripts/render_png.sh -i .agents/skills/typst-authoring/assets/fixtures/attachments-and-operators.typ -o /tmp/fixtures --root . --pages 1
 EOF
 }
 
@@ -21,6 +24,7 @@ input=""
 out_dir="./out"
 ppi="300"
 pages=""
+root=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -38,6 +42,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --pages)
       pages="$2"
+      shift 2
+      ;;
+    --root)
+      root="$2"
       shift 2
       ;;
     -h|--help)
@@ -58,6 +66,11 @@ if [[ -z "$input" ]]; then
   exit 1
 fi
 
+if ! command -v typst >/dev/null 2>&1; then
+  echo "typst CLI not found on PATH" >&2
+  exit 127
+fi
+
 mkdir -p "$out_dir"
 
 output_template="${out_dir}/{0p}.png"
@@ -66,5 +79,12 @@ args=(compile "$input" "$output_template" --format png --ppi "$ppi")
 if [[ -n "$pages" ]]; then
   args+=(--pages "$pages")
 fi
+if [[ -n "$root" ]]; then
+  args+=(--root "$root")
+fi
+
+printf 'Running:' >&2
+printf ' %q' typst "${args[@]}" >&2
+printf '\n' >&2
 
 typst "${args[@]}"

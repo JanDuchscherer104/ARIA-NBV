@@ -324,7 +324,7 @@ Use these alongside package macros like `#color-block` and `#quote-block`.
 
 For tables, equations, and diagrams, always isolate and render to PNG first:
 
-- Use `.codex/skills/typst-authoring/scripts/render_png.sh`
+- Use `.agents/skills/typst-authoring/scripts/render_png.sh`
 - Iterate until the PNG is clean, then integrate into the main deck
 
 ## Notes

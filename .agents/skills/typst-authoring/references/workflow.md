@@ -1,40 +1,62 @@
-# Workflow: Typst Edit Loop
+# Typst Edit, Compile, Render, Inspect Loop
 
-Use this loop for non-trivial changes (multi-paragraph edits, layout changes, or figures).
+Use this loop for non-trivial edits: equations, figures, tables, layout,
+captions, bibliography/cross-references, or multi-paragraph thesis prose.
 
-## Visuals-first loop (tables, equations, diagrams)
-When building complex visuals, work in isolation to reduce noise and make issues obvious.
+## 1. Inspect Local Context
 
-1) Create a minimal `.typ` that only contains the object.
-2) Render to PNG for fast inspection (use `typst compile --format png`).
-3) Critique the PNG, fix issues, and repeat until clean.
-4) Integrate into the main document and re-check in context.
+```bash
+make context-typst-includes TYPST_INCLUDES_ARGS='--paper --mode includes'
+make context-typst-outline TYPST_OUTLINE_ARGS='--paper --mode outline'
+```
 
-### PNG export commands (CLI)
+Then read the target file, adjacent sections, and relevant files under
+`docs/typst/shared`.
 
-- **Helper script (preferred):**
-  - `.codex/skills/typst-authoring/scripts/render_png.sh -i input.typ -o out --ppi 300 --pages 1`
-- **Single page to PNG (explicit):**
-  - `typst compile input.typ output.png --format png --ppi 300 --pages 1`
-- **Multi-page to PNG (template required):**
-  - `typst compile input.typ 'out/{0p}.png' --format png --ppi 300`
-- **High-detail inspection (larger PPI):**
-  - `typst compile input.typ 'out/{0p}.png' --format png --ppi 600`
+## 2. Isolate Fragile Objects
 
-Notes:
-- Default PPI is `144`. Use `300`–`600` for clean inspection, `1200` for print-quality diagrams.
-- If you need transparency, set `#set page(fill: none)` in the `.typ` file.
-- PNG text is not extractable; keep PDFs for accessibility.
+For a complex equation, table, or figure, create or update a small fixture
+first. This reduces noise and makes visual errors obvious.
 
-## Compile → Inspect → Critique → Fix
-1) Compile to PDF (no errors; warnings reviewed).
-2) Inspect the relevant pages (PDF or rendered PNGs).
-3) Critique with the checklist below and fix issues.
-4) Re-compile and re-inspect until clean.
+## 3. Compile
 
-## Critique Checklist (fast)
-- **Text:** no overflow/cutoff, consistent sizes, readable line lengths.
-- **Layout:** clean alignment, balanced grids, no orphaned elements.
-- **Figures:** correct scale/cropping, legible labels, consistent captions.
-- **Equations:** rendered correctly, consistent notation, referenced.
-- **References:** citations resolved; cross-refs point to correct objects.
+```bash
+typst compile docs/typst/thesis/proposal.typ /tmp/proposal.pdf --root docs
+```
+
+Use the correct root for the document. If compiling files under
+`.agents/skills`, use `--root .`.
+
+## 4. Render Affected Pages
+
+```bash
+.agents/skills/typst-authoring/scripts/render_png.sh \
+  -i docs/typst/thesis/proposal.typ \
+  -o /tmp/proposal-pages \
+  --root docs \
+  --pages 1-4 \
+  --ppi 300
+```
+
+Use `--ppi 600` for detailed equation/figure inspection.
+
+## 5. Inspect Visually
+
+Check attachment scope after `_` / `^`, bolding and symbol consistency, line
+breaks and equation overflow, figure scale/cropping, caption clarity, table
+alignment, cross-reference output, and awkward page breaks.
+
+## 6. Fix And Repeat
+
+A clean compile alone is insufficient when the change affects rendering. Repeat
+until the affected pages are visually clean.
+
+## 7. Final Hygiene
+
+```bash
+.agents/skills/typst-authoring/scripts/hygiene_checks.sh .agents/skills/typst-authoring docs/typst/thesis
+make check-agent-memory
+git diff --check
+```
+
+Report exactly what was checked. If a command cannot run, say why.

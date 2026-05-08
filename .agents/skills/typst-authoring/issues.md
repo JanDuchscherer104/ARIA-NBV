@@ -1,49 +1,143 @@
-# Common Issues that Codex keeps running into when woring with Typst
+# Known ARIA-NBV Typst Authoring Failures
 
-- vectors, matrices, and tensors must always be bf.
-- prefer bf(cal(...)) for tensors and sets?
-- contents after a subscript are often incorrect. typst will render the following op("IoU")_"3D"(hat(bold(B))_(hat(e)), bold(B)_e^"GT") incorrectly - `(hat(bold(B))_(hat(e)), bold(B)_e^"GT")` will render as subscript. to ensure that only "3D" is subscripted, use `op("IoU")_"3D" (hat(bold(B))_(hat(e)), bold(B)_e^"GT")`. So the space between the subscript and following content that is not supposed to be subscripted is important. Please query typst library docs to see how this should optimally be done!
-- always ensure usage of symbols from the shared typst symbol and equation library (^1) to ensure consistency across documents. if a symbol or equation is missing, add it to the library and use it from there.
-- also consider skills listed in "https://context7.com/skills?q=typst". What helpful guidance from those skills could be added to our skill?
+Use this regression checklist before editing equations, notation, figures,
+captions, or shared Typst modules.
 
-(^1):
+## 1. Attachment Over-Capture After `_` / `^`
+
+Typst attachments are easy to misread when an attached expression is followed
+immediately by a parenthesized argument list.
+
+Bad:
+
+```typst
+$ op("IoU")_"3D"(hat(bold(B))_(hat(e)), bold(B)_e^"GT") $
 ```
-docs/typst/shared
-├── data
-│   ├── paper_figures_oracle_labeler.toml
-│   ├── vin_offline_store_stats.json
-│   ├── vin_v3_01_vs_t41_summary.json
-│   ├── wandb_rtjvfyyp_dynamics.json
-│   ├── wandb_rtjvfyyp_summary.json
-│   └── wandb_top2_improvements.json
-├── equations
-│   ├── action.typ
-│   ├── binning.typ
-│   ├── coral.typ
-│   ├── coverage.typ
-│   ├── entity.typ
-│   ├── features.typ
-│   ├── metrics.typ
-│   ├── rl.typ
-│   ├── rri.typ
-│   └── vin.typ
-├── equations.typ
-├── glossary.generated.typ
-├── glossary.typ
-├── macros.typ
-├── math.typ
-├── notation.generated.typ
-├── slide-template.typ
-├── style.typ
-├── symbols
-│   ├── ase.typ
-│   ├── entity.typ
-│   ├── frame.typ
-│   ├── obs.typ
-│   ├── oracle.typ
-│   ├── rl.typ
-│   ├── shape.typ
-│   └── vin.typ
-├── symbols.typ
-└── terms.typ
+
+Good:
+
+```typst
+$ op("IoU")_"3D" (hat(bold(B))_(hat(e)), bold(B)_e^"GT") $
 ```
+
+Rule: if the argument list is not part of the attachment, insert a space after
+the attached operator.
+
+## 2. Output Indexing vs. Argument Indexing
+
+Bad:
+
+```typst
+$ op("Transformer")_theta (bold(X)_t)_i $
+```
+
+This reads as indexing the input argument. If the index belongs to the network
+output, group the whole call.
+
+Good:
+
+```typst
+$ (op("Transformer")_theta (bold(X)_t))_i $
+```
+
+## 3. Bolding Policy For Data-Bearing Objects
+
+Bad:
+
+```typst
+$ x_q, F_v, V_"occ"^"pr", s_"proj" $
+```
+
+Good for data vectors, feature fields, voxel tensors, and learned embeddings:
+
+```typst
+$ bold(x)_q, bold(F)_v, bold(V)_"occ"^"pr", bold(s)_"proj" $
+```
+
+Do not blindly bold abstract sets or operators:
+
+```typst
+$ cal(E), cal(A)(s_t), op("argmax")_(q in cal(Q)) $
+```
+
+## 4. Duplicate Or Ad-Hoc Symbols
+
+Bad:
+
+```typst
+$ bold(P)_"semi" $
+$ RRI_total(q) $
+```
+
+Good:
+
+```typst
+#import "../shared/symbols.typ": symb
+#import "../shared/equations.typ": eqs
+
+#symb.obs.points_semi
+#symb.entity.rri_total
+#eqs.entity.objective
+```
+
+If a symbol appears in more than one thesis/proposal section, put it in
+`docs/typst/shared`.
+
+## 5. Raw Unicode And LaTeX Leakage
+
+Bad:
+
+```typst
+$ <raw Unicode alpha> <raw Unicode arrow> <raw Unicode beta> $
+$ \mathcal{E} $
+```
+
+Good:
+
+```typst
+$ alpha -> beta $
+$ cal(E) $
+```
+
+In markup, use `#sym.*` names. In math, use Typst math names/shorthands and
+ARIA-NBV shared macros.
+
+## 6. Figure Inclusion Without Scale And Visual QA
+
+Bad:
+
+```typst
+#image("figures/vin_pipeline.png")
+```
+
+Good:
+
+```typst
+#figure(
+  image("figures/vin_pipeline.png", width: 92%),
+  caption: [VIN offline-store training pipeline. Logged observations define historical context, counterfactual candidate rendering provides alternative views, and oracle RRI labels supervise candidate scoring.],
+) <fig:vin-offline-store>
+```
+
+Then compile and inspect the affected page.
+
+## 7. Mermaid-To-Typst Figure Rules
+
+- Keep `.mmd` as the version-controlled source.
+- Render locally with Mermaid CLI or the ARIA-NBV Mermaid workflow.
+- Include PNG/SVG/PDF with explicit Typst width.
+- Inspect the final Typst page, not only the standalone diagram.
+- Captions should state the scientific point, not just list components.
+
+## 8. Fluent But Empty Scientific Prose
+
+Bad:
+
+> This work highlights the crucial role of semantic relevance in the rapidly evolving landscape of AR-based reconstruction.
+
+Good:
+
+> ARIA-NBV uses entity relevance to prioritize candidate views whose expected reconstruction gain concerns the selected target rather than only the scene-level surface.
+
+Rule: replace importance claims with mechanisms, conditions, comparisons, or
+measured effects.
