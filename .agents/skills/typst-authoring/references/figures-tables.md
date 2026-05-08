@@ -23,6 +23,17 @@ Captions should contain:
 3. thesis relevance;
 4. no unsupported result claim unless backed by data.
 
+Label conventions:
+
+- Figures: `<fig:short-slug>`
+- Tables: `<tab:short-slug>`
+- Equations: `<eq:short-slug>`
+- Sections: `<sec:short-slug>`
+
+In prose, avoid bare "Figure X shows..." phrasing. State the claim and attach
+the reference, for example: "The offline-store pipeline separates historical
+context from counterfactual candidate rendering (@fig:vin-offline-store)."
+
 ## Table Policy
 
 Use tables for exact values and compact comparisons. Use figures for trends,
@@ -39,10 +50,25 @@ For thesis result tables:
 ## Mermaid / Diagram Policy
 
 - Keep `.mmd` as the version-controlled source.
-- Render locally with Mermaid CLI or the ARIA-NBV Mermaid workflow.
+- Render locally with Mermaid CLI, this skill's helper, or the ARIA-NBV Mermaid
+  workflow if available.
 - Include PNG/SVG/PDF with explicit Typst width.
 - Inspect the standalone render and final Typst page.
 - Use notation consistent with `docs/typst/shared`.
+
+Typical proposal/thesis render command:
+
+```bash
+.agents/skills/typst-authoring/scripts/render_mermaid.sh \
+  -i docs/typst/thesis/figures/proposal_system_flow.mmd \
+  -o docs/typst/thesis/figures/proposal_system_flow.png \
+  --width 1600
+```
+
+For Quarto pages, use `{mermaid}` fences instead of rendered PNG unless the
+page explicitly needs a static export. For Typst proposal/thesis sources, do
+not paste raw Mermaid; include the rendered asset and keep the `.mmd` beside
+it.
 
 ## Visual QA Checklist
 

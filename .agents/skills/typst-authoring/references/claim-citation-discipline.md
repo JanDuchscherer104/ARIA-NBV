@@ -41,8 +41,14 @@ For advisor-facing scientific claims, run:
 make kg-claim-check KG_CLAIM='...'
 ```
 
-Do not require `kg-claim-check` for skill-only edits or purely mechanical
-Typst fixes.
+Treat `unverifiable` or weak results as a request to downgrade the claim, add
+evidence, or mark it as a hypothesis. Do not require `kg-claim-check` for
+skill-only edits or purely mechanical Typst fixes.
+
+For non-trivial sections, build a scratch claim ledger before final prose. Use
+`assets/templates/claim-ledger.md` to track paragraph, claim type, evidence
+path, citation/result, and status. The ledger is an authoring artifact, not a
+required final thesis table.
 
 ## Hedging
 
@@ -66,4 +72,22 @@ Avoid procedure-first prose:
 
 ```text
 We trained the model and then evaluated the predictions. Figure X shows the results.
+```
+
+## Related-Work Paragraph Protocol
+
+For each related-work paragraph:
+
+1. name the subfield;
+2. identify what prior work contributes;
+3. state the unresolved limitation relative to ARIA-NBV;
+4. cite specific sources;
+5. avoid generic openings such as "many works have explored".
+
+Useful local searches:
+
+```bash
+make context-literature-index
+make context-literature-search LITERATURE_SEARCH_QUERY='next best view learned reconstruction'
+rg -n 'GenNBV|VIN-NBV|NBV' docs/references.bib docs/literature docs/_generated/context
 ```

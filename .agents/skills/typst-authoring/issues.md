@@ -124,7 +124,8 @@ Then compile and inspect the affected page.
 ## 7. Mermaid-To-Typst Figure Rules
 
 - Keep `.mmd` as the version-controlled source.
-- Render locally with Mermaid CLI or the ARIA-NBV Mermaid workflow.
+- Render locally with Mermaid CLI, the ARIA-NBV Mermaid workflow, or
+  `scripts/render_mermaid.sh`.
 - Include PNG/SVG/PDF with explicit Typst width.
 - Inspect the final Typst page, not only the standalone diagram.
 - Captions should state the scientific point, not just list components.
@@ -141,3 +142,33 @@ Good:
 
 Rule: replace importance claims with mechanisms, conditions, comparisons, or
 measured effects.
+
+## 9. Claim Strength Drift
+
+Bad:
+
+```text
+ARIA-NBV solves interactive semantic reconstruction.
+```
+
+Good:
+
+```text
+ARIA-NBV evaluates whether target-conditioned candidate scoring improves
+reconstruction utility under fixed view budgets in an offline ARIA-derived
+setting.
+```
+
+Rule: planned work, bridge work, and future work must not read like completed
+empirical evidence.
+
+## 10. Strict Hygiene Is For Real Documents
+
+Run:
+
+```bash
+.agents/skills/typst-authoring/scripts/hygiene_checks.sh --strict docs/typst/thesis/sections/proposal
+```
+
+Use `--examples` only when intentionally reviewing the bad/good examples in
+this skill. Do not normalize fixture warnings as acceptable proposal output.

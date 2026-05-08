@@ -1,0 +1,23 @@
+# Typst Package Reference Index
+
+Use packages only when they reduce real document complexity and are already
+available in the local Typst environment.
+
+| Need | Prefer | Notes |
+| --- | --- | --- |
+| Thesis architecture or process diagrams | Mermaid source rendered to PNG/SVG/PDF | Best for diffable pipeline figures and Quarto/Typst reuse. |
+| Typst-native diagrams | Fletcher | Use when the diagram must inherit Typst styling or math layout. |
+| Result or comparison tables | Typst-native tables | Add `booktabs` only when the style benefit justifies a package. |
+| Simple network schematics | `neural-netz` | Prefer Mermaid/Fletcher for ARIA-NBV pipelines. |
+| Complex external figures | Versioned image/PDF assets | Keep source and render command next to the asset. |
+
+Never introduce a new package into thesis/proposal sources without compiling a
+minimal fixture and recording the package name, version/date checked, source
+URL, and compile command in the relevant package reference.
+
+Current package notes:
+
+- `booktabs.md` and `booktabs-*.typ` - table rules and examples.
+- `fletcher.md` and `fletcher-*.typ` - diagram rules and examples.
+- `neural-netz.md` and `neural-netz-example.typ` - simple network schematic
+  fallback.

@@ -1,28 +1,129 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -eq 0 ]]; then
-  set -- .agents/skills/typst-authoring docs/typst/thesis
+usage() {
+  cat <<'EOF'
+Usage: hygiene_checks.sh [--strict|--examples] [paths...]
+
+Modes:
+  default     Advisory checks for real documents; exits zero.
+  --strict    Fail if suspicious matches are found in real documents.
+  --examples  Include skill fixtures/examples; exits zero.
+
+Examples:
+  .agents/skills/typst-authoring/scripts/hygiene_checks.sh docs/typst/thesis
+  .agents/skills/typst-authoring/scripts/hygiene_checks.sh --strict docs/typst/thesis/sections/proposal
+  .agents/skills/typst-authoring/scripts/hygiene_checks.sh --examples .agents/skills/typst-authoring
+EOF
+}
+
+mode="soft"
+targets=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --strict)
+      mode="strict"
+      shift
+      ;;
+    --examples)
+      mode="examples"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      targets+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ${#targets[@]} -eq 0 ]]; then
+  if [[ "$mode" == "examples" ]]; then
+    targets=(.agents/skills/typst-authoring)
+  else
+    targets=(docs/typst/thesis)
+  fi
 fi
 
 echo "== Typst authoring hygiene checks =="
-echo "Targets: $*"
+echo "Mode: $mode"
+echo "Targets: ${targets[*]}"
 
-if command -v rg >/dev/null 2>&1; then
-  echo
-  echo "-- suspicious op(...) attachment followed immediately by an argument list --"
-  rg -n 'op\("[^"]+"\)_[^ ]+\(' "$@" || true
-
-  echo
-  echo "-- accidental double bold or stale .codex path --"
-  rg -n 'bold\(bold|\.codex/skills/typst-authoring' "$@" || true
-
-  echo
-  echo "-- temporary citation markers --"
-  rg -n '\[CITATION NEEDED|TODO citation|citation needed' "$@" || true
-else
+if ! command -v rg >/dev/null 2>&1; then
   echo "ripgrep (rg) not available; skipping pattern checks" >&2
+  exit 0
 fi
 
+exclude_args=()
+if [[ "$mode" != "examples" ]]; then
+  exclude_args+=(
+    --glob '!**/assets/fixtures/**'
+    --glob '!**/assets/templates/**'
+    --glob '!**/issues.md'
+    --glob '!**/references/math-attachments.md'
+    --glob '!**/references/notation-migration.md'
+  )
+else
+  exclude_args+=(
+    --glob '!**/references/packages/**'
+    --glob '!**/scripts/**'
+  )
+fi
+
+found_any=0
+
+run_check() {
+  local title="$1"
+  local pattern="$2"
+  local status=0
+
+  echo
+  echo "-- $title --"
+  if rg -n "${exclude_args[@]}" "$pattern" "${targets[@]}"; then
+    found_any=1
+  else
+    status=$?
+    if [[ $status -eq 1 ]]; then
+      echo "no matches"
+    else
+      echo "rg failed with status $status" >&2
+      exit "$status"
+    fi
+  fi
+}
+
+run_check "Typst operator attachment followed immediately by arguments" \
+  'op\("[^"]+"\)_[^[:space:]]+\('
+
+run_check "Accidental double bolding" \
+  'bold\(bold'
+
+run_check "Raw LaTeX leakage" \
+  '\\(mathbf|mathcal|mathrm|operatorname|textbf)|cal\{'
+
+run_check "Temporary citation placeholders" \
+  '\[CITATION NEEDED|TODO citation|citation needed|TODO: cite|FIXME citation'
+
+run_check "Stale global skill paths inside repo-local guidance" \
+  '[.]codex/skills/typst-authoring'
+
+run_check "Recurring proposal notation that should migrate to shared modules" \
+  'bold\(s\)_t\^"obs"|bold\(s\)_t\^"cf0"|bold\(z\)_e|Q_\(H,theta\)|Delta_t\^e|J_e\^\(H\)|G_t\^\(H\)|bold\(F\)_t\^"EVL"|bold\(O\)_t\^"pred"'
+
+run_check "Image includes without same-line width argument" \
+  'image\("[^"]+"\)'
+
+run_check "Unprefixed Typst labels" \
+  '<[[:alpha:]][[:alnum:]_-]*>'
+
 echo
-echo "Done. Treat matches as review prompts, not automatic failures."
+if [[ "$mode" == "strict" && "$found_any" -ne 0 ]]; then
+  echo "Strict hygiene failed. Review matches above; do not suppress real document issues silently." >&2
+  exit 1
+fi
+
+echo "Done. Treat matches as review prompts unless --strict was used."

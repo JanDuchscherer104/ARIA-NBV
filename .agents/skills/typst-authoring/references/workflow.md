@@ -20,12 +20,20 @@ first. This reduces noise and makes visual errors obvious.
 
 ## 3. Compile
 
+Prefer repo Make targets for full document builds:
+
 ```bash
-typst compile docs/typst/thesis/proposal.typ /tmp/proposal.pdf --root docs
+make proposal-pdf
+make thesis-pdf
 ```
 
-Use the correct root for the document. If compiling files under
-`.agents/skills`, use `--root .`.
+Use the manual form when isolating an output path:
+
+```bash
+cd docs && typst compile typst/thesis/proposal.typ /tmp/proposal.pdf --root .
+```
+
+For files under `.agents/skills`, compile from the repo root with `--root .`.
 
 ## 4. Render Affected Pages
 
@@ -54,7 +62,8 @@ until the affected pages are visually clean.
 ## 7. Final Hygiene
 
 ```bash
-.agents/skills/typst-authoring/scripts/hygiene_checks.sh .agents/skills/typst-authoring docs/typst/thesis
+.agents/skills/typst-authoring/scripts/hygiene_checks.sh --strict docs/typst/thesis/sections/proposal
+.agents/skills/typst-authoring/scripts/hygiene_checks.sh --examples .agents/skills/typst-authoring
 make check-agent-memory
 git diff --check
 ```
