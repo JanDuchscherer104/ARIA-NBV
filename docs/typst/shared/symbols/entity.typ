@@ -17,6 +17,8 @@
     target_desc: $bold(z)_e$,
     // Target-specific reconstruction error and derived rollout metrics.
     target_error: $Delta_t^e$,
+    target_error_pm: $D_(P -> M,t)^e$,
+    target_error_mp: $D_(M -> P,t)^e$,
     target_error_next: $Delta_(t+1)^e$,
     target_error_0: $Delta_0^e$,
     target_error_H: $Delta_H^e$,

@@ -1,6 +1,6 @@
 ---
 id: decisions
-updated: 2026-05-07
+updated: 2026-05-09
 scope: repo
 owner: jan
 status: active
@@ -39,6 +39,16 @@ tags: [codex, workflow, architecture]
   expected context-pack fields live in `.agents/references/litkg_quick_reference.md`.
 - Advisor-facing proposal, thesis roadmap/question, and literature-synthesis
   claims require `kg-claim-check` before being treated as supported.
+- Codex Desktop persists local session transcripts under
+  `${CODEX_HOME:-$HOME/.codex}/sessions/YYYY/MM/DD/rollout-*.jsonl`; restored
+  backup stores may be queried explicitly but are not canonical repo memory.
+- Transcript mining must not check in full raw Codex transcripts. Repo memory
+  may contain only user-authored extracts and reviewed candidate distillates
+  under `.agents/memory/transcripts/`, where LitKG indexes them with lower
+  authority than canonical memory.
+- Plan-mode transcript answers mean the user's answers to `request_user_input`
+  questions. Assistant `<proposed_plan>` text remains agent output and does not
+  become a decision unless the user later accepts or restates it.
 
 ## Technical Decisions
 - Runtime objects are instantiated through config `.setup_target()` factories.
@@ -148,6 +158,27 @@ tags: [codex, workflow, architecture]
 - Rollout target rows preserve selector rank, score, policy, probability,
   temperature, target invalidity bits, and GT match metadata so target identity
   can be audited in `rollouts.zarr`.
+
+### 2026-05-09 Typst Thesis Notation Decisions
+- Shared Typst notation separates abstract mathematical objects from
+  implementation tensors: `cal(...)` owns point sets, candidate sets, meshes,
+  face sets, spaces, and geometric collections; `bold(...)` is reserved for
+  coordinate vectors, matrices, tensors, feature fields, embeddings, images,
+  voxel grids, and implementation arrays.
+- Candidate notation reserves `Q_H` / `Q_(H,theta)` for value functions.
+  Finite candidate sets are `cal(Q)_t`, candidate poses are `q_(t,i)`, and
+  candidate feature tensors are `bold(X)_t^"cand"`.
+- Abstract states are plain symbols such as `s_t^"obs"`, `s_t^"cf0"`, and
+  `s_t^"oracle"`. Learned state/candidate embeddings use symbols such as
+  `bold(h)_t` and `bold(u)_(t,i)`.
+- Thesis-core ARIA-NBV reconstruction-quality equations use point-mesh error
+  `D` with directional components `D_(P -> M)` and `D_(M -> P)`. `Delta_t^e`
+  remains the target-error sum. Generic `CD(...)` and `cal(A)` / `cal(C)`
+  component notation are historical/background only.
+- The repo-local `typst-authoring` skill owns the convention and strict
+  hygiene checks for advisor-facing Typst files. Compatibility keys may remain
+  in `docs/typst/shared` temporarily, but their rendered notation must follow
+  the locked convention.
 
 - The core thesis claim is target-conditioned, quality-driven NBV on ASE/EFM with strict M1 data/cache/oracle contracts.
 - RRI is the primary project objective for next-best-view research in this repo. Coverage-style objectives remain baselines or diagnostics, not the main thesis target.

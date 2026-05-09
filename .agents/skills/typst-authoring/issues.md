@@ -46,19 +46,42 @@ Bad:
 
 ```typst
 $ x_q, F_v, V_"occ"^"pr", s_"proj" $
+$ bold(cal(P)), bold(cal(Q)), bold(s)_t^"obs" $
 ```
 
 Good for data vectors, feature fields, voxel tensors, and learned embeddings:
 
 ```typst
 $ bold(x)_q, bold(F)_v, bold(V)_"occ"^"pr", bold(s)_"proj" $
+$ bold(X)_t^"cand", bold(u)_(t,i), bold(h)_t $
 ```
 
-Do not blindly bold abstract sets or operators:
+Do not bold abstract sets, meshes, candidate sets, candidate poses, states, or
+operators:
 
 ```typst
-$ cal(E), cal(A)(s_t), op("argmax")_(q in cal(Q)) $
+$ cal(P)_t, cal(Q)_t, cal(M)_e^"GT", q_(t,i), s_t^"obs" $
+$ cal(E), cal(A)(s_t), op("argmax", limits: #true)_(q in cal(Q)) $
 ```
+
+## 3b. ARIA-NBV RRI Component Notation
+
+Bad:
+
+```typst
+$ CD(cal(P)_t, cal(M)^"GT") $
+$ Delta_t^e = cal(A)_t^e + cal(C)_t^e $
+```
+
+Good:
+
+```typst
+$ D(cal(P)_t, cal(M)^"GT") $
+$ Delta_t^e = D_(P -> M,t)^e + D_(M -> P,t)^e $
+```
+
+Rule: thesis-core ARIA-NBV equations use point-mesh error `D`; `CD` remains
+historical/background wording only.
 
 ## 4. Duplicate Or Ad-Hoc Symbols
 

@@ -88,13 +88,13 @@
       #(symb.oracle.points)_(t+1) = #(symb.oracle.points)_t union #(symb.oracle.points)_(q_t)
     $,
     target_rri_reward: $
-      #symb.rl.reward_target = "RRI"_e(q_t mid #(symb.oracle.points)_t, #symb.ase.mesh_target)
+      #symb.rl.reward_target = op("RRI")_e (q_t mid #(symb.oracle.points)_t, #symb.ase.mesh_target)
     $,
     finite_horizon_return: $
       #symb.rl.return_h = sum_(k=0)^(#symb.rl.H - 1) #symb.rl.gamma^k r_(t+k)^e
     $,
     q_h: $
-      "Q"_H(#symb.rl.s_cf0, #(symb.rl.a)_t)
+      #symb.rl.qh (#symb.rl.s_cf0, #(symb.rl.a)_t)
       =
       bb(E)[G_t^((H)) mid s_t = #symb.rl.s_cf0, a_t = #(symb.rl.a)_t]
     $,
@@ -104,21 +104,21 @@
       (op("Transformer")_theta (#symb.rl.candidate_features))_i
     $,
     qh_candidate_value: $
-      Q_(H,theta) (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)
+      #symb.rl.qh_theta (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)
       =
       #symb.rl.q_weight^top #symb.rl.candidate_token
     $,
     qh_masked_argmax: $
       #symb.rl.selected_action_theta
       =
-      arg max_(i : m_(t,i) = 1)
-      Q_(H,theta) (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)
+      op("argmax", limits: #true)_(i : m_(t,i) = 1)
+      #symb.rl.qh_theta (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)
     $,
     qh_doubleq_index: $
       i^star
       =
-      arg max_(i : m_(t+1,i) = 1)
-      Q_(H,theta) (#symb.rl.s_cf0_next, #symb.entity.target_desc, bold(q)_(t+1,i))
+      op("argmax", limits: #true)_(i : m_(t+1,i) = 1)
+      #symb.rl.qh_theta (#symb.rl.s_cf0_next, #symb.entity.target_desc, q_(t+1,i))
     $,
     qh_doubleq_target: $
       #symb.rl.td_target
@@ -127,7 +127,7 @@
       +
       gamma
       (1 - d_t)
-      Q_(H,theta^-) (#symb.rl.s_cf0_next, #symb.entity.target_desc, bold(q)_(t+1,i^star))
+      #symb.rl.qh_target (#symb.rl.s_cf0_next, #symb.entity.target_desc, q_(t+1,i^star))
     $,
     qh_loss: $
       #symb.rl.q_loss
@@ -136,7 +136,7 @@
       sum_((s,a,r,s') in cal(D))
       m_(t,a)
       (
-        Q_(H,theta) (#symb.rl.s_cf0, #symb.entity.target_desc, bold(q)_(t,a))
+        #symb.rl.qh_theta (#symb.rl.s_cf0, #symb.entity.target_desc, q_(t,a))
         -
         #symb.rl.td_target
       )^2
@@ -144,16 +144,16 @@
     reward_log: $
       #(symb.rl.r) _t
       =
-      "log"("CD"(#(symb.oracle.points) _t, #symb.ase.mesh) + epsilon)
+      log(#symb.oracle.err (#(symb.oracle.points)_t, #symb.ase.mesh) + epsilon)
       -
-      "log"("CD"(#(symb.oracle.points) _(t+1), #symb.ase.mesh) + epsilon)
+      log(#symb.oracle.err (#(symb.oracle.points)_(t+1), #symb.ase.mesh) + epsilon)
     $,
     reward_geom: $
       #(symb.rl.r) _t^"geom"
       =
-      "log"("CD"(#(symb.oracle.points) _t, #symb.ase.mesh) + epsilon)
+      log(#symb.oracle.err (#(symb.oracle.points)_t, #symb.ase.mesh) + epsilon)
       -
-      "log"("CD"(#(symb.oracle.points) _(t+1), #symb.ase.mesh) + epsilon)
+      log(#symb.oracle.err (#(symb.oracle.points)_(t+1), #symb.ase.mesh) + epsilon)
       -
       alpha bb(1)["collision"(#(symb.rl.a) _t)]
       -
@@ -162,7 +162,7 @@
     planner: $
       #(symb.rl.a) _t^star
       =
-      "arg max"_(#(symb.rl.a) _(t:t+H-1))
+      op("argmax", limits: #true)_(#(symb.rl.a) _(t:t+H-1))
       sum_(k=0)^(H-1) gamma^k #(symb.rl.r) _(t+k)
     $,
     q_backup: $
@@ -183,7 +183,7 @@
       (1)/(2) ( #(symb.rl.Q) ( #(symb.rl.s) _t, #(symb.rl.a) _t ) - y_t^Q )^2
       +
       alpha (
-        "logsumexp"_(a in cal(A)) #(symb.rl.Q) ( #(symb.rl.s) _t, a )
+        op("logsumexp")_(a in cal(A)) #(symb.rl.Q) ( #(symb.rl.s) _t, a )
         -
         #(symb.rl.Q) ( #(symb.rl.s) _t, #(symb.rl.a) _t )
       )
@@ -196,7 +196,7 @@
     leq_loss: $
       cal(L)_(#(symb.rl.V))^"LEQ"
       =
-      rho_(tau)(
+      rho_(tau) (
         #(symb.rl.V) ( #(symb.rl.s) _t ) - #(symb.rl.G) _t^lambda
       )
     $,
@@ -209,15 +209,15 @@
       cal(L)_(#(symb.rl.pi))^"PPO"
       =
       bb(E)[
-        "min"(
+        op("min")(
           #(symb.rl.rho) _t #(symb.rl.A) _t,
-          "clip"(#(symb.rl.rho) _t, 1-epsilon, 1+epsilon) #(symb.rl.A) _t
+          op("clip") (#(symb.rl.rho) _t, 1-epsilon, 1+epsilon) #(symb.rl.A) _t
         )
       ]
     $,
     hier_policy: $
-      #(symb.rl.z) _t ~ #(symb.rl.pi) _("hi")(z ; #(symb.rl.s) _t),
+      #(symb.rl.z) _t ~ #(symb.rl.pi) _("hi") (z ; #(symb.rl.s) _t),
       quad
-      #(symb.rl.a) _t ~ #(symb.rl.pi) _("lo")(a ; #(symb.rl.s) _t, #(symb.rl.z) _t)
+      #(symb.rl.a) _t ~ #(symb.rl.pi) _("lo") (a ; #(symb.rl.s) _t, #(symb.rl.z) _t)
     $,
   )

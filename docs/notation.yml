@@ -5,16 +5,16 @@ symbols:
     tex: '\mathrm{RRI}'
     typst: '#symb.oracle.rri'
   oracle.points:
-    tex: '\boldsymbol{\mathcal{P}}'
+    tex: '\mathcal{P}'
     typst: '#symb.oracle.points'
   oracle.points_q:
-    tex: '\boldsymbol{\mathcal{P}}_q'
+    tex: '\mathcal{P}_q'
     typst: '#symb.oracle.points_q'
   oracle.candidates:
-    tex: '\boldsymbol{\mathcal{Q}}'
+    tex: '\mathcal{Q}'
     typst: '#symb.oracle.candidates'
   oracle.candidates_t:
-    tex: 'Q_t'
+    tex: '\mathcal{Q}_t'
     typst: '#symb.oracle.candidates_t'
   oracle.candidate_qti:
     tex: 'q_{t,i}'
@@ -23,22 +23,22 @@ symbols:
     tex: '\boldsymbol{D}_q'
     typst: '#symb.oracle.depth_q'
   oracle.acc:
-    tex: '\mathcal{A}'
+    tex: 'D_{P\to M}'
     typst: '#symb.oracle.acc'
   oracle.comp:
-    tex: '\mathcal{C}'
+    tex: 'D_{M\to P}'
     typst: '#symb.oracle.comp'
   rri.cd_value:
-    tex: '\mathrm{CD}'
+    tex: 'D'
     typst: '#eqs.rri.cd'
   ase.mesh:
-    tex: '\boldsymbol{\mathcal{M}}_{\mathrm{GT}}'
+    tex: '\mathcal{M}^{\mathrm{GT}}'
     typst: '#symb.ase.mesh'
   ase.mesh_target:
-    tex: 'M_e'
+    tex: '\mathcal{M}_e^{\mathrm{GT}}'
     typst: '#symb.ase.mesh_target'
   ase.faces:
-    tex: '\boldsymbol{\mathcal{F}}_{\mathrm{GT}}'
+    tex: '\mathcal{F}^{\mathrm{GT}}'
     typst: '#symb.ase.faces'
   ase.traj:
     tex: '\boldsymbol{T}_{\mathrm{rig}}^{\mathrm{w}}(t)'
@@ -136,25 +136,25 @@ symbols:
 
 equations:
   rri.cd:
-    tex: '\mathrm{CD}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\mathcal{A}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\mathcal{C}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})'
+    tex: 'D(\mathcal{P},\mathcal{M}^{\mathrm{GT}})=D_{P\to M}(\mathcal{P},\mathcal{M}^{\mathrm{GT}})+D_{M\to P}(\mathcal{P},\mathcal{M}^{\mathrm{GT}})'
     typst: '#eqs.rri.cd'
   rri.acc:
-    tex: '\mathcal{A}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\frac{1}{\lVert\boldsymbol{\mathcal{P}}\rVert}\sum_{\boldsymbol{p}\in\boldsymbol{\mathcal{P}}}\min_{\boldsymbol{f}\in\boldsymbol{\mathcal{F}}_{\mathrm{GT}}} d(\boldsymbol{p},\boldsymbol{f})^2'
+    tex: 'D_{P\to M}(\mathcal{P},\mathcal{M}^{\mathrm{GT}})=\frac{1}{\lVert\mathcal{P}\rVert}\sum_{\boldsymbol{p}\in\mathcal{P}}\min_{\boldsymbol{f}\in\mathcal{F}^{\mathrm{GT}}} d(\boldsymbol{p},\boldsymbol{f})^2'
     typst: '#eqs.rri.acc'
   rri.comp:
-    tex: '\mathcal{C}(\boldsymbol{\mathcal{P}},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})=\frac{1}{\lVert\boldsymbol{\mathcal{F}}_{\mathrm{GT}}\rVert}\sum_{\boldsymbol{f}\in\boldsymbol{\mathcal{F}}_{\mathrm{GT}}}\min_{\boldsymbol{p}\in\boldsymbol{\mathcal{P}}} d(\boldsymbol{p},\boldsymbol{f})^2'
+    tex: 'D_{M\to P}(\mathcal{P},\mathcal{M}^{\mathrm{GT}})=\frac{1}{\lVert\mathcal{F}^{\mathrm{GT}}\rVert}\sum_{\boldsymbol{f}\in\mathcal{F}^{\mathrm{GT}}}\min_{\boldsymbol{p}\in\mathcal{P}} d(\boldsymbol{p},\boldsymbol{f})^2'
     typst: '#eqs.rri.comp'
   rri.union:
-    tex: '\boldsymbol{\mathcal{P}}_{t\cup q}=\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q'
+    tex: '\mathcal{P}_{t\cup q}=\mathcal{P}_t\cup\mathcal{P}_q'
     typst: '#eqs.rri.union'
   rri.rri:
-    tex: '\mathrm{RRI}(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t\cup\boldsymbol{\mathcal{P}}_q,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon}'
+    tex: '\mathrm{RRI}(q)=\frac{D(\mathcal{P}_t,\mathcal{M}^{\mathrm{GT}})-D(\mathcal{P}_t\cup\mathcal{P}_q,\mathcal{M}^{\mathrm{GT}})}{D(\mathcal{P}_t,\mathcal{M}^{\mathrm{GT}})+\varepsilon}'
     typst: '#eqs.rri.rri'
   rri.target_rri:
-    tex: '\mathrm{RRI}_e(q)=\frac{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)-\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e\cup\boldsymbol{\mathcal{P}}_q^e,M_e)}{\mathrm{CD}(\boldsymbol{\mathcal{P}}_t^e,M_e)+\varepsilon}'
+    tex: '\mathrm{RRI}_e(q)=\frac{D(\mathcal{P}_t^e,\mathcal{M}_e^{\mathrm{GT}})-D(\mathcal{P}_t^e\cup\mathcal{P}_q^e,\mathcal{M}_e^{\mathrm{GT}})}{D(\mathcal{P}_t^e,\mathcal{M}_e^{\mathrm{GT}})+\varepsilon}'
     typst: '#eqs.rri.target_rri'
   rri.greedy:
-    tex: 'q^*=\operatorname*{argmax}_{q\in\boldsymbol{\mathcal{Q}}}\mathrm{RRI}(q)'
+    tex: 'q^*=\operatorname*{argmax}_{q\in\mathcal{Q}}\mathrm{RRI}(q)'
     typst: '#eqs.rri.greedy'
   binning.edges:
     tex: 'e_k=\operatorname{Quantile}(\{r_i\}_{i=1}^{N}, k/K),\quad k\in\{1,\ldots,K-1\}'
@@ -196,25 +196,25 @@ equations:
     tex: 's_t^{\mathrm{hist}}=(I_{1:t},T_{1:t},P_{1:t}^{\mathrm{semi}},V^{\mathrm{root}},e_t,b_t)'
     typst: '#eqs.rl.s_hist'
   rl.s_off:
-    tex: 's_t^{\mathrm{off}}=(\mathrm{VinSnippetView},Q_t,N_t,m_{t,i},\ell_{t,i})'
+    tex: 's_t^{\mathrm{off}}=(\mathrm{VinSnippetView},\mathcal{Q}_t,N_t,m_{t,i},\ell_{t,i})'
     typst: '#eqs.rl.s_off'
   rl.s_cf0:
-    tex: 's_t^{\mathrm{cf0}}=(V^{\mathrm{root}},P_t,Q_t,m_{t,i},\rho_{t,i},e_t,b_t)'
+    tex: 's_t^{\mathrm{cf0}}=(V^{\mathrm{root}},\mathcal{P}_t,\mathcal{Q}_t,m_{t,i},\rho_{t,i},e_t,b_t)'
     typst: '#eqs.rl.s_cf0'
   rl.s_cf_geom:
     tex: 's_t^{\mathrm{cf+}}=(s_t^{\mathrm{cf0}},D_{1:t}^{\mathrm{sel}},P_{1:t}^{\mathrm{sel}},N_{1:t}^{\mathrm{sel}})'
     typst: '#eqs.rl.s_cf_geom'
   rl.s_oracle:
-    tex: 's_t^{\mathrm{oracle}}=(s_t^{\mathrm{cf+}},M_{\mathrm{GT}},M_e,\{D_{t,i}^{\mathrm{GT}},P_{t,i}^{\mathrm{GT}},\mathrm{RRI}_{t,i}\}_{i=1}^{N_t})'
+    tex: 's_t^{\mathrm{oracle}}=(s_t^{\mathrm{cf+}},\mathcal{M}^{\mathrm{GT}},\mathcal{M}_e^{\mathrm{GT}},\{D_{t,i}^{\mathrm{GT}},\mathcal{P}_{t,i}^{\mathrm{GT}},\mathrm{RRI}_{t,i}\}_{i=1}^{N_t})'
     typst: '#eqs.rl.s_oracle'
   rl.finite_action_set:
-    tex: 'Q_t=\{q_{t,i}\}_{i=1}^{N_t},\quad \mathcal{A}(s_t)=\{i\in\{1,\ldots,N_t\}:m_{t,i}=1\},\quad q_t=q_{t,a_t}'
+    tex: '\mathcal{Q}_t=\{q_{t,i}\}_{i=1}^{N_t},\quad \mathcal{A}(s_t)=\{i\in\{1,\ldots,N_t\}:m_{t,i}=1\},\quad q_t=q_{t,a_t}'
     typst: '#eqs.rl.finite_action_set'
   rl.counterfactual_transition:
-    tex: 'P_{t+1}=P_t\cup P_{q_t}'
+    tex: '\mathcal{P}_{t+1}=\mathcal{P}_t\cup\mathcal{P}_{q_t}'
     typst: '#eqs.rl.counterfactual_transition'
   rl.target_rri_reward:
-    tex: 'r_t^e=\mathrm{RRI}_e(q_t\mid P_t,M_e)'
+    tex: 'r_t^e=\mathrm{RRI}_e(q_t\mid \mathcal{P}_t,\mathcal{M}_e^{\mathrm{GT}})'
     typst: '#eqs.rl.target_rri_reward'
   rl.finite_horizon_return:
     tex: 'G_t^{(H)}=\sum_{k=0}^{H-1}\gamma^k r_{t+k}^e'
@@ -223,13 +223,13 @@ equations:
     tex: 'Q_H(s_t^{\mathrm{cf0}},a_t)=\mathbb{E}\left[G_t^{(H)}\mid s_t=s_t^{\mathrm{cf0}},a_t\right]'
     typst: '#eqs.rl.q_h'
   rl.reward_geom:
-    tex: 'r_t^{\mathrm{geom}}=\log(\mathrm{CD}(\boldsymbol{\mathcal{P}}_t,\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon)-\log(\mathrm{CD}(\boldsymbol{\mathcal{P}}_{t+1},\boldsymbol{\mathcal{M}}_{\mathrm{GT}})+\varepsilon)-\alpha\mathbb{1}[\mathrm{collision}(a_t)]-\beta c(a_t)'
+    tex: 'r_t^{\mathrm{geom}}=\log(D(\mathcal{P}_t,\mathcal{M}^{\mathrm{GT}})+\varepsilon)-\log(D(\mathcal{P}_{t+1},\mathcal{M}^{\mathrm{GT}})+\varepsilon)-\alpha\mathbb{1}[\mathrm{collision}(a_t)]-\beta c(a_t)'
     typst: '#eqs.rl.reward_geom'
   rl.q_backup:
     tex: 'y_t^Q=r_t+\gamma V(s_{t+1})'
     typst: '#eqs.rl.q_backup'
   action.space:
-    tex: '\mathcal{A}=\mathbb{R}^3\times SO(2)'
+    tex: '\mathcal{A}^{\mathrm{cont}}\subset\mathbb{R}^3\times \operatorname{SO}(2)'
     typst: '#eqs.action.space'
   entity.objective:
     tex: '\mathrm{RRI}_{\mathrm{total}}(q)=\sum_{e\in\mathcal{E}}w_e\mathrm{RRI}_e+\lambda_{\mathrm{scene}}\mathrm{RRI}'

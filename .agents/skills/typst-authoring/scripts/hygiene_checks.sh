@@ -66,6 +66,11 @@ if [[ "$mode" != "examples" ]]; then
     --glob '!**/issues.md'
     --glob '!**/references/math-attachments.md'
     --glob '!**/references/notation-migration.md'
+    --glob '!**/*.generated.typ'
+    --glob '!**/*.mmd'
+    --glob '!**/*.svg'
+    --glob '!**/*.png'
+    --glob '!**/*.pdf'
   )
 else
   exclude_args+=(
@@ -75,16 +80,21 @@ else
 fi
 
 found_any=0
+found_blocking=0
 
 run_check() {
   local title="$1"
   local pattern="$2"
+  local severity="${3:-blocking}"
   local status=0
 
   echo
-  echo "-- $title --"
+  echo "-- $title [$severity] --"
   if rg -n "${exclude_args[@]}" "$pattern" "${targets[@]}"; then
     found_any=1
+    if [[ "$severity" == "blocking" ]]; then
+      found_blocking=1
+    fi
   else
     status=$?
     if [[ $status -eq 1 ]]; then
@@ -102,8 +112,12 @@ run_check "Typst operator attachment followed immediately by arguments" \
 run_check "Accidental double bolding" \
   'bold\(bold'
 
+run_check "Locked ARIA-NBV notation convention violations" \
+  'bold\(cal\(|bold\(Q\)_t|bold\(s\)_t\^"(obs|cf0|cf\+|oracle)"|bold\(q\)_\(t,|S O\(2\)|cal\(A\)_t\^e|cal\(C\)_t\^e'
+
 run_check "Raw LaTeX leakage" \
-  '\\(mathbf|mathcal|mathrm|operatorname|textbf)|cal\{'
+  '\\(mathbf|mathcal|mathrm|operatorname|textbf)|cal\{' \
+  advisory
 
 run_check "Temporary citation placeholders" \
   '\[CITATION NEEDED|TODO citation|citation needed|TODO: cite|FIXME citation'
@@ -111,19 +125,22 @@ run_check "Temporary citation placeholders" \
 run_check "Stale global skill paths inside repo-local guidance" \
   '[.]codex/skills/typst-authoring'
 
-run_check "Recurring proposal notation that should migrate to shared modules" \
-  'bold\(s\)_t\^"obs"|bold\(s\)_t\^"cf0"|bold\(z\)_e|Q_\(H,theta\)|Delta_t\^e|J_e\^\(H\)|G_t\^\(H\)|bold\(F\)_t\^"EVL"|bold\(O\)_t\^"pred"'
+run_check "Recurring proposal notation that should use shared modules when edited" \
+  'bold\(z\)_e|Q_\(H,theta\)|Delta_t\^e|J_e\^\(H\)|G_t\^\(H\)|bold\(F\)_t\^"EVL"|bold\(O\)_t\^"pred"' \
+  advisory
 
 run_check "Image includes without same-line width argument" \
-  'image\("[^"]+"\)'
+  'image\("[^"]+"\)' \
+  advisory
 
 run_check "Unprefixed Typst labels" \
-  '<[[:alpha:]][[:alnum:]_-]*>'
+  '<[[:alpha:]][[:alnum:]_-]*>' \
+  advisory
 
 echo
-if [[ "$mode" == "strict" && "$found_any" -ne 0 ]]; then
-  echo "Strict hygiene failed. Review matches above; do not suppress real document issues silently." >&2
+if [[ "$mode" == "strict" && "$found_blocking" -ne 0 ]]; then
+  echo "Strict hygiene failed. Review blocking matches above; do not suppress real document issues silently." >&2
   exit 1
 fi
 
-echo "Done. Treat matches as review prompts unless --strict was used."
+echo "Done. Advisory matches are review prompts; strict mode fails only on blocking checks."

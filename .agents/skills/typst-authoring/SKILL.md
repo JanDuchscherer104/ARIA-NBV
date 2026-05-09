@@ -87,28 +87,43 @@ figures, tables, Mermaid inclusion, and visual QA as one workflow.
    and `math.typ`.
 3. Add recurring symbols/equations to `docs/typst/shared` first, then use them
    from the document. Do not duplicate notation inline across sections.
-4. Use typed notation: bold data vectors, matrices, tensors, feature fields,
-   embeddings, images/depth maps, point-cloud collections, and voxel tensors;
-   keep abstract sets/operators unbolded unless the shared symbol says
-   otherwise.
-5. Handle Typst attachments defensively. After `_` or `^`, insert a space
+4. Use typed notation: `cal(...)` for abstract sets, spaces, candidate sets,
+   point sets, meshes, and geometric collections; `bold(...)` only for
+   coordinate vectors, matrices, tensors, feature fields, embeddings,
+   images/depth maps, voxel tensors, and implementation arrays. Do not write
+   `bold(cal(...))`.
+5. Keep finite-candidate and value notation disjoint: candidate sets are
+   `cal(Q)_t`, candidate poses are `q_(t,i)`, candidate feature tables are
+   `bold(X)_t^"cand"`, and `Q_H` / `Q_(H,theta)` are value functions only.
+6. Keep abstract states non-bold: `s_t^"obs"`, `s_t^"cf0"`,
+   `s_t^"oracle"`. Use `bold(h)_t` or `bold(u)_(t,i)` for learned state and
+   candidate embeddings.
+7. ARIA-NBV thesis RRI equations use point-mesh error `D`, directional
+   components `D_(P -> M)` and `D_(M -> P)`, and target error `Delta_t^e`.
+   Do not reintroduce generic `CD(...)` or `cal(A)` / `cal(C)` as thesis-core
+   component notation.
+8. Handle Typst attachments defensively. After `_` or `^`, insert a space
    before following arguments when they should not be captured, and group full
    calls before output indexing: `(op("Transformer")_theta (bold(X)_t))_i`.
-6. Classify every scientific claim as definition, literature claim,
+9. Classify every scientific claim as definition, literature claim,
    implementation fact, design decision, empirical result, limitation, or
    hypothesis. If it cannot be classified, rewrite it.
-7. For advisor-facing literature or thesis claims, run `make kg-claim-check`
+10. For advisor-facing literature or thesis claims, run `make kg-claim-check`
    and downgrade, cite, or mark as hypothesis when evidence is weak.
-8. If a new durable acronym, term, or recurring noun phrase is introduced,
+11. If a new durable acronym, term, or recurring noun phrase is introduced,
    update `docs/typst/shared/glossary.typ` and run `make glossary`.
-9. Final proposal/thesis prose should be flowing paragraphs unless the
+12. Final proposal/thesis prose should be flowing paragraphs unless the
    template explicitly asks for lists. Bullet outlines are planning scaffolds.
-10. Figures and tables must be evidence: use `#figure(...)`, stable labels,
+13. In `.typ` prose, do not use source line breaks for visual wrapping; VSCode
+    wraps long lines automatically. Insert line breaks only where the rendered
+    document should have a paragraph, block, list item, table row, equation
+    structure, or other intentional Typst boundary.
+14. Figures and tables must be evidence: use `#figure(...)`, stable labels,
     explicit sizing, concise captions, and prose that states the claim the
     visual supports.
-11. Use Typst symbols, math shorthands, or shared macros instead of raw
+15. Use Typst symbols, math shorthands, or shared macros instead of raw
     Unicode glyphs or LaTeX commands.
-12. Compile and inspect rendered pages for equations, figures, tables,
+16. Compile and inspect rendered pages for equations, figures, tables,
     captions, layout changes, and multi-paragraph thesis prose.
 
 ## Workflow

@@ -9,16 +9,19 @@
     pose: $bold(X)$,
     // Pose / camera metadata bundle.
     meta: $bold(M)$,
-    // Semidense point-cloud observation stream.
-    points_semi: $bold(cal(P))^"semi"$,
+    // Semidense point-cloud observation stream as an abstract set.
+    points_semi: $cal(P)^"semi"$,
     // Time-indexed semi-dense evidence used in proposal state notation.
-    points_semi_t: $bold(P)_t^"semi"$,
+    points_semi_t: $cal(P)_t^"semi"$,
     // Time-indexed accumulated and candidate geometry proxies.
-    points_t: $bold(P)_t$,
-    points_next: $bold(P)_(t+1)$,
-    points_cand_ti: $bold(P)_(t,i)^"cand"$,
+    points_t: $cal(P)_t$,
+    points_next: $cal(P)_(t+1)$,
+    points_cand_ti: $cal(P)_(t,i)^"cand"$,
+    // Tensor encodings of accumulated and candidate geometry.
+    points_tensor_t: $bold(P)_t$,
+    points_tensor_cand_ti: $bold(P)_(t,i)^"cand"$,
     // Counterfactual / rendered geometry point-cloud stream.
-    points_cf: $bold(cal(P))^"cf"$,
+    points_cf: $cal(P)^"cf"$,
     // Geometry / voxel-grid observation bundle.
     grid: $bold(G)$,
     // Generic visibility / directional-observability cue.

@@ -3,17 +3,52 @@
 
 #let entity = (
     objective: $
-      RRI_"total"(q)
+      RRI_"total" (q)
       =
       sum_(e in #symb.entity.E)
       #(symb.entity.w) _e dot #(symb.oracle.rri) _e
       +
       #symb.entity.lambda_scene dot #symb.oracle.rri
     $,
+    target_descriptor: $
+      #symb.entity.target_desc
+      =
+      phi(
+        hat(bold(B))_e,
+        hat(bold(y))_e,
+        hat(p)_e,
+        A_e^"proj",
+        n_e^"semi",
+        n_e^"EVL",
+        bold(T)_e^"rel"
+      )
+    $,
+    target_match_score: $
+      mu(hat(e), e)
+      =
+      kappa(hat(y)_(hat(e)), y_e)
+      dot op("IoU")_"3D" (hat(bold(B))_(hat(e)), bold(B)_e^"GT")
+      dot sigma(A_(hat(e))^"proj", n_(hat(e))^"semi", n_(hat(e))^"EVL")
+    $,
+    target_match_selection: $
+      e^star
+      =
+      op("argmax", limits: #true)_(e in cal(E))
+      mu(hat(e), e)
+    $,
+    target_match_acceptance: $
+      "accept iff"
+      quad
+      mu(hat(e), e^star) >= tau_mu
+      quad "and" quad
+      mu_1 - mu_2 >= tau_"gap"
+    $,
     target_error: $
       #symb.entity.target_error
       =
-      A_t^e + C_t^e
+      #symb.entity.target_error_pm
+      +
+      #symb.entity.target_error_mp
     $,
     target_rri_reward: $
       #symb.entity.target_reward

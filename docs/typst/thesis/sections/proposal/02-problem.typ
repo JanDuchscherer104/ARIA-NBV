@@ -26,7 +26,7 @@ $b_t$ is remaining budget. The oracle state augments this with ASE GT assets:
 
 $
   #symb.rl.s_oracle =
-  (#symb.rl.s_obs, bold(M)_"GT", {bold(M)_e^"GT"}_(e in cal(E)),
+  (#symb.rl.s_obs, #symb.ase.mesh, {#symb.ase.mesh_target}_(e in cal(E)),
     {#symb.obs.points_cand_ti}_(i=1)^(N_q)).
 $
 
@@ -50,7 +50,7 @@ $ #symb.rl.action_set_t = {i in {1,dots,N_q}: m_(t,i)=1}. $
 Invalidity is a constraint, not low utility. Masks apply before argmax,
 softmax, loss targets, and bootstrap maximization.
 
-Counterfactual rollouts keep the root EVL field $bold(F)_0^"EVL"$ fixed. After
+Counterfactual rollouts keep the root EVL field #symb.vin.field_evl_0 fixed. After
 a selected valid view, only the accumulated geometry proxy, history, budget,
 candidate table, masks, and reason codes are updated. The proposal therefore
 studies geometry-only counterfactual planning, not synthetic future EVL
@@ -68,7 +68,7 @@ $
 $
 
 covering predicted/observed OBB geometry, class, confidence, projected area,
-semi-dense support, EVL support, and relative pose. GT crops $bold(M)_e$ are used only
+semi-dense support, EVL support, and relative pose. GT crops #symb.ase.mesh_target are used only
 after matching #symb.entity.target_desc to GT. The matching score is protocol-level, not an
 actor input:
 

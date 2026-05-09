@@ -1,30 +1,65 @@
 #import "../symbols.typ": symb
 
 #let rri = (
+    error: $
+      #symb.oracle.err (#symb.oracle.points, #symb.ase.mesh) =
+      #symb.oracle.dist_pm (#symb.oracle.points, #symb.ase.mesh)
+      +
+      #symb.oracle.dist_mp (#symb.oracle.points, #symb.ase.mesh)
+    $,
+    // Compatibility key for older notation lookups; ARIA-NBV uses point-mesh error D.
     cd: $
-      "CD"(#symb.oracle.points, #symb.ase.mesh) =
-      #symb.oracle.acc (#symb.oracle.points, #symb.ase.mesh) + #symb.oracle.comp (#symb.oracle.points, #symb.ase.mesh)
+      #symb.oracle.err (#symb.oracle.points, #symb.ase.mesh) =
+      #symb.oracle.dist_pm (#symb.oracle.points, #symb.ase.mesh)
+      +
+      #symb.oracle.dist_mp (#symb.oracle.points, #symb.ase.mesh)
+    $,
+    dist_pm: $
+      #symb.oracle.dist_pm (#symb.oracle.points, #symb.ase.mesh) =
+      (1)/(||#symb.oracle.points||)
+      sum_(bold(p) in #symb.oracle.points)
+      min_(bold(f) in #symb.ase.faces) d(bold(p), bold(f))^2
+    $,
+    dist_mp: $
+      #symb.oracle.dist_mp (#symb.oracle.points, #symb.ase.mesh) =
+      (1)/(||#symb.ase.faces||)
+      sum_(bold(f) in #symb.ase.faces)
+      min_(bold(p) in #symb.oracle.points) d(bold(p), bold(f))^2
     $,
     acc: $
-      #symb.oracle.acc (#symb.oracle.points, #symb.ase.mesh) =
-      (1)/(||#symb.oracle.points||) sum_(bold(p) in #symb.oracle.points) min_(bold(f) in #symb.ase.faces) d(bold(p), bold(f))^2
+      #symb.oracle.dist_pm (#symb.oracle.points, #symb.ase.mesh) =
+      (1)/(||#symb.oracle.points||)
+      sum_(bold(p) in #symb.oracle.points)
+      min_(bold(f) in #symb.ase.faces) d(bold(p), bold(f))^2
     $,
     comp: $
-      #symb.oracle.comp (#symb.oracle.points, #symb.ase.mesh) =
-      (1)/(||#symb.ase.faces||) sum_(bold(f) in #symb.ase.faces) min_(bold(p) in #symb.oracle.points) d(bold(p), bold(f))^2
+      #symb.oracle.dist_mp (#symb.oracle.points, #symb.ase.mesh) =
+      (1)/(||#symb.ase.faces||)
+      sum_(bold(f) in #symb.ase.faces)
+      min_(bold(p) in #symb.oracle.points) d(bold(p), bold(f))^2
     $,
     union: $
       #(symb.oracle.points) _(t union q) = #(symb.oracle.points) _t union #symb.oracle.points_q
     $,
     rri: $
-      "RRI"(q) =
-      ("CD"(#(symb.oracle.points) _t, #symb.ase.mesh) - "CD"(#(symb.oracle.points) _t union #symb.oracle.points_q, #symb.ase.mesh))
-      / ("CD"(#(symb.oracle.points) _t, #symb.ase.mesh) + epsilon)
+      op("RRI") (q) =
+      (
+        #symb.oracle.err (#(symb.oracle.points)_t, #symb.ase.mesh)
+        -
+        #symb.oracle.err (#(symb.oracle.points)_t union #symb.oracle.points_q, #symb.ase.mesh)
+      )
+      /
+      (#symb.oracle.err (#(symb.oracle.points)_t, #symb.ase.mesh) + epsilon)
     $,
     target_rri: $
-      "RRI"_e(q) =
-      ("CD"(#(symb.oracle.points) _t^e, #symb.ase.mesh_target) - "CD"(#(symb.oracle.points) _t^e union #(symb.oracle.points) _q^e, #symb.ase.mesh_target))
-      / ("CD"(#(symb.oracle.points) _t^e, #symb.ase.mesh_target) + epsilon)
+      op("RRI")_e (q) =
+      (
+        #symb.oracle.err (#(symb.oracle.points)_t^e, #symb.ase.mesh_target)
+        -
+        #symb.oracle.err (#(symb.oracle.points)_t^e union #(symb.oracle.points)_q^e, #symb.ase.mesh_target)
+      )
+      /
+      (#symb.oracle.err (#(symb.oracle.points)_t^e, #symb.ase.mesh_target) + epsilon)
     $,
-    greedy: $ q_star = op("argmax", limits: #true)_(q in #symb.oracle.candidates) "RRI"(q) $,
+    greedy: $ q_star = op("argmax", limits: #true)_(q in #symb.oracle.candidates) op("RRI") (q) $,
   )

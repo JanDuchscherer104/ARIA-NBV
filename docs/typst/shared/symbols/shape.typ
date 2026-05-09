@@ -2,7 +2,7 @@
     // Batch size.
     B: $B$,
     // Generic count.
-    N: $N_q$,
+    N: $N$,
     // Number of candidates.
     Nq: $N_q$,
     // Trajectory length / time steps.

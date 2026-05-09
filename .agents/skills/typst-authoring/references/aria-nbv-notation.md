@@ -70,21 +70,59 @@ Current shared equation modules:
 
 Use a typed convention, not blanket bolding:
 
-- Bold data-bearing vectors, matrices, tensors, fields, embeddings,
-  point-cloud collections, image/depth tensors, voxel tensors, and learned
-  feature bundles.
-- Usually leave scalar losses, scalar metrics, abstract sets, operators,
-  indices, dimensions, and weights unbolded unless the shared symbol says
-  otherwise.
-- Use `cal(...)` or the shared symbol for mathematical sets and collections.
-- Use `op("...")` for named mathematical operators.
+- Use `cal(...)` for abstract sets, spaces, point sets, candidate sets, meshes,
+  face sets, and geometric collections: `cal(P)_t`, `cal(Q)_t`,
+  `cal(M)^"GT"`, `cal(M)_e^"GT"`, `cal(F)^"GT"`.
+- Use `bold(...)` for coordinate vectors, matrices, tensors, feature fields,
+  embeddings, image/depth tensors, voxel tensors, and implementation arrays:
+  `bold(x)_q`, `bold(F)_v`, `bold(X)_t^"cand"`, `bold(u)_(t,i)`.
+- Use `bb(...)` for number/probability spaces and expectations:
+  `bb(R)^3`, `bb(E)`, `bb(P)`, `bb(1)`.
+- Use `op("...")` for named mathematical operators and manifolds:
+  `op("argmax", limits: #true)`, `op("RRI")`, `op("SO")(2)`.
+- Use quoted strings for semantic tags: `s_t^"obs"`,
+  `bold(F)_t^"EVL"`, `bold(V)_"occ"^"pr"`.
 
 Examples:
 
 ```typst
-$ bold(x)_q, bold(E)_q, bold(F)_v, bold(V)_"occ"^"pr" $
-$ cal(Q), cal(E), op("argmax")_(q in cal(Q)) $
+$ cal(P)_t, cal(Q)_t, cal(M)_e^"GT", q_(t,i) $
+$ bold(x)_q, bold(F)_v, bold(X)_t^"cand", bold(u)_(t,i) $
+$ op("argmax", limits: #true)_(q in cal(Q)) op("RRI") (q) $
 ```
+
+Negative examples that must not appear in advisor-facing thesis math:
+
+```typst
+$ bold(cal(P)), bold(cal(Q)), bold(cal(M))_"GT" $
+$ bold(Q)_t, bold(s)_t^"obs", S O(2) $
+```
+
+## ARIA-NBV Core Objects
+
+Use these canonical meanings:
+
+| Object | Shared form | Meaning |
+| --- | --- | --- |
+| Accumulated point set | `#symb.obs.points_t` / `cal(P)_t` | Abstract actor-visible geometry. |
+| Candidate set | `#symb.rl.candidate_table` / `cal(Q)_t` | Finite unordered candidate rows. |
+| Candidate pose | `#symb.rl.candidate_qti` / `q_(t,i)` | Candidate action row, not a tensor. |
+| Candidate features | `#symb.rl.candidate_features` / `bold(X)_t^"cand"` | Tensor/table passed to a model. |
+| Abstract states | `#symb.rl.s_obs`, `#symb.rl.s_cf0`, `#symb.rl.s_oracle` | Plain `s`, never bold. |
+| Learned embeddings | `bold(h)_t`, `#symb.rl.candidate_token` | Data-bearing model states/tokens. |
+| Scene GT mesh | `#symb.ase.mesh` / `cal(M)^"GT"` | Oracle/evaluation surface. |
+| Target GT crop | `#symb.ase.mesh_target` / `cal(M)_e^"GT"` | Target-only oracle/evaluation surface. |
+
+For thesis-core reconstruction quality, use point-mesh error `D` and
+directional components:
+
+```typst
+$ D_(P -> M), D_(M -> P), Delta_t^e $
+```
+
+Do not describe the implemented ARIA-NBV target objective as generic
+point-cloud Chamfer distance. Historical seminar text may still use `CD`; new
+proposal/thesis math should use `D` and the shared equations.
 
 ## Adding Missing Notation
 
@@ -105,13 +143,13 @@ When a new symbol is needed:
 Do not create a local one-off alias in a thesis section if the symbol will
 recur.
 
-## Reconciliation To Watch
+## Compatibility Aliases
 
-`symb.obs.points_semi` currently renders as `bold(cal(P))^"semi"`, while some
-proposal prose has used the timestep-indexed form `bold(P)_t^"semi"`. Treat
-that as unresolved notation drift until the next proposal/shared-notation pass:
-either add a distinct time-indexed shared state or migrate proposal prose to
-the collection-valued shared symbol with an explicit timestep wrapper.
+Some shared keys retain older names for compatibility, for example
+`symb.oracle.acc`, `symb.oracle.comp`, and `eqs.rri.cd`. Their rendered
+notation now follows the thesis convention (`D_(P -> M)`, `D_(M -> P)`, and
+aggregate `D`). Do not infer old `cal(A)` / `cal(C)` or `CD(...)` semantics
+from compatibility key names.
 
 ## ARIA-NBV Prose Convention
 

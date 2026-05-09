@@ -13,9 +13,9 @@ diagnostics that must agree in frame and indexing. Oracle labels use the
 implemented point-mesh terms
 
 $
-  Delta_t = cal(A)_t + cal(C)_t,
+  Delta_t = D_(P -> M,t) + D_(M -> P,t),
   quad
-  #symb.entity.target_error = cal(A)_t^e + cal(C)_t^e,
+  #symb.entity.target_error = #symb.entity.target_error_pm + #symb.entity.target_error_mp,
   quad
   #symb.entity.target_reward =
   (#symb.entity.target_error - #symb.entity.target_error_next)
@@ -31,7 +31,7 @@ CORAL variants @CORAL-cao2019, and becomes the myopic learned control.
 
 == Candidate and Replay Contract
 
-Each decision state carries a finite candidate table $bold(Q)_t$, hard mask
+Each decision state carries a finite candidate table #symb.rl.candidate_table, hard mask
 $bold(m)_t$, invalid-reason vector $bold(rho)_t$, and the target descriptor
 #symb.entity.target_desc. It also stores selected-view history and remaining
 budget. Candidate generation is logged as a mixture over target-point, radial-shell, and forward-rig
@@ -102,7 +102,7 @@ $
     a_t,
     #symb.entity.target_reward,
     #symb.rl.s_cf0_next,
-    bold(Q)_(t+1),
+    cal(Q)_(t+1),
     bold(m)_(t+1),
     bold(k)_"meta"
   ).
@@ -118,18 +118,18 @@ re-evaluation.
 The planning evaluation first compares deterministic one-step oracle greedy and
 bounded oracle lookahead:
 
-$ pi_"oracle-1"(bold(s)_t) =
-  op("argmax", limits: #true)_(i in cal(A)_t) r_t^e(i), $
+$ pi_"oracle-1" (s_t) =
+  op("argmax", limits: #true)_(i in cal(A)_t) r_t^e (i), $
 
-$ pi_"oracle-look"(bold(s)_t) =
-  pi_0(
+$ pi_"oracle-look" (s_t) =
+  pi_0 (
     op("argmax", limits: #true)_(a_(t:t+H-1))
     sum_(k=0)^(H-1) gamma^k r_(t+k)^e
   ). $
 
 Temperature-softmax traces are rollout-data diversity, not the final policy:
 
-$ P(a_t=i | bold(s)_t)
+$ P(a_t=i | s_t)
   =
   exp(beta ell_(t,i)) / (sum_(j in cal(A)_t) exp(beta ell_(t,j))). $
 

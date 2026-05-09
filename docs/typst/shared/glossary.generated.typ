@@ -229,7 +229,7 @@
   - *ASE - Aria Synthetic Environments*: Large-scale synthetic indoor dataset with simulated Project Aria sensor characteristics, egocentric trajectories, and scene annotations.
   - *candidate - Candidate View*: Proposed camera pose whose expected reconstruction utility is evaluated before selecting the next observation.
   - *CPF - Central Pupil Frame*: Coordinate frame placed at the midpoint between the left and right eye boxes of Project Aria glasses.
-  - *CD - Chamfer Distance*: Bidirectional point-set distance commonly used to compare reconstructed points against reference geometry.
+  - *CD - Chamfer Distance*: Historical bidirectional distance family used to compare reconstructed points against reference geometry.
   - *transition - Counterfactual Transition*: Replayable state update after selecting a candidate index.
   - *CR - Coverage Ratio*: Fraction of a target surface, scene, or region treated as observed under a chosen visibility or distance threshold.
   - *DoF - Degrees of Freedom*: Number of independent pose parameters available to a camera, object, or action representation.

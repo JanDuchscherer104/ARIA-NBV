@@ -1,36 +1,40 @@
 # Shared-Notation Migration Notes
 
 Use this when a proposal/thesis edit touches notation that appears in more
-than one section. This pass records drift; it does not require migrating the
-current proposal unless the user asks for proposal edits.
+than one section. The May 2026 shared-notation pass locked the core convention:
+abstract geometry uses `cal(...)`, tensors/features use `bold(...)`, candidate
+sets use `cal(Q)_t`, abstract states use plain `s`, and thesis-core RRI uses
+point-mesh error `D` rather than generic `CD`.
 
-## Probation Symbols
+## Locked Migration Targets
 
-The following inline patterns recur or are expected to recur and should be
-shared before the next substantial proposal/thesis notation pass:
+These patterns should not reappear in real proposal/thesis Typst sources:
 
-| Inline pattern | Target owner |
+| Old pattern | Use instead |
 | --- | --- |
-| `bold(s)_t^"obs"` | `docs/typst/shared/symbols/obs.typ` or `symbols/rl.typ` |
-| `bold(s)_t^"cf0"` | `docs/typst/shared/symbols/rl.typ` |
-| `bold(z)_e` | `docs/typst/shared/symbols/entity.typ` |
-| `Q_(H,theta)` / `Q_H` | `docs/typst/shared/equations/rl.typ` |
-| `Delta_t^e` | `docs/typst/shared/equations/entity.typ` or `metrics.typ` |
-| `J_e^(H)` | `docs/typst/shared/equations/entity.typ` or `metrics.typ` |
-| `G_t^(H)` | `docs/typst/shared/equations/rl.typ` |
-| `bold(F)_t^"EVL"` | `docs/typst/shared/symbols/vin.typ` or `obs.typ` |
-| `bold(O)_t^"pred"` | `docs/typst/shared/symbols/entity.typ` or `obs.typ` |
+| `bold(cal(P))`, `bold(cal(Q))`, `bold(cal(M))`, `bold(cal(F))` | `cal(P)`, `cal(Q)`, `cal(M)`, `cal(F)` |
+| `bold(Q)_t` as candidate table | `cal(Q)_t` or `#symb.rl.candidate_table` |
+| `bold(q)_(t,i)` as candidate pose | `q_(t,i)` or `#symb.rl.candidate_qti` |
+| `bold(s)_t^"obs"`, `bold(s)_t^"cf0"` | `s_t^"obs"`, `s_t^"cf0"` |
+| `cal(A)_t^e + cal(C)_t^e` | `D_(P -> M,t)^e + D_(M -> P,t)^e` |
+| `CD(...)` for thesis-core ARIA-NBV error | `D(...)` / `#symb.oracle.err` |
+| `S O(2)` | `op("SO")(2)` |
 
-## Known Conflict
+## Shared Owners
 
-The shared library currently exposes semi-dense points as
-`bold(cal(P))^"semi"` through `symb.obs.points_semi`, while proposal prose has
-used `bold(P)_t^"semi"` for a timestep-indexed state. The next notation pass
-must decide whether the time-indexed state is a separate shared symbol or
-whether proposal usage should adopt the collection-valued shared symbol with a
-clear timestep wrapper.
+| Concept | Owner |
+| --- | --- |
+| Abstract points, candidates, directional error | `docs/typst/shared/symbols/oracle.typ` |
+| ASE meshes/faces/target crops | `docs/typst/shared/symbols/ase.typ` |
+| Observed and counterfactual point sets | `docs/typst/shared/symbols/obs.typ` |
+| Abstract states, masks, candidate tokens, `Q_H` | `docs/typst/shared/symbols/rl.typ` |
+| Target error, endpoint gain, headroom, recovery | `docs/typst/shared/symbols/entity.typ` and `equations/entity.typ` |
+| Point-mesh RRI equations | `docs/typst/shared/equations/rri.typ` |
 
 ## Migration Rule
 
-Migrate only when touching the affected prose or equations for content work.
-Do not mix a large notation migration into unrelated prose polish.
+Migrate advisor-facing Typst when touching affected prose or equations.
+Broader Quarto/theory migration can be deferred unless a page directly
+contradicts proposal/advisor notation. Keep temporary compatibility keys in the
+shared API until migrated documents are stable, then remove aliases in a
+separate cleanup.

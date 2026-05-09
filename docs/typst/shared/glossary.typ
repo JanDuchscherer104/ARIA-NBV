@@ -104,8 +104,8 @@
         typst: "#symb.oracle.rri",
       ),
       formula: (
-        tex: "\\mathrm{RRI}(q)=\\frac{d(P_t,M)-d(P_t\\cup P_q,M)}{d(P_t,M)+\\varepsilon}",
-        typst: "$\"RRI\"(q) = (d(#(symb.oracle.points)_t, M) - d(#(symb.oracle.points)_t union #(symb.oracle.points_q), M)) / (d(#(symb.oracle.points)_t, M) + epsilon)$",
+        tex: "\\mathrm{RRI}(q)=\\frac{D(\\mathcal{P}_t,\\mathcal{M}^{\\mathrm{GT}})-D(\\mathcal{P}_t\\cup\\mathcal{P}_q,\\mathcal{M}^{\\mathrm{GT}})}{D(\\mathcal{P}_t,\\mathcal{M}^{\\mathrm{GT}})+\\varepsilon}",
+        typst: "$op(\"RRI\") (q) = (#(symb.oracle.err) (#(symb.oracle.points)_t, #(symb.ase.mesh)) - #(symb.oracle.err) (#(symb.oracle.points)_t union #(symb.oracle.points_q), #(symb.ase.mesh))) / (#(symb.oracle.err) (#(symb.oracle.points)_t, #(symb.ase.mesh)) + epsilon)$",
       ),
       formulae: (),
     ),
@@ -245,8 +245,8 @@
         typst: "$RRI_e$",
       ),
       formula: (
-        /* TODO: must also have valid typst formula! */
-        tex: "\\mathrm{RRI}_e(q)=\\frac{d(P_t^e,M_e)-d(P_t^e\\cup P_q^e,M_e)}{d(P_t^e,M_e)+\\varepsilon}",
+        tex: "\\mathrm{RRI}_e(q)=\\frac{D(\\mathcal{P}_t^e,\\mathcal{M}_e^{\\mathrm{GT}})-D(\\mathcal{P}_t^e\\cup\\mathcal{P}_q^e,\\mathcal{M}_e^{\\mathrm{GT}})}{D(\\mathcal{P}_t^e,\\mathcal{M}_e^{\\mathrm{GT}})+\\varepsilon}",
+        typst: "$op(\"RRI\")_e (q) = (#(symb.oracle.err) (#(symb.oracle.points)_t^e, #(symb.ase.mesh_target)) - #(symb.oracle.err) (#(symb.oracle.points)_t^e union #(symb.oracle.points)_q^e, #(symb.ase.mesh_target))) / (#(symb.oracle.err) (#(symb.oracle.points)_t^e, #(symb.ase.mesh_target)) + epsilon)$",
       ),
       formulae: (),
     ),
@@ -823,7 +823,7 @@
     key: "oracle-rollout-state",
     short: "oracle state",
     long: "Oracle Rollout State",
-    description: "Privileged state used only for ASE mesh-supervised label generation, upper-bound planning, and evaluation. It includes GT mesh and target crops, all-candidate renders, points, normals, mesh-face visibility, RRI/CD metrics, oracle scores, and GT OBBs.",
+    description: "Privileged state used only for ASE mesh-supervised label generation, upper-bound planning, and evaluation. It includes GT mesh and target crops, all-candidate renders, points, normals, mesh-face visibility, RRI and point-mesh error metrics, oracle scores, and GT OBBs.",
     group: "Planning",
     custom: (
       anchor: "term-oracle-rollout-state",
@@ -920,7 +920,7 @@
       ),
       formula: (
         label: "Masked finite action-index set",
-        tex: "Q_t=\\{q_{t,i}\\}_{i=1}^{N_t},\\quad \\mathcal{A}(s_t)=\\{i\\in\\{1,\\ldots,N_t\\}:m_{t,i}=1\\},\\quad q_t=q_{t,a_t}",
+        tex: "\\mathcal{Q}_t=\\{q_{t,i}\\}_{i=1}^{N_t},\\quad \\mathcal{A}(s_t)=\\{i\\in\\{1,\\ldots,N_t\\}:m_{t,i}=1\\},\\quad q_t=q_{t,a_t}",
       ),
       formulae: (),
     ),
@@ -974,7 +974,7 @@
       ),
       formula: (
         label: "Point-state transition",
-        tex: "P_{t+1}=P_t\\cup P_{q_t}",
+        tex: "\\mathcal{P}_{t+1}=\\mathcal{P}_t\\cup\\mathcal{P}_{q_t}",
       ),
       formulae: (),
     ),
@@ -1031,12 +1031,12 @@
       ),
       formula: (
         label: "Target-RRI reward",
-        tex: "r_t^e=\\mathrm{RRI}_e(q_t\\mid P_t,M_e)",
+        tex: "r_t^e=\\mathrm{RRI}_e(q_t\\mid \\mathcal{P}_t,\\mathcal{M}_e^{\\mathrm{GT}})",
       ),
       formulae: (
         (
           label: "Log-improvement follow-up",
-          tex: "r_t^{\\log,e}=\\log(d(P_t^e,M_e)+\\varepsilon)-\\log(d(P_{t+1}^e,M_e)+\\varepsilon)",
+          tex: "r_t^{\\log,e}=\\log(D(\\mathcal{P}_t^e,\\mathcal{M}_e^{\\mathrm{GT}})+\\varepsilon)-\\log(D(\\mathcal{P}_{t+1}^e,\\mathcal{M}_e^{\\mathrm{GT}})+\\varepsilon)",
         ),
       ),
     ),
@@ -1085,7 +1085,7 @@
       ),
       typst_macro: none,
       notation: (
-        typst: "$G_t^(H)$",
+        typst: "$G_t^((H))$",
       ),
       formula: (
         label: "Finite-horizon return",
@@ -2155,7 +2155,7 @@
     key: "chamfer-distance",
     short: "CD",
     long: "Chamfer Distance",
-    description: "Bidirectional point-set distance commonly used to compare reconstructed points against reference geometry. ARIA-NBV uses point-to-mesh and Chamfer-style distances as reconstruction error components when deriving oracle RRI labels and diagnostics.",
+    description: "Historical bidirectional distance family used to compare reconstructed points against reference geometry. Thesis-facing ARIA-NBV notation uses point-mesh error D with directional components D_{P->M} and D_{M->P}; older seminar material may still call this CD.",
     group: "Metrics",
     custom: (
       anchor: "term-chamfer-distance",
@@ -2164,8 +2164,8 @@
       ),
       category: "metrics.reconstruction_quality",
       parent: "reconstruction-quality",
-      definition_short: "Bidirectional point-set distance commonly used to compare reconstructed points against reference geometry.",
-      definition_long: "ARIA-NBV uses point-to-mesh and Chamfer-style distances as reconstruction error components when deriving oracle RRI labels and diagnostics.",
+      definition_short: "Historical bidirectional distance family used to compare reconstructed points against reference geometry.",
+      definition_long: "Thesis-facing ARIA-NBV notation uses point-mesh error D with directional components D_{P->M} and D_{M->P}; older seminar material may still call this CD.",
       internal_links: (
         "docs/contents/impl/rri_computation.qmd",
         "docs/contents/theory/rri_theory.qmd",
