@@ -39,14 +39,78 @@ families. Each row stores provenance, pose, target/scene support, path
 increment, validity, reason code, and oracle labels. Candidate order has no
 semantics, so shuffled-candidate evaluation is required.
 
+A feature split avoids overloading pose codes with visibility history. Candidate
+orientation uses a continuous 6D rotation code @zhou2019continuity, but
+accumulated visibility is a directional memory over $S^2$, not a sum of R6D
+vectors. For a target point or voxel center $bold(v)$ and a previously selected
+camera center $bold(c)_k$, the observed direction is
+
+#block[#align(center)[#eqs.features.direction_unit]]
+
+The planned actor-visible feature branch stores this history either as
+low-order spherical-harmonic coefficients @e3nn-SphericalHarmonics-2025,
+
+#block[#align(center)[#eqs.features.direction_memory_sh]]
+
+or as a second-moment summary,
+
+#block[#align(center)[#eqs.features.direction_memory_moment]]
+
+from which the candidate can read a directional novelty score:
+
+#block[#align(center)[#eqs.features.direction_novelty]]
+
+Thus R6D belongs to the pose branch, while directional observation history
+belongs to the visibility branch. The candidate token receives both:
+
+$
+  #symb.vin.candidate_pose_feat (#symb.rl.candidate_qti)
+  =
+  [
+    bold(t)_(t,i),
+    bold(R)_(t,i)^"6D",
+    bold(t)_(t,i) - bold(t)_e,
+    alpha_(t,i)^e,
+    l_(t,i),
+    c_(t,i)^"strategy"
+  ],
+$
+
+$
+  bold(x)_(t,i)
+  =
+  [
+    #symb.vin.candidate_pose_feat,
+    #symb.vin.candidate_dir_feat,
+    phi_"frustum" (#symb.vin.field_evl_0, #symb.rl.candidate_qti, #symb.entity.target_desc),
+    phi_"valid" (m_(t,i), rho_(t,i)),
+    bold(h)_t
+  ].
+$
+
 The minimum replay row is
 
-$ ("scene", "snippet", "target", t, #symb.rl.s_cf0, #symb.entity.target_desc,
-   #symb.rl.candidate_table, #symb.rl.candidate_mask, #symb.rl.invalid_reasons,
-   a_t, #symb.entity.target_reward, #symb.rl.s_cf0_next, bold(Q)_(t+1),
-   bold(m)_(t+1), "policy", "seed"). $
+$
+  bold(xi)_t =
+  (
+    bold(k)_"id",
+    #symb.rl.s_cf0,
+    #symb.entity.target_desc,
+    #symb.rl.candidate_table,
+    #symb.rl.candidate_mask,
+    #symb.rl.invalid_reasons,
+    a_t,
+    #symb.entity.target_reward,
+    #symb.rl.s_cf0_next,
+    bold(Q)_(t+1),
+    bold(m)_(t+1),
+    bold(k)_"meta"
+  ).
+$
 
-This row reproduces the mask, selected transition, value target, and oracle
+Here $bold(k)_"id"$ stores scene, snippet, target, and step identifiers, while
+$bold(k)_"meta"$ stores policy, seed, and sampler provenance. This row
+reproduces the mask, selected transition, value target, and oracle
 re-evaluation.
 
 == Rollout Policies and $Q_H$

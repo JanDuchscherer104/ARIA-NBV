@@ -98,4 +98,12 @@
     field_evl_0: $bold(F)_0^"EVL"$,
     // Per-candidate voxel features sampled/pooled from the scene field.
     field_q: $bold(F)_q^("vox")$,
+    // Candidate pose/orientation and directional-observation features.
+    pose_6d: $bold(R)^"6D"$,
+    dir_unit: $bold(d)$,
+    dir_memory: $bold(h)_"dir"$,
+    dir_moment: $bold(M)_"dir"$,
+    sh_basis: $bold(Y)_L$,
+    candidate_pose_feat: $bold(x)_"pose"$,
+    candidate_dir_feat: $bold(x)_"dir"$,
   )

@@ -9,6 +9,7 @@
 #let proposal-rule = rgb("#D6DEE8")
 
 #let proposal-style(body) = {
+  set math.equation(numbering: "(1)")
   show heading.where(level: 1): set block(above: 1.9em, below: 0.8em)
   show heading.where(level: 1): set text(size: 16pt, weight: 700, fill: proposal-blue)
   show heading.where(level: 2): set block(above: 1.25em, below: 0.55em)
