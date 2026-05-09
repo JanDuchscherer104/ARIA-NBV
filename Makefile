@@ -3,10 +3,11 @@
 .PHONY: context-qmd-tree qmd-frontmatter-check
 .PHONY: context-index context-get context-contracts context-modules context-classes context-functions
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
-.PHONY: context-literature-index context-literature-search migrate-codex-memory
+.PHONY: context-literature-index context-literature-search migrate-codex-memory codex-transcripts
 .PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory new-debrief claude-skills
 .PHONY: memory-mine agents-db glossary kg-up kg-down kg-status kg-capabilities kg-ollama-check kg-search kg-brief kg-route kg-claim-check kg-consolidate kg-related kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-docs-smoke kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-full
 .PHONY: lrz-probe lrz-resources lrz-resources-gpu lrz-resources-cpu lrz-jobs lrz-dss-init lrz-container-shell lrz-sbatch-cpu lrz-sbatch-single-gpu lrz-sbatch-multigpu
+.PHONY: mermaid-lint
 
 # Color codes
 BLUE := \033[0;34m
@@ -59,11 +60,14 @@ TYPST_OUTLINE_ARGS ?= --paper --mode outline
 TYPST_INCLUDES_ARGS ?= --paper --mode includes
 LITERATURE_SEARCH_QUERY ?=
 MIGRATE_CODEX_MEMORY_ARGS ?=
+CODEX_TRANSCRIPT_ARGS ?=
 MMDC ?= mmdc
 MMD_DIR ?= external/mmdc-examples
 MMD_OUT ?= $(MMD_DIR)
 MMD_FORMAT ?= png
 MMD_SCALE ?= 4
+MERMAID_LINT ?= tools/mermaid/scripts/aria_mermaid_lint.py
+MERMAID_LINT_FILES ?= $(shell git ls-files '*.mmd')
 LRZ_SKILL_DIR ?= .agents/skills/lrz-ai-systems
 LRZ_SCRIPTS_DIR ?= $(LRZ_SKILL_DIR)/scripts
 LRZ_RESOURCES_ARGS ?= summary
@@ -167,6 +171,9 @@ context-literature-search: ## 🗺️ Search literature sources (set LITERATURE_
 
 migrate-codex-memory: _check_python ## 🗺️ Migrate legacy .codex notes into .agents/memory
 	@$(PYTHON_INTERPRETER) scripts/migrate_codex_memory.py $(MIGRATE_CODEX_MEMORY_ARGS)
+
+codex-transcripts: _check_python ## 🧠 Extract ARIA-NBV Codex user transcript memory (set CODEX_TRANSCRIPT_ARGS='--write')
+	@$(PYTHON_INTERPRETER) scripts/codex_transcript_extract.py $(CODEX_TRANSCRIPT_ARGS)
 
 check-agent-memory: _check_python ## 🗺️ Validate agent memory scaffolding and debrief hygiene
 	@$(PYTHON_INTERPRETER) scripts/validate_agent_memory.py
@@ -619,6 +626,13 @@ mmdc-render: ## 📊 Render all .mmd files in a folder (MMD_DIR=..., MMD_OUT=...
 				$(MMDC) -i "$$f" -o "$$out" -s "$$scale"; \
 			fi; \
 		done'
+
+mermaid-lint: _check_python ## 📊 Lint tracked Mermaid .mmd files (MERMAID_LINT_FILES='a.mmd b.mmd')
+	@if [ -z "$(strip $(MERMAID_LINT_FILES))" ]; then \
+		echo "$(YELLOW)No Mermaid files to lint$(NC)"; \
+	else \
+		$(PYTHON_INTERPRETER) $(MERMAID_LINT) $(MERMAID_LINT_FILES); \
+	fi
 
 #  ═══════════════════════════════════════════════════════════════════════
 #  📚 Documentation hygiene

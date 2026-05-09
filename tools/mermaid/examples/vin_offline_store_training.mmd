@@ -1,0 +1,73 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 10
+    rankSpacing: 10
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 19px; }
+    .edgeLabel { font-size: 19px; }
+    .cluster-label { font-size: 21px; font-weight: 700; }
+    .title { font-size: 18px; font-weight: 700; }
+---
+flowchart TB
+  DM["$$\\begin{array}{c}\\texttt{VinDataModule}\\end{array}$$"]
+  Out["$$\\begin{array}{c}\\texttt{VinOracleBatch}\\end{array}$$"]
+
+  subgraph Cache["Immutable VIN offline store"]
+    direction TB
+    Manifest["$$\\begin{array}{c}\\texttt{manifest.json}\\\\\\texttt{sample\\_index.jsonl}\\end{array}$$"]
+    Shards["$$\\begin{array}{c}\\texttt{Zarr shards}\\\\\\texttt{+ msgpack diagnostics}\\end{array}$$"]
+    Dataset["$$\\begin{array}{c}\\texttt{VinOfflineDataset}\\end{array}$$"]
+  end
+
+  %% Bottom row: keep immutable reads next to batching.
+  subgraph Bottom[" "]
+    direction LR
+    subgraph Snip["Store Blocks"]
+      direction TB
+      OracleBlocks["$$\\begin{array}{c}\\texttt{oracle.*}\\\\\\texttt{RRI + cameras + poses}\\end{array}$$"]
+      VinBlocks["$$\\begin{array}{c}\\texttt{vin.*}\\\\\\texttt{points + lengths + poses}\\end{array}$$"]
+      OptionalBlocks["$$\\begin{array}{c}\\texttt{optional diagnostics}\\\\\\texttt{depths/backbone/pcs}\\end{array}$$"]
+    end
+
+
+    subgraph Batch["Batching"]
+      direction TB
+      Loader["$$\\begin{array}{c}\\texttt{DataLoader}\\end{array}$$"]
+      Collate["$$\\begin{array}{c}\\texttt{VinOracleBatch.collate}\\\\\\texttt{(pad + stack)}\\end{array}$$"]
+    end
+  end
+
+  DM -->|"$$\\texttt{train/val\\_dataloader()}$$"| Loader
+  DM -->|"$$\\texttt{setup()}$$"| Dataset
+  Manifest -->|"$$\\texttt{split rows}$$"| Dataset
+  Shards -->|"$$\\texttt{random access}$$"| Dataset
+
+  Dataset -->|"$$\\texttt{read}$$"| OracleBlocks
+  Dataset -->|"$$\\texttt{read}$$"| VinBlocks
+  Dataset -->|"$$\\texttt{on demand}$$"| OptionalBlocks
+  Dataset -->|"$$\\texttt{VinOracleBatch}$$"| Loader
+  Loader -->|"$$\\texttt{collate-fn}$$"| Collate
+  Collate -->|"$$\\texttt{batch}$$"| Out
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class DM input;
+  class Manifest,Shards data;
+  class Dataset,OracleBlocks,VinBlocks,OptionalBlocks,Loader,Collate compute;
+  class VinSnipIdx,AseData data;
+  class Out output;
+
+  %% Optional cluster styling (matches doc-classifier-config.mmd).
+  style Cache fill:#f7f3ff,stroke:#cdb2ff,stroke-width:2px,rx:12,ry:12
+  style Snip fill:#f1fff6,stroke:#97ddb5,stroke-width:2px,rx:12,ry:12
+  style Batch fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12
+  style Bottom fill:transparent,stroke:transparent

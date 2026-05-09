@@ -1,0 +1,157 @@
+# ARIA-NBV Mermaid symbol map
+# Purpose: Mermaid/KaTeX projection of the canonical Typst notation in docs/typst/shared.
+# Rule: update this file only by consulting docs/typst/shared/symbols/*.typ and docs/typst/shared/equations/*.typ.
+# Do not invent alternate symbols inside Mermaid diagrams; add a Typst symbol first, then extend this map.
+
+metadata:
+  project: ARIA-NBV / master's thesis
+  typst_root: docs/typst/shared
+  mermaid_math_engine: KaTeX/MathML via Mermaid $$...$$ labels
+  preferred_label_wrapper: '$$\begin{array}{c} ... \end{array}$$'
+  source_modules:
+    symbols_facade: docs/typst/shared/symbols.typ
+    equations_facade: docs/typst/shared/equations.typ
+    math_helpers: docs/typst/shared/math.typ
+
+frames:
+  symb.frame.w: { typst: '$w$', latex: 'w', meaning: world frame }
+  symb.frame.r: { typst: '$r$', latex: 'r', meaning: rig frame }
+  symb.frame.c: { typst: '$c$', latex: 'c', meaning: camera frame }
+  symb.frame.cq: { typst: '$c_q$', latex: 'c_q', meaning: candidate camera frame }
+  symb.frame.v: { typst: '$v$', latex: 'v', meaning: voxel frame }
+  symb.frame.s: { typst: '$s$', latex: 's', meaning: sampling frame }
+
+math_helpers:
+  T:
+    typst: '#let T(A, B) = $#symb.vin.T^(#A)_(#B)$'
+    latex_pattern: '\\mathbf{T}^{%A}_{%B}'
+    examples:
+      world_to_rig: '\\mathbf{T}^{w}_{r}'
+      world_to_candidate_camera: '\\mathbf{T}^{w}_{c_q}'
+      rig_to_candidate_camera: '\\mathbf{T}^{r}_{c_q}'
+    mermaid_example: '$$\\mathbf{T}^{r}_{c_q}=(\\mathbf{T}^{w}_{r})^{-1}\\circ\\mathbf{T}^{w}_{c_q}$$'
+
+symbols:
+  ase.mesh: { typst: '$bold(cal(M))_"GT"$', latex: '\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}}', meaning: ground-truth mesh }
+  ase.mesh_target: { typst: '$M_e$', latex: 'M_e', meaning: target/entity-specific mesh crop }
+  ase.faces: { typst: '$bold(cal(F))_"GT"$', latex: '\\boldsymbol{\\mathcal{F}}_{\\mathrm{GT}}', meaning: ground-truth faces }
+  ase.traj: { typst: '$bold(T)_"rig"^"w"(t)$', latex: '\\mathbf{T}^{w}_{\\mathrm{rig}}(t)', meaning: rig trajectory }
+  ase.traj_final: { typst: '$bold(T)_"rig"^"w"(T)$', latex: '\\mathbf{T}^{w}_{\\mathrm{rig}}(T)', meaning: final rig pose }
+  ase.points_semi: { typst: '$bold(cal(P))_t$', latex: '\\boldsymbol{\\mathcal{P}}_{t}', meaning: semi-dense point cloud at time t }
+
+  obs.img_rgb: { typst: '$bold(I)^"rgb"$', latex: '\\mathbf{I}^{\\mathrm{rgb}}', meaning: logged RGB image stream }
+  obs.depth: { typst: '$bold(D)$', latex: '\\mathbf{D}', meaning: depth image }
+  obs.pose: { typst: '$bold(X)$', latex: '\\mathbf{X}', meaning: pose stream }
+  obs.points_semi: { typst: '$bold(cal(P))^"semi"$', latex: '\\boldsymbol{\\mathcal{P}}^{\\mathrm{semi}}', meaning: semi-dense point-cloud observation stream }
+  obs.grid: { typst: '$bold(G)$', latex: '\\mathbf{G}', meaning: geometry / voxel-grid observation bundle }
+  obs.voxel_center: { typst: '$bold(p)_v$', latex: '\\mathbf{p}_{v}', meaning: voxel center position }
+  obs.face_normal: { typst: '$bold(n)$', latex: '\\mathbf{n}', meaning: face normal vector }
+
+  oracle.points: { typst: '$bold(cal(P))$', latex: '\\boldsymbol{\\mathcal{P}}', meaning: point set }
+  oracle.points_q: { typst: '$bold(cal(P))_q$', latex: '\\boldsymbol{\\mathcal{P}}_{q}', meaning: candidate point cloud }
+  oracle.candidates: { typst: '$bold(cal(Q))$', latex: '\\boldsymbol{\\mathcal{Q}}', meaning: candidate pose set }
+  oracle.candidates_t: { typst: '$Q_t$', latex: 'Q_t', meaning: candidate pose set at rollout step t }
+  oracle.candidate_qti: { typst: '$q_(t,i)$', latex: 'q_{t,i}', meaning: candidate i at rollout step t }
+  oracle.depth_q: { typst: '$bold(D)_q$', latex: '\\mathbf{D}_{q}', meaning: candidate depth maps }
+  oracle.mask_q: { typst: '$bold(M)_q$', latex: '\\mathbf{M}_{q}', meaning: candidate valid mask }
+  oracle.cameras_q: { typst: '$bold(bold(C))_q$', latex: '\\mathbf{C}_{q}', meaning: candidate cameras }
+  oracle.rri: { typst: '$RRI$', latex: '\\mathrm{RRI}', meaning: relative reconstruction improvement }
+
+  entity.E: { typst: '$cal(E)$', latex: '\\mathcal{E}', meaning: entity set }
+  entity.w: { typst: '$bold(w)$', latex: '\\mathbf{w}', meaning: entity-weight vector }
+  entity.lambda_scene: { typst: '$lambda_"scene"$', latex: '\\lambda_{\\mathrm{scene}}', meaning: scene-term mixing weight }
+  entity.rri_total: { typst: '$RRI_"total"$', latex: '\\mathrm{RRI}_{\\mathrm{total}}', meaning: weighted global + entity objective }
+  entity.rri_e: { typst: '$RRI_e$', latex: '\\mathrm{RRI}_{e}', meaning: entity-specific RRI }
+
+  rl.s: { typst: '$s$', latex: 's', meaning: RL state }
+  rl.o: { typst: '$o$', latex: 'o', meaning: RL observation }
+  rl.a: { typst: '$a$', latex: 'a', meaning: RL action }
+  rl.r: { typst: '$r$', latex: 'r', meaning: RL reward }
+  rl.pi: { typst: '$pi$', latex: '\\pi', meaning: policy }
+  rl.action_set: { typst: '$cal(A)(s_t)$', latex: '\\mathcal{A}(s_t)', meaning: valid action set }
+  rl.reward_target: { typst: '$r_t^e$', latex: 'r_t^e', meaning: target/entity reward }
+  rl.validity_mask: { typst: '$m_(t,i)$', latex: 'm_{t,i}', meaning: candidate validity mask }
+
+  vin.loss: { typst: '$cal(L)$', latex: '\\mathcal{L}', meaning: loss }
+  vin.pose_emb: { typst: '$bold(E)_q$', latex: '\\mathbf{E}_{q}', meaning: pose embedding }
+  vin.token: { typst: '$bold(x)$', latex: '\\mathbf{x}', meaning: token / feature vector }
+  vin.vox_tok: { typst: '$bold(t)$', latex: '\\mathbf{t}', meaning: pooled voxel token feature }
+  vin.pos: { typst: '$bold(p)$', latex: '\\mathbf{p}', meaning: positional encoding }
+  vin.global: { typst: '$bold(g)$', latex: '\\mathbf{g}', meaning: global context vector }
+  vin.query: { typst: '$bold(Q)_q$', latex: '\\mathbf{Q}_{q}', meaning: attention query }
+  vin.key: { typst: '$bold(K)$', latex: '\\mathbf{K}', meaning: attention key }
+  vin.value: { typst: '$bold(V)$', latex: '\\mathbf{V}', meaning: attention value }
+  vin.T: { typst: '$bold(T)$', latex: '\\mathbf{T}', meaning: SE(3) transform }
+  vin.W: { typst: '$bold(W)$', latex: '\\mathbf{W}', meaning: weight matrix }
+  vin.gamma: { typst: '$bold(gamma)$', latex: '\\boldsymbol{\\gamma}', meaning: FiLM scale }
+  vin.beta: { typst: '$bold(beta)$', latex: '\\boldsymbol{\\beta}', meaning: FiLM shift }
+  vin.n_obs: { typst: '$n_"obs"$', latex: 'n_{\\mathrm{obs}}', meaning: semi-dense observation count / track length }
+  vin.n_obs_max: { typst: '$n_"obs"^"max"$', latex: 'n_{\\mathrm{obs}}^{\\mathrm{max}}', meaning: max observation count }
+  vin.inv_dist_std: { typst: '$sigma_(rho)$', latex: '\\sigma_{\\rho}', meaning: inverse-distance std }
+  vin.dist_std: { typst: '$sigma_d$', latex: '\\sigma_d', meaning: distance std }
+  vin.rri: { typst: '$r$', latex: 'r', meaning: continuous oracle RRI per candidate }
+  vin.rri_hat: { typst: '$hat(r)$', latex: '\\hat{r}', meaning: predicted RRI proxy }
+  vin.cov_frac: { typst: '$c$', latex: 'c', meaning: coverage / visibility fraction }
+  vin.cov_weight: { typst: '$w$', latex: 'w', meaning: coverage-based weight }
+  vin.cov_strength: { typst: '$lambda$', latex: '\\lambda', meaning: coverage-weight blend strength }
+  vin.aux_weight: { typst: '$lambda_"reg"$', latex: '\\lambda_{\\mathrm{reg}}', meaning: auxiliary regression weight }
+  vin.voxel_valid: { typst: '$v$', latex: 'v', meaning: voxel coverage proxy }
+  vin.sem_valid: { typst: '$v^("sem")$', latex: 'v^{\\mathrm{sem}}', meaning: semi-dense visibility proxy }
+  vin.sem_proj: { typst: '$bold(s)_"proj"$', latex: '\\mathbf{s}_{\\mathrm{proj}}', meaning: semi-dense projection statistics }
+  vin.sem_grid: { typst: '$bold(s)_"grid"$', latex: '\\mathbf{s}_{\\mathrm{grid}}', meaning: semi-dense grid CNN features }
+  vin.traj_feat: { typst: '$bold(f)_"traj"$', latex: '\\mathbf{f}_{\\mathrm{traj}}', meaning: trajectory pooled feature }
+  vin.traj_ctx: { typst: '$bold(c)_"traj"$', latex: '\\mathbf{c}_{\\mathrm{traj}}', meaning: trajectory context per candidate }
+  vin.cand_valid: { typst: '$m$', latex: 'm', meaning: candidate validity mask }
+  vin.occ_pr: { typst: '$bold(V)_"occ"^"pr"$', latex: '\\mathbf{V}_{\\mathrm{occ}}^{\\mathrm{pr}}', meaning: occupancy prediction on voxel grid }
+  vin.occ_in: { typst: '$bold(V)_"surf"^"in"$', latex: '\\mathbf{V}_{\\mathrm{surf}}^{\\mathrm{in}}', meaning: occupied surface evidence }
+  vin.free_in: { typst: '$bold(V)_"free"^"in"$', latex: '\\mathbf{V}_{\\mathrm{free}}^{\\mathrm{in}}', meaning: free-space evidence }
+  vin.counts: { typst: '$bold(V)_"count"^"in"$', latex: '\\mathbf{V}_{\\mathrm{count}}^{\\mathrm{in}}', meaning: observation counts per voxel }
+  vin.counts_norm: { typst: '$bold(V)_"count"^"norm"$', latex: '\\mathbf{V}_{\\mathrm{count}}^{\\mathrm{norm}}', meaning: normalized observation counts }
+  vin.cent_pr: { typst: '$bold(V)_"cent"^"pr"$', latex: '\\mathbf{V}_{\\mathrm{cent}}^{\\mathrm{pr}}', meaning: centerness prediction }
+  vin.observed: { typst: '$bold(V)_"obs"$', latex: '\\mathbf{V}_{\\mathrm{obs}}', meaning: observed mask }
+  vin.unknown: { typst: '$bold(V)_"unk"$', latex: '\\mathbf{V}_{\\mathrm{unk}}', meaning: unknown mask }
+  vin.new_surface_prior: { typst: '$bold(V)_"new"$', latex: '\\mathbf{V}_{\\mathrm{new}}', meaning: new-surface prior }
+  vin.field_v: { typst: '$bold(F)_v$', latex: '\\mathbf{F}_{v}', meaning: VIN scene field in voxel frame }
+  vin.field_q: { typst: '$bold(F)_q^("vox")$', latex: '\\mathbf{F}_{q}^{\\mathrm{vox}}', meaning: per-candidate voxel features }
+
+shapes:
+  shape.B: { typst: '$B$', latex: 'B', meaning: batch size }
+  shape.Nq: { typst: '$N_q$', latex: 'N_q', meaning: number of candidate views }
+  shape.Tlen: { typst: '$T$', latex: 'T', meaning: trajectory length / time steps }
+  shape.P: { typst: '$P$', latex: 'P', meaning: point count }
+  shape.Pmax: { typst: '$P_"max"$', latex: 'P_{\\mathrm{max}}', meaning: maximum points after subsampling }
+  shape.Csem: { typst: '$C_"sem"$', latex: 'C_{\\mathrm{sem}}', meaning: semidense feature channels }
+  shape.Gsem: { typst: '$G_"sem"$', latex: 'G_{\\mathrm{sem}}', meaning: semidense projection grid size }
+  shape.Fpose: { typst: '$F_"pose"$', latex: 'F_{\\mathrm{pose}}', meaning: pose embedding dimension }
+  shape.Fproj: { typst: '$F_"proj"$', latex: 'F_{\\mathrm{proj}}', meaning: projection feature dimension }
+  shape.Fcnn: { typst: '$F_"cnn"$', latex: 'F_{\\mathrm{cnn}}', meaning: CNN feature dimension }
+  shape.Ftraj: { typst: '$F_"traj"$', latex: 'F_{\\mathrm{traj}}', meaning: trajectory feature dimension }
+  shape.Ffield: { typst: '$F_"field"$', latex: 'F_{\\mathrm{field}}', meaning: scene field channel dimension }
+
+equations:
+  rri.rri:
+    typst_module: docs/typst/shared/equations/rri.typ
+    latex: '\\mathrm{RRI}(q)=\\frac{\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_t,\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}})-\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_t\\cup\\boldsymbol{\\mathcal{P}}_q,\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}})}{\\mathrm{CD}(\\boldsymbol{\\mathcal{P}}_t,\\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}})+\\epsilon}'
+  rri.greedy:
+    typst_module: docs/typst/shared/equations/rri.typ
+    latex: 'q^{\\star}=\\operatorname*{arg\\,max}_{q\\in\\boldsymbol{\\mathcal{Q}}}\\,\\mathrm{RRI}(q)'
+  entity.objective:
+    typst_module: docs/typst/shared/equations/entity.typ
+    latex: '\\mathrm{RRI}_{\\mathrm{total}}(q)=\\sum_{e\\in\\mathcal{E}}\\mathbf{w}_e\\,\\mathrm{RRI}_e(q)+\\lambda_{\\mathrm{scene}}\\,\\mathrm{RRI}(q)'
+  features.semidense_visibility:
+    typst_module: docs/typst/shared/equations/features.typ
+    latex: 'v_i^{\\mathrm{sem}}=\\frac{\\sum_j w_{i,j}m_{i,j}}{\\sum_j w_{i,j}f_{i,j}}'
+  vin.counts_norm:
+    typst_module: docs/typst/shared/equations/vin.typ
+    latex: '\\mathbf{V}_{\\mathrm{count}}^{\\mathrm{norm}}=\\frac{\\log(1+\\mathbf{V}_{\\mathrm{count}}^{\\mathrm{in}})}{\\log(1+\\max(\\mathbf{V}_{\\mathrm{count}}^{\\mathrm{in}}))}'
+  vin.new_surface_prior:
+    typst_module: docs/typst/shared/equations/vin.typ
+    latex: '\\mathbf{V}_{\\mathrm{unk}}=1-\\mathbf{V}_{\\mathrm{count}}^{\\mathrm{norm}},\\quad \\mathbf{V}_{\\mathrm{new}}=\\mathbf{V}_{\\mathrm{unk}}\\odot\\mathbf{V}_{\\mathrm{occ}}^{\\mathrm{pr}}'
+
+lint_substitutions:
+  # Common non-canonical symbols seen in older/nice diagrams.
+  '\\mathbf{e}_{\\mathrm{pose}}': '\\mathbf{E}_{q}'
+  '\\mathbf{z}_{\\mathrm{traj}}': '\\mathbf{c}_{\\mathrm{traj}}'
+  '\\mathbf{T}^{w}_{r}(t)': '\\mathbf{T}^{w}_{\\mathrm{rig}}(t)'
+  '\\mathbf{P}_{\\mathrm{sem}}': '\\boldsymbol{\\mathcal{P}}^{\\mathrm{semi}}'
+  '\\mathbf{C}_q': '\\mathbf{C}_{q}'

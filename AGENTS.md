@@ -16,6 +16,10 @@ Use this file as the root dispatcher. Detailed rules live in the nearest
 - Package work under `aria_nbv/`: read `aria_nbv/AGENTS.md`, then one nested
   guide only when that module contract is touched.
 - Docs, bibliography, Typst, or Quarto work: read `docs/AGENTS.md`.
+- Mermaid `.mmd` or thesis diagram work: use `aria-nbv-mermaid`; math notation
+  must come from `docs/typst/shared`; validate with
+  `tools/mermaid/scripts/aria_mermaid_lint.py`; render locally with `mmdc`
+  when available and do not use online renderers unless explicitly permitted.
 - Need file localization or deterministic local discovery: use `aria-nbv-context`.
 - Need KG-backed retrieval, source-backed routing, claim checks, or
   consolidation: use `aria-litkg-memory`.

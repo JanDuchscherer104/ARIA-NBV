@@ -133,7 +133,7 @@ Next-best-view selection is often optimized through coverage, uncertainty, or in
 ARIA-NBV studies a finite-candidate, target-conditioned version of this problem on Project Aria / #ASE data @projectaria-engel2023 @ProjectAria-ASE-2025 with frozen EFM3D/EVL evidence @EFM3D-straub2024. The prior seminar implementation provides scene-level oracle #RRI labels and a one-step scoring substrate. The thesis extends this substrate to leakage-safe target labels, fixed-budget oracle lookahead, actor-visible finite-horizon value learning, and a scaling analysis that preserves mesh/oracle target-#RRI supervision. Online discrete interaction and continuous target-then-pose policies are lower-priority escalation RQs after the finite-candidate evidence, not substitutes for it.
 
 #claim-box([Thesis claim])[
-  Target-specific reconstruction-quality improvement can serve as a finite-horizon #NBV objective for egocentric indoor reconstruction. The thesis tests this by first measuring oracle lookahead headroom over one-step target-#RRI selection. If headroom exists, an actor-visible finite-candidate value model #symb.rl.qh is trained to recover it under the same candidate and acquisition budgets.
+  Target-specific reconstruction-quality improvement can serve as a finite-horizon #NBV objective for egocentric indoor reconstruction. The thesis tests this by training #symb.rl.qh to predict bounded cumulative target-#RRI for a target of interest and by evaluating selected trajectories with endpoint target-quality gain. Oracle lookahead first measures whether non-myopic headroom exists; only then is actor-visible #symb.rl.qh recovery interpreted under the same candidate and acquisition budgets.
 ]
 
 = Formal Model and Research Questions
@@ -192,13 +192,13 @@ $
   q_t = q_(t,a_t).
 $
 
-Invalidity is a constraint, not weak supervision: masks apply before argmax, temperature softmax, loss targets, and bootstrap maximization. V1 uses OBS-SEL, PRED-Q, and GT-EVAL. The actor-visible descriptor is
+Invalidity is a constraint, not weak supervision: masks apply before argmax, temperature softmax, loss targets, and bootstrap maximization. True infeasibility or absent evaluation samples are hard-invalid; low immediate target support is a diagnostic unless no meaningful oracle/evaluation sample exists. V1 uses OBS-SEL, PRED-Q, and GT-EVAL. The actor-visible descriptor is
 
 $
   #eqs.entity.target_descriptor
 $
 
-It bundles observed or predicted OBB geometry, class, confidence, projected area, semidense support, EVL support, and relative pose. GT crops are selected only after protocol-level matching:
+It bundles observed or predicted OBB geometry, class, confidence, projected area, semidense support, EVL support, and relative pose. A compact actor-visible crop descriptor is the first target-input ablation after this OBB-level path, not a GT crop. GT crops are selected only after protocol-level matching:
 
 $
   #eqs.entity.target_match_score
@@ -214,7 +214,7 @@ $
 
 Targets that fail acceptance, or whose top-1/top-2 scores are ambiguous, are counted as target-invalid protocol cases rather than low target-#RRI examples.
 
-The target error is the implemented point-mesh accuracy plus mesh-to-point completeness diagnostic, not point-cloud Chamfer distance:
+Let $C_e (#symb.obs.points_t)$ denote the oracle-only crop of accumulated points to the matched target region. The target error is the implemented point-mesh accuracy plus mesh-to-point completeness diagnostic on this target crop, not point-cloud Chamfer distance:
 
 $
   #eqs.entity.target_error
@@ -236,7 +236,7 @@ $
   #eqs.entity.log_gain
 $
 
-#symb.entity.endpoint_gain is the primary endpoint metric, #symb.entity.return_h is the rollout training return, and #symb.entity.log_gain is an ablation for scale sensitivity only.
+#symb.entity.endpoint_gain is the primary endpoint metric, #symb.entity.return_h is the rollout training return, and #symb.entity.log_gain is an ablation for scale sensitivity only. Since each immediate #RRI term is normalized by the current target error, the additive return is not algebraically identical to endpoint gain; the former supports value fitting and the latter supports fixed-budget interpretation.
 
 After selecting a valid candidate, the acquired geometry is added to the current geometry:
 
@@ -254,13 +254,13 @@ The six research questions form a dependency chain: the objective defines what c
 
 #figure(
   block(width: 100%)[
-    #rq-node([RQ1 Objective and metrics], [separate #symb.entity.endpoint_gain for endpoint evaluation, #symb.entity.return_h for value learning, and #symb.entity.log_gain as ablation])
+    #rq-node([RQ1 Objective and metrics], [learn target-conditioned finite-candidate multi-step #NBV and separate #symb.entity.endpoint_gain for endpoint evaluation, #symb.entity.return_h for value learning, and #symb.entity.log_gain as ablation])
     #rq-down()
     #rq-node([RQ2 Target and matching], [OBB plus support is the V1 baseline; actor-visible crop descriptors are the first ablation; #symb.entity.target_desc is matched to GT only for labels and evaluation])
     #rq-down()
     #rq-node([RQ3 Candidate and rollout support], [mixed target-centric plus exploration candidates, branch/beam knobs, and stochastic support traces define the finite action rows available to learning])
     #rq-down()
-    #rq-node([RQ4 Headroom and #symb.rl.qh], [deterministic oracle lookahead estimates non-myopic headroom before actor-visible #symb.rl.qh recovery is interpreted], critical: true)
+    #rq-node([RQ4 Headroom and #symb.rl.qh], [oracle lookahead optimizes cumulative target-#RRI, and actor-visible #symb.rl.qh must beat validated myopic scoring when headroom is positive], critical: true)
     #rq-down()
     #rq-node([RQ5 Scaling], [scale ASE finite-candidate evidence first, then external mesh/oracle-compatible substrates and online discrete #symb.rl.qh if the supervision contract remains comparable])
     #rq-down()
@@ -269,7 +269,7 @@ The six research questions form a dependency chain: the objective defines what c
   caption: [Causal RQ dependency chain. Later questions should not be used to rescue failed earlier contracts.],
 ) <fig:advisor-rq-dag>
 
-The headroom and recovery quantities are
+Oracle lookahead selects by cumulative target-#RRI and endpoint gain evaluates the resulting trajectory. Report #symb.entity.q_recovery only when its denominator is positive and above the advisor-set minimum effect threshold. The headroom and recovery quantities are
 
 $
   #eqs.entity.lookahead_headroom
@@ -281,7 +281,7 @@ $
 
 = Planned Value-Model Design
 
-This section is subordinate to the oracle and headroom tests. The learned model must map each valid candidate row to a finite-horizon value using only actor-visible scene, target, history, and candidate features. It must be permutation-equivariant over candidate rows, apply the hard mask before action selection and training targets, and be evaluated by oracle re-scoring rather than by its own predicted values.
+This section is subordinate to the oracle and headroom tests. The research object is the finite-candidate value model #symb.rl.qh, with the candidate-query Transformer as the first implementation. The learned model must map each valid candidate row to a finite-horizon value using only actor-visible scene, target, history, and candidate features. It must be permutation-equivariant over candidate rows, apply the hard mask before action selection and training targets, and be evaluated by oracle re-scoring rather than by its own predicted values.
 
 The recommended first architecture is a residual finite-horizon model on top of the target-conditioned one-step scorer:
 
@@ -438,7 +438,9 @@ $
   #eqs.rl.qh_loss
 $
 
-All selected actions are re-evaluated by the oracle under identical roots, candidate budgets, and acquisition budgets. The minimum final evidence report must contain symbolic thresholds that are locked with the advisor before final experiments:
+Before #symb.rl.qh is interpreted as planning, the learned one-step target scorer must pass the myopic-control evidence gate: held-out ranking, oracle-evaluated model-selected rollouts, calibration and stage-shift diagnostics, and Rerun examples of representative successes and failures.
+
+All selected actions are re-evaluated by the oracle under identical roots, candidate budgets, and acquisition budgets. Equal budget means equal selected-view horizon $H$, candidate count $N_q$, candidate-generation distribution, and validity constraints; path length, runtime, and oracle evaluation count are reported separately. The minimum final evidence report must contain symbolic thresholds that are locked with the advisor before final experiments:
 
 $
   (S_min, T_min, N_min)
@@ -446,17 +448,20 @@ $
   (S_"scenes", T_"targets", N_"roots").
 $
 
-Here the three symbols denote the minimum number of scenes, matched targets, and rollout roots. Coverage is reported against the full scale bar of 100 GT-mesh ASE scenes and 4,608 snippet windows, or against an explicit scene-level held-out subset if scale is blocked.
+Here the three symbols denote the minimum number of scenes, matched targets, and rollout roots. Coverage is reported against the full scale bar of 100 GT-mesh ASE scenes and 4,608 snippet windows, or against an explicit scene-level held-out subset if scale is blocked. Final splits are scene-level; sample-level splitting across snippets from the same scene is not valid for final claims.
 
 #figure(
   table(
     columns: (0.62fr, 1.78fr),
     table.header([*Surface*], [*Required evidence*]),
     [One-step scorer],
-    [rank correlation, top-$k$ oracle hit, calibration, selected-candidate oracle #RRI, target visibility, invalid fraction, grouped failure modes],
+    [held-out rank correlation, top-$k$ oracle hit, calibration, stage-shift diagnostics, selected-candidate oracle #RRI, target visibility, Rerun success/failure examples],
 
     [Candidate and replay],
-    [strategy provenance, path increments, scene/target support fields, validity masks, reason codes, policy metadata, seed metadata, shuffled-candidate evaluation],
+    [strategy provenance, path increments, scene/target support fields, validity masks, reason codes, with/without-mask rank metrics, policy metadata, seed metadata, shuffled-candidate evaluation],
+
+    [Scale and storage],
+    [scene-level splits, no silent coverage changes, scale axes reported separately, Zarr asset references, LRZ/Slurm/DSS/resume/storage gates],
   ),
   caption: [Compact evidence contract: quality is reported both as ranking performance and as replay/candidate integrity.],
 ) <tab:advisor-evidence-contract>
@@ -468,8 +473,8 @@ Here the three symbols denote the minimum number of scenes, matched targets, and
     [$pi_"rand"$], [yes], [no], [1], [lower reference over valid candidates],
     [$pi_"learned-1"$], [yes], [no], [1], [myopic learned target scorer],
     [$pi_"oracle-1"$], [no], [yes], [1], [one-step oracle upper bound],
-    [$pi_"oracle-look"$], [no], [yes], [$H$], [non-myopic headroom estimate],
-    [$pi_Q$], [yes], [no], [$H$], [learned recovery after oracle re-scoring],
+    [$pi_"oracle-look"$], [no], [yes], [$H$], [cumulative-#RRI headroom estimate],
+    [$pi_Q$], [yes], [no], [$H$], [learned recovery; must beat myopic scoring when headroom is positive],
   ),
   caption: [Leakage-aware policy comparison. Report #symb.entity.endpoint_gain, #symb.entity.return_h, scene #RRI, cost, invalidity, runtime, and coverage for each row.],
 ) <tab:advisor-policy-comparison>
@@ -497,7 +502,7 @@ Here the three symbols denote the minimum number of scenes, matched targets, and
 
     [CORAL and set models @CORAL-cao2019 @SetTransformer-lee2019],
     [Ranking and permutation-aware candidate scoring.],
-    [Ordinal one-step target scorer; candidate-token #symb.rl.qh with masked set output.],
+    [Ordinal one-step target scorer; finite-candidate #symb.rl.qh, first as masked candidate-query Transformer.],
     [Unbounded architecture search before target/RL evidence is stable.],
 
     [Offline value learning #cite(label("DBLP:journals/corr/MnihKSGAWR13")) @DoubleDQN-vanHasselt2015 @IQL-kostrikov2021 @CQL-kumar2020 @BCQ-fujimoto2019],
@@ -547,6 +552,6 @@ Here the three symbols denote the minimum number of scenes, matched targets, and
   caption: [Typst-native thesis Gantt, 2026-04-29 to 2026-09-30. Red bars mark interpretation-critical evidence and submission freeze.],
 ) <fig:advisor-gantt>
 
-Three risks decide interpretation. If M1 geometry or oracle labels fail, the thesis becomes a validation and one-step-scoring study. If target matching is sparse or ambiguous, target #RRI is reported only on validated subsets with unmatched counts. If #symb.entity.lookahead_headroom is near zero, the thesis reports an effectively myopic candidate/objective regime and uses scaling or online-discrete tests only if they preserve the same target-#RRI supervision contract.
+Three risks decide interpretation. If M1 geometry or oracle labels fail, the thesis becomes a validation and one-step-scoring study. If target matching is sparse or ambiguous, target #RRI is reported only on validated subsets with unmatched counts. If #symb.entity.lookahead_headroom is near zero, the thesis reports no measurable non-myopic headroom for the evaluated split, target set, horizon, branch factor, and candidate distribution, then uses scaling or online-discrete tests only if they preserve the same target-#RRI supervision contract.
 
 Open advisor decisions are deliberately narrow: final scene-level split, numeric minimum scale $(S_min,T_min,N_min)$, pass/fail threshold for #symb.entity.q_recovery, exact target-match thresholds $(tau_mu,tau_"gap")$, the first actor-visible crop descriptor ablation, and whether any external or online scaling substrate preserves comparable mesh/oracle target-#RRI labels. These choices change the evidence bar, not the thesis spine.

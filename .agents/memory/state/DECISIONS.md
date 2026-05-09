@@ -49,6 +49,10 @@ tags: [codex, workflow, architecture]
 - Plan-mode transcript answers mean the user's answers to `request_user_input`
   questions. Assistant `<proposed_plan>` text remains agent output and does not
   become a decision unless the user later accepts or restates it.
+- Transcript distillation emits candidate and reviewed JSONL records. Reviewed
+  transcript status is routing metadata for promotion/backlog review; it is not
+  current truth until the item is accepted into canonical memory, backlog, docs,
+  or code.
 
 ## Technical Decisions
 - Runtime objects are instantiated through config `.setup_target()` factories.

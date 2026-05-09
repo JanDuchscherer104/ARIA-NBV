@@ -1,0 +1,878 @@
+#!/usr/bin/env python3
+"""Extract ARIA-NBV user intent from local Codex session JSONL files.
+
+The extractor keeps full raw Codex transcripts out of repo memory. It writes
+only high-signal user-authored records and candidate distillates that LitKG can
+index through the existing `.configs/litkg.toml` transcript source globs.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+from collections import Counter
+from dataclasses import dataclass, field
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_PROJECT_ROOT = REPO_ROOT
+DEFAULT_CODEX_ROOT = Path.home() / ".codex" / "sessions"
+RESTORED_CODEX_ROOT = (
+    Path.home()
+    / "Desktop"
+    / "pre-essential-restore-20260425-234438"
+    / ".codex"
+    / "sessions"
+)
+TRANSCRIPT_ROOT = REPO_ROOT / ".agents" / "memory" / "transcripts"
+PROJECT_MARKERS = ("ARIA-NBV", "aria-nbv", "aria_nbv", "/home/jd/repos/ARIA-NBV")
+SCHEMA_VERSION = 1
+STOPWORDS = {
+    "a",
+    "about",
+    "after",
+    "all",
+    "also",
+    "an",
+    "and",
+    "are",
+    "as",
+    "be",
+    "by",
+    "can",
+    "current",
+    "for",
+    "from",
+    "has",
+    "have",
+    "how",
+    "in",
+    "into",
+    "is",
+    "it",
+    "its",
+    "not",
+    "of",
+    "on",
+    "or",
+    "our",
+    "should",
+    "that",
+    "the",
+    "their",
+    "this",
+    "to",
+    "under",
+    "use",
+    "uses",
+    "using",
+    "with",
+}
+
+
+@dataclass
+class PendingQuestion:
+    mode: str | None
+    timestamp: str | None
+    turn_id: str | None
+    questions: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+
+@dataclass
+class SessionState:
+    session_id: str | None = None
+    session_timestamp: str | None = None
+    cwd: str | None = None
+    turn_id: str | None = None
+    mode: str | None = None
+    matched_by_cwd: bool = False
+    matched_by_marker: bool = False
+    user_messages: list[dict[str, Any]] = field(default_factory=list)
+    plan_answers: list[dict[str, Any]] = field(default_factory=list)
+    pending_questions: dict[str, PendingQuestion] = field(default_factory=dict)
+
+
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def normalize_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def is_under_path(path_text: str | None, root: Path) -> bool:
+    if not path_text:
+        return False
+    try:
+        path = Path(path_text).resolve()
+        root = root.resolve()
+        return path == root or root in path.parents
+    except OSError:
+        return False
+
+
+def is_other_repo_checkout(path_text: str | None, project_root: Path) -> bool:
+    if not path_text:
+        return False
+    try:
+        path = Path(path_text).resolve()
+        repos_root = Path.home() / "repos"
+        if repos_root in path.parents and not is_under_path(path_text, project_root):
+            return True
+        parts = set(path.parts)
+        if (
+            ".codex" in parts
+            and "worktrees" in parts
+            and project_root.name not in parts
+        ):
+            return True
+        return "prml-vslam" in parts
+    except OSError:
+        return False
+
+
+def record_allowed_for_project(
+    record: dict[str, Any],
+    project_root: Path,
+    *,
+    session_marker_context: bool,
+) -> bool:
+    cwd = record.get("cwd")
+    if is_under_path(str(cwd) if cwd else None, project_root):
+        return True
+    if is_other_repo_checkout(str(cwd) if cwd else None, project_root):
+        return False
+    return session_marker_context
+
+
+def is_bootstrap_or_context_dump(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped:
+        return True
+    first_line = stripped.splitlines()[0].strip()
+    bootstrap_prefixes = (
+        "# AGENTS.md instructions for ",
+        "# Context from my IDE setup:",
+        "<environment_context>",
+        "<INSTRUCTIONS>",
+    )
+    if first_line.startswith(bootstrap_prefixes):
+        return True
+    if first_line == "# AGENTS.md instructions" or stripped.startswith(
+        "<INSTRUCTIONS>"
+    ):
+        return True
+    if "<INSTRUCTIONS>" in stripped[:500] and "Agent Guidance" in stripped[:1200]:
+        return True
+    return False
+
+
+def jsonl_objects(path: Path) -> list[tuple[int, dict[str, Any]]]:
+    objects: list[tuple[int, dict[str, Any]]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line_no, line in enumerate(handle, start=1):
+            if not line.strip():
+                continue
+            try:
+                objects.append((line_no, json.loads(line)))
+            except json.JSONDecodeError:
+                continue
+    return objects
+
+
+def content_text_from_message(payload: dict[str, Any]) -> str:
+    chunks: list[str] = []
+    for item in payload.get("content") or []:
+        if isinstance(item, dict):
+            text = item.get("text") or item.get("input_text") or ""
+            if text:
+                chunks.append(str(text))
+    return "\n".join(chunks)
+
+
+def session_root_label(path: Path, roots: list[Path]) -> tuple[str, str]:
+    for index, root in enumerate(roots):
+        try:
+            rel = path.relative_to(root)
+            label = "default" if root == DEFAULT_CODEX_ROOT else f"root_{index + 1}"
+            if root == RESTORED_CODEX_ROOT:
+                label = "restored_pre_20260425"
+            return label, rel.as_posix()
+        except ValueError:
+            continue
+    return "unknown", path.as_posix()
+
+
+def build_source(
+    path: Path,
+    line_no: int,
+    roots: list[Path],
+) -> dict[str, Any]:
+    root_label, relative_path = session_root_label(path, roots)
+    return {
+        "root": root_label,
+        "session_path": relative_path,
+        "line": line_no,
+    }
+
+
+def record_user_message(
+    state: SessionState,
+    *,
+    text: str,
+    timestamp: str | None,
+    line_no: int,
+    path: Path,
+    roots: list[Path],
+) -> None:
+    if is_bootstrap_or_context_dump(text):
+        return
+    if any(marker in text for marker in PROJECT_MARKERS):
+        state.matched_by_marker = True
+    normalized = normalize_text(text)
+    if not normalized:
+        return
+    state.user_messages.append(
+        {
+            "schema_version": SCHEMA_VERSION,
+            "kind": "user_message",
+            "timestamp": timestamp,
+            "session_id": state.session_id,
+            "session_timestamp": state.session_timestamp,
+            "cwd": state.cwd,
+            "turn_id": state.turn_id,
+            "mode": state.mode,
+            "text": text.strip(),
+            "normalized_text": normalized,
+            "content_hash": sha256_text(normalized),
+            "source": build_source(path, line_no, roots),
+        }
+    )
+
+
+def parse_request_questions(arguments: str) -> dict[str, dict[str, Any]]:
+    try:
+        payload = json.loads(arguments or "{}")
+    except json.JSONDecodeError:
+        return {}
+
+    questions: dict[str, dict[str, Any]] = {}
+    for question in payload.get("questions") or []:
+        if not isinstance(question, dict):
+            continue
+        question_id = str(question.get("id") or "").strip()
+        if not question_id:
+            continue
+        questions[question_id] = {
+            "id": question_id,
+            "header": question.get("header"),
+            "question": question.get("question"),
+            "options": question.get("options") or [],
+        }
+    return questions
+
+
+def record_plan_answers(
+    state: SessionState,
+    *,
+    call_id: str,
+    output: str,
+    timestamp: str | None,
+    line_no: int,
+    path: Path,
+    roots: list[Path],
+) -> None:
+    pending = state.pending_questions.get(call_id)
+    if pending is None or pending.mode != "plan":
+        return
+    try:
+        payload = json.loads(output or "{}")
+    except json.JSONDecodeError:
+        return
+    answers = payload.get("answers")
+    if not isinstance(answers, dict) or not answers:
+        return
+
+    for question_id, answer_payload in answers.items():
+        answer_list = []
+        if isinstance(answer_payload, dict):
+            answer_list = answer_payload.get("answers") or []
+        if not answer_list:
+            continue
+        question = pending.questions.get(str(question_id), {"id": str(question_id)})
+        state.plan_answers.append(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "kind": "plan_mode_answer",
+                "timestamp": timestamp,
+                "session_id": state.session_id,
+                "session_timestamp": state.session_timestamp,
+                "cwd": state.cwd,
+                "turn_id": pending.turn_id or state.turn_id,
+                "mode": "plan",
+                "call_id": call_id,
+                "question": question,
+                "answers": [str(answer) for answer in answer_list],
+                "content_hash": sha256_text(
+                    normalize_text(
+                        json.dumps({question_id: answer_list}, sort_keys=True)
+                    )
+                ),
+                "source": build_source(path, line_no, roots),
+            }
+        )
+
+
+def extract_session(
+    path: Path, roots: list[Path], project_root: Path
+) -> SessionState | None:
+    objects = jsonl_objects(path)
+    if not objects:
+        return None
+
+    state = SessionState()
+    for line_no, obj in objects:
+        obj_type = obj.get("type")
+        payload = obj.get("payload") or {}
+        timestamp = obj.get("timestamp")
+
+        if obj_type == "session_meta":
+            state.session_id = payload.get("id") or state.session_id
+            state.session_timestamp = payload.get("timestamp") or timestamp
+            state.cwd = payload.get("cwd") or state.cwd
+            state.matched_by_cwd = state.matched_by_cwd or is_under_path(
+                state.cwd, project_root
+            )
+            continue
+
+        if obj_type == "turn_context":
+            state.turn_id = payload.get("turn_id") or state.turn_id
+            state.cwd = payload.get("cwd") or state.cwd
+            mode_payload = payload.get("collaboration_mode") or {}
+            state.mode = mode_payload.get("mode") or state.mode
+            state.matched_by_cwd = state.matched_by_cwd or is_under_path(
+                state.cwd, project_root
+            )
+            continue
+
+        if obj_type == "event_msg":
+            event_type = payload.get("type")
+            if event_type == "task_started":
+                state.turn_id = payload.get("turn_id") or state.turn_id
+                state.mode = payload.get("collaboration_mode_kind") or state.mode
+            elif event_type == "user_message":
+                record_user_message(
+                    state,
+                    text=str(payload.get("message") or ""),
+                    timestamp=timestamp,
+                    line_no=line_no,
+                    path=path,
+                    roots=roots,
+                )
+            continue
+
+        if obj_type != "response_item":
+            continue
+
+        payload_type = payload.get("type")
+        if payload_type == "message" and payload.get("role") == "user":
+            record_user_message(
+                state,
+                text=content_text_from_message(payload),
+                timestamp=timestamp,
+                line_no=line_no,
+                path=path,
+                roots=roots,
+            )
+            continue
+
+        if (
+            payload_type == "function_call"
+            and payload.get("name") == "request_user_input"
+        ):
+            call_id = str(payload.get("call_id") or "")
+            if call_id:
+                state.pending_questions[call_id] = PendingQuestion(
+                    mode=state.mode,
+                    timestamp=timestamp,
+                    turn_id=state.turn_id,
+                    questions=parse_request_questions(
+                        str(payload.get("arguments") or "")
+                    ),
+                )
+            continue
+
+        if payload_type == "function_call_output":
+            call_id = str(payload.get("call_id") or "")
+            record_plan_answers(
+                state,
+                call_id=call_id,
+                output=str(payload.get("output") or ""),
+                timestamp=timestamp,
+                line_no=line_no,
+                path=path,
+                roots=roots,
+            )
+
+    state.user_messages = [
+        record
+        for record in state.user_messages
+        if record_allowed_for_project(
+            record,
+            project_root,
+            session_marker_context=state.matched_by_marker,
+        )
+    ]
+    state.plan_answers = [
+        record
+        for record in state.plan_answers
+        if record_allowed_for_project(
+            record,
+            project_root,
+            session_marker_context=state.matched_by_marker,
+        )
+    ]
+    if not (state.matched_by_cwd or state.matched_by_marker):
+        return None
+    if not (state.user_messages or state.plan_answers):
+        return None
+    return state
+
+
+def dedupe_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for record in sorted(
+        records,
+        key=lambda item: (
+            str(item.get("timestamp") or ""),
+            str((item.get("source") or {}).get("session_path") or ""),
+            str((item.get("source") or {}).get("line") or ""),
+        ),
+    ):
+        key = f"{record.get('kind')}:{record.get('content_hash')}"
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(record)
+    return deduped
+
+
+def answer_label(answer: str) -> str:
+    return re.sub(r"\s*\(Recommended\)\s*$", "", answer).strip()
+
+
+def classify_text(text: str, question_id: str = "") -> tuple[str, str, str]:
+    lowered = f"{question_id} {text}".lower()
+    if any(
+        token in lowered for token in ("owner", "preference", "human", "tone", "style")
+    ):
+        return "human-owner preference", "candidate", "medium"
+    if any(
+        token in lowered
+        for token in ("todo", "issue", "backlog", "implement", "fix", "add ")
+    ):
+        return "backlog/action item", "candidate", "medium"
+    if any(
+        token in lowered
+        for token in ("api", "schema", "store", "format", "version", "test", "lint")
+    ):
+        return "technical decision", "candidate", "medium"
+    if any(
+        token in lowered
+        for token in ("decision", "must", "should", "source", "canonical", "thesis")
+    ):
+        return "durable repo decision", "candidate", "medium"
+    if question_id:
+        return "working project decision", "candidate", "low"
+    return "reject/noise", "reject", "low"
+
+
+def distill_records(
+    user_messages: list[dict[str, Any]],
+    plan_answers: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    distillates: list[dict[str, Any]] = []
+
+    for record in plan_answers:
+        question = record.get("question") or {}
+        question_id = str(question.get("id") or "")
+        answers = [answer_label(str(answer)) for answer in record.get("answers") or []]
+        answer_text = "; ".join(answer for answer in answers if answer)
+        prompt = str(question.get("question") or "").strip()
+        category, status, confidence = classify_text(answer_text, question_id)
+        distillates.append(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "kind": "candidate_decision",
+                "status": status,
+                "category": category,
+                "confidence": confidence,
+                "summary": f"Plan-mode answer `{question_id}` selected: {answer_text}",
+                "prompt": prompt,
+                "evidence_hashes": [record["content_hash"]],
+                "source_records": [record["source"]],
+                "promotion_target": promotion_target_for(category),
+            }
+        )
+
+    for record in user_messages:
+        normalized = str(record.get("normalized_text") or "")
+        category, status, confidence = classify_text(normalized)
+        if status == "reject" and len(normalized) > 160:
+            continue
+        summary = normalized[:240] + ("..." if len(normalized) > 240 else "")
+        distillates.append(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "kind": "candidate_decision",
+                "status": status,
+                "category": category,
+                "confidence": confidence,
+                "summary": summary,
+                "prompt": None,
+                "evidence_hashes": [record["content_hash"]],
+                "source_records": [record["source"]],
+                "promotion_target": promotion_target_for(category),
+            }
+        )
+
+    return dedupe_distillates(distillates)
+
+
+def promotion_target_for(category: str) -> str | None:
+    if category in {
+        "durable repo decision",
+        "technical decision",
+        "working project decision",
+    }:
+        return ".agents/memory/state/DECISIONS.md"
+    if category == "human-owner preference":
+        return ".agents/references/human_owner_intent.md"
+    if category == "backlog/action item":
+        return ".agents/issues.toml|.agents/todos.toml|.agents/refactors.toml"
+    return None
+
+
+def dedupe_distillates(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[tuple[str, tuple[str, ...]]] = set()
+    deduped: list[dict[str, Any]] = []
+    for record in records:
+        key = (
+            str(record.get("summary") or ""),
+            tuple(str(item) for item in record.get("evidence_hashes") or []),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(record)
+    return deduped
+
+
+def significant_tokens(text: str) -> set[str]:
+    tokens = {
+        token
+        for token in re.findall(r"[a-z0-9_][a-z0-9_\-]{2,}", text.lower())
+        if token not in STOPWORDS
+    }
+    return tokens
+
+
+def indexed_doc_chunks(text: str) -> list[tuple[str, set[str]]]:
+    chunks: list[tuple[str, set[str]]] = []
+    for raw_chunk in re.split(r"\n\s*(?:[-*]|\d+[.)]|\#\#)", text):
+        chunk = normalize_text(raw_chunk)
+        tokens = significant_tokens(chunk)
+        if len(tokens) >= 3:
+            chunks.append((chunk, tokens))
+    return chunks
+
+
+def best_chunk_overlap(
+    text: str, chunks: list[tuple[str, set[str]]]
+) -> tuple[float, str | None]:
+    tokens = significant_tokens(text)
+    if not tokens:
+        return 0.0, None
+    best_score = 0.0
+    best_chunk: str | None = None
+    denominator = min(len(tokens), 18)
+    for chunk, chunk_tokens in chunks:
+        score = len(tokens & chunk_tokens) / denominator
+        if score > best_score:
+            best_score = score
+            best_chunk = chunk
+    return best_score, best_chunk
+
+
+def review_distillates(
+    distillates: list[dict[str, Any]],
+    *,
+    canonical_text: str,
+    preference_text: str = "",
+) -> list[dict[str, Any]]:
+    """Mark candidate distillates with a conservative promotion review status.
+
+    The review pass is intentionally lexical and conservative: it can identify
+    candidates already reflected in canonical memory and candidates that still
+    need human/agent review, but it does not auto-promote transcript evidence.
+    """
+
+    canonical_chunks = indexed_doc_chunks(canonical_text)
+    preference_chunks = indexed_doc_chunks(preference_text)
+    reviewed: list[dict[str, Any]] = []
+
+    for record in distillates:
+        candidate = dict(record)
+        review_text = " ".join(
+            str(value or "")
+            for value in (
+                candidate.get("summary"),
+                candidate.get("prompt"),
+                candidate.get("category"),
+            )
+        )
+
+        if candidate.get("status") == "reject":
+            candidate.update(
+                {
+                    "review_status": "rejected_noise",
+                    "review_reason": "classifier rejected this record as low-signal transcript noise",
+                }
+            )
+            reviewed.append(candidate)
+            continue
+
+        chunks = (
+            preference_chunks
+            if candidate.get("promotion_target")
+            == ".agents/references/human_owner_intent.md"
+            else canonical_chunks
+        )
+        overlap, matched_chunk = best_chunk_overlap(review_text, chunks)
+        candidate["canonical_overlap"] = round(overlap, 3)
+        if matched_chunk:
+            candidate["canonical_match"] = matched_chunk[:280]
+
+        if overlap >= 0.55:
+            candidate.update(
+                {
+                    "review_status": "already_reflected",
+                    "review_reason": "lexical overlap with the owning canonical surface is high enough for evidence-only indexing",
+                }
+            )
+        elif candidate.get("promotion_target") == ".agents/memory/state/DECISIONS.md":
+            candidate.update(
+                {
+                    "review_status": "needs_canonical_review",
+                    "review_reason": "not clearly reflected in DECISIONS.md; inspect against current source order before promotion",
+                }
+            )
+        elif (
+            candidate.get("promotion_target")
+            == ".agents/references/human_owner_intent.md"
+        ):
+            candidate.update(
+                {
+                    "review_status": "needs_preference_review",
+                    "review_reason": "not clearly reflected in human-owner intent; inspect before promotion",
+                }
+            )
+        elif candidate.get("promotion_target"):
+            candidate.update(
+                {
+                    "review_status": "route_to_backlog_review",
+                    "review_reason": "actionable-looking transcript evidence; add to agents DB only if current and not duplicate",
+                }
+            )
+        else:
+            candidate.update(
+                {
+                    "review_status": "evidence_only",
+                    "review_reason": "retained as searchable transcript evidence, not a canonical decision",
+                }
+            )
+        reviewed.append(candidate)
+
+    return reviewed
+
+
+def gather_records(
+    roots: list[Path],
+    project_root: Path,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], Counter[str]]:
+    counter: Counter[str] = Counter()
+    all_user_messages: list[dict[str, Any]] = []
+    all_plan_answers: list[dict[str, Any]] = []
+
+    for root in roots:
+        if not root.exists():
+            counter["missing_roots"] += 1
+            continue
+        for path in sorted(root.rglob("*.jsonl")):
+            counter["session_files_seen"] += 1
+            state = extract_session(path, roots, project_root)
+            if state is None:
+                continue
+            counter["candidate_sessions"] += 1
+            if state.matched_by_cwd:
+                counter["sessions_matched_by_cwd"] += 1
+            if state.matched_by_marker:
+                counter["sessions_matched_by_marker"] += 1
+            if state.mode == "plan" or state.plan_answers:
+                counter["sessions_with_plan_mode"] += 1
+            all_user_messages.extend(state.user_messages)
+            all_plan_answers.extend(state.plan_answers)
+
+    user_messages = dedupe_records(all_user_messages)
+    plan_answers = dedupe_records(all_plan_answers)
+    counter["user_messages_raw"] = len(all_user_messages)
+    counter["user_messages_deduped"] = len(user_messages)
+    counter["plan_answers_raw"] = len(all_plan_answers)
+    counter["plan_answers_deduped"] = len(plan_answers)
+    return user_messages, plan_answers, counter
+
+
+def write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def default_roots() -> list[Path]:
+    roots = [DEFAULT_CODEX_ROOT]
+    if RESTORED_CODEX_ROOT.exists():
+        roots.append(RESTORED_CODEX_ROOT)
+    return roots
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--sessions-root",
+        action="append",
+        type=Path,
+        help="Codex sessions root. May be passed multiple times. Defaults to local Codex roots.",
+    )
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        default=DEFAULT_PROJECT_ROOT,
+        help="Project root used for cwd matching.",
+    )
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=TRANSCRIPT_ROOT,
+        help="Output root for user and distilled transcript JSONL.",
+    )
+    parser.add_argument(
+        "--decisions-file",
+        type=Path,
+        default=REPO_ROOT / ".agents" / "memory" / "state" / "DECISIONS.md",
+        help="Canonical decisions file used to mark already-reflected candidates.",
+    )
+    parser.add_argument(
+        "--preferences-file",
+        type=Path,
+        default=REPO_ROOT / ".agents" / "references" / "human_owner_intent.md",
+        help="Human-owner preference file used to mark already-reflected preferences.",
+    )
+    parser.add_argument(
+        "--date",
+        default=date.today().isoformat(),
+        help="Batch date used in output paths.",
+    )
+    parser.add_argument(
+        "--write",
+        action="store_true",
+        help="Write transcript user extracts and distillates. Without this, only print counts.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+    roots = [
+        root.expanduser().resolve() for root in (args.sessions_root or default_roots())
+    ]
+    project_root = args.project_root.expanduser().resolve()
+    user_messages, plan_answers, counter = gather_records(roots, project_root)
+    distillates = distill_records(user_messages, plan_answers)
+    canonical_text = (
+        args.decisions_file.read_text(encoding="utf-8")
+        if args.decisions_file.exists()
+        else ""
+    )
+    preference_text = (
+        args.preferences_file.read_text(encoding="utf-8")
+        if args.preferences_file.exists()
+        else ""
+    )
+    reviewed_distillates = review_distillates(
+        distillates,
+        canonical_text=canonical_text,
+        preference_text=preference_text,
+    )
+    counter["candidate_distillates"] = len(distillates)
+    counter["candidate_distillates_promotable"] = sum(
+        1 for item in distillates if item.get("status") == "candidate"
+    )
+    counter.update(
+        {
+            f"reviewed_{status}": count
+            for status, count in Counter(
+                str(item.get("review_status") or "unknown")
+                for item in reviewed_distillates
+            ).items()
+        }
+    )
+
+    print(
+        json.dumps(
+            {"roots": [root.as_posix() for root in roots], "counts": counter}, indent=2
+        )
+    )
+
+    if not args.write:
+        return 0
+
+    batch = str(args.date)
+    user_root = args.output_root / "user" / batch
+    distilled_root = args.output_root / "distilled" / batch
+    write_jsonl(user_root / "user_messages.jsonl", user_messages)
+    write_jsonl(user_root / "plan_mode_answers.jsonl", plan_answers)
+    write_jsonl(distilled_root / "candidate_decisions.jsonl", distillates)
+    write_jsonl(distilled_root / "reviewed_decisions.jsonl", reviewed_distillates)
+    manifest = {
+        "schema_version": SCHEMA_VERSION,
+        "batch": batch,
+        "roots": [root.as_posix() for root in roots],
+        "project_root": project_root.as_posix(),
+        "counts": dict(counter),
+        "outputs": [
+            (user_root / "user_messages.jsonl").relative_to(REPO_ROOT).as_posix(),
+            (user_root / "plan_mode_answers.jsonl").relative_to(REPO_ROOT).as_posix(),
+            (distilled_root / "candidate_decisions.jsonl")
+            .relative_to(REPO_ROOT)
+            .as_posix(),
+            (distilled_root / "reviewed_decisions.jsonl")
+            .relative_to(REPO_ROOT)
+            .as_posix(),
+        ],
+    }
+    (distilled_root / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

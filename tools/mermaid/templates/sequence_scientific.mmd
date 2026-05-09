@@ -1,0 +1,27 @@
+---
+config:
+  sequence:
+    showSequenceNumbers: false
+  themeVariables:
+    fontSize: "18px"
+---
+sequenceDiagram
+  autonumber
+  %% ARIA-NBV sequence template for training/serving/data-loading protocols.
+
+  participant User as User / Evaluator
+  participant Sup as Supervisor
+  participant Policy as NBV Policy
+  participant Store as Immutable VIN offline store
+  participant Model as VIN Model
+  participant AR as AR Overlay
+
+  User->>Sup: start rollout(scene_id, budget)
+  Sup->>Store: load observations + candidate set
+  Store-->>Sup: sample, cameras, semidense points
+  Sup->>Model: score candidates
+  Model-->>Sup: predicted RRI map
+  Sup->>Policy: select q_star
+  Policy-->>Sup: next view action
+  Sup->>AR: render pose / trajectory suggestion
+  AR-->>User: visual NBV overlay

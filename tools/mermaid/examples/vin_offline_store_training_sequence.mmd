@@ -1,0 +1,28 @@
+sequenceDiagram
+autonumber
+participant DM as VinDataModule
+participant SRC as VinOfflineSourceConfig
+participant DS as VinOfflineDataset
+participant STORE as Immutable VIN offline store
+participant ZARR as Zarr tensor blocks
+participant MSG as MessagePack diagnostics
+participant DL as DataLoader
+participant BATCH as VinOracleBatch
+
+DM->>SRC: setup_target(split, shuffle)
+SRC->>DS: build map-style dataset
+DS->>STORE: load manifest.json + sample_index.jsonl
+Note over STORE: split arrays select train/val/all rows
+
+loop Each batch
+  DM->>DL: train_dataloader()
+  DL->>DS: __getitem__(idx)
+  DS->>ZARR: read fixed tensor rows
+  opt diagnostics requested
+    DS->>MSG: read indexed payload blobs
+  end
+  DS-->>DS: reconstruct VinSnippetView + oracle fields
+  DS-->>DL: sample
+  DL->>BATCH: collate(samples)
+  Note over BATCH: pad candidates to max Nq, stack cameras, pad semidense points
+end

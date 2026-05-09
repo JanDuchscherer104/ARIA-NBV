@@ -1,0 +1,122 @@
+---
+config:
+  theme: base
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 20
+    rankSpacing: 32
+    curve: basis
+  layout: elk
+  themeVariables:
+    background: "#ffffff"
+    fontFamily: "Inter, DejaVu Sans, Arial, sans-serif"
+    fontSize: "18px"
+    primaryTextColor: "#1f2937"
+    lineColor: "#64748b"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 18px; font-weight: 700; }
+---
+flowchart LR
+  subgraph Scene["Scene memory encoder"]
+    direction TB
+    EVLRoot["$$\begin{array}{c}\textbf{Frozen root EVL}\\\\ \mathbf{F}_{0}^{\mathrm{EVL}}\end{array}$$"]
+    Points["$$\begin{array}{c}\textbf{Accumulated points}\\\\ \boldsymbol{\mathcal{P}}_{t}\end{array}$$"]
+    DirVol["$$\begin{array}{c}\textbf{Directional memory}\\\\ \mathbf{V}_{\mathrm{dir}}(\boldsymbol{\mathcal{P}}_{t})\end{array}$$"]
+    SceneEnc["$$\begin{array}{c}\textbf{Small 3D field adapter}\\\\ E_{\mathrm{3D}}(\bullet)\end{array}$$"]
+    SceneField["$$\begin{array}{c}\textbf{Scene field}\\\\ \mathbf{F}_{t}^{\mathrm{scene}}\end{array}$$"]
+  end
+
+  subgraph TargetBranch["Target encoder"]
+    direction TB
+    TargetDesc["$$\begin{array}{c}\textbf{Actor-visible target}\\\\ \mathbf{z}_{e}\end{array}$$"]
+    TargetRead["$$\begin{array}{c}\textbf{Target-local read}\\\\ \operatorname{ROIAlign3D}(\mathbf{F}_{t}^{\mathrm{scene}},\hat{\mathbf{B}}_e)\end{array}$$"]
+    TargetTok["$$\begin{array}{c}\textbf{Target token}\\\\ \mathbf{T}_{e}\end{array}$$"]
+  end
+
+  subgraph HistoryBranch["History encoder"]
+    direction TB
+    HistIn["$$\begin{array}{c}\textbf{Selected-view history}\\\\ \{q_k,r_k,c_k\}_{0:t-1},\ b_t\end{array}$$"]
+    HistTok["$$\begin{array}{c}\textbf{History token}\\\\ \mathbf{H}_{t}\end{array}$$"]
+  end
+
+  subgraph CandidateBranch["Per-candidate encoder"]
+    direction TB
+    PoseFeat["$$\begin{array}{c}\textbf{Pose and provenance}\\\\ q_{t,i},\ \texttt{strategy},\ \texttt{cost}\end{array}$$"]
+    RelFeat["$$\begin{array}{c}\textbf{Target-relative pose}\\\\ \mathbf{T}^{r}_{c_q},\ q_{t,i}\rightarrow e\end{array}$$"]
+    FrustumPool["$$\begin{array}{c}\textbf{Frustum field pool}\\\\ \operatorname{Pool}(\mathbf{F}_{t}^{\mathrm{scene}},q_{t,i},\mathbf{z}_e)\end{array}$$"]
+    BeliefRender["$$\begin{array}{c}\textbf{Current-belief render}\\\\ \operatorname{Render}(\boldsymbol{\mathcal{P}}_{t},\mathbf{F}_{0}^{\mathrm{EVL}},q_{t,i})\end{array}$$"]
+    Novelty["$$\begin{array}{c}\textbf{Directional novelty}\\\\ \phi_{\mathrm{dir}}(\mathbf{V}_{\mathrm{dir}},q_{t,i},\mathbf{z}_e)\end{array}$$"]
+    ValidFeat["$$\begin{array}{c}\textbf{Mask features}\\\\ m_{t,i},\ \rho_{t,i}\end{array}$$"]
+    CandTok["$$\begin{array}{c}\textbf{Candidate token}\\\\ \mathbf{C}_{t,i}\end{array}$$"]
+  end
+
+  subgraph SetReasoner["Permutation-equivariant candidate reasoner"]
+    direction TB
+    Tokens["$$\begin{array}{c}\textbf{Token set}\\\\ \{\mathbf{T}_e,\mathbf{H}_t,\mathbf{C}_{t,1:N_q}\}\end{array}$$"]
+    SetModule["$$\begin{array}{c}\textbf{Set Transformer or spatial GNN}\\\\ E_{\mathrm{set}}(\bullet)\end{array}$$"]
+    ContextTok["$$\begin{array}{c}\textbf{Contextual candidate tokens}\\\\ \mathbf{U}_{t,i}\end{array}$$"]
+  end
+
+  subgraph Heads["Masked residual value heads"]
+    direction TB
+    OneStepAux["$$\begin{array}{c}\textbf{One-step auxiliary}\\\\ \hat r_{t,i}^{e}\end{array}$$"]
+    ResidualQ["$$\begin{array}{c}\textbf{Residual }Q_H\\\\ Q_{H,\theta}=\hat r_{\psi}^{e}+A_{\theta}^{H}\end{array}$$"]
+    DistHead["$$\begin{array}{c}\textbf{Distributional head}\\\\ Z_{H,\theta}(q_{t,i})\end{array}$$"]
+    AuxHeads["$$\begin{array}{c}\textbf{Diagnostics}\\\\ \texttt{visibility},\ \texttt{validity},\ \texttt{cost}\end{array}$$"]
+    MaskedSelect["$$\begin{array}{c}\textbf{Masked selection}\\\\ \operatorname*{arg\,max}_{i:m_{t,i}=1}\ Q_{H,\theta}\end{array}$$"]
+  end
+
+  EVLRoot --> SceneEnc
+  Points --> SceneEnc
+  DirVol --> SceneEnc
+  SceneEnc --> SceneField
+
+  TargetDesc --> TargetTok
+  SceneField --> TargetRead
+  TargetRead --> TargetTok
+
+  HistIn --> HistTok
+
+  PoseFeat --> CandTok
+  RelFeat --> CandTok
+  SceneField --> FrustumPool
+  FrustumPool --> CandTok
+  Points --> BeliefRender
+  EVLRoot --> BeliefRender
+  BeliefRender --> CandTok
+  DirVol --> Novelty
+  Novelty --> CandTok
+  ValidFeat --> CandTok
+
+  TargetTok --> Tokens
+  HistTok --> Tokens
+  CandTok --> Tokens
+  Tokens --> SetModule
+  SetModule --> ContextTok
+
+  ContextTok --> OneStepAux
+  ContextTok --> ResidualQ
+  ContextTok --> DistHead
+  ContextTok --> AuxHeads
+  ResidualQ --> MaskedSelect
+  DistHead --> MaskedSelect
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class EVLRoot,Points,DirVol,TargetDesc,HistIn,PoseFeat,RelFeat,ValidFeat input;
+  class SceneEnc,TargetRead,TargetTok,HistTok,FrustumPool,BeliefRender,Novelty,CandTok,SetModule,ContextTok,OneStepAux,ResidualQ,DistHead,AuxHeads compute;
+  class SceneField,Tokens data;
+  class MaskedSelect output;
+
+  style Scene fill:#f1fff6,stroke:#97ddb5,stroke-width:2px,rx:12,ry:12
+  style TargetBranch fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12
+  style HistoryBranch fill:#fffaf0,stroke:#fbbf24,stroke-width:2px,rx:12,ry:12
+  style CandidateBranch fill:#ffffff,stroke:#cbd5e1,stroke-width:1.5px,rx:12,ry:12
+  style SetReasoner fill:#f7f3ff,stroke:#cdb2ff,stroke-width:2px,rx:12,ry:12
+  style Heads fill:#fff1f2,stroke:#fda4af,stroke-width:2px,rx:12,ry:12

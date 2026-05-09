@@ -19,10 +19,10 @@
     $,
     aux_reg_huber: $
       #(symb.vin.loss) _"reg"
-      = (1)/(N) sum_i "Huber"_1(#(symb.vin.rri_hat) _i - #(symb.vin.rri) _i)
+      = (1)/(N) sum_i "Huber"_1 (#(symb.vin.rri_hat) _i - #(symb.vin.rri) _i)
     $,
     huber: $
-      "Huber"_1(e) = { 0.5 e^2 "if" |e| <= 1; |e| - 0.5 "otherwise" }
+      "Huber"_1 (e) = { 0.5 e^2 "if" |e| <= 1; |e| - 0.5 "otherwise" }
     $,
     aux_weight: $
       lambda_"reg" (t)
