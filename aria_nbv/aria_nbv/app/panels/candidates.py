@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import streamlit as st
 import torch
 from efm3d.aria.pose import PoseTW
 
-from ...data_handling import EfmSnippetView
+from ...data_handling import EfmSnippetView, RolloutZarrStoreReader
 from ...pose_generation import (
     CandidateViewGeneratorConfig,
     CounterfactualPoseGeneratorConfig,
@@ -45,6 +48,12 @@ from ...pose_generation.utils import (
 )
 from ...utils import Console
 from ...utils.frames import world_up_tensor
+from ..rerun_launch import (
+    build_rerun_rollout_spawn_command,
+    format_command,
+    repo_root,
+    spawn_background_command,
+)
 from ..state_types import config_signature, sample_key
 from .common import _info_popover, _pretty_label, _report_exception, _strip_ansi
 
@@ -189,7 +198,7 @@ def _run_counterfactual_rollouts(
     return rollouts, "\n".join(lines)
 
 
-def render_candidates_page(
+def _render_live_candidates_page(
     sample: EfmSnippetView | None,
     candidates: CandidateSamplingResult,
     cand_cfg: CandidateViewGeneratorConfig | None,
@@ -787,6 +796,195 @@ def render_candidates_page(
                         st.code(log_text, language="text")
                     else:
                         st.caption("No Console output was emitted during this rollout run.")
+
+
+def render_candidates_page(
+    sample: EfmSnippetView | None,
+    candidates: CandidateSamplingResult,
+    cand_cfg: CandidateViewGeneratorConfig | None,
+    *,
+    source_caption: str | None = None,
+    source_note: str | None = None,
+) -> None:
+    live_tab, rollout_tab = st.tabs(["Live Candidates", "Rollout Zarr"])
+    with live_tab:
+        _render_live_candidates_page(
+            sample,
+            candidates,
+            cand_cfg,
+            source_caption=source_caption,
+            source_note=source_note,
+        )
+    with rollout_tab:
+        _render_rollout_store_tab()
+
+
+def _render_rollout_store_tab() -> None:
+    st.header("Rollout Store")
+    st.caption("Load a standalone rollouts.zarr store, validate row contracts, and open selected rows in Rerun.")
+    default_store = repo_root() / ".artifacts" / "rollouts" / "rollouts.zarr"
+    default_config = repo_root() / ".configs" / "rerun_offline.toml"
+    store_path = Path(
+        st.text_input(
+            "rollouts.zarr path",
+            value=str(default_store),
+            key="rollout_store_path",
+        )
+    ).expanduser()
+    config_path = Path(
+        st.text_input(
+            "Rerun inspector config",
+            value=str(default_config),
+            key="rollout_rerun_config_path",
+        )
+    ).expanduser()
+
+    if not store_path.exists():
+        st.info("Enter an existing rollouts.zarr path to inspect generated rollout rows.")
+        return
+
+    try:
+        reader = RolloutZarrStoreReader(store_path)
+        validation = reader.validate()
+    except Exception as exc:  # pragma: no cover - UI guard
+        _report_exception(exc, context="Failed to load rollout store")
+        return
+
+    root_attrs = dict(reader.root.attrs)
+    meta_col1, meta_col2, meta_col3, meta_col4 = st.columns(4)
+    with meta_col1:
+        st.metric("Rollouts", validation.num_rollouts)
+    with meta_col2:
+        st.metric("Steps", validation.num_steps)
+    with meta_col3:
+        st.metric("Candidates", validation.num_candidates)
+    with meta_col4:
+        st.metric("Validation", "OK" if validation.ok else "FAILED")
+    if validation.ok:
+        st.success("Store validation passed.")
+    else:
+        st.error("Store validation failed.")
+        st.dataframe([{"error": error} for error in validation.errors], width="stretch", hide_index=True)
+
+    with st.expander("Root metadata", expanded=False):
+        st.json(root_attrs)
+
+    _render_rollout_store_summaries(reader)
+    rollout_ids = reader.array("rollouts/rollout_row_id").astype(int).tolist()
+    if not rollout_ids:
+        st.info("No rollout rows are present.")
+        return
+    selected_rollout = int(
+        st.selectbox(
+            "Rollout row",
+            options=rollout_ids,
+            format_func=lambda row_id: _format_rollout_option(reader, row_id),
+            key="rollout_row_selector",
+        )
+    )
+    st.dataframe(_candidate_rows_for_rollout(reader, selected_rollout), width="stretch", hide_index=True)
+    command = build_rerun_rollout_spawn_command(
+        config_path=config_path,
+        rollout_store=store_path,
+        rollout_row_id=selected_rollout,
+    )
+    st.code(format_command(command), language="bash")
+    if st.button("Open selected rollout in Rerun", key="rollout_open_rerun"):
+        try:
+            process = spawn_background_command(command)
+        except Exception as exc:  # pragma: no cover - UI guard
+            _report_exception(exc, context="Failed to spawn Rerun inspector")
+        else:
+            st.success(f"Spawned Rerun inspector with pid {process.pid}.")
+
+
+def _render_rollout_store_summaries(reader: RolloutZarrStoreReader) -> None:
+    target_rows = reader.array("targets/target_row_id")
+    rollout_rows = reader.array("rollouts/rollout_row_id")
+    step_rows = reader.array("steps/step_row_id")
+    candidate_rows = reader.array("candidates/candidate_row_id")
+    q_train = reader.array("q_h/q_train_mask")
+    valid_action = reader.array("q_h/valid_action_mask")
+    actor_action = reader.array("candidates/actor_action_mask")
+    oracle_label = reader.array("candidates/oracle_label_mask")
+    summary = [
+        {"table": "targets", "rows": int(target_rows.shape[0])},
+        {"table": "rollouts", "rows": int(rollout_rows.shape[0])},
+        {"table": "steps", "rows": int(step_rows.shape[0])},
+        {"table": "candidates", "rows": int(candidate_rows.shape[0])},
+        {"table": "actor_action candidates", "rows": int(actor_action.sum())},
+        {"table": "oracle_label candidates", "rows": int(oracle_label.sum())},
+        {"table": "q_h valid actions", "rows": int(valid_action.sum())},
+        {"table": "q_h train cells", "rows": int(q_train.sum())},
+    ]
+    st.dataframe(summary, width="stretch", hide_index=True)
+    target_summary = []
+    target_valid = reader.array("targets/target_valid_mask")
+    gt_valid = reader.array("targets/gt_label_valid_mask")
+    for row_id, valid, gt_label in zip(target_rows, target_valid, gt_valid, strict=True):
+        target_summary.append(
+            {
+                "target_row_id": int(row_id),
+                "target_valid": bool(valid),
+                "gt_label_valid": bool(gt_label),
+            }
+        )
+    if target_summary:
+        st.dataframe(target_summary, width="stretch", hide_index=True)
+
+
+def _candidate_rows_for_rollout(reader: RolloutZarrStoreReader, rollout_row_id: int) -> list[dict[str, object]]:
+    rollout_ids = reader.array("candidates/rollout_row_id")
+    mask = rollout_ids == int(rollout_row_id)
+    rows: list[dict[str, object]] = []
+    for index in np.nonzero(mask)[0].tolist():
+        rows.append(
+            {
+                "candidate_row_id": int(reader.array("candidates/candidate_row_id")[index]),
+                "step_index": int(reader.array("candidates/step_index")[index]),
+                "shell_index": int(reader.array("candidates/shell_index")[index]),
+                "selected": bool(reader.array("candidates/selected_mask")[index]),
+                "actor_action": bool(reader.array("candidates/actor_action_mask")[index]),
+                "q_train": bool(reader.array("candidates/q_train_mask")[index]),
+                "target_rri": _finite_or_none(reader.array("candidates/target_rri")[index]),
+                "scene_rri": _finite_or_none(reader.array("candidates/scene_rri")[index]),
+                "strategy_id": int(reader.array("candidates/strategy_id")[index]),
+                "mixture_id": int(reader.array("candidates/mixture_id")[index]),
+            }
+        )
+    return rows
+
+
+def _format_rollout_option(reader: RolloutZarrStoreReader, rollout_row_id: int) -> str:
+    rollout_rows = reader.array("rollouts/rollout_row_id")
+    matches = np.nonzero(rollout_rows == int(rollout_row_id))[0]
+    if matches.size != 1:
+        return f"rollout {rollout_row_id}"
+    index = int(matches[0])
+    policies = _string_list(reader, "dictionaries/policy")
+    scenes = _string_list(reader, "dictionaries/scene")
+    policy = _dict_value(policies, int(reader.array("rollouts/policy_id")[index]))
+    scene = _dict_value(scenes, int(reader.array("rollouts/scene_id")[index]))
+    target_row = int(reader.array("rollouts/target_row_id")[index])
+    return f"rollout {rollout_row_id} · target {target_row} · {policy} · {scene}"
+
+
+def _string_list(reader: RolloutZarrStoreReader, path: str) -> list[str]:
+    try:
+        return json.loads(bytes(reader.array(path).tolist()).decode("utf-8"))
+    except Exception:
+        return []
+
+
+def _dict_value(values: list[str], index: int) -> str:
+    if index < 0 or index >= len(values):
+        return ""
+    return values[index]
+
+
+def _finite_or_none(value: object) -> float | None:
+    value_float = float(value)
+    return value_float if np.isfinite(value_float) else None
 
 
 __all__ = ["render_candidates_page"]

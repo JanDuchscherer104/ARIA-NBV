@@ -1,4 +1,10 @@
 from .candidate_generation import CandidateViewGenerator, CandidateViewGeneratorConfig
+from .candidate_mixture import (
+    CandidateMixtureComponentConfig,
+    CandidateMixtureViewGenerator,
+    CandidateMixtureViewGeneratorConfig,
+    candidate_strategy_id,
+)
 from .counterfactuals import (
     CounterfactualCandidateEvaluation,
     CounterfactualEvaluatorFn,
@@ -23,7 +29,20 @@ from .rollout_trace import (
     traces_from_rollout_result,
     write_rollout_traces,
 )
-from .types import CandidateSamplingResult, CollisionBackend, SamplingStrategy
+from .target_counterfactuals import (
+    SCENE_CROP_POLICY_SNIPPET_EXTENT_V1,
+    TARGET_CROP_POLICY_GT_OBB_ORIENTED_ANY_VERTEX_V1,
+    CounterfactualTargetOracleRriScorer,
+    CounterfactualTargetOracleRriScorerConfig,
+    TargetRriInvalidError,
+)
+from .types import (
+    CandidateGenerationRuntimeContext,
+    CandidateSamplingResult,
+    CollisionBackend,
+    SamplingStrategy,
+    ViewDirectionMode,
+)
 from .utils import (
     stats_to_markdown_table,
     summarise_dirs_ref,
@@ -33,12 +52,23 @@ from .utils import (
 __all__ = [
     "CandidateViewGenerator",
     "CandidateViewGeneratorConfig",
+    "CandidateMixtureComponentConfig",
+    "CandidateMixtureViewGenerator",
+    "CandidateMixtureViewGeneratorConfig",
+    "CandidateGenerationRuntimeContext",
+    "ViewDirectionMode",
+    "candidate_strategy_id",
     "CounterfactualPoseGenerator",
     "CounterfactualPoseGeneratorConfig",
     "CounterfactualCandidateEvaluation",
     "CounterfactualEvaluatorFn",
     "CounterfactualOracleRriScorer",
     "CounterfactualOracleRriScorerConfig",
+    "CounterfactualTargetOracleRriScorer",
+    "CounterfactualTargetOracleRriScorerConfig",
+    "SCENE_CROP_POLICY_SNIPPET_EXTENT_V1",
+    "TARGET_CROP_POLICY_GT_OBB_ORIENTED_ANY_VERTEX_V1",
+    "TargetRriInvalidError",
     "CounterfactualRolloutResult",
     "CounterfactualSelectionRecord",
     "CounterfactualSelectionPolicy",

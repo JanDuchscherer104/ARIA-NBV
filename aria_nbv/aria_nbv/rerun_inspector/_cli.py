@@ -52,6 +52,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--scene-id", help="Override selection.scene_id.")
     parser.add_argument("--snippet-id", help="Override selection.snippet_id.")
     parser.add_argument("--candidate-index", type=int, help="Override candidate.selected_index for detail layers.")
+    parser.add_argument("--offline-store", type=Path, help="Override dataset.offline.store.store_dir.")
     parser.add_argument(
         "--rollout-store",
         type=Path,
@@ -156,6 +157,10 @@ def _apply_overrides(config: RerunOfflineInspectorConfig, args: argparse.Namespa
         selection_updates["rollout_context_mode"] = args.rollout_context
     if selection_updates:
         cfg.selection = type(cfg.selection).model_validate({**cfg.selection.model_dump(), **selection_updates})
+    if args.offline_store is not None:
+        store = cfg.dataset.offline.store.model_copy(update={"store_dir": args.offline_store.expanduser()})
+        offline = cfg.dataset.offline.model_copy(update={"store": store})
+        cfg.dataset = cfg.dataset.model_copy(update={"offline": offline})
     if args.candidate_index is not None:
         cfg.candidate.selected_index = args.candidate_index
     if args.save is not None:

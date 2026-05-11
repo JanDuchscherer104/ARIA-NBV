@@ -19,7 +19,8 @@ from ..rri_metrics.oracle_rri import OracleRRIConfig
 from ..utils import BaseConfig, Console, Verbosity
 from ..utils.frames import rotate_yaw_cw90
 from .candidate_generation import CandidateViewGenerator, CandidateViewGeneratorConfig
-from .types import CandidateSamplingResult
+from .candidate_mixture import CandidateMixtureViewGenerator, CandidateMixtureViewGeneratorConfig
+from .types import CandidateGenerationRuntimeContext, CandidateSamplingResult
 from .utils import ensure_unbatched_pose
 
 if TYPE_CHECKING:
@@ -261,7 +262,9 @@ class CounterfactualPoseGeneratorConfig(BaseConfig):
     def target(self) -> type["CounterfactualPoseGenerator"]:
         return CounterfactualPoseGenerator
 
-    candidate_config: CandidateViewGeneratorConfig = Field(default_factory=CandidateViewGeneratorConfig)
+    candidate_config: CandidateViewGeneratorConfig | CandidateMixtureViewGeneratorConfig = Field(
+        default_factory=CandidateViewGeneratorConfig
+    )
     horizon: int = 3
     branch_factor: int = 2
     beam_width: int | None = None
@@ -404,7 +407,9 @@ class CounterfactualPoseGenerator:
             .set_verbosity(self.config.verbosity)
             .set_debug(self.config.is_debug)
         )
-        self._candidate_generator: CandidateViewGenerator = self.config.candidate_config.setup_target()
+        self._candidate_generator: CandidateViewGenerator | CandidateMixtureViewGenerator = (
+            self.config.candidate_config.setup_target()
+        )
         self._selection_generator = torch.Generator(device="cpu")
         if self.config.seed is not None:
             self._selection_generator.manual_seed(int(self.config.seed))
@@ -423,6 +428,7 @@ class CounterfactualPoseGenerator:
         *,
         reference_pose: PoseTW | None = None,
         score_candidates: CounterfactualEvaluatorFn | None = None,
+        candidate_runtime_context: CandidateGenerationRuntimeContext | None = None,
     ) -> CounterfactualRolloutResult:
         """Generate rollout trajectories directly from one typed snippet."""
 
@@ -439,6 +445,7 @@ class CounterfactualPoseGenerator:
             camera_calib_template=cam_view.calib.to(device=device),
             occupancy_extent=sample.get_occupancy_extend().to(device=device, dtype=torch.float32),
             score_candidates=score_candidates,
+            candidate_runtime_context=candidate_runtime_context,
         )
 
     def generate(
@@ -451,6 +458,7 @@ class CounterfactualPoseGenerator:
         camera_calib_template: CameraTW,
         occupancy_extent: torch.Tensor,
         score_candidates: CounterfactualEvaluatorFn | None = None,
+        candidate_runtime_context: CandidateGenerationRuntimeContext | None = None,
     ) -> CounterfactualRolloutResult:
         """Generate multi-step counterfactual rollouts from one root pose."""
 
@@ -471,6 +479,7 @@ class CounterfactualPoseGenerator:
                     mesh_faces=mesh_faces,
                     camera_calib_template=camera_calib_template,
                     occupancy_extent=occupancy_extent,
+                    runtime_context=candidate_runtime_context,
                 )
                 valid_count = int(candidates.mask_valid.sum().item())
                 if valid_count <= 0:

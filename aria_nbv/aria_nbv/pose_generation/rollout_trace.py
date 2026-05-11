@@ -158,6 +158,9 @@ class RolloutLineage:
     target_protocol_version: str | None = None
     """Target protocol used for actor input and GT evaluation."""
 
+    target_crop_policy: str | None = None
+    """Oracle/evaluation crop policy used for target-specific RRI labels."""
+
     reason_code_version: str = INVALID_REASON_VERSION
     """Version of candidate invalidity reason codes used by this trace."""
 
@@ -236,6 +239,15 @@ class RolloutStepTrace:
 
     candidate_primary_invalid_reason: torch.Tensor | None = None
     """Dominant invalidity reason bit with shape ``(N,)`` and dtype ``uint16``."""
+
+    candidate_strategy_id: torch.Tensor | None = None
+    """Full-shell candidate strategy ids with shape ``(N,)``."""
+
+    candidate_mixture_id: torch.Tensor | None = None
+    """Full-shell candidate mixture component ids with shape ``(N,)``."""
+
+    candidate_sampler_probability: torch.Tensor | None = None
+    """Full-shell sampler probabilities with shape ``(N,)``."""
 
     candidate_scores: torch.Tensor | None = None
     """Full-shell score vector; invalid or unscored candidates are ``NaN``."""
@@ -331,6 +343,21 @@ class RolloutStepTrace:
             candidate_valid=candidate_valid,
             candidate_invalid_reason_bitset=reason_bitset,
             candidate_primary_invalid_reason=primary_reason,
+            candidate_strategy_id=_full_shell_or_default(
+                step.candidates.strategy_id,
+                candidate_valid,
+                fill_value=-1,
+            ),
+            candidate_mixture_id=_full_shell_or_default(
+                step.candidates.mixture_id,
+                candidate_valid,
+                fill_value=-1,
+            ),
+            candidate_sampler_probability=_full_shell_or_default(
+                step.candidates.sampler_probability,
+                candidate_valid,
+                fill_value=float("nan"),
+            ),
             candidate_scores=candidate_scores,
             selection_score=float(step.selection_score),
             selection_score_label=str(step.selection_score_label),
@@ -464,6 +491,7 @@ def traces_from_rollout_result(
     target_row_id: int | None = None,
     target_id: str | None = None,
     target_protocol_version: str | None = None,
+    target_crop_policy: str | None = None,
     reason_code_version: str = INVALID_REASON_VERSION,
     selection_rng_state_hash: str | None = None,
     target_selection_policy: str | None = None,
@@ -504,6 +532,7 @@ def traces_from_rollout_result(
             target_row_id=target_row_id,
             target_id=target_id,
             target_protocol_version=target_protocol_version,
+            target_crop_policy=target_crop_policy,
             reason_code_version=reason_code_version,
             selection_rng_state_hash=selection_rng_state_hash,
             target_selection_policy=target_selection_policy,
@@ -650,9 +679,14 @@ def _full_candidate_vector(
     candidate_valid: torch.Tensor,
     *,
     fill_value: float | int | None = None,
+    require_full_shell: bool = False,
 ) -> torch.Tensor:
     valid_values = values.detach().cpu().reshape(-1)
     valid_mask = candidate_valid.detach().cpu().to(dtype=torch.bool).reshape(-1)
+    if require_full_shell:
+        if valid_values.numel() != valid_mask.numel():
+            raise ValueError(f"Expected {valid_mask.numel()} full-shell values, got {valid_values.numel()}.")
+        return valid_values
     valid_count = int(valid_mask.sum().item())
     if valid_values.numel() != valid_count:
         raise ValueError(f"Expected {valid_count} valid values, got {valid_values.numel()}.")
@@ -666,6 +700,19 @@ def _full_candidate_vector(
     )
     full[valid_mask] = valid_values
     return full
+
+
+def _full_shell_or_default(
+    values: torch.Tensor | None,
+    candidate_valid: torch.Tensor,
+    *,
+    fill_value: float | int,
+) -> torch.Tensor:
+    valid_mask = candidate_valid.detach().cpu().to(dtype=torch.bool).reshape(-1)
+    if values is None:
+        dtype = torch.float32 if isinstance(fill_value, float) else torch.int64
+        return torch.full(valid_mask.shape, fill_value, dtype=dtype)
+    return _full_candidate_vector(values, candidate_valid, fill_value=fill_value, require_full_shell=True)
 
 
 def _candidate_invalid_reasons(candidates: Any) -> tuple[torch.Tensor, torch.Tensor]:

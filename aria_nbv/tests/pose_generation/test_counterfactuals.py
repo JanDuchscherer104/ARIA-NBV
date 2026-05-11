@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,16 +15,24 @@ import plotly.graph_objects as go  # type: ignore[import-untyped]
 import torch
 import trimesh
 from efm3d.aria import CameraTW, PoseTW
+from efm3d.aria.obb import ObbTW
 
+from aria_nbv.data_handling import TargetCandidateRow
 from aria_nbv.pose_generation import (
+    CandidateGenerationRuntimeContext,
+    CandidateMixtureComponentConfig,
+    CandidateMixtureViewGeneratorConfig,
     CandidateSamplingResult,
     CandidateViewGeneratorConfig,
     CounterfactualCandidateEvaluation,
     CounterfactualPoseGenerator,
     CounterfactualPoseGeneratorConfig,
     CounterfactualSelectionPolicy,
+    CounterfactualTargetOracleRriScorerConfig,
+    CounterfactualTrajectory,
     RolloutTrace,
     SamplingStrategy,
+    ViewDirectionMode,
     read_rollout_traces,
     traces_from_rollout_result,
     write_rollout_traces,
@@ -32,7 +41,14 @@ from aria_nbv.pose_generation.plotting import (
     plot_counterfactual_paths_simple,
     plot_counterfactual_step_simple,
 )
+from aria_nbv.pose_generation.target_counterfactuals import (
+    TargetRriInvalidError,
+    _crop_mesh_to_obb,
+    _crop_points_to_obb,
+)
 from aria_nbv.rendering import CandidateDepthRendererConfig
+from aria_nbv.rendering.candidate_pointclouds import CandidatePointClouds
+from aria_nbv.rri_metrics.oracle_rri import OracleRRIConfig
 
 
 def _identity_pose(device: torch.device | str = "cpu") -> PoseTW:
@@ -57,11 +73,215 @@ def _dummy_camera(device: torch.device | str = "cpu") -> CameraTW:
     )
 
 
+def _obb(center: tuple[float, float, float], size: tuple[float, float, float]) -> ObbTW:
+    half = torch.tensor(size, dtype=torch.float32) / 2.0
+    bb3 = torch.tensor([[-half[0], half[0], -half[1], half[1], -half[2], half[2]]], dtype=torch.float32)
+    return ObbTW.from_lmc(
+        bb3_object=bb3,
+        bb2_rgb=torch.zeros((1, 4), dtype=torch.float32),
+        bb2_slaml=torch.zeros((1, 4), dtype=torch.float32),
+        bb2_slamr=torch.zeros((1, 4), dtype=torch.float32),
+        T_world_object=PoseTW.from_Rt(
+            torch.eye(3, dtype=torch.float32).reshape(1, 3, 3),
+            torch.tensor([center], dtype=torch.float32),
+        ),
+        sem_id=torch.zeros(1, dtype=torch.int64),
+        inst_id=torch.zeros(1, dtype=torch.int64),
+        prob=torch.ones(1, dtype=torch.float32),
+    )
+
+
+def _target_row(*, gt_target_row_id: int) -> TargetCandidateRow:
+    return TargetCandidateRow(
+        scene_id="scene",
+        snippet_id="snippet",
+        source="detected_obbs",
+        source_index=0,
+        target_row_id=1,
+        target_id="target",
+        sem_id=1,
+        inst_id=2,
+        class_name="chair",
+        confidence=0.9,
+        center_world=(0.0, 0.0, 0.0),
+        extents=(1.0, 1.0, 1.0),
+        pose_world_object=tuple(_identity_pose().tensor().reshape(-1).tolist()),
+        relative_pose_reference_object=tuple(_identity_pose().tensor().reshape(-1).tolist()),
+        projected_area_pixels=100.0,
+        projected_area_fraction=0.1,
+        semidense_support_count=10,
+        evl_support_count=10,
+        visibility_score=1.0,
+        support_score=1.0,
+        deficit_score=0.0,
+        score=1.0,
+        eligible=True,
+        invalid_reason_bitset=1,
+        primary_invalid_reason=0,
+        gt_label_valid=True,
+        gt_target_row_id=gt_target_row_id,
+        gt_target_id="gt-target",
+        gt_match_iou=1.0,
+        gt_match_score=1.0,
+        gt_match_status="matched",
+    )
+
+
+def _candidate_result_for_pose(pose: PoseTW, *, count: int = 1) -> CandidateSamplingResult:
+    if count == 1:
+        views = _dummy_camera()
+        shell = pose
+        mask = torch.tensor([True])
+    else:
+        views = CameraTW(_dummy_camera().tensor().repeat(count, 1))
+        shell = PoseTW(pose.tensor().reshape(1, 12).repeat(count, 1))
+        mask = torch.ones(count, dtype=torch.bool)
+    return CandidateSamplingResult(
+        views=views,
+        reference_pose=pose,
+        mask_valid=mask,
+        masks={},
+        shell_poses=shell,
+    )
+
+
 def _mesh_triplet(device: torch.device | str = "cpu") -> tuple[trimesh.Trimesh, torch.Tensor, torch.Tensor]:
     mesh = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
     verts = torch.from_numpy(mesh.vertices).to(dtype=torch.float32, device=device)
     faces = torch.from_numpy(mesh.faces).to(dtype=torch.int64, device=device)
     return mesh, verts, faces
+
+
+def test_target_obb_crop_keeps_oriented_membership_not_axis_aligned_shell() -> None:
+    obb = _obb((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+    points = torch.tensor(
+        [
+            [0.25, 0.25, 0.25],
+            [0.75, 0.0, 0.0],
+            [0.0, -0.75, 0.0],
+        ],
+        dtype=torch.float32,
+    )
+
+    cropped = _crop_points_to_obb(points, obb)
+
+    assert cropped.tolist() == [[0.25, 0.25, 0.25]]
+
+
+def test_target_obb_mesh_crop_keeps_faces_with_any_inside_vertex() -> None:
+    obb = _obb((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+    verts = torch.tensor(
+        [
+            [0.0, 0.0, 0.0],
+            [2.0, 0.0, 0.0],
+            [0.0, 2.0, 0.0],
+            [2.0, 2.0, 0.0],
+        ],
+        dtype=torch.float32,
+    )
+    faces = torch.tensor([[0, 1, 2], [1, 2, 3]], dtype=torch.int64)
+
+    cropped_verts, cropped_faces = _crop_mesh_to_obb(verts, faces, obb)
+
+    assert cropped_faces.shape == (1, 3)
+    assert cropped_verts.shape == (3, 3)
+
+
+def test_target_obb_mesh_crop_reports_empty_crop_as_target_invalid() -> None:
+    obb = _obb((10.0, 10.0, 10.0), (1.0, 1.0, 1.0))
+    mesh, verts, faces = _mesh_triplet()
+
+    with pytest.raises(TargetRriInvalidError, match="no mesh faces"):
+        _crop_mesh_to_obb(verts, faces, obb)
+
+
+def test_target_scorer_computes_target_and_scene_rri_from_one_pointcloud_batch(monkeypatch) -> None:
+    class _FakeDepthRenderer:
+        render_count = 0
+
+        def render(self, sample, candidates):
+            del sample, candidates
+            self.render_count += 1
+            return object()
+
+    class _FakeOracle:
+        calls: list[int] = []
+
+        def score(self, *, points_t, points_q, lengths_q, gt_verts, gt_faces, extend):
+            del points_t, points_q, lengths_q, gt_faces, extend
+            self.calls.append(int(gt_verts.shape[0]))
+            values = torch.full((2,), float(gt_verts.shape[0]), dtype=torch.float32)
+            return SimpleNamespace(
+                rri=values,
+                pm_dist_before=values + 1.0,
+                pm_dist_after=values + 2.0,
+                pm_acc_before=values + 3.0,
+                pm_comp_before=values + 4.0,
+                pm_acc_after=values + 5.0,
+                pm_comp_after=values + 6.0,
+            )
+
+    import aria_nbv.pose_generation.target_counterfactuals as target_cf
+
+    renderer = _FakeDepthRenderer()
+    oracle = _FakeOracle()
+    pointcloud_calls = {"count": 0}
+
+    def _fake_pointclouds(sample, depths, *, stride=1):
+        del sample, depths, stride
+        pointcloud_calls["count"] += 1
+        return CandidatePointClouds(
+            points=torch.tensor(
+                [
+                    [[0.1, 0.1, 0.1], [2.0, 2.0, 2.0]],
+                    [[0.2, 0.1, 0.1], [3.0, 3.0, 3.0]],
+                ],
+                dtype=torch.float32,
+            ),
+            lengths=torch.tensor([2, 2], dtype=torch.long),
+            semidense_points=torch.tensor([[0.0, 0.0, 0.0]], dtype=torch.float32),
+            semidense_length=torch.tensor([1], dtype=torch.long),
+            occupancy_bounds=torch.tensor([-10.0, 10.0, -10.0, 10.0, -10.0, 10.0], dtype=torch.float32),
+        )
+
+    monkeypatch.setattr(target_cf, "build_candidate_pointclouds", _fake_pointclouds)
+    monkeypatch.setattr(CandidateDepthRendererConfig, "setup_target", lambda self: renderer)
+    monkeypatch.setattr(OracleRRIConfig, "setup_target", lambda self: oracle)
+    target_obb = _obb((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+    row = _target_row(gt_target_row_id=0)
+    target_sample = SimpleNamespace(gt_obbs=SimpleNamespace(obbs=target_obb.tensor(), sem_id_to_name=[]))
+    sample = SimpleNamespace(
+        mesh_verts=torch.tensor(
+            [
+                [-0.5, -0.5, 0.0],
+                [0.5, -0.5, 0.0],
+                [0.0, 0.5, 0.0],
+                [3.0, 3.0, 0.0],
+                [4.0, 3.0, 0.0],
+                [3.0, 4.0, 0.0],
+            ],
+            dtype=torch.float32,
+        ),
+        mesh_faces=torch.tensor([[0, 1, 2], [3, 4, 5]], dtype=torch.int64),
+    )
+    candidates = _candidate_result_for_pose(_identity_pose(), count=2)
+    cfg = CounterfactualTargetOracleRriScorerConfig(
+        min_current_target_points=1,
+        include_scene_rri=True,
+    )
+
+    evaluation = cfg.setup_target(sample=sample, target_sample=target_sample, target_row=row)(
+        candidates,
+        CounterfactualTrajectory(root_pose_world=_identity_pose()),
+        0,
+    )
+
+    assert renderer.render_count == 1
+    assert pointcloud_calls["count"] == 1
+    assert oracle.calls == [3, 6]
+    assert evaluation.score_label == "target_rri"
+    assert evaluation.metric_vectors["target_rri"].tolist() == [3.0, 3.0]
+    assert evaluation.metric_vectors["scene_rri"].tolist() == [6.0, 6.0]
 
 
 def _default_extent(device: torch.device | str = "cpu") -> torch.Tensor:
@@ -384,3 +604,59 @@ def test_rollout_trace_maps_scores_to_full_candidate_shell_and_roundtrips(tmp_pa
         first_step.candidate_scores,
         equal_nan=True,
     )
+
+
+def test_counterfactual_rollout_passes_target_runtime_context_to_mixed_sampler() -> None:
+    base_cfg = CandidateViewGeneratorConfig(
+        num_samples=4,
+        oversample_factor=1.0,
+        min_radius=0.5,
+        max_radius=0.5,
+        ensure_collision_free=False,
+        ensure_free_space=False,
+        min_distance_to_mesh=0.0,
+        view_max_azimuth_deg=0.0,
+        view_max_elevation_deg=0.0,
+        verbosity=0,
+        seed=0,
+        is_debug=True,
+    )
+    cfg = CounterfactualPoseGeneratorConfig(
+        candidate_config=CandidateMixtureViewGeneratorConfig(
+            base=base_cfg,
+            components=[
+                CandidateMixtureComponentConfig(name="target", count=4, strategy=ViewDirectionMode.TARGET_POINT)
+            ],
+        ),
+        horizon=1,
+        branch_factor=1,
+        selection_policy=CounterfactualSelectionPolicy.RANDOM_VALID,
+        verbosity=0,
+    )
+    generator = CounterfactualPoseGenerator(cfg)
+    mesh, verts, faces = _mesh_triplet(cfg.candidate_config.device)
+
+    with pytest.raises(ValueError, match="target_center_world"):
+        generator.generate(
+            reference_pose=_identity_pose(device=cfg.candidate_config.device),
+            gt_mesh=mesh,
+            mesh_verts=verts,
+            mesh_faces=faces,
+            camera_calib_template=_dummy_camera(cfg.candidate_config.device),
+            occupancy_extent=_default_extent(cfg.candidate_config.device),
+        )
+
+    rollouts = generator.generate(
+        reference_pose=_identity_pose(device=cfg.candidate_config.device),
+        gt_mesh=mesh,
+        mesh_verts=verts,
+        mesh_faces=faces,
+        camera_calib_template=_dummy_camera(cfg.candidate_config.device),
+        occupancy_extent=_default_extent(cfg.candidate_config.device),
+        candidate_runtime_context=CandidateGenerationRuntimeContext(target_center_world=torch.zeros(3)),
+    )
+
+    step = rollouts.trajectories[0].steps[0]
+    assert step.candidates.strategy_id is not None
+    assert step.candidates.mixture_id is not None
+    assert step.candidates.strategy_id.unique().tolist() == [3]

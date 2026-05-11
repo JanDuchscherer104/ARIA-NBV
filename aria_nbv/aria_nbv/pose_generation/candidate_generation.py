@@ -40,6 +40,7 @@ from .orientations import OrientationBuilder
 from .positional_sampling import PositionSampler
 from .types import (
     CandidateContext,
+    CandidateGenerationRuntimeContext,
     CandidateSamplingResult,
     CollisionBackend,
     SamplingStrategy,
@@ -324,6 +325,7 @@ class CandidateViewGenerator:
         self,
         sample: EfmSnippetView,
         frame_index: int | None = None,
+        runtime_context: CandidateGenerationRuntimeContext | None = None,
     ) -> CandidateSamplingResult:
         """Generate candidates using an :class:`EfmSnippetView` sample.
 
@@ -331,7 +333,11 @@ class CandidateViewGenerator:
             sample: Snippet view with trajectory and mesh.
             frame_index: Optional frame index to extract the reference pose instead of using the final pose.
                 0 <= frame_index < F where is the number of frames in the snippet; F = sample.get_camera(self.config.camera_label).num_frames.
+            runtime_context: Optional target/runtime context accepted for interface
+                compatibility with mixture generators. The single-family
+                generator reads target state directly from the config.
         """
+        del runtime_context
         device = torch.device(self.config.device)
         occ = sample.get_occupancy_extend()
         self.console.dbg(
@@ -382,6 +388,7 @@ class CandidateViewGenerator:
         mesh_faces: torch.Tensor,
         camera_calib_template: CameraTW,
         occupancy_extent: torch.Tensor,
+        runtime_context: CandidateGenerationRuntimeContext | None = None,
     ) -> CandidateSamplingResult:
         """Sample candidate poses around `reference_pose` and apply pruning rules.
 
@@ -404,11 +411,16 @@ class CandidateViewGenerator:
                 overwritten with candidate extrinsics.
             occupancy_extent:
                 `Tensor['6']` world-space AABB used by :class:`FreeSpaceRule`.
+            runtime_context:
+                Optional target/runtime context accepted for interface
+                compatibility with mixture generators. The single-family
+                generator reads target state directly from the config.
 
         Returns:
             :class:`CandidateSamplingResult` holding the valid candidate :class:`CameraTW`, reference pose, shell
             poses, masks and optional debug statistics.
         """
+        del runtime_context
         device = self.config.device
 
         reference_pose = rotate_yaw_cw90(

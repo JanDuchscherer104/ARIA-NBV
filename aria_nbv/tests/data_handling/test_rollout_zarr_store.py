@@ -21,6 +21,7 @@ from aria_nbv.data_handling import (
     write_rollout_zarr_store,
 )
 from aria_nbv.pose_generation import INVALID_REASON_VERSION, build_synthetic_rollout_traces
+from aria_nbv.pose_generation.target_counterfactuals import TARGET_CROP_POLICY_GT_OBB_ORIENTED_ANY_VERTEX_V1
 
 
 def _json_list(reader: RolloutZarrStoreReader, path: str) -> list[str]:
@@ -99,6 +100,21 @@ def test_rollout_zarr_requires_explicit_target_rri_for_q_training(tmp_path) -> N
     assert not reader.array("candidates/q_train_mask").any()
     assert np.isnan(reader.array("q_h/one_step_target_rri")).all()
     assert not reader.array("q_h/q_train_mask").any()
+
+
+def test_rollout_zarr_never_backfills_scene_rri_from_generic_rri(tmp_path) -> None:
+    traces = build_synthetic_rollout_traces(horizon=1, num_samples=6, seed=10)[:1]
+    for step in traces[0].steps:
+        generic = torch.arange(step.candidate_valid.shape[0], dtype=torch.float32)
+        step.metric_vectors = {"rri": generic, "target_rri": generic}
+        step.selected_metrics = {"rri": 1.0, "target_rri": 1.0}
+
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", traces)
+    reader = RolloutZarrStoreReader(result.store_dir)
+
+    assert np.isfinite(reader.array("candidates/target_rri")).any()
+    assert np.isnan(reader.array("candidates/scene_rri")).all()
+    assert np.isnan(reader.array("q_h/one_step_scene_rri")).all()
 
 
 def test_rollout_zarr_masks_invalid_candidate_oracle_labels(tmp_path) -> None:
@@ -200,8 +216,23 @@ def test_rollout_zarr_records_per_rollout_lineage_and_split(tmp_path) -> None:
     lineage.split_manifest_hash = "split-manifest"
     lineage.branch_schedule_id = "branch-schedule"
     lineage.target_protocol_version = "v1-observed"
+    lineage.target_crop_policy = TARGET_CROP_POLICY_GT_OBB_ORIENTED_ANY_VERTEX_V1
     lineage.reason_code_version = INVALID_REASON_VERSION
     lineage.selection_rng_state_hash = "rng-state"
+    lineage.target_row_id = 5
+    lineage.target_id = "target"
+    lineage.target_selection_policy = "greedy_top_k"
+    lineage.target_invalid_reason_bitset = 1
+    lineage.target_primary_invalid_reason = 0
+    lineage.target_reason_code_version = TARGET_INVALID_REASON_VERSION
+    lineage.matched_gt_target_row_id = 50
+    lineage.matched_gt_target_id = "gt-target"
+    lineage.gt_match_status = "matched"
+    for step in traces[0].steps:
+        n = int(step.candidate_valid.shape[0])
+        step.candidate_strategy_id = torch.arange(n, dtype=torch.int64) % 4
+        step.candidate_mixture_id = torch.arange(n, dtype=torch.int64) % 2
+        step.candidate_sampler_probability = torch.full((n,), 1.0 / float(n), dtype=torch.float32)
 
     result = write_rollout_zarr_store(
         tmp_path / "rollouts.zarr",
@@ -225,12 +256,77 @@ def test_rollout_zarr_records_per_rollout_lineage_and_split(tmp_path) -> None:
         "split_manifest_hash_id",
         "branch_schedule_id",
         "target_protocol_version_id",
+        "target_crop_policy_id",
         "reason_code_version_id",
         "selection_rng_state_hash_id",
     ):
         assert int(reader.array(f"lineage/{name}")[0]) >= 0
     validation = validate_rollout_zarr_store(result.store_dir)
     assert validation.ok, validation.errors
+
+
+def test_rollout_zarr_preserves_candidate_mixture_provenance_for_real_stores(tmp_path) -> None:
+    traces = build_synthetic_rollout_traces(horizon=1, num_samples=6, seed=21)[:1]
+    lineage = traces[0].lineage
+    lineage.split = "train"
+    lineage.candidate_config_hash = "candidate-cfg"
+    lineage.oracle_config_hash = "oracle-cfg"
+    lineage.rollout_config_hash = "rollout-cfg"
+    lineage.source_cache_version = "source-cache-v7"
+    lineage.source_offline_store_manifest_hash = "source-manifest"
+    lineage.split_manifest_hash = "split-manifest"
+    lineage.target_protocol_version = "v1-observed"
+    lineage.target_crop_policy = TARGET_CROP_POLICY_GT_OBB_ORIENTED_ANY_VERTEX_V1
+    lineage.reason_code_version = INVALID_REASON_VERSION
+    lineage.selection_rng_state_hash = "rng-state"
+    lineage.target_row_id = 3
+    lineage.target_id = "target"
+    lineage.target_selection_policy = "greedy_top_k"
+    lineage.target_invalid_reason_bitset = 1
+    lineage.target_primary_invalid_reason = 0
+    lineage.target_reason_code_version = TARGET_INVALID_REASON_VERSION
+    lineage.matched_gt_target_row_id = 30
+    lineage.matched_gt_target_id = "gt-target"
+    lineage.gt_match_status = "matched"
+    for step in traces[0].steps:
+        n = int(step.candidate_valid.shape[0])
+        step.candidate_strategy_id = torch.arange(n, dtype=torch.int64) % 4
+        step.candidate_mixture_id = torch.arange(n, dtype=torch.int64) % 2
+        step.candidate_sampler_probability = torch.full((n,), 1.0 / float(n), dtype=torch.float32)
+
+    result = write_rollout_zarr_store(
+        tmp_path / "rollouts.zarr",
+        traces,
+        target_protocol_version="v1-observed",
+        source_offline_store_version="7",
+        split_manifest_hash="split-manifest",
+    )
+    reader = RolloutZarrStoreReader(result.store_dir)
+
+    actor_rows = reader.array("candidates/actor_action_mask")
+    assert np.all(reader.array("candidates/strategy_id")[actor_rows] >= 0)
+    assert np.all(reader.array("candidates/mixture_id")[actor_rows] >= 0)
+    assert np.isfinite(reader.array("candidates/sampler_probability")[actor_rows]).all()
+
+    validation = validate_rollout_zarr_store(result.store_dir)
+    assert validation.ok, validation.errors
+
+
+def test_rollout_zarr_blocks_q_training_for_target_invalid_traces(tmp_path) -> None:
+    traces = build_synthetic_rollout_traces(horizon=1, num_samples=6, seed=25)[:1]
+    traces[0].lineage.target_protocol_version = "v1-observed"
+    traces[0].lineage.target_row_id = 11
+    traces[0].lineage.target_id = "target-invalid"
+    traces[0].lineage.target_invalid_reason_bitset = 1 << 10
+    traces[0].lineage.target_primary_invalid_reason = 10
+    traces[0].lineage.gt_match_status = "unmatched_gt"
+
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", traces, target_protocol_version="synthetic")
+    reader = RolloutZarrStoreReader(result.store_dir)
+
+    assert reader.array("candidates/oracle_label_mask").any()
+    assert not reader.array("candidates/q_train_mask").any()
+    assert not reader.array("q_h/q_train_mask").any()
 
 
 def test_rollout_zarr_rejects_non_synthetic_store_with_synthetic_lineage(tmp_path) -> None:

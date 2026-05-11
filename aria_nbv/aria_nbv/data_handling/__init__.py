@@ -1,11 +1,19 @@
-"""Canonical public API for raw snippets, VIN runtime types, and offline storage.
+"""Canonical data contracts for ASE/EFM snippets and derived NBV stores.
 
-This package root intentionally exposes the supported *canonical* data-handling
-surface:
+`aria_nbv.data_handling` owns the typed boundary between upstream ASE/ATEK/EFM
+payloads and the training/evaluation objects consumed by ARIA-NBV. The public
+surface exposes:
 
-- raw ASE/EFM snippets and typed views,
-- VIN-facing runtime helpers and batch types,
-- the immutable VIN offline dataset format and writer.
+- `EfmSnippetView` and stream-specific views for camera images, calibration,
+  trajectory poses, semidense points, OBBs, GT annotations, and optional meshes;
+- `VinSnippetView` and `VinOracleBatch` for VIN-style one-step RRI scoring;
+- strict immutable VIN offline-store readers/writers;
+- actor-visible target selection and standalone rollout-Zarr replay stores.
+
+The central safety contract is actor/oracle separation. Observed EVL/MPS/OBB
+evidence is actor-visible; ASE meshes, GT OBBs, target crops, and oracle labels
+are supervision/evaluation assets. Invalid samples, targets, or candidates must
+be represented with masks and reason codes rather than low RRI values.
 """
 
 from __future__ import annotations
@@ -43,6 +51,10 @@ _LAZY_EXPORTS = {
     "RolloutZarrStoreWriter": "._rollout_zarr_store",
     "RolloutZarrValidationResult": "._rollout_zarr_store",
     "RolloutZarrWriteResult": "._rollout_zarr_store",
+    "RolloutDatasetWriter": "._rollout_dataset_writer",
+    "RolloutDatasetWriterConfig": "._rollout_dataset_writer",
+    "RolloutDatasetWriterStats": "._rollout_dataset_writer",
+    "RolloutRecipeConfig": "._rollout_dataset_writer",
     "TARGET_INVALID_REASON_CODES": "._target_selection",
     "TARGET_INVALID_REASON_VERSION": "._target_selection",
     "TargetCandidateRow": "._target_selection",
@@ -50,6 +62,8 @@ _LAZY_EXPORTS = {
     "TargetSelectionResult": "._target_selection",
     "TargetSelectorConfig": "._target_selection",
     "TargetSourceMode": "._target_selection",
+    "target_gt_aabb_world": "._target_selection",
+    "target_gt_obb_world": "._target_selection",
     "VinDatasetSourceConfig": "._vin_sources",
     "VinOfflineBackboneDiagnostic": "._offline_diagnostics",
     "VinOfflineBlockDiagnostic": "._offline_diagnostics",
@@ -122,6 +136,10 @@ __all__ = [
     "RolloutZarrStoreWriter",
     "RolloutZarrValidationResult",
     "RolloutZarrWriteResult",
+    "RolloutDatasetWriter",
+    "RolloutDatasetWriterConfig",
+    "RolloutDatasetWriterStats",
+    "RolloutRecipeConfig",
     "TARGET_INVALID_REASON_CODES",
     "TARGET_INVALID_REASON_VERSION",
     "TargetCandidateRow",
@@ -129,6 +147,8 @@ __all__ = [
     "TargetSelectionResult",
     "TargetSelectorConfig",
     "TargetSourceMode",
+    "target_gt_aabb_world",
+    "target_gt_obb_world",
     "VinDatasetSourceConfig",
     "VinOfflineDataset",
     "VinOfflineBackboneDiagnostic",

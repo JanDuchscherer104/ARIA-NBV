@@ -558,6 +558,63 @@ def _compact_obb_block(value: Any) -> tuple[ObbTW, list[str] | None] | None:
     return ObbTW(torch.as_tensor(obbs, dtype=torch.float32)), sem_id_to_name
 
 
+def target_gt_aabb_world(
+    row: TargetCandidateRow,
+    sample: Any,
+    *,
+    margin_m: float = 0.0,
+) -> Tensor:
+    """Resolve the matched GT target OBB to a world-frame AABB.
+
+    Args:
+        row: Actor-visible target row after GT matching.
+        sample: VIN offline sample carrying ``gt_obbs`` and snippet transform.
+        margin_m: Optional symmetric world-space margin in metres.
+
+    Returns:
+        ``Tensor[6]`` in ``[xmin, xmax, ymin, ymax, zmin, zmax]`` order.
+
+    Raises:
+        ValueError: If the row is not label-valid or the matched GT row cannot
+            be resolved.
+    """
+
+    obb = target_gt_obb_world(row, sample)
+    corners = obb.bb3corners_world.detach().cpu().reshape(-1, 3).to(dtype=torch.float32)
+    lower = corners.min(dim=0).values - float(margin_m)
+    upper = corners.max(dim=0).values + float(margin_m)
+    return torch.stack([lower[0], upper[0], lower[1], upper[1], lower[2], upper[2]]).to(dtype=torch.float32)
+
+
+def target_gt_obb_world(row: TargetCandidateRow, sample: Any) -> ObbTW:
+    """Resolve the matched GT target OBB in world coordinates.
+
+    Args:
+        row: Actor-visible target row after GT matching.
+        sample: VIN offline sample carrying ``gt_obbs`` and snippet transform.
+
+    Returns:
+        A single-row :class:`ObbTW` in world coordinates.
+
+    Raises:
+        ValueError: If the row is not label-valid or the matched GT row cannot
+            be resolved.
+    """
+
+    if not row.gt_label_valid or row.gt_target_row_id is None:
+        raise ValueError("Target row is not GT-label valid; refusing to build target RRI crop.")
+    gt_block = _compact_obb_block(getattr(sample, "gt_obbs", None))
+    if gt_block is None:
+        raise ValueError("Target RRI crop requires sample.gt_obbs.")
+    gt_world = _world_obbs_for_sample(gt_block[0], sample)
+    gt_data, gt_source_indices = _valid_obb_data_with_source_indices(gt_world)
+    try:
+        gt_index = gt_source_indices.index(int(row.gt_target_row_id))
+    except ValueError as exc:
+        raise ValueError(f"Matched GT target row {row.gt_target_row_id} is not present in sample.gt_obbs.") from exc
+    return ObbTW(gt_data[gt_index].unsqueeze(0))
+
+
 def _world_obbs_for_sample(obbs: ObbTW, sample: Any) -> ObbTW:
     selected = _latest_valid_obb_slice(obbs)
     transform = _snippet_t_world_snippet(sample)
@@ -820,4 +877,6 @@ __all__ = [
     "TargetSelectionResult",
     "TargetSelectorConfig",
     "TargetSourceMode",
+    "target_gt_aabb_world",
+    "target_gt_obb_world",
 ]

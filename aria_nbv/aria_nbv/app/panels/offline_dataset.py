@@ -20,6 +20,7 @@ from ...data_handling import (
 )
 from ...lightning.aria_nbv_experiment import AriaNBVExperimentConfig
 from ...rri_metrics.rri_binning import RriOrdinalBinner
+from ..rerun_launch import build_rerun_offline_spawn_command, format_command, repo_root, spawn_background_command
 
 _STATS_CACHE_KEY = "vin_offline_dataset_page_stats"
 _COVERAGE_CACHE_KEY = "vin_offline_dataset_page_coverage"
@@ -575,8 +576,30 @@ def render_offline_dataset_page() -> None:
             ),
         )
         log_y = st.checkbox("Log-scale histogram counts", value=False, key="vin_offline_dataset_log_y")
+        rerun_config_text = st.text_input(
+            "Rerun inspector config",
+            value=str(repo_root() / ".configs" / "rerun_offline.toml"),
+            key="vin_offline_dataset_rerun_config",
+        )
+        rerun_split = st.selectbox(
+            "Rerun split",
+            options=["all", "train", "val"],
+            index=0,
+            key="vin_offline_dataset_rerun_split",
+        )
+        rerun_index = int(
+            st.number_input(
+                "Rerun sample index",
+                min_value=0,
+                max_value=100000000,
+                value=0,
+                step=1,
+                key="vin_offline_dataset_rerun_index",
+            )
+        )
         inspect = st.form_submit_button("Inspect offline store")
         scan_coverage = st.form_submit_button("Scan dataset coverage")
+        launch_rerun = st.form_submit_button("Open sample in Rerun")
 
     try:
         store = _resolve_store(
@@ -589,6 +612,23 @@ def render_offline_dataset_page() -> None:
         if inspect or scan_coverage:
             st.error(f"Could not resolve VIN offline store: {type(exc).__name__}: {exc}")
         store = None
+
+    if launch_rerun:
+        try:
+            if store is None:
+                raise ValueError("No VIN offline store is selected.")
+            command = build_rerun_offline_spawn_command(
+                config_path=Path(rerun_config_text).expanduser(),
+                offline_store=store.store_dir,
+                split=str(rerun_split),
+                index=int(rerun_index),
+            )
+            st.code(format_command(command), language="bash")
+            process = spawn_background_command(command)
+        except Exception as exc:  # pragma: no cover - UI guard
+            st.error(f"Could not spawn Rerun inspector: {type(exc).__name__}: {exc}")
+        else:
+            st.success(f"Spawned Rerun inspector with pid {process.pid}.")
 
     stats_key = None
     coverage_key = None

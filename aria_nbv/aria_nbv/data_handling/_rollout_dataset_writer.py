@@ -1,0 +1,459 @@
+"""Build standalone target-RRI rollout replay stores from VIN offline rows."""
+
+from __future__ import annotations
+
+import hashlib
+from dataclasses import dataclass, field
+
+import msgspec
+import torch
+from pydantic import Field, field_validator
+
+from ..pose_generation import (
+    INVALID_REASON_VERSION,
+    CandidateGenerationRuntimeContext,
+    CandidateMixtureViewGeneratorConfig,
+    CounterfactualPoseGeneratorConfig,
+    CounterfactualSelectionPolicy,
+    CounterfactualTargetOracleRriScorerConfig,
+    TargetRriInvalidError,
+    traces_from_rollout_result,
+)
+from ..utils import BaseConfig, Console, Verbosity
+from ._offline_dataset import VinOfflineDatasetConfig, VinOfflineSample
+from ._rollout_zarr_store import (
+    RolloutZarrStoreConfig,
+    RolloutZarrWriteResult,
+    validate_rollout_zarr_store,
+    write_rollout_zarr_store,
+)
+from ._target_selection import (
+    TARGET_INVALID_REASON_VERSION,
+    ActorVisibleTargetSelector,
+    TargetCandidateRow,
+    TargetSelectorConfig,
+)
+
+
+@dataclass(slots=True)
+class RolloutDatasetWriterStats:
+    """Counters reported by one rollout-store build."""
+
+    samples_seen: int = 0
+    samples_without_snippet_or_mesh: int = 0
+    targets_selected: int = 0
+    targets_label_invalid: int = 0
+    target_invalid_skips: int = 0
+    rollout_invalid_skips: int = 0
+    traces_written: int = 0
+    skipped_reasons: dict[str, int] = field(default_factory=dict)
+
+    def skip(self, reason: str) -> None:
+        """Increment a named skip/failure counter."""
+
+        self.skipped_reasons[reason] = self.skipped_reasons.get(reason, 0) + 1
+
+
+class RolloutRecipeConfig(BaseConfig):
+    """One rollout policy recipe materialized into the replay store."""
+
+    name: str
+    """Stable recipe name stored as branch schedule lineage."""
+
+    selection_policy: CounterfactualSelectionPolicy
+    """Action-selection policy used inside the rollout tree."""
+
+    horizon: int = 2
+    """Maximum number of rollout steps."""
+
+    branch_factor: int = 1
+    """Number of actions sampled/expanded per non-terminal step."""
+
+    beam_width: int | None = None
+    """Retained beam width; ``None`` keeps the generator default."""
+
+    selection_temperature: float = 1.0
+    """Softmax temperature for stochastic selection policies."""
+
+    seed: int | None = 0
+    """Recipe-local random seed for candidate/action sampling."""
+
+    @field_validator("horizon", "branch_factor")
+    @classmethod
+    def _positive_int(cls, value: int) -> int:
+        if int(value) <= 0:
+            raise ValueError("rollout recipe horizon and branch_factor must be >= 1.")
+        return int(value)
+
+    @field_validator("beam_width")
+    @classmethod
+    def _positive_beam(cls, value: int | None) -> int | None:
+        if value is not None and int(value) <= 0:
+            raise ValueError("rollout recipe beam_width must be >= 1 when provided.")
+        return value
+
+    @field_validator("selection_temperature")
+    @classmethod
+    def _positive_temperature(cls, value: float) -> float:
+        value = float(value)
+        if value <= 0.0:
+            raise ValueError("selection_temperature must be > 0.")
+        return value
+
+
+def _default_recipes() -> list[RolloutRecipeConfig]:
+    return [
+        RolloutRecipeConfig(
+            name="random_valid",
+            selection_policy=CounterfactualSelectionPolicy.RANDOM_VALID,
+            horizon=2,
+            branch_factor=1,
+            seed=0,
+        ),
+        RolloutRecipeConfig(
+            name="oracle_greedy",
+            selection_policy=CounterfactualSelectionPolicy.ORACLE_GREEDY,
+            horizon=2,
+            branch_factor=1,
+            seed=0,
+        ),
+        RolloutRecipeConfig(
+            name="oracle_lookahead",
+            selection_policy=CounterfactualSelectionPolicy.ORACLE_GREEDY,
+            horizon=2,
+            branch_factor=2,
+            beam_width=2,
+            seed=0,
+        ),
+        RolloutRecipeConfig(
+            name="temperature_softmax",
+            selection_policy=CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
+            horizon=2,
+            branch_factor=2,
+            beam_width=2,
+            selection_temperature=1.0,
+            seed=0,
+        ),
+    ]
+
+
+class RolloutDatasetWriterConfig(BaseConfig):
+    """Configuration for building standalone target-RRI rollout Zarr stores."""
+
+    @property
+    def target(self) -> type["RolloutDatasetWriter"]:
+        return RolloutDatasetWriter
+
+    source: VinOfflineDatasetConfig = Field(
+        default_factory=lambda: VinOfflineDatasetConfig(
+            return_format="sample",
+            include_efm_snippet=True,
+            include_gt_mesh=True,
+            load_backbone=True,
+            load_candidates=False,
+            load_depths=False,
+            load_candidate_pcs=False,
+            load_gt_obbs=True,
+            load_detected_obbs=True,
+            load_trajectory_metadata=True,
+        )
+    )
+    """VIN strict-v7 source reader; must return samples with live snippet and GT mesh."""
+
+    target_selector: TargetSelectorConfig = Field(default_factory=TargetSelectorConfig)
+    """Actor-visible target selector used before GT-only label matching."""
+
+    candidate_mixture: CandidateMixtureViewGeneratorConfig = Field(default_factory=CandidateMixtureViewGeneratorConfig)
+    """Fixed-count mixed finite-candidate generator regenerated at every rollout step."""
+
+    target_scorer: CounterfactualTargetOracleRriScorerConfig = Field(
+        default_factory=CounterfactualTargetOracleRriScorerConfig
+    )
+    """Target-specific oracle scorer that also emits diagnostic scene RRI."""
+
+    store: RolloutZarrStoreConfig = Field(
+        default_factory=lambda: RolloutZarrStoreConfig(
+            target_protocol_version="v1_observed",
+            field_retention_policy="compact_selected_heavy",
+        )
+    )
+    """Standalone rollout Zarr destination; the VIN offline store remains unchanged."""
+
+    recipes: list[RolloutRecipeConfig] = Field(default_factory=_default_recipes)
+    """Rollout policies/branch schedules materialized into the replay store."""
+
+    max_samples: int | None = None
+    """Optional local smoke cap on source samples."""
+
+    require_label_valid: bool = True
+    """Skip selected targets without valid GT/evaluation labels when true."""
+
+    verbosity: Verbosity = Field(default=Verbosity.NORMAL)
+    """Console verbosity."""
+
+    is_debug: bool = False
+    """Enable debug logging in writer dependencies."""
+
+    _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
+
+    def _propagate_to_child(self, parent_field: str, child_config: BaseConfig) -> None:
+        """Avoid propagating rollout Zarr ``store`` into the VIN source config."""
+
+        if parent_field == "source":
+            shared_fields = {
+                name: value
+                for name, value in self
+                if name in child_config.__class__.model_fields
+                and name not in {"store", parent_field, "propagated_fields", "target"}
+            }
+            for name, value in shared_fields.items():
+                if getattr(child_config, name, None) != value:
+                    setattr(child_config, name, value)
+                    child_config.propagated_fields[name] = value
+            return
+        super()._propagate_to_child(parent_field, child_config)
+
+    @field_validator("max_samples")
+    @classmethod
+    def _positive_max_samples(cls, value: int | None) -> int | None:
+        if value is not None and int(value) <= 0:
+            raise ValueError("max_samples must be >= 1 when provided.")
+        return value
+
+
+class RolloutDatasetWriter:
+    """Generate target-RRI rollout traces and write a standalone Zarr store."""
+
+    def __init__(self, config: RolloutDatasetWriterConfig) -> None:
+        self.config = config
+        self.console = (
+            Console.with_prefix(self.__class__.__name__).set_verbosity(config.verbosity).set_debug(config.is_debug)
+        )
+        self.stats = RolloutDatasetWriterStats()
+
+    def run(self) -> RolloutZarrWriteResult:
+        """Build the configured rollout store."""
+
+        dataset = self.config.source.setup_target()
+        if dataset is None:
+            raise RuntimeError("VinOfflineDatasetConfig did not instantiate a dataset.")
+        selector = ActorVisibleTargetSelector(self.config.target_selector)
+        source_manifest_hash = _source_manifest_hash(dataset.manifest)
+        max_samples = (
+            len(dataset) if self.config.max_samples is None else min(int(self.config.max_samples), len(dataset))
+        )
+        split_manifest_hash = _split_manifest_hash(
+            source_manifest_hash=source_manifest_hash,
+            split=dataset.config.split,
+            records=_dataset_records_for_hash(dataset, limit=max_samples),
+        )
+        traces = []
+
+        for sample_index in range(max_samples):
+            sample = dataset[sample_index]
+            if not isinstance(sample, VinOfflineSample):
+                raise TypeError("RolloutDatasetWriter requires source.return_format='sample'.")
+            self.stats.samples_seen += 1
+            if sample.efm_snippet_view is None or not sample.efm_snippet_view.has_mesh:
+                self.stats.samples_without_snippet_or_mesh += 1
+                self.stats.skip("missing_snippet_or_mesh")
+                continue
+            target_result = selector.select(sample)
+            for target_rank, target in enumerate(target_result.selected_rows):
+                self.stats.targets_selected += 1
+                if self.config.require_label_valid and not target.gt_label_valid:
+                    self.stats.targets_label_invalid += 1
+                    self.stats.skip(str(target.gt_match_status))
+                    continue
+                traces.extend(
+                    self._rollout_target(
+                        sample=sample,
+                        target=target,
+                        target_rank=target_rank,
+                        source_cache_version=str(dataset.manifest.version),
+                        source_manifest_hash=source_manifest_hash,
+                        split_manifest_hash=split_manifest_hash,
+                    )
+                )
+
+        if not traces:
+            raise RuntimeError(f"No rollout traces were generated; skipped={self.stats.skipped_reasons}")
+
+        result = write_rollout_zarr_store(
+            self.config.store.store_dir,
+            traces,
+            return_semantics=self.config.store.return_semantics,
+            discount_gamma=self.config.store.discount_gamma,
+            target_protocol_version=self.config.store.target_protocol_version,
+            reason_code_version=self.config.store.reason_code_version,
+            field_retention_policy=self.config.store.field_retention_policy,
+            source_offline_store_version=str(dataset.manifest.version),
+            split_manifest_hash=split_manifest_hash,
+        )
+        self.stats.traces_written = int(result.num_rollouts)
+        validation = validate_rollout_zarr_store(result.store_dir)
+        if not validation.ok:
+            joined = "; ".join(validation.errors)
+            raise RuntimeError(f"Rollout Zarr post-write validation failed for {result.store_dir}: {joined}")
+        self.console.log(
+            "Wrote rollout store: "
+            f"rollouts={result.num_rollouts} steps={result.num_steps} candidates={result.num_candidates} "
+            f"path={result.store_dir}",
+        )
+        return result
+
+    def _rollout_target(
+        self,
+        *,
+        sample: VinOfflineSample,
+        target: TargetCandidateRow,
+        target_rank: int,
+        source_cache_version: str,
+        source_manifest_hash: str,
+        split_manifest_hash: str,
+    ) -> list:
+        traces = []
+        runtime_context = CandidateGenerationRuntimeContext(
+            target_center_world=torch.tensor(target.center_world, dtype=torch.float32),
+            target_id=target.target_id,
+        )
+        try:
+            scorer = self.config.target_scorer.setup_target(
+                sample=sample.efm_snippet_view,
+                target_sample=sample,
+                target_row=target,
+            )
+        except TargetRriInvalidError as exc:
+            self.stats.target_invalid_skips += 1
+            self.stats.skip(f"target_scorer:{exc.__class__.__name__}")
+            self.console.warn(
+                f"Skipping target scorer scene={sample.scene_id} snippet={sample.snippet_id} "
+                f"target={target.target_id}: {exc}",
+            )
+            return traces
+        for recipe in self.config.recipes:
+            rollout_cfg = CounterfactualPoseGeneratorConfig(
+                candidate_config=self.config.candidate_mixture,
+                horizon=recipe.horizon,
+                branch_factor=recipe.branch_factor,
+                beam_width=recipe.beam_width,
+                selection_policy=recipe.selection_policy,
+                selection_temperature=recipe.selection_temperature,
+                branch_schedule_id=recipe.name,
+                seed=recipe.seed,
+                verbosity=self.config.verbosity,
+                is_debug=self.config.is_debug,
+            )
+            try:
+                result = rollout_cfg.setup_target().generate_from_typed_sample(
+                    sample.efm_snippet_view,
+                    score_candidates=scorer,
+                    candidate_runtime_context=runtime_context,
+                )
+            except TargetRriInvalidError as exc:
+                self.stats.rollout_invalid_skips += 1
+                self.stats.skip(f"{recipe.name}:{exc.__class__.__name__}")
+                self.console.warn(
+                    f"Skipping rollout recipe={recipe.name} scene={sample.scene_id} snippet={sample.snippet_id} "
+                    f"target={target.target_id}: {exc}",
+                )
+                continue
+
+            prefix = f"{sample.sample_index:08d}-target-{target_rank:02d}-{recipe.name}"
+            traces.extend(
+                traces_from_rollout_result(
+                    result,
+                    rollout_id_prefix=prefix,
+                    scene_id=sample.scene_id,
+                    snippet_id=sample.snippet_id,
+                    mesh_version=_mesh_version(sample),
+                    candidate_config_hash=_config_hash(self.config.candidate_mixture),
+                    oracle_config_hash=_config_hash(self.config.target_scorer),
+                    random_seed=recipe.seed,
+                    source_cache_version=source_cache_version,
+                    split=sample.split,
+                    source_offline_store_manifest_hash=source_manifest_hash,
+                    split_manifest_hash=split_manifest_hash,
+                    rollout_config_hash=_config_hash(rollout_cfg),
+                    branch_schedule_id=recipe.name,
+                    target_row_id=target.target_row_id,
+                    target_id=target.target_id,
+                    target_protocol_version=self.config.store.target_protocol_version,
+                    target_crop_policy=self.config.target_scorer.target_crop_policy,
+                    reason_code_version=INVALID_REASON_VERSION,
+                    selection_rng_state_hash="not-captured-v1",
+                    target_selection_policy=self.config.target_selector.policy.value,
+                    target_selection_rank=target.selected_rank if target.selected_rank is not None else target_rank,
+                    target_selection_score=target.score,
+                    target_selection_probability=target.selection_probability,
+                    target_selection_temperature=self._target_selection_temperature(),
+                    target_invalid_reason_bitset=target.invalid_reason_bitset,
+                    target_primary_invalid_reason=target.primary_invalid_reason,
+                    target_reason_code_version=TARGET_INVALID_REASON_VERSION,
+                    matched_gt_target_row_id=target.gt_target_row_id,
+                    matched_gt_target_id=target.gt_target_id,
+                    gt_match_iou=target.gt_match_iou,
+                    gt_match_score=target.gt_match_score,
+                    gt_match_status=target.gt_match_status,
+                )
+            )
+        return traces
+
+    def _target_selection_temperature(self) -> float | None:
+        if self.config.target_selector.policy.value == "temperature_softmax_top_k":
+            return float(self.config.target_selector.temperature)
+        return None
+
+
+def _config_hash(config: BaseConfig) -> str:
+    payload = repr(config.model_dump_jsonable()).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()[:16]
+
+
+def _source_manifest_hash(manifest: object) -> str:
+    return hashlib.sha256(msgspec.json.encode(manifest)).hexdigest()[:16]
+
+
+def _dataset_records_for_hash(dataset: object, *, limit: int) -> list[dict[str, object]]:
+    records = list(getattr(dataset, "_records", []))[:limit]
+    output: list[dict[str, object]] = []
+    for order, record in enumerate(records):
+        output.append(
+            {
+                "order": order,
+                "sample_index": int(record.sample_index),
+                "sample_key": str(record.sample_key),
+                "scene_id": str(record.scene_id),
+                "snippet_id": str(record.snippet_id),
+                "split": str(record.split),
+                "shard_id": str(record.shard_id),
+                "row": int(record.row),
+            }
+        )
+    return output
+
+
+def _split_manifest_hash(*, source_manifest_hash: str, split: str, records: list[dict[str, object]]) -> str:
+    payload = {
+        "source_manifest_hash": source_manifest_hash,
+        "split": split,
+        "records": records,
+    }
+    return hashlib.sha256(msgspec.json.encode(payload)).hexdigest()[:16]
+
+
+def _mesh_version(sample: VinOfflineSample) -> str:
+    snippet = sample.efm_snippet_view
+    if snippet is None or snippet.mesh is None:
+        return "missing-mesh"
+    verts = getattr(snippet.mesh, "vertices", None)
+    faces = getattr(snippet.mesh, "faces", None)
+    return f"mesh-v={0 if verts is None else len(verts)}-f={0 if faces is None else len(faces)}"
+
+
+__all__ = [
+    "RolloutDatasetWriter",
+    "RolloutDatasetWriterConfig",
+    "RolloutDatasetWriterStats",
+    "RolloutRecipeConfig",
+]

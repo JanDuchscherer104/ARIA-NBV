@@ -58,6 +58,17 @@ class CollisionBackend(StrEnum):
 
 
 @dataclass
+class CandidateGenerationRuntimeContext:
+    """Runtime-only context for target-conditioned candidate generation."""
+
+    target_center_world: torch.Tensor | None = None
+    """Actor-visible target center in world coordinates, required by TARGET_POINT components."""
+
+    target_id: str | None = None
+    """Optional stable actor-visible target id for diagnostics."""
+
+
+@dataclass
 class CandidateContext:
     """Mutable state passed between sampling and pruning rules."""
 
@@ -111,6 +122,14 @@ class CandidateSamplingResult:
     """Sampled offsets in the sampling frame for the full shell (pre-pruning)."""
     sampling_pose: PoseTW | None = None
     """World <- sampling pose (gravity-aligned when enabled) used to generate candidate centers. FIXME: Previously we only provided reference_pose, which was *not* gravity-aligned."""
+    strategy_id: torch.Tensor | None = None
+    """Full-shell candidate strategy ids aligned with ``mask_valid``."""
+    mixture_id: torch.Tensor | None = None
+    """Full-shell mixture component ids aligned with ``mask_valid``."""
+    sampler_probability: torch.Tensor | None = None
+    """Full-shell sampler probabilities aligned with ``mask_valid``."""
+    component_name: tuple[str, ...] | None = None
+    """Optional per-shell component names aligned with ``mask_valid``."""
     extras: dict[str, Any] = field(default_factory=dict)
 
     def to_serializable(self) -> dict[str, Any]:
@@ -219,6 +238,7 @@ class CandidateSamplingResult:
 
 __all__ = [
     "SamplingStrategy",
+    "CandidateGenerationRuntimeContext",
     "CollisionBackend",
     "ViewDirectionMode",
     "CandidateContext",

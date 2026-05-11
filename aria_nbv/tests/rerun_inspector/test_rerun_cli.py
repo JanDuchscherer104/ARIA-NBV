@@ -20,6 +20,7 @@ def test_cli_applies_selection_and_save_overrides(
 
     config_path = tmp_path / "rerun.toml"
     save_path = tmp_path / "sample.rrd"
+    offline_store = tmp_path / "vin_offline"
     RerunOfflineInspectorConfig().save_toml(config_path)
     captured: dict[str, RerunOfflineInspectorConfig] = {}
 
@@ -45,6 +46,8 @@ def test_cli_applies_selection_and_save_overrides(
             "snippet-b",
             "--candidate-index",
             "2",
+            "--offline-store",
+            str(offline_store),
             "--save",
             str(save_path),
         ],
@@ -57,6 +60,7 @@ def test_cli_applies_selection_and_save_overrides(
     assert cfg.selection.scene_id == "scene-a"  # noqa: S101
     assert cfg.selection.snippet_id == "snippet-b"  # noqa: S101
     assert cfg.candidate.selected_index == 2  # noqa: S101
+    assert cfg.dataset.offline.store.store_dir == offline_store  # noqa: S101
     assert cfg.output.mode == "save"  # noqa: S101
     assert cfg.output.save_path == save_path  # noqa: S101
 

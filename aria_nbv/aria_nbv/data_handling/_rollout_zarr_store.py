@@ -253,8 +253,20 @@ def validate_rollout_zarr_store(store_dir: Path | str) -> RolloutZarrValidationR
         errors.append("Q_H target_row_id does not match the parent rollout target_row_id.")
     elif q_target_row_id.shape != expected_q_target.shape:
         errors.append("Q_H target_row_id shape does not match the steps table.")
-
-    if "synthetic" not in str(root.attrs.get("target_protocol_version", "")).lower():
+    non_synthetic = "synthetic" not in str(root.attrs.get("target_protocol_version", "")).lower()
+    if non_synthetic:
+        target_valid_by_id = {
+            int(row_id): bool(valid and gt_valid)
+            for row_id, valid, gt_valid in zip(
+                target_row_id,
+                np.asarray(root["targets/target_valid_mask"]),
+                np.asarray(root["targets/gt_label_valid_mask"]),
+                strict=True,
+            )
+        }
+        q_target_valid = np.asarray([target_valid_by_id.get(int(row_id), False) for row_id in q_target_row_id])
+        if q_train_mask.shape[0] == q_target_valid.shape[0] and np.any(q_train_mask & (~q_target_valid[:, None])):
+            errors.append("Q_H q_train_mask is true for a target without valid actor-visible and GT label state.")
         for attr_name in ("source_offline_store_version", "split_manifest_hash", "target_protocol_version"):
             if _missing_lineage_token(root.attrs.get(attr_name)):
                 errors.append(f"Non-synthetic rollout store is missing required root attr {attr_name!r}.")
@@ -265,6 +277,7 @@ def validate_rollout_zarr_store(store_dir: Path | str) -> RolloutZarrValidationR
             "source_offline_store_manifest_hash_id",
             "split_manifest_hash_id",
             "target_protocol_version_id",
+            "target_crop_policy_id",
             "reason_code_version_id",
         )
         for name in required_lineage:
@@ -275,6 +288,7 @@ def validate_rollout_zarr_store(store_dir: Path | str) -> RolloutZarrValidationR
             "oracle_config_id",
             "rollout_config_id",
             "source_offline_store_manifest_hash_id",
+            "target_crop_policy_id",
         ):
             values = _encoded_values(root, dictionary_name="config", array_path=f"lineage/{name}")
             if any(_missing_lineage_token(value) for value in values):
@@ -288,6 +302,13 @@ def validate_rollout_zarr_store(store_dir: Path | str) -> RolloutZarrValidationR
             values = _encoded_values(root, dictionary_name="config", array_path=f"lineage/{name}")
             if any(value != expected for value in values):
                 errors.append(f"Non-synthetic rollout store lineage field {name!r} does not match root metadata.")
+        actor_rows = np.asarray(root["candidates/actor_action_mask"])
+        if np.any(actor_rows & (np.asarray(root["candidates/strategy_id"]) < 0)):
+            errors.append("Non-synthetic actor-selectable candidates require non-placeholder strategy_id.")
+        if np.any(actor_rows & (np.asarray(root["candidates/mixture_id"]) < 0)):
+            errors.append("Non-synthetic actor-selectable candidates require non-placeholder mixture_id.")
+        if np.any(actor_rows & (~np.isfinite(np.asarray(root["candidates/sampler_probability"])))):
+            errors.append("Non-synthetic actor-selectable candidates require finite sampler_probability.")
 
     for name, array in root["candidates"].arrays():
         if int(array.shape[0]) != int(candidate_row_id.shape[0]):
@@ -401,6 +422,7 @@ def _build_dictionaries(traces: list[RolloutTrace]) -> dict[str, list[str]]:
                     trace.lineage.split_manifest_hash,
                     trace.lineage.branch_schedule_id,
                     trace.lineage.target_protocol_version,
+                    trace.lineage.target_crop_policy,
                     trace.lineage.target_reason_code_version,
                     trace.lineage.reason_code_version,
                     trace.lineage.selection_rng_state_hash,
@@ -606,6 +628,17 @@ def _write_targets(
             dtype=np.bool_,
         ),
     )
+    _write_array(
+        group,
+        "target_crop_policy_id",
+        np.asarray(
+            [
+                _dict_id(dictionaries["config"], str(target_rows[target_row_id].get("target_crop_policy") or ""))
+                for target_row_id in target_ids
+            ],
+            dtype=np.int32,
+        ),
+    )
     _write_string_array(group, "target_protocol_version", [target_protocol_version])
     _write_array(group, "crop_vertices", np.empty((0, 3), dtype=np.float32))
     _write_array(group, "crop_vertex_offsets", np.asarray([0], dtype=np.int64))
@@ -633,6 +666,7 @@ def _target_rows_from_traces(traces: list[RolloutTrace]) -> dict[int, dict[str, 
             "gt_match_iou": trace.lineage.gt_match_iou,
             "gt_match_score": trace.lineage.gt_match_score,
             "gt_match_status": trace.lineage.gt_match_status,
+            "target_crop_policy": trace.lineage.target_crop_policy,
         }
         for name, value in values.items():
             if value is not None or name not in existing:
@@ -675,6 +709,7 @@ def _flatten_traces(traces: list[RolloutTrace], dictionaries: dict[str, list[str
         "split_manifest_hash_id": [],
         "branch_schedule_id": [],
         "target_protocol_version_id": [],
+        "target_crop_policy_id": [],
         "reason_code_version_id": [],
         "selection_rng_state_hash_id": [],
         "target_selection_policy_id": [],
@@ -709,6 +744,10 @@ def _flatten_traces(traces: list[RolloutTrace], dictionaries: dict[str, list[str
     candidate_row_id = 0
     step_row_id = 0
     for rollout_row_id, trace in enumerate(traces):
+        final_target_rri = _trace_cumulative_metric(trace, ("target_rri", "rri"))
+        if final_target_rri is None:
+            final_target_rri = trace.final_cumulative_rri
+        final_scene_rri = _trace_cumulative_metric(trace, ("scene_rri",))
         rollout_rows["rollout_row_id"].append(rollout_row_id)
         rollout_rows["rollout_id"].append(_dict_id(dictionaries["rollout"], trace.lineage.rollout_id))
         rollout_rows["chain_id"].append(trace.lineage.chain_id)
@@ -729,8 +768,8 @@ def _flatten_traces(traces: list[RolloutTrace], dictionaries: dict[str, list[str
         rollout_rows["termination_reason"].append(
             _dict_id(dictionaries["termination_reason"], trace.termination_reason)
         )
-        rollout_rows["final_cumulative_target_rri"].append(_nan_if_none(trace.final_cumulative_rri))
-        rollout_rows["final_cumulative_scene_rri"].append(_nan_if_none(trace.final_cumulative_rri))
+        rollout_rows["final_cumulative_target_rri"].append(_nan_if_none(final_target_rri))
+        rollout_rows["final_cumulative_scene_rri"].append(_nan_if_none(final_scene_rri))
         rollout_rows["split_id"].append(_dict_id(dictionaries["split"], trace.lineage.split or "synthetic"))
         rollout_rows["candidate_config_id"].append(
             _dict_id(dictionaries["config"], trace.lineage.candidate_config_hash or "")
@@ -759,6 +798,9 @@ def _flatten_traces(traces: list[RolloutTrace], dictionaries: dict[str, list[str
         )
         rollout_rows["target_protocol_version_id"].append(
             _dict_id(dictionaries["config"], trace.lineage.target_protocol_version or "")
+        )
+        rollout_rows["target_crop_policy_id"].append(
+            _dict_id(dictionaries["config"], trace.lineage.target_crop_policy or "")
         )
         rollout_rows["reason_code_version_id"].append(
             _dict_id(dictionaries["config"], trace.lineage.reason_code_version or "")
@@ -800,7 +842,11 @@ def _flatten_traces(traces: list[RolloutTrace], dictionaries: dict[str, list[str
             _dict_id(dictionaries["target_match_status"], trace.lineage.gt_match_status or "not_requested")
         )
 
+        running_target_rri: float | None = None
+        running_scene_rri: float | None = None
         for step in trace.steps:
+            running_target_rri = _accumulate_selected_metric(running_target_rri, step, ("target_rri", "rri"))
+            running_scene_rri = _accumulate_selected_metric(running_scene_rri, step, ("scene_rri",))
             this_step_row_id = step_row_id
             step_row_id += 1
             selected_candidate_row_id = candidate_row_id + int(step.selected_shell_index)
@@ -812,8 +858,8 @@ def _flatten_traces(traces: list[RolloutTrace], dictionaries: dict[str, list[str
             step_rows["selected_compact_valid_index"].append(step.selected_valid_index)
             step_rows["num_candidates"].append(int(step.candidate_valid.shape[0]))
             step_rows["num_valid_candidates"].append(int(step.candidate_valid.sum().item()))
-            step_rows["cumulative_target_rri"].append(_nan_if_none(step.cumulative_rri))
-            step_rows["cumulative_scene_rri"].append(_nan_if_none(step.cumulative_rri))
+            step_rows["cumulative_target_rri"].append(_nan_if_none(running_target_rri))
+            step_rows["cumulative_scene_rri"].append(_nan_if_none(running_scene_rri))
             step_rows["transition_id"].append(_dict_id(dictionaries["transition"], step.transition_id or ""))
 
             root_pose = trace.root_pose_world.reshape(-1)
@@ -827,6 +873,7 @@ def _flatten_traces(traces: list[RolloutTrace], dictionaries: dict[str, list[str
                     shell_index=shell_index,
                     root_pose=root_pose,
                     dictionaries=dictionaries,
+                    target_label_valid=_trace_target_label_valid(trace),
                 )
                 candidate_row_id += 1
 
@@ -880,16 +927,17 @@ def _append_candidate_row(
     shell_index: int,
     root_pose: Any,
     dictionaries: dict[str, list[str]],
+    target_label_valid: bool,
 ) -> None:
     is_valid = bool(step.candidate_valid[shell_index].item())
     is_selected = int(step.selected_shell_index) == int(shell_index)
     target_rri = _metric_value(step, ("target_rri", "oracle_target_rri"), shell_index)
-    scene_rri = _metric_value(step, ("scene_rri", "oracle_scene_rri", "rri"), shell_index)
+    scene_rri = _metric_value(step, ("scene_rri", "oracle_scene_rri"), shell_index)
     if not is_valid:
         target_rri = float("nan")
         scene_rri = float("nan")
     oracle_label = bool(is_valid and np.isfinite(target_rri))
-    q_train = bool(is_valid and oracle_label)
+    q_train = bool(is_valid and oracle_label and target_label_valid)
     pose = step.candidate_poses_world_cam[shell_index].detach().cpu().numpy().astype(np.float32)
     rows["candidate_row_id"].append(candidate_row_id)
     rows["step_row_id"].append(step_row_id)
@@ -906,9 +954,9 @@ def _append_candidate_row(
     rows["padded_mask"].append(False)
     rows["selected_mask"].append(is_selected)
     rows["heavy_diag_available_mask"].append(bool(is_selected and step.selected_point_cloud_world is not None))
-    rows["strategy_id"].append(-1)
-    rows["mixture_id"].append(-1)
-    rows["sampler_probability"].append(float("nan"))
+    rows["strategy_id"].append(_array_value(step.candidate_strategy_id, shell_index, default=-1))
+    rows["mixture_id"].append(_array_value(step.candidate_mixture_id, shell_index, default=-1))
+    rows["sampler_probability"].append(_array_value(step.candidate_sampler_probability, shell_index, default=np.nan))
     rows["score_source_id"].append(
         _dict_id(dictionaries["score_source"], step.score_source or step.selection_score_label)
     )
@@ -922,6 +970,18 @@ def _append_candidate_row(
         _array_value(step.selection_log_probabilities, shell_index, default=-np.inf)
     )
     rows["selection_entropy"].append(_nan_if_none(step.selection_entropy))
+
+
+def _trace_target_label_valid(trace: RolloutTrace) -> bool:
+    target_bitset = trace.lineage.target_invalid_reason_bitset
+    target_valid = target_bitset is None or int(target_bitset) == (1 << INVALID_REASON_CODES["VALID"])
+    gt_status = trace.lineage.gt_match_status
+    gt_valid = gt_status in {"matched", "v0_gt_input"} and (
+        trace.lineage.matched_gt_target_row_id is not None and int(trace.lineage.matched_gt_target_row_id) >= 0
+    )
+    if trace.lineage.target_protocol_version is not None and "synthetic" in trace.lineage.target_protocol_version:
+        return True
+    return bool(target_valid and gt_valid)
 
 
 def _write_rollout_tables(groups: dict[str, Any], table: dict[str, np.ndarray]) -> None:
@@ -1125,6 +1185,21 @@ def _first_temperature(trace: RolloutTrace) -> float:
 
 def _nan_if_none(value: float | None) -> float:
     return float("nan") if value is None else float(value)
+
+
+def _trace_cumulative_metric(trace: RolloutTrace, metric_names: tuple[str, ...]) -> float | None:
+    cumulative: float | None = None
+    for step in trace.steps:
+        cumulative = _accumulate_selected_metric(cumulative, step, metric_names)
+    return cumulative
+
+
+def _accumulate_selected_metric(current: float | None, step: Any, metric_names: tuple[str, ...]) -> float | None:
+    for metric_name in metric_names:
+        value = step.selected_metrics.get(metric_name)
+        if value is not None and np.isfinite(float(value)):
+            return float(value) if current is None else float(current + float(value))
+    return current
 
 
 def _float_or_nan(value: Any) -> float:
