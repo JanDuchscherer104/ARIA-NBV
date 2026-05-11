@@ -34,6 +34,22 @@ fast 0/1 probe (checks `.configs/litkg.toml`, the litkg-rs submodule, and
 on stderr; never blocks. If degraded, fall back to `aria-nbv-context` plus
 targeted reads instead of waiting for the heavier `make kg-*` commands.
 
+## Automatic KG refresh on session Stop
+`scripts/kg/auto_refresh.sh` runs on every Claude/Codex Stop hook (see
+`.claude/settings.json` and `.codex/hooks.example.json`). It silently skips
+when:
+- the ollama tunnel at `127.0.0.1:11434` is unreachable
+  (`ssh -N -R 11434:127.0.0.1:11434 ubuntu` not running);
+- no tracked source under `docs/`, `aria_nbv/aria_nbv/`,
+  `.agents/memory/state/`, or `.agents/*.toml` changed since the last
+  refresh;
+- another refresh is in flight (`.agents/kg/.refresh.lock` present).
+
+Otherwise it spawns `make kg-refresh-light` detached; status lands in
+`.agents/kg/.refresh.log`. Force a refresh with
+`KG_FORCE=1 scripts/kg/auto_refresh.sh`. If a stale lock blocks future
+refreshes, remove it manually: `rm .agents/kg/.refresh.lock`.
+
 ## Mac-Offloaded litkg Ollama
 Use the Mac as the Ollama model host while keeping ARIA-NBV sources, Neo4j,
 Graphiti, and generated KG artifacts on the Ubuntu workstation.

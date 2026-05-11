@@ -240,6 +240,9 @@ docs/_freeze/**/*.html
 .omx/
 .agents/generated/
 .agents/kg/generated/
+.agents/kg/.refresh.log
+.agents/kg/.refresh.lock
+.agents/kg/.last-refresh
 .agents/tmp/*
 .agents/work/
 .claude/worktrees/

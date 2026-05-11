@@ -29,6 +29,10 @@
           {
             "type": "command",
             "command": "scripts/debrief_nudge.sh || true"
+          },
+          {
+            "type": "command",
+            "command": "scripts/kg/auto_refresh.sh || true"
           }
         ]
       }

@@ -34,7 +34,35 @@ generic context, treat it as advisory and inspect the concrete owner directly.
 - Inspect source/backend readiness:
   `make kg-capabilities KG_FORMAT=json`
 
-Use `KG_FORMAT=json` when another tool, script, or agent consumes the output.
+## Output Modes
+
+`kg-route`, `kg-search`, and `kg-claim-check` print a **compact ~12-line
+summary by default** (top sources, active backlog ids, risk flags, suggested
+next action, first required read). The compact output is the agent-readable
+fast path; reach for it first.
+
+Escape hatches when more detail is needed:
+
+- `KG_VERBOSE=1` -> full text rendering (top sources with snippets, all
+  backlog items with context, evidence spans, verification commands).
+- `KG_FORMAT=json` -> raw JSON for `jq`, downstream tools, or hook scripts.
+  This is what the compact filters consume internally.
+
+Examples:
+
+```bash
+# Compact default (fastest to read):
+make kg-route KG_TASK="harden bounded oracle-RRI lookahead"
+
+# Full text payload when triaging:
+make kg-route KG_TASK="..." KG_VERBOSE=1
+
+# Raw JSON for piping:
+make kg-route KG_TASK="..." KG_FORMAT=json | jq '.top_sources[].path'
+```
+
+The compact filters live under `scripts/kg/compact_*.jq`; edit those if the
+summary shape needs to change.
 
 ## Expected Context-Pack Fields
 

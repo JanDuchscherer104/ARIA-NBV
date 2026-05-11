@@ -223,17 +223,26 @@ kg-ollama-check: ## 📚 Validate Mac/remote Ollama model endpoint for litkg run
 	@python3 .agents/external/litkg-rs/scripts/kg/ollama_http.py check \
 		--config "$(LITKG_CONFIG)"
 
-kg-search: ## 📚 Search litkg-indexed code/docs/memory/backlog/literature (set KG_QUERY='...')
+kg-search: ## 📚 Search litkg-indexed code/docs/memory/backlog/literature (set KG_QUERY='...'; KG_VERBOSE=1 or KG_FORMAT=json for full payload)
 	@if [ -z "$(strip $(KG_QUERY))" ]; then \
 		echo "$(RED)KG_QUERY is required, e.g. make kg-search KG_QUERY='entity-aware RRI'$(NC)"; \
 		exit 2; \
 	fi
-	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- kg find \
-		--config "$(LITKG_CONFIG)" \
-		--repo-root "$(LITKG_REPO_ROOT)" \
-		--limit "$(KG_LIMIT)" \
-		--format "$(KG_FORMAT)" \
-		"$(KG_QUERY)"
+	@if [ "$(KG_VERBOSE)" = "1" ] || [ "$(KG_FORMAT)" = "json" ]; then \
+		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- kg find \
+			--config "$(LITKG_CONFIG)" \
+			--repo-root "$(LITKG_REPO_ROOT)" \
+			--limit "$(KG_LIMIT)" \
+			--format "$(KG_FORMAT)" \
+			"$(KG_QUERY)"; \
+	else \
+		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- kg find \
+			--config "$(LITKG_CONFIG)" \
+			--repo-root "$(LITKG_REPO_ROOT)" \
+			--limit "$(KG_LIMIT)" \
+			--format json \
+			"$(KG_QUERY)" | jq -r -f scripts/kg/compact_search.jq; \
+	fi
 
 kg-brief: ## 📚 Build a litkg brief for a topic (set KG_TOPIC='...')
 	@if [ -z "$(strip $(KG_TOPIC))" ]; then \
@@ -247,29 +256,47 @@ kg-brief: ## 📚 Build a litkg brief for a topic (set KG_TOPIC='...')
 		--profile "$(LITKG_PROFILE)" \
 		--format "$(KG_FORMAT)"
 
-kg-route: ## 📚 Route a broad task through litkg evidence and backlog (set KG_TASK='...')
+kg-route: ## 📚 Route a broad task through litkg evidence and backlog (set KG_TASK='...'; KG_VERBOSE=1 or KG_FORMAT=json for full payload)
 	@if [ -z "$(strip $(KG_TASK))" ]; then \
 		echo "$(RED)KG_TASK is required, e.g. make kg-route KG_TASK='debug candidate pose frame mismatch'$(NC)"; \
 		exit 2; \
 	fi
-	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
-		--config "$(LITKG_CONFIG)" \
-		--repo-root "$(LITKG_REPO_ROOT)" \
-		--task "$(KG_TASK)" \
-		--profile "$(LITKG_PROFILE)" \
-		--format "$(KG_FORMAT)"
+	@if [ "$(KG_VERBOSE)" = "1" ] || [ "$(KG_FORMAT)" = "json" ]; then \
+		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
+			--config "$(LITKG_CONFIG)" \
+			--repo-root "$(LITKG_REPO_ROOT)" \
+			--task "$(KG_TASK)" \
+			--profile "$(LITKG_PROFILE)" \
+			--format "$(KG_FORMAT)"; \
+	else \
+		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
+			--config "$(LITKG_CONFIG)" \
+			--repo-root "$(LITKG_REPO_ROOT)" \
+			--task "$(KG_TASK)" \
+			--profile "$(LITKG_PROFILE)" \
+			--format json | jq -r -f scripts/kg/compact_route.jq; \
+	fi
 
-kg-claim-check: ## 📚 Claim-check against litkg context (set KG_CLAIM='...')
+kg-claim-check: ## 📚 Claim-check against litkg context (set KG_CLAIM='...'; KG_VERBOSE=1 or KG_FORMAT=json for full payload)
 	@if [ -z "$(strip $(KG_CLAIM))" ]; then \
 		echo "$(RED)KG_CLAIM is required, e.g. make kg-claim-check KG_CLAIM='ARIA-NBV is an end-to-end policy'$(NC)"; \
 		exit 2; \
 	fi
-	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
-		--config "$(LITKG_CONFIG)" \
-		--repo-root "$(LITKG_REPO_ROOT)" \
-		--task "claim-check: $(KG_CLAIM)" \
-		--profile "$(LITKG_PROFILE)" \
-		--format "$(KG_FORMAT)"
+	@if [ "$(KG_VERBOSE)" = "1" ] || [ "$(KG_FORMAT)" = "json" ]; then \
+		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
+			--config "$(LITKG_CONFIG)" \
+			--repo-root "$(LITKG_REPO_ROOT)" \
+			--task "claim-check: $(KG_CLAIM)" \
+			--profile "$(LITKG_PROFILE)" \
+			--format "$(KG_FORMAT)"; \
+	else \
+		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
+			--config "$(LITKG_CONFIG)" \
+			--repo-root "$(LITKG_REPO_ROOT)" \
+			--task "claim-check: $(KG_CLAIM)" \
+			--profile "$(LITKG_PROFILE)" \
+			--format json | jq -r -f scripts/kg/compact_claim_check.jq; \
+	fi
 
 kg-consolidate: ## 📚 Propose memory/backlog consolidation updates without editing files
 	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- kg consolidate \

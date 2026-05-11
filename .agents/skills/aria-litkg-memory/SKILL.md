@@ -51,6 +51,14 @@ source families.
 4. Use `make kg-claim-check KG_CLAIM="<claim>"` for advisor-facing proposal,
    roadmap, research-question, or literature-synthesis claims; expect
    `verdict, confidence, supporting_evidence, contradicting_evidence`.
+   The default output is a compact ~10-line summary (verdict + top 2
+   supporting + top 2 contradicting); add `KG_VERBOSE=1` for full text or
+   `KG_FORMAT=json` for raw payload. **Known gap**: literature `paper:*`
+   nodes currently lack source paths, so a real literature claim can come
+   back `unverifiable` even when the cited paper is indexed (filed under
+   `issue-025` follow-up). When that happens, also run
+   `make kg-search KG_QUERY="<claim keywords>"` and inspect returned
+   `paper:*` titles + snippets directly before downgrading the claim.
 5. When KG output looks degraded or empty, run `make kg-status` first as a
    fast 0/1 health probe. If non-zero, fall back to `aria-nbv-context` plus
    targeted reads and record the outage in the debrief.
