@@ -69,7 +69,7 @@ On Ubuntu, the ARIA-NBV Makefile reads the Ollama model settings from
 ```bash
 make kg-ollama-check
 make kg-up
-make kg-ingest-docs-smoke
+make kg-ingest-docs KG_SMOKE=1
 ```
 
 Run `make kg-ollama-check` before `make kg-ingest-docs` or embedding

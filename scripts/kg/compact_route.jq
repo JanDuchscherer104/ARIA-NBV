@@ -1,5 +1,13 @@
 ### Compact kg-route summary (<=15 lines).
 ### Default output for `make kg-route`; opt out via KG_VERBOSE=1 or KG_FORMAT=json.
+###
+### Invariant: this filter MUST NOT surface ContextPack fields
+###   evidence_spans, backend_status, action_plan, assumptions,
+###   missing_leaves, missing_context_leaves, profile, budget_tokens, truncated.
+### Those are either legacy aliases (missing_*), debug metadata (profile,
+### budget_tokens, truncated), or bulk data the agent shouldn't read
+### unfiltered. Use top_sources, suggested_next_action, required_reads,
+### risk_flags, and the active backlog instead.
 
 def cap($n): if length > $n then .[:$n] else . end;
 def or_none: if . == null or . == "" then "(none)" else . end;

@@ -5,7 +5,7 @@
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory codex-transcripts
 .PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory new-debrief claude-skills
-.PHONY: memory-mine agents-db glossary kg-up kg-down kg-status kg-capabilities kg-ollama-check kg-search kg-brief kg-route kg-claim-check kg-consolidate kg-related kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-ingest-docs-smoke kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-full
+.PHONY: memory-mine agents-db glossary kg-up kg-down kg-status kg-capabilities kg-ollama-check kg-search kg-route kg-claim-check kg-consolidate kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-full
 .PHONY: lrz-probe lrz-resources lrz-resources-gpu lrz-resources-cpu lrz-jobs lrz-dss-init lrz-container-shell lrz-sbatch-cpu lrz-sbatch-single-gpu lrz-sbatch-multigpu
 .PHONY: mermaid-lint
 
@@ -244,18 +244,6 @@ kg-search: ## 📚 Search litkg-indexed code/docs/memory/backlog/literature (set
 			"$(KG_QUERY)" | jq -r -f scripts/kg/compact_search.jq; \
 	fi
 
-kg-brief: ## 📚 Build a litkg brief for a topic (set KG_TOPIC='...')
-	@if [ -z "$(strip $(KG_TOPIC))" ]; then \
-		echo "$(RED)KG_TOPIC is required, e.g. make kg-brief KG_TOPIC='entity-aware RRI'$(NC)"; \
-		exit 2; \
-	fi
-	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
-		--config "$(LITKG_CONFIG)" \
-		--repo-root "$(LITKG_REPO_ROOT)" \
-		--task "brief: $(KG_TOPIC)" \
-		--profile "$(LITKG_PROFILE)" \
-		--format "$(KG_FORMAT)"
-
 kg-route: ## 📚 Route a broad task through litkg evidence and backlog (set KG_TASK='...'; KG_VERBOSE=1 or KG_FORMAT=json for full payload)
 	@if [ -z "$(strip $(KG_TASK))" ]; then \
 		echo "$(RED)KG_TASK is required, e.g. make kg-route KG_TASK='debug candidate pose frame mismatch'$(NC)"; \
@@ -304,18 +292,6 @@ kg-consolidate: ## 📚 Propose memory/backlog consolidation updates without edi
 		--repo-root "$(LITKG_REPO_ROOT)" \
 		--format "$(KG_FORMAT)"
 
-kg-related: ## 📚 Find litkg context related to a path or symbol (set KG_RELATED_PATH='...')
-	@if [ -z "$(strip $(KG_RELATED_PATH))" ]; then \
-		echo "$(RED)KG_RELATED_PATH is required, e.g. make kg-related KG_RELATED_PATH='aria_nbv/aria_nbv/rri_metrics/oracle_rri.py'$(NC)"; \
-		exit 2; \
-	fi
-	@cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- kg find \
-		--config "$(LITKG_CONFIG)" \
-		--repo-root "$(LITKG_REPO_ROOT)" \
-		--limit "$(KG_LIMIT)" \
-		--format "$(KG_FORMAT)" \
-		"$(KG_RELATED_PATH)"
-
 kg-show-paper: ## 📚 Show one registered paper (set KG_PAPER='VIN-NBV-frahm2025')
 	@if [ -z "$(strip $(KG_PAPER))" ]; then \
 		echo "$(RED)KG_PAPER is required, e.g. make kg-show-paper KG_PAPER='VIN-NBV-frahm2025'$(NC)"; \
@@ -337,11 +313,12 @@ kg-materialize: ## 📚 Materialize literature into Markdown for agent consumpti
 kg-index-code: ## 🏗️ Index aria_nbv code into Neo4j
 	@./scripts/kg/index_code.sh
 
-kg-ingest-docs: ## 📝 Ingest docs/ into Neo4j/Graphiti
-	@./scripts/kg/ingest_docs.sh $(KG_DOC_PATHS)
-
-kg-ingest-docs-smoke: ## 📝 Smoke-ingest one small doc into Neo4j/Graphiti
-	@GRAPHITI_DOC_CHAR_LIMIT=1200 $(MAKE) kg-ingest-docs KG_DOC_PATHS=AGENTS.md
+kg-ingest-docs: ## 📝 Ingest docs/ into Neo4j/Graphiti (set KG_SMOKE=1 for a single-doc smoke pass)
+	@if [ "$(KG_SMOKE)" = "1" ]; then \
+		GRAPHITI_DOC_CHAR_LIMIT=1200 ./scripts/kg/ingest_docs.sh AGENTS.md; \
+	else \
+		./scripts/kg/ingest_docs.sh $(KG_DOC_PATHS); \
+	fi
 
 kg-enrich: ## 📚 Refresh litkg runtime embeddings and code↔doc links
 	@KG_OLLAMA_CONFIG="$(LITKG_CONFIG)" \

@@ -310,7 +310,7 @@ urls = []
 # - Neo4j is an optional traversal/runtime DB over exported bundles.
 # - Graphiti is optional temporal ingestion.
 # - MemPalace remains separate episodic memory mining through make memory-mine.
-# - Static kg-route/kg-query/claim-check quality comes before live graph UX.
+# - Static kg-search/kg-route/kg-claim-check quality comes before live graph UX.
 [representation]
 primary = "graphify"
 durable_exports = ["graphify", "neo4j_export"]
