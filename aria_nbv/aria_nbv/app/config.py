@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from ..data_handling import AseEfmDatasetConfig
 from ..pipelines import OracleRriLabelerConfig
 from ..rl import CounterfactualPPOConfig, CounterfactualRLEnvConfig
-from ..utils import BaseConfig
+from ..utils import BaseConfig, TargetConfig
 
 if TYPE_CHECKING:
     from .app import NbvStreamlitApp
@@ -21,11 +21,11 @@ def _target_cls():
     return NbvStreamlitApp
 
 
-class NbvStreamlitAppConfig(BaseConfig):
+class NbvStreamlitAppConfig(TargetConfig["NbvStreamlitApp"]):
     """Top-level config for the refactored Streamlit app."""
 
     @property
-    def target(self) -> type["NbvStreamlitApp"]:
+    def target_type(self) -> type["NbvStreamlitApp"]:
         return _target_cls()
 
     dataset: AseEfmDatasetConfig = Field(default_factory=AseEfmDatasetConfig)
@@ -59,10 +59,10 @@ class RlPageConfig(BaseConfig):
     enable_episode_table: bool = True
     """Whether to show per-step episode tables."""
 
-    default_eval_episodes: int = 4
+    default_eval_episodes: int = Field(default=4, ge=1)
     """Default number of episodes for policy comparison."""
 
-    max_eval_episodes: int = 16
+    max_eval_episodes: int = Field(default=16, ge=1)
     """Maximum number of episodes exposed in the UI."""
 
     env: CounterfactualRLEnvConfig = Field(default_factory=CounterfactualRLEnvConfig)
@@ -70,13 +70,6 @@ class RlPageConfig(BaseConfig):
 
     ppo: CounterfactualPPOConfig = Field(default_factory=CounterfactualPPOConfig)
     """Default PPO configuration used when loading or instantiating SB3 policies."""
-
-    @field_validator("default_eval_episodes", "max_eval_episodes")
-    @classmethod
-    def _positive_ints(cls, value: int) -> int:
-        if int(value) <= 0:
-            raise ValueError("Episode-count controls must be >= 1.")
-        return int(value)
 
 
 __all__ = ["NbvStreamlitAppConfig", "RlPageConfig"]

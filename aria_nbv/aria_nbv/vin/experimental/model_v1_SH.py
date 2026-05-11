@@ -88,8 +88,7 @@ context to an ordinal NBV score that correlates with oracle RRI.
 
 from __future__ import annotations
 
-import math
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import torch
 from efm3d.aria.pose import PoseTW
@@ -98,7 +97,7 @@ from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import
 from torch import Tensor, nn
 
 from ...rri_metrics.coral import coral_expected_from_logits, coral_logits_to_prob
-from ...utils import BaseConfig
+from ...utils import TargetConfig
 from .._model_mixins import FrustumSamplingMixin
 from ..backbone_evl import EvlBackboneConfig
 from ..vin_utils import (
@@ -118,7 +117,7 @@ from .spherical_encoding import ShellShPoseEncoderConfig
 from .types import EvlBackboneOutput, VinForwardDiagnostics, VinPrediction
 
 
-class VinModelConfig(BaseConfig):
+class VinModelConfig(TargetConfig["VinModel"]):
     """Configuration for `VinModel`.
 
     This config collects all architectural choices that determine how VIN
@@ -136,7 +135,7 @@ class VinModelConfig(BaseConfig):
     """
 
     @property
-    def target(self) -> type["VinModel"]:
+    def target_type(self) -> type["VinModel"]:
         """Factory target for `BaseConfig.setup_target`."""
         return VinModel
 
@@ -175,7 +174,7 @@ class VinModelConfig(BaseConfig):
     frustum_grid_size: int = Field(default=4, gt=0)
     """Grid size on the image plane for candidate frustum sampling (grid_size² directions)."""
 
-    frustum_depths_m: list[float] = Field(
+    frustum_depths_m: list[Annotated[float, Field(gt=0.0, allow_inf_nan=False)]] = Field(
         default_factory=lambda: [0.5, 1.0, 2.0, 3.0],
         min_length=1,
     )
@@ -213,19 +212,6 @@ class VinModelConfig(BaseConfig):
             raise ValueError(f"Unknown/unsupported scene_field_channels: {unknown}")
         if len(set(value)) != len(value):
             raise ValueError("scene_field_channels must not contain duplicates.")
-        return value
-
-    @field_validator("frustum_depths_m")
-    @classmethod
-    def _validate_frustum_depths_m(cls, value: list[float]) -> list[float]:
-        """Validate frustum depths.
-
-        Depths are used as *metric z* in camera space before unprojection, so
-        they must be finite and strictly positive.
-        """
-        bad = [d for d in value if (not math.isfinite(d)) or d <= 0.0]
-        if bad:
-            raise ValueError(f"frustum_depths_m must contain finite values > 0, got {bad}")
         return value
 
 

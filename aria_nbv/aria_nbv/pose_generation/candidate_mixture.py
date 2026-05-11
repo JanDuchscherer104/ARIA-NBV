@@ -22,10 +22,10 @@ import torch
 import trimesh  # type: ignore[import-untyped]
 from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 
 from ..data_handling import EfmSnippetView
-from ..utils import BaseConfig
+from ..utils import BaseConfig, TargetConfig
 from .candidate_generation import CandidateViewGenerator, CandidateViewGeneratorConfig
 from .types import (
     CandidateGenerationRuntimeContext,
@@ -54,7 +54,7 @@ class CandidateMixtureComponentConfig(BaseConfig):
     name: str
     """Human-readable component name retained as row provenance."""
 
-    count: int
+    count: int = Field(ge=1)
     """Number of full-shell candidates sampled by this component."""
 
     strategy: ViewDirectionMode
@@ -78,19 +78,12 @@ class CandidateMixtureComponentConfig(BaseConfig):
     view_max_elevation_deg: float | None = None
     view_roll_jitter_deg: float | None = None
 
-    @field_validator("count")
-    @classmethod
-    def _positive_count(cls, value: int) -> int:
-        if int(value) <= 0:
-            raise ValueError("Candidate mixture component count must be >= 1.")
-        return int(value)
 
-
-class CandidateMixtureViewGeneratorConfig(BaseConfig):
+class CandidateMixtureViewGeneratorConfig(TargetConfig["CandidateMixtureViewGenerator"]):
     """Config-as-factory for fixed-count mixed candidate tables."""
 
     @property
-    def target(self) -> type["CandidateMixtureViewGenerator"]:
+    def target_type(self) -> type["CandidateMixtureViewGenerator"]:
         return CandidateMixtureViewGenerator
 
     base: CandidateViewGeneratorConfig = Field(default_factory=CandidateViewGeneratorConfig)

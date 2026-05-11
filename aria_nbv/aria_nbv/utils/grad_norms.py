@@ -5,7 +5,7 @@ from __future__ import annotations
 from fnmatch import fnmatch
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field
 from torch import nn
 
 from .base_config import BaseConfig
@@ -86,7 +86,7 @@ class GradNormLoggingConfig(BaseConfig):
     enabled: bool = True
     """Whether to log gradient norms during training."""
 
-    group_depth: int = 2
+    group_depth: int = Field(default=2, ge=1)
     """Module depth relative to ``vin`` (1 = vin, 2 = vin.<child>)."""
 
     include: list[str] = Field(default_factory=list)
@@ -98,22 +98,5 @@ class GradNormLoggingConfig(BaseConfig):
     norm_type: GradNormType = "L2"
     """Norm type used for logging."""
 
-    max_items: int | None = 32
+    max_items: int | None = Field(default=32, ge=1)
     """Maximum number of modules to log (None disables the cap)."""
-
-    @field_validator("group_depth")
-    @classmethod
-    def _validate_group_depth(cls, value: int) -> int:
-        if value < 1:
-            raise ValueError("group_depth must be >= 1.")
-        return int(value)
-
-    @field_validator("max_items")
-    @classmethod
-    def _validate_max_items(cls, value: int | None) -> int | None:
-        if value is None:
-            return None
-        value = int(value)
-        if value < 1:
-            raise ValueError("max_items must be >= 1 or None.")
-        return value

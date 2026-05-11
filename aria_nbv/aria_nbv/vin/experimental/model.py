@@ -115,7 +115,7 @@ from ...rri_metrics.coral import (
     coral_expected_from_logits,
     coral_logits_to_prob,
 )
-from ...utils import BaseConfig
+from ...utils import TargetConfig
 from .._model_mixins import FrustumSamplingMixin
 from ..backbone_evl import EvlBackboneConfig
 from ..vin_utils import (
@@ -211,7 +211,7 @@ class PoseConditionedGlobalPool(nn.Module):
         return attn_out
 
 
-class VinModelConfig(BaseConfig):
+class VinModelConfig(TargetConfig["VinModel"]):
     """Configuration for `VinModel`.
 
     This config collects all architectural choices that determine how VIN
@@ -230,7 +230,7 @@ class VinModelConfig(BaseConfig):
     """
 
     @property
-    def target(self) -> type[VinModel]:
+    def target_type(self) -> type[VinModel]:
         """Factory target for `BaseConfig.setup_target`."""
         return VinModel
 
@@ -308,7 +308,7 @@ class VinModelConfig(BaseConfig):
     global_pool_grid_size: int = Field(default=8, gt=0)
     """Target grid size for attention pooling (downsampled voxel resolution)."""
 
-    global_pool_dim: int | None = None
+    global_pool_dim: int | None = Field(default=None, gt=0)
     """Attention embedding dimension (defaults to `field_dim` when None)."""
 
     global_pool_heads: int = Field(default=4, gt=0)
@@ -366,24 +366,6 @@ class VinModelConfig(BaseConfig):
             raise ValueError(
                 "pose_encoder_lff.input_dim must be 8 (shell) or 9 (t+R6d).",
             )
-        return value
-
-    @field_validator("global_pool_dim")
-    @classmethod
-    def _validate_global_pool_dim(cls, value: int | None) -> int | None:
-        """Validate attention embedding dimension when provided."""
-        if value is not None and value <= 0:
-            raise ValueError("global_pool_dim must be > 0 when provided.")
-        return value
-
-    @field_validator("pose_scale_init")
-    @classmethod
-    def _validate_pose_scale_init(
-        cls,
-        value: tuple[float, float],
-    ) -> tuple[float, float]:
-        if len(value) != 2:
-            raise ValueError("pose_scale_init must be a (translation, rotation) tuple.")
         return value
 
     @model_validator(mode="after")

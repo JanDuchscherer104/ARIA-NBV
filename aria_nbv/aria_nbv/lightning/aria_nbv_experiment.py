@@ -25,7 +25,7 @@ from pydantic import Field, field_validator, model_validator
 
 from ..configs import OptunaConfig, PathConfig
 from ..data_handling import VinOfflineSourceConfig
-from ..utils import BaseConfig, Console, Stage
+from ..utils import Console, Stage, TargetConfig
 from ..utils.console import Verbosity
 from .lit_datamodule import VinDataModule, VinDataModuleConfig
 from .lit_module import VinLightningModule, VinLightningModuleConfig
@@ -35,13 +35,17 @@ if TYPE_CHECKING:
     import optuna
     import pytorch_lightning as pl
 
+    ExperimentTarget = tuple[pl.Trainer, VinLightningModule, VinDataModule]
+else:
+    ExperimentTarget = tuple[Any, VinLightningModule, VinDataModule]
+
 
 def _default_run_name() -> str:
     # Zone info uses IANA time zone database
     return datetime.now(tz=ZoneInfo("Europe/Berlin")).strftime("R%Y-%m-%d_%H-%M-%S")
 
 
-class AriaNBVExperimentConfig(BaseConfig):
+class AriaNBVExperimentConfig(TargetConfig[ExperimentTarget]):
     """Top-level experiment config for VIN training/evaluation."""
 
     run_mode: Literal[
@@ -301,7 +305,7 @@ class AriaNBVExperimentConfig(BaseConfig):
         return self
 
     # ------------------------------------------------------------------ orchestration
-    def setup_target(  # type: ignore[override]
+    def setup_target(
         self,
         setup_stage: Stage | str | None = None,
         *,

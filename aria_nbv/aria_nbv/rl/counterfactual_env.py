@@ -38,7 +38,7 @@ from ..pose_generation.counterfactuals import (
     CounterfactualStepResult,
     CounterfactualTrajectory,
 )
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..utils.frames import rotate_yaw_cw90
 
 if TYPE_CHECKING:
@@ -58,11 +58,11 @@ def _float_box(shape: tuple[int, ...]) -> spaces.Box:
     return spaces.Box(low=-max_f, high=max_f, shape=shape, dtype=np.float32)
 
 
-class CounterfactualRLEnvConfig(BaseConfig):
+class CounterfactualRLEnvConfig(TargetConfig["CounterfactualRLEnv"]):
     """Config-as-factory surface for the basic counterfactual RL environment."""
 
     @property
-    def target(self) -> type["CounterfactualRLEnv"]:
+    def target_type(self) -> type["CounterfactualRLEnv"]:
         return CounterfactualRLEnv
 
     candidate_config: CandidateViewGeneratorConfig = Field(default_factory=CandidateViewGeneratorConfig)
@@ -71,7 +71,7 @@ class CounterfactualRLEnvConfig(BaseConfig):
     reward: CounterfactualOracleRriScorerConfig = Field(default_factory=CounterfactualOracleRriScorerConfig)
     """Reward evaluator used when no explicit runtime evaluator is provided."""
 
-    horizon: int = 3
+    horizon: int = Field(default=3, ge=1)
     """Episode horizon in rollout steps."""
 
     invalid_action_penalty: float = -0.01
@@ -87,13 +87,6 @@ class CounterfactualRLEnvConfig(BaseConfig):
     """Enable debug logging for environment orchestration."""
 
     _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
-
-    @field_validator("horizon")
-    @classmethod
-    def _positive_horizon(cls, value: int) -> int:
-        if int(value) <= 0:
-            raise ValueError("horizon must be >= 1.")
-        return int(value)
 
 
 class CounterfactualRLEnv(gym.Env[dict[str, np.ndarray], int]):
@@ -491,11 +484,11 @@ class CounterfactualRLEnv(gym.Env[dict[str, np.ndarray], int]):
         )
 
 
-class CounterfactualPPOConfig(BaseConfig):
+class CounterfactualPPOConfig(TargetConfig[Any]):
     """Low-gamma PPO defaults for the basic counterfactual RL environment."""
 
     @property
-    def target(self) -> type["CounterfactualPPOFactory"]:
+    def target_type(self) -> type["CounterfactualPPOFactory"]:
         return CounterfactualPPOFactory
 
     learning_rate: float = 3e-4

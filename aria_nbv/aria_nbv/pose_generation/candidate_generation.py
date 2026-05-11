@@ -32,7 +32,7 @@ from efm3d.aria.pose import PoseTW
 from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ..data_handling import EfmSnippetView
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..utils.frames import rotate_yaw_cw90, world_up_tensor
 from .candidate_generation_rules import (
     FreeSpaceRule,
@@ -53,7 +53,7 @@ from .types import (
 from .utils import ensure_unbatched_pose
 
 
-class CandidateViewGeneratorConfig(BaseConfig):
+class CandidateViewGeneratorConfig(TargetConfig["CandidateViewGenerator"]):
     """Configuration for sampling and pruning candidate camera poses around a reference frame.
 
     Encapsulates the radii/angle sampling envelope, orientation jitter options, collision and free-space
@@ -61,7 +61,7 @@ class CandidateViewGeneratorConfig(BaseConfig):
     """
 
     @property
-    def target(self) -> type["CandidateViewGenerator"]:
+    def target_type(self) -> type["CandidateViewGenerator"]:
         """Factory target for `BaseConfig.setup_target`."""
         return CandidateViewGenerator
 
@@ -152,22 +152,22 @@ class CandidateViewGeneratorConfig(BaseConfig):
     view_kappa: float | None = None
     """Concentration for PowerSpherical view sampler; defaults to positional `kappa` when None."""
 
-    view_max_angle_deg: float = 0.0
+    view_max_angle_deg: float = Field(default=0.0, ge=0.0)
     """Fallback cap (deg) applied to both azimuth and elevation jitter when per-axis caps are unset."""
 
-    view_max_azimuth_deg: float | None = 60.0
+    view_max_azimuth_deg: float | None = Field(default=60.0, ge=0.0)
     """Maximum horizontal deviation (deg, +/-) from the base direction."""
 
-    view_max_elevation_deg: float | None = 30.0
+    view_max_elevation_deg: float | None = Field(default=30.0, ge=0.0)
     """Maximum vertical deviation (deg, +/-) from the base direction."""
 
-    view_roll_jitter_deg: float = 0.0
+    view_roll_jitter_deg: float = Field(default=0.0, ge=0.0)
     """Symmetric roll jitter (deg) around the sampled forward axis in camera frame."""
 
     view_target_point_world: torch.Tensor | None = None
     """Optional world-space target for TARGET_POINT mode (shape (3,))."""
 
-    seed: int | None = 0
+    seed: int | None = Field(default=0, ge=0)
     """Optional deterministic seed for candidate sampling.
 
     Set to ``None`` to keep the current global RNG state (non-deterministic).
@@ -176,20 +176,6 @@ class CandidateViewGeneratorConfig(BaseConfig):
     _resolve_device = field_validator("device", mode="before")(BaseConfig._resolve_device)
 
     _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
-
-    _non_negative_seed = field_validator("seed")(BaseConfig._validate_non_negative_seed)
-
-    @field_validator(
-        "view_max_angle_deg",
-        "view_max_azimuth_deg",
-        "view_max_elevation_deg",
-        "view_roll_jitter_deg",
-    )
-    @classmethod
-    def _non_negative_angles(cls, value: float | None) -> float | None:
-        if value is not None and value < 0:
-            raise ValueError("Angular jitter caps must be non-negative.")
-        return value
 
     @model_validator(mode="after")
     def set_debug(self) -> CandidateViewGeneratorConfig:

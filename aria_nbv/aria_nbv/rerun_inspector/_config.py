@@ -8,12 +8,12 @@ geometry, performance, and primitive toggles used by the CLI runtime.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
 from aria_nbv.data_handling import VinOfflineDatasetConfig
-from aria_nbv.utils import BaseConfig, Verbosity
+from aria_nbv.utils import BaseConfig, TargetConfig, Verbosity
 
 
 class RerunInspectorDatasetConfig(BaseConfig):
@@ -57,20 +57,11 @@ class RerunInspectorSelectionConfig(BaseConfig):
     split: Literal["all", "train", "val"] = "val"
     """Split used for index-based selection."""
 
-    index: int = 0
+    index: int = Field(default=0, ge=0)
     """Zero-based index inside ``split`` when no higher-precedence selector is set."""
 
     rollout_context_mode: Literal["auto", "required", "off"] = "auto"
     """VIN context policy for rollout-Zarr inspection."""
-
-    @field_validator("index")
-    @classmethod
-    def _validate_index(cls, value: int) -> int:
-        """Reject negative split indices."""
-
-        if int(value) < 0:
-            raise ValueError("selection.index must be >= 0.")
-        return int(value)
 
     @model_validator(mode="after")
     def _validate_scene_snippet_pair(self) -> "RerunInspectorSelectionConfig":
@@ -99,7 +90,7 @@ class RerunInspectorOutputConfig(BaseConfig):
     connect_addr: str | None = None
     """Rerun gRPC endpoint when ``mode='connect'``."""
 
-    spawn_port: int = 9876
+    spawn_port: int = Field(default=9876, ge=1, le=65535)
     """Viewer port used when ``mode='spawn'``."""
 
     spawn_memory_limit: str = "75%"
@@ -108,96 +99,48 @@ class RerunInspectorOutputConfig(BaseConfig):
     hide_welcome_screen: bool = True
     """Whether spawned viewers should hide the Rerun welcome screen."""
 
-    @field_validator("spawn_port")
-    @classmethod
-    def _validate_port(cls, value: int) -> int:
-        """Validate the configured viewer port."""
-
-        port = int(value)
-        if port <= 0 or port > 65535:
-            raise ValueError("output.spawn_port must be in [1, 65535].")
-        return port
-
 
 class RerunInspectorGeometryConfig(BaseConfig):
     """Geometry rendering parameters for Rerun primitives."""
 
-    frustum_scale: float = 0.35
+    frustum_scale: float = Field(default=0.35, gt=0.0)
     """Candidate frustum size in world units."""
 
-    reference_axis_length: float = 0.45
+    reference_axis_length: float = Field(default=0.45, gt=0.0)
     """Axis length used for the reference-pose transform."""
 
-    semidense_radius: float = 0.015
+    semidense_radius: float = Field(default=0.015, gt=0.0)
     """Rerun point radius for semidense world points."""
 
-    candidate_center_radius: float = 0.035
+    candidate_center_radius: float = Field(default=0.035, gt=0.0)
     """Rerun point radius for candidate centers."""
 
-    candidate_point_radius: float = 0.01
+    candidate_point_radius: float = Field(default=0.01, gt=0.0)
     """Rerun point radius for optional candidate point clouds."""
 
-    trajectory_radius: float = 0.02
+    trajectory_radius: float = Field(default=0.02, gt=0.0)
     """Line radius for trajectory paths."""
 
-    mesh_alpha: int = 51
+    mesh_alpha: int = Field(default=51, ge=0, le=255)
     """Alpha channel for the GT mesh albedo factor in ``[0, 255]``."""
-
-    @field_validator(
-        "frustum_scale",
-        "reference_axis_length",
-        "semidense_radius",
-        "candidate_center_radius",
-        "candidate_point_radius",
-        "trajectory_radius",
-    )
-    @classmethod
-    def _validate_positive(cls, value: float) -> float:
-        """Validate positive geometry scales."""
-
-        scalar = float(value)
-        if scalar <= 0:
-            raise ValueError("geometry scales and radii must be > 0.")
-        return scalar
-
-    @field_validator("mesh_alpha")
-    @classmethod
-    def _validate_mesh_alpha(cls, value: int) -> int:
-        """Validate the GT mesh alpha channel."""
-
-        alpha = int(value)
-        if alpha < 0 or alpha > 255:
-            raise ValueError("geometry.mesh_alpha must be in [0, 255].")
-        return alpha
 
 
 class RerunInspectorPerformanceConfig(BaseConfig):
     """Performance and deterministic sampling knobs."""
 
-    max_semidense_points: int = 50_000
+    max_semidense_points: int = Field(default=50_000, ge=0)
     """Maximum semidense points to log after deterministic downsampling."""
 
-    max_candidate_points: int = 20_000
+    max_candidate_points: int = Field(default=20_000, ge=0)
     """Maximum optional candidate point-cloud points to log."""
 
-    seed: int | None = 0
+    seed: int | None = Field(default=0, ge=0)
     """Seed used for deterministic downsampling."""
 
     verbosity: Verbosity = Verbosity.NORMAL
     """Console verbosity for the inspector."""
 
     _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
-    _non_negative_seed = field_validator("seed")(BaseConfig._validate_non_negative_seed)
-
-    @field_validator("max_semidense_points", "max_candidate_points")
-    @classmethod
-    def _validate_non_negative_limit(cls, value: int) -> int:
-        """Validate point-count limits."""
-
-        limit = int(value)
-        if limit < 0:
-            raise ValueError("point-count limits must be >= 0.")
-        return limit
 
 
 class RerunInspectorCandidateConfig(BaseConfig):
@@ -206,49 +149,17 @@ class RerunInspectorCandidateConfig(BaseConfig):
     subset_mode: Literal["all", "valid_only", "invalid_only", "top_k_oracle", "indices"] = "all"
     """Candidate subset to log as native Rerun camera entities."""
 
-    subset_top_k: int = 5
+    subset_top_k: int = Field(default=5, ge=1)
     """Number of candidates used when ``subset_mode='top_k_oracle'``."""
 
-    subset_indices: list[int] = Field(default_factory=list)
+    subset_indices: list[Annotated[int, Field(ge=0)]] = Field(default_factory=list)
     """Explicit candidate indices used when ``subset_mode='indices'``."""
 
     selected_strategy: Literal["top_valid_oracle", "first_valid", "explicit_index"] = "top_valid_oracle"
     """Strategy used for the single candidate that receives depth/point details."""
 
-    selected_index: int | None = None
+    selected_index: int | None = Field(default=None, ge=0)
     """Explicit selected candidate index, overriding ``selected_strategy`` when set."""
-
-    @field_validator("subset_top_k")
-    @classmethod
-    def _validate_positive_top_k(cls, value: int) -> int:
-        """Validate positive candidate top-k counts."""
-
-        count = int(value)
-        if count <= 0:
-            raise ValueError("candidate.subset_top_k must be > 0.")
-        return count
-
-    @field_validator("subset_indices")
-    @classmethod
-    def _validate_subset_indices(cls, value: list[int]) -> list[int]:
-        """Reject negative candidate subset indices."""
-
-        indices = [int(item) for item in value]
-        if any(item < 0 for item in indices):
-            raise ValueError("candidate.subset_indices must be non-negative.")
-        return indices
-
-    @field_validator("selected_index")
-    @classmethod
-    def _validate_selected_index(cls, value: int | None) -> int | None:
-        """Reject negative selected candidate indices."""
-
-        if value is None:
-            return None
-        index = int(value)
-        if index < 0:
-            raise ValueError("candidate.selected_index must be >= 0.")
-        return index
 
 
 class RerunInspectorEfmVoxelConfig(BaseConfig):
@@ -266,50 +177,20 @@ class RerunInspectorEfmVoxelConfig(BaseConfig):
     log_cent_pr_nms: bool = True
     """Log NMS-filtered centerness probabilities as thresholded voxel-center points."""
 
-    occ_threshold: float = 0.95
+    occ_threshold: float = Field(default=0.95, ge=0.0, le=1.0)
     """Minimum ``occ_pr`` value to log."""
 
-    cent_threshold: float = 0.03
+    cent_threshold: float = Field(default=0.03, ge=0.0, le=1.0)
     """Minimum ``cent_pr`` value to log."""
 
-    cent_nms_threshold: float = 0.01
+    cent_nms_threshold: float = Field(default=0.01, ge=0.0, le=1.0)
     """Minimum ``cent_pr_nms`` value to log."""
 
-    max_points_per_field: int = 10_000
+    max_points_per_field: int = Field(default=10_000, ge=0)
     """Maximum logged voxel centers per EFM field after thresholding."""
 
-    point_radius: float = 0.025
+    point_radius: float = Field(default=0.025, gt=0.0)
     """Rerun point radius for logged voxel centers."""
-
-    @field_validator("occ_threshold", "cent_threshold", "cent_nms_threshold")
-    @classmethod
-    def _validate_threshold(cls, value: float) -> float:
-        """Validate probability thresholds."""
-
-        threshold = float(value)
-        if threshold < 0.0 or threshold > 1.0:
-            raise ValueError("EFM voxel thresholds must be in [0, 1].")
-        return threshold
-
-    @field_validator("max_points_per_field")
-    @classmethod
-    def _validate_non_negative_points(cls, value: int) -> int:
-        """Validate non-negative voxel point limits."""
-
-        limit = int(value)
-        if limit < 0:
-            raise ValueError("efm_voxels.max_points_per_field must be >= 0.")
-        return limit
-
-    @field_validator("point_radius")
-    @classmethod
-    def _validate_positive_radius(cls, value: float) -> float:
-        """Validate positive voxel point radius."""
-
-        radius = float(value)
-        if radius <= 0.0:
-            raise ValueError("efm_voxels.point_radius must be > 0.")
-        return radius
 
 
 class RerunInspectorAseKeyframeConfig(BaseConfig):
@@ -380,11 +261,11 @@ class RerunInspectorPrimitivesConfig(BaseConfig):
     """Log curated EFM voxel evidence when available."""
 
 
-class RerunOfflineInspectorConfig(BaseConfig):
+class RerunOfflineInspectorConfig(TargetConfig[Any]):
     """Top-level config-as-factory model for the offline Rerun inspector."""
 
     @property
-    def target(self) -> type[Any]:
+    def target_type(self) -> type[Any]:
         """Return the inspector runtime factory target."""
 
         from ._cli import RerunOfflineInspector

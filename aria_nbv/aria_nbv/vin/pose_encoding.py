@@ -16,10 +16,10 @@ from __future__ import annotations
 import math
 
 import torch
-from pydantic import Field, field_validator
+from pydantic import Field
 from torch import Tensor, nn
 
-from ..utils import BaseConfig
+from ..utils import TargetConfig
 
 
 class LearnableFourierFeatures(nn.Module):
@@ -74,17 +74,17 @@ class LearnableFourierFeatures(nn.Module):
         return torch.cat([x, enc], dim=-1)
 
 
-class LearnableFourierFeaturesConfig(BaseConfig):
+class LearnableFourierFeaturesConfig(TargetConfig[LearnableFourierFeatures]):
     """Config-as-factory wrapper for `LearnableFourierFeatures`."""
 
     @property
-    def target(self) -> type[LearnableFourierFeatures]:
+    def target_type(self) -> type[LearnableFourierFeatures]:
         return LearnableFourierFeatures
 
     input_dim: int = Field(default=6, gt=0)
     """Input dimensionality (default: 6 for SE(3) relative pose as translation + so(3) log)."""
 
-    fourier_dim: int = Field(default=128, gt=0)
+    fourier_dim: int = Field(default=128, gt=0, multiple_of=2)
     """Fourier feature dimensionality (must be even)."""
 
     hidden_dim: int = Field(default=256, gt=0)
@@ -98,10 +98,3 @@ class LearnableFourierFeaturesConfig(BaseConfig):
 
     include_input: bool = False
     """Concatenate raw inputs to the learned encoding when True."""
-
-    @field_validator("fourier_dim")
-    @classmethod
-    def _validate_fourier_dim_is_even(cls, value: int) -> int:
-        if value % 2 != 0:
-            raise ValueError("fourier_dim must be even.")
-        return value

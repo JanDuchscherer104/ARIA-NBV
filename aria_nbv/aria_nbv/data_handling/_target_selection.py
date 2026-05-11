@@ -17,16 +17,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from enum import StrEnum
-from typing import Any
+from typing import Any, Protocol
 
 import torch
 from efm3d.aria.aria_constants import ARIA_SNIPPET_T_WORLD_SNIPPET
 from efm3d.aria.obb import ObbTW, obb_iou3d
 from efm3d.aria.pose import PoseTW
-from pydantic import field_validator
+from pydantic import Field
 from torch import Tensor
 
-from ..utils import BaseConfig
+from ..utils import TargetConfig
 from ..vin.types import EvlBackboneOutput
 from .efm_views import EfmSnippetView, VinSnippetView
 
@@ -69,10 +69,18 @@ TARGET_INVALID_REASON_VERSION = "target-selection-invalidity-v1"
 class TargetCandidateRow:
     """One actor-visible target candidate and its oracle audit fields.
 
-    Geometry is stored in ARIA world coordinates. ``relative_pose_reference``
-    is ``T_reference_rig_target = T_world_reference_rig^{-1} @
-    T_world_target`` flattened to 12 values. GT match fields are labels and
-    diagnostics only; they do not participate in V1 ranking.
+    This is the row-level DTO for the OBS-SEL/PRED-Q/GT-EVAL boundary. The
+    actor-visible part is derived from detected or predicted OBBs: class id,
+    confidence, world-frame OBB center/extents/pose, support counts, visibility
+    score, support score, deficit score, eligibility, and the final selection
+    score. `pose_world_object` is an EFM `PoseTW` payload flattened to 12
+    values. `relative_pose_reference_object` is
+    `T_reference_world @ T_world_object`, also flattened to 12 values.
+
+    `source_index` points back into the padded source OBB table after flattening
+    valid rows; `target_row_id` is the selector-local dense row id. GT match
+    fields are oracle/evaluation audit fields only. They are filled after
+    actor-visible selection and must not be fed to actor policies in V1.
     """
 
     scene_id: str | None
@@ -114,7 +122,18 @@ class TargetCandidateRow:
 
 @dataclass(frozen=True, slots=True)
 class TargetSelectionResult:
-    """Ranked target table and selected top-K rows for one snippet."""
+    """Ranked target table and selected top-K rows for one snippet.
+
+    `rows` contains every non-padded candidate target that could be interpreted
+    from the resolved actor-visible source. `ranked_rows` filters that table to
+    eligible rows and sorts it by the configured selection score. `selected_rows`
+    is the top-K or stochastic policy output used to condition candidate
+    generation and target-RRI labeling.
+
+    `source` records the resolved target source, for example `detected_obbs` or
+    `backbone.obb_pred_viz`. In V1, GT OBBs can appear only in GT match fields;
+    if GT was the selection source, `source_mode` must be `v0_gt_sanity`.
+    """
 
     rows: tuple[TargetCandidateRow, ...]
     ranked_rows: tuple[TargetCandidateRow, ...]
@@ -131,21 +150,36 @@ class TargetSelectionResult:
 
 @dataclass(slots=True)
 class _TargetSource:
+    """Resolved OBB source block before target rows are built.
+
+    `obbs` is still an EFM `ObbTW` padded tensor, commonly shaped `(1, K, 34)`
+    for a single snippet. `_world_obbs_for_sample` selects the latest valid OBB
+    slice, applies the snippet-to-world transform when present, and leaves
+    padded rows in place until `_valid_obb_data_with_source_indices` records
+    their source indices.
+    """
+
     source: str
     obbs: ObbTW
     sem_id_to_name: list[str] | None = None
 
 
-class TargetSelectorConfig(BaseConfig):
+class _TargetSelectionSourceSample(Protocol):
+    gt_obbs: Any | None
+    detected_obbs: Any | None
+    backbone_out: EvlBackboneOutput | None
+
+
+class TargetSelectorConfig(TargetConfig["ActorVisibleTargetSelector"]):
     """Configuration for `ActorVisibleTargetSelector`."""
 
     @property
-    def target(self) -> type["ActorVisibleTargetSelector"]:
+    def target_type(self) -> type["ActorVisibleTargetSelector"]:
         """Factory target for `BaseConfig.setup_target`."""
 
         return ActorVisibleTargetSelector
 
-    k: int = 3
+    k: int = Field(default=3, ge=1)
     """Number of selected targets to materialize."""
 
     policy: TargetSelectionPolicy = TargetSelectionPolicy.GREEDY_TOP_K
@@ -157,74 +191,44 @@ class TargetSelectorConfig(BaseConfig):
     seed: int | None = 0
     """Seed for stochastic target selection policies."""
 
-    temperature: float = 1.0
+    temperature: float = Field(default=1.0, gt=0.0)
     """Softmax temperature for ``temperature_softmax_top_k``."""
 
-    min_confidence: float = 0.2
+    min_confidence: float = Field(default=0.2, ge=0.0)
     """Minimum observed/predicted OBB confidence for V1 eligibility."""
 
-    min_projected_area_pixels: float = 16.0
+    min_projected_area_pixels: float = Field(default=16.0, gt=0.0)
     """Minimum max projected 2D area over RGB/SLAM OBB boxes."""
 
-    projected_area_normalizer_pixels: float = 240.0 * 240.0
+    projected_area_normalizer_pixels: float = Field(default=240.0 * 240.0, gt=0.0)
     """Image-area normalizer used for projected-area fractions."""
 
-    projected_area_full_score_fraction: float = 0.05
+    projected_area_full_score_fraction: float = Field(default=0.05, gt=0.0)
     """Projected-area fraction that saturates the visibility score."""
 
-    min_support_points: int = 1
+    min_support_points: int = Field(default=1, ge=1)
     """Minimum semidense plus EVL points inside the target OBB."""
 
-    support_saturation_points: int = 128
+    support_saturation_points: int = Field(default=128, ge=1)
     """Support count at which the deficit score reaches zero."""
 
-    obb_support_scale: float = 1.0
+    obb_support_scale: float = Field(default=1.0, gt=0.0)
     """OBB scale used when counting semidense/EVL points inside a target."""
 
-    max_support_points: int = 20000
+    max_support_points: int = Field(default=20000, ge=1)
     """Maximum support points inspected per snippet, using deterministic prefix truncation."""
 
     match_gt: bool = True
     """Match selected V1 targets to GT OBBs after ranking when GT is available."""
 
-    min_gt_iou: float = 0.1
+    min_gt_iou: float = Field(default=0.1, ge=0.0)
     """Minimum sampled 3D OBB IoU for a GT target match."""
 
-    gt_iou_samples: int = 8
+    gt_iou_samples: int = Field(default=8, ge=1)
     """Samples per dimension for EFM's sampled OBB IoU fallback."""
 
-    gt_ambiguity_margin: float = 0.02
+    gt_ambiguity_margin: float = Field(default=0.02, ge=0.0)
     """IoU margin below which competing GT matches are considered ambiguous."""
-
-    @field_validator("k", "min_support_points", "support_saturation_points", "max_support_points", "gt_iou_samples")
-    @classmethod
-    def _positive_int(cls, value: int) -> int:
-        value = int(value)
-        if value < 1:
-            raise ValueError("Target selector integer thresholds must be >= 1.")
-        return value
-
-    @field_validator(
-        "temperature",
-        "min_projected_area_pixels",
-        "projected_area_normalizer_pixels",
-        "projected_area_full_score_fraction",
-        "obb_support_scale",
-    )
-    @classmethod
-    def _positive_float(cls, value: float) -> float:
-        value = float(value)
-        if value <= 0.0:
-            raise ValueError("Target selector float thresholds must be > 0.")
-        return value
-
-    @field_validator("min_confidence", "min_gt_iou", "gt_ambiguity_margin")
-    @classmethod
-    def _non_negative_float(cls, value: float) -> float:
-        value = float(value)
-        if value < 0.0:
-            raise ValueError("Target selector thresholds must be >= 0.")
-        return value
 
 
 class ActorVisibleTargetSelector:
@@ -288,26 +292,43 @@ class ActorVisibleTargetSelector:
             warnings=tuple(warnings),
         )
 
-    def _resolve_source(self, sample: Any, *, warnings: list[str]) -> _TargetSource | None:
+    def _resolve_source(self, sample: _TargetSelectionSourceSample, *, warnings: list[str]) -> _TargetSource | None:
+        """Resolve the OBB source allowed by the selector mode.
+
+        V0 sanity mode intentionally reads GT OBBs. V1 first prefers
+        actor-visible detected OBBs, then EVL-predicted OBBs from the cached
+        backbone output. GT OBBs are refused in V1 and only surfaced as a
+        warning so they remain GT-EVAL labels, not OBS-SEL input.
+
+        Args:
+            sample: Data container exposing GT, detected, and backbone OBB
+                sources.
+            warnings: Mutable warning list propagated to the selection result.
+
+        Returns:
+            The resolved source block, or ``None`` when no permitted source is
+            available.
+        """
+
         if self.config.source_mode == TargetSourceMode.V0_GT_SANITY:
-            gt = _compact_obb_block(getattr(sample, "gt_obbs", None))
+            gt = _compact_obb_block(sample.gt_obbs)
             if gt is None:
                 warnings.append("V0 GT target selection requested, but sample has no GT OBB block.")
                 return None
             return _TargetSource(source="gt_obbs_v0_sanity", obbs=gt[0], sem_id_to_name=gt[1])
 
-        detected = _compact_obb_block(getattr(sample, "detected_obbs", None))
+        detected = _compact_obb_block(sample.detected_obbs)
         if detected is not None:
             return _TargetSource(source="detected_obbs", obbs=detected[0], sem_id_to_name=detected[1])
 
-        backbone = getattr(sample, "backbone_out", None)
+        backbone = sample.backbone_out
         if isinstance(backbone, EvlBackboneOutput):
             obb = backbone.obb_pred_viz if backbone.obb_pred_viz is not None else backbone.obb_pred
             if obb is not None:
                 source_name = "backbone.obb_pred_viz" if backbone.obb_pred_viz is not None else "backbone.obb_pred"
                 return _TargetSource(source=source_name, obbs=obb, sem_id_to_name=backbone.obb_pred_sem_id_to_name)
 
-        if getattr(sample, "gt_obbs", None) is not None:
+        if sample.gt_obbs is not None:
             warnings.append("V1 target selection refused GT OBBs because they are oracle-only labels/evaluation data.")
         warnings.append("No actor-visible detected/predicted OBB source was available for target selection.")
         return None
@@ -565,6 +586,7 @@ def _compact_obb_block(value: Any) -> tuple[ObbTW, list[str] | None] | None:
 
 def target_gt_aabb_world(
     row: TargetCandidateRow,
+    # TODO(fix): why is sample of type any? aria_nbv.data_handling._offline_dataset.VinOfflineSample
     sample: Any,
     *,
     margin_m: float = 0.0,
@@ -586,8 +608,8 @@ def target_gt_aabb_world(
 
     obb = target_gt_obb_world(row, sample)
     corners = obb.bb3corners_world.detach().cpu().reshape(-1, 3).to(dtype=torch.float32)
-    lower = corners.min(dim=0).values - float(margin_m)
-    upper = corners.max(dim=0).values + float(margin_m)
+    lower = corners.min(dim=0).values - margin_m
+    upper = corners.max(dim=0).values + margin_m
     return torch.stack([lower[0], upper[0], lower[1], upper[1], lower[2], upper[2]]).to(dtype=torch.float32)
 
 
@@ -688,6 +710,7 @@ def _reference_pose_world_rig(sample: Any) -> PoseTW:
     return PoseTW()
 
 
+# TODO: does this really need to cover all those cases or can we collapse it to the actual source? Currently type(sample) is aria_nbv.data_handling._offline_dataset.VinOfflineSample
 def _semidense_points(sample: Any, *, max_points: int) -> Tensor:
     vin_snippet = getattr(sample, "vin_snippet", None)
     if isinstance(vin_snippet, VinSnippetView):
@@ -856,6 +879,7 @@ def _target_id(
     return f"{scene_id or 'scene'}:{snippet_id or 'snippet'}:{source}:sem={sem_id}:inst={inst_id}:idx={source_index}"
 
 
+# TODO: inline, don't use gettatr, corretly typed samples + direct method / attribute access!
 def _string_or_none(value: Any) -> str | None:
     if value is None:
         return None
@@ -869,6 +893,7 @@ def _float_tuple(values: Tensor, *, length: int | None = None) -> tuple[float, .
     return tuple(float(value.item()) for value in flat)
 
 
+# TODO: inline this function!
 def _clamp01(value: float) -> float:
     return max(0.0, min(float(value), 1.0))
 

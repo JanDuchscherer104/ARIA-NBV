@@ -31,7 +31,7 @@ from efm3d.aria.aria_constants import ARIA_OBB_SEM_ID_TO_NAME
 from efm3d.aria.obb import ObbTW
 from efm3d.aria.pose import PoseTW
 from numpy.typing import DTypeLike, NDArray
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from ..configs import PathConfig
 from ..pipelines.oracle_rri_labeler import OracleRriLabelerConfig, OracleRriSample
@@ -39,7 +39,7 @@ from ..pose_generation.types import CandidateSamplingResult
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..rri_metrics.types import RriResult
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import Console, TargetConfig, Verbosity
 from ..vin.backbone_evl import EvlBackboneConfig
 from ..vin.types import EvlBackboneOutput
 from ._offline_format import (
@@ -778,11 +778,11 @@ def _assign_splits(
     return {"all": all_indices, "train": train_indices, "val": val_indices}
 
 
-class VinOfflineWriterConfig(BaseConfig):
+class VinOfflineWriterConfig(TargetConfig["VinOfflineWriter"]):
     """Configuration for building immutable VIN offline datasets from raw snippets."""
 
     @property
-    def target(self) -> type["VinOfflineWriter"]:
+    def target_type(self) -> type["VinOfflineWriter"]:
         """Return the writer factory target."""
 
         return VinOfflineWriter
@@ -837,7 +837,7 @@ class VinOfflineWriterConfig(BaseConfig):
     )
     """EVL backbone fields written to the optional rich diagnostic payload."""
 
-    vin_pad_points: int = DEFAULT_VIN_SNIPPET_PAD_POINTS
+    vin_pad_points: int = Field(default=DEFAULT_VIN_SNIPPET_PAD_POINTS, ge=0)
     """Fixed VIN point count stored per sample."""
 
     semidense_max_points: int | None = None
@@ -849,13 +849,13 @@ class VinOfflineWriterConfig(BaseConfig):
     max_candidates: int | None = None
     """Maximum number of candidates stored per sample."""
 
-    samples_per_shard: int = 64
+    samples_per_shard: int = Field(default=64, ge=1)
     """Number of samples stored in each immutable shard."""
 
     max_samples: int | None = None
     """Optional cap on the number of processed samples."""
 
-    train_val_split: float = 0.2
+    train_val_split: float = Field(default=0.2, ge=0.0, le=1.0)
     """Fraction of samples assigned to the validation split."""
 
     overwrite: bool = False
@@ -866,36 +866,6 @@ class VinOfflineWriterConfig(BaseConfig):
 
     verbosity: Verbosity = Verbosity.NORMAL
     """Verbosity level for dataset build logging."""
-
-    @field_validator("vin_pad_points")
-    @classmethod
-    def _validate_vin_pad_points(cls, value: int) -> int:
-        """Validate the configured VIN padding budget."""
-
-        value = int(value)
-        if value < 0:
-            raise ValueError("vin_pad_points must be >= 0.")
-        return value
-
-    @field_validator("samples_per_shard")
-    @classmethod
-    def _validate_samples_per_shard(cls, value: int) -> int:
-        """Validate the requested shard size."""
-
-        value = int(value)
-        if value <= 0:
-            raise ValueError("samples_per_shard must be >= 1.")
-        return value
-
-    @field_validator("train_val_split")
-    @classmethod
-    def _validate_train_val_split(cls, value: float) -> float:
-        """Validate the validation split fraction."""
-
-        value = float(value)
-        if not 0.0 <= value <= 1.0:
-            raise ValueError("train_val_split must be in [0, 1].")
-        return value
 
 
 class VinOfflineWriter:

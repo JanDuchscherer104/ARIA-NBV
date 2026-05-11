@@ -14,6 +14,8 @@ Target RRI and scene RRI are distinct diagnostics; target labels must not be
 silently filled from scene scores or low-quality invalid rows.
 """
 
+# TODO: This module is an intransparent, convoluted mess. Refactor, make more object oriented instead of definining so many hard to track parallel data structures and free functions!
+
 from __future__ import annotations
 
 import json
@@ -30,7 +32,7 @@ from pydantic import Field, field_validator
 
 from ..configs import PathConfig
 from ..pose_generation import INVALID_REASON_CODES, INVALID_REASON_VERSION, RolloutTrace
-from ..utils import BaseConfig
+from ..utils import TargetConfig
 from ._config_utils import resolve_cache_artifact_dir
 
 ROLLOUT_ZARR_SCHEMA_ID = "aria_nbv.rollout_zarr_q_invalidity"
@@ -45,7 +47,12 @@ DEFAULT_RETURN_SEMANTICS = "cumulative_target_rri"
 
 @dataclass(slots=True)
 class RolloutZarrWriteResult:
-    """Summary of one rollout Zarr write."""
+    """Summary of one rollout Zarr write.
+
+    Counts refer to materialized row tables, not source VIN samples. One source
+    sample can contribute multiple targets, rollout recipes, beam chains,
+    steps, and full-shell candidate rows.
+    """
 
     store_dir: Path
     num_rollouts: int
@@ -57,7 +64,13 @@ class RolloutZarrWriteResult:
 
 @dataclass(slots=True)
 class RolloutZarrValidationResult:
-    """Validation summary for a rollout Zarr store."""
+    """Validation summary for a rollout Zarr store.
+
+    `errors` contains schema, linkage, mask, and lineage violations. For
+    non-synthetic stores, validation is expected to fail if candidate strategy
+    ids, mixture ids, target protocol metadata, source hashes, or explicit
+    target-RRI labels are missing.
+    """
 
     store_dir: Path
     num_rollouts: int
@@ -72,17 +85,17 @@ class RolloutZarrValidationResult:
         return not self.errors
 
 
-class RolloutZarrStoreConfig(BaseConfig):
+class RolloutZarrStoreConfig(TargetConfig["RolloutZarrStoreWriter"]):
     """Filesystem and target metadata for one standalone rollout replay store."""
 
     @property
-    def target(self) -> type["RolloutZarrStoreWriter"]:
+    def target_type(self) -> type["RolloutZarrStoreWriter"]:
         return RolloutZarrStoreWriter
 
     paths: PathConfig = Field(default_factory=PathConfig)
     store_dir: Path = Field(default_factory=lambda: PathConfig().offline_cache_dir / "rollouts.zarr")
     return_semantics: str = DEFAULT_RETURN_SEMANTICS
-    discount_gamma: float = 1.0
+    discount_gamma: float = Field(default=1.0, ge=0.0)
     target_protocol_version: str = "synthetic"
     reason_code_version: str = INVALID_REASON_VERSION
     field_retention_policy: str = "compact"
@@ -90,14 +103,6 @@ class RolloutZarrStoreConfig(BaseConfig):
     split_manifest_hash: str = "synthetic"
 
     _resolve_store_dir = field_validator("store_dir", mode="before")(resolve_cache_artifact_dir)
-
-    @field_validator("discount_gamma")
-    @classmethod
-    def _valid_discount(cls, value: float) -> float:
-        value = float(value)
-        if value < 0.0:
-            raise ValueError("discount_gamma must be >= 0.")
-        return value
 
 
 class RolloutZarrStoreWriter:
@@ -359,22 +364,20 @@ def _write_root_metadata(
     source_offline_store_version: str,
     split_manifest_hash: str,
 ) -> None:
-    root.attrs.update(
-        {
-            "schema_id": ROLLOUT_ZARR_SCHEMA_ID,
-            "schema_version": ROLLOUT_ZARR_SCHEMA_VERSION,
-            "zarr_format": 3,
-            "created_at_utc": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
-            "source_offline_store_version": source_offline_store_version,
-            "split_manifest_hash": split_manifest_hash,
-            "reason_code_version": reason_code_version,
-            "target_protocol_version": target_protocol_version,
-            "return_semantics": return_semantics,
-            "discount_gamma": float(discount_gamma),
-            "field_retention_policy": field_retention_policy,
-            "num_rollouts": len(traces),
-        }
-    )
+    root.attrs.update({
+        "schema_id": ROLLOUT_ZARR_SCHEMA_ID,
+        "schema_version": ROLLOUT_ZARR_SCHEMA_VERSION,
+        "zarr_format": 3,
+        "created_at_utc": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "source_offline_store_version": source_offline_store_version,
+        "split_manifest_hash": split_manifest_hash,
+        "reason_code_version": reason_code_version,
+        "target_protocol_version": target_protocol_version,
+        "return_semantics": return_semantics,
+        "discount_gamma": float(discount_gamma),
+        "field_retention_policy": field_retention_policy,
+        "num_rollouts": len(traces),
+    })
 
 
 def _write_metadata_group(group: Any, *, field_retention_policy: str) -> None:
@@ -413,29 +416,27 @@ def _build_dictionaries(traces: list[RolloutTrace]) -> dict[str, list[str]]:
         "policy": sorted(policy_values),
         "score_source": sorted(score_source_values),
         "split": sorted(split_values),
-        "config": sorted(
-            {
-                value
-                for trace in traces
-                for value in (
-                    trace.lineage.candidate_config_hash,
-                    trace.lineage.oracle_config_hash,
-                    trace.lineage.rollout_config_hash,
-                    trace.lineage.model_checkpoint_hash,
-                    trace.lineage.mesh_version,
-                    trace.lineage.source_cache_version,
-                    trace.lineage.source_offline_store_manifest_hash,
-                    trace.lineage.split_manifest_hash,
-                    trace.lineage.branch_schedule_id,
-                    trace.lineage.target_protocol_version,
-                    trace.lineage.target_crop_policy,
-                    trace.lineage.target_reason_code_version,
-                    trace.lineage.reason_code_version,
-                    trace.lineage.selection_rng_state_hash,
-                )
-                if value
-            }
-        ),
+        "config": sorted({
+            value
+            for trace in traces
+            for value in (
+                trace.lineage.candidate_config_hash,
+                trace.lineage.oracle_config_hash,
+                trace.lineage.rollout_config_hash,
+                trace.lineage.model_checkpoint_hash,
+                trace.lineage.mesh_version,
+                trace.lineage.source_cache_version,
+                trace.lineage.source_offline_store_manifest_hash,
+                trace.lineage.split_manifest_hash,
+                trace.lineage.branch_schedule_id,
+                trace.lineage.target_protocol_version,
+                trace.lineage.target_crop_policy,
+                trace.lineage.target_reason_code_version,
+                trace.lineage.reason_code_version,
+                trace.lineage.selection_rng_state_hash,
+            )
+            if value
+        }),
         "class_name": ["unknown"],
         "target_match_status": sorted(target_match_status_values),
         "termination_reason": sorted({trace.termination_reason for trace in traces}),
@@ -1081,13 +1082,11 @@ def _write_q_h(group: Any, q_h: dict[str, np.ndarray], *, return_semantics: str,
     for name, values in q_h.items():
         array = _write_array(group, name, values)
         if name.startswith("q_target") or name in {"discount", "td_reward_target_rri"}:
-            array.attrs.update(
-                {
-                    "return_semantics": return_semantics,
-                    "target_protocol_version": target_protocol_version,
-                    "dense_all_action_oracle_q_materialized": False,
-                }
-            )
+            array.attrs.update({
+                "return_semantics": return_semantics,
+                "target_protocol_version": target_protocol_version,
+                "dense_all_action_oracle_q_materialized": False,
+            })
 
 
 def _candidate_rows_to_numpy(rows: dict[str, list[Any]]) -> dict[str, np.ndarray]:

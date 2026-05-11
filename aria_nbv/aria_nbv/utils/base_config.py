@@ -2,7 +2,7 @@ import tomllib
 from enum import Enum
 from pathlib import Path
 from threading import Lock
-from typing import Any, ClassVar, ForwardRef, Self
+from typing import Any, ClassVar, ForwardRef, Generic, Self, TypeVar, cast
 
 import tomli_w
 import torch
@@ -19,6 +19,8 @@ from rich.tree import Tree
 
 from .console import Console, Verbosity
 
+TargetT = TypeVar("TargetT")
+
 
 class BaseConfig(BaseSettings):
     cache_exclude_fields: ClassVar[set[str]] = set()
@@ -28,29 +30,63 @@ class BaseConfig(BaseSettings):
     """json_schema_extra key for marking fields excluded from cache snapshots."""
 
     @property
-    def target(self) -> type[Any] | None:
-        """Callable target used by `setup_target`. Type of the runtime object or factory method to prodcuce it.
+    def target_type(self) -> type[Any] | None:
+        """Callable target used by `setup_target`.
 
-        Defaults to ``None``; subclasses should override as a property or field.
+        Defaults to ``None``; target-producing subclasses should use
+        `TargetConfig` and override this property.
         """
         return None
 
-    def setup_target(self, **kwargs: Any) -> Any | None:
+    @property
+    def target(self) -> type[Any] | None:
+        """Compatibility alias for `target_type`.
+
+        New config factories should override `target_type`; this property keeps
+        existing subclasses and external callers working during migration.
+        """
+        return self.target_type
+
+    def setup_target(self, *args: Any, **kwargs: Any) -> Any | None:
         """Instantiate or return the target object for this config, if applicable.
-        Prioritizes a 'setup_target' method on the target itself and falls back to calling the init method."""
-        if (target := self.target) is None:
-            return None
-        factory = getattr(target, "setup_target", target)
+
+        Prioritizes a 'setup_target' method on the target itself and falls back to calling the init method.
+        """
+        return self._setup_target_from_factory(*args, _allow_missing_target=True, **kwargs)
+
+    def _config_target_type(self) -> type[Any] | None:
+        """Resolve the preferred target declaration, including legacy `target` overrides."""
+        if (target_type := self.target_type) is not None:
+            return target_type
+        return self.target
+
+    def _setup_target_from_factory(
+        self,
+        *args: Any,
+        _allow_missing_target: bool,
+        **kwargs: Any,
+    ) -> Any | None:
+        """Instantiate the configured target with shared error handling."""
+        if (target_type := self._config_target_type()) is None:
+            if _allow_missing_target:
+                return None
+            msg = (
+                f"{self.__class__.__name__} must define a 'target_type' or legacy 'target' property, "
+                "or override 'setup_target'."
+            )
+            Console.from_callsite(stack_offset=1).error(msg)
+            raise ValueError(msg)
+        factory = getattr(target_type, "setup_target", target_type)
 
         if not callable(factory):
             msg = (
-                f"Target '{target}' of type {factory.__class__.__name__} is not callable / does not have a "
+                f"Target '{target_type}' of type {factory.__class__.__name__} is not callable / does not have a "
                 "'setup_target' or '__init__' method."
             )
             Console.from_callsite(stack_offset=1).error(msg)
             raise ValueError(msg)
 
-        return factory(self, **kwargs)  # type: ignore[return-value]
+        return factory(self, *args, **kwargs)
 
     model_config = SettingsConfigDict(
         arbitrary_types_allowed=True,
@@ -86,16 +122,6 @@ class BaseConfig(BaseSettings):
         """Normalize verbosity values accepted across config models."""
         return Verbosity.from_any(value)
 
-    @staticmethod
-    def _validate_non_negative_seed(value: Any) -> int | None:
-        """Validate optional RNG seeds shared across config models."""
-        if value is None:
-            return None
-        seed = int(value)
-        if seed < 0:
-            raise ValueError("seed must be >= 0 or None.")
-        return seed
-
     @classmethod
     def settings_customise_sources(
         cls,
@@ -126,7 +152,7 @@ class BaseConfig(BaseSettings):
     # ------------------------------------------------------------------ JSON-friendly dumps
     def model_dump_jsonable(self, **kwargs: Any) -> dict[str, Any]:
         """Return a JSON-serializable dump suitable for logging/checkpoint metadata."""
-        return self.to_jsonable(self.model_dump(**kwargs))
+        return cast(dict[str, Any], self.to_jsonable(self.model_dump(**kwargs)))
 
     def model_dump_cache(
         self,
@@ -263,7 +289,7 @@ class BaseConfig(BaseSettings):
     # ------------------------------------------------------------------ Visualization
     def inspect(self, show_docs: bool = False) -> None:
         tree = self._build_tree(show_docs=show_docs, _seen_singletons=set())
-        Console().print(tree, soft_wrap=False, highlight=True, markup=True, emoji=False)
+        Console.from_callsite(stack_offset=1).print(tree, soft_wrap=False, highlight=True, markup=True, emoji=False)
 
     def _build_tree(  # pragma: no cover - visualization helper
         self,
@@ -472,7 +498,7 @@ class BaseConfig(BaseSettings):
     def _propagate_shared_fields(self) -> "BaseConfig":
         """Propagate shared field values to nested BaseConfig instances."""
         for field_name, field_value in self:
-            if field_name in {"propagated_fields", "target"}:
+            if field_name in {"propagated_fields", "target", "target_type"}:
                 continue
 
             if isinstance(field_value, BaseConfig):
@@ -496,7 +522,7 @@ class BaseConfig(BaseSettings):
             for name, value in self
             if name in child_config.__class__.model_fields
             and name != parent_field
-            and name not in ("propagated_fields", "target")
+            and name not in ("propagated_fields", "target", "target_type")
         }
 
         for name, value in shared_fields.items():
@@ -506,7 +532,7 @@ class BaseConfig(BaseSettings):
                 setattr(child_config, name, value)
                 child_config.propagated_fields[name] = value
 
-                Console().log(
+                Console.from_callsite(stack_offset=1).log(
                     f"Propagated {name}={value} from {self.__class__.__name__} to {child_config.__class__.__name__}"
                 )
 
@@ -541,6 +567,26 @@ class BaseConfig(BaseSettings):
         return value
 
 
+class TargetConfig(BaseConfig, Generic[TargetT]):
+    """Typed config-as-factory base whose `setup_target` returns `TargetT`.
+
+    `TargetT` describes the runtime object returned by `setup_target`; it does
+    not have to be the same type as `target_type` when the target delegates to a
+    custom factory method.
+    """
+
+    def setup_target(self, *args: Any, **kwargs: Any) -> TargetT:
+        """Instantiate or return the typed target object for this config."""
+        return cast(
+            TargetT,
+            self._setup_target_from_factory(
+                *args,
+                _allow_missing_target=False,
+                **kwargs,
+            ),
+        )
+
+
 class SingletonConfig(BaseConfig):
     """Base class for singleton configurations."""
 
@@ -553,15 +599,15 @@ class SingletonConfig(BaseConfig):
         validate_default=True,
     )
 
-    def __new__(cls, *args: Any, **kwargs: Any):
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
         with cls._lock:
             if cls not in cls._instances:
                 instance = super(BaseConfig, cls).__new__(cls)
                 instance.__dict__["_initialized"] = False
                 cls._instances[cls] = instance
-            return cls._instances[cls]
+            return cast(Self, cls._instances[cls])
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         if not getattr(self, "_initialized", False):
             super().__init__(**kwargs)
             self.__dict__["_initialized"] = True
@@ -570,7 +616,7 @@ class SingletonConfig(BaseConfig):
                 if hasattr(self, key):
                     current = getattr(self, key)
                     if current != value:
-                        Console().log(
+                        Console.from_callsite(stack_offset=1).log(
                             f"Updating singleton {self.__class__.__name__} field '{key}' from {current} to {value}"
                         )
                     setattr(self, key, value)

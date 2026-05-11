@@ -33,7 +33,7 @@ from ..pose_generation import (
     TargetRriInvalidError,
     traces_from_rollout_result,
 )
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ._offline_dataset import VinOfflineDatasetConfig, VinOfflineSample
 from ._rollout_zarr_store import (
     RolloutZarrStoreConfig,
@@ -88,42 +88,20 @@ class RolloutRecipeConfig(BaseConfig):
     selection_policy: CounterfactualSelectionPolicy
     """Action-selection policy used inside the rollout tree."""
 
-    horizon: int = 2
+    horizon: int = Field(default=2, ge=1)
     """Maximum number of rollout steps."""
 
-    branch_factor: int = 1
+    branch_factor: int = Field(default=1, ge=1)
     """Number of actions sampled/expanded per non-terminal step."""
 
-    beam_width: int | None = None
+    beam_width: int | None = Field(default=None, ge=1)
     """Retained beam width; ``None`` keeps the generator default."""
 
-    selection_temperature: float = 1.0
+    selection_temperature: float = Field(default=1.0, gt=0.0)
     """Softmax temperature for stochastic selection policies."""
 
     seed: int | None = 0
     """Recipe-local random seed for candidate/action sampling."""
-
-    @field_validator("horizon", "branch_factor")
-    @classmethod
-    def _positive_int(cls, value: int) -> int:
-        if int(value) <= 0:
-            raise ValueError("rollout recipe horizon and branch_factor must be >= 1.")
-        return int(value)
-
-    @field_validator("beam_width")
-    @classmethod
-    def _positive_beam(cls, value: int | None) -> int | None:
-        if value is not None and int(value) <= 0:
-            raise ValueError("rollout recipe beam_width must be >= 1 when provided.")
-        return value
-
-    @field_validator("selection_temperature")
-    @classmethod
-    def _positive_temperature(cls, value: float) -> float:
-        value = float(value)
-        if value <= 0.0:
-            raise ValueError("selection_temperature must be > 0.")
-        return value
 
 
 def _default_recipes() -> list[RolloutRecipeConfig]:
@@ -162,7 +140,7 @@ def _default_recipes() -> list[RolloutRecipeConfig]:
     ]
 
 
-class RolloutDatasetWriterConfig(BaseConfig):
+class RolloutDatasetWriterConfig(TargetConfig["RolloutDatasetWriter"]):
     """Configuration for building standalone target-RRI rollout Zarr stores.
 
     The source is a strict-v7 VIN offline dataset opened in `sample` mode with
@@ -172,7 +150,7 @@ class RolloutDatasetWriterConfig(BaseConfig):
     """
 
     @property
-    def target(self) -> type["RolloutDatasetWriter"]:
+    def target_type(self) -> type["RolloutDatasetWriter"]:
         return RolloutDatasetWriter
 
     source: VinOfflineDatasetConfig = Field(
@@ -213,7 +191,7 @@ class RolloutDatasetWriterConfig(BaseConfig):
     recipes: list[RolloutRecipeConfig] = Field(default_factory=_default_recipes)
     """Rollout policies/branch schedules materialized into the replay store."""
 
-    max_samples: int | None = None
+    max_samples: int | None = Field(default=None, ge=1)
     """Optional local smoke cap on source samples."""
 
     require_label_valid: bool = True
@@ -243,13 +221,6 @@ class RolloutDatasetWriterConfig(BaseConfig):
                     child_config.propagated_fields[name] = value
             return
         super()._propagate_to_child(parent_field, child_config)
-
-    @field_validator("max_samples")
-    @classmethod
-    def _positive_max_samples(cls, value: int | None) -> int | None:
-        if value is not None and int(value) <= 0:
-            raise ValueError("max_samples must be >= 1 when provided.")
-        return value
 
 
 class RolloutDatasetWriter:

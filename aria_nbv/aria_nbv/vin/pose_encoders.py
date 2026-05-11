@@ -6,7 +6,7 @@ This module centralizes pose-encoding logic used by VIN-Core (v3).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Annotated, Literal
 
 import torch
 from efm3d.aria.pose import PoseTW
@@ -14,7 +14,7 @@ from pydantic import Field, field_validator
 from pytorch3d.transforms import matrix_to_rotation_6d
 from torch import Tensor, nn
 
-from ..utils import BaseConfig
+from ..utils import TargetConfig
 from .pose_encoding import LearnableFourierFeatures, LearnableFourierFeaturesConfig
 
 
@@ -110,11 +110,11 @@ class R6dLffPoseEncoder(PoseEncoder):
         return PoseEncodingOutput(center_m=center_m, pose_vec=pose_vec, pose_enc=pose_enc)
 
 
-class R6dLffPoseEncoderConfig(BaseConfig):
+class R6dLffPoseEncoderConfig(TargetConfig[R6dLffPoseEncoder]):
     """Config for `R6dLffPoseEncoder`."""
 
     @property
-    def target(self) -> type[R6dLffPoseEncoder]:
+    def target_type(self) -> type[R6dLffPoseEncoder]:
         return R6dLffPoseEncoder
 
     kind: Literal["r6d_lff"] = "r6d_lff"
@@ -130,7 +130,7 @@ class R6dLffPoseEncoderConfig(BaseConfig):
     )
     """LFF encoder for ``[t, r6d]`` pose vectors (input_dim=9)."""
 
-    pose_scale_init: tuple[float, float] = (1.0, 1.0)
+    pose_scale_init: tuple[Annotated[float, Field(gt=0.0)], Annotated[float, Field(gt=0.0)]] = (1.0, 1.0)
     """Initial per-group scale for translation and rotation (t, r6d)."""
 
     pose_scale_learnable: bool = True
@@ -149,20 +149,6 @@ class R6dLffPoseEncoderConfig(BaseConfig):
             raise ValueError(
                 "pose_encoder_lff.input_dim must be 9 for [t, r6d] pose vectors.",
             )
-        return value
-
-    @field_validator("pose_scale_init")
-    @classmethod
-    def _validate_pose_scale_init(
-        cls,
-        value: tuple[float, float],
-    ) -> tuple[float, float]:
-        if len(value) != 2:
-            raise ValueError(
-                "pose_scale_init must have two entries (t_scale, r6d_scale).",
-            )
-        if value[0] <= 0 or value[1] <= 0:
-            raise ValueError("pose_scale_init values must be > 0.")
         return value
 
 

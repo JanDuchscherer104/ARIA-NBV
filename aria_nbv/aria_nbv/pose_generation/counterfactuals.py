@@ -27,7 +27,7 @@ from ..data_handling import EfmSnippetView
 from ..rendering.candidate_depth_renderer import CandidateDepthRendererConfig
 from ..rendering.candidate_pointclouds import build_candidate_pointclouds
 from ..rri_metrics.oracle_rri import OracleRRIConfig
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..utils.frames import rotate_yaw_cw90
 from .candidate_generation import CandidateViewGenerator, CandidateViewGeneratorConfig
 from .candidate_mixture import CandidateMixtureViewGenerator, CandidateMixtureViewGeneratorConfig
@@ -266,85 +266,45 @@ CounterfactualEvaluatorFn = Callable[
 ]
 
 
-class CounterfactualPoseGeneratorConfig(BaseConfig):
+class CounterfactualPoseGeneratorConfig(TargetConfig["CounterfactualPoseGenerator"]):
     """Configuration for multi-step counterfactual rollout generation."""
 
     @property
-    def target(self) -> type["CounterfactualPoseGenerator"]:
+    def target_type(self) -> type["CounterfactualPoseGenerator"]:
         return CounterfactualPoseGenerator
 
     candidate_config: CandidateViewGeneratorConfig | CandidateMixtureViewGeneratorConfig = Field(
         default_factory=CandidateViewGeneratorConfig
     )
-    horizon: int = 3
-    branch_factor: int = 2
-    beam_width: int | None = None
+    horizon: int = Field(default=3, ge=1)
+    branch_factor: int = Field(default=2, ge=1)
+    beam_width: int | None = Field(default=None, ge=1)
     selection_policy: CounterfactualSelectionPolicy = CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY
-    selection_temperature: float = 1.0
+    selection_temperature: float = Field(default=1.0, gt=0.0)
     branch_schedule_id: str | None = None
-    min_history_distance_m: float = 0.0
-    min_sibling_distance_m: float = 0.0
-    seed: int | None = 0
+    min_history_distance_m: float = Field(default=0.0, ge=0.0)
+    min_sibling_distance_m: float = Field(default=0.0, ge=0.0)
+    seed: int | None = Field(default=0, ge=0)
     verbosity: Verbosity = Field(default=Verbosity.NORMAL)
     is_debug: bool = False
 
     _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
-    _non_negative_seed = field_validator("seed")(BaseConfig._validate_non_negative_seed)
-
-    @field_validator("horizon", "branch_factor")
-    @classmethod
-    def _positive_ints(cls, value: int) -> int:
-        if int(value) <= 0:
-            raise ValueError("horizon and branch_factor must be >= 1.")
-        return int(value)
-
-    @field_validator("beam_width")
-    @classmethod
-    def _positive_beam(cls, value: int | None) -> int | None:
-        if value is None:
-            return None
-        if int(value) <= 0:
-            raise ValueError("beam_width must be >= 1 when provided.")
-        return int(value)
-
-    @field_validator("min_history_distance_m", "min_sibling_distance_m")
-    @classmethod
-    def _non_negative_distance(cls, value: float) -> float:
-        value = float(value)
-        if value < 0.0:
-            raise ValueError("Distance thresholds must be >= 0.")
-        return value
-
-    @field_validator("selection_temperature")
-    @classmethod
-    def _positive_temperature(cls, value: float) -> float:
-        value = float(value)
-        if value <= 0.0:
-            raise ValueError("selection_temperature must be > 0.")
-        return value
 
 
-class CounterfactualOracleRriScorerConfig(BaseConfig):
+class CounterfactualOracleRriScorerConfig(TargetConfig["CounterfactualOracleRriScorer"]):
     """Config-as-factory wrapper for oracle-RRI rollout scoring."""
 
     @property
-    def target(self) -> type["CounterfactualOracleRriScorer"]:
+    def target_type(self) -> type["CounterfactualOracleRriScorer"]:
         return CounterfactualOracleRriScorer
 
     depth: CandidateDepthRendererConfig = Field(default_factory=CandidateDepthRendererConfig)
     oracle: OracleRRIConfig = Field(default_factory=OracleRRIConfig)
-    backprojection_stride: int = 1
+    backprojection_stride: int = Field(default=1, ge=1)
     verbosity: Verbosity = Field(default=Verbosity.NORMAL)
     is_debug: bool = False
 
     _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
-
-    @field_validator("backprojection_stride")
-    @classmethod
-    def _positive_stride(cls, value: int) -> int:
-        if int(value) <= 0:
-            raise ValueError("backprojection_stride must be >= 1.")
-        return int(value)
 
 
 class CounterfactualOracleRriScorer:

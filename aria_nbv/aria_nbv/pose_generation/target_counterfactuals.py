@@ -18,11 +18,12 @@ import torch
 from efm3d.aria.obb import ObbTW
 from pydantic import Field, field_validator
 
+# TODO(fix: TargetCandidateRow and target_gt_obb_world are not recognized as valid imports!)
 from ..data_handling import EfmSnippetView, TargetCandidateRow, target_gt_obb_world
 from ..rendering.candidate_depth_renderer import CandidateDepthRendererConfig
 from ..rendering.candidate_pointclouds import build_candidate_pointclouds
 from ..rri_metrics.oracle_rri import OracleRRIConfig
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from .counterfactuals import (
     CounterfactualCandidateEvaluation,
     CounterfactualTrajectory,
@@ -40,11 +41,11 @@ class TargetRriInvalidError(ValueError):
     """Expected data invalidity that prevents target-RRI labeling for a row."""
 
 
-class CounterfactualTargetOracleRriScorerConfig(BaseConfig):
+class CounterfactualTargetOracleRriScorerConfig(TargetConfig["CounterfactualTargetOracleRriScorer"]):
     """Config-as-factory wrapper for target-cropped oracle-RRI rollout scoring."""
 
     @property
-    def target(self) -> type["CounterfactualTargetOracleRriScorer"]:
+    def target_type(self) -> type["CounterfactualTargetOracleRriScorer"]:
         return CounterfactualTargetOracleRriScorer
 
     depth: CandidateDepthRendererConfig = Field(default_factory=CandidateDepthRendererConfig)
@@ -53,13 +54,13 @@ class CounterfactualTargetOracleRriScorerConfig(BaseConfig):
     oracle: OracleRRIConfig = Field(default_factory=OracleRRIConfig)
     """Point-mesh oracle metric configuration shared by target and scene RRI."""
 
-    backprojection_stride: int = 1
+    backprojection_stride: int = Field(default=1, ge=1)
     """Pixel stride for backprojecting rendered candidate depths."""
 
-    target_crop_margin_m: float = 0.0
+    target_crop_margin_m: float = Field(default=0.0, ge=0.0)
     """Optional symmetric margin applied in GT-OBB local coordinates."""
 
-    min_current_target_points: int = 1
+    min_current_target_points: int = Field(default=1, ge=1)
     """Minimum current observed/support points inside the target crop."""
 
     include_scene_rri: bool = True
@@ -78,21 +79,6 @@ class CounterfactualTargetOracleRriScorerConfig(BaseConfig):
     """Enable debug logging in scorer dependencies."""
 
     _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
-
-    @field_validator("backprojection_stride", "min_current_target_points")
-    @classmethod
-    def _positive_int(cls, value: int) -> int:
-        if int(value) <= 0:
-            raise ValueError("target oracle scorer integer thresholds must be >= 1.")
-        return int(value)
-
-    @field_validator("target_crop_margin_m")
-    @classmethod
-    def _non_negative_margin(cls, value: float) -> float:
-        value = float(value)
-        if value < 0.0:
-            raise ValueError("target_crop_margin_m must be >= 0.")
-        return value
 
     @field_validator("target_crop_policy")
     @classmethod
@@ -191,6 +177,7 @@ class CounterfactualTargetOracleRriScorer:
             target_obb,
             margin_m=self.config.target_crop_margin_m,
         )
+        # TODO(fix): self._ocale must be typed correctly!
         target_rri = self._oracle.score(
             points_t=target_points_t,
             points_q=target_points_q,
