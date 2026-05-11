@@ -6,6 +6,10 @@
 - Prefer short summary lines followed by dense explanation.
 - Document behavior, invariants, side effects, units, shapes, ownership, and
   lifecycle expectations.
+- Use Quarto/Markdown math for rendered equations in generated API pages:
+  `$...$` inline and `$$...$$` for display equations.
+- Prefer raw docstrings (`r"""..."""`) whenever a docstring contains LaTeX
+  backslashes such as `\mathcal`, `\rightarrow`, or `\sum`.
 - Do not paraphrase obvious type hints.
 - Avoid `Raises:` by default. Add it only when the failure behavior is part of
   the caller-facing contract.
@@ -31,6 +35,9 @@ Use only the sections that add information:
     matter
 - Use `Notes:` or `Theory:` only when they materially help the caller use the
   API correctly
+- Put substantial equations in module/class `Theory:` or `Notes:` sections.
+  Function docstrings should normally cite the contract and keep the formula
+  out of the hot path unless misuse is likely.
 
 ## Summary-Line Rules
 
@@ -40,8 +47,8 @@ Use only the sections that add information:
 
 Good:
 
-- `Normalize native outputs into :class:\`SlamArtifacts\`.`
-- `Translate one :class:\`SlamUpdate\` into explicit backend events.`
+- ``Normalize native outputs into `SlamArtifacts`.``
+- ``Translate one `SlamUpdate` into explicit backend events.``
 
 Weak:
 

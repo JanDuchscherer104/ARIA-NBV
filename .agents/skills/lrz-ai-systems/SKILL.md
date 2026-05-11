@@ -6,7 +6,7 @@ metadata:
     - ".configs/lrz/**"
     - "scripts/templates/**"
     - ".agents/skills/lrz-ai-systems/**"
-    - "docs/contents/impl/lrz_dry_runs.qmd"
+    - "docs/contents/setup.qmd"
   triggers:
     - "LRZ"
     - "Slurm"

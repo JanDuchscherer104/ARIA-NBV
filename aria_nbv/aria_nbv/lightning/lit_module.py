@@ -53,7 +53,7 @@ from .optimizers import AdamWConfig, OneCycleSchedulerConfig, ReduceLrOnPlateauC
 
 
 class VinLightningModuleConfig(BaseConfig):
-    """Configuration for :class:`VinLightningModule`."""
+    """Configuration for `VinLightningModule`."""
 
     @property
     def target(self) -> type["VinLightningModule"]:
@@ -1068,7 +1068,7 @@ class VinLightningModule(pl.LightningModule):
         """Summarize VIN inputs/outputs for a single oracle-labeled batch.
 
         Args:
-            batch: Oracle-labeled VIN batch from :class:`VinDataModule`.
+            batch: Oracle-labeled VIN batch from `VinDataModule`.
             include_torchsummary: Whether to append torchsummary module summaries.
             torchsummary_depth: Max depth for torchsummary module traversal.
 
@@ -1094,7 +1094,7 @@ class VinLightningModule(pl.LightningModule):
         """Generate VIN encoding plots for a single oracle-labeled batch.
 
         Args:
-            batch: Oracle-labeled VIN batch from :class:`VinDataModule`.
+            batch: Oracle-labeled VIN batch from `VinDataModule`.
             out_dir: Output directory for plots.
             lmax: Max SH degree for visualization.
             sh_normalization: Spherical harmonics normalization mode.

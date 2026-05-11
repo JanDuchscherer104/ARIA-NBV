@@ -6,7 +6,7 @@ Use this reference before changing or reviewing:
 - `aria_nbv/tests/rerun_inspector/`
 - `aria_nbv/aria_nbv/data_handling/_offline_visual_inventory.py`
 - `.configs/rerun_offline.toml`
-- `docs/contents/impl/rerun_offline_inspector.qmd`
+- generated API docs under `docs/reference/`
 
 ## Purpose
 

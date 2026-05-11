@@ -202,7 +202,6 @@ Run these after setup-doc or smoke-doc edits:
 make qmd-frontmatter-check
 cd docs
 quarto render contents/setup.qmd
-quarto render contents/impl/one_scene_smoke.qmd
-quarto render contents/impl/rerun_offline_inspector.qmd
+quarto render reference/index.qmd
 quarto check
 ```

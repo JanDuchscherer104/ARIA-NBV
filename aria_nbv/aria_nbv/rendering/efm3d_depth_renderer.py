@@ -1,6 +1,6 @@
 """CPU ray-based depth renderer using trimesh.
 
-This renderer mirrors the public API of :class:`Pytorch3DDepthRenderer`
+This renderer mirrors the public API of `Pytorch3DDepthRenderer`
 but uses pure CPU ray-mesh intersection so it works without a GPU. It is
 intended as a correctness-oriented fallback and for lightweight testing.
 
@@ -32,11 +32,11 @@ if TYPE_CHECKING:
 
 
 class Efm3dDepthRendererConfig(BaseConfig):
-    """Configuration for :class:`Efm3dDepthRenderer`."""
+    """Configuration for `Efm3dDepthRenderer`."""
 
     @property
     def target(self) -> type["Efm3dDepthRenderer"]:
-        """Factory target for :meth:`BaseConfig.setup_target`."""
+        """Factory target for `BaseConfig.setup_target`."""
         return Efm3dDepthRenderer
 
     device: str = "cpu"

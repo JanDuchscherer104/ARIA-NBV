@@ -163,7 +163,7 @@ class ShellShPoseEncoder(nn.Module):
 
 
 class ShellShPoseEncoderConfig(BaseConfig):
-    """Config-as-factory wrapper for :class:`ShellShPoseEncoder`."""
+    """Config-as-factory wrapper for `ShellShPoseEncoder`."""
 
     @property
     def target(self) -> type[ShellShPoseEncoder]:

@@ -132,18 +132,18 @@ def _normalize_evl_model_config_paths(
 
 
 class EvlBackboneConfig(BaseConfig):
-    """Configuration for :class:`EvlBackbone`."""
+    """Configuration for `EvlBackbone`."""
 
     @property
     def target(self) -> type["EvlBackbone"]:
-        """Factory target for :meth:`BaseConfig.setup_target`."""
+        """Factory target for `BaseConfig.setup_target`."""
         return _target_cls()
 
     paths: PathConfig = Field(default_factory=PathConfig)
     """Project path resolver."""
 
     model_cfg: Path = Field(default_factory=lambda: Path(".configs") / "evl_inf_desktop.yaml")
-    """Hydra YAML used to instantiate :class:`efm3d.model.evl.EVL`."""
+    """Hydra YAML used to instantiate `efm3d.model.evl.EVL`."""
 
     model_ckpt: Path = Field(default_factory=lambda: Path(".logs") / "ckpts" / "model_lite.pth")
     """Checkpoint containing an ``EVL`` state dict under ``['state_dict']``."""
@@ -225,7 +225,7 @@ class EvlBackbone:
             efm: Raw EFM snippet dict (unbatched ``T×...`` or batched ``B×T×...``).
 
         Returns:
-            :class:`EvlBackboneOutput` with neck features and voxel grid pose.
+            `EvlBackboneOutput` with neck features and voxel grid pose.
         """
 
         batch = self._prepare_batch(efm)

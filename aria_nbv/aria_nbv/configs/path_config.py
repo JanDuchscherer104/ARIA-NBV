@@ -261,7 +261,8 @@ class PathConfig(SingletonConfig):
 
         Args:
             scene_id: ASE scene identifier.
-            snippet_id: Optional snippet/shard identifier for disambiguation.
+            simplification_ratio: Mesh simplification ratio encoded in the filename.
+            is_crop: Whether the processed mesh is a cropped artifact.
             spec_hash: Short hash of the processing specification.
 
         Returns:
@@ -328,7 +329,7 @@ class PathConfig(SingletonConfig):
         Args:
             path: Path to resolve (absolute or relative).
             base_dir: Optional base directory to resolve relative paths against.
-                Defaults to :attr:`root`.
+                Defaults to `root`.
 
         Returns:
             Absolute, expanded, resolved path.
@@ -342,10 +343,10 @@ class PathConfig(SingletonConfig):
     def resolve_cache_artifact_dir(self, path: str | Path) -> Path:
         """Resolve a cache or store directory against the configured data roots.
 
-        Relative paths default to :attr:`offline_cache_dir` when available and
-        otherwise fall back to :attr:`data_root`. Paths that already start with
+        Relative paths default to `offline_cache_dir` when available and
+        otherwise fall back to `data_root`. Paths that already start with
         the data-root or offline-cache root name are instead interpreted
-        relative to :attr:`root` so callers can still pass repo-root-relative
+        relative to `root` so callers can still pass repo-root-relative
         paths such as ``offline_cache/foo``.
         """
 
@@ -402,8 +403,8 @@ class PathConfig(SingletonConfig):
         """Resolve a TOML experiment config path.
 
         Relative paths are resolved as:
-        - bare filenames (no parent) are interpreted as under :attr:`configs_dir`
-        - other relative paths are interpreted as under :attr:`root`
+        - bare filenames (no parent) are interpreted as under `configs_dir`
+        - other relative paths are interpreted as under `root`
         """
         cfg_path = Path(path)
         if not cfg_path.is_absolute():

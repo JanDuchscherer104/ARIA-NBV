@@ -1,4 +1,15 @@
-"""Utilities to render candidate poses directly from dataset snippets."""
+"""Render valid candidate poses directly from dataset snippets.
+
+`CandidateDepthRenderer` consumes an `EfmSnippetView` with an attached mesh and
+a `CandidateSamplingResult`. It renders the compact valid candidate table but
+returns `candidate_indices` into the full sampled shell so labels and heavy
+diagnostics can be joined back to candidate provenance, validity masks, and
+reason codes.
+
+Depth output is metric PyTorch3D z-depth in the physical camera frame. The
+renderer is used for oracle/evaluation labels; callers decide whether rendered
+depths or backprojected point clouds are retained in a rollout store.
+"""
 
 from __future__ import annotations
 
@@ -27,7 +38,12 @@ if TYPE_CHECKING:
 # TODO: Wouldn't it make sense to derive all of these dataclasses from a common base data class?
 @dataclass(slots=True)
 class CandidateDepths:
-    """Typed result for candidate depth rendering."""
+    """Typed result for candidate depth rendering.
+
+    `candidate_indices` maps rendered compact rows back to the full candidate
+    shell. That link is required when writing target-RRI labels or selected
+    heavy diagnostics into `rollouts.zarr`.
+    """
 
     depths: torch.Tensor
     """Tensor['N', 'H', 'W'] with per-candidate depth maps in metres."""
@@ -65,7 +81,7 @@ class CandidateDepths:
         """Reconstruct one batch from a serialized payload.
 
         Args:
-            payload: Serialized payload produced by :meth:`to_serializable`.
+            payload: Serialized payload produced by `to_serializable`.
             device: Destination device for tensors and wrappers.
 
         Returns:
@@ -105,7 +121,7 @@ class CandidateDepthRendererConfig(BaseConfig):
 
 
 class CandidateDepthRenderer:
-    """High-level wrapper that renders depth for candidate poses."""
+    """High-level wrapper that renders depth for compact valid candidate poses."""
 
     def __init__(self, config: CandidateDepthRendererConfig) -> None:
         self.config = config

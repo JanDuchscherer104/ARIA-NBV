@@ -1,4 +1,14 @@
-"""EFM-formatted ASE dataset wrapper."""
+"""EFM-formatted ASE dataset wrapper.
+
+`AseEfmDataset` streams ATEK/ASE shards through the EFM adaptor and yields
+typed `EfmSnippetView` objects. It is the live data source used by candidate
+generation, VIN offline-cache construction, and rollout-data smoke builds.
+
+Scene/snippet identity, mesh attachment, taxonomy mapping, and semidense bounds
+are part of the contract. Any downstream store that depends on oracle labels
+must keep scene-level splits and manifest hashes instead of relying on sample
+order alone.
+"""
 
 from __future__ import annotations
 
@@ -31,14 +41,14 @@ from .mesh_cache import MeshProcessSpec, load_or_process_mesh
 
 
 class AseEfmDatasetConfig(BaseConfig):
-    """Configuration for :class:`AseEfmDataset`."""
+    """Configuration for `AseEfmDataset`."""
 
     cache_exclude_fields: ClassVar[set[str]] = {"tar_urls", "scene_to_mesh"}
     """Fields omitted from cache snapshots because they are large or derived."""
 
     @property
     def target(self) -> type["AseEfmDataset"]:
-        """Factory target for :meth:`BaseConfig.setup_target`."""
+        """Factory target for `BaseConfig.setup_target`."""
         return AseEfmDataset
 
     paths: PathConfig = Field(default_factory=PathConfig)
@@ -318,7 +328,7 @@ class AseEfmDatasetConfig(BaseConfig):
 
 
 class AseEfmDataset(IterableDataset[EfmSnippetView]):
-    """Iterable dataset yielding :class:`EfmSnippetView` with optional GT mesh."""
+    """Iterable dataset yielding `EfmSnippetView` with optional GT mesh."""
 
     def __init__(self, config: AseEfmDatasetConfig):
         """Initialize the dataset wrapper and its WebDataset source."""

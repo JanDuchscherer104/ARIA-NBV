@@ -13,7 +13,7 @@ format: html
 
 **Local source.** [`main.tex`](../../literature/tex-src/arXiv-EFM3D/main.tex), [`method.tex`](../../literature/tex-src/arXiv-EFM3D/method.tex), [`experiments.tex`](../../literature/tex-src/arXiv-EFM3D/experiments.tex), and [`supplemental_text.tex`](../../literature/tex-src/arXiv-EFM3D/supplemental_text.tex).
 
-**Related ARIA-NBV pages.** [Project Aria](project_aria.qmd), [ASE dataset](../ase_dataset.qmd), [VIN implementation](../impl/vin_nbv.qmd), and [VIN feature proposals](../impl/vin_v2_feature_proposals.qmd).
+**Related ARIA-NBV pages.** [Project Aria](project_aria.qmd), [ASE dataset](../ase_dataset.qmd), [VIN model API](../../reference/vin.model_v3.qmd), and [VIN feature contracts](../../reference/vin.types.qmd).
 
 ### Core contribution
 
@@ -58,7 +58,7 @@ where $P_t^{\mathrm{semi}}$ is the semi-dense reconstruction proxy, $V_t^{\mathr
 - Do not treat EVL predictions as ground truth; they are actor-visible evidence.
 - Do not ignore the fixed local voxel extent. Candidates can be partially out of bounds even when valid in the scene.
 - Do not mix offline GT meshes/OBBs into target selection or scorer inputs for the main protocol.
-- Do not keep implementation debug dictionaries in this literature page; feature-selection details belong in [VIN feature proposals](../impl/vin_v2_feature_proposals.qmd).
+- Do not keep implementation debug dictionaries in this literature page; feature-selection details belong in generated VIN API docs and code docstrings.
 
 ### Open risks / caveats
 

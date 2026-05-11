@@ -6,7 +6,7 @@
 """Artifact import helpers for an external SLAM wrapper.
 
 This module reads native backend outputs, validates the expected files, and
-normalizes them into :class:`SlamArtifacts`. It owns end-of-run artifact
+normalizes them into `SlamArtifacts`. It owns end-of-run artifact
 normalization only; live telemetry and viewer logging belong elsewhere.
 """
 ```
@@ -15,7 +15,7 @@ normalization only; live telemetry and viewer logging belong elsewhere.
 
 ```python
 def build_run_request(...) -> RunRequest:
-    """Build one typed :class:`RunRequest` from a user-facing method selection.
+    """Build one typed `RunRequest` from a user-facing method selection.
 
     Normalizes the selected backend into a discriminated backend spec, attaches
     repo-owned runtime and placement defaults, and returns a request that can be
@@ -25,11 +25,11 @@ def build_run_request(...) -> RunRequest:
         experiment_name:
             Human-readable run label used to derive the stable run id.
         method:
-            Selected :class:`MethodId` used to choose the backend spec.
+            Selected `MethodId` used to choose the backend spec.
 
     Returns:
-        Fully typed :class:`RunRequest` ready for
-        :meth:`RunRequest.build`.
+        Fully typed `RunRequest` ready for
+        `RunRequest.build`.
 
     Example:
         >>> request = build_run_request(
@@ -80,7 +80,7 @@ class SlamSession(Protocol):
 
     A session follows the lifecycle ``start_session() -> step(...) ->
     try_get_updates() -> close()``. Callers should treat the returned
-    :class:`SlamUpdate` values as live telemetry and the final
-    :class:`SlamArtifacts` bundle as the durable output boundary.
+    `SlamUpdate` values as live telemetry and the final
+    `SlamArtifacts` bundle as the durable output boundary.
     """
 ```

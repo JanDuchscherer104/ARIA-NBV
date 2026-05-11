@@ -127,7 +127,7 @@ def _view_axes_from_positions(
     """Return camera axes (batch) for the Aria LUF camera frame.
 
     This is the tensor-level implementation. Use
-    :func:`view_axes_from_poses` when you already operate on ``PoseTW``
+    `view_axes_from_poses` when you already operate on ``PoseTW``
     instances.
     """
 

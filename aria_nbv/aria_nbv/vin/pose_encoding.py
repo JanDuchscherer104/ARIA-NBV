@@ -75,7 +75,7 @@ class LearnableFourierFeatures(nn.Module):
 
 
 class LearnableFourierFeaturesConfig(BaseConfig):
-    """Config-as-factory wrapper for :class:`LearnableFourierFeatures`."""
+    """Config-as-factory wrapper for `LearnableFourierFeatures`."""
 
     @property
     def target(self) -> type[LearnableFourierFeatures]:

@@ -1,4 +1,14 @@
-"""Rendering utilities (depth + point clouds) used by oracle RRI."""
+"""Rendering utilities used by oracle RRI and rollout diagnostics.
+
+Candidate renders are metric depth images generated from ASE/EFM meshes and
+candidate `PoseTW` cameras. PyTorch3D returns z-depth in the physical camera
+frame; unprojection converts valid pixels back into world-frame point clouds
+that can be joined with semidense history before point-mesh RRI scoring.
+
+Rendering code is an oracle/evaluation dependency. Actor-visible datasets may
+store poses, masks, and selected diagnostics, but rendered GT-depth point clouds
+are supervision artifacts unless an experiment explicitly exposes them.
+"""
 
 from .candidate_depth_renderer import (
     CandidateDepthRenderer,

@@ -2,7 +2,7 @@
 
 This module exposes the ``nbv-build-offline`` console script. It loads a
 ``VinOfflineWriterConfig`` TOML file, validates it through the normal
-config-as-factory path, and runs :class:`aria_nbv.data_handling.VinOfflineWriter`.
+config-as-factory path, and runs `aria_nbv.data_handling.VinOfflineWriter`.
 """
 
 from __future__ import annotations

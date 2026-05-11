@@ -1,11 +1,15 @@
 """Canonical helpers for adapting raw EFM snippets into VIN snippet views.
 
 This module owns the single supported transformation from
-:class:`EfmSnippetView` to :class:`VinSnippetView` in the v2 stack:
+`EfmSnippetView` to `VinSnippetView`:
 - collapse padded per-frame semidense points,
 - optionally cap the collapsed point count,
 - pad or truncate to a fixed on-disk/runtime point budget,
 - preserve the snippet trajectory needed by VIN models.
+
+The adapter is actor-visible preprocessing. It does not attach oracle RRI,
+target matches, GT crops, or candidate labels; those belong to offline writers
+or rollout replay generation.
 """
 
 from __future__ import annotations

@@ -6,7 +6,7 @@ metadata:
     - "aria_nbv/aria_nbv/data_handling/**"
     - ".configs/**"
     - "docs/contents/setup.qmd"
-    - "docs/contents/impl/**"
+    - "docs/reference/**"
   triggers:
     - "ASE download"
     - "ATEK shard"

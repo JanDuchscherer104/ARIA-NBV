@@ -5,6 +5,12 @@ candidate tables, selected actions, lightweight per-step metrics, cumulative
 rollout metrics, and deterministic lineage. Heavy observations such as rendered
 depths or per-candidate point clouds remain optional and should be materialized
 only for selected actions or retained chains.
+
+Actor-visible and oracle-only fields are named explicitly so `rollouts.zarr`
+can derive Q-training masks without leaking labels into observations. For
+bounded value learning, per-step target RRI contributes to the training return,
+while endpoint target-quality gain is measured by oracle re-scoring the selected
+trajectory under the same budget.
 """
 
 from __future__ import annotations
@@ -88,7 +94,7 @@ INVALID_REASON_CODES: dict[str, int] = {
 """Version-1 invalidity reason bit positions for rollout replay tables."""
 
 INVALID_REASON_VERSION = "rollout-invalidity-v1"
-"""Version label for :data:`INVALID_REASON_CODES`."""
+"""Version label for `INVALID_REASON_CODES`."""
 
 _RULE_REASON_BITS = {
     "FreeSpaceRule": INVALID_REASON_CODES["POSE_OUT_OF_EXTENT"],
@@ -256,7 +262,7 @@ class RolloutStepTrace:
     """Score used to choose the selected action."""
 
     selection_score_label: str = "score"
-    """Semantic label for :attr:`selection_score`, for example ``oracle_rri``."""
+    """Semantic label for `selection_score`, for example ``oracle_rri``."""
 
     selection_policy: str = "unknown"
     """Selection policy used at this step."""
@@ -289,7 +295,7 @@ class RolloutStepTrace:
     """Stable selected-action transition id inside one rollout trace."""
 
     metric_vectors: dict[str, torch.Tensor] = field(default_factory=dict)
-    """Full-shell metric vectors aligned with :attr:`candidate_valid`."""
+    """Full-shell metric vectors aligned with `candidate_valid`."""
 
     selected_metrics: dict[str, float] = field(default_factory=dict)
     """Metrics for the selected action only."""
@@ -426,7 +432,7 @@ class RolloutTrace:
 
     @classmethod
     def from_serializable(cls, payload: dict[str, Any], *, device: torch.device | None = None) -> "RolloutTrace":
-        """Reconstruct a trace from :meth:`to_serializable` output."""
+        """Reconstruct a trace from `to_serializable` output."""
 
         return from_serializable(cls, payload, device=device)
 
@@ -572,7 +578,7 @@ def write_rollout_traces(path: Path | str, traces: list[RolloutTrace]) -> Path:
 
 
 def read_rollout_traces(path: Path | str, *, device: torch.device | None = None) -> list[RolloutTrace]:
-    """Read rollout traces written by :func:`write_rollout_traces`."""
+    """Read rollout traces written by `write_rollout_traces`."""
 
     payload = msgspec.msgpack.decode(Path(path).expanduser().resolve().read_bytes())
     if not isinstance(payload, list):

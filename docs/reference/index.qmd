@@ -6,8 +6,19 @@ toc: true
 # `aria_nbv` API Reference
 
 This section is generated from Google-style docstrings in `aria_nbv/aria_nbv/`.
-The published GitHub Pages build refreshes these pages via `quartodoc` in `.github/workflows/quarto-publish.yml`.
+The published GitHub Pages build refreshes these pages via `quartodoc` in
+`.github/workflows/quarto-publish.yml`.
 
-Prefer `aria_nbv.data_handling` for the stable typed data surface. The `VIN Core` entries document the model internals that sit behind training and inference.
+This is now the public implementation-contract surface. The retired manual
+implementation pages were archived because package docstrings are closer to the
+code and easier to keep current. Use the generated contracts for ASE/EFM
+snippets, strict VIN offline-store v7, target selection, rollout Zarr,
+finite-candidate generation, rendering, RRI metrics, and VIN one-step scoring.
+
+Prefer `aria_nbv.data_handling` for stable import surfaces. The
+`Implementation Contracts` section expands selected internal modules whose
+schema, masking, lineage, and actor/oracle boundaries are important for thesis
+experiments. The `VIN Core` entries document the active one-step model internals
+behind training and inference.
 
 {{< include _api_index.md >}}

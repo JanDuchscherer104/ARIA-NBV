@@ -5,7 +5,7 @@ configs can declare Optuna search spaces declaratively via ``optimizable_field``
 
 The core idea is:
 
-- attach an :class:`Optimizable` instance to a Pydantic ``Field`` via
+- attach an `Optimizable` instance to a Pydantic ``Field`` via
   ``json_schema_extra={"optimizable": ...}``,
 - have an Optuna-aware orchestration layer traverse the config tree and apply
   trial suggestions before constructing runtime objects.

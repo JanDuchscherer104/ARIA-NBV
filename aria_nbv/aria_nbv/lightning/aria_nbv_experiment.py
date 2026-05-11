@@ -59,7 +59,7 @@ class AriaNBVExperimentConfig(BaseConfig):
     """Human-readable run name (used for loggers and config snapshots)."""
 
     stage: Stage = Field(default=Stage.TRAIN)
-    """Stage to execute when calling :meth:`setup_target_and_run`."""
+    """Stage to execute when calling `setup_target_and_run`."""
 
     summary_stage: Stage = Field(default=Stage.TRAIN)
     """Stage used when running the VIN summary helper."""
@@ -235,7 +235,7 @@ class AriaNBVExperimentConfig(BaseConfig):
         """Save this config (and nested configs) as TOML.
 
         Args:
-            path: Destination TOML path. If None, uses :meth:`default_config_path`.
+            path: Destination TOML path. If None, uses `default_config_path`.
             include_comments: Include docstring comments in the TOML.
             include_type_hints: Include type hints in the TOML comments.
 
@@ -577,7 +577,7 @@ class AriaNBVExperimentConfig(BaseConfig):
             trainer: Lightning trainer instance used for the run.
 
         Returns:
-            Absolute checkpoint path under :attr:`PathConfig.checkpoints`.
+            Absolute checkpoint path under `PathConfig.checkpoints`.
         """
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         epoch = int(getattr(trainer, "current_epoch", 0))

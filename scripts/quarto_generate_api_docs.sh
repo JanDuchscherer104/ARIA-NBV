@@ -42,8 +42,7 @@ if ! "${PYTHON_BIN}" -m quartodoc --help >/dev/null 2>&1; then
 fi
 
 clean_reference_pages() {
-  find "${REFERENCE_DIR}" -maxdepth 1 -type f -name "*.qmd" ! -name "_*.qmd" -delete
-  rm -f "${REFERENCE_DIR}/_api_index.md"
+  find "${REFERENCE_DIR}" -maxdepth 1 -type f -name "*.qmd" ! -name "_*.qmd" ! -name "index.qmd" -delete
 }
 
 run_quartodoc() {

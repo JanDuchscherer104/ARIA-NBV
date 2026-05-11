@@ -1,11 +1,16 @@
 """Actor-visible target selection for target-conditioned ARIA-NBV.
 
-This module implements the first V1 ``OBS-SEL`` target selector. It ranks
-observed or predicted OBBs by actor-visible evidence only: OBB confidence,
-projected visibility, semidense/EVL support, and a simple support-deficit
-score. Ground-truth OBBs may be used only for the explicit V0 sanity mode or
-for post-selection GT matching diagnostics; they are never used to rank V1
-targets.
+This module implements the V1 `OBS-SEL / PRED-Q / GT-EVAL` target contract.
+V1 ranks observed or predicted OBB records by actor-visible evidence only: OBB
+confidence, projected area, semidense support, EVL support, and support deficit.
+GT OBBs are allowed only in explicit V0 sanity/upper-bound mode or after
+selection for label/evaluation matching.
+
+The selector stores both actor-facing descriptors and oracle-side audit fields.
+Target matching is accepted only when the best GT match passes configured IoU
+or score thresholds and the top-1/top-2 gap is unambiguous. Unmatched,
+ambiguous, empty-crop, or no-source cases are target-invalid states, not low
+target-RRI examples.
 """
 
 from __future__ import annotations
@@ -57,12 +62,12 @@ TARGET_INVALID_REASON_CODES: dict[str, int] = {
 """Version-1 target invalidity reason bit positions."""
 
 TARGET_INVALID_REASON_VERSION = "target-selection-invalidity-v1"
-"""Version label for :data:`TARGET_INVALID_REASON_CODES`."""
+"""Version label for `TARGET_INVALID_REASON_CODES`."""
 
 
 @dataclass(frozen=True, slots=True)
 class TargetCandidateRow:
-    """One actor-visible target candidate and its audit fields.
+    """One actor-visible target candidate and its oracle audit fields.
 
     Geometry is stored in ARIA world coordinates. ``relative_pose_reference``
     is ``T_reference_rig_target = T_world_reference_rig^{-1} @
@@ -132,11 +137,11 @@ class _TargetSource:
 
 
 class TargetSelectorConfig(BaseConfig):
-    """Configuration for :class:`ActorVisibleTargetSelector`."""
+    """Configuration for `ActorVisibleTargetSelector`."""
 
     @property
     def target(self) -> type["ActorVisibleTargetSelector"]:
-        """Factory target for :meth:`BaseConfig.setup_target`."""
+        """Factory target for `BaseConfig.setup_target`."""
 
         return ActorVisibleTargetSelector
 
@@ -594,7 +599,7 @@ def target_gt_obb_world(row: TargetCandidateRow, sample: Any) -> ObbTW:
         sample: VIN offline sample carrying ``gt_obbs`` and snippet transform.
 
     Returns:
-        A single-row :class:`ObbTW` in world coordinates.
+        A single-row `ObbTW` in world coordinates.
 
     Raises:
         ValueError: If the row is not label-valid or the matched GT row cannot

@@ -1,15 +1,18 @@
-"""Runtime dataset and typed sample views for the VIN offline dataset.
+"""Runtime views over the strict immutable VIN offline dataset.
 
-This module rebuilds typed runtime objects from the immutable VIN offline
-dataset format:
+The VIN offline store is the frozen one-step substrate for current ARIA-NBV
+training and diagnostics. It materializes ASE/EFM snippets into shard-local
+numeric blocks plus optional MessagePack diagnostics, then exposes either:
 
-- ``VinOfflineSample`` for diagnostics and app-facing reads,
-- ``VinOfflineDataset`` for map-style random access, and
-- ``VinOfflineDatasetConfig`` for config-as-factory instantiation.
+- `VinOfflineSample` for diagnostics, Rerun/Streamlit inspection, rollout-root
+  generation, and live attachment of raw snippets or meshes; or
+- `VinOracleBatch` for Lightning/VIN training.
 
-The training-critical path reads fixed-size blocks directly from shard-local
-Zarr arrays. Optional diagnostic blocks are loaded lazily from shard-local
-msgspec record lists only when requested.
+The store is intentionally strict: readers accept the current
+`OFFLINE_DATASET_VERSION` only, split membership comes from file-backed arrays,
+and `sample_index.jsonl` owns scene/snippet coverage. Rebuild stale stores with
+`VinOfflineWriter`; do not patch manifests, split arrays, or shard payloads by
+hand.
 """
 
 from __future__ import annotations
@@ -158,6 +161,10 @@ class VinOfflineSample:
         )
 
 
+VinOfflineDatasetItem = VinOfflineSample | VinOracleBatch
+"""Item returned by `VinOfflineDataset` depending on `return_format`."""
+
+
 class VinOfflineDatasetConfig(BaseConfig):
     """Configuration for reading immutable VIN offline datasets."""
 
@@ -224,7 +231,7 @@ class VinOfflineDatasetConfig(BaseConfig):
     _validate_map_location = field_validator("map_location", mode="before")(BaseConfig._resolve_device)
 
 
-class VinOfflineDataset(Dataset[VinOfflineSample | VinOracleBatch]):
+class VinOfflineDataset(Dataset[VinOfflineDatasetItem]):
     """Map-style random-access dataset backed by the immutable VIN offline store."""
 
     is_map_style: bool = True

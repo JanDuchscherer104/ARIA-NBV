@@ -72,6 +72,11 @@ class ExperimentConfig(BaseConfig):
 ## Google-Style Docstrings
 All public methods and functions should use Google-style docstrings. Prefer concise descriptions plus explicit `Args:` / `Returns:` sections over prose-heavy blocks.
 
+Quartodoc renders these docstrings through Quarto. Use Markdown math (`$...$`
+and `$$...$$`) and backtick code references; avoid Sphinx/RST math, class, and
+function roles unless the generated page has been checked.
+Use raw docstrings (`r"""..."""`) when LaTeX backslashes are present.
+
 ## Data Views and Typed Containers
 Typed view objects and prediction containers should make their contracts explicit in field docstrings.
 
@@ -82,7 +87,7 @@ class EfmCameraView:
 
     Attributes:
         images: ``Tensor["F C H W", float32]`` normalized to ``[0, 1]``.
-        calib: :class:`CameraTW` storing per-frame intrinsics/extrinsics.
+        calib: `CameraTW` storing per-frame intrinsics/extrinsics.
     """
 
     images: Tensor

@@ -35,8 +35,8 @@ See the
 [research questions](questions.qmd), the
 [RRI theory page](../theory/rri_theory.qmd), the
 [finite-candidate rollout and Q_H contract](../theory/rl_planning.qmd), the
-[VIN implementation note](../impl/vin_nbv.qmd), the
-[Rerun offline inspector note](../impl/rerun_offline_inspector.qmd), and the
+[VIN model API](../../reference/vin.model_v3.qmd), the
+[generated implementation contracts](../../reference/index.qmd), and the
 [M1 contract report](m1_contract_report.qmd) for the main connected nodes. The
 advisor-facing proposal is maintained in
 `docs/typst/thesis/proposal.typ`; the seminar paper is historical implemented
@@ -379,7 +379,7 @@ Rerun offline inspector, and the available VIN offline store.
   objective/metric split, target and matching protocol, candidate and rollout
   support, headroom-gated $Q_H$, scaling, and online/continuous escalation;
 - validate that `offline_only.toml` can load the available VIN offline store
-  into the [VIN diagnostics page](../../reference/aria_nbv.lightning.VinDataModule.qmd)
+  into the [VIN diagnostics/API surface](../../reference/lightning.qmd)
   once corrected command behavior and validation land;
 - save one Rerun recording from a validation sample once the inspector CLI and
   `.configs/rerun_offline.toml` are present;
@@ -398,7 +398,7 @@ and planning claims?
 [data-handling API](../../reference/data_handling.qmd), the
 [offline store contracts](../../reference/aria_nbv.data_handling.VinSnippetView.qmd),
 the [RRI metric API](../../reference/rri_metrics.qmd), and the
-[data pipeline overview](../impl/data_pipeline_overview.qmd).
+[M1 contract map](m1_contract_report.qmd#m1-contract-map).
 
 **Exit checks:**
 
@@ -422,8 +422,8 @@ the [RRI metric API](../../reference/rri_metrics.qmd), and the
 **Primary question:** What is the reproducible one-step baseline before adding
 target conditioning?
 
-**Implementation surfaces:** the [VIN implementation note](../impl/vin_nbv.qmd),
-the [VIN model API](../../reference/aria_nbv.vin.model_v3.VinModelV3.qmd), the
+**Implementation surfaces:** the [VIN model module](../../reference/vin.model_v3.qmd),
+the [VinModelV3 API](../../reference/aria_nbv.vin.model_v3.VinModelV3.qmd), the
 Lightning training surface, W&B/Optuna reports, and Streamlit diagnostics.
 
 **Exit checks:**
@@ -433,7 +433,7 @@ Lightning training surface, W&B/Optuna reports, and Streamlit diagnostics.
 - calibration, ordinal-bin, rank-correlation, and top-k selection diagnostics;
 - controlled ablation matrix for surface reconstruction inputs, CORAL variants,
   auxiliary regression, and candidate features.
-- [Zarr-first rollout/Q storage schema](../impl/rollout_storage_contract.qmd)
+- [Zarr-first rollout/Q storage schema](../theory/rl_planning.qmd)
   drafted before large sequence data is written;
 - LRZ deterministic sharding, Slurm/DSS staging, and full-scale storage budget
   planned before M3/M5 generation.
@@ -493,7 +493,7 @@ headroom over one-step selection, and can learned $Q_H$ recover that headroom?
 **Implementation surfaces:** the
 [counterfactual rollout API](../../reference/aria_nbv.pose_generation.CounterfactualPoseGenerator.qmd),
 candidate generation, target-aware scorer backends, rollout diagnostics, and
-the [rollout storage and invalidity contract](../impl/rollout_storage_contract.qmd).
+the [finite-candidate rollout and Q_H contract](../theory/rl_planning.qmd).
 
 **Exit checks:**
 

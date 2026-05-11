@@ -64,7 +64,7 @@ class TrainerFactoryConfig(BaseConfig):
     enable_model_summary: bool = True
     """Enable Lightning's default model summary callback.
 
-    When using :class:`~pytorch_lightning.callbacks.RichModelSummary`, consider
+    When using `pytorch_lightning.callbacks.RichModelSummary`, consider
     disabling this to avoid duplicate summaries.
     """
 

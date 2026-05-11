@@ -1,4 +1,18 @@
-"""Mixed finite-candidate view generation with provenance."""
+"""Mixed finite-candidate view generation with full-shell provenance.
+
+The mixture wrapper keeps `CandidateViewGeneratorConfig` backward-compatible by
+instantiating one normal generator per component, overriding only the component
+fields, and concatenating the full sampled shells. Component counts therefore
+define the fixed candidate budget exactly, while each output row retains
+`strategy_id`, `mixture_id`, `sampler_probability`, and optional component name.
+
+Ordering is part of the data contract: invalid candidates remain in the
+full-shell masks and provenance arrays; compact valid views are recoverable
+through `CandidateSamplingResult.candidate_shell_indices()`. Target-point
+components require `CandidateGenerationRuntimeContext.target_center_world`
+because the thesis V1 actor may condition on observed/predicted target records
+but not on GT target geometry.
+"""
 
 from __future__ import annotations
 

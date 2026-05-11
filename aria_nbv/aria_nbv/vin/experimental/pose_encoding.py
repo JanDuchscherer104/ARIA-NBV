@@ -59,7 +59,7 @@ class FourierFeatures(nn.Module):
 
 
 class FourierFeaturesConfig(BaseConfig):
-    """Config-as-factory wrapper for :class:`FourierFeatures`."""
+    """Config-as-factory wrapper for `FourierFeatures`."""
 
     @property
     def target(self) -> type[FourierFeatures]:

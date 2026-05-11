@@ -12,7 +12,7 @@ Apply this file when working under `aria_nbv/aria_nbv/rri_metrics/`.
 - Canonical metric and oracle surface: `aria_nbv/aria_nbv/rri_metrics/oracle_rri.py`, `metrics.py`, `types.py`
 - Binning and ordinal surfaces: `rri_binning.py`, `coral.py`
 - Diagnostics and plotting helpers: `logging.py`, `plotting.py`
-- Narrative surfaces: `docs/typst/seminar_paper/sections/05-oracle-rri.typ`, `docs/typst/seminar_paper/sections/07a-binning.typ`, `docs/contents/impl/rri_computation.qmd`, `docs/contents/theory/rri_theory.qmd`
+- Narrative surfaces: `docs/typst/seminar_paper/sections/05-oracle-rri.typ`, `docs/typst/seminar_paper/sections/07a-binning.typ`, generated API docs under `docs/reference/`, `docs/contents/theory/rri_theory.qmd`
 
 ## Boundary Rules
 - Treat oracle-label semantics, binning definitions, and reported metric meaning as contract changes, not local refactors.

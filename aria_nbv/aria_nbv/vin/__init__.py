@@ -1,4 +1,15 @@
-"""Public VIN package root with explicit imports and exports."""
+"""VIN one-step scoring models and typed prediction contracts.
+
+The active public surface is `VinModelV3`: a target-agnostic one-step scorer for
+candidate RRI rows that uses EVL voxel evidence, candidate pose encodings,
+semidense projection features, and a CORAL ordinal head. It is the implemented
+seminar substrate and the myopic control for the thesis target-conditioned
+rollout work; it is not a full multi-step NBV policy.
+
+Inputs must preserve actor/oracle separation. EVL fields, candidate poses, and
+semidense observations are actor-visible features. Oracle RRI labels, GT meshes,
+and target crops are supervision/evaluation assets.
+"""
 
 from __future__ import annotations
 

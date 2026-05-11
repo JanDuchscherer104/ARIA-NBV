@@ -1,4 +1,4 @@
-"""Utilities to back-project rendered depth maps into world-frame point clouds.
+r"""Utilities to back-project rendered depth maps into world-frame point clouds.
 
 This module centralises depth unprojection for candidate renders to avoid frame
 confusion between the PyTorch3D renderer (which outputs metric ``z`` depth in
@@ -6,12 +6,17 @@ the physical camera frame) and downstream visualisations or fusion steps.
 
 All functions assume:
     * ``depth`` is metric depth along the camera +Z axis (same convention as
-      :class:`~pytorch3d.renderer.MeshRasterizer` with ``in_ndc=False``).
-    * ``pose_world_cam`` is a :class:`efm3d.aria.pose.PoseTW` storing
+      `pytorch3d.renderer.MeshRasterizer` with ``in_ndc=False``).
+    * ``pose_world_cam`` is a `efm3d.aria.pose.PoseTW` storing
       **world ← camera** extrinsics (LUF camera frame).
-    * ``camera`` is the matching :class:`efm3d.aria.camera.CameraTW` carrying
+    * ``camera`` is the matching `efm3d.aria.camera.CameraTW` carrying
       intrinsics (and, if batched, per-candidate extrinsics that align with the
       provided depths/poses).
+
+The returned points live in the same VIO/world frame as the ASE mesh and
+semidense history. Conceptually a valid depth pixel $d(u,v)$ maps to
+$\mathbf{p}_w = T_{w \leftarrow c}\,\pi^{-1}(u,v,d)$; crop and RRI code then
+decide whether the point contributes to scene-level or target-level scoring.
 """
 
 from __future__ import annotations
@@ -38,7 +43,7 @@ def backproject_depths_p3d_batch(
     Args:
         depths: ``Tensor["B", "H", "W"]`` metric z-depth maps in metres.
         mask_valid: ``Tensor["B", "H", "W"]`` boolean masks for usable pixels.
-        cameras: One :class:`~pytorch3d.renderer.PerspectiveCameras` entry per
+        cameras: One `pytorch3d.renderer.PerspectiveCameras` entry per
             depth map, carrying world-from-camera extrinsics.
         stride: Pixel subsampling stride.
 
@@ -105,9 +110,9 @@ def backproject_depth_with_p3d(
 
     Args:
         depth: ``Tensor["H", "W"]`` metric depth (metres) in the camera frame.
-        cameras: Matching :class:`~pytorch3d.renderer.PerspectiveCameras`.
+        cameras: Matching `pytorch3d.renderer.PerspectiveCameras`.
         valid_mask: ``Tensor["H", "W"]`` boolean mask for usable pixels
-            (e.g. zclose/zfar filtering from :class:`CandidateDepths`).
+            (e.g. zclose/zfar filtering from `CandidateDepths`).
         stride: Optional subsampling stride in pixel space.
         max_points: Optional cap on returned points (random subset when exceeded).
 
@@ -145,7 +150,7 @@ def backproject_batch(
     max_points: int | None = None,
     candidate_indices: Sequence[int] | None = None,
 ) -> torch.Tensor:
-    """Back-project a :class:`CandidateDepths` batch into a merged world point cloud.
+    """Back-project a `CandidateDepths` batch into a merged world point cloud.
 
     Args:
         batch: Rendered candidate depths + poses.

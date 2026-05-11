@@ -1,4 +1,18 @@
-"""Build standalone target-RRI rollout replay stores from VIN offline rows."""
+"""Build standalone target-RRI rollout replay stores from VIN offline rows.
+
+This writer is the first rollout-data generation path, not a migration of the
+immutable VIN offline cache. It reads `VinOfflineDataset` samples with live
+`EfmSnippetView` snippets and GT meshes attached, selects actor-visible targets,
+generates fixed-count mixed candidate tables, scores valid candidates with the
+target-cropped oracle, and writes a separate `rollouts.zarr` store.
+
+The generated store must be interpretable as replay data for finite-candidate
+value learning. Lineage includes source manifest hashes, split hashes,
+candidate/oracle/rollout config hashes, selected target records, GT match audit
+fields, candidate strategy provenance, and rollout policy identifiers. Invalid
+targets or actions are skipped or masked with reason codes; they are never
+encoded as low target RRI.
+"""
 
 from __future__ import annotations
 
@@ -37,7 +51,12 @@ from ._target_selection import (
 
 @dataclass(slots=True)
 class RolloutDatasetWriterStats:
-    """Counters reported by one rollout-store build."""
+    """Counters reported by one rollout-store build.
+
+    The counters are operational diagnostics for local smoke builds. They are
+    not dataset labels; invalidity details that affect training/evaluation must
+    also be represented in rollout trace masks and lineage.
+    """
 
     samples_seen: int = 0
     samples_without_snippet_or_mesh: int = 0
@@ -55,7 +74,13 @@ class RolloutDatasetWriterStats:
 
 
 class RolloutRecipeConfig(BaseConfig):
-    """One rollout policy recipe materialized into the replay store."""
+    """One rollout policy recipe materialized into the replay store.
+
+    Recipes control both candidate-set sampling and action selection. The first
+    supported policies cover random valid selection, greedy oracle selection,
+    retained-beam oracle lookahead, and temperature-softmax traces for rollout
+    diversity.
+    """
 
     name: str
     """Stable recipe name stored as branch schedule lineage."""
@@ -138,7 +163,13 @@ def _default_recipes() -> list[RolloutRecipeConfig]:
 
 
 class RolloutDatasetWriterConfig(BaseConfig):
-    """Configuration for building standalone target-RRI rollout Zarr stores."""
+    """Configuration for building standalone target-RRI rollout Zarr stores.
+
+    The source is a strict-v7 VIN offline dataset opened in `sample` mode with
+    enough live assets to rerun candidate generation and oracle scoring. The
+    destination is a standalone rollout store; the source cache version is
+    recorded as lineage and is not modified.
+    """
 
     @property
     def target(self) -> type["RolloutDatasetWriter"]:
@@ -222,7 +253,14 @@ class RolloutDatasetWriterConfig(BaseConfig):
 
 
 class RolloutDatasetWriter:
-    """Generate target-RRI rollout traces and write a standalone Zarr store."""
+    """Generate target-RRI rollout traces and write a standalone Zarr store.
+
+    For each source row the writer selects V1 actor-visible targets, validates
+    GT/evaluation matches when required, regenerates candidates at each rollout
+    step from updated history/budget, scores candidates by target RRI, and
+    persists compact replay traces. Heavy diagnostics should be retained only
+    for selected actions or retained chains through the downstream Zarr policy.
+    """
 
     def __init__(self, config: RolloutDatasetWriterConfig) -> None:
         self.config = config

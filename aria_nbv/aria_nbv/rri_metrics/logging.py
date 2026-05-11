@@ -62,7 +62,7 @@ class Metric(Logable):
     """Metric suffixes composed with Stage as ``{stage}/{metric}``."""
 
     LOSS = "loss"
-    """Legacy loss key (prefer :class:`Loss` for losses)."""
+    """Legacy loss key (prefer `Loss` for losses)."""
 
     RRI_MEAN = "rri_mean"
     PRED_RRI_MEAN = "pred_rri_mean"
@@ -274,7 +274,7 @@ class VinMetricsConfig(BaseConfig):
 
     @property
     def target(self) -> type[VinMetrics]:
-        """Factory target for :meth:`~aria_nbv.utils.base_config.BaseConfig.setup_target`."""
+        """Factory target for `aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return VinMetrics
 
     num_classes: int

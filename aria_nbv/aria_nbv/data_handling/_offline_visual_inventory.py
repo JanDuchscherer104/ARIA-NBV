@@ -1,7 +1,7 @@
 """Reusable visual-inventory diagnostics for immutable VIN offline samples.
 
 The collector in this module validates the app-facing
-``VinOfflineSample`` object built by :class:`VinOfflineDataset` and records
+``VinOfflineSample`` object built by `VinOfflineDataset` and records
 which optional visual payloads are available for downstream diagnostics.
 Required model and oracle fields raise actionable errors in strict mode, while
 missing optional rich visual blocks are surfaced as warnings.
@@ -485,7 +485,7 @@ def collect_offline_visual_inventory(sample: VinOfflineSample, *, strict: bool =
     Args:
         sample: Offline sample returned by ``VinOfflineDataset`` with
             ``return_format="sample"``.
-        strict: If ``True``, raise :class:`OfflineVisualInventoryError` when a
+        strict: If ``True``, raise `OfflineVisualInventoryError` when a
             required field is absent or invalid. Optional visual payloads are
             always represented as warnings instead of failures.
 

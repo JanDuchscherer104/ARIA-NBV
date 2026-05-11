@@ -6,7 +6,7 @@ metadata:
     - "aria_nbv/aria_nbv/app/**"
     - "aria_nbv/aria_nbv/rerun_inspector/**"
     - "aria_nbv/aria_nbv/**/rerun*.py"
-    - "docs/contents/impl/**"
+    - "docs/reference/**"
     - ".agents/skills/rerun-nbv-inspector/**"
   triggers:
     - "Rerun"

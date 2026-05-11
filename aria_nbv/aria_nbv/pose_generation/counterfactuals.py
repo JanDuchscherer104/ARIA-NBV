@@ -1,4 +1,15 @@
-"""Multi-step counterfactual pose rollout utilities."""
+"""Bounded counterfactual pose rollout utilities.
+
+Rollouts regenerate finite candidate tables at each step from the updated pose,
+history, and remaining budget. The candidate generator may be single-family or
+mixed, but the selected action must satisfy the actor-valid mask. Oracle scores
+are supervision/evaluation fields; actor-visible replay rows retain poses,
+masks, candidate provenance, and selected-action lineage.
+
+The first thesis-core use is deterministic oracle lookahead and replay data for
+finite-candidate value learning. Online simulator training and continuous action
+control are outside this module's current contract.
+"""
 
 from __future__ import annotations
 

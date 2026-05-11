@@ -212,7 +212,7 @@ class PoseConditionedGlobalPool(nn.Module):
 
 
 class VinModelConfig(BaseConfig):
-    """Configuration for :class:`VinModel`.
+    """Configuration for `VinModel`.
 
     This config collects all architectural choices that determine how VIN
     represents scene context and candidate poses. Conceptually, the VIN score is
@@ -231,7 +231,7 @@ class VinModelConfig(BaseConfig):
 
     @property
     def target(self) -> type[VinModel]:
-        """Factory target for :meth:`BaseConfig.setup_target`."""
+        """Factory target for `BaseConfig.setup_target`."""
         return VinModel
 
     backbone: EvlBackboneConfig | None = Field(default_factory=EvlBackboneConfig)
@@ -952,7 +952,7 @@ class VinModel(FrustumSamplingMixin, nn.Module):
             p3d_cameras: PyTorch3D cameras for each candidate (same ordering as candidates).
 
         Returns:
-            :class:`VinPrediction` with CORAL logits, probabilities, and expected scores.
+            `VinPrediction` with CORAL logits, probabilities, and expected scores.
         """
         pred, _ = self._forward_impl(
             efm,
@@ -987,7 +987,7 @@ class VinModel(FrustumSamplingMixin, nn.Module):
             p3d_cameras: PyTorch3D cameras for each candidate (same ordering as candidates).
 
         Returns:
-            Tuple of (:class:`VinPrediction`, :class:`VinForwardDiagnostics`).
+            Tuple of (`VinPrediction`, `VinForwardDiagnostics`).
         """
         pred, debug = self._forward_impl(
             efm,

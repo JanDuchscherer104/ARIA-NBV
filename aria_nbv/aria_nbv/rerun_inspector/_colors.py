@@ -114,7 +114,7 @@ def oracle_rri_to_rgba(
         oracle_rri: Candidate RRI values.  Higher finite values map to brighter
             colors.
         validity: Optional candidate validity mask.  Invalid candidates override
-            the RRI color with :data:`INVALID_RGBA`.
+            the RRI color with `INVALID_RGBA`.
         vmin: Optional lower normalization bound.  Defaults to the minimum
             finite RRI in ``oracle_rri``.
         vmax: Optional upper normalization bound.  Defaults to the maximum
@@ -158,7 +158,7 @@ def rank_to_rgba(
         ranks: Candidate ranks where rank ``0`` receives the first palette
             color.
         validity: Optional candidate validity mask.  Invalid candidates override
-            the rank color with :data:`INVALID_RGBA`.
+            the rank color with `INVALID_RGBA`.
         alpha: Alpha channel for valid rank colors.
 
     Returns:

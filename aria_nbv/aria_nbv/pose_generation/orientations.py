@@ -81,30 +81,30 @@ class OrientationBuilder:
 
         Args:
             reference_pose:
-                reference2world :class:`PoseTW` used as origin for radial modes and as source of the rig2world
+                reference2world `PoseTW` used as origin for radial modes and as source of the rig2world
                 rotation.
             centers_world:
                 `Tensor['N, 3']` candidate camera centers in the world frame.
 
         Returns:
-            :class:`PoseTW` instance encoding cam2world SE(3) transforms for all candidates (length `N`).
+            `PoseTW` instance encoding cam2world SE(3) transforms for all candidates (length `N`).
 
         This method takes a reference2world rig pose and world-space candidate centers and returns per-candidate
-        :class:`PoseTW` cam2world transforms. It proceeds in two stages:
+        `PoseTW` cam2world transforms. It proceeds in two stages:
 
-        1. Construct base poses according to :class:`ViewDirectionMode`:
+        1. Construct base poses according to `ViewDirectionMode`:
 
-           * :data:`ViewDirectionMode.FORWARD_RIG`:
+           * `ViewDirectionMode.FORWARD_RIG`:
              reuse the rig rotation for all candidates and place cameras at `centers_world`.
-           * :data:`ViewDirectionMode.RADIAL_AWAY` / :data:`RADIAL_TOWARDS`:
-             call :func:`view_axes_from_poses` so that camera optical axes point away from or towards the reference
+           * `ViewDirectionMode.RADIAL_AWAY` / `RADIAL_TOWARDS`:
+             call `view_axes_from_poses` so that camera optical axes point away from or towards the reference
              pose along the center-reference line, keeping x horizontal.
-           * :data:`ViewDirectionMode.TARGET_POINT`:
+           * `ViewDirectionMode.TARGET_POINT`:
              build look-at frames for the configured target point, using the world up vector to stabilise roll.
 
         2. Apply local view jitter:
 
-           * sample camera-frame forward axes via :meth:`_sample_view_dirs_cam`,
+           * sample camera-frame forward axes via `_sample_view_dirs_cam`,
            * build orthonormal camera bases from these directions,
            * optionally apply roll jitter around the forward axis, and
            * compose the resulting rotations as right-multiplicative deltas with the base cam2world poses.

@@ -22,7 +22,7 @@ def summarize(val: Tensor | Any, *, include_stats: bool = False) -> Any:
 
 
 def summarize_shape(value: Any) -> str:
-    """Return a compact shape/dtype/device string using :func:`summarize`."""
+    """Return a compact shape/dtype/device string using `summarize`."""
     summary = summarize(value)
     if summary is None:
         return "None"

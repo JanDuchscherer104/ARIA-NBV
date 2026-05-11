@@ -1,4 +1,4 @@
-"""High-level oracle RRI computation orchestrator.
+r"""High-level oracle RRI computation orchestrator.
 
 This module wires together rendering outputs (candidate depth → point clouds),
 distance primitives (see ``metrics.py``), and configuration defaults to produce
@@ -11,6 +11,18 @@ kept modular:
 * **Distance evaluation** is performed via PyTorch3D on GPU for efficiency.
 * **Config-as-factory** pattern is used to keep runtime objects
   serialisable and consistent with the rest of the codebase.
+
+The implemented scalar score is
+
+$$
+\mathrm{RRI}(q) =
+\frac{\Delta(P_t, M) - \Delta(P_t \cup P_q, M)}
+     {\max(\Delta(P_t, M), \epsilon)}
+$$
+
+where $\Delta$ is the configured point-mesh error. Target-specific callers pass
+target-cropped points and meshes; invalid crops raise upstream and must not be
+silently converted to scene-level labels.
 """
 
 from __future__ import annotations
@@ -34,11 +46,11 @@ class OracleRRIConfig(BaseConfig):
 class OracleRRI:
     """Facade to compute oracle RRI for one or more candidates.
 
-    Conceptual steps (cf. ``docs/contents/impl/rri_computation.qmd``):
+    Conceptual steps:
         1. Merge ``P_t`` (semi-dense SLAM) with candidate view point cloud
            ``P_q`` to obtain ``P_{t∪q}``.
         2. (Optional) Voxel-downsample both ``P_t`` and ``P_{t∪q}`` to ensure
-           comparable density when evaluating Chamfer-like distances.
+           comparable density when evaluating point-mesh distances.
         3. Compute accuracy/completeness distances to the GT mesh using the
            PyTorch3D backend.
         4. Form RRI = (d_before - d_after) / d_before and return diagnostics.

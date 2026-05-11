@@ -1,8 +1,13 @@
-"""Vectorised depth→point-cloud conversion for candidate renders.
+"""Vectorised depth-to-point-cloud conversion for candidate renders.
 
-Consumes a single :class:`EfmSnippetView` and matching :class:`CandidateDepths`
+Consumes a single `EfmSnippetView` and matching `CandidateDepths`
 to produce padded per-candidate point clouds, fused clouds with the collapsed
 semi-dense SLAM reconstruction, and a combined occupancy extent for cropping.
+
+The output is world-frame oracle evidence. Scene-level RRI uses the combined
+snippet/candidate extent; target-level RRI may further crop both candidate
+points and mesh geometry with the matched GT target OBB. Empty target crops or
+unusable candidate depth should surface as invalidity, not as a low score.
 """
 
 from __future__ import annotations
@@ -49,7 +54,7 @@ class CandidatePointClouds:
         """Reconstruct one point-cloud batch from a serialized payload.
 
         Args:
-            payload: Serialized payload produced by :meth:`to_serializable`.
+            payload: Serialized payload produced by `to_serializable`.
             device: Destination device for tensors.
 
         Returns:

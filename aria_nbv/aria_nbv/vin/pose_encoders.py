@@ -111,7 +111,7 @@ class R6dLffPoseEncoder(PoseEncoder):
 
 
 class R6dLffPoseEncoderConfig(BaseConfig):
-    """Config for :class:`R6dLffPoseEncoder`."""
+    """Config for `R6dLffPoseEncoder`."""
 
     @property
     def target(self) -> type[R6dLffPoseEncoder]:

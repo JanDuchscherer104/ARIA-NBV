@@ -118,7 +118,7 @@ class ShellLffPoseEncoder(PoseEncoder):
 
 
 class ShellLffPoseEncoderConfig(BaseConfig):
-    """Config for :class:`ShellLffPoseEncoder`."""
+    """Config for `ShellLffPoseEncoder`."""
 
     @property
     def target(self) -> type[ShellLffPoseEncoder]:
@@ -146,7 +146,7 @@ class ShellLffPoseEncoderConfig(BaseConfig):
 
 
 class ShellShPoseEncoderAdapterConfig(BaseConfig):
-    """Config for :class:`ShellShPoseEncoderAdapter`."""
+    """Config for `ShellShPoseEncoderAdapter`."""
 
     @property
     def target(self) -> type[ShellShPoseEncoderAdapter]:

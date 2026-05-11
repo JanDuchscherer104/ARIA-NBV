@@ -10,8 +10,12 @@ This module implements a clear three-stage pipeline:
    space). Rules may optionally emit diagnostics such as per-candidate mesh
    distances.
 
-All poses are expressed as :class:`efm3d.aria.pose.PoseTW` in the VIO world
+All poses are expressed as `efm3d.aria.pose.PoseTW` in the VIO world
 frame (LUF camera convention: x=left, y=up, z=forward).
+
+`CandidateViewGenerator` returns compact valid views for rendering and keeps the
+full sampled shell as masks/diagnostics. Mixture generation should wrap this
+single-family generator rather than changing its ordering semantics.
 """
 
 from __future__ import annotations
@@ -53,12 +57,12 @@ class CandidateViewGeneratorConfig(BaseConfig):
     """Configuration for sampling and pruning candidate camera poses around a reference frame.
 
     Encapsulates the radii/angle sampling envelope, orientation jitter options, collision and free-space
-    filtering, and logging/debug controls used by :class:`CandidateViewGenerator`.
+    filtering, and logging/debug controls used by `CandidateViewGenerator`.
     """
 
     @property
     def target(self) -> type["CandidateViewGenerator"]:
-        """Factory target for :meth:`BaseConfig.setup_target`."""
+        """Factory target for `BaseConfig.setup_target`."""
         return CandidateViewGenerator
 
     camera_label: Literal["rgb", "slaml", "slamr"] = "rgb"
@@ -215,7 +219,7 @@ class CandidateViewGeneratorConfig(BaseConfig):
 def _gravity_align_pose(reference_pose: PoseTW, *, eps: float = 1e-6) -> PoseTW:
     """Return a gravity-aligned variant of ``reference_pose`` with identical translation.
 
-    The aligned pose uses the VIO world-up axis (see :func:`aria_nbv.utils.frames.world_up_tensor`) and keeps
+    The aligned pose uses the VIO world-up axis (see `aria_nbv.utils.frames.world_up_tensor`) and keeps
     the reference yaw by projecting the original forward axis onto the horizontal plane. This effectively removes
     pitch and roll so azimuth/elevation sampling caps behave as intended even when the reference camera is tilted.
 
@@ -301,13 +305,13 @@ def _maybe_seed(seed: int | None, *, device: torch.device) -> Iterator[None]:
 
 
 class CandidateViewGenerator:
-    """Generate candidate :class:`PoseTW` around a reference rig pose using composeable and modular rules.
+    """Generate candidate `PoseTW` around a reference rig pose using composeable and modular rules.
 
     This class orchestrates the full candidate generation process:
 
-    * positional sampling via :class:`PositionSampler`,
-    * orientation construction via :class:`OrientationBuilder`, and
-    * rule-based pruning via :class:`FreeSpaceRule`, :class:`MinDistanceToMeshRule` and :class:`PathCollisionRule`.
+    * positional sampling via `PositionSampler`,
+    * orientation construction via `OrientationBuilder`, and
+    * rule-based pruning via `FreeSpaceRule`, `MinDistanceToMeshRule` and `PathCollisionRule`.
 
     """
 
@@ -327,7 +331,7 @@ class CandidateViewGenerator:
         frame_index: int | None = None,
         runtime_context: CandidateGenerationRuntimeContext | None = None,
     ) -> CandidateSamplingResult:
-        """Generate candidates using an :class:`EfmSnippetView` sample.
+        """Generate candidates using an `EfmSnippetView` sample.
 
         Args:
             sample: Snippet view with trajectory and mesh.
@@ -392,32 +396,32 @@ class CandidateViewGenerator:
     ) -> CandidateSamplingResult:
         """Sample candidate poses around `reference_pose` and apply pruning rules.
 
-        Samples candidate positions and orientations, wraps them in a :class:`CandidateContext`, runs all configured
-        rules, and returns :class:`CandidateSamplingResult`.
+        Samples candidate positions and orientations, wraps them in a `CandidateContext`, runs all configured
+        rules, and returns `CandidateSamplingResult`.
 
         Args:
             reference_pose:
-                World<-reference :class:`PoseTW` used as the physical rig pose. When
+                World<-reference `PoseTW` used as the physical rig pose. When
                 ``align_to_gravity`` is enabled, a gravity-aligned copy of this pose
                 defines the sampling frame (stored in ``CandidateSamplingResult.sampling_pose``).
             gt_mesh:
-                Ground-truth :class:`trimesh.Trimesh` in the world frame for pruning.
+                Ground-truth `trimesh.Trimesh` in the world frame for pruning.
             mesh_verts:
-                `Tensor['V, 3']` mesh vertices aligned with :attr:`gt_mesh`.
+                `Tensor['V, 3']` mesh vertices aligned with `gt_mesh`.
             mesh_faces:
                 `Tensor['F, 3']` integer vertex indices defining mesh faces.
             camera_calib_template:
-                :class:`CameraTW` whose intrinsics/metadata are cloned for each candidate; its pose block is
+                `CameraTW` whose intrinsics/metadata are cloned for each candidate; its pose block is
                 overwritten with candidate extrinsics.
             occupancy_extent:
-                `Tensor['6']` world-space AABB used by :class:`FreeSpaceRule`.
+                `Tensor['6']` world-space AABB used by `FreeSpaceRule`.
             runtime_context:
                 Optional target/runtime context accepted for interface
                 compatibility with mixture generators. The single-family
                 generator reads target state directly from the config.
 
         Returns:
-            :class:`CandidateSamplingResult` holding the valid candidate :class:`CameraTW`, reference pose, shell
+            `CandidateSamplingResult` holding the valid candidate `CameraTW`, reference pose, shell
             poses, masks and optional debug statistics.
         """
         del runtime_context

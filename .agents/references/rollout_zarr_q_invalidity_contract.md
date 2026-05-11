@@ -5,9 +5,9 @@ Q_H dataset writers. It is a draft schema only. Do not treat it as evidence
 that writers, migrations, stochastic rollout generation, Q_H training, LRZ
 templates, or CI exist.
 
-Public-facing context lives in
-`docs/contents/impl/rollout_storage_contract.qmd`. This reference is allowed to
-be more mechanical because it is an internal developer contract.
+Public-facing implementation context lives in generated API docs under
+`docs/reference/` and the rollout modules themselves. This reference is allowed
+to be more mechanical because it is an internal developer contract.
 
 ## Scope
 

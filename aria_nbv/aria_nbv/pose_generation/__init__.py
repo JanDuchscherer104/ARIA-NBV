@@ -1,3 +1,18 @@
+"""Finite-candidate generation and counterfactual rollout contracts.
+
+The package owns the thesis action space: every NBV decision is a finite table
+of candidate camera poses, validity masks, reason codes, and provenance fields.
+`CandidateSamplingResult.views` is the compact valid table used for rendering
+and scoring; `mask_valid`, `shell_poses`, strategy ids, mixture ids, and sampler
+probabilities stay aligned to the full sampled shell so invalid actions remain
+auditable instead of becoming low-RRI samples.
+
+Target-conditioned rollout generation adds a runtime-only actor-visible target
+context. `TARGET_POINT` candidates must use the selected observed/predicted
+target center, not GT geometry. GT meshes and GT target crops are consumed only
+by oracle scoring/evaluation.
+"""
+
 from .candidate_generation import CandidateViewGenerator, CandidateViewGeneratorConfig
 from .candidate_mixture import (
     CandidateMixtureComponentConfig,

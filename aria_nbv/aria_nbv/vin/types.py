@@ -1,4 +1,10 @@
-"""Small typed containers for VIN (View Introspection Network)."""
+"""Typed containers for VIN one-step scoring and EVL feature exchange.
+
+These dataclasses are the API contract between data handling, EVL backbone
+wrappers, VIN models, Lightning training, and diagnostics. They intentionally
+record shapes and actor-visible semantics because generated Quartodoc reference
+pages now serve as the implementation-contract surface.
+"""
 
 from __future__ import annotations
 
@@ -152,7 +158,7 @@ class EvlBackboneOutput:
         """Reconstruct one backbone output from a serialized payload.
 
         Args:
-            payload: Serialized payload produced by :meth:`to_serializable`.
+            payload: Serialized payload produced by `to_serializable`.
             device: Destination device for tensors and wrappers.
             include_fields: Optional subset of fields to decode.
 
@@ -215,9 +221,12 @@ class EvlBackboneOutput:
 class VinPrediction:
     """VIN predictions for a candidate set.
 
-    This is the primary output of :class:`aria_nbv.vin.model_v3.VinModelV3`.
+    This is the primary output of `aria_nbv.vin.model_v3.VinModelV3`.
     It is consumed by the Lightning training loop (loss + metrics) and by
     downstream NBV selection (ranking candidates by predicted improvement).
+    The expected score is a learned one-step ranking proxy; rollout-level
+    endpoint metrics and cumulative target RRI are produced by rollout stores
+    and oracle re-scoring, not by this container.
 
     Typical usage in training (see ``aria_nbv/lightning/lit_module.py``):
         - ``logits`` / ``prob``: CORAL ordinal loss and optional auxiliary losses.

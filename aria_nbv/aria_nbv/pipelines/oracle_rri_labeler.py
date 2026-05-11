@@ -44,7 +44,7 @@ def _target_cls():
 
 
 class OracleRriLabelerConfig(BaseConfig):
-    """Config-as-factory wrapper for :class:`OracleRriLabeler`.
+    """Config-as-factory wrapper for `OracleRriLabeler`.
 
     This config composes the existing stage configs (generation, rendering,
     scoring) and adds a small number of pipeline-level knobs.

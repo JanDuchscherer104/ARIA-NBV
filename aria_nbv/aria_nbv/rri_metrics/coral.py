@@ -1,10 +1,13 @@
-"""CORAL ordinal regression utilities.
+"""CORAL ordinal regression utilities for RRI-derived labels.
 
 This module uses the MIT-licensed reference implementation from
-`coral-pytorch <https://raschka-research-group.github.io/coral-pytorch/>`_.
+[`coral-pytorch`](https://raschka-research-group.github.io/coral-pytorch/).
 
 VIN-NBV trains the RRI predictor via ordinal classification and uses a ranking-aware
 loss (CORAL) to penalize distant misclassifications more strongly than nearby ones.
+The expected value decoded from CORAL logits is a one-step ranking proxy; oracle
+RRI and endpoint target-quality metrics remain the geometry-grounded evaluation
+signals.
 """
 
 from __future__ import annotations
@@ -164,8 +167,8 @@ def coral_expected_from_logits(logits: Tensor) -> tuple[Tensor, Tensor]:
 
     Returns:
         Tuple of ``(expected, expected_normalized)`` where:
-          - expected is in ``[0, K-1]``
-          - expected_normalized is in ``[0, 1]``
+        - expected is in ``[0, K-1]``
+        - expected_normalized is in ``[0, 1]``
     """
 
     # In CORAL, the logits parameterize the probabilities P(y > k).

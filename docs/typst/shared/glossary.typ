@@ -75,7 +75,7 @@
       definition_long: "ARIA-NBV computes RRI by comparing reconstruction error before and after fusing candidate-view geometry, usually against an ASE ground-truth mesh for oracle supervision and evaluation.",
       internal_links: (
         "docs/contents/theory/rri_theory.qmd",
-        "docs/contents/impl/rri_computation.qmd",
+        "docs/reference/rri_metrics.oracle_rri.qmd",
         "docs/contents/literature/vin_nbv.qmd",
       ),
       citations: (
@@ -128,7 +128,7 @@
       definition_long: "In ARIA-NBV, ground truth usually refers to ASE meshes, object annotations, poses, or labels used to compute oracle supervision and diagnostic metrics.",
       internal_links: (
         "docs/contents/ase_dataset.qmd",
-        "docs/contents/impl/rri_computation.qmd",
+        "docs/contents/theory/rri_theory.qmd",
       ),
       citations: (
         "ProjectAria-ASE-2025",
@@ -172,7 +172,7 @@
       internal_links: (
         "docs/contents/thesis/questions.qmd#rq2-target-encoding",
         "docs/contents/thesis/questions.qmd#rq4-planning",
-        "docs/contents/impl/vin_v2_feature_proposals.qmd",
+        "docs/reference/vin.types.qmd",
       ),
       citations: (),
       related: (
@@ -216,7 +216,7 @@
       internal_links: (
         "docs/contents/thesis/questions.qmd#rq1-objective",
         "docs/contents/thesis/questions.qmd#rq4-planning",
-        "docs/contents/impl/rri_computation.qmd#entity-wise-rri",
+        "docs/contents/theory/rri_theory.qmd",
       ),
       citations: (
         "VIN-NBV-frahm2025",
@@ -312,7 +312,7 @@
       definition_long: "The scorer predicts target-specific utility so view ranking can prioritize a selected entity or region instead of only optimizing scene-level RRI.",
       internal_links: (
         "docs/contents/thesis/questions.qmd#rq4-planning",
-        "docs/contents/impl/vin_nbv.qmd",
+        "docs/reference/vin.model_v3.qmd",
         "docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd",
       ),
       citations: (
@@ -461,7 +461,7 @@
       internal_links: (
         "docs/contents/thesis/questions.qmd#rq2-target-encoding",
         "docs/contents/thesis/questions.qmd#rq1-objective",
-        "docs/contents/impl/rri_computation.qmd#entity-wise-rri",
+        "docs/contents/theory/rri_theory.qmd",
       ),
       citations: (
         "ProjectAria-ASE-2025",
@@ -693,7 +693,7 @@
       definition_long: "The persisted offline sample state is not the full raw snippet. It is the compact immutable training and diagnostic payload: VinSnippetView, candidate poses/cameras/counts, labels and oracle metrics, optional candidate depths, compact OBB fields, trajectory metadata, and selected EVL numeric tensors needed to reproduce scoring diagnostics.",
       internal_links: (
         "docs/contents/theory/rl_planning.qmd#state-and-action-space-contract",
-        "docs/contents/impl/vin_nbv.qmd",
+        "docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd",
       ),
       citations: (),
       related: (
@@ -838,7 +838,7 @@
       definition_long: "The oracle rollout state may contain GT mesh geometry, GT target crops, GT OBBs, all-candidate synthetic depth and point clouds, derived normals, mesh-face visibility, Chamfer/RRI terms, and oracle scores. These fields support label generation and diagnostics but are not actor-visible inputs for the main scorer or Q_H model.",
       internal_links: (
         "docs/contents/theory/rl_planning.qmd#state-and-action-space-contract",
-        "docs/contents/impl/rri_computation.qmd",
+        "docs/contents/theory/rri_theory.qmd",
       ),
       citations: (
         "ProjectAria-ASE-2025",
@@ -1316,7 +1316,7 @@
       definition_long: "The current project uses EFM3D and its EVL architecture to expose voxel occupancy, centerness, semantic, and OBB evidence for VIN-style RRI prediction.",
       internal_links: (
         "docs/contents/literature/efm3d.qmd",
-        "docs/contents/impl/vin_nbv.qmd",
+        "docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd",
         "docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd",
       ),
       citations: (
@@ -1357,7 +1357,7 @@
       internal_links: (
         "docs/contents/literature/efm3d.qmd",
         "docs/reference/aria_nbv.vin.backbone_evl.EvlBackbone.qmd",
-        "docs/contents/impl/vin_nbv.qmd",
+        "docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd",
       ),
       citations: (
         "EFM3D-straub2024",
@@ -1398,7 +1398,7 @@
       internal_links: (
         "docs/contents/ase_dataset.qmd#oriented-bounding-boxes",
         "docs/contents/thesis/questions.qmd#rq2-target-encoding",
-        "docs/contents/impl/vin_v2_feature_proposals.qmd",
+        "docs/reference/vin.types.qmd",
       ),
       citations: (
         "EFM3D-straub2024",
@@ -1436,8 +1436,8 @@
       definition_short: "Truncated pyramidal camera-visible volume bounded by near and far clipping planes plus lateral field-of-view planes.",
       definition_long: "Candidate-view frusta define which scene surfaces can project into a camera image and are therefore central to visibility, rendering, and RRI diagnostics.",
       internal_links: (
-        "docs/contents/impl/rri_computation.qmd",
-        "docs/contents/impl/vin_nbv.qmd",
+        "docs/contents/theory/rri_theory.qmd",
+        "docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd",
       ),
       citations: (
         "Frustum-Wikipedia-2025",
@@ -1591,7 +1591,7 @@
       internal_links: (
         "docs/contents/theory/semi-dense-pc.qmd",
         "docs/contents/theory/surface_metrics.qmd",
-        "docs/contents/impl/rri_computation.qmd",
+        "docs/contents/theory/rri_theory.qmd",
       ),
       citations: (),
       related: (
@@ -1676,8 +1676,8 @@
       definition_long: "A snippet typically contains RGB or grayscale streams, poses, calibration, semi-dense points, and scene metadata that EVL lifts into a voxel grid.",
       internal_links: (
         "docs/contents/ase_dataset.qmd",
-        "docs/contents/impl/data_pipeline_overview.qmd",
-        "docs/contents/impl/vin_nbv.qmd",
+        "docs/reference/data_handling.efm_dataset.qmd",
+        "docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd",
       ),
       citations: (
         "ProjectAria-ASE-2025",
@@ -1791,7 +1791,7 @@
       definition_long: "MTD supplies the logged egocentric trajectory used to define snippet state, current reconstruction context, and candidate-view reference poses.",
       internal_links: (
         "docs/contents/ase_dataset.qmd",
-        "docs/contents/impl/data_pipeline_overview.qmd",
+        "docs/reference/data_handling.efm_views.qmd",
       ),
       citations: (
         "ProjectAria-ASE-2025",
@@ -1872,7 +1872,7 @@
       definition_long: "MSDPD is the sparse observed geometry that ARIA-NBV fuses with candidate point clouds and compares against ground-truth meshes for RRI labels.",
       internal_links: (
         "docs/contents/theory/semi-dense-pc.qmd",
-        "docs/contents/impl/rri_computation.qmd",
+        "docs/contents/theory/rri_theory.qmd",
       ),
       citations: (
         "ProjectAria-ASE-2025",
@@ -1993,7 +1993,7 @@
       definition_long: "ARIA-NBV samples candidate views around a reference pose or target, renders candidate depths from the mesh for oracle labels, and scores candidates with RRI or learned VIN predictions.",
       internal_links: (
         "docs/contents/thesis/questions.qmd#rq3-candidates",
-        "docs/contents/impl/rri_computation.qmd",
+        "docs/contents/theory/rri_theory.qmd",
         "docs/reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd",
       ),
       citations: (
@@ -2041,8 +2041,8 @@
       definition_short: "RRI label computed with privileged ground-truth geometry, used for supervised training and evaluation.",
       definition_long: "The current oracle renders candidate depth maps from ASE ground-truth meshes, backprojects candidate point clouds, fuses them with the current semi-dense reconstruction, and scores the resulting surface-distance improvement.",
       internal_links: (
-        "docs/contents/impl/rri_computation.qmd",
-        "docs/contents/impl/data_pipeline_overview.qmd",
+        "docs/contents/theory/rri_theory.qmd",
+        "docs/contents/ase_dataset.qmd",
         "docs/contents/thesis/roadmap.qmd#roadmap-m1",
       ),
       citations: (
@@ -2093,7 +2093,7 @@
       definition_long: "ARIA-NBV adapts VIN-NBV by placing a lightweight RRI prediction head on top of frozen EVL features and candidate-pose evidence from ASE snippets.",
       internal_links: (
         "docs/contents/literature/vin_nbv.qmd",
-        "docs/contents/impl/vin_nbv.qmd",
+        "docs/reference/vin.model_v3.qmd",
         "docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd",
       ),
       citations: (
@@ -2132,7 +2132,7 @@
       definition_long: "Coverage ratio is a useful diagnostic baseline for NBV, but ARIA-NBV treats reconstruction-quality improvement through RRI as the preferred optimization target.",
       internal_links: (
         "docs/contents/theory/nbv_background.qmd",
-        "docs/contents/impl/rri_computation.qmd",
+        "docs/contents/theory/rri_theory.qmd",
       ),
       citations: (
         "VIN-NBV-frahm2025",
@@ -2167,7 +2167,7 @@
       definition_short: "Historical bidirectional distance family used to compare reconstructed points against reference geometry.",
       definition_long: "Thesis-facing ARIA-NBV notation uses point-mesh error D with directional components D_{P->M} and D_{M->P}; older seminar material may still call this CD.",
       internal_links: (
-        "docs/contents/impl/rri_computation.qmd",
+        "docs/reference/rri_metrics.metrics.qmd",
         "docs/contents/theory/rri_theory.qmd",
       ),
       citations: (
@@ -2429,7 +2429,7 @@
       definition_short: "Spatial grid whose cells encode whether space is occupied, free, unknown, or represented by a related occupancy probability.",
       definition_long: "Occupancy-style voxel evidence appears in EVL outputs and VIN feature construction, where it helps summarize local 3D scene state for candidate scoring.",
       internal_links: (
-        "docs/contents/impl/vin_nbv.qmd",
+        "docs/reference/aria_nbv.vin.model_v3.VinModelV3.qmd",
         "docs/typst/seminar_paper/sections/06-architecture.typ",
       ),
       citations: (

@@ -1,39 +1,46 @@
 # Cross-References
 
-Use Sphinx-style roles for internal symbols and markdown links for external
-sources.
+Use Quarto-compatible Markdown for internal symbols and external sources.
+Quartodoc currently preserves many Sphinx/RST roles as literal text in generated
+`.qmd` pages, so use Markdown links, backticks, and Markdown math unless a local
+render proves that role conversion works.
 
-## Preferred Internal Roles
+## Preferred Internal References
 
-- `:class:` for classes, configs, datamodels, and typed containers
-- `:func:` for free functions
-- `:meth:` for methods
-- `:mod:` for modules
-- `:attr:` for attributes and fields
-- `:property:` for important computed properties
-- `:data:` for exported constants and module-level values
-
-Examples:
-
-- `Return a :class:\`RunPlan\` built from the validated request.`
-- `Translate updates through :func:\`translate_slam_update\`.`
-- `See :meth:\`RunService.start_run\` for the entrypoint.`
-- `Keep offline-store semantics in :mod:\`aria_nbv.data_handling\`.`
-- `The payload is stored in :attr:\`RunSnapshot.slam\`.`
-- `Use :property:\`MethodId.display_name\` for UI labels.`
-- `Respect :data:\`DEFAULT_MAX_FRAMES_IN_FLIGHT\` when tuning credits.`
-
-## Other Useful Roles
-
-Use these only when they add clarity:
-
-- `:exc:` for exception classes mentioned in prose
-- `:paramref:` for referencing a parameter name from a method or function
+- Use backticks for symbol names: `VinOfflineDataset`, `OracleRRI.score`,
+  `aria_nbv.data_handling`, `OFFLINE_DATASET_VERSION`.
+- Use Markdown links only when the target is stable and helpful:
+  `[RRI theory](../../contents/theory/rri_theory.qmd)`.
+- Prefer module/class docstrings for dense cross-surface contracts; avoid
+  repeating the same link on every method.
 
 Examples:
 
-- `Propagate :exc:\`ValueError\` only when the caller can recover from it.`
-- `When :paramref:\`build_run_request.method\` changes, update the backend spec.`
+- ``Return a `RunPlan` built from the validated request.``
+- ``Translate updates through `translate_slam_update`.``
+- ``See `RunService.start_run` for the entrypoint.``
+- ``Keep offline-store semantics in `aria_nbv.data_handling`.``
+- ``The payload is stored in `RunSnapshot.slam`.``
+- ``Respect `DEFAULT_MAX_FRAMES_IN_FLIGHT` when tuning credits.``
+
+## Math
+
+Use Markdown math:
+
+- Inline: `$P_t \cup P_q$`
+- Display:
+
+```text
+$$
+\mathrm{RRI}(q)=\frac{D(P_t,M)-D(P_t\cup P_q,M)}{D(P_t,M)+\epsilon}.
+$$
+```
+
+Use raw docstrings when LaTeX backslashes appear:
+
+```python
+r"""Compute improvement $D(\mathcal{P}_t,M)-D(\mathcal{P}_{t\cup q},M)$."""
+```
 
 ## External References
 

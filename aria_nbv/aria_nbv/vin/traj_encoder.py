@@ -31,11 +31,11 @@ class TrajectoryEncodingOutput:
 
 
 class TrajectoryEncoderConfig(BaseConfig):
-    """Configuration for :class:`TrajectoryEncoder`."""
+    """Configuration for `TrajectoryEncoder`."""
 
     @property
     def target(self) -> type["TrajectoryEncoder"]:
-        """Factory target for :meth:`~aria_nbv.utils.base_config.BaseConfig.setup_target`."""
+        """Factory target for `aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return TrajectoryEncoder
 
     pose_encoder: R6dLffPoseEncoderConfig = Field(default_factory=R6dLffPoseEncoderConfig)
@@ -97,7 +97,7 @@ class TrajectoryEncoder(nn.Module):
         """Encode a trajectory's world←rig poses.
 
         Args:
-            trajectory: :class:`~aria_nbv.data_handling.efm_views.EfmTrajectoryView`.
+            trajectory: `aria_nbv.data_handling.efm_views.EfmTrajectoryView`.
 
         Returns:
             TrajectoryEncodingOutput with per-frame encodings and pooled embedding.

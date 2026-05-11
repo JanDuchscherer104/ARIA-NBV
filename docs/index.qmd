@@ -26,7 +26,9 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 
 ## Done
 
-- Develop an [oracle RRI computation pipeline](contents/impl/rri_computation.qmd) using ASE visibility data, semi-dense point clouds  and GT meshes.
+- Develop an oracle RRI computation pipeline using ASE visibility data,
+  semi-dense point clouds, GT meshes, and the generated
+  [`rri_metrics` API contracts](reference/index.qmd).
 - Directly optimize reconstruction quality rather than surrogate coverage metrics, following RRI-based policies as per VIN-NBV.
 - Develop computational tools to efficiently simulate candidate viewpoints and their expected observations utilizing [`PyTorch3d`](https://pytorch3d.org/), [EFM3D](https://github.com/facebookresearch/efm3d) and [ATEK](https://github.com/facebookresearch/ATEK).
 
@@ -90,15 +92,13 @@ This project aims to develop an NBV system that integrates VIN-NBV's key insight
 - **[EFM3D & EVL](contents/literature/efm3d.qmd)**: Egocentric foundation models and voxel lifting
 - **[SceneScript](contents/literature/scene_script.qmd)**: Structured scene language and entity representation
 
-## Implementation Guides
+## Implementation Contracts
 
-- **[Implementation Overview](contents/impl/overview.qmd)**: Metrics + RRI computation entry point
-- **[aria_nbv Overview & Architecture](contents/impl/aria_nbv_overview.qmd)**: Package structure and components
-- **[aria_nbv Package](contents/impl/aria_nbv_package.qmd)**: API map + module responsibilities
-- **[API Reference](reference/index.qmd)**: Auto-generated signatures and docstrings for the documented `aria_nbv` surfaces
-- **[ASE Data Pipeline & Streamlit Usage](contents/impl/data_pipeline_overview.qmd)**: Data ingestion and dashboards
-- **[aria_nbv Implementation Overview](contents/impl/oracle_rri_impl.qmd)**: Key modules and workflows
-- **[Computing RRI with Ground Truth Meshes](contents/impl/rri_computation.qmd)**: Oracle pipeline and labels
-- **[CORAL for Ordinal Regression](contents/impl/coral_integration.qmd)**: Ordinal binning and loss integration
-- **[View Introspection Network (VIN) on EVL](contents/impl/vin_nbv.qmd)**: Model design and training notes
-- **[VIN v2 Feature + Encoding Proposals](contents/impl/vin_v2_feature_proposals.qmd)**: Design space and ideas
+- **[API Reference](reference/index.qmd)**: Generated package contracts for
+  datasets, immutable VIN offline stores, target selection, rollout Zarr,
+  finite-candidate generation, rendering, RRI metrics, and VIN one-step
+  scoring.
+- **[Setup Instructions](contents/setup.qmd)**: Environment, cache, and smoke
+  commands for local validation.
+- **[Architecture Diagrams](contents/diagrams.qmd)**: Generated context diagrams
+  and package-level views.

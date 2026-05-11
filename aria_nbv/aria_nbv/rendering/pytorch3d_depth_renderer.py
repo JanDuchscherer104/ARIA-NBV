@@ -1,7 +1,7 @@
 """PyTorch3D depth renderer used for oracle RRI simulations.
 
 This module contains a configurable renderer that turns candidate poses
-(:class:`efm3d.aria.PoseTW`) plus an ASE mesh into per-pixel depth maps.
+(`efm3d.aria.PoseTW`) plus an ASE mesh into per-pixel depth maps.
 It follows the project's config-as-factory pattern and keeps the public
 API torch-native so it can slot into the NBV training loop without
 intermediate numpy copies.
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 class Pytorch3DDepthRendererConfig(BaseConfig):
-    """Configuration for :class:`Pytorch3DDepthRenderer`."""
+    """Configuration for `Pytorch3DDepthRenderer`."""
 
     @property
     def target(self) -> type["Pytorch3DDepthRenderer"]:
@@ -71,7 +71,7 @@ class Pytorch3DDepthRendererConfig(BaseConfig):
         default=Verbosity.VERBOSE,
         description="Verbosity level for logging (0=quiet, 1=normal, 2=verbose).",
     )
-    """Enable :class:`Console` logging."""
+    """Enable `Console` logging."""
 
     _resolve_device = field_validator("device", mode="before")(BaseConfig._resolve_device)
 

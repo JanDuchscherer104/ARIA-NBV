@@ -900,7 +900,7 @@ def plot_vin_encodings_from_debug(
     """Generate VIN encoding plots using Plotly and persist them as HTML.
 
     Args:
-        debug: Diagnostics from :meth:`VinModel.forward_with_debug`.
+        debug: Diagnostics from `VinModel.forward_with_debug`.
         out_dir: Output directory for saved figures.
         lmax: Maximum SH degree to visualize (legacy plots only).
         sh_normalization: Spherical harmonics normalization mode (legacy plots only).

@@ -40,8 +40,8 @@ hints.
 4. Write behavioral contracts. Document semantics, invariants, side effects,
    units, shapes, ownership, lifecycle, and boundary expectations. Do not
    restate obvious type hints.
-5. Cross-reference internal symbols with Sphinx roles and link external sources
-   with markdown. See [references/cross-references.md](./references/cross-references.md).
+5. Cross-reference internal symbols and external sources with Quarto-compatible
+   Markdown. See [references/cross-references.md](./references/cross-references.md).
 6. Add examples when misuse is likely or sequencing matters. See
    [references/examples.md](./references/examples.md).
 7. Trim boilerplate. Remove empty sections, duplicated type information, and
@@ -64,6 +64,9 @@ hints.
 - Use `Yields:` for generators, iterators, and streaming-style APIs.
 - Use `Example:` or `Examples:` for public APIs that are easy to misuse.
 - Use `Notes:` or `Theory:` only when they materially help correct usage.
+- Use Markdown math (`$...$`, `$$...$$`) for equations that should render in
+  generated Quarto API pages; use raw Python docstrings (`r"""..."""`) when
+  LaTeX backslashes appear.
 - If the repository carries a local docstring addendum, apply it after the
   general rules in this skill.
 

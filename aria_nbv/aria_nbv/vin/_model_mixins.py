@@ -1,6 +1,6 @@
 """Shared method mixins for VIN model variants.
 
-These wrappers sit one layer above :mod:`aria_nbv.vin.vin_utils`: they bridge
+These wrappers sit one layer above `aria_nbv.vin.vin_utils`: they bridge
 model-owned members such as ``self.pose_encoder``, ``self.global_pooler``, and
 ``self.config`` into the stateless tensor helpers without repeating identical
 method bodies across VIN generations.

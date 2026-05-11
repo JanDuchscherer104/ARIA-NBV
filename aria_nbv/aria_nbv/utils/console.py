@@ -194,7 +194,7 @@ class Console(RichConsole):
             self._log_to_lightning("info", message)
 
     def log_summary(self, label: str, value: Any, *, include_stats: bool = False) -> None:
-        """Log a structured summary built from :func:`summarize`."""
+        """Log a structured summary built from `summarize`."""
         summary = summarize(value, include_stats=include_stats)
         self.log(f"{label}: {summary}")
 
@@ -250,7 +250,7 @@ class Console(RichConsole):
         return self
 
     def set_verbose(self, verbose: Verbosity | int | bool) -> "Console":
-        """Backward-compatible alias for :meth:`set_verbosity`."""
+        """Backward-compatible alias for `set_verbosity`."""
         self.set_verbosity(verbose)
         return self
 

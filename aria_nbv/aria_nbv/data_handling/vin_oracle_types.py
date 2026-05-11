@@ -930,7 +930,7 @@ class VinOracleBatch:
 
 @runtime_checkable
 class VinOracleDatasetBase(Protocol):
-    """Shared interface for datasets that yield :class:`VinOracleBatch`."""
+    """Shared interface for datasets that yield `VinOracleBatch`."""
 
     is_map_style: bool
     """Whether the dataset is map-style (supports random access + batching)."""

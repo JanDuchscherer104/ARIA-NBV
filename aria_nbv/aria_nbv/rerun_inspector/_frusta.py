@@ -73,7 +73,7 @@ def frusta_from_camera_tw(
             mutated.
 
     Returns:
-        :class:`CandidateFrustumLineStrips` with all points in the world frame.
+        `CandidateFrustumLineStrips` with all points in the world frame.
     """
 
     _validate_depth(depth_m)
@@ -121,7 +121,7 @@ def frusta_from_p3d_cameras(
 ) -> CandidateFrustumLineStrips:
     """Build world-frame frustum strips from ``PoseTW`` plus PyTorch3D cameras.
 
-    This fallback mirrors :mod:`aria_nbv.rendering.unproject`: pixel-space
+    This fallback mirrors `aria_nbv.rendering.unproject`: pixel-space
     corners are converted to PyTorch3D NDC coordinates and unprojected via
     ``PerspectiveCameras.unproject_points(..., world_coordinates=True,
     from_ndc=True)``.  Camera centers come from the typed ``PoseTW`` boundary so
@@ -142,7 +142,7 @@ def frusta_from_p3d_cameras(
         display_cw90: If true, apply CW90 only to copied output arrays.
 
     Returns:
-        :class:`CandidateFrustumLineStrips` with all points in the world frame.
+        `CandidateFrustumLineStrips` with all points in the world frame.
     """
 
     _validate_depth(depth_m)
@@ -188,7 +188,7 @@ def apply_display_cw90(
         undo: If true, apply the inverse 90 degree roll.
 
     Returns:
-        A new :class:`CandidateFrustumLineStrips` instance with copied arrays.
+        A new `CandidateFrustumLineStrips` instance with copied arrays.
     """
 
     poses_flat = _flatten_poses(poses_world_cam)

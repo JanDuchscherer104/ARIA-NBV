@@ -79,7 +79,7 @@ def depth_histogram(depths: Tensor, *, bins: int = 50, zfar: float | None = None
 
 
 class RenderingPlotBuilder(CandidatePlotBuilder):
-    """Rendering-focused extensions on top of :class:`CandidatePlotBuilder`.
+    """Rendering-focused extensions on top of `CandidatePlotBuilder`.
 
     This keeps a single builder hierarchy: SnippetPlotBuilder -> CandidatePlotBuilder -> RenderingPlotBuilder.
     Rendering methods operate on explicit pose/camera/depth inputs and remain usable even when no

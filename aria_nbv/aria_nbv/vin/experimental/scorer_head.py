@@ -50,11 +50,11 @@ class VinScorerHead(nn.Module):
 
 
 class VinScorerHeadConfig(BaseConfig):
-    """Configuration for :class:`VinScorerHead`."""
+    """Configuration for `VinScorerHead`."""
 
     @property
     def target(self) -> type[VinScorerHead]:
-        """Factory target for :meth:`BaseConfig.setup_target`."""
+        """Factory target for `BaseConfig.setup_target`."""
         return VinScorerHead
 
     hidden_dim: int = Field(default=128, gt=0)

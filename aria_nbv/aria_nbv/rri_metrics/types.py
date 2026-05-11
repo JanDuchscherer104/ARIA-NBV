@@ -5,6 +5,11 @@ between the RRI metrics utilities and the high-level ``OracleRRI`` facade.
 Keeping the types separate avoids circular imports between ``metrics`` and
 ``aria_nbv.rri_metrics.oracle_rri`` while providing a single source of truth for shapes, units, and
 semantic meaning.
+
+`RriResult` stores both the scalar improvement label and the directional
+point-mesh diagnostics needed to audit target-vs-scene behavior. Downstream
+datasets should carry these diagnostics when feasible so improvements in RRI
+can be decomposed into accuracy and completeness changes.
 """
 
 from __future__ import annotations
@@ -86,7 +91,7 @@ class RriResult:
         """Reconstruct one result from a serialized payload.
 
         Args:
-            payload: Serialized payload produced by :meth:`to_serializable`.
+            payload: Serialized payload produced by `to_serializable`.
             device: Destination device for tensors.
 
         Returns:

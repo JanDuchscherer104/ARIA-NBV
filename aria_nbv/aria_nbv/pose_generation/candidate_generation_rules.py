@@ -39,13 +39,13 @@ class RuleBase:
 class MinDistanceToMeshRule(RuleBase):
     r"""Reject candidates whose centers are too close to the GT mesh.
 
-    For each candidate center :math:`c_i` and mesh :math:`\mathcal{M}`, this rule computes the distance
+    For each candidate center $c_i$ and mesh $\mathcal{M}$, this rule computes the distance
 
-    .. math::
+    $$
+    d_i = \min_{x \in \mathcal{M}} \lVert c_i - x \rVert_2
+    $$
 
-        d_i = \min_{x \in \mathcal{M}} \lVert c_i - x \rVert_2
-
-    and rejects candidates with :math:`d_i \leq \text{min_distance_to_mesh}`.
+    and rejects candidates with $d_i \leq \text{min_distance_to_mesh}$.
 
     When `cfg.collect_debug_stats` is True, the per-candidate distances are stored as
     `ctx.debug['min_distance_to_mesh']` for later analysis.
@@ -96,24 +96,24 @@ class PathCollisionRule(RuleBase):
     This rule enforces that the straight segment from the reference rig position to each candidate center does not
     intersect the mesh, optionally with a configurable clearance.
 
-    Depending on :class:`CollisionBackend`, collision checks are implemented either by discretised distance sampling
+    Depending on `CollisionBackend`, collision checks are implemented either by discretised distance sampling
     (PyTorch3D) or by analytic ray-mesh intersection tests (Trimesh / PyEmbree).
 
     The method:
 
     1. Returns early if no mesh is available or the step clearance is non-positive.
     2. Constructs a ray from the reference position to each candidate center.
-    3. Depending on :attr:`config.collision_backend`:
+    3. Depending on `config.collision_backend`:
 
-        * :data:`CollisionBackend.P3D`:
-            discretise each segment into ``ray_subsample`` points, compute distances via :func:`point_mesh_distance`,
+        * `CollisionBackend.P3D`:
+            discretise each segment into ``ray_subsample`` points, compute distances via `point_mesh_distance`,
             and mark collisions where any sample falls below ``step_clearance``.
-        * :data:`CollisionBackend.TRIMESH` / :data:`CollisionBackend.PYEMBREE`:
+        * `CollisionBackend.TRIMESH` / `CollisionBackend.PYEMBREE`:
             cast rays with maximum distance equal to the segment length and use the ray engine's
-            :meth:`intersects_any` to identify collisions.
+            `intersects_any` to identify collisions.
 
     4. Records the boolean collision mask in ``ctx.debug['path_collision_mask']`` when debug stats are enabled.
-    5. Calls :meth:`CandidateContext.invalidate` to apply the collision mask as a rejection mask.
+    5. Calls `CandidateContext.invalidate` to apply the collision mask as a rejection mask.
     """
 
     def __init__(self, config: "CandidateViewGeneratorConfig"):

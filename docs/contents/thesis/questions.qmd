@@ -21,8 +21,8 @@ This page states the research questions for the master's thesis phase of
 The questions are tied to the dated [roadmap](roadmap.qmd), the
 [RRI theory page](../theory/rri_theory.qmd), the
 [finite-candidate rollout and Q_H contract](../theory/rl_planning.qmd), the
-[oracle/RRI implementation notes](../impl/rri_computation.qmd), the
-[VIN implementation notes](../impl/vin_nbv.qmd), and the current ASE/EVL stack
+[RRI metric API](../../reference/rri_metrics.qmd), the
+[VIN model API](../../reference/vin.model_v3.qmd), and the current ASE/EVL stack
 [@ProjectAria-ASE-2025; @EFM3D-straub2024]. The thesis builds on VIN-NBV's
 quality-driven candidate-ranking objective [@VIN-NBV-frahm2025], while treating
 GenNBV [@GenNBV-chen2024], Hestia [@Hestia-lu2026], and SceneScript
@@ -72,7 +72,7 @@ The core terms used by the research questions are maintained in the shared
 - {{< glsfull predicted-target-q >}}
 - {{< glsfull ground-truth-target-evaluation >}}
 
-Related implementation nodes remain [VINv3](../impl/vin_nbv.qmd),
+Related implementation nodes remain [VINv3](../../reference/aria_nbv.vin.model_v3.VinModelV3.qmd),
 [EVL literature notes](../literature/efm3d.qmd), and
 [candidate generation](../../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd).
 
@@ -573,7 +573,7 @@ $Q_{H,\theta}$, invalid-mask handling, surface reconstruction input, CORAL
 variant, auxiliary regression, candidate-relative pose encoding,
 stage-aware calibration, and storage/scale gates. Rollout and $Q_H$ data should
 use the
-[Zarr-first rollout/Q store](../impl/rollout_storage_contract.qmd) before
+[Zarr-first rollout/Q store](../theory/rl_planning.qmd) before
 large-scale generation.
 
 ## Research Matrix {#rq-matrix}
@@ -584,9 +584,9 @@ large-scale generation.
 | [RQ2](#rq2-target-encoding) | M3, M4 | actor-visible target encoding and crop-descriptor ablation | [EVL notes](../literature/efm3d.qmd) |
 | [RQ3](#rq3-candidates) | M3, M5 | mixed candidate sampler, branch/beam support, stochastic rollout diversity, and validity statistics | [Candidate API](../../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd) |
 | [RQ4](#rq4-planning) | M4, M5 | one-step scorer evidence gate, oracle lookahead, rollout traces, endpoint gain, cumulative target RRI, and $Q_{H,\theta}$ success bar | [Rollout/Q_H contract](../theory/rl_planning.qmd) |
-| [RQ5](#rq5-scaling) | M2 to M7 | ASE scale, external mesh/oracle-compatible expansion, online discrete scale, and coverage reports | [Data pipeline](../impl/data_pipeline_overview.qmd) |
+| [RQ5](#rq5-scaling) | M2 to M7 | ASE scale, external mesh/oracle-compatible expansion, online discrete scale, and coverage reports | [M1 contract report](m1_contract_report.qmd) |
 | [RQ6](#rq6-escalation) | M6 | online discrete Q_H and time-permitting continuous target-then-pose policy escalation | [Roadmap M6](roadmap.qmd#roadmap-m6) |
-| [Protocol](#rq-evidence-protocol) | M1 to M7 | invalidity masks/reason metrics, scene-level splits, no sample leakage, coverage reports, calibration/stage-shift diagnostics, Zarr/LRZ gates, and ablation tables | [Data pipeline](../impl/data_pipeline_overview.qmd) |
+| [Protocol](#rq-evidence-protocol) | M1 to M7 | invalidity masks/reason metrics, scene-level splits, no sample leakage, coverage reports, calibration/stage-shift diagnostics, Zarr/LRZ gates, and ablation tables | [M1 contract report](m1_contract_report.qmd) |
 
 ## KG-Friendly Question Writing {#rq-kg-writing}
 

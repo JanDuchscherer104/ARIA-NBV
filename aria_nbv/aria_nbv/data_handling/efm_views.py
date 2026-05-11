@@ -1,9 +1,15 @@
 """Typed, zero-copy views over EFM-formatted ATEK samples.
 
-These classes mirror the style of :mod:`aria_nbv.data.views` but read the
+These classes mirror the style of `aria_nbv.data.views` but read the
 keys produced by ``efm3d.dataset.efm_model_adaptor.load_atek_wds_dataset_as_efm``.
 All properties surface rich shape/type information to make downstream use
 explicit and safe.
+
+The view layer defines which fields are actor-visible (`rgb`, calibrated poses,
+semidense points, EVL/OBB predictions) and which are oracle/evaluation assets
+(attached GT meshes and GT OBBs). It avoids copying large tensors so dataset
+writers can attach mesh and snippet context without changing the immutable VIN
+offline-cache rows.
 """
 
 from __future__ import annotations
@@ -565,7 +571,7 @@ class EfmSnippetView(BaseView):
             mesh_specs: Optional mesh processing spec.
 
         Returns:
-            Parsed :class:`EfmSnippetView` instance.
+            Parsed `EfmSnippetView` instance.
         """
         key = efm.get("__key__")
         if not isinstance(key, str):
@@ -828,7 +834,7 @@ class VinSnippetView(BaseView):
 
 
 def is_efm_snippet_view_instance(value: object) -> bool:
-    """Return whether ``value`` behaves like an :class:`EfmSnippetView`.
+    """Return whether ``value`` behaves like an `EfmSnippetView`.
 
     The v2 stack accepts both the local data-handling view classes and legacy
     view objects that expose the same public attributes.
@@ -843,7 +849,7 @@ def is_efm_snippet_view_instance(value: object) -> bool:
 
 
 def is_vin_snippet_view_instance(value: object) -> bool:
-    """Return whether ``value`` behaves like a :class:`VinSnippetView`."""
+    """Return whether ``value`` behaves like a `VinSnippetView`."""
     try:
         getattr_static(value, "points_world")
         getattr_static(value, "lengths")

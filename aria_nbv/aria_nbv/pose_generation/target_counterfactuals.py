@@ -1,4 +1,14 @@
-"""Target-aware oracle RRI scoring for counterfactual rollouts."""
+"""Target-aware oracle RRI scoring for counterfactual rollouts.
+
+This module scores valid candidate rows with target-specific point-mesh RRI.
+The actor selects an observed/predicted target record upstream; this scorer then
+uses the matched GT OBB only as an oracle/evaluation crop. Missing GT matches,
+ambiguous matches, empty mesh crops, sparse current support, or unusable depth
+are expected invalidity cases and surface as `TargetRriInvalidError`.
+
+Scene RRI may be emitted as a diagnostic from the same candidate point clouds,
+but it must not replace target RRI labels in thesis-core rollout stores.
+"""
 
 from __future__ import annotations
 
@@ -100,7 +110,13 @@ class CounterfactualTargetOracleRriScorerConfig(BaseConfig):
 
 
 class CounterfactualTargetOracleRriScorer:
-    """Evaluate valid candidates with target-cropped oracle RRI."""
+    """Evaluate valid candidates with target-cropped oracle RRI.
+
+    The scorer renders candidate depth, backprojects world-frame point clouds,
+    crops current and candidate points to the matched target OBB, crops the mesh
+    with the configured policy, and returns target-RRI labels plus audit metrics.
+    Invalid target crops abort the target row rather than producing low labels.
+    """
 
     def __init__(
         self,

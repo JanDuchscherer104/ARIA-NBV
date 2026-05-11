@@ -1,11 +1,17 @@
-"""Standalone Zarr replay store for counterfactual rollout traces.
+"""Standalone Zarr replay store for finite-candidate rollout traces.
 
-The store is the first concrete rollout-data path for finite-candidate
-``Q_H`` training. It writes compact row tables from :class:`RolloutTrace`
-objects, keeps full-shell candidate rows for replayability, and derives padded
-``q_h`` arrays for selected-action TD/replay training. Dense all-action oracle-Q
-targets are present as schema-ready arrays but intentionally remain unavailable
-until a later converter materializes them.
+This module is the implementation-contract owner for `rollouts.zarr`. A store
+contains compact row tables for rollout chains, steps, full-shell candidates,
+lineage, target records, masks, reason codes, and padded `q_h` arrays used by
+finite-candidate value learning. It deliberately does not mutate or migrate the
+strict VIN offline store; rollout replay is a separate artifact with source
+manifest, split, target, candidate-mixture, policy, and oracle config hashes.
+
+`q_train_mask` is true only when a row is non-padded, actor-selectable,
+target-valid, GT-label-valid, and has a finite target-RRI label. Invalid
+candidates keep their full-shell row but carry false masks and NaN labels.
+Target RRI and scene RRI are distinct diagnostics; target labels must not be
+silently filled from scene scores or low-quality invalid rows.
 """
 
 from __future__ import annotations
@@ -95,7 +101,7 @@ class RolloutZarrStoreConfig(BaseConfig):
 
 
 class RolloutZarrStoreWriter:
-    """Write standalone rollout replay stores from :class:`RolloutTrace` objects."""
+    """Write standalone rollout replay stores from `RolloutTrace` objects."""
 
     def __init__(self, config: RolloutZarrStoreConfig) -> None:
         self.config = config

@@ -1,11 +1,11 @@
-"""VIN v3 (core) for RRI prediction with evidence-backed components.
+"""VIN v3 one-step RRI scorer with evidence-backed components.
 
-This module implements a streamlined VIN baseline distilled from the vin-v2
-optuna sweep. The sweep showed that extra modules (PointNeXt point encoder,
-semidense frustum MHCA, trajectory context) were confounded by config fixes or
-only weakly positive. The most reliable signal came from semidense projection
-coverage and voxel-validity cues, so v3 keeps a minimal, deterministic path
-with optional trajectory context re-enabled behind a config flag:
+This module implements the active VIN one-step baseline. It predicts per-row
+RRI scores for a finite candidate set and is used as a myopic scorer/control,
+not as the thesis finite-horizon value model. The most reliable signal in the
+current implementation comes from pose encoding, EVL voxel evidence, and
+semidense projection coverage, so v3 keeps a compact deterministic path with
+optional trajectory context behind a config flag:
 
 1) Pose encoding (R6D + LFF):
    Candidate poses are expressed in the reference rig frame
@@ -42,6 +42,11 @@ with optional trajectory context re-enabled behind a config flag:
 7) CORAL head:
    A shallow MLP plus CORAL ordinal head produces per-candidate RRI scores.
 
+The forward contract is actor-visible: candidate poses, EVL features, and
+semidense observations are inputs; oracle RRI labels are training/evaluation
+targets. Target-conditioned rollout data may reuse the same architecture family,
+but matched GT targets and target crops must remain outside actor inputs.
+
 Frame-consistency:
 Candidate generation applies rotate_yaw_cw90 (a local +Z roll) to poses for UI
 alignment. EVL backbone outputs do not use this convention. VinModelV3 therefore
@@ -53,7 +58,9 @@ or (N,5) containing (x, y, z, 1/sigma_d) with optional n_obs. This file
 enforces the required XYZ + reliability channel contract to avoid silent
 failure modes.
 
-TODO: Do we differentiate between semi-dense points based on their visibility from each candidate view?
+Candidate orientation uses R6D pose features. Accumulated target visibility, if
+added for target-conditioned value learning, should be represented as a separate
+directional memory over view directions, not folded into the pose encoding.
 """
 
 from __future__ import annotations
@@ -122,11 +129,11 @@ FIELD_CHANNELS_V3: tuple[str, ...] = (
 
 
 class VinModelV3Config(BaseConfig):
-    """Configuration for :class:`VinModelV3` (streamlined VIN baseline)."""
+    """Configuration for `VinModelV3` (streamlined one-step VIN baseline)."""
 
     @property
     def target(self) -> type["VinModelV3"]:
-        """Factory target for :meth:`BaseConfig.setup_target` (config-as-factory)."""
+        """Factory target for `BaseConfig.setup_target` (config-as-factory)."""
         return VinModelV3
 
     backbone: EvlBackboneConfig | None = Field(default_factory=EvlBackboneConfig)
@@ -255,12 +262,12 @@ class VinModelV3Config(BaseConfig):
 
 
 class VinModelV3(PoseFeatureGlobalContextMixin, nn.Module):
-    """VIN-Core head for RRI prediction with a minimal evidence-backed feature set.
+    """VIN-Core head for one-step RRI prediction.
 
-    The vin-v2 optuna sweep showed weak or confounded gains for heavy modules
-    (PointNeXt point encoder, frustum MHCA, trajectory context). VIN v3 therefore
-    focuses on pose encoding, compact voxel evidence, and semidense projection
-    stats, while enforcing fail-fast contracts to avoid silent collapse.
+    VIN v3 focuses on pose encoding, compact voxel evidence, and semidense
+    projection stats, while enforcing fail-fast contracts to avoid silent
+    collapse. It ranks candidates for immediate RRI; bounded rollout values
+    such as $Q_H$ are separate thesis models trained on rollout replay.
     """
 
     def __init__(self, config: VinModelV3Config) -> None:
@@ -388,7 +395,7 @@ class VinModelV3(PoseFeatureGlobalContextMixin, nn.Module):
         """Ensure a VinSnippetView is available for semidense projection stats.
 
         VIN v3 consumes padded semidense points, so we always operate on
-        :class:`VinSnippetView`. Full EFM snippets are converted on demand.
+        `VinSnippetView`. Full EFM snippets are converted on demand.
 
         Args:
             efm (EfmSnippetView | VinSnippetView): EFM/VIN snippet.
@@ -1257,7 +1264,7 @@ class VinModelV3(PoseFeatureGlobalContextMixin, nn.Module):
             candidate_poses_world_cam (PoseTW["B, Nq, 12"]): Candidate camera poses ``T_w_cq``.
             reference_pose_world_rig (PoseTW["B, 12"]): Reference rig pose ``T_w_r``.
             p3d_cameras (PerspectiveCameras): PyTorch3D camera batch (size ``B*Nq``) aligned with candidates.
-            return_debug (bool): If True, return :class:`VinV3ForwardDiagnostics`.
+            return_debug (bool): If True, return `VinV3ForwardDiagnostics`.
             backbone_out (EvlBackboneOutput | None): Optional cached EVL outputs (required for VinSnippetView).
 
         Returns:

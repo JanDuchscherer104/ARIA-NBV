@@ -42,7 +42,7 @@ def _default_source() -> VinDatasetSourceConfig:
 
 
 class VinDataModuleConfig(BaseConfig):
-    """Configuration for :class:`VinDataModule`."""
+    """Configuration for `VinDataModule`."""
 
     @property
     def target(self) -> type["VinDataModule"]:

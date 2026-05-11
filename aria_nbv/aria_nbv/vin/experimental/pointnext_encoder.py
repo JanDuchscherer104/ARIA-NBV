@@ -60,7 +60,7 @@ class PointNeXtSEncoderConfig(BaseConfig):
 
     @property
     def target(self) -> type["PointNeXtSEncoder"]:
-        """Factory target for :meth:`~aria_nbv.utils.base_config.BaseConfig.setup_target`."""
+        """Factory target for `aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return PointNeXtSEncoder
 
     cfg_path: Path = Field(default_factory=lambda: Path("PointNeXt/cfgs/s3dis/pointnext-s.yaml"))  #

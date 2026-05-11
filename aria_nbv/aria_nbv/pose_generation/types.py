@@ -1,4 +1,16 @@
-"""Type definitions for candidate pose generation."""
+r"""Type definitions for finite candidate pose generation.
+
+Candidate generation separates the full sampled shell from the compact valid
+table. The full shell carries invalidity masks, reason codes, strategy
+provenance, and optional diagnostics; compact valid views are the actions an
+actor or oracle selector may actually choose. Any dataset writer that trains a
+finite-action value model must apply the valid mask before argmax, softmax,
+loss targets, and bootstrap maximization.
+
+Direction sampling happens on $\mathbb{S}^2$. Orientation encodings such as R6D
+describe candidate pose rows; accumulated target visibility is a separate
+actor-visible directional-memory feature, not an orientation representation.
+"""
 
 from __future__ import annotations
 
@@ -21,22 +33,22 @@ if TYPE_CHECKING:
 class SamplingStrategy(StrEnum):
     r"""Angular sampling strategy for candidate directions on S^2.
 
-    The strategy controls how unit directions on the sphere :math:`\mathbb{S}^2` are drawn for both:
+    The strategy controls how unit directions on the sphere $\mathbb{S}^2$ are drawn for both:
 
-    * positional sampling of candidate camera centers (see :class:`pose_generation.samplers.PositionSampler`), and
-    * optional view-direction jitter in the camera frame (see :class:`pose_generation.orientations.OrientationBuilder`).
+    * positional sampling of candidate camera centers (see `pose_generation.samplers.PositionSampler`), and
+    * optional view-direction jitter in the camera frame (see `pose_generation.orientations.OrientationBuilder`).
     """
 
     UNIFORM_SPHERE = "uniform_sphere"
     r"""
-    Draw directions uniformly on :math:`\mathbb{S}^2` using a :class:`HypersphericalUniform` distribution (constant
+    Draw directions uniformly on $\mathbb{S}^2$ using a `HypersphericalUniform` distribution (constant
             density over the sphere; no directional prior).
     """
     FORWARD_POWERSPHERICAL = "forward_powerspherical"
     r"""
-    Draw directions from a forward-biased Power Spherical distribution :math:`\mathcal{PS}(\mu, \kappa)` centerd on
-            the device forward axis with concentration ``kappa``. Larger :math:`\kappa` yields views clustered around
-            the *mean direction*; :math:`\kappa \rightarrow 0` approaches the uniform sphere.
+    Draw directions from a forward-biased Power Spherical distribution $\mathcal{PS}(\mu, \kappa)$ centered on
+            the device forward axis with concentration ``kappa``. Larger $\kappa$ yields views clustered around
+            the *mean direction*; $\kappa \rightarrow 0$ approaches the uniform sphere.
     """
 
 
@@ -59,7 +71,13 @@ class CollisionBackend(StrEnum):
 
 @dataclass
 class CandidateGenerationRuntimeContext:
-    """Runtime-only context for target-conditioned candidate generation."""
+    """Runtime-only context for target-conditioned candidate generation.
+
+    The context is actor-visible. It may contain a target center selected from
+    observed/predicted OBBs or target records; it must not contain matched GT
+    target geometry. Missing target context is a configuration error for
+    `TARGET_POINT` mixture components.
+    """
 
     target_center_world: torch.Tensor | None = None
     """Actor-visible target center in world coordinates, required by TARGET_POINT components."""
@@ -108,7 +126,13 @@ class CandidateContext:
 
 @dataclass
 class CandidateSamplingResult:
-    """Immutable result of candidate sampling + rule-based pruning."""
+    """Immutable result of candidate sampling and rule-based pruning.
+
+    `views` usually stores compact valid candidates for rendering. `mask_valid`,
+    `shell_poses`, provenance fields, and rule masks stay aligned with the full
+    sampled shell. Use `candidate_shell_indices()` whenever a rendered or scored
+    compact row must be joined back to full-shell lineage.
+    """
 
     views: CameraTW
     """views.T_camera_rig are candidate_camera <- reference_pose (camera pose in reference frame; intrinsics as per CandidateGenerationConfig :: camera_label)."""
@@ -147,7 +171,7 @@ class CandidateSamplingResult:
         """Reconstruct one result from a serialized payload.
 
         Args:
-            payload: Serialized payload produced by :meth:`to_serializable`.
+            payload: Serialized payload produced by `to_serializable`.
             device: Optional destination device for tensors and wrappers.
 
         Returns:

@@ -18,7 +18,7 @@ from .vin_oracle_types import VinOracleBatch
 
 
 class VinOracleOnlineDataset(IterableDataset[VinOracleBatch]):
-    """Iterable dataset yielding :class:`VinOracleBatch` with online oracle labels."""
+    """Iterable dataset yielding `VinOracleBatch` with online oracle labels."""
 
     is_map_style: bool = False
     """Whether the dataset supports random access and batching."""
@@ -95,7 +95,7 @@ class VinOracleOnlineDatasetConfig(BaseConfig):
 
     @property
     def target(self) -> type[VinOracleOnlineDataset]:
-        """Return the factory target for :meth:`BaseConfig.setup_target`."""
+        """Return the factory target for `BaseConfig.setup_target`."""
         return VinOracleOnlineDataset
 
     paths: PathConfig = Field(default_factory=PathConfig)
@@ -166,7 +166,7 @@ class VinOfflineSourceConfig(BaseConfig):
 
     @property
     def target(self) -> type[VinOfflineDataset]:
-        """Return the factory target for :meth:`BaseConfig.setup_target`."""
+        """Return the factory target for `BaseConfig.setup_target`."""
 
         return VinOfflineDataset
 

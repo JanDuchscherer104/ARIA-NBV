@@ -131,27 +131,6 @@ website:
             - contents/theory/rl_planning.qmd
             - contents/theory/surface_metrics.qmd
             - contents/theory/semi-dense-pc.qmd
-        - section: "Implementations"
-          contents:
-            - contents/impl/overview.qmd
-            - section: "System And Package"
-              contents:
-                - contents/impl/aria_nbv_overview.qmd
-                - contents/impl/aria_nbv_package.qmd
-            - section: "Data, Oracle, And Diagnostics"
-              contents:
-                - contents/impl/data_pipeline_overview.qmd
-                - contents/impl/oracle_rri_impl.qmd
-                - contents/impl/rri_computation.qmd
-                - contents/impl/rollout_storage_contract.qmd
-                - contents/impl/rerun_offline_inspector.qmd
-                - contents/impl/one_scene_smoke.qmd
-                - contents/impl/lrz_dry_runs.qmd
-            - section: "Scorer And Training"
-              contents:
-                - contents/impl/coral_integration.qmd
-                - contents/impl/vin_nbv.qmd
-                - contents/impl/vin_v2_feature_proposals.qmd
         - section: "Architecture Diagrams"
           contents:
             - contents/diagrams.qmd
@@ -226,6 +205,72 @@ quartodoc:
           member_options: *embedded_members
         - name: utils
           include_imports: true
+          children: separate
+          member_options: *embedded_members
+    - title: "Implementation Contracts"
+      desc: "Generated package contracts replacing the retired manual implementation pages."
+      contents:
+        - name: data_handling.efm_dataset
+          children: separate
+          member_options: *embedded_members
+        - name: data_handling.efm_views
+          children: separate
+          member_options: *embedded_members
+        - name: data_handling._offline_dataset
+          children: separate
+          member_options: *embedded_members
+        - name: data_handling._offline_format
+          children: separate
+          member_options: *embedded_members
+        - name: data_handling._offline_store
+          children: separate
+          member_options: *embedded_members
+        - name: data_handling._target_selection
+          children: separate
+          member_options: *embedded_members
+        - name: data_handling._rollout_dataset_writer
+          children: separate
+          member_options: *embedded_members
+        - name: data_handling._rollout_zarr_store
+          children: separate
+          member_options: *embedded_members
+        - name: pose_generation.candidate_generation
+          children: separate
+          member_options: *embedded_members
+        - name: pose_generation.candidate_mixture
+          children: separate
+          member_options: *embedded_members
+        - name: pose_generation.counterfactuals
+          children: separate
+          member_options: *embedded_members
+        - name: pose_generation.rollout_trace
+          children: separate
+          member_options: *embedded_members
+        - name: pose_generation.target_counterfactuals
+          children: separate
+          member_options: *embedded_members
+        - name: pose_generation.types
+          children: separate
+          member_options: *embedded_members
+        - name: rendering.candidate_depth_renderer
+          children: separate
+          member_options: *embedded_members
+        - name: rendering.candidate_pointclouds
+          children: separate
+          member_options: *embedded_members
+        - name: rendering.unproject
+          children: separate
+          member_options: *embedded_members
+        - name: rri_metrics.oracle_rri
+          children: separate
+          member_options: *embedded_members
+        - name: rri_metrics.metrics
+          children: separate
+          member_options: *embedded_members
+        - name: rri_metrics.coral
+          children: separate
+          member_options: *embedded_members
+        - name: rri_metrics.types
           children: separate
           member_options: *embedded_members
     - title: "VIN Core"

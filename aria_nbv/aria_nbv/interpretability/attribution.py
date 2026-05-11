@@ -326,7 +326,7 @@ class AttributionResult:
 
 
 class InterpretabilityConfig(BaseConfig):
-    """Factory config that builds an :class:`AttributionEngine`."""
+    """Factory config that builds an `AttributionEngine`."""
 
     @property
     def target(self) -> type["AttributionEngine"]:
@@ -366,7 +366,7 @@ class InterpretabilityConfig(BaseConfig):
         *,
         forward_func: Callable[[Tensor], Tensor] | None = None,
     ) -> "AttributionEngine":
-        """Instantiate an :class:`AttributionEngine` bound to ``model``."""
+        """Instantiate an `AttributionEngine` bound to ``model``."""
 
         return AttributionEngine(config=self, model=model, forward_func=forward_func)
 
