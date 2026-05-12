@@ -128,17 +128,22 @@
 
 = Current State and Thesis Claim
 
-ARIA-NBV starts from the implemented seminar substrate: Project Aria / #ASE snippets with poses, calibration, semidense geometry, GT meshes, frozen EFM3D/EVL evidence @projectaria-engel2023 @ProjectAria-ASE-2025 @EFM3D-straub2024, scene-level oracle #RRI labels, finite candidate tables, and a VIN-style one-step scorer inspired by quality-driven #NBV ranking @VIN-NBV-frahm2025. What is not yet thesis evidence is target-specific supervision, actor-visible target selection, trusted multi-step rollout data, or a learned finite-horizon policy-like model.
+ARIA-NBV starts from the implemented seminar substrate: Project Aria / #ASE snippets with poses, calibration, semidense geometry, GT meshes, EFM3D/EVL scene encodings @projectaria-engel2023 @ProjectAria-ASE-2025 @EFM3D-straub2024, scene-level oracle #RRI labels, finite candidate tables, and a VIN-style one-step scorer inspired by quality-driven #NBV ranking @VIN-NBV-frahm2025. What is not yet thesis evidence is target-specific supervision, actor-visible target selection, trusted multi-step rollout data, or a learned finite-horizon value model or policy.
 
-The thesis tests whether this substrate can be upgraded from scene-level myopic scoring to target-conditioned multi-step #NBV without leaking GT target geometry into actor inputs. The core path is leakage-safe target-#RRI, an adapted target-conditioned myopic scorer over counterfactual state rows, oracle lookahead headroom, and residual dueling #symb.rl.qh over finite candidates. Online discrete interaction, continuous target-then-pose policies, and simulator-backed actor-critic remain bridge decisions after the finite-candidate result.
+The thesis tests whether this substrate can be upgraded from scene-level myopic scoring to _target-conditioned multi-step #NBV _. The core path is leakage-safe target-#RRI, an adapted target-conditioned myopic scorer over counterfactual state rows, oracle lookahead headroom, and residual dueling #symb.rl.qh over finite candidates. Online discrete interaction, continuous target-then-pose policies, and simulator-backed actor-critic remain bridge decisions after the finite-candidate result.
 
+// TODO: How is qh actor style? also point to the question: How can we scale the offline learning approach? And do we get further improvement by on-policy online training + optionally by a continuous-control policy? The ~...~ sentence should be revised. don't point to a negative outcome!
 #claim-box([Thesis claim])[
-  Given an #ASE snippet, an actor-visible target record, a finite valid candidate table, and a fixed acquisition budget, ARIA-NBV should be able to measure target-specific point-mesh improvement, test whether oracle lookahead exposes non-myopic headroom, and train actor-visible #symb.rl.qh to recover part of that headroom under oracle re-evaluation. A negative outcome is still informative when it localizes failure to target matching, one-step target signal, candidate support, or absence of measurable lookahead headroom.
+  Given an #ASE snippet, an actor-visible target record, a finite valid candidate table, and a fixed acquisition budget, ARIA-NBV should be able to measure target-specific point-mesh improvement, test whether oracle lookahead exposes headroom over a myopic model, and train actor-visible #symb.rl.qh to recover part of that headroom under oracle re-evaluation. ~A negative outcome is still informative when it localizes failure to target matching, one-step target signal, candidate support, or absence of measurable lookahead headroom.~
 ]
 
 = Formal Model and Research Questions
+// TODO: shouldn't we start with defining the MDP? Drop / demote aquisition budget for now!
 
+// TODO: what does #symb.obs.points_t represent more precisely? we need to denote that! do we mean just the point cloud or pointcloud with enriched features (i.e. S^2 frequency histogram!?)
+// TODO: what do we mean with target descriptor z_e, h_t... provide a bit more context!
 Let #symb.obs.points_t denote the accumulated actor-visible geometry proxy at decision step $t$, initialized from logged semidense reconstruction and updated during counterfactual rollouts. Let #symb.vin.field_evl_0 be the frozen root egocentric evidence field, #symb.entity.target_desc the actor-visible target descriptor, $bold(h)_t$ a compact selected-view history embedding, and $b_t$ the remaining acquisition budget. The actor-visible state is
+
 
 $
   #symb.rl.s_obs
@@ -154,6 +159,7 @@ $
 
 The privileged oracle state augments this with GT geometry and all-candidate oracle render/evaluation assets:
 
+// TODO: why {#symb.ase.mesh_target}_(e in cal(E)) instead of #symb.ase.mesh_target_e given that its only one targe per state!?
 $
   #symb.rl.s_oracle
   =
@@ -165,6 +171,8 @@ $
   ).
 $
 
+// TODO(^1): we need to clarify s^cf0 vs s^obs - i.e. difference in state space for myopic single step w.r.t. efm snippet and geometry only encodings for the counterfactuals, and also concisely point out the issue of different stat spaces for historic ego traj and counterfactual rollouts!
+// TODO: don't use terms like V1 / V0 if not clearly defined!
 For the V1 main result, GT meshes, GT OBBs, GT crops, and all-candidate GT renders are label and evaluation assets only. V0 may use GT OBB input only as a sanity or upper-bound path, not as the main actor-visible result. The counterfactual state keeps root EVL fixed:
 
 $
@@ -182,35 +190,46 @@ $
   ).
 $
 
+// TODO(^1): difference between historic trajectory and counterfactual views. clearly term counter factual state space - how should we optimally denote it given that it is a superset of the historic ego traj state space?
+// TODO: what do we mean by candidate rows? we mean the available candidate views at a given step t!
 The counterfactual state uses the same root EVL field but updates geometry, history, budget, candidate rows, masks, and reason metadata after selected views. The finite action set is the masked subset of candidate rows:
 
 $
   #eqs.rl.finite_action_set
 $
-
-Invalidity is a constraint, not weak supervision: masks apply before argmax, temperature softmax, loss targets, and bootstrap maximization. True infeasibility or absent evaluation samples are hard-invalid; low immediate target support is a diagnostic unless no meaningful oracle/evaluation sample exists. V1 uses OBS-SEL, PRED-Q, and GT-EVAL. The actor-visible descriptor is
+// TODO: what is meant by OBS-SEL, PRED-Q, GT-EVAL? We need to clarify these terms (also those must be gls entries!)
+// TODO: Invalidity is a constraint, not weak supervision in the baseline model!
+Invalidity is a constraint, not weak supervision: masks apply before argmax, temperature softmax, loss targets, and bootstrap maximization. True infeasibility or absent evaluation samples are hard-invalid; low immediate target support is a diagnostic unless no meaningful oracle/evaluation sample exists. V1 uses OBS-SEL, PRED-Q, and GT-EVAL. The actor-visible target-descriptor is
 
 $
   #eqs.entity.target_descriptor
 $
+// TODO: elaborate on the different terms in the target descriptor! so list the symbols  together with the following NLP description / terms.
 
-It bundles observed or predicted OBB geometry, class, confidence, projected area, semidense support, EVL support, and relative pose. A compact actor-visible crop descriptor is the first target-input ablation after this OBB-level path, not a GT crop. GT crops are selected only after protocol-level matching. In the match score, $kappa$ is class compatibility and $sigma$ is an observed-support compatibility term over projected area, semidense support, and EVL support:
+It bundles observed or predicted OBB geometry, class, confidence, projected area, semidense support, EVL support, and relative pose. A compact actor-visible crop of spatial feature fields could be the first target-input ablation after this OBB-level path.
+// TODO: GT crops are selected sounds stupid. rather Target selection is based on ..., protocal-level matching also sounds sloppy!
+GT crops are selected only after protocol-level matching. In the match score, $kappa$ is class compatibility and $sigma$ is an observed-support compatibility term over projected area, semidense support, and EVL support:
 
 $
   #eqs.entity.target_match_score
 $
 
+// TODO: I don't quite understand this equation. Shouldn't we do temperature-softmax over the scores to allow for a greater variety?
 $
   #eqs.entity.target_match_selection
 $
 
+// TODO: Do we really need the target_match_acceptance predicate?
 $
   #eqs.entity.target_match_acceptance
 $
 
 Here $mu_1$ is the best match score, $mu_2$ the runner-up score, and $g_mu$ the top-1/top-2 gap. The binary predicate $a_"match"$ records whether the observed target is class-compatible, sufficiently supported, and unique under the matching protocol. Unmatched, unsupported, or ambiguous targets are target-invalid protocol cases rather than low target-#RRI examples.
 
-Let $C_e (#symb.obs.points_t)$ denote the oracle-only crop of accumulated points to the matched target region. The target error is the implemented point-mesh accuracy plus mesh-to-point completeness diagnostic on this target crop, not point-cloud Chamfer distance:
+// TODO: include link t the implementation / cite the cloud to mesh metric source!
+// TODO: also point out that #eqs.entity.target_error is pretty much target cropped RRI and cite vin paper!
+// TODO: point out that it's fixed horizon metrics!
+Let $C_e (#symb.obs.points_t)$ denote the oracle-only crop of accumulated points to the matched target region. The target error is the implemented point-mesh accuracy plus mesh-to-point completeness diagnostic on this target crop:
 
 $
   #eqs.entity.target_error
@@ -232,9 +251,12 @@ $
   #eqs.entity.log_gain
 $
 
+// TODO: how did we find inspiration for #symb.entity.log_gain? We need a citation for this one!
 #symb.entity.endpoint_gain is the primary endpoint metric, #symb.entity.return_h is the rollout training return, and #symb.entity.log_gain is an ablation for scale sensitivity only. Since each immediate #RRI term is normalized by the current target error, the additive return is not algebraically identical to endpoint gain; the former supports value fitting and the latter supports fixed-budget interpretation.
 
+// TODO: clarify - what do we mean by *selecting* a candidate here? point out that for now softmax+temperature, greed -> potentially gumbel-top-k (get context from proposal or other sources)
 After selecting a valid candidate, the acquired geometry is added to the current geometry:
+
 
 $
   #symb.obs.points_next
@@ -243,11 +265,13 @@ $
   union
   #symb.obs.points_cand_ti.
 $
-
+// TODO: what do we mean by "mixture families" - also include a brief description of target generation - i.e. mixture of look-away, look-at,
 The next candidate table $cal(Q)_(t+1)$ is regenerated from the updated geometry, selected-view history, and remaining budget with the same logged mixture families, while #symb.vin.field_evl_0 remains fixed.
 
-The six research questions form a dependency chain. In advisor-facing terms they reduce to three empirical dependencies: can target labels be measured without leakage, can actor-visible myopic scoring rank target-RRI candidates, and does non-myopic evidence justify and support #symb.rl.qh beyond that myopic control?
+// TODO: bad wording "In advisor-facing terms". "can target labels be measured without leakage" is stupid and vague.
+Six research questions form a dependency chain. In advisor-facing terms they reduce to three empirical dependencies: can target labels be measured without leakage, can actor-visible myopic scoring rank target-RRI candidates, and does non-myopic evidence justify and support #symb.rl.qh beyond that myopic control?
 
+// TODO: the RQs are too vague! Consider @questions.qmd and .agents/work/proposal-review/questions-drift-feedback-gpt55pro.md and clarify! Also not all contents of these "RQs" actually appears to be RQs in the meaning of the word - $grill-me! there again seemes to have been some regression w.r.t. our research questions!
 #figure(
   block(width: 100%)[
     #rq-node(
