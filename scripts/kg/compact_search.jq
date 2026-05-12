@@ -10,9 +10,9 @@
 ###   - the on-disk repo_path when present (paper:* nodes carry null today
 ###     pending todo-062 provenance fix)
 ###
-### When Phase B (todo-067) ships, kg-search may emit a wrapper object with
-### .results + .search_mode + .query_fixups + .mode_reason fields. This filter
-### handles both shapes: bare array (today) and wrapped object (future).
+### kg-search now emits a wrapper object with .results + .search_mode +
+### .query_fixups + .mode_reason fields. This filter still accepts older bare
+### arrays for compatibility.
 
 def cap($n): if length > $n then .[:$n] else . end;
 def truncate($n; $cap): if length > $cap then .[:$cap] + "..." else . end;

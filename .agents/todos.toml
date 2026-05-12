@@ -585,10 +585,10 @@ description = "Curated literature notes ingested as Paper/Document nodes (paper:
 priority = "high"
 status = "todo"
 labels = ["litkg", "ingestion", "authority", "claim-check"]
+issue_ids = ["issue-025"]
 loc_min = 60
 loc_expected = 140
 loc_max = 320
-issue_ids = ["issue-025"]
 context = ["nodes.jsonl shows 84 paper:* nodes; all have source_path=null and repo_path=null in their properties.", "ranking.rs:27 reads source_path.to_string_lossy() and falls through to authority_label=default when no glob matches.", "context_pack.rs:1727 (is_canonical_or_active) accepts only labels canonical or active for claim-verdict counting.", "The 2026-05-11 proposal-claim review pivoted P0 of the litkg native-integration plan from a 5-line TOML edit to this Rust change once V2 verification showed the null paths.", "Best fix is to populate source_path at the ingestion site (crates/litkg-core/src/ingest/papers.rs or wherever Paper/Document nodes are created from QMD/MD sources); a less-invasive alternative is a config-driven paper_authority map in litkg.toml read before path-glob fallback."]
 references = ["repo:.agents/external/litkg-rs/crates/litkg-core/src/ranking.rs", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.configs/litkg.toml", "repo:.agents/issues.toml#issue-025", "repo:.agents/kg/generated/neo4j-export/nodes.jsonl", "repo:.agents/skills/aria-litkg-memory/SKILL.md"]
 implementation_notes = ["Locate the ingestion code that constructs Paper/Document nodes from QMD/MD sources (likely .agents/external/litkg-rs/crates/litkg-core/src/ingest/ or sibling).", "Add a source_path property to those nodes pointing at the originating file (e.g. docs/contents/theory/rri_theory.qmd).", "Verify by inspecting nodes.jsonl after re-ingestion: paper:rri-theory should carry properties.source_path.", "Add an [authority_tiers] entry tier-ing docs/contents/theory/** and docs/contents/literature/** at 1.4 (active) or 1.5 (canonical) once provenance is restored.", "Alternative if source-path injection is hard: add a top-level [paper_authority] table to litkg.toml mapping paper_id to a multiplier; have ranking.rs read it before falling back to path-glob.", "Re-run the seven proposal claim checks documented in .agents/memory/history/2026/05/2026-05-08 and confirm at least 5/7 flip to supported."]
@@ -602,10 +602,10 @@ description = "make kg-route KG_TASK='smoke' KG_FORMAT=json returns a 242 KB pay
 priority = "medium"
 status = "todo"
 labels = ["litkg", "context-pack", "signal-noise"]
+issue_ids = ["issue-025"]
 loc_min = 80
 loc_expected = 200
 loc_max = 400
-issue_ids = ["issue-025"]
 context = ["The 2026-05-11 litkg audit (see history debrief) measured 242 KB vs 39 KB JSON for a trivial smoke query when six fields are removed.", "evidence_spans is the bulk (154 entries x ~1.3 KB) and is already deduplicated into top_sources for agent consumption.", "backend_status duplicates kg-capabilities output on every call.", "missing_leaves and missing_context_leaves are documented as legacy aliases for missing_context in .agents/references/litkg_quick_reference.md.", "action_plan emits the same two generic bullets regardless of task; suggested_next_action.summary already carries the actionable line.", "assumptions emits the same three boilerplate sentences regardless of task.", "profile, budget_tokens, and truncated metadata almost never matter to the agent and are misleading for trivial inputs.", "The P1 compact filter (scripts/kg/compact_*.jq) already hides these from agents, but litkg-rs still constructs the payload and jq still chews it. This todo fixes the source."]
 references = ["repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/crates/litkg-cli/src/main.rs", "repo:.agents/references/litkg_quick_reference.md", "repo:scripts/kg/compact_route.jq", "repo:.agents/issues.toml#issue-025", "repo:.agents/memory/history/2026/05/2026-05-11_kg_compact_default_and_stop_hook_auto_refresh.md"]
 implementation_notes = ["Identify the ContextPack serialization site in crates/litkg-core/src/context_pack.rs and wrap legacy/bulk fields in conditional emission based on a new --full CLI flag.", "Default-omit on kg-route, kg-claim-check, kg-search; opt-in on --full or KG_VERBOSE=1.", "Bulk fields to omit by default: evidence_spans, backend_status, action_plan, assumptions, missing_leaves, missing_context_leaves, profile, budget_tokens, truncated, and relevant_papers when empty.", "Update inspect_cli.rs tests to cover both default-lean and --full output.", "Update Makefile kg-route etc. so KG_VERBOSE=1 path passes --full.", "Acceptance: trivial kg-route KG_TASK='smoke' KG_FORMAT=json payload drops from 242 KB to <=50 KB."]
@@ -619,10 +619,10 @@ description = "21 MB of generated KG artifacts live under .agents/kg/generated/.
 priority = "low"
 status = "todo"
 labels = ["litkg", "cleanup", "kg-artifacts"]
+issue_ids = ["issue-025"]
 loc_min = 40
 loc_expected = 100
 loc_max = 200
-issue_ids = ["issue-025"]
 context = ["du -sh .agents/kg/generated reports 21 MB on 2026-05-11.", "neo4j-export/nodes.jsonl + edges.jsonl are 9.4 MB combined and are live data; the rest is text notes.", "generated/literature/ carries 2026-03-30-* refactor notes referring to seminar-era code paths and design choices the project has since superseded.", "Stale notes increase KG noise without contributing value; they may also bleed into top_sources for unrelated queries."]
 references = ["repo:.agents/kg/generated/literature/", "repo:.agents/kg/generated/neo4j-export/", "repo:.agents/external/litkg-rs/scripts/kg/", "repo:.agents/issues.toml#issue-025"]
 implementation_notes = ["Write a stale-file audit shell or Python script under scripts/kg/audit_stale_literature.py that lists files in generated/literature/ older than 60 days and checks whether each references a still-tracked path or backlog id.", "Produce a candidate-deletion list with one-line justification per file; do not auto-delete.", "User reviews the list, then archives or deletes confirmed-stale files.", "Optionally add a stale-threshold knob to .configs/litkg.toml so future audits use one source of truth."]
@@ -636,66 +636,15 @@ description = "Two small kg-search output cleanups: (a) verify whether matched_f
 priority = "low"
 status = "todo"
 labels = ["litkg", "kg-search", "signal-noise"]
+issue_ids = ["issue-025"]
 loc_min = 30
 loc_expected = 80
 loc_max = 160
-issue_ids = ["issue-025"]
 context = ["matched_field always reads 'search_text' in spot-checks during the 2026-05-11 litkg audit; if this is constant in practice it adds bytes to every hit with no signal.", "Raw lexical scores observed during the audit: 315.0, 1535.0, 2946.0. The variance is huge across queries and the compact filter prints these to humans.", "Normalization could happen client-side in the jq filters, but it's cleaner at the source (litkg-rs) so that all downstream consumers (Streamlit panels, KG viz, etc.) get consistent ranges."]
 references = ["repo:.agents/external/litkg-rs/crates/litkg-core/src/", "repo:scripts/kg/compact_search.jq", "repo:.agents/issues.toml#issue-025"]
 implementation_notes = ["Probe: run 10 distinct kg-search queries (KG_FORMAT=json) and tabulate distinct matched_field values. If always 'search_text', remove from the response schema and update the compact filter.", "Score normalization: divide score_final by max(score_final) for the result set; emit normalized_score alongside score_final or in place of it (depending on whether existing consumers depend on the magnitude)."]
 acceptance = ["matched_field is removed from kg-search output (or proven to carry real signal and kept) with the decision recorded in the debrief.", "kg-search results either expose a normalized score in [0,1] for legibility, or a decision-recorded reason to keep raw magnitudes.", "compact_search.jq is updated accordingly."]
 verification = ["for q in 'RRI' 'oracle' 'next-best-view' 'CORAL' 'VIN' 'pose generation' 'rerun inspector' 'dataset cache' 'Hestia' 'Aria'; do make kg-search KG_QUERY=\"$q\" KG_FORMAT=json KG_LIMIT=3 | jq -r '.[].matched_field'; done | sort -u", "make kg-search KG_QUERY='RRI' | head -10"]
-
-[[todo]]
-id = "todo-066"
-title = "Phase A: BM25 + Porter stemming + synonyms + Levenshtein fuzzy for kg-search"
-description = "kg-search uses naive term-frequency scoring today (inspect.rs:1297 score_lexical: score as f32). A typo'd query (hierachical viewpoint) returns PB-NBV instead of Hestia because hierachical matches nothing and viewpoint frequency wins by sheer count. Replace the lexical scorer with BM25, add Porter stemming to the tokenizer, expand query tokens via a config-driven synonym table, and add a Levenshtein distance<=2 fallback that fires only on zero-exact-hits. Ships independently of Phase B (todo-067) and works even when Neo4j is unavailable."
-priority = "high"
-status = "todo"
-labels = ["litkg", "kg-search", "ranking", "bm25", "lexical"]
-loc_min = 250
-loc_expected = 420
-loc_max = 700
-issue_ids = ["issue-025"]
-context = ["The 2026-05-11 'hierachical viewpoint' query incident exposed three lexical gaps: typo intolerance, no stemming, no synonym expansion.", "BM25 is the standard improvement over raw count: IDF penalises common terms (viewpoint) and rewards rare ones (hierarchical), and the document-length normalisation prevents long papers with many similarly-titled sections from dominating.", "Porter stemming via rust-stemmers crate (~4 KB, no transitive deps) collapses viewpoint/viewpoints and hierarchical/hierarchically.", "Synonyms live in a new [synonyms] table in .configs/litkg.toml; query tokens expand to (self + synonyms) capped at one count per token to avoid over-fire.", "Fuzzy fallback fires only on zero-exact-hits for tokens length>=5; surfaces query_fixups in JSON output."]
-references = ["repo:.agents/external/litkg-rs/crates/litkg-core/src/ranking.rs", "repo:.agents/external/litkg-rs/crates/litkg-core/src/inspect.rs", "repo:.agents/external/litkg-rs/crates/litkg-core/src/config.rs", "repo:.configs/litkg.toml", "repo:scripts/kg/compact_search.jq", "repo:.agents/issues.toml#issue-025"]
-implementation_notes = ["Add rust-stemmers crate (Porter English stemmer) to crates/litkg-core/Cargo.toml.", "In ranking.rs, extend the existing tokenize/is_search_stopword pipeline with stem(token) -> String; apply to BOTH index build and query tokens.", "Implement BM25 scorer in ranking.rs: score_bm25(q, d) = sum over query terms t of IDF(t) * (tf*(k1+1)) / (tf + k1*(1 - b + b*|d|/avgdl)) with k1=1.5, b=0.75 defaults.", "Compute IDF table once during index build; cache avgdl. Persist alongside the existing index data.", "Replace score_lexical at inspect.rs:1297 with score_bm25 call.", "Add [synonyms] deserialisation to config.rs; expand query tokens with synonyms after stemming.", "Add Levenshtein fuzzy fallback using strsim or inline DP impl; fire only when exact-match returned zero hits.", "Surface query_fixups in the JSON response; update scripts/kg/compact_search.jq to print fixup line.", "Regression-test on RRI / oracle / counterfactual / viewpoint queries; flag ordering changes >25 percent for manual review."]
-acceptance = ["make kg-search KG_QUERY='hierachical viewpoint' returns Hestia in top 5; query_fixups field shows hierachical->hierarchical.", "make kg-search KG_QUERY='viewpoints' returns identical top-5 ordering as KG_QUERY='viewpoint' (stemming works).", "make kg-search KG_QUERY='NBV view selection' returns >=2 NBV papers in top 5 (synonym expansion).", "Existing exact-match queries (RRI, oracle) keep stable top-5 within +-1 position (BM25 regression baseline).", "Phase A works independently when Neo4j is down."]
-verification = ["cd .agents/external/litkg-rs && cargo fmt --all --check && cargo test", "make kg-search KG_QUERY='hierachical viewpoint' KG_FORMAT=json | jq '.[0:5] | map({title, query_fixups})'", "make kg-search KG_QUERY='viewpoints' | head -10", "make kg-search KG_QUERY='NBV view selection' | head -10"]
-
-[[todo]]
-id = "todo-067"
-title = "Phase B: Neo4j vector index for true semantic kg-search (depends on todo-070 paper-ingest gap)"
-description = "Embeddings are computed by enrich_embeddings.py and the vector index kg_embedding_index_2560 already exists on KGEmbeddingNode.kg_embedding (HNSW cosine, dim 2560, 1936 nodes today). BUT verified 2026-05-11 that only CodeGraphContext code symbols are embedded; zero Paper/PaperSection/DocSection/ProjectMemory nodes are in the runtime DB. Wiring db.index.vector.queryNodes into run_kg_find works (demoed via raw Cypher) but only surfaces code symbols until todo-070 closes the paper-ingest gap. Blend with Phase A lexical (BM25) at alpha=0.4 by default. Falls back to lexical-only when Neo4j or Ollama is unreachable, with explicit search_mode surfaced in the response."
-priority = "high"
-status = "todo"
-labels = ["litkg", "kg-search", "neo4j", "embeddings", "semantic"]
-loc_min = 350
-loc_expected = 600
-loc_max = 1000
-issue_ids = ["issue-025"]
-context = ["User confirmed 2026-05-11 that Neo4j vector index is the right home for embedding cosine; soft dependency on make kg-up is acceptable; lexical fallback always available.", "enrich_embeddings.py already creates the vector index kg_embedding_index_2560 (HNSW cosine, dim 2560) at line 502 and writes node embeddings to Neo4j; this Phase B prerequisite is DONE.", "Index targets nodes labeled KGEmbeddingNode with property kg_embedding (not :Paper or :DocSection directly; the embedder applies KGEmbeddingNode as a marker label).", "Verified 2026-05-11: the live Neo4j contains 1936 KGEmbeddingNode entries, all code symbols (1234 Function, 352 Module, 209 Class, 141 File). Zero Paper, PaperSection, DocSection, ProjectMemory nodes are embedded. todo-070 closes that gap.", "Query path: probe bolt://127.0.0.1:7687, compute query embedding via ollama HTTP, run CALL db.index.vector.queryNodes('kg_embedding_index_2560', $k, $qvec) Cypher, blend with BM25.", "Manual smoke 2026-05-11 with query 'hierachical viewpoint' returned 5 code-symbol hits with cosine ~0.74 -- proves the query path works end-to-end; gap is the missing paper coverage.", "Auto-refresh hook keeps Ollama-up gated; add optional KG_NEO4J_AUTO_UP=1 for symmetric Neo4j warm-start at session Stop.", "Surface search_mode (hybrid|lexical_only) and mode_reason (neo4j_unreachable|ollama_unreachable|paper_coverage_missing) in the JSON response so agents always know which retrieval path produced the hits."]
-references = ["repo:.agents/external/litkg-rs/crates/litkg-cli/src/main.rs", "repo:.agents/external/litkg-rs/crates/litkg-neo4j/src/lib.rs", "repo:.agents/external/litkg-rs/crates/litkg-core/src/ranking.rs", "repo:.agents/external/litkg-rs/scripts/kg/enrich_embeddings.py", "repo:scripts/kg/auto_refresh.sh", "repo:scripts/kg/compact_search.jq", "repo:.agents/issues.toml#issue-025", "repo:.agents/todos.toml#todo-066"]
-implementation_notes = ["B1 (DONE): scripts/kg/enrich_embeddings.py:502 already creates kg_embedding_index_2560 (CREATE VECTOR INDEX IF NOT EXISTS, idempotent). No work needed.", "B0 prereq (filed as todo-070): get paper/docsection/memory nodes embedded in Neo4j before B2 is fully useful for literature search.", "B2: in crates/litkg-cli/src/main.rs run_kg_find, probe bolt://127.0.0.1:7687; if down, set search_mode=lexical_only and skip to Phase A.", "B2: compute query embedding via the ollama HTTP path (use POST /api/embeddings with model=qwen3-embedding:4b; either factor scripts/kg/ollama_http.py logic into a reusable Rust client OR shell out for the first iteration).", "B2: in crates/litkg-neo4j/src/lib.rs add pub fn query_vector_index(client, index_name, k, qvec) -> Vec<(NodeId, f32)>; use the existing Bolt connection pool.", "B2: blend lexical and cosine: final = alpha*bm25 + (1-alpha)*cosine, alpha=0.4 (semantic-leaning); tunable via [context_pack].lexical_weight.", "B2: emit search_mode (hybrid|lexical_only) and mode_reason fields on the response. When todo-070 isn't yet done, can return search_mode=hybrid_code_only to be transparent about partial coverage.", "B3: add KG_NEO4J_AUTO_UP=1 env opt-in to scripts/kg/auto_refresh.sh; when set, warm-start make kg-up if Neo4j not running and Docker is available.", "B4: scripts/kg/compact_search.jq prints a one-line footer showing search_mode + mode_reason.", "Test: scenario tests in inspect_cli.rs covering hybrid + lexical-fallback + ollama-down paths.", "Cache the last query embedding to keep repeat queries fast (~80 ms saved per repeat)."]
-acceptance = ["make kg-up + make kg-refresh-light + make kg-search KG_QUERY='how do hierarchical NBV methods decompose target proposal from pose realization' returns Hestia in top 3 (zero token overlap).", "make kg-search KG_QUERY='RRI' KG_FORMAT=json | jq '.[0].search_mode' returns 'hybrid'.", "make kg-down then make kg-search KG_QUERY='RRI' KG_FORMAT=json | jq '.[0].search_mode' returns 'lexical_only' with mode_reason 'neo4j_unreachable'.", "compact_search.jq footer shows the search_mode and any query_fixups.", "Existing kg-search test suite passes."]
-verification = ["cd .agents/external/litkg-rs && cargo fmt --all --check && cargo test", "make kg-up && make kg-refresh-light", "make kg-search KG_QUERY='how do hierarchical NBV methods decompose target proposal from pose realization' KG_FORMAT=json | jq '{mode: .[0].search_mode, top: [.[0:3] | .[].title]}'", "make kg-down && make kg-search KG_QUERY='RRI' KG_FORMAT=json | jq -r '.[0].search_mode'"]
-
-[[todo]]
-id = "todo-070"
-title = "Phase B0 prerequisite: ingest Paper/DocSection/ProjectMemory nodes into Neo4j with embeddings"
-description = "Verified 2026-05-11 that the Neo4j runtime contains only CodeGraphContext code symbols (1234 Function + 352 Module + 209 Class + 141 File = 1936 nodes). The JSONL export at .agents/kg/generated/neo4j-export/nodes.jsonl has 6500+ nodes including 84 Paper, ~5000 DocSection (paper sections), and ProjectMemory entries -- but these have never been loaded into the live Neo4j DB. Until they are, Phase B (todo-067) Neo4j vector search will only surface code, not papers. Pick one of two routes: (a) extend kg-ingest-docs/kg-enrich to ingest the JSONL paper+docsection+memory nodes into Neo4j and run enrich_embeddings.py on them; or (b) pivot to the JSONL-sidecar approach (write embeddings.jsonl alongside nodes.jsonl; run_kg_find reads it directly and does cosine in Rust without Neo4j)."
-priority = "high"
-status = "todo"
-labels = ["litkg", "neo4j", "ingestion", "semantic-prereq"]
-loc_min = 150
-loc_expected = 350
-loc_max = 700
-issue_ids = ["issue-025"]
-context = ["Without this, todo-067's Hestia case (semantic query for 'hierarchical viewpoint' should find Hestia) cannot work because Hestia paper sections are not in Neo4j with embeddings.", "Route (a) Neo4j-ingest is consistent with the user's 2026-05-11 direction to use Neo4j vector index. Requires loading the JSONL bundle into Neo4j via APOC (apoc.load.jsonl) or a Rust-side loader, then running enrich_embeddings.py to add embeddings to the newly-loaded nodes.", "Route (b) JSONL-sidecar keeps semantic search Neo4j-independent. Smaller surface; faster to ship; doesn't require Neo4j Docker for query-time semantic.", "Recommended route: (a) for symmetry with existing infra; (b) only if (a) proves blocked.", "kg-ingest-docs already uses Graphiti for doc ingest, but [backends].graphiti=false today so that path is dormant."]
-references = ["repo:.agents/external/litkg-rs/scripts/kg/ingest_docs.sh", "repo:.agents/external/litkg-rs/scripts/kg/enrich_embeddings.py", "repo:.agents/external/litkg-rs/crates/litkg-neo4j/src/lib.rs", "repo:.agents/kg/generated/neo4j-export/nodes.jsonl", "repo:.agents/todos.toml#todo-067", "repo:.agents/issues.toml#issue-025"]
-implementation_notes = ["Audit current ingestion paths: kg-ingest-docs (Graphiti), kg-ingest-papers (full lit pipeline), kg-export-neo4j (writes bundle).", "Route (a) preferred: add a kg-load-bundle target that reads nodes.jsonl + edges.jsonl into the live Neo4j via APOC apoc.load.jsonl + parametrized CREATE; idempotent by node id.", "After loading, run enrich_embeddings.py with --include-papers / --include-docs / --include-memory flags so the new node kinds get KGEmbeddingNode label + kg_embedding property.", "Verify: MATCH (n:Paper) WHERE n.kg_embedding IS NOT NULL RETURN count(n) returns >0; same for DocSection, ProjectMemory.", "Acceptance must cover the 'hierachical viewpoint' use case end-to-end after this lands + todo-067 lands."]
-acceptance = ["MATCH (n:Paper) WHERE n.kg_embedding IS NOT NULL RETURN count(n) > 50 (most curated papers covered).", "MATCH (n:DocSection) WHERE n.kg_embedding IS NOT NULL RETURN count(n) > 500.", "MATCH (n:ProjectMemory) WHERE n.kg_embedding IS NOT NULL RETURN count(n) > 30.", "Manual Cypher vector-search smoke for 'hierarchical viewpoint' (using ollama-computed embedding) returns Hestia or PB-NBV PaperSection in top 5 -- NOT just code symbols.", "make kg-refresh-light (or a new kg-refresh-full) updates these nodes incrementally."]
-verification = ["curl -sSf -u neo4j:litkglocal -H 'Content-Type: application/json' -X POST 'http://127.0.0.1:7474/db/neo4j/tx/commit' -d '{\"statements\":[{\"statement\":\"MATCH (n:KGEmbeddingNode) WITH labels(n) AS lbls, count(n) AS cnt RETURN lbls, cnt ORDER BY cnt DESC\"}]}' | jq '.results[].data'", "Should show Paper/DocSection/ProjectMemory rows alongside the existing code-symbol rows."]
 
 [[todo]]
 id = "todo-068"
@@ -704,10 +653,10 @@ description = "Graphiti is configured ([backends].graphiti = false today) with M
 priority = "low"
 status = "todo"
 labels = ["litkg", "graphiti", "temporal", "deferred"]
+issue_ids = ["issue-025"]
 loc_min = 100
 loc_expected = 300
 loc_max = 700
-issue_ids = ["issue-025"]
 context = ["Graphiti uses Neo4j as backend storage; would share the runtime with Phase B (todo-067) if both are enabled.", "Adds an LLM call per ingest (entity/relation extraction) -- cost not yet justified for current use case.", "Real value: temporal reasoning. 'When did this concept change?' 'What was the rationale at week W?'", "Defer until thesis writing surfaces a need to audit decision evolution over time."]
 references = ["repo:.agents/external/litkg-rs/scripts/kg/start_graphiti.sh", "repo:.agents/external/litkg-rs/scripts/kg/ingest_docs.sh", "repo:.agents/external/litkg-rs/docs/tooling-and-backends.md", "repo:.configs/litkg.toml"]
 implementation_notes = ["Survey current Graphiti capabilities (the upstream project) for relevance to ARIA-NBV's temporal questions.", "If enabling: flip [backends].graphiti = true, ensure scripts/kg/start_graphiti.sh works against the Mac, add a kg-temporal-search verb that calls Graphiti's search API.", "If not enabling: document the decision in DECISIONS.md and close the todo."]
@@ -721,10 +670,10 @@ description = "make kg-capabilities reports MemPalace as state=ready, agent_reco
 priority = "low"
 status = "todo"
 labels = ["litkg", "mempalace", "deferred", "config-hygiene"]
+issue_ids = ["issue-025"]
 loc_min = 60
 loc_expected = 180
 loc_max = 400
-issue_ids = ["issue-025"]
 context = ["User asked 2026-05-11 about employing mempalace as another backend; recommendation was to defer pending audit.", "MemPalace stores human-curated memory chunks separately from the project KG; complements rather than replaces Neo4j vector.", "Cross-project memory: notes from other repos could surface in ARIA-NBV searches.", "MCP integration: Claude/Codex could query MemPalace tools directly without going through make kg-* targets.", "Risk of drift: two semantic backends (Neo4j vector + MemPalace) must be kept in sync; current pipeline doesn't do that automatically."]
 references = ["repo:.configs/litkg.toml", "repo:.agents/external/litkg-rs/docs/tooling-and-backends.md", "url:https://mempalace.github.io/mempalace/", "url:https://mempalace.github.io/mempalace/guide/mcp-integration.html"]
 implementation_notes = ["Step 1: investigate the kg-capabilities reporter to find where MemPalace state=ready is computed despite the backend flag being off; reconcile so the two surfaces agree.", "Step 2: if the user actively uses MemPalace for human-curated annotations on other projects, spec the integration: would litkg-cli call MemPalace MCP tools (mem.search) at query time and blend with Neo4j hits? Or would MemPalace memories be ingested into Neo4j as additional nodes?", "Step 3: if MemPalace value is low for the current paper/code retrieval problem, document the decision and either enable for cross-project memory only or fully drop the backend reference."]

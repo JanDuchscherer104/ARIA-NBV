@@ -5,7 +5,7 @@
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory codex-transcripts
 .PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory new-debrief claude-skills
-.PHONY: memory-mine agents-db glossary kg-up kg-down kg-status kg-capabilities kg-ollama-check kg-search kg-route kg-claim-check kg-consolidate kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-full
+.PHONY: memory-mine agents-db glossary kg-up kg-down kg-status kg-capabilities kg-ollama-check kg-search kg-route kg-claim-check kg-consolidate kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-load-bundle kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-semantic kg-refresh-full
 .PHONY: lrz-probe lrz-resources lrz-resources-gpu lrz-resources-cpu lrz-jobs lrz-dss-init lrz-container-shell lrz-sbatch-cpu lrz-sbatch-single-gpu lrz-sbatch-multigpu
 .PHONY: mermaid-lint
 
@@ -76,6 +76,7 @@ LITKG_MANIFEST ?= .agents/external/litkg-rs/Cargo.toml
 LITKG_CONFIG ?= .configs/litkg.toml
 LITKG_REPO_ROOT ?= .
 LITKG_PROFILE ?= thesis-coding
+KG_BUNDLE_ROOT ?= .agents/kg/generated/neo4j-export
 KG_QUERY ?=
 KG_TOPIC ?=
 KG_TASK ?=
@@ -320,6 +321,10 @@ kg-ingest-docs: ## 📝 Ingest docs/ into Neo4j/Graphiti (set KG_SMOKE=1 for a s
 		./scripts/kg/ingest_docs.sh $(KG_DOC_PATHS); \
 	fi
 
+kg-load-bundle: ## 📚 Load the litkg Neo4j export bundle into the live Neo4j runtime
+	@python3 .agents/external/litkg-rs/scripts/kg/load_bundle.py \
+		--bundle-root "$(KG_BUNDLE_ROOT)"
+
 kg-enrich: ## 📚 Refresh litkg runtime embeddings and code↔doc links
 	@KG_OLLAMA_CONFIG="$(LITKG_CONFIG)" \
 		KG_CODE_REPO_ROOT="$(CURDIR)" \
@@ -345,6 +350,8 @@ kg-refresh-lit: kg-sync kg-materialize kg-export-neo4j ## 📚 Refresh literatur
 	else \
 		echo "$(YELLOW)Skipping Semantic Scholar enrichment; SEMANTIC_SCHOLAR_API_KEY is not set.$(NC)"; \
 	fi
+
+kg-refresh-semantic: kg-refresh-lit kg-load-bundle kg-enrich ## 📚 Refresh literature export, load it into Neo4j, and embed semantic nodes
 
 kg-refresh-full: kg-refresh-light kg-refresh-code kg-refresh-lit ## 📚 Refresh lightweight context, code index, and literature artifacts
 
