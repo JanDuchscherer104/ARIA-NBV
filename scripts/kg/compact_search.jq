@@ -10,14 +10,12 @@
 ###   - the on-disk repo_path when present (paper:* nodes carry null today
 ###     pending todo-062 provenance fix)
 ###
-### The previous version stripped paper_id and snippet, making PaperSection
-### hits like "Candidate Viewpoint Proposal [default/literature] score=95" -
-### no way to tell which paper or what the content was. This version makes
-### the search output actionable.
+### When Phase B (todo-067) ships, kg-search may emit a wrapper object with
+### .results + .search_mode + .query_fixups + .mode_reason fields. This filter
+### handles both shapes: bare array (today) and wrapped object (future).
 
 def cap($n): if length > $n then .[:$n] else . end;
 def truncate($n; $cap): if length > $cap then .[:$cap] + "..." else . end;
-def first_nonempty: map(select(. != null and . != "")) | first;
 
 # Extract paper_id from a node_id like "paper:pb-nbv-jia2025:section:3" or
 # "paper:pb-nbv-jia2025". Returns null for non-paper nodes.
@@ -38,8 +36,15 @@ def kind_tag:
   else "?"
   end;
 
-"top_hits:",
-( . // []
+# Normalize input: bare array OR {results, search_mode, ...} wrapper.
+( if type == "array" then {results: ., search_mode: "lexical_only", mode_reason: "kg-search has not yet adopted hybrid output (todo-067 pending)", query_fixups: []}
+  else . + {results: (.results // []), search_mode: (.search_mode // "lexical_only"), mode_reason: (.mode_reason // ""), query_fixups: (.query_fixups // [])}
+  end
+) as $env
+| ($env.results // []) as $hits
+
+| "top_hits:",
+( $hits
   | cap(5)
   | if length == 0 then ["  (no matches)"]
     else (
@@ -70,5 +75,15 @@ def kind_tag:
   | .[]
 ),
 "",
+
+# Query fixups (Phase A fuzzy fallback surfaces these here when shipped).
+( if ($env.query_fixups | length) > 0
+    then "# query_fixups: " + ($env.query_fixups | join(", "))
+    else empty
+  end ),
+
+# Search-mode hint: tells the agent which retrieval path produced the hits.
+"# search_mode: " + $env.search_mode
+  + (if ($env.mode_reason // "") != "" then "  (reason: " + $env.mode_reason + ")" else "" end),
 "# For full search payload: re-run with KG_VERBOSE=1 or KG_FORMAT=json."
 | @text

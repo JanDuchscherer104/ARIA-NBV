@@ -47,6 +47,23 @@ if [ "$FORCE" != "1" ]; then
   fi
 fi
 
+# 1a) Optional Neo4j warm-start. Opt-in via KG_NEO4J_AUTO_UP=1.
+# When set, ensure the local Neo4j Docker is running so that future kg-search
+# queries can use the vector index (kg_embedding_index_2560). When the runtime
+# is up, hybrid (lexical + cosine) search becomes available; when it isn't,
+# search falls back to lexical-only with an explicit mode hint.
+if [ "${KG_NEO4J_AUTO_UP:-0}" = "1" ]; then
+  if ! curl -sSf --max-time 1 http://127.0.0.1:7474/ >/dev/null 2>&1; then
+    log "neo4j down and KG_NEO4J_AUTO_UP=1 set; attempting make kg-up"
+    if command -v docker >/dev/null 2>&1; then
+      ( nohup make kg-up >> "$LOG" 2>&1 & disown 2>/dev/null || true )
+      log "kg-up dispatched in background; vector search available after warm-up"
+    else
+      log "skip: docker not on PATH; cannot warm-start Neo4j"
+    fi
+  fi
+fi
+
 # 2) Anything to do? Compare tracked sources against the stamp.
 if [ "$FORCE" != "1" ] && [ -f "$STAMP" ]; then
   # Use mtime comparison; bound the search depth to keep this fast.
