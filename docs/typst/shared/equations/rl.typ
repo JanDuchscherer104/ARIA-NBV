@@ -78,9 +78,9 @@
       )
     $,
     finite_action_set: $
-      #symb.oracle.candidates_t = {q_(t,i)}_(i=1)^(#symb.shape.Nq),
+      #symb.rl.candidate_table = {q_(t,i)}_(i=1)^(#symb.shape.Nq),
       quad
-      #symb.rl.action_set = {i in {1, dots, #symb.shape.Nq} : #symb.rl.validity_mask = 1},
+      #symb.rl.action_set_t = {i in {1, dots, #symb.shape.Nq} : m_(t,i) = 1},
       quad
       q_t = q_(t, #(symb.rl.a)_t)
     $,
@@ -88,7 +88,7 @@
       #(symb.oracle.points)_(t+1) = #(symb.oracle.points)_t union #(symb.oracle.points)_(q_t)
     $,
     target_rri_reward: $
-      #symb.rl.reward_target = op("RRI")_e (q_t mid #(symb.oracle.points)_t, #symb.ase.mesh_target)
+      #symb.rl.reward_target = op("RRI")_e (q_t | #(symb.oracle.points)_t, #symb.ase.mesh_target)
     $,
     finite_horizon_return: $
       #symb.rl.return_h = sum_(k=0)^(#symb.rl.H - 1) #symb.rl.gamma^k r_(t+k)^e
@@ -96,7 +96,35 @@
     q_h: $
       #symb.rl.qh (#symb.rl.s_cf0, #(symb.rl.a)_t)
       =
-      bb(E)[G_t^((H)) mid s_t = #symb.rl.s_cf0, a_t = #(symb.rl.a)_t]
+      bb(E)[G_t^((H)) | s_t = #symb.rl.s_cf0, a_t = #(symb.rl.a)_t]
+    $,
+    qh_residual: $
+      #symb.rl.qh_theta (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)
+      =
+      hat(r)_psi^e (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)
+      +
+      A_theta^H (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_table, bold(h)_t, i)
+    $,
+    qh_coral_interface: $
+      bold(c)_(t,i)^"CORAL"
+      =
+      op("softmax") (bold(o)_(t,i)^"CORAL"),
+      quad
+      hat(r)_psi^e
+      =
+      op("calib") (bold(c)_(t,i)^"CORAL")
+    $,
+    qh_dueling_residual: $
+      #symb.rl.qh_theta (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)
+      =
+      hat(r)_psi^e (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)
+      +
+      V_theta (#symb.rl.s_cf0, #symb.entity.target_desc, bold(H)_t)
+      +
+      A_(theta,i)^H
+      -
+      (1) / (abs(#symb.rl.action_set_t))
+      sum_(j in #symb.rl.action_set_t) A_(theta,j)^H
     $,
     qh_candidate_token: $
       #symb.rl.candidate_token
@@ -219,5 +247,11 @@
       #(symb.rl.z) _t ~ #(symb.rl.pi) _("hi") (z ; #(symb.rl.s) _t),
       quad
       #(symb.rl.a) _t ~ #(symb.rl.pi) _("lo") (a ; #(symb.rl.s) _t, #(symb.rl.z) _t)
+    $,
+    target_pose_factorization: $
+      pi_"cont" (bold(x)_t, bold(ell)_t | s_t, z_e)
+      =
+      pi_"pose" (bold(x)_t | bold(ell)_t, s_t, z_e)
+      pi_"look" (bold(ell)_t | s_t, z_e)
     $,
   )

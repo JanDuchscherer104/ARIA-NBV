@@ -44,4 +44,73 @@
     /
     (op("tr") (#symb.vin.dir_moment (bold(v))) + epsilon)
   $,
+  qh_scene_memory: $
+    bold(F)_t^"scene"
+    =
+    op("Conv3D") (
+      bold(F)_0^"EVL",
+      bold(V) (#symb.obs.points_t),
+      bold(V)_"dir" (#symb.obs.points_t),
+      bold(V)_"target" (#symb.entity.target_desc)
+    )
+  $,
+  qh_target_token: $
+    bold(T)_e
+    =
+    op("MLP")_phi (
+      op("concat") (
+        #symb.entity.target_desc,
+        op("ROIAlign3D") (bold(F)_t^"scene", hat(bold(B))_e)
+      )
+    )
+  $,
+  candidate_pose_features: $
+    #symb.vin.candidate_pose_feat (q_(t,i))
+    =
+    op("concat") (
+      bold(t)_(t,i),
+      bold(R)_(t,i)^"6D",
+      bold(t)_(t,i) - bold(t)_e,
+      alpha_(t,i)^e,
+      l_(t,i),
+      c_(t,i)^"strategy"
+    )
+  $,
+  candidate_pose_context: $
+    bold(p)_(t,i)
+    =
+    op("concat") (
+      #symb.vin.candidate_pose_feat (q_(t,i)),
+      phi_"target-rel" (q_(t,i), #symb.entity.target_desc)
+    )
+  $,
+  candidate_geometry_context: $
+    bold(g)_(t,i)
+    =
+    op("concat") (
+      phi_"frustum" (bold(F)_t^"scene", q_(t,i)),
+      phi_"belief" (#symb.obs.points_t, #symb.vin.field_evl_0, q_(t,i)),
+      phi_"dir" (#symb.vin.dir_moment, q_(t,i))
+    )
+  $,
+  candidate_row_features: $
+    bold(x)_(t,i)
+    =
+    op("concat") (
+      bold(p)_(t,i),
+      bold(g)_(t,i),
+      phi_"valid" (m_(t,i), rho_(t,i)),
+      bold(H)_t
+    )
+  $,
+  qh_set_encoder: $
+    {bold(u)_(t,i)}_(i=1)^(#symb.shape.Nq)
+    =
+    E_"set" (
+      {
+        op("concat") (bold(x)_(t,i), bold(T)_e, bold(H)_t)
+      }_(i=1)^(#symb.shape.Nq),
+      bold(m)_t
+    )
+  $,
 )

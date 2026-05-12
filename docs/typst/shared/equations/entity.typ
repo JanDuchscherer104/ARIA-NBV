@@ -31,20 +31,30 @@
       dot sigma(A_(hat(e))^"proj", n_(hat(e))^"semi", n_(hat(e))^"EVL")
     $,
     target_match_selection: $
-      e^star
+      (e^star, mu_1, mu_2, g_mu)
       =
-      op("argmax", limits: #true)_(e in cal(E))
-      mu(hat(e), e)
+      (
+        op("argmax", limits: #true)_(e in cal(E)) mu(hat(e), e),
+        mu(hat(e), e^star),
+        op("max", limits: #true)_(e in cal(E), e != e^star) mu(hat(e), e),
+        mu_1 - mu_2
+      )
     $,
     target_match_acceptance: $
-      "accept iff"
-      quad
-      mu(hat(e), e^star) >= tau_mu
-      quad "and" quad
-      mu_1 - mu_2 >= tau_"gap"
+      a_"match" (hat(e))
+      =
+      bb(1)[
+        op("class-ok") (hat(e), e^star)
+        and
+        op("supported") (hat(e), e^star)
+        and
+        op("unique") (mu_1, g_mu)
+      ]
     $,
     target_error: $
       #symb.entity.target_error
+      =
+      d(C_e (#symb.obs.points_t), #symb.ase.mesh_target)
       =
       #symb.entity.target_error_pm
       +
