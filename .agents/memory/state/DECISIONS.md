@@ -1,6 +1,6 @@
 ---
 id: decisions
-updated: 2026-05-09
+updated: 2026-05-12
 scope: repo
 owner: jan
 status: active
@@ -10,7 +10,6 @@ tags: [codex, workflow, architecture]
 # Decisions
 
 ## Durable Repo Decisions
-- Codex repo guidance uses repo-root and nested `AGENTS.md` files, not `.codex/AGENTS.md`.
 - Repo skills live in `.agents/skills/` and use progressive disclosure.
 - Non-trivial coding, docs, scaffold, research, or memory edits start from the
   `agent-behavior` skill: state assumptions, prefer the simplest sufficient
@@ -19,7 +18,10 @@ tags: [codex, workflow, architecture]
   `metadata` key: `applies_to`, `triggers`, `must_read`, and `verification`.
 - Shared repo guidance must stay machine-portable; operator-specific interpreter or host paths belong in `.agents/references/` or user-local notes, not repo-root or nested `AGENTS.md` files.
 - Canonical project memory lives in `.agents/memory/state/`; episodic notes live in `.agents/memory/history/`.
-- Generated context is derived output under `docs/_generated/context/` and should remain untracked.
+- Generated routing context under `docs/_generated/context/*.md` is derived
+  output and remains untracked; tracked generated glossary/KG artifacts such
+  as `docs/_generated/context/glossary.jsonl` are regenerated through the
+  glossary pipeline.
 - `make context` is the lightweight scaffold refresh for `source_index.md`, `literature_index.md`, and `data_contracts.md`.
 - `make context-heavy` is explicit fallback for bundled heavy artifacts such as UML, bulk docstrings, and directory trees.
 - `docs/_generated/context/source_index.md` is a compact routing index; broad file inventories stay discoverable through commands, not the hot path.
@@ -64,11 +66,25 @@ tags: [codex, workflow, architecture]
 - Generated agent-scaffold pages are internal operator artifacts under
   `.agents/generated/agent_scaffold/`; the published Quarto site must not
   regenerate or render them.
-- Retained QMD docs remain renderable, but current thesis pages use
-  `docs/contents/thesis/`, past seminar material uses `docs/contents/seminar/`,
-  and only curated public archive summaries use `docs/contents/archive/` with
-  explicit `phase`, `audience`, `status`, and `owner` frontmatter. Raw
-  scratch/history belongs under `.agents/archive/docs/`.
+- Retained public QMD pages remain renderable, but retired implementation
+  scratch/history belongs under `.agents/archive/docs/`. Generated quartodoc/API
+  implementation contracts replace retired manual impl pages in public docs.
+  Current thesis pages use `docs/contents/thesis/`, past seminar material uses
+  `docs/contents/seminar/`, and only curated public archive summaries use
+  `docs/contents/archive/` with explicit `phase`, `audience`, `status`, and
+  `owner` frontmatter.
+- Environment/setup instructions live in setup docs such as `SETUP.md` or
+  setup QMD pages; root and nested guidance should point there rather than
+  duplicating host-specific setup detail.
+- `docs/contents/ideas.qmd` is human-maintained scratch/history and read-only
+  for agents unless the user explicitly requests edits. Treat it as idea
+  evidence, not current thesis direction.
+- `docs/typst/shared/glossary.typ` remains the glossary/terminology source of
+  truth. YAML, QMD, Typst, and KG-facing glossary outputs are derived from it.
+- Canonical generated docs artifacts that belong to the glossary, notation, or
+  docs pipeline should be regenerated and tracked when their source changes.
+  Generated context and KG-routing artifacts remain derived/untracked unless
+  explicitly versioned.
 - Human-owner preferences that are durable but not public narrative or workflow
   rules live in `.agents/references/human_owner_intent.md`.
 - OMX remains optional operator orchestration; it does not own canonical memory,
@@ -184,6 +200,27 @@ tags: [codex, workflow, architecture]
   in `docs/typst/shared` temporarily, but their rendered notation must follow
   the locked convention.
 
+### 2026-05-11 Transcript-Mined Project Decisions
+- Rollout and `Q_H` stores keep full scene meshes as external
+  path/hash/version references and may embed high-detail target mesh crops once
+  per target with crop metadata. Lean training shards and richer
+  validation/audit retention profiles are distinct store profiles.
+- The first multi-step rollout payload is geometry-first and typed. Selection
+  policy uses a typed enum such as `StrEnum` and records configurable
+  temperature/noisy-softmax, beam width, valid-candidate score source, and
+  sampling provenance.
+- VIN/offline training-facing tensors use padded dense arrays with explicit
+  lengths or `candidate_count` masks, preserving full candidate width through
+  model-facing paths while masking padded tails. The canonical VIN offline
+  store remains manifest/sample-index/split/shard based.
+- ARIA-NBV keeps first-class sample, dataset, and rollout inspection utilities
+  through repo-native summary, Rerun, and Streamlit surfaces. Compatibility
+  with external viewers such as VS Code Scientific Data Viewer is optional
+  operator convenience, not a canonical project contract.
+- Rerun inspectors should use native Rerun component types such as
+  `Transform3D`, `Pinhole`, and `Boxes3D` whenever available instead of
+  reconstructing cameras or OBBs from primitive line/point geometry.
+
 - The core thesis claim is target-conditioned, quality-driven NBV on ASE/EFM with strict M1 data/cache/oracle contracts.
 - RRI is the primary project objective for next-best-view research in this repo. Coverage-style objectives remain baselines or diagnostics, not the main thesis target.
 - The canonical training and evaluation surface remains finite candidate ranking/selection anchored on prerecorded ASE trajectory snippets with oracle supervision derived from GT meshes where available.
@@ -219,15 +256,29 @@ tags: [codex, workflow, architecture]
 - Fitted Double-Q-style targets are the first value-learning target family for
   `Q_H`. IQL is a second offline-RL ablation only after `Q_H` is stable; SB3
   DQN/PPO/SAC are deferred until an online Gymnasium simulator exists.
-- Zarr is the first-choice rollout/Q store. It should contain replay/training/evaluation payloads and lineage without duplicating raw ASE/ATEK; full meshes are external path/hash/version references, and high-detail target mesh crops are embedded once per target with crop metadata.
-- The first implemented rollout replay path uses a standalone `rollouts.zarr`
-  store, not VIN offline-store embedded counterfactual blocks.
+- Zarr is the first-choice rollout replay store. It should contain factual
+  source, target, rollout, step, candidate, lineage, dictionary, and metadata
+  tables without duplicating raw ASE/ATEK; full meshes are external
+  path/hash/version references, and `Q_H` tensors are derived reader/training
+  views unless profiling later proves persisted arrays necessary.
+- The first implemented rollout replay path uses standalone `rollouts.zarr`
+  schema `0.3-source-facts-derived-qh`, not VIN offline-store embedded
+  counterfactual blocks. The production root contract is `VinOfflineSample`;
+  `VinOracleBatch` remains a one-step VIN training DTO.
 - Masked oracle temperature-softmax is the first stochastic rollout
   data-diversity policy. It samples discrete selected actions from valid
   candidate distributions and persists logits, probabilities, log-probs,
   entropy, temperature, score source, and RNG replay metadata.
-- The first `Q_H` data store is selected-action transition replay. Dense
-  all-action oracle-Q tensors are schema-ready but remain unavailable and
-  `NaN`/masked until a later oracle-lookahead converter materializes them.
+- The first `Q_H` data view is selected-action transition replay derived from
+  factual rollout rows. Dense all-action oracle-Q targets remain unavailable
+  and `NaN`/masked until a later oracle-lookahead converter materializes them.
 - The public glossary is a tiered math lookup table generated from `docs/typst/shared/glossary.typ`: core thesis math terms render first with shared symbol/equation refs, support terms remain normal glossary entries, and peripheral background terms stay linkable but visually demoted.
 - CI/pre-commit becomes required before full-scale generation, not before proposal/M1 groundwork. GitHub issue mirroring remains a local TODO; `.agents/*.toml` stays the source of truth.
+
+## litkg Decisions (2026-05-11/12)
+- Semantic kg-search uses the Neo4j vector index as the canonical backend: `kg_embedding_index_2560` over `KGEmbeddingNode.kg_embedding` (HNSW, cosine, dim 2560). Lexical fallback is always available when Neo4j or the Ollama tunnel is down; the response surfaces `search_mode: hybrid|lexical_only` with `mode_reason`.
+- BM25 (k1=1.5, b=0.75) replaces naive term-frequency as the lexical scorer. Porter stemming + a curated `[synonyms]` table in `.configs/litkg.toml` + Levenshtein distance-≤2 fuzzy fallback for zero-exact-hits round out the lexical layer.
+- Agent-facing kg-* output is compact-by-default (≤14 lines). Verbose payloads require explicit opt-in via `KG_VERBOSE=1` or `KG_FORMAT=json`. The compact filters live at `scripts/kg/compact_*.jq` and must not surface `evidence_spans`, `backend_status`, `action_plan`, `assumptions`, `missing_leaves`, `missing_context_leaves`, `profile`, `budget_tokens`, or `truncated`.
+- Auto-refresh on session Stop is enabled via `scripts/kg/auto_refresh.sh`, gated on Ollama tunnel reachability at `127.0.0.1:11434`. Optional `KG_NEO4J_AUTO_UP=1` warm-starts Neo4j Docker so the next session has hybrid search available.
+- Graphiti (`[backends].graphiti = false` today) and MemPalace remain deferred. They are not the right home for paper/code retrieval; revisit only when temporal queries (Graphiti) or human-curated annotations (MemPalace) become explicit workflows. Tracked as `todo-068` and `todo-069`.
+- `kg-query` and `kg-brief` were deleted as Makefile aliases for `kg-route`; `kg-related` was deleted as a subset of `kg-search`. `kg-ingest-docs-smoke` collapsed into `make kg-ingest-docs KG_SMOKE=1`. The agent-facing kg verb set is `kg-search`, `kg-route`, `kg-claim-check`, `kg-status`, `kg-capabilities`.

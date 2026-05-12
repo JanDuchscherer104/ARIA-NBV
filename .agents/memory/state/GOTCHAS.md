@@ -1,6 +1,6 @@
 ---
 id: gotchas
-updated: 2026-04-29
+updated: 2026-05-12
 scope: repo
 owner: jan
 status: active
@@ -38,3 +38,13 @@ tags: [workflow, training, cache, frames]
 ## Config and Pydantic
 - `Field(default=<callable>)` stores the callable itself; use `Field(default_factory=...)` for computed defaults.
 - Prefer config-local `field_validator` and `model_validator` hooks for cross-field validation and coercion.
+
+## litkg / Knowledge Graph
+- The Neo4j runtime today contains **only CodeGraphContext code symbols** (1936 KGEmbeddingNodes; 1234 Function, 352 Module, 209 Class, 141 File). Paper / PaperSection / DocSection / ProjectMemory nodes exist in the JSONL export but have never been loaded into the live DB. Vector queries return only code hits until `todo-070` lands.
+- Vector index is named `kg_embedding_index_2560` over `KGEmbeddingNode.kg_embedding` (dim 2560, cosine). Created idempotently by `enrich_embeddings.py:502`. The index name is dimension-suffixed; do not hardcode `node_embedding` or similar.
+- Neo4j default credentials are `neo4j:litkglocal` per `.agents/external/litkg-rs/.env.example`. HTTP at `http://127.0.0.1:7474`, Bolt at `bolt://127.0.0.1:7687`.
+- Ollama tunnel expected at `http://127.0.0.1:11434` (Mac runs `ollama serve`; reverse-tunnel via `ssh -N -R 11434:127.0.0.1:11434 ubuntu`). All embedding/chat-backed kg operations gracefully skip when the tunnel is down — they never fail loudly.
+- `paper:*` synthetic nodes lose `ParsedPaper.provenance` during ingest. Their `source_path` is null, blocking `[authority_tiers]` glob-based promotion. Workaround: lexical-search the citation key (`make kg-search KG_QUERY='hestia-lu2026'`) or the on-disk QMD path (`docs/contents/literature/*.qmd`).
+- `kg-search`, `kg-route`, `kg-claim-check` produce compact output by default since `c861d46`. Use `KG_VERBOSE=1` for full text or `KG_FORMAT=json` for raw JSON. Don't read the verbose form by default — it's >1000 lines.
+- `kg find` (the underlying CLI verb) does **pure lexical token matching** — no stemming, no synonyms, no embedding similarity. Typos collapse to single-token searches and lose. Filed as `todo-066`/`todo-067`.
+- `make kg-claim-check` accepts only authority labels `canonical | active` for verdict counting (ranking.rs:46-54, context_pack.rs:1727). Labels below 1.2 multiplier are skipped even on exact lexical match.
