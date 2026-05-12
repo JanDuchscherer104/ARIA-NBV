@@ -25,7 +25,24 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class CompactObbBlock:
-    """Collatable numeric OBB payload used by training and diagnostics."""
+    """Collatable numeric OBB payload used by training and diagnostics.
+
+    `obbs` keeps the raw EFM `ObbTW` backing layout, not a simplified center
+    size representation. The shape is `(..., K, 34)`, where `K` is a padded box
+    slot count. Valid boxes must be determined through
+    `ObbTW(obbs).get_padding_mask()`.
+
+    The last dimension follows the EFM layout:
+
+    * `0:6`: object-frame 3D bounds `[xmin, xmax, ymin, ymax, zmin, zmax]`;
+    * `6:10`, `10:14`, `14:18`: RGB, SLAM-left, and SLAM-right 2D boxes;
+    * `18:30`: `PoseTW` object-to-world/object-to-snippet transform payload;
+    * `30`, `31`, `32`, `33`: semantic id, instance id, confidence, movable.
+
+    The tensor is stored as `float32` even for id-like columns; use `ObbTW`
+    properties such as `sem_id`, `inst_id`, `prob`, `bb3_center_world`, and
+    `bb3_diagonal` when interpreting rows.
+    """
 
     obbs: Tensor
     """OBB tensor with shape ``(..., K, 34)`` using EFM ``ObbTW`` layout."""
@@ -172,6 +189,7 @@ class VinOracleBatch:
             return arange < counts
         return arange.unsqueeze(0) < counts.unsqueeze(1)
 
+    # TODO: derive all data-classes like this one from a shared base - i.e. BaseView, curretly defined in efm_views.py - so move this shared base out of this leaf node!
     def shape_summary(self) -> dict[str, str]:
         """Summarize tensor shapes for diagnostics/logging."""
 

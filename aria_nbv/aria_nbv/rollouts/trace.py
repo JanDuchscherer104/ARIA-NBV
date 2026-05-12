@@ -1,0 +1,211 @@
+"""Minimal rollout replay inputs shared by the Zarr writer.
+
+`rollouts.zarr` stores facts derived from existing counterfactual rollout
+results. This module intentionally does not define a second serializable trace
+hierarchy; it only carries invalidity constants, lineage facts, and the compact
+record that pairs a `CounterfactualRolloutResult` with source/target lineage.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+from typing import Any
+
+import torch
+
+from ..pose_generation.counterfactuals import (
+    CounterfactualRolloutResult,
+    CounterfactualSelectionPolicy,
+    CounterfactualTrajectory,
+)
+
+INVALID_REASON_CODES: dict[str, int] = {
+    "VALID": 0,
+    "POSE_NONFINITE": 1,
+    "POSE_OUT_OF_EXTENT": 2,
+    "CAMERA_OUT_OF_EXTENT": 3,
+    "COLLISION_MESH": 4,
+    "CLEARANCE_TOO_SMALL": 5,
+    "PATH_SEGMENT_COLLISION": 6,
+    "FRUSTUM_OUT_OF_BOUNDS": 7,
+    "DEPTH_NO_HIT": 8,
+    "DEPTH_TOO_SPARSE": 9,
+    "BACKPROJECT_EMPTY": 10,
+    "CANDIDATE_DUPLICATE": 11,
+    "SAMPLER_RULE_REJECTED": 12,
+    "TARGET_NOT_ACTOR_VISIBLE": 13,
+    "TARGET_GT_UNMATCHED": 14,
+    "TARGET_CROP_EMPTY": 15,
+    "TARGET_SUPPORT_TOO_LOW": 16,
+    "TARGET_VISIBILITY_TOO_LOW": 17,
+    "SEMIDENSE_SUPPORT_TOO_LOW": 18,
+    "EVL_EVIDENCE_MISSING": 19,
+    "MESH_REFERENCE_MISSING": 20,
+    "ORACLE_DISTANCE_FAILED": 21,
+    "CANDIDATE_ORDER_GUARD_FAILED": 22,
+    "RUNTIME_ERROR": 23,
+}
+"""Version-1 invalidity reason bit positions for rollout replay tables."""
+
+INVALID_REASON_VERSION = "rollout-invalidity-v1"
+"""Version label for `INVALID_REASON_CODES`."""
+
+_RULE_REASON_BITS = {
+    "FreeSpaceRule": INVALID_REASON_CODES["POSE_OUT_OF_EXTENT"],
+    "MinDistanceToMeshRule": INVALID_REASON_CODES["CLEARANCE_TOO_SMALL"],
+    "PathCollisionRule": INVALID_REASON_CODES["PATH_SEGMENT_COLLISION"],
+}
+
+
+@dataclass(slots=True)
+class RolloutLineage:
+    """Deterministic provenance for one rollout root and target."""
+
+    rollout_id: str = ""
+    """Stable rollout identifier; filled from `RolloutZarrRecord` per retained chain."""
+
+    chain_id: int = 0
+    """Zero-based retained trajectory index."""
+
+    scene_id: str | None = None
+    snippet_id: str | None = None
+    mesh_version: str | None = None
+    candidate_config_hash: str | None = None
+    oracle_config_hash: str | None = None
+    model_checkpoint_hash: str | None = None
+    random_seed: int | None = None
+    rollout_policy: str = "unknown"
+    source_cache_version: str | None = None
+    split: str | None = None
+    source_offline_store_manifest_hash: str | None = None
+    source_row_id: int | None = None
+    source_sample_index: int | None = None
+    source_sample_key: str | None = None
+    split_manifest_hash: str | None = None
+    source_shard_id: str | None = None
+    source_shard_row: int | None = None
+    rollout_config_hash: str | None = None
+    branch_schedule_id: str | None = None
+    target_row_id: int | None = None
+    target_id: str | None = None
+    target_protocol_version: str | None = None
+    target_crop_policy: str | None = None
+    reason_code_version: str = INVALID_REASON_VERSION
+    selection_rng_state_hash: str | None = None
+    target_selection_policy: str | None = None
+    target_selection_rank: int | None = None
+    target_selection_score: float | None = None
+    target_selection_probability: float | None = None
+    target_selection_temperature: float | None = None
+    target_invalid_reason_bitset: int | None = None
+    target_primary_invalid_reason: int | None = None
+    target_reason_code_version: str | None = None
+    matched_gt_target_row_id: int | None = None
+    matched_gt_target_id: str | None = None
+    gt_match_iou: float | None = None
+    gt_match_score: float | None = None
+    gt_match_status: str | None = None
+
+
+@dataclass(slots=True)
+class RolloutZarrRecord:
+    """One counterfactual rollout result plus source/target lineage."""
+
+    result: CounterfactualRolloutResult
+    lineage: RolloutLineage
+    rollout_id_prefix: str
+
+    def lineage_for_chain(self, chain_id: int) -> RolloutLineage:
+        """Return lineage with rollout id and chain id for one retained trajectory."""
+
+        return replace(
+            self.lineage,
+            rollout_id=f"{self.rollout_id_prefix}-{chain_id:06d}",
+            chain_id=chain_id,
+            rollout_policy=_policy_name(self.result.selection_policy),
+        )
+
+
+def _full_candidate_vector(
+    values: torch.Tensor,
+    candidate_valid: torch.Tensor,
+    *,
+    fill_value: float | int | None = None,
+    require_full_shell: bool = False,
+) -> torch.Tensor:
+    valid_values = values.detach().cpu().reshape(-1)
+    valid_mask = candidate_valid.detach().cpu().to(dtype=torch.bool).reshape(-1)
+    if require_full_shell:
+        if valid_values.numel() != valid_mask.numel():
+            raise ValueError(f"Expected {valid_mask.numel()} full-shell values, got {valid_values.numel()}.")
+        return valid_values
+    valid_count = int(valid_mask.sum().item())
+    if valid_values.numel() != valid_count:
+        raise ValueError(f"Expected {valid_count} valid values, got {valid_values.numel()}.")
+    if fill_value is None:
+        fill_value = float("nan") if torch.is_floating_point(valid_values) else 0
+    full = torch.full(valid_mask.shape, fill_value, dtype=valid_values.dtype, device=valid_values.device)
+    full[valid_mask] = valid_values
+    return full
+
+
+def _full_shell_or_default(
+    values: torch.Tensor | None,
+    candidate_valid: torch.Tensor,
+    *,
+    fill_value: float | int,
+) -> torch.Tensor:
+    valid_mask = candidate_valid.detach().cpu().to(dtype=torch.bool).reshape(-1)
+    if values is None:
+        dtype = torch.float32 if isinstance(fill_value, float) else torch.int64
+        return torch.full(valid_mask.shape, fill_value, dtype=dtype)
+    return _full_candidate_vector(values, candidate_valid, fill_value=fill_value, require_full_shell=True)
+
+
+def _candidate_invalid_reasons(candidates: Any) -> tuple[torch.Tensor, torch.Tensor]:
+    valid_mask = candidates.mask_valid.detach().cpu().to(dtype=torch.bool).reshape(-1)
+    bitset = torch.zeros(valid_mask.shape, dtype=torch.int64)
+    primary = torch.full(valid_mask.shape, INVALID_REASON_CODES["SAMPLER_RULE_REJECTED"], dtype=torch.int64)
+    bitset[valid_mask] = 1 << INVALID_REASON_CODES["VALID"]
+    primary[valid_mask] = INVALID_REASON_CODES["VALID"]
+
+    previous = torch.ones_like(valid_mask)
+    for rule_name, cumulative_mask in candidates.masks.items():
+        current = cumulative_mask.detach().cpu().to(dtype=torch.bool).reshape(-1)
+        if current.shape != valid_mask.shape:
+            continue
+        failed_here = previous & (~current)
+        reason_bit = _RULE_REASON_BITS.get(rule_name, INVALID_REASON_CODES["SAMPLER_RULE_REJECTED"])
+        bitset[failed_here] = bitset[failed_here] | (1 << reason_bit)
+        primary[failed_here] = reason_bit
+        previous = current
+
+    unresolved_invalid = (~valid_mask) & (bitset == 0)
+    bitset[unresolved_invalid] = 1 << INVALID_REASON_CODES["SAMPLER_RULE_REJECTED"]
+
+    shell = candidates.shell_poses.tensor().detach().cpu()
+    nonfinite = ~torch.isfinite(shell.reshape(shell.shape[0], -1)).all(dim=1)
+    bitset[nonfinite] = bitset[nonfinite] | (1 << INVALID_REASON_CODES["POSE_NONFINITE"])
+    primary[nonfinite] = INVALID_REASON_CODES["POSE_NONFINITE"]
+
+    return bitset.to(dtype=torch.int64), primary.to(dtype=torch.int64)
+
+
+def _termination_reason(result: CounterfactualRolloutResult, trajectory: CounterfactualTrajectory) -> str:
+    if trajectory.terminated_early:
+        return "terminated_early"
+    if len(trajectory.steps) >= int(result.horizon):
+        return "fixed_horizon"
+    return "incomplete_rollout"
+
+
+def _policy_name(policy: str | CounterfactualSelectionPolicy) -> str:
+    return policy.value if isinstance(policy, CounterfactualSelectionPolicy) else str(policy)
+
+
+__all__ = [
+    "INVALID_REASON_CODES",
+    "INVALID_REASON_VERSION",
+    "RolloutLineage",
+    "RolloutZarrRecord",
+]

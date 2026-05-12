@@ -54,7 +54,7 @@ PY
 ## CUDA and CPU Expectations {#cuda-and-cpu-expectations}
 
 CPU-only machines are suitable for docs work, config validation, lightweight
-tests, immutable-store reads, and the synthetic rollout trace smoke command.
+tests, immutable-store reads, and rollout-builder dry-run validation.
 They are not the expected path for full ASE oracle generation, EVL backbone
 materialization, PyTorch3D depth rendering, or VIN training.
 
@@ -162,11 +162,11 @@ uv run nbv-rerun-inspect --config-path ../.configs/rerun_offline_smoke_v7.toml -
 The Rerun inspector is diagnostic-only. Its downsampling is display-only and
 must not be treated as label, ranking, or training behavior.
 
-For CPU-only rollout trace plumbing without ASE data:
+For local rollout-store plumbing, use the current V1 rollout builder smoke config:
 
 ```sh
 cd aria_nbv
-uv run nbv-rollout-trace-smoke --output-path ../.artifacts/rollouts/synthetic_rollout_traces.msgpack
+uv run nbv-build-rollouts --config-path ../.configs/build_rollouts_v1_smoke.toml --dry-run
 ```
 
 ## Entry Points {#entry-points}

@@ -8,7 +8,7 @@ from pydantic import Field
 from torch import Tensor, nn
 
 from ...rri_metrics.coral import CoralLayer
-from ...utils import BaseConfig
+from ...utils import TargetConfig
 
 
 class VinScorerHead(nn.Module):
@@ -49,11 +49,11 @@ class VinScorerHead(nn.Module):
         return self.coral(self.mlp(x))
 
 
-class VinScorerHeadConfig(BaseConfig):
+class VinScorerHeadConfig(TargetConfig[VinScorerHead]):
     """Configuration for `VinScorerHead`."""
 
     @property
-    def target(self) -> type[VinScorerHead]:
+    def target_type(self) -> type[VinScorerHead]:
         """Factory target for `BaseConfig.setup_target`."""
         return VinScorerHead
 
@@ -72,7 +72,7 @@ class VinScorerHeadConfig(BaseConfig):
     activation: Literal["gelu", "relu"] = "gelu"
     """Activation function."""
 
-    def setup_target(self, *, in_dim: int | None = None) -> VinScorerHead:  # type: ignore[override]
+    def setup_target(self, *, in_dim: int | None = None) -> VinScorerHead:
         return self.target(self, in_dim=in_dim)
 
 

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import TYPE_CHECKING
 
 import torch
 from efm3d.aria.aria_constants import ARIA_SNIPPET_T_WORLD_SNIPPET
@@ -29,6 +29,10 @@ from torch import Tensor
 from ..utils import TargetConfig
 from ..vin.types import EvlBackboneOutput
 from .efm_views import EfmSnippetView, VinSnippetView
+from .vin_oracle_types import CompactObbBlock
+
+if TYPE_CHECKING:
+    from ._offline_dataset import VinOfflineSample
 
 
 class TargetSelectionPolicy(StrEnum):
@@ -164,12 +168,6 @@ class _TargetSource:
     sem_id_to_name: list[str] | None = None
 
 
-class _TargetSelectionSourceSample(Protocol):
-    gt_obbs: Any | None
-    detected_obbs: Any | None
-    backbone_out: EvlBackboneOutput | None
-
-
 class TargetSelectorConfig(TargetConfig["ActorVisibleTargetSelector"]):
     """Configuration for `ActorVisibleTargetSelector`."""
 
@@ -243,8 +241,8 @@ class ActorVisibleTargetSelector:
 
         self.config = config
 
-    def select(self, sample: Any) -> TargetSelectionResult:
-        """Select top-K targets from a VIN offline sample or oracle batch.
+    def select(self, sample: "VinOfflineSample") -> TargetSelectionResult:
+        """Select top-K targets from a VIN offline sample.
 
         Args:
             sample: Object carrying ``detected_obbs`` or ``backbone_out`` for
@@ -254,6 +252,10 @@ class ActorVisibleTargetSelector:
             Ranked target table and selected top-K rows.
         """
 
+        from ._offline_dataset import VinOfflineSample
+
+        if not isinstance(sample, VinOfflineSample):
+            raise TypeError("ActorVisibleTargetSelector expects VinOfflineSample input.")
         warnings: list[str] = []
         source = self._resolve_source(sample, warnings=warnings)
         if source is None:
@@ -292,7 +294,7 @@ class ActorVisibleTargetSelector:
             warnings=tuple(warnings),
         )
 
-    def _resolve_source(self, sample: _TargetSelectionSourceSample, *, warnings: list[str]) -> _TargetSource | None:
+    def _resolve_source(self, sample: "VinOfflineSample", *, warnings: list[str]) -> _TargetSource | None:
         """Resolve the OBB source allowed by the selector mode.
 
         V0 sanity mode intentionally reads GT OBBs. V1 first prefers
@@ -333,7 +335,13 @@ class ActorVisibleTargetSelector:
         warnings.append("No actor-visible detected/predicted OBB source was available for target selection.")
         return None
 
-    def _build_rows(self, sample: Any, *, source: _TargetSource, world_obbs: ObbTW) -> tuple[TargetCandidateRow, ...]:
+    def _build_rows(
+        self,
+        sample: "VinOfflineSample",
+        *,
+        source: _TargetSource,
+        world_obbs: ObbTW,
+    ) -> tuple[TargetCandidateRow, ...]:
         valid_data, source_indices = _valid_obb_data_with_source_indices(world_obbs)
         if valid_data.numel() == 0:
             return ()
@@ -341,8 +349,8 @@ class ActorVisibleTargetSelector:
         semidense_points = _semidense_points(sample, max_points=self.config.max_support_points)
         evl_points, evl_counts = _evl_support_points(sample, max_points=self.config.max_support_points)
         reference_pose = _reference_pose_world_rig(sample)
-        scene_id = _string_or_none(getattr(sample, "scene_id", None))
-        snippet_id = _string_or_none(getattr(sample, "snippet_id", None))
+        scene_id = _first_scalar_string(sample.scene_id)
+        snippet_id = _first_scalar_string(sample.snippet_id)
 
         rows: list[TargetCandidateRow] = []
         for row_index in range(int(obbs.shape[0])):
@@ -356,7 +364,9 @@ class ActorVisibleTargetSelector:
             relative_pose = (reference_pose.inverse() @ obb.T_world_object).tensor().detach().cpu().reshape(-1)
             projected_area = _max_projected_area(obb)
             projected_fraction = projected_area / float(self.config.projected_area_normalizer_pixels)
-            visibility_score = _clamp01(projected_fraction / self.config.projected_area_full_score_fraction)
+            visibility_score = max(
+                0.0, min(float(projected_fraction / self.config.projected_area_full_score_fraction), 1.0)
+            )
             semidense_count = _points_inside_count(obb, semidense_points, scale=self.config.obb_support_scale)
             evl_count = _points_inside_count(
                 obb,
@@ -365,8 +375,10 @@ class ActorVisibleTargetSelector:
                 positive_counts=evl_counts,
             )
             total_support = semidense_count + evl_count
-            support_score = _clamp01(total_support / float(self.config.min_support_points))
-            deficit_score = 1.0 - _clamp01(total_support / float(self.config.support_saturation_points))
+            support_score = max(0.0, min(float(total_support / float(self.config.min_support_points)), 1.0))
+            deficit_score = 1.0 - max(
+                0.0, min(float(total_support / float(self.config.support_saturation_points)), 1.0)
+            )
             reason_bitset = _target_reason_bitset(
                 obb=obb,
                 confidence=confidence,
@@ -460,7 +472,7 @@ class ActorVisibleTargetSelector:
         self,
         selected_rows: tuple[TargetCandidateRow, ...],
         *,
-        sample: Any,
+        sample: "VinOfflineSample",
         pred_obbs_world: ObbTW,
     ) -> tuple[TargetCandidateRow, ...]:
         if not selected_rows:
@@ -480,7 +492,7 @@ class ActorVisibleTargetSelector:
             )
         if not self.config.match_gt:
             return selected_rows
-        gt_block = _compact_obb_block(getattr(sample, "gt_obbs", None))
+        gt_block = _compact_obb_block(sample.gt_obbs)
         if gt_block is None:
             return tuple(replace(row, gt_match_status="missing_gt") for row in selected_rows)
 
@@ -572,48 +584,19 @@ class ActorVisibleTargetSelector:
         )
 
 
-def _compact_obb_block(value: Any) -> tuple[ObbTW, list[str] | None] | None:
+def _compact_obb_block(value: CompactObbBlock | ObbTW | Tensor | None) -> tuple[ObbTW, list[str] | None] | None:
     if value is None:
         return None
-    obbs = getattr(value, "obbs", value)
+    obbs = value.obbs if isinstance(value, CompactObbBlock) else value
     if obbs is None:
         return None
-    sem_id_to_name = getattr(value, "sem_id_to_name", None)
+    sem_id_to_name = value.sem_id_to_name if isinstance(value, CompactObbBlock) else None
     if isinstance(obbs, ObbTW):
         return obbs, sem_id_to_name
     return ObbTW(torch.as_tensor(obbs, dtype=torch.float32)), sem_id_to_name
 
 
-def target_gt_aabb_world(
-    row: TargetCandidateRow,
-    # TODO(fix): why is sample of type any? aria_nbv.data_handling._offline_dataset.VinOfflineSample
-    sample: Any,
-    *,
-    margin_m: float = 0.0,
-) -> Tensor:
-    """Resolve the matched GT target OBB to a world-frame AABB.
-
-    Args:
-        row: Actor-visible target row after GT matching.
-        sample: VIN offline sample carrying ``gt_obbs`` and snippet transform.
-        margin_m: Optional symmetric world-space margin in metres.
-
-    Returns:
-        ``Tensor[6]`` in ``[xmin, xmax, ymin, ymax, zmin, zmax]`` order.
-
-    Raises:
-        ValueError: If the row is not label-valid or the matched GT row cannot
-            be resolved.
-    """
-
-    obb = target_gt_obb_world(row, sample)
-    corners = obb.bb3corners_world.detach().cpu().reshape(-1, 3).to(dtype=torch.float32)
-    lower = corners.min(dim=0).values - margin_m
-    upper = corners.max(dim=0).values + margin_m
-    return torch.stack([lower[0], upper[0], lower[1], upper[1], lower[2], upper[2]]).to(dtype=torch.float32)
-
-
-def target_gt_obb_world(row: TargetCandidateRow, sample: Any) -> ObbTW:
+def target_gt_obb_world(row: TargetCandidateRow, sample: "VinOfflineSample") -> ObbTW:
     """Resolve the matched GT target OBB in world coordinates.
 
     Args:
@@ -630,7 +613,7 @@ def target_gt_obb_world(row: TargetCandidateRow, sample: Any) -> ObbTW:
 
     if not row.gt_label_valid or row.gt_target_row_id is None:
         raise ValueError("Target row is not GT-label valid; refusing to build target RRI crop.")
-    gt_block = _compact_obb_block(getattr(sample, "gt_obbs", None))
+    gt_block = _compact_obb_block(sample.gt_obbs)
     if gt_block is None:
         raise ValueError("Target RRI crop requires sample.gt_obbs.")
     gt_world = _world_obbs_for_sample(gt_block[0], sample)
@@ -642,7 +625,7 @@ def target_gt_obb_world(row: TargetCandidateRow, sample: Any) -> ObbTW:
     return ObbTW(gt_data[gt_index].unsqueeze(0))
 
 
-def _world_obbs_for_sample(obbs: ObbTW, sample: Any) -> ObbTW:
+def _world_obbs_for_sample(obbs: ObbTW, sample: "VinOfflineSample") -> ObbTW:
     selected = _latest_valid_obb_slice(obbs)
     transform = _snippet_t_world_snippet(sample)
     if transform is None:
@@ -675,51 +658,35 @@ def _valid_obb_data_with_source_indices(obbs: ObbTW) -> tuple[Tensor, list[int]]
     return flat[valid], [int(index) for index in source_indices]
 
 
-def _snippet_t_world_snippet(sample: Any) -> PoseTW | None:
-    snippet = getattr(sample, "efm_snippet_view", None)
+def _sample_snippet_view(sample: "VinOfflineSample") -> EfmSnippetView | VinSnippetView:
+    return sample.efm_snippet_view if sample.efm_snippet_view is not None else sample.vin_snippet
+
+
+def _snippet_t_world_snippet(sample: "VinOfflineSample") -> PoseTW | None:
+    snippet = _sample_snippet_view(sample)
     if isinstance(snippet, EfmSnippetView):
         value = snippet.efm.get(ARIA_SNIPPET_T_WORLD_SNIPPET)
         if isinstance(value, PoseTW):
             return PoseTW(value.tensor().reshape(-1, 12)[:1])
         if torch.is_tensor(value):
             return PoseTW(value.reshape(-1, 12)[:1])
-    vin_snippet = getattr(sample, "vin_snippet", None)
-    if isinstance(vin_snippet, VinSnippetView):
-        poses = vin_snippet.t_world_rig.tensor().reshape(-1, 12)
-        if poses.shape[0] > 0:
-            return PoseTW(poses[:1])
-    efm_or_vin = getattr(sample, "efm_snippet_view", None)
-    if isinstance(efm_or_vin, VinSnippetView):
-        poses = efm_or_vin.t_world_rig.tensor().reshape(-1, 12)
+    if isinstance(snippet, VinSnippetView):
+        poses = snippet.t_world_rig.tensor().reshape(-1, 12)
         if poses.shape[0] > 0:
             return PoseTW(poses[:1])
     return None
 
 
-def _reference_pose_world_rig(sample: Any) -> PoseTW:
-    reference = getattr(sample, "reference_pose_world_rig", None)
-    if isinstance(reference, PoseTW):
-        return PoseTW(reference.tensor().reshape(-1, 12)[:1])
-    oracle = getattr(sample, "oracle", None)
-    reference = getattr(oracle, "reference_pose_world_rig", None)
-    if isinstance(reference, PoseTW):
-        return PoseTW(reference.tensor().reshape(-1, 12)[:1])
-    transform = _snippet_t_world_snippet(sample)
-    if transform is not None:
-        return transform
-    return PoseTW()
+def _reference_pose_world_rig(sample: "VinOfflineSample") -> PoseTW:
+    return PoseTW(sample.oracle.reference_pose_world_rig.tensor().reshape(-1, 12)[:1])
 
 
-# TODO: does this really need to cover all those cases or can we collapse it to the actual source? Currently type(sample) is aria_nbv.data_handling._offline_dataset.VinOfflineSample
-def _semidense_points(sample: Any, *, max_points: int) -> Tensor:
-    vin_snippet = getattr(sample, "vin_snippet", None)
-    if isinstance(vin_snippet, VinSnippetView):
-        return _valid_prefix_points(vin_snippet.points_world, vin_snippet.lengths, max_points=max_points)
-    efm_or_vin = getattr(sample, "efm_snippet_view", None)
-    if isinstance(efm_or_vin, VinSnippetView):
-        return _valid_prefix_points(efm_or_vin.points_world, efm_or_vin.lengths, max_points=max_points)
-    if isinstance(efm_or_vin, EfmSnippetView):
-        semidense = efm_or_vin.semidense
+def _semidense_points(sample: "VinOfflineSample", *, max_points: int) -> Tensor:
+    snippet = _sample_snippet_view(sample)
+    if isinstance(snippet, VinSnippetView):
+        return _valid_prefix_points(snippet.points_world, snippet.lengths, max_points=max_points)
+    if isinstance(snippet, EfmSnippetView):
+        semidense = snippet.semidense
         points = semidense.points_world
         lengths = semidense.lengths.to(device=points.device)
         max_len = points.shape[1]
@@ -740,8 +707,8 @@ def _valid_prefix_points(points: Tensor, lengths: Tensor, *, max_points: int) ->
     return pts[finite][:max_points]
 
 
-def _evl_support_points(sample: Any, *, max_points: int) -> tuple[Tensor, Tensor | None]:
-    backbone = getattr(sample, "backbone_out", None)
+def _evl_support_points(sample: "VinOfflineSample", *, max_points: int) -> tuple[Tensor, Tensor | None]:
+    backbone = sample.backbone_out
     if not isinstance(backbone, EvlBackboneOutput) or backbone.pts_world is None:
         return torch.zeros((0, 3), dtype=torch.float32), None
     points = backbone.pts_world.detach().cpu().to(dtype=torch.float32)
@@ -879,10 +846,11 @@ def _target_id(
     return f"{scene_id or 'scene'}:{snippet_id or 'snippet'}:{source}:sem={sem_id}:inst={inst_id}:idx={source_index}"
 
 
-# TODO: inline, don't use gettatr, corretly typed samples + direct method / attribute access!
-def _string_or_none(value: Any) -> str | None:
+def _first_scalar_string(value: str | list[str] | None) -> str | None:
     if value is None:
         return None
+    if isinstance(value, list):
+        return None if not value else str(value[0])
     return str(value)
 
 
@@ -891,11 +859,6 @@ def _float_tuple(values: Tensor, *, length: int | None = None) -> tuple[float, .
     if length is not None:
         flat = flat[:length]
     return tuple(float(value.item()) for value in flat)
-
-
-# TODO: inline this function!
-def _clamp01(value: float) -> float:
-    return max(0.0, min(float(value), 1.0))
 
 
 __all__ = [
@@ -907,6 +870,5 @@ __all__ = [
     "TargetSelectionResult",
     "TargetSelectorConfig",
     "TargetSourceMode",
-    "target_gt_aabb_world",
     "target_gt_obb_world",
 ]

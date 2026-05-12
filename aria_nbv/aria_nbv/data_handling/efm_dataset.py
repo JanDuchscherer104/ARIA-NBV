@@ -25,7 +25,7 @@ from pydantic import Field, ValidationInfo, field_validator, model_validator
 from torch.utils.data import IterableDataset
 
 from ..configs import PathConfig
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from .efm_dataset_utils import (
     _find_tar_for_sample,
     _infer_ids,
@@ -40,14 +40,14 @@ from .efm_views import EfmSnippetView
 from .mesh_cache import MeshProcessSpec, load_or_process_mesh
 
 
-class AseEfmDatasetConfig(BaseConfig):
+class AseEfmDatasetConfig(TargetConfig["AseEfmDataset"]):
     """Configuration for `AseEfmDataset`."""
 
     cache_exclude_fields: ClassVar[set[str]] = {"tar_urls", "scene_to_mesh"}
     """Fields omitted from cache snapshots because they are large or derived."""
 
     @property
-    def target(self) -> type["AseEfmDataset"]:
+    def target_type(self) -> type["AseEfmDataset"]:
         """Factory target for `BaseConfig.setup_target`."""
         return AseEfmDataset
 
@@ -305,7 +305,7 @@ class AseEfmDatasetConfig(BaseConfig):
 
         return self
 
-    def setup_target(self) -> AseEfmDataset:  # type: ignore[override]
+    def setup_target(self) -> AseEfmDataset:
         """Instantiate the configured raw EFM dataset."""
         console = Console.with_prefix(
             self.__class__.__name__,

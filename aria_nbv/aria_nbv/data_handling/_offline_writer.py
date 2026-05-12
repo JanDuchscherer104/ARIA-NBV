@@ -17,31 +17,24 @@ because the numeric blocks are the canonical offline training contract.
 from __future__ import annotations
 
 import hashlib
-import json
+import re
 import shutil
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
 from efm3d.aria.aria_constants import ARIA_OBB_SEM_ID_TO_NAME
-from efm3d.aria.obb import ObbTW
-from efm3d.aria.pose import PoseTW
-from numpy.typing import DTypeLike, NDArray
 from pydantic import Field
 
 from ..configs import PathConfig
-from ..pipelines.oracle_rri_labeler import OracleRriLabelerConfig, OracleRriSample
-from ..pose_generation.types import CandidateSamplingResult
-from ..rendering.candidate_depth_renderer import CandidateDepths
-from ..rendering.candidate_pointclouds import CandidatePointClouds
-from ..rri_metrics.types import RriResult
+from ..pipelines.oracle_rri_labeler import OracleRriLabelerConfig
 from ..utils import Console, TargetConfig, Verbosity
+from ..utils.fingerprints import stable_json_signature
 from ..vin.backbone_evl import EvlBackboneConfig
-from ..vin.types import EvlBackboneOutput
 from ._offline_format import (
     VinOfflineIndexRecord,
     VinOfflineManifest,
@@ -54,8 +47,19 @@ from ._offline_store import (
     VinOfflineStoreConfig,
 )
 from ._raw import AseEfmDatasetConfig, EfmSnippetView, VinSnippetView
-from ._sample_keys import sanitize_token
-from ._vin_runtime import DEFAULT_VIN_SNIPPET_PAD_POINTS, build_vin_snippet_view
+from .vin_adapter import DEFAULT_VIN_SNIPPET_PAD_POINTS, build_vin_snippet_view
+
+if TYPE_CHECKING:
+    from efm3d.aria.obb import ObbTW
+    from efm3d.aria.pose import PoseTW
+    from numpy.typing import DTypeLike, NDArray
+
+    from ..pipelines.oracle_rri_labeler import OracleRriSample
+    from ..pose_generation.types import CandidateSamplingResult
+    from ..rendering.candidate_depth_renderer import CandidateDepths
+    from ..rendering.candidate_pointclouds import CandidatePointClouds
+    from ..rri_metrics.types import RriResult
+    from ..vin.types import EvlBackboneOutput
 
 DEFAULT_BACKBONE_NUMERIC_KEEP_FIELDS: tuple[str, ...] = (
     "t_world_voxel",
@@ -103,8 +107,7 @@ def _json_signature(payload: dict[str, Any]) -> str:
         Stable SHA-1 hex digest.
     """
 
-    serial = json.dumps(payload, sort_keys=True, ensure_ascii=True)
-    return hashlib.sha1(serial.encode("utf-8")).hexdigest()
+    return stable_json_signature(payload)
 
 
 def _split_membership_rank(sample_key: str) -> str:
@@ -124,7 +127,9 @@ def _default_sample_key(scene_id: str, snippet_id: str) -> str:
         Stable sample key.
     """
 
-    return f"{sanitize_token(scene_id)}::{sanitize_token(snippet_id)}"
+    scene = re.sub(r"[^0-9a-zA-Z._-]+", "_", scene_id).strip("_")
+    snippet = re.sub(r"[^0-9a-zA-Z._-]+", "_", snippet_id).strip("_")
+    return f"{scene}::{snippet}"
 
 
 def _to_numpy(

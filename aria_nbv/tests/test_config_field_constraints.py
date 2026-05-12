@@ -11,9 +11,6 @@ pytest.importorskip("efm3d")
 
 from aria_nbv.app.config import RlPageConfig
 from aria_nbv.data_handling import (
-    RolloutDatasetWriterConfig,
-    RolloutRecipeConfig,
-    RolloutZarrStoreConfig,
     TargetSelectorConfig,
     VinOfflineWriterConfig,
 )
@@ -32,6 +29,7 @@ from aria_nbv.rerun_inspector._config import (
     RerunInspectorOutputConfig,
 )
 from aria_nbv.rl import CounterfactualRLEnvConfig
+from aria_nbv.rollouts import RolloutDatasetWriterConfig, RolloutRecipeConfig, RolloutZarrStoreConfig
 from aria_nbv.utils.grad_norms import GradNormLoggingConfig
 from aria_nbv.vin.experimental.model_v1_SH import VinModelConfig as ShVinModelConfig
 from aria_nbv.vin.pose_encoders import R6dLffPoseEncoderConfig

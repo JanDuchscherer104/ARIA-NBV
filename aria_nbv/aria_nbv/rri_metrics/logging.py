@@ -21,7 +21,7 @@ from torchmetrics import Metric as MetricBase
 from torchmetrics.classification import MulticlassConfusionMatrix
 from torchmetrics.regression import SpearmanCorrCoef
 
-from ..utils import BaseConfig, Stage, ValueStrEnum
+from ..utils import Stage, TargetConfig, ValueStrEnum
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,18 +269,18 @@ class VinMetrics(MetricBase):
         self.has_updates.fill_(False)
 
 
-class VinMetricsConfig(BaseConfig):
+class VinMetricsConfig(TargetConfig[VinMetrics]):
     """Configuration for VIN torchmetrics bundles."""
 
     @property
-    def target(self) -> type[VinMetrics]:
+    def target_type(self) -> type[VinMetrics]:
         """Factory target for `aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return VinMetrics
 
     num_classes: int
     """Number of ordinal classes used for confusion/histogram metrics."""
 
-    def setup_target(self) -> VinMetrics:  # type: ignore[override]
+    def setup_target(self) -> VinMetrics:
         return self.target(num_classes=int(self.num_classes))
 
 

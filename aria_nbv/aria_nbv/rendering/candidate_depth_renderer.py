@@ -14,17 +14,12 @@ depths or backprojected point clouds are retained in a rollout store.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING
 
 import torch
-from efm3d.aria import CameraTW, PoseTW
 from pydantic import Field, field_validator
-from pytorch3d.renderer.cameras import (
-    PerspectiveCameras,  # type: ignore[import-untyped]
-)
 
-from ..data_handling import EfmSnippetView
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..utils.typed_payloads import from_serializable, to_serializable
 from .pytorch3d_depth_renderer import (
     Pytorch3DDepthRenderer,
@@ -32,6 +27,10 @@ from .pytorch3d_depth_renderer import (
 )
 
 if TYPE_CHECKING:
+    from efm3d.aria import CameraTW, PoseTW
+    from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import-untyped]
+
+    from ..data_handling import EfmSnippetView
     from ..pose_generation.types import CandidateSamplingResult
 
 
@@ -91,12 +90,12 @@ class CandidateDepths:
         return from_serializable(cls, payload, device=device)
 
 
-class CandidateDepthRendererConfig(BaseConfig):
+class CandidateDepthRendererConfig(TargetConfig["CandidateDepthRenderer"]):
     @property
-    def target(self) -> type["CandidateDepthRenderer"]:
+    def target_type(self) -> type["CandidateDepthRenderer"]:
         return CandidateDepthRenderer
 
-    device: Annotated[torch.device, Field(default="auto")]
+    device: torch.device = Field(default="auto")
 
     renderer: Pytorch3DDepthRendererConfig = Field(
         default_factory=Pytorch3DDepthRendererConfig,

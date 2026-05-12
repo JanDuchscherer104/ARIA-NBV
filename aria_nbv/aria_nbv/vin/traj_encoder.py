@@ -10,7 +10,7 @@ from pydantic import Field
 from torch import Tensor, nn
 
 from ..data_handling import EfmTrajectoryView
-from ..utils import BaseConfig
+from ..utils import TargetConfig
 from .pose_encoders import PoseEncodingOutput, R6dLffPoseEncoder, R6dLffPoseEncoderConfig
 
 
@@ -30,11 +30,11 @@ class TrajectoryEncodingOutput:
     """``Tensor["B E", float32]`` pooled trajectory embedding (or None)."""
 
 
-class TrajectoryEncoderConfig(BaseConfig):
+class TrajectoryEncoderConfig(TargetConfig["TrajectoryEncoder"]):
     """Configuration for `TrajectoryEncoder`."""
 
     @property
-    def target(self) -> type["TrajectoryEncoder"]:
+    def target_type(self) -> type["TrajectoryEncoder"]:
         """Factory target for `aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return TrajectoryEncoder
 

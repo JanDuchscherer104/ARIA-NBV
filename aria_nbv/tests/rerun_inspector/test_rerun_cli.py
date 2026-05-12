@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 
 from aria_nbv.rerun_inspector import _cli, _rollout_zarr
 from aria_nbv.rerun_inspector._config import RerunOfflineInspectorConfig
 from aria_nbv.rerun_inspector._metadata import OfflineVisualInventory
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_cli_applies_selection_and_save_overrides(

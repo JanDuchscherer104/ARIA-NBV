@@ -187,6 +187,10 @@ quartodoc:
           include_imports: true
           children: separate
           member_options: *embedded_members
+        - name: rollouts
+          include_imports: true
+          children: separate
+          member_options: *embedded_members
         - name: rendering
           include_imports: true
           children: separate
@@ -228,12 +232,6 @@ quartodoc:
         - name: data_handling._target_selection
           children: separate
           member_options: *embedded_members
-        - name: data_handling._rollout_dataset_writer
-          children: separate
-          member_options: *embedded_members
-        - name: data_handling._rollout_zarr_store
-          children: separate
-          member_options: *embedded_members
         - name: pose_generation.candidate_generation
           children: separate
           member_options: *embedded_members
@@ -243,13 +241,19 @@ quartodoc:
         - name: pose_generation.counterfactuals
           children: separate
           member_options: *embedded_members
-        - name: pose_generation.rollout_trace
-          children: separate
-          member_options: *embedded_members
         - name: pose_generation.target_counterfactuals
           children: separate
           member_options: *embedded_members
         - name: pose_generation.types
+          children: separate
+          member_options: *embedded_members
+        - name: rollouts.trace
+          children: separate
+          member_options: *embedded_members
+        - name: rollouts.dataset_writer
+          children: separate
+          member_options: *embedded_members
+        - name: rollouts.zarr_store
           children: separate
           member_options: *embedded_members
         - name: rendering.candidate_depth_renderer

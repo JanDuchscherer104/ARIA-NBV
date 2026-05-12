@@ -22,10 +22,9 @@ low RRI values.
 - Immutable one-step cache: `VinOfflineWriterConfig`, `VinOfflineWriter`,
   `VinOfflineDatasetConfig`, `VinOfflineStoreConfig`, `VinOfflineManifest`,
   and `VinOfflineIndexRecord`.
-- Target and rollout replay: `ActorVisibleTargetSelector`,
-  `TargetSelectorConfig`, `RolloutDatasetWriterConfig`,
-  `RolloutDatasetWriter`, `RolloutZarrStoreConfig`,
-  `RolloutZarrStoreReader`, and `validate_rollout_zarr_store`.
+- Target selection: `ActorVisibleTargetSelector` and
+  `TargetSelectorConfig`. Multi-step rollout generation, compact Zarr records,
+  and rollout stores live in `aria_nbv.rollouts`.
 - Diagnostics: `collect_vin_offline_dataset_stats`,
   `collect_vin_offline_dataset_coverage`, and
   `collect_offline_visual_inventory`.
@@ -45,30 +44,57 @@ tensors, full meshes, or raw camera streams into every rollout sample.
 
 ```mermaid
 flowchart LR
-  Raw["ASE / ATEK / EFM assets<br/>RGB, calibration, trajectory, semidense points, meshes"]
-  VinWriter["VinOfflineWriter<br/>one-step candidate/oracle/cache build"]
-  VinStore["vin_offline<br/>strict immutable indexed shards"]
-  VinDataset["VinOfflineDataset<br/>sample or batch reader"]
-  TargetSel["ActorVisibleTargetSelector<br/>V1 targets from observed records"]
-  CandidateGen["Candidate mixture generator<br/>finite cal(Q)_t with provenance"]
-  Oracle["Target RRI scorer<br/>GT-only crop and labels"]
-  RolloutWriter["RolloutDatasetWriter<br/>policies, chains, masks"]
-  RolloutStore["rollouts_v1<br/>sharded multi-step replay collection"]
-  Joined["RolloutJoinedDataset<br/>training and inspection API"]
-  Inspect["Rerun / Streamlit<br/>store summaries and selected traces"]
+  subgraph Source["Source assets"]
+    Raw["ASE / ATEK / EFM<br/>RGB, calibration, trajectory<br/>semidense points, GT meshes"]
+  end
 
-  Raw --> VinWriter --> VinStore
-  VinStore --> VinDataset
-  Raw --> VinDataset
-  VinDataset --> TargetSel --> CandidateGen
-  VinDataset --> Oracle
-  CandidateGen --> RolloutWriter
-  Oracle --> RolloutWriter
+  subgraph OneStep["Immutable one-step substrate"]
+    VinWriter["VinOfflineWriter<br/>materialize cached blocks"]
+    VinStore["vin_offline<br/>strict indexed shards"]
+    VinDataset["VinOfflineDataset<br/>sample or batch reader"]
+  end
+
+  subgraph Generation["Target rollout generation"]
+    TargetSel["ActorVisibleTargetSelector<br/>V1 observed targets"]
+    CandidateGen["Candidate mixture<br/>finite cal(Q)_t + provenance"]
+    Oracle["Target RRI scorer<br/>GT-only crop and labels"]
+    RolloutWriter["RolloutDatasetWriter<br/>policies, chains, masks"]
+  end
+
+  subgraph Derived["Derived multi-step data"]
+    RolloutStore["rollouts_v1<br/>sharded replay collection"]
+  end
+
+  subgraph Consumers["Consumers"]
+    Joined["RolloutJoinedDataset<br/>single training API"]
+    Inspect["Rerun / Streamlit<br/>summary and rollout launch"]
+  end
+
+  Raw --> VinWriter --> VinStore --> VinDataset
+  Raw -. "live snippet + mesh refs" .-> VinDataset
+  VinDataset --> TargetSel --> CandidateGen --> RolloutWriter
+  VinDataset --> Oracle --> RolloutWriter
   RolloutWriter --> RolloutStore
   VinDataset --> Joined
   RolloutStore --> Joined
   RolloutStore --> Inspect
   VinDataset --> Inspect
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Raw input;
+  class VinWriter,TargetSel,CandidateGen,Oracle,RolloutWriter compute;
+  class VinStore,VinDataset,RolloutStore data;
+  class Joined,Inspect output;
+
+  style Source fill:#f1fff6,stroke:#97ddb5,stroke-width:2px,rx:12,ry:12
+  style OneStep fill:#f7f3ff,stroke:#cdb2ff,stroke-width:2px,rx:12,ry:12
+  style Generation fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12
+  style Derived fill:#f7f3ff,stroke:#cdb2ff,stroke-width:2px,rx:12,ry:12
+  style Consumers fill:#ffffff,stroke:#cbd5e1,stroke-width:1.5px,rx:12,ry:12
 ```
 
 The current implementation has a single standalone `rollouts.zarr` writer. The
@@ -120,8 +146,10 @@ classDiagram
     +run()
   }
 
-  class RolloutZarrStoreWriter {
-    +write(traces)
+  class RolloutZarrRecord {
+    +result
+    +lineage
+    +rollout_id_prefix
   }
 
   class RolloutZarrStoreReader {
@@ -146,8 +174,8 @@ classDiagram
   VinOfflineDataset --> VinOfflineSample
   VinOfflineSample --> ActorVisibleTargetSelector
   ActorVisibleTargetSelector --> RolloutDatasetWriter
-  RolloutDatasetWriter --> RolloutZarrStoreWriter
-  RolloutZarrStoreWriter --> RolloutZarrStoreReader
+  RolloutDatasetWriter --> RolloutZarrRecord
+  RolloutZarrRecord --> RolloutZarrStoreReader
   RolloutCollectionReader --> RolloutZarrStoreReader
   RolloutJoinedDataset --> VinOfflineDataset
   RolloutJoinedDataset --> RolloutCollectionReader
@@ -226,14 +254,12 @@ rollouts_v1/
     split=train/
       shard=000000.zarr/
         metadata/
+        sources/
         lineage/
-        source_rows/
-        mesh_refs/
         targets/
         rollouts/
         steps/
         candidates/
-        q_h/
         depths/
           selected_action/
           candidate_valid/        # optional heavier profile
@@ -243,7 +269,9 @@ rollouts_v1/
       shard=000000.zarr/
 ```
 
-Shards should be assigned by split plus bounded VIN source-row chunks. This
+Shards should be assigned by split plus bounded VIN source-row chunks. A shard
+stores its split as `rollouts/split_id`; it does not contain a separate
+shard-local `splits/` mirror because that only duplicates rollout rows. This
 keeps shard sizes predictable, avoids sample-level leakage across final splits,
 and gives Slurm/DSS jobs a simple resume key. Scene-level split boundaries are
 still owned by the source split manifest; a shard must not mix train/val/test.
@@ -253,14 +281,12 @@ still owned by the source split manifest; a shard must not mix train/val/test.
 | Group          | Responsibility                                                      | Redundancy rule                                                            |
 | -------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `metadata/`    | Schema, field-retention profile, depth profile, build stats.        | One copy per shard.                                                        |
-| `lineage/`     | Source manifest hashes, config hashes, split hash, policy ids.      | Required for every non-synthetic shard.                                    |
-| `source_rows/` | VIN sample keys, source row ids, scene/snippet ids.                 | References source rows; does not copy VIN tensors.                         |
-| `mesh_refs/`   | Full and simplified mesh URI/hash/version records.                  | Full meshes remain external.                                               |
+| `sources/`     | VIN offline source rows shared by many target/rollout chains.       | Owns sample key/index, split, and source manifest hashes.                   |
+| `lineage/`     | Rollout-row id plus config/protocol hashes.                         | Does not mirror source, rollout, target, step, or candidate fields.         |
 | `targets/`     | Actor-visible selected targets plus GT-match evaluation fields.     | Target crops may be embedded once per target.                              |
-| `rollouts/`    | One row per rollout chain and policy recipe.                        | No candidate arrays duplicated here.                                       |
+| `rollouts/`    | One row per rollout chain and policy recipe.                        | Owns split id, root pose, policy, horizon, and target-row links only.       |
 | `steps/`       | One row per time step in a rollout chain.                           | Links selected candidate by row id.                                        |
 | `candidates/`  | Full-shell candidate rows, masks, provenance, labels.               | Invalid candidates stay as masked rows.                                    |
-| `q_h/`         | Padded candidate-query tensors for finite-candidate value learning. | Derived view over `steps` and `candidates`.                                |
 | `depths/`      | ML-ready counterfactual depth renders.                              | Store selected-action depths by default; all-valid depths only by profile. |
 | `diagnostics/` | Optional summaries and retained heavy debug payloads.               | Never required for training.                                               |
 
@@ -275,69 +301,72 @@ One trainable multi-step sample is a joined view over one source row, one
 selected target, one rollout chain, its step rows, and the candidate tables at
 those steps:
 
+Shape notation follows `docs/typst/shared`: `H` is the rollout horizon, `N_q`
+is the padded candidate width, `N_t <= N_q` is the valid row count at step `t`,
+and `H_img x W_img` is the stored ML depth resolution. `PoseTW[12]` means the
+12-value `PoseTW.tensor()` representation used by the implementation.
+
 ```text
 multi_step_sample/
-  source/
-    sample_key
-    scene_id
-    snippet_id
-    source_row_id
-    vin_offline_manifest_hash
-    cached_backbone_ref
-    raw_snippet_ref
-    mesh_ref
-  target/
-    target_row_id
-    actor_visible_descriptor
-    observed_obb_world
-    support_summary
-    gt_match_status
-    gt_match_score
-    target_valid_mask
-    target_invalid_reason_bitset
-  rollout/
-    rollout_row_id
-    policy_id
-    horizon
-    branch_factor
-    beam_width
-    random_seed
-    final_cumulative_target_rri
-    final_cumulative_scene_rri
-  steps/
+  source/                               # s_t^cf0 source refs; shape: 1 source row
+    sample_key                          # source id; shape: scalar string/dict id
+    scene_id, snippet_id                # scene/snippet ids; shape: scalar dict ids
+    source_row_id                       # row id; shape: int64[1]
+    vin_offline_manifest_hash           # source lineage; shape: scalar string/dict id
+    cached_backbone_ref                 # cached EVL/VIN blocks; shape: external ref
+    raw_snippet_ref                     # EfmSnippetView ref; shape: external ref
+    mesh_ref                            # cal(M)_GT ref; shape: external path/hash/version
+  target/                               # e, z_e; shape: 1 target row
+    target_row_id                       # e id; shape: int64[1]
+    actor_visible_descriptor            # z_e; shape: struct or Float[F_tok]
+    observed_obb_world                  # observed target box; shape: Float[10 or 34]
+    support_summary                     # target support; shape: Float[F_aux]
+    gt_match_status                     # GT-EVAL status; shape: enum[1]
+    gt_match_score                      # mu(hat(e), e); shape: float32[1]
+    target_valid_mask                   # target-valid; shape: bool[1]
+    target_invalid_reason_bitset        # target rho; shape: uint32[1]
+  rollout/                              # pi, H; shape: 1 rollout chain
+    rollout_row_id                      # rollout id; shape: int64[1]
+    policy_id                           # pi; shape: enum[1]
+    horizon                             # H; shape: int16[1]
+    branch_factor, beam_width           # rollout branching; shape: int16[1]
+    random_seed                         # stochastic lineage; shape: int64[1]
+    final_cumulative_target_rri         # G_0^(H); shape: float32[1]
+    final_cumulative_scene_rri          # scene diagnostic; shape: float32[1]
+  steps/                                # t = 0..H-1; shape: up to H rows
     step_000/
-      step_row_id
-      selected_candidate_row_id
-      cumulative_target_rri
-      candidates/
-        candidate_row_id
-        pose_world_cam
-        pose_relative_root
-        strategy_id
-        mixture_id
-        sampler_probability
-        actor_action_mask
-        oracle_label_mask
-        q_train_mask
-        invalid_reason_bitset
-        target_rri
-        scene_rri
-      selected_action_depth/
-        depth_m_f16
-        depth_valid_mask
-        znear
-        zfar
-        normalization
+      step_row_id                       # t row id; shape: int64[1]
+      selected_candidate_row_id         # q_(t,i*); shape: int64[1]
+      cumulative_target_rri             # sum_k r_(t+k)^e; shape: float32[1]
+      candidates/                       # cal(Q)_t; shape: padded N_q rows
+        candidate_row_id                # q_(t,i) id; shape: int64[N_q]
+        pose_world_cam                  # q_(t,i); shape: PoseTW[N_q, 12]
+        pose_relative_root              # relative q_(t,i); shape: Float[N_q, 12]
+        candidate_features              # X_t^cand; shape: optional Float[N_q, F_q]
+        strategy_id, mixture_id         # sampler provenance; shape: enum[N_q]
+        sampler_probability             # proposal prob; shape: float32[N_q]
+        actor_action_mask               # m_(t,i); shape: bool[N_q]
+        oracle_label_mask               # oracle label mask; shape: bool[N_q]
+        q_train_mask                    # Q_H train mask; shape: bool[N_q]
+        invalid_reason_bitset           # rho_(t,i); shape: uint32[N_q]
+        target_rri                      # r_t^e(q_(t,i)); shape: float32[N_q]
+        scene_rri                       # scene diagnostic; shape: float32[N_q]
+      selected_action_depth/            # D_(q_(t,i*)); shape: selected action only
+        depth_m_f16                     # D_q; shape: float16[H_img, W_img]
+        depth_valid_mask                # M_q; shape: bool[H_img, W_img]
+        znear, zfar                     # renderer bounds; shape: float32[1]
+        normalization                   # ML depth contract; shape: scalar string/dict id
     step_001/
       ...
-  q_h/
-    candidate_row_id
-    valid_action_mask
-    q_train_mask
-    one_step_target_rri
-    q_target_target_rri
-    bootstrap_next_step_row_id
-    terminal_mask
+  q_h_view()                            # derived Q_H view, not persisted as a store group
+    candidate_row_id                    # q_(t,i) ids; shape: int64[H, N_q]
+    valid_action_mask                   # m_(t,i); shape: bool[H, N_q]
+    q_train_mask                        # trainable Q mask; shape: bool[H, N_q]
+    one_step_target_rri                 # r_t^e; shape: float32[H, N_q]
+    td_reward_target_rri                # selected r_t^e; shape: float32[H]
+    td_next_step_row_id                 # selected transition link; shape: int64[H]
+    bootstrap_next_step_row_id          # s_(t+1)^cf0 link; shape: int64[H, N_q]
+    terminal_mask                       # d_t; shape: bool[H, N_q]
 ```
 
 In thesis notation, `cal(Q)_t` is the finite candidate set at step `t`, and
@@ -349,23 +378,92 @@ also store depth renders for every actor-valid `q_(t,i)` in materialized
 
 ```mermaid
 flowchart TD
-  S["source row<br/>VIN sample key + cached refs"]
-  T["target row e<br/>actor-visible descriptor + GT label metadata"]
-  R["rollout chain<br/>policy, horizon, seed"]
-  Step0["step t=0<br/>state/history/budget"]
-  Q0["candidate set cal(Q)_0<br/>full-shell rows + masks"]
-  Pick0["selected valid q_(0,i*)"]
-  Depth0["selected-action depth<br/>float16 meters + valid mask"]
-  Step1["step t=1<br/>updated geometry/history"]
-  Q1["candidate set cal(Q)_1"]
-  Pick1["selected valid q_(1,i*)"]
-  Depth1["selected-action depth"]
-  Train["Q_H training view<br/>masked candidates + returns"]
+  SourceRow["source row<br/>s_t^cf0 refs<br/>1 row"]
+  TargetRow["target row<br/>e, z_e<br/>TargetCandidateRow[1]"]
+  RolloutRow["rollout chain<br/>pi, H, seed<br/>1 chain"]
 
-  S --> T --> R --> Step0 --> Q0 --> Pick0 --> Depth0 --> Step1
-  Step1 --> Q1 --> Pick1 --> Depth1 --> Train
-  Q0 --> Train
-  Q1 --> Train
+  subgraph StepZero["Step t = 0"]
+    State0["state / history / budget<br/>s_0^cf0, b_0"]
+    Cand0["candidate table<br/>cal(Q)_0<br/>PoseTW[N_q,12] + m_(0,i)"]
+    Pick0["selected action<br/>q_(0,i*)<br/>int64[1]"]
+    Depth0["selected depth<br/>D_q, M_q<br/>float16/bool[H_img,W_img]"]
+  end
+
+  subgraph StepOne["Step t = 1"]
+    State1["updated state<br/>s_1^cf0"]
+    Cand1["candidate table<br/>cal(Q)_1<br/>PoseTW[N_q,12] + m_(1,i)"]
+    Pick1["selected action<br/>q_(1,i*)<br/>int64[1]"]
+    Depth1["selected depth<br/>D_q, M_q<br/>float16/bool[H_img,W_img]"]
+  end
+
+  Train["Q_H training view<br/>r_t^e, G_t^(H), d_t<br/>Float[H,N_q] + masks"]
+
+  SourceRow --> TargetRow --> RolloutRow --> State0
+  State0 --> Cand0 --> Pick0 --> Depth0 --> State1
+  State1 --> Cand1 --> Pick1 --> Depth1 --> Train
+  Cand0 --> Train
+  Cand1 --> Train
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class SourceRow input;
+  class TargetRow,RolloutRow,State0,State1,Pick0,Pick1 compute;
+  class Cand0,Cand1,Depth0,Depth1 data;
+  class Train output;
+
+  style StepZero fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12
+  style StepOne fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12
+```
+
+## Multi-Step Oracle Generation Sequence
+
+The rollout generator reuses the immutable VIN store for cached substrate
+features and the raw snippet/mesh references for counterfactual rendering. It
+only advances the counterfactual state with the selected action depth; oracle
+labels for all valid candidates remain supervision/evaluation data.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant CLI as nbv-build-rollouts
+  participant DS as VinOfflineDataset
+  participant SEL as ActorVisibleTargetSelector
+  participant GEN as CandidateMixtureViewGenerator
+  participant SC as TargetRriScorer
+  participant REN as CandidateDepthRenderer
+  participant RRI as OracleRRI
+  participant POL as RolloutPolicy
+  participant STORE as rollouts_v1 shard
+  participant AUD as audit tables
+
+  CLI->>DS: open strict VIN store in sample mode
+  loop source rows in split shard
+    DS-->>CLI: VinOfflineSample with cached refs and live snippet
+    CLI->>SEL: select V1 actor-visible targets
+    SEL-->>CLI: target rows z_e with GT-EVAL metadata
+    alt target is invalid for labels
+      CLI->>AUD: record source or target skip reason
+    else target is label-valid
+      loop rollout recipes and t = 0..H-1
+        CLI->>GEN: regenerate cal(Q)_t from state, target, budget
+        GEN-->>CLI: q_(t,i), m_(t,i), rho_(t,i), provenance
+        CLI->>SC: score actor-valid candidates for target e
+        SC->>REN: render candidate depths D_q from GT mesh
+        REN-->>SC: D_q and M_q for valid candidates
+        SC->>RRI: compute target and scene RRI labels
+        RRI-->>CLI: r_t^e, scene_rri, selected-depth payloads
+        CLI->>POL: select valid q_(t,i*) under recipe policy
+        POL-->>CLI: selected candidate id and policy metadata
+        CLI->>CLI: update s_(t+1)^cf0 using selected D_q only
+      end
+      CLI->>STORE: write factual targets, rollouts, steps, candidates, depths
+    end
+  end
+  CLI->>STORE: validate shard masks, lineage, depth links
+  STORE-->>CLI: validation summary
 ```
 
 ## Depth Retention Profiles
@@ -438,7 +536,7 @@ For rollout-store work, include the rollout and target-selection tests:
 
 ```sh
 uv run pytest tests/data_handling/test_target_selection.py
-uv run pytest tests/data_handling/test_rollout_zarr_store.py
+uv run pytest tests/rollouts
 uv run nbv-build-rollouts --config-path ../.configs/build_rollouts_v1_smoke.toml --dry-run
 ```
 

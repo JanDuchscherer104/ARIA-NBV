@@ -4,20 +4,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import numpy as np
 import streamlit as st
 import torch
-from efm3d.aria.pose import PoseTW
 
-from ...data_handling import EfmSnippetView, RolloutZarrStoreReader
+from ...data_handling import EfmSnippetView
 from ...pose_generation import (
     CandidateViewGeneratorConfig,
     CounterfactualPoseGeneratorConfig,
     CounterfactualSelectionPolicy,
 )
-from ...pose_generation.counterfactuals import CounterfactualRolloutResult
 from ...pose_generation.plotting import (
     CandidatePlotBuilder,
     CounterfactualPlotBuilder,
@@ -39,13 +37,13 @@ from ...pose_generation.plotting import (
     plot_rule_masks,
     plot_rule_rejection_bar,
 )
-from ...pose_generation.types import CandidateSamplingResult
 from ...pose_generation.utils import (
     rejected_pose_tensor,
     stats_to_markdown_table,
     summarise_dirs_ref,
     summarise_offsets_ref,
 )
+from ...rollouts import RolloutZarrStoreReader
 from ...utils import Console
 from ...utils.frames import world_up_tensor
 from ..rerun_launch import (
@@ -54,6 +52,14 @@ from ..rerun_launch import (
     repo_root,
     spawn_background_command,
 )
+
+if TYPE_CHECKING:
+    from types import SimpleNamespace
+
+    from efm3d.aria.pose import PoseTW
+
+    from ...pose_generation.counterfactuals import CounterfactualRolloutResult
+    from ...pose_generation.types import CandidateSamplingResult
 from ..state_types import config_signature, sample_key
 from .common import _info_popover, _pretty_label, _report_exception, _strip_ansi
 
@@ -903,8 +909,9 @@ def _render_rollout_store_summaries(reader: RolloutZarrStoreReader) -> None:
     rollout_rows = reader.array("rollouts/rollout_row_id")
     step_rows = reader.array("steps/step_row_id")
     candidate_rows = reader.array("candidates/candidate_row_id")
-    q_train = reader.array("q_h/q_train_mask")
-    valid_action = reader.array("q_h/valid_action_mask")
+    q_h = reader.q_h_view()
+    q_train = q_h["q_train_mask"]
+    valid_action = q_h["valid_action_mask"]
     actor_action = reader.array("candidates/actor_action_mask")
     oracle_label = reader.array("candidates/oracle_label_mask")
     summary = [
@@ -936,20 +943,30 @@ def _render_rollout_store_summaries(reader: RolloutZarrStoreReader) -> None:
 def _candidate_rows_for_rollout(reader: RolloutZarrStoreReader, rollout_row_id: int) -> list[dict[str, object]]:
     rollout_ids = reader.array("candidates/rollout_row_id")
     mask = rollout_ids == int(rollout_row_id)
+    candidate_row_ids = reader.array("candidates/candidate_row_id")
+    step_indices = reader.array("candidates/step_index")
+    shell_indices = reader.array("candidates/shell_index")
+    selected_mask = reader.array("candidates/selected_mask")
+    actor_action_mask = reader.array("candidates/actor_action_mask")
+    q_train_mask = reader.array("candidates/q_train_mask")
+    target_rri = reader.array("candidates/target_rri")
+    scene_rri = reader.array("candidates/scene_rri")
+    strategy_id = reader.array("candidates/strategy_id")
+    mixture_id = reader.array("candidates/mixture_id")
     rows: list[dict[str, object]] = []
     for index in np.nonzero(mask)[0].tolist():
         rows.append(
             {
-                "candidate_row_id": int(reader.array("candidates/candidate_row_id")[index]),
-                "step_index": int(reader.array("candidates/step_index")[index]),
-                "shell_index": int(reader.array("candidates/shell_index")[index]),
-                "selected": bool(reader.array("candidates/selected_mask")[index]),
-                "actor_action": bool(reader.array("candidates/actor_action_mask")[index]),
-                "q_train": bool(reader.array("candidates/q_train_mask")[index]),
-                "target_rri": _finite_or_none(reader.array("candidates/target_rri")[index]),
-                "scene_rri": _finite_or_none(reader.array("candidates/scene_rri")[index]),
-                "strategy_id": int(reader.array("candidates/strategy_id")[index]),
-                "mixture_id": int(reader.array("candidates/mixture_id")[index]),
+                "candidate_row_id": int(candidate_row_ids[index]),
+                "step_index": int(step_indices[index]),
+                "shell_index": int(shell_indices[index]),
+                "selected": bool(selected_mask[index]),
+                "actor_action": bool(actor_action_mask[index]),
+                "q_train": bool(q_train_mask[index]),
+                "target_rri": _finite_or_none(target_rri[index]),
+                "scene_rri": _finite_or_none(scene_rri[index]),
+                "strategy_id": int(strategy_id[index]),
+                "mixture_id": int(mixture_id[index]),
             }
         )
     return rows

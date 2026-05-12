@@ -1237,7 +1237,8 @@ def plot_min_distance_to_mesh(
     hover = [f"dist={d:.3f} m<br>valid={bool(v)}" for d, v in zip(dist_np.tolist(), mask_valid.tolist(), strict=False)]
 
     builder = (
-        CandidatePlotBuilder.from_snippet(snippet, title="Min distance to mesh")
+        CandidatePlotBuilder
+        .from_snippet(snippet, title="Min distance to mesh")
         .attach_candidate_results(candidates)
         .add_mesh()
         .add_candidate_points(
@@ -1265,7 +1266,8 @@ def plot_path_collision_segments(
     colors = ["rgba(0,200,0,0.2)" if not m else "rgba(220,0,0,0.9)" for m in mask_np.tolist()]
 
     builder = (
-        CandidatePlotBuilder.from_snippet(snippet, title="Path collision segments")
+        CandidatePlotBuilder
+        .from_snippet(snippet, title="Path collision segments")
         .attach_candidate_results(candidates)
         .add_mesh()
     )

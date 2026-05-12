@@ -86,7 +86,7 @@ continuous-control or real-device RL policy before the evidence exists.
 
 | Status | Work included |
 |---|---|
-| Already implemented substrate | Scene-level oracle RRI, immutable VIN offline-store paths, VINv3-style one-step scoring, candidate generation, rollout scaffolding, RolloutTrace smoke storage, and Rerun offline inspection. |
+| Already implemented substrate | Scene-level oracle RRI, immutable VIN offline-store paths, VINv3-style one-step scoring, candidate generation, rollout scaffolding, rollout Zarr record/store path, and Rerun offline inspection. |
 | Prerequisite and evidence protocol | Proposal freeze, M1 contract report, V0/V1 target contracts, candidate-label/frame guards, invalidity masks/reasons, rollout/Q storage schema, LRZ deterministic sharding/storage gates, scene-level splits, coverage reporting, and ablation reporting. |
 | Hard quantitative thesis core | Observed-only automatic target selector; OBS-SEL / PRED-Q / GT-EVAL protocol; target-conditioned learned one-step scorer as the myopic control; mixed observed candidate sets; random-valid, oracle-greedy/lookahead, and oracle-scored temperature-softmax rollouts; finite-candidate $Q_{H,\theta}$ value model, first implemented as a candidate-query Transformer; explicit scale reporting. |
 | Scaling research | ASE-wide finite-candidate offline scale; external mesh/oracle-compatible expansion; online discrete $Q_H$ only after finite-candidate evidence is trusted. |

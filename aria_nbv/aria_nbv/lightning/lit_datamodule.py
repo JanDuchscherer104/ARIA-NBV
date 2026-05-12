@@ -25,7 +25,7 @@ from ..data_handling import (
     VinOracleDatasetBase,
     VinOracleOnlineDatasetConfig,
 )
-from ..utils import BaseConfig, Console, Stage, Verbosity
+from ..utils import Console, Stage, TargetConfig, Verbosity
 
 
 def _default_source() -> VinDatasetSourceConfig:
@@ -41,11 +41,11 @@ def _default_source() -> VinDatasetSourceConfig:
     )
 
 
-class VinDataModuleConfig(BaseConfig):
+class VinDataModuleConfig(TargetConfig["VinDataModule"]):
     """Configuration for `VinDataModule`."""
 
     @property
-    def target(self) -> type["VinDataModule"]:
+    def target_type(self) -> type["VinDataModule"]:
         return VinDataModule
 
     paths: PathConfig = Field(default_factory=PathConfig)

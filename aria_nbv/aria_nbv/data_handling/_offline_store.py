@@ -12,7 +12,7 @@ This module owns the immutable on-disk layout of the VIN offline dataset:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path  # noqa: TC003 - Pydantic config annotations need Path at runtime.
 from typing import Any
 
 import msgspec
@@ -22,7 +22,7 @@ from pydantic import Field, field_validator
 
 from ..configs import PathConfig
 from ..utils import BaseConfig
-from ._config_utils import resolve_cache_artifact_dir
+from ..utils.config_paths import resolve_cache_artifact_dir
 from ._offline_format import (
     VinOfflineBlockSpec,
     VinOfflineIndexRecord,

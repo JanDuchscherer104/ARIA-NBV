@@ -24,6 +24,7 @@ from ..configs.path_config import PROJECT_ROOT
 from ._offline_format import VinOfflineIndexRecord, VinOfflineShardSpec
 from ._offline_store import VinOfflineStoreConfig, VinOfflineStoreReader
 
+# TODO: what is this shit. Can't we just iterate over the fields of the respective data class?
 RRI_COMPONENT_BLOCKS: tuple[str, ...] = (
     "oracle.pm_dist_before",
     "oracle.pm_dist_after",
@@ -449,6 +450,7 @@ def _broadcast_ref_pose(
         raise ValueError(f"reference pose dims {ref_shape} are incompatible with target {target_shape}.")
 
     expanded_shape = []
+    # TODO: why the fuck would we need to loop here?
     for ref_dim, target_dim in zip(ref_shape, target_shape, strict=True):
         if ref_dim not in (1, target_dim):
             raise ValueError(f"reference pose dims {ref_shape} are incompatible with target {target_shape}.")
@@ -457,6 +459,7 @@ def _broadcast_ref_pose(
     return ref_rot.expand(*expanded_shape, 3, 3), ref_t.expand(*expanded_shape, 3)
 
 
+# TODO: This is a geometry helper / util!
 def _roll_about_forward(
     *,
     forward: torch.Tensor,

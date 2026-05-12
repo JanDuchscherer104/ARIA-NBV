@@ -6,6 +6,7 @@ website:
     - contents:
       - reference/data_handling.qmd
       - reference/pose_generation.qmd
+      - reference/rollouts.qmd
       - reference/rendering.qmd
       - reference/rri_metrics.qmd
       - reference/lightning.qmd
@@ -19,14 +20,14 @@ website:
       - reference/data_handling._offline_format.qmd
       - reference/data_handling._offline_store.qmd
       - reference/data_handling._target_selection.qmd
-      - reference/data_handling._rollout_dataset_writer.qmd
-      - reference/data_handling._rollout_zarr_store.qmd
       - reference/pose_generation.candidate_generation.qmd
       - reference/pose_generation.candidate_mixture.qmd
       - reference/pose_generation.counterfactuals.qmd
-      - reference/pose_generation.rollout_trace.qmd
       - reference/pose_generation.target_counterfactuals.qmd
       - reference/pose_generation.types.qmd
+      - reference/rollouts.trace.qmd
+      - reference/rollouts.dataset_writer.qmd
+      - reference/rollouts.zarr_store.qmd
       - reference/rendering.candidate_depth_renderer.qmd
       - reference/rendering.candidate_pointclouds.qmd
       - reference/rendering.unproject.qmd

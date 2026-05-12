@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import Field
 from pytorch_lightning import Callback
 
-from ..utils import BaseConfig, Console
+from ..utils import BaseConfig, Console, TargetConfig
 from ..utils.optuna_optimizable import Optimizable
 from .path_config import PathConfig
 
@@ -28,7 +28,7 @@ def _require_optuna() -> Any:
     return optuna
 
 
-class OptunaConfig(BaseConfig):
+class OptunaConfig(TargetConfig["optuna.Study"]):
     """Configure an Optuna study used by `aria_nbv.lightning.AriaNBVExperimentConfig`."""
 
     study_name: str = "aria-nbv"

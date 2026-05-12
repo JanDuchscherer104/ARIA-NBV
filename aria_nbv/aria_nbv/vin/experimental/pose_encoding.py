@@ -8,7 +8,7 @@ import torch
 from pydantic import Field
 from torch import Tensor, nn
 
-from ...utils import BaseConfig
+from ...utils import TargetConfig
 from ..pose_encoding import LearnableFourierFeatures, LearnableFourierFeaturesConfig
 
 
@@ -58,11 +58,11 @@ class FourierFeatures(nn.Module):
         return torch.cat([x, fourier], dim=-1)
 
 
-class FourierFeaturesConfig(BaseConfig):
+class FourierFeaturesConfig(TargetConfig[FourierFeatures]):
     """Config-as-factory wrapper for `FourierFeatures`."""
 
     @property
-    def target(self) -> type[FourierFeatures]:
+    def target_type(self) -> type[FourierFeatures]:
         return FourierFeatures
 
     input_dim: int = Field(default=1, gt=0)

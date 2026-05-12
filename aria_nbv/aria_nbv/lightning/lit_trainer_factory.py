@@ -18,7 +18,7 @@ import torch
 from pydantic import Field, model_validator
 
 from ..configs.wandb_config import WandbConfig
-from ..utils import BaseConfig, Console
+from ..utils import Console, TargetConfig
 from .lit_trainer_callbacks import TrainerCallbacksConfig
 
 if TYPE_CHECKING:
@@ -27,11 +27,11 @@ if TYPE_CHECKING:
     from ..configs.optuna_config import OptunaConfig
 
 
-class TrainerFactoryConfig(BaseConfig):
+class TrainerFactoryConfig(TargetConfig[pl.Trainer]):
     """Configuration for constructing a PyTorch Lightning trainer."""
 
     @property
-    def target(self) -> type[pl.Trainer]:
+    def target_type(self) -> type[pl.Trainer]:
         return pl.Trainer
 
     is_debug: bool = False
@@ -102,7 +102,7 @@ class TrainerFactoryConfig(BaseConfig):
             console.log("Validation disabled: limit_val_batches=0, check_val_every_n_epoch=0, num_sanity_val_steps=0.")
         return self
 
-    def setup_target(  # type: ignore[override]
+    def setup_target(
         self,
         experiment: Any | None = None,
         *,

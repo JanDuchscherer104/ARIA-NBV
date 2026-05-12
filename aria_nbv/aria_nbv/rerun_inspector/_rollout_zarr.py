@@ -4,21 +4,23 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
-import torch
-from efm3d.aria.pose import PoseTW
-from numpy.typing import NDArray
 
-from aria_nbv.data_handling import RolloutZarrStoreReader, validate_rollout_zarr_store
+from aria_nbv.rollouts import RolloutZarrStoreReader, validate_rollout_zarr_store
 
 from ._colors import INVALID_RGBA, step_to_rgba
-from ._config import RerunInspectorSelectionConfig, RerunOfflineInspectorConfig
 from ._loggers import ENTITY_WORLD, RerunModule, RerunOfflineLogger, log_default_inspector_blueprint
 from ._metadata import collect_visual_inventory, validate_required_inventory
 from ._sample import select_rerun_sample
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from numpy.typing import NDArray
+
+    from ._config import RerunInspectorSelectionConfig, RerunOfflineInspectorConfig
 
 ENTITY_ROLLOUT_ROOT = "world/rollout"
 ENTITY_ROLLOUT_STEP_ROOT = f"{ENTITY_ROLLOUT_ROOT}/step"
@@ -44,15 +46,6 @@ class SelectedRolloutRows:
     step_rows: NDArray[np.int64]
 
 
-@dataclass(frozen=True, slots=True)
-class _RolloutPoseAlignment:
-    """Display transform that maps store-rooted rollout poses into VIN context world."""
-
-    store_root_pose_world: NDArray[np.float32]
-    context_root_pose_world: NDArray[np.float32]
-    validity_trusted: bool
-
-
 class RerunRolloutZarrLogger:
     """Log one multistep rollout chain from ``rollouts.zarr`` to Rerun."""
 
@@ -63,11 +56,10 @@ class RerunRolloutZarrLogger:
         if rr_module is None:
             import rerun as imported_rr
 
-            self.rr = cast(RerunModule, imported_rr)
+            self.rr = cast("RerunModule", imported_rr)
         else:
             self.rr = rr_module
         self._context_warnings: list[str] = []
-        self._pose_alignment: _RolloutPoseAlignment | None = None
 
     def start(self) -> None:
         """Initialize the Rerun recording and configured output sink."""
@@ -103,14 +95,13 @@ class RerunRolloutZarrLogger:
         reader = RolloutZarrStoreReader(store_dir)
         validation = validate_rollout_zarr_store(store_dir)
         rows = _resolve_rollout_rows(reader, rollout_index=rollout_index, rollout_row_id=rollout_row_id)
-        self._pose_alignment = None
         self._log_static_context(reader=reader, rows=rows)
         self._log_static_metadata(reader=reader, rows=rows, validation_errors=validation.errors)
 
-        selected_path: list[list[float]] = _rollout_root_path(reader, rows=rows, pose_alignment=self._pose_alignment)
+        selected_path: list[list[float]] = _rollout_root_path(reader, rows=rows)
         for order, step_row_position in enumerate(rows.step_rows.tolist()):
             self.rr.set_time_sequence(ROLLOUT_STEP_TIMELINE, order)
-            step = _step_payload(reader, step_row_position=step_row_position, pose_alignment=self._pose_alignment)
+            step = _step_payload(reader, step_row_position=step_row_position)
             self._log_step(step)
             if step.selected_center is not None:
                 selected_path.append(step.selected_center.tolist())
@@ -124,14 +115,6 @@ class RerunRolloutZarrLogger:
         if mode == "off":
             self._context_warnings.append("VIN context logging disabled by selection.rollout_context_mode='off'.")
             return
-        if (
-            _synthetic_rollout_store(reader)
-            and mode == "auto"
-            and not _has_explicit_context_selector(self.config.selection)
-        ):
-            message = "VIN context logging skipped for synthetic rollout store."
-            self._context_warnings.append(message)
-            return
         selection = _rollout_context_selection(reader, rows=rows, fallback=self.config.selection)
         if selection is None:
             message = "No rollout scene/snippet or explicit sample selector available for VIN context logging."
@@ -143,25 +126,6 @@ class RerunRolloutZarrLogger:
             selected = select_rerun_sample(dataset_config=self.config.dataset.offline, selection=selection)
             inventory = collect_visual_inventory(selected.sample)
             validate_required_inventory(self.config, inventory)
-            if _synthetic_rollout_store(reader):
-                alignment = _synthetic_pose_alignment(
-                    reader=reader,
-                    rows=rows,
-                    context_root_pose=getattr(
-                        getattr(selected.sample, "oracle", None), "reference_pose_world_rig", None
-                    ),
-                )
-                if alignment is None:
-                    self._context_warnings.append(
-                        "Synthetic rollout poses were not aligned: missing rollouts/root_pose_world or VIN reference pose.",
-                    )
-                else:
-                    self._pose_alignment = alignment
-                    self._context_warnings.append(
-                        "Synthetic rollout poses are visually root-aligned to the selected VIN sample; "
-                        "stored candidate validity was computed in the synthetic smoke scene and is displayed "
-                        "as untrusted for this overlay.",
-                    )
             logger = RerunOfflineLogger(
                 self.config,
                 rr_module=self.rr,
@@ -342,7 +306,6 @@ def _step_payload(
     reader: RolloutZarrStoreReader,
     *,
     step_row_position: int,
-    pose_alignment: _RolloutPoseAlignment | None = None,
 ) -> _RolloutStepPayload:
     step_row_id = int(reader.array("steps/step_row_id")[step_row_position])
     step_index = int(reader.array("steps/step_index")[step_row_position])
@@ -354,12 +317,10 @@ def _step_payload(
     row_positions = row_positions[order]
 
     stored_valid = reader.array("candidates/candidate_valid_mask")[row_positions].astype(bool)
-    display_validity_trusted = pose_alignment is None or pose_alignment.validity_trusted
-    display_valid = stored_valid if display_validity_trusted else np.zeros_like(stored_valid, dtype=bool)
+    display_validity_trusted = True
+    display_valid = stored_valid
     selected = reader.array("candidates/selected_mask")[row_positions].astype(bool)
     poses = reader.array("candidates/pose_world_cam")[row_positions].astype(np.float32).reshape(-1, 12)
-    if pose_alignment is not None:
-        poses = _align_pose_rows_to_context(poses, pose_alignment)
     centers = _pose_centers(poses)
     target_rri = reader.array("candidates/target_rri")[row_positions].astype(np.float32).reshape(-1)
     probabilities = reader.array("candidates/selection_probabilities")[row_positions].astype(np.float32).reshape(-1)
@@ -404,7 +365,7 @@ def _step_payload(
         "selection_entropy": float(entropy[selected_local]) if selected_local >= 0 else None,
         "invalid_candidate_count": int((~display_valid).sum()),
         "stored_invalid_candidate_count": int((~stored_valid).sum()),
-        "pose_frame": ("context_world_from_synthetic_root" if pose_alignment is not None else "stored_pose_world_cam"),
+        "pose_frame": "stored_pose_world_cam",
         "q_h": _q_h_metadata(reader, step_row_id=step_row_id),
     }
     return _RolloutStepPayload(
@@ -420,24 +381,25 @@ def _step_payload(
 
 
 def _q_h_metadata(reader: RolloutZarrStoreReader, *, step_row_id: int) -> dict[str, Any]:
-    state_step_ids = reader.array("q_h/state_step_row_id").astype(np.int64).reshape(-1)
+    q_h = reader.q_h_view()
+    state_step_ids = q_h["state_step_row_id"].astype(np.int64).reshape(-1)
     matches = np.nonzero(state_step_ids == int(step_row_id))[0]
     if matches.size != 1:
         return {"state_row_found": False}
     row = int(matches[0])
-    valid_mask = reader.array("q_h/valid_action_mask")[row].astype(bool)
-    train_mask = reader.array("q_h/q_train_mask")[row].astype(bool)
-    dense_available = reader.array("q_h/q_target_available_mask")[row].astype(bool)
+    valid_mask = q_h["valid_action_mask"][row].astype(bool)
+    train_mask = q_h["q_train_mask"][row].astype(bool)
     return {
         "state_row_found": True,
         "q_h_state_row": row,
         "valid_action_count": int(valid_mask.sum()),
         "trainable_action_count": int(train_mask.sum()),
-        "selected_candidate_index": int(reader.array("q_h/selected_candidate_index")[row]),
-        "td_selected_candidate_row_id": int(reader.array("q_h/td_selected_candidate_row_id")[row]),
-        "td_next_step_row_id": int(reader.array("q_h/td_next_step_row_id")[row]),
-        "td_terminal": bool(reader.array("q_h/td_terminal_mask")[row]),
-        "dense_q_targets_available": bool(dense_available.any()),
+        "selected_candidate_index": int(q_h["selected_candidate_index"][row]),
+        "td_selected_candidate_row_id": int(q_h["td_selected_candidate_row_id"][row]),
+        "td_reward_target_rri": float(q_h["td_reward_target_rri"][row]),
+        "td_next_step_row_id": int(q_h["td_next_step_row_id"][row]),
+        "td_terminal": bool(q_h["td_terminal_mask"][row]),
+        "selected_transition_available": int(q_h["td_selected_candidate_row_id"][row]) >= 0,
     }
 
 
@@ -451,79 +413,11 @@ def _rollout_root_path(
     reader: RolloutZarrStoreReader,
     *,
     rows: SelectedRolloutRows,
-    pose_alignment: _RolloutPoseAlignment | None,
 ) -> list[list[float]]:
     """Return the selected-path seed point in the displayed world frame."""
 
-    try:
-        root = reader.array("rollouts/root_pose_world")[rows.rollout_index].astype(np.float32).reshape(1, 12)
-    except Exception:
-        return []
-    if pose_alignment is not None:
-        root = pose_alignment.context_root_pose_world.reshape(1, 12)
+    root = reader.array("rollouts/root_pose_world")[rows.rollout_index].astype(np.float32).reshape(1, 12)
     return [_pose_centers(root)[0].tolist()]
-
-
-def _synthetic_pose_alignment(
-    *,
-    reader: RolloutZarrStoreReader,
-    rows: SelectedRolloutRows,
-    context_root_pose: object | None,
-) -> _RolloutPoseAlignment | None:
-    """Return a visual-only transform from synthetic rollout space to VIN world."""
-
-    if context_root_pose is None:
-        return None
-    try:
-        store_root = reader.array("rollouts/root_pose_world")[rows.rollout_index].astype(np.float32).reshape(12)
-    except Exception:
-        return None
-    context_root = _pose_object_to_row(context_root_pose)
-    if context_root is None:
-        return None
-    return _RolloutPoseAlignment(
-        store_root_pose_world=store_root,
-        context_root_pose_world=context_root,
-        validity_trusted=False,
-    )
-
-
-def _align_pose_rows_to_context(
-    pose_rows: NDArray[np.float32],
-    alignment: _RolloutPoseAlignment,
-) -> NDArray[np.float32]:
-    """Map stored rollout ``T_storeWorld_cam`` rows into the selected VIN world."""
-
-    if pose_rows.size == 0:
-        return pose_rows
-    source_root = _pose_from_row(alignment.store_root_pose_world)
-    target_root = _pose_from_row(alignment.context_root_pose_world)
-    root_from_source_world = source_root.inverse()
-    aligned_rows: list[NDArray[np.float32]] = []
-    for row in pose_rows.reshape(-1, 12):
-        store_pose = _pose_from_row(row)
-        root_from_cam = root_from_source_world.compose(store_pose)
-        aligned = target_root.compose(root_from_cam)
-        aligned_rows.append(aligned.tensor().detach().cpu().numpy().astype(np.float32).reshape(12))
-    return np.stack(aligned_rows, axis=0).astype(np.float32, copy=False)
-
-
-def _pose_from_row(row: NDArray[np.float32]) -> PoseTW:
-    """Build an unbatched ``PoseTW`` from one flattened 12-value pose row."""
-
-    return PoseTW(torch.as_tensor(row, dtype=torch.float32).reshape(-1))
-
-
-def _pose_object_to_row(pose: object) -> NDArray[np.float32] | None:
-    """Convert a PoseTW-like object to one flattened float32 row."""
-
-    tensor = pose.tensor() if hasattr(pose, "tensor") else pose
-    if not isinstance(tensor, torch.Tensor):
-        return None
-    row = tensor.detach().cpu().to(dtype=torch.float32).reshape(-1)
-    if row.numel() != 12 or not torch.isfinite(row).all():
-        return None
-    return row.numpy().astype(np.float32, copy=True)
 
 
 def _candidate_payloads(
@@ -642,10 +536,6 @@ def _rollout_context_selection(
 ) -> RerunInspectorSelectionConfig | None:
     if fallback.sample_key or (fallback.scene_id and fallback.snippet_id):
         return fallback.model_copy(deep=True)
-    if _synthetic_rollout_store(reader):
-        if fallback.rollout_context_mode == "required":
-            return fallback.model_copy(deep=True)
-        return None
 
     scene_id = _rollout_dictionary_value(reader, group="scene", array_path="rollouts/scene_id", row=rows.rollout_index)
     snippet_id = _rollout_dictionary_value(
@@ -663,19 +553,6 @@ def _rollout_context_selection(
     return None
 
 
-def _has_explicit_context_selector(selection: RerunInspectorSelectionConfig) -> bool:
-    return bool(selection.sample_key or (selection.scene_id and selection.snippet_id))
-
-
-def _synthetic_rollout_store(reader: RolloutZarrStoreReader) -> bool:
-    attrs = dict(reader.root.attrs)
-    synthetic_values = {
-        str(attrs.get("source_offline_store_version", "")).lower(),
-        str(attrs.get("target_protocol_version", "")).lower(),
-    }
-    return any("synthetic" in value for value in synthetic_values)
-
-
 def _rollout_dictionary_value(
     reader: RolloutZarrStoreReader,
     *,
@@ -683,11 +560,8 @@ def _rollout_dictionary_value(
     array_path: str,
     row: int,
 ) -> str | None:
-    try:
-        dictionary = _read_string_dictionary(reader, f"dictionaries/{group}")
-        index = int(reader.array(array_path)[row])
-    except Exception:
-        return None
+    dictionary = _read_string_dictionary(reader, f"dictionaries/{group}")
+    index = int(reader.array(array_path)[row])
     if index < 0 or index >= len(dictionary):
         return None
     value = dictionary[index].strip()
@@ -695,25 +569,19 @@ def _rollout_dictionary_value(
 
 
 def _dictionary_preview(reader: RolloutZarrStoreReader) -> dict[str, list[str]]:
-    preview: dict[str, list[str]] = {}
-    for name in ("scene", "snippet", "rollout", "target", "policy", "termination_reason"):
-        try:
-            preview[name] = _read_string_dictionary(reader, f"dictionaries/{name}")[:20]
-        except Exception:
-            preview[name] = []
-    return preview
+    return {
+        name: _read_string_dictionary(reader, f"dictionaries/{name}")[:20]
+        for name in ("scene", "snippet", "rollout", "target", "policy", "termination_reason")
+    }
 
 
 def _rollout_target_hint(reader: RolloutZarrStoreReader, *, rows: SelectedRolloutRows) -> str | None:
     """Return a target dictionary value for optional OBB highlighting."""
 
-    try:
-        target_rows = reader.array("targets/target_row_id").astype(np.int64).reshape(-1)
-        target_ids = reader.array("targets/target_id").astype(np.int64).reshape(-1)
-        target_row_id = int(reader.array("rollouts/target_row_id")[rows.rollout_index])
-        names = _read_string_dictionary(reader, "dictionaries/target")
-    except Exception:
-        return None
+    target_rows = reader.array("targets/target_row_id").astype(np.int64).reshape(-1)
+    target_ids = reader.array("targets/target_id").astype(np.int64).reshape(-1)
+    target_row_id = int(reader.array("rollouts/target_row_id")[rows.rollout_index])
+    names = _read_string_dictionary(reader, "dictionaries/target")
     matches = np.nonzero(target_rows == target_row_id)[0]
     if matches.size != 1:
         return str(target_row_id)

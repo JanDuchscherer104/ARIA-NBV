@@ -14,6 +14,23 @@
             ]
         },
         {
+            "name": "ARIA: Build Rollouts V1 Smoke",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/aria_nbv/.venv/bin/nbv-build-rollouts",
+            "python": "${workspaceFolder}/aria_nbv/.venv/bin/python",
+            "cwd": "${workspaceFolder}/aria_nbv",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--config-path",
+                "${workspaceFolder}/.configs/build_rollouts_v1_smoke.toml"
+            ],
+            "env": {
+                "PYTHONUNBUFFERED": "1"
+            }
+        },
+        {
             "name": "Python: Streamlit",
             "type": "debugpy",
             "request": "launch",

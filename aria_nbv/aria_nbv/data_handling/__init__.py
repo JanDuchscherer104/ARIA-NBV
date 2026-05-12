@@ -8,7 +8,7 @@ surface exposes:
   trajectory poses, semidense points, OBBs, GT annotations, and optional meshes;
 - `VinSnippetView` and `VinOracleBatch` for VIN-style one-step RRI scoring;
 - strict immutable VIN offline-store readers/writers;
-- actor-visible target selection and standalone rollout-Zarr replay stores.
+- actor-visible target selection for rollout and target-conditioned training.
 
 The central safety contract is actor/oracle separation. Observed EVL/MPS/OBB
 evidence is actor-visible; ASE meshes, GT OBBs, target crops, and oracle labels
@@ -37,7 +37,7 @@ from ._raw import (
 
 _LAZY_EXPORTS = {
     "ActorVisibleTargetSelector": "._target_selection",
-    "DEFAULT_VIN_SNIPPET_PAD_POINTS": "._vin_runtime",
+    "DEFAULT_VIN_SNIPPET_PAD_POINTS": ".vin_adapter",
     "CompactObbBlock": ".vin_oracle_types",
     "CompactTrajectoryBlock": ".vin_oracle_types",
     "MeshProcessSpec": ".mesh_cache",
@@ -46,15 +46,6 @@ _LAZY_EXPORTS = {
     "OfflineVisualInventoryError": "._offline_visual_inventory",
     "ProcessedMesh": ".mesh_cache",
     "NumericSummary": "._offline_diagnostics",
-    "RolloutZarrStoreConfig": "._rollout_zarr_store",
-    "RolloutZarrStoreReader": "._rollout_zarr_store",
-    "RolloutZarrStoreWriter": "._rollout_zarr_store",
-    "RolloutZarrValidationResult": "._rollout_zarr_store",
-    "RolloutZarrWriteResult": "._rollout_zarr_store",
-    "RolloutDatasetWriter": "._rollout_dataset_writer",
-    "RolloutDatasetWriterConfig": "._rollout_dataset_writer",
-    "RolloutDatasetWriterStats": "._rollout_dataset_writer",
-    "RolloutRecipeConfig": "._rollout_dataset_writer",
     "TARGET_INVALID_REASON_CODES": "._target_selection",
     "TARGET_INVALID_REASON_VERSION": "._target_selection",
     "TargetCandidateRow": "._target_selection",
@@ -62,7 +53,6 @@ _LAZY_EXPORTS = {
     "TargetSelectionResult": "._target_selection",
     "TargetSelectorConfig": "._target_selection",
     "TargetSourceMode": "._target_selection",
-    "target_gt_aabb_world": "._target_selection",
     "target_gt_obb_world": "._target_selection",
     "VinDatasetSourceConfig": "._vin_sources",
     "VinOfflineBackboneDiagnostic": "._offline_diagnostics",
@@ -82,21 +72,18 @@ _LAZY_EXPORTS = {
     "VinOfflineStoreConfig": "._offline_store",
     "VinOfflineWriter": "._offline_writer",
     "VinOfflineWriterConfig": "._offline_writer",
-    "VinOnlineDatasetConfig": "._vin_runtime",
-    "VinOracleBatch": "._vin_runtime",
+    "VinOracleBatch": ".vin_oracle_types",
     "VinOracleDatasetBase": ".vin_oracle_types",
-    "VinOracleOnlineDataset": "._vin_runtime",
-    "VinOracleOnlineDatasetConfig": "._vin_runtime",
-    "build_vin_snippet_view": "._vin_runtime",
+    "VinOracleOnlineDataset": "._vin_sources",
+    "VinOracleOnlineDatasetConfig": "._vin_sources",
+    "build_vin_snippet_view": ".vin_adapter",
     "collect_vin_offline_dataset_coverage": "._offline_diagnostics",
     "collect_vin_offline_dataset_stats": "._offline_diagnostics",
     "collect_offline_visual_inventory": "._offline_visual_inventory",
-    "empty_vin_snippet": "._vin_runtime",
+    "empty_vin_snippet": ".vin_adapter",
     "flush_prepared_samples_to_shard": "._offline_writer",
     "load_or_process_mesh": ".mesh_cache",
     "prepare_vin_offline_sample": "._offline_writer",
-    "validate_rollout_zarr_store": "._rollout_zarr_store",
-    "write_rollout_zarr_store": "._rollout_zarr_store",
 }
 
 
@@ -131,15 +118,6 @@ __all__ = [
     "OfflineVisualInventory",
     "OfflineVisualInventoryError",
     "ProcessedMesh",
-    "RolloutZarrStoreConfig",
-    "RolloutZarrStoreReader",
-    "RolloutZarrStoreWriter",
-    "RolloutZarrValidationResult",
-    "RolloutZarrWriteResult",
-    "RolloutDatasetWriter",
-    "RolloutDatasetWriterConfig",
-    "RolloutDatasetWriterStats",
-    "RolloutRecipeConfig",
     "TARGET_INVALID_REASON_CODES",
     "TARGET_INVALID_REASON_VERSION",
     "TargetCandidateRow",
@@ -147,7 +125,6 @@ __all__ = [
     "TargetSelectionResult",
     "TargetSelectorConfig",
     "TargetSourceMode",
-    "target_gt_aabb_world",
     "target_gt_obb_world",
     "VinDatasetSourceConfig",
     "VinOfflineDataset",
@@ -167,7 +144,6 @@ __all__ = [
     "VinOfflineStoreConfig",
     "VinOfflineWriter",
     "VinOfflineWriterConfig",
-    "VinOnlineDatasetConfig",
     "VinOracleBatch",
     "VinOracleDatasetBase",
     "VinOracleOnlineDataset",
@@ -184,6 +160,4 @@ __all__ = [
     "is_vin_snippet_view_instance",
     "load_or_process_mesh",
     "prepare_vin_offline_sample",
-    "validate_rollout_zarr_store",
-    "write_rollout_zarr_store",
 ]

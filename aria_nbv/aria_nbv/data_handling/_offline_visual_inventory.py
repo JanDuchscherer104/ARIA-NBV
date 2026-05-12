@@ -32,6 +32,7 @@ class OfflineVisualInventoryError(ValueError):
         super().__init__("Offline visual inventory validation failed:\n- " + "\n- ".join(self.errors))
 
 
+# TODO: all tensor fields must have shape and type information and use JaxTyping!
 @dataclass(slots=True)
 class OfflineVisualInventory:
     """Summary of required and optional visual payloads for one offline sample."""
@@ -135,6 +136,7 @@ def _invalid(path: str, reason: str, errors: list[str]) -> None:
     errors.append(f"Invalid required field `{path}`: {reason}.")
 
 
+#  TODO: <Never use type object!>
 def _get_required(owner: object | None, attr: str, path: str, errors: list[str]) -> object | None:
     if owner is None or not hasattr(owner, attr):
         _missing(path, errors)
@@ -146,6 +148,7 @@ def _get_required(owner: object | None, attr: str, path: str, errors: list[str])
     return value
 
 
+#  TODO: <Never use type object!>, also this is a util that needs to be shared. Pretty sure we alrey have similar code / function somewhere else
 def _as_tensor(value: object | None, path: str, errors: list[str]) -> Tensor | None:
     if value is None:
         _missing(path, errors)
@@ -186,6 +189,9 @@ def _first_length(lengths: Tensor, errors: list[str]) -> int | None:
     return value
 
 
+#  TODO: <Never use type object!>
+
+
 def _validate_vin_snippet(vin_snippet: object | None, errors: list[str], metadata: dict[str, Any]) -> None:
     points = _as_tensor(
         _get_required(vin_snippet, "points_world", "sample.vin_snippet.points_world", errors),
@@ -224,12 +230,18 @@ def _validate_vin_snippet(vin_snippet: object | None, errors: list[str], metadat
         _invalid("sample.vin_snippet.points_world", "valid semidense XYZ prefix contains non-finite values", errors)
 
 
+#  TODO: <Never use type object!>
+
+
 def _validate_pose(value: object | None, path: str, errors: list[str], metadata: dict[str, Any]) -> Tensor | None:
     tensor = _as_tensor(value, path, errors)
     _shape_metadata(metadata, path, tensor)
     if tensor is not None and not bool(torch.isfinite(tensor).all().item()):
         _invalid(path, "pose tensor contains non-finite values", errors)
     return tensor
+
+
+#  TODO: <Never use type object!>
 
 
 def _validate_p3d_cameras(cameras: object | None, errors: list[str], metadata: dict[str, Any]) -> None:
@@ -243,6 +255,7 @@ def _validate_p3d_cameras(cameras: object | None, errors: list[str], metadata: d
             _invalid(f"sample.oracle.p3d_cameras.{name}", "camera parameter contains non-finite values", errors)
 
 
+#  TODO: <Never use type object!>
 def _candidate_count(oracle: object | None, errors: list[str]) -> int | None:
     value = _get_required(oracle, "candidate_count", "sample.oracle.candidate_count", errors)
     if value is None:
@@ -506,6 +519,7 @@ def collect_offline_visual_inventory(sample: VinOfflineSample, *, strict: bool =
         errors,
         metadata,
     )
+    # TODO: remove this sloppy intermediate dict and just pass the relevant fields directly to the OfflineVisualInventory constructor!
     optional = _optional_inventory(sample, warnings, metadata)
 
     inventory = OfflineVisualInventory(

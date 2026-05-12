@@ -29,6 +29,7 @@ Apply this file when working under `aria_nbv/`.
 - Stay at this file for shared Python, config-as-factory, and verification rules across `aria_nbv/`.
 - Open one deeper module guide only after the touched contract is clear:
   - `aria_nbv/aria_nbv/data_handling/AGENTS.md` for raw snippets, cache flows, datasets, and cache contracts
+  - `aria_nbv/aria_nbv/rollouts/AGENTS.md` for multi-step rollout traces, rollout Zarr/Q stores, and rollout generation CLIs
   - `aria_nbv/aria_nbv/rri_metrics/AGENTS.md` for oracle labels, binning, ordinal loss, and reported metric semantics
   - `aria_nbv/aria_nbv/vin/AGENTS.md` for scorer, candidate-context, training batch, and VIN model contracts
 - If a task spans multiple modules, start with the owner of the main contract, then open adjacent guides only for crossed boundaries.

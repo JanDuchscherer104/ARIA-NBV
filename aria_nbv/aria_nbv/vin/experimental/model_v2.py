@@ -62,7 +62,7 @@ from aria_nbv.utils.frames import rotate_yaw_cw90
 
 from ...data_handling import EfmSnippetView, VinSnippetView
 from ...rri_metrics.coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
-from ...utils import BaseConfig, Optimizable, optimizable_field
+from ...utils import Optimizable, TargetConfig, optimizable_field
 from .._model_mixins import PoseFeatureGlobalContextMixin
 from ..backbone_evl import EvlBackboneConfig
 from ..pose_encoders import R6dLffPoseEncoderConfig
@@ -110,11 +110,11 @@ SEMIDENSE_FRUSTUM_TOKEN_FEATURES: tuple[str, ...] = (
 SEMIDENSE_FRUSTUM_TOKEN_DIM = len(SEMIDENSE_FRUSTUM_TOKEN_FEATURES)
 
 
-class VinModelV2Config(BaseConfig):
+class VinModelV2Config(TargetConfig["VinModelV2"]):
     """Configuration for `VinModelV2` (minimal, configurable)."""
 
     @property
-    def target(self) -> type[VinModelV2]:
+    def target_type(self) -> type[VinModelV2]:
         """Factory target for `BaseConfig.setup_target`."""
         return VinModelV2
 

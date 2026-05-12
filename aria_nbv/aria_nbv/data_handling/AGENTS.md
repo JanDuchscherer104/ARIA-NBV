@@ -12,7 +12,7 @@ Apply this file when working under `aria_nbv/aria_nbv/data_handling/`.
 - Public package surface: `aria_nbv/aria_nbv/data_handling/__init__.py`
 - Raw snippet and typed container surface: `efm_dataset.py`, `efm_views.py`, `efm_snippet_loader.py`
 - Immutable offline store contracts: `_offline_format.py`, `_offline_store.py`, `_offline_writer.py`, `_offline_dataset.py`
-- VIN datamodule source contracts: `_vin_sources.py`, `_vin_runtime.py`, `_vin_oracle_dataset.py`, `_vin_oracle_types.py`
+- VIN datamodule source contracts: `_vin_sources.py`, `vin_adapter.py`, and `vin_oracle_types.py`
 - Narrative surfaces: `aria_nbv/aria_nbv/data_handling/README.md`, generated API docs under `docs/reference/`, `docs/contents/ase_dataset.qmd`, `docs/typst/seminar_paper/sections/12h-appendix-offline-cache.typ`
 
 ## Boundary Rules

@@ -23,7 +23,7 @@ import trimesh
 from pydantic import AliasChoices, Field, field_validator
 from trimesh import Trimesh
 
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 
 if TYPE_CHECKING:
     from efm3d.aria import CameraTW, PoseTW
@@ -31,11 +31,11 @@ if TYPE_CHECKING:
     from trimesh import Trimesh
 
 
-class Efm3dDepthRendererConfig(BaseConfig):
+class Efm3dDepthRendererConfig(TargetConfig["Efm3dDepthRenderer"]):
     """Configuration for `Efm3dDepthRenderer`."""
 
     @property
-    def target(self) -> type["Efm3dDepthRenderer"]:
+    def target_type(self) -> type["Efm3dDepthRenderer"]:
         """Factory target for `BaseConfig.setup_target`."""
         return Efm3dDepthRenderer
 

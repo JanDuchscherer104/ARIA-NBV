@@ -18,7 +18,7 @@ from e3nn import o3  # type: ignore[import-untyped]
 from pydantic import Field
 from torch import Tensor, nn
 
-from ...utils import BaseConfig
+from ...utils import TargetConfig
 from .pose_encoding import FourierFeaturesConfig
 
 
@@ -162,11 +162,11 @@ class ShellShPoseEncoder(nn.Module):
         return torch.cat(parts, dim=-1)
 
 
-class ShellShPoseEncoderConfig(BaseConfig):
+class ShellShPoseEncoderConfig(TargetConfig[ShellShPoseEncoder]):
     """Config-as-factory wrapper for `ShellShPoseEncoder`."""
 
     @property
-    def target(self) -> type[ShellShPoseEncoder]:
+    def target_type(self) -> type[ShellShPoseEncoder]:
         return ShellShPoseEncoder
 
     kind: Literal["shell_sh"] = "shell_sh"

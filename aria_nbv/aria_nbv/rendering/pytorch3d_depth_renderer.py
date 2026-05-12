@@ -18,17 +18,17 @@ from pytorch3d.renderer.cameras import PerspectiveCameras  # type: ignore[import
 from pytorch3d.structures import Meshes  # type: ignore[import-untyped]
 from torch import Tensor
 
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 
 if TYPE_CHECKING:
     from efm3d.aria import CameraTW, PoseTW
 
 
-class Pytorch3DDepthRendererConfig(BaseConfig):
+class Pytorch3DDepthRendererConfig(TargetConfig["Pytorch3DDepthRenderer"]):
     """Configuration for `Pytorch3DDepthRenderer`."""
 
     @property
-    def target(self) -> type["Pytorch3DDepthRenderer"]:
+    def target_type(self) -> type["Pytorch3DDepthRenderer"]:
         return Pytorch3DDepthRenderer
 
     device: Annotated[torch.device, Field(default="auto")]

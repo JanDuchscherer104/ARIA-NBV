@@ -12,7 +12,7 @@ import torch
 from efm3d.aria.pose import PoseTW
 from pydantic import Field, field_validator
 
-from ...utils import BaseConfig
+from ...utils import TargetConfig
 from ..pose_encoders import PoseEncoder, PoseEncodingOutput, R6dLffPoseEncoder, R6dLffPoseEncoderConfig
 from ..pose_encoding import LearnableFourierFeaturesConfig
 from .spherical_encoding import ShellShPoseEncoderConfig
@@ -117,11 +117,11 @@ class ShellLffPoseEncoder(PoseEncoder):
         )
 
 
-class ShellLffPoseEncoderConfig(BaseConfig):
+class ShellLffPoseEncoderConfig(TargetConfig[ShellLffPoseEncoder]):
     """Config for `ShellLffPoseEncoder`."""
 
     @property
-    def target(self) -> type[ShellLffPoseEncoder]:
+    def target_type(self) -> type[ShellLffPoseEncoder]:
         return ShellLffPoseEncoder
 
     kind: Literal["shell_lff"] = "shell_lff"
@@ -145,11 +145,11 @@ class ShellLffPoseEncoderConfig(BaseConfig):
         return value
 
 
-class ShellShPoseEncoderAdapterConfig(BaseConfig):
+class ShellShPoseEncoderAdapterConfig(TargetConfig[ShellShPoseEncoderAdapter]):
     """Config for `ShellShPoseEncoderAdapter`."""
 
     @property
-    def target(self) -> type[ShellShPoseEncoderAdapter]:
+    def target_type(self) -> type[ShellShPoseEncoderAdapter]:
         return ShellShPoseEncoderAdapter
 
     kind: Literal["shell_sh"] = "shell_sh"

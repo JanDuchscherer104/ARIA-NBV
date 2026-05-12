@@ -11,7 +11,7 @@ from torch.utils.data import IterableDataset
 
 from ..configs import PathConfig
 from ..pipelines.oracle_rri_labeler import OracleRriLabeler, OracleRriLabelerConfig
-from ..utils import BaseConfig, Console, Stage, Verbosity
+from ..utils import Console, Stage, TargetConfig, Verbosity
 from ._offline_dataset import VinOfflineDataset, VinOfflineDatasetConfig
 from ._raw import AseEfmDatasetConfig, EfmSnippetView
 from .vin_oracle_types import VinOracleBatch
@@ -87,14 +87,14 @@ def _default_online_train_ds() -> AseEfmDatasetConfig:
     )
 
 
-class VinOracleOnlineDatasetConfig(BaseConfig):
+class VinOracleOnlineDatasetConfig(TargetConfig[VinOracleOnlineDataset]):
     """Configuration for online oracle VIN datasets."""
 
     kind: Literal["online"] = "online"
     """Discriminator for online datasets."""
 
     @property
-    def target(self) -> type[VinOracleOnlineDataset]:
+    def target_type(self) -> type[VinOracleOnlineDataset]:
         """Return the factory target for `BaseConfig.setup_target`."""
         return VinOracleOnlineDataset
 
@@ -127,7 +127,7 @@ class VinOracleOnlineDatasetConfig(BaseConfig):
     verbosity: Verbosity = Verbosity.NORMAL
     """Verbosity level for dataset and labeler diagnostics."""
 
-    def setup_target(self, *, split: Stage) -> VinOracleOnlineDataset:  # type: ignore[override]
+    def setup_target(self, *, split: Stage) -> VinOracleOnlineDataset:
         """Instantiate the online VIN dataset for the requested split."""
         dataset_cfg = self._resolve_dataset_cfg(split)
         base = dataset_cfg.setup_target()
@@ -158,14 +158,14 @@ class VinOracleOnlineDatasetConfig(BaseConfig):
         return False
 
 
-class VinOfflineSourceConfig(BaseConfig):
+class VinOfflineSourceConfig(TargetConfig[VinOfflineDataset]):
     """Configuration for the immutable VIN offline dataset source."""
 
     kind: Literal["offline"] = "offline"
     """Discriminator for the immutable offline dataset."""
 
     @property
-    def target(self) -> type[VinOfflineDataset]:
+    def target_type(self) -> type[VinOfflineDataset]:
         """Return the factory target for `BaseConfig.setup_target`."""
 
         return VinOfflineDataset
@@ -200,7 +200,7 @@ class VinOfflineSourceConfig(BaseConfig):
     load_trajectory_metadata_for_batch: bool = True
     """Whether VIN-batch reads should decode trajectory metadata blocks."""
 
-    def setup_target(self, *, split: Stage) -> VinOfflineDataset:  # type: ignore[override]
+    def setup_target(self, *, split: Stage) -> VinOfflineDataset:
         """Instantiate the immutable offline VIN dataset for the requested split."""
 
         dataset_split = self.train_split if split is Stage.TRAIN else self.val_split

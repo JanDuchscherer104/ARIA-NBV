@@ -28,7 +28,7 @@ from pydantic import Field, ValidationInfo, field_validator
 from torch import Tensor
 
 from ..configs import PathConfig
-from ..utils import BaseConfig, Console
+from ..utils import BaseConfig, Console, TargetConfig
 from .types import EfmDict, EvlBackboneOutput
 
 
@@ -131,11 +131,11 @@ def _normalize_evl_model_config_paths(
     return model_config
 
 
-class EvlBackboneConfig(BaseConfig):
+class EvlBackboneConfig(TargetConfig["EvlBackbone"]):
     """Configuration for `EvlBackbone`."""
 
     @property
-    def target(self) -> type["EvlBackbone"]:
+    def target_type(self) -> type["EvlBackbone"]:
         """Factory target for `BaseConfig.setup_target`."""
         return _target_cls()
 

@@ -65,6 +65,17 @@ def test_public_api_omits_internal_helper_exports() -> None:
         "scan_dataset_snippets",
         "scan_tar_sample_keys",
         "snippets_by_scene",
+        "RolloutDatasetWriter",
+        "RolloutDatasetWriterConfig",
+        "RolloutDatasetWriterStats",
+        "RolloutRecipeConfig",
+        "RolloutZarrStoreConfig",
+        "RolloutZarrStoreReader",
+        "RolloutZarrStoreWriter",
+        "RolloutZarrValidationResult",
+        "RolloutZarrWriteResult",
+        "validate_rollout_zarr_store",
+        "write_rollout_zarr_store",
     }
     assert not (unexpected & set(module.__all__))  # noqa: S101
 
@@ -74,6 +85,7 @@ def test_public_api_omits_legacy_vin_oracle_dataset_alias() -> None:
 
     module = importlib.import_module("aria_nbv.data_handling")
     assert not hasattr(module, "VinOracleDatasetConfig")  # noqa: S101
+    assert not hasattr(module, "VinOnlineDatasetConfig")  # noqa: S101
 
 
 def test_offline_configs_omit_premature_counterfactual_knobs() -> None:
@@ -99,8 +111,18 @@ def test_runtime_modules_do_not_import_data_handling_submodules() -> None:
     """Keep direct ``data_handling`` submodule imports tightly constrained."""
 
     package_root = Path(__file__).resolve().parents[2] / "aria_nbv"
-    allowed_modules: set[str] = set()
     allowlist = {"vin/model_v3.py"}
+    allowed_direct_imports = {
+        "pose_generation/target_counterfactuals.py": {
+            "data_handling._offline_dataset",
+            "data_handling._target_selection",
+            "data_handling.efm_views",
+        },
+        "rollouts/dataset_writer.py": {
+            "data_handling._offline_dataset",
+            "data_handling._target_selection",
+        },
+    }
     offenders: list[str] = []
     for path in package_root.rglob("*.py"):
         if "data_handling" in path.parts:
@@ -114,7 +136,8 @@ def test_runtime_modules_do_not_import_data_handling_submodules() -> None:
                     bad = [
                         alias.name
                         for alias in node.names
-                        if alias.name.startswith("aria_nbv.data_handling.") and alias.name not in allowed_modules
+                        if alias.name.startswith("aria_nbv.data_handling.")
+                        and not _allowed_data_handling_import(rel, alias.name, allowed_direct_imports)
                     ]
                     if rel not in allowlist and bad:
                         offenders.append(f"{rel}: {', '.join(bad)}")
@@ -127,10 +150,18 @@ def test_runtime_modules_do_not_import_data_handling_submodules() -> None:
                     or (node.level > 0 and module.startswith("data_handling."))
                 ):
                     rel = rel_path.as_posix()
-                    if rel not in allowlist and module not in allowed_modules:
+                    if rel not in allowlist and not _allowed_data_handling_import(rel, module, allowed_direct_imports):
                         offenders.append(f"{rel}: {module}")
                     break
     assert not offenders  # noqa: S101
+
+
+def _allowed_data_handling_import(rel_path: str, module: str, allowed_by_file: dict[str, set[str]]) -> bool:
+    """Return whether a file has an explicit canonical data-handling dependency."""
+
+    allowed = allowed_by_file.get(rel_path, set())
+    normalized = module.removeprefix("aria_nbv.")
+    return normalized in allowed
 
 
 def test_data_handling_has_no_legacy_data_imports() -> None:
@@ -198,6 +229,7 @@ def test_removed_legacy_data_handling_modules_raise_import_error() -> None:
         "aria_nbv.data_handling._legacy_vin_provider",
         "aria_nbv.data_handling._legacy_vin_source",
         "aria_nbv.data_handling._migration",
+        "aria_nbv.data_handling._config_utils",
         "aria_nbv.data_handling.cache_contracts",
         "aria_nbv.data_handling.cache_index",
         "aria_nbv.data_handling.offline_cache_coverage",
@@ -207,6 +239,8 @@ def test_removed_legacy_data_handling_modules_raise_import_error() -> None:
         "aria_nbv.data_handling.vin_cache",
         "aria_nbv.data_handling.vin_oracle_datasets",
         "aria_nbv.data_handling.vin_provider",
+        "aria_nbv.data_handling._vin_runtime",
+        "aria_nbv.data_handling._sample_keys",
     ]
 
     for module_name in removed_modules:

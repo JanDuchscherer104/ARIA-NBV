@@ -2,27 +2,13 @@
 
 from __future__ import annotations
 
+# TODO: Use typer for nicer CLI!
 import argparse
 from pathlib import Path
 
-from ..configs import PathConfig
 from ..utils import Console
-from ._rollout_dataset_writer import RolloutDatasetWriterConfig
-
-
-def _resolve_config_path(path: Path) -> Path:
-    expanded = path.expanduser()
-    if expanded.is_absolute():
-        resolved = expanded.resolve()
-    elif expanded.exists():
-        resolved = expanded.resolve()
-    else:
-        resolved = PathConfig().resolve_config_toml_path(expanded, must_exist=True)
-    if resolved.suffix != ".toml":
-        raise ValueError(f"Config path must be a .toml file, got {resolved}.")
-    if not resolved.exists():
-        raise FileNotFoundError(f"Config file not found: {resolved}")
-    return resolved
+from ..utils.config_paths import resolve_config_toml_path
+from .dataset_writer import RolloutDatasetWriterConfig
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -47,7 +33,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> None:
     args = _build_parser().parse_args(argv)
     console = Console.with_prefix("nbv-build-rollouts")
-    config_path = _resolve_config_path(args.config_path)
+    config_path = resolve_config_toml_path(args.config_path)
     cfg = RolloutDatasetWriterConfig.from_toml(config_path)
     console.log(f"Loaded rollout writer config: {config_path}")
     console.log(f"Resolved source store: {cfg.source.store.store_dir}")

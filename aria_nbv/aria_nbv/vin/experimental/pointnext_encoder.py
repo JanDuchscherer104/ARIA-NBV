@@ -11,7 +11,7 @@ from torch import Tensor, nn
 
 from aria_nbv.configs.path_config import PathConfig
 
-from ...utils import BaseConfig, Optimizable, optimizable_field
+from ...utils import Optimizable, TargetConfig, optimizable_field
 
 
 def _extract_tensor(output: Any) -> Tensor:
@@ -55,11 +55,11 @@ def _load_checkpoint_strict(model: nn.Module, checkpoint_path: Path) -> None:
     model.load_state_dict(state, strict=True)
 
 
-class PointNeXtSEncoderConfig(BaseConfig):
+class PointNeXtSEncoderConfig(TargetConfig["PointNeXtSEncoder"]):
     """Configuration for the optional PointNeXt-S semidense encoder."""
 
     @property
-    def target(self) -> type["PointNeXtSEncoder"]:
+    def target_type(self) -> type["PointNeXtSEncoder"]:
         """Factory target for `aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return PointNeXtSEncoder
 

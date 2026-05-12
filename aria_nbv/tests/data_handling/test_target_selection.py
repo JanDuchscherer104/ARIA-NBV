@@ -194,14 +194,11 @@ def test_selector_falls_back_to_backbone_obbs_when_detected_block_is_missing() -
     assert len(result.selected_rows) == 1
 
 
-def test_selector_accepts_vin_oracle_batch_input() -> None:
+def test_selector_rejects_vin_oracle_batch_input() -> None:
     sample = _sample(detected_obbs=_obb_block([[0.0, 0.0, 0.0]]), points=[[0.0, 0.0, 0.0]])
 
-    result = _selector(k=1).select(sample.to_vin_oracle_batch())
-
-    assert result.source == "detected_obbs"
-    assert len(result.selected_rows) == 1
-    assert result.selected_rows[0].scene_id == "scene"
+    with pytest.raises(TypeError, match="VinOfflineSample"):
+        _selector(k=1).select(sample.to_vin_oracle_batch())
 
 
 def test_selected_target_matches_compatible_gt_obb() -> None:

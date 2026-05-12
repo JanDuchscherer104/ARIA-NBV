@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -16,8 +15,10 @@ import torch
 import trimesh
 from efm3d.aria import CameraTW, PoseTW
 from efm3d.aria.obb import ObbTW
+from pytorch3d.renderer.cameras import PerspectiveCameras
 
-from aria_nbv.data_handling import TargetCandidateRow
+from aria_nbv.data_handling import CompactObbBlock, TargetCandidateRow
+from aria_nbv.data_handling._offline_dataset import VinOfflineOracleBlock, VinOfflineSample
 from aria_nbv.pose_generation import (
     CandidateGenerationRuntimeContext,
     CandidateMixtureComponentConfig,
@@ -30,12 +31,8 @@ from aria_nbv.pose_generation import (
     CounterfactualSelectionPolicy,
     CounterfactualTargetOracleRriScorerConfig,
     CounterfactualTrajectory,
-    RolloutTrace,
     SamplingStrategy,
     ViewDirectionMode,
-    read_rollout_traces,
-    traces_from_rollout_result,
-    write_rollout_traces,
 )
 from aria_nbv.pose_generation.plotting import (
     plot_counterfactual_paths_simple,
@@ -48,6 +45,7 @@ from aria_nbv.pose_generation.target_counterfactuals import (
 )
 from aria_nbv.rendering import CandidateDepthRendererConfig
 from aria_nbv.rendering.candidate_pointclouds import CandidatePointClouds
+from aria_nbv.rollouts import RolloutLineage, RolloutZarrRecord
 from aria_nbv.rri_metrics.oracle_rri import OracleRRIConfig
 
 
@@ -249,7 +247,30 @@ def test_target_scorer_computes_target_and_scene_rri_from_one_pointcloud_batch(m
     monkeypatch.setattr(OracleRRIConfig, "setup_target", lambda self: oracle)
     target_obb = _obb((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
     row = _target_row(gt_target_row_id=0)
-    target_sample = SimpleNamespace(gt_obbs=SimpleNamespace(obbs=target_obb.tensor(), sem_id_to_name=[]))
+    zero = torch.zeros(1, dtype=torch.float32)
+    target_sample = VinOfflineSample(
+        sample_key="sample",
+        scene_id="scene",
+        snippet_id="snippet",
+        vin_snippet=None,
+        oracle=VinOfflineOracleBlock(
+            candidate_poses_world_cam=_identity_pose(),
+            reference_pose_world_rig=_identity_pose(),
+            candidate_count=1,
+            rri=zero,
+            pm_dist_before=zero,
+            pm_dist_after=zero,
+            pm_acc_before=zero,
+            pm_comp_before=zero,
+            pm_acc_after=zero,
+            pm_comp_after=zero,
+            p3d_cameras=PerspectiveCameras(device="cpu"),
+        ),
+        sample_index=0,
+        split="test",
+        efm_snippet_view=None,
+        gt_obbs=CompactObbBlock(obbs=target_obb.tensor(), sem_id_to_name=[]),
+    )
     sample = SimpleNamespace(
         mesh_verts=torch.tensor(
             [
@@ -436,14 +457,9 @@ def test_temperature_softmax_masks_invalid_candidates_and_reproduces_selection()
     assert step_a.selected_valid_index == step_b.selected_valid_index
     assert step_a.selected_shell_index == step_b.selected_shell_index
 
-    trace = traces_from_rollout_result(rollouts_a, rollout_id_prefix="temp-softmax")[0]
-    trace_step = trace.steps[0]
-    assert trace_step.selection_probabilities is not None
-    invalid_probs = trace_step.selection_probabilities[~trace_step.candidate_valid]
-    assert torch.equal(invalid_probs, torch.zeros_like(invalid_probs))
-    assert torch.isclose(trace_step.selection_probabilities[trace_step.candidate_valid].sum(), torch.tensor(1.0))
-    assert trace_step.selection_temperature == pytest.approx(1.0)
-    assert trace_step.selected_log_probability is not None
+    assert step_a.selection_probabilities.shape[0] == int(step_a.candidates.mask_valid.sum().item())
+    assert step_a.selection_temperature == pytest.approx(1.0)
+    assert step_a.selected_log_probability is not None
 
 
 def test_temperature_softmax_branch_factor_samples_distinct_candidates() -> None:
@@ -552,58 +568,42 @@ def test_candidate_depth_renderer_rejects_ambiguous_candidate_index_mapping() ->
         renderer._select_candidate_views(candidates)  # noqa: SLF001
 
 
-def test_rollout_trace_maps_scores_to_full_candidate_shell_and_roundtrips(tmp_path: Path) -> None:
+def test_rollout_zarr_record_carries_rollout_result_and_lineage() -> None:
     rollouts = _run_rollouts(horizon=2, branch_factor=1, score_candidates=_fake_rri_evaluator)
-    traces = traces_from_rollout_result(
-        rollouts,
+    record = RolloutZarrRecord(
+        result=rollouts,
         rollout_id_prefix="test-rollout",
-        scene_id="scene",
-        snippet_id="snippet",
-        candidate_config_hash="candidate-hash",
-        oracle_config_hash="oracle-hash",
-        random_seed=0,
+        lineage=RolloutLineage(
+            scene_id="scene",
+            snippet_id="snippet",
+            candidate_config_hash="candidate-hash",
+            oracle_config_hash="oracle-hash",
+            random_seed=0,
+        ),
     )
 
-    assert len(traces) == 1
-    trace = traces[0]
-    assert isinstance(trace, RolloutTrace)
-    assert trace.lineage.rollout_id == "test-rollout-000000"
-    assert trace.lineage.candidate_config_hash == "candidate-hash"
-    assert trace.termination_reason == "fixed_horizon"
+    lineage = record.lineage_for_chain(0)
+    assert lineage.rollout_id == "test-rollout-000000"
+    assert lineage.candidate_config_hash == "candidate-hash"
+    assert lineage.rollout_policy == rollouts.selection_policy
 
-    first_step = trace.steps[0]
-    assert first_step.candidate_valid.shape[0] == first_step.candidate_poses_world_cam.shape[0]
-    assert first_step.candidate_scores is not None
-    valid_indices = torch.nonzero(first_step.candidate_valid, as_tuple=False).reshape(-1)
+    trajectory = rollouts.trajectories[0]
+    first_step = trajectory.steps[0]
+    candidate_valid = first_step.candidates.mask_valid.detach().cpu()
+    valid_indices = torch.nonzero(candidate_valid, as_tuple=False).reshape(-1)
     expected_valid_scores = torch.linspace(
         0.1,
         0.1 * valid_indices.numel(),
         valid_indices.numel(),
-        dtype=first_step.candidate_scores.dtype,
+        dtype=first_step.selection_scores.dtype,
+        device=first_step.selection_scores.device,
     )
-    assert torch.allclose(first_step.candidate_scores[valid_indices], expected_valid_scores)
-    assert torch.isnan(first_step.candidate_scores[~first_step.candidate_valid]).all()
     assert torch.isclose(
-        first_step.candidate_scores[first_step.selected_shell_index],
-        torch.tensor(first_step.selection_score, dtype=first_step.candidate_scores.dtype),
+        first_step.selection_scores[first_step.selected_valid_index],
+        torch.tensor(first_step.selection_score, dtype=first_step.selection_scores.dtype),
     )
-    assert first_step.metric_vectors["rri"].shape == first_step.candidate_valid.shape
-    assert torch.allclose(first_step.metric_vectors["rri"][valid_indices], expected_valid_scores)
-    assert torch.isnan(first_step.metric_vectors["rri"][~first_step.candidate_valid]).all()
-    assert first_step.cumulative_rri == pytest.approx(first_step.selected_metrics["rri"])
-
-    path = write_rollout_traces(tmp_path / "rollouts.msgpack", traces)
-    decoded = read_rollout_traces(path)
-
-    assert decoded[0].lineage.scene_id == "scene"
-    assert decoded[0].steps[0].selected_shell_index == first_step.selected_shell_index
-    assert torch.equal(decoded[0].steps[0].candidate_valid, first_step.candidate_valid)
-    assert decoded[0].steps[0].candidate_scores is not None
-    assert torch.allclose(
-        decoded[0].steps[0].candidate_scores,
-        first_step.candidate_scores,
-        equal_nan=True,
-    )
+    assert torch.allclose(first_step.metric_vectors["rri"], expected_valid_scores)
+    assert trajectory.cumulative_rri == pytest.approx(sum(step.selected_metrics["rri"] for step in trajectory.steps))
 
 
 def test_counterfactual_rollout_passes_target_runtime_context_to_mixed_sampler() -> None:

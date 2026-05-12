@@ -20,7 +20,7 @@ from captum.attr import (  # type: ignore[import-untyped]
 )
 from torch import Tensor, nn
 
-from ..utils import BaseConfig, Console
+from ..utils import Console, TargetConfig
 
 
 class AttributionMethod(StrEnum):
@@ -325,11 +325,11 @@ class AttributionResult:
     target: Tensor | int | None
 
 
-class InterpretabilityConfig(BaseConfig):
+class InterpretabilityConfig(TargetConfig["AttributionEngine"]):
     """Factory config that builds an `AttributionEngine`."""
 
     @property
-    def target(self) -> type["AttributionEngine"]:
+    def target_type(self) -> type["AttributionEngine"]:
         """Factory target for the config."""
         return AttributionEngine
 

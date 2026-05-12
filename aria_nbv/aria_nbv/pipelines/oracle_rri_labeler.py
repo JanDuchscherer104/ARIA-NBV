@@ -27,7 +27,7 @@ from ..rendering.candidate_depth_renderer import CandidateDepthRendererConfig, C
 from ..rendering.candidate_pointclouds import CandidatePointClouds, build_candidate_pointclouds
 from ..rri_metrics.oracle_rri import OracleRRIConfig
 from ..rri_metrics.types import RriResult
-from ..utils import BaseConfig, Console
+from ..utils import BaseConfig, Console, TargetConfig
 
 
 @dataclass(slots=True)
@@ -43,7 +43,7 @@ def _target_cls():
     return OracleRriLabeler
 
 
-class OracleRriLabelerConfig(BaseConfig):
+class OracleRriLabelerConfig(TargetConfig["OracleRriLabeler"]):
     """Config-as-factory wrapper for `OracleRriLabeler`.
 
     This config composes the existing stage configs (generation, rendering,
@@ -51,7 +51,7 @@ class OracleRriLabelerConfig(BaseConfig):
     """
 
     @property
-    def target(self) -> type[OracleRriLabeler]:
+    def target_type(self) -> type[OracleRriLabeler]:
         return _target_cls()
 
     device: Annotated[torch.device, Field(default="auto")]

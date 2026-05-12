@@ -90,6 +90,7 @@ def _repr(obj: Any, *, include_docstrings: bool) -> str:
     return pformat(items, indent=2, width=100, compact=False)
 
 
+# TODO: create a shared BaseView / base data-class! Should probably be defined in aria_nbv/utils?
 class BaseView:
     """Base class for EFM view dataclasses with fast, optional docstring repr."""
 
@@ -473,10 +474,20 @@ class EfmPointsView(BaseView):
 
 @dataclass(slots=True)
 class EfmObbView(BaseView):
-    """Snippet-level oriented bounding boxes (OBB) in snippet frame."""
+    """Snippet-level oriented bounding boxes in the EFM `ObbTW` layout.
+
+    `obbs` may be shaped `(T, K, 34)`, `(1, K, 34)`, or `(K, 34)` depending on
+    the source. `K` is padded; padded rows are all `PAD_VAL` and must be removed
+    with `ObbTW.get_padding_mask()` before ranking or matching targets.
+
+    The `34` payload columns are the EFM OBB contract: object-frame 3D bounds,
+    three 2D boxes, a 12-value pose, semantic id, instance id, confidence, and
+    movable flag. Downstream target selection transforms the latest valid slice
+    into world coordinates before constructing `TargetCandidateRow` records.
+    """
 
     obbs: ObbTW
-    """Padded oriented boxes in snippet frame (center, size, yaw, sem-id)."""
+    """Padded oriented boxes in snippet frame or world frame, shape ``(..., K, 34)``."""
     hz: Tensor | None = None
     """Optional ``Tensor["1", int32]`` detection frequency."""
 

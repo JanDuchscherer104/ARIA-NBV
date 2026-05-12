@@ -80,7 +80,7 @@ class CandidateGenerationRuntimeContext:
     """
 
     target_center_world: torch.Tensor | None = None
-    """Actor-visible target center in world coordinates, required by TARGET_POINT components."""
+    """Actor-visible target center in world coordinates, shape ``(3,)``."""
 
     target_id: str | None = None
     """Optional stable actor-visible target id for diagnostics."""
@@ -88,7 +88,17 @@ class CandidateGenerationRuntimeContext:
 
 @dataclass
 class CandidateContext:
-    """Mutable state passed between sampling and pruning rules."""
+    """Mutable full-shell state passed between sampling and pruning rules.
+
+    `shell_poses`, `centers_world`, `shell_offsets_ref`, and `mask_valid` are
+    aligned over the full candidate shell of size `N`, including candidates that
+    later become invalid. Pruning rules must update `mask_valid` and may store
+    same-shape diagnostic masks in `rule_masks`; they must not compact rows.
+
+    `views` are not stored here because compact valid camera views are built
+    only after pruning. This separation lets rollout writers preserve invalid
+    candidates with reason codes while exposing only valid actions to policies.
+    """
 
     cfg: "CandidateViewGeneratorConfig"
     reference_pose: PoseTW
@@ -128,10 +138,24 @@ class CandidateContext:
 class CandidateSamplingResult:
     """Immutable result of candidate sampling and rule-based pruning.
 
-    `views` usually stores compact valid candidates for rendering. `mask_valid`,
-    `shell_poses`, provenance fields, and rule masks stay aligned with the full
-    sampled shell. Use `candidate_shell_indices()` whenever a rendered or scored
-    compact row must be joined back to full-shell lineage.
+    `views` stores compact valid candidates for rendering and oracle/model
+    scoring. `mask_valid`, `shell_poses`, provenance fields, and rule masks stay
+    aligned with the full sampled shell of size `N`. Use
+    `candidate_shell_indices()` whenever a compact row index must be joined back
+    to full-shell lineage.
+
+    Shapes:
+
+    * `views.T_camera_rig`: compact valid candidate camera poses in reference
+      coordinates, shape `(V, 12)`;
+    * `shell_poses`: full-shell world<-camera `PoseTW` payload, shape
+      `(N, 12)`;
+    * `mask_valid`: full-shell actor-action mask, shape `(N,)`;
+    * `strategy_id`, `mixture_id`, `sampler_probability`, and `component_name`:
+      optional full-shell provenance arrays/tuples aligned with `mask_valid`.
+
+    Invalid candidates remain in the full shell and must receive false training
+    masks and NaN oracle labels rather than low RRI.
     """
 
     views: CameraTW

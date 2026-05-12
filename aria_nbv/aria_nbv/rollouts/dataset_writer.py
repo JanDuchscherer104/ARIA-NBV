@@ -16,36 +16,34 @@ encoded as low target RRI.
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, field
 
-import msgspec
 import torch
 from pydantic import Field, field_validator
 
+from ..data_handling._offline_dataset import VinOfflineDataset, VinOfflineDatasetConfig, VinOfflineSample
+from ..data_handling._target_selection import (
+    TARGET_INVALID_REASON_VERSION,
+    ActorVisibleTargetSelector,
+    TargetCandidateRow,
+    TargetSelectorConfig,
+)
 from ..pose_generation import (
-    INVALID_REASON_VERSION,
     CandidateGenerationRuntimeContext,
     CandidateMixtureViewGeneratorConfig,
     CounterfactualPoseGeneratorConfig,
     CounterfactualSelectionPolicy,
     CounterfactualTargetOracleRriScorerConfig,
     TargetRriInvalidError,
-    traces_from_rollout_result,
 )
 from ..utils import BaseConfig, Console, TargetConfig, Verbosity
-from ._offline_dataset import VinOfflineDatasetConfig, VinOfflineSample
-from ._rollout_zarr_store import (
+from ..utils.fingerprints import stable_config_hash, stable_msgspec_hash
+from .trace import INVALID_REASON_VERSION, RolloutLineage, RolloutZarrRecord
+from .zarr_store import (
     RolloutZarrStoreConfig,
     RolloutZarrWriteResult,
     validate_rollout_zarr_store,
     write_rollout_zarr_store,
-)
-from ._target_selection import (
-    TARGET_INVALID_REASON_VERSION,
-    ActorVisibleTargetSelector,
-    TargetCandidateRow,
-    TargetSelectorConfig,
 )
 
 
@@ -64,7 +62,7 @@ class RolloutDatasetWriterStats:
     targets_label_invalid: int = 0
     target_invalid_skips: int = 0
     rollout_invalid_skips: int = 0
-    traces_written: int = 0
+    rollouts_written: int = 0
     skipped_reasons: dict[str, int] = field(default_factory=dict)
 
     def skip(self, reason: str) -> None:
@@ -78,7 +76,7 @@ class RolloutRecipeConfig(BaseConfig):
 
     Recipes control both candidate-set sampling and action selection. The first
     supported policies cover random valid selection, greedy oracle selection,
-    retained-beam oracle lookahead, and temperature-softmax traces for rollout
+    retained-beam oracle lookahead, and temperature-softmax records for rollout
     diversity.
     """
 
@@ -103,41 +101,43 @@ class RolloutRecipeConfig(BaseConfig):
     seed: int | None = 0
     """Recipe-local random seed for candidate/action sampling."""
 
+    @staticmethod
+    def default_suite() -> list["RolloutRecipeConfig"]:
+        """Return the default smoke recipe suite."""
 
-def _default_recipes() -> list[RolloutRecipeConfig]:
-    return [
-        RolloutRecipeConfig(
-            name="random_valid",
-            selection_policy=CounterfactualSelectionPolicy.RANDOM_VALID,
-            horizon=2,
-            branch_factor=1,
-            seed=0,
-        ),
-        RolloutRecipeConfig(
-            name="oracle_greedy",
-            selection_policy=CounterfactualSelectionPolicy.ORACLE_GREEDY,
-            horizon=2,
-            branch_factor=1,
-            seed=0,
-        ),
-        RolloutRecipeConfig(
-            name="oracle_lookahead",
-            selection_policy=CounterfactualSelectionPolicy.ORACLE_GREEDY,
-            horizon=2,
-            branch_factor=2,
-            beam_width=2,
-            seed=0,
-        ),
-        RolloutRecipeConfig(
-            name="temperature_softmax",
-            selection_policy=CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
-            horizon=2,
-            branch_factor=2,
-            beam_width=2,
-            selection_temperature=1.0,
-            seed=0,
-        ),
-    ]
+        return [
+            RolloutRecipeConfig(
+                name="random_valid",
+                selection_policy=CounterfactualSelectionPolicy.RANDOM_VALID,
+                horizon=2,
+                branch_factor=1,
+                seed=0,
+            ),
+            RolloutRecipeConfig(
+                name="oracle_greedy",
+                selection_policy=CounterfactualSelectionPolicy.ORACLE_GREEDY,
+                horizon=2,
+                branch_factor=1,
+                seed=0,
+            ),
+            RolloutRecipeConfig(
+                name="oracle_lookahead",
+                selection_policy=CounterfactualSelectionPolicy.ORACLE_GREEDY,
+                horizon=2,
+                branch_factor=2,
+                beam_width=2,
+                seed=0,
+            ),
+            RolloutRecipeConfig(
+                name="temperature_softmax",
+                selection_policy=CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
+                horizon=2,
+                branch_factor=2,
+                beam_width=2,
+                selection_temperature=1.0,
+                seed=0,
+            ),
+        ]
 
 
 class RolloutDatasetWriterConfig(TargetConfig["RolloutDatasetWriter"]):
@@ -188,7 +188,7 @@ class RolloutDatasetWriterConfig(TargetConfig["RolloutDatasetWriter"]):
     )
     """Standalone rollout Zarr destination; the VIN offline store remains unchanged."""
 
-    recipes: list[RolloutRecipeConfig] = Field(default_factory=_default_recipes)
+    recipes: list[RolloutRecipeConfig] = Field(default_factory=RolloutRecipeConfig.default_suite)
     """Rollout policies/branch schedules materialized into the replay store."""
 
     max_samples: int | None = Field(default=None, ge=1)
@@ -223,13 +223,83 @@ class RolloutDatasetWriterConfig(TargetConfig["RolloutDatasetWriter"]):
         super()._propagate_to_child(parent_field, child_config)
 
 
+@dataclass(frozen=True, slots=True)
+class _RolloutSourceLineageBuilder:
+    """Build deterministic source/config lineage values for rollout records."""
+
+    source_manifest_hash: str
+    split_manifest_hash: str
+    source_cache_version: str
+
+    @classmethod
+    def from_dataset(cls, dataset: VinOfflineDataset, *, max_samples: int) -> "_RolloutSourceLineageBuilder":
+        """Hash the source manifest and ordered source rows used by a rollout shard."""
+
+        source_manifest_hash = stable_msgspec_hash(dataset.manifest)
+        return cls(
+            source_manifest_hash=source_manifest_hash,
+            split_manifest_hash=cls.build_split_manifest_hash(
+                source_manifest_hash=source_manifest_hash,
+                split=dataset.config.split,
+                records=cls.dataset_records_for_hash(dataset, limit=max_samples),
+            ),
+            source_cache_version=str(dataset.manifest.version),
+        )
+
+    @staticmethod
+    def config_hash(config: BaseConfig) -> str:
+        """Hash one config for rollout trace lineage."""
+
+        return stable_config_hash(config)
+
+    @staticmethod
+    def build_split_manifest_hash(*, source_manifest_hash: str, split: str, records: list[dict[str, object]]) -> str:
+        """Hash the split-local ordered source rows used for a rollout shard."""
+
+        payload = {
+            "source_manifest_hash": source_manifest_hash,
+            "split": split,
+            "records": records,
+        }
+        return stable_msgspec_hash(payload)
+
+    @staticmethod
+    def dataset_records_for_hash(dataset: VinOfflineDataset, *, limit: int) -> list[dict[str, object]]:
+        """Return ordered source-row fields that define a rollout shard lineage."""
+
+        output: list[dict[str, object]] = []
+        for order, record in enumerate(dataset._records[:limit]):
+            output.append(
+                {
+                    "order": order,
+                    "sample_index": int(record.sample_index),
+                    "sample_key": str(record.sample_key),
+                    "scene_id": str(record.scene_id),
+                    "snippet_id": str(record.snippet_id),
+                    "split": str(record.split),
+                    "shard_id": str(record.shard_id),
+                    "row": int(record.row),
+                }
+            )
+        return output
+
+    @staticmethod
+    def mesh_version(sample: VinOfflineSample) -> str:
+        """Return a compact mesh-size fingerprint for rollout lineage."""
+
+        snippet = sample.efm_snippet_view
+        if snippet is None or snippet.mesh is None:
+            return "missing-mesh"
+        return f"mesh-v={len(snippet.mesh.vertices)}-f={len(snippet.mesh.faces)}"
+
+
 class RolloutDatasetWriter:
-    """Generate target-RRI rollout traces and write a standalone Zarr store.
+    """Generate target-RRI rollout records and write a standalone Zarr store.
 
     For each source row the writer selects V1 actor-visible targets, validates
     GT/evaluation matches when required, regenerates candidates at each rollout
     step from updated history/budget, scores candidates by target RRI, and
-    persists compact replay traces. Heavy diagnostics should be retained only
+    persists compact replay records. Heavy diagnostics should be retained only
     for selected actions or retained chains through the downstream Zarr policy.
     """
 
@@ -247,16 +317,11 @@ class RolloutDatasetWriter:
         if dataset is None:
             raise RuntimeError("VinOfflineDatasetConfig did not instantiate a dataset.")
         selector = ActorVisibleTargetSelector(self.config.target_selector)
-        source_manifest_hash = _source_manifest_hash(dataset.manifest)
         max_samples = (
             len(dataset) if self.config.max_samples is None else min(int(self.config.max_samples), len(dataset))
         )
-        split_manifest_hash = _split_manifest_hash(
-            source_manifest_hash=source_manifest_hash,
-            split=dataset.config.split,
-            records=_dataset_records_for_hash(dataset, limit=max_samples),
-        )
-        traces = []
+        source_lineage = _RolloutSourceLineageBuilder.from_dataset(dataset, max_samples=max_samples)
+        records = []
 
         for sample_index in range(max_samples):
             sample = dataset[sample_index]
@@ -274,32 +339,30 @@ class RolloutDatasetWriter:
                     self.stats.targets_label_invalid += 1
                     self.stats.skip(str(target.gt_match_status))
                     continue
-                traces.extend(
+                records.extend(
                     self._rollout_target(
                         sample=sample,
                         target=target,
                         target_rank=target_rank,
-                        source_cache_version=str(dataset.manifest.version),
-                        source_manifest_hash=source_manifest_hash,
-                        split_manifest_hash=split_manifest_hash,
+                        source_lineage=source_lineage,
                     )
                 )
 
-        if not traces:
-            raise RuntimeError(f"No rollout traces were generated; skipped={self.stats.skipped_reasons}")
+        if not records:
+            raise RuntimeError(f"No rollout records were generated; skipped={self.stats.skipped_reasons}")
 
         result = write_rollout_zarr_store(
             self.config.store.store_dir,
-            traces,
+            records,
             return_semantics=self.config.store.return_semantics,
             discount_gamma=self.config.store.discount_gamma,
             target_protocol_version=self.config.store.target_protocol_version,
             reason_code_version=self.config.store.reason_code_version,
             field_retention_policy=self.config.store.field_retention_policy,
-            source_offline_store_version=str(dataset.manifest.version),
-            split_manifest_hash=split_manifest_hash,
+            source_offline_store_version=source_lineage.source_cache_version,
+            split_manifest_hash=source_lineage.split_manifest_hash,
         )
-        self.stats.traces_written = int(result.num_rollouts)
+        self.stats.rollouts_written = int(result.num_rollouts)
         validation = validate_rollout_zarr_store(result.store_dir)
         if not validation.ok:
             joined = "; ".join(validation.errors)
@@ -317,11 +380,9 @@ class RolloutDatasetWriter:
         sample: VinOfflineSample,
         target: TargetCandidateRow,
         target_rank: int,
-        source_cache_version: str,
-        source_manifest_hash: str,
-        split_manifest_hash: str,
-    ) -> list:
-        traces = []
+        source_lineage: _RolloutSourceLineageBuilder,
+    ) -> list[RolloutZarrRecord]:
+        records: list[RolloutZarrRecord] = []
         runtime_context = CandidateGenerationRuntimeContext(
             target_center_world=torch.tensor(target.center_world, dtype=torch.float32),
             target_id=target.target_id,
@@ -339,7 +400,7 @@ class RolloutDatasetWriter:
                 f"Skipping target scorer scene={sample.scene_id} snippet={sample.snippet_id} "
                 f"target={target.target_id}: {exc}",
             )
-            return traces
+            return records
         for recipe in self.config.recipes:
             rollout_cfg = CounterfactualPoseGeneratorConfig(
                 candidate_config=self.config.candidate_mixture,
@@ -369,95 +430,54 @@ class RolloutDatasetWriter:
                 continue
 
             prefix = f"{sample.sample_index:08d}-target-{target_rank:02d}-{recipe.name}"
-            traces.extend(
-                traces_from_rollout_result(
-                    result,
+            records.append(
+                RolloutZarrRecord(
+                    result=result,
                     rollout_id_prefix=prefix,
-                    scene_id=sample.scene_id,
-                    snippet_id=sample.snippet_id,
-                    mesh_version=_mesh_version(sample),
-                    candidate_config_hash=_config_hash(self.config.candidate_mixture),
-                    oracle_config_hash=_config_hash(self.config.target_scorer),
-                    random_seed=recipe.seed,
-                    source_cache_version=source_cache_version,
-                    split=sample.split,
-                    source_offline_store_manifest_hash=source_manifest_hash,
-                    split_manifest_hash=split_manifest_hash,
-                    rollout_config_hash=_config_hash(rollout_cfg),
-                    branch_schedule_id=recipe.name,
-                    target_row_id=target.target_row_id,
-                    target_id=target.target_id,
-                    target_protocol_version=self.config.store.target_protocol_version,
-                    target_crop_policy=self.config.target_scorer.target_crop_policy,
-                    reason_code_version=INVALID_REASON_VERSION,
-                    selection_rng_state_hash="not-captured-v1",
-                    target_selection_policy=self.config.target_selector.policy.value,
-                    target_selection_rank=target.selected_rank if target.selected_rank is not None else target_rank,
-                    target_selection_score=target.score,
-                    target_selection_probability=target.selection_probability,
-                    target_selection_temperature=self._target_selection_temperature(),
-                    target_invalid_reason_bitset=target.invalid_reason_bitset,
-                    target_primary_invalid_reason=target.primary_invalid_reason,
-                    target_reason_code_version=TARGET_INVALID_REASON_VERSION,
-                    matched_gt_target_row_id=target.gt_target_row_id,
-                    matched_gt_target_id=target.gt_target_id,
-                    gt_match_iou=target.gt_match_iou,
-                    gt_match_score=target.gt_match_score,
-                    gt_match_status=target.gt_match_status,
+                    lineage=RolloutLineage(
+                        scene_id=sample.scene_id,
+                        snippet_id=sample.snippet_id,
+                        mesh_version=source_lineage.mesh_version(sample),
+                        candidate_config_hash=source_lineage.config_hash(self.config.candidate_mixture),
+                        oracle_config_hash=source_lineage.config_hash(self.config.target_scorer),
+                        random_seed=recipe.seed,
+                        source_cache_version=source_lineage.source_cache_version,
+                        source_row_id=sample.sample_index,
+                        source_sample_index=sample.sample_index,
+                        source_sample_key=sample.sample_key,
+                        split=sample.split,
+                        source_offline_store_manifest_hash=source_lineage.source_manifest_hash,
+                        split_manifest_hash=source_lineage.split_manifest_hash,
+                        rollout_config_hash=source_lineage.config_hash(rollout_cfg),
+                        branch_schedule_id=recipe.name,
+                        target_row_id=target.target_row_id,
+                        target_id=target.target_id,
+                        target_protocol_version=self.config.store.target_protocol_version,
+                        target_crop_policy=self.config.target_scorer.target_crop_policy,
+                        reason_code_version=INVALID_REASON_VERSION,
+                        selection_rng_state_hash="not-captured-v1",
+                        target_selection_policy=self.config.target_selector.policy.value,
+                        target_selection_rank=target.selected_rank if target.selected_rank is not None else target_rank,
+                        target_selection_score=target.score,
+                        target_selection_probability=target.selection_probability,
+                        target_selection_temperature=self._target_selection_temperature(),
+                        target_invalid_reason_bitset=target.invalid_reason_bitset,
+                        target_primary_invalid_reason=target.primary_invalid_reason,
+                        target_reason_code_version=TARGET_INVALID_REASON_VERSION,
+                        matched_gt_target_row_id=target.gt_target_row_id,
+                        matched_gt_target_id=target.gt_target_id,
+                        gt_match_iou=target.gt_match_iou,
+                        gt_match_score=target.gt_match_score,
+                        gt_match_status=target.gt_match_status,
+                    ),
                 )
             )
-        return traces
+        return records
 
     def _target_selection_temperature(self) -> float | None:
         if self.config.target_selector.policy.value == "temperature_softmax_top_k":
             return float(self.config.target_selector.temperature)
         return None
-
-
-def _config_hash(config: BaseConfig) -> str:
-    payload = repr(config.model_dump_jsonable()).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()[:16]
-
-
-def _source_manifest_hash(manifest: object) -> str:
-    return hashlib.sha256(msgspec.json.encode(manifest)).hexdigest()[:16]
-
-
-def _dataset_records_for_hash(dataset: object, *, limit: int) -> list[dict[str, object]]:
-    records = list(getattr(dataset, "_records", []))[:limit]
-    output: list[dict[str, object]] = []
-    for order, record in enumerate(records):
-        output.append(
-            {
-                "order": order,
-                "sample_index": int(record.sample_index),
-                "sample_key": str(record.sample_key),
-                "scene_id": str(record.scene_id),
-                "snippet_id": str(record.snippet_id),
-                "split": str(record.split),
-                "shard_id": str(record.shard_id),
-                "row": int(record.row),
-            }
-        )
-    return output
-
-
-def _split_manifest_hash(*, source_manifest_hash: str, split: str, records: list[dict[str, object]]) -> str:
-    payload = {
-        "source_manifest_hash": source_manifest_hash,
-        "split": split,
-        "records": records,
-    }
-    return hashlib.sha256(msgspec.json.encode(payload)).hexdigest()[:16]
-
-
-def _mesh_version(sample: VinOfflineSample) -> str:
-    snippet = sample.efm_snippet_view
-    if snippet is None or snippet.mesh is None:
-        return "missing-mesh"
-    verts = getattr(snippet.mesh, "vertices", None)
-    faces = getattr(snippet.mesh, "faces", None)
-    return f"mesh-v={0 if verts is None else len(verts)}-f={0 if faces is None else len(faces)}"
 
 
 __all__ = [

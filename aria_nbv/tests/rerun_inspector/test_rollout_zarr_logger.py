@@ -5,8 +5,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
@@ -14,10 +13,6 @@ import torch
 
 pytest.importorskip("efm3d")
 
-from efm3d.aria.pose import PoseTW
-
-from aria_nbv.data_handling import RolloutZarrStoreReader, write_rollout_zarr_store
-from aria_nbv.pose_generation import INVALID_REASON_CODES, build_synthetic_rollout_traces
 from aria_nbv.rerun_inspector._config import RerunOfflineInspectorConfig
 from aria_nbv.rerun_inspector._loggers import ENTITY_WORLD
 from aria_nbv.rerun_inspector._rollout_zarr import (
@@ -29,6 +24,11 @@ from aria_nbv.rerun_inspector._rollout_zarr import (
     ENTITY_ROLLOUT_VALID_ROOT,
     RerunRolloutZarrLogger,
 )
+from aria_nbv.rollouts import write_rollout_zarr_store
+from tests.rollout_fixtures import build_rollout_records
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class _Archetype:
@@ -87,48 +87,37 @@ class _FakeRerun:
         self.logged_extras[entity_path] = args
 
 
-def _synthetic_rollout_store(tmp_path: Path, *, synthetic_attrs: bool = True) -> Path:
-    traces = build_synthetic_rollout_traces(horizon=2, num_samples=6, seed=13)
-    sampler_reject = INVALID_REASON_CODES["SAMPLER_RULE_REJECTED"]
-    valid_bit = INVALID_REASON_CODES["VALID"]
-    for trace in traces:
-        for step in trace.steps:
-            candidate_valid = step.candidate_valid.clone()
-            invalid = torch.zeros_like(candidate_valid, dtype=torch.bool)
-            invalid[::4] = True
-            invalid[int(step.selected_shell_index)] = False
-            candidate_valid[invalid] = False
-            step.candidate_valid = candidate_valid
-            step.candidate_invalid_reason_bitset = torch.full(
-                candidate_valid.shape,
-                1 << valid_bit,
-                dtype=torch.int64,
-            )
-            step.candidate_invalid_reason_bitset[invalid] = 1 << sampler_reject
-            step.candidate_primary_invalid_reason = torch.full(
-                candidate_valid.shape,
-                valid_bit,
-                dtype=torch.int64,
-            )
-            step.candidate_primary_invalid_reason[invalid] = sampler_reject
-            _mask_vector(step.candidate_scores, invalid, fill=float("nan"))
-            _mask_vector(step.selection_logits, invalid, fill=float("nan"))
-            _mask_vector(step.selection_probabilities, invalid, fill=0.0, renormalize=True, valid=candidate_valid)
-            _mask_vector(
-                step.selection_log_probabilities, invalid, fill=float("-inf"), log_from=step.selection_probabilities
-            )
-            for values in step.metric_vectors.values():
-                _mask_vector(values, invalid, fill=float("nan"))
+def _fixture_rollout_store(tmp_path: Path) -> Path:
+    records = build_rollout_records(horizon=2, num_samples=6, seed=13)
+    for record in records:
+        for trajectory in record.result.trajectories:
+            for step in trajectory.steps:
+                candidate_valid = step.candidates.mask_valid.clone()
+                invalid = torch.zeros_like(candidate_valid, dtype=torch.bool)
+                invalid[::4] = True
+                invalid[int(step.selected_shell_index)] = False
+                candidate_valid[invalid] = False
+                step.candidates.mask_valid = candidate_valid
+                step.candidates.masks["FixtureInvalidRule"] = candidate_valid
+                _mask_vector(step.selection_scores, invalid, fill=float("nan"))
+                _mask_vector(step.selection_logits, invalid, fill=float("nan"))
+                _mask_vector(step.selection_probabilities, invalid, fill=0.0, renormalize=True, valid=candidate_valid)
+                _mask_vector(
+                    step.selection_log_probabilities,
+                    invalid,
+                    fill=float("-inf"),
+                    log_from=step.selection_probabilities,
+                )
+                for values in step.metric_vectors.values():
+                    _mask_vector(values, invalid, fill=float("nan"))
 
-    if synthetic_attrs:
-        result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", traces)
-    else:
-        result = write_rollout_zarr_store(
-            tmp_path / "rollouts.zarr",
-            traces,
-            target_protocol_version="v1-test",
-            source_offline_store_version="vin-test",
-        )
+    result = write_rollout_zarr_store(
+        tmp_path / "rollouts.zarr",
+        records,
+        target_protocol_version="v1-observed",
+        source_offline_store_version="7",
+        split_manifest_hash="fixture-split-manifest",
+    )
     return result.store_dir
 
 
@@ -154,7 +143,7 @@ def _mask_vector(
 
 
 def test_rollout_zarr_logger_logs_multistep_candidate_layers(tmp_path: Path) -> None:
-    store_dir = _synthetic_rollout_store(tmp_path)
+    store_dir = _fixture_rollout_store(tmp_path)
     cfg = RerunOfflineInspectorConfig()
     cfg.output.save_path = tmp_path / "rollout.rrd"
     cfg.selection.rollout_context_mode = "off"
@@ -192,7 +181,7 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(tmp_path: Path) -> 
 
     step_metadata = json.loads(fake.logged[ENTITY_ROLLOUT_STEP_METADATA].args[0])
     assert step_metadata["q_h"]["state_row_found"]
-    assert not step_metadata["q_h"]["dense_q_targets_available"]
+    assert step_metadata["q_h"]["selected_transition_available"]
     assert step_metadata["invalid_candidate_count"] > 0
     assert step_metadata["display_validity_trusted"]
 
@@ -206,7 +195,7 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(tmp_path: Path) -> 
 def test_rollout_zarr_logger_logs_matching_static_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Auto context should reuse the normal VIN sample logger when rollout lineage resolves."""
 
-    store_dir = _synthetic_rollout_store(tmp_path, synthetic_attrs=False)
+    store_dir = _fixture_rollout_store(tmp_path)
     cfg = RerunOfflineInspectorConfig()
     cfg.output.save_path = tmp_path / "rollout.rrd"
     fake = _FakeRerun()
@@ -215,7 +204,7 @@ def test_rollout_zarr_logger_logs_matching_static_context(tmp_path: Path, monkey
     monkeypatch.setattr(
         "aria_nbv.rerun_inspector._rollout_zarr.select_rerun_sample",
         lambda **kwargs: calls.append(("select", kwargs["selection"]))
-        or type("Selected", (), {"sample": object(), "description": "scene_id=synthetic_box snippet_id=smoke"})(),
+        or type("Selected", (), {"sample": object(), "description": "scene_id=fixture_box snippet_id=smoke"})(),
     )
     monkeypatch.setattr(
         "aria_nbv.rerun_inspector._rollout_zarr.collect_visual_inventory",
@@ -258,17 +247,17 @@ def test_rollout_zarr_logger_logs_matching_static_context(tmp_path: Path, monkey
         "log_metadata",
     ]
     selection = calls[0][1]
-    assert selection.scene_id == "synthetic_box"
+    assert selection.scene_id == "fixture_box"
     assert selection.snippet_id == "smoke"
 
 
-def test_rollout_zarr_logger_required_context_uses_selection_for_synthetic_store(
+def test_rollout_zarr_logger_required_context_uses_rollout_lineage(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Required context should allow synthetic rollout overlays on an explicitly selected VIN sample."""
+    """Required context should use rollout scene/snippet lineage when no explicit selector is set."""
 
-    store_dir = _synthetic_rollout_store(tmp_path)
+    store_dir = _fixture_rollout_store(tmp_path)
     cfg = RerunOfflineInspectorConfig()
     cfg.output.save_path = tmp_path / "rollout.rrd"
     cfg.selection.rollout_context_mode = "required"
@@ -315,117 +304,5 @@ def test_rollout_zarr_logger_required_context_uses_selection_for_synthetic_store
 
     assert [name for name, _ in calls] == ["select", "log_sample", "log_metadata"]
     selection = calls[0][1]
-    assert selection.scene_id is None
-    assert selection.snippet_id is None
-    assert selection.split == "val"
-    assert selection.index == 3
-
-
-def test_rollout_zarr_logger_aligns_synthetic_poses_to_context_world(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Synthetic rollout overlays should be transformed into the selected VIN world frame."""
-
-    store_dir = _synthetic_rollout_store(tmp_path)
-    reader = RolloutZarrStoreReader(store_dir)
-    store_root = reader.array("rollouts/root_pose_world")[0].astype(np.float32)
-    step_rollout_ids = reader.array("steps/rollout_row_id").astype(np.int64)
-    step_ids = reader.array("steps/step_row_id").astype(np.int64)
-    step_indices = reader.array("steps/step_index").astype(np.int64)
-    rollout_step_rows = np.nonzero(step_rollout_ids == 0)[0]
-    final_step_row = rollout_step_rows[np.argmax(step_indices[rollout_step_rows])]
-    final_step_id = int(step_ids[final_step_row])
-    candidate_step_ids = reader.array("candidates/step_row_id").astype(np.int64)
-    shell_indices = reader.array("candidates/shell_index").astype(np.int64)
-    candidate_row = np.nonzero((candidate_step_ids == final_step_id) & (shell_indices == 0))[0][0]
-    final_store_pose = reader.array("candidates/pose_world_cam")[candidate_row].astype(np.float32)
-    context_root = store_root.copy()
-    context_root[9:12] = np.asarray([10.0, 20.0, 30.0], dtype=np.float32)
-    expected_pose = (
-        PoseTW(torch.as_tensor(context_root))
-        .compose(PoseTW(torch.as_tensor(store_root)).inverse().compose(PoseTW(torch.as_tensor(final_store_pose))))
-        .tensor()
-        .numpy()
-        .reshape(12)
-    )
-
-    cfg = RerunOfflineInspectorConfig()
-    cfg.output.save_path = tmp_path / "rollout.rrd"
-    cfg.selection.rollout_context_mode = "required"
-    fake = _FakeRerun()
-
-    monkeypatch.setattr(
-        "aria_nbv.rerun_inspector._rollout_zarr.select_rerun_sample",
-        lambda **kwargs: type(
-            "Selected",
-            (),
-            {
-                "sample": type(
-                    "Sample",
-                    (),
-                    {
-                        "oracle": type(
-                            "Oracle", (), {"reference_pose_world_rig": PoseTW(torch.as_tensor(context_root))}
-                        )()
-                    },
-                )(),
-                "description": "split=val index=0",
-            },
-        )(),
-    )
-    monkeypatch.setattr(
-        "aria_nbv.rerun_inspector._rollout_zarr.collect_visual_inventory",
-        lambda sample: object(),
-    )
-    monkeypatch.setattr(
-        "aria_nbv.rerun_inspector._rollout_zarr.validate_required_inventory",
-        lambda config, inventory: None,
-    )
-
-    class _FakeOfflineLogger:
-        def __init__(
-            self,
-            config: RerunOfflineInspectorConfig,
-            *,
-            rr_module: object | None = None,
-            target_obb_hint: str | None = None,
-        ) -> None:
-            del config, rr_module, target_obb_hint
-
-        def log_sample(self, *, sample: object, inventory: object, selection: str) -> None:
-            pass
-
-        def log_metadata(self, *, sample: object, inventory: object, selection: str) -> None:
-            pass
-
-    monkeypatch.setattr("aria_nbv.rerun_inspector._rollout_zarr.RerunOfflineLogger", _FakeOfflineLogger)
-
-    logger = RerunRolloutZarrLogger(cfg, rr_module=fake)
-    logger.start()
-    logger.log_store(store_dir=store_dir, rollout_index=0)
-
-    camera_path = next(path for path in fake.logged if path.endswith("/candidate_000/camera"))
-    transform = fake.logged[camera_path]
-    np.testing.assert_allclose(
-        np.asarray(transform.kwargs["translation"], dtype=np.float32),
-        expected_pose[9:12],
-        atol=1e-5,
-    )
-
-    candidate_values = [
-        extras[1].kwargs
-        for path, extras in fake.logged_extras.items()
-        if path.startswith("world/rollout/step/") and path.endswith("/camera")
-    ]
-    assert candidate_values
-    assert not any(values["valid_mask"] for values in candidate_values)
-    assert any(values["stored_valid_mask"] for values in candidate_values)
-    assert not any(values["display_validity_trusted"] for values in candidate_values)
-
-    metadata = json.loads(fake.logged[ENTITY_ROLLOUT_METADATA].args[0])
-    assert any("stored candidate validity" in warning for warning in metadata["context"]["warnings"])
-    step_metadata = json.loads(fake.logged[ENTITY_ROLLOUT_STEP_METADATA].args[0])
-    assert step_metadata["num_valid_candidates"] == 0
-    assert step_metadata["stored_num_valid_candidates"] > 0
-    assert not step_metadata["display_validity_trusted"]
+    assert selection.scene_id == "fixture_box"
+    assert selection.snippet_id == "smoke"

@@ -40,7 +40,7 @@ from ..rri_metrics import (
     topk_accuracy_from_probs,
 )
 from ..rri_metrics.coral import coral_logits_to_label, coral_monotonicity_violation_rate
-from ..utils import BaseConfig, Console, Stage
+from ..utils import Console, Stage, TargetConfig
 from ..utils.grad_norms import (
     GradNormLoggingConfig,
     _collect_grad_norm_targets,
@@ -52,11 +52,11 @@ from ..vin.vin_utils import largest_divisor_leq
 from .optimizers import AdamWConfig, OneCycleSchedulerConfig, ReduceLrOnPlateauConfig
 
 
-class VinLightningModuleConfig(BaseConfig):
+class VinLightningModuleConfig(TargetConfig["VinLightningModule"]):
     """Configuration for `VinLightningModule`."""
 
     @property
-    def target(self) -> type["VinLightningModule"]:
+    def target_type(self) -> type["VinLightningModule"]:
         return VinLightningModule
 
     vin: VinModelV3Config = Field(default_factory=VinModelV3Config)

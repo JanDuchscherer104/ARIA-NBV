@@ -13,29 +13,31 @@ control are outside this module's current contract.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
 import torch
-from efm3d.aria.camera import CameraTW
 from efm3d.aria.pose import PoseTW
 from pydantic import Field, field_validator
 
-from ..data_handling import EfmSnippetView
 from ..rendering.candidate_depth_renderer import CandidateDepthRendererConfig
 from ..rendering.candidate_pointclouds import build_candidate_pointclouds
 from ..rri_metrics.oracle_rri import OracleRRIConfig
 from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..utils.frames import rotate_yaw_cw90
 from .candidate_generation import CandidateViewGenerator, CandidateViewGeneratorConfig
-from .candidate_mixture import CandidateMixtureViewGenerator, CandidateMixtureViewGeneratorConfig
+from .candidate_mixture import CandidateMixtureViewGeneratorConfig  # noqa: TC001 - Pydantic config field.
 from .types import CandidateGenerationRuntimeContext, CandidateSamplingResult
 from .utils import ensure_unbatched_pose
 
 if TYPE_CHECKING:
     import trimesh
+    from efm3d.aria.camera import CameraTW
+
+    from ..data_handling import EfmSnippetView
+    from .candidate_mixture import CandidateMixtureViewGenerator
 
 
 def _pose_row(pose: PoseTW) -> torch.Tensor:
@@ -79,14 +81,91 @@ class CounterfactualSelectionRecord:
 
 
 @dataclass(slots=True)
+class CounterfactualMetricBundle:
+    """Typed per-valid-candidate metrics emitted by rollout evaluators."""
+
+    rri: torch.Tensor | None = None
+    target_rri: torch.Tensor | None = None
+    scene_rri: torch.Tensor | None = None
+    target_pm_dist_before: torch.Tensor | None = None
+    target_pm_dist_after: torch.Tensor | None = None
+    target_pm_acc_before: torch.Tensor | None = None
+    target_pm_comp_before: torch.Tensor | None = None
+    target_pm_acc_after: torch.Tensor | None = None
+    target_pm_comp_after: torch.Tensor | None = None
+    target_candidate_support: torch.Tensor | None = None
+    target_current_support: torch.Tensor | None = None
+    scene_pm_dist_before: torch.Tensor | None = None
+    scene_pm_dist_after: torch.Tensor | None = None
+    scene_pm_acc_before: torch.Tensor | None = None
+    scene_pm_comp_before: torch.Tensor | None = None
+    scene_pm_acc_after: torch.Tensor | None = None
+    scene_pm_comp_after: torch.Tensor | None = None
+
+    @classmethod
+    def from_vectors(cls, vectors: Mapping[str, torch.Tensor] | None) -> "CounterfactualMetricBundle":
+        """Build a typed metric bundle from legacy or test vector mappings."""
+
+        if not vectors:
+            return cls()
+        names = cls.__dataclass_fields__
+        values = {name: vectors[name] for name in names if name in vectors}
+        return cls(**values)
+
+    def validate(self, *, num_valid: int, device: torch.device, dtype: torch.dtype) -> "CounterfactualMetricBundle":
+        """Normalize all present metric vectors and verify valid-candidate length."""
+
+        values: dict[str, torch.Tensor | None] = {}
+        for name in self.__dataclass_fields__:
+            metric = getattr(self, name)
+            if metric is None:
+                values[name] = None
+                continue
+            tensor = torch.as_tensor(metric, device=device, dtype=dtype).reshape(-1)
+            if tensor.shape[0] != num_valid:
+                raise ValueError(
+                    f"Counterfactual evaluator metric '{name}' must return {num_valid} values, got {tensor.shape[0]}.",
+                )
+            values[name] = tensor
+        return CounterfactualMetricBundle(**values)
+
+    def as_vectors(self) -> dict[str, torch.Tensor]:
+        """Return present metrics as name-to-vector mapping for trace serialization."""
+
+        return {name: value for name in self.__dataclass_fields__ if (value := getattr(self, name)) is not None}
+
+
+@dataclass(init=False, slots=True)
 class CounterfactualCandidateEvaluation:
     """Structured per-valid-candidate rollout scores and optional diagnostics."""
 
     scores: torch.Tensor
-    score_label: str = "score"
-    metric_vectors: dict[str, torch.Tensor] = field(default_factory=dict)
-    candidate_point_clouds_world: torch.Tensor | None = None
-    candidate_point_cloud_lengths: torch.Tensor | None = None
+    score_label: str
+    metrics: CounterfactualMetricBundle
+    candidate_point_clouds_world: torch.Tensor | None
+    candidate_point_cloud_lengths: torch.Tensor | None
+
+    def __init__(
+        self,
+        *,
+        scores: torch.Tensor,
+        score_label: str = "score",
+        metrics: CounterfactualMetricBundle | None = None,
+        metric_vectors: Mapping[str, torch.Tensor] | None = None,
+        candidate_point_clouds_world: torch.Tensor | None = None,
+        candidate_point_cloud_lengths: torch.Tensor | None = None,
+    ) -> None:
+        self.scores = scores
+        self.score_label = score_label
+        self.metrics = metrics if metrics is not None else CounterfactualMetricBundle.from_vectors(metric_vectors)
+        self.candidate_point_clouds_world = candidate_point_clouds_world
+        self.candidate_point_cloud_lengths = candidate_point_cloud_lengths
+
+    @property
+    def metric_vectors(self) -> dict[str, torch.Tensor]:
+        """Return present metric vectors by stable metric name."""
+
+        return self.metrics.as_vectors()
 
     def validate(
         self,
@@ -101,14 +180,7 @@ class CounterfactualCandidateEvaluation:
         if scores.shape[0] != num_valid:
             raise ValueError(f"Counterfactual evaluator must return {num_valid} scores, got {scores.shape[0]}.")
 
-        metric_vectors: dict[str, torch.Tensor] = {}
-        for name, values in self.metric_vectors.items():
-            metric = torch.as_tensor(values, device=device, dtype=dtype).reshape(-1)
-            if metric.shape[0] != num_valid:
-                raise ValueError(
-                    f"Counterfactual evaluator metric '{name}' must return {num_valid} values, got {metric.shape[0]}.",
-                )
-            metric_vectors[name] = metric
+        metrics = self.metrics.validate(num_valid=num_valid, device=device, dtype=dtype)
 
         candidate_point_clouds_world = self.candidate_point_clouds_world
         candidate_point_cloud_lengths = self.candidate_point_cloud_lengths
@@ -141,7 +213,7 @@ class CounterfactualCandidateEvaluation:
         return CounterfactualCandidateEvaluation(
             scores=scores,
             score_label=self.score_label,
-            metric_vectors=metric_vectors,
+            metrics=metrics,
             candidate_point_clouds_world=candidate_point_clouds_world,
             candidate_point_cloud_lengths=candidate_point_cloud_lengths,
         )
@@ -362,7 +434,7 @@ class CounterfactualOracleRriScorer:
         return CounterfactualCandidateEvaluation(
             scores=rri.rri,
             score_label="oracle_rri",
-            metric_vectors={"rri": rri.rri},
+            metrics=CounterfactualMetricBundle(rri=rri.rri),
             candidate_point_clouds_world=point_clouds.points,
             candidate_point_cloud_lengths=point_clouds.lengths,
         )
@@ -772,6 +844,7 @@ class CounterfactualPoseGenerator:
 __all__ = [
     "CounterfactualCandidateEvaluation",
     "CounterfactualEvaluatorFn",
+    "CounterfactualMetricBundle",
     "CounterfactualOracleRriScorer",
     "CounterfactualOracleRriScorerConfig",
     "CounterfactualPoseGenerator",

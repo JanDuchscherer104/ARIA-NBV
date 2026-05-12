@@ -12,23 +12,29 @@ but it must not replace target RRI labels in thesis-core rollout stores.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 import torch
-from efm3d.aria.obb import ObbTW
 from pydantic import Field, field_validator
 
-# TODO(fix: TargetCandidateRow and target_gt_obb_world are not recognized as valid imports!)
-from ..data_handling import EfmSnippetView, TargetCandidateRow, target_gt_obb_world
+from ..data_handling._target_selection import target_gt_obb_world
 from ..rendering.candidate_depth_renderer import CandidateDepthRendererConfig
 from ..rendering.candidate_pointclouds import build_candidate_pointclouds
 from ..rri_metrics.oracle_rri import OracleRRIConfig
 from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from .counterfactuals import (
     CounterfactualCandidateEvaluation,
+    CounterfactualMetricBundle,
     CounterfactualTrajectory,
 )
-from .types import CandidateSamplingResult
+
+if TYPE_CHECKING:
+    from efm3d.aria.obb import ObbTW
+
+    from ..data_handling._offline_dataset import VinOfflineSample
+    from ..data_handling._target_selection import TargetCandidateRow
+    from ..data_handling.efm_views import EfmSnippetView
+    from .types import CandidateSamplingResult
 
 TARGET_CROP_POLICY_GT_OBB_ORIENTED_ANY_VERTEX_V1 = "gt_obb_oriented_any_vertex_v1"
 """Target crop policy: keep mesh faces with any vertex inside the matched oriented GT OBB."""
@@ -48,10 +54,10 @@ class CounterfactualTargetOracleRriScorerConfig(TargetConfig["CounterfactualTarg
     def target_type(self) -> type["CounterfactualTargetOracleRriScorer"]:
         return CounterfactualTargetOracleRriScorer
 
-    depth: CandidateDepthRendererConfig = Field(default_factory=CandidateDepthRendererConfig)
+    depth: CandidateDepthRendererConfig = Field(default_factory=lambda: CandidateDepthRendererConfig())
     """Depth renderer used once per candidate table before target/scene scoring."""
 
-    oracle: OracleRRIConfig = Field(default_factory=OracleRRIConfig)
+    oracle: OracleRRIConfig = Field(default_factory=lambda: OracleRRIConfig())
     """Point-mesh oracle metric configuration shared by target and scene RRI."""
 
     backprojection_stride: int = Field(default=1, ge=1)
@@ -109,7 +115,7 @@ class CounterfactualTargetOracleRriScorer:
         config: CounterfactualTargetOracleRriScorerConfig,
         *,
         sample: EfmSnippetView,
-        target_sample: Any,
+        target_sample: "VinOfflineSample",
         target_row: TargetCandidateRow,
     ) -> None:
         self.config = config
@@ -177,7 +183,7 @@ class CounterfactualTargetOracleRriScorer:
             target_obb,
             margin_m=self.config.target_crop_margin_m,
         )
-        # TODO(fix): self._ocale must be typed correctly!
+
         target_rri = self._oracle.score(
             points_t=target_points_t,
             points_q=target_points_q,
@@ -186,18 +192,18 @@ class CounterfactualTargetOracleRriScorer:
             gt_faces=target_mesh_faces,
             extend=target_extent,
         )
-        metric_vectors = {
-            "rri": target_rri.rri,
-            "target_rri": target_rri.rri,
-            "target_pm_dist_before": target_rri.pm_dist_before,
-            "target_pm_dist_after": target_rri.pm_dist_after,
-            "target_pm_acc_before": target_rri.pm_acc_before,
-            "target_pm_comp_before": target_rri.pm_comp_before,
-            "target_pm_acc_after": target_rri.pm_acc_after,
-            "target_pm_comp_after": target_rri.pm_comp_after,
-            "target_candidate_support": target_lengths_q.to(device=device, dtype=dtype),
-            "target_current_support": torch.full_like(target_rri.rri, float(target_points_t.shape[0])),
-        }
+        metrics = CounterfactualMetricBundle(
+            rri=target_rri.rri,
+            target_rri=target_rri.rri,
+            target_pm_dist_before=target_rri.pm_dist_before,
+            target_pm_dist_after=target_rri.pm_dist_after,
+            target_pm_acc_before=target_rri.pm_acc_before,
+            target_pm_comp_before=target_rri.pm_comp_before,
+            target_pm_acc_after=target_rri.pm_acc_after,
+            target_pm_comp_after=target_rri.pm_comp_after,
+            target_candidate_support=target_lengths_q.to(device=device, dtype=dtype),
+            target_current_support=torch.full_like(target_rri.rri, float(target_points_t.shape[0])),
+        )
 
         if self.config.include_scene_rri:
             scene_rri = self._oracle.score(
@@ -208,22 +214,18 @@ class CounterfactualTargetOracleRriScorer:
                 gt_faces=mesh_faces,
                 extend=point_clouds.occupancy_bounds,
             )
-            metric_vectors.update(
-                {
-                    "scene_rri": scene_rri.rri,
-                    "scene_pm_dist_before": scene_rri.pm_dist_before,
-                    "scene_pm_dist_after": scene_rri.pm_dist_after,
-                    "scene_pm_acc_before": scene_rri.pm_acc_before,
-                    "scene_pm_comp_before": scene_rri.pm_comp_before,
-                    "scene_pm_acc_after": scene_rri.pm_acc_after,
-                    "scene_pm_comp_after": scene_rri.pm_comp_after,
-                }
-            )
+            metrics.scene_rri = scene_rri.rri
+            metrics.scene_pm_dist_before = scene_rri.pm_dist_before
+            metrics.scene_pm_dist_after = scene_rri.pm_dist_after
+            metrics.scene_pm_acc_before = scene_rri.pm_acc_before
+            metrics.scene_pm_comp_before = scene_rri.pm_comp_before
+            metrics.scene_pm_acc_after = scene_rri.pm_acc_after
+            metrics.scene_pm_comp_after = scene_rri.pm_comp_after
 
         return CounterfactualCandidateEvaluation(
             scores=target_rri.rri,
             score_label="target_rri",
-            metric_vectors=metric_vectors,
+            metrics=metrics,
             candidate_point_clouds_world=point_clouds.points,
             candidate_point_cloud_lengths=point_clouds.lengths,
         )

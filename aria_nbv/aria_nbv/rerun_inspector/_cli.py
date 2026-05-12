@@ -7,30 +7,13 @@ import socket
 import subprocess
 from pathlib import Path
 
-from aria_nbv.configs import PathConfig
 from aria_nbv.utils import Console
+from aria_nbv.utils.config_paths import resolve_config_toml_path
 
 from ._config import RerunOfflineInspectorConfig
 from ._loggers import RerunModule, RerunOfflineLogger
 from ._metadata import collect_visual_inventory, validate_required_inventory
 from ._sample import select_rerun_sample
-
-
-def _resolve_config_path(path: Path) -> Path:
-    """Resolve an inspector TOML path from shell-relative paths or config names."""
-
-    expanded = path.expanduser()
-    if expanded.is_absolute():
-        resolved = expanded.resolve()
-    elif expanded.exists():
-        resolved = expanded.resolve()
-    else:
-        resolved = PathConfig().resolve_config_toml_path(expanded, must_exist=True)
-    if resolved.suffix != ".toml":
-        raise ValueError(f"Config path must be a .toml file, got {resolved}.")
-    if not resolved.exists():
-        raise FileNotFoundError(f"Config file not found: {resolved}")
-    return resolved
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -279,7 +262,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = _build_parser()
     args = parser.parse_args(argv)
     _validate_viewer_args(parser, args)
-    config_path = _resolve_config_path(args.config_path)
+    config_path = resolve_config_toml_path(args.config_path)
     cfg = RerunOfflineInspectorConfig.from_toml(config_path)
     cfg = _apply_overrides(cfg, args)
     if args.rollout_store is not None:

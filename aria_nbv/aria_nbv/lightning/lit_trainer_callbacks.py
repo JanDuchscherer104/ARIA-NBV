@@ -20,7 +20,7 @@ from pytorch_lightning.callbacks import (
 )
 
 from ..configs import PathConfig
-from ..utils import BaseConfig, Console
+from ..utils import Console, TargetConfig
 
 if TYPE_CHECKING:
     from optuna import Trial
@@ -46,11 +46,11 @@ class CustomRichProgressBar(RichProgressBar):
         return items
 
 
-class TrainerCallbacksConfig(BaseConfig):
+class TrainerCallbacksConfig(TargetConfig[list[Callback]]):
     """Configuration for standard trainer callbacks."""
 
     @property
-    def target(self) -> type[list]:
+    def target_type(self) -> type[list]:
         """Factory target for `aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return list
 
@@ -142,7 +142,7 @@ class TrainerCallbacksConfig(BaseConfig):
                 raise ValueError("checkpoint_train_time_interval must be > 0 seconds when set.")
         return self
 
-    def setup_target(  # type: ignore[override]
+    def setup_target(
         self,
         model_name: str | None = None,
         *,

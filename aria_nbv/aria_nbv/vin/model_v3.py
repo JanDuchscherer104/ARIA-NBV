@@ -86,7 +86,7 @@ from ..data_handling._raw import (
 )
 from ..data_handling.vin_adapter import build_vin_snippet_view
 from ..rri_metrics.coral import CoralLayer, coral_expected_from_logits, coral_logits_to_prob
-from ..utils import BaseConfig
+from ..utils import TargetConfig
 from ._model_mixins import PoseFeatureGlobalContextMixin
 from .backbone_evl import EvlBackboneConfig
 from .pose_encoders import PoseEncoder, R6dLffPoseEncoderConfig
@@ -128,11 +128,11 @@ FIELD_CHANNELS_V3: tuple[str, ...] = (
 )
 
 
-class VinModelV3Config(BaseConfig):
+class VinModelV3Config(TargetConfig["VinModelV3"]):
     """Configuration for `VinModelV3` (streamlined one-step VIN baseline)."""
 
     @property
-    def target(self) -> type["VinModelV3"]:
+    def target_type(self) -> type["VinModelV3"]:
         """Factory target for `BaseConfig.setup_target` (config-as-factory)."""
         return VinModelV3
 

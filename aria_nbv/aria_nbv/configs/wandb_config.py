@@ -7,11 +7,11 @@ from typing import Any, Literal
 from pydantic import Field
 from pytorch_lightning.loggers import WandbLogger
 
-from ..utils import BaseConfig
+from ..utils import TargetConfig
 from .path_config import PathConfig
 
 
-class WandbConfig(BaseConfig):
+class WandbConfig(TargetConfig[WandbLogger]):
     """Wrapper around Lightning's `WandbLogger`.
 
     References:
@@ -19,7 +19,7 @@ class WandbConfig(BaseConfig):
     """
 
     @property
-    def target(self) -> type[WandbLogger]:
+    def target_type(self) -> type[WandbLogger]:
         return WandbLogger
 
     name: str | None = Field(default=None, description="Display name for the run.")

@@ -1,8 +1,8 @@
 """Tests for rollout dataset writer lineage helpers."""
 
-# ruff: noqa: S101, SLF001
+# ruff: noqa: S101
 
-from aria_nbv.data_handling._rollout_dataset_writer import _split_manifest_hash
+from aria_nbv.rollouts.dataset_writer import _RolloutSourceLineageBuilder
 
 
 def test_split_manifest_hash_tracks_source_rows_and_order() -> None:
@@ -29,9 +29,15 @@ def test_split_manifest_hash_tracks_source_rows_and_order() -> None:
         },
     ]
 
-    base = _split_manifest_hash(source_manifest_hash="source", split="train", records=rows)
-    reordered = _split_manifest_hash(source_manifest_hash="source", split="train", records=list(reversed(rows)))
-    changed_source = _split_manifest_hash(source_manifest_hash="other", split="train", records=rows)
+    base = _RolloutSourceLineageBuilder.build_split_manifest_hash(
+        source_manifest_hash="source", split="train", records=rows
+    )
+    reordered = _RolloutSourceLineageBuilder.build_split_manifest_hash(
+        source_manifest_hash="source", split="train", records=list(reversed(rows))
+    )
+    changed_source = _RolloutSourceLineageBuilder.build_split_manifest_hash(
+        source_manifest_hash="other", split="train", records=rows
+    )
 
     assert base != reordered
     assert base != changed_source

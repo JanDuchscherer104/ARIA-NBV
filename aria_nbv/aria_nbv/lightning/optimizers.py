@@ -8,14 +8,14 @@ from torch.nn import functional as functional
 from torch.optim import AdamW, Optimizer
 from torch.optim.lr_scheduler import OneCycleLR, ReduceLROnPlateau
 
-from ..utils import BaseConfig, Optimizable, optimizable_field
+from ..utils import Optimizable, TargetConfig, optimizable_field
 
 
-class AdamWConfig(BaseConfig):
+class AdamWConfig(TargetConfig[Optimizer]):
     """AdamW optimizer configuration for VIN."""
 
     @property
-    def target(self) -> type[Optimizer]:
+    def target_type(self) -> type[Optimizer]:
         """Factory target for `aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return AdamW
 
@@ -42,7 +42,7 @@ class AdamWConfig(BaseConfig):
     )
     """Weight decay for AdamW."""
 
-    def setup_target(self, params: list[Tensor]) -> Optimizer:  # type: ignore[override]
+    def setup_target(self, params: list[Tensor]) -> Optimizer:
         return AdamW(
             params=params,
             lr=self.learning_rate,
@@ -50,11 +50,11 @@ class AdamWConfig(BaseConfig):
         )
 
 
-class ReduceLrOnPlateauConfig(BaseConfig):
+class ReduceLrOnPlateauConfig(TargetConfig[ReduceLROnPlateau]):
     """ReduceLROnPlateau scheduler configuration."""
 
     @property
-    def target(self) -> type[ReduceLROnPlateau]:
+    def target_type(self) -> type[ReduceLROnPlateau]:
         """Factory target for `aria_nbv.utils.base_config.BaseConfig.setup_target`."""
         return ReduceLROnPlateau
 
@@ -91,7 +91,7 @@ class ReduceLrOnPlateauConfig(BaseConfig):
     frequency: int = 1
     """Scheduler frequency."""
 
-    def setup_target(  # type: ignore[override]
+    def setup_target(
         self,
         optimizer: Optimizer,
         *,
@@ -133,11 +133,11 @@ class ReduceLrOnPlateauConfig(BaseConfig):
         }
 
 
-class OneCycleSchedulerConfig(BaseConfig):
+class OneCycleSchedulerConfig(TargetConfig[OneCycleLR]):
     """OneCycle learning-rate scheduler configuration."""
 
     @property
-    def target(self) -> type[OneCycleLR]:
+    def target_type(self) -> type[OneCycleLR]:
         return OneCycleLR
 
     max_lr: float | None = optimizable_field(
@@ -191,7 +191,7 @@ class OneCycleSchedulerConfig(BaseConfig):
     anneal_strategy: Literal["cos", "linear"] = "cos"
     """Annealing strategy: 'cos' or 'linear'."""
 
-    def setup_target(  # type: ignore[override]
+    def setup_target(
         self,
         optimizer: Optimizer,
         *,

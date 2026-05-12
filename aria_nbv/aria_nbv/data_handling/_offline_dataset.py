@@ -33,7 +33,7 @@ from ..configs import PathConfig
 from ..pose_generation.types import CandidateSamplingResult
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rendering.candidate_pointclouds import CandidatePointClouds
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..vin.types import EvlBackboneOutput
 from ._offline_format import VinOfflineIndexRecord
 from ._offline_store import VinOfflineStoreConfig, VinOfflineStoreReader
@@ -165,11 +165,11 @@ VinOfflineDatasetItem = VinOfflineSample | VinOracleBatch
 """Item returned by `VinOfflineDataset` depending on `return_format`."""
 
 
-class VinOfflineDatasetConfig(BaseConfig):
+class VinOfflineDatasetConfig(TargetConfig["VinOfflineDataset"]):
     """Configuration for reading immutable VIN offline datasets."""
 
     @property
-    def target(self) -> type["VinOfflineDataset"]:
+    def target_type(self) -> type["VinOfflineDataset"]:
         """Return the dataset factory target."""
 
         return VinOfflineDataset

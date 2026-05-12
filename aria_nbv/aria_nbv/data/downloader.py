@@ -18,12 +18,12 @@ from pydantic_settings import (
 from tqdm import tqdm
 
 from ..configs import PathConfig
-from ..utils import BaseConfig, Console, Verbosity
+from ..utils import Console, TargetConfig, Verbosity
 from .download_stats import compute_downloaded_atek_stats
 from .metadata import ASEMetadata, SceneMetadata
 
 
-class ASEDownloaderConfig(BaseConfig):
+class ASEDownloaderConfig(TargetConfig["ASEDownloader"]):
     """Configuration for ASE downloader with CLI support.
 
     Supports two CLI modes (explicitly selected via positional `mode`):
@@ -39,7 +39,7 @@ class ASEDownloaderConfig(BaseConfig):
     """
 
     @property
-    def target(self) -> type[ASEDownloader]:
+    def target_type(self) -> type[ASEDownloader]:
         return ASEDownloader
 
     # CLI dispatch
