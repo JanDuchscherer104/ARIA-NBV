@@ -28,7 +28,7 @@ policy = "greedy_top_k"
 match_gt = true
 
 [candidate_mixture.base]
-num_samples = 60
+num_samples = 8
 oversample_factor = 1.0
 ensure_collision_free = true
 ensure_free_space = true
@@ -41,34 +41,34 @@ view_max_elevation_deg = 0.0
 
 [[candidate_mixture.components]]
 name = "target_point"
-count = 24
+count = 3
 strategy = "target_point"
 view_max_azimuth_deg = 0.0
 view_max_elevation_deg = 0.0
 
 [[candidate_mixture.components]]
 name = "radial_towards"
-count = 12
+count = 2
 strategy = "radial_towards"
 view_max_azimuth_deg = 0.0
 view_max_elevation_deg = 0.0
 
 [[candidate_mixture.components]]
 name = "radial_away"
-count = 12
+count = 2
 strategy = "radial_away"
 view_max_azimuth_deg = 0.0
 view_max_elevation_deg = 0.0
 
 [[candidate_mixture.components]]
 name = "forward_rig"
-count = 12
+count = 1
 strategy = "forward_rig"
 view_max_azimuth_deg = 0.0
 view_max_elevation_deg = 0.0
 
 [target_scorer]
-backprojection_stride = 2
+backprojection_stride = 12
 target_crop_margin_m = 0.05
 min_current_target_points = 1
 include_scene_rri = false
@@ -76,8 +76,8 @@ verbosity = 1
 
 [target_scorer.depth]
 device = "cpu"
-max_candidates_final = 60
-resolution_scale = 0.5
+max_candidates_final = 8
+resolution_scale = 0.2
 verbosity = 1
 
 [store]

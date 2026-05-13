@@ -130,50 +130,48 @@
 
 ARIA-NBV starts from the implemented seminar substrate: Project Aria / #ASE snippets with poses, calibration, semidense geometry, GT meshes, EFM3D/EVL scene encodings @projectaria-engel2023 @ProjectAria-ASE-2025 @EFM3D-straub2024, scene-level oracle #RRI labels, finite candidate tables, and a VIN-style one-step scorer inspired by quality-driven #NBV ranking @VIN-NBV-frahm2025. What is not yet thesis evidence is target-specific supervision, actor-visible target selection, trusted multi-step rollout data, or a learned finite-horizon value model or policy.
 
-The thesis tests whether this substrate can be upgraded from scene-level myopic scoring to _target-conditioned multi-step #NBV _. The core path is leakage-safe target-#RRI, an adapted target-conditioned myopic scorer over counterfactual state rows, oracle lookahead headroom, and residual dueling #symb.rl.qh over finite candidates. Online discrete interaction, continuous target-then-pose policies, and simulator-backed actor-critic remain bridge decisions after the finite-candidate result.
+The thesis tests whether this substrate can be upgraded from scene-level myopic scoring to target-conditioned multi-step #NBV. The core path is leakage-safe target-#RRI, an adapted target-conditioned myopic scorer over counterfactual state rows, oracle lookahead headroom, and residual dueling #symb.rl.qh over finite candidates. Online discrete interaction, continuous target-then-pose policies, and simulator-backed actor-critic are scaling and escalation research questions after the finite-candidate result, not substitutes for it.
 
-// TODO: How is qh actor style? also point to the question: How can we scale the offline learning approach? And do we get further improvement by on-policy online training + optionally by a continuous-control policy? The ~...~ sentence should be revised. don't point to a negative outcome!
 #claim-box([Thesis claim])[
-  Given an #ASE snippet, an actor-visible target record, a finite valid candidate table, and a fixed acquisition budget, ARIA-NBV should be able to measure target-specific point-mesh improvement, test whether oracle lookahead exposes headroom over a myopic model, and train actor-visible #symb.rl.qh to recover part of that headroom under oracle re-evaluation. ~A negative outcome is still informative when it localizes failure to target matching, one-step target signal, candidate support, or absence of measurable lookahead headroom.~
+  Given an #ASE snippet, an actor-visible target record, a finite valid candidate table, and a fixed horizon, ARIA-NBV should measure target-specific point-mesh improvement, test whether oracle lookahead exposes headroom over myopic selection, and train actor-visible #symb.rl.qh to recover that headroom under oracle re-evaluation. The learned value model induces a finite-action policy $pi_Q(s_t)=op("argmax", limits: #true)_(i in cal(A)_t) #symb.rl.qh_theta (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)$; RQ5/RQ6 then ask whether scale, online discrete interaction, or continuous target-then-pose control improves beyond this offline finite-candidate result.
 ]
 
+The quantitative success rule is conditional. If #symb.entity.lookahead_headroom is positive on the evaluated split, #symb.rl.qh must improve over the learned myopic target scorer under matched oracle re-evaluation. If headroom is near zero, the thesis reports a negative planning result for the evaluated candidate distribution, horizon, branch factor, target set, and split rather than treating architecture changes as a rescue path.
+
 = Formal Model and Research Questions
-// TODO: shouldn't we start with defining the MDP? Drop / demote aquisition budget for now!
 
-// TODO: what does #symb.obs.points_t represent more precisely? we need to denote that! do we mean just the point cloud or pointcloud with enriched features (i.e. S^2 frequency histogram!?)
-// TODO: what do we mean with target descriptor z_e, h_t... provide a bit more context!
-Let #symb.obs.points_t denote the accumulated actor-visible geometry proxy at decision step $t$, initialized from logged semidense reconstruction and updated during counterfactual rollouts. Let #symb.vin.field_evl_0 be the frozen root egocentric evidence field, #symb.entity.target_desc the actor-visible target descriptor, $bold(h)_t$ a compact selected-view history embedding, and $b_t$ the remaining acquisition budget. The actor-visible state is
-
+The first non-myopic experiment is a masked finite-horizon candidate-decision process, not a continuous-control problem. After fixing the root snippet, target, candidate generator, RNG seed, and transition rule, it can be treated as an MDP over valid candidate indices; without those fixtures it is better viewed as controlled counterfactual replay with stochastic candidate regeneration:
 
 $
-  #symb.rl.s_obs
+  cal(M)_"NBV"
   =
   (
-    #symb.obs.points_t,
-    #symb.vin.field_evl_0,
-    #symb.entity.target_desc,
-    bold(h)_t,
-    b_t
+    cal(S)^"hist",
+    cal(S)^"cf0",
+    cal(S)^"oracle",
+    {cal(A)_t},
+    T,
+    r_t^e,
+    gamma,
+    H
   ).
 $
 
-The privileged oracle state augments this with GT geometry and all-candidate oracle render/evaluation assets:
+The notation separates logged snippet state, counterfactual actor state, and privileged oracle state because the modalities available on the real egocentric trajectory differ from the geometry-only state that can be replayed after synthetic view choices. The raw historic state is the actor-visible state available on the logged #ASE trajectory:
 
-// TODO: why {#symb.ase.mesh_target}_(e in cal(E)) instead of #symb.ase.mesh_target_e given that its only one targe per state!?
 $
-  #symb.rl.s_oracle
+  #symb.rl.s_hist
   =
   (
-    #symb.rl.s_obs,
-    #symb.ase.mesh,
-    {#symb.ase.mesh_target}_(e in cal(E)),
-    {#symb.obs.points_cand_ti}_(i=1)^(N_q)
+    #symb.obs.img_rgb,
+    #symb.obs.pose,
+    #symb.obs.points_semi_t,
+    #symb.vin.field_evl_t,
+    #symb.entity.target_hyp_pred_t
   ).
 $
 
-// TODO(^1): we need to clarify s^cf0 vs s^obs - i.e. difference in state space for myopic single step w.r.t. efm snippet and geometry only encodings for the counterfactuals, and also concisely point out the issue of different stat spaces for historic ego traj and counterfactual rollouts!
-// TODO: don't use terms like V1 / V0 if not clearly defined!
-For the V1 main result, GT meshes, GT OBBs, GT crops, and all-candidate GT renders are label and evaluation assets only. V0 may use GT OBB input only as a sanity or upper-bound path, not as the main actor-visible result. The counterfactual state keeps root EVL fixed:
+The symbol #symb.obs.points_t is only the accumulated fused point-set proxy after selected logged or rendered views. It does not include the frozen EVL tensor, target descriptor, directional $bb(S)^2$ memory, candidate feature table, or learned history tokens. The minimal counterfactual actor state freezes the root EVL field and updates only the fused geometry proxy, selected-view history $bold(h)_t$, remaining horizon metadata $b_t$, target descriptor, candidates, masks, and reason codes:
 
 $
   #symb.rl.s_cf0
@@ -190,46 +188,65 @@ $
   ).
 $
 
-// TODO(^1): difference between historic trajectory and counterfactual views. clearly term counter factual state space - how should we optimally denote it given that it is a superset of the historic ego traj state space?
-// TODO: what do we mean by candidate rows? we mean the available candidate views at a given step t!
-The counterfactual state uses the same root EVL field but updates geometry, history, budget, candidate rows, masks, and reason metadata after selected views. The finite action set is the masked subset of candidate rows:
+The privileged oracle state augments this current counterfactual state with GT geometry, the matched target mesh, all-candidate rendered points, and oracle labels. It is used for label generation, upper-bound planning, and evaluation only:
+
+$
+  #symb.rl.s_oracle
+  =
+  (
+    #symb.rl.s_cf0,
+    #symb.ase.mesh,
+    #symb.ase.mesh_target,
+    {#symb.obs.points_cand_ti}_(i=1)^(N_q),
+    {r_t^e (i)}_(i=1)^(N_q)
+  ).
+$
+
+A candidate row is one available candidate view at step $t$: pose, view direction, provenance, support fields, validity mask, invalid reason, and candidate features. The action is the valid row index, and $q_t=q_(t,a_t)$ is the selected candidate pose:
 
 $
   #eqs.rl.finite_action_set
 $
-// TODO: what is meant by OBS-SEL, PRED-Q, GT-EVAL? We need to clarify these terms (also those must be gls entries!)
-// TODO: Invalidity is a constraint, not weak supervision in the baseline model!
-Invalidity is a constraint, not weak supervision: masks apply before argmax, temperature softmax, loss targets, and bootstrap maximization. True infeasibility or absent evaluation samples are hard-invalid; low immediate target support is a diagnostic unless no meaningful oracle/evaluation sample exists. V1 uses OBS-SEL, PRED-Q, and GT-EVAL. The actor-visible target-descriptor is
+
+Invalidity is a hard constraint in the baseline model, not weak supervision: masks apply before argmax, temperature softmax, loss targets, and bootstrap maximization. True infeasibility or absent evaluation samples are hard-invalid; low immediate target support is a diagnostic unless no meaningful oracle/evaluation sample exists.
+
+The target protocol has two named regimes. V0 uses GT OBB target input as a sanity or upper-bound path. V1 is the main actor-visible protocol: Observed Target Selection (OBS-SEL) chooses from observed or predicted target hypotheses; Predicted-Target Q (PRED-Q) conditions the one-step scorer or #symb.rl.qh on actor-visible target descriptors; Ground-Truth Target Evaluation (GT-EVAL) uses GT OBBs and target mesh crops only for labels, matching checks, and evaluation. The actor-visible descriptor is
 
 $
   #eqs.entity.target_descriptor
 $
-// TODO: elaborate on the different terms in the target descriptor! so list the symbols  together with the following NLP description / terms.
 
-It bundles observed or predicted OBB geometry, class, confidence, projected area, semidense support, EVL support, and relative pose. A compact actor-visible crop of spatial feature fields could be the first target-input ablation after this OBB-level path.
-// TODO: GT crops are selected sounds stupid. rather Target selection is based on ..., protocal-level matching also sounds sloppy!
-GT crops are selected only after protocol-level matching. In the match score, $kappa$ is class compatibility and $sigma$ is an observed-support compatibility term over projected area, semidense support, and EVL support:
+In this descriptor, $hat(bold(B))_e$ is observed or predicted OBB geometry; $hat(bold(y))_e$ is class probabilities or class embedding; $hat(p)_e$ is confidence; $A_e^"proj"$ is projected area; $n_e^"semi"$ and $n_e^"EVL"$ are semidense and EVL support counts; and $bold(T)_e^"rel"$ is relative target pose. A compact actor-visible crop of spatial feature fields inside $hat(bold(B))_e$ is the first target-input ablation after this OBB-level path.
+
+Target selection and target-to-GT matching are different operations. For training/root diversity, OBS-SEL may sample actor-visible target hypotheses by top-$K$ or temperature-softmax over selector scores:
+
+$
+  P(hat(e)_j | #symb.rl.s_hist)
+  =
+  (exp(beta u_(t,j)^"tar"))
+  /
+  (sum_(l in cal(E)_t^"obs") exp(beta u_(t,l)^"tar")).
+$
+
+After a target hypothesis $hat(e)$ is selected, GT-EVAL deterministically matches it to a GT target for labels and evaluation. In the match score, $kappa$ is class compatibility and $sigma$ is an observed-support compatibility term over projected area, semidense support, and EVL support:
 
 $
   #eqs.entity.target_match_score
 $
 
-// TODO: I don't quite understand this equation. Shouldn't we do temperature-softmax over the scores to allow for a greater variety?
 $
   #eqs.entity.target_match_selection
 $
 
-// TODO: Do we really need the target_match_acceptance predicate?
+Here $mu_1$ is the best match score, $mu_2$ the runner-up score, and $g_mu$ the top-1/top-2 gap. The validated target subset is defined by symbolic acceptance filters:
+
 $
   #eqs.entity.target_match_acceptance
 $
 
-Here $mu_1$ is the best match score, $mu_2$ the runner-up score, and $g_mu$ the top-1/top-2 gap. The binary predicate $a_"match"$ records whether the observed target is class-compatible, sufficiently supported, and unique under the matching protocol. Unmatched, unsupported, or ambiguous targets are target-invalid protocol cases rather than low target-#RRI examples.
+The numeric values of $tau_mu$, $tau_"gap"$, and $tau_"support"$ are advisor decisions. Unmatched, unsupported, or ambiguous targets are target-invalid protocol cases rather than low target-#RRI examples.
 
-// TODO: include link t the implementation / cite the cloud to mesh metric source!
-// TODO: also point out that #eqs.entity.target_error is pretty much target cropped RRI and cite vin paper!
-// TODO: point out that it's fixed horizon metrics!
-Let $C_e (#symb.obs.points_t)$ denote the oracle-only crop of accumulated points to the matched target region. The target error is the implemented point-mesh accuracy plus mesh-to-point completeness diagnostic on this target crop:
+Let $C_e (#symb.obs.points_t)$ denote the oracle-only crop of accumulated points to the matched target region. The target error is the target-cropped version of the VIN-NBV #RRI idea @VIN-NBV-frahm2025: point-to-mesh accuracy plus mesh-to-point completeness on the crop. In code, this is implemented by `OracleRRI.score` and `chamfer_point_mesh_batched` in `aria_nbv.rri_metrics`, with target cropping in `aria_nbv.pose_generation.target_counterfactuals`; PyTorch3D point-mesh face distances are the closest implementation reference for the low-level primitive. Completeness should be area-weighted or evaluated on uniformly sampled target-surface points so target-#RRI is not biased by mesh tessellation density.
 
 $
   #eqs.entity.target_error
@@ -251,11 +268,19 @@ $
   #eqs.entity.log_gain
 $
 
-// TODO: how did we find inspiration for #symb.entity.log_gain? We need a citation for this one!
-#symb.entity.endpoint_gain is the primary endpoint metric, #symb.entity.return_h is the rollout training return, and #symb.entity.log_gain is an ablation for scale sensitivity only. Since each immediate #RRI term is normalized by the current target error, the additive return is not algebraically identical to endpoint gain; the former supports value fitting and the latter supports fixed-budget interpretation.
+#symb.entity.endpoint_gain is the primary fixed-horizon endpoint metric, #symb.entity.return_h is the rollout training return, and #symb.entity.log_gain is only an algebraic scale-sensitivity ablation. Since each immediate #RRI term is normalized by the current target error, the additive return is not algebraically identical to endpoint gain; the former supports value fitting and the latter supports fixed-horizon interpretation.
 
-// TODO: clarify - what do we mean by *selecting* a candidate here? point out that for now softmax+temperature, greed -> potentially gumbel-top-k (get context from proposal or other sources)
-After selecting a valid candidate, the acquired geometry is added to the current geometry:
+Selecting a candidate means choosing a valid index $a_t=i in cal(A)_t$ and then rendering or retrieving only $q_(t,i)$ for the transition. Greedy selection chooses the highest current score; temperature-softmax widens rollout support over valid candidate scores; Gumbel-Top-$K$ is a later diversity method if temperature-softmax produces insufficient branch diversity:
+
+$
+  P(a_t = i | s_t)
+  =
+  (exp(beta ell_(t,i)))
+  /
+  (sum_(j in cal(A)_t) exp(beta ell_(t,j))).
+$
+
+After selection, the acquired geometry is added to the current geometry:
 
 
 $
@@ -265,44 +290,42 @@ $
   union
   #symb.obs.points_cand_ti.
 $
-// TODO: what do we mean by "mixture families" - also include a brief description of target generation - i.e. mixture of look-away, look-at,
-The next candidate table $cal(Q)_(t+1)$ is regenerated from the updated geometry, selected-view history, and remaining budget with the same logged mixture families, while #symb.vin.field_evl_0 remains fixed.
 
-// TODO: bad wording "In advisor-facing terms". "can target labels be measured without leakage" is stupid and vague.
-Six research questions form a dependency chain. In advisor-facing terms they reduce to three empirical dependencies: can target labels be measured without leakage, can actor-visible myopic scoring rank target-RRI candidates, and does non-myopic evidence justify and support #symb.rl.qh beyond that myopic control?
+The next candidate table $cal(Q)_(t+1)$ is regenerated from the updated geometry, selected-view history, and remaining horizon metadata with the same logged mixture families, while #symb.vin.field_evl_0 remains fixed. The first mixture vocabulary is target-point or look-at candidates from the actor-visible target record, radial-towards/radial-away shell candidates for local exploration, forward-rig candidates that preserve logged trajectory direction, and bounded yaw/pitch/roll jitter with per-row strategy provenance.
 
-// TODO: the RQs are too vague! Consider @questions.qmd and .agents/work/proposal-review/questions-drift-feedback-gpt55pro.md and clarify! Also not all contents of these "RQs" actually appears to be RQs in the meaning of the word - $grill-me! there again seemes to have been some regression w.r.t. our research questions!
+The research questions form a dependency chain: objective definition, target representation, candidate support, finite-horizon planning, scale, and optional online/continuous escalation.
+
 #figure(
   block(width: 100%)[
     #rq-node(
       [RQ1 Objective and metrics],
-      [learn target-conditioned finite-candidate multi-step #NBV and separate #symb.entity.endpoint_gain for endpoint evaluation, #symb.entity.return_h for value learning, and #symb.entity.log_gain as ablation],
+      [Can target-conditioned finite-candidate #NBV improve endpoint target quality under equal budget while training on additive target-#RRI returns?],
     )
     #rq-down()
     #rq-node(
       [RQ2 Target and matching],
-      [OBB plus support is the V1 baseline; actor-visible crop descriptors are the first ablation; #symb.entity.target_desc is matched to GT only for labels and evaluation],
+      [Can actor-visible target descriptors and deterministic GT matching produce leakage-safe target-#RRI labels at sufficient coverage?],
     )
     #rq-down()
     #rq-node(
       [RQ3 Candidate and rollout support],
-      [mixed target-centric plus exploration candidates, branch/beam knobs, and stochastic support traces define the finite action rows available to learning],
+      [Do mixed target-centric/exploration candidates and stochastic rollout support produce enough valid, diverse, non-myopic training data?],
     )
     #rq-down()
     #rq-node(
       [RQ4 Headroom and #symb.rl.qh],
-      [oracle lookahead optimizes cumulative target-#RRI, and actor-visible #symb.rl.qh must beat validated myopic scoring when headroom is positive],
+      [Does bounded oracle lookahead expose non-myopic headroom, and can masked residual dueling #symb.rl.qh recover it over the learned myopic scorer?],
       critical: true,
     )
     #rq-down()
     #rq-node(
       [RQ5 Scaling],
-      [scale ASE finite-candidate evidence first, then external mesh/oracle-compatible substrates and online discrete #symb.rl.qh if the supervision contract remains comparable],
+      [Which scaling path preserves mesh/oracle target-#RRI supervision beyond small trusted subsets?],
     )
     #rq-down()
     #rq-node(
       [RQ6 Online and continuous escalation],
-      [continuous target-then-pose actor-critic is time-permitting after online training evidence; imitation variants are deferred beyond planned #RRI + #symb.rl.qh],
+      [When, after finite-candidate evidence, is online discrete or continuous target-then-pose control justified?],
     )
   ],
   caption: [Causal RQ dependency chain. Later questions should not be used to rescue failed earlier contracts.],
@@ -322,17 +345,15 @@ $
 
 This section is subordinate to the oracle and headroom tests. The research object is the finite-candidate value model #symb.rl.qh, with a permutation-equivariant candidate-set encoder as the first implementation. The learned model must map each valid candidate row to a finite-horizon value using only actor-visible scene, target, selected-history, budget, candidate, mask, and reason-code features. It is evaluated by oracle re-scoring rather than by its own predicted values.
 
-The first implementation should not reuse the current seminar VIN checkpoint as-is. It should adapt the VIN-style one-step scorer to counterfactual rollout rows: #symb.obs.points_t, #symb.rl.candidate_table, #symb.rl.candidate_mask, selected history, directional memory, and budget all reflect the current rollout state. The scorer remains myopic and predicts immediate target-#RRI evidence for each candidate. The finite-horizon model is residual:
+The first implementation should not reuse the current seminar VIN checkpoint as-is. It should adapt the VIN-style one-step scorer to counterfactual rollout rows: #symb.obs.points_t, #symb.rl.candidate_table, #symb.rl.candidate_mask, selected history, directional memory, and budget all reflect the current rollout state. The scorer remains myopic and predicts immediate target-#RRI evidence for each candidate. #symb.rl.qh is residual around this calibrated myopic base, but the canonical handout definition is the dueling residual head below.
 
-$
-  #eqs.rl.qh_residual
-$
-
-Here $hat(r)_psi^e$ is the adapted target-conditioned one-step scorer, and $A_theta^H$ is the finite-horizon residual advantage for candidate row $i$. The residual advantage is initialized near zero, so the first #symb.rl.qh behaves like the myopic scorer until rollout evidence supports a planning correction. The CORAL interface is an explicit advisor decision: use calibrated ordinal output as the scalar myopic base, pass CORAL logits/probabilities as candidate features, or use both. The default handout contract is to retain ordinal probabilities as candidate features and optionally derive $hat(r)_psi^e$ by monotone calibration:
+The CORAL interface is an explicit advisor decision. The default handout contract uses CORAL threshold logits correctly: sigmoid outputs are cumulative threshold probabilities, not softmax class probabilities. They may be passed as uncertainty/ranking features, while the scalar base $hat(r)_psi^e$ is obtained by converting threshold probabilities into class marginals and taking an expected value over monotone bin representatives:
 
 $
   #eqs.rl.qh_coral_interface
 $
+
+Training is staged to preserve the residual interpretation: first train and calibrate $hat(r)_psi^e$, then freeze or slow-finetune it while fitting the residual #symb.rl.qh, and finally ablate whether end-to-end fine-tuning improves oracle-evaluated policy performance.
 
 The scene memory uses the frozen EVL field, accumulated actor-visible geometry, target support, and directional memory. The tensors $bold(V)(#symb.obs.points_t)$, $bold(V)_"dir"(#symb.obs.points_t)$, and $bold(V)_"target"(#symb.entity.target_desc)$ denote voxelized accumulated geometry, directional-observation channels, and target-support channels:
 
@@ -351,6 +372,26 @@ Candidate orientation and accumulated visibility are separate signals. The pose 
 $
   #eqs.features.candidate_pose_features
 $
+
+R6D+LFF encodes each candidate token independently. The default candidate token already includes relative pose to the target and selected-history summaries. Inspired by QCNet's query-centric relative encoding @zhou2023query, the first candidate-set interaction ablation adds target, selected-history, and other-candidate relations in candidate $i$'s local frame. Here $bold(c)_(t,i)$ and $bold(R)_(t,i)$ are the candidate camera center and orientation; $bold(p)_j$ and $bold(R)_j$ are a neighboring candidate, history, target, or scene-token representative point and orientation:
+
+$
+  #eqs.features.candidate_query_local_frame
+$
+
+The relative positional encodings are Fourier/MLP features over candidate-candidate, target-candidate, and history-candidate relations:
+
+$
+  #eqs.features.candidate_query_rpe
+$
+
+These pairwise features modulate attention keys and values rather than replacing candidate content features:
+
+$
+  #eqs.features.edge_conditioned_attention
+$
+
+This query-centric RPE and the R6D pose branch are pose-relation signals. The $bb(S)^2$ memory below is different: it summarizes which viewing directions have already observed a target-local cell and is therefore an accumulated visibility signal rather than a pairwise pose encoding.
 
 Accumulated visibility is a separate actor-visible directional memory on $bb(S)^2$. Let $bold(v)$ be a voxel, point cell, or target-local cell; $bold(c)_k$ the camera center selected at step $k$; and $w_k(bold(v))$ a visibility/support weight. The first implementation uses a second-moment directional memory:
 
@@ -374,6 +415,8 @@ $
   #eqs.features.direction_memory_sh
 $
 
+Directional-memory ablations should report endpoint #symb.entity.endpoint_gain and whether selected views increase angular diversity around the matched target crop, otherwise the memory is only an architectural feature rather than tested evidence.
+
 Each candidate row then receives pose, target-relative, frustum, belief-render, directional novelty, mask/reason, and history features. Here $bold(p)_(t,i)$ is pose/target context, $bold(g)_(t,i)$ is geometry/frustum context, $rho_(t,i)$ is the invalid-reason code, and $bold(H)_t$ is a learned selected-history token representation distinct from the horizon scalar $H$:
 
 $
@@ -388,30 +431,28 @@ $
   #eqs.features.candidate_row_features
 $
 
-Candidate reasoning must be permutation-equivariant; a Set Transformer candidate encoder is the first planned implementation @SetTransformer-lee2019:
+Candidate reasoning must be permutation-equivariant; a Set Transformer or masked self-attention candidate encoder is the first planned interaction model @SetTransformer-lee2019:
 
 $
   #eqs.features.qh_set_encoder
 $
 
-The first planned head is a dueling residual decomposition over valid actions @DuelingDQN-wang2016. $V_theta$ is shared scene-target-history value; $A_(theta,i)^H$ is candidate-specific finite-horizon advantage; the mean advantage is subtracted only over #symb.rl.action_set_t:
+No-interaction candidate MLP scoring and pooled DeepSets aggregation @DeepSets-zaheer2017 are required baselines before attributing gains to Set Transformer interaction or QCNet-style RPE.
+
+The first planned head is a dueling residual decomposition over valid actions @DuelingDQN-wang2016. $hat(r)_psi^e$ is the calibrated myopic base; $V_theta$ is shared scene-target-history value; $A_(theta,i)^H$ is candidate-specific finite-horizon advantage; and the mean advantage is subtracted only over #symb.rl.action_set_t. The decomposition fits finite candidate tables because many candidate views can be near-duplicates in value while still requiring candidate-specific corrections:
 
 $
   #eqs.rl.qh_dueling_residual
 $
 
-The thesis-safe order is therefore: target-conditioned one-step scorer on counterfactual rows, residual dueling #symb.rl.qh without a dense future-render branch, actor-visible belief-render branch, R6D pose features, $bb(S)^2$ moment directional memory, low-order spherical-harmonic memory, candidate-set interaction ablations, edge-conditioned spatial GNNs, distributional #symb.rl.qh heads, and privileged-teacher distillation. Dense GT candidate renders may be used only as privileged training signals in later ablations, never as V1 actor input. Point backbones, sparse convolutions, online discrete interaction, and continuous control are lower-priority scaling or escalation steps, not the first success criterion.
+The thesis-safe order is therefore: target-conditioned one-step scorer on counterfactual rows; residual dueling #symb.rl.qh without a dense future-render branch; R6D+LFF candidate pose features; $bb(S)^2$ moment directional memory as the default accumulated-visibility signal; required MLP/DeepSets/Set-Transformer candidate encoder comparisons; QCNet-style candidate-query RPE as the first interaction ablation; low-order spherical-harmonic or histogram directional-memory ablations; richer scene/cell attention; edge-conditioned spatial GNNs; distributional #symb.rl.qh heads; and privileged-teacher distillation. Dense GT candidate renders may be used only as privileged training signals in later ablations, never as V1 actor input. Point backbones, sparse convolutions, online discrete interaction, and continuous control are lower-priority scaling or escalation steps, not the first success criterion.
 
 = Learning Objective and Evaluation
 
-The planned value model remains finite-candidate and masked. The candidate token, candidate value, and selected action are
+The planned value model remains finite-candidate and masked. Candidate tokens are decoded only over valid actions:
 
 $
   #eqs.rl.qh_candidate_token
-$
-
-$
-  #eqs.rl.qh_candidate_value
 $
 
 $
@@ -434,9 +475,13 @@ $
   #eqs.rl.qh_loss
 $
 
+The one-step scorer is trained on all valid candidate rows with oracle immediate target-#RRI labels. The bootstrapped #symb.rl.qh backup is trained only on expanded transition rows for which the selected action, successor counterfactual state, successor candidate table, successor mask, and terminal flag are materialized. If all-candidate successor expansion is unavailable, non-expanded candidates contribute myopic supervision but not bootstrapped finite-horizon targets.
+
 Before #symb.rl.qh is interpreted as planning, the learned one-step target scorer must pass the myopic-control evidence gate: held-out ranking, oracle-evaluated model-selected rollouts, calibration and stage-shift diagnostics, and Rerun examples of representative successes and failures.
 
 All selected actions are re-evaluated by the oracle under identical roots, candidate budgets, and acquisition budgets. Equal budget means equal selected-view horizon $H$, candidate count $N_q$, candidate-generation distribution, and validity constraints; path length, runtime, and oracle evaluation count are reported separately. Coverage is reported against the full scale bar of 100 GT-mesh ASE scenes and 4,608 snippet windows, or against an explicit scene-level held-out subset if scale is blocked. Final splits are scene-level; sample-level splitting across snippets from the same scene is not valid for final claims.
+
+Policy comparisons are paired by root snippet, target, candidate seed, candidate budget, and horizon. Report mean, median, bootstrap confidence intervals, and per-scene win rates for #symb.entity.endpoint_gain, #symb.entity.return_h, and invalidity; aggregate tables should not hide scene-level failures behind global averages.
 
 #figure(
   table(
@@ -449,7 +494,7 @@ All selected actions are re-evaluated by the oracle under identical roots, candi
     [strategy provenance, path increments, scene/target support fields, validity masks, reason codes, with/without-mask rank metrics, policy metadata, seed metadata, shuffled-candidate evaluation],
 
     [Scale and storage],
-    [scene-level splits, no silent coverage changes, scale axes reported separately, Zarr asset references, LRZ/Slurm/DSS/resume/storage gates],
+    [scene-level splits, paired policy comparisons, bootstrap confidence intervals, per-scene win rates, no silent coverage changes, scale axes reported separately, Zarr asset references, LRZ/Slurm/DSS/resume/storage gates],
   ),
   caption: [Compact evidence contract: quality is reported both as ranking performance and as replay/candidate integrity.],
 ) <tab:advisor-evidence-contract>
@@ -469,7 +514,7 @@ All selected actions are re-evaluated by the oracle under identical roots, candi
 
 = What We Adopt From Prior Work
 
-The important transfers are narrow. VIN-NBV motivates point-mesh #RRI labels and one-step ranking; #ASE / Project Aria / EFM3D provide the egocentric mesh-supervised substrate; greedy/submodular sensing motivates measuring oracle headroom before claiming planning gain; CORAL, set models, and Double-Q provide the ranking, candidate-set, and backup machinery; Hestia contributes directional observability and target/look-at then pose factorization as a bridge, not as the thesis-core reward.
+The important transfers are narrow. VIN-NBV motivates point-mesh #RRI labels and one-step ranking; #ASE / Project Aria / EFM3D provide the egocentric mesh-supervised substrate; greedy/submodular sensing motivates measuring oracle headroom before claiming planning gain; CORAL, set models, QCNet, and Double-Q provide the ranking, candidate-set, relative-encoding, and backup machinery; SCONE and MACARONS contrast coverage/online exploration with ARIA-NBV's mesh-supervised target-#RRI objective; Hestia contributes directional observability and target/look-at then pose factorization as a bridge, not as the thesis-core reward.
 
 #figure(
   table(
@@ -487,9 +532,13 @@ The important transfers are narrow. VIN-NBV motivates point-mesh #RRI labels and
     [Diminishing-returns intuition; oracle-lookahead headroom as a required test.],
     [Do not assume non-myopic learning is useful without headroom.],
 
-    [CORAL, set models, Double-Q @CORAL-cao2019 @SetTransformer-lee2019 #cite(label("DBLP:journals/corr/MnihKSGAWR13")) @DoubleDQN-vanHasselt2015],
-    [Ordinal target scorer, permutation-equivariant candidate reasoning, masked fitted backups.],
-    [IQL/CQL/BCQ and distributional heads are later ablations.],
+    [CORAL, set models, QCNet, Double-Q @CORAL-cao2019 @SetTransformer-lee2019 @zhou2023query #cite(label("DBLP:journals/corr/MnihKSGAWR13")) @DoubleDQN-vanHasselt2015],
+    [Ordinal target scorer, MLP/DeepSets/Set Transformer candidate controls, query-centric relative-encoding ablation, masked fitted backups.],
+    [Do not adopt QCNet trajectory decoding, motion-forecasting losses, or streaming online claims as thesis core; IQL/CQL/BCQ and distributional heads are later ablations.],
+
+    [SCONE, MACARONS @SCONE-guedon2022 @MACARONS-guedon2023],
+    [Coverage/gain prediction over partial 3D evidence and online RGB-only coverage anticipation as contrast.],
+    [Do not replace mesh-supervised target-#RRI with surface coverage, occupancy, or RGB-only self-supervision.],
 
     [GenNBV, Hestia, 3DGS, SceneScript @GenNBV-chen2024 @Hestia-lu2026 @FisherRF-jiang2024 @SceneScript-avetisyan2024],
     [Continuous-control pressure, directional face/visibility memory, semantic/global-memory bridge ideas.],
@@ -538,6 +587,6 @@ $
   caption: [Typst-native thesis Gantt, 2026-04-29 to 2026-09-30. Red bars mark interpretation-critical evidence and submission freeze.],
 ) <fig:advisor-gantt>
 
-Three risks decide interpretation. If M1 geometry or oracle labels fail, the thesis becomes a validation and one-step-scoring study. If target matching is sparse or ambiguous, target #RRI is reported only on validated subsets with unmatched counts. If #symb.entity.lookahead_headroom is near zero, the thesis reports no measurable non-myopic headroom for the evaluated split, target set, horizon, branch factor, and candidate distribution, then uses scaling or online-discrete tests only if they preserve the same target-#RRI supervision contract.
+Three risks decide interpretation. If M1 geometry or oracle labels fail, the thesis becomes a validation and one-step-scoring study. If target matching is sparse or ambiguous, target #RRI is reported only on validated subsets with unmatched counts and the advisor-chosen acceptance filters. If #symb.entity.lookahead_headroom is near zero, the thesis reports no measurable non-myopic headroom for the evaluated split, target set, horizon, branch factor, and candidate distribution, then uses scaling or online-discrete tests only if they preserve the same target-#RRI supervision contract.
 
-Open advisor decisions are deliberately narrow: final scene-level split, target-match acceptance protocol, the CORAL-to-#symb.rl.qh interface, the first actor-visible crop descriptor ablation, final evidence scale, and whether any external or online scaling substrate preserves comparable mesh/oracle target-#RRI labels. These choices change the evidence bar, not the thesis spine.
+Open advisor decisions are deliberately narrow: final scene-level split; symbolic target-match thresholds $(tau_mu, tau_"gap", tau_"support")$; the CORAL-to-#symb.rl.qh interface; the first actor-visible crop descriptor ablation; final evidence scale and subset rule; and whether any external or online scaling substrate preserves comparable mesh/oracle target-#RRI labels. These choices change the evidence bar, not the thesis spine.

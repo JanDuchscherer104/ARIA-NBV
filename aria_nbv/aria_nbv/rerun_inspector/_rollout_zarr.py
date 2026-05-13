@@ -171,9 +171,9 @@ class RerunRolloutZarrLogger:
         for candidate in step.candidates:
             self._log_candidate_camera(candidate)
             self._log_candidate_center(candidate)
-        self.rr.log(ENTITY_ROLLOUT_VALID_COUNT, self.rr.Scalar(float(step.valid_candidate_count)))
-        self.rr.log(ENTITY_ROLLOUT_SELECTED_PROBABILITY, self.rr.Scalar(_finite_or_zero(step.selected_probability)))
-        self.rr.log(ENTITY_ROLLOUT_SELECTED_TARGET_RRI, self.rr.Scalar(_finite_or_zero(step.selected_target_rri)))
+        self.rr.log(ENTITY_ROLLOUT_VALID_COUNT, self.rr.Scalars(float(step.valid_candidate_count)))
+        self.rr.log(ENTITY_ROLLOUT_SELECTED_PROBABILITY, self.rr.Scalars(_finite_or_zero(step.selected_probability)))
+        self.rr.log(ENTITY_ROLLOUT_SELECTED_TARGET_RRI, self.rr.Scalars(_finite_or_zero(step.selected_target_rri)))
         self.rr.log(
             ENTITY_ROLLOUT_STEP_METADATA,
             self.rr.TextDocument(json.dumps(step.metadata, indent=2, sort_keys=True), media_type="application/json"),
@@ -579,13 +579,17 @@ def _rollout_target_hint(reader: RolloutZarrStoreReader, *, rows: SelectedRollou
     """Return a target dictionary value for optional OBB highlighting."""
 
     target_rows = reader.array("targets/target_row_id").astype(np.int64).reshape(-1)
-    target_ids = reader.array("targets/target_id").astype(np.int64).reshape(-1)
     target_row_id = int(reader.array("rollouts/target_row_id")[rows.rollout_index])
     names = _read_string_dictionary(reader, "dictionaries/target")
     matches = np.nonzero(target_rows == target_row_id)[0]
     if matches.size != 1:
         return str(target_row_id)
-    name_index = int(target_ids[int(matches[0])])
+    match_index = int(matches[0])
+    gt_target_ids = reader.array("targets/matched_gt_target_id").astype(np.int64).reshape(-1)
+    target_ids = reader.array("targets/target_id").astype(np.int64).reshape(-1)
+    name_index = int(gt_target_ids[match_index])
+    if name_index < 0:
+        name_index = int(target_ids[match_index])
     if 0 <= name_index < len(names):
         return names[name_index]
     return str(target_row_id)

@@ -97,6 +97,16 @@ class RolloutLineage:
     target_selection_score: float | None = None
     target_selection_probability: float | None = None
     target_selection_temperature: float | None = None
+    target_source: str | None = None
+    target_source_index: int | None = None
+    target_sem_id: int | None = None
+    target_inst_id: int | None = None
+    target_class_name: str | None = None
+    target_confidence: float | None = None
+    target_center_world: tuple[float, float, float] | None = None
+    target_extents: tuple[float, float, float] | None = None
+    target_pose_world_object: tuple[float, ...] | None = None
+    target_relative_pose_reference_object: tuple[float, ...] | None = None
     target_invalid_reason_bitset: int | None = None
     target_primary_invalid_reason: int | None = None
     target_reason_code_version: str | None = None

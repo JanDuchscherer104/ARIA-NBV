@@ -333,6 +333,18 @@ class RolloutDatasetWriter:
                 self.stats.skip("missing_snippet_or_mesh")
                 continue
             target_result = selector.select(sample)
+            if not target_result.selected_rows:
+                reason = (
+                    "no_ranked_targets"
+                    if target_result.rows and not target_result.ranked_rows
+                    else "no_actor_visible_targets"
+                )
+                self.stats.skip(reason)
+                self.console.warn(
+                    f"Skipping sample scene={sample.scene_id} snippet={sample.snippet_id}: {reason}; "
+                    f"source={target_result.source} warnings={target_result.warnings}",
+                )
+                continue
             for target_rank, target in enumerate(target_result.selected_rows):
                 self.stats.targets_selected += 1
                 if self.config.require_label_valid and not target.gt_label_valid:
@@ -461,6 +473,16 @@ class RolloutDatasetWriter:
                         target_selection_score=target.score,
                         target_selection_probability=target.selection_probability,
                         target_selection_temperature=self._target_selection_temperature(),
+                        target_source=target.source,
+                        target_source_index=target.source_index,
+                        target_sem_id=target.sem_id,
+                        target_inst_id=target.inst_id,
+                        target_class_name=target.class_name,
+                        target_confidence=target.confidence,
+                        target_center_world=target.center_world,
+                        target_extents=target.extents,
+                        target_pose_world_object=target.pose_world_object,
+                        target_relative_pose_reference_object=target.relative_pose_reference_object,
                         target_invalid_reason_bitset=target.invalid_reason_bitset,
                         target_primary_invalid_reason=target.primary_invalid_reason,
                         target_reason_code_version=TARGET_INVALID_REASON_VERSION,

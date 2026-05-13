@@ -41,15 +41,14 @@
       )
     $,
     target_match_acceptance: $
-      a_"match" (hat(e))
-      =
-      bb(1)[
-        op("class-ok") (hat(e), e^star)
-        and
-        op("supported") (hat(e), e^star)
-        and
-        op("unique") (mu_1, g_mu)
-      ]
+      a_"match" (hat(e)) = 1
+      op("iff")
+      cases(
+        kappa(hat(y)_(hat(e)), y_(e^star)) = 1,
+        mu_1 >= tau_mu,
+        g_mu >= tau_"gap",
+        n_(hat(e))^"semi" + n_(hat(e))^"EVL" >= tau_"support",
+      )
     $,
     target_error: $
       #symb.entity.target_error

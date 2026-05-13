@@ -4,25 +4,28 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Sequence
-from typing import Any, Protocol, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, cast
 
 import numpy as np
 import torch
 from efm3d.aria.aria_constants import ARIA_SNIPPET_T_WORLD_SNIPPET
-from efm3d.aria.camera import CameraTW
 from efm3d.aria.obb import ObbTW, transform_obbs
 from efm3d.aria.pose import PoseTW
 from efm3d.aria.tensor_wrapper import TensorWrapper
-from numpy.typing import DTypeLike, NDArray
-from pytorch3d.renderer.cameras import PerspectiveCameras
 from pytorch3d.transforms import matrix_to_quaternion
 from torch import Tensor
 
-from aria_nbv.data_handling import VinOfflineSample
-
 from ._colors import obb_semantic_rgba
-from ._config import RerunOfflineInspectorConfig
 from ._metadata import OfflineVisualInventory, build_sample_metadata_document
+
+if TYPE_CHECKING:
+    from efm3d.aria.camera import CameraTW
+    from numpy.typing import DTypeLike, NDArray
+    from pytorch3d.renderer.cameras import PerspectiveCameras
+
+    from aria_nbv.data_handling import VinOfflineSample
+
+    from ._config import RerunOfflineInspectorConfig
 
 RerunEntityFactory: TypeAlias = Callable[..., object]
 LineStripPayload: TypeAlias = list[Any]
@@ -276,7 +279,7 @@ def _subset_poses(poses_world_cam: PoseTW, indices: Sequence[int]) -> PoseTW:
         raise ValueError("PoseTW payload is empty; cannot subset candidate poses.")
     data = data.reshape(-1, 12)
     index = torch.as_tensor(list(indices), device=data.device, dtype=torch.long)
-    return cast(PoseTW, PoseTW(data.index_select(0, index)))
+    return cast("PoseTW", PoseTW(data.index_select(0, index)))
 
 
 def _subset_cameras(cameras: PerspectiveCameras, indices: Sequence[int]) -> PerspectiveCameras:
@@ -360,7 +363,7 @@ def _rgba(name: str, count: int) -> list[list[int]]:
         helper = getattr(colors_module, "rgba_u8", None)
         if callable(helper):
             colors = np.asarray(helper(name, count), dtype=np.uint8).reshape(count, 4).tolist()
-            return cast(list[list[int]], colors)
+            return cast("list[list[int]]", colors)
 
     palette = {
         "semidense": [170, 176, 190, 180],
@@ -636,7 +639,7 @@ def _transform_snippet_obbs_to_world(obbs: Tensor | ObbTW, t_world_snippet: Pose
 def _obb_line_strips(obbs: Tensor | ObbTW, *, t_world_snippet: PoseTW) -> list[list[list[float]]]:
     """Convert EFM snippet-frame OBB tensors into world-frame Rerun line strips."""
 
-    world_obbs = _transform_snippet_obbs_to_world(obbs, t_world_snippet)
+    world_obbs = _latest_valid_obb_slice(_transform_snippet_obbs_to_world(obbs, t_world_snippet))
     valid_mask = ~world_obbs.get_padding_mask().detach().cpu().numpy()
     if not np.any(valid_mask):
         return []
@@ -675,7 +678,7 @@ def _obb_boxes(
     transform is display-only for this recording.
     """
 
-    world_obbs = _transform_snippet_obbs_to_world(obbs, t_world_snippet)
+    world_obbs = _latest_valid_obb_slice(_transform_snippet_obbs_to_world(obbs, t_world_snippet))
     valid_mask_t = ~world_obbs.get_padding_mask().detach().cpu()
     if not bool(valid_mask_t.any()):
         empty = np.zeros((0, 3), dtype=np.float32)
@@ -713,6 +716,18 @@ def _obb_boxes(
     return centers, half_sizes, quats_xyzw, labels, sem_id.astype(np.int64), inst_id.astype(np.int64)
 
 
+def _latest_valid_obb_slice(obbs: ObbTW) -> ObbTW:
+    data = obbs.tensor().detach().cpu().to(dtype=torch.float32)
+    if data.ndim <= 2:
+        return ObbTW(data)
+    rows = data.reshape(-1, data.shape[-2], data.shape[-1])
+    for index in range(rows.shape[0] - 1, -1, -1):
+        candidate = ObbTW(rows[index])
+        if bool((~candidate.get_padding_mask()).any().item()):
+            return candidate
+    return ObbTW(rows[-1])
+
+
 def _obb_family(palette: str) -> str:
     """Return the visual OBB color family for a palette name."""
 
@@ -732,9 +747,11 @@ def _target_obb_mask(
     if target_hint is None:
         return mask
     normalized = str(target_hint).strip().lower()
-    if not normalized or "synthetic" in normalized:
+    if not normalized:
         return mask
     tokens = set(re.findall(r"[a-z0-9_:-]+", normalized))
+    hint_sem = _structured_target_value(normalized, key="sem")
+    hint_inst = _structured_target_value(normalized, key="inst")
     for index, label in enumerate(labels):
         label_lower = label.lower()
         sem = int(sem_ids[index])
@@ -742,16 +759,29 @@ def _target_obb_mask(
         exact_tokens = {
             str(sem),
             str(inst),
+            f"sem={sem}",
             f"sem_id={sem}",
             f"sem:{sem}",
             f"sem_id:{sem}",
+            f"inst={inst}",
             f"inst_id={inst}",
             f"inst:{inst}",
             f"inst_id:{inst}",
         }
-        if normalized in label_lower or tokens.intersection(exact_tokens):
+        structured_match = (
+            (hint_sem is not None or hint_inst is not None)
+            and (hint_sem is None or hint_sem == sem)
+            and (hint_inst is None or hint_inst == inst)
+        )
+        token_match = not (hint_sem is not None or hint_inst is not None) and bool(tokens.intersection(exact_tokens))
+        if normalized in label_lower or token_match or structured_match:
             mask[index] = True
     return mask
+
+
+def _structured_target_value(target_hint: str, *, key: str) -> int | None:
+    match = re.search(rf"(?:^|[:/_-]){key}(?:_id)?[=:](\d+)(?:$|[:/_-])", target_hint)
+    return None if match is None else int(match.group(1))
 
 
 def _gt_obb_semantic_names(sample: VinOfflineSample) -> Sequence[str] | None:
@@ -914,7 +944,7 @@ class RerunOfflineLogger:
         if rr_module is None:
             import rerun as imported_rr
 
-            self.rr = cast(RerunModule, imported_rr)
+            self.rr = cast("RerunModule", imported_rr)
         else:
             self.rr = rr_module
         self._metadata_warnings: list[str] = []
@@ -1157,8 +1187,8 @@ class RerunOfflineLogger:
         self.rr.log(
             ENTITY_MESH,
             self.rr.Mesh3D(
-                vertex_positions=verts,
-                triangle_indices=faces,
+                vertex_positions=np.asarray(verts, dtype=np.float32),
+                triangle_indices=np.asarray(faces, dtype=np.uint32),
                 albedo_factor=mesh_color,
             ),
             static=True,
@@ -1199,7 +1229,7 @@ class RerunOfflineLogger:
             "quaternions": quaternions,
             "colors": obb_semantic_rgba(
                 sem_ids,
-                family=cast(Any, _obb_family(palette)),
+                family=cast("Any", _obb_family(palette)),
                 target_mask=target_mask,
                 alpha=235 if palette == "gt_obbs" else 220,
             ).tolist(),

@@ -50,7 +50,7 @@ class _FakeRerun:
     Boxes3D = _Archetype
     AnyValues = _Archetype
     TextDocument = _Archetype
-    Scalar = _Archetype
+    Scalars = _Archetype
     Transform3D = _Archetype
     Mesh3D = _Archetype
     Image = _Archetype
@@ -457,8 +457,8 @@ def test_compact_modalities_log_to_stable_entity_paths() -> None:
     )  # noqa: E501, S101
 
 
-def test_mesh_logging_uses_configured_alpha() -> None:
-    """GT mesh transparency should be configurable without changing the palette RGB."""
+def test_mesh_logging_uses_mesh3d_with_configured_alpha() -> None:
+    """GT mesh should use Rerun Mesh3D with configured albedo alpha."""
 
     cfg = RerunOfflineInspectorConfig()
     cfg.geometry.mesh_alpha = 48
@@ -482,6 +482,13 @@ def test_mesh_logging_uses_configured_alpha() -> None:
     )
 
     assert ENTITY_MESH in fake.logged  # noqa: S101
+    np.testing.assert_array_equal(
+        fake.logged[ENTITY_MESH].kwargs["vertex_positions"], sample.efm_snippet_view.mesh_verts
+    )
+    np.testing.assert_array_equal(
+        fake.logged[ENTITY_MESH].kwargs["triangle_indices"],
+        sample.efm_snippet_view.mesh_faces.to(dtype=torch.uint32),
+    )
     assert fake.logged[ENTITY_MESH].kwargs["albedo_factor"] == [130, 138, 150, 48]  # noqa: S101
 
 
@@ -541,6 +548,34 @@ def test_obb_labels_include_class_names_and_unknown_fallback() -> None:
     assert detected_labels == ["class=<unknown> | sem_id=99 | inst_id=2 | prob=0.400"]  # noqa: S101
     assert "labels" not in fake.logged[ENTITY_DETECTED_OBBS].kwargs  # noqa: S101
     assert fake.logged[ENTITY_GT_OBBS].kwargs["colors"][0] == TARGET_OBB_RGBA.tolist()  # noqa: S101
+    assert fake.logged_extras[ENTITY_GT_OBBS][0].kwargs["obb_is_target"] == [True]  # noqa: S101
+
+
+def test_target_obb_hint_accepts_rollout_target_id_tokens() -> None:
+    """Rollout target ids use compact ``sem=...`` and ``inst=...`` tokens."""
+
+    cfg = RerunOfflineInspectorConfig()
+    cfg.primitives.log_semidense = False
+    cfg.primitives.log_reference_pose = False
+    cfg.primitives.log_candidate_frusta = False
+    cfg.primitives.log_candidate_centers = False
+    sample = _sample()
+    sample.gt_obbs = SimpleNamespace(
+        obbs=_obb_tensor(0.0, sem_id=28, inst_id=34, prob=1.0),
+        sem_id_to_name=[],
+    )
+    fake = _FakeRerun()
+
+    RerunOfflineLogger(
+        cfg,
+        rr_module=fake,
+        target_obb_hint="scene:snippet:gt_obbs:sem=28:inst=34:idx=0",
+    ).log_sample(
+        sample=sample,
+        inventory=OfflineVisualInventory(has_gt_obbs=True),
+        selection="sample_key=sample-0",
+    )
+
     assert fake.logged_extras[ENTITY_GT_OBBS][0].kwargs["obb_is_target"] == [True]  # noqa: S101
 
 

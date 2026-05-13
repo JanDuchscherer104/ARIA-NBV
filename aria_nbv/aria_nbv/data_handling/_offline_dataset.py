@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import torch
@@ -35,10 +35,12 @@ from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..vin.types import EvlBackboneOutput
-from ._offline_format import VinOfflineIndexRecord
 from ._offline_store import VinOfflineStoreConfig, VinOfflineStoreReader
 from ._raw import EfmSnippetLoader, EfmSnippetView, VinSnippetView
 from .vin_oracle_types import CompactObbBlock, CompactTrajectoryBlock, VinOracleBatch
+
+if TYPE_CHECKING:
+    from ._offline_format import VinOfflineIndexRecord
 
 
 @dataclass(slots=True)
@@ -648,13 +650,22 @@ class VinOfflineDataset(Dataset[VinOfflineDatasetItem]):
             return None
         return CandidatePointClouds.from_serializable(payload, device=self.config.map_location)
 
-    def _build_gt_obbs(self, record: VinOfflineIndexRecord) -> CompactObbBlock | None:
+    def _build_gt_obbs(
+        self,
+        record: VinOfflineIndexRecord,
+        efm_snippet: EfmSnippetView | None = None,
+    ) -> CompactObbBlock | None:
         """Decode compact GT OBB tensors when requested and available."""
 
         if not self.config.load_gt_obbs:
             return None
         if not self.manifest.materialized_blocks.gt_obbs:
-            return None
+            if efm_snippet is None or efm_snippet.obbs is None:
+                return None
+            return CompactObbBlock(
+                obbs=efm_snippet.obbs.obbs.tensor().detach().cpu().to(dtype=torch.float32),
+                sem_id_to_name=self._normalize_semantic_names(efm_snippet.efm.get("obbs/sem_id_to_name")),
+            )
         if not self._has_block("gt.obbs"):
             return None
         sem_id_to_name = self._normalize_semantic_names(
@@ -778,6 +789,7 @@ class VinOfflineDataset(Dataset[VinOfflineDatasetItem]):
 
         vin_snippet = self._build_vin_snippet(record)
         oracle = self._build_oracle(record)
+        efm_snippet = self._attach_efm_snippet(record, vin_snippet)
         sample = VinOfflineSample(
             sample_key=record.sample_key,
             scene_id=record.scene_id,
@@ -790,8 +802,8 @@ class VinOfflineDataset(Dataset[VinOfflineDatasetItem]):
             backbone_out=self._build_backbone(record),
             depths=self._build_depths(record, oracle),
             candidate_pcs=self._build_candidate_pcs(record),
-            efm_snippet_view=self._attach_efm_snippet(record, vin_snippet),
-            gt_obbs=self._build_gt_obbs(record),
+            efm_snippet_view=efm_snippet,
+            gt_obbs=self._build_gt_obbs(record, efm_snippet),
             detected_obbs=self._build_detected_obbs(record),
             trajectory=self._build_trajectory_metadata(record),
         )
@@ -823,7 +835,7 @@ class VinOfflineDataset(Dataset[VinOfflineDatasetItem]):
             scene_id=record.scene_id,
             snippet_id=record.snippet_id,
             backbone_out=self._build_backbone(record),
-            gt_obbs=self._build_gt_obbs(record),
+            gt_obbs=self._build_gt_obbs(record, efm_snippet),
             detected_obbs=self._build_detected_obbs(record),
             trajectory=self._build_trajectory_metadata(record),
         )

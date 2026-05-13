@@ -45,7 +45,7 @@ class _FakeRerun:
     Points3D = _Archetype
     LineStrips3D = _Archetype
     TextDocument = _Archetype
-    Scalar = _Archetype
+    Scalars = _Archetype
     Transform3D = _Archetype
     Pinhole = _Archetype
     AnyValues = _Archetype
@@ -203,8 +203,10 @@ def test_rollout_zarr_logger_logs_matching_static_context(tmp_path: Path, monkey
 
     monkeypatch.setattr(
         "aria_nbv.rerun_inspector._rollout_zarr.select_rerun_sample",
-        lambda **kwargs: calls.append(("select", kwargs["selection"]))
-        or type("Selected", (), {"sample": object(), "description": "scene_id=fixture_box snippet_id=smoke"})(),
+        lambda **kwargs: (
+            calls.append(("select", kwargs["selection"]))
+            or type("Selected", (), {"sample": object(), "description": "scene_id=fixture_box snippet_id=smoke"})()
+        ),
     )
     monkeypatch.setattr(
         "aria_nbv.rerun_inspector._rollout_zarr.collect_visual_inventory",
@@ -268,8 +270,10 @@ def test_rollout_zarr_logger_required_context_uses_rollout_lineage(
 
     monkeypatch.setattr(
         "aria_nbv.rerun_inspector._rollout_zarr.select_rerun_sample",
-        lambda **kwargs: calls.append(("select", kwargs["selection"]))
-        or type("Selected", (), {"sample": object(), "description": "split=val index=3"})(),
+        lambda **kwargs: (
+            calls.append(("select", kwargs["selection"]))
+            or type("Selected", (), {"sample": object(), "description": "split=val index=3"})()
+        ),
     )
     monkeypatch.setattr(
         "aria_nbv.rerun_inspector._rollout_zarr.collect_visual_inventory",

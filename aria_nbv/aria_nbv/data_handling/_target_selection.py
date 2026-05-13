@@ -198,6 +198,9 @@ class TargetSelectorConfig(TargetConfig["ActorVisibleTargetSelector"]):
     min_projected_area_pixels: float = Field(default=16.0, gt=0.0)
     """Minimum max projected 2D area over RGB/SLAM OBB boxes."""
 
+    require_projected_visibility: bool = False
+    """Whether missing 2D OBB boxes hard-mask otherwise supported 3D target records."""
+
     projected_area_normalizer_pixels: float = Field(default=240.0 * 240.0, gt=0.0)
     """Image-area normalizer used for projected-area fractions."""
 
@@ -364,8 +367,10 @@ class ActorVisibleTargetSelector:
             relative_pose = (reference_pose.inverse() @ obb.T_world_object).tensor().detach().cpu().reshape(-1)
             projected_area = _max_projected_area(obb)
             projected_fraction = projected_area / float(self.config.projected_area_normalizer_pixels)
-            visibility_score = max(
-                0.0, min(float(projected_fraction / self.config.projected_area_full_score_fraction), 1.0)
+            visibility_score = (
+                1.0
+                if projected_area <= 0.0 and not self.config.require_projected_visibility
+                else max(0.0, min(float(projected_fraction / self.config.projected_area_full_score_fraction), 1.0))
             )
             semidense_count = _points_inside_count(obb, semidense_points, scale=self.config.obb_support_scale)
             evl_count = _points_inside_count(
@@ -763,10 +768,11 @@ def _target_reason_bitset(
         bitset |= 1 << TARGET_INVALID_REASON_CODES["OBB_EXTENT_INVALID"]
     if confidence < config.min_confidence:
         bitset |= 1 << TARGET_INVALID_REASON_CODES["CONFIDENCE_TOO_LOW"]
-    if projected_area <= 0.0:
-        bitset |= 1 << TARGET_INVALID_REASON_CODES["NO_PROJECTED_VISIBILITY"]
-    if projected_area < config.min_projected_area_pixels:
-        bitset |= 1 << TARGET_INVALID_REASON_CODES["PROJECTED_AREA_TOO_SMALL"]
+    if config.require_projected_visibility:
+        if projected_area <= 0.0:
+            bitset |= 1 << TARGET_INVALID_REASON_CODES["NO_PROJECTED_VISIBILITY"]
+        if projected_area < config.min_projected_area_pixels:
+            bitset |= 1 << TARGET_INVALID_REASON_CODES["PROJECTED_AREA_TOO_SMALL"]
     if total_support < config.min_support_points:
         bitset |= 1 << TARGET_INVALID_REASON_CODES["TARGET_SUPPORT_TOO_LOW"]
     return (1 << TARGET_INVALID_REASON_CODES["VALID"]) if bitset == 0 else bitset

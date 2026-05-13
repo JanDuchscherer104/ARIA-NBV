@@ -194,6 +194,35 @@ def test_selector_falls_back_to_backbone_obbs_when_detected_block_is_missing() -
     assert len(result.selected_rows) == 1
 
 
+def test_backbone_obb_without_2d_projection_can_use_3d_support() -> None:
+    backbone = EvlBackboneOutput(
+        t_world_voxel=_poses([[0.0, 0.0, 0.0]]),
+        voxel_extent=torch.tensor([-1.0, 1.0, -1.0, 1.0, -1.0, 1.0], dtype=torch.float32),
+        obb_pred_viz=ObbTW(_obb_block([[0.0, 0.0, 0.0]], box_size=0.0).obbs),
+        obb_pred_sem_id_to_name=["chair"],
+        pts_world=torch.tensor([[[0.0, 0.0, 0.0]]], dtype=torch.float32),
+        counts=torch.ones((1, 1), dtype=torch.int64),
+    )
+    sample = _sample(backbone_out=backbone, points=[])
+
+    result = _selector(k=1).select(sample)
+
+    assert len(result.selected_rows) == 1
+    assert result.selected_rows[0].projected_area_pixels == 0.0
+
+
+def test_projected_visibility_can_still_be_required() -> None:
+    sample = _sample(
+        detected_obbs=_obb_block([[0.0, 0.0, 0.0]], box_size=0.0),
+        points=[[0.0, 0.0, 0.0]],
+    )
+
+    result = _selector(k=1, require_projected_visibility=True).select(sample)
+
+    assert result.selected_rows == ()
+    assert result.rows[0].primary_invalid_reason == TARGET_INVALID_REASON_CODES["NO_PROJECTED_VISIBILITY"]
+
+
 def test_selector_rejects_vin_oracle_batch_input() -> None:
     sample = _sample(detected_obbs=_obb_block([[0.0, 0.0, 0.0]]), points=[[0.0, 0.0, 0.0]])
 

@@ -18,3 +18,4 @@
 {"title":"Stochastic Beams and Where to Find Them: The Gumbel-Top-k Trick for Sampling Sequences Without Replacement","short_title":"Gumbel-Top-k","arxiv_id":"1903.06059","tex_dir":"arXiv-Gumbel-Top-k","pdf_file":"Gumbel-Top-k.pdf"}
 {"title":"Next Best Sense: Guiding Vision and Touch with FisherRF for 3D Gaussian Splatting","short_title":"Next Best Sense","arxiv_id":"2410.04680","tex_dir":"arXiv-Next-Best-Sense","pdf_file":"Next-Best-Sense.pdf"}
 {"title":"Finding Optimal Viewpoints for Monocular 3D Human Pose Estimation in Dynamic 3D Gaussian Splatting Space","short_title":"FOV-HPE","arxiv_id":"","tex_dir":"","pdf_file":"","doi":"10.1109/AVSS65446.2025.11149906","url":"https://doi.org/10.1109/AVSS65446.2025.11149906"}
+{"title":"Query-Centric Trajectory Prediction","short_title":"QCNet","arxiv_id":"2306.10508","tex_dir":"arXiv-QCNet","pdf_file":"QCNet.pdf","url":"https://github.com/ZikangZhou/QCNet"}

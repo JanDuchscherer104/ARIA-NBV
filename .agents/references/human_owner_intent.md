@@ -8,8 +8,9 @@ narrative, not current technical truth, and not a repeatable workflow.
 - Keep `.agents/` as the canonical agent scaffold.
 - Keep OMX optional; it is orchestration, not repo state.
 - Do not restore legacy cache migration or runtime training APIs.
-- Keep retained QMD docs renderable, but separate current thesis, past seminar,
-  and archived scratch material through folders and frontmatter.
+- Keep retained public QMD docs renderable, but move retired implementation
+  scratch/history to `.agents/archive/docs/` and expose current implementation
+  contracts through generated quartodoc/API docs.
 - Manage checkpoints and model artifacts through Git LFS when they are intended
   to be versioned.
 - Prefer compact ARIA-native skills over vendoring generic upstream skill sets.
@@ -24,7 +25,7 @@ narrative, not current technical truth, and not a repeatable workflow.
 | Current project truth | `.agents/memory/state/*.md` |
 | Actionable defect, todo, or refactor | `.agents/issues.toml`, `.agents/todos.toml`, or `.agents/refactors.toml` |
 | Public thesis narrative | `docs/` Quarto or `docs/typst/thesis/proposal.typ` |
-| Generated routing/context | ignored output under `docs/_generated/context/`, `.agents/generated/`, or `.agents/kg/generated/` with provenance |
+| Generated routing/context | ignored output under `docs/_generated/context/*.md`, `.agents/generated/`, or `.agents/kg/generated/` with provenance; tracked glossary/KG artifacts are regenerated through the glossary pipeline |
 
 Prefer the smallest surface that can preserve the instruction without creating
 a second source of truth.

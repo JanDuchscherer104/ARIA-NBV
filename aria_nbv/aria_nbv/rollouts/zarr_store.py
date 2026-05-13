@@ -672,6 +672,7 @@ def _build_dictionaries(records: list[RolloutZarrRecord]) -> dict[str, list[str]
         "target": sorted(target_values),
         "source_key": sorted(source_key_values),
         "source_shard": sorted(source_shard_values),
+        "target_source": sorted({lineage.target_source or "" for _record, _trajectory, lineage in items}),
         "policy": sorted(policy_values),
         "score_source": sorted(score_source_values),
         "split": sorted(split_values),
@@ -698,7 +699,7 @@ def _build_dictionaries(records: list[RolloutZarrRecord]) -> dict[str, list[str]
                 if value
             }
         ),
-        "class_name": ["unknown"],
+        "class_name": sorted({lineage.target_class_name or "unknown" for _record, _trajectory, lineage in items}),
         "target_match_status": sorted(target_match_status_values),
         "termination_reason": sorted(
             {
@@ -797,6 +798,116 @@ def _write_targets(
         np.asarray(
             [
                 _float_or_nan(target_rows[target_row_id].get("target_selection_temperature"))
+                for target_row_id in target_ids
+            ],
+            dtype=np.float32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_source_id",
+        np.asarray(
+            [
+                _dict_id(dictionaries["target_source"], str(target_rows[target_row_id].get("target_source") or ""))
+                for target_row_id in target_ids
+            ],
+            dtype=np.int32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_source_index",
+        np.asarray(
+            [
+                _int_or_default(target_rows[target_row_id].get("target_source_index"), default=-1)
+                for target_row_id in target_ids
+            ],
+            dtype=np.int32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_sem_id",
+        np.asarray(
+            [
+                _int_or_default(target_rows[target_row_id].get("target_sem_id"), default=-1)
+                for target_row_id in target_ids
+            ],
+            dtype=np.int32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_inst_id",
+        np.asarray(
+            [
+                _int_or_default(target_rows[target_row_id].get("target_inst_id"), default=-1)
+                for target_row_id in target_ids
+            ],
+            dtype=np.int32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_class_name_id",
+        np.asarray(
+            [
+                _dict_id(dictionaries["class_name"], str(target_rows[target_row_id].get("target_class_name") or ""))
+                for target_row_id in target_ids
+            ],
+            dtype=np.int32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_confidence",
+        np.asarray(
+            [_float_or_nan(target_rows[target_row_id].get("target_confidence")) for target_row_id in target_ids],
+            dtype=np.float32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_center_world",
+        np.asarray(
+            [
+                _fixed_float_vector(target_rows[target_row_id].get("target_center_world"), length=3)
+                for target_row_id in target_ids
+            ],
+            dtype=np.float32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_extents",
+        np.asarray(
+            [
+                _fixed_float_vector(target_rows[target_row_id].get("target_extents"), length=3)
+                for target_row_id in target_ids
+            ],
+            dtype=np.float32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_pose_world_object",
+        np.asarray(
+            [
+                _fixed_float_vector(target_rows[target_row_id].get("target_pose_world_object"), length=12)
+                for target_row_id in target_ids
+            ],
+            dtype=np.float32,
+        ),
+    )
+    _write_array(
+        group,
+        "target_relative_pose_reference_object",
+        np.asarray(
+            [
+                _fixed_float_vector(
+                    target_rows[target_row_id].get("target_relative_pose_reference_object"),
+                    length=12,
+                )
                 for target_row_id in target_ids
             ],
             dtype=np.float32,
@@ -935,6 +1046,16 @@ def _target_rows_from_records(records: list[RolloutZarrRecord]) -> dict[int, dic
             "target_selection_score": lineage.target_selection_score,
             "target_selection_probability": lineage.target_selection_probability,
             "target_selection_temperature": lineage.target_selection_temperature,
+            "target_source": lineage.target_source,
+            "target_source_index": lineage.target_source_index,
+            "target_sem_id": lineage.target_sem_id,
+            "target_inst_id": lineage.target_inst_id,
+            "target_class_name": lineage.target_class_name,
+            "target_confidence": lineage.target_confidence,
+            "target_center_world": lineage.target_center_world,
+            "target_extents": lineage.target_extents,
+            "target_pose_world_object": lineage.target_pose_world_object,
+            "target_relative_pose_reference_object": lineage.target_relative_pose_reference_object,
             "target_invalid_reason_bitset": lineage.target_invalid_reason_bitset,
             "target_primary_invalid_reason": lineage.target_primary_invalid_reason,
             "target_reason_code_version": lineage.target_reason_code_version,
@@ -1349,6 +1470,15 @@ def _accumulate_selected_metric(
 
 def _float_or_nan(value: Any) -> float:
     return float("nan") if value is None else float(value)
+
+
+def _fixed_float_vector(value: Any, *, length: int) -> np.ndarray:
+    if value is None:
+        return np.full((length,), np.nan, dtype=np.float32)
+    array = np.asarray(value, dtype=np.float32).reshape(-1)
+    if array.shape[0] != length:
+        return np.full((length,), np.nan, dtype=np.float32)
+    return array
 
 
 def _int_or_default(value: Any, *, default: int) -> int:

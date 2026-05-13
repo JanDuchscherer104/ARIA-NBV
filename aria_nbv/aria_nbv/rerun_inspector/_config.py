@@ -121,7 +121,7 @@ class RerunInspectorGeometryConfig(BaseConfig):
     trajectory_radius: float = Field(default=0.02, gt=0.0)
     """Line radius for trajectory paths."""
 
-    mesh_alpha: int = Field(default=51, ge=0, le=255)
+    mesh_alpha: int = Field(default=18, ge=0, le=255)
     """Alpha channel for the GT mesh albedo factor in ``[0, 255]``."""
 
 

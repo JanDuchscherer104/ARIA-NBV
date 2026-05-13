@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import importlib.util
+import importlib
 from typing import TYPE_CHECKING, Protocol
 
 import torch
@@ -120,7 +120,11 @@ class PathCollisionRule(RuleBase):
         super().__init__(config)
         self._pyembree_available = False
         if self.config.collision_backend == CollisionBackend.PYEMBREE:
-            self._pyembree_available = importlib.util.find_spec("trimesh.ray.ray_pyembree") is not None
+            try:
+                importlib.import_module("trimesh.ray.ray_pyembree")
+                self._pyembree_available = True
+            except ModuleNotFoundError:
+                self._pyembree_available = False
 
     def __call__(self, ctx: CandidateContext) -> None:
         """Reject candidates whose straight-line path from reference to center intersects the mesh."""

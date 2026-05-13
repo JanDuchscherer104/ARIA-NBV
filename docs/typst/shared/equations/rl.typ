@@ -106,13 +106,18 @@
       A_theta^H (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_table, bold(h)_t, i)
     $,
     qh_coral_interface: $
-      bold(c)_(t,i)^"CORAL"
-      =
-      op("softmax") (bold(o)_(t,i)^"CORAL"),
-      quad
-      hat(r)_psi^e
-      =
-      op("calib") (bold(c)_(t,i)^"CORAL")
+      p_(t,i,k)^"CORAL"
+      &=
+      sigma(o_(t,i,k)^"CORAL"),
+      quad k=0,dots,K-2 \
+      pi_(t,i,k)^"CORAL"
+      &=
+      p_(t,i,k-1)^"CORAL" - p_(t,i,k)^"CORAL",
+      quad p_(t,i,-1)^"CORAL"=1,
+      quad p_(t,i,K-1)^"CORAL"=0 \
+      hat(r)_psi^e (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)
+      &=
+      sum_(k=0)^(K - 1) pi_(t,i,k)^"CORAL" u_k
     $,
     qh_dueling_residual: $
       #symb.rl.qh_theta (#symb.rl.s_cf0, #symb.entity.target_desc, #symb.rl.candidate_qti)

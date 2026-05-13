@@ -25,24 +25,34 @@ def point_mesh_distance(points: torch.Tensor, verts: torch.Tensor, faces: torch.
     )
 
     device = points.device
+    dtype = points.dtype
     points = points.to(device)
     verts = verts.to(device)
     faces = faces.to(device)
 
-    tris = verts[faces]
-    points_first_idx = torch.zeros(1, device=device, dtype=torch.int64)
-    tris_first_idx = torch.zeros(1, device=device, dtype=torch.int64)
-    max_points = points.shape[0]
+    def _point_face_distance_on_current_device() -> torch.Tensor:
+        tris = verts[faces]
+        points_first_idx = torch.zeros(1, device=points.device, dtype=torch.int64)
+        tris_first_idx = torch.zeros(1, device=points.device, dtype=torch.int64)
+        return point_face_distance(
+            points,
+            points_first_idx,
+            tris,
+            tris_first_idx,
+            points.shape[0],
+            _DEFAULT_MIN_TRIANGLE_AREA,
+        )
 
-    dist_sq = point_face_distance(
-        points,
-        points_first_idx,
-        tris,
-        tris_first_idx,
-        max_points,
-        _DEFAULT_MIN_TRIANGLE_AREA,
-    )
-    return torch.sqrt(dist_sq)
+    try:
+        dist_sq = _point_face_distance_on_current_device()
+    except RuntimeError as exc:
+        if device.type != "cuda" or "Not compiled with GPU support" not in str(exc):
+            raise
+        points = points.cpu()
+        verts = verts.cpu()
+        faces = faces.cpu()
+        dist_sq = _point_face_distance_on_current_device()
+    return torch.sqrt(dist_sq).to(device=device, dtype=dtype)
 
 
 __all__ = ["point_mesh_distance"]

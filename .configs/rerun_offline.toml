@@ -33,7 +33,7 @@ semidense_radius        = 0.015
 candidate_center_radius = 0.035
 candidate_point_radius  = 0.01
 trajectory_radius       = 0.02
-mesh_alpha              = 51
+mesh_alpha              = 18
 
 [performance]
 max_semidense_points = 50000
