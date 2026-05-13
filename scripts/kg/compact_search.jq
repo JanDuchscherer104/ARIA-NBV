@@ -26,10 +26,14 @@ def paper_id_from_node_id:
   end;
 
 # One-token kind tag for the hit (mem / paper / code / doc / ?).
+# Hybrid mode emits raw Neo4j labels (Function/Module/Class/File) from the
+# vector-index query; the bundle path still emits CodeSymbol/CodeFile. Both
+# collapse to "code". MemorySurface joins ProjectMemory under "mem".
 def kind_tag:
   if (.kind // "") == "PaperSection" or (.kind // "") == "Paper" then "paper"
-  elif (.kind // "") == "ProjectMemory" then "mem"
+  elif (.kind // "") == "ProjectMemory" or (.kind // "") == "MemorySurface" then "mem"
   elif (.kind // "") == "CodeSymbol" or (.kind // "") == "CodeFile" then "code"
+  elif (.kind // "") == "Function" or (.kind // "") == "Module" or (.kind // "") == "Class" or (.kind // "") == "File" then "code"
   elif (.kind // "") == "Document" or (.kind // "") == "DocSection" then "doc"
   elif (.source_type // "") == "code" then "code"
   elif (.source_type // "") == "canonical_memory" or (.source_type // "") == "agent_backlog" then "mem"

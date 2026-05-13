@@ -85,16 +85,6 @@ bm25_k1 = 1.5
 bm25_b = 0.75
 lexical_weight = 0.4
 
-[synonyms]
-nbv = ["next best view", "next-best-view", "viewpoint", "view selection", "viewpoint selection"]
-view = ["viewpoint", "camera", "pose"]
-viewpoint = ["view", "camera pose", "view selection"]
-selection = ["ranking", "choice", "viewpoint", "next best view"]
-hierarchical = ["hierarchy", "coarse to fine", "target proposal", "pose realization"]
-rri = ["relative reconstruction improvement", "reconstruction improvement", "surface error gain"]
-obb = ["oriented bounding box", "object bounding box", "target box"]
-semidense = ["semi dense", "semi-dense", "point support"]
-
 [project]
 id = "aria-nbv"
 name = "ARIA-NBV"
