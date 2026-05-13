@@ -26,5 +26,36 @@
   },
   "general": {
     "defaultApprovalMode": "auto_edit"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "name": "check-agent-memory",
+            "type": "command",
+            "command": "make check-agent-memory >/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "exit",
+        "hooks": [
+          {
+            "name": "debrief-nudge",
+            "type": "command",
+            "command": "scripts/debrief_nudge.sh || true"
+          },
+          {
+            "name": "kg-auto-refresh",
+            "type": "command",
+            "command": "scripts/kg/auto_refresh.sh || true"
+          }
+        ]
+      }
+    ]
   }
 }

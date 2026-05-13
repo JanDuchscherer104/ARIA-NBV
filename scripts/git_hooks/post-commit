@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Universal KG-refresh backstop: triggers scripts/kg/auto_refresh.sh after
+# any commit that touches a watched bucket. Works regardless of which CLI
+# created the commit (Claude, Codex, Gemini, or a bare git invocation).
+#
+# Install with `make install-git-hooks` (which symlinks this file into
+# .git/hooks/post-commit).
+#
+# The hook returns immediately; auto_refresh.sh handles backgrounding so the
+# commit never blocks on KG refresh. If the Ollama tunnel is down or no
+# watched bucket changed, auto_refresh.sh exits silently.
+
+set -u
+
+REPO="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$REPO" || exit 0
+
+# Inspect the just-landed commit. Skip if it didn't touch any watched path.
+changed=$(git diff --name-only HEAD~ HEAD 2>/dev/null || git diff --name-only HEAD 2>/dev/null || true)
+
+case "$changed" in
+  *.agents/memory/state*|*.agents/issues.toml*|*.agents/todos.toml*|*.agents/refactors.toml*|*.agents/resolved.toml*|*docs/contents/*|*docs/typst/*|*docs/references.bib*|*aria_nbv/aria_nbv/*)
+    exec scripts/kg/auto_refresh.sh
+    ;;
+  *)
+    exit 0
+    ;;
+esac

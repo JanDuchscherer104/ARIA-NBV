@@ -4,7 +4,7 @@
 .PHONY: context-index context-get context-contracts context-modules context-classes context-functions
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory codex-transcripts
-.PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory new-debrief claude-skills
+.PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory new-debrief claude-skills install-git-hooks install-hooks
 .PHONY: memory-mine agents-db glossary kg-up kg-down kg-status kg-capabilities kg-ollama-check kg-search kg-route kg-claim-check kg-consolidate kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-load-bundle kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-semantic kg-refresh-full
 .PHONY: lrz-probe lrz-resources lrz-resources-gpu lrz-resources-cpu lrz-jobs lrz-dss-init lrz-container-shell lrz-sbatch-cpu lrz-sbatch-single-gpu lrz-sbatch-multigpu
 .PHONY: mermaid-lint
@@ -185,6 +185,30 @@ new-debrief: _check_python ## 🗺️ Scaffold a dated debrief under .agents/mem
 
 claude-skills: ## 🤖 Symlink .agents/skills/* into .claude/skills/ for Claude Code activation
 	@scripts/sync_claude_skills.sh
+
+install-git-hooks: ## 🪝 Symlink scripts/git_hooks/* into .git/hooks/ (KG auto-refresh on commit)
+	@GIT_DIR="$$(git rev-parse --git-dir 2>/dev/null)"; \
+	if [ -z "$$GIT_DIR" ]; then \
+		echo "$(RED)not inside a git tree$(NC)" >&2; exit 1; \
+	fi; \
+	mkdir -p "$$GIT_DIR/hooks"; \
+	for hook in scripts/git_hooks/*; do \
+		[ -f "$$hook" ] || continue; \
+		name=$$(basename "$$hook"); \
+		target="$$GIT_DIR/hooks/$$name"; \
+		ln -sf "$(CURDIR)/$$hook" "$$target" && \
+			echo "$(GREEN)linked $$target -> $(CURDIR)/$$hook$(NC)"; \
+	done
+
+install-hooks: install-git-hooks ## 🪝 Activate KG auto-refresh hooks for Claude, Codex, Gemini, and git
+	@if [ ! -f .codex/hooks.json ]; then \
+		cp .codex/hooks.example.json .codex/hooks.json && \
+			echo "$(GREEN)copied .codex/hooks.example.json -> .codex/hooks.json$(NC)"; \
+	else \
+		echo "$(YELLOW).codex/hooks.json already present; leaving as-is$(NC)"; \
+	fi
+	@echo "$(GREEN)Claude hooks: .claude/settings.json (tracked, auto-loaded)$(NC)"
+	@echo "$(GREEN)Gemini hooks: .gemini/settings.json (tracked, auto-loaded)$(NC)"
 
 agents-db: _check_python ## 🧠 Inspect or maintain .agents/issues,todos,refactors,resolved (set AGENTS_ARGS='validate')
 	@$(PYTHON_INTERPRETER) scripts/agents_db.py $(AGENTS_ARGS)
