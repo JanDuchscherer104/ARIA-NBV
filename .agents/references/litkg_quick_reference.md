@@ -43,10 +43,13 @@ fast path; reach for it first.
 
 Escape hatches when more detail is needed:
 
-- `KG_VERBOSE=1` -> full text rendering (top sources with snippets, all
-  backlog items with context, evidence spans, verification commands).
-- `KG_FORMAT=json` -> raw JSON for `jq`, downstream tools, or hook scripts.
-  This is what the compact filters consume internally.
+- `KG_VERBOSE=1` -> legacy full payload (passes `--full` to context-pack;
+  re-emits `evidence_spans`, `backend_status`, `action_plan`, `assumptions`,
+  `profile`, `budget_tokens`, `truncated`, `relevant_papers`, and the legacy
+  aliases `missing_leaves` / `missing_context_leaves`). Use only when
+  triaging or back-filling a tool that depends on the legacy shape.
+- `KG_FORMAT=json` -> lean JSON (the default agent-facing shape; suitable
+  for `jq` pipelines and hooks). Bulk and legacy fields are omitted.
 
 Examples:
 
@@ -82,12 +85,15 @@ spans before changing code or docs.
 - `suggested_next_action` as an object with `summary`, optional `skill`,
   optional `command`, and `why`
 - `verification_commands`
-- `missing_context`, plus legacy aliases `missing_leaves` and
-  `missing_context_leaves`
+- `missing_context` (canonical name; the legacy aliases `missing_leaves`
+  and `missing_context_leaves` are now emitted only under `KG_VERBOSE=1`)
 
-The following legacy fields remain for compatibility: `action_plan`,
-`evidence_spans`, `missing_leaves`, `missing_context_leaves`, `active_issues`,
-and `active_todos`.
+The following legacy fields are emitted only under `KG_VERBOSE=1`
+(equivalent to passing `--full` to `context-pack`): `profile`,
+`budget_tokens`, `truncated`, `assumptions`, `action_plan`,
+`evidence_spans`, `relevant_papers`, `missing_leaves`,
+`missing_context_leaves`, and `backend_status`. The default lean JSON
+payload for a trivial smoke task is ~42 KB (vs ~230 KB legacy).
 
 Authority is configured in `.configs/litkg.toml`. Current canonical memory,
 current thesis QMDs, thesis proposal Typst, and implementation code should rank

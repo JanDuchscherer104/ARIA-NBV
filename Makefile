@@ -245,18 +245,26 @@ kg-search: ## 📚 Search litkg-indexed code/docs/memory/backlog/literature (set
 			"$(KG_QUERY)" | jq -r -f scripts/kg/compact_search.jq; \
 	fi
 
-kg-route: ## 📚 Route a broad task through litkg evidence and backlog (set KG_TASK='...'; KG_VERBOSE=1 or KG_FORMAT=json for full payload)
+kg-route: ## 📚 Route a broad task through litkg evidence and backlog (set KG_TASK='...'; KG_VERBOSE=1 for legacy full payload, KG_FORMAT=json for lean JSON)
 	@if [ -z "$(strip $(KG_TASK))" ]; then \
 		echo "$(RED)KG_TASK is required, e.g. make kg-route KG_TASK='debug candidate pose frame mismatch'$(NC)"; \
 		exit 2; \
 	fi
-	@if [ "$(KG_VERBOSE)" = "1" ] || [ "$(KG_FORMAT)" = "json" ]; then \
+	@if [ "$(KG_VERBOSE)" = "1" ]; then \
 		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
 			--config "$(LITKG_CONFIG)" \
 			--repo-root "$(LITKG_REPO_ROOT)" \
 			--task "$(KG_TASK)" \
 			--profile "$(LITKG_PROFILE)" \
-			--format "$(KG_FORMAT)"; \
+			--format "$(or $(KG_FORMAT),json)" \
+			--full; \
+	elif [ "$(KG_FORMAT)" = "json" ]; then \
+		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
+			--config "$(LITKG_CONFIG)" \
+			--repo-root "$(LITKG_REPO_ROOT)" \
+			--task "$(KG_TASK)" \
+			--profile "$(LITKG_PROFILE)" \
+			--format json; \
 	else \
 		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
 			--config "$(LITKG_CONFIG)" \
@@ -266,18 +274,26 @@ kg-route: ## 📚 Route a broad task through litkg evidence and backlog (set KG_
 			--format json | jq -r -f scripts/kg/compact_route.jq; \
 	fi
 
-kg-claim-check: ## 📚 Claim-check against litkg context (set KG_CLAIM='...'; KG_VERBOSE=1 or KG_FORMAT=json for full payload)
+kg-claim-check: ## 📚 Claim-check against litkg context (set KG_CLAIM='...'; KG_VERBOSE=1 for legacy full payload, KG_FORMAT=json for lean JSON)
 	@if [ -z "$(strip $(KG_CLAIM))" ]; then \
 		echo "$(RED)KG_CLAIM is required, e.g. make kg-claim-check KG_CLAIM='ARIA-NBV is an end-to-end policy'$(NC)"; \
 		exit 2; \
 	fi
-	@if [ "$(KG_VERBOSE)" = "1" ] || [ "$(KG_FORMAT)" = "json" ]; then \
+	@if [ "$(KG_VERBOSE)" = "1" ]; then \
 		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
 			--config "$(LITKG_CONFIG)" \
 			--repo-root "$(LITKG_REPO_ROOT)" \
 			--task "claim-check: $(KG_CLAIM)" \
 			--profile "$(LITKG_PROFILE)" \
-			--format "$(KG_FORMAT)"; \
+			--format "$(or $(KG_FORMAT),json)" \
+			--full; \
+	elif [ "$(KG_FORMAT)" = "json" ]; then \
+		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
+			--config "$(LITKG_CONFIG)" \
+			--repo-root "$(LITKG_REPO_ROOT)" \
+			--task "claim-check: $(KG_CLAIM)" \
+			--profile "$(LITKG_PROFILE)" \
+			--format json; \
 	else \
 		cargo run --manifest-path "$(LITKG_MANIFEST)" -p litkg-cli -- context-pack \
 			--config "$(LITKG_CONFIG)" \
