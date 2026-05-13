@@ -696,3 +696,37 @@ references = ["repo:.agents/external/litkg-rs/crates/litkg-viewer/src/query.rs",
 implementation_notes = ["Approach 1 sketch: per-candidate scoring loop computes BM25 with two query-term sets (stemmed for non-code records, raw-token for code records). Cost: doubles per-record term lookup.", "Approach 2 sketch: extend SearchTokenizer with a stem_unless_identifier() helper that returns the raw token if it matches an identifier shape (contains uppercase mid-token, contains underscore-joined parts, has length>=8 with no vowel transition). Applies symmetrically to indexing and query.", "Add a regression test: query 'Vinformer' against a code record with title 'aria_nbv.vin.Vinformer' must rank top-1; query 'viewpoints' against a paper with body 'viewpoint planning' must still match."]
 acceptance = ["search_penalizes_generated_context_below_code_for_equal_matches still passes.", "A new test exercises a CamelCase identifier query and asserts the code record outranks any noisy stem-collapse match.", "DECISIONS.md updated with the chosen approach (1, 2, or 3) and a one-line rationale."]
 verification = ["cd .agents/external/litkg-rs && cargo test -p litkg-viewer query::tests::", "make kg-search KG_QUERY='Vinformer' KG_LIMIT=5 | head -20"]
+
+[[todo]]
+id = "todo-072"
+title = "Hybrid kg-search overrides paper authority to 'semantic' instead of consulting [authority_tiers]"
+description = "graph_hit_from_vector in crates/litkg-cli/src/main.rs hardcodes authority='semantic' for every Neo4j vector-index hit. Combined with todo-062's path-tier fix, this means paper:vin-nbv:section:* now carries authority=canonical in lexical-only mode but reverts to authority=semantic the moment hybrid kicks in. The verdict gate (context_pack.rs:1727 trusted_claim_source) accepts 'canonical|active|canonical_memory|docs' but not 'semantic', so the hybrid path is verdict-blind for paper hits."
+priority = "medium"
+status = "todo"
+labels = ["litkg", "hybrid-search", "authority", "ranking"]
+issue_ids = ["issue-025"]
+loc_min = 40
+loc_expected = 90
+loc_max = 200
+context = ["Confirmed 2026-05-13: with todo-062 landed, paper:vin-nbv:section:6 returns authority=canonical via --lexical-only and authority=semantic via hybrid (default).", "graph_hit_from_vector currently sets WeightedScore { score_lexical: 0.0, score_authority: 1.0, score_freshness: 1.0, authority: 'semantic'.into(), ... } regardless of node properties.", "The Neo4j vector-index query already returns repo_path/source_path in the row; the hybrid path could call calculate_weighted_score with that path and the configured authority_tiers to assign a real label."]
+references = ["repo:.agents/external/litkg-rs/crates/litkg-cli/src/main.rs", "repo:.agents/external/litkg-rs/crates/litkg-core/src/ranking.rs", "repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs"]
+implementation_notes = ["In graph_hit_from_vector, when hit.repo_path is set, build a Path and call calculate_weighted_score(path, hit.score, config.authority_tiers.as_ref()) instead of synthesizing a flat semantic label.", "Where repo_path is missing (e.g. CodeGraphContext nodes that may not carry it yet), keep the synthetic 'semantic' label as a fallback.", "Add a unit test that constructs a Neo4jVectorHit with repo_path='docs/contents/literature/vin_nbv.qmd' and asserts the converted GraphSearchHit.rank.authority == 'canonical' when authority_tiers tier the path at 1.5+."]
+acceptance = ["make kg-search KG_QUERY='VIN-NBV RRI' KG_FORMAT=json | jq '.results[] | select(.node_id|startswith(\"paper:vin-nbv\")) | .authority' returns 'canonical' in hybrid mode (not 'semantic').", "Lexical-only mode result for the same query is unchanged.", "An integration test in inspect_cli.rs covers the hybrid-side authority assignment."]
+verification = ["cd .agents/external/litkg-rs && cargo test", "make kg-search KG_QUERY='VIN-NBV RRI' KG_LIMIT=5 KG_FORMAT=json | jq '.results[] | select(.node_id|startswith(\"paper:\")) | {id: .node_id, authority}'"]
+
+[[todo]]
+id = "todo-073"
+title = "kg-claim-check verdict pipeline excludes curated literature even when tier is canonical"
+description = "todo-062 lifted literature notes (docs/contents/literature/**/*.qmd) to authority=canonical. The verdict gate at trusted_claim_source admits the canonical label. But top_sources at context_pack.rs:267 selects only 8 paths and ranks them via a freshness-weighted score that currently floors literature notes below thesis/code, so vin_nbv.qmd never surfaces in top_sources for a VIN-NBV-RRI claim and the verdict comes back unverifiable. Need either a literature-aware top_sources boost or a path-prefix bypass for canonical literature when the claim text matches the file's terms."
+priority = "medium"
+status = "todo"
+labels = ["litkg", "claim-check", "verdict", "ranking"]
+issue_ids = ["issue-025"]
+loc_min = 60
+loc_expected = 140
+loc_max = 300
+context = ["Confirmed 2026-05-13: docs/contents/literature/vin_nbv.qmd contains explicit RRI definition and VIN-NBV objective; reading it directly satisfies the claim. select_spans matches 'RRI', 'VIN-NBV', 'reconstruction' terms correctly. But top_sources for the claim returns only thesis/code/backlog files; literature is dropped before the verdict layer sees it.", "Likely cause: the freshness multiplier in calculate_weighted_score halves a file's score every 30 days. Curated literature notes are stable and may date back months, dropping their score_final below the [context_pack].min_top_source_score = 0.4 floor.", "Knob options: (a) bypass the freshness penalty for files matching docs/contents/literature/**/*.qmd; (b) raise their score floor; (c) admit canonical-tier files to top_sources regardless of freshness when claim terms overlap."]
+references = ["repo:.agents/external/litkg-rs/crates/litkg-core/src/context_pack.rs", "repo:.agents/external/litkg-rs/crates/litkg-core/src/ranking.rs", "repo:.configs/litkg.toml"]
+implementation_notes = ["Diagnose first: instrument top_sources to print the score breakdown for vin_nbv.qmd on the canonical RRI claim. Confirm whether freshness or term-overlap is the gating factor.", "Likely fix: in top_sources scoring, if a file matches authority=canonical AND has any term overlap with the claim, admit it even when freshness is low.", "Add a regression test: build a ContextPackRequest with task='claim-check: VIN-NBV introduces Relative Reconstruction Improvement' and assert at least one top_source path starts with 'docs/contents/literature/'."]
+acceptance = ["make kg-claim-check KG_CLAIM='VIN-NBV introduces Relative Reconstruction Improvement (RRI), an oracle label computed from point-mesh reconstruction-error reduction after adding a query view' KG_FORMAT=json returns verdict='supported' with confidence > 0.6.", "Top_sources for the same claim includes at least one docs/contents/literature/*.qmd entry."]
+verification = ["cd .agents/external/litkg-rs && cargo test", "make kg-claim-check KG_CLAIM='VIN-NBV introduces Relative Reconstruction Improvement (RRI)' KG_FORMAT=json | jq '{verdict, confidence, top_lit: [.top_sources[] | select(.path|test(\"contents/literature\"))]}'"]
